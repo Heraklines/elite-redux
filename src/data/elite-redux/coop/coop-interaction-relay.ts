@@ -35,6 +35,7 @@ import {
   COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
   COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopMarketProjectionKind,
+  parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 // #840: seq bands now live in the single-source-of-truth registry; re-exported below under their
 // historical names so no call site changes (pure re-export, zero behavior change).
@@ -44,12 +45,13 @@ import {
   COOP_CATCH_FULL_SEQ,
   COOP_DEX_SYNC_SEQ,
   COOP_FAINT_SWITCH_SEQ_BASE,
+  COOP_MAX_REACHABLE_COUNTER,
   COOP_REVIVAL_SEQ_BASE,
 } from "#data/elite-redux/coop/coop-seq-registry";
 // #829 malicious-peer hardening: the fixed 2-player seat map (pure, engine-free) resolves which role
 // OWNS a field slot, so a forged cross-owner faint-replacement pick can be dropped WITHOUT consulting
 // the engine - keeping the relay fully unit-testable headlessly (coop-session imports no game engine).
-import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
+import { coopInteractionOwnerSeat, coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopInteractionOutcome,
   CoopMessage,
@@ -279,6 +281,21 @@ export interface CoopV2AuthorityProposalWait {
   readonly acceptedKinds: readonly string[];
   readonly expectedRewardSurface?: CoopRewardSurfaceIdentity | null | undefined;
   readonly waiterToken: object;
+}
+
+/** One complete non-authority outcome proposal before it enters the ordered V2 log. */
+interface CoopV2InteractionOutcomeProposal {
+  readonly kind: string;
+  readonly outcome: CoopInteractionOutcome;
+  readonly operationId: string;
+}
+
+/** Exact authority waiter for a complete outcome proposal (Bargain is the first such surface). */
+interface CoopV2OutcomeProposalWaiter {
+  readonly expectedKind: string;
+  readonly expectedOperationId: string;
+  readonly authorityWait: CoopV2AuthorityProposalWait;
+  readonly finish: (proposal: CoopV2InteractionOutcomeProposal | null) => void;
 }
 
 /** Options for {@linkcode CoopInteractionRelay} (timer injection for tests). */
@@ -526,6 +543,12 @@ export class CoopInteractionRelay {
   private readonly outcomeInbox = new Map<number, CoopInteractionOutcome[]>();
   /** seq -> resolver for the in-flight {@linkcode awaitInteractionOutcome} (one at a time). */
   private readonly outcomePending = new Map<number, (res: CoopInteractionOutcome | null) => void>();
+  /** Complete non-authority outcomes are proposals, never legacy result FIFO entries, under V2. */
+  private readonly v2OutcomeProposalInbox = new Map<number, CoopV2InteractionOutcomeProposal[]>();
+  /** Address-exact authority waiter for one complete V2 outcome proposal. */
+  private readonly v2OutcomeProposalPending = new Map<number, CoopV2OutcomeProposalWaiter>();
+  /** Diagnostics age for complete V2 outcome proposal waits. */
+  private readonly v2OutcomeProposalPendingSince = new Map<number, number>();
 
   /** "seq:reroll" -> the owner's rolled reward-option list that arrived before its waiter (#633 Fix #2). */
   private readonly rewardOptionsInbox = new Map<string, CoopSerializedRewardOption[]>();
@@ -985,6 +1008,45 @@ export class CoopInteractionRelay {
   }
 
   /**
+   * NON-AUTHORITY OWNER: retainable complete-result proposal ingress for surfaces whose human action cannot
+   * be represented as a small choice tuple. The proposal is deliberately not delivered through the legacy
+   * outcome FIFO: only the authority's exact projected waiter can consume it, and only the later immutable
+   * INTERACTION_COMMIT can apply material or release progression.
+   */
+  sendInteractionOutcomeProposal(
+    seq: number,
+    kind: string,
+    outcome: CoopInteractionOutcome,
+    proposalOperationId: string,
+  ): void {
+    if (!this.isInteractionAuthorityV2()) {
+      this.sendInteractionOutcome(seq, kind, outcome);
+      return;
+    }
+    if (this.isLocalAuthority()) {
+      coopLog("v2-interaction", `suppressed authority outcome proposal seq=${seq} kind=${kind}`);
+      return;
+    }
+    if (!isValidOperationId(proposalOperationId)) {
+      const reason = `Authority V2 outcome proposal at seq=${seq} kind=${kind} is missing a valid immutable operation ID`;
+      coopWarn("v2-proposal", reason);
+      this.onV2AuthorityProposalViolation(reason);
+      return;
+    }
+    recordCoopUiRelayCarrier(
+      "interactionOutcome",
+      `seq=${seq} kind=${kind} outcome=${outcome.k} proposal=${proposalOperationId}`,
+    );
+    this.transport.send({
+      t: "interactionOutcome",
+      seq,
+      kind,
+      outcome,
+      cosmeticOperationId: proposalOperationId,
+    });
+  }
+
+  /**
    * Deliver a host-COMMITTED outcome from the durable carrier into the real outcome FIFO. The matching
    * legacy frame may arrive before or after the envelope; one credit on either side suppresses that echo,
    * so the phase observes exactly one presentation without caring which carrier won the race.
@@ -1076,6 +1138,94 @@ export class CoopInteractionRelay {
         resolve(res);
       };
       this.outcomePending.set(seq, finish);
+      cancelTimer = this.schedule(() => finish(null), timeoutMs);
+    });
+  }
+
+  /**
+   * AUTHORITY: consume one complete non-authority result proposal only while the global V2 control ledger
+   * proves the exact remote-owned presentation is live. Early arrival is buffered, identity retries are
+   * removed before this seam, and timeout revokes only this waiter generation.
+   */
+  awaitInteractionOutcomeProposal(
+    seq: number,
+    expectedKind: string,
+    expectedOperationId: string,
+    timeoutMs = this.timeoutMs,
+  ): Promise<CoopInteractionOutcome | null> {
+    if (!this.isInteractionAuthorityV2()) {
+      return this.awaitInteractionOutcome(seq, timeoutMs);
+    }
+    if (
+      !this.isLocalAuthority()
+      || expectedKind.length === 0
+      || !isValidOperationId(expectedOperationId)
+      || this.cancelledSeqs.has(seq)
+      || this.isAuthorityWaitCreationFrozen()
+    ) {
+      return Promise.resolve(null);
+    }
+    const controlOperationId = this.resolveV2AuthorityProposalControlId({
+      relaySequence: seq,
+      acceptedKinds: [expectedKind],
+      expectedRewardSurface: undefined,
+    });
+    if (controlOperationId == null) {
+      coopWarn("v2-interaction", `refused unaddressed outcome proposal wait seq=${seq} expected=${expectedKind}`);
+      return Promise.resolve(null);
+    }
+    const authorityWait = {
+      controlOperationId,
+      relaySequence: seq,
+      acceptedKinds: [expectedKind],
+      expectedRewardSurface: undefined,
+      waiterToken: {},
+    } satisfies CoopV2AuthorityProposalWait;
+    const queue = this.v2OutcomeProposalInbox.get(seq);
+    const bufferedIndex =
+      queue?.findIndex(proposal => proposal.kind === expectedKind && proposal.operationId === expectedOperationId)
+      ?? -1;
+    if (bufferedIndex >= 0) {
+      if (!this.projectV2AuthorityProposalWait(authorityWait)) {
+        return Promise.resolve(null);
+      }
+      const proposal = queue!.splice(bufferedIndex, 1)[0];
+      if (queue!.length === 0) {
+        this.v2OutcomeProposalInbox.delete(seq);
+      }
+      return Promise.resolve(proposal.outcome);
+    }
+    this.v2OutcomeProposalPending.get(seq)?.finish(null);
+    return new Promise<CoopInteractionOutcome | null>(resolve => {
+      let settled = false;
+      let cancelTimer: () => void = () => {};
+      const finish = (proposal: CoopV2InteractionOutcomeProposal | null): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelTimer();
+        if (this.v2OutcomeProposalPending.get(seq)?.finish === finish) {
+          this.v2OutcomeProposalPending.delete(seq);
+          this.v2OutcomeProposalPendingSince.delete(seq);
+        }
+        if (proposal == null) {
+          this.revokeV2AuthorityProposalWait(authorityWait);
+        }
+        resolve(proposal?.outcome ?? null);
+      };
+      const waiter = {
+        expectedKind,
+        expectedOperationId,
+        authorityWait,
+        finish,
+      } satisfies CoopV2OutcomeProposalWaiter;
+      this.v2OutcomeProposalPending.set(seq, waiter);
+      this.v2OutcomeProposalPendingSince.set(seq, Date.now());
+      if (!this.projectV2AuthorityProposalWait(authorityWait)) {
+        finish(null);
+        return;
+      }
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
     });
   }
@@ -1299,6 +1449,12 @@ export class CoopInteractionRelay {
         oldest = age;
       }
     }
+    for (const since of this.v2OutcomeProposalPendingSince.values()) {
+      const age = now - since;
+      if (age > oldest) {
+        oldest = age;
+      }
+    }
     return oldest;
   }
 
@@ -1325,6 +1481,13 @@ export class CoopInteractionRelay {
         seq,
         ageMs: now - since,
         expectedKinds: this.pending.get(seq)?.expectedKinds ?? [],
+      });
+    }
+    for (const [seq, since] of this.v2OutcomeProposalPendingSince) {
+      out.push({
+        seq,
+        ageMs: now - since,
+        expectedKinds: [this.v2OutcomeProposalPending.get(seq)?.expectedKind ?? "outcome"],
       });
     }
     return out.sort((a, b) => a.seq - b.seq);
@@ -1358,6 +1521,7 @@ export class CoopInteractionRelay {
     // snapshot is safe). Each map has its own resolver type, so keep them separate (no variance hack).
     const choiceFinishers: Array<(res: CoopInteractionChoice | null) => void> = [];
     const outcomeFinishers: Array<(res: CoopInteractionOutcome | null) => void> = [];
+    const outcomeProposalFinishers: Array<(res: CoopV2InteractionOutcomeProposal | null) => void> = [];
     const rewardFinishers: Array<(res: CoopSerializedRewardOption[] | null) => void> = [];
     for (const [seq, waiter] of this.pending) {
       if (shouldCancel(seq)) {
@@ -1369,6 +1533,12 @@ export class CoopInteractionRelay {
       if (shouldCancel(seq)) {
         seqs.add(seq);
         outcomeFinishers.push(finish);
+      }
+    }
+    for (const [seq, waiter] of this.v2OutcomeProposalPending) {
+      if (shouldCancel(seq)) {
+        seqs.add(seq);
+        outcomeProposalFinishers.push(waiter.finish);
       }
     }
     for (const [key, finish] of this.rewardOptionsPending) {
@@ -1395,6 +1565,9 @@ export class CoopInteractionRelay {
     for (const finish of outcomeFinishers) {
       finish(null);
     }
+    for (const finish of outcomeProposalFinishers) {
+      finish(null);
+    }
     for (const finish of rewardFinishers) {
       finish(null);
     }
@@ -1402,11 +1575,16 @@ export class CoopInteractionRelay {
 
   /** Stop listening and fail any in-flight waits. */
   dispose(): void {
-    const inFlight = this.pending.size + this.outcomePending.size + this.rewardOptionsPending.size;
+    const inFlight =
+      this.pending.size
+      + this.outcomePending.size
+      + this.v2OutcomeProposalPending.size
+      + this.rewardOptionsPending.size;
     if (inFlight > 0) {
       coopWarn(
         "relay",
-        `dispose() failing inFlightWaiters=${inFlight} (choice=${this.pending.size} outcome=${this.outcomePending.size} rewardOptions=${this.rewardOptionsPending.size}) -> all resolve null`,
+        `dispose() failing inFlightWaiters=${inFlight} (choice=${this.pending.size} outcome=${this.outcomePending.size} `
+          + `outcomeProposal=${this.v2OutcomeProposalPending.size} rewardOptions=${this.rewardOptionsPending.size}) -> all resolve null`,
       );
     } else {
       coopLog("relay", "dispose() (no in-flight waiters)");
@@ -1419,6 +1597,9 @@ export class CoopInteractionRelay {
     for (const finish of [...this.outcomePending.values()]) {
       finish(null);
     }
+    for (const waiter of [...this.v2OutcomeProposalPending.values()]) {
+      waiter.finish(null);
+    }
     for (const finish of [...this.rewardOptionsPending.values()]) {
       finish(null);
     }
@@ -1427,6 +1608,9 @@ export class CoopInteractionRelay {
     this.inbox.clear();
     this.outcomePending.clear();
     this.outcomeInbox.clear();
+    this.v2OutcomeProposalPending.clear();
+    this.v2OutcomeProposalPendingSince.clear();
+    this.v2OutcomeProposalInbox.clear();
     this.rawOutcomeCredits.clear();
     this.committedOutcomeCredits.clear();
     this.committedOutcomeOperationIds.clear();
@@ -1457,11 +1641,17 @@ export class CoopInteractionRelay {
    * await. Unlike {@linkcode dispose} the relay stays alive - the session continues after the boundary.
    */
   purgeBufferedArrivals(reason: string): void {
-    const buffered = this.inbox.size + this.outcomeInbox.size + this.rewardOptionsInbox.size + this.cancelledSeqs.size;
+    const buffered =
+      this.inbox.size
+      + this.outcomeInbox.size
+      + this.v2OutcomeProposalInbox.size
+      + this.rewardOptionsInbox.size
+      + this.cancelledSeqs.size;
     if (buffered > 0) {
       coopWarn(
         "relay",
         `purgeBufferedArrivals(${reason}) dropping inbox=${this.inbox.size} outcomeInbox=${this.outcomeInbox.size} `
+          + `outcomeProposalInbox=${this.v2OutcomeProposalInbox.size} `
           + `rewardOptionsInbox=${this.rewardOptionsInbox.size} cancelledSeqs=${this.cancelledSeqs.size} `
           + "(#861 stale-session isolation)",
       );
@@ -1470,6 +1660,7 @@ export class CoopInteractionRelay {
     }
     this.inbox.clear();
     this.outcomeInbox.clear();
+    this.v2OutcomeProposalInbox.clear();
     this.rawOutcomeCredits.clear();
     this.committedOutcomeCredits.clear();
     this.committedOutcomeOperationIds.clear();
@@ -1616,6 +1807,10 @@ export class CoopInteractionRelay {
     }
     if (msg.t === "interactionOutcome") {
       if (this.isInteractionAuthorityV2()) {
+        if (this.isLocalAuthority() && msg.kind === "bargain") {
+          this.handleV2BargainOutcomeProposal(msg);
+          return;
+        }
         if (!this.isLocalAuthority() && isCoopV2AccountMergeOutcome(msg.seq, msg.kind, msg.outcome)) {
           // `wireCoopDexSync` consumes this merge-only account telemetry directly from the transport.
           // Do not place it in a phase-local legacy outcome FIFO.
@@ -1884,6 +2079,85 @@ export class CoopInteractionRelay {
         `${source} interactionOutcome seq=${seq} -> BUFFER outcomeInbox depth=${queue.length} ${summarizeOutcome(outcome)}`,
       );
     }
+  }
+
+  /** Validate and identity-dedupe one remote Bargain result before exposing it to the exact authority wait. */
+  private handleV2BargainOutcomeProposal(msg: Extract<CoopMessage, { t: "interactionOutcome" }>): void {
+    const pinned = msg.seq - COOP_BARGAIN_SEQ_BASE;
+    const parsed =
+      isValidOperationId(msg.cosmeticOperationId) && msg.cosmeticOperationId != null
+        ? parseCoopOperationId(msg.cosmeticOperationId)
+        : null;
+    const presentationOperationId = this.resolveV2AuthorityProposalControlId({
+      relaySequence: msg.seq,
+      acceptedKinds: ["bargain"],
+      expectedRewardSurface: undefined,
+    });
+    const presentation = presentationOperationId == null ? null : parseCoopOperationId(presentationOperationId);
+    if (
+      !Number.isSafeInteger(pinned)
+      || pinned < 0
+      || pinned > COOP_MAX_REACHABLE_COUNTER
+      || msg.outcome.k !== "meResync"
+      || parsed?.kind !== "BARGAIN"
+      || parsed.pinnedSeq !== pinned
+      || parsed.owner !== coopInteractionOwnerSeat(pinned)
+      || presentation?.kind !== "BARGAIN_PRESENT"
+      || presentation.epoch !== parsed.epoch
+      || presentation.owner !== parsed.owner
+      || presentation.pinnedSeq !== parsed.pinnedSeq
+    ) {
+      const reason = `Authority V2 received an invalid Bargain outcome proposal at seq=${msg.seq}`;
+      coopWarn("v2-proposal", reason);
+      this.onV2AuthorityProposalViolation(reason);
+      return;
+    }
+    const fingerprint = JSON.stringify([msg.seq, msg.kind, msg.outcome]);
+    const admission = this.authorityProposalAdmissions.admit({
+      operationId: msg.cosmeticOperationId!,
+      fingerprint,
+    });
+    if (admission === "duplicate") {
+      coopLog(
+        "v2-proposal",
+        `dropped duplicate outcome proposal id=${msg.cosmeticOperationId} seq=${msg.seq} kind=${msg.kind}`,
+      );
+      return;
+    }
+    if (admission !== "admitted") {
+      const reason =
+        `Authority V2 outcome proposal ${msg.cosmeticOperationId} was refused (${admission})`
+        + ` at seq=${msg.seq} kind=${msg.kind}`;
+      coopWarn("v2-proposal", reason);
+      this.onV2AuthorityProposalViolation(reason);
+      return;
+    }
+    this.deliverV2OutcomeProposal(msg.seq, {
+      kind: msg.kind,
+      outcome: msg.outcome,
+      operationId: msg.cosmeticOperationId!,
+    });
+  }
+
+  /** Route an admitted complete-result proposal only to its exact authority waiter generation. */
+  private deliverV2OutcomeProposal(seq: number, proposal: CoopV2InteractionOutcomeProposal): void {
+    const waiter = this.v2OutcomeProposalPending.get(seq);
+    if (
+      waiter != null
+      && waiter.expectedKind === proposal.kind
+      && waiter.expectedOperationId === proposal.operationId
+    ) {
+      coopLog("v2-proposal", `deliver outcome proposal id=${proposal.operationId} seq=${seq} kind=${proposal.kind}`);
+      waiter.finish(proposal);
+      return;
+    }
+    const queue = this.v2OutcomeProposalInbox.get(seq) ?? [];
+    queue.push(proposal);
+    this.v2OutcomeProposalInbox.set(seq, queue);
+    coopLog(
+      "v2-proposal",
+      `buffer outcome proposal id=${proposal.operationId} seq=${seq} kind=${proposal.kind} depth=${queue.length}`,
+    );
   }
 }
 

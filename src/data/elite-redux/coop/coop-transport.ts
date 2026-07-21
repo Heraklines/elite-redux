@@ -1771,7 +1771,18 @@ export type CoopMessage =
    * to the SAME `seq` the choice relay uses (the interaction counter at screen-open), so a
    * mid-interaction reconcile can't move the watcher's await off the owner's send seq.
    */
-  | { t: "interactionOutcome"; seq: number; kind: string; outcome: CoopInteractionOutcome }
+  | {
+      t: "interactionOutcome";
+      seq: number;
+      kind: string;
+      outcome: CoopInteractionOutcome;
+      /**
+       * Exact non-mechanical V2 proposal identity. Present only when a non-authority interaction owner
+       * proposes one complete outcome for the authority to validate and commit. The field never allocates a
+       * revision or authorizes progression; the resulting INTERACTION_COMMIT remains the sole authority.
+       */
+      cosmeticOperationId?: string | undefined;
+    }
   /**
    * Owner -> watcher (#633, TRACK-2 Phase C): the owner's full-state CHECKSUM at a mystery-
    * encounter boundary (`seq` = the ME interaction seq). The ME pump replays the owner's

@@ -155,6 +155,62 @@ describe("co-op alternating-interaction relay (#633)", () => {
     await expect(legacyWait).resolves.toBeNull();
   });
 
+  it("admits a guest Bargain outcome only through its exact projected V2 proposal wait", async () => {
+    const { host, guest } = createLoopbackPair();
+    const timer: { fire?: () => void } = {};
+    const violations: string[] = [];
+    const projected: string[] = [];
+    const pinned = 1;
+    const seq = 7_500_000 + pinned;
+    const presentationOperationId = "1:1:BARGAIN_PRESENT:1";
+    const resultOperationId = "1:1:BARGAIN:1";
+    const outcome = { k: "meResync", authoritativeState: { marker: "complete" } } as never;
+    const owner = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+      onV2AuthorityProposalViolation: reason => violations.push(reason),
+    });
+    const authority = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+      isV2AuthorityProposalWaitRequired: () => true,
+      resolveV2AuthorityProposalControlId: wait =>
+        wait.relaySequence === seq && wait.acceptedKinds.length === 1 && wait.acceptedKinds[0] === "bargain"
+          ? presentationOperationId
+          : null,
+      projectV2AuthorityProposalWait: wait => {
+        projected.push(wait.controlOperationId);
+        return wait.controlOperationId === presentationOperationId;
+      },
+      onV2AuthorityProposalViolation: reason => violations.push(reason),
+      schedule: cb => {
+        timer.fire = cb;
+        return () => {};
+      },
+    });
+
+    const first = authority.awaitInteractionOutcomeProposal(seq, "bargain", resultOperationId, 1_000);
+    owner.sendInteractionOutcomeProposal(seq, "bargain", outcome, "2:1:BARGAIN:1");
+    owner.sendInteractionOutcomeProposal(seq, "bargain", outcome, resultOperationId);
+    await expect(first).resolves.toEqual(outcome);
+    expect(projected).toEqual([presentationOperationId]);
+    expect(violations).toEqual([`Authority V2 received an invalid Bargain outcome proposal at seq=${seq}`]);
+
+    // Retained lease retries carry the same stable ID. Admission removes them before they can satisfy a
+    // later waiter on the reused Bargain sequence.
+    owner.sendInteractionOutcomeProposal(seq, "bargain", outcome, resultOperationId);
+    const retryWait = authority.awaitInteractionOutcomeProposal(seq, "bargain", resultOperationId, 1);
+    let retrySettled = false;
+    void retryWait.then(() => {
+      retrySettled = true;
+    });
+    await Promise.resolve();
+    expect(retrySettled).toBe(false);
+    timer.fire?.();
+    await expect(retryWait).resolves.toBeNull();
+    expect(violations).toHaveLength(1);
+  });
+
   it("delivers a multi-pick shop sequence FIFO, ending in the leave sentinel", async () => {
     const { host, guest } = createLoopbackPair();
     const owner = new CoopInteractionRelay(host);

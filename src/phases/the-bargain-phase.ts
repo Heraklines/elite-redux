@@ -20,6 +20,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
   adoptBargainWatcherOutcome,
@@ -41,6 +42,7 @@ import {
   getCoopInteractionRelay,
   getCoopRuntime,
   isCoopV2InteractionHumanInputFrozen,
+  retainCoopV2InteractionProposal,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { erRecordSevenSinOutcome } from "#data/elite-redux/er-achievement-detection";
@@ -94,6 +96,8 @@ export class TheBargainPhase extends Phase {
   private coopBargainDone = false;
   /** Complete owner result captured before cosmetic teardown and published only after this phase ends. */
   private coopTerminalOutcome: ReturnType<typeof captureCoopMeOutcome> | null = null;
+  /** Guest-owned V2 terminal parked on this phase until the host-authored result returns. */
+  private coopAwaitingAuthorityOperationId: string | null = null;
   /** Exact runtime that owns this phase across its post-terminal publication callback. */
   private readonly coopOwningRuntime = getCoopRuntime();
 
@@ -177,7 +181,11 @@ export class TheBargainPhase extends Phase {
     advanceCoopInteractionForContinuation(this.coopBargainStart);
   }
 
-  /** Publish only after the exact owner phase ended, so its ordered successor never overlaps this UI. */
+  /**
+   * Publish only after the public Bargain input has closed. A guest V2 owner deliberately keeps this phase
+   * current as an ordered wait until the host-authored result returns; ending it at proposal-send time lets
+   * the ambient queue advance before Authority V2 owns the successor.
+   */
   private flushCoopBargainTerminal(): void {
     const outcome = this.coopTerminalOutcome;
     const controller = getCoopController();
@@ -185,6 +193,7 @@ export class TheBargainPhase extends Phase {
       return;
     }
     const operationId = coopBargainOperationId(this.coopBargainStart);
+    const seq = COOP_BARGAIN_SEQ_BASE + this.coopBargainStart;
     settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
     if (
       !commitBargainOwnerOutcome({
@@ -198,12 +207,99 @@ export class TheBargainPhase extends Phase {
       failCoopSharedSession(`Bargain terminal ${this.coopBargainStart} could not enter durable authority`);
       return;
     }
-    getCoopInteractionRelay()?.sendInteractionOutcome(
-      COOP_BARGAIN_SEQ_BASE + this.coopBargainStart,
-      "bargain",
-      outcome,
-    );
+    const relay = getCoopInteractionRelay();
+    const sendProposal = (): void => relay?.sendInteractionOutcomeProposal(seq, "bargain", outcome, operationId);
+    const runtime = this.coopOwningRuntime ?? getCoopRuntime();
+    if (controller.role === "guest" && isCoopV2InteractionCutoverActive(runtime?.durability)) {
+      if (relay == null || runtime == null) {
+        failCoopSharedSession(`Bargain proposal ${operationId} has no active V2 relay`);
+        return;
+      }
+      const lease = retainCoopV2InteractionProposal(
+        {
+          operationId,
+          fingerprint: JSON.stringify([seq, "bargain", outcome]),
+          resend: sendProposal,
+          onExhausted: exhaustedOperationId => {
+            if (getCoopRuntime() === runtime) {
+              failCoopSharedSession(`Bargain proposal ${exhaustedOperationId} exhausted before Authority V2 commit`);
+            }
+          },
+        },
+        runtime,
+      );
+      if (lease === "conflict" || lease === "invalid" || lease === "disposed") {
+        failCoopSharedSession(`Bargain proposal ${operationId} could not obtain a V2 resend lease (${lease})`);
+        return;
+      }
+      coopLog("v2-proposal", `retained Bargain outcome proposal id=${operationId} status=${lease}`);
+      this.coopAwaitAuthoritativeBargainResult(operationId, seq, runtime);
+      return;
+    }
+    relay?.sendInteractionOutcome(seq, "bargain", outcome);
     coopLog("reward", `bargain OWNER terminal: outcome blob sent (pinnedStart=${this.coopBargainStart})`);
+  }
+
+  /** Guest owner: hold the engine boundary until the exact committed result has materially applied. */
+  private coopAwaitAuthoritativeBargainResult(
+    operationId: string,
+    seq: number,
+    runtime: NonNullable<ReturnType<typeof getCoopRuntime>>,
+  ): void {
+    if (this.coopAwaitingAuthorityOperationId != null) {
+      if (this.coopAwaitingAuthorityOperationId !== operationId) {
+        failCoopSharedSession(
+          `Bargain proposal wait changed identity from ${this.coopAwaitingAuthorityOperationId} to ${operationId}`,
+        );
+      }
+      return;
+    }
+    this.coopAwaitingAuthorityOperationId = operationId;
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      failCoopSharedSession(`Bargain result ${operationId} has no live relay`);
+      return;
+    }
+    void (async () => {
+      const result = await relay.awaitInteractionOutcome(seq, COOP_BIOME_WAIT_MS);
+      if (getCoopRuntime() !== runtime || this.coopAwaitingAuthorityOperationId !== operationId) {
+        return;
+      }
+      if (result == null) {
+        runtime.durability?.reconnect();
+        failCoopSharedSession(`Bargain result ${operationId} was not recovered`);
+        return;
+      }
+      const committedOperationId = relay.consumeCommittedInteractionOutcomeOperationId(seq, result);
+      if (committedOperationId !== operationId || result.k !== "meResync") {
+        failCoopSharedSession(
+          `Bargain result ${operationId} returned the wrong committed address ${committedOperationId ?? "(missing)"}`,
+        );
+        return;
+      }
+      if (globalScene.phaseManager.getCurrentPhase() !== this) {
+        failCoopSharedSession(`Bargain result ${operationId} arrived after its ordered wait phase was replaced`);
+        return;
+      }
+      this.coopAwaitingAuthorityOperationId = null;
+      coopLog("v2-proposal", `Bargain result ${operationId} materially applied; releasing ordered wait`);
+      super.end();
+      settleCoopV2InteractionOperation(operationId, runtime);
+    })();
+  }
+
+  /** Close locally only when no host-authored V2 result still owns this phase's successor. */
+  private closeCoopBargainOwnerTerminal(): void {
+    const runtime = this.coopOwningRuntime ?? getCoopRuntime();
+    const controller = getCoopController();
+    const parkForAuthority =
+      this.coopTerminalOutcome != null
+      && controller?.role === "guest"
+      && isCoopV2InteractionCutoverActive(runtime?.durability);
+    if (!parkForAuthority) {
+      super.end();
+    }
+    this.flushCoopBargainTerminal();
   }
 
   /** Co-op WATCHER (#795): never opens the bargain; adopts the owner's outcome verbatim. */
@@ -218,7 +314,12 @@ export class TheBargainPhase extends Phase {
     const outcome =
       relay == null
         ? null
-        : await relay.awaitInteractionOutcome(COOP_BARGAIN_SEQ_BASE + this.coopBargainStart, COOP_BIOME_WAIT_MS);
+        : await relay.awaitInteractionOutcomeProposal(
+            COOP_BARGAIN_SEQ_BASE + this.coopBargainStart,
+            "bargain",
+            coopBargainOperationId(this.coopBargainStart),
+            COOP_BIOME_WAIT_MS,
+          );
     const controller = getCoopController();
     const adoption =
       controller == null
@@ -322,11 +423,10 @@ export class TheBargainPhase extends Phase {
   private runWithSins(sins: BargainSinKey[]): void {
     if (sins.length === 0) {
       this.coopBargainTerminal();
-      this.end();
       if (this.coopV2ControlOperationId != null) {
         settleCoopV2InteractionOperation(this.coopV2ControlOperationId);
       }
-      this.flushCoopBargainTerminal();
+      this.closeCoopBargainOwnerTerminal();
       return;
     }
     this.openScreen(sins);
@@ -385,8 +485,7 @@ export class TheBargainPhase extends Phase {
       // catalog-v2 (#900) READ_THE_FINE_PRINT: carry an "accepted the bargain" flag to the run victory.
       erAchvRun().bargainAccepted = true;
       this.coopBargainTerminal();
-      this.end();
-      this.flushCoopBargainTerminal();
+      this.closeCoopBargainOwnerTerminal();
       return;
     }
     // Backed out before any effect - reopen the choices so the player can pick again.
@@ -407,8 +506,7 @@ export class TheBargainPhase extends Phase {
     await this.giratina(`${ns}:option.leave.line1`);
     await this.narrate(`${ns}:option.leave.line2`);
     await this.giratina(`${ns}:option.leave.line3`);
-    this.end();
-    this.flushCoopBargainTerminal();
+    this.closeCoopBargainOwnerTerminal();
   }
 
   /**

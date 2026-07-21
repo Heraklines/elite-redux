@@ -4900,9 +4900,10 @@ function coopV2AuthorityProposalWaitSpec(
         acceptedKinds: COOP_ABILITY_CHOICE_KINDS,
       };
     case "bargain":
-      // Bargain still publishes one comprehensive terminal outcome rather than a relay choice. It must
-      // acquire a V2-native operation-proposal lease before remote ownership can use this proof path.
-      return null;
+      return {
+        relaySequence: COOP_BARGAIN_SEQ_BASE + plan.pinned,
+        acceptedKinds: ["bargain"],
+      };
     case "biome":
       return parsed?.kind === "BIOME_PICK"
         ? { relaySequence: parsed.pinnedSeq, acceptedKinds: COOP_BIOME_PICK_CHOICE_KINDS }
@@ -8482,14 +8483,17 @@ function materializeCoopBargainOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
   ) {
     return false;
   }
-  // A guest-owned Bargain already closed its local owner phase after sending the proposal. It still adopts
-  // the host's final image above, but it has no watcher waiter to wake. A host-owned Bargain wakes the guest
-  // watcher only after DATA is real, and the proof credit tells that phase not to apply the image twice.
-  if (op.owner !== runtime.controller.localSeatId) {
-    armCoopBargainJournalMaterialization(op.id);
+  // Only the non-authority replica owns a phase-local result waiter. A host-owned Bargain wakes its guest
+  // watcher with an apply-proof credit; a guest-owned Bargain wakes the guest owner's ordered wait so it can
+  // end only after this host-authored image is real. The authority already consumed the proposal directly.
+  if (runtime.controller.authorityRole !== "authority") {
+    if (op.owner !== runtime.controller.localSeatId) {
+      armCoopBargainJournalMaterialization(op.id);
+    }
     runtime.interactionRelay.materializeCommittedInteractionOutcome(
       COOP_BARGAIN_SEQ_BASE + parsed.pinnedSeq,
       payload.outcome,
+      op.id,
     );
   }
   return true;

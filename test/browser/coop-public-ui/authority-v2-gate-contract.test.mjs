@@ -71,6 +71,7 @@ const interactionRelay = readFileSync(new URL("src/data/elite-redux/coop/coop-in
 const rewardOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-reward-operation.ts", root), "utf8");
 const biomeOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-biome-operation.ts", root), "utf8");
 const selectModifierPhase = readFileSync(new URL("src/phases/select-modifier-phase.ts", root), "utf8");
+const theBargainPhase = readFileSync(new URL("src/phases/the-bargain-phase.ts", root), "utf8");
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
 
@@ -964,6 +965,7 @@ test("every relay-driven remote interaction derives one exact authority proposal
   const spec = coopRuntime.slice(specStart, specEnd);
   for (const planKind of [
     "ability",
+    "bargain",
     "biome",
     "crossroads",
     "catch-full",
@@ -997,6 +999,41 @@ test("every relay-driven remote interaction derives one exact authority proposal
     controlLedger,
     /sameRewardSurface\(installed\.expectedRewardSurface, observation\.expectedRewardSurface\)/u,
     "nested Mystery reward waits cannot attest the wrong surface at a reused sequence",
+  );
+  assert.match(
+    interactionRelay,
+    /awaitInteractionOutcomeProposal\([\s\S]*?resolveV2AuthorityProposalControlId\([\s\S]*?projectV2AuthorityProposalWait\(authorityWait\)/u,
+    "complete Bargain outcomes use the same address-exact control proof as small choice proposals",
+  );
+  assert.match(
+    interactionRelay,
+    /sendInteractionOutcomeProposal\([\s\S]*?cosmeticOperationId: proposalOperationId/u,
+    "the non-authority Bargain result carries a stable non-mechanical proposal identity",
+  );
+
+  const closeStart = theBargainPhase.indexOf("  private closeCoopBargainOwnerTerminal(): void {");
+  const closeEnd = theBargainPhase.indexOf("\n  /** Co-op WATCHER", closeStart);
+  assert.ok(closeStart >= 0 && closeEnd > closeStart, "Bargain exposes its bounded owner-terminal close");
+  const close = theBargainPhase.slice(closeStart, closeEnd);
+  const park = close.indexOf("const parkForAuthority");
+  const localEnd = close.indexOf("super.end()");
+  const publish = close.indexOf("this.flushCoopBargainTerminal()");
+  assert.ok(park >= 0 && localEnd > park && publish > localEnd, "Bargain decides its V2 park before publishing");
+  assert.match(
+    close.slice(park, publish),
+    /if \(!parkForAuthority\) \{\s*super\.end\(\);\s*\}/u,
+    "a guest owner cannot advance its ambient phase queue at proposal-send time",
+  );
+
+  const resultWaitStart = theBargainPhase.indexOf("  private coopAwaitAuthoritativeBargainResult(");
+  const resultWaitEnd = theBargainPhase.indexOf("\n  /** Close locally only", resultWaitStart);
+  assert.ok(resultWaitStart >= 0 && resultWaitEnd > resultWaitStart, "Bargain exposes its exact result wait");
+  const resultWait = theBargainPhase.slice(resultWaitStart, resultWaitEnd);
+  const consumeAddress = resultWait.indexOf("consumeCommittedInteractionOutcomeOperationId");
+  const authorityEnd = resultWait.indexOf("super.end()");
+  assert.ok(
+    consumeAddress >= 0 && authorityEnd > consumeAddress,
+    "the parked phase ends only after the exact committed result address is observed",
   );
 });
 
