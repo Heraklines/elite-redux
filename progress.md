@@ -1203,3 +1203,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   The replay driver also stops as soon as that authenticated picker shifts instead of draining a later turn
   outside the call's requested scope. Production fail-closed semantics are unchanged; only the non-browser
   fixture now respects the public UI-to-relay ordering.
+
+2026-07-21 - A completed wave transaction remains valid victory-seal evidence
+
+- Exact-SHA gate 29814526120 exposed the real cause hidden behind several downstream `TitlePhase` soak
+  errors. The replica admitted and applied WAVE_ADVANCE revision 3, installed its explicit
+  `AWAIT_SUCCESSOR`, and therefore correctly moved the transaction from the live projector map into the
+  bounded completed-evidence cache. The later `CoopVictorySealPhase` still looked only in the live map,
+  declared the already-proven transaction "missing," and terminalized the session before revision 4's
+  reward presentation could apply.
+- Both BattleEnd's defensive check and the post-victory seal now resolve the exact transaction from the live
+  map or its read-only completed cache. Completed evidence cannot replay material or install control; it only
+  proves the immutable wave/turn/image that the seal already requires. A fast source contract pins this
+  lifecycle so future projector cleanup cannot again invalidate a later engine-owned seal.

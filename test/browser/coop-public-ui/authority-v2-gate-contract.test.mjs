@@ -181,6 +181,27 @@ test("wave/terminal cutover carries full settled state and retires every legacy 
   );
 });
 
+test("the post-victory seal accepts the exact completed V2 wave transaction after successor installation", () => {
+  const helperStart = coopRuntime.indexOf("function settledCoopV2WaveTransaction(");
+  const helperEnd = coopRuntime.indexOf("\n}", helperStart);
+  assert.notEqual(helperStart, -1, "runtime keeps one bounded read-only settled-wave evidence resolver");
+  assert.ok(helperEnd > helperStart, "the settled-wave resolver has a bounded source block");
+  const helper = coopRuntime.slice(helperStart, helperEnd);
+  assert.match(helper, /v2WaveTransactions\.get\(wave\)/u);
+  assert.match(helper, /v2CompletedWaveTransactions\.get\(wave\)/u);
+
+  const sealStart = coopRuntime.indexOf("export function sealCoopAutomaticVictoryBoundary(");
+  const sealEnd = coopRuntime.indexOf("\nexport function ", sealStart + 1);
+  assert.notEqual(sealStart, -1, "runtime exposes the automatic victory seal");
+  assert.ok(sealEnd > sealStart, "the automatic victory seal has a bounded source block");
+  const seal = coopRuntime.slice(sealStart, sealEnd);
+  assert.match(
+    seal,
+    /const staged = settledCoopV2WaveTransaction\(runtime, identity\.wave\)/u,
+    "successor installation may retire the live transaction before the later victory seal proves it",
+  );
+});
+
 test("correlated recovery is wired through all four production progression fences", () => {
   assert.match(commandPhase, /isCoopV2CommandAdmissionFrozen\(\)/u);
   assert.match(phaseManager, /replaceWithCoopRecoveryPhase/u);

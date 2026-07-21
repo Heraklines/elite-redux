@@ -1769,7 +1769,7 @@ export function deferCoopAutomaticVictorySealAtBattleEnd(identity: CoopAutomatic
   }
   if (runtime.controller.role === "guest") {
     if (coopV2WaveCutovers.has(runtime)) {
-      const staged = runtime.v2WaveTransactions.get(identity.wave);
+      const staged = settledCoopV2WaveTransaction(runtime, identity.wave);
       if (
         staged == null
         || staged.dataApplied !== true
@@ -4819,6 +4819,16 @@ function completeCoopV2WaveTransaction(runtime: CoopRuntime, transaction: CoopV2
     }
     runtime.v2CompletedWaveTransactions.delete(oldestWave);
   }
+}
+
+/**
+ * Read-only proof for a settled wave boundary. Installing the stated successor retires the transaction from
+ * the live projector map, but the later CoopVictorySealPhase must still verify the same immutable applied
+ * image before opening rewards/maps. The bounded completed cache is explicitly that evidence; consulting it
+ * here cannot replay material or authorize a second control.
+ */
+function settledCoopV2WaveTransaction(runtime: CoopRuntime, wave: number): CoopV2WaveLiveTransaction | null {
+  return runtime.v2WaveTransactions.get(wave) ?? runtime.v2CompletedWaveTransactions.get(wave) ?? null;
 }
 
 function projectCoopV2WaveControl(
@@ -9288,7 +9298,7 @@ export function sealCoopAutomaticVictoryBoundary(identity: CoopAutomaticVictoryS
 
   if (runtime.controller.role === "guest") {
     if (coopV2WaveCutovers.has(runtime)) {
-      const staged = runtime.v2WaveTransactions.get(identity.wave);
+      const staged = settledCoopV2WaveTransaction(runtime, identity.wave);
       if (
         staged == null
         || staged.dataApplied !== true
