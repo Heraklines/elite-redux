@@ -55,6 +55,7 @@
     "src/phases/switch-biome-phase.ts",
     "src/phases/switch-phase.ts",
     "src/phases/title-phase.ts",
+    "src/phases/turn-init-phase.ts",
     "src/phases/victory-phase.ts",
     "src/system/game-data.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",

@@ -956,4 +956,55 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   a bounded fail-closed path while covering observed response-body latency.
   The resume source contract rejects any future regression below that floor.
 - Local permitted evidence: the resume source contract is green. Co-op Vitest
-  and the exact two-browser replay remain remote-only.
+ and the exact two-browser replay remain remote-only.
+
+2026-07-21 - Recovery reconstructs wave-owned control and command frontiers
+
+- The current audit correctly identified two correlated-recovery holes. A
+  recovered WAVE_ADVANCE or TERMINAL_COMMIT adopted its control ledger entry
+  without rebuilding the runtime-owned wave transaction, so wave/terminal
+  projection could never prove its immutable material. Aggregate local command
+  frontiers also required every CommandPhase to start while the recovery fence
+  deliberately allowed only the first phase, creating a control-proof cycle.
+- Recovery now rebuilds the exact wave transaction from the retained final V2
+  entry after the full snapshot applies. It marks only the already-covered data
+  stages and never replays BattleEnd or consults the ambient legacy wave latch.
+  Terminal recovery requires that transaction and queues the exact GameOver or
+  final-boss terminal phase.
+- Multi-target command recovery constructs every local phase from the immutable
+  frontier under one runtime-owned bootstrap. The whole ordered target list must
+  match and the first real CommandPhase must cross the ordinary address-exact
+  proof edge before the aggregate controller can release recovery. Ordinary live
+  delivery retains the stronger all-target proof.
+- Local permitted evidence: public source contracts 33/33 green before the
+  replacement-ordering addition, scoped Biome clean, `git diff --check` clean,
+  and zero TypeScript diagnostics in touched files against the unrelated
+  222-error repository baseline. Co-op engine/browser execution remains remote.
+
+2026-07-21 - Replacement material is applied before the next command frontier
+
+- Two-browser journey 29800890533 exposed a real wave-1 production divergence,
+  not a driver miss. After a host-owned faint and replacement, one browser still
+  rendered an empty allied slot and full-health enemies while the authority
+  rendered the replacement and post-turn enemy HP. The later
+  `turn-2-first-move` owner timeout only detected that earlier divergence.
+- The trace showed REPLACEMENT_COMMIT revision 3 admitted with its complete
+  checkpoint, then remaining forever `materialDeferred`. Releasing the settled
+  turn ran replica TurnInit, whose CommandPhase precedes TurnStart/replay. That
+  CommandPhase correctly fenced on unapplied V2 material and blocked the only
+  replay phase capable of applying it: a closed queue dependency.
+- Under V2 replacement cutover, TurnInit now probes only the exact current/N+1
+  retained replacement address. It resets local input ephemera and routes that
+  carrier through the real replay/apply/checksum/presentation transaction before
+  queuing any command. The transaction itself then opens only the command slot
+  named by the committed successor.
+- The failure-first host-faint soak now continues the replica through its next
+  real CommandPhase and compares the complete four-slot field across both
+  engines. The old test stopped at the authority's CommandPhase and therefore
+  could never observe the replica's stale field, which is exactly why the soak
+  previously reported green while the public journey failed.
+- Local permitted evidence: public source contracts 34/34 green, scoped Biome
+  clean, `git diff --check` clean, and zero TypeScript diagnostics in production
+  files against the unrelated 222-error repository baseline. The expanded
+  two-engine soak and public-browser reproduction are reserved for the exact-SHA
+  remote gates.

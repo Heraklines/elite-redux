@@ -42,6 +42,7 @@ import {
   buildDuo,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   installDuoLogCapture,
   withClient,
@@ -174,6 +175,41 @@ describe.skipIf(!RUN)("co-op SOAK host-owned faint: the driver drives the host's
     ).toBe(SpeciesId.LAPRAS);
     expect(hostReplacement?.isFainted(), "the replacement is battle-ready on the host").toBe(false);
     expect(hostReplacement?.coopOwner, "the replacement is a HOST-owned mon (owner-legal pick)").toBe("host");
+
+    // Production ordering proof missing from the original soak: continue the REPLICA too. Before the V2
+    // ordering fix, REPLACEMENT_COMMIT buffered the complete checkpoint, released the settled-turn
+    // finalizer, and then TurnInit put CommandPhase in front of the only replay phase that could apply the
+    // checkpoint. This helper therefore returned the fenced CommandPhase while slot 0 was still empty and
+    // enemy HP was stale. The real next command is valid only after both engines expose the same field.
+    await withClient(rig.guestCtx, async () => {
+      await driveClientPhaseQueueTo(rig.guestScene, "guest command after host-owned replacement material", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase" && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === 1,
+        perPhaseTimeoutMs: 5_000,
+        pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+      });
+    });
+    const summarizeField = (scene: BattleScene) =>
+      scene.getField().map(pokemon =>
+        pokemon == null
+          ? null
+          : {
+              id: pokemon.id,
+              speciesId: pokemon.species.speciesId,
+              hp: pokemon.hp,
+              maxHp: pokemon.getMaxHp(),
+              fainted: pokemon.isFainted(),
+            },
+      );
+    const hostField = withClientSync(rig.hostCtx, () => summarizeField(rig.hostScene));
+    const guestField = withClientSync(rig.guestCtx, () => summarizeField(rig.guestScene));
+    expect(guestField, "the replica applies the complete replacement state before exposing command input").toEqual(
+      hostField,
+    );
+    expect(
+      rig.guestScene.getPlayerField()[COOP_HOST_FIELD_INDEX]?.species.speciesId,
+      "the replica rendered the host-owned LAPRAS before the next command",
+    ).toBe(SpeciesId.LAPRAS);
 
     logs.flush();
   }, 240_000);

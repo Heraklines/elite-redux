@@ -1,9 +1,12 @@
 import { consumePendingDevBattleSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
+import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import {
   isCoopAuthoritativeGuestGated,
   isShowdownGuestFlipGated,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { erRecordAchievementTurnStart } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { BattleType } from "#enums/battle-type";
@@ -25,6 +28,39 @@ export class TurnInitPhase extends FieldPhase {
   public readonly phaseName = "TurnInitPhase";
 
   /**
+   * A V2 replacement result owns the complete post-summon state and the next command frontier. The
+   * replica's ordinary TurnInit queue puts CommandPhase before TurnStartPhase/CoopReplayTurnPhase; if the
+   * retained replacement carrier is already waiting, that command correctly fences itself on V2 material
+   * and thereby blocks the only phase that can apply that material. Route the exact current/N+1 carrier to
+   * the replay transaction first. It will apply + checksum + settle the replacement and then open only the
+   * command slot authorized by the committed successor.
+   */
+  private pendingAuthoritativeReplacementTurn(): number | null {
+    if (!isCoopAuthoritativeGuestGated() || !isCoopV2ReplacementCutoverActive()) {
+      return null;
+    }
+    const controller = getCoopController();
+    const streamer = getCoopBattleStreamer();
+    const battle = globalScene.currentBattle;
+    if (controller == null || streamer == null || battle == null) {
+      return null;
+    }
+    const currentTurn = battle.turn;
+    const currentWave = battle.waveIndex;
+    const pending = streamer.peekCheckpointForTurn(currentTurn, currentWave);
+    if (
+      pending?.reason !== "replacement"
+      || pending.epoch !== controller.sessionEpoch
+      || pending.wave !== currentWave
+      || pending.authoritativeState?.wave !== currentWave
+      || (pending.turn !== currentTurn && pending.turn !== currentTurn + 1)
+    ) {
+      return null;
+    }
+    return currentTurn;
+  }
+
+  /**
    * A versus guest must not expose its next command while the host's fainted lead is still on its
    * renderer. The replacement is a separately addressed authority commit; CoopReplayTurnPhase consumes
    * it at the safe replay boundary and opens the command only after the new enemy is materialized.
@@ -42,6 +78,28 @@ export class TurnInitPhase extends FieldPhase {
   private startAuthoritativeGuestInputTurn(): boolean {
     if (!isCoopAuthoritativeGuestGated()) {
       return false;
+    }
+    const replacementReplayTurn = this.pendingAuthoritativeReplacementTurn();
+    if (replacementReplayTurn != null) {
+      globalScene.getPlayerField().forEach(pokemon => {
+        if (pokemon?.isActive()) {
+          pokemon.resetTurnData();
+        }
+      });
+      coopLog(
+        "v2-replacement",
+        `guest defers command until retained replacement material applies at wave=${globalScene.currentBattle.waveIndex} `
+          + `turn=${replacementReplayTurn}`,
+      );
+      globalScene.phaseManager.pushNew(
+        "CoopReplayTurnPhase",
+        replacementReplayTurn,
+        0,
+        undefined,
+        globalScene.currentBattle.waveIndex,
+      );
+      this.end();
+      return true;
     }
     const deferCommand = this.shouldDeferVersusGuestCommandForEnemyReplacement();
     globalScene.getField().forEach((pokemon, fieldIndex) => {

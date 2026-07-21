@@ -22,6 +22,7 @@ const sessionController = readFileSync(new URL("src/data/elite-redux/coop/coop-s
 const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
+const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
 const mysteryEncounterPhases = readFileSync(new URL("src/phases/mystery-encounter-phases.ts", root), "utf8");
@@ -168,6 +169,55 @@ test("correlated recovery is wired through all four production progression fence
   assert.match(coopRuntime, /isAuthorityWaitCreationFrozen:\s*\(\)\s*=>/u);
   assert.match(coopRuntime, /queueCoopV2AtomicSnapshotApply/u);
   assert.match(coopRuntime, /retainUntilReleased/u);
+});
+
+test("recovery rebuilds wave terminals and installs a multi-target command supervisor without a fence cycle", () => {
+  const waveStart = coopRuntime.indexOf("function prepareCoopV2RecoveryWaveTransaction(");
+  const waveEnd = coopRuntime.indexOf("\n/**\n * Complete recovery integration", waveStart);
+  assert.notEqual(waveStart, -1, "recovery has a dedicated immutable wave-frontier rebuilder");
+  assert.ok(waveEnd > waveStart, "the wave-frontier rebuilder has a bounded source block");
+  const waveRecovery = coopRuntime.slice(waveStart, waveEnd);
+  assert.match(waveRecovery, /decodeCoopV2WaveTransaction\(entry\)/u);
+  assert.match(waveRecovery, /transaction\.bootstrapProjected = true/u);
+  assert.match(waveRecovery, /transaction\.dataApplied = true/u);
+  assert.match(waveRecovery, /runtime\.v2WaveTransactions\.set/u);
+  assert.doesNotMatch(
+    waveRecovery,
+    /pendingWaveAdvance|bootstrapCoopV2WaveTransaction/u,
+    "snapshot recovery must not replay BattleEnd or consult an obsolete local wave latch",
+  );
+
+  const surfaceStart = coopRuntime.indexOf("function prepareCoopV2RecoveryControlSurface(");
+  const surfaceEnd = coopRuntime.indexOf("\n/**\n * Rebuild the runtime-owned wave/terminal transaction", surfaceStart);
+  assert.notEqual(surfaceStart, -1, "recovery exposes one exact control-surface constructor");
+  assert.ok(surfaceEnd > surfaceStart, "the recovery surface constructor has a bounded source block");
+  const surface = coopRuntime.slice(surfaceStart, surfaceEnd);
+  assert.match(
+    surface,
+    /control\.kind === "TERMINAL"[\s\S]*matchingCoopV2WaveTransaction[\s\S]*pushNew\("GameOverPhase"/u,
+    "terminal recovery reconstructs the runtime transaction and a real GameOver phase",
+  );
+  assert.match(surface, /runtime\.v2RecoveryCommandBootstrap = \{/u);
+  assert.match(surface, /localTargetIds: localCommands\.map/u);
+  assert.match(surface, /pushNew\("CommandPhase", fieldIndex\)/u);
+
+  const proofStart = coopRuntime.indexOf("function isCoopV2RecoveryCommandBootstrapInstalled(");
+  const proofEnd = coopRuntime.indexOf("\n/**", proofStart + 1);
+  assert.notEqual(proofStart, -1, "recovery has an address-exact command bootstrap proof");
+  assert.ok(proofEnd > proofStart, "the recovery command proof has a bounded source block");
+  const proof = coopRuntime.slice(proofStart, proofEnd);
+  assert.match(proof, /localTargetIds\.length !== bootstrap\.localTargetIds\.length/u);
+  assert.match(proof, /runtime\.v2InstalledCommandTargets\.has\(firstTargetId\)/u);
+
+  const liveProjectStart = coopRuntime.indexOf("projectControl: (");
+  const liveProjectEnd = coopRuntime.indexOf("\n  };\n  return seams;", liveProjectStart);
+  assert.ok(liveProjectStart >= 0 && liveProjectEnd > liveProjectStart, "live control projection is bounded");
+  const liveProject = coopRuntime.slice(liveProjectStart, liveProjectEnd);
+  assert.match(
+    liveProject,
+    /missing\.length > 0 && !isCoopV2RecoveryCommandBootstrapInstalled/u,
+    "only an exact recovery bootstrap bypasses the ordinary all-target-live wait",
+  );
 });
 
 test("an existing Authority V2 runtime rebinds only after the replacement channel is authenticated", () => {
@@ -903,6 +953,32 @@ test("the host-faint soak observes the actionable successor without consuming it
     /phaseInterceptor\.to\("CommandPhase", false\)/u,
     "the focused replacement proof stops at CommandPhase instead of running past the boundary under test",
   );
+});
+
+test("a retained V2 replacement is consumed before the next replica command can fence the queue", () => {
+  const guestTurnStart = turnInitPhase.indexOf("private startAuthoritativeGuestInputTurn(): boolean");
+  const guestTurnEnd = turnInitPhase.indexOf("\n  start()", guestTurnStart);
+  assert.notEqual(guestTurnStart, -1, "TurnInit exposes the authoritative replica branch");
+  assert.ok(guestTurnEnd > guestTurnStart, "the authoritative replica branch has a bounded source block");
+  const guestTurn = turnInitPhase.slice(guestTurnStart, guestTurnEnd);
+  const pendingProbe = guestTurn.indexOf("this.pendingAuthoritativeReplacementTurn()");
+  const replacementReplay = guestTurn.indexOf('"CoopReplayTurnPhase"');
+  const ordinaryCommand = guestTurn.indexOf('"CommandPhase"');
+  assert.ok(pendingProbe >= 0, "the replica probes the exact retained replacement before queuing input");
+  assert.ok(
+    replacementReplay > pendingProbe && ordinaryCommand > replacementReplay,
+    "replacement replay is structurally queued before the ordinary command path",
+  );
+
+  const probeStart = turnInitPhase.indexOf("private pendingAuthoritativeReplacementTurn(): number | null");
+  const probeEnd = turnInitPhase.indexOf("\n  /**", probeStart + 1);
+  assert.notEqual(probeStart, -1, "TurnInit exposes the retained replacement probe");
+  assert.ok(probeEnd > probeStart, "the retained replacement probe has a bounded source block");
+  const probe = turnInitPhase.slice(probeStart, probeEnd);
+  assert.match(probe, /isCoopV2ReplacementCutoverActive\(\)/u);
+  assert.match(probe, /pending\.epoch !== controller\.sessionEpoch/u);
+  assert.match(probe, /pending\.wave !== currentWave/u);
+  assert.match(probe, /pending\.turn !== currentTurn && pending\.turn !== currentTurn \+ 1/u);
 });
 
 test("a chained biome picker preserves its exact interaction coordinate through owner, watcher, and recovery", () => {

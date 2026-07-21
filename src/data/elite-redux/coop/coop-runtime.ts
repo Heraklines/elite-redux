@@ -3970,10 +3970,27 @@ interface CoopV2WaveLiveTransaction {
   readonly transition: CoopWaveAdvancePayload;
   readonly authoritativeState: CoopAuthoritativeBattleStateV1;
   readonly terminalId: string | null;
+  readonly terminalReason: CoopTerminalMaterialV2["reason"] | null;
   readonly nextControlId: string;
   bootstrapProjected: boolean;
   dataApplied: boolean;
   continuationReady: boolean;
+}
+
+/**
+ * Exact command generations constructed while the correlated recovery fence owns the phase tree.
+ *
+ * Ordinary delivery still proves every local target from its real CommandPhase. Recovery cannot do that
+ * before reopening input: only the first exact phase may start while the fence is held, and reaching a
+ * second local target would require a human choice that command admission deliberately refuses. Instead,
+ * recovery installs one runtime-owned frontier supervisor: all local phases are created from the immutable
+ * command control after the old tree is destroyed, and the first target must cross its real CommandPhase
+ * chokepoint. Once that exact bootstrap is live, releasing the fence lets the already-constructed remaining
+ * phases progress under the same ledger control without claiming that their handlers were already shown.
+ */
+interface CoopV2RecoveryCommandBootstrap {
+  readonly controlId: string;
+  readonly localTargetIds: readonly string[];
 }
 
 /**
@@ -4101,6 +4118,8 @@ export interface CoopRuntime {
   v2RecoveryWaitSuccessorOperationId: string | null;
   /** Exact control whose new engine generation was queued under the current correlated recovery fence. */
   v2RecoveryPreparedControlId: string | null;
+  /** Exact aggregate command controller reconstructed under recovery, never used by ordinary delivery. */
+  v2RecoveryCommandBootstrap: CoopV2RecoveryCommandBootstrap | null;
   /**
    * Exact ordinary replacement generation queued from the immutable control. This is a duplicate-construction
    * guard only; the real PARTY handler must still publish address-exact controlInstalled proof.
@@ -4511,6 +4530,7 @@ function decodeCoopV2WaveTransaction(entry: CoopAuthorityEntry): CoopV2WaveLiveT
     transition,
     authoritativeState,
     terminalId: terminalMaterial?.terminalId ?? null,
+    terminalReason: terminalMaterial?.reason ?? null,
     nextControlId: controlIdOf(entry.nextControl),
     bootstrapProjected: false,
     dataApplied: false,
@@ -4524,6 +4544,37 @@ function matchingCoopV2WaveTransaction(
 ): CoopV2WaveLiveTransaction | null {
   const controlId = controlIdOf(control as ProjectableControl);
   return [...runtime.v2WaveTransactions.values()].find(transaction => transaction.nextControlId === controlId) ?? null;
+}
+
+/**
+ * Recovery-only proof that the aggregate local command controller is installed.
+ *
+ * The immutable plan must still name exactly this seat's whole command partition, in order, and its first
+ * real CommandPhase must have crossed the ordinary address-exact chokepoint. The later exact phases were
+ * constructed together while the fenced phase queue was empty; they become actionable only after recovery
+ * releases. Ordinary entry delivery has no bootstrap and therefore retains the stronger all-target-live
+ * proof below.
+ */
+function isCoopV2RecoveryCommandBootstrapInstalled(
+  runtime: CoopRuntime,
+  control: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }>,
+): boolean {
+  const bootstrap = runtime.v2RecoveryCommandBootstrap;
+  const controlId = controlIdOf(control);
+  if (bootstrap == null || bootstrap.controlId !== controlId) {
+    return false;
+  }
+  const localTargetIds = commandTargetsOwnedBySeat(control, runtime.controller.localSeatId).map(command =>
+    commandControlTargetId(control.epoch, control.wave, control.turn, command),
+  );
+  if (
+    localTargetIds.length !== bootstrap.localTargetIds.length
+    || localTargetIds.some((targetId, index) => bootstrap.localTargetIds[index] !== targetId)
+  ) {
+    return false;
+  }
+  const firstTargetId = localTargetIds[0];
+  return firstTargetId == null || runtime.v2InstalledCommandTargets.has(firstTargetId);
 }
 
 /**
@@ -5555,7 +5606,7 @@ function buildCoopV2LiveSeams(
             ),
         );
         return runtime.v2ControlLedger.projectMechanical(control, () => {
-          if (missing.length > 0) {
+          if (missing.length > 0 && !isCoopV2RecoveryCommandBootstrapInstalled(runtime, control)) {
             return {
               kind: "deferred",
               reason:
@@ -5918,7 +5969,21 @@ function prepareCoopV2RecoveryControlSurface(runtime: CoopRuntime, control: NonN
     coopLog("v2-recovery", `queued exact ${plan.kind} generation for ${controlId}`);
     return true;
   }
-  if (control.kind !== "COMMAND_FRONTIER") {
+  if (control.kind === "TERMINAL") {
+    const transaction = matchingCoopV2WaveTransaction(runtime, control);
+    if (
+      transaction == null
+      || transaction.terminalId !== control.terminalId
+      || (transaction.terminalReason !== "game-over" && transaction.terminalReason !== "final-boss-credits")
+    ) {
+      return false;
+    }
+    globalScene.phaseManager.pushNew("GameOverPhase", transaction.terminalReason === "final-boss-credits");
+    runtime.v2RecoveryPreparedControlId = controlId;
+    coopLog("v2-recovery", `queued exact ${transaction.terminalReason} terminal for ${controlId}`);
+    return true;
+  }
+  if (control.kind === "AWAIT_SUCCESSOR") {
     runtime.v2RecoveryPreparedControlId = controlId;
     return true;
   }
@@ -5936,16 +6001,46 @@ function prepareCoopV2RecoveryControlSurface(runtime: CoopRuntime, control: NonN
   const localFieldIndices: number[] = [];
   for (const command of localCommands) {
     const localFieldIndex = playerField.findIndex(pokemon => pokemon?.id === command.pokemonId);
-    if (localFieldIndex < 0) {
+    if (localFieldIndex < 0 || (!runtime.controller.isVersusSession() && localFieldIndex !== command.fieldIndex)) {
       return false;
     }
     localFieldIndices.push(localFieldIndex);
   }
+  runtime.v2RecoveryCommandBootstrap = {
+    controlId,
+    localTargetIds: localCommands.map(command =>
+      commandControlTargetId(control.epoch, control.wave, control.turn, command),
+    ),
+  };
   for (const fieldIndex of localFieldIndices) {
     globalScene.phaseManager.pushNew("CommandPhase", fieldIndex);
   }
   runtime.v2RecoveryPreparedControlId = controlId;
   coopLog("v2-recovery", `queued ${localFieldIndices.length} exact CommandPhase generation(s) for ${controlId}`);
+  return true;
+}
+
+/**
+ * Rebuild the runtime-owned wave/terminal transaction from the immutable recovery frontier.
+ *
+ * The full snapshot has already installed DATA, so recovery must not replay BattleEnd mutations or consult
+ * `pendingWaveAdvance`. It adopts only the exact entry identity and marks its material as already covered by
+ * the snapshot. The ordinary control projector then proves the newly-created destination and retires this
+ * transaction exactly as it would after normal delivery.
+ */
+function prepareCoopV2RecoveryWaveTransaction(runtime: CoopRuntime, entry: CoopAuthorityEntry | null): boolean {
+  runtime.v2WaveTransactions.clear();
+  if (entry == null || (entry.kind !== "WAVE_ADVANCE" && entry.kind !== "TERMINAL_COMMIT")) {
+    return true;
+  }
+  const transaction = decodeCoopV2WaveTransaction(entry);
+  if (transaction == null) {
+    return false;
+  }
+  transaction.bootstrapProjected = true;
+  transaction.dataApplied = true;
+  runtime.v2WaveTransactions.set(transaction.transition.wave, transaction);
+  coopLog("v2-recovery", `rebuilt ${entry.kind} transaction rev=${entry.revision} wave=${transaction.transition.wave}`);
   return true;
 }
 
@@ -6002,7 +6097,9 @@ function buildCoopV2LiveRecoverySeams(
       runtime.v2DeferredCommandStarts.clear();
       runtime.v2DeferredInteractionStarts.clear();
       runtime.v2InstalledInteractionTargets.clear();
+      runtime.v2RecoveryWaitSuccessorOperationId = null;
       runtime.v2RecoveryPreparedControlId = null;
+      runtime.v2RecoveryCommandBootstrap = null;
       runtime.v2ProjectedReplacementControlId = null;
       runtime.v2ProjectedInteractionControlId = null;
       const finalEntry = bundle.requiredTail.at(-1) ?? null;
@@ -6015,9 +6112,10 @@ function buildCoopV2LiveRecoverySeams(
             && finalEntry.operationId === bundle.frontierOperationId
             && controlsEqual(finalEntry.nextControl, bundle.nextControl)
             && runtime.v2ControlLedger.adoptRecoveryFrontier(finalEntry);
-      return (
-        adopted && (bundle.nextControl == null || prepareCoopV2RecoveryControlSurface(runtime, bundle.nextControl))
-      );
+      if (!adopted || !prepareCoopV2RecoveryWaveTransaction(runtime, finalEntry)) {
+        return false;
+      }
+      return bundle.nextControl == null || prepareCoopV2RecoveryControlSurface(runtime, bundle.nextControl);
     },
     projectControl: (ctx, control) => {
       if (
@@ -6043,12 +6141,14 @@ function buildCoopV2LiveRecoverySeams(
     },
     onRecovered: () => {
       runtime.v2RecoveryPreparedControlId = null;
+      runtime.v2RecoveryCommandBootstrap = null;
       if (runtime.v2ControlLedger.activeControl?.kind !== "AWAIT_SUCCESSOR") {
         releaseCoopV2RecoveryPhase(runtime);
       }
     },
     onTerminal: reason => {
       runtime.v2RecoveryPreparedControlId = null;
+      runtime.v2RecoveryCommandBootstrap = null;
       abandonCoopV2RecoveryPhase(runtime);
       const point = readCoopBattlePoint();
       failCoopRuntimeSharedSession(runtime, reason, {
@@ -6899,6 +6999,7 @@ function disposeCoopV2Shadow(runtime: CoopRuntime): void {
     coopV2ShadowHarnesses.delete(runtime);
   }
   coopV2ShadowBuildFailed.delete(runtime);
+  runtime.v2RecoveryCommandBootstrap = null;
   runtime.v2WaveTransactions.clear();
 }
 
@@ -7446,7 +7547,7 @@ export function recordCoopV2CommandControlStarted(
         !runtime.v2InstalledCommandTargets.has(commandControlTargetId(stated.epoch, stated.wave, stated.turn, command)),
     );
     const projected = runtime.v2ControlLedger.projectMechanical(stated, () =>
-      missing.length === 0
+      missing.length === 0 || isCoopV2RecoveryCommandBootstrapInstalled(runtime, stated)
         ? { kind: "installed", controlId: controlIdOf(stated) }
         : {
             kind: "deferred",
@@ -10086,6 +10187,8 @@ export function assembleCoopRuntime(
       runtime.v2SettledInteractionOperations.clear();
       runtime.v2ControlLedger.clear();
       runtime.v2RecoveryWaitSuccessorOperationId = null;
+      runtime.v2RecoveryPreparedControlId = null;
+      runtime.v2RecoveryCommandBootstrap = null;
       runtime.v2ProjectedReplacementControlId = null;
       runtime.v2ProjectedInteractionControlId = null;
       runtime.v2WaveTransactions.clear();
@@ -10378,6 +10481,7 @@ export function assembleCoopRuntime(
     v2ControlLedger: new CoopV2ControlLedger(),
     v2RecoveryWaitSuccessorOperationId: null,
     v2RecoveryPreparedControlId: null,
+    v2RecoveryCommandBootstrap: null,
     v2ProjectedReplacementControlId: null,
     v2ProjectedInteractionControlId: null,
     v2WaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
