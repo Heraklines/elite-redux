@@ -22,6 +22,7 @@ const operationSurfaceRegistry = readFileSync(
 );
 const sessionController = readFileSync(new URL("src/data/elite-redux/coop/coop-session-controller.ts", root), "utf8");
 const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root), "utf8");
+const publicUiHarness = readFileSync(new URL("test/browser/coop-public-ui/public-ui-harness.mjs", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root), "utf8");
@@ -1250,6 +1251,42 @@ test("a retained V2 replacement is consumed before the next replica command can 
   assert.match(probe, /pending\.epoch !== controller\.sessionEpoch/u);
   assert.match(probe, /pending\.wave !== currentWave/u);
   assert.match(probe, /pending\.turn !== currentTurn && pending\.turn !== currentTurn \+ 1/u);
+});
+
+test("a committed guest picker settles and buffers its V2 carrier before yielding to TurnInit", () => {
+  const closeStart = guestFaintSwitchPhase.indexOf("const closePicker = (): void => {");
+  const closeEnd = guestFaintSwitchPhase.indexOf("\n    };", closeStart) + 7;
+  assert.notEqual(closeStart, -1, "the guest replacement phase exposes its committed close boundary");
+  assert.ok(closeEnd > closeStart, "the committed close boundary has a bounded source block");
+  const close = guestFaintSwitchPhase.slice(closeStart, closeEnd);
+  const materialized = close.indexOf("markPickerMaterialized()");
+  const yielded = close.indexOf("scene.phaseManager.shiftPhase()");
+  assert.ok(
+    materialized >= 0 && yielded > materialized,
+    "the exact picker terminal becomes materially settled before local phase progression can resume",
+  );
+
+  const settleStart = guestFaintSwitchPhase.indexOf("const markPickerMaterialized = (): void => {");
+  const settleEnd = guestFaintSwitchPhase.indexOf("\n    };", settleStart) + 7;
+  assert.notEqual(settleStart, -1, "the guest replacement phase exposes its material settlement boundary");
+  assert.ok(settleEnd > settleStart, "the material settlement boundary has a bounded source block");
+  const settle = guestFaintSwitchPhase.slice(settleStart, settleEnd);
+  const recordsTerminal = settle.indexOf("markCoopFaintSwitchPickerSettled(");
+  const retriesAuthority = settle.indexOf("retryCoopV2PendingAuthorityAtSafeBoundary(runtime)");
+  assert.ok(
+    recordsTerminal >= 0 && retriesAuthority > recordsTerminal,
+    "the already-admitted V2 entry is retried synchronously after terminal proof and before picker yield",
+  );
+});
+
+test("the public post-turn scanner never infers replacement ownership from a phase name", () => {
+  const scanStart = publicUiHarness.indexOf("async waitForPostTurnOutcome(");
+  const scanEnd = publicUiHarness.indexOf("\n  async driveReplacement(", scanStart);
+  assert.notEqual(scanStart, -1, "the public driver exposes its post-turn outcome scanner");
+  assert.ok(scanEnd > scanStart, "the post-turn outcome scanner has a bounded source block");
+  const scan = publicUiHarness.slice(scanStart, scanEnd);
+  assert.match(scan, /findOwnedReadyReplacement\(client, from\[client\.label\]\)/u);
+  assert.doesNotMatch(scan, /GUEST_FAINT_PICKER|HOST_SWITCH_PHASE/u);
 });
 
 test("a chained biome picker preserves its exact interaction coordinate through owner, watcher, and recovery", () => {

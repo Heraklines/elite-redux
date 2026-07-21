@@ -31,6 +31,7 @@ import {
   getCoopInteractionRelay,
   getCoopRuntime,
   notifyCoopV2InteractionSurfaceReady,
+  retryCoopV2PendingAuthorityAtSafeBoundary,
   runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
@@ -170,6 +171,12 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       // instead of relying on another host resend after the real UI boundary is already complete.
       runWhenCoopRuntimeActive(runtime, () => {
         runtime.durability?.retryDeferred("op:faintSwitch");
+        // The committed V2 result is already admitted when it asks this picker to close. Retry that exact
+        // retained entry while this phase is still current, after the terminal is materially settled but
+        // before shiftPhase can manufacture TurnInit/Command. The retry buffers the complete replacement
+        // carrier, so TurnInit's authoritative-replacement probe deterministically routes through
+        // CoopReplayTurnPhase instead of racing the next network redelivery by a few milliseconds.
+        retryCoopV2PendingAuthorityAtSafeBoundary(runtime);
       });
     };
     const closePicker = (): void => {
@@ -181,8 +188,8 @@ export class CoopGuestFaintSwitchPhase extends Phase {
           failCoopSharedSession("The replacement picker lost its exact material boundary while closing.");
           return;
         }
-        scene.phaseManager.shiftPhase();
         markPickerMaterialized();
+        scene.phaseManager.shiftPhase();
       });
     };
     unregisterTerminal = registerCoopFaintSwitchPickerTerminal(

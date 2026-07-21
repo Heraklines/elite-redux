@@ -26,8 +26,6 @@ const REWARD_PHASE = /Start Phase SelectModifierPhase/u;
 const GAME_OVER_PHASE = /Start Phase GameOverPhase/u;
 const POST_GAME_OVER_PHASE = /Start Phase PostGameOverPhase/u;
 const REWARD_OWNER = /OWNER drives reward screen/u;
-const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
-const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 // A replacement pick has COMMITTED once either the picker logs its choice or the send-out summon
 // starts. Once this appears the picker's action submenu never reappears, so a drive that keeps
 // waiting for a send-out menu after it would hang forever (run 29644735938, 30-wave lane).
@@ -3357,13 +3355,11 @@ export class DuoPublicUiRig {
         if (findOwnedReadyReplacement(client, from[client.label])) {
           return { kind: "faint", client };
         }
-        if (
-          client.evidence.find(GUEST_FAINT_PICKER, from[client.label])
-          || client.evidence.find(HOST_SWITCH_PHASE, from[client.label])
-        ) {
-          return { kind: "faint", client };
-        }
       }
+      // Phase-name/log evidence is not ownership evidence. The authority browser legitimately runs a
+      // SwitchPhase while waiting for a GUEST-owned pick; treating that host phase as the owner sent the
+      // driver to the wrong browser and left the real PARTY picker untouched until the 60s fallback. Only
+      // the public semantic surface carries the exact localSeat/ownerSeat/actionability proof.
       let droveTarget = false;
       for (const client of values) {
         if (
