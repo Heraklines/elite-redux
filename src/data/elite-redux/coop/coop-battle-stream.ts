@@ -453,6 +453,20 @@ function authoritativePartyIsDefeated(party: readonly Record<string, unknown>[])
  * always contain PokemonData HP.
  */
 export function hasCoopV2ImmediateCommandSuccessor(state: CoopAuthoritativeBattleStateV1): boolean {
+  // An immediate COMMAND frontier is only meaningful against a LIVING enemy to command. A complete V2
+  // carrier whose enemy party is EMPTY has already crossed a victory/wave boundary - the enemies were
+  // defeated AND cleared this turn (an automatic win, incl. a same-turn faint+replacement), and its only
+  // legal successor is WAVE_ADVANCE, never a TURN_COMMIT. Without this, a post-summon replacement carrier
+  // whose fainted enemy field seats no longer resolve to a party entry (authoritativeSeatHp -> null) slips
+  // BOTH the party-defeated check (length-0 guard below) and the fainted-field-seat check, wrongly stating a
+  // COMMAND_FRONTIER successor; the log then refuses the victory's WAVE_ADVANCE (fail-closed) and terminates
+  // the shared session. The retained "pre-encounter replacement" image (empty enemyParty + player-only field,
+  // applied at the next wave's NewBattlePhase) is this SAME carrier and equally wants a terminal successor -
+  // the following wave's TURN_COMMIT is authorized by that wave's own control, not by this replacement.
+  // (A NON-empty enemy party whose mons lack PokemonData HP is a legacy/unknown shape and still fails OPEN.)
+  if (state.enemyParty.length === 0) {
+    return false;
+  }
   if (authoritativePartyIsDefeated(state.playerParty) || authoritativePartyIsDefeated(state.enemyParty)) {
     return false;
   }
@@ -1102,6 +1116,23 @@ export class CoopBattleStreamer {
     }
     const mark = this.finalizedMarks.get(`${current.epoch}:${wave}`);
     return mark != null && turn <= mark.turn;
+  }
+
+  /**
+   * Whether a retained REPLACEMENT checkpoint is buffered that the live pump's fast path
+   * ({@link awaitTurnOrLiveEvent}) would consume for this exact replay turn. This distinguishes a
+   * materialized SAME-TURN replacement carrier - which MUST be consumed even though its turn was already
+   * finalized (the post-summon replacement legitimately shares the finalized turn's number) - from a STALE
+   * duplicate turn-resolution pump that the host will never resend (the #790 phantom the start()-time guard
+   * kills). It mirrors the pump fast-path condition exactly (peek + reason==="replacement" +
+   * {@link checkpointCanWakeTurn}) so a "don't bail" verdict here is guaranteed to make synchronous progress.
+   */
+  hasConsumableReplacementForTurn(turn: number, sourceWave?: number): boolean {
+    const checkpoint = this.peekCheckpointForTurn(turn, sourceWave);
+    if (checkpoint == null || checkpoint.reason !== "replacement") {
+      return false;
+    }
+    return this.checkpointCanWakeTurn(checkpoint, this.currentAuthorityAddress(turn, sourceWave), turn);
   }
 
   /**

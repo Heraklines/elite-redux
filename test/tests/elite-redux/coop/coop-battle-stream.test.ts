@@ -109,6 +109,21 @@ describe("Authority V2 turn successor classification", () => {
     ).toBe(false);
   });
 
+  it("states a wave/terminal boundary (not COMMAND) for a WON-wave post-summon carrier with a cleared enemy party", () => {
+    // The automatic-victory faint+replacement carrier: the enemy party is DEFEATED and CLEARED the same
+    // turn, so its authoritativeState has enemyParty.length === 0 and a player-only field. The only legal
+    // successor is WAVE_ADVANCE; a COMMAND successor here yields a COMMAND_FRONTIER that then refuses the
+    // victory's WAVE_ADVANCE and fail-closed terminates the shared session (run 29832035821).
+    expect(
+      hasCoopV2ImmediateCommandSuccessor({
+        ...emptyAuthoritativeState(3),
+        playerParty: [{ id: 1, hp: 20 }],
+        enemyParty: [],
+        field: [{ side: "player" as const, bi: 0, partyIndex: 0, pokemonId: 1, presented: true }],
+      }),
+    ).toBe(false);
+  });
+
   it("keeps incomplete legacy PokemonData shapes on the compatible command path", () => {
     expect(hasCoopV2ImmediateCommandSuccessor(emptyAuthoritativeState(3))).toBe(true);
   });
@@ -3034,6 +3049,50 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
       clearActiveCoopV2TurnCutover(cutover);
       cutover.dispose();
       stream.dispose();
+    }
+  });
+
+  it("keeps a materialized same-turn replacement carrier consumable even after its turn is finalized (#faint-material-digest)", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostCurrent = { epoch: 7, wave: 1, turn: 1 };
+    const guestCurrent = { epoch: 7, wave: 1, turn: 1 };
+    const hostStream = new CoopBattleStreamer(host, { authorityContext: () => hostCurrent });
+    const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => guestCurrent });
+    try {
+      // Nothing buffered yet: the #790 stale-duplicate bail is free to fire.
+      expect(guestStream.hasConsumableReplacementForTurn(1)).toBe(false);
+
+      // The authority ships the post-summon SAME-TURN replacement carrier for turn 1 (a faint replacement is
+      // addressed at the faint's own turn, which the ordinary TURN_COMMIT already finalized).
+      const replacement = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 20 },
+        "cafebabecafebabe",
+        emptyAuthoritativeState(1, 1, 21),
+      );
+      hostStream.sendCheckpoint(
+        replacement.reason,
+        replacement.epoch,
+        replacement.wave,
+        replacement.turn,
+        replacement.checkpoint,
+        replacement.checksum,
+        replacement.fullField,
+        replacement.authoritativeState,
+      );
+      await flushWire();
+
+      // The carrier is buffered and wakeable for the exact same turn, so the replay phase MUST NOT treat the
+      // finalized turn as a stale phantom - it has to fall through to the pump and consume this checkpoint.
+      expect(guestStream.peekCheckpointForTurn(1)).toEqual(replacement);
+      expect(guestStream.hasConsumableReplacementForTurn(1)).toBe(true);
+
+      // Once consumed, there is nothing left to wake the turn, so a later duplicate replay IS a stale phantom.
+      expect(guestStream.consumeCheckpointForTurn(1)).toEqual(replacement);
+      expect(guestStream.hasConsumableReplacementForTurn(1)).toBe(false);
+    } finally {
+      guestStream.dispose();
+      hostStream.dispose();
     }
   });
 
