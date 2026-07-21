@@ -3694,8 +3694,9 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
   // Observe the exact replay object that production creates during the divert. Current-phase sampling
   // alone has two valid races: before a loopback drain it can still be MysteryEncounterPhase, while a
   // complete retained ME tail can advance it beyond CoopReplayMePhase during that drain. Capturing create()
-  // is passive (the real factory still constructs and queues the phase) and gives the cooperative scheduler
-  // a stable identity without fabricating a phase or a successful handoff.
+  // remains useful for the legacy synchronous factory path. Authority V2 can instead construct the phase
+  // while the retained entry drains, after this temporary factory tap has been removed; in that case the
+  // exact current object is the projector's authoritative result and is safe to adopt.
   const factory = guestScene.phaseManager as unknown as {
     create: (phaseName: string, ...args: unknown[]) => Phase;
   };
@@ -3717,7 +3718,9 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
   await drainLoopback();
   const current = guestScene.phaseManager.getCurrentPhase();
   const activeReplayAfter = getActiveCoopReplayMePhaseForHarness();
-  const replay = createdReplay ?? (activeReplayAfter === activeReplayBefore ? null : activeReplayAfter);
+  const currentReplay = current?.phaseName === "CoopReplayMePhase" ? current : null;
+  const replay =
+    createdReplay ?? (activeReplayAfter === activeReplayBefore ? null : activeReplayAfter) ?? currentReplay;
   if (replay == null || replay.phaseName !== "CoopReplayMePhase") {
     throw new Error(
       `guest ME divert FAILED: production created no CoopReplayMePhase (current=${current?.phaseName ?? "none"}) - see dev-logs/coop-duo/`,

@@ -676,3 +676,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the interaction or wave lease.
 - Source contracts pin both invariants, including the ban on invoking the
   replaced Mystery predecessor. Runtime qualification remains GitHub-hosted.
+- The first remote C1 result at `99314d790` confirmed the replacement itself:
+  its failure reported that no replay was "created" while its exact current
+  phase was already `CoopReplayMePhase`. The two-engine observer still depended
+  on the legacy synchronous factory tap, but V2 constructs during retained-log
+  delivery after that tap is removed. It now accepts the exact directly
+  installed current object and still starts only that production-created phase.

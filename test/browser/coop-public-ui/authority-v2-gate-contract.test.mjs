@@ -307,6 +307,17 @@ test("V2 Mystery waits for its ordered presentation and destructively replaces t
     /predecessor\.end\(\)/u,
     "the legacy predecessor never gets another chance to choose progression",
   );
+
+  const harnessStart = duoHarness.indexOf("export async function startGuestMeReplay(");
+  const harnessEnd = duoHarness.indexOf("/**", harnessStart + 1);
+  assert.ok(harnessStart >= 0, "the two-engine Mystery scheduler exists");
+  assert.ok(harnessEnd > harnessStart, "the Mystery scheduler has a bounded source section");
+  const harness = duoHarness.slice(harnessStart, harnessEnd);
+  assert.match(
+    harness,
+    /current\?\.phaseName === "CoopReplayMePhase" \? current : null/u,
+    "the headless scheduler observes V2's directly installed phase rather than requiring a legacy queue tap",
+  );
 });
 
 test("Mystery projection construction cannot recursively attest an unopened handler", () => {
