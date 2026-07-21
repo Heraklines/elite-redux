@@ -257,7 +257,6 @@ import {
   commitMeOwnerIntent,
   isCompleteCoopMeTerminalPayload,
   isCoopMeOperationEnabled,
-  isCoopMePickProposalOperationId,
   isCoopMeQuizAnswerOperationId,
   receiveCoopMeTerminalTransactionFor,
   resetCoopMeOperationState,
@@ -10278,38 +10277,6 @@ export function assembleCoopRuntime(
     isAuthorityWaitCreationFrozen: () => isCoopV2AuthorityWaitCreationFrozen(runtime),
     isInteractionAuthorityV2: () => runtime != null && isCoopV2InteractionCutoverActive(runtime.durability),
     isLocalAuthority: () => controller.authorityRole === "authority",
-    validateV2InteractionProposal: ({ controlOperationId, proposalOperationId, seq, kind, choice, data }) => {
-      const control = runtime?.v2ControlLedger.latestControl;
-      if (
-        control?.kind !== "SHARED_INTERACTION"
-        || control.operationId !== controlOperationId
-        || control.surfaceClass !== "op:me"
-        || control.operationKind !== "ME_PRESENT"
-        || control.ownerSeatId === controller.authoritySeatId
-        || kind !== COOP_ME_PICK_CHOICE_KINDS[0]
-        || data?.length !== 1
-        || !Number.isSafeInteger(data[0])
-        || !Number.isSafeInteger(choice)
-      ) {
-        return false;
-      }
-      const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
-      const plan = sourceEntry == null ? null : projectionPlanOfCoopV2InteractionEntry(sourceEntry);
-      return (
-        plan?.kind === "mystery"
-        && seq === COOP_ME_PUMP_SEQ_BASE + plan.pinned
-        && choice >= 0
-        && choice < plan.presentation.meetsReqs.length
-        && plan.presentation.meetsReqs[choice] === true
-        && isCoopMePickProposalOperationId({
-          operationId: proposalOperationId,
-          epoch: controller.sessionEpoch,
-          pinned: plan.pinned,
-          step: data[0],
-          seq,
-        })
-      );
-    },
     projectV2AuthorityProposalWait: wait => runtime != null && projectCoopV2AuthorityProposalWait(runtime, wait),
     revokeV2AuthorityProposalWait: wait => {
       if (runtime != null) {

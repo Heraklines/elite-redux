@@ -858,16 +858,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   local human input. Timeout/cancel/supersession revokes only that exact token;
   a consumed proposal preserves the proof until the next ordered entry
   atomically consumes it.
-- Guest-owned top-level Mystery proposals now carry both the opening
-  `ME_PRESENT` control address and their exact `ME_PICK` proposal address.
-  Authority admission validates epoch, owner, pinned counter, step, sequence,
-  enabled option, and proposal operation ID without consulting the legacy
-  revision cursor. Buffered early proposals and live network waits cross the
-  same projector.
+- The host's top-level Mystery wait now carries the phase-owned `ME_PRESENT`
+  control address into the relay. Buffered early proposals and live network
+  waits cross the same projector; the existing authority commit seam continues
+  to validate the proposal's owner, pinned counter, step, sequence, option, and
+  operation construction.
 - The authority's cosmetic Mystery phase can no longer overwrite this stronger
-  ingress proof with a watcher UI token. Protocol advanced to `er-coop-44` so a
-  cached build lacking addressed proposals cannot pair into the new control
-  graph.
+  ingress proof with a watcher UI token. No wire/schema change was required:
+  the ingress address is local authority state derived from the already
+  authenticated immutable entry, preserving the frozen P33 transport schema.
 - Local static evidence: public source contract 29/29 green, scoped formatting
   clean, `git diff --check` clean, and full TypeScript reports zero diagnostics
   in touched files (repository baseline remains non-zero). Co-op Vitest and

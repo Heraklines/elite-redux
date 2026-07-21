@@ -52,7 +52,6 @@ const interactionCutover = readFileSync(
 const nextControl = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/next-control.ts", root), "utf8");
 const controlLedger = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/control-ledger.ts", root), "utf8");
 const interactionRelay = readFileSync(new URL("src/data/elite-redux/coop/coop-interaction-relay.ts", root), "utf8");
-const coopTransport = readFileSync(new URL("src/data/elite-redux/coop/coop-transport.ts", root), "utf8");
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
 
@@ -757,16 +756,6 @@ test("the duo Mystery split cannot inject a choice before public V2 input is act
 });
 
 test("guest-owned Mystery control is installed only by an exact authority proposal wait", () => {
-  assert.match(
-    coopTransport,
-    /authorityControlOperationId\?: string \| undefined;[\s\S]*proposalOperationId\?: string \| undefined;/u,
-    "the raw proposal carries both its immutable control and proposed-operation identities",
-  );
-  assert.match(
-    replayMePhase,
-    /authorityControlOperationId,\s+proposalOperationId: operationId/u,
-    "the guest sends the ME_PICK proposal under the ME_PRESENT control that opened its picker",
-  );
   assert.match(
     mysteryEncounterPhases,
     /awaitInteractionChoice\([\s\S]*?COOP_ME_PICK_CHOICE_KINDS,[\s\S]*?authorityControlOperationId \?\? undefined/u,

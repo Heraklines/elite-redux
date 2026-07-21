@@ -247,10 +247,6 @@ export interface CoopInteractionChoice {
   kind?: string;
   /** Local-only durable carrier correlation. Never serialized on the legacy interactionChoice wire arm. */
   operationId?: string | undefined;
-  /** Exact V2 control address carried by a remote-owner proposal. */
-  authorityControlOperationId?: string | undefined;
-  /** Exact non-authority proposal address; mechanical only after the authority commits its V2 result. */
-  proposalOperationId?: string | undefined;
   /** Local-only complete result material carried by an immutable V2 entry (for example market stock). */
   resultData?: number[] | undefined;
   /** Ordered retained Mystery reward surface carried by reward actions. */
@@ -304,18 +300,6 @@ export interface CoopInteractionRelayOptions {
     readonly choice: number;
     readonly questionIndex: number;
     readonly operationId: string;
-  }) => boolean;
-  /**
-   * Validate an addressed remote-owner proposal before it can enter the relay
-   * FIFO. This is identity/payload admission only; it never commits a V2 entry.
-   */
-  validateV2InteractionProposal?: (input: {
-    readonly controlOperationId: string;
-    readonly proposalOperationId: string;
-    readonly seq: number;
-    readonly kind: string;
-    readonly choice: number;
-    readonly data: readonly number[] | undefined;
   }) => boolean;
   /**
    * Install the authority's address-exact proposal-ingress lease. Returning
@@ -394,10 +378,6 @@ interface CoopChoiceWaiter {
   readonly expectedKinds: readonly string[] | undefined;
   /** Exact ordered Mystery surface, null for ambient, undefined when surface validation is not requested. */
   readonly expectedRewardSurface: CoopRewardSurfaceIdentity | null | undefined;
-  /** Exact Authority V2 SHARED_INTERACTION address, when this is a remote-owner proposal wait. */
-  readonly authorityControlOperationId: string | undefined;
-  /** Opaque identity used to revoke only this waiter generation. */
-  readonly waiterToken: object;
 }
 
 /** Compact, log-safe one-line summary of a host-resolved interaction outcome (discriminated by `k`). */
@@ -463,9 +443,6 @@ export class CoopInteractionRelay {
   private readonly isLocalAuthority: () => boolean;
   private readonly validateV2QuizAnswerObservation: NonNullable<
     CoopInteractionRelayOptions["validateV2QuizAnswerObservation"]
-  >;
-  private readonly validateV2InteractionProposal: NonNullable<
-    CoopInteractionRelayOptions["validateV2InteractionProposal"]
   >;
   private readonly projectV2AuthorityProposalWait: NonNullable<
     CoopInteractionRelayOptions["projectV2AuthorityProposalWait"]
@@ -539,7 +516,6 @@ export class CoopInteractionRelay {
     this.isInteractionAuthorityV2 = opts.isInteractionAuthorityV2 ?? isCoopV2InteractionCutoverActive;
     this.isLocalAuthority = opts.isLocalAuthority ?? (() => transport.role === "host");
     this.validateV2QuizAnswerObservation = opts.validateV2QuizAnswerObservation ?? (() => false);
-    this.validateV2InteractionProposal = opts.validateV2InteractionProposal ?? (() => false);
     this.projectV2AuthorityProposalWait = opts.projectV2AuthorityProposalWait ?? (() => false);
     this.revokeV2AuthorityProposalWait = opts.revokeV2AuthorityProposalWait ?? (() => {});
     this.publishRewardOptions = opts.publishRewardOptions ?? null;
@@ -619,10 +595,6 @@ export class CoopInteractionRelay {
     choice: number,
     data?: number[],
     rewardSurface?: CoopRewardSurfaceIdentity,
-    v2Proposal?: {
-      readonly authorityControlOperationId: string;
-      readonly proposalOperationId: string;
-    },
   ): void {
     recordCoopUiRelayCarrier("interactionChoice", `seq=${seq} kind=${kind} choice=${choice}`);
     if (isCoopDebug()) {
@@ -641,12 +613,6 @@ export class CoopInteractionRelay {
         choice,
         ...(data === undefined ? {} : { data }),
         ...(rewardSurface == null ? {} : { rewardSurface }),
-        ...(v2Proposal == null
-          ? {}
-          : {
-              authorityControlOperationId: v2Proposal.authorityControlOperationId,
-              proposalOperationId: v2Proposal.proposalOperationId,
-            }),
       });
     }
     // #record-replay: capture this OWNER-sent interaction pick (no-op unless recording on the host).
@@ -779,10 +745,7 @@ export class CoopInteractionRelay {
       // keep strict FIFO order because we take the FIRST accepted one.
       const matchIdx = queue.findIndex(
         entry =>
-          kindAccepted(entry.kind, expectedKinds)
-          && rewardSurfaceAccepted(entry.rewardSurface, expectedRewardSurface)
-          && (authorityControlOperationId === undefined
-            || entry.authorityControlOperationId === authorityControlOperationId),
+          kindAccepted(entry.kind, expectedKinds) && rewardSurfaceAccepted(entry.rewardSurface, expectedRewardSurface),
       );
       if (matchIdx >= 0) {
         for (let i = 0; i < matchIdx; i++) {
@@ -881,8 +844,6 @@ export class CoopInteractionRelay {
         finish,
         expectedKinds,
         expectedRewardSurface,
-        authorityControlOperationId,
-        waiterToken,
       });
       if (
         authorityWait != null
@@ -1502,8 +1463,6 @@ export class CoopInteractionRelay {
       waiter
       && kindAccepted(choice.kind, waiter.expectedKinds)
       && rewardSurfaceAccepted(choice.rewardSurface, waiter.expectedRewardSurface)
-      && (waiter.authorityControlOperationId === undefined
-        || choice.authorityControlOperationId === waiter.authorityControlOperationId)
     ) {
       if (isCoopDebug()) {
         coopLog("relay", `DELIVER interactionChoice seq=${seq} -> waiter ${summarizeChoice(choice)}`);
@@ -1690,27 +1649,6 @@ export class CoopInteractionRelay {
         return;
       }
     }
-    if (
-      this.isInteractionAuthorityV2()
-      && this.isLocalAuthority()
-      && (msg.authorityControlOperationId != null || msg.proposalOperationId != null)
-    ) {
-      const acceptsProposal =
-        msg.authorityControlOperationId != null
-        && msg.proposalOperationId != null
-        && this.validateV2InteractionProposal({
-          controlOperationId: msg.authorityControlOperationId,
-          proposalOperationId: msg.proposalOperationId,
-          seq: msg.seq,
-          kind: msg.kind,
-          choice: msg.choice,
-          data: msg.data,
-        });
-      if (!acceptsProposal) {
-        coopWarn("v2-interaction", `dropped invalid addressed interaction proposal seq=${msg.seq} kind=${msg.kind}`);
-        return;
-      }
-    }
     if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
       coopWarn("relay", "RECV interactionChoice -> invalid ordered reward surface");
       return;
@@ -1742,8 +1680,6 @@ export class CoopInteractionRelay {
       data: msg.data,
       kind: msg.kind,
       operationId: msg.cosmeticOperationId,
-      authorityControlOperationId: msg.authorityControlOperationId,
-      proposalOperationId: msg.proposalOperationId,
       rewardSurface: msg.rewardSurface,
     });
   }

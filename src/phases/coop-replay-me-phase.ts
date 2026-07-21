@@ -6,7 +6,6 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { applyCoopMeOutcome, consumeCoopMeOutcomeRollbackFatal } from "#data/elite-redux/coop/coop-battle-engine";
 import { openGuestMeEmbeddedShop } from "#data/elite-redux/coop/coop-biome-shop";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -708,24 +707,7 @@ export class CoopReplayMePhase extends Phase {
     }
     const step = this.pickStep;
     const pickWave = globalScene.currentBattle?.waveIndex ?? -1;
-    const authorityControlOperationId = this.coopV2ControlOperationId;
-    let operationId: string | null = null;
-    const sendProposal = (): void => {
-      relay.sendInteractionChoice(
-        this.seq,
-        ME_CHOICE_KIND,
-        index,
-        [step],
-        undefined,
-        authorityControlOperationId == null || operationId == null
-          ? undefined
-          : {
-              authorityControlOperationId,
-              proposalOperationId: operationId,
-            },
-      );
-    };
-    operationId = commitMeOwnerIntent({
+    const operationId = commitMeOwnerIntent({
       kind: "ME_PICK",
       seq: this.seq,
       pinned: this.interactionCounter,
@@ -734,17 +716,12 @@ export class CoopReplayMePhase extends Phase {
       localRole: getCoopController()?.role ?? "guest",
       wave: pickWave,
       turn: 0,
-      resend: isCoopMeOperationJournalActive() ? sendProposal : undefined,
+      resend: isCoopMeOperationJournalActive()
+        ? () => relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index, [step])
+        : undefined,
     });
     if (operationId == null && isCoopMeOperationEnabled()) {
       failCoopSharedSession(`Mystery pick ${this.seq}/${step} could not enter authoritative control`);
-      return;
-    }
-    if (
-      isCoopV2InteractionCutoverActive(getCoopRuntime()?.durability)
-      && (authorityControlOperationId == null || operationId == null)
-    ) {
-      failCoopSharedSession(`Mystery pick ${this.seq}/${step} had no exact Authority V2 proposal address`);
       return;
     }
     this.pickStep = step + 1;
@@ -762,7 +739,7 @@ export class CoopReplayMePhase extends Phase {
       kind: ME_CHOICE_KIND,
       index,
     });
-    sendProposal(); // P1 on seq_me; stable proposal ordinal + exact V2 control/proposal identity
+    relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index, [step]); // P1 on seq_me; stable proposal ordinal
     // #831: for a REPEATED option-select round (delve / Safari) beginNewRound reset pickSent so THIS pick is
     // allowed, and this re-armed race INHERITS the live 9M terminal arm (awaitOutcomeThenTerminal reads
     // this.liveTerminalArm) rather than re-awaiting the inbox - a fast host's buffered LEAVE is never lost.
