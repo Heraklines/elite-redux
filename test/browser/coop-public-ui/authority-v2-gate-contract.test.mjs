@@ -14,6 +14,10 @@ const journeyWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-j
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
 const meOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-operation.ts", root), "utf8");
+const operationSurfaceRegistry = readFileSync(
+  new URL("src/data/elite-redux/coop/coop-operation-surface-registry.ts", root),
+  "utf8",
+);
 const sessionController = readFileSync(new URL("src/data/elite-redux/coop/coop-session-controller.ts", root), "utf8");
 const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
@@ -21,6 +25,7 @@ const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), 
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
 const mysteryEncounterPhases = readFileSync(new URL("src/phases/mystery-encounter-phases.ts", root), "utf8");
+const erQuizPhase = readFileSync(new URL("src/phases/er-quiz-phase.ts", root), "utf8");
 const guestFaintSwitchPhase = readFileSync(new URL("src/phases/coop-guest-faint-switch-phase.ts", root), "utf8");
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
 const replayMePhase = readFileSync(new URL("src/phases/coop-replay-me-phase.ts", root), "utf8");
@@ -746,6 +751,50 @@ test("the duo Mystery split cannot inject a choice before public V2 input is act
   assert.ok(
     presentationGuard > addressField && selectorOpen > presentationGuard,
     "runtime execution completes the presentation commit/bind guard before exposing the delayed selector",
+  );
+});
+
+test("Mystery dialogue and quiz verdicts retain the same address-exact human-input lease", () => {
+  const mysteryProofStart = operationSurfaceRegistry.indexOf("  ME_PRESENT: {");
+  const mysteryProofEnd = operationSurfaceRegistry.indexOf("\n  ME_SUB:", mysteryProofStart);
+  assert.notEqual(mysteryProofStart, -1, "the V2 registry declares the Mystery presentation proof");
+  assert.ok(mysteryProofEnd > mysteryProofStart, "the Mystery presentation proof has a bounded source block");
+  const mysteryProof = operationSurfaceRegistry.slice(mysteryProofStart, mysteryProofEnd);
+  assert.match(mysteryProof, /UiMode\.MYSTERY_ENCOUNTER/u);
+  assert.match(
+    mysteryProof,
+    /UiMode\.MESSAGE/u,
+    "selected-option dialogue remains actionable under the live ME_PRESENT address",
+  );
+  assert.match(mysteryProof, /"MysteryEncounterPhase"/u);
+  assert.match(
+    mysteryEncounterPhases,
+    /continueEncounter\(\)[\s\S]*setMode\(UiMode\.MESSAGE\)\.then\(showNextDialogue\)/u,
+  );
+
+  const quizProofStart = operationSurfaceRegistry.indexOf("  QUIZ_ANSWER: {");
+  const quizProofEnd = operationSurfaceRegistry.indexOf("\n  REVIVAL:", quizProofStart);
+  assert.notEqual(quizProofStart, -1, "the V2 registry declares the quiz-answer proof");
+  assert.ok(quizProofEnd > quizProofStart, "the quiz-answer proof has a bounded source block");
+  const quizProof = operationSurfaceRegistry.slice(quizProofStart, quizProofEnd);
+  assert.match(quizProof, /UiMode\.ER_QUIZ/u);
+  assert.match(quizProof, /UiMode\.MESSAGE/u, "the answer verdict retains the live QUIZ_ANSWER address");
+  assert.match(quizProof, /"ErQuizPhase"/u);
+  assert.match(
+    erQuizPhase,
+    /onAnswer\(choice: number\)[\s\S]*setModeBoundedWhen\(UiMode\.MESSAGE[\s\S]*showText\([\s\S]*afterVerdict/u,
+    "the production quiz crosses MESSAGE before the next ordered question",
+  );
+
+  assert.match(
+    controlLedger,
+    /installed\.observation\.phaseToken === observation\.phaseToken[\s\S]*claim\.installed =/u,
+    "handler rebinding remains limited to the exact same phase generation",
+  );
+  assert.match(
+    controlLedger,
+    /installed\.phaseToken === observation\.phaseToken[\s\S]*installed\.handlerToken === observation\.handlerToken/u,
+    "physical input still requires the exact newly installed handler token",
   );
 });
 

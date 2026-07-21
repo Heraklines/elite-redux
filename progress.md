@@ -731,3 +731,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   only direct handler tests appeared to work. The live phase now binds that
   immutable address before exposing its selector. A source contract fixes the
   required commit -> bind -> public-handler order.
+
+2026-07-21 - Same-generation Mystery dialogue input lease
+
+- The public failure screen is a generic fail-closed terminal and deliberately
+  omits its internal reason, but the V2 surface inventory exposed a concrete
+  production-only input freeze hidden by direct-handler tests. A selected
+  Mystery option moves its still-live `MysteryEncounterPhase` from
+  `MYSTERY_ENCOUNTER` to `MESSAGE`; a quiz answer similarly moves its still-live
+  `ErQuizPhase` from `ER_QUIZ` to a `MESSAGE` verdict. Both transitions preserve
+  the exact authoritative operation and phase generation, yet their proof
+  contracts rejected `MESSAGE`, so a real keypress could never install the new
+  handler token and remained correctly-but-permanently frozen.
+- `ME_PRESENT` and `QUIZ_ANSWER` now admit `MESSAGE` only for their already
+  registered exact phase classes. The control ledger still requires the same
+  phase token for a handler rebind and the physical input gate still requires
+  the exact newly installed handler token, operation ID, owner seat, and active
+  actionable handler. No cross-phase or address inheritance was added.
+- The Authority source contract now pins both real mode transitions and the
+  ledger's same-generation/exact-handler invariants so direct helper coverage
+  cannot mask this public-input path again.

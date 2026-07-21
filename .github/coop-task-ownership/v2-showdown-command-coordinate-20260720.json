@@ -16,6 +16,7 @@
     "src/data/elite-redux/coop/authority-v2/cutover-interaction.ts",
     "src/data/elite-redux/coop/authority-v2/next-control.ts",
     "src/data/elite-redux/coop/coop-me-operation.ts",
+    "src/data/elite-redux/coop/coop-operation-surface-registry.ts",
     "src/data/elite-redux/coop/coop-renderer-gate.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
     "src/data/elite-redux/coop/coop-session-controller.ts",

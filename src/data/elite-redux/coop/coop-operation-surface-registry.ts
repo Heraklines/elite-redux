@@ -100,7 +100,7 @@ const COOP_V2_INTERACTION_UI_PROOFS = {
     phaseNames: ["MysteryEncounterPhase", "CoopReplayMePhase"],
   },
   ME_PRESENT: {
-    uiModes: [UiMode.MYSTERY_ENCOUNTER, UiMode.PARTY, UiMode.OPTION_SELECT],
+    uiModes: [UiMode.MYSTERY_ENCOUNTER, UiMode.PARTY, UiMode.OPTION_SELECT, UiMode.MESSAGE],
     phaseNames: ["MysteryEncounterPhase", "CoopReplayMePhase"],
   },
   ME_SUB: {
@@ -126,7 +126,7 @@ const COOP_V2_INTERACTION_UI_PROOFS = {
     ],
   },
   QUIZ_ANSWER: {
-    uiModes: [UiMode.ER_QUIZ],
+    uiModes: [UiMode.ER_QUIZ, UiMode.MESSAGE],
     phaseNames: ["ErQuizPhase", "CoopReplayMePhase"],
   },
   REVIVAL: {
