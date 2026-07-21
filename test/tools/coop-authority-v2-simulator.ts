@@ -327,14 +327,13 @@ export function controlKey(control: CoopNextControl | null): string {
         `REPLACEMENT:${control.operationId}:${control.ownerSeatId}:`
         + `e${control.epoch}:w${control.wave}:t${control.turn}:o${control.occurrence}:f${control.fieldIndex}`
       );
-    case "REWARD":
-      return `REWARD:${control.operationId}:${control.ownerSeatId}`;
-    case "BIOME":
-      return `BIOME:${control.operationId}:${control.ownerSeatId}`;
-    case "MYSTERY":
-      return `MYSTERY:${control.operationId}:${control.ownerSeatId}`;
     case "SHARED_INTERACTION":
-      return `SHARED_INTERACTION:${control.surfaceClass}:${control.operationKind}:${control.operationId}:${control.ownerSeatId}`;
+      return (
+        `SHARED_INTERACTION:${control.surfaceClass}:${control.operationKind}:${control.operationId}:`
+        + `${control.ownerSeatId}:e${control.epoch}:w${control.wave}:t${control.turn}:`
+        + `${[...control.successor.operationKinds].sort().join(",")}:`
+        + `${control.successor.operationIds == null ? "*" : [...control.successor.operationIds].sort().join(",")}`
+      );
     case "AWAIT_SUCCESSOR":
       return (
         `AWAIT_SUCCESSOR:${control.afterOperationId}:e${control.epoch}:w${control.wave}:t${control.turn}:`
@@ -1768,7 +1767,17 @@ export function standardStory(rng: SeededRng, opts: { readonly terminal: boolean
   // An interaction (reward) surface.
   acts.push({
     kind: "INTERACTION_COMMIT",
-    control: { kind: "REWARD", operationId: "reward-1", ownerSeatId: 0 },
+    control: {
+      kind: "SHARED_INTERACTION",
+      operationId: "reward-1",
+      ownerSeatId: 0,
+      epoch,
+      wave: 1,
+      turn: 2,
+      surfaceClass: "op:reward",
+      operationKind: "REWARD",
+      successor: { operationKinds: ["REWARD"], operationIds: ["reward-1"] },
+    },
     delta: rng.int(1, 9),
     checkpoint: false,
     subsumePrior: false,

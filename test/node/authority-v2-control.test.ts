@@ -83,10 +83,18 @@ const command = (over: CommandOverrides = {}): CommandFrontier => {
   };
 };
 
-const reward = (over: Partial<Extract<Projectable, { kind: "REWARD" }>> = {}): Projectable => ({
-  kind: "REWARD",
+const rewardControl = (
+  over: Partial<Extract<Projectable, { kind: "SHARED_INTERACTION" }>> = {},
+): Extract<Projectable, { kind: "SHARED_INTERACTION" }> => ({
+  kind: "SHARED_INTERACTION",
   operationId: "op-reward-1",
   ownerSeatId: 0,
+  epoch: 1,
+  wave: 3,
+  turn: 2,
+  surfaceClass: "op:reward",
+  operationKind: "REWARD_PRESENT",
+  successor: { operationKinds: ["REWARD"], operationIds: null },
   ...over,
 });
 
@@ -167,7 +175,7 @@ describe("ordered-wait local presentation lease", () => {
 describe("controlIdOf", () => {
   it("is a stable, complete encoding - identical inputs give identical ids", () => {
     expect(controlIdOf(command())).toBe(controlIdOf(command()));
-    expect(controlIdOf(reward())).toBe(controlIdOf(reward()));
+    expect(controlIdOf(rewardControl())).toBe(controlIdOf(rewardControl()));
     expect(controlIdOf(terminal())).toBe(controlIdOf(terminal()));
   });
 
@@ -188,16 +196,26 @@ describe("controlIdOf", () => {
   });
 
   it("distinguishes kinds even when scalar fields coincide", () => {
-    const rew = controlIdOf(reward({ operationId: "x", ownerSeatId: 0 }));
-    const biome = controlIdOf({ kind: "BIOME", operationId: "x", ownerSeatId: 0 });
-    const mystery = controlIdOf({ kind: "MYSTERY", operationId: "x", ownerSeatId: 0 });
-    expect(new Set([rew, biome, mystery]).size).toBe(3);
+    const reward = controlIdOf(rewardControl({ operationId: "x", ownerSeatId: 0 }));
+    const biome = controlIdOf({
+      ...rewardControl({ operationId: "x", ownerSeatId: 0 }),
+      surfaceClass: "op:biome",
+      operationKind: "BIOME_PICK",
+      successor: { operationKinds: ["BIOME_PICK"], operationIds: null },
+    });
+    const mystery = controlIdOf({
+      ...rewardControl({ operationId: "x", ownerSeatId: 0 }),
+      surfaceClass: "op:me",
+      operationKind: "ME_PRESENT",
+      successor: { operationKinds: ["ME_PICK"], operationIds: null },
+    });
+    expect(new Set([reward, biome, mystery]).size).toBe(3);
   });
 
   it("percent-encodes opaque ids so delimiters can't collide addresses", () => {
     // Without encoding, "a/s9" + seat 0 could collide with "a" + seat 9/s0-style ids.
-    const a = controlIdOf(reward({ operationId: "a/s9", ownerSeatId: 0 }));
-    const b = controlIdOf(reward({ operationId: "a", ownerSeatId: 0 }));
+    const a = controlIdOf(rewardControl({ operationId: "a/s9", ownerSeatId: 0 }));
+    const b = controlIdOf(rewardControl({ operationId: "a", ownerSeatId: 0 }));
     expect(a).not.toBe(b);
     expect(controlIdOf(terminal("a/b"))).not.toBe(controlIdOf(terminal("a%2Fb")));
   });
@@ -217,19 +235,19 @@ describe("controlsEqual / sameControlAddress", () => {
   it("is exact structural equality for non-null controls", () => {
     expect(controlsEqual(command(), command())).toBe(true);
     expect(controlsEqual(command(), command({ pokemonId: 99 }))).toBe(false);
-    expect(controlsEqual(command(), reward())).toBe(false);
+    expect(controlsEqual(command(), rewardControl())).toBe(false);
   });
 
   it("sameControlAddress matches controlId equality", () => {
-    expect(sameControlAddress(reward(), reward())).toBe(true);
-    expect(sameControlAddress(reward(), reward({ ownerSeatId: 1 }))).toBe(false);
+    expect(sameControlAddress(rewardControl(), rewardControl())).toBe(true);
+    expect(sameControlAddress(rewardControl(), rewardControl({ ownerSeatId: 1 }))).toBe(false);
   });
 });
 
 describe("control ownership", () => {
   it("returns the owner seat for owned controls and null for TERMINAL", () => {
     expect(controlOwnerSeatId(command({ ownerSeatId: 0 }))).toBe(0);
-    expect(controlOwnerSeatId(reward({ ownerSeatId: 0 }))).toBe(0);
+    expect(controlOwnerSeatId(rewardControl({ ownerSeatId: 0 }))).toBe(0);
     expect(controlOwnerSeatId(terminal())).toBeNull();
   });
 
@@ -268,9 +286,7 @@ describe("control ownership", () => {
 describe("validateNextControl", () => {
   it("accepts well-formed controls of every kind", () => {
     expect(isValidNextControl(command())).toBe(true);
-    expect(isValidNextControl(reward())).toBe(true);
-    expect(isValidNextControl({ kind: "BIOME", operationId: "b", ownerSeatId: 0 })).toBe(true);
-    expect(isValidNextControl({ kind: "MYSTERY", operationId: "m", ownerSeatId: 2 })).toBe(true);
+    expect(isValidNextControl(rewardControl())).toBe(true);
     expect(
       isValidNextControl({
         kind: "SHARED_INTERACTION",
@@ -297,6 +313,16 @@ describe("validateNextControl", () => {
       }),
     ).toBe(true);
     expect(isValidNextControl(terminal())).toBe(true);
+  });
+
+  it("rejects retired broad reward, biome, and Mystery controls", () => {
+    for (const control of [
+      { kind: "REWARD", operationId: "r", ownerSeatId: 0 },
+      { kind: "BIOME", operationId: "b", ownerSeatId: 0 },
+      { kind: "MYSTERY", operationId: "m", ownerSeatId: 1 },
+    ]) {
+      expect(isValidNextControl(control)).toBe(false);
+    }
   });
 
   it("requires the cross-wave permission only on successor waits", () => {
@@ -368,7 +394,7 @@ describe("validateNextControl", () => {
   });
 
   it("rejects empty opaque ids", () => {
-    expect(validateNextControl(reward({ operationId: "" })).ok).toBe(false);
+    expect(validateNextControl(rewardControl({ operationId: "" })).ok).toBe(false);
     expect(validateNextControl(terminal("")).ok).toBe(false);
   });
 
@@ -431,9 +457,6 @@ function fakeSurface(script: FakeSurfaceScript = {}) {
       calls.push({ verb: "installReplacement", args });
       return true;
     },
-    installReward: (...args) => calls.push({ verb: "installReward", args }),
-    installBiome: (...args) => calls.push({ verb: "installBiome", args }),
-    installMystery: (...args) => calls.push({ verb: "installMystery", args }),
     installSharedInteraction: (...args) => {
       calls.push({ verb: "installSharedInteraction", args });
       return true;
@@ -532,12 +555,6 @@ describe("DefaultCoopControlProjector", () => {
     const { result, calls } = project(frontier, { fieldSlots: { 42: 0 } });
     expect(result.kind).toBe("deferred");
     expect(calls).toHaveLength(0);
-  });
-
-  it("installs the owning interaction surface for REWARD / BIOME / MYSTERY", () => {
-    expect(project(reward(), {}).calls[0].verb).toBe("installReward");
-    expect(project({ kind: "BIOME", operationId: "b", ownerSeatId: 0 }, {}).calls[0].verb).toBe("installBiome");
-    expect(project({ kind: "MYSTERY", operationId: "m", ownerSeatId: 0 }, {}).calls[0].verb).toBe("installMystery");
   });
 
   it("projects registered shared interactions and explicit address-constrained successor waits", () => {
@@ -723,7 +740,7 @@ describe("applyEntry (replica pipeline)", () => {
 
   it("surfaces a rejected control without retiring (no controlInstalled)", () => {
     const rec = recordingSink();
-    const out = applyEntry(CTX, entryWith(reward()), {
+    const out = applyEntry(CTX, entryWith(rewardControl()), {
       applyMaterial: () => true,
       projector: fixedProjector({ kind: "rejected", reason: "impossible" }),
       receipts: rec.sink,

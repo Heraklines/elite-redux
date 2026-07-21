@@ -165,6 +165,19 @@ const TERMINAL_MATERIAL: CoopTerminalMaterialV2 = {
   },
 };
 
+function awaitInteraction(afterOperationId: string) {
+  return {
+    kind: "AWAIT_SUCCESSOR" as const,
+    afterOperationId,
+    epoch: SESSION.epoch,
+    wave: WAVE_MATERIAL.wave,
+    turn: WAVE_MATERIAL.turn,
+    allowedKinds: ["INTERACTION_COMMIT" as const],
+    allowNextWaveStart: true,
+    expectedOperationId: null,
+  };
+}
+
 afterEach(() => {
   clearActiveCoopV2WaveCutover();
   clearCoopV2ShadowInbound();
@@ -213,23 +226,20 @@ describe("authority-v2 wave/terminal cutover mode", () => {
 });
 
 describe("authority-v2 wave/terminal host commits", () => {
-  it("commits the full wave carrier and exact reward successor through one ordered log", () => {
+  it("commits the full wave carrier and an explicit ordered wait for the typed interaction entry", () => {
     const duo = buildDuo();
     const cutover = new CoopV2WaveCutover(duo.host);
+    const operationId = "V2/WAVE/e11/w8/tick90";
     const entry = cutover.commitHostWave({
-      operationId: "V2/WAVE/e11/w8/tick90",
+      operationId,
       transition: WAVE_MATERIAL,
-      destination: { kind: "REWARD", operationId: "V2/WAVE/NEXT/e11/w8/tick90", ownerSeatId: 1 },
+      destination: awaitInteraction(operationId),
       legacyImage: WAVE_MATERIAL,
       legacyDigest: "unused-when-image-present",
     });
     expect(entry?.kind).toBe("WAVE_ADVANCE");
     expect(entry?.material.payload).toEqual(WAVE_MATERIAL);
-    expect(entry?.nextControl).toEqual({
-      kind: "REWARD",
-      operationId: "V2/WAVE/NEXT/e11/w8/tick90",
-      ownerSeatId: 1,
-    });
+    expect(entry?.nextControl).toEqual(awaitInteraction(operationId));
     expect(duo.host.diagnostics().retained).toBe(0);
     expect(duo.guest.diagnostics().applied).toBe(1);
     cutover.dispose();
@@ -237,7 +247,7 @@ describe("authority-v2 wave/terminal host commits", () => {
       cutover.commitHostWave({
         operationId: "after-dispose",
         transition: WAVE_MATERIAL,
-        destination: { kind: "REWARD", operationId: "after-dispose-next", ownerSeatId: 0 },
+        destination: awaitInteraction("after-dispose"),
         legacyDigest: "after-dispose",
       }),
     ).toBeNull();

@@ -24,7 +24,7 @@
 //  - buildWaveAdvanceEntry: a WAVE_ADVANCE entry whose material is the COMPLETE
 //    transition (outcome, victory kind, next wave, biome change, egg lapse, ME
 //    boundary) and whose nextControl is the canonical destination
-//    (REWARD | BIOME | COMMAND | MYSTERY). A WAVE_ADVANCE SUBSUMES the unretired
+//    (COMMAND_FRONTIER or an explicit AWAIT_SUCCESSOR). A WAVE_ADVANCE SUBSUMES the unretired
 //    same-wave TURN/REPLACEMENT entries: the wave is over, their control surfaces
 //    are moot, so ordinary log order retires them (no cross-retention race).
 //  - buildTerminalCommitEntry: a TERMINAL_COMMIT for GameOver / final flee /
@@ -186,7 +186,7 @@ export interface CoopTerminalMaterialV2 {
 export type CoopWaveAdvanceDestination = Extract<
   ProjectableControl,
   {
-    kind: "REWARD" | "BIOME" | "COMMAND_FRONTIER" | "MYSTERY" | "SHARED_INTERACTION" | "AWAIT_SUCCESSOR";
+    kind: "COMMAND_FRONTIER" | "AWAIT_SUCCESSOR";
   }
 >;
 
@@ -360,21 +360,40 @@ export function buildWaveAdvanceEntry(input: BuildWaveAdvanceEntryInput): Omit<C
   if (!isValidWaveTransitionMaterial(transition)) {
     throw new CoopWaveTerminalBuildError("WAVE_ADVANCE material is not a complete wave-transition");
   }
-  // Runtime guard against a mistyped caller: the type excludes TERMINAL, but a control minted
-  // dynamically could still carry it; a wave-advance never seals the session (that is the terminal builder).
+  // Runtime guard against a mistyped caller. A wave entry contains no interaction presentation capsule,
+  // so it may state only a command frontier or an explicit wait for the later typed interaction entry.
+  // TERMINAL belongs exclusively to the terminal builder.
   const destinationKind: string = (destination as ProjectableControl).kind;
-  if (destinationKind === "TERMINAL") {
-    throw new CoopWaveTerminalBuildError(`WAVE_ADVANCE destination cannot be TERMINAL (got ${destinationKind})`);
+  if (destinationKind !== "COMMAND_FRONTIER" && destinationKind !== "AWAIT_SUCCESSOR") {
+    throw new CoopWaveTerminalBuildError(
+      `WAVE_ADVANCE destination must be COMMAND_FRONTIER | AWAIT_SUCCESSOR (got ${destinationKind})`,
+    );
   }
   const validation = validateNextControl(destination);
   if (!validation.ok) {
     throw new CoopWaveTerminalBuildError(`WAVE_ADVANCE destination is malformed: ${validation.reason}`);
+  }
+  if (destination.epoch !== context.sessionEpoch) {
+    throw new CoopWaveTerminalBuildError(
+      `WAVE_ADVANCE destination epoch must match sessionEpoch=${context.sessionEpoch} (got ${destination.epoch})`,
+    );
   }
   // The command frontier states the next wave, turn 1.
   if (destination.kind === "COMMAND_FRONTIER" && (destination.wave !== transition.nextWave || destination.turn !== 1)) {
     throw new CoopWaveTerminalBuildError(
       `WAVE_ADVANCE COMMAND_FRONTIER destination must address nextWave=${transition.nextWave} turn=1`
         + ` (got wave=${destination.wave} turn=${destination.turn})`,
+    );
+  }
+  if (
+    destination.kind === "AWAIT_SUCCESSOR"
+    && (destination.afterOperationId !== operationId
+      || destination.wave !== transition.wave
+      || destination.turn !== transition.turn)
+  ) {
+    throw new CoopWaveTerminalBuildError(
+      `WAVE_ADVANCE AWAIT_SUCCESSOR must bind operation=${operationId}`
+        + ` wave=${transition.wave} turn=${transition.turn}`,
     );
   }
   const subsumes = normalizeSubsumes(input.subsumes);
@@ -460,8 +479,8 @@ function normalizeSubsumes(subsumes: readonly number[] | undefined): readonly nu
 
 /**
  * The wave an entry's stated control belongs to, or null when the control has no
- * wave coordinate (REWARD/BIOME/MYSTERY/TERMINAL are wave-agnostic boundaries,
- * and a null control has no successor). This is the ONLY non-opaque wave signal
+ * wave coordinate (TERMINAL is wave-agnostic and a null control has no
+ * successor). This is the ONLY non-opaque wave signal
  * on an arbitrary entry - the log never reads the material payload - so
  * same-wave supersession keys on it.
  */
@@ -470,7 +489,7 @@ export function entryControlWave(entry: CoopAuthorityEntry): number | null {
   if (control == null) {
     return null;
   }
-  return control.kind === "COMMAND_FRONTIER" || control.kind === "AWAIT_SUCCESSOR" ? control.wave : null;
+  return control.kind === "TERMINAL" ? null : control.wave;
 }
 
 /**

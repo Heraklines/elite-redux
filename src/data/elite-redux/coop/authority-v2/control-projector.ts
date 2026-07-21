@@ -108,15 +108,6 @@ export interface ControlSurface {
   /** Prove the exact naturally-created faint replacement picker; never fabricate one from ambient state. */
   installReplacement(operationId: string, ownerSeatId: number, controlId: string): boolean;
 
-  /** Install the reward interaction surface for `operationId`. */
-  installReward(operationId: string, controlId: string): void;
-
-  /** Install the biome interaction surface for `operationId`. */
-  installBiome(operationId: string, controlId: string): void;
-
-  /** Install the mystery-encounter interaction surface for `operationId`. */
-  installMystery(operationId: string, controlId: string): void;
-
   /** Prove/install one registered shared-input surface after its immutable result materialized. */
   installSharedInteraction(
     surfaceClass: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>["surfaceClass"],
@@ -231,15 +222,6 @@ export class DefaultCoopControlProjector implements CoopControlProjector {
         return surface.installReplacement(projectable.operationId, projectable.ownerSeatId, controlId)
           ? { kind: "installed", controlId }
           : { kind: "deferred", reason: `awaiting exact replacement picker for ${controlId}` };
-      case "REWARD":
-        surface.installReward(projectable.operationId, controlId);
-        return { kind: "installed", controlId };
-      case "BIOME":
-        surface.installBiome(projectable.operationId, controlId);
-        return { kind: "installed", controlId };
-      case "MYSTERY":
-        surface.installMystery(projectable.operationId, controlId);
-        return { kind: "installed", controlId };
       case "SHARED_INTERACTION":
         return surface.installSharedInteraction(
           projectable.surfaceClass,
@@ -288,9 +270,8 @@ export function createCoopControlProjector(
  *   COMMAND     -> "CommandPhase" for the owner's resolved field slot.
  *   REPLACEMENT -> owner: "SwitchPhase" (modal faint-switch picker);
  *                  non-owner: "CoopPartnerSyncPhase" (await the owner's pick).
- *   REWARD      -> "SelectModifierPhase" (the reward shop surface).
- *   BIOME       -> "SelectBiomePhase".
- *   MYSTERY     -> "MysteryEncounterPhase".
+ *   SHARED_INTERACTION -> prove the registered, address-exact public interaction surface.
+ *   AWAIT_SUCCESSOR    -> park at the stated ordered-log boundary.
  *   TERMINAL    -> drain the local control queue (freeze; stop deriving successors).
  *
  * SEAM CAVEATS (driven precisely by the sentinel suite, conservative here):
@@ -346,21 +327,6 @@ export function sceneControlSurface(ctx: CoopRuntimeContext): ControlSurface {
         && scene.ui?.getHandler()?.active === true
         && scene.ui.getMode() === UiMode.PARTY
       );
-    },
-    installReward(): void {
-      if (!pm.hasPhaseOfType("SelectModifierPhase")) {
-        pm.unshiftNew("SelectModifierPhase");
-      }
-    },
-    installBiome(): void {
-      if (!pm.hasPhaseOfType("SelectBiomePhase")) {
-        pm.unshiftNew("SelectBiomePhase");
-      }
-    },
-    installMystery(): void {
-      if (!pm.hasPhaseOfType("MysteryEncounterPhase")) {
-        pm.unshiftNew("MysteryEncounterPhase");
-      }
     },
     installSharedInteraction(surfaceClass, operationKind): boolean {
       const contract = coopV2InteractionUiProofContract(surfaceClass, operationKind);

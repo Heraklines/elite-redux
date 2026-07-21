@@ -146,9 +146,6 @@ describe("authority-v2 frame codec (round-trip)", () => {
         turn: 1,
         commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
       },
-      { kind: "REWARD", operationId: "op-r", ownerSeatId: 0 },
-      { kind: "BIOME", operationId: "op-b", ownerSeatId: 1 },
-      { kind: "MYSTERY", operationId: "op-m", ownerSeatId: 0 },
       {
         kind: "SHARED_INTERACTION",
         operationId: "op-i",

@@ -26,8 +26,8 @@
 // the REPLICA ADOPTS that material and PROJECTS that control. The legacy path
 // DERIVED the successor from the local phase queue (crossroads STAY -> queued
 // NewBattlePhase, LEAVE -> unshiftNew SelectBiomePhase). Here the successor is a
-// first-class stated CoopNextControl - COMMAND for the next wave, or a REWARD /
-// BIOME / MYSTERY chain - never derived by the guest.
+// first-class stated CoopNextControl - COMMAND for the next wave, another exact
+// SHARED_INTERACTION, or an explicit AWAIT_SUCCESSOR - never derived by the guest.
 //
 // THE WATCHER-CLOSE (frozen ownership rules): a committed entry CLOSES the
 // non-owner's open watcher surface through the ORDERED material apply (the applier
@@ -75,14 +75,14 @@ export type CoopInteractionSurface = "reward" | "market" | "biome";
  * The successor control the AUTHORITY may state after an interaction (frozen
  * decision 4). It is a plain {@link CoopNextControl} restricted to the destinations
  * an interaction can legally chain to: COMMAND (the next wave's first command),
- * REWARD / BIOME / MYSTERY (another between-wave interaction in the chain), or
- * AWAIT_SUCCESSOR (an explicit ordered wait). A
+ * another address-exact SHARED_INTERACTION, or AWAIT_SUCCESSOR (an explicit
+ * ordered wait). A
  * TERMINAL is NEVER an interaction's job (that is the wave-terminal adapter) and a
  * REPLACEMENT is a faint's, so both are excluded by construction.
  */
 export type CoopInteractionSuccessor = Extract<
   ProjectableControl,
-  { kind: "COMMAND_FRONTIER" | "REWARD" | "BIOME" | "MYSTERY" | "AWAIT_SUCCESSOR" }
+  { kind: "COMMAND_FRONTIER" | "SHARED_INTERACTION" | "AWAIT_SUCCESSOR" }
 >;
 
 /** Thrown by the authority-side builders on malformed input: an authority must NEVER commit a malformed entry. */
@@ -175,15 +175,9 @@ function assertInteractionSuccessor(successor: CoopInteractionSuccessor): CoopNe
     throw new CoopInteractionBuildError("interaction successor is required; use AWAIT_SUCCESSOR for an ordered wait");
   }
   const kind: string = (successor as ProjectableControl).kind;
-  if (
-    kind !== "COMMAND_FRONTIER"
-    && kind !== "REWARD"
-    && kind !== "BIOME"
-    && kind !== "MYSTERY"
-    && kind !== "AWAIT_SUCCESSOR"
-  ) {
+  if (kind !== "COMMAND_FRONTIER" && kind !== "SHARED_INTERACTION" && kind !== "AWAIT_SUCCESSOR") {
     throw new CoopInteractionBuildError(
-      `interaction successor must be COMMAND_FRONTIER | REWARD | BIOME | MYSTERY | AWAIT_SUCCESSOR (got ${kind})`,
+      `interaction successor must be COMMAND_FRONTIER | SHARED_INTERACTION | AWAIT_SUCCESSOR (got ${kind})`,
     );
   }
   const validation = validateNextControl(successor);
@@ -323,7 +317,7 @@ export interface BuildRewardInteractionEntryInput {
   readonly address?: CoopInteractionWindowAddress;
   /** The resolved reward material. */
   readonly material: CoopRewardInteractionMaterialV2;
-  /** The authority-stated successor control (COMMAND next wave, or REWARD/BIOME/MYSTERY chain, or null). */
+  /** The authority-stated exact successor control. */
   readonly successor: CoopInteractionSuccessor;
   /** Revisions this entry explicitly subsumes (supersession by log order); default none. */
   readonly subsumes?: readonly number[];

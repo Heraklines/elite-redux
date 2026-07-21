@@ -11,8 +11,8 @@
 // import + the pure next-control / authority-entry / replica helpers), so it runs
 // in the node-pure project in milliseconds. These pin Migration C's load-bearing
 // behaviours:
-//   - destination coverage for all five nextControl kinds (REWARD/BIOME/COMMAND/
-//     MYSTERY on a WAVE_ADVANCE; TERMINAL on a TERMINAL_COMMIT).
+//   - destination coverage for the closed wave graph (COMMAND/AWAIT_SUCCESSOR
+//     on a WAVE_ADVANCE; TERMINAL on a TERMINAL_COMMIT).
 //   - a TERMINAL_COMMIT supersedes an unretired turn entry at the LOG level: the
 //     stale wait's lease cancels and both sides converge on TERMINAL, via the
 //     foundation log's subsumes mechanism (no special abort predicate).
@@ -223,15 +223,22 @@ const GAME_OVER_TERMINAL: CoopTerminalMaterialV2 = {
   turn: 2,
 };
 
-const reward = (): CoopNextControl => ({ kind: "REWARD", operationId: "op-reward-w3", ownerSeatId: 0 });
-const biome = (): CoopNextControl => ({ kind: "BIOME", operationId: "op-biome-w3", ownerSeatId: 0 });
-const mystery = (): CoopNextControl => ({ kind: "MYSTERY", operationId: "op-mystery-w3", ownerSeatId: 1 });
 const command = (): CoopNextControl => ({
   kind: "COMMAND_FRONTIER",
   epoch: 1,
   wave: 4,
   turn: 1,
   commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
+});
+const awaitInteraction = (afterOperationId = "wave-adv-w3"): Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> => ({
+  kind: "AWAIT_SUCCESSOR",
+  afterOperationId,
+  epoch: 1,
+  wave: 3,
+  turn: 2,
+  allowedKinds: ["INTERACTION_COMMIT"],
+  allowNextWaveStart: false,
+  expectedOperationId: null,
 });
 
 function receipt(entry: CoopAuthorityEntry, stage: "admitted" | "materialApplied" | "controlInstalled") {
@@ -245,15 +252,13 @@ function receipt(entry: CoopAuthorityEntry, stage: "admitted" | "materialApplied
 }
 
 // ---------------------------------------------------------------------------
-// Destination coverage for all five nextControl kinds
+// Destination coverage for the closed wave successor graph
 // ---------------------------------------------------------------------------
 
 describe("buildWaveAdvanceEntry - destination coverage", () => {
   const cases: [string, CoopNextControl][] = [
-    ["REWARD", reward()],
-    ["BIOME", biome()],
     ["COMMAND", command()],
-    ["MYSTERY", mystery()],
+    ["AWAIT_SUCCESSOR", awaitInteraction("wave-adv-AWAIT_SUCCESSOR")],
   ];
 
   for (const [name, destination] of cases) {
@@ -275,7 +280,7 @@ describe("buildWaveAdvanceEntry - destination coverage", () => {
     });
   }
 
-  it("covers the fifth kind (TERMINAL) via buildTerminalCommitEntry", () => {
+  it("states TERMINAL only via buildTerminalCommitEntry", () => {
     const entry = buildTerminalCommitEntry({
       context: frameContext(),
       operationId: "terminal-w3",
@@ -305,13 +310,69 @@ describe("buildWaveAdvanceEntry - destination coverage", () => {
     ).toThrow(CoopWaveTerminalBuildError);
   });
 
-  it("rejects a TERMINAL / REPLACEMENT destination on a wave-advance", () => {
+  it("rejects legacy broad interaction, TERMINAL, and REPLACEMENT destinations on a wave-advance", () => {
+    for (const destination of [
+      { kind: "REWARD", operationId: "broad-reward", ownerSeatId: 0 },
+      { kind: "BIOME", operationId: "broad-biome", ownerSeatId: 0 },
+      { kind: "MYSTERY", operationId: "broad-mystery", ownerSeatId: 1 },
+      { kind: "TERMINAL", terminalId: "x" },
+      {
+        kind: "REPLACEMENT",
+        operationId: "replace",
+        ownerSeatId: 0,
+        epoch: 1,
+        wave: 3,
+        turn: 2,
+        occurrence: 0,
+        fieldIndex: 0,
+      },
+    ]) {
+      expect(() =>
+        buildWaveAdvanceEntry({
+          context: frameContext(),
+          operationId: `wave-adv-invalid-${destination.kind}`,
+          transition: WIN_TRANSITION,
+          destination: destination as never,
+        }),
+      ).toThrow(CoopWaveTerminalBuildError);
+    }
+  });
+
+  it("binds an ordered wait to the exact wave operation, epoch, and source coordinate", () => {
+    for (const destination of [
+      awaitInteraction("wrong-operation"),
+      { ...awaitInteraction("wave-adv-coordinate"), epoch: 2 },
+      { ...awaitInteraction("wave-adv-coordinate"), wave: 4 },
+      { ...awaitInteraction("wave-adv-coordinate"), turn: 3 },
+    ]) {
+      expect(() =>
+        buildWaveAdvanceEntry({
+          context: frameContext(),
+          operationId: "wave-adv-coordinate",
+          transition: WIN_TRANSITION,
+          destination,
+        }),
+      ).toThrow(CoopWaveTerminalBuildError);
+    }
+  });
+
+  it("rejects a direct shared interaction without a wave-owned immutable presentation capsule", () => {
     expect(() =>
       buildWaveAdvanceEntry({
         context: frameContext(),
-        operationId: "wave-adv-terminal-dest",
+        operationId: "wave-adv-direct-shared",
         transition: WIN_TRANSITION,
-        destination: { kind: "TERMINAL", terminalId: "x" } as never,
+        destination: {
+          kind: "SHARED_INTERACTION",
+          operationId: "present",
+          ownerSeatId: 0,
+          epoch: 1,
+          wave: 3,
+          turn: 2,
+          surfaceClass: "op:reward",
+          operationKind: "REWARD_PRESENT",
+          successor: { operationKinds: ["REWARD"] },
+        } as never,
       }),
     ).toThrow(CoopWaveTerminalBuildError);
   });
@@ -403,7 +464,7 @@ describe("material completeness validation", () => {
         context: frameContext(),
         operationId: "",
         transition: WIN_TRANSITION,
-        destination: reward() as never,
+        destination: awaitInteraction() as never,
       }),
     ).toThrow(CoopWaveTerminalBuildError);
     expect(() =>
@@ -430,20 +491,28 @@ describe("material completeness validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("waveBoundarySubsumes / terminalSubsumes / entryControlWave", () => {
-  it("entryControlWave reads the wave only from COMMAND/REPLACEMENT controls", () => {
+  it("entryControlWave reads every address-bearing control and excludes terminal", () => {
     expect(entryControlWave({ ...turnEntryInput(3, 1), revision: 1 })).toBe(3);
     expect(entryControlWave({ ...replacementEntryInput(3), revision: 2 })).toBe(3);
-    // A reward/biome/terminal/null control has no wave coordinate.
-    const rewardEntry: CoopAuthorityEntry = {
+    const waitEntry: CoopAuthorityEntry = {
       ...buildWaveAdvanceEntry({
         context: frameContext(),
         operationId: "wa",
         transition: WIN_TRANSITION,
-        destination: reward() as never,
+        destination: awaitInteraction("wa") as never,
       }),
       revision: 3,
     };
-    expect(entryControlWave(rewardEntry)).toBeNull();
+    expect(entryControlWave(waitEntry)).toBe(3);
+    const terminalEntry: CoopAuthorityEntry = {
+      ...buildTerminalCommitEntry({
+        context: frameContext(),
+        operationId: "term",
+        terminal: GAME_OVER_TERMINAL,
+      }),
+      revision: 4,
+    };
+    expect(entryControlWave(terminalEntry)).toBeNull();
   });
 
   it("waveBoundarySubsumes selects ONLY same-wave turn/replacement entries", () => {
@@ -464,7 +533,7 @@ describe("waveBoundarySubsumes / terminalSubsumes / entryControlWave", () => {
         context: frameContext(),
         operationId: "wa",
         transition: WIN_TRANSITION,
-        destination: reward() as never,
+        destination: awaitInteraction("wa") as never,
       }),
       revision: 5,
     };
@@ -509,7 +578,7 @@ describe("WAVE_ADVANCE supersession at the log", () => {
         context: frameContext(),
         operationId: "wave-adv-w3",
         transition: { ...WIN_TRANSITION, turn: 1 },
-        destination: reward() as never,
+        destination: awaitInteraction("wave-adv-w3") as never,
         subsumes,
       }),
     );
@@ -643,7 +712,7 @@ describe("createWaveTerminalApplier (replica adoption)", () => {
         context: frameContext(),
         operationId: "wa",
         transition: WIN_TRANSITION,
-        destination: reward() as never,
+        destination: awaitInteraction("wa") as never,
       }),
       revision: 1,
     };
@@ -652,7 +721,7 @@ describe("createWaveTerminalApplier (replica adoption)", () => {
       applyMaterial: applier,
       projector: fixedProjector({
         kind: "installed",
-        controlId: controlIdOf(reward() as NonNullable<CoopNextControl>),
+        controlId: controlIdOf(awaitInteraction("wa") as NonNullable<CoopNextControl>),
       }),
       receipts: rec.sink,
       ...PIPELINE_BOOKKEEPING,
@@ -688,7 +757,7 @@ describe("createWaveTerminalApplier (replica adoption)", () => {
       context: frameContext(),
       operationId: "wa",
       transition: WIN_TRANSITION,
-      destination: reward() as never,
+      destination: awaitInteraction("wa") as never,
     });
     // A redelivery that smuggled a different payload under the same digest is rejected.
     const tampered: CoopAuthorityEntry = {
@@ -745,7 +814,7 @@ describe("shadow parity", () => {
         context: frameContext(),
         operationId: "wa",
         transition: WIN_TRANSITION,
-        destination: reward() as never,
+        destination: awaitInteraction("wa") as never,
       }),
     );
     const shadow = shadowOfWaveTerminalEntry(
@@ -753,7 +822,7 @@ describe("shadow parity", () => {
         context: frameContext(),
         operationId: "wa",
         transition: WIN_TRANSITION,
-        destination: biome() as never,
+        destination: command() as never,
       }),
     );
     const verdict = checkWaveTerminalParity(authority, shadow);
@@ -769,7 +838,7 @@ describe("shadow parity", () => {
         context: frameContext(),
         operationId: "wa",
         transition: WIN_TRANSITION,
-        destination: reward() as never,
+        destination: awaitInteraction("wa") as never,
       }),
     );
     const shadow = shadowOfWaveTerminalEntry(
@@ -777,7 +846,7 @@ describe("shadow parity", () => {
         context: frameContext(),
         operationId: "wa",
         transition: { ...WIN_TRANSITION, nextWave: 5, biomeChange: true },
-        destination: reward() as never,
+        destination: awaitInteraction("wa") as never,
       }),
     );
     const verdict = checkWaveTerminalParity(authority, shadow);

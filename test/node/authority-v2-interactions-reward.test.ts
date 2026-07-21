@@ -134,6 +134,34 @@ function commandSuccessor(
   };
 }
 
+function rewardContinuation(operationId: string) {
+  return {
+    kind: "SHARED_INTERACTION" as const,
+    operationId,
+    ownerSeatId: 1,
+    epoch: 1,
+    wave: 5,
+    turn: 1,
+    surfaceClass: "op:reward" as const,
+    operationKind: "REWARD" as const,
+    successor: { operationKinds: ["REWARD" as const], operationIds: [operationId] },
+  };
+}
+
+function biomeContinuation(operationId: string) {
+  return {
+    kind: "SHARED_INTERACTION" as const,
+    operationId,
+    ownerSeatId: 1,
+    epoch: 1,
+    wave: 5,
+    turn: 1,
+    surfaceClass: "op:biome" as const,
+    operationKind: "BIOME_PICK" as const,
+    successor: { operationKinds: ["BIOME_PICK" as const], operationIds: [operationId] },
+  };
+}
+
 /**
  * A deterministic scheduler clock driving the REAL CoopSchedulerImpl (so active-time
  * pause/resume is exercised for real). Mirrors the replacement test's ManualClock.
@@ -261,18 +289,20 @@ describe("reward builder + material validation", () => {
     ).toThrow();
   });
 
-  it("states a REWARD-chain successor for a non-terminal continuation pick", () => {
+  it("states an exact shared reward successor for a non-terminal continuation pick", () => {
+    const nextOperationId = rewardOperationId(windowAddress({ actionOrdinal: 1 }));
     const built = buildRewardInteractionEntry({
       context: FRAME,
       address: windowAddress({ actionOrdinal: 0 }),
       material: rewardMaterial({ choice: { kind: "pick", optionIndex: 1, subPicks: [] }, terminal: false }),
-      successor: {
-        kind: "REWARD",
-        operationId: rewardOperationId(windowAddress({ actionOrdinal: 1 })),
-        ownerSeatId: 1,
-      },
+      successor: rewardContinuation(nextOperationId),
     });
-    expect(built.nextControl).toMatchObject({ kind: "REWARD", ownerSeatId: 1 });
+    expect(built.nextControl).toMatchObject({
+      kind: "SHARED_INTERACTION",
+      surfaceClass: "op:reward",
+      operationId: nextOperationId,
+      ownerSeatId: 1,
+    });
   });
 });
 
@@ -361,15 +391,21 @@ describe("biome builder + destination validation", () => {
     expect(pick.operationId).toBe("IBIO/e1/w5/s1/kb");
     expect(pick.nextControl).toMatchObject({ kind: "COMMAND_FRONTIER", wave: 6 });
 
-    // Crossroads LEAVE (optionIndex 1) chains to another BIOME interaction (legacy: unshift SelectBiomePhase).
+    // Crossroads LEAVE (optionIndex 1) chains to an exact biome interaction.
+    const nextOperationId = "IBIO/e1/w5/s1/kb";
     const leave = buildBiomeInteractionEntry({
       context: FRAME,
       address: { epoch: 1, wave: 5, ownerSeatId: 1, selection: "crossroads-pick" },
       material: biomeMaterial({ selection: { kind: "crossroads-pick", optionIndex: 1 } }),
-      successor: { kind: "BIOME", operationId: "IBIO/e1/w5/s1/kb", ownerSeatId: 1 },
+      successor: biomeContinuation(nextOperationId),
     });
     expect(leave.operationId).toBe("IBIO/e1/w5/s1/kx");
-    expect(leave.nextControl).toMatchObject({ kind: "BIOME", ownerSeatId: 1 });
+    expect(leave.nextControl).toMatchObject({
+      kind: "SHARED_INTERACTION",
+      surfaceClass: "op:biome",
+      operationId: nextOperationId,
+      ownerSeatId: 1,
+    });
   });
 });
 

@@ -4759,44 +4759,6 @@ function completeCoopV2WaveTransaction(runtime: CoopRuntime, transaction: CoopV2
   }
 }
 
-/**
- * Prove that the current reward-like phase has actually opened its own executable handler.
- *
- * `handler.active` alone is insufficient: a freshly-current phase can inherit an active Title/Confirm/
- * Message handler from the phase it replaced. Accept only the mode owned by this exact phase. The biome
- * watcher is the one deliberate MESSAGE exception, and it publishes its phase-owned readiness latch only
- * after authoritative stock and the terminal-consumer loop are both live.
- */
-function isCoopV2RewardContinuationSurfacePublic(phaseName: string | undefined): boolean {
-  if (globalScene.ui.getHandler()?.active !== true) {
-    return false;
-  }
-  const mode = globalScene.ui.getMode();
-  switch (phaseName) {
-    case "SelectModifierPhase": {
-      // BiomeShopPhase deliberately inherits SelectModifierPhase.phaseName because the party/item
-      // continuation machinery keys off it. Its non-owner never opens BIOME_SHOP: after reconstructing
-      // authoritative stock it keeps an executable MESSAGE handler alive and sets this phase-owned latch.
-      // Recognize that exact tuple here so the V2 WAVE_ADVANCE can install its REWARD control before the
-      // following Crossroads interaction advances the owner counter and later entries become a permanent gap.
-      const phase = globalScene.phaseManager?.getCurrentPhase() as
-        | { coopBiomeWatcherContinuationReady?: boolean }
-        | undefined;
-      return (
-        mode === UiMode.MODIFIER_SELECT
-        || mode === UiMode.BIOME_SHOP
-        || (mode === UiMode.MESSAGE && phase?.coopBiomeWatcherContinuationReady === true)
-      );
-    }
-    case "TheBargainPhase":
-      return mode === UiMode.ER_BARGAIN;
-    case "ErCrossroadsPhase":
-      return mode === UiMode.OPTION_SELECT;
-    default:
-      return false;
-  }
-}
-
 function projectCoopV2WaveControl(
   runtime: CoopRuntime,
   control: NonNullable<CoopNextControl>,
@@ -4810,34 +4772,11 @@ function projectCoopV2WaveControl(
     return { kind: "deferred", reason: `wave ${transaction.transition.wave} DATA has not reached BattleEnd` };
   }
   const phaseName = globalScene.phaseManager?.getCurrentPhase()?.phaseName;
-  const handlerActive = globalScene.ui.getHandler()?.active === true;
-  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
-  const atTransactionWave =
-    currentWave === transaction.transition.wave || currentWave === transaction.transition.nextWave;
   const installed = (): CoopControlInstallResult => {
     completeCoopV2WaveTransaction(runtime, transaction);
     return { kind: "installed", controlId };
   };
   switch (control.kind) {
-    case "REWARD": {
-      return atTransactionWave && isCoopV2RewardContinuationSurfacePublic(phaseName)
-        ? installed()
-        : { kind: "deferred", reason: `awaiting real reward surface for ${controlId}` };
-    }
-    case "BIOME": {
-      return atTransactionWave && handlerActive && phaseName === "SelectBiomePhase"
-        ? installed()
-        : { kind: "deferred", reason: `awaiting real biome surface for ${controlId}` };
-    }
-    case "MYSTERY": {
-      return atTransactionWave
-        && handlerActive
-        && (phaseName === "MysteryEncounterPhase"
-          || phaseName === "CoopReplayMePhase"
-          || phaseName === "PostMysteryEncounterPhase")
-        ? installed()
-        : { kind: "deferred", reason: `awaiting real Mystery surface for ${controlId}` };
-    }
     case "TERMINAL":
       return (transaction.terminalId === control.terminalId && phaseName === "GameOverPhase")
         || isCoopSharedTerminalFrozen(runtime)
@@ -5250,11 +5189,7 @@ function buildCoopV2LiveSeams(
       || ((surfaces.turn || surfaces.control) && control.kind === "COMMAND_FRONTIER")
       || (surfaces.replacement && control.kind === "REPLACEMENT")
       || (surfaces.interaction && control.kind === "SHARED_INTERACTION")
-      || (surfaces.wave
-        && (control.kind === "REWARD"
-          || control.kind === "BIOME"
-          || control.kind === "MYSTERY"
-          || control.kind === "TERMINAL")),
+      || (surfaces.wave && control.kind === "TERMINAL"),
     prepareAuthorityEntry: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): (() => void) | null => {
       if (
         runtime.controller.authorityRole !== "authority"
@@ -5595,13 +5530,7 @@ function buildCoopV2LiveSeams(
           return null;
         }
       }
-      if (
-        surfaces.wave
-        && (control.kind === "REWARD"
-          || control.kind === "BIOME"
-          || control.kind === "MYSTERY"
-          || control.kind === "TERMINAL")
-      ) {
+      if (surfaces.wave && control.kind === "TERMINAL") {
         try {
           return runtime.v2ControlLedger.projectMechanical(control, () => projectCoopV2WaveControl(runtime, control));
         } catch (error) {
@@ -7765,7 +7694,6 @@ function tapCoopV2ShadowWaveBoundary(
   }
   const turn = globalScene.currentBattle?.turn ?? 1;
   const legacyDigest = fnv1a64(canonicalize(transition));
-  const ownerSeatId = runtime.controller.authoritySeatId;
   if (outcome === "gameOver") {
     const terminal: CoopTerminalMaterialV2 = {
       kind: "terminal",
@@ -7796,17 +7724,23 @@ function tapCoopV2ShadowWaveBoundary(
     outcome === "flee"
       ? { ...base, outcome: "flee" }
       : { ...base, outcome, victoryKind: transition.victoryKind ?? "wild" };
+  const operationId = `WSHADOW/ADV/w${wave}`;
   const destination: CoopWaveAdvanceDestination = {
-    kind: "REWARD",
-    operationId: `WSHADOW/REWARD/w${wave}`,
-    ownerSeatId,
+    kind: "AWAIT_SUCCESSOR",
+    afterOperationId: operationId,
+    epoch: runtime.controller.sessionEpoch,
+    wave,
+    turn: Math.max(1, turn),
+    allowedKinds: ["INTERACTION_COMMIT"],
+    allowNextWaveStart: true,
+    expectedOperationId: null,
   };
   // Deliverable 3: fingerprint the LEGACY waveResolved image (the transition the host broadcast) through the
   // wave adapter's OWN digest so wave parity becomes JUDGEABLE-true - v2 entry digest vs v2-digest-of-legacy-
   // image, like-for-like. The raw canonicalize(transition) token stays as the fallback legacyDigest for the
   // log. Shadow only - no wave cutover; the wave surface stays legacy-authoritative.
   shadow.tapWaveAdvance({
-    operationId: `WSHADOW/ADV/w${wave}`,
+    operationId,
     transition: material,
     destination,
     legacyImage: material,
@@ -9107,7 +9041,7 @@ function commitCoopV2SettledWaveAdvance(
       wave: transition.wave,
       turn: state.turn,
       allowedKinds: ["INTERACTION_COMMIT"],
-      allowNextWaveStart: false,
+      allowNextWaveStart: true,
       expectedOperationId: null,
     };
   } else {
@@ -9115,10 +9049,10 @@ function commitCoopV2SettledWaveAdvance(
       kind: "AWAIT_SUCCESSOR",
       afterOperationId: operationId,
       epoch: runtime.controller.sessionEpoch,
-      wave: transition.nextWave,
-      turn: 1,
+      wave: transition.wave,
+      turn: state.turn,
       allowedKinds: ["CONTROL_COMMIT"],
-      allowNextWaveStart: false,
+      allowNextWaveStart: true,
       expectedOperationId: null,
     };
   }

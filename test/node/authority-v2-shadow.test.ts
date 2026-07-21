@@ -30,9 +30,10 @@ import {
   decodeBiomeInteractionMaterial,
   decodeMarketInteractionMaterial,
   decodeRewardInteractionMaterial,
+  rewardOperationId,
 } from "#data/elite-redux/coop/authority-v2/adapters/interactions-reward";
 import { computeTurnCommitDigest } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
-import type { CoopAuthorityEntry } from "#data/elite-redux/coop/authority-v2/contract";
+import type { CoopAuthorityEntry, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
@@ -125,6 +126,24 @@ const SESSION = {
   membershipRevision: 1,
   seatMapId: "seatmap-shadow-1",
 };
+
+function awaitSuccessor(
+  afterOperationId: string,
+  wave: number,
+  turn: number,
+  allowNextWaveStart: boolean,
+): Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> {
+  return {
+    kind: "AWAIT_SUCCESSOR",
+    afterOperationId,
+    epoch: SESSION.epoch,
+    wave,
+    turn,
+    allowedKinds: ["CONTROL_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+    allowNextWaveStart,
+    expectedOperationId: null,
+  };
+}
 
 function identity(localSeatId: number): CoopV2ShadowIdentity {
   return {
@@ -439,8 +458,9 @@ describe("authority-v2 shadow harness", () => {
       successor: { kind: "terminal" },
       legacyDigest: "legacy-replace",
     });
+    const waveOperationId = "TAP/wave";
     duos[2].host.tapWaveAdvance({
-      operationId: "TAP/wave",
+      operationId: waveOperationId,
       transition: {
         kind: "wave-advance",
         wave: 5,
@@ -452,7 +472,7 @@ describe("authority-v2 shadow harness", () => {
         meBoundary: "none",
         victoryKind: "wild",
       },
-      destination: { kind: "REWARD", operationId: "TAP/wave/reward", ownerSeatId: 0 },
+      destination: awaitSuccessor(waveOperationId, 5, 1, true),
       legacyDigest: "legacy-wave",
     });
     duos[3].host.tapTerminal({
@@ -460,11 +480,12 @@ describe("authority-v2 shadow harness", () => {
       terminal: { kind: "terminal", terminalId: "term-1", reason: "game-over", wave: 6, turn: 1 },
       legacyDigest: "legacy-terminal",
     });
+    const rewardAddress = { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal: 0 } as const;
     const rewardEntry = buildRewardInteractionEntry({
       context: duos[4].host.authenticatedFrameContext,
-      address: { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal: 0 },
+      address: rewardAddress,
       material: { kind: "reward", wave: 6, ownerSeatId: 0, choice: { kind: "leave" }, terminal: true },
-      successor: { kind: "REWARD", operationId: "TAP/reward/successor", ownerSeatId: 0 },
+      successor: awaitSuccessor(rewardOperationId(rewardAddress), 6, 1, true),
     });
     duos[4].host.tapInteraction({ entry: rewardEntry, legacyDigest: "legacy-interaction" });
 
@@ -633,12 +654,13 @@ describe("authority-v2 shadow transport routing seam", () => {
     });
     clearActiveCoopV2Shadow(hosts[1]);
     setActiveCoopV2Shadow(hosts[2]);
+    const rewardAddress = { epoch: SESSION.epoch, wave: 5, ownerSeatId: 0, actionOrdinal: 1 } as const;
     tapCoopV2ShadowInteraction({
       entry: buildRewardInteractionEntry({
         context: hosts[2].authenticatedFrameContext,
-        address: { epoch: SESSION.epoch, wave: 5, ownerSeatId: 0, actionOrdinal: 1 },
+        address: rewardAddress,
         material: { kind: "reward", wave: 5, ownerSeatId: 0, choice: { kind: "skip" }, terminal: true },
-        successor: { kind: "REWARD", operationId: "THIN/reward/successor", ownerSeatId: 0 },
+        successor: awaitSuccessor(rewardOperationId(rewardAddress), 5, 1, true),
       }),
       legacyDigest: "legacy",
     });
@@ -906,12 +928,11 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
   });
 
   it("WAVE parity match=true/false by fingerprinting the legacy transition image", () => {
-    const destination = { kind: "REWARD", operationId: "W/reward", ownerSeatId: 0 } as const;
     const matchingDuo = buildDuo(new FakeClock());
     matchingDuo.host.tapWaveAdvance({
       operationId: "WAVE/true",
       transition: waveTransition(6),
-      destination,
+      destination: awaitSuccessor("WAVE/true", 5, 1, true),
       legacyDigest: "legacy-wave-token",
       legacyImage: waveTransition(6),
     });
@@ -919,7 +940,7 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
     divergentDuo.host.tapWaveAdvance({
       operationId: "WAVE/false",
       transition: waveTransition(6),
-      destination,
+      destination: awaitSuccessor("WAVE/false", 5, 1, true),
       legacyDigest: "legacy-wave-token",
       legacyImage: waveTransition(7), // a divergent nextWave -> states differ
     });
@@ -957,12 +978,13 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
 
   it("INTERACTION (pre-built) parity match=true/false by fingerprinting the legacy interaction image", () => {
     const duo = buildDuo(new FakeClock());
+    const rewardAddress = { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal: 0 } as const;
     const reward = (choice: { kind: "leave" } | { kind: "skip" }) =>
       buildRewardInteractionEntry({
         context: duo.host.authenticatedFrameContext,
-        address: { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal: 0 },
+        address: rewardAddress,
         material: { kind: "reward", wave: 6, ownerSeatId: 0, choice, terminal: true },
-        successor: { kind: "REWARD", operationId: "PARITY/reward/successor", ownerSeatId: 0 },
+        successor: awaitSuccessor(rewardOperationId(rewardAddress), 6, 1, true),
       });
     // Identical legacy image -> match=true.
     duo.host.tapInteraction({

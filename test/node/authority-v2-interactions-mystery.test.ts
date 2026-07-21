@@ -84,7 +84,21 @@ function address(over: Partial<CoopInteractionAddress> = {}): CoopInteractionAdd
   return { epoch: 1, wave: 12, turn: 1, interactionSeq: 4, ownerSeatId: 0, ...over };
 }
 
-const MYSTERY_SUCCESSOR: CoopNextControl = { kind: "MYSTERY", operationId: "me-op-42", ownerSeatId: 0 };
+function mysterySuccessor(ownerSeatId = 0): CoopNextControl {
+  return {
+    kind: "SHARED_INTERACTION",
+    operationId: "me-op-42",
+    ownerSeatId,
+    epoch: 1,
+    wave: 12,
+    turn: 1,
+    surfaceClass: "op:me",
+    operationKind: "ME_PRESENT",
+    successor: { operationKinds: ["ME_PICK"], operationIds: null },
+  };
+}
+
+const MYSTERY_SUCCESSOR = mysterySuccessor();
 const BATTLE_SUCCESSOR: CoopNextControl = {
   kind: "COMMAND_FRONTIER",
   epoch: 1,
@@ -92,7 +106,17 @@ const BATTLE_SUCCESSOR: CoopNextControl = {
   turn: 1,
   commands: [{ ownerSeatId: 0, pokemonId: 55, fieldIndex: 0 }],
 };
-const REWARD_SUCCESSOR: CoopNextControl = { kind: "REWARD", operationId: "rew-op-9", ownerSeatId: 0 };
+const REWARD_SUCCESSOR: CoopNextControl = {
+  kind: "SHARED_INTERACTION",
+  operationId: "rew-op-9",
+  ownerSeatId: 0,
+  epoch: 1,
+  wave: 12,
+  turn: 1,
+  surfaceClass: "op:reward",
+  operationKind: "REWARD_PRESENT",
+  successor: { operationKinds: ["REWARD"], operationIds: null },
+};
 
 /**
  * A deterministic {@link CoopSchedulerClock}: `setTimer` records a fire-at, and
@@ -187,13 +211,13 @@ describe("ME option pick", () => {
       context: FRAME,
       address: address({ ownerSeatId: 0 }),
       optionIndex: 1,
-      successor: { kind: "MYSTERY", operationId: "me-op-42", ownerSeatId: 0 },
+      successor: mysterySuccessor(0),
     });
     const guestPick = buildMysteryOptionPickEntry({
       context: FRAME,
       address: address({ ownerSeatId: 1 }),
       optionIndex: 1,
-      successor: { kind: "MYSTERY", operationId: "me-op-42", ownerSeatId: 1 },
+      successor: mysterySuccessor(1),
     });
     // Distinct owner-seat addresses (no host/guest branch - only the seat id changes).
     expect(hostPick.entry.operationId).not.toBe(guestPick.entry.operationId);

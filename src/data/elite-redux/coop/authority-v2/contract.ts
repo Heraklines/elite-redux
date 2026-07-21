@@ -273,9 +273,6 @@ export type CoopNextControl =
       readonly commands: readonly CoopCommandControlTarget[];
     }
   | ({ readonly kind: "REPLACEMENT" } & CoopReplacementControlAddress)
-  | { readonly kind: "REWARD"; readonly operationId: string; readonly ownerSeatId: number }
-  | { readonly kind: "BIOME"; readonly operationId: string; readonly ownerSeatId: number }
-  | { readonly kind: "MYSTERY"; readonly operationId: string; readonly ownerSeatId: number }
   | {
       /**
        * Exact shared-input surface authorized after immutable interaction material applies. The operation

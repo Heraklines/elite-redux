@@ -167,7 +167,35 @@ function receipt(entry: CoopAuthorityEntry, stage: "admitted" | "materialApplied
   };
 }
 
-const TEST_SUCCESSOR: CoopNextControl = { kind: "REWARD", operationId: "test-reward-successor", ownerSeatId: 1 };
+function rewardPresentation(operationId: string): CoopNextControl {
+  return {
+    kind: "SHARED_INTERACTION",
+    operationId,
+    ownerSeatId: 1,
+    epoch: 1,
+    wave: 1,
+    turn: 1,
+    surfaceClass: "op:reward",
+    operationKind: "REWARD_PRESENT",
+    successor: { operationKinds: ["REWARD"], operationIds: null },
+  };
+}
+
+function mysteryPresentation(operationId: string): CoopNextControl {
+  return {
+    kind: "SHARED_INTERACTION",
+    operationId,
+    ownerSeatId: 1,
+    epoch: 1,
+    wave: 1,
+    turn: 1,
+    surfaceClass: "op:me",
+    operationKind: "ME_PRESENT",
+    successor: { operationKinds: ["ME_PICK"], operationIds: null },
+  };
+}
+
+const TEST_SUCCESSOR = rewardPresentation("test-reward-successor");
 const base = { context: frameContext(), ownerSeatId: 1, successor: TEST_SUCCESSOR } as const;
 
 // ---------------------------------------------------------------------------
@@ -238,7 +266,7 @@ describe("owner-seat-addressed builders - per surface", () => {
   });
 
   it("carries and validates the mandatory stated successor control", () => {
-    const successor: CoopNextControl = { kind: "REWARD", operationId: "op-reward", ownerSeatId: 1 };
+    const successor = rewardPresentation("op-reward");
     const withSuccessor = buildStormglassInteractionEntry({
       ...base,
       operationId: "sg-succ",
@@ -425,7 +453,7 @@ describe("createInteractionApplier (replica adoption)", () => {
   it("drives a full applyEntry to controlInstalled when a successor is stated", () => {
     const { sink } = makeSink();
     const applier = createInteractionApplier(sink);
-    const successor: CoopNextControl = { kind: "MYSTERY", operationId: "op-mystery", ownerSeatId: 1 };
+    const successor = mysteryPresentation("op-mystery");
     const entry: CoopAuthorityEntry = {
       ...buildBargainInteractionEntry({
         ...base,
@@ -626,7 +654,7 @@ describe("digest defense + material validation", () => {
 
 describe("shadow parity", () => {
   it("an independently-built identical entry is parity-equal to the authority's", () => {
-    const successor: CoopNextControl = { kind: "REWARD", operationId: "op-reward", ownerSeatId: 1 };
+    const successor = rewardPresentation("op-reward");
     const build = () =>
       buildLearnMoveBatchInteractionEntry({
         ...base,

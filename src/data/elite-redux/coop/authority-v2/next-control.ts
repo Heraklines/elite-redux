@@ -66,12 +66,6 @@ export function controlIdOf(control: ProjectableControl): string {
         + `/e${control.epoch}/w${control.wave}/t${control.turn}`
         + `/o${control.occurrence}/f${control.fieldIndex}`
       );
-    case "REWARD":
-      return `REWARD/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`;
-    case "BIOME":
-      return `BIOME/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`;
-    case "MYSTERY":
-      return `MYSTERY/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`;
     case "SHARED_INTERACTION":
       return (
         `SHARED_INTERACTION/${encodeURIComponent(control.surfaceClass)}`
@@ -453,10 +447,6 @@ export function controlAllowsSuccessorEntry(
         && (control.successor.operationIds == null || control.successor.operationIds.includes(next.operationId))
       );
     }
-    case "REWARD":
-    case "BIOME":
-    case "MYSTERY":
-      return next.kind === "INTERACTION_COMMIT";
     case "TERMINAL":
       return false;
   }
@@ -795,10 +785,6 @@ export function nextControlIssues(control: unknown): string[] {
   switch (control.kind) {
     case "COMMAND_FRONTIER":
       return commandFrontierIssues(control);
-    case "REWARD":
-    case "BIOME":
-    case "MYSTERY":
-      return interactionIssues(control);
     case "REPLACEMENT":
       return replacementControlIssues(control);
     case "SHARED_INTERACTION":
