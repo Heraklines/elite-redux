@@ -23,6 +23,7 @@
 // retained replacement checkpoint at `continuationReady`, decoupled from the
 // post-barrier UI open.
 
+import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { CoopBattleStreamer, type CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -121,6 +122,33 @@ function sendReplacement(host: CoopBattleStreamer, envelope: CoopCheckpointEnvel
 }
 
 describe("co-op replacement continuation releases from the command-barrier park (Track R)", () => {
+  it("V2 projection metadata reaches the renderer without changing the admitted carrier identity", () => {
+    const { guest } = createLoopbackPair();
+    const current = { epoch: 7, wave: 2, turn: 2 };
+    const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+    const envelope = replacementEnvelope();
+    const message = { t: "battleCheckpoint" as const, ...envelope };
+    const nextControl: CoopNextControl = {
+      kind: "COMMAND_FRONTIER",
+      epoch: envelope.epoch,
+      wave: envelope.wave,
+      turn: envelope.turn,
+      commands: [{ ownerSeatId: 1, pokemonId: 1, fieldIndex: 0 }],
+    };
+
+    guestStream.ingestAuthoritativeV2Replacement(message, nextControl, 41);
+    const delivered = guestStream.consumeCheckpoint();
+    expect(delivered?.authorityNextControl).toEqual(nextControl);
+    expect(delivered?.authorityRevision).toBe(41);
+    expect(guestStream.acknowledgeReplacement(delivered!, "materialApplied")).toBe(true);
+    expect(
+      guestStream.hasFinalizedAuthoritativeV2Replacement(message),
+      "local-only successor metadata cannot make exact material proof conflict with its wire carrier",
+    ).toBe(true);
+
+    guestStream.dispose();
+  });
+
   it("a parked authoritative guest's rendererWait at the replacement address releases host retention", async () => {
     const { host, guest } = createLoopbackPair();
     // The guest is at its OWN next command point (wave 2, turn 2) - the point it parks

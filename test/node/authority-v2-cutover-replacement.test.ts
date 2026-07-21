@@ -13,6 +13,7 @@ import type {
   ReplacementProposal,
   ReplacementSourceAddress,
 } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
+import type { CoopNextControl, CoopReplacementControlAddress } from "#data/elite-redux/coop/authority-v2/contract";
 import {
   activeCoopReplacementAuthorityMode,
   CoopV2ReplacementCutover,
@@ -42,7 +43,7 @@ import {
   routeCoopV2InboundFrame,
 } from "#data/elite-redux/coop/authority-v2/shadow";
 import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 class FakeClock implements CoopSchedulerClock {
   private readonly nowMs = 0;
@@ -171,6 +172,27 @@ function stage(cutover: CoopV2ReplacementCutover, value: ReplacementProposal): b
   });
 }
 
+function replacementAddress(value: ReplacementProposal): CoopReplacementControlAddress {
+  return {
+    operationId:
+      `RC/e${value.sourceAddress.epoch}/w${value.sourceAddress.wave}/t${value.sourceAddress.turn}`
+      + `/o${value.sourceAddress.occurrence}/f${value.sourceAddress.fieldIndex}/s${value.ownerSeatId}`,
+    ownerSeatId: value.ownerSeatId,
+    ...value.sourceAddress,
+  };
+}
+
+function replacementControl(
+  value: ReplacementProposal,
+  remaining: readonly ReplacementProposal[] = [],
+): Extract<CoopNextControl, { kind: "REPLACEMENT" }> {
+  return {
+    kind: "REPLACEMENT",
+    ...replacementAddress(value),
+    remaining: remaining.map(replacementAddress),
+  };
+}
+
 afterEach(() => {
   clearActiveCoopV2ReplacementCutover();
   clearCoopV2ShadowInbound();
@@ -246,6 +268,7 @@ describe("authority-v2 replacement staged transaction", () => {
     expect(stage(cutover, proposal())).toBe(true);
     const result = cutover.commitStagedHostReplacements({
       authorityCarrier: carrier(),
+      activeControl: replacementControl(proposal()),
       commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
     });
     expect(result.kind).toBe("committed");
@@ -275,7 +298,7 @@ describe("authority-v2 replacement staged transaction", () => {
     duo.dispose();
   });
 
-  it("orders a same-boundary double faint through an exact result permit without fabricating a spent picker", () => {
+  it("commits only the active same-boundary faint and installs the next exact picker", () => {
     const duo = buildDuo();
     const cutover = new CoopV2ReplacementCutover(duo.host);
     const second = proposal({
@@ -289,6 +312,7 @@ describe("authority-v2 replacement staged transaction", () => {
 
     const result = cutover.commitStagedHostReplacements({
       authorityCarrier: carrier(),
+      activeControl: replacementControl(first, [second]),
       commands: [
         { ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 },
         { ownerSeatId: 1, pokemonId: 202, fieldIndex: 1 },
@@ -298,28 +322,29 @@ describe("authority-v2 replacement staged transaction", () => {
     if (result.kind !== "committed") {
       throw new Error("expected committed replacement batch");
     }
-    expect(result.entries.map(entry => entry.material.payload)).toEqual([
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].material.payload).toEqual(
       expect.objectContaining({ sourceAddress: expect.objectContaining({ occurrence: 2, fieldIndex: 0 }) }),
-      expect.objectContaining({ sourceAddress: expect.objectContaining({ occurrence: 9, fieldIndex: 1 }) }),
-    ]);
+    );
     expect(result.entries[0].nextControl).toEqual({
-      kind: "AWAIT_SUCCESSOR",
-      afterOperationId: result.entries[0].operationId,
+      kind: "REPLACEMENT",
+      operationId: replacementAddress(second).operationId,
+      ownerSeatId: 1,
       epoch: SESSION.epoch,
       wave: 8,
       turn: 4,
-      allowedKinds: ["REPLACEMENT_COMMIT"],
-      allowNextWaveStart: false,
-      expectedOperationId: result.entries[1].operationId,
+      occurrence: 9,
+      fieldIndex: 1,
+      remaining: [],
     });
-    expect(result.entries[1].nextControl?.kind).toBe("COMMAND_FRONTIER");
+    expect(cutover.pendingCount, "the later seat cannot be consumed before its control becomes active").toBe(1);
     expect(duo.host.diagnostics().retained).toBe(0);
     expect(duo.host.diagnostics().pendingTimers).toBe(0);
     cutover.dispose();
     duo.dispose();
   });
 
-  it("reports partial commit explicitly so the caller can terminalize instead of starting legacy authority", () => {
+  it("fails cleanly when the staged answer does not match the active replacement head", () => {
     const duo = buildDuo();
     const cutover = new CoopV2ReplacementCutover(duo.host);
     expect(stage(cutover, proposal())).toBe(true);
@@ -333,21 +358,13 @@ describe("authority-v2 replacement staged transaction", () => {
         }),
       ),
     ).toBe(true);
-    const original = duo.host.tapReplacementCommit.bind(duo.host);
-    let calls = 0;
-    vi.spyOn(duo.host, "tapReplacementCommit").mockImplementation(input => {
-      calls += 1;
-      return calls === 2 ? null : original(input);
-    });
+    const missing = proposal({ sourceAddress: source({ occurrence: 7, fieldIndex: 0 }) });
     const result = cutover.commitStagedHostReplacements({
       authorityCarrier: carrier(),
+      activeControl: replacementControl(missing),
       commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
     });
-    expect(result.kind).toBe("failed-partial");
-    if (result.kind !== "failed-partial") {
-      throw new Error("expected explicit partial commit");
-    }
-    expect(result.entries).toHaveLength(1);
+    expect(result.kind).toBe("no-pending");
     expect(cutover.pendingCount).toBe(2);
     cutover.dispose();
     expect(cutover.pendingCount).toBe(0);

@@ -35,6 +35,7 @@ import type {
   CoopAuthorityEntry,
   CoopCommandControlTarget,
   CoopFrameContextV2,
+  CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopAuthorityV2Shadow, CoopV2ShadowReplacementTap } from "#data/elite-redux/coop/authority-v2/shadow";
 
@@ -89,15 +90,16 @@ type StagedReplacementTap = Omit<CoopV2ShadowReplacementTap, "authorityCarrier" 
 
 export interface CoopV2ReplacementCommitBatch {
   readonly authorityCarrier: ReplacementAuthorityCarrier;
-  /** Exact mechanical successor command frontier after every staged same-boundary faint is materialized. */
+  /** Exact currently-executable replacement head authored by the preceding mechanical entry. */
+  readonly activeControl: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
+  /** Exact mechanical successor command frontier after the final same-boundary faint is materialized. */
   readonly commands: readonly CoopCommandControlTarget[];
 }
 
 export type CoopV2ReplacementBatchResult =
   | { readonly kind: "no-pending" }
   | { readonly kind: "committed"; readonly entries: readonly CoopAuthorityEntry[] }
-  | { readonly kind: "failed-clean" }
-  | { readonly kind: "failed-partial"; readonly entries: readonly CoopAuthorityEntry[] };
+  | { readonly kind: "failed-clean" };
 
 export class CoopV2ReplacementCutover {
   private readonly harness: CoopAuthorityV2Shadow;
@@ -150,9 +152,9 @@ export class CoopV2ReplacementCutover {
   }
 
   /**
-   * Commit every proposal whose immutable source is the just-materialized carrier boundary. Same-turn
-   * double faints are ordered by occurrence and chained through REPLACEMENT controls; the last entry states
-   * the complete post-summon COMMAND frontier at the carrier's actual (possibly N+1) battle address.
+   * Commit exactly the active proposal whose post-summon carrier just materialized. Same-turn multi-faints
+   * are an ordered chain: this entry installs the next executable REPLACEMENT head, while the final entry
+   * states the complete post-summon COMMAND frontier at the carrier's actual (possibly N+1) battle address.
    */
   commitStagedHostReplacements(batch: CoopV2ReplacementCommitBatch): CoopV2ReplacementBatchResult {
     if (this.disposed) {
@@ -174,66 +176,61 @@ export class CoopV2ReplacementCutover {
     ) {
       return { kind: "failed-clean" };
     }
-    const staged = [...this.pending.values()]
-      .filter(({ tap }) => {
-        const source = tap.proposal.sourceAddress;
-        return (
-          source.epoch === carrierEpoch
-          && source.wave === carrierWave
-          && (source.turn === carrierTurn || source.turn + 1 === carrierTurn)
-        );
-      })
-      .sort(
-        (left, right) =>
-          left.tap.proposal.sourceAddress.occurrence - right.tap.proposal.sourceAddress.occurrence
-          || left.tap.proposal.sourceAddress.fieldIndex - right.tap.proposal.sourceAddress.fieldIndex,
-      );
-    if (staged.length === 0) {
+    const active = batch.activeControl;
+    const staged = this.pending.get(active.operationId);
+    if (staged == null) {
       return { kind: "no-pending" };
     }
-
-    const entries: CoopAuthorityEntry[] = [];
-    for (let index = 0; index < staged.length; index++) {
-      const current = staged[index].tap;
-      const next = staged[index + 1]?.tap;
-      const successor =
-        next == null
-          ? batch.commands.length === 0
-            ? ({ kind: "terminal" } as const)
-            : ({
-                kind: "resume-command-frontier",
-                epoch: carrierEpoch,
-                wave: carrierWave,
-                turn: carrierTurn,
-                commands: batch.commands,
-              } as const)
+    const current = staged.tap;
+    const source = current.proposal.sourceAddress;
+    if (
+      source.epoch !== active.epoch
+      || source.wave !== active.wave
+      || source.turn !== active.turn
+      || source.occurrence !== active.occurrence
+      || source.fieldIndex !== active.fieldIndex
+      || current.proposal.ownerSeatId !== active.ownerSeatId
+      || source.epoch !== carrierEpoch
+      || source.wave !== carrierWave
+      || (source.turn !== carrierTurn && source.turn + 1 !== carrierTurn)
+    ) {
+      return { kind: "failed-clean" };
+    }
+    const [next, ...remaining] = active.remaining;
+    const successor =
+      next == null
+        ? batch.commands.length === 0
+          ? ({ kind: "terminal" } as const)
           : ({
-              kind: "next-replacement",
-              occurrence: next.proposal.sourceAddress.occurrence,
-              fieldIndex: next.proposal.sourceAddress.fieldIndex,
-              ownerSeatId: next.proposal.ownerSeatId,
-            } as const);
-      const entry = this.harness.tapReplacementCommit({
-        ...current,
+              kind: "resume-command-frontier",
+              epoch: carrierEpoch,
+              wave: carrierWave,
+              turn: carrierTurn,
+              commands: batch.commands,
+            } as const)
+        : ({
+            kind: "next-replacement",
+            control: {
+              kind: "REPLACEMENT",
+              ...next,
+              remaining,
+            },
+          } as const);
+    const entry = this.harness.tapReplacementCommit({
+      ...current,
+      authorityCarrier: batch.authorityCarrier,
+      successor,
+      legacyImage: {
+        proposal: current.proposal,
+        resolution: current.resolution,
         authorityCarrier: batch.authorityCarrier,
-        successor,
-        legacyImage: {
-          proposal: current.proposal,
-          resolution: current.resolution,
-          authorityCarrier: batch.authorityCarrier,
-        },
-      });
-      if (entry == null) {
-        return entries.length === 0 ? { kind: "failed-clean" } : { kind: "failed-partial", entries };
-      }
-      entries.push(entry);
+      },
+    });
+    if (entry == null) {
+      return { kind: "failed-clean" };
     }
-    for (const { tap } of staged) {
-      this.pending.delete(
-        tap.operationId ?? replacementOperationId(tap.proposal.sourceAddress, tap.proposal.ownerSeatId),
-      );
-    }
-    return { kind: "committed", entries };
+    this.pending.delete(active.operationId);
+    return { kind: "committed", entries: [entry] };
   }
 
   dispose(): void {

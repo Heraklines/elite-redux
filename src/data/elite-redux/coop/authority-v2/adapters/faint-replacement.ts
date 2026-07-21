@@ -128,10 +128,8 @@ export type ReplacementResolutionMode = "owner-pick" | "fallback-auto";
  *   - "resume-command-frontier" - the last faint in the chain resolved; resume
  *                          every independently-controlled active battler.
  *   - "next-replacement" - another faint remains in the SAME turn; the current
- *                          post-summon batch installs an exact ordered permit for
- *                          that already-resolved REPLACEMENT_COMMIT operation.
- *                          It must not fabricate a second executable picker after
- *                          both replacement choices and summons already completed.
+ *                          post-summon result installs the next exact executable
+ *                          picker plus the immutable remainder of the chain.
  *   - "terminal"         - no executable control follows the replacement; the
  *                          entry waits explicitly for interaction/wave/terminal authority.
  */
@@ -146,9 +144,7 @@ export type ReplacementSuccessor =
     }
   | {
       readonly kind: "next-replacement";
-      readonly occurrence: number;
-      readonly fieldIndex: number;
-      readonly ownerSeatId: number;
+      readonly control: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
     }
   | { readonly kind: "terminal" };
 
@@ -413,25 +409,7 @@ export function successorControl(
         commands: successor.commands,
       };
     case "next-replacement":
-      return {
-        kind: "AWAIT_SUCCESSOR",
-        afterOperationId: sourceOperationId,
-        epoch: address.epoch,
-        wave: address.wave,
-        turn: address.turn,
-        allowedKinds: ["REPLACEMENT_COMMIT"],
-        allowNextWaveStart: false,
-        expectedOperationId: replacementOperationId(
-          {
-            epoch: address.epoch,
-            wave: address.wave,
-            turn: address.turn,
-            occurrence: successor.occurrence,
-            fieldIndex: successor.fieldIndex,
-          },
-          successor.ownerSeatId,
-        ),
-      };
+      return successor.control;
     case "terminal":
       return {
         kind: "AWAIT_SUCCESSOR",

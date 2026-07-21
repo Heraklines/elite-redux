@@ -1116,6 +1116,36 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The source contract now proves construction still cannot recursively attest,
   the immediate proof occurs only after opening begins, and the asynchronous
   retry remains wired. Local permitted evidence: Authority V2 contract 32/32
-  green, scoped Biome has no errors (existing warnings/info only), and
-  `git diff --check` is green. The failure-first P1 engine reproduction remains
-  remote-only.
+ green, scoped Biome has no errors (existing warnings/info only), and
+ `git diff --check` is green. The failure-first P1 engine reproduction remains
+ remote-only.
+
+2026-07-21 - Same-turn multi-faints become an ordered V2 replacement chain
+
+- The supplied branch audit was 58 integration commits stale. Its proposal
+  retry, broad wave-control, wave recovery, and multi-command recovery findings
+  are closed on the current line. The remaining exact-shape failure in full-gate
+  B1 was different: a TURN_COMMIT exposed one executable REPLACEMENT head, while
+  the host deferred authority until every same-turn summon completed and then
+  sorted the whole staged batch. If the active picker was not the first sorted
+  item, the log correctly rejected the earlier result as unauthorized; the
+  second picker could never receive a committed predecessor.
+- REPLACEMENT control now carries one executable head plus an immutable ordered
+  tail. Each completed summon commits its own complete post-summon image. That
+  entry installs the next head; only the final entry installs COMMAND_FRONTIER
+  or an explicit terminal wait. The guest applies and acknowledges intermediate
+  carriers without deriving or demanding a premature command. Full-V2
+  `no-pending` capture now fails closed instead of reviving a legacy checkpoint.
+- V2 successor metadata rides beside the compatibility checkpoint only for the
+  local renderer. ACK/finalization canonicalization strips it, preventing a
+  valid material proof from conflicting with the immutable carrier admitted on
+  the wire. Deferred picker matching uses the executable head identity rather
+  than the changing tail-bearing control ID.
+- The two-engine harness now tags every party member with both textual and
+  numeric alternating ownership. Its double-KO driver remains armed until the
+  first committed replacement actually opens the second seat's public PARTY
+  handler, so it no longer pre-injects an answer before V2 control exists.
+- Local permitted evidence: public Authority V2 source contract 32/32 green,
+  scoped Biome has no errors (repository-baseline warnings/info only), and full
+  TypeScript output contains no touched co-op path. Exact-SHA remote node,
+  two-engine, and public-browser qualification is required after push.

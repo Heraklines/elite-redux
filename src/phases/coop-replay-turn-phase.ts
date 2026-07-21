@@ -407,6 +407,22 @@ export class CoopReplayTurnPhase extends Phase {
                   ? numericSeat === controller?.localSeatId
                   : (mon as { coopOwner?: string }).coopOwner === controller?.role;
               });
+            const nextReplacement =
+              envelope.authorityNextControl?.kind === "REPLACEMENT" ? envelope.authorityNextControl : null;
+            if (nextReplacement != null) {
+              // A same-turn multi-faint is one ordered transaction per summon. This intermediate carrier is
+              // complete even though another field slot remains fainted: its immutable successor explicitly
+              // authorizes that next PARTY picker. Never demand/open a command from this partial frontier.
+              if (!streamer.acknowledgeReplacement(envelope, "continuationReady")) {
+                return;
+              }
+              coopLog(
+                "replay",
+                `guest replacement rev=${envelope.authorityRevision ?? "?"} installed next picker `
+                  + `${nextReplacement.operationId} (${nextReplacement.remaining.length} later)`,
+              );
+              continue;
+            }
             if (!hasLocalCommandSlot && hasLivingLocalMon) {
               this.failAuthority(
                 streamer,

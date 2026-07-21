@@ -28,7 +28,12 @@ const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), 
 const mysteryEncounterPhases = readFileSync(new URL("src/phases/mystery-encounter-phases.ts", root), "utf8");
 const erQuizPhase = readFileSync(new URL("src/phases/er-quiz-phase.ts", root), "utf8");
 const guestFaintSwitchPhase = readFileSync(new URL("src/phases/coop-guest-faint-switch-phase.ts", root), "utf8");
+const pushReplacementCheckpointPhase = readFileSync(
+  new URL("src/phases/coop-push-replacement-checkpoint-phase.ts", root),
+  "utf8",
+);
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
+const replayTurnPhase = readFileSync(new URL("src/phases/coop-replay-turn-phase.ts", root), "utf8");
 const replayMePhase = readFileSync(new URL("src/phases/coop-replay-me-phase.ts", root), "utf8");
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
@@ -582,7 +587,7 @@ test("ordinary replacement projection has an immutable fallback when cosmetic fa
   assert.match(project, /prepareCoopV2OrdinaryReplacementControlSurface\(runtime, control\)/u);
 });
 
-test("replacement controls are proven by the real async PARTY surface and batched results never fabricate a spent picker", () => {
+test("replacement controls are proven by the real async PARTY surface and multi-faints advance one picker at a time", () => {
   const openParty = guestFaintSwitchPhase.indexOf("const openedParty = scene.ui.setMode(");
   const awaitParty = guestFaintSwitchPhase.indexOf("Promise.resolve(openedParty).then(", openParty);
   const notifyReady = guestFaintSwitchPhase.indexOf("notifyCoopV2InteractionSurfaceReady(runtime)", awaitParty);
@@ -602,16 +607,30 @@ test("replacement controls are proven by the real async PARTY surface and batche
 
   const successorStart = replacementAdapter.indexOf('case "next-replacement":');
   const successorEnd = replacementAdapter.indexOf('\n    case "terminal":', successorStart);
-  assert.notEqual(successorStart, -1, "the replacement adapter exposes its same-batch successor");
-  assert.ok(successorEnd > successorStart, "the same-batch successor has a bounded source block");
+  assert.notEqual(successorStart, -1, "the replacement adapter exposes its ordered-chain successor");
+  assert.ok(successorEnd > successorStart, "the ordered-chain successor has a bounded source block");
   const successor = replacementAdapter.slice(successorStart, successorEnd);
-  assert.match(successor, /kind: "AWAIT_SUCCESSOR"/u);
-  assert.match(successor, /allowedKinds: \["REPLACEMENT_COMMIT"\]/u);
-  assert.match(successor, /expectedOperationId: replacementOperationId\(/u);
-  assert.doesNotMatch(
-    successor,
-    /kind: "REPLACEMENT"/u,
-    "an already-resolved double-KO batch may not demand a second executable picker",
+  assert.match(successor, /return successor\.control/u);
+
+  assert.match(
+    pushReplacementCheckpointPhase,
+    /Every completed summon is now its own immutable V2 transaction/u,
+    "each picker result is captured before the next modal can act",
+  );
+  assert.match(
+    pushReplacementCheckpointPhase,
+    /if \(!isCoopV2ReplacementCutoverActive\(\)\)[\s\S]*partySlotStillFainted/u,
+    "only rollback/legacy mode retains the old whole-batch capture guard",
+  );
+  assert.match(
+    pushReplacementCheckpointPhase,
+    /v2\?\.kind === "no-pending"[\s\S]*refusing an unlogged compatibility checkpoint/u,
+    "a full-V2 replacement carrier without its exact staged result fails closed instead of reviving legacy authority",
+  );
+  assert.match(
+    replayTurnPhase,
+    /envelope\.authorityNextControl\?\.kind === "REPLACEMENT"[\s\S]*acknowledgeReplacement\(envelope, "continuationReady"\)/u,
+    "an intermediate complete carrier advances to its stated picker without demanding a command",
   );
 });
 

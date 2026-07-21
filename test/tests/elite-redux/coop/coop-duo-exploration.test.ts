@@ -661,31 +661,31 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         "both player slots were vacated (or already refilled) by the double KO on the host",
       ).toBe(true);
 
-      // GUEST renders turn 1: presents BOTH faints; ONLY its own slot's picker opens (the
-      // host-owned faint is not its pick). One-shot PARTY stub picks CHARIZARD (slot 3).
-      await withClient(rig.guestCtx, async () => {
-        const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
-        const realSetMode = ui.setMode.bind(ui);
-        ui.setMode = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.PARTY) {
-            ui.setMode = realSetMode; // one-shot
-            (args[3] as (slotIndex: number, option: number) => void)(3, 0);
-            return;
-          }
-          if (args[0] === UiMode.MESSAGE) {
-            return;
-          }
-          return realSetMode(...args);
-        };
-        try {
-          await driveGuestReplayTurn(rig.guestScene, turn);
-        } finally {
-          ui.setMode = realSetMode;
+      // GUEST renders both faints, but the authority log orders the host-owned f0 picker first.
+      // Keep the public PARTY driver armed across the later host crossing: only the first
+      // post-summon REPLACEMENT_COMMIT is allowed to install the guest-owned f1 picker.
+      const guestUi = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+      const realGuestSetMode = guestUi.setMode.bind(guestUi);
+      let guestPickCount = 0;
+      guestUi.setMode = (...args: unknown[]): unknown => {
+        if (args[0] === UiMode.PARTY) {
+          guestPickCount += 1;
+          expect(guestPickCount, "the ordered V2 chain opened exactly one guest picker").toBe(1);
+          (args[3] as (slotIndex: number, option: number) => void)(3, 0);
+          return;
         }
+        if (args[0] === UiMode.MESSAGE) {
+          return;
+        }
+        return realGuestSetMode(...args);
+      };
+      await withClient(rig.guestCtx, async () => {
+        await driveGuestReplayTurn(rig.guestScene, turn);
       });
 
-      // HOST: both SwitchPhases resolve (own pick already stubbed; the guest's pick is
-      // buffered on the relay) -> both replacements summoned + OOB checkpoints pushed.
+      // HOST: its first SwitchPhase resolves and commits an intermediate post-summon image.
+      // That exact entry opens the guest picker above; only its result may release the second
+      // SwitchPhase. Each summon therefore emits one ordered OOB checkpoint.
       // The crossing settles under BOTH destination contexts: the FAINT_SWITCH operation
       // envelopes park in the destination pump until the guest context runs, and the host's
       // material-ACK barrier cannot resolve until the guest applies + ACKs them (the b59dba12
@@ -700,7 +700,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         await settleDuoPromise(rig, hostAdvance!, "exploration double-KO host crossing");
       } finally {
         hostUi.setMode = realHostSetMode;
+        guestUi.setMode = realGuestSetMode;
       }
+      expect(guestPickCount, "the guest supplied one human action after its V2 control became public").toBe(1);
       const hostSlot0 = rig.hostScene.getPlayerField()[0];
       const hostSlot1 = rig.hostScene.getPlayerField()[1];
       expect(hostSlot0?.species.speciesId, "host slot 0 refilled with the HOST's pick").toBe(SpeciesId.LAPRAS);
@@ -708,8 +710,8 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       expect(hostSlot0?.isFainted(), "host slot 0 battle-ready").toBe(false);
       expect(hostSlot1?.isFainted(), "host slot 1 battle-ready").toBe(false);
 
-      // GUEST: the next pump consumes BOTH out-of-band replacement checkpoints - both
-      // replacements materialize (the second empty slot must not deadlock behind the first).
+      // GUEST: the next pump consumes both ordered out-of-band replacement checkpoints - the
+      // intermediate one authorizes f1, and the final one installs the complete command frontier.
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn + 1);
       });

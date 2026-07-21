@@ -128,6 +128,31 @@ export interface CoopCheckpointEnvelope {
   fullField: CoopFullMonSnapshot[];
   /** Full authoritative state for intra-turn boundaries such as replacement unblock. */
   authoritativeState: CoopAuthoritativeBattleStateV1;
+  /** Local-only Authority V2 successor carried beside (never inside) the immutable compatibility image. */
+  authorityNextControl?: CoopNextControl;
+  /** Global V2 revision paired with {@link authorityNextControl}. */
+  authorityRevision?: number;
+}
+
+/**
+ * Return the immutable compatibility image whose identity is admitted by the stream.
+ *
+ * Authority V2 projection metadata is deliberately local-only.  It must reach the
+ * renderer, but it must never change the canonical identity of the legacy carrier
+ * that the ACK/finalization ledger already admitted.
+ */
+function mechanicalCheckpointEnvelope(envelope: CoopCheckpointEnvelope): CoopCheckpointEnvelope {
+  return {
+    reason: envelope.reason,
+    epoch: envelope.epoch,
+    wave: envelope.wave,
+    turn: envelope.turn,
+    revision: envelope.revision,
+    checkpoint: envelope.checkpoint,
+    checksum: envelope.checksum,
+    fullField: envelope.fullField,
+    authoritativeState: envelope.authoritativeState,
+  };
 }
 
 /** Options for {@linkcode CoopBattleStreamer} (timer injection for tests). */
@@ -1038,12 +1063,13 @@ export class CoopBattleStreamer {
   }
 
   private markAuthoritativeReplacementFinalized(envelope: CoopCheckpointEnvelope): boolean {
-    const exactKey = authorityKey(envelope);
+    const mechanicalEnvelope = mechanicalCheckpointEnvelope(envelope);
+    const exactKey = authorityKey(mechanicalEnvelope);
     const admitted = this.seenReplacementAuthority.get(exactKey);
     if (
       admitted == null
-      || admitted.canonical !== canonicalize(envelope)
-      || !sameAuthorityAckIdentity(admitted.value, envelope)
+      || admitted.canonical !== canonicalize(mechanicalEnvelope)
+      || !sameAuthorityAckIdentity(admitted.value, mechanicalEnvelope)
     ) {
       return false;
     }
@@ -1055,17 +1081,7 @@ export class CoopBattleStreamer {
   hasFinalizedAuthoritativeV2Replacement(
     message: CoopCheckpointEnvelope | Extract<CoopMessage, { t: "battleCheckpoint" }>,
   ): boolean {
-    const normalized: CoopCheckpointEnvelope = {
-      reason: message.reason,
-      epoch: message.epoch,
-      wave: message.wave,
-      turn: message.turn,
-      revision: message.revision,
-      checkpoint: message.checkpoint,
-      checksum: message.checksum,
-      fullField: message.fullField,
-      authoritativeState: message.authoritativeState,
-    };
+    const normalized = mechanicalCheckpointEnvelope(message);
     const exactKey = authorityKey(normalized);
     const admitted = this.seenReplacementAuthority.get(exactKey);
     return (
@@ -3999,8 +4015,12 @@ export class CoopBattleStreamer {
    * not discard it; immutable carrier classification, complete-companion checks, and apply/checksum proof
    * remain unchanged.
    */
-  ingestAuthoritativeV2Replacement(msg: Extract<CoopMessage, { t: "battleCheckpoint" }>): void {
-    this.handle(msg, "authority-v2");
+  ingestAuthoritativeV2Replacement(
+    msg: Extract<CoopMessage, { t: "battleCheckpoint" }>,
+    nextControl: CoopNextControl,
+    authorityRevision: number,
+  ): void {
+    this.handle(msg, "authority-v2", nextControl, authorityRevision);
   }
 
   /**
@@ -4900,6 +4920,10 @@ export class CoopBattleStreamer {
           }
           if (this.replacementRedeliveryRequests.delete(exactKey)) {
             const retained = copyAdmittedAuthority(admission.seen);
+            const delivered =
+              source === "authority-v2" && authorityNextControl !== undefined && authorityRevision !== undefined
+                ? { ...retained, authorityNextControl, authorityRevision }
+                : retained;
             coopLog(
               "checkpoint",
               `guest REDELIVER explicitly retried replacement e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
@@ -4908,10 +4932,10 @@ export class CoopBattleStreamer {
             // pump, but consumeCheckpoint() is the transaction handoff; omitting this buffer made a
             // requested retry observable yet impossible to apply.
             const key = bufferedAuthorityKey("replacement", retained);
-            rememberBounded(this.pendingCheckpoints, key, structuredClone(retained));
-            this.notifyCheckpointEnvelope(retained);
-            this.checkpointWaiter?.(retained);
-            this.checkpointHandler?.(retained.reason, retained.checkpoint);
+            rememberBounded(this.pendingCheckpoints, key, structuredClone(delivered));
+            this.notifyCheckpointEnvelope(delivered);
+            this.checkpointWaiter?.(delivered);
+            this.checkpointHandler?.(delivered.reason, delivered.checkpoint);
             return;
           }
           coopLog(
@@ -4921,12 +4945,16 @@ export class CoopBattleStreamer {
           return;
         }
         const key = bufferedAuthorityKey("replacement", envelope);
+        const deliveredEnvelope =
+          source === "authority-v2" && authorityNextControl !== undefined && authorityRevision !== undefined
+            ? { ...envelope, authorityNextControl, authorityRevision }
+            : envelope;
         // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
         // carrying the host's checksum so the guest can verify convergence after applying.
         coopLog("checksum", `guest RECV battleCheckpoint reason=${msg.reason} checksum=${msg.checksum}`);
-        rememberBounded(this.pendingCheckpoints, key, envelope);
-        this.notifyCheckpointEnvelope(envelope);
-        this.checkpointWaiter?.(envelope);
+        rememberBounded(this.pendingCheckpoints, key, deliveredEnvelope);
+        this.notifyCheckpointEnvelope(deliveredEnvelope);
+        this.checkpointWaiter?.(deliveredEnvelope);
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
         return;
       }

@@ -139,6 +139,7 @@ describe("#P33 asymmetric stall watchdog -> bounded recovery -> shared terminal"
       turn: 1,
       occurrence: 2,
       fieldIndex: 0,
+      remaining: [],
     });
     wireHost(runtime);
     const endHold = beginCoopMachineWait("authority-v2-successor:w2:t1:r25");

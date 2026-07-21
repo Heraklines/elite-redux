@@ -212,6 +212,7 @@ describe("buildTurnCommitEntry - shape + digest", () => {
       turn: 5,
       occurrence: 2,
       fieldIndex: 1,
+      remaining: [],
     };
     const entry = buildCommitted({
       capture: CAPTURE_WITH_COMPANIONS,

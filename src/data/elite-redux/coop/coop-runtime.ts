@@ -101,6 +101,7 @@ import {
   controlIdOf,
   controlsEqual,
   type ProjectableControl,
+  replacementControlTargetId,
   successorWaitAllowsLocalPresentationInput,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
@@ -5527,7 +5528,7 @@ function buildCoopV2LiveSeams(
           if (runtime.battleStream.hasFinalizedAuthoritativeV2Replacement(checkpoint)) {
             return markCoopV2ControlMaterialApplied(runtime, entry);
           }
-          runtime.battleStream.ingestAuthoritativeV2Replacement(checkpoint);
+          runtime.battleStream.ingestAuthoritativeV2Replacement(checkpoint, entry.nextControl, entry.revision);
           // The checkpoint is now retained in the correct replica stream. Release a preceding
           // null-successor turn only after that carrier exists, allowing the normal TurnInit/replay path
           // to consume it without opening a phantom command first.
@@ -6456,7 +6457,17 @@ export function commitCoopV2ReplacementAuthority(
   if (state == null || typeof state !== "object" || !Array.isArray(state.field)) {
     return { kind: "failed-clean" };
   }
-  const hasImmediateCommand = hasCoopV2ImmediateCommandSuccessor(state);
+  const activeControl = runtime.v2ControlLedger.latestControl;
+  if (
+    activeControl?.kind !== "REPLACEMENT"
+    || activeControl.epoch !== runtime.controller.sessionEpoch
+    || activeControl.wave !== authorityCarrier.wave
+    || (activeControl.turn !== authorityCarrier.turn && activeControl.turn + 1 !== authorityCarrier.turn)
+  ) {
+    coopWarn("v2-replacement", "host refused post-summon carrier without the exact active replacement head");
+    return { kind: "failed-clean" };
+  }
+  const hasImmediateCommand = activeControl.remaining.length === 0 && hasCoopV2ImmediateCommandSuccessor(state);
   const commandFrontier = hasImmediateCommand ? resolveCoopV2CommandFrontier(state) : { commands: [], unresolved: [] };
   if (hasImmediateCommand && (commandFrontier.commands.length === 0 || commandFrontier.unresolved.length > 0)) {
     const unresolved = commandFrontier.unresolved
@@ -6468,7 +6479,11 @@ export function commitCoopV2ReplacementAuthority(
     );
     return { kind: "failed-clean" };
   }
-  return cutover.commitStagedHostReplacements({ authorityCarrier, commands: commandFrontier.commands });
+  return cutover.commitStagedHostReplacements({
+    authorityCarrier,
+    activeControl,
+    commands: commandFrontier.commands,
+  });
 }
 
 export type CoopV2CommandBoundaryVerdict = "ready" | "deferred" | "failed";
@@ -6503,6 +6518,7 @@ export function enterCoopV2ReplacementControlBoundary(input: {
     turn: input.turn,
     occurrence: input.occurrence,
     fieldIndex: input.fieldIndex,
+    remaining: [],
   };
   const check = validateNextControl(control);
   if (!check.ok) {
@@ -6513,13 +6529,23 @@ export function enterCoopV2ReplacementControlBoundary(input: {
     return "ready";
   }
   const current = runtime.v2ControlLedger.latestControl;
-  if (current != null && controlsEqual(current, control) && runtime.v2ControlLedger.isMaterialApplied(current)) {
+  if (
+    current?.kind === "REPLACEMENT"
+    && current.operationId === control.operationId
+    && current.ownerSeatId === control.ownerSeatId
+    && current.epoch === control.epoch
+    && current.wave === control.wave
+    && current.turn === control.turn
+    && current.occurrence === control.occurrence
+    && current.fieldIndex === control.fieldIndex
+    && runtime.v2ControlLedger.isMaterialApplied(current)
+  ) {
     return "ready";
   }
   if (runtime.controller.authorityRole === "authority" || current?.kind === "TERMINAL") {
     return "failed";
   }
-  const controlId = controlIdOf(control);
+  const controlId = replacementControlTargetId(control);
   const existing = runtime.v2DeferredInteractionStarts.get(controlId);
   if (existing != null && existing.phaseToken !== input.phaseToken) {
     return "failed";
@@ -6951,7 +6977,7 @@ function releaseCoopV2DeferredInteractionStarts(
   runtime: CoopRuntime,
   control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" | "REPLACEMENT" }>,
 ): boolean {
-  const controlId = controlIdOf(control);
+  const controlId = control.kind === "REPLACEMENT" ? replacementControlTargetId(control) : controlIdOf(control);
   const pending = runtime.v2DeferredInteractionStarts.get(controlId);
   if (pending == null) {
     return false;

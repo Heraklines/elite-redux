@@ -272,7 +272,16 @@ export type CoopNextControl =
       /** Every living player battler that must reach its real CommandPhase. */
       readonly commands: readonly CoopCommandControlTarget[];
     }
-  | ({ readonly kind: "REPLACEMENT" } & CoopReplacementControlAddress)
+  | ({
+      readonly kind: "REPLACEMENT";
+      /**
+       * Canonical tail of same-boundary faint pickers. Only the address on this control is executable now;
+       * every tail address becomes executable only after the preceding REPLACEMENT_COMMIT installs it.
+       * Carrying the whole immutable tail makes simultaneous multi-faint turns representable without
+       * opening several modal PARTY handlers or letting a local phase derive which seat acts next.
+       */
+      readonly remaining: readonly CoopReplacementControlAddress[];
+    } & CoopReplacementControlAddress)
   | {
       /**
        * Exact shared-input surface authorized after immutable interaction material applies. The operation

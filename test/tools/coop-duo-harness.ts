@@ -2295,6 +2295,17 @@ async function maybeSealHostRetainedWaveBoundary(
  * MUST be called with the HOST GameManager already in a live battle (game.classicMode.startBattle).
  * Returns the {@linkcode DuoRig}; the caller pumps it wave by wave with the drive* helpers below.
  */
+function tagAlternatingDuoPartyOwnership(scene: BattleScene): void {
+  scene.getPlayerParty().forEach((mon, index) => {
+    if (mon == null) {
+      return;
+    }
+    const owner = index % 2 === 0 ? "host" : "guest";
+    mon.coopOwner = owner;
+    (mon as PlayerPokemon & { coopOwnerSeatId?: number }).coopOwnerSeatId = owner === "host" ? 0 : 1;
+  });
+}
+
 export async function buildDuo(
   hostGame: GameManager,
   pair: { host: CoopTransport; guest: CoopTransport },
@@ -2317,19 +2328,14 @@ export async function buildDuo(
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
-  // Flip the host engine into co-op + tag the party leads host/guest. Tag by PARTY index, not field: in a
+  // Flip the host engine into co-op + tag every party member by the same alternating ownership production
+  // uses. Tag by PARTY index, not field: in a
   // final-boss STAGE-ONE the player field is single (only slot 0 is summoned), yet the co-op party still
   // holds the guest partner's mon on the BENCH (slot 1). A field-only tag left that benched partner
   // untagged, so a stage-one rig had "no healthy guest-owned bench mon" (coop-final-boss-stage-one). Slots
   // 0/1 ARE field 0/1 in a normal double battle, so this is byte-identical for every doubles rig.
   toCoopGameMode(hostScene);
-  const hostParty = hostScene.getPlayerParty();
-  if (hostParty[0] != null) {
-    hostParty[0].coopOwner = "host";
-  }
-  if (hostParty[1] != null) {
-    hostParty[1].coopOwner = "guest";
-  }
+  tagAlternatingDuoPartyOwnership(hostScene);
 
   const hostCtx: ClientCtx = {
     label: "host",
@@ -3549,19 +3555,14 @@ export async function buildDuoForMe(
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
-  // Flip the host engine into co-op + tag the party leads host/guest. Tag by PARTY index, not field: in a
+  // Flip the host engine into co-op + tag every party member by the same alternating ownership production
+  // uses. Tag by PARTY index, not field: in a
   // final-boss STAGE-ONE the player field is single (only slot 0 is summoned), yet the co-op party still
   // holds the guest partner's mon on the BENCH (slot 1). A field-only tag left that benched partner
   // untagged, so a stage-one rig had "no healthy guest-owned bench mon" (coop-final-boss-stage-one). Slots
   // 0/1 ARE field 0/1 in a normal double battle, so this is byte-identical for every doubles rig.
   toCoopGameMode(hostScene);
-  const hostParty = hostScene.getPlayerParty();
-  if (hostParty[0] != null) {
-    hostParty[0].coopOwner = "host";
-  }
-  if (hostParty[1] != null) {
-    hostParty[1].coopOwner = "guest";
-  }
+  tagAlternatingDuoPartyOwnership(hostScene);
 
   const hostCtx: ClientCtx = {
     label: "host",

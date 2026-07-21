@@ -24,7 +24,11 @@
 // replica pipeline (replica.ts) build on.
 // =============================================================================
 
-import type { CoopCommandControlTarget, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
+import type {
+  CoopCommandControlTarget,
+  CoopNextControl,
+  CoopReplacementControlAddress,
+} from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopOperationKind } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopOperationSurfaceClass } from "#data/elite-redux/coop/coop-operation-surface-registry";
 
@@ -65,6 +69,13 @@ export function controlIdOf(control: ProjectableControl): string {
         `REPLACEMENT/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`
         + `/e${control.epoch}/w${control.wave}/t${control.turn}`
         + `/o${control.occurrence}/f${control.fieldIndex}`
+        + `/remaining:${control.remaining
+          .map(
+            target =>
+              `${encodeURIComponent(target.operationId)}:s${target.ownerSeatId}:e${target.epoch}:w${target.wave}`
+              + `:t${target.turn}:o${target.occurrence}:f${target.fieldIndex}`,
+          )
+          .join(",")}`
       );
     case "SHARED_INTERACTION":
       return (
@@ -492,6 +503,14 @@ export function commandControlTargetId(
   return `COMMAND_TARGET/e${epoch}/w${wave}/t${turn}/f${target.fieldIndex}:s${target.ownerSeatId}:p${target.pokemonId}`;
 }
 
+/** Stable address of one executable replacement head, independent of its not-yet-active immutable tail. */
+export function replacementControlTargetId(target: CoopReplacementControlAddress): string {
+  return (
+    `REPLACEMENT_TARGET/${encodeURIComponent(target.operationId)}/s${target.ownerSeatId}`
+    + `/e${target.epoch}/w${target.wave}/t${target.turn}/o${target.occurrence}/f${target.fieldIndex}`
+  );
+}
+
 /** Stable order for hashing, wire comparison, projection, and proof aggregation. */
 export function canonicalCommandTargets(
   commands: readonly CoopCommandControlTarget[],
@@ -597,6 +616,48 @@ function replacementControlIssues(control: Record<string, unknown>): string[] {
   addIssue(issues, "turn", isPositiveInt(control.turn));
   addIssue(issues, "occurrence", isNonNegativeInt(control.occurrence));
   addIssue(issues, "fieldIndex", isNonNegativeInt(control.fieldIndex));
+  if (!Array.isArray(control.remaining)) {
+    issues.push("remaining");
+    return issues;
+  }
+  const headEpoch = control.epoch;
+  const headWave = control.wave;
+  const headTurn = control.turn;
+  let priorOccurrence = control.occurrence;
+  const operationIds = new Set<string>(
+    typeof control.operationId === "string" && control.operationId.length > 0 ? [control.operationId] : [],
+  );
+  for (const [index, target] of control.remaining.entries()) {
+    if (!isPlainObject(target)) {
+      issues.push(`remaining[${index}]`);
+      continue;
+    }
+    addIssue(issues, `remaining[${index}].operationId`, isNonEmptyString(target.operationId));
+    addIssue(issues, `remaining[${index}].ownerSeatId`, isNonNegativeInt(target.ownerSeatId));
+    addIssue(issues, `remaining[${index}].epoch`, isPositiveInt(target.epoch));
+    addIssue(issues, `remaining[${index}].wave`, isPositiveInt(target.wave));
+    addIssue(issues, `remaining[${index}].turn`, isPositiveInt(target.turn));
+    addIssue(issues, `remaining[${index}].occurrence`, isNonNegativeInt(target.occurrence));
+    addIssue(issues, `remaining[${index}].fieldIndex`, isNonNegativeInt(target.fieldIndex));
+    if (target.epoch !== headEpoch || target.wave !== headWave || target.turn !== headTurn) {
+      issues.push(`remaining[${index}]: boundary`);
+    }
+    if (
+      isNonNegativeInt(target.occurrence)
+      && (!isNonNegativeInt(priorOccurrence) || target.occurrence <= priorOccurrence)
+    ) {
+      issues.push(`remaining[${index}].occurrence: order`);
+    }
+    if (isNonNegativeInt(target.occurrence)) {
+      priorOccurrence = target.occurrence;
+    }
+    if (isNonEmptyString(target.operationId)) {
+      if (operationIds.has(target.operationId)) {
+        issues.push(`remaining[${index}].operationId: duplicate`);
+      }
+      operationIds.add(target.operationId);
+    }
+  }
   return issues;
 }
 

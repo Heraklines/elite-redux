@@ -6,6 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -18,12 +19,10 @@ import {
 
 /**
  * Co-op (#633, the guest-faint deadlock): pushed by the HOST right after it auto-summons a
- * replacement into the PARTNER-owned fainted slot (switch-phase HALF B). Sends an OUT-OF-BAND
- * checkpoint so the guest materializes the replacement IMMEDIATELY instead of at the next
- * turn resolution - which can never arrive, because the host's next turn needs the guest's
- * command for the very mon the guest cannot see yet (the live "host just sent out a pokemon
- * without the guest choosing and now we were stuck" deadlock). The guest's live pump consumes
- * this checkpoint while parked and opens the guest's own CommandPhase for the refilled slot.
+ * replacement into a fainted slot (switch-phase HALF B). In Authority V2, every completed
+ * summon seals one REPLACEMENT_COMMIT: an intermediate image installs the next ordered picker,
+ * while the final image installs the command frontier. In rollback mode it sends the legacy
+ * OUT-OF-BAND checkpoint so the guest materializes the replacement before the next turn.
  * Runs AFTER the SwitchSummonPhase on the same queue level (FIFO), so the capture includes
  * the summoned mon. No-op on the guest / solo / with no live streamer.
  */
@@ -58,29 +57,22 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
     };
     try {
       if (streamer != null && controller?.role === "host") {
-        // DOUBLE FAINT (Track R mystery-gauntlet lane, run 29651275134): when BOTH the host's own
-        // field slot AND the partner-owned slot faint the same turn, the host's OWN-faint replacement
-        // (SwitchSummonPhase HALF B) unshifts THIS checkpoint phase, which runs - via child-level FIFO -
-        // BEFORE the partner slot's own SwitchPhase -> SwitchSummonPhase has refilled it. Capturing here
-        // would ship a turn N+1 replacement frame whose partner-owned slot is still fainted; the guest
-        // applies it while parked (checksum converges on the same incomplete field), then its
-        // CoopReplayTurnPhase projection check reads its own still-fainted slot and FATALs ("Replacement
-        // authority did not project into the local owner's command slot"). Defer to the PARTNER slot's
-        // own CoopPushReplacementCheckpointPhase, which runs after ITS SwitchSummonPhase and captures the
-        // COMPLETE refilled field. Only when a player field slot is still unfilled AND another
-        // replacement switch is genuinely pending this turn - the single-faint #633 / #836 paths refill
-        // their slot before this phase runs, so the guard is inert there and the checkpoint fires as before.
-        const partySlotStillFainted = globalScene.getPlayerField().some(mon => mon == null || mon.isActive() !== true);
-        const anotherReplacementPending =
-          globalScene.phaseManager.hasPhaseOfType("SwitchPhase")
-          || globalScene.phaseManager.hasPhaseOfType("SwitchSummonPhase");
-        if (partySlotStillFainted && anotherReplacementPending) {
-          coopLog(
-            "checkpoint",
-            "host DEFER replacement checkpoint - a player field slot is still unfilled this turn (double faint)",
-          );
-          this.end();
-          return;
+        // Every completed summon is now its own immutable V2 transaction. Capturing the intermediate field
+        // is intentional: its entry installs the next addressed replacement picker, so no later seat must
+        // choose before the log authorizes it. The final summon then carries the fully-refilled field and
+        // command frontier. Legacy/non-cutover sessions still use the original single checkpoint carrier.
+        if (!isCoopV2ReplacementCutoverActive()) {
+          const partySlotStillFainted = globalScene
+            .getPlayerField()
+            .some(mon => mon == null || mon.isActive() !== true);
+          const anotherReplacementPending =
+            globalScene.phaseManager.hasPhaseOfType("SwitchPhase")
+            || globalScene.phaseManager.hasPhaseOfType("SwitchSummonPhase");
+          if (partySlotStillFainted && anotherReplacementPending) {
+            coopLog("checkpoint", "legacy replacement capture deferred until every pending summon completes");
+            this.end();
+            return;
+          }
         }
         const carrier = captureCoopAuthoritativeCarrier(turn, "replacement");
         if (carrier == null) {
@@ -106,16 +98,22 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
           this.end();
           return;
         }
-        if (v2?.kind === "failed-clean" || v2?.kind === "failed-partial") {
-          const committed = v2.kind === "failed-partial" ? v2.entries.length : 0;
+        if (v2?.kind === "failed-clean") {
           fatal(
-            `Authority V2 replacement commit failed after ${committed} committed entr${committed === 1 ? "y" : "ies"} `
-              + `for wave ${wave}, turn ${turn}; refusing a second legacy authority.`,
+            `Authority V2 replacement commit failed for wave ${wave}, turn ${turn}; `
+              + "refusing a second legacy authority.",
           );
           return;
         }
-        // `null` = this session is not cut over. `no-pending` = this checkpoint was produced by a still-
-        // legacy path (for example the versus host's vanilla own-side switch). Preserve that path exactly.
+        if (v2?.kind === "no-pending") {
+          fatal(
+            `Authority V2 replacement carrier had no address-exact staged result for wave ${wave}, turn ${turn}; `
+              + "refusing an unlogged compatibility checkpoint.",
+          );
+          return;
+        }
+        // `null` means this session is not cut over. Only rollback/legacy mode may retain and send the
+        // compatibility checkpoint outside the global V2 log.
         coopLog("checkpoint", "host push OUT-OF-BAND replacement checkpoint (partner-slot auto-summon)");
         streamer.sendCheckpoint(
           "replacement",

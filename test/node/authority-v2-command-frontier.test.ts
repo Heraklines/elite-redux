@@ -199,6 +199,7 @@ describe("resolveCoopV2ReplacementControl", () => {
       turn: 1,
       occurrence: 1,
       fieldIndex: 1,
+      remaining: [],
     });
   });
 
@@ -221,6 +222,50 @@ describe("resolveCoopV2ReplacementControl", () => {
       ownerSeatId: 9,
       fieldIndex: 0,
     });
+  });
+
+  it("retains every simultaneous human faint as an ordered executable chain", () => {
+    const result = resolveCoopV2ReplacementControl(
+      6,
+      state(
+        [fieldSeat("player", 0, 10, { ownerSeatId: 0 }), fieldSeat("player", 1, 11, { ownerSeatId: 1 })],
+        [
+          { id: 10, hp: 0, coopOwnerSeatId: 0 },
+          { id: 11, hp: 0, coopOwnerSeatId: 1 },
+          { id: 20, hp: 20, coopOwnerSeatId: 0 },
+          { id: 21, hp: 20, coopOwnerSeatId: 1 },
+        ],
+        [],
+      ),
+      [
+        { k: "faint", bi: 0 },
+        { k: "message", text: "between" },
+        { k: "faint", bi: 1 },
+      ],
+    );
+
+    expect(result).toEqual({
+      kind: "REPLACEMENT",
+      operationId: "RC/e6/w1/t1/o0/f0/s0",
+      ownerSeatId: 0,
+      epoch: 6,
+      wave: 1,
+      turn: 1,
+      occurrence: 0,
+      fieldIndex: 0,
+      remaining: [
+        {
+          operationId: "RC/e6/w1/t1/o2/f1/s1",
+          ownerSeatId: 1,
+          epoch: 6,
+          wave: 1,
+          turn: 1,
+          occurrence: 2,
+          fieldIndex: 1,
+        },
+      ],
+    });
+    expect(validateNextControl(result)).toEqual({ ok: true });
   });
 });
 

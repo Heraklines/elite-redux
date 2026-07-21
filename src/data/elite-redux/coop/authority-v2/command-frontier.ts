@@ -149,11 +149,12 @@ function hasLegalHumanReplacement(
 }
 
 /**
- * Resolve the first exact human replacement picker made necessary by a settled turn image.
+ * Resolve the ordered exact human replacement chain made necessary by a settled turn image.
  *
- * The faint event's stable batch index is the same occurrence consumed by FaintPhase. AI-enemy faints and
- * wiped human halves are deliberately omitted: neither opens a human picker, so they remain explicit ordered
- * waits for their later wave/terminal authority.
+ * The head is the only executable picker. Every later same-boundary address is carried immutably in
+ * `remaining` and becomes executable only after the preceding post-summon REPLACEMENT_COMMIT. AI-enemy
+ * faints and wiped human halves are deliberately omitted: neither opens a human picker, so they remain
+ * explicit ordered waits for their later wave/terminal authority.
  */
 export function resolveCoopV2ReplacementControl(
   epoch: number,
@@ -163,6 +164,15 @@ export function resolveCoopV2ReplacementControl(
   const enemyOffset = state.field
     .filter(candidate => candidate.side === "enemy")
     .reduce((lowest, candidate) => Math.min(lowest, candidate.bi), Number.POSITIVE_INFINITY);
+  const addresses: Array<{
+    operationId: string;
+    ownerSeatId: number;
+    epoch: number;
+    wave: number;
+    turn: number;
+    occurrence: number;
+    fieldIndex: number;
+  }> = [];
   for (const [occurrence, event] of events.entries()) {
     if (event.k !== "faint") {
       continue;
@@ -186,14 +196,20 @@ export function resolveCoopV2ReplacementControl(
       occurrence,
       fieldIndex,
     };
-    return {
-      kind: "REPLACEMENT",
+    addresses.push({
       operationId: replacementOperationId(address, ownerSeatId),
       ownerSeatId,
       ...address,
-    };
+    });
   }
-  return null;
+  const [head, ...remaining] = addresses;
+  return head == null
+    ? null
+    : {
+        kind: "REPLACEMENT",
+        ...head,
+        remaining,
+      };
 }
 
 /**
