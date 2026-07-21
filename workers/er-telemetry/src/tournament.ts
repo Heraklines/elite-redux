@@ -62,13 +62,39 @@ export const DEFAULT_SERIES_FORMAT: SeriesFormat = "single";
 export type RewardPlace = "champion" | "runnerUp" | "semifinalist";
 export const REWARD_PLACES: readonly RewardPlace[] = ["champion", "runnerUp", "semifinalist"];
 
+/** Shiny prize tier: 1/2/3 = the three shiny variants (DexAttr DEFAULT/VARIANT_2/VARIANT_3), 4 = ER black shiny. */
+export type ShinyTier = 1 | 2 | 3 | 4;
+/** Shiny-lab effect categories (append-only ordered id lists live in er-shiny-lab-effects.ts). */
+export type LabEffectCategory = "palette" | "surface" | "around";
+export const LAB_EFFECT_CATEGORIES: readonly LabEffectCategory[] = ["palette", "surface", "around"];
+
 /**
  * A single settlement mutation in a reward definition. Re-declared from the client's
- * ShowdownSettlementMutation (the worker cannot import client code). `grantUnlock`/`grantCandy`
- * are the natural PRIZE grants (a tournament never REMOVES an unlock — prize-only, design doc);
- * `grantItem`/`grantCurrency` are additive prize kinds a tournament organizer may fund.
+ * ShowdownSettlementMutation (the worker cannot import client code). A tournament never REMOVES an
+ * unlock (prize-only, design doc). Prize kinds:
+ *   - grantShinyChosen: a specific species at a chosen shiny tier (T1/T2/T3, or T4 = black shiny).
+ *   - grantShinyRandom: a shiny at a chosen tier, species ROLLED at grant time (seeded, deterministic;
+ *       the resolved species is recorded on the grant). `speciesPool` optionally constrains the roll;
+ *       `unownedOnly` is advisory (the client converts an already-owned shiny grant to candy, exactly
+ *       like a staked shiny the winner already owns).
+ *   - grantLabEffect: a shiny-lab effect/look granted on a species (owned + auto-equipped if the mon
+ *       has no current look), by category + 1-based effect index into that category's id list.
+ *   - grantCandy: candy on a species (pooled at the evolution-line root by the client).
+ *   - grantUnlock: a raw unlock (kept for back-compat / direct use).
+ *   - grantItem / grantCurrency: organizer-funded prizes carried in the pool (P3); NOT delivered
+ *       through the settlement pipeline (no account-mutation representation) — see tournamentGrantSettlements.
  */
 export type TournamentRewardMutation =
+  | { kind: "grantShinyChosen"; speciesId: number; tier: ShinyTier }
+  | {
+      kind: "grantShinyRandom";
+      tier: ShinyTier;
+      unownedOnly: boolean;
+      speciesPool: number[];
+      /** Set by the worker at grant time (seeded roll); once present the grant is fixed/deterministic. */
+      resolvedSpeciesId?: number;
+    }
+  | { kind: "grantLabEffect"; speciesId: number; category: LabEffectCategory; effectIndex: number }
   | { kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
   | { kind: "grantCandy"; speciesId: number; candy: number }
   | { kind: "grantItem"; itemId: string; count: number }
@@ -154,12 +180,48 @@ function nonNegInt(v: unknown, fallback = 0): number {
   return Math.max(0, n);
 }
 
+/** Clamp an arbitrary value into a valid ShinyTier (1..4), defaulting to T1. */
+function coerceShinyTier(v: unknown): ShinyTier {
+  const n = typeof v === "number" && Number.isFinite(v) ? Math.floor(v) : 1;
+  return (Math.min(4, Math.max(1, n)) as ShinyTier) ?? 1;
+}
+
 function sanitizeRewardMutation(raw: unknown): TournamentRewardMutation | null {
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
   const m = raw as Record<string, unknown>;
   switch (m.kind) {
+    case "grantShinyChosen":
+      if (typeof m.speciesId !== "number") {
+        return null;
+      }
+      return { kind: "grantShinyChosen", speciesId: Math.floor(m.speciesId), tier: coerceShinyTier(m.tier) };
+    case "grantShinyRandom": {
+      const pool = Array.isArray(m.speciesPool)
+        ? m.speciesPool.filter((x): x is number => typeof x === "number" && Number.isFinite(x)).map(x => Math.floor(x))
+        : [];
+      const out: TournamentRewardMutation = {
+        kind: "grantShinyRandom",
+        tier: coerceShinyTier(m.tier),
+        unownedOnly: Boolean(m.unownedOnly),
+        speciesPool: pool.slice(0, 2000),
+      };
+      if (typeof m.resolvedSpeciesId === "number" && Number.isFinite(m.resolvedSpeciesId)) {
+        out.resolvedSpeciesId = Math.floor(m.resolvedSpeciesId);
+      }
+      return out;
+    }
+    case "grantLabEffect":
+      if (typeof m.speciesId !== "number" || !LAB_EFFECT_CATEGORIES.includes(m.category as LabEffectCategory)) {
+        return null;
+      }
+      return {
+        kind: "grantLabEffect",
+        speciesId: Math.floor(m.speciesId),
+        category: m.category as LabEffectCategory,
+        effectIndex: nonNegInt(m.effectIndex),
+      };
     case "grantUnlock":
       if (typeof m.speciesId !== "number") {
         return null;
@@ -776,3 +838,140 @@ export function computeRewardGrants(tournament: TournamentRecord): RewardGrant[]
   }
   return grants;
 }
+
+// #region reward -> settlement translation (delivery)
+
+/**
+ * A client-applicable settlement mutation (mirrors ShowdownSettlementMutation in
+ * src/data/elite-redux/showdown/showdown-settlement.ts — the worker cannot import client code).
+ * Only the account-mutating kinds are deliverable through the settlement pipeline.
+ */
+export type TournamentSettlementMutation =
+  | { kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
+  | { kind: "grantCandy"; speciesId: number; candy: number }
+  | { kind: "grantShinyLabLook"; speciesId: number; savedLook: number[] };
+
+/** One winner's deliverable mutation, keyed by account username (the settlement store's uid column). */
+export interface TournamentGrantSettlement {
+  uid: Participant;
+  mutation: TournamentSettlementMutation;
+}
+
+/** Result of pushing grants into the settlement store (server-to-server). */
+export interface GrantDeliveryResult {
+  ok: boolean;
+  delivered: number;
+  error?: string;
+}
+
+/**
+ * Default seeded-roll pool for a random-shiny reward when the organizer supplies none: the
+ * three starter species of every generation (recognizable, always-valid shiny grants).
+ */
+export const DEFAULT_RANDOM_SHINY_POOL: readonly number[] = [
+  1, 4, 7, 25, 152, 155, 158, 252, 255, 258, 387, 390, 393, 495, 498, 501, 650, 653, 656, 722, 725, 728, 810, 813, 816,
+];
+
+/** Deterministic 32-bit FNV-1a hash of a string (seeds the random-shiny roll — stable across recomputes). */
+function fnv1a(str: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/** Map a shiny tier to the (variant, erBlackShiny) unlock encoding used by the settlement apply. */
+function tierToUnlock(tier: ShinyTier): { variant: number; erBlackShiny: boolean } {
+  // T1->variant 0, T2->variant 1, T3->variant 2, T4->black (variant 2 + erBlackShiny).
+  return tier === 4 ? { variant: 2, erBlackShiny: true } : { variant: tier - 1, erBlackShiny: false };
+}
+
+/** Default shiny-lab render params (all-ones) as the 11 trailing bytes of a saved-look array. */
+const LAB_DEFAULT_PARAM_BYTES: readonly number[] = [255, 255, 255, 96, 0, 0, 0, 0, 0, 70, 85];
+
+/** Build the 14-element shiny-lab saved-look for a single effect in one category (rest = none/default). */
+function buildLabSavedLook(category: LabEffectCategory, effectIndex: number): number[] {
+  const loadout = [0, 0, 0];
+  const slot = category === "palette" ? 0 : category === "surface" ? 1 : 2;
+  loadout[slot] = Math.max(0, Math.floor(effectIndex));
+  return [...loadout, ...LAB_DEFAULT_PARAM_BYTES];
+}
+
+/** Resolve a random-shiny mutation's species deterministically (seeded by tournament/participant/index). */
+function rollRandomShinySpecies(
+  mut: Extract<TournamentRewardMutation, { kind: "grantShinyRandom" }>,
+  seed: string,
+): number {
+  if (typeof mut.resolvedSpeciesId === "number") {
+    return mut.resolvedSpeciesId;
+  }
+  const pool = mut.speciesPool.length > 0 ? mut.speciesPool : DEFAULT_RANDOM_SHINY_POOL;
+  return pool[fnv1a(seed) % pool.length];
+}
+
+/**
+ * Translate ONE reward mutation into zero or more client settlement mutations for a given winner.
+ * `seed` seeds the random-shiny roll (deterministic per participant+place+index). Currency/item
+ * kinds have no account-mutation representation and are intentionally dropped here (they remain in
+ * the reward pool / computeRewardGrants for the record, but are not settlement-delivered — P3).
+ */
+function translateRewardMutation(mut: TournamentRewardMutation, seed: string): TournamentSettlementMutation[] {
+  switch (mut.kind) {
+    case "grantShinyChosen": {
+      const { variant, erBlackShiny } = tierToUnlock(mut.tier);
+      return [{ kind: "grantUnlock", speciesId: mut.speciesId, shiny: true, variant, erBlackShiny, cost: 0 }];
+    }
+    case "grantShinyRandom": {
+      const speciesId = rollRandomShinySpecies(mut, seed);
+      const { variant, erBlackShiny } = tierToUnlock(mut.tier);
+      return [{ kind: "grantUnlock", speciesId, shiny: true, variant, erBlackShiny, cost: 0 }];
+    }
+    case "grantLabEffect":
+      return [
+        {
+          kind: "grantShinyLabLook",
+          speciesId: mut.speciesId,
+          savedLook: buildLabSavedLook(mut.category, mut.effectIndex),
+        },
+      ];
+    case "grantUnlock":
+      return [
+        {
+          kind: "grantUnlock",
+          speciesId: mut.speciesId,
+          shiny: mut.shiny,
+          variant: mut.variant,
+          erBlackShiny: mut.erBlackShiny,
+          cost: mut.cost,
+        },
+      ];
+    case "grantCandy":
+      return [{ kind: "grantCandy", speciesId: mut.speciesId, candy: mut.candy }];
+    case "grantItem":
+    case "grantCurrency":
+      return []; // not settlement-deliverable (no account-mutation representation)
+  }
+}
+
+/**
+ * Materialize a completed tournament's reward pool into the deliverable per-winner settlement
+ * mutations (the payload pushed into the settlement store for the login sweep to apply). Random
+ * shinies are resolved deterministically (seeded per participant+place+index) so repeated calls
+ * produce byte-identical output. PURE — delivery/idempotency is the caller's concern.
+ */
+export function tournamentGrantSettlements(tournament: TournamentRecord): TournamentGrantSettlement[] {
+  const out: TournamentGrantSettlement[] = [];
+  for (const grant of computeRewardGrants(tournament)) {
+    grant.mutations.forEach((mut, idx) => {
+      const seed = `${tournament.id}:${grant.participant}:${grant.place}:${idx}`;
+      for (const settlement of translateRewardMutation(mut, seed)) {
+        out.push({ uid: grant.participant, mutation: settlement });
+      }
+    });
+  }
+  return out;
+}
+
+// #endregion

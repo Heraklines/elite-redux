@@ -30,6 +30,10 @@ interface Env {
   TOURNAMENT_ADMIN_UIDS?: string;
   /** Shared team editor password (SAME as er-editor-api's EDITOR_PASSWORD) — an alternate admin credential. */
   EDITOR_PASSWORD?: string;
+  /** Base URL of er-save-api (settlement store) for server-to-server tournament reward delivery. */
+  SAVE_API_URL?: string;
+  /** Shared secret authenticating the tournament→save-api reward push (SAME as er-save-api's SHOWDOWN_GRANT_SECRET). */
+  SHOWDOWN_GRANT_SECRET?: string;
 }
 
 interface TokenPayload {

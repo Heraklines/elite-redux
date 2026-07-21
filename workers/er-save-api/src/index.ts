@@ -97,6 +97,12 @@ interface Env {
   /** Refuse to publish usage tiers from a too-small 30-day sample. */
   USAGE_TIER_MIN_PLAYERS?: string;
   USAGE_TIER_MIN_RUNS?: string;
+  /**
+   * Shared secret authenticating the er-telemetry tournament worker's server-to-server reward push
+   * (POST /showdown/tournament-grant). SAME value must be set on er-telemetry as SHOWDOWN_GRANT_SECRET.
+   * Set via `wrangler secret put`. Unset = the tournament-grant route is disabled (503).
+   */
+  SHOWDOWN_GRANT_SECRET?: string;
 }
 
 interface UserRow {
@@ -4481,6 +4487,67 @@ async function handleShowdownPendingAck(request: Request, auth: TokenPayload, en
   return json({ ok: true, acked: res.meta.changes ?? 0 }, 200, cors);
 }
 
+/**
+ * TOURNAMENT reward delivery (server-to-server, called by the er-telemetry tournament worker).
+ * Pushes each winner's reward mutations into the SAME showdown_settlements store the escrow flow
+ * uses, so winners receive them on their next login sweep exactly like a staked payout. Auth is a
+ * shared worker secret (X-Grant-Auth == SHOWDOWN_GRANT_SECRET), NOT a session token — this is not a
+ * player-facing route. Idempotent: rows are keyed by the synthetic match id `tour:<tournamentId>`,
+ * and (like escrow) we only insert when NONE exist yet for that match id, so a retry never
+ * double-grants. Ledger discipline is unchanged: the client applies each row once (row id + ledger).
+ */
+async function handleShowdownTournamentGrant(request: Request, env: Env, cors: Record<string, string>) {
+  const secret = env.SHOWDOWN_GRANT_SECRET;
+  if (!secret) {
+    return json({ error: "tournament grant delivery not configured" }, 503, cors);
+  }
+  const provided = request.headers.get("X-Grant-Auth") ?? "";
+  if (!timingSafeEqual(enc.encode(provided), enc.encode(secret))) {
+    return json({ error: "unauthorized" }, 401, cors);
+  }
+  const body = await readShowdownBody(request);
+  if (body == null) {
+    return json({ error: "invalid body" }, 400, cors);
+  }
+  const tournamentId = typeof body.tournamentId === "string" ? body.tournamentId : "";
+  const grants = Array.isArray(body.grants) ? body.grants : null;
+  if (!tournamentId || !grants) {
+    return json({ error: "missing tournamentId or grants" }, 400, cors);
+  }
+  await ensureShowdownTables(env);
+  const matchId = `tour:${tournamentId}`;
+  const now = Date.now();
+  // Idempotency guard (mirrors finalizeSettlement): only insert when no rows exist for this tournament.
+  const existing = await env.DB.prepare("SELECT COUNT(*) AS c FROM showdown_settlements WHERE match_id = ?1")
+    .bind(matchId)
+    .first<{ c: number }>();
+  if ((existing?.c ?? 0) > 0) {
+    return json({ ok: true, delivered: 0, alreadyDelivered: true }, 200, cors);
+  }
+  const stmts: D1PreparedStatement[] = [];
+  for (const g of grants) {
+    if (!g || typeof g !== "object") {
+      continue;
+    }
+    const uid = typeof g.uid === "string" ? g.uid : "";
+    const mutation = g.mutation;
+    if (!uid || !mutation || typeof mutation !== "object") {
+      continue;
+    }
+    // Stamp the uid INTO the stored mutation json (client mutations carry no uid; escrow rows do).
+    const stored = { uid, ...mutation };
+    stmts.push(
+      env.DB.prepare(
+        "INSERT INTO showdown_settlements (match_id, uid, mutation_json, created_at, applied_at) VALUES (?1, ?2, ?3, ?4, NULL)",
+      ).bind(matchId, uid, JSON.stringify(stored), now),
+    );
+  }
+  if (stmts.length > 0) {
+    await env.DB.batch(stmts);
+  }
+  return json({ ok: true, delivered: stmts.length }, 200, cors);
+}
+
 // #endregion
 // #region showdown ranked ladder
 // -----------------------------------------------------------------------------
@@ -4865,6 +4932,12 @@ export default {
       // client clears its cookie regardless.
       if (pathname === "/account/logout" && method === "GET") {
         return text("", 200, cors);
+      }
+
+      // Tournament reward delivery — server-to-server from er-telemetry, authenticated by the shared
+      // SHOWDOWN_GRANT_SECRET (X-Grant-Auth), NOT a session token. Placed in the unauthenticated block.
+      if (pathname === "/showdown/tournament-grant" && method === "POST") {
+        return await handleShowdownTournamentGrant(request, env, cors);
       }
 
       // ---- authenticated ----

@@ -197,8 +197,24 @@ function req(method: string, body?: unknown, headers?: Record<string, string>): 
 }
 
 let env: TournamentEnv;
+// Records every reward delivery the grant route pushes (the server-to-server settlement sink stub).
+let deliveries: { tournamentId: string; settlements: unknown[] }[];
+let sinkFails: boolean;
 beforeEach(() => {
-  env = { DB: new FakeD1(), TOURNAMENT_ADMIN_UIDS: "1,7", EDITOR_PASSWORD: "team-secret" };
+  deliveries = [];
+  sinkFails = false;
+  env = {
+    DB: new FakeD1(),
+    TOURNAMENT_ADMIN_UIDS: "1,7",
+    EDITOR_PASSWORD: "team-secret",
+    grantSink: async (tournamentId, settlements) => {
+      if (sinkFails) {
+        return { ok: false, delivered: 0, error: "stub failure" };
+      }
+      deliveries.push({ tournamentId, settlements });
+      return { ok: true, delivered: settlements.length };
+    },
+  };
 });
 
 async function call(
@@ -239,6 +255,7 @@ describe("tournament routes — editor-password auth (team credential)", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;
     expect(body.tournament.state).toBe("registration");
+    // organizer is the synthetic editor identity
     expect(body.tournament.organizer).toBe("editor");
   });
 
@@ -250,6 +267,7 @@ describe("tournament routes — editor-password auth (team credential)", () => {
   it("a NON-admin token PLUS a valid editor password is granted admin", async () => {
     const res = await call("/tournament/create", "POST", player("bob"), { id: "bc", name: "Bob Cup" }, EDITOR_HDR);
     expect(res.status).toBe(200);
+    // organizer is the real token identity (bob), but admin came from the editor password
     expect(((await res.json()) as any).tournament.organizer).toBe("bob");
   });
 
@@ -482,16 +500,9 @@ describe("tournament routes — lifecycle + attestation", () => {
     expect((await call(`/tournament/bracket?id=${id}`, "GET", player("a"))).status).toBe(404);
   });
 
-  it("GRANT-REWARDS computes per-place grants at completion (scenario 10, stub)", async () => {
-    const id = await createTour({
-      maxEntrants: 4,
-      rewardPool: [
-        { place: "champion", mutations: [{ kind: "grantCurrency", amount: 10000 }] },
-        { place: "semifinalist", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 20 }] },
-      ],
-    });
+  async function playOutSampleCup(extra: Record<string, unknown>): Promise<{ id: string; champion: string }> {
+    const id = await createTour({ maxEntrants: 4, ...extra });
     await register(id, ["a", "b", "c", "d"]);
-    // play the whole thing out (seed order: slots [1,4,2,3] -> a,d,b,c)
     const play = async (mid: string, winner: string) => {
       const t = await bracketOf(id);
       const m = t.bracket.rounds.flat().find((x: any) => x.id === mid);
@@ -503,18 +514,82 @@ describe("tournament routes — lifecycle + attestation", () => {
     await play(r0m0.id, r0m0.a);
     await play(r0m1.id, r0m1.a);
     t = await bracketOf(id);
-    const finalM = t.bracket.rounds[1][0];
-    await play(finalM.id, finalM.a);
+    await play(t.bracket.rounds[1][0].id, t.bracket.rounds[1][0].a);
     t = await bracketOf(id);
     expect(t.state).toBe("complete");
-    // grant
+    return { id, champion: t.champion };
+  }
+
+  it("GRANT-REWARDS computes per-place grants at completion (scenario 10)", async () => {
+    const { id, champion } = await playOutSampleCup({
+      rewardPool: [
+        { place: "champion", mutations: [{ kind: "grantCurrency", amount: 10000 }] },
+        { place: "semifinalist", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 20 }] },
+      ],
+    });
     const g = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
     expect(g.status).toBe(200);
     const gbody = (await g.json()) as any;
     const champGrant = gbody.granted.find((x: any) => x.place === "champion");
-    expect(champGrant.participant).toBe(t.champion);
+    expect(champGrant.participant).toBe(champion);
     expect(gbody.granted.filter((x: any) => x.place === "semifinalist").length).toBe(2);
     // double-grant guarded
     expect((await call("/tournament/grant-rewards", "POST", ADMIN, { id })).status).toBe(422);
+  });
+
+  it("GRANT-REWARDS DELIVERS chosen-shiny + candy settlements through the sink, once", async () => {
+    const { id, champion } = await playOutSampleCup({
+      rewardPool: [
+        {
+          place: "champion",
+          mutations: [
+            { kind: "grantShinyChosen", speciesId: 6, tier: 4 },
+            { kind: "grantCandy", speciesId: 1, candy: 25 },
+          ],
+        },
+        {
+          place: "semifinalist",
+          mutations: [{ kind: "grantShinyRandom", tier: 2, unownedOnly: true, speciesPool: [151] }],
+        },
+      ],
+    });
+    const g = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
+    expect(g.status).toBe(200);
+    const gbody = (await g.json()) as any;
+    // Delivered exactly once
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0].tournamentId).toBe(id);
+    const sent = deliveries[0].settlements as any[];
+    // champion gets a black-shiny grantUnlock + a candy grant; two semifinalists each get a shiny-151.
+    const champSettlements = sent.filter(s => s.uid === champion);
+    expect(champSettlements).toContainEqual({
+      uid: champion,
+      mutation: { kind: "grantUnlock", speciesId: 6, shiny: true, variant: 2, erBlackShiny: true, cost: 0 },
+    });
+    expect(champSettlements).toContainEqual({
+      uid: champion,
+      mutation: { kind: "grantCandy", speciesId: 1, candy: 25 },
+    });
+    const semiShinies = sent.filter(s => s.mutation.kind === "grantUnlock" && s.mutation.speciesId === 151);
+    expect(semiShinies).toHaveLength(2);
+    expect(gbody.delivered).toBe(sent.length);
+
+    // Idempotent: a second grant is refused (rewardsGranted) and NEVER delivers again.
+    expect((await call("/tournament/grant-rewards", "POST", ADMIN, { id })).status).toBe(422);
+    expect(deliveries).toHaveLength(1);
+  });
+
+  it("GRANT-REWARDS leaves rewardsGranted FALSE on a delivery failure (retryable)", async () => {
+    const { id } = await playOutSampleCup({
+      rewardPool: [{ place: "champion", mutations: [{ kind: "grantShinyChosen", speciesId: 6, tier: 1 }] }],
+    });
+    sinkFails = true;
+    const fail = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
+    expect(fail.status).toBe(502);
+    // rewards NOT marked granted -> a retry (now succeeding) delivers.
+    sinkFails = false;
+    const retry = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
+    expect(retry.status).toBe(200);
+    expect(deliveries).toHaveLength(1);
   });
 });

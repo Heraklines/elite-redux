@@ -6120,49 +6120,168 @@ function tourCreateHtml() {
     </div>`;
 }
 
-/** Per-place reward inputs (currency + item). Prefix `p` differs for create (tc) vs edit (te). */
-function tourRewardFieldsHtml(p, pool) {
-  const val = (place, kind, key) => {
-    const entry = (pool || []).find(e => e.place === place);
-    const mut = entry && entry.mutations.find(m => m.kind === kind);
-    return mut ? mut[key] : "";
+// Reward pool editor — TYPE-SELECTABLE rows (shiny chosen / shiny random / lab effect / candies /
+// currency / item), each mapping onto the settlement mutation vocabulary the tournament worker
+// accepts. Prefix `p` differs for create (tc) vs edit (te).
+const TOUR_REWARD_PLACES = [
+  ["champion", "Champion"],
+  ["runnerUp", "Runner-up"],
+  ["semifinalist", "Semifinalists"],
+];
+const TOUR_ROWS_PER_PLACE = 4;
+// Which fields each reward TYPE uses (drives per-row show/hide + serialization).
+const TOUR_REWARD_FIELDS = {
+  "shiny-chosen": ["species", "tier"],
+  "shiny-random": ["tier", "unowned", "pool"],
+  "lab-effect": ["species", "effect"],
+  candies: ["species", "amount"],
+  currency: ["amount"],
+  item: ["item", "count"],
+};
+
+/** Build the grouped shiny-lab effect <option> list; each value encodes `category:index` (1-based). */
+function tourEffectOptions(selected) {
+  const group = (cat, list) => {
+    if (!list || list.length === 0) {
+      return "";
+    }
+    const opts = list
+      .map((e, i) => {
+        const val = `${cat}:${i + 1}`;
+        return `<option value="${val}"${val === selected ? " selected" : ""}>${tEsc(e.label || e.id)}</option>`;
+      })
+      .join("");
+    return `<optgroup label="${cat}">${opts}</optgroup>`;
   };
-  const row = (place, label) => `
-    <div class="tour-reward-row">
-      <b style="width:110px">${label}</b>
-      <label>💰 currency <input type="number" min="0" id="${p}-rw-${place}-cur" value="${tEsc(val(place, "grantCurrency", "amount"))}" /></label>
-      <label>🎒 item id <input type="text" style="width:130px" id="${p}-rw-${place}-item" value="${tEsc(val(place, "grantItem", "itemId"))}" /></label>
-      <label>× <input type="number" min="1" id="${p}-rw-${place}-itemn" value="${tEsc(val(place, "grantItem", "count"))}" /></label>
+  return (
+    `<option value="">— pick effect —</option>`
+    + group("palette", SHINY_EFFECTS.palette)
+    + group("surface", SHINY_EFFECTS.surface)
+    + group("around", SHINY_EFFECTS.around)
+  );
+}
+
+/** Map an existing mutation to a {type, species, tier, unowned, pool, effect, amount, item, count} row model. */
+function tourMutToRow(m) {
+  switch (m && m.kind) {
+    case "grantShinyChosen":
+      return { type: "shiny-chosen", species: m.speciesId, tier: m.tier };
+    case "grantShinyRandom":
+      return { type: "shiny-random", tier: m.tier, unowned: m.unownedOnly, pool: (m.speciesPool || []).join(",") };
+    case "grantLabEffect":
+      return { type: "lab-effect", species: m.speciesId, effect: `${m.category}:${m.effectIndex}` };
+    case "grantCandy":
+      return { type: "candies", species: m.speciesId, amount: m.candy };
+    case "grantCurrency":
+      return { type: "currency", amount: m.amount };
+    case "grantItem":
+      return { type: "item", item: m.itemId, count: m.count };
+    default:
+      return { type: "" };
+  }
+}
+
+/** One reward row (all fields present; JS toggles visibility by the selected type). */
+function tourRewardRowHtml(p, place, idx, row) {
+  const id = f => `${p}-rw-${place}-${idx}-${f}`;
+  const typeOpt = (v, label) => `<option value="${v}"${row.type === v ? " selected" : ""}>${label}</option>`;
+  return `
+    <div class="tour-reward-row" data-rwrow="${p}-${place}-${idx}">
+      <select class="rw-type" id="${id("type")}">
+        ${typeOpt("", "— none —")}
+        ${typeOpt("shiny-chosen", "Shiny (chosen)")}
+        ${typeOpt("shiny-random", "Shiny (random)")}
+        ${typeOpt("lab-effect", "Shiny-lab effect")}
+        ${typeOpt("candies", "Candies")}
+        ${typeOpt("currency", "Currency")}
+        ${typeOpt("item", "Item")}
+      </select>
+      <span data-f="species"><input type="number" min="0" placeholder="species id" id="${id("species")}" value="${tEsc(row.species ?? "")}" /></span>
+      <span data-f="tier"><select id="${id("tier")}">
+        <option value="1"${row.tier === 1 ? " selected" : ""}>T1</option>
+        <option value="2"${row.tier === 2 ? " selected" : ""}>T2</option>
+        <option value="3"${row.tier === 3 ? " selected" : ""}>T3</option>
+        <option value="4"${row.tier === 4 ? " selected" : ""}>Black (T4)</option>
+      </select></span>
+      <span data-f="unowned"><label style="font-size:12px"><input type="checkbox" id="${id("unowned")}"${row.unowned ? " checked" : ""} /> unowned only</label></span>
+      <span data-f="pool"><input type="text" style="width:120px" placeholder="pool ids (opt)" id="${id("pool")}" value="${tEsc(row.pool ?? "")}" /></span>
+      <span data-f="effect"><select id="${id("effect")}">${tourEffectOptions(row.effect || "")}</select></span>
+      <span data-f="amount"><input type="number" min="0" placeholder="amount" id="${id("amount")}" value="${tEsc(row.amount ?? "")}" /></span>
+      <span data-f="item"><input type="text" style="width:120px" placeholder="item id" id="${id("item")}" value="${tEsc(row.item ?? "")}" /></span>
+      <span data-f="count"><input type="number" min="1" placeholder="×" style="width:60px" id="${id("count")}" value="${tEsc(row.count ?? "")}" /></span>
     </div>`;
+}
+
+function tourRewardFieldsHtml(p, pool) {
+  const placeBlock = (place, label) => {
+    const muts = ((pool || []).find(e => e.place === place)?.mutations || []).map(tourMutToRow);
+    const rows = [];
+    for (let i = 0; i < TOUR_ROWS_PER_PLACE; i++) {
+      rows.push(tourRewardRowHtml(p, place, i, muts[i] || { type: "" }));
+    }
+    return `<div class="tour-reward-place"><b style="display:block;margin:6px 0 4px">${label}</b>${rows.join("")}</div>`;
+  };
   return `
     <fieldset>
-      <legend>Reward pool (settlement mutation vocabulary)</legend>
-      ${row("champion", "Champion")}
-      ${row("runnerUp", "Runner-up")}
-      ${row("semifinalist", "Semifinalists")}
+      <legend>Reward pool — champion / runner-up / semifinalists (delivered on next login sweep)</legend>
+      ${TOUR_REWARD_PLACES.map(([pl, lbl]) => placeBlock(pl, lbl)).join("")}
     </fieldset>`;
 }
 
-/** Read the reward inputs for prefix `p` into a RewardPool array. */
+/** Show only the fields the selected reward TYPE uses (called on render + on every type change). */
+function tourSyncRewardRow(rowEl) {
+  const type = rowEl.querySelector(".rw-type")?.value || "";
+  const fields = TOUR_REWARD_FIELDS[type] || [];
+  rowEl.querySelectorAll("[data-f]").forEach(span => {
+    span.style.display = fields.includes(span.dataset.f) ? "" : "none";
+  });
+}
+
+/** Read the reward rows for prefix `p` into a RewardPool array of the settlement mutation vocabulary. */
 function tourReadRewardPool(root, p) {
-  const num = id => {
-    const v = root.querySelector(`#${id}`);
-    return v && v.value !== "" ? Number(v.value) : null;
-  };
-  const str = id => {
-    const v = root.querySelector(`#${id}`);
-    return v ? v.value.trim() : "";
-  };
+  const q = (place, idx, f) => root.querySelector(`#${p}-rw-${place}-${idx}-${f}`);
+  const numOf = el => (el && el.value !== "" ? Number(el.value) : 0);
   const pool = [];
-  for (const place of ["champion", "runnerUp", "semifinalist"]) {
+  for (const [place] of TOUR_REWARD_PLACES) {
     const muts = [];
-    const cur = num(`${p}-rw-${place}-cur`);
-    if (cur && cur > 0) {
-      muts.push({ kind: "grantCurrency", amount: cur });
-    }
-    const item = str(`${p}-rw-${place}-item`);
-    if (item) {
-      muts.push({ kind: "grantItem", itemId: item, count: num(`${p}-rw-${place}-itemn`) || 1 });
+    for (let i = 0; i < TOUR_ROWS_PER_PLACE; i++) {
+      const type = q(place, i, "type")?.value || "";
+      if (!type) {
+        continue;
+      }
+      const species = numOf(q(place, i, "species"));
+      const tier = Number(q(place, i, "tier")?.value) || 1;
+      if (type === "shiny-chosen" && species > 0) {
+        muts.push({ kind: "grantShinyChosen", speciesId: species, tier });
+      } else if (type === "shiny-random") {
+        const poolIds = (q(place, i, "pool")?.value || "")
+          .split(",")
+          .map(s => Number(s.trim()))
+          .filter(n => Number.isFinite(n) && n > 0);
+        muts.push({
+          kind: "grantShinyRandom",
+          tier,
+          unownedOnly: !!q(place, i, "unowned")?.checked,
+          speciesPool: poolIds,
+        });
+      } else if (type === "lab-effect" && species > 0) {
+        const [cat, idx] = (q(place, i, "effect")?.value || "").split(":");
+        if (cat && idx) {
+          muts.push({ kind: "grantLabEffect", speciesId: species, category: cat, effectIndex: Number(idx) });
+        }
+      } else if (type === "candies" && species > 0) {
+        muts.push({ kind: "grantCandy", speciesId: species, candy: numOf(q(place, i, "amount")) });
+      } else if (type === "currency") {
+        const amt = numOf(q(place, i, "amount"));
+        if (amt > 0) {
+          muts.push({ kind: "grantCurrency", amount: amt });
+        }
+      } else if (type === "item") {
+        const itemId = (q(place, i, "item")?.value || "").trim();
+        if (itemId) {
+          muts.push({ kind: "grantItem", itemId, count: numOf(q(place, i, "count")) || 1 });
+        }
+      }
     }
     if (muts.length > 0) {
       pool.push({ place, mutations: muts });
@@ -6323,6 +6442,14 @@ function tourBind(root) {
   if (tok) {
     tok.addEventListener("change", () => localStorage.setItem(TOUR_TOKEN_KEY, tok.value.trim()));
   }
+  // Reward rows: show only the fields the selected reward TYPE uses; re-sync on every type change.
+  root.querySelectorAll("[data-rwrow]").forEach(rowEl => {
+    tourSyncRewardRow(rowEl);
+    const sel = rowEl.querySelector(".rw-type");
+    if (sel) {
+      sel.addEventListener("change", () => tourSyncRewardRow(rowEl));
+    }
+  });
   const on = (sel, fn) => {
     const el = root.querySelector(sel);
     if (el) {

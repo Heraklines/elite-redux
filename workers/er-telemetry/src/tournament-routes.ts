@@ -28,6 +28,7 @@ import {
   type EntrantRecord,
   editTournament,
   type GhostIconSummary,
+  type GrantDeliveryResult,
   kickEntrant,
   makeEntrant,
   type RewardPool,
@@ -36,7 +37,9 @@ import {
   sanitizeGhostIcon,
   sanitizeRewardPool,
   syncCompletion,
+  type TournamentGrantSettlement,
   type TournamentRecord,
+  tournamentGrantSettlements,
   withdrawEntrant,
 } from "./tournament";
 import { applyResultReport, type Bracket, findMatch, manualResolve } from "./tournament-bracket";
@@ -66,6 +69,18 @@ export interface TournamentEnv {
    * tournaments without a personal admin-uid entry. Unset = editor-password auth disabled.
    */
   EDITOR_PASSWORD?: string;
+  /** Base URL of the er-save-api worker (settlement store) for server-to-server reward delivery. */
+  SAVE_API_URL?: string;
+  /**
+   * Shared secret authenticating the tournament→save-api reward push (the SAME value must be set
+   * on er-save-api as SHOWDOWN_GRANT_SECRET). Sent as `X-Grant-Auth`. Unset = delivery disabled.
+   */
+  SHOWDOWN_GRANT_SECRET?: string;
+  /**
+   * Test seam: overrides the server-to-server reward delivery. Production leaves this unset and
+   * uses the default fetch-based sink (SAVE_API_URL + SHOWDOWN_GRANT_SECRET).
+   */
+  grantSink?: (tournamentId: string, settlements: TournamentGrantSettlement[]) => Promise<GrantDeliveryResult>;
 }
 
 /** The authenticated caller (mirrors index.ts TokenPayload). */
@@ -768,13 +783,50 @@ async function handleDelete(body: any, caller: Caller, env: TournamentEnv, cors:
 }
 
 /**
- * P3 GRANT REWARDS (scenario 10) — STUB. Computes the per-account grants from the reward pool +
- * final placements (fully implemented + tested in computeRewardGrants) and marks the tournament
- * granted so it can't double-grant. The ACTUAL application of the mutations runs through the
- * existing settlement pipeline (the same trusted client-apply as stakes) — that cross-worker grant
- * path (pushing mutations into er-save-api's showdown_settlements for each winner to apply) is a
- * FOLLOW-UP; this route returns the computed grants and records intent. TODO(P3-followup): push the
- * grants into the settlement queue so the champion/runner-up/semifinalists receive them on next sync.
+ * Default reward delivery sink: push the per-winner settlement mutations into er-save-api's
+ * pending-settlement store (server-to-server) so each champion/runner-up/semifinalist receives them
+ * on their next login sweep, exactly like a staked payout. Idempotent on the er-save-api side (keyed
+ * by the synthetic match id `tour:<id>`). Auth via the shared SHOWDOWN_GRANT_SECRET (X-Grant-Auth).
+ */
+async function defaultGrantSink(
+  env: TournamentEnv,
+  tournamentId: string,
+  settlements: TournamentGrantSettlement[],
+): Promise<GrantDeliveryResult> {
+  const base = env.SAVE_API_URL;
+  const secret = env.SHOWDOWN_GRANT_SECRET;
+  if (!base || !secret) {
+    return {
+      ok: false,
+      delivered: 0,
+      error: "reward delivery is not configured (SAVE_API_URL / SHOWDOWN_GRANT_SECRET)",
+    };
+  }
+  if (settlements.length === 0) {
+    return { ok: true, delivered: 0 };
+  }
+  try {
+    const res = await fetch(`${base.replace(/\/$/, "")}/showdown/tournament-grant`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Grant-Auth": secret },
+      body: JSON.stringify({ tournamentId, grants: settlements }),
+    });
+    if (!res.ok) {
+      return { ok: false, delivered: 0, error: `save-api returned ${res.status}` };
+    }
+    const data = (await res.json().catch(() => ({}))) as { delivered?: number };
+    return { ok: true, delivered: typeof data.delivered === "number" ? data.delivered : settlements.length };
+  } catch (err) {
+    return { ok: false, delivered: 0, error: `delivery failed: ${String(err)}` };
+  }
+}
+
+/**
+ * P3 GRANT REWARDS (scenario 10). Computes per-account grants from the reward pool + final
+ * placements, translates them to settlement mutations, and DELIVERS them through the existing
+ * settlement pipeline (er-save-api's pending-settlement store — the same trusted client-apply as
+ * stakes) so winners receive them on their next login sweep. Delivery runs BEFORE the rewardsGranted
+ * flag is set, and is idempotent server-side, so a retry after a partial failure never double-grants.
  */
 async function handleGrantRewards(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
   const gate = await requireAdminOrOrganizer(body, caller, env, cors);
@@ -789,13 +841,22 @@ async function handleGrantRewards(body: any, caller: Caller, env: TournamentEnv,
     return json({ error: "rewards already granted" }, 422, cors);
   }
   const grants = computeRewardGrants(t);
+  const settlements = tournamentGrantSettlements(t);
+  // Deliver FIRST (idempotent on the save-api side), then mark granted — so a delivery failure leaves
+  // rewardsGranted false (retryable) and a re-run can't double-insert the settlement rows.
+  const sink = env.grantSink ?? ((id, s) => defaultGrantSink(env, id, s));
+  const delivery = await sink(t.id, settlements);
+  if (!delivery.ok) {
+    return json({ error: `reward delivery failed: ${delivery.error ?? "unknown"}` }, 502, cors);
+  }
   await updateTournament(env, { ...t, rewardsGranted: true });
   return json(
     {
       ok: true,
       granted: grants,
-      // Honest status: definitions stored + placements resolved; settlement-pipeline delivery is a follow-up.
-      note: "grants computed + tournament marked granted; settlement-pipeline delivery is a follow-up (stub)",
+      delivered: delivery.delivered,
+      settlements,
+      note: `granted + delivered ${delivery.delivered} settlement mutation(s) to the pending-settlement store; winners receive them on next login sweep`,
     },
     200,
     cors,

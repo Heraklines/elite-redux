@@ -20,6 +20,8 @@ database_id = "e75604f0-bef9-49ef-aba7-d93779e48b8f"   # set after `wrangler d1 
 #   npx wrangler secret put EDITOR_PASSWORD         # MUST equal er-editor-api's EDITOR_PASSWORD (team
 #                                                   # editor password) — lets any teammate administer
 #                                                   # tournaments via the editor page (X-Editor-Auth).
+#   npx wrangler secret put SHOWDOWN_GRANT_SECRET   # MUST equal er-save-api's SHOWDOWN_GRANT_SECRET
+#                                                   # (authenticates the server-to-server reward push).
 # SESSION_SECRET is the SHARED HMAC key so the client's existing session token verifies here.
 
 [vars]
@@ -31,3 +33,6 @@ ALLOWED_ORIGIN = "*"
 # EDITOR_PASSWORD secret is now an ALTERNATIVE admin credential (the whole team can use it),
 # so this list is no longer the only way to grant admin.
 TOURNAMENT_ADMIN_UIDS = "2"   # staging uid of Heraklines1 (maintainer): tournament create/close/cancel/resolve
+# Base URL of the er-save-api worker (the settlement store). The tournament grant route pushes
+# reward mutations there (POST /showdown/tournament-grant) for the login-sweep delivery.
+SAVE_API_URL = "https://er-save-api.heraklines.workers.dev"
