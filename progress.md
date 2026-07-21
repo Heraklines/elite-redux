@@ -1281,3 +1281,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: Authority V2 source contracts 39/39 green, scoped Biome has no errors
   (repository-baseline warnings/info only), git diff check is clean, and TypeScript remains the unchanged
   584-line baseline with zero diagnostics in either touched file. Remote P1/full-gate requalification is next.
+
+2026-07-21 - Nested Mystery reward return and repeated presentation identity are explicit V2 edges
+
+- Exact-SHA gate 29820804036 confirmed the initial Mystery selector is now actionable and the real browser
+  WebRTC checkpoint, static gate, fast Authority V2 contracts, and every mutation shard remain green. P1
+  then exposed two independent product defects rather than a harness-only red.
+- A terminal embedded Mystery reward is authored at wave N / turn 1, while the enclosing ME_TERMINAL is
+  intentionally authored at wave N / turn 0. The generic same-turn successor wait rejected that return and
+  terminalized both clients. AWAIT_SUCCESSOR can now state an additional exact interaction address including
+  surface, operation kind, wave, and turn. Only a validated ordered Mystery reward grants the precise
+  `op:me / ME_TERMINAL / N / 0` edge; the ordinary same-turn and cross-wave rules are unchanged.
+- The repeated-delve artifact also showed the relay used `seq + JSON presentation` as event identity. One
+  retained entry redelivery therefore queued the same operation twice, while two legitimate rounds with
+  byte-identical options collided in a single operation-ID slot. Committed outcome materialization now
+  deduplicates by immutable operation ID, rejects same-ID/different-material redelivery, and retains a FIFO
+  of distinct operation IDs for identical presentation payloads.
+- Added node-pure admission/validation/identity tests plus an engine relay regression for duplicate versus
+  byte-identical-new presentation events. Local permitted evidence: scoped Biome has no errors (baseline
+  warnings/info only), git diff check is clean, Authority V2 source contracts remain 39/39 green, and the
+  unchanged 584-line TypeScript baseline contains zero diagnostics in any touched file. Remote P1 and full
+  aggregate requalification are required for this checkpoint.

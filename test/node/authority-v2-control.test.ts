@@ -34,6 +34,7 @@ import {
   controlsEqual,
   isValidNextControl,
   sameControlAddress,
+  successorWaitAllows,
   successorWaitAllowsLocalPresentationInput,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
@@ -168,6 +169,64 @@ describe("ordered-wait local presentation lease", () => {
   });
 });
 
+describe("ordered-wait nested interaction addresses", () => {
+  const mysteryTerminalMaterial = (wave = 3, turn = 0, operationKind = "ME_TERMINAL") => ({
+    kind: "OPERATION_ENVELOPE_V1",
+    surfaceClass: "op:me",
+    envelope: {
+      sessionEpoch: 1,
+      wave,
+      turn,
+      pendingOperation: { kind: operationKind },
+    },
+  });
+
+  it("admits only the exact typed return from a nested Mystery reward", () => {
+    const wait = successorWait({
+      allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: 3, turn: 0 }],
+    });
+    expect(
+      successorWaitAllows(wait, "reward-terminal", "INTERACTION_COMMIT", "me-terminal", 1, mysteryTerminalMaterial()),
+    ).toBe(true);
+    expect(
+      successorWaitAllows(
+        wait,
+        "reward-terminal",
+        "INTERACTION_COMMIT",
+        "wrong-kind",
+        1,
+        mysteryTerminalMaterial(3, 0, "ME_PRESENT"),
+      ),
+    ).toBe(false);
+    expect(
+      successorWaitAllows(wait, "reward-terminal", "INTERACTION_COMMIT", "wrong-surface", 1, {
+        ...mysteryTerminalMaterial(),
+        surfaceClass: "op:reward",
+      }),
+    ).toBe(false);
+    expect(
+      successorWaitAllows(
+        wait,
+        "reward-terminal",
+        "INTERACTION_COMMIT",
+        "wrong-wave",
+        1,
+        mysteryTerminalMaterial(4, 0),
+      ),
+    ).toBe(false);
+    expect(
+      successorWaitAllows(
+        wait,
+        "reward-terminal",
+        "INTERACTION_COMMIT",
+        "wrong-turn",
+        1,
+        mysteryTerminalMaterial(3, 1),
+      ),
+    ).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // controlId
 // ---------------------------------------------------------------------------
@@ -177,6 +236,16 @@ describe("controlIdOf", () => {
     expect(controlIdOf(command())).toBe(controlIdOf(command()));
     expect(controlIdOf(rewardControl())).toBe(controlIdOf(rewardControl()));
     expect(controlIdOf(terminal())).toBe(controlIdOf(terminal()));
+  });
+
+  it("includes alternate typed interaction addresses in ordered-wait identity", () => {
+    const base = controlIdOf(successorWait());
+    const nested = controlIdOf(
+      successorWait({
+        allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: 3, turn: 0 }],
+      }),
+    );
+    expect(nested).not.toBe(base);
   });
 
   it("distinguishes every field (id equality == structural equality)", () => {
@@ -313,6 +382,13 @@ describe("validateNextControl", () => {
       }),
     ).toBe(true);
     expect(isValidNextControl(terminal())).toBe(true);
+    expect(
+      isValidNextControl(
+        successorWait({
+          allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: 3, turn: 0 }],
+        }),
+      ),
+    ).toBe(true);
   });
 
   it("rejects retired broad reward, biome, and Mystery controls", () => {
@@ -349,6 +425,21 @@ describe("validateNextControl", () => {
         expectedOperationId: null,
       }),
     ).toMatchObject({ ok: false, reason: "allowNextWaveStart" });
+  });
+
+  it("rejects malformed or ungranted alternate interaction addresses", () => {
+    expect(
+      validateNextControl({
+        ...successorWait(),
+        allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: 3, turn: -1 }],
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateNextControl({
+        ...successorWait({ allowedKinds: ["CONTROL_COMMIT"] }),
+        allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: 3, turn: 0 }],
+      }).ok,
+    ).toBe(false);
   });
 
   it("rejects non-positive mechanical coordinates with a named reason", () => {

@@ -328,6 +328,19 @@ export type CoopNextControl =
       readonly turn: number;
       readonly allowedKinds: readonly CoopAuthorityEntryKind[];
       /**
+       * Exact same-wave interaction addresses that are additionally reachable from this ordered wait.
+       * This models a nested authoritative surface returning to its enclosing interaction without weakening
+       * the ordinary same-turn rule. For example, a Mystery reward is authored at turn 1 while its enclosing
+       * ME_TERMINAL is deliberately authored at turn 0; that edge must be stated here by operation kind and
+       * complete coordinate. Absence means there are no alternate interaction addresses.
+       */
+      readonly allowedInteractionAddresses?: readonly {
+        readonly surfaceClass: Exclude<CoopOperationSurfaceClass, "op:faintSwitch" | "op:wave">;
+        readonly operationKind: Exclude<CoopOperationKind, "FAINT_SWITCH" | "WAVE_ADVANCE">;
+        readonly wave: number;
+        readonly turn: number;
+      }[];
+      /**
        * Whether one of the stated kinds may be addressed at exactly wave N+1, turn 1. False keeps the wait
        * within its source wave. This is explicit because reward/market terminals cross the wave boundary,
        * while turn/replacement and mid-interaction waits must not.

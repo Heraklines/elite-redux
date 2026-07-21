@@ -479,6 +479,27 @@ describe("Authority V2 interaction cutover", () => {
     expect(terminalMarket).toMatchObject({ kind: "AWAIT_SUCCESSOR", allowNextWaveStart: true });
   });
 
+  it("states the exact enclosing Mystery terminal address after an embedded terminal reward", () => {
+    const successor = successorOfCoopV2InteractionEnvelope(
+      "op:reward",
+      envelope(
+        "REWARD",
+        {
+          rewardSurface: { surfaceId: "modifier:me:6:0", ordinal: 0 },
+          label: "skip",
+          choice: -1,
+          terminal: true,
+          result: { lockModifierTiers: false },
+        },
+        "REWARD_SELECT",
+      ),
+    );
+    expect(successor).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: 1, turn: 0 }],
+    });
+  });
+
   it.each([
     ["REVIVAL", { type: "decision", fieldIndex: 0, partySlot: 1, speciesId: 25 }, "op:revival"],
     ["CATCH_FULL", { type: "decision", partySlot: 1 }, "op:catchFull"],

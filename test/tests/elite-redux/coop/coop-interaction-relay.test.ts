@@ -19,6 +19,64 @@ import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault
 import { describe, expect, it } from "vitest";
 
 describe("co-op alternating-interaction relay (#633)", () => {
+  it("deduplicates committed redelivery by operation id without conflating identical later presentations", async () => {
+    const { guest } = createLoopbackPair();
+    const relay = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+    });
+    const seq = 8_000_001;
+    const presentation = {
+      k: "mePresent" as const,
+      tokens: {},
+      meetsReqs: [true, true],
+      labels: ["Continue", "Leave"],
+    };
+
+    relay.materializeCommittedInteractionOutcome(seq, presentation, "1:0:ME_PRESENT:round-1");
+    relay.materializeCommittedInteractionOutcome(seq, presentation, "1:0:ME_PRESENT:round-1");
+    relay.materializeCommittedInteractionOutcome(seq, presentation, "1:0:ME_PRESENT:round-2");
+
+    const first = await relay.awaitInteractionOutcome(seq);
+    expect(first).toEqual(presentation);
+    expect(relay.consumeCommittedInteractionOutcomeOperationId(seq, first!)).toBe("1:0:ME_PRESENT:round-1");
+    const second = await relay.awaitInteractionOutcome(seq);
+    expect(second).toEqual(presentation);
+    expect(relay.consumeCommittedInteractionOutcomeOperationId(seq, second!)).toBe("1:0:ME_PRESENT:round-2");
+    expect(relay.hasBufferedInteractionOutcomeFor(seq)).toBe(false);
+
+    relay.dispose();
+  });
+
+  it("rejects a committed operation id redelivered with conflicting outcome material", async () => {
+    const { guest } = createLoopbackPair();
+    const violations: string[] = [];
+    const relay = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+      onV2AuthorityProposalViolation: reason => violations.push(reason),
+    });
+    const seq = 8_000_001;
+    const operationId = "1:0:ME_PRESENT:round-1";
+    relay.materializeCommittedInteractionOutcome(
+      seq,
+      { k: "mePresent", tokens: {}, meetsReqs: [true], labels: ["Continue"] },
+      operationId,
+    );
+    relay.materializeCommittedInteractionOutcome(
+      seq,
+      { k: "mePresent", tokens: {}, meetsReqs: [false], labels: ["Forged"] },
+      operationId,
+    );
+
+    const retained = await relay.awaitInteractionOutcome(seq);
+    expect(retained).toMatchObject({ labels: ["Continue"] });
+    expect(violations).toEqual([expect.stringContaining("conflicting material")]);
+    expect(relay.hasBufferedInteractionOutcomeFor(seq)).toBe(false);
+
+    relay.dispose();
+  });
+
   it("delivers the owner's choice to a parked watcher (reward pick)", async () => {
     const { host, guest } = createLoopbackPair();
     const owner = new CoopInteractionRelay(host);

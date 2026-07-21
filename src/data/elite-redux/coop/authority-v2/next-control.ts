@@ -95,6 +95,7 @@ export function controlIdOf(control: ProjectableControl): string {
         `AWAIT_SUCCESSOR/${encodeURIComponent(control.afterOperationId)}`
         + `/e${control.epoch}/w${control.wave}/t${control.turn}`
         + `/${canonicalSuccessorKinds(control.allowedKinds).join(",")}`
+        + `/interactionAddresses:${canonicalAllowedInteractionAddresses(control.allowedInteractionAddresses)}`
         + `/nextWave:${control.allowNextWaveStart ? "1" : "0"}`
         + `/next:${control.expectedOperationId == null ? "*" : encodeURIComponent(control.expectedOperationId)}`
       );
@@ -152,6 +153,25 @@ export function successorWaitAllows(
   }
   if (address.epoch !== wait.epoch) {
     return false;
+  }
+  const interactionOperationKind = interactionOperationKindOfEntry({
+    kind: nextKind,
+    material: { payload: nextMaterial },
+  });
+  const interactionMaterial = objectRecord(nextMaterial);
+  if (
+    nextKind === "INTERACTION_COMMIT"
+    && interactionOperationKind != null
+    && wait.allowedInteractionAddresses?.some(
+      allowed =>
+        allowed.wave === wait.wave
+        && allowed.surfaceClass === interactionMaterial?.surfaceClass
+        && allowed.operationKind === interactionOperationKind
+        && allowed.wave === address.wave
+        && allowed.turn === address.turn,
+    )
+  ) {
+    return true;
   }
   // A turn result parks at turn N before the engine finishes its post-effects settlement. A surviving
   // battle authors CONTROL_COMMIT for turn N+1. Victory/GameOver can likewise capture its complete
@@ -801,6 +821,22 @@ function canonicalOpaqueIds(ids: readonly string[]): readonly string[] {
   return [...new Set(ids)].sort();
 }
 
+function canonicalAllowedInteractionAddresses(
+  addresses: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedInteractionAddresses"],
+): string {
+  if (addresses == null) {
+    return "*";
+  }
+  return [...addresses]
+    .map(
+      address =>
+        `${encodeURIComponent(address.surfaceClass)}:${encodeURIComponent(address.operationKind)}`
+        + `:w${address.wave}:t${address.turn}`,
+    )
+    .sort()
+    .join(",");
+}
+
 function successorWaitIssues(control: Record<string, unknown>): string[] {
   const issues: string[] = [];
   addIssue(issues, "afterOperationId", isNonEmptyString(control.afterOperationId));
@@ -825,6 +861,44 @@ function successorWaitIssues(control: Record<string, unknown>): string[] {
   }
   if (control.expectedOperationId !== null && !isNonEmptyString(control.expectedOperationId)) {
     issues.push("expectedOperationId");
+  }
+  if (control.allowedInteractionAddresses !== undefined) {
+    if (
+      !Array.isArray(control.allowedInteractionAddresses)
+      || control.allowedInteractionAddresses.length === 0
+      || !Array.isArray(control.allowedKinds)
+      || !control.allowedKinds.includes("INTERACTION_COMMIT")
+    ) {
+      issues.push("allowedInteractionAddresses");
+    } else {
+      const seen = new Set<string>();
+      for (const [index, candidate] of control.allowedInteractionAddresses.entries()) {
+        if (!isPlainObject(candidate)) {
+          issues.push(`allowedInteractionAddresses[${index}]`);
+          continue;
+        }
+        const operationKind = candidate.operationKind;
+        const surfaceClass = candidate.surfaceClass;
+        const key = `${String(surfaceClass)}:${String(operationKind)}:${String(candidate.wave)}:${String(candidate.turn)}`;
+        if (
+          typeof operationKind !== "string"
+          || !(operationKind in V2_INTERACTION_OPERATION_SURFACES)
+          || typeof surfaceClass !== "string"
+          || !(surfaceClass in V2_INTERACTION_SURFACES)
+          || !V2_INTERACTION_OPERATION_SURFACES[operationKind as V2InteractionOperationKind].includes(
+            surfaceClass as V2InteractionSurface,
+          )
+          || !isNonNegativeInt(candidate.wave)
+          || candidate.wave !== control.wave
+          || !isNonNegativeInt(candidate.turn)
+        ) {
+          issues.push(`allowedInteractionAddresses[${index}]`);
+        } else if (seen.has(key)) {
+          issues.push(`allowedInteractionAddresses[${index}]: duplicate`);
+        }
+        seen.add(key);
+      }
+    }
   }
   return issues;
 }

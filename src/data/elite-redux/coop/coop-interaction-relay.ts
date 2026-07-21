@@ -353,7 +353,7 @@ export interface CoopInteractionRelayOptions {
   projectV2AuthorityProposalWait?: (wait: CoopV2AuthorityProposalWait) => boolean;
   /** Revoke only a timed-out, cancelled, or superseded waiter generation. */
   revokeV2AuthorityProposalWait?: (wait: CoopV2AuthorityProposalWait) => void;
-  /** Fail the shared session when one proposal identity is reused for conflicting material. */
+  /** Fail the shared session when one V2 proposal or committed-operation identity carries conflicting material. */
   onV2AuthorityProposalViolation?: (reason: string) => void;
   /**
    * Authority-owned option-pool commit. Called before a V2 reward/market surface is exposed; success means
@@ -511,8 +511,13 @@ export class CoopInteractionRelay {
   private readonly rawOutcomeCredits = new Map<string, number>();
   /** Journal outcomes awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
   private readonly committedOutcomeCredits = new Map<string, number>();
-  /** Exact V2 operation paired with a committed outcome until its real phase consumes it. */
-  private readonly committedOutcomeOperationIds = new Map<string, string>();
+  /**
+   * Exact V2 operations paired FIFO with committed outcomes until their real phase consumes them. Content
+   * is not identity: repeated Mystery rounds may intentionally publish byte-identical presentations.
+   */
+  private readonly committedOutcomeOperationIds = new Map<string, string[]>();
+  /** A retained V2 operation may materialize one immutable payload even when redelivered for receipts. */
+  private readonly materializedCommittedOutcomeOperationIds = new Map<string, string>();
   /** Raw choices awaiting a same-delivery-turn journal carrier; keyed by seq + kind + exact payload. */
   private readonly rawChoiceCredits = new Map<string, number>();
   /** Journal choices awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
@@ -1053,11 +1058,27 @@ export class CoopInteractionRelay {
    */
   materializeCommittedInteractionOutcome(seq: number, outcome: CoopInteractionOutcome, operationId?: string): void {
     const key = `${seq}:${JSON.stringify(outcome)}`;
+    if (operationId != null && operationId.length > 0) {
+      const priorKey = this.materializedCommittedOutcomeOperationIds.get(operationId);
+      if (priorKey != null) {
+        if (priorKey !== key) {
+          const reason = `Authority V2 outcome operation ${operationId} was redelivered with conflicting material`;
+          coopWarn("v2-interaction", reason);
+          this.onV2AuthorityProposalViolation(reason);
+          return;
+        }
+        coopLog("relay", `JOURNAL interactionOutcome seq=${seq} duplicate operation=${operationId} -> drop`);
+        return;
+      }
+      this.materializedCommittedOutcomeOperationIds.set(operationId, key);
+    }
     if (this.consumeEchoCredit(this.rawOutcomeCredits, key)) {
       return;
     }
     if (operationId != null && operationId.length > 0) {
-      this.committedOutcomeOperationIds.set(key, operationId);
+      const operationIds = this.committedOutcomeOperationIds.get(key) ?? [];
+      operationIds.push(operationId);
+      this.committedOutcomeOperationIds.set(key, operationIds);
     }
     this.addEchoCredit(this.committedOutcomeCredits, key);
     this.deliverInteractionOutcome(seq, outcome, "JOURNAL");
@@ -1066,8 +1087,11 @@ export class CoopInteractionRelay {
   /** Consume the immutable operation address paired with one exact outcome delivery. */
   consumeCommittedInteractionOutcomeOperationId(seq: number, outcome: CoopInteractionOutcome): string | null {
     const key = `${seq}:${JSON.stringify(outcome)}`;
-    const operationId = this.committedOutcomeOperationIds.get(key) ?? null;
-    this.committedOutcomeOperationIds.delete(key);
+    const operationIds = this.committedOutcomeOperationIds.get(key);
+    const operationId = operationIds?.shift() ?? null;
+    if (operationIds?.length === 0) {
+      this.committedOutcomeOperationIds.delete(key);
+    }
     return operationId;
   }
 
@@ -1614,6 +1638,7 @@ export class CoopInteractionRelay {
     this.rawOutcomeCredits.clear();
     this.committedOutcomeCredits.clear();
     this.committedOutcomeOperationIds.clear();
+    this.materializedCommittedOutcomeOperationIds.clear();
     this.rawChoiceCredits.clear();
     this.committedChoiceCredits.clear();
     this.rawRevivalPromptCredits.clear();
@@ -1664,6 +1689,7 @@ export class CoopInteractionRelay {
     this.rawOutcomeCredits.clear();
     this.committedOutcomeCredits.clear();
     this.committedOutcomeOperationIds.clear();
+    this.materializedCommittedOutcomeOperationIds.clear();
     this.rawChoiceCredits.clear();
     this.committedChoiceCredits.clear();
     this.rawRevivalPromptCredits.clear();

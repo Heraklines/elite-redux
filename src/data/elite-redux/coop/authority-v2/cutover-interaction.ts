@@ -46,7 +46,12 @@ import type {
   CoopLogicalPhase,
   CoopOperationKind,
 } from "#data/elite-redux/coop/coop-operation-envelope";
-import { makeCoopOperationId, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
+  COOP_ME_REWARD_SURFACE_LIMIT,
+  makeCoopOperationId,
+  parseCoopOperationId,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import type {
   CoopOperationSurfaceClass,
   CoopV2InteractionOperationKind,
@@ -127,6 +132,20 @@ function outcome(value: unknown): boolean {
   return isPlainObject(value) && typeof value.k === "string" && value.k.length > 0;
 }
 
+const COOP_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
+
+function rewardSurfaceIdentity(value: unknown): boolean {
+  return (
+    isPlainObject(value)
+    && typeof value.surfaceId === "string"
+    && value.surfaceId.length <= COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH
+    && COOP_REWARD_SURFACE_ID_PATTERN.test(value.surfaceId)
+    && integer(value.ordinal)
+    && value.ordinal >= 0
+    && value.ordinal < COOP_ME_REWARD_SURFACE_LIMIT
+  );
+}
+
 function rewardPayload(value: unknown): boolean {
   const continuing =
     isPlainObject(value)
@@ -150,6 +169,7 @@ function rewardPayload(value: unknown): boolean {
     && integer(value.choice)
     && (value.data === undefined || integerArray(value.data))
     && typeof value.terminal === "boolean"
+    && (value.rewardSurface === undefined || rewardSurfaceIdentity(value.rewardSurface))
     && terminalMatchesAction
     && isPlainObject(value.result)
     && typeof value.result.lockModifierTiers === "boolean"
@@ -207,14 +227,7 @@ function rewardPresentationPayload(value: unknown, surface: "reward" | "market")
   ) {
     return false;
   }
-  if (
-    value.rewardSurface !== undefined
-    && (!isPlainObject(value.rewardSurface)
-      || typeof value.rewardSurface.surfaceId !== "string"
-      || value.rewardSurface.surfaceId.length === 0
-      || !integer(value.rewardSurface.ordinal)
-      || value.rewardSurface.ordinal < 0)
-  ) {
+  if (value.rewardSurface !== undefined && !rewardSurfaceIdentity(value.rewardSurface)) {
     return false;
   }
   return value.options.every(
@@ -612,6 +625,7 @@ function successorWait(
   allowedKinds: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedKinds"],
   allowNextWaveStart: boolean,
   coordinate: Readonly<{ wave: number; turn: number }> = envelope,
+  allowedInteractionAddresses?: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedInteractionAddresses"],
 ): ProjectableControl {
   const operation = envelope.pendingOperation;
   if (operation == null) {
@@ -624,6 +638,7 @@ function successorWait(
     wave: coordinate.wave,
     turn: coordinate.turn,
     allowedKinds,
+    ...(allowedInteractionAddresses == null ? {} : { allowedInteractionAddresses }),
     allowNextWaveStart,
     expectedOperationId: null,
   };
@@ -696,7 +711,12 @@ export function successorOfCoopV2InteractionEnvelope(
   const wait = (
     allowedKinds: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedKinds"],
     allowNextWaveStart: boolean,
-  ): ProjectableControl => successorWait(envelope, allowedKinds, allowNextWaveStart);
+    allowedInteractionAddresses?: Extract<
+      ProjectableControl,
+      { kind: "AWAIT_SUCCESSOR" }
+    >["allowedInteractionAddresses"],
+  ): ProjectableControl =>
+    successorWait(envelope, allowedKinds, allowNextWaveStart, envelope, allowedInteractionAddresses);
   const shared = (
     cls: Exclude<CoopOperationSurfaceClass, "op:faintSwitch" | "op:wave">,
     operationKind: CoopV2InteractionOperationKind,
@@ -757,7 +777,13 @@ export function successorOfCoopV2InteractionEnvelope(
           || payload?.label === "transfer"
           || payload?.label === "lock")
         ? shared("op:reward", "REWARD", operation.id, operation.owner, ["REWARD", "REWARD_PRESENT"])
-        : wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], payload?.terminal === true);
+        : wait(
+            ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+            payload?.terminal === true,
+            payload?.terminal === true && rewardSurfaceIdentity(payload.rewardSurface)
+              ? [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: envelope.wave, turn: 0 }]
+              : undefined,
+          );
     case "SHOP_BUY":
       return payload?.terminal === false
         ? shared("op:reward", "SHOP_BUY", operation.id, operation.owner, ["SHOP_BUY", "SHOP_PRESENT"])
