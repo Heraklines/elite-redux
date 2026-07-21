@@ -277,6 +277,7 @@ export interface CoopV2AuthorityProposalWait {
   readonly controlOperationId: string;
   readonly relaySequence: number;
   readonly acceptedKinds: readonly string[];
+  readonly expectedRewardSurface?: CoopRewardSurfaceIdentity | null | undefined;
   readonly waiterToken: object;
 }
 
@@ -309,6 +310,8 @@ export interface CoopInteractionRelayOptions {
   isInteractionAuthorityV2?: () => boolean;
   /** Whether this relay endpoint is the authenticated mechanical authority. */
   isLocalAuthority?: () => boolean;
+  /** Whether the current V2 control requires an address-exact remote proposal waiter. */
+  isV2AuthorityProposalWaitRequired?: () => boolean;
   /**
    * Authenticate the sole non-mechanical V2 choice carrier. The enclosing
    * Mystery presentation retains mechanical control; this only lets its exact
@@ -320,6 +323,12 @@ export interface CoopInteractionRelayOptions {
     readonly questionIndex: number;
     readonly operationId: string;
   }) => boolean;
+  /** Resolve the active remote-owned V2 control from one exact relay wait address. */
+  resolveV2AuthorityProposalControlId?: (input: {
+    readonly relaySequence: number;
+    readonly acceptedKinds: readonly string[];
+    readonly expectedRewardSurface?: CoopRewardSurfaceIdentity | null | undefined;
+  }) => string | null;
   /**
    * Install the authority's address-exact proposal-ingress lease. Returning
    * false keeps the choice unconsumed and resolves the attempted wait as null.
@@ -462,8 +471,12 @@ export class CoopInteractionRelay {
   private readonly isAuthorityWaitCreationFrozen: () => boolean;
   private readonly isInteractionAuthorityV2: () => boolean;
   private readonly isLocalAuthority: () => boolean;
+  private readonly isV2AuthorityProposalWaitRequired: () => boolean;
   private readonly validateV2QuizAnswerObservation: NonNullable<
     CoopInteractionRelayOptions["validateV2QuizAnswerObservation"]
+  >;
+  private readonly resolveV2AuthorityProposalControlId: NonNullable<
+    CoopInteractionRelayOptions["resolveV2AuthorityProposalControlId"]
   >;
   private readonly projectV2AuthorityProposalWait: NonNullable<
     CoopInteractionRelayOptions["projectV2AuthorityProposalWait"]
@@ -544,7 +557,9 @@ export class CoopInteractionRelay {
     this.isAuthorityWaitCreationFrozen = opts.isAuthorityWaitCreationFrozen ?? (() => false);
     this.isInteractionAuthorityV2 = opts.isInteractionAuthorityV2 ?? isCoopV2InteractionCutoverActive;
     this.isLocalAuthority = opts.isLocalAuthority ?? (() => transport.role === "host");
+    this.isV2AuthorityProposalWaitRequired = opts.isV2AuthorityProposalWaitRequired ?? (() => false);
     this.validateV2QuizAnswerObservation = opts.validateV2QuizAnswerObservation ?? (() => false);
+    this.resolveV2AuthorityProposalControlId = opts.resolveV2AuthorityProposalControlId ?? (() => null);
     this.projectV2AuthorityProposalWait = opts.projectV2AuthorityProposalWait ?? (() => false);
     this.revokeV2AuthorityProposalWait = opts.revokeV2AuthorityProposalWait ?? (() => {});
     this.onV2AuthorityProposalViolation = opts.onV2AuthorityProposalViolation ?? (() => {});
@@ -791,6 +806,24 @@ export class CoopInteractionRelay {
       coopWarn("relay", `AWAIT interactionChoice seq=${seq} -> STICKY-CANCELLED (resync rescue) resolve null`);
       return Promise.resolve(null);
     }
+    const proposalWaitRequired =
+      this.isInteractionAuthorityV2() && this.isLocalAuthority() && this.isV2AuthorityProposalWaitRequired();
+    const resolvedAuthorityControlOperationId =
+      authorityControlOperationId
+      ?? (this.isInteractionAuthorityV2() && this.isLocalAuthority()
+        ? (this.resolveV2AuthorityProposalControlId({
+            relaySequence: seq,
+            acceptedKinds: [...(expectedKinds ?? [])],
+            expectedRewardSurface,
+          }) ?? undefined)
+        : undefined);
+    if (proposalWaitRequired && resolvedAuthorityControlOperationId === undefined) {
+      coopWarn(
+        "v2-interaction",
+        `refused unaddressed remote proposal wait seq=${seq} expected=[${(expectedKinds ?? []).join(",")}]`,
+      );
+      return Promise.resolve(null);
+    }
     const queue = this.inbox.get(seq);
     if (queue !== undefined && queue.length > 0) {
       // #861: scan FIFO for the first buffered entry whose kind this site accepts. Entries with a
@@ -810,18 +843,23 @@ export class CoopInteractionRelay {
           );
         }
         const next = queue[matchIdx];
-        if (authorityControlOperationId !== undefined && this.isInteractionAuthorityV2() && this.isLocalAuthority()) {
+        if (
+          resolvedAuthorityControlOperationId !== undefined
+          && this.isInteractionAuthorityV2()
+          && this.isLocalAuthority()
+        ) {
           const waiterToken = {};
           const wait = {
-            controlOperationId: authorityControlOperationId,
+            controlOperationId: resolvedAuthorityControlOperationId,
             relaySequence: seq,
             acceptedKinds: [...(expectedKinds ?? [])],
+            expectedRewardSurface,
             waiterToken,
           } satisfies CoopV2AuthorityProposalWait;
           if (!this.projectV2AuthorityProposalWait(wait)) {
             coopWarn(
               "v2-interaction",
-              `refused buffered proposal consumption without exact authority wait control=${authorityControlOperationId} seq=${seq}`,
+              `refused buffered proposal consumption without exact authority wait control=${resolvedAuthorityControlOperationId} seq=${seq}`,
             );
             return Promise.resolve(null);
           }
@@ -866,12 +904,13 @@ export class CoopInteractionRelay {
       let cancelTimer: () => void = () => {};
       const waiterToken = {};
       const authorityWait =
-        authorityControlOperationId === undefined
+        resolvedAuthorityControlOperationId === undefined
           ? null
           : ({
-              controlOperationId: authorityControlOperationId,
+              controlOperationId: resolvedAuthorityControlOperationId,
               relaySequence: seq,
               acceptedKinds: [...(expectedKinds ?? [])],
+              expectedRewardSurface,
               waiterToken,
             } satisfies CoopV2AuthorityProposalWait);
       const finish = (res: CoopInteractionChoice | null) => {
@@ -907,7 +946,7 @@ export class CoopInteractionRelay {
       ) {
         coopWarn(
           "v2-interaction",
-          `refused proposal wait without exact authority control=${authorityControlOperationId} seq=${seq}`,
+          `refused proposal wait without exact authority control=${resolvedAuthorityControlOperationId} seq=${seq}`,
         );
         finish(null);
         return;

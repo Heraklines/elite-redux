@@ -362,21 +362,31 @@ import {
   setCoopRewardOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import {
+  COOP_ABILITY_CHOICE_KINDS,
   COOP_BARGAIN_SEQ_BASE,
+  COOP_BIOME_PICK_CHOICE_KINDS,
   COOP_BIOME_PICK_SEQ_BASE,
   COOP_BIOME_SHOP_CHOICE_KINDS,
   COOP_BIOME_TRANSITION_SEQ_BASE,
+  COOP_CATCH_FULL_CHOICE_KINDS,
+  COOP_CATCH_FULL_SEQ,
+  COOP_COLO_CHOICE_KINDS,
   COOP_COLOSSEUM_SEQ_BASE,
+  COOP_CROSSROADS_CHOICE_KINDS,
   COOP_CROSSROADS_SEQ_BASE,
+  COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
   COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
+  COOP_LEARN_MOVE_CHOICE_KINDS,
   COOP_LEARN_MOVE_FWD_SEQ_BASE,
   COOP_MAX_REACHABLE_COUNTER,
   COOP_ME_PICK_CHOICE_KINDS,
   COOP_ME_PUMP_SEQ_BASE,
   COOP_ME_TERM_SEQ_BASE,
   COOP_REJOIN_SYNC_SEQ_BASE,
+  COOP_REVIVAL_CHOICE_KINDS,
   COOP_REVIVAL_SEQ_BASE,
   COOP_REWARD_CHOICE_KINDS,
+  COOP_STORMGLASS_CHOICE_KINDS,
   COOP_STORMGLASS_SEQ,
 } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopInteractionOwnerSeat, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
@@ -416,6 +426,7 @@ import type {
   CoopNetcodeMode,
   CoopRecoveryAdmissionV1,
   CoopRecoveryReason,
+  CoopRewardSurfaceIdentity,
   CoopRole,
   CoopSerializedEnemy,
   CoopSerializedRewardOption,
@@ -4873,6 +4884,7 @@ function projectCoopV2WaveControl(
 interface CoopV2AuthorityProposalWaitSpec {
   readonly relaySequence: number;
   readonly acceptedKinds: readonly string[];
+  readonly expectedRewardSurface?: CoopRewardSurfaceIdentity | null | undefined;
 }
 
 /** Derive the authority's remote-input ingress solely from the immutable projection capsule. */
@@ -4880,17 +4892,105 @@ function coopV2AuthorityProposalWaitSpec(
   control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
   plan: CoopV2InteractionProjectionPlan,
 ): CoopV2AuthorityProposalWaitSpec | null {
-  if (plan.kind === "mystery" && control.surfaceClass === "op:me" && control.operationKind === "ME_PRESENT") {
-    return {
-      relaySequence: COOP_ME_PUMP_SEQ_BASE + plan.pinned,
-      acceptedKinds: COOP_ME_PICK_CHOICE_KINDS,
-    };
+  const parsed = parseCoopOperationId(control.operationId);
+  switch (plan.kind) {
+    case "ability":
+      return {
+        relaySequence: coopAbilityPickerSeq(plan.presentation.pinned),
+        acceptedKinds: COOP_ABILITY_CHOICE_KINDS,
+      };
+    case "bargain":
+      // Bargain still publishes one comprehensive terminal outcome rather than a relay choice. It must
+      // acquire a V2-native operation-proposal lease before remote ownership can use this proof path.
+      return null;
+    case "biome":
+      return parsed?.kind === "BIOME_PICK"
+        ? { relaySequence: parsed.pinnedSeq, acceptedKinds: COOP_BIOME_PICK_CHOICE_KINDS }
+        : null;
+    case "crossroads":
+      return parsed?.kind === "CROSSROADS_PICK"
+        ? { relaySequence: parsed.pinnedSeq, acceptedKinds: COOP_CROSSROADS_CHOICE_KINDS }
+        : null;
+    case "catch-full":
+      return { relaySequence: COOP_CATCH_FULL_SEQ, acceptedKinds: COOP_CATCH_FULL_CHOICE_KINDS };
+    case "colosseum":
+      return {
+        relaySequence: COOP_COLOSSEUM_SEQ_BASE + plan.pinned,
+        acceptedKinds: COOP_COLO_CHOICE_KINDS,
+      };
+    case "learn-move":
+      return {
+        relaySequence: COOP_LEARN_MOVE_FWD_SEQ_BASE + plan.partySlot,
+        acceptedKinds: COOP_LEARN_MOVE_CHOICE_KINDS,
+      };
+    case "learn-move-batch":
+      return {
+        relaySequence: COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE + plan.partySlot,
+        acceptedKinds: COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
+      };
+    case "mystery":
+      return control.surfaceClass === "op:me" && control.operationKind === "ME_PRESENT"
+        ? {
+            relaySequence: COOP_ME_PUMP_SEQ_BASE + plan.pinned,
+            acceptedKinds: COOP_ME_PICK_CHOICE_KINDS,
+          }
+        : null;
+    case "revival":
+      return {
+        relaySequence: COOP_REVIVAL_SEQ_BASE + plan.fieldIndex,
+        acceptedKinds: COOP_REVIVAL_CHOICE_KINDS,
+      };
+    case "reward":
+      return {
+        relaySequence: plan.projection.pinned,
+        acceptedKinds: COOP_REWARD_CHOICE_KINDS,
+        expectedRewardSurface: plan.projection.rewardSurface ?? null,
+      };
+    case "market":
+      return {
+        relaySequence: coopBiomeShopSeq(plan.projection.pinned),
+        acceptedKinds: COOP_BIOME_SHOP_CHOICE_KINDS,
+      };
+    case "stormglass":
+      return { relaySequence: COOP_STORMGLASS_SEQ, acceptedKinds: COOP_STORMGLASS_CHOICE_KINDS };
   }
-  return null;
 }
 
 function sameOrderedStrings(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sameCoopRewardSurface(
+  left: CoopRewardSurfaceIdentity | null | undefined,
+  right: CoopRewardSurfaceIdentity | null | undefined,
+): boolean {
+  if (left == null || right == null) {
+    return left === right;
+  }
+  return left.ordinal === right.ordinal && left.surfaceId === right.surfaceId;
+}
+
+function resolveCoopV2AuthorityProposalControlId(
+  runtime: CoopRuntime,
+  wait: Omit<CoopV2AuthorityProposalWait, "controlOperationId" | "waiterToken">,
+): string | null {
+  const control = runtime.v2ControlLedger.latestControl;
+  if (
+    runtime.controller.authorityRole !== "authority"
+    || control?.kind !== "SHARED_INTERACTION"
+    || control.ownerSeatId === runtime.controller.localSeatId
+  ) {
+    return null;
+  }
+  const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
+  const plan = sourceEntry == null ? null : projectionPlanOfCoopV2InteractionEntry(sourceEntry);
+  const expected = plan == null ? null : coopV2AuthorityProposalWaitSpec(control, plan);
+  return expected != null
+    && wait.relaySequence === expected.relaySequence
+    && sameOrderedStrings(wait.acceptedKinds, expected.acceptedKinds)
+    && sameCoopRewardSurface(wait.expectedRewardSurface, expected.expectedRewardSurface)
+    ? control.operationId
+    : null;
 }
 
 /**
@@ -4898,22 +4998,13 @@ function sameOrderedStrings(left: readonly string[], right: readonly string[]): 
  * The relay is the only caller and supplies one opaque waiter generation.
  */
 function projectCoopV2AuthorityProposalWait(runtime: CoopRuntime, wait: CoopV2AuthorityProposalWait): boolean {
+  const resolvedControlOperationId = resolveCoopV2AuthorityProposalControlId(runtime, wait);
   const control = runtime.v2ControlLedger.latestControl;
   if (
-    runtime.controller.authorityRole !== "authority"
-    || control?.kind !== "SHARED_INTERACTION"
-    || control.ownerSeatId === runtime.controller.localSeatId
+    control?.kind !== "SHARED_INTERACTION"
+    || resolvedControlOperationId == null
+    || resolvedControlOperationId !== wait.controlOperationId
     || control.operationId !== wait.controlOperationId
-  ) {
-    return false;
-  }
-  const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
-  const plan = sourceEntry == null ? null : projectionPlanOfCoopV2InteractionEntry(sourceEntry);
-  const expected = plan == null ? null : coopV2AuthorityProposalWaitSpec(control, plan);
-  if (
-    expected == null
-    || wait.relaySequence !== expected.relaySequence
-    || !sameOrderedStrings(wait.acceptedKinds, expected.acceptedKinds)
   ) {
     return false;
   }
@@ -4921,6 +5012,7 @@ function projectCoopV2AuthorityProposalWait(runtime: CoopRuntime, wait: CoopV2Au
     controlOperationId: wait.controlOperationId,
     relaySequence: wait.relaySequence,
     acceptedKinds: [...wait.acceptedKinds],
+    expectedRewardSurface: wait.expectedRewardSurface,
     waiterToken: wait.waiterToken,
     active: true,
   };
@@ -10371,6 +10463,16 @@ export function assembleCoopRuntime(
     isAuthorityWaitCreationFrozen: () => isCoopV2AuthorityWaitCreationFrozen(runtime),
     isInteractionAuthorityV2: () => runtime != null && isCoopV2InteractionCutoverActive(runtime.durability),
     isLocalAuthority: () => controller.authorityRole === "authority",
+    isV2AuthorityProposalWaitRequired: () => {
+      const control = runtime?.v2ControlLedger.latestControl;
+      return (
+        controller.authorityRole === "authority"
+        && control?.kind === "SHARED_INTERACTION"
+        && control.ownerSeatId !== controller.localSeatId
+      );
+    },
+    resolveV2AuthorityProposalControlId: wait =>
+      runtime == null ? null : resolveCoopV2AuthorityProposalControlId(runtime, wait),
     projectV2AuthorityProposalWait: wait => runtime != null && projectCoopV2AuthorityProposalWait(runtime, wait),
     revokeV2AuthorityProposalWait: wait => {
       if (runtime != null) {

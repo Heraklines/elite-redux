@@ -1228,5 +1228,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   TrainerVictory, reward, and biome tails to prove the same immutable current-wave source after projector
   retirement.
 - Local permitted evidence: Authority V2 public source contracts 35/35 green, scoped Biome has no errors
-  (repository-baseline warnings/info only), and git diff --check is clean. Co-op engine/browser execution
-  remains remote-only.
+ (repository-baseline warnings/info only), and git diff --check is clean. Co-op engine/browser execution
+ remains remote-only.
+
+2026-07-21 - Every relay-driven remote interaction requires an exact V2 proposal ingress
+
+- The authority-side proposal proof was previously phase-wired only for Mystery. Other guest-owned
+  interaction waiters could consume the same retained proposal carrier without proving that their sequence,
+  accepted kind set, and nested reward surface came from the active immutable SHARED_INTERACTION capsule.
+- The relay now centrally asks the runtime to resolve every wait. The runtime has an exhaustive derivation
+  for ability, biome, crossroads, catch-full, colosseum, learn-move, learn-move-batch, Mystery, revival,
+  reward, market, and Stormglass projection plans. Nested Mystery reward waits additionally bind the exact
+  reward-surface ordinal and ID.
+- A remote-owned V2 control now fails closed before buffering or parking if that exact address cannot be
+  derived; it cannot silently fall back to legacy consumption. The global control ledger binds the proof to
+  one waiter generation and rejects a changed reward surface under the same token.
+- Bargain is deliberately not claimed by this change: it still sends one comprehensive operation outcome,
+  not an interaction-choice proposal, and needs a V2-native operation-proposal lease. Embedded Market also
+  remains under audit until its nested reward-surface identity is carried at every real phase wait.
+- Local permitted evidence: public Authority V2 source contracts 36/36 green before the final fail-closed
+  assertion was added, scoped Biome reported only repository-baseline warnings/info after formatting, and
+  `git diff --check` was clean. Co-op Vitest and browser verification remain remote-only.

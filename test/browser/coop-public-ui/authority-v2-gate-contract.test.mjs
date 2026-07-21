@@ -940,6 +940,50 @@ test("guest-owned Mystery control is installed only by an exact authority propos
   );
 });
 
+test("every relay-driven remote interaction derives one exact authority proposal ingress", () => {
+  const specStart = coopRuntime.indexOf("function coopV2AuthorityProposalWaitSpec(");
+  const specEnd = coopRuntime.indexOf("\nfunction sameOrderedStrings", specStart);
+  assert.notEqual(specStart, -1, "runtime exposes one closed proposal-ingress derivation");
+  assert.ok(specEnd > specStart, "the proposal-ingress derivation has a bounded source block");
+  const spec = coopRuntime.slice(specStart, specEnd);
+  for (const planKind of [
+    "ability",
+    "biome",
+    "crossroads",
+    "catch-full",
+    "colosseum",
+    "learn-move",
+    "learn-move-batch",
+    "mystery",
+    "revival",
+    "reward",
+    "market",
+    "stormglass",
+  ]) {
+    assert.match(spec, new RegExp(`case "${planKind}"`, "u"), `${planKind} has an exact remote proposal wait spec`);
+  }
+  assert.match(
+    interactionRelay,
+    /resolveV2AuthorityProposalControlId\(\{[\s\S]*?relaySequence: seq,[\s\S]*?acceptedKinds:[\s\S]*?expectedRewardSurface/u,
+    "the relay derives the active control centrally from every real wait rather than optional phase wiring",
+  );
+  assert.match(
+    coopRuntime,
+    /resolveV2AuthorityProposalControlId: wait =>[\s\S]*?resolveCoopV2AuthorityProposalControlId\(runtime, wait\)/u,
+    "the production relay is wired to the runtime's immutable projection capsule",
+  );
+  assert.match(
+    interactionRelay,
+    /if \(proposalWaitRequired && resolvedAuthorityControlOperationId === undefined\)[\s\S]*?return Promise\.resolve\(null\)/u,
+    "a remote-owned V2 surface fails closed when its exact proposal address cannot be derived",
+  );
+  assert.match(
+    controlLedger,
+    /sameRewardSurface\(installed\.expectedRewardSurface, observation\.expectedRewardSurface\)/u,
+    "nested Mystery reward waits cannot attest the wrong surface at a reused sequence",
+  );
+});
+
 test("every retained V2 interaction proposal is identity-idempotent before any later waiter", () => {
   assert.match(
     proposalAdmission,

@@ -24,6 +24,7 @@ import {
   controlsEqual,
   type ProjectableControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
+import type { CoopRewardSurfaceIdentity } from "#data/elite-redux/coop/coop-transport";
 
 export type CoopV2InteractionControl = Extract<
   ProjectableControl,
@@ -59,6 +60,8 @@ export interface CoopV2AuthorityProposalWaitObservation {
   readonly relaySequence: number;
   /** Closed set of wire choice kinds this waiter may consume. */
   readonly acceptedKinds: readonly string[];
+  /** Exact nested reward address, null for an ordinary reward, absent for non-reward surfaces. */
+  readonly expectedRewardSurface?: CoopRewardSurfaceIdentity | null | undefined;
   /** Opaque identity of this exact live waiter generation. */
   readonly waiterToken: object;
   /** False after timeout, supersession, cancellation, or recovery fencing. */
@@ -99,6 +102,7 @@ interface InteractionControlClaim {
           readonly kind: "authority-proposal-wait";
           readonly relaySequence: number;
           readonly acceptedKinds: readonly string[];
+          readonly expectedRewardSurface?: CoopRewardSurfaceIdentity | null | undefined;
           readonly waiterToken: object;
         };
   } | null;
@@ -106,6 +110,16 @@ interface InteractionControlClaim {
 
 function controlOf(entry: CoopAuthorityEntry): CoopV2ClaimedControl {
   return entry.nextControl;
+}
+
+function sameRewardSurface(
+  left: CoopRewardSurfaceIdentity | null | undefined,
+  right: CoopRewardSurfaceIdentity | null | undefined,
+): boolean {
+  if (left == null || right == null) {
+    return left === right;
+  }
+  return left.ordinal === right.ordinal && left.surfaceId === right.surfaceId;
 }
 
 /** Per-runtime global control ledger; never shared between the two in-process browser engines. */
@@ -347,6 +361,11 @@ export class CoopV2ControlLedger {
       || observation.acceptedKinds.length === 0
       || observation.acceptedKinds.some(kind => typeof kind !== "string" || kind.length === 0)
       || new Set(observation.acceptedKinds).size !== observation.acceptedKinds.length
+      || (observation.expectedRewardSurface != null
+        && (!Number.isSafeInteger(observation.expectedRewardSurface.ordinal)
+          || observation.expectedRewardSurface.ordinal < 0
+          || typeof observation.expectedRewardSurface.surfaceId !== "string"
+          || observation.expectedRewardSurface.surfaceId.length === 0))
     ) {
       return { kind: "deferred", reason: `exact remote proposal waiter is not active for ${controlId}` };
     }
@@ -357,6 +376,7 @@ export class CoopV2ControlLedger {
         && installed.relaySequence === observation.relaySequence
         && installed.acceptedKinds.length === observation.acceptedKinds.length
         && installed.acceptedKinds.every((kind, index) => kind === observation.acceptedKinds[index])
+        && sameRewardSurface(installed.expectedRewardSurface, observation.expectedRewardSurface)
       ) {
         this.activeControlId = controlId;
         return { kind: "already-installed", controlId };
@@ -372,6 +392,10 @@ export class CoopV2ControlLedger {
         kind: "authority-proposal-wait",
         relaySequence: observation.relaySequence,
         acceptedKinds: [...observation.acceptedKinds],
+        expectedRewardSurface:
+          observation.expectedRewardSurface == null
+            ? observation.expectedRewardSurface
+            : { ...observation.expectedRewardSurface },
         waiterToken: observation.waiterToken,
       },
     };

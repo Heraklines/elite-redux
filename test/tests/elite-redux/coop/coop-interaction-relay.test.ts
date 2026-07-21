@@ -295,6 +295,25 @@ describe("co-op alternating-interaction relay (#633)", () => {
     await expect(wait).resolves.toBeNull();
   });
 
+  it("fails closed before parking a remote-owned V2 wait whose exact control cannot be derived", async () => {
+    const { host } = createLoopbackPair();
+    let projected = false;
+    const authority = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+      isV2AuthorityProposalWaitRequired: () => true,
+      resolveV2AuthorityProposalControlId: () => null,
+      projectV2AuthorityProposalWait: () => {
+        projected = true;
+        return true;
+      },
+    });
+
+    await expect(authority.awaitInteractionChoice(3, 1_000, ["reward"])).resolves.toBeNull();
+    expect(projected).toBe(false);
+    expect(authority.describeAwaitedInteractions()).toEqual([]);
+  });
+
   it("deduplicates journal-first then raw interaction-choice carriers", async () => {
     const { host, guest } = createLoopbackPair();
     const owner = new CoopInteractionRelay(host);

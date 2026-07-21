@@ -289,9 +289,19 @@ describe("Authority V2 interaction control ledger", () => {
       kind: "rejected",
     });
 
-    const exact = proposalWait();
+    const exact = proposalWait({ expectedRewardSurface: { ordinal: 0, surfaceId: "mystery-reward" } });
     expect(ledger.projectAuthorityProposalWait(control, exact, 0)).toMatchObject({ kind: "installed" });
     expect(ledger.projectAuthorityProposalWait(control, exact, 0)).toMatchObject({ kind: "already-installed" });
+    expect(
+      ledger.projectAuthorityProposalWait(
+        control,
+        proposalWait({
+          expectedRewardSurface: { ordinal: 1, surfaceId: "mystery-reward" },
+          waiterToken: exact.waiterToken,
+        }),
+        0,
+      ),
+    ).toMatchObject({ kind: "deferred" });
     expect(ledger.project(control, observation(), 0)).toMatchObject({ kind: "already-installed" });
     expect(ledger.isAuthorityProposalWaitInstalled(control)).toBe(true);
     expect(ledger.allowsHumanInput(0, observation())).toBe(false);
