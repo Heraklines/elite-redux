@@ -124,6 +124,61 @@ describe("Authority V2 turn successor classification", () => {
     ).toBe(false);
   });
 
+  it("states COMMAND for a WILD co-fainted enemy seat with no reserve (nothing refills it)", () => {
+    // Real-browser faint journey (run 29838585830): a double wild battle where an enemy seat CO-FAINTS
+    // alongside the just-replaced guest mon. bi3 (partyIndex 1) fainted, bi2 (partyIndex 0) is alive, and
+    // BOTH enemies are on the field with NO living off-field reserve - a WILD faint crosses no replacement
+    // (nothing will refill that seat). The next real successor IS the command frontier, so classifying it
+    // `terminal` (as the raw field.some(hp<=0) check did) fail-closed refused the turn-2 CONTROL_COMMIT.
+    expect(
+      hasCoopV2ImmediateCommandSuccessor({
+        ...emptyAuthoritativeState(3),
+        double: true,
+        playerParty: [
+          { id: 1, hp: 20 },
+          { id: 11, hp: 20 },
+        ],
+        enemyParty: [
+          { id: 2, hp: 7 },
+          { id: 3, hp: 0 },
+        ],
+        field: [
+          { side: "player" as const, bi: 0, partyIndex: 0, pokemonId: 1, presented: true },
+          { side: "player" as const, bi: 1, partyIndex: 1, pokemonId: 11, presented: true },
+          { side: "enemy" as const, bi: 2, partyIndex: 0, pokemonId: 2, presented: true },
+          { side: "enemy" as const, bi: 3, partyIndex: 1, pokemonId: 3, presented: true },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("states a REPLACEMENT boundary (not COMMAND) for a co-fainted enemy seat WITH a living reserve", () => {
+    // The TRAINER counterpart: an enemy seat co-faints but a living off-field reserve (partyIndex 2) will
+    // be summoned to refill it (getNextSummonIndex). That IS a replacement boundary, so the settled turn
+    // must NOT state an immediate command successor - it stays gated exactly as before this fix.
+    expect(
+      hasCoopV2ImmediateCommandSuccessor({
+        ...emptyAuthoritativeState(3),
+        double: true,
+        playerParty: [
+          { id: 1, hp: 20 },
+          { id: 11, hp: 20 },
+        ],
+        enemyParty: [
+          { id: 2, hp: 7 },
+          { id: 3, hp: 0 },
+          { id: 4, hp: 20 },
+        ],
+        field: [
+          { side: "player" as const, bi: 0, partyIndex: 0, pokemonId: 1, presented: true },
+          { side: "player" as const, bi: 1, partyIndex: 1, pokemonId: 11, presented: true },
+          { side: "enemy" as const, bi: 2, partyIndex: 0, pokemonId: 2, presented: true },
+          { side: "enemy" as const, bi: 3, partyIndex: 1, pokemonId: 3, presented: true },
+        ],
+      }),
+    ).toBe(false);
+  });
+
   it("keeps incomplete legacy PokemonData shapes on the compatible command path", () => {
     expect(hasCoopV2ImmediateCommandSuccessor(emptyAuthoritativeState(3))).toBe(true);
   });

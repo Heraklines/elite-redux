@@ -442,6 +442,32 @@ function authoritativePartyIsDefeated(party: readonly Record<string, unknown>[])
 }
 
 /**
+ * Whether a just-fainted field seat on `side` will be REFILLED by a replacement, mirroring the engine's own
+ * enemy/player send decision ({@link FaintPhase}): a replacement occurs iff a LIVING party member exists that
+ * is NOT already occupying a field seat (a reserve `getNextSummonIndex` would summon). This is what actually
+ * distinguishes a WILD co-faint from a TRAINER co-faint on the authoritative image: a WILD battle's enemyParty
+ * holds only its on-field mons (no reserve), so a fainted wild enemy seat crosses NO replacement and the next
+ * real successor is the command frontier; a TRAINER (or player bench) keeps a living off-field reserve that
+ * WILL refill the seat, which is a replacement boundary. Battle-type is not carried on the authoritative state,
+ * but "a living off-field party member on this side" is the exact input the engine's replacement decision reads,
+ * so classifying by reserve presence agrees with the engine on both sides without inspecting battleType.
+ *
+ * A mon whose hp is a non-finite/unknown legacy shape is NOT counted as a living reserve (it stays on the
+ * legacy-compatible command path, matching the seat-HP fail-open below).
+ */
+function sideHasLivingOffFieldReserve(
+  state: CoopAuthoritativeBattleStateV1,
+  side: CoopAuthoritativeBattleStateV1["field"][number]["side"],
+): boolean {
+  const party = side === "player" ? state.playerParty : state.enemyParty;
+  const onFieldPartyIndices = new Set(state.field.filter(seat => seat.side === side).map(seat => seat.partyIndex));
+  return party.some(
+    (mon, index) =>
+      !onFieldPartyIndices.has(index) && typeof mon.hp === "number" && Number.isFinite(mon.hp) && mon.hp > 0,
+  );
+}
+
+/**
  * Whether a settled turn can truthfully state an immediate COMMAND successor.
  *
  * A living player mon is not sufficient: victory/defeat crosses into wave or
@@ -472,7 +498,11 @@ export function hasCoopV2ImmediateCommandSuccessor(state: CoopAuthoritativeBattl
   }
   return !state.field.some(seat => {
     const hp = authoritativeSeatHp(state, seat);
-    return hp != null && hp <= 0;
+    // A living (or unknown-shape) seat crosses no boundary. A just-fainted seat only crosses a REPLACEMENT
+    // boundary when its side will actually refill it - a living off-field reserve exists (trainer enemy /
+    // player bench). A WILD co-fainted enemy seat (or any side with no reserve) is refilled by nothing, so
+    // the next real successor is the command frontier and must NOT be classified as a gated replacement.
+    return hp != null && hp <= 0 && sideHasLivingOffFieldReserve(state, seat.side);
   });
 }
 
