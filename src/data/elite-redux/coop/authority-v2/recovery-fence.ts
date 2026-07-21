@@ -99,7 +99,9 @@ export function createRecoveryFence(): CoopRecoveryFence {
     controlSurfaceStartFrozen: frozen() && !controlProjectionAllowed,
     progressionFrozen: frozen(),
     materializationFrozen: frozen(),
-    authorityWaitCreationFrozen: frozen(),
+    // Wait creation unfreezes with the control-projection window: the stated control's own surface
+    // must be able to arm its wait, or the projection it green-lit can never present (#Frontier3).
+    authorityWaitCreationFrozen: frozen() && !controlProjectionAllowed,
     // exactOptionalPropertyTypes: only present once terminalized.
     ...(terminalReason === undefined ? {} : { terminalReason }),
   });
@@ -162,7 +164,7 @@ export function createRecoveryFence(): CoopRecoveryFence {
     isControlSurfaceStartFrozen: () => frozen() && !controlProjectionAllowed,
     isProgressionFrozen: frozen,
     isMaterializationFrozen: frozen,
-    isAuthorityWaitCreationFrozen: frozen,
+    isAuthorityWaitCreationFrozen: () => frozen() && !controlProjectionAllowed,
     view,
     subscribe(listener: (view: CoopRecoveryFenceView) => void): () => void {
       listeners.add(listener);
