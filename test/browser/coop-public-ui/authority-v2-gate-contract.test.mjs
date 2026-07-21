@@ -13,6 +13,7 @@ const campaignWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-
 const journeyWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-journey.yml", root), "utf8");
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
+const meOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-operation.ts", root), "utf8");
 const sessionController = readFileSync(new URL("src/data/elite-redux/coop/coop-session-controller.ts", root), "utf8");
 const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
@@ -317,6 +318,50 @@ test("V2 Mystery waits for its ordered presentation and destructively replaces t
     harness,
     /current\?\.phaseName === "CoopReplayMePhase" \? current : null/u,
     "the headless scheduler observes V2's directly installed phase rather than requiring a legacy queue tap",
+  );
+});
+
+test("every Mystery result stays on the presentation's pre-battle authority coordinate", () => {
+  assert.match(meOperation, /export const COOP_ME_AUTHORITY_TURN = 0;/u);
+  assert.match(
+    meOperation,
+    /if \(params\.turn !== COOP_ME_AUTHORITY_TURN\) \{\s+coopWarn\("me", `ME op OWNER rejected/u,
+    "the runtime commit boundary also rejects an untyped or stale ambient turn",
+  );
+  assert.match(
+    meOperation,
+    /guest\(\)\.hasApplied\(id\) \? \{ epoch: s\.epoch, wave, turn: COOP_ME_AUTHORITY_TURN \} : null/u,
+    "guest result proof returns the same fixed coordinate",
+  );
+
+  for (const functionName of [
+    "commitCoopMeBattleSettlementAtBattleEnd",
+    "commitCoopMeNoBattleRewardSettlementAfterPreparation",
+    "coopMeOwnerRelayBattleHandoff",
+  ]) {
+    const start = coopRuntime.indexOf(`function ${functionName}(`);
+    const end = coopRuntime.indexOf("\n/**", start + 1);
+    assert.ok(start >= 0, `${functionName} exists`);
+    assert.ok(end > start, `${functionName} has a bounded source section`);
+    const source = coopRuntime.slice(start, end);
+    assert.match(source, /kind: "ME_TERMINAL"/u, `${functionName} commits a Mystery terminal`);
+    assert.match(
+      source,
+      /turn: COOP_ME_AUTHORITY_TURN/u,
+      `${functionName} preserves the presentation's authority coordinate`,
+    );
+    assert.doesNotMatch(
+      source,
+      /turn: (?:battle\.turn|hostTurn)/u,
+      `${functionName} must not borrow the battle's ambient turn for log ordering`,
+    );
+  }
+
+  const mysteryCoordinates = mysteryEncounterPhases.match(/turn: COOP_ME_AUTHORITY_TURN/g) ?? [];
+  assert.equal(
+    mysteryCoordinates.length,
+    4,
+    "presentation, owner picks, and the no-battle terminal all share the fixed Mystery coordinate",
   );
 });
 

@@ -682,3 +682,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   on the legacy synchronous factory tap, but V2 constructs during retained-log
   delivery after that tap is removed. It now accepts the exact directly
   installed current object and still starts only that production-created phase.
+
+2026-07-20 - Mystery transaction-coordinate closure
+
+- Exact-SHA C1 at `6469ae153` crossed the directly installed Mystery replay and
+  exposed the next production authority fault at wave 12. `ME_PRESENT` and both
+  `ME_PICK` entries correctly occupied the transaction's pre-battle turn-zero
+  coordinate, but the battle and reward settlement paths borrowed the ambient
+  `Battle.turn` when constructing `ME_TERMINAL`. Authority V2 correctly rejected
+  that result as an unauthorized successor, and the deliberate fail-closed
+  teardown surfaced later as a null session read in the harness.
+- All Mystery entries now use one exported `COOP_ME_AUTHORITY_TURN` coordinate.
+  The actual battle turn remains immutable destination payload material, but it
+  can no longer change the mechanical log address. A source contract covers the
+  presentation, both pick owners, the no-battle result, both battle settlement
+  paths, the relay handoff, and the guest continuation proof so another
+  ambient-turn leak cannot silently reopen this graph hole.

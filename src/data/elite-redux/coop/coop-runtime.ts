@@ -251,6 +251,7 @@ import {
 import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
+  COOP_ME_AUTHORITY_TURN,
   commitMeOwnerIntent,
   isCompleteCoopMeTerminalPayload,
   isCoopMeOperationEnabled,
@@ -9562,7 +9563,7 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
     payload,
     localRole: "host",
     wave: battle.waveIndex,
-    turn: battle.turn,
+    turn: COOP_ME_AUTHORITY_TURN,
     beforeAuthorityCommit: id => settleCoopV2InteractionOperation(id, runtime),
   });
   if (operationId == null) {
@@ -9628,7 +9629,7 @@ export function commitCoopMeNoBattleRewardSettlementAfterPreparation(plan: CoopM
     payload,
     localRole: "host",
     wave: battle.waveIndex,
-    turn: battle.turn,
+    turn: COOP_ME_AUTHORITY_TURN,
     beforeAuthorityCommit: id => settleCoopV2InteractionOperation(id, runtime),
   });
   if (operationId == null) {
@@ -9766,7 +9767,7 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
         payload,
         localRole: "host",
         wave,
-        turn: hostTurn,
+        turn: COOP_ME_AUTHORITY_TURN,
         beforeAuthorityCommit: id => settleCoopV2InteractionOperation(id, runtime),
       });
     let operationId = commit();

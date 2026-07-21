@@ -11,6 +11,7 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
+  COOP_ME_AUTHORITY_TURN,
   CoopMeTerminalOutcomeLatch,
   captureCoopMeCommittedTerminalCursor,
   commitMeAuthorityGuestIntent,
@@ -264,7 +265,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
       payload,
       localRole: "host",
       wave,
-      turn: 0,
+      turn: COOP_ME_AUTHORITY_TURN,
       beforeAuthorityCommit: operationId => settleCoopV2InteractionOperation(operationId, getCoopRuntime()),
     });
     if (terminalOperationId == null) {
@@ -578,7 +579,7 @@ export class MysteryEncounterPhase extends Phase {
         payload: { present: true, presentation: present },
         localRole: getCoopController()?.role ?? "host",
         wave: globalScene.currentBattle?.waveIndex ?? -1,
-        turn: 0,
+        turn: COOP_ME_AUTHORITY_TURN,
       });
       if (operationId == null && isCoopMeOperationEnabled()) {
         failCoopSharedSession(`Mystery presentation ${seqMe} could not enter authoritative control`);
@@ -716,7 +717,7 @@ export class MysteryEncounterPhase extends Phase {
           step: step as number,
           value: choice.choice,
           wave,
-          turn: 0,
+          turn: COOP_ME_AUTHORITY_TURN,
         });
         if (committed.kind === "duplicate") {
           // A delayed resend from the previous round is confirmation noise, never the next round's pick.
@@ -768,7 +769,7 @@ export class MysteryEncounterPhase extends Phase {
         pinned,
         optionIndex: index,
         wave: globalScene.currentBattle?.waveIndex ?? -1,
-        turn: 0,
+        turn: COOP_ME_AUTHORITY_TURN,
       });
       if (operationId == null && isCoopMeOperationEnabled()) {
         failCoopSharedSession(`Host Mystery pick ${pinned} could not enter authoritative control`);

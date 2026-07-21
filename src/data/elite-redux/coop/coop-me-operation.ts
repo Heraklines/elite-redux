@@ -110,6 +110,15 @@ import type {
   CoopRole,
 } from "#data/elite-redux/coop/coop-transport";
 
+/**
+ * Every entry in one Mystery transaction shares its pre-battle control coordinate.
+ *
+ * A battle spawned by the encounter may advance its own `Battle.turn`, but that value is payload material
+ * (`destination.hostTurn`), not a new authority address. Letting terminal entries borrow the ambient battle
+ * turn makes the ordered result ineligible to succeed the turn-zero ME_PRESENT that opened the transaction.
+ */
+export const COOP_ME_AUTHORITY_TURN = 0;
+
 /** First-success latch for the immutable terminal DATA image reused by every journal retry. */
 export class CoopMeTerminalOutcomeLatch {
   private retained: Extract<CoopInteractionOutcome, { k: "meResync" }> | undefined;
@@ -841,7 +850,7 @@ export function coopMeGuestAppliedPickContinuationAddress(
   }
   const s = state();
   const id = makeCoopOperationId(s.epoch, ownerSeatFor("ME_PICK", pinned), meOpAddr("ME_PICK", seq, step), "ME_PICK");
-  return guest().hasApplied(id) ? { epoch: s.epoch, wave, turn: 0 } : null;
+  return guest().hasApplied(id) ? { epoch: s.epoch, wave, turn: COOP_ME_AUTHORITY_TURN } : null;
 }
 
 /**
@@ -933,6 +942,10 @@ export interface CoopMeOwnerCommitParams {
  */
 export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | null {
   if (!isCoopMeOperationEnabled()) {
+    return null;
+  }
+  if (params.turn !== COOP_ME_AUTHORITY_TURN) {
+    coopWarn("me", `ME op OWNER rejected non-transaction turn ${params.turn}`);
     return null;
   }
   try {
@@ -1224,6 +1237,9 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
   }
   if (params.res == null) {
     return { adopt: false, reason: "no-relay" };
+  }
+  if (params.turn !== COOP_ME_AUTHORITY_TURN) {
+    return { adopt: false, reason: "invalid-authority-coordinate" };
   }
   // A P33 terminal is adopted only by the retained envelope's complete DATA+destination sink. Raw 9M
   // remains a negotiated rollback carrier, but while the journal is active it can neither author nor
