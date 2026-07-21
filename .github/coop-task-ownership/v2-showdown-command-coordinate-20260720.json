@@ -52,6 +52,7 @@
     "test/node/authority-v2-log.test.ts",
     "test/node/authority-v2-replacement.test.ts",
     "test/tests/elite-redux/coop/coop-duo-stormglass.test.ts",
+    "test/tests/elite-redux/coop/coop-me-terminal-transaction.test.ts",
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",
     "test/tests/elite-redux/coop/coop-soak-host-faint.test.ts",
     "test/tests/elite-redux/coop/coop-stall-asymmetric-watchdog.test.ts",

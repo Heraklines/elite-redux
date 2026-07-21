@@ -6,6 +6,7 @@
 
 import { resetCoopStateTicks } from "#data/elite-redux/coop/coop-battle-engine";
 import {
+  COOP_ME_AUTHORITY_TURN,
   CoopMeTerminalTransactionReceiver,
   captureCoopMeCommittedTerminalCursor,
   commitMeOwnerIntent,
@@ -210,7 +211,7 @@ describe("complete retained Mystery terminal transaction", () => {
         payload: rewardSettledPayload(12),
         localRole: "host",
         wave: 12,
-        turn: 3,
+        turn: COOP_ME_AUTHORITY_TURN,
       });
       expect(settlementId).not.toBeNull();
       expect(captureCoopMeCommittedTerminalCursor(pinned)).toEqual({
@@ -227,7 +228,7 @@ describe("complete retained Mystery terminal transaction", () => {
         payload: leavePayload(12),
         localRole: "host",
         wave: 12,
-        turn: 3,
+        turn: COOP_ME_AUTHORITY_TURN,
       });
       expect(leaveId).not.toBeNull();
       expect(captureCoopMeCommittedTerminalCursor(pinned)).toEqual({

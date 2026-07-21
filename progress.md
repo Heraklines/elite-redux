@@ -798,3 +798,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   15-minute absolute circuit breaker, and the budget's use of that breaker. It
   can no longer demand the exact false-abort implementation that the regression
   contract deliberately replaced.
+
+2026-07-21 - Mystery terminal primitive follows the transaction coordinate
+
+- Gate 29792022305 A's sole red was stale test input, not a failed settlement:
+  the terminal-cursor test still authored `ME_TERMINAL` at ambient battle turn
+  3. The production primitive correctly rejected it because every Mystery
+  presentation, pick, settlement, and final leave now occupies the exported
+  turn-zero transaction coordinate.
+- The test now uses `COOP_ME_AUTHORITY_TURN` for both terminal entries while its
+  embedded authoritative battle state deliberately retains battle turn 3. This
+  preserves the important distinction between mechanical log address and
+  immutable destination payload.
