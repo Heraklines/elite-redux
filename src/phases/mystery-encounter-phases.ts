@@ -334,6 +334,8 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
  */
 export class MysteryEncounterPhase extends Phase {
   public readonly phaseName = "MysteryEncounterPhase";
+  /** Exact immutable ME_PRESENT address that authorizes this host selector generation under Authority V2. */
+  public coopV2ControlOperationId: string | null = null;
   private readonly FIRST_DIALOGUE_PROMPT_DELAY = 300;
   optionSelectSettings?: OptionSelectSettings | undefined;
   private coopGuestPickRecoveryAttempts = 0;
@@ -585,6 +587,11 @@ export class MysteryEncounterPhase extends Phase {
         failCoopSharedSession(`Mystery presentation ${seqMe} could not enter authoritative control`);
         return false;
       }
+      // Authority-local projection runs synchronously inside the commit above, before this call can return.
+      // Bind the resulting address before the selector is exposed; the physical input gate will retry the
+      // exact claim once the delayed Mystery handler becomes actionable. Without this phase-owned token,
+      // direct headless handler calls worked while every real host keypress remained correctly fail-closed.
+      this.coopV2ControlOperationId = operationId;
       enc.dialogueTokens = { ...present.tokens };
       if (isCoopMeOperationJournalActive()) {
         setCoopMeActivePresentation(present);

@@ -724,3 +724,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   retain a successor while a slower replica is still proving presentation, but
   the local owner can no longer consume a control that its own ledger never
   installed.
+- That stronger oracle immediately found the corresponding production wiring
+  omission: `MysteryEncounterPhase` did not carry the operation ID returned by
+  its committed `ME_PRESENT`. Authority-local projection therefore had no
+  address-exact phase token to install when a real host keypress retried it;
+  only direct handler tests appeared to work. The live phase now binds that
+  immutable address before exposing its selector. A source contract fixes the
+  required commit -> bind -> public-handler order.

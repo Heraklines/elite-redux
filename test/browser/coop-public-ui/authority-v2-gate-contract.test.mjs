@@ -724,6 +724,29 @@ test("the duo Mystery split cannot inject a choice before public V2 input is act
     2,
     "both host-owned paths cross the production physical-input projector before their legacy engine helper",
   );
+
+  const hostMysteryStart = mysteryEncounterPhases.indexOf("export class MysteryEncounterPhase extends Phase");
+  const hostMysteryEnd = mysteryEncounterPhases.indexOf(
+    "\nexport class MysteryEncounterOptionSelectedPhase",
+    hostMysteryStart + 1,
+  );
+  assert.notEqual(hostMysteryStart, -1, "production exposes the authoritative host Mystery selector");
+  assert.ok(hostMysteryEnd > hostMysteryStart, "the host Mystery selector has a bounded source block");
+  const hostMystery = mysteryEncounterPhases.slice(hostMysteryStart, hostMysteryEnd);
+  const addressField = hostMystery.indexOf("public coopV2ControlOperationId: string | null = null;");
+  const presentationCommit = hostMystery.indexOf("const operationId = commitMeOwnerIntent({");
+  const addressBind = hostMystery.indexOf("this.coopV2ControlOperationId = operationId;");
+  const presentationGuard = hostMystery.indexOf("if (!this.coopHostStreamPresentation())");
+  const selectorOpen = hostMystery.indexOf("setModeBoundedWhen(UiMode.MYSTERY_ENCOUNTER");
+  assert.ok(addressField >= 0, "the live host phase carries its immutable ME_PRESENT address");
+  assert.ok(
+    presentationCommit > addressField && addressBind > presentationCommit,
+    "the host binds the exact operation returned by the committed presentation",
+  );
+  assert.ok(
+    presentationGuard > addressField && selectorOpen > presentationGuard,
+    "runtime execution completes the presentation commit/bind guard before exposing the delayed selector",
+  );
 });
 
 test("the host-faint soak observes the actionable successor without consuming it", () => {
