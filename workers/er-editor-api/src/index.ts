@@ -2140,6 +2140,22 @@ export default {
       return json({ ok: true, deployed: true }, 200, env);
     }
 
+    // Tournament-admin delegation (2026-07-21): er-telemetry verifies the shared editor password
+    // here instead of holding its own copy, so the team needs ZERO extra setup to run tournaments.
+    // No side effects; same open-mode semantics as every other gate (no secret configured -> ok).
+    if (url.pathname === "/auth-check" && request.method === "POST") {
+      let body: { password?: string };
+      try {
+        body = (await request.json()) as { password?: string };
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      if (env.EDITOR_PASSWORD && body.password !== env.EDITOR_PASSWORD) {
+        return json({ ok: false, error: "bad password" }, 401, env);
+      }
+      return json({ ok: true }, 200, env);
+    }
+
     if (url.pathname === "/save" && request.method === "POST") {
       let body: SaveBody;
       try {

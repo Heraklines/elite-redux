@@ -126,8 +126,6 @@ describe("tournamentGrantSettlements — translation to client settlement mutati
           mutations: [
             { kind: "grantCandy", speciesId: 1, candy: 30 },
             { kind: "grantLabEffect", speciesId: 25, category: "surface", effectIndex: 2 },
-            { kind: "grantCurrency", amount: 5000 },
-            { kind: "grantItem", itemId: "MASTER_BALL", count: 1 },
           ],
         },
       ]),

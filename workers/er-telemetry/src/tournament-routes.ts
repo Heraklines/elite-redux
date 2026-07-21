@@ -69,6 +69,8 @@ export interface TournamentEnv {
    * tournaments without a personal admin-uid entry. Unset = editor-password auth disabled.
    */
   EDITOR_PASSWORD?: string;
+  /** er-editor-api base URL - the delegated editor-password verifier (zero-setup team admin). */
+  EDITOR_API_URL?: string;
   /** Base URL of the er-save-api worker (settlement store) for server-to-server reward delivery. */
   SAVE_API_URL?: string;
   /**
@@ -122,13 +124,56 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 }
 
 /** True when the request carries a valid `X-Editor-Auth` header matching the shared editor password. */
-function editorAuthValid(request: Request, env: TournamentEnv): boolean {
-  const secret = env.EDITOR_PASSWORD;
-  if (!secret) {
+/**
+ * Editor-password verification cache (per-isolate). Delegated checks hit er-editor-api over the
+ * network; cache a short-lived verdict per provided value so the admin UI's bursts of calls cost
+ * one probe. Values are never stored - only a digest of the provided credential.
+ */
+const editorAuthCache = new Map<string, { ok: boolean; until: number }>();
+
+async function sha256Hex(v: string): Promise<string> {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v));
+  return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Zero-setup team admin (maintainer 2026-07-21): verify the shared editor password WITHOUT this
+ * worker holding its own copy. If a local EDITOR_PASSWORD secret happens to be configured it is
+ * used directly; otherwise the check is DELEGATED to er-editor-api's /auth-check (the service
+ * that already owns the secret). Positive verdicts cache 5 minutes, negatives 30 seconds.
+ */
+async function editorAuthValid(request: Request, env: TournamentEnv): Promise<boolean> {
+  const provided = request.headers.get("X-Editor-Auth");
+  if (typeof provided !== "string" || provided.length === 0) {
     return false;
   }
-  const provided = request.headers.get("X-Editor-Auth");
-  return typeof provided === "string" && provided.length > 0 && timingSafeEqualStr(provided, secret);
+  const secret = env.EDITOR_PASSWORD;
+  if (secret) {
+    return timingSafeEqualStr(provided, secret);
+  }
+  const base = env.EDITOR_API_URL;
+  if (!base) {
+    return false;
+  }
+  const key = await sha256Hex(provided);
+  const now = Date.now();
+  const hit = editorAuthCache.get(key);
+  if (hit && hit.until > now) {
+    return hit.ok;
+  }
+  let ok = false;
+  try {
+    const res = await fetch(`${base.replace(/\/$/, "")}/auth-check`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: provided }),
+    });
+    ok = res.status === 200;
+  } catch {
+    ok = false; // editor API unreachable -> fail closed; uid-allowlist admin still works
+  }
+  editorAuthCache.set(key, { ok, until: now + (ok ? 300_000 : 30_000) });
+  return ok;
 }
 
 /** Synthetic identity for an editor-password-only caller (no personal account). uid < 0 never collides. */
@@ -883,7 +928,7 @@ export async function handleTournamentRoute(
   // The shared editor password (X-Editor-Auth) is an ALTERNATIVE admin credential to the personal
   // session token: a valid one grants admin whether or not a token is present. When only the editor
   // password is presented (no token) we act as a synthetic "editor" admin identity.
-  const editorAdmin = editorAuthValid(request, env);
+  const editorAdmin = await editorAuthValid(request, env);
   if (caller !== null) {
     caller = { ...caller, editorAdmin };
   } else if (editorAdmin) {

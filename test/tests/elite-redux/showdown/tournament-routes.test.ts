@@ -385,14 +385,16 @@ describe("tournament routes — lifecycle + attestation", () => {
       battleFormat: "doubles",
       seriesFormat: "bo3",
       closeAt: 5_000_000_000_000,
-      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCurrency", amount: 5000 }] }],
+      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 50 }] }],
     });
     const t = await bracketOf(id);
     expect(t.maxEntrants).toBe(32);
     expect(t.battleFormat).toBe("doubles");
     expect(t.seriesFormat).toBe("bo3");
     expect(t.closeAt).toBe(5_000_000_000_000);
-    expect(t.rewardPool).toEqual([{ place: "champion", mutations: [{ kind: "grantCurrency", amount: 5000 }] }]);
+    expect(t.rewardPool).toEqual([
+      { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 50 }] },
+    ]);
   });
 
   it("clamps a > 64 cap down to 64", async () => {
@@ -523,7 +525,7 @@ describe("tournament routes — lifecycle + attestation", () => {
   it("GRANT-REWARDS computes per-place grants at completion (scenario 10)", async () => {
     const { id, champion } = await playOutSampleCup({
       rewardPool: [
-        { place: "champion", mutations: [{ kind: "grantCurrency", amount: 10000 }] },
+        { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 100 }] },
         { place: "semifinalist", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 20 }] },
       ],
     });

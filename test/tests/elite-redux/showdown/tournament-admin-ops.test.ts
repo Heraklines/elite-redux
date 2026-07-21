@@ -99,7 +99,7 @@ describe("format + cap coercion", () => {
       battleFormat: "triples",
       seriesFormat: "bo3",
       closeAt: 999,
-      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCurrency", amount: 100 }] }],
+      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 100 }] }],
     });
     expect(t.battleFormat).toBe("triples");
     expect(t.seriesFormat).toBe("bo3");
@@ -112,13 +112,13 @@ describe("format + cap coercion", () => {
 describe("sanitizeRewardPool", () => {
   it("drops unknown places + malformed mutations, clamps negatives", () => {
     const pool = sanitizeRewardPool([
-      { place: "champion", mutations: [{ kind: "grantCurrency", amount: -50 }] },
-      { place: "bogus", mutations: [{ kind: "grantCurrency", amount: 10 }] },
+      { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: -50 }] },
+      { place: "bogus", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 10 }] },
       { place: "runnerUp", mutations: [{ kind: "nope" }, { kind: "grantCandy", speciesId: 25, candy: 5 }] },
       "garbage",
     ]);
     expect(pool).toEqual([
-      { place: "champion", mutations: [{ kind: "grantCurrency", amount: 0 }] },
+      { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 0 }] },
       { place: "runnerUp", mutations: [{ kind: "grantCandy", speciesId: 25, candy: 5 }] },
     ]);
   });
@@ -314,7 +314,7 @@ describe("editTournament (scenario 5)", () => {
         roundWindowMs: 12 * 3600_000,
         battleFormat: "doubles",
         seriesFormat: "bo5",
-        rewardPool: [{ place: "champion", mutations: [{ kind: "grantCurrency", amount: 1 }] }],
+        rewardPool: [{ place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 1 }] }],
       },
       3,
     );
@@ -401,8 +401,8 @@ describe("computeRewardGrants + placements (scenario 10)", () => {
     const t = fresh({
       maxEntrants: 4,
       rewardPool: [
-        { place: "champion", mutations: [{ kind: "grantCurrency", amount: 100 }] },
-        { place: "runnerUp", mutations: [{ kind: "grantCurrency", amount: 50 }] },
+        { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 100 }] },
+        { place: "runnerUp", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 50 }] },
         { place: "semifinalist", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 10 }] },
       ],
     });
@@ -438,7 +438,7 @@ describe("computeRewardGrants + placements (scenario 10)", () => {
   it("returns [] when the tournament is not complete", () => {
     const t = fresh({
       maxEntrants: 4,
-      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCurrency", amount: 1 }] }],
+      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 1 }] }],
     });
     const t2 = started(t, withEntrants(t, 4));
     expect(computeRewardGrants(t2)).toEqual([]);

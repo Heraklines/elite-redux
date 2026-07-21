@@ -81,8 +81,6 @@ export const LAB_EFFECT_CATEGORIES: readonly LabEffectCategory[] = ["palette", "
  *       has no current look), by category + 1-based effect index into that category's id list.
  *   - grantCandy: candy on a species (pooled at the evolution-line root by the client).
  *   - grantUnlock: a raw unlock (kept for back-compat / direct use).
- *   - grantItem / grantCurrency: organizer-funded prizes carried in the pool (P3); NOT delivered
- *       through the settlement pipeline (no account-mutation representation) — see tournamentGrantSettlements.
  */
 export type TournamentRewardMutation =
   | { kind: "grantShinyChosen"; speciesId: number; tier: ShinyTier }
@@ -96,9 +94,7 @@ export type TournamentRewardMutation =
     }
   | { kind: "grantLabEffect"; speciesId: number; category: LabEffectCategory; effectIndex: number }
   | { kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
-  | { kind: "grantCandy"; speciesId: number; candy: number }
-  | { kind: "grantItem"; itemId: string; count: number }
-  | { kind: "grantCurrency"; amount: number };
+  | { kind: "grantCandy"; speciesId: number; candy: number };
 
 /** One place's reward: the mutations granted to whoever finishes in that place. */
 export interface RewardPoolEntry {
@@ -239,13 +235,6 @@ function sanitizeRewardMutation(raw: unknown): TournamentRewardMutation | null {
         return null;
       }
       return { kind: "grantCandy", speciesId: Math.floor(m.speciesId), candy: nonNegInt(m.candy) };
-    case "grantItem":
-      if (typeof m.itemId !== "string" || m.itemId.length === 0) {
-        return null;
-      }
-      return { kind: "grantItem", itemId: m.itemId.slice(0, 64), count: Math.max(1, nonNegInt(m.count, 1)) };
-    case "grantCurrency":
-      return { kind: "grantCurrency", amount: nonNegInt(m.amount) };
     default:
       return null;
   }
@@ -949,9 +938,6 @@ function translateRewardMutation(mut: TournamentRewardMutation, seed: string): T
       ];
     case "grantCandy":
       return [{ kind: "grantCandy", speciesId: mut.speciesId, candy: mut.candy }];
-    case "grantItem":
-    case "grantCurrency":
-      return []; // not settlement-deliverable (no account-mutation representation)
   }
 }
 

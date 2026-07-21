@@ -25,6 +25,7 @@ database_id = "e75604f0-bef9-49ef-aba7-d93779e48b8f"   # set after `wrangler d1 
 # SESSION_SECRET is the SHARED HMAC key so the client's existing session token verifies here.
 
 [vars]
+EDITOR_API_URL = "https://er-editor-api.heraklines.workers.dev"   # delegated editor-password verification (zero-setup team tournament admin)
 # Optional: restrict which site origin may post telemetry. "*" (or unset) allows any origin.
 ALLOWED_ORIGIN = "*"
 # Showdown Tournament (P1): comma-separated list of ADMIN account uids (the token `uid`,

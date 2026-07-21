@@ -6135,8 +6135,6 @@ const TOUR_REWARD_FIELDS = {
   "shiny-random": ["tier", "unowned", "pool"],
   "lab-effect": ["species", "effect"],
   candies: ["species", "amount"],
-  currency: ["amount"],
-  item: ["item", "count"],
 };
 
 /** Build the grouped shiny-lab effect <option> list; each value encodes `category:index` (1-based). */
@@ -6172,10 +6170,6 @@ function tourMutToRow(m) {
       return { type: "lab-effect", species: m.speciesId, effect: `${m.category}:${m.effectIndex}` };
     case "grantCandy":
       return { type: "candies", species: m.speciesId, amount: m.candy };
-    case "grantCurrency":
-      return { type: "currency", amount: m.amount };
-    case "grantItem":
-      return { type: "item", item: m.itemId, count: m.count };
     default:
       return { type: "" };
   }
@@ -6193,8 +6187,6 @@ function tourRewardRowHtml(p, place, idx, row) {
         ${typeOpt("shiny-random", "Shiny (random)")}
         ${typeOpt("lab-effect", "Shiny-lab effect")}
         ${typeOpt("candies", "Candies")}
-        ${typeOpt("currency", "Currency")}
-        ${typeOpt("item", "Item")}
       </select>
       <span data-f="species"><input type="number" min="0" placeholder="species id" id="${id("species")}" value="${tEsc(row.species ?? "")}" /></span>
       <span data-f="tier"><select id="${id("tier")}">
@@ -6207,7 +6199,6 @@ function tourRewardRowHtml(p, place, idx, row) {
       <span data-f="pool"><input type="text" style="width:120px" placeholder="pool ids (opt)" id="${id("pool")}" value="${tEsc(row.pool ?? "")}" /></span>
       <span data-f="effect"><select id="${id("effect")}">${tourEffectOptions(row.effect || "")}</select></span>
       <span data-f="amount"><input type="number" min="0" placeholder="amount" id="${id("amount")}" value="${tEsc(row.amount ?? "")}" /></span>
-      <span data-f="item"><input type="text" style="width:120px" placeholder="item id" id="${id("item")}" value="${tEsc(row.item ?? "")}" /></span>
       <span data-f="count"><input type="number" min="1" placeholder="×" style="width:60px" id="${id("count")}" value="${tEsc(row.count ?? "")}" /></span>
     </div>`;
 }
@@ -6271,16 +6262,6 @@ function tourReadRewardPool(root, p) {
         }
       } else if (type === "candies" && species > 0) {
         muts.push({ kind: "grantCandy", speciesId: species, candy: numOf(q(place, i, "amount")) });
-      } else if (type === "currency") {
-        const amt = numOf(q(place, i, "amount"));
-        if (amt > 0) {
-          muts.push({ kind: "grantCurrency", amount: amt });
-        }
-      } else if (type === "item") {
-        const itemId = (q(place, i, "item")?.value || "").trim();
-        if (itemId) {
-          muts.push({ kind: "grantItem", itemId, count: numOf(q(place, i, "count")) || 1 });
-        }
       }
     }
     if (muts.length > 0) {

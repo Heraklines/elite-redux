@@ -30,9 +30,7 @@ export type RewardPlace = "champion" | "runnerUp" | "semifinalist";
 /** P3: a single reward settlement mutation (mirror of the worker TournamentRewardMutation). */
 export type TournamentRewardMutation =
   | { kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
-  | { kind: "grantCandy"; speciesId: number; candy: number }
-  | { kind: "grantItem"; itemId: string; count: number }
-  | { kind: "grantCurrency"; amount: number };
+  | { kind: "grantCandy"; speciesId: number; candy: number };
 
 /** P3: one place's reward definition (mirror of the worker RewardPoolEntry). */
 export interface RewardPoolEntry {
