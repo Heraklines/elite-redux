@@ -304,18 +304,37 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
   it("guest-owned Wide Lens intent is executed and priced by the host without ending the market", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
 
-    await withClient(rig.hostCtx, async () => {
-      // Odd interaction => guest owns the market and the host is the watcher,
-      // matching the tester capture. A peer counter broadcast is only advisory; each controller
-      // crosses its own local terminal, so put both engines on the same pin explicitly.
-      rig.hostRuntime.controller.advanceInteraction(0);
-    });
+    // Open the interaction control the way PRODUCTION does - via the real wave-1 reward boundary (the green
+    // model in coop-duo-reward-operation.test.ts). hostPlayWave -> driveGuestReplayTurn -> reaching
+    // SelectModifierPhase commits the WAVE_ADVANCE whose settled destination is an AWAIT_SUCCESSOR that admits
+    // INTERACTION_COMMIT (coop-runtime.ts:9284-9300 - the REWARD_PRESENT and SHOP_PRESENT destinations are
+    // BYTE-IDENTICAL there), so the market SHOP_BUY chain rides the SAME control the reward boundary opened.
+    // The old synthetic advanceInteraction(0) only bumped the counter and opened NO control, so the market
+    // buy had nothing to submit against ("expected false to be true" at applyCoopRelayedPurchase).
+    const turn = rig.hostScene.currentBattle.turn;
+    await hostPlayWave(rig);
     await withClient(rig.guestCtx, async () => {
-      rig.guestRuntime.controller.advanceInteraction(0);
+      await driveGuestReplayTurn(rig.guestScene, turn);
     });
-    expect(rig.hostRuntime.controller.interactionCounter()).toBe(1);
-    expect(rig.guestRuntime.controller.interactionCounter()).toBe(1);
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+    });
+
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const control = (
+      rig.hostRuntime as unknown as {
+        v2ControlLedger?: { latestControl?: { kind?: string; allowedKinds?: string[]; allowNextWaveStart?: boolean } };
+      }
+    ).v2ControlLedger?.latestControl;
+    // The reward boundary's control is exactly the AWAIT_SUCCESSOR the market must ride: it admits an
+    // INTERACTION_COMMIT and permits the next wave to start (the byte-identical REWARD_PRESENT/SHOP_PRESENT
+    // destination). Assert it so a regression that closes/retypes that control fails HERE, not opaquely below.
+    expect(control?.kind, "the wave-1 reward boundary opened an AWAIT_SUCCESSOR").toBe("AWAIT_SUCCESSOR");
+    expect(control?.allowedKinds, "that control admits the market's INTERACTION_COMMIT").toContain(
+      "INTERACTION_COMMIT",
+    );
 
     await withClient(rig.hostCtx, async () => {
       const phase = liveBiomeShop() as unknown as BiomeShopSeam;
@@ -323,18 +342,22 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       const target = rig.hostScene.getPlayerParty()[1];
       const modifier = option.type.newModifier(target);
       expect(modifier).not.toBeNull();
-      phase.coopBiomeStart = 1;
+      // Align the market pin to the counter the reward boundary opened on. The host is the watcher/applier
+      // (coopBiomeOwner=false) exactly as a guest-owned market relays to the host for authoritative pricing.
+      phase.coopBiomeStart = counterBefore;
       phase.coopBiomeOwner = false;
       phase.coopBiomeOptionOwner = true;
       phase.shopOptions = [option];
       phase.qtys = [1];
       phase.pendingIndex = 0;
       rig.hostScene.money = 2_000;
-      prepareHostMarketIntent(phase, 1, 0, [1, 1_020, 0, 100]);
+      prepareHostMarketIntent(phase, counterBefore, 0, [1, 1_020, 0, 100]);
 
       expect(phase.applyCoopRelayedPurchase(modifier!, 100, 1_020)).toBe(true);
 
-      expect(rig.hostRuntime.controller.interactionCounter(), "buy does not terminate the pinned market").toBe(1);
+      expect(rig.hostRuntime.controller.interactionCounter(), "buy does not terminate the pinned market").toBe(
+        counterBefore,
+      );
       expect(rig.hostScene.money, "the host ignores raw proposed money and applies its exact local price").toBe(1_900);
       expect(phase.qtys[0], "watcher decrements the bought stock once").toBe(0);
       expect(phase.coopPendingAuthorityOperationId, "the complete retained host result releases the intent").toBeNull();
