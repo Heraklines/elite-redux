@@ -5,7 +5,11 @@
  */
 
 import { globalScene } from "#app/global-scene";
-import { clearCoopRuntime, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  freezeCoopSharedTerminalForShowdownResult,
+  getCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { resolveGhostDialogue } from "#data/elite-redux/er-ghost-profile";
 import { buildGhostDialogueCtx } from "#data/elite-redux/er-ghost-teams";
 import { erRecordShowdownResult } from "#data/elite-redux/er-social-achievement-tracker";
@@ -76,6 +80,10 @@ export class ShowdownResultPhase extends BattlePhase {
     super.start();
     const scene = globalScene;
     const runtime = getCoopRuntime();
+    // Task #116: freeze the shared terminal FIRST - the peer may drop its channel at any moment during
+    // this teardown, and an unfrozen terminal lets the disconnect reaction start membership recovery /
+    // hot-rejoin against a peer that is already gone, overlaying the result screen.
+    freezeCoopSharedTerminalForShowdownResult(runtime);
 
     // #900: unlock the Versus achievements for this match BEFORE endShowdownBattle() (below)
     // drops the match id + team manifests this reads. Pure local observer - it validates

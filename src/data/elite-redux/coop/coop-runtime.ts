@@ -2625,6 +2625,11 @@ function wireShowdownResult(transport: CoopTransport, runtime: CoopRuntime): voi
     if (!pendingShowdownResults.has(runtime)) {
       pendingShowdownResults.set(runtime, msg);
     }
+    // Task #116: the forfeiter closes its channel ~immediately after sending the result, so the
+    // disconnect reaction fires right behind this message. Freeze the shared terminal NOW - the
+    // disconnect handler early-outs on a frozen terminal, otherwise the hot-rejoin recovery loop
+    // preempts ShowdownResultPhase for ~a minute (frozen battlefield + recovery UI over the result).
+    prepareCoopSharedTerminal(runtime, "showdown-result");
     flushPendingShowdownResult(runtime);
   });
 }
@@ -7215,6 +7220,17 @@ function sharedTerminalState(runtime: CoopRuntime): CoopRuntimeSharedTerminalSta
 }
 
 /** Whether this exact runtime has synchronously entered a shared terminal boundary. */
+/**
+ * Task #116: arm the shared-terminal freeze for a locally-driven showdown result. ShowdownResultPhase
+ * calls this at start so a peer channel-drop arriving mid-teardown takes the frozen-terminal early-out
+ * in the disconnect reaction instead of launching the hot-rejoin recovery loop over the result screen.
+ */
+export function freezeCoopSharedTerminalForShowdownResult(runtime: CoopRuntime | null = active): void {
+  if (runtime != null) {
+    prepareCoopSharedTerminal(runtime, "showdown-result");
+  }
+}
+
 export function isCoopSharedTerminalFrozen(runtime: CoopRuntime | null = active): boolean {
   return runtime != null && sharedTerminalStates.get(runtime)?.frozen === true;
 }

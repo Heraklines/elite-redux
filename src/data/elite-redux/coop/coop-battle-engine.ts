@@ -306,6 +306,40 @@ function getCoopSerializableField(): Pokemon[] {
  * screen the host cleared), not just gain tags. An OLDER host omits the field entirely, and the
  * guest then leaves its tags alone (the `undefined` skip in {@linkcode reconcileArenaTags}).
  */
+/**
+ * Renderer-side weather/terrain adoption (showdown/coop entry-sync, task #115): when the TYPE drifted,
+ * set it WITH the host's remaining-turn counter (a bare trySetWeather constructs Weather(type, 0, 0),
+ * so the peer's on-screen counter is dead); when the type already matches, silently converge the
+ * counter alone. The sync checksum deliberately excludes turnsLeft, so nothing else ever heals it.
+ */
+function applyAuthoritativeWeatherAndTerrain(
+  arena: typeof globalScene.arena,
+  weather: number,
+  weatherTurnsLeft: number | undefined,
+  terrain: number,
+  terrainTurnsLeft: number | undefined,
+  tag: string,
+): void {
+  const weatherTurns = Number.isFinite(weatherTurnsLeft)
+    ? Math.max(0, Math.trunc(weatherTurnsLeft as number))
+    : undefined;
+  const terrainTurns = Number.isFinite(terrainTurnsLeft)
+    ? Math.max(0, Math.trunc(terrainTurnsLeft as number))
+    : undefined;
+  if ((arena.weather?.weatherType ?? 0) !== weather) {
+    coopWarn(tag, `weather host=${weather}/${weatherTurns ?? "?"} guest=${arena.weather?.weatherType ?? 0} -> applied`);
+    arena.trySetWeather(weather as WeatherType, undefined, weatherTurns);
+  } else if (arena.weather && weatherTurns !== undefined && arena.weather.turnsLeft !== weatherTurns) {
+    arena.weather.turnsLeft = weatherTurns;
+  }
+  if ((arena.terrain?.terrainType ?? 0) !== terrain) {
+    coopWarn(tag, `terrain host=${terrain}/${terrainTurns ?? "?"} guest=${arena.terrain?.terrainType ?? 0} -> applied`);
+    arena.trySetTerrain(terrain as TerrainType, true, undefined, terrainTurns);
+  } else if (arena.terrain && terrainTurns !== undefined && arena.terrain.turnsLeft !== terrainTurns) {
+    arena.terrain.turnsLeft = terrainTurns;
+  }
+}
+
 function readArenaView(): CoopArenaView {
   const arena = globalScene.arena;
   return {
@@ -1191,16 +1225,16 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
         );
       }
     }
-    // Correct weather / terrain type if it drifted (turn counts are approximate).
+    // Correct weather / terrain type if it drifted, carrying the host's turn counters through.
     const arena = globalScene.arena;
-    if ((arena.weather?.weatherType ?? 0) !== checkpoint.weather) {
-      coopWarn("checkpoint", `weather host=${checkpoint.weather} guest=${arena.weather?.weatherType ?? 0} -> applied`);
-      arena.trySetWeather(checkpoint.weather as WeatherType);
-    }
-    if ((arena.terrain?.terrainType ?? 0) !== checkpoint.terrain) {
-      coopWarn("checkpoint", `terrain host=${checkpoint.terrain} guest=${arena.terrain?.terrainType ?? 0} -> applied`);
-      arena.trySetTerrain(checkpoint.terrain as TerrainType, true);
-    }
+    applyAuthoritativeWeatherAndTerrain(
+      arena,
+      checkpoint.weather,
+      checkpoint.weatherTurnsLeft,
+      checkpoint.terrain,
+      checkpoint.terrainTurnsLeft,
+      "checkpoint",
+    );
     // Reconcile arena tags (#633 GAP 1): add hazards/screens/tailwind the guest's MoveEffectPhases
     // never set, remove ones the host cleared. This is the top resync-loop fix - the checksum hashes
     // `(tagType, side)`, so converging the SET is what makes it stop diverging every turn.
@@ -3855,12 +3889,14 @@ function applyCoopAuthoritativeBattleStateInternal(
     reassertAuthoritativePartyOrder("player", playerParty);
     reassertAuthoritativePartyOrder("enemy", enemyParty);
     const arena = globalScene.arena;
-    if ((arena.weather?.weatherType ?? 0) !== state.weather) {
-      arena.trySetWeather(state.weather as WeatherType);
-    }
-    if ((arena.terrain?.terrainType ?? 0) !== state.terrain) {
-      arena.trySetTerrain(state.terrain as TerrainType, true);
-    }
+    applyAuthoritativeWeatherAndTerrain(
+      arena,
+      state.weather,
+      state.weatherTurnsLeft,
+      state.terrain,
+      state.terrainTurnsLeft,
+      "state",
+    );
     reconcileArenaTags(state.arenaTags, true);
     globalScene.money = state.money;
     if (typeof state.lockModifierTiers === "boolean") {
@@ -4739,14 +4775,14 @@ export function applyCoopFullSnapshot(
       globalScene.updateModifiers(false);
     }
     const arena = globalScene.arena;
-    if ((arena.weather?.weatherType ?? 0) !== snapshot.weather) {
-      coopWarn("heal", `weather host=${snapshot.weather} guest=${arena.weather?.weatherType ?? 0} -> applied`);
-      arena.trySetWeather(snapshot.weather as WeatherType);
-    }
-    if ((arena.terrain?.terrainType ?? 0) !== snapshot.terrain) {
-      coopWarn("heal", `terrain host=${snapshot.terrain} guest=${arena.terrain?.terrainType ?? 0} -> applied`);
-      arena.trySetTerrain(snapshot.terrain as TerrainType, true);
-    }
+    applyAuthoritativeWeatherAndTerrain(
+      arena,
+      snapshot.weather,
+      snapshot.weatherTurnsLeft,
+      snapshot.terrain,
+      snapshot.terrainTurnsLeft,
+      "heal",
+    );
     // Reconcile arena tags (#633 GAP 1): the full snapshot now HEALS hazards / screens / tailwind,
     // not just the per-turn checkpoint - so a guest that resyncs on a mismatch converges its arena.
     reconcileArenaTags(snapshot.arenaTags);
