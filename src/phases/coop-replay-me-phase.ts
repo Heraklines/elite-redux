@@ -295,7 +295,15 @@ export class CoopReplayMePhase extends Phase {
 
   /** Open the exact Mystery handler, then publish readiness only for this still-live addressed generation. */
   private openV2MysterySurface(): void {
-    void this.openModeBounded(UiMode.MYSTERY_ENCOUNTER, undefined).then(opened => {
+    const opening = this.openModeBounded(UiMode.MYSTERY_ENCOUNTER, undefined);
+    // setModeBoundedWhen may install the handler synchronously. Publish in that same call stack so a public
+    // input cannot commit the next entry before this presentation records controlInstalled. The notifier is
+    // fail-closed: it proves the exact phase, operation id, mode, handler, and actionability before advancing.
+    if (this.boundaryStillLive() && this.coopV2ControlOperationId != null) {
+      notifyCoopV2InteractionSurfaceReady(this.boundRuntime);
+    }
+    // Retain the settled retry for implementations where the UI handler becomes actionable asynchronously.
+    void opening.then(opened => {
       if (opened !== "superseded" && this.boundaryStillLive() && this.coopV2ControlOperationId != null) {
         notifyCoopV2InteractionSurfaceReady(this.boundRuntime);
       }

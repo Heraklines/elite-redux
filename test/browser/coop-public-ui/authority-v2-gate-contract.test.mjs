@@ -460,10 +460,18 @@ test("Mystery projection construction cannot recursively attest an unopened hand
   const readiness = replayMePhase.slice(readinessStart, readinessEnd);
   assert.match(readiness, /openModeBounded\(UiMode\.MYSTERY_ENCOUNTER/u);
   assert.match(readiness, /boundaryStillLive\(\)/u);
+  const openingIndex = readiness.indexOf("const opening = this.openModeBounded(");
+  const immediateProofIndex = readiness.indexOf("notifyCoopV2InteractionSurfaceReady(this.boundRuntime)", openingIndex);
+  const settledRetryIndex = readiness.indexOf("void opening.then(", immediateProofIndex);
+  assert.ok(openingIndex >= 0, "the Mystery surface starts opening before it can attest control");
+  assert.ok(
+    immediateProofIndex > openingIndex && settledRetryIndex > immediateProofIndex,
+    "the synchronously actionable handler is proved before public input can outrun the settled retry",
+  );
   assert.match(
     readiness,
-    /notifyCoopV2InteractionSurfaceReady\(this\.boundRuntime\)/u,
-    "only the opened, still-live Mystery handler may attest control",
+    /void opening\.then\([\s\S]*notifyCoopV2InteractionSurfaceReady\(this\.boundRuntime\)/u,
+    "an asynchronously actionable Mystery handler retains its settled proof retry",
   );
 });
 

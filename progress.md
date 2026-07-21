@@ -1099,3 +1099,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   no errors; `git diff --check` green; zero TypeScript diagnostics mention the
   touched files against the unchanged 584-line repository baseline. Co-op Vitest
   and all browser execution remain remote-only.
+
+2026-07-21 - Mystery public input cannot outrun its V2 control proof
+
+- P1 artifact tracing found the guest visibly entered the immutable
+  `ME_PRESENT` selector, chose an option, and received later `ME_TERMINAL` and
+  `REWARD_PRESENT` commits while the presentation entry still reported
+  `controlInstalled=false`. The sole readiness edge was a Promise continuation
+  after `setModeBoundedWhen`; a synchronous public input could therefore outrun
+  the proof and strand every later revision as a gap.
+- `CoopReplayMePhase` now attempts the exact readiness proof in the same call
+  stack that opens the handler, while retaining its settled retry for genuinely
+  asynchronous UI installation. The notifier itself remains fail-closed on the
+  exact phase, operation ID, mode, handler, and actionability, so the eager edge
+  cannot fabricate control.
+- The source contract now proves construction still cannot recursively attest,
+  the immediate proof occurs only after opening begins, and the asynchronous
+  retry remains wired. Local permitted evidence: Authority V2 contract 32/32
+  green, scoped Biome has no errors (existing warnings/info only), and
+  `git diff --check` is green. The failure-first P1 engine reproduction remains
+  remote-only.
