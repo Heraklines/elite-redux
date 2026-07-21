@@ -85,12 +85,15 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
 
     await withClient(rig.hostCtx, async () => {
       let options: OptionSelectItem[] | undefined;
+      const setMode = globalScene.ui.setMode.bind(globalScene.ui);
       vi.spyOn(globalScene.ui, "showText").mockImplementation((_text, _delay, callback) => callback?.());
       vi.spyOn(globalScene.ui, "setMode").mockImplementation((mode, config) => {
         if (mode === UiMode.OPTION_SELECT) {
           options = (config as { options: OptionSelectItem[] }).options;
         }
-        return Promise.resolve(true) as never;
+        // Observe the production transition instead of replacing it. Authority V2 must see the real active,
+        // actionable OPTION_SELECT handler before the host is allowed to commit the decision successor.
+        return setMode(mode, config);
       });
       const phase = globalScene.phaseManager.getCurrentPhase();
       expect(phase.phaseName).toBe("ErStormglassPickerPhase");

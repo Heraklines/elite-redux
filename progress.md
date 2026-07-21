@@ -810,3 +810,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   embedded authoritative battle state deliberately retains battle turn 3. This
   preserves the important distinction between mechanical log address and
   immutable destination payload.
+
+2026-07-21 - Stormglass test preserves the real Authority V2 input surface
+
+- Exact-SHA gate 29794324283 proved that the phase-driven Stormglass migration
+  reached its real V2 presentation, but the test then replaced `ui.setMode` with
+  a capture-only stub. That left no active OPTION_SELECT handler, so the
+  address-exact control ledger correctly refused the decision successor and the
+  shared session failed closed.
+- The test now delegates through the production `setMode` while observing its
+  options. The commit must therefore earn the same real phase, UI mode, active
+  handler, and actionable-input proof required in a browser.
