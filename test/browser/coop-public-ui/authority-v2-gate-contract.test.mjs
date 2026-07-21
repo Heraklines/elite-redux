@@ -51,6 +51,8 @@ const interactionCutover = readFileSync(
 );
 const nextControl = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/next-control.ts", root), "utf8");
 const controlLedger = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/control-ledger.ts", root), "utf8");
+const interactionRelay = readFileSync(new URL("src/data/elite-redux/coop/coop-interaction-relay.ts", root), "utf8");
+const coopTransport = readFileSync(new URL("src/data/elite-redux/coop/coop-transport.ts", root), "utf8");
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
 
@@ -751,6 +753,44 @@ test("the duo Mystery split cannot inject a choice before public V2 input is act
   assert.ok(
     presentationGuard > addressField && selectorOpen > presentationGuard,
     "runtime execution completes the presentation commit/bind guard before exposing the delayed selector",
+  );
+});
+
+test("guest-owned Mystery control is installed only by an exact authority proposal wait", () => {
+  assert.match(
+    coopTransport,
+    /authorityControlOperationId\?: string \| undefined;[\s\S]*proposalOperationId\?: string \| undefined;/u,
+    "the raw proposal carries both its immutable control and proposed-operation identities",
+  );
+  assert.match(
+    replayMePhase,
+    /authorityControlOperationId,\s+proposalOperationId: operationId/u,
+    "the guest sends the ME_PICK proposal under the ME_PRESENT control that opened its picker",
+  );
+  assert.match(
+    mysteryEncounterPhases,
+    /awaitInteractionChoice\([\s\S]*?COOP_ME_PICK_CHOICE_KINDS,[\s\S]*?authorityControlOperationId \?\? undefined/u,
+    "the authority arms the host wait at the exact phase-owned ME_PRESENT address",
+  );
+  assert.match(
+    interactionRelay,
+    /projectV2AuthorityProposalWait\(authorityWait\)/u,
+    "the relay refuses to park an addressed V2 waiter unless the global ledger installs it",
+  );
+  assert.match(
+    coopRuntime,
+    /function projectCoopV2AuthorityProposalWait\([\s\S]*?projectAuthorityProposalWait\(/u,
+    "the runtime derives and installs the proposal ingress through the one global control ledger",
+  );
+  assert.match(
+    controlLedger,
+    /kind: "authority-proposal-wait"/u,
+    "a remote proposal wait is distinct from executable owner UI and cosmetic watcher UI",
+  );
+  assert.match(
+    interactionRelay,
+    /res == null && authorityWait != null[\s\S]*?revokeV2AuthorityProposalWait\(authorityWait\)/u,
+    "timeout, cancellation, and supersession retire the exact waiter generation",
   );
 });
 

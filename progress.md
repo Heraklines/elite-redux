@@ -842,3 +842,38 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   can legally succeed it. A focused contract proves the entry stays addressed
   at wave 12 / turn 0, retains state wave 12 / turn 3, and authorizes the next
   ordered boundary at wave 12 / turn 3.
+
+2026-07-21 - Guest-owned Mystery gets an address-exact authority ingress lease
+
+- Exact gate run 29795779477 proved the state-coordinate correction worked:
+  the guest-owned `ME_PRESENT` admitted/applied and the host executed the
+  relayed pick. The next `ME_TERMINAL` then failed at
+  `authority-local successor reservation refused`. The host had accepted a
+  guest proposal while its global control ledger still had no installed
+  predecessor: the guest owned the public picker, while the host's real
+  actionable surface was an unmodelled relay waiter.
+- Added a distinct authority proposal-wait proof to the one global V2 control
+  ledger. It binds the immutable opening operation, derived relay sequence,
+  closed accepted-kind set, and one opaque live waiter generation. It grants no
+  local human input. Timeout/cancel/supersession revokes only that exact token;
+  a consumed proposal preserves the proof until the next ordered entry
+  atomically consumes it.
+- Guest-owned top-level Mystery proposals now carry both the opening
+  `ME_PRESENT` control address and their exact `ME_PICK` proposal address.
+  Authority admission validates epoch, owner, pinned counter, step, sequence,
+  enabled option, and proposal operation ID without consulting the legacy
+  revision cursor. Buffered early proposals and live network waits cross the
+  same projector.
+- The authority's cosmetic Mystery phase can no longer overwrite this stronger
+  ingress proof with a watcher UI token. Protocol advanced to `er-coop-44` so a
+  cached build lacking addressed proposals cannot pair into the new control
+  graph.
+- Local static evidence: public source contract 29/29 green, scoped formatting
+  clean, `git diff --check` clean, and full TypeScript reports zero diagnostics
+  in touched files (repository baseline remains non-zero). Co-op Vitest and
+  browser execution remain remote-only.
+- TODO: push the checkpoint, run the focused Authority V2 node contract plus
+  C1/P1 Mystery shards remotely, inspect causal artifacts, then rerun the exact
+  production/public journeys. Extend the same proposal-ingress descriptor to
+  every other remote-owned registered interaction before treating six-seat
+  ownership as complete.

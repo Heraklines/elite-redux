@@ -776,6 +776,40 @@ export function isCoopMeQuizAnswerOperationId(params: {
   );
 }
 
+/**
+ * Validate one remote owner's top-level Mystery proposal against its immutable
+ * V2 identity without consulting the legacy operation revision cursor.
+ */
+export function isCoopMePickProposalOperationId(params: {
+  readonly operationId: string;
+  readonly epoch: number;
+  readonly pinned: number;
+  readonly step: number;
+  readonly seq: number;
+}): boolean {
+  if (
+    !Number.isSafeInteger(params.epoch)
+    || params.epoch <= 0
+    || !Number.isSafeInteger(params.pinned)
+    || params.pinned < 0
+    || !Number.isSafeInteger(params.step)
+    || params.step < 0
+    || params.step > 999
+    || params.seq !== COOP_ME_PUMP_SEQ_BASE + params.pinned
+  ) {
+    return false;
+  }
+  return (
+    params.operationId
+    === makeCoopOperationId(
+      params.epoch,
+      ownerSeatFor("ME_PICK", params.pinned),
+      meOpAddr("ME_PICK", params.seq, params.step),
+      "ME_PICK",
+    )
+  );
+}
+
 /** Project one newly applied owner intent into the reconnect control snapshot. */
 export function adoptCoopMeCommittedOwnerOrdinal(op: CoopPendingOperation): boolean {
   if ((op.kind !== "ME_PICK" && op.kind !== "ME_SUB") || op.status !== "applied") {

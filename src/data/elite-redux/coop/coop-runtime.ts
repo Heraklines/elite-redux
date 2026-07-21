@@ -53,6 +53,7 @@ import type {
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import {
+  type CoopV2AuthorityProposalWaitObservation,
   CoopV2ControlLedger,
   type CoopV2InteractionSurfaceObservation,
 } from "#data/elite-redux/coop/authority-v2/control-ledger";
@@ -238,6 +239,7 @@ import {
   COOP_FAINT_SWITCH_SEQ_BASE,
   COOP_INTERACTION_LEAVE,
   CoopInteractionRelay,
+  type CoopV2AuthorityProposalWait,
   coopBiomeShopSeq,
   isCoopFaintSwitchSeq,
   isCoopFaintSwitchWindowOpen,
@@ -255,6 +257,7 @@ import {
   commitMeOwnerIntent,
   isCompleteCoopMeTerminalPayload,
   isCoopMeOperationEnabled,
+  isCoopMePickProposalOperationId,
   isCoopMeQuizAnswerOperationId,
   receiveCoopMeTerminalTransactionFor,
   resetCoopMeOperationState,
@@ -368,6 +371,7 @@ import {
   COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
   COOP_LEARN_MOVE_FWD_SEQ_BASE,
   COOP_MAX_REACHABLE_COUNTER,
+  COOP_ME_PICK_CHOICE_KINDS,
   COOP_ME_PUMP_SEQ_BASE,
   COOP_ME_TERM_SEQ_BASE,
   COOP_REJOIN_SYNC_SEQ_BASE,
@@ -4845,6 +4849,83 @@ function projectCoopV2WaveControl(
   }
 }
 
+interface CoopV2AuthorityProposalWaitSpec {
+  readonly relaySequence: number;
+  readonly acceptedKinds: readonly string[];
+}
+
+/** Derive the authority's remote-input ingress solely from the immutable projection capsule. */
+function coopV2AuthorityProposalWaitSpec(
+  control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
+  plan: CoopV2InteractionProjectionPlan,
+): CoopV2AuthorityProposalWaitSpec | null {
+  if (plan.kind === "mystery" && control.surfaceClass === "op:me" && control.operationKind === "ME_PRESENT") {
+    return {
+      relaySequence: COOP_ME_PUMP_SEQ_BASE + plan.pinned,
+      acceptedKinds: COOP_ME_PICK_CHOICE_KINDS,
+    };
+  }
+  return null;
+}
+
+function sameOrderedStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+/**
+ * Install the exact host-side relay waiter that substitutes for a remote owner's public UI.
+ * The relay is the only caller and supplies one opaque waiter generation.
+ */
+function projectCoopV2AuthorityProposalWait(runtime: CoopRuntime, wait: CoopV2AuthorityProposalWait): boolean {
+  const control = runtime.v2ControlLedger.latestControl;
+  if (
+    runtime.controller.authorityRole !== "authority"
+    || control?.kind !== "SHARED_INTERACTION"
+    || control.ownerSeatId === runtime.controller.localSeatId
+    || control.operationId !== wait.controlOperationId
+  ) {
+    return false;
+  }
+  const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
+  const plan = sourceEntry == null ? null : projectionPlanOfCoopV2InteractionEntry(sourceEntry);
+  const expected = plan == null ? null : coopV2AuthorityProposalWaitSpec(control, plan);
+  if (
+    expected == null
+    || wait.relaySequence !== expected.relaySequence
+    || !sameOrderedStrings(wait.acceptedKinds, expected.acceptedKinds)
+  ) {
+    return false;
+  }
+  const observation: CoopV2AuthorityProposalWaitObservation = {
+    controlOperationId: wait.controlOperationId,
+    relaySequence: wait.relaySequence,
+    acceptedKinds: [...wait.acceptedKinds],
+    waiterToken: wait.waiterToken,
+    active: true,
+  };
+  const result = runtime.v2ControlLedger.projectAuthorityProposalWait(
+    control,
+    observation,
+    runtime.controller.localSeatId,
+  );
+  if (result.kind === "installed" || result.kind === "already-installed") {
+    runtime.v2InstalledInteractionTargets.add(result.controlId);
+    return true;
+  }
+  return false;
+}
+
+function revokeCoopV2AuthorityProposalWait(runtime: CoopRuntime, wait: CoopV2AuthorityProposalWait): void {
+  const control = runtime.v2ControlLedger.latestControl;
+  if (
+    control?.kind === "SHARED_INTERACTION"
+    && control.operationId === wait.controlOperationId
+    && runtime.v2ControlLedger.revokeAuthorityProposalWait(control, wait.waiterToken)
+  ) {
+    runtime.v2InstalledInteractionTargets.delete(controlIdOf(control));
+  }
+}
+
 function projectCoopV2InteractionControl(
   runtime: CoopRuntime,
   control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" | "REPLACEMENT" | "AWAIT_SUCCESSOR" }>,
@@ -4869,6 +4950,19 @@ function projectCoopV2InteractionControl(
         kind: "rejected",
         reason: `shared interaction ${controlId} has no complete immutable projection capsule`,
       };
+    }
+    const authorityProposalSpec = coopV2AuthorityProposalWaitSpec(control, plan);
+    if (
+      authorityProposalSpec != null
+      && runtime.controller.authorityRole === "authority"
+      && runtime.controller.localSeatId !== control.ownerSeatId
+    ) {
+      return runtime.v2ControlLedger.isAuthorityProposalWaitInstalled(control)
+        ? { kind: "already-installed", controlId }
+        : {
+            kind: "deferred",
+            reason: `awaiting exact remote proposal ingress for ${controlId}`,
+          };
     }
     prepareCoopV2OrdinaryInteractionControlSurface(runtime, control, plan);
   } else if (runtime.controller.localSeatId === control.ownerSeatId) {
@@ -10184,6 +10278,44 @@ export function assembleCoopRuntime(
     isAuthorityWaitCreationFrozen: () => isCoopV2AuthorityWaitCreationFrozen(runtime),
     isInteractionAuthorityV2: () => runtime != null && isCoopV2InteractionCutoverActive(runtime.durability),
     isLocalAuthority: () => controller.authorityRole === "authority",
+    validateV2InteractionProposal: ({ controlOperationId, proposalOperationId, seq, kind, choice, data }) => {
+      const control = runtime?.v2ControlLedger.latestControl;
+      if (
+        control?.kind !== "SHARED_INTERACTION"
+        || control.operationId !== controlOperationId
+        || control.surfaceClass !== "op:me"
+        || control.operationKind !== "ME_PRESENT"
+        || control.ownerSeatId === controller.authoritySeatId
+        || kind !== COOP_ME_PICK_CHOICE_KINDS[0]
+        || data?.length !== 1
+        || !Number.isSafeInteger(data[0])
+        || !Number.isSafeInteger(choice)
+      ) {
+        return false;
+      }
+      const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
+      const plan = sourceEntry == null ? null : projectionPlanOfCoopV2InteractionEntry(sourceEntry);
+      return (
+        plan?.kind === "mystery"
+        && seq === COOP_ME_PUMP_SEQ_BASE + plan.pinned
+        && choice >= 0
+        && choice < plan.presentation.meetsReqs.length
+        && plan.presentation.meetsReqs[choice] === true
+        && isCoopMePickProposalOperationId({
+          operationId: proposalOperationId,
+          epoch: controller.sessionEpoch,
+          pinned: plan.pinned,
+          step: data[0],
+          seq,
+        })
+      );
+    },
+    projectV2AuthorityProposalWait: wait => runtime != null && projectCoopV2AuthorityProposalWait(runtime, wait),
+    revokeV2AuthorityProposalWait: wait => {
+      if (runtime != null) {
+        revokeCoopV2AuthorityProposalWait(runtime, wait);
+      }
+    },
     validateV2QuizAnswerObservation: ({ seq, choice, questionIndex, operationId }) => {
       const control = runtime?.v2ControlLedger.activeControl;
       if (

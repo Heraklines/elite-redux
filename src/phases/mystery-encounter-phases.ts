@@ -640,6 +640,11 @@ export class MysteryEncounterPhase extends Phase {
     const controller = getCoopController();
     const generation = coopSessionGeneration();
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const authorityControlOperationId = this.coopV2ControlOperationId;
+    if (isCoopV2InteractionCutoverActive(runtime?.durability) && authorityControlOperationId == null) {
+      failCoopSharedSession(`Mystery proposal wait ${seqMe} had no exact Authority V2 control address`);
+      return;
+    }
     const live = (): boolean =>
       globalScene === scene
       && getCoopRuntime() === runtime
@@ -648,100 +653,108 @@ export class MysteryEncounterPhase extends Phase {
       && coopMeInteractionStartValue() === pinned
       && (globalScene.currentBattle?.waveIndex ?? -1) === wave
       && globalScene.phaseManager.getCurrentPhase() === this;
-    void relay.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_PICK_CHOICE_KINDS).then(choice => {
-      if (!live() || getCoopController()?.role !== "host") {
-        return; // a replaced scene/runtime can never consume this old callback
-      }
-      if (choice == null || choice.choice < 0) {
-        this.coopGuestPickRecoveryAttempts++;
-        coopWarn("me", "host await guest index missing; retaining selector and requesting durable replay", {
-          seq: seqMe,
-          choice: choice == null ? "null" : choice.choice,
-          attempt: this.coopGuestPickRecoveryAttempts,
-        });
-        getCoopRuntime()?.durability?.reconnect();
-        if (this.coopGuestPickRecoveryAttempts >= 3) {
-          failCoopSharedSession(`Mystery pick ${seqMe} unavailable after bounded recovery`);
+    void relay
+      .awaitInteractionChoice(
+        seqMe,
+        COOP_ME_REPLAY_WAIT_MS,
+        COOP_ME_PICK_CHOICE_KINDS,
+        undefined,
+        authorityControlOperationId ?? undefined,
+      )
+      .then(choice => {
+        if (!live() || getCoopController()?.role !== "host") {
+          return; // a replaced scene/runtime can never consume this old callback
+        }
+        if (choice == null || choice.choice < 0) {
+          this.coopGuestPickRecoveryAttempts++;
+          coopWarn("me", "host await guest index missing; retaining selector and requesting durable replay", {
+            seq: seqMe,
+            choice: choice == null ? "null" : choice.choice,
+            attempt: this.coopGuestPickRecoveryAttempts,
+          });
+          getCoopRuntime()?.durability?.reconnect();
+          if (this.coopGuestPickRecoveryAttempts >= 3) {
+            failCoopSharedSession(`Mystery pick ${seqMe} unavailable after bounded recovery`);
+            return;
+          }
+          setTimeout(() => {
+            if (live()) {
+              this.coopHostAwaitGuestIndex();
+            }
+          }, 250);
           return;
         }
-        setTimeout(() => {
-          if (live()) {
-            this.coopHostAwaitGuestIndex();
-          }
-        }, 250);
-        return;
-      }
-      this.coopGuestPickRecoveryAttempts = 0;
-      coopLog("me", "host received guest ME option index", { seq: seqMe, index: choice.choice });
-      const encounter = globalScene.currentBattle.mysteryEncounter!;
-      const options = this.optionSelectSettings?.overrideOptions ?? encounter.options;
-      const opt = options[choice.choice];
-      if (opt == null) {
-        coopWarn("me", "host: relayed Mystery index out of range; terminating shared session", {
+        this.coopGuestPickRecoveryAttempts = 0;
+        coopLog("me", "host received guest ME option index", { seq: seqMe, index: choice.choice });
+        const encounter = globalScene.currentBattle.mysteryEncounter!;
+        const options = this.optionSelectSettings?.overrideOptions ?? encounter.options;
+        const opt = options[choice.choice];
+        if (opt == null) {
+          coopWarn("me", "host: relayed Mystery index out of range; terminating shared session", {
+            seq: seqMe,
+            index: choice.choice,
+            optionCount: options.length,
+          });
+          failCoopSharedSession(`Malformed Mystery pick ${choice.choice}/${options.length}`);
+          return;
+        }
+        // ADD-2c (BLOCK-3 residual): an ME whose option chain pushes a BESPOKE interactive sub-PHASE
+        // (ErQuizPhase) has no generic party/secondary host relay site. It is NOT safe-degraded: #818 co-op
+        // quiz MIRRORING - the 8 quiz MEs are MIRRORED, the host streams the question session and BOTH clients
+        // run ErQuizPhase off it, with the GUEST owner driving its OWN answers over the quiz relay. So the host
+        // input gate must STAY UP (standing it down would let the HOST player hijack and answer the guest's
+        // quiz), and every case falls through unchanged to the programmatic option apply below
+        // (ErQuizPhase.start streams the session there).
+        // #827: CLOWNING_AROUND (a bespoke yes/no OPTION_SELECT) is no longer in this set - it now relays its
+        // yes/no as a `{ kind: "secondary" }` sub-prompt (coopHostStreamSecondaryAwaitIndex) exactly like the
+        // party->secondary path, so it needs no bespoke branch and reaches this apply like any relayed ME. The
+        // #823 host-drives set is therefore EMPTY (setCoopMeBespokeHostDrives is never set true anymore; the
+        // ui.ts gate reader stays as a harmless always-false guard, kept for a future bespoke host-drive ME).
+        if (COOP_AUTHORITATIVE_BESPOKE_SUB_ME.has(encounter.encounterType)) {
+          coopLog(
+            "me",
+            `quiz ME on guest-owned encounter ${MysteryEncounterType[encounter.encounterType]}: MIRRORED (host gate stays up; guest owner drives the quiz) (#818)`,
+            { seq: seqMe, index: choice.choice },
+          );
+        }
+        coopLog("me", "host applies relayed guest option programmatically", {
           seq: seqMe,
           index: choice.choice,
-          optionCount: options.length,
+          encounter: MysteryEncounterType[encounter.encounterType],
         });
-        failCoopSharedSession(`Malformed Mystery pick ${choice.choice}/${options.length}`);
-        return;
-      }
-      // ADD-2c (BLOCK-3 residual): an ME whose option chain pushes a BESPOKE interactive sub-PHASE
-      // (ErQuizPhase) has no generic party/secondary host relay site. It is NOT safe-degraded: #818 co-op
-      // quiz MIRRORING - the 8 quiz MEs are MIRRORED, the host streams the question session and BOTH clients
-      // run ErQuizPhase off it, with the GUEST owner driving its OWN answers over the quiz relay. So the host
-      // input gate must STAY UP (standing it down would let the HOST player hijack and answer the guest's
-      // quiz), and every case falls through unchanged to the programmatic option apply below
-      // (ErQuizPhase.start streams the session there).
-      // #827: CLOWNING_AROUND (a bespoke yes/no OPTION_SELECT) is no longer in this set - it now relays its
-      // yes/no as a `{ kind: "secondary" }` sub-prompt (coopHostStreamSecondaryAwaitIndex) exactly like the
-      // party->secondary path, so it needs no bespoke branch and reaches this apply like any relayed ME. The
-      // #823 host-drives set is therefore EMPTY (setCoopMeBespokeHostDrives is never set true anymore; the
-      // ui.ts gate reader stays as a harmless always-false guard, kept for a future bespoke host-drive ME).
-      if (COOP_AUTHORITATIVE_BESPOKE_SUB_ME.has(encounter.encounterType)) {
-        coopLog(
-          "me",
-          `quiz ME on guest-owned encounter ${MysteryEncounterType[encounter.encounterType]}: MIRRORED (host gate stays up; guest owner drives the quiz) (#818)`,
-          { seq: seqMe, index: choice.choice },
-        );
-      }
-      coopLog("me", "host applies relayed guest option programmatically", {
-        seq: seqMe,
-        index: choice.choice,
-        encounter: MysteryEncounterType[encounter.encounterType],
+        // Wave-2c: DUAL-RUN - the AUTHORITY (host) COMMITS the guest-owned ME_PICK it just received
+        // (invariant 3, the guest minted the intent at handleGuestOptionSelect). No-op when the flag is OFF.
+        if (isCoopMeOperationEnabled()) {
+          const step = choice.data?.[0];
+          if (!Number.isSafeInteger(step) || (step as number) < 0) {
+            failCoopSharedSession(`Mystery pick ${seqMe} arrived without an exact operation step`);
+            return;
+          }
+          const committed = commitMeAuthorityGuestIntent({
+            kind: "ME_PICK",
+            seq: seqMe,
+            pinned,
+            step: step as number,
+            value: choice.choice,
+            wave,
+            turn: COOP_ME_AUTHORITY_TURN,
+          });
+          if (committed.kind === "duplicate") {
+            // A delayed resend from the previous round is confirmation noise, never the next round's pick.
+            this.coopHostAwaitGuestIndex();
+            return;
+          }
+          if (committed.kind !== "committed") {
+            failCoopSharedSession(`Mystery pick ${seqMe}/${String(step)} could not commit (${committed.kind})`);
+            return;
+          }
+        }
+        hideCoopControllerTag(); // #817: the pick landed - the tag comes down before the engine runs it
+        // Input-free option apply (the same path the local handler uses): drives onPre / onOption /
+        // onPost; the engine sub-prompts (party target / secondary menu) await the guest's relayed
+        // sub-picks at their own sites (encounter-phase-utils ADD-2b).
+        this.handleOptionSelect(opt, choice.choice);
       });
-      // Wave-2c: DUAL-RUN - the AUTHORITY (host) COMMITS the guest-owned ME_PICK it just received
-      // (invariant 3, the guest minted the intent at handleGuestOptionSelect). No-op when the flag is OFF.
-      if (isCoopMeOperationEnabled()) {
-        const step = choice.data?.[0];
-        if (!Number.isSafeInteger(step) || (step as number) < 0) {
-          failCoopSharedSession(`Mystery pick ${seqMe} arrived without an exact operation step`);
-          return;
-        }
-        const committed = commitMeAuthorityGuestIntent({
-          kind: "ME_PICK",
-          seq: seqMe,
-          pinned,
-          step: step as number,
-          value: choice.choice,
-          wave,
-          turn: COOP_ME_AUTHORITY_TURN,
-        });
-        if (committed.kind === "duplicate") {
-          // A delayed resend from the previous round is confirmation noise, never the next round's pick.
-          this.coopHostAwaitGuestIndex();
-          return;
-        }
-        if (committed.kind !== "committed") {
-          failCoopSharedSession(`Mystery pick ${seqMe}/${String(step)} could not commit (${committed.kind})`);
-          return;
-        }
-      }
-      hideCoopControllerTag(); // #817: the pick landed - the tag comes down before the engine runs it
-      // Input-free option apply (the same path the local handler uses): drives onPre / onOption /
-      // onPost; the engine sub-prompts (party target / secondary menu) await the guest's relayed
-      // sub-picks at their own sites (encounter-phase-utils ADD-2b).
-      this.handleOptionSelect(opt, choice.choice);
-    });
   }
 
   /**

@@ -43,6 +43,28 @@ export interface CoopV2InteractionSurfaceObservation {
   readonly actionable: boolean;
 }
 
+/**
+ * Exact authority-side ingress lease for a human choice owned by another seat.
+ *
+ * This is deliberately separate from a watcher UI observation. The mechanical
+ * authority does not own the remote player's public picker; its actionable
+ * control surface is the addressed relay waiter that can consume that owner's
+ * proposal. A transport connection, buffered keepalive, or unaddressed waiter
+ * is not sufficient.
+ */
+export interface CoopV2AuthorityProposalWaitObservation {
+  /** Immutable SHARED_INTERACTION address whose remote owner may propose. */
+  readonly controlOperationId: string;
+  /** Relay sequence derived from that immutable interaction capsule. */
+  readonly relaySequence: number;
+  /** Closed set of wire choice kinds this waiter may consume. */
+  readonly acceptedKinds: readonly string[];
+  /** Opaque identity of this exact live waiter generation. */
+  readonly waiterToken: object;
+  /** False after timeout, supersession, cancellation, or recovery fencing. */
+  readonly active: boolean;
+}
+
 interface InteractionControlClaim {
   readonly revision: number;
   readonly sourceOperationId: string;
@@ -72,6 +94,12 @@ interface InteractionControlClaim {
           readonly uiMode: number;
           readonly phaseToken: object;
           readonly handlerToken: object;
+        }
+      | {
+          readonly kind: "authority-proposal-wait";
+          readonly relaySequence: number;
+          readonly acceptedKinds: readonly string[];
+          readonly waiterToken: object;
         };
   } | null;
 }
@@ -245,6 +273,13 @@ export class CoopV2ControlLedger {
       };
     }
     const installed = claim.installed;
+    if (installed?.observation.kind === "authority-proposal-wait") {
+      // A cosmetic authority-side phase can become visible after the exact
+      // remote ingress was armed. It must never replace that stronger proof
+      // with a watcher UI token.
+      this.activeControlId = controlId;
+      return { kind: "already-installed", controlId };
+    }
     if (installed?.observation.kind === (isOwner ? "executable" : "watcher")) {
       if (installed.observation.phaseToken === observation.phaseToken) {
         // One semantic interaction can legitimately advance across public handlers (for example LearnMove
@@ -278,6 +313,106 @@ export class CoopV2ControlLedger {
     };
     this.activeControlId = controlId;
     return { kind: "installed", controlId };
+  }
+
+  /**
+   * Prove the authority's exact proposal-ingress surface for a remote-owned interaction.
+   *
+   * The runtime derives `relaySequence` and `acceptedKinds` from the immutable
+   * projection capsule before calling this method. The ledger then binds that
+   * verified address to one live waiter token. It never grants local human
+   * input, and it cannot be used for a locally-owned control.
+   */
+  projectAuthorityProposalWait(
+    control: Extract<CoopV2InteractionControl, { kind: "SHARED_INTERACTION" }>,
+    observation: CoopV2AuthorityProposalWaitObservation,
+    localSeatId: number,
+  ): CoopControlInstallResult {
+    const controlId = controlIdOf(control);
+    const claim = this.claims.get(controlId);
+    if (claim == null || claim.superseded || !controlsEqual(claim.control, control)) {
+      return { kind: "rejected", reason: `no authenticated remote interaction claim owns ${controlId}` };
+    }
+    if (!claim.materialApplied) {
+      return { kind: "deferred", reason: `remote interaction material is not applied for ${controlId}` };
+    }
+    if (localSeatId === control.ownerSeatId) {
+      return { kind: "rejected", reason: `owner seat ${localSeatId} cannot install a remote proposal wait` };
+    }
+    if (
+      !observation.active
+      || observation.controlOperationId !== control.operationId
+      || !Number.isSafeInteger(observation.relaySequence)
+      || observation.relaySequence < 0
+      || observation.acceptedKinds.length === 0
+      || observation.acceptedKinds.some(kind => typeof kind !== "string" || kind.length === 0)
+      || new Set(observation.acceptedKinds).size !== observation.acceptedKinds.length
+    ) {
+      return { kind: "deferred", reason: `exact remote proposal waiter is not active for ${controlId}` };
+    }
+    const installed = claim.installed?.observation;
+    if (installed?.kind === "authority-proposal-wait") {
+      if (
+        installed.waiterToken === observation.waiterToken
+        && installed.relaySequence === observation.relaySequence
+        && installed.acceptedKinds.length === observation.acceptedKinds.length
+        && installed.acceptedKinds.every((kind, index) => kind === observation.acceptedKinds[index])
+      ) {
+        this.activeControlId = controlId;
+        return { kind: "already-installed", controlId };
+      }
+      return { kind: "deferred", reason: `remote proposal waiter generation changed for ${controlId}` };
+    }
+    if (installed != null) {
+      return { kind: "deferred", reason: `a different control proof already owns ${controlId}` };
+    }
+    claim.installed = {
+      controlId,
+      observation: {
+        kind: "authority-proposal-wait",
+        relaySequence: observation.relaySequence,
+        acceptedKinds: [...observation.acceptedKinds],
+        waiterToken: observation.waiterToken,
+      },
+    };
+    this.activeControlId = controlId;
+    return { kind: "installed", controlId };
+  }
+
+  /** Retire only the exact remote waiter generation that timed out or was cancelled. */
+  revokeAuthorityProposalWait(
+    control: Extract<CoopV2InteractionControl, { kind: "SHARED_INTERACTION" }>,
+    waiterToken: object,
+  ): boolean {
+    const controlId = controlIdOf(control);
+    const claim = this.claims.get(controlId);
+    if (
+      claim == null
+      || claim.superseded
+      || !controlsEqual(claim.control, control)
+      || claim.installed?.observation.kind !== "authority-proposal-wait"
+      || claim.installed.observation.waiterToken !== waiterToken
+    ) {
+      return false;
+    }
+    claim.installed = null;
+    if (this.activeControlId === controlId) {
+      this.activeControlId = null;
+    }
+    return true;
+  }
+
+  /** Whether this exact unsuperseded control is owned by a live remote-input waiter proof. */
+  isAuthorityProposalWaitInstalled(
+    control: Extract<CoopV2InteractionControl, { kind: "SHARED_INTERACTION" }>,
+  ): boolean {
+    const claim = this.claims.get(controlIdOf(control));
+    return (
+      claim != null
+      && !claim.superseded
+      && controlsEqual(claim.control, control)
+      && claim.installed?.observation.kind === "authority-proposal-wait"
+    );
   }
 
   /**

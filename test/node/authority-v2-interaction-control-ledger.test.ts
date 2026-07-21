@@ -9,6 +9,7 @@ import type {
   CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import {
+  type CoopV2AuthorityProposalWaitObservation,
   type CoopV2InteractionControl,
   CoopV2InteractionControlLedger,
   type CoopV2InteractionSurfaceObservation,
@@ -55,7 +56,7 @@ function shared(
     operationKinds: ["REWARD"],
     operationIds: null,
   },
-): CoopV2InteractionControl {
+): Extract<CoopV2InteractionControl, { kind: "SHARED_INTERACTION" }> {
   return {
     kind: "SHARED_INTERACTION",
     operationId,
@@ -125,6 +126,19 @@ function observation(
     handlerToken,
     handlerActive: true,
     actionable: true,
+    ...overrides,
+  };
+}
+
+function proposalWait(
+  overrides: Partial<CoopV2AuthorityProposalWaitObservation> = {},
+): CoopV2AuthorityProposalWaitObservation {
+  return {
+    controlOperationId: "operation-1",
+    relaySequence: 8_000_004,
+    acceptedKinds: ["me"],
+    waiterToken: {},
+    active: true,
     ...overrides,
   };
 }
@@ -256,6 +270,48 @@ describe("Authority V2 interaction control ledger", () => {
         kind: "INTERACTION_COMMIT",
       }),
     ).toBe(false);
+  });
+
+  it("installs a remote-owner interaction only from its exact live authority proposal waiter", () => {
+    const ledger = new CoopV2InteractionControlLedger();
+    const control = shared();
+    const entry = interactionEntry(1, "operation-1", control);
+    expect(ledger.registerEntry(entry)).toBe(true);
+    expect(ledger.markMaterialApplied(entry)).toBe(true);
+
+    expect(
+      ledger.projectAuthorityProposalWait(control, proposalWait({ controlOperationId: "wrong" }), 0),
+    ).toMatchObject({ kind: "deferred" });
+    expect(ledger.projectAuthorityProposalWait(control, proposalWait({ active: false }), 0)).toMatchObject({
+      kind: "deferred",
+    });
+    expect(ledger.projectAuthorityProposalWait(control, proposalWait(), 1)).toMatchObject({
+      kind: "rejected",
+    });
+
+    const exact = proposalWait();
+    expect(ledger.projectAuthorityProposalWait(control, exact, 0)).toMatchObject({ kind: "installed" });
+    expect(ledger.projectAuthorityProposalWait(control, exact, 0)).toMatchObject({ kind: "already-installed" });
+    expect(ledger.project(control, observation(), 0)).toMatchObject({ kind: "already-installed" });
+    expect(ledger.isAuthorityProposalWaitInstalled(control)).toBe(true);
+    expect(ledger.allowsHumanInput(0, observation())).toBe(false);
+    expect(ledger.allowsHumanInput(1, observation())).toBe(false);
+    expect(ledger.admitSuccessor(interactionResultEntry(2, "result-1", "REWARD"))).toBe(true);
+  });
+
+  it("revokes only the exact timed-out remote proposal waiter generation", () => {
+    const ledger = new CoopV2InteractionControlLedger();
+    const control = shared();
+    const entry = interactionEntry(1, "operation-1", control);
+    const token = {};
+    expect(ledger.registerEntry(entry)).toBe(true);
+    expect(ledger.markMaterialApplied(entry)).toBe(true);
+    expect(ledger.projectAuthorityProposalWait(control, proposalWait({ waiterToken: token }), 0)).toMatchObject({
+      kind: "installed",
+    });
+    expect(ledger.revokeAuthorityProposalWait(control, {})).toBe(false);
+    expect(ledger.revokeAuthorityProposalWait(control, token)).toBe(true);
+    expect(ledger.admitSuccessor(interactionResultEntry(2, "result-1", "REWARD"))).toBe(false);
   });
 
   it("consumes a shared surface only with its authority-stated result kind and exact address", () => {

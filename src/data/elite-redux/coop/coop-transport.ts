@@ -123,7 +123,10 @@ export type CoopRole = "host" | "guest";
 // identity. Older builds drop host-owned quiz answers after V2 suppresses the raw legacy authority stream.
 // er-coop-43 makes the exact market subclass and stock vector part of every authoritative option
 // presentation/continuation. Older builds rebuild curated shops as generic 99-stock markets after recovery.
-export const COOP_PROTOCOL_VERSION = "er-coop-43";
+// er-coop-44 binds every migrated remote-owner input proposal to both the immutable SHARED_INTERACTION
+// that opened it and the exact proposed operation. A protocol-43 authority can consume an unaddressed
+// replay under a same-band waiter and cannot prove its remote input frontier to the global V2 ledger.
+export const COOP_PROTOCOL_VERSION = "er-coop-44";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1763,6 +1766,17 @@ export type CoopMessage =
        * carrier may set this; it never advances the authority log or chooses a successor.
        */
       cosmeticOperationId?: string | undefined;
+      /**
+       * Exact installed SHARED_INTERACTION whose remote-owner proposal this frame addresses.
+       * Optional only for legacy carriers; a V2 authority wait that declares this address will
+       * never consume an unaddressed or differently-addressed frame.
+       */
+      authorityControlOperationId?: string | undefined;
+      /**
+       * Exact proposed operation minted by the remote owner. This remains non-mechanical until
+       * the authority validates it and publishes the corresponding immutable V2 result.
+       */
+      proposalOperationId?: string | undefined;
     }
   /**
    * Owner -> watcher (#633, TRACK-2 Phase C): the HOST-resolved AUTHORITATIVE outcome of one
