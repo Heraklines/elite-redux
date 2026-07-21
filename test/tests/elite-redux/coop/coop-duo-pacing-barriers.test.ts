@@ -36,6 +36,7 @@ import { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
@@ -263,9 +264,20 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-    await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
+    // V2 reciprocal shop rendezvous: the owner ARRIVEs at shop:<wave>:<counter> and AWAITs the partner
+    // before its reward commit may enter the authority log. Park the guest watcher at that same barrier
+    // (partnerReady) so the commit is not refused into a shared-session terminal, then let the watcher
+    // materialize the relayed terminal (partnerSettle) - the reciprocal owner-then-watcher pump.
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
-    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+    await withClient(rig.hostCtx, () =>
+      driveHostRewardShopOwner(hostShop, {
+        takeReward: true,
+        partnerReady: async () => {
+          await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+        },
+        partnerSettle: () => withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true })),
+      }),
+    );
 
     await arriveGuestCommandBoundary(rig, 2);
     // Cross into wave 2's first CommandPhase - its start() invokes coopNextCommandBarrier(cmd:2:1).
@@ -313,8 +325,20 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-    // Driving the OWNER shop start() -> it arrives at shop:<wave>:<counter> + awaits the partner barrier.
-    await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
+    // Driving the OWNER shop start() -> it arrives at shop:<wave>:<counter> + AWAITS the partner barrier
+    // BEFORE the commit may enter the authority log. Park the guest watcher at that same barrier
+    // (partnerReady) so the arrive/await is observed AND the reciprocal commit is admitted (not refused into
+    // a shared-session terminal), then let the watcher mirror the relayed terminal (partnerSettle).
+    await withClient(rig.hostCtx, () =>
+      driveHostRewardShopOwner(hostShop, {
+        takeReward: true,
+        partnerReady: async () => {
+          await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+        },
+        partnerSettle: () => withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true })),
+      }),
+    );
 
     const shopPoint = `shop:1:${counter}`;
     const arrivedPoints = arriveSpy.mock.calls.map(c => String(c[0]));
@@ -322,9 +346,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     expect(arrivedPoints, `the owner shop ARRIVED at ${shopPoint}`).toContain(shopPoint);
     expect(awaitedPoints, `the owner shop AWAITED the partner at ${shopPoint} before committing`).toContain(shopPoint);
 
-    // The watcher then mirrors + the interaction still advances exactly once (barrier did not desync it).
-    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
-    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+    // The watcher mirrored (via partnerSettle) + the interaction still advances exactly once (no desync).
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counter + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest lockstep with host").toBe(counter + 1);
 
