@@ -878,6 +878,16 @@ test("every retained V2 interaction proposal is identity-idempotent before any l
   );
   assert.match(
     interactionRelay,
+    /interactionAuthorityV2 && kind === "meBtn"[\s\S]*suppressed retired raw Mystery button[\s\S]*return;/u,
+    "a V2 sender must not emit the obsolete Mystery button carrier",
+  );
+  assert.match(
+    interactionRelay,
+    /this\.isInteractionAuthorityV2\(\) && msg\.kind === "meBtn"[\s\S]*dropped retired raw Mystery button[\s\S]*return;/u,
+    "a stale peer cannot inject an obsolete Mystery button into a V2 waiter or FIFO",
+  );
+  assert.match(
+    interactionRelay,
     /if \(admission === "duplicate"\)[\s\S]*return;/u,
     "same-ID retries are dropped before the per-sequence FIFO can feed a later action",
   );

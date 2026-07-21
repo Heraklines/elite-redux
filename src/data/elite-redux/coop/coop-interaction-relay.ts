@@ -91,12 +91,12 @@ function isCoopMarketProjectionKind(value: unknown): value is CoopMarketProjecti
 const COOP_FAINT_SWITCH_SLOT_COUNT = 4;
 
 /**
- * Only immutable human decisions are V2 proposals. Faint replacement has its own proposal protocol, while
- * `meBtn` is a non-retrying presentation pump input inside an already-addressed Mystery control lease.
- * The latter remains a compatibility carrier until the presentation pump moves onto its own typed control.
+ * Only immutable human decisions are V2 proposals. Faint replacement has its own proposal protocol.
+ * Legacy `meBtn` traffic is retired before this predicate: V2 owns Mystery choices through ME_PICK/ME_SUB
+ * and closure through ME_TERMINAL, so admitting an unconsumed raw button would only leak into the 8M FIFO.
  */
 function requiresV2GuestProposalIdentity(kind: string): boolean {
-  return kind !== "switch" && kind !== "meBtn";
+  return kind !== "switch";
 }
 
 /** Keep legacy reward keys byte-identical when no ordered ME surface address exists. */
@@ -627,13 +627,21 @@ export class CoopInteractionRelay {
     rewardSurface?: CoopRewardSurfaceIdentity,
     proposalOperationId?: string,
   ): void {
+    const interactionAuthorityV2 = this.isInteractionAuthorityV2();
+    if (interactionAuthorityV2 && kind === "meBtn") {
+      // Authority V2 never consumes the old per-button Mystery pump. Decisions already cross as exact
+      // ME_PICK/ME_SUB proposals, the sole host engine advances its own dialogue, and ME_TERMINAL carries
+      // closure durably. Sending this frame from a guest used to populate an unbounded, never-read 8M FIFO;
+      // sending it from the authority was already suppressed as a raw result. Retain it only for rollback.
+      coopLog("v2-interaction", `suppressed retired raw Mystery button seq=${seq} choice=${choice}`);
+      return;
+    }
     recordCoopUiRelayCarrier("interactionChoice", `seq=${seq} kind=${kind} choice=${choice}`);
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionChoice seq=${seq} kind=${kind} ${summarizeChoice({ choice, data })}`);
     }
-    const v2ResultCarrierSuppressed = this.isInteractionAuthorityV2() && this.isLocalAuthority();
-    const v2GuestProposal =
-      this.isInteractionAuthorityV2() && !this.isLocalAuthority() && requiresV2GuestProposalIdentity(kind);
+    const v2ResultCarrierSuppressed = interactionAuthorityV2 && this.isLocalAuthority();
+    const v2GuestProposal = interactionAuthorityV2 && !this.isLocalAuthority() && requiresV2GuestProposalIdentity(kind);
     if (v2GuestProposal && !isValidOperationId(proposalOperationId)) {
       const reason = `Authority V2 guest proposal at seq=${seq} kind=${kind} is missing a valid immutable operation ID`;
       coopWarn("v2-proposal", reason);
@@ -656,7 +664,7 @@ export class CoopInteractionRelay {
         // slot. On the non-authority -> authority direction it identifies the
         // retained V2 proposal; it remains non-mechanical and allocates no log
         // revision. Legacy sends and unretained observations leave it absent.
-        ...(this.isInteractionAuthorityV2() && isValidOperationId(proposalOperationId)
+        ...(interactionAuthorityV2 && isValidOperationId(proposalOperationId)
           ? { cosmeticOperationId: proposalOperationId }
           : {}),
       });
@@ -1675,6 +1683,13 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t !== "interactionChoice") {
+      return;
+    }
+    if (this.isInteractionAuthorityV2() && msg.kind === "meBtn") {
+      // Defense in depth for a stale/mixed peer: no raw Mystery button may enter a V2 waiter or FIFO.
+      // The complete ME_TERMINAL entry locally materializes the one compatibility terminal wake-up still
+      // needed by detached legacy phases; ordinary buttons have no Authority V2 consumer.
+      coopLog("v2-interaction", `dropped retired raw Mystery button seq=${msg.seq} choice=${msg.choice}`);
       return;
     }
     if (this.isInteractionAuthorityV2() && !this.isLocalAuthority()) {

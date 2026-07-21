@@ -68,6 +68,49 @@ describe("co-op alternating-interaction relay (#633)", () => {
     });
   });
 
+  it("retires raw Mystery buttons under V2 instead of leaking them into the unused choice FIFO", async () => {
+    const { host, guest } = createLoopbackPair();
+    const timer: { fire?: () => void } = {};
+    const receivedRawButtons: number[] = [];
+    host.onMessage(msg => {
+      if (msg.t === "interactionChoice" && msg.kind === "meBtn") {
+        receivedRawButtons.push(msg.choice);
+      }
+    });
+    const owner = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+    });
+    const authority = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+      schedule: cb => {
+        timer.fire = cb;
+        return () => {};
+      },
+    });
+
+    // A real V2 sender must emit no obsolete pump frame at all.
+    owner.sendInteractionChoice(8_000_012, "meBtn", 4);
+    expect(receivedRawButtons).toEqual([]);
+
+    // A stale/mixed peer can bypass the local sender, but the authority must drop that frame before it
+    // reaches either a live waiter or the early-arrival FIFO.
+    guest.send({ t: "interactionChoice", seq: 8_000_012, kind: "meBtn", choice: 5 });
+    expect(receivedRawButtons).toEqual([5]);
+    const wait = authority.awaitInteractionChoice(8_000_012, 1, ["meBtn"]);
+    const beforeTimeout = await Promise.race([
+      wait.then(() => "settled" as const),
+      Promise.resolve("pending" as const),
+    ]);
+    expect(beforeTimeout).toBe("pending");
+    timer.fire?.();
+    await expect(wait).resolves.toBeNull();
+
+    owner.dispose();
+    authority.dispose();
+  });
+
   it("carries only exact account-local dexSync telemetry outside the V2 mechanical log", async () => {
     const { host, guest } = createLoopbackPair();
     const timer: { fire?: () => void } = {};

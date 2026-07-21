@@ -53,6 +53,11 @@ const campaignNav = sources.get("campaign-nav.mjs");
 const soloClassic = sources.get("solo-classic.mjs");
 const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
 const evidence = sources.get("evidence.mjs");
+// The exact allowance is a calibrated behavioral budget, not a public-driver boundary. Pinning its source
+// literal made a failure-first regression that raised the measured no-progress allowance fail here before
+// the behavioral budget suite could run. Require only that the driver continues to use its named bounded
+// budget; public-ui-post-turn-budget.test.mjs owns the measured timing contract.
+const usesNamedPostTurnProgressBudget = harness?.includes("progressAllowanceMs = POST_TURN_PROGRESS_ALLOWANCE_MS");
 if (
   // Optimization brief R1: launchBrowser carries the seat so each Chromium process is
   // pinned to its OWN Xvfb display (COOP_UI_DISPLAY_HOST/GUEST). Still exactly two
@@ -112,7 +117,7 @@ if (
   || !harness.includes("findOwnedCommandUi(boundary.owner")
   || !harness.includes("async waitForCommanderCommandBoundaryDrivingBattlePrompts(")
   || !harness.includes("const advanceBattlePrompt = createBattlePromptAdvancer(this, cursors, {}, purpose, {")
-  || !harness.includes("const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;")
+  || !usesNamedPostTurnProgressBudget
   || !harness.includes("const POST_TURN_ABSOLUTE_CEILING_MS = 900_000;")
   || !harness.includes("hardCeilingMs = POST_TURN_ABSOLUTE_CEILING_MS")
   || !harness.includes("const COMMANDER_BOUNDARY_HARD_CEILING_MS = 420_000;")

@@ -1046,3 +1046,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: all 32 Authority V2 public source contracts pass,
   scoped Biome is clean apart from pre-existing informational complexity notes,
   and `git diff --check` is clean. Engine and soak execution remains remote-only.
+
+2026-07-21 - Authority V2 retires the dead raw Mystery button carrier
+
+- Fresh tracing corrected the prior audit hypothesis: ordinary `meBtn` frames are
+  not an Authority V2 control and have no consumer. Exact `ME_PICK` / `ME_SUB`
+  proposals own decisions, the sole host engine advances its own dialogue, and
+  the immutable `ME_TERMINAL` owns closure. Guest-origin `meBtn` traffic was only
+  accumulating in the unused 8M choice FIFO; retrying it would enlarge legacy
+  authority rather than close it.
+- `CoopInteractionRelay` now suppresses `meBtn` at every V2 sender and rejects a
+  stale/mixed peer's raw frame before any waiter/admission/FIFO seam. The legacy
+  rollback path remains byte-identical when the V2 interaction cutover is off.
+  A failure-first relay regression proves both local suppression and forged-frame
+  rejection; the public Authority V2 contract pins both guards.
+- The public-driver boundary no longer hard-codes the obsolete 90-second source
+  literal. It requires the named bounded progress budget, while the executable
+  node contract owns the measured 95-second Explosion gap and independent
+  15-minute circuit breaker. This lets behavior corrections reach Chromium
+  instead of failing on implementation spelling.
+- Local permitted evidence: public boundary green; Authority V2 plus progress
+  contracts 63/63 green; scoped Biome has no errors (only existing warnings/info);
+  `git diff --check` green. Co-op Vitest and browser execution remain remote-only.
+- TODO: push the exact checkpoint, inspect the remote relay/static and public
+  two-browser runs, then triage the live biome/market retained-control gap from
+  gate 29803881361 without relaxing the six-lane focused planner.
