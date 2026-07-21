@@ -190,7 +190,18 @@ export class CoopReplayTurnPhase extends Phase {
     // (a leftover pump continuation that a resync raced past) must never park - the host will
     // never resend that turn's resolution, and the legit instance already advanced the run.
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    if (streamer.isTurnFinalized(wave, this.turn)) {
+    // #790 kills a leftover DUPLICATE turn-resolution pump for an already-finalized turn (a resync raced
+    // past; the host will never resend it). But a same-turn REPLACEMENT carrier legitimately shares the
+    // finalized turn's number (the post-summon replacement is addressed at the faint's turn), and it is
+    // ALREADY buffered locally awaiting consumption. Bailing on it strands the retained checkpoint, so
+    // TurnInit's pendingAuthoritativeReplacementTurn re-defers here forever (a synchronous phase ping-pong
+    // that overflows the stack and surfaces as a bogus materialRejected). Only bail when there is NO
+    // consumable replacement carrier for this turn; otherwise fall through to the pump, whose fast path
+    // consumes the buffered checkpoint synchronously.
+    if (
+      streamer.isTurnFinalized(wave, this.turn)
+      && !streamer.hasConsumableReplacementForTurn(this.turn, this.sourceWave)
+    ) {
       coopWarn("replay", `guest replay turn=${this.turn}: STALE duplicate (already finalized this wave) -> end`);
       this.end();
       return;
