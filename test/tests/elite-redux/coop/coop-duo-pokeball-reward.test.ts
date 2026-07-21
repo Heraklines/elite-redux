@@ -150,7 +150,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);
       await withClient(rig.guestCtx, async () => {
-        await driveGuestReplayTurn(rig.guestScene, turn);
+        await driveGuestReplayTurn(rig.guestScene, turn, { pumpHostVictoryTail: true });
       });
       const { hostOwns } = await driveBallReward(rig, pair);
       expect(hostOwns, "wave 1 reward is host-owned").toBe(true);
@@ -160,7 +160,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
 
     // ===== Cross to wave 2 (force another ball reward). =====
     forceItemRewards(game.override, [{ name: "GREAT_BALL" }]);
-    await arriveGuestCommandBoundary(rig, 2);
+    await arriveGuestCommandBoundary(rig, 2, 1, { proveGuestCommand: true });
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });
@@ -175,7 +175,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);
       await withClient(rig.guestCtx, async () => {
-        await driveGuestReplayTurn(rig.guestScene, turn);
+        await driveGuestReplayTurn(rig.guestScene, turn, { pumpHostVictoryTail: true });
       });
       const { hostOwns } = await driveBallReward(rig, pair);
       expect(hostOwns, "wave 2 reward is guest-owned").toBe(false);

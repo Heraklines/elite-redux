@@ -1689,6 +1689,41 @@ async function pumpReciprocalPeer(
 }
 
 /**
+ * The host victory-tail phases whose START emits the wave-victory/seal stream a guest replay AWAITs (Family
+ * α, victory-tail sub-case). BOUNDED ON PURPOSE: only these three are ever started. `SelectModifierPhase`
+ * and `NewBattlePhase` are deliberately EXCLUDED so the pump stops the instant `CoopVictorySealPhase` has
+ * run - it never advances the host past the sealed wave boundary into the next wave.
+ */
+const HOST_VICTORY_TAIL_PHASES: ReadonlySet<string> = new Set([
+  "VictoryPhase",
+  "EggLapsePhase",
+  "CoopVictorySealPhase",
+]);
+
+/**
+ * Bounded host-tail pump (Family α, victory-tail sub-case). When a guest replay AWAITs the host's turn
+ * resolution, that resolution is only emitted as the host runs its post-commit victory tail
+ * (EggLapsePhase -> CoopVictorySealPhase). Under the all-V2 cutover PhaseInterceptor parks the host UNSTARTED
+ * at EggLapsePhase with [CoopVictorySealPhase, SelectModifierPhase, NewBattlePhase] queued; an unstarted
+ * phase never emits, so draining the host transport alone (`drainLoopback`) leaves the guest replay parked
+ * forever. Start the host's CURRENT victory-tail phase exactly once (WeakSet-deduped, same guarded style as
+ * {@linkcode pumpReciprocalPeer}) - that is the host browser running its OWN real victory phase, NOT an
+ * injected command or a bypass of any commit. It is strictly BOUNDED to {@linkcode HOST_VICTORY_TAIL_PHASES}:
+ * once CoopVictorySealPhase runs the current phase becomes SelectModifierPhase (not in the set) and the pump
+ * goes inert, so the host is never advanced into the reward shop or the next wave here.
+ */
+async function pumpHostVictoryTail(hostCtx: ClientCtx, started: WeakSet<Phase>): Promise<void> {
+  await withClient(hostCtx, async () => {
+    const hostPhase = hostCtx.scene.phaseManager.getCurrentPhase();
+    if (hostPhase != null && HOST_VICTORY_TAIL_PHASES.has(hostPhase.phaseName) && !started.has(hostPhase)) {
+      started.add(hostPhase);
+      hostPhase.start();
+    }
+    await drainLoopback();
+  });
+}
+
+/**
  * Drive one manually-pumped client's REAL phase queue until `target` is current, stopping BEFORE the
  * target starts. This is the guest-side counterpart to {@linkcode PhaseInterceptor.to(..., false)}:
  * the duo guest has no interceptor because its scene is constructed directly, but production-transition
@@ -2510,9 +2545,28 @@ export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerPart
  * until it consumes that carrier and reaches CommandPhase. Only after both engines have materialized the
  * exact wave/turn does the harness announce the guest command arrival. This preserves the production
  * ordering while leaving the host CommandPhase unstarted for the test framework's public driver.
+ *
+ * `opts.proveGuestCommand` additionally STARTS the guest's own CommandPhase before marking the boundary,
+ * exactly as `buildDuo` does for wave 1 (its comment: "starting the guest-owned CommandPhase supplies the
+ * replica's address-exact proof"). A between-wave guest that only ARRIVEs at (but never starts) its
+ * CommandPhase never emits the "local-seat real CommandPhase proof (frontier=N)" the V2 replica's
+ * CONTROL_COMMIT awaits, so a subsequent driveGuestReplayTurn parks forever. Opt-in so the existing
+ * arrival-only callers (which start the guest command through their own public/UI driver) are unchanged.
  */
-export async function arriveGuestCommandBoundary(rig: DuoRig, wave: number, turn = 1): Promise<void> {
-  if (rig.hostScene.currentBattle.waveIndex < wave || rig.guestScene.currentBattle.waveIndex < wave) {
+export async function arriveGuestCommandBoundary(
+  rig: DuoRig,
+  wave: number,
+  turn = 1,
+  opts: { proveGuestCommand?: boolean } = {},
+): Promise<void> {
+  // A same-WAVE next-TURN rendezvous also needs the drive when proving the guest command: after a turn-1
+  // replay the pure-renderer guest parks at its finalize "waiting for next ordered authority entry" (it has
+  // NOT reached turn 2's CommandPhase), so an arrival-only pass would throw the not-materialized check. Only
+  // broaden the gate under proveGuestCommand so every existing arrival-only caller keeps its exact behavior.
+  const behind = (scene: BattleScene): boolean =>
+    scene.currentBattle.waveIndex < wave
+    || (opts.proveGuestCommand === true && scene.currentBattle.waveIndex === wave && scene.currentBattle.turn < turn);
+  if (behind(rig.hostScene) || behind(rig.guestScene)) {
     await withClient(rig.hostCtx, () =>
       driveClientPhaseQueueTo(rig.hostScene, `host wave ${wave} CommandPhase`, {
         matches: phase =>
@@ -2526,10 +2580,35 @@ export async function arriveGuestCommandBoundary(rig: DuoRig, wave: number, turn
         matches: phase =>
           phase.phaseName === "CommandPhase"
           && rig.guestScene.currentBattle.waveIndex === wave
-          && rig.guestScene.currentBattle.turn === turn,
+          && rig.guestScene.currentBattle.turn === turn
+          && (opts.proveGuestCommand !== true
+            || (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX),
       }),
     );
-    markRealGuestCommandBoundary(rig.guestScene, wave, turn);
+    if (opts.proveGuestCommand === true) {
+      // Present (start) the guest-owned CommandPhase so its address-exact frontier proof is recorded. Once
+      // the proof is submitted the pure-renderer guest advances through its own TurnStart into a parked
+      // CoopReplayTurnPhase (awaiting the host resolution) - the exact production tail. Drive to that phase
+      // and record the crossed boundary directly (the guest is no longer AT a CommandPhase, so the
+      // CommandPhase-guarded markRealGuestCommandBoundary cannot be used): this keeps remirrorWave from
+      // re-clobbering the proven guest and lets driveGuestReplayTurn reuse the already-current replay object.
+      await withClient(rig.guestCtx, async () => {
+        const guestCommand = rig.guestScene.phaseManager.getCurrentPhase();
+        const mode = rig.guestScene.ui.getMode();
+        if (guestCommand.phaseName === "CommandPhase" && mode !== UiMode.COMMAND && mode !== UiMode.FIGHT) {
+          guestCommand.start();
+        }
+        await drainLoopback();
+        if (rig.guestScene.phaseManager.getCurrentPhase().phaseName !== "CoopReplayTurnPhase") {
+          // TurnStart -> CoopReplayTurnPhase is a purely local guest progression; keep the peer host at its
+          // still-unstarted wave CommandPhase (hostPlayWave owns starting it) with a drain-only peer pump.
+          await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase", { pumpPeer: () => drainLoopback() });
+        }
+      });
+      realGuestCommandBoundaries.set(rig.guestScene, { wave, turn });
+    } else {
+      markRealGuestCommandBoundary(rig.guestScene, wave, turn);
+    }
   }
 
   if (
@@ -2638,6 +2717,13 @@ export async function driveGuestReplayTurn(
      */
     returnAtReplacementPicker?: boolean;
     sealRetainedWaveBoundary?: boolean;
+    /**
+     * When the replay AWAITs a turn resolution the host only emits by running its post-commit victory tail,
+     * pump the host's parked EggLapsePhase -> CoopVictorySealPhase (bounded; never past the sealed wave
+     * boundary) so the stream arrives. Opt-in: only the victory-tail rendezvous fixtures need it; every
+     * other caller keeps the plain drain-only peer pump.
+     */
+    pumpHostVictoryTail?: boolean;
   } = {},
 ): Promise<void> {
   await maybeSealHostRetainedWaveBoundary(guestScene, options.sealRetainedWaveBoundary !== false);
@@ -2696,6 +2782,7 @@ export async function driveGuestReplayTurn(
   let startedPhase: Phase | null = replayStarted ? null : replay;
   let lastPhase: Phase | null = null;
   let postFinalizeReplacement: Phase | null = null;
+  const startedHostTailPhases = new WeakSet<Phase>();
   let stall = 0;
   for (let i = 0; i < 256; i++) {
     const cur = guestScene.phaseManager.getCurrentPhase();
@@ -2735,7 +2822,13 @@ export async function driveGuestReplayTurn(
     // restore this guest context and deliver the response. This is scheduling,
     // never a synthetic authority or direct state mutation.
     if (guestScene.phaseManager.getCurrentPhase() === cur && peerCtx != null) {
-      await withClient(peerCtx, () => drainLoopback());
+      if (options.pumpHostVictoryTail === true) {
+        // The stall is the host parked UNSTARTED at its victory tail; start it (bounded) so the seal stream
+        // the replay AWAITs is emitted. Falls back to a plain drain once the tail is inert (peer is guest).
+        await pumpHostVictoryTail(peerCtx, startedHostTailPhases);
+      } else {
+        await withClient(peerCtx, () => drainLoopback());
+      }
       await drainLoopback();
     }
     // A real PARTY picker is an actionable human-input frontier, not a replay hang. Public-input tests must
