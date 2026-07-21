@@ -34,6 +34,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
@@ -157,8 +158,11 @@ describe.skipIf(!RUN)("co-op DUO revive-in-shop: a Revive on a fainted bench mon
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
     // OWNER (host) picks the REVIVE onto the fainted bench slot; WATCHER (guest) mirrors the relayed pick.
+    // V2 reciprocal shop rendezvous: park the watcher at shop:<wave>:<counter> BEFORE the owner commits so
+    // the commit is admitted (not refused into a shared-session terminal), then drain its relayed terminal.
+    await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
     await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: REVIVE_SLOT }));
-    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
 
     // The interaction advanced once on both (lockstep).
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);

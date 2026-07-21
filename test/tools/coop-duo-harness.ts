@@ -1649,6 +1649,46 @@ export function shiftQueuedGuestBootTail(scene: BattleScene): boolean {
 }
 
 /**
+ * The peer phases whose START is the reciprocal V2 rendezvous ARRIVE (the #839 next-command barrier). While
+ * one client waits at this barrier, the peer must also ARRIVE - and an UNSTARTED phase never arrives, so
+ * draining the peer's transport alone leaves both parked forever in the single-process fixture.
+ */
+const RECIPROCAL_PEER_BARRIER_PHASES: ReadonlySet<string> = new Set(["CommandPhase"]);
+
+/**
+ * Reciprocal peer pump (Family α). A real partner browser runs its OWN event loop; when a V2 reciprocal
+ * barrier parks the peer at an unstarted barrier phase, THIS client can never pass the same barrier until
+ * the peer ARRIVEs at it. Pumping only the peer's transport (`drainLoopback`) is not enough: an unstarted
+ * phase never arrives. Start the peer's current barrier phase exactly once (tracked in `started`) - that is
+ * the peer browser executing its own real phase, NOT an injected command, private progression, or a bypass
+ * of control proof (the peer's command CONTENT still comes from its own driver later; this only lets it
+ * reach the shared cmd:<wave>:<turn> rendezvous point). Non-barrier phases and already-open input surfaces
+ * are left untouched and merely drained, exactly as before.
+ */
+async function pumpReciprocalPeer(
+  peerCtx: ClientCtx,
+  started: WeakSet<Phase>,
+  barrierPhases: ReadonlySet<string> = RECIPROCAL_PEER_BARRIER_PHASES,
+): Promise<void> {
+  await withClient(peerCtx, async () => {
+    const peerScene = peerCtx.scene;
+    const peerPhase = peerScene.phaseManager.getCurrentPhase();
+    const mode = peerScene.ui.getMode();
+    if (
+      peerPhase != null
+      && barrierPhases.has(peerPhase.phaseName)
+      && !started.has(peerPhase)
+      && mode !== UiMode.COMMAND
+      && mode !== UiMode.FIGHT
+    ) {
+      started.add(peerPhase);
+      peerPhase.start();
+    }
+    await drainLoopback();
+  });
+}
+
+/**
  * Drive one manually-pumped client's REAL phase queue until `target` is current, stopping BEFORE the
  * target starts. This is the guest-side counterpart to {@linkcode PhaseInterceptor.to(..., false)}:
  * the duo guest has no interceptor because its scene is constructed directly, but production-transition
@@ -1683,7 +1723,9 @@ export async function driveClientPhaseQueueTo(
   const maxPhases = options.maxPhases ?? 128;
   const perPhaseTimeoutMs = options.perPhaseTimeoutMs ?? 10_000;
   const peerCtx = peerContextByScene.get(scene);
-  const pumpPeer = options.pumpPeer ?? (peerCtx == null ? undefined : () => withClient(peerCtx, () => drainLoopback()));
+  const startedPeerPhases = new WeakSet<Phase>();
+  const pumpPeer =
+    options.pumpPeer ?? (peerCtx == null ? undefined : () => pumpReciprocalPeer(peerCtx, startedPeerPhases));
 
   for (let step = 0; step < maxPhases; step++) {
     await drainLoopback();
@@ -3414,11 +3456,23 @@ export async function driveGuestTmCaseRegression(
  */
 export async function driveHostPartyRewardOwner(
   hostPhase: ShopPhaseSeam,
-  opts: { slot?: number; option?: number } = {},
+  opts: {
+    slot?: number;
+    option?: number;
+    /** Start/arrive the other real client at this same reciprocal shop boundary before the owner commits. */
+    partnerReady?: () => Promise<void>;
+    /** Let the other client materialize the retained terminal after the owner commits. */
+    partnerSettle?: () => Promise<void>;
+  } = {},
 ): Promise<number> {
   const slot = opts.slot ?? 0;
   const option = opts.option ?? 0;
   hostPhase.start();
+  // V2 reciprocal shop rendezvous: the owner ARRIVEs at shop:<wave>:<counter> and AWAITs the partner before
+  // its committed pick may enter the authority log. Park the watcher at that same barrier here (as a real
+  // second browser reaching the shop would) so the party-target commit is admitted, not refused into a
+  // shared-session terminal. Mirrors driveHostRewardShopOwner's partnerReady seam.
+  await opts.partnerReady?.();
   await drainLoopback();
   const pinned = hostPhase.coopInteractionStart;
   // Find the first PARTY-TARGET reward (the inverse of driveHostRewardShopOwner's non-party filter).
@@ -3449,6 +3503,8 @@ export async function driveHostPartyRewardOwner(
   } finally {
     ui.setModeWithoutClear = realSetModeWithoutClear; // restore even if the PARTY open never came
   }
+  await opts.partnerSettle?.();
+  await drainLoopback();
   return pinned;
 }
 

@@ -57,6 +57,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -184,8 +185,11 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
 
     // OWNER drives the party-target sub-pick (its openModifierMenu PARTY open is auto-answered with SLOT,
     // firing the GENUINE owner relay AND the dual-run operation commit). WATCHER adopts THROUGH the primitive.
+    // V2 reciprocal shop rendezvous: park the watcher at shop:<wave>:<counter> BEFORE the owner commits so
+    // the commit is admitted (not refused into a shared-session terminal), then drain its relayed terminal.
+    await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
     await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: SLOT }));
-    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
 
     // THE CONVERGENCE: the held item was granted on the OWNER engine AND mirrored on the WATCHER's (the
     // relayed pick adopted through the migrated gate applied against the identical pool). Counter lockstep.
@@ -232,9 +236,10 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     const guestModsBefore = rig.guestScene.modifiers.length;
 
+    await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
     await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: SLOT }));
     expect(pair.faultsInjected(), "the legacy reward action must actually be dropped").toBeGreaterThan(0);
-    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
 
     expect(
       rig.guestScene.modifiers.length,

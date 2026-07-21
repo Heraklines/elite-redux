@@ -49,6 +49,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -151,12 +152,31 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
     const { hostShop, guestShop } = await reachShops(rig);
+    // V2 reciprocal shop rendezvous: park the WATCHER at the owner's shop barrier (partnerReady) so the
+    // party-target commit is admitted, then let it mirror the relayed terminal (partnerSettle).
     if (hostOwns) {
-      await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot, option }));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      await withClient(rig.hostCtx, () =>
+        driveHostPartyRewardOwner(hostShop, {
+          slot,
+          option,
+          partnerReady: async () => {
+            await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+          },
+          partnerSettle: () =>
+            withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true })),
+        }),
+      );
     } else {
-      await withClient(rig.guestCtx, () => driveHostPartyRewardOwner(guestShop, { slot, option }));
-      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+      await withClient(rig.guestCtx, () =>
+        driveHostPartyRewardOwner(guestShop, {
+          slot,
+          option,
+          partnerReady: async () => {
+            await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
+          },
+          partnerSettle: () => withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true })),
+        }),
+      );
     }
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the counter once").toBe(counterBefore + 1);
