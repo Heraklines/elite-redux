@@ -787,3 +787,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - This is the migration rule for the remaining broad-gate fanout: establish a
   real phase/predecessor boundary in the two-engine rig; never relax
   `controlAllowsSuccessorEntry` or silently bless a legacy direct-handler call.
+
+2026-07-21 - Public boundary guard follows liveness semantics
+
+- The first `b16133de0` browser job stopped before building because its
+  source-string boundary guard required the deleted
+  `POST_TURN_HARD_CEILING_MS = 360_000` spelling. It therefore provided no
+  browser verdict and was a pure guard-maintenance red.
+- The guard now independently pins the 90-second causal-stall allowance, the
+  15-minute absolute circuit breaker, and the budget's use of that breaker. It
+  can no longer demand the exact false-abort implementation that the regression
+  contract deliberately replaced.
