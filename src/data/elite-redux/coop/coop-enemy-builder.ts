@@ -93,6 +93,13 @@ export function buildCoopEnemy(
   if (variant !== undefined) {
     enemy.variant = variant as 0 | 1 | 2;
   }
+  if (typeof data.isTerastallized === "boolean") {
+    enemy.isTerastallized = data.isTerastallized;
+  }
+  const teraType = coopNum(data, "teraType");
+  if (teraType !== undefined) {
+    enemy.teraType = teraType as EnemyPokemon["teraType"];
+  }
   if (Array.isArray(data.ivs)) {
     const ivs = (data.ivs as unknown[]).filter((n): n is number => typeof n === "number").slice(0, 6);
     if (ivs.length === 6) {
@@ -167,7 +174,7 @@ export function buildCoopEnemy(
   // visible. heldItems summarized by count (the full reconcile logs in applyCoopEnemyHeldItems).
   coopLog(
     "enemy",
-    `buildCoopEnemy ADOPT bi=${trainerSlot} species=${speciesId} form=${enemy.formIndex} lv=${enemy.level} abilityIdx=${enemy.abilityIndex} nature=${enemy.nature} gender=${enemy.gender} shiny=${enemy.shiny} hp=${enemy.hp}/${enemy.getMaxHp()} moves=${enemy.moveset.length} heldItems=${Array.isArray(data.heldItems) ? data.heldItems.length : 0}`,
+    `buildCoopEnemy ADOPT bi=${trainerSlot} species=${speciesId} form=${enemy.formIndex} lv=${enemy.level} abilityIdx=${enemy.abilityIndex} nature=${enemy.nature} gender=${enemy.gender} shiny=${enemy.shiny} tera=${enemy.isTerastallized ? 1 : 0}:${enemy.teraType} hp=${enemy.hp}/${enemy.getMaxHp()} moves=${enemy.moveset.length} heldItems=${Array.isArray(data.heldItems) ? data.heldItems.length : 0}`,
   );
   return enemy;
 }

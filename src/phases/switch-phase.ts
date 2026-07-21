@@ -568,7 +568,32 @@ export class SwitchPhase extends BattlePhase {
       return;
     }
 
-    globalScene.ui.setMode(
+    // Showdown uses the vanilla SwitchPhase path because gameMode.isCoop is false, but the P33 versus
+    // session still owns an Authority V2 runtime. Bind this real picker to the exact replacement control
+    // emitted by the preceding TURN_COMMIT. Without this address + the post-setMode proof below, the guest
+    // could install revision N's REPLACEMENT control while the authority left its own claim uninstalled;
+    // the later post-summon REPLACEMENT_COMMIT then correctly failed its atomic successor reservation and
+    // terminated both browsers with "battle could not be synchronized".
+    const versusController = isVersusSession() ? getCoopController() : null;
+    const versusRuntime =
+      versusController?.role === "host" && isCoopV2ReplacementCutoverActive() ? getCoopRuntime() : null;
+    if (versusRuntime != null && versusRuntime.controller === versusController) {
+      const sourceAddress = this.faintSourceAddress ?? {
+        wave: globalScene.currentBattle.waveIndex,
+        turn: globalScene.currentBattle.turn ?? 0,
+        occurrence: 0,
+      };
+      this.coopV2ControlOperationId = replacementOperationId(
+        {
+          epoch: versusController.sessionEpoch,
+          ...sourceAddress,
+          fieldIndex: this.fieldIndex,
+        },
+        0,
+      );
+    }
+
+    const openedVersusParty = globalScene.ui.setMode(
       UiMode.PARTY,
       this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
       fieldIndex,
@@ -585,6 +610,17 @@ export class SwitchPhase extends BattlePhase {
       },
       PartyUiHandler.FilterNonFainted,
     );
+    if (versusRuntime != null && this.coopV2ControlOperationId != null) {
+      // UI mode transitions are asynchronous. Only the completed PARTY handler can install the exact
+      // authority-local replacement claim; queue insertion or a still-current MESSAGE handler is not proof.
+      Promise.resolve(openedVersusParty).then(
+        () => runWhenCoopRuntimeActive(versusRuntime, () => notifyCoopV2InteractionSurfaceReady(versusRuntime)),
+        () =>
+          runWhenCoopRuntimeActive(versusRuntime, () =>
+            failCoopSharedSession("The Showdown host replacement picker failed to open its public PARTY surface."),
+          ),
+      );
+    }
   }
 
   /**

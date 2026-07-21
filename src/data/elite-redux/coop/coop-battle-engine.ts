@@ -1300,6 +1300,12 @@ export function captureCoopEnemies(): CoopSerializedEnemy[] {
           // authoritative roll so the guest renders + catches the EXACT same mon.
           shiny: enemy.shiny,
           variant: enemy.variant,
+          // Tera type is rolled during construction and is therefore authority state even before a mon
+          // terastallizes. The guest builds this manifest after applying the V2 command-open image; omitting
+          // these fields let construction overwrite that newer exact state with a local roll immediately
+          // before command input opened.
+          isTerastallized: enemy.isTerastallized === true,
+          teraType: (enemy as { teraType?: number }).teraType ?? 0,
           // Held items (#633): for TRAINER waves the host's `trainer.genModifiers` (and the
           // wild held-item roll) attach held modifiers the guest would otherwise regenerate
           // from its own RNG (double/divergent items). Serialize each as a `ModifierData`
@@ -1574,6 +1580,13 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
         const variant = num(d, "variant");
         if (variant !== undefined) {
           enemy.variant = variant as 0 | 1 | 2;
+        }
+        if (typeof d.isTerastallized === "boolean") {
+          enemy.isTerastallized = d.isTerastallized;
+        }
+        const teraType = num(d, "teraType");
+        if (teraType !== undefined) {
+          enemy.teraType = teraType as Pokemon["teraType"];
         }
         if (enemy.shiny !== prevShiny || enemy.variant !== prevVariant) {
           void enemy.loadAssets(false);

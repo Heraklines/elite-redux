@@ -237,6 +237,10 @@ describe.skipIf(!RUN)("co-op launch (#633) - real phase launch decision (hang fi
     // The host's generated enemy party, serialized for the wire (LIVE-D6).
     const hostParty = globalScene.getEnemyParty();
     expect(hostParty.length).toBeGreaterThan(0);
+    hostParty.forEach((enemy, index) => {
+      enemy.isTerastallized = index === 0;
+      enemy.teraType = (index + 3) as typeof enemy.teraType;
+    });
     const serialized = captureCoopEnemies();
     expect(serialized.length).toBe(hostParty.length);
 
@@ -253,6 +257,8 @@ describe.skipIf(!RUN)("co-op launch (#633) - real phase launch decision (hang fi
       expect(rebuilt?.nature).toBe(hostParty[i].nature);
       expect(rebuilt?.ivs).toEqual(hostParty[i].ivs);
       expect(rebuilt?.getMoveset().map(m => m.moveId)).toEqual(hostParty[i].getMoveset().map(m => m.moveId));
+      expect(rebuilt?.isTerastallized).toBe(hostParty[i].isTerastallized);
+      expect(rebuilt?.teraType).toBe(hostParty[i].teraType);
     });
   });
 });

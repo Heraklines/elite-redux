@@ -1340,3 +1340,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   formatting errors (repository-baseline warnings/info only), `git diff --check` is clean, and the unchanged
   584-line TypeScript baseline contains zero diagnostics in any touched file. Co-op Vitest/Showdown/browser
   execution remains remote-only.
+
+2026-07-21 - Showdown authority picker proof and enemy-manifest Tera state
+
+- Exact-SHA gate 29824797416 proved the previous Showdown host-faint discovery fix: TURN_COMMIT revision 2
+  now states the exact host-side REPLACEMENT address and the guest installs it. The next deterministic abort
+  was authority-local: Showdown uses vanilla SwitchPhase because gameMode.isCoop is false, so its visible
+  PARTY picker had neither the V2 operation address nor the post-setMode actionability notification. The
+  post-summon REPLACEMENT_COMMIT therefore correctly refused to consume an uninstalled predecessor and both
+  clients showed the shared synchronization terminal. The vanilla Showdown path now binds that exact address
+  and publishes proof only after the real asynchronous PARTY handler opens. The strict reservation is unchanged.
+- C5 artifacts exposed a separate pre-command state overwrite. The guest first applied the authority's exact
+  command-open image, then NextEncounterPhase rebuilt the same enemy from enemyPartySync. That manifest omitted
+  `isTerastallized` and `teraType`, so construction rolled a local Tera type and overwrote the newer V2 image
+  until a later heal happened to repair it. Enemy capture, reconstruction, and same-species adoption now carry
+  both Tera fields; the launch round-trip regression assigns deliberately distinct values and checks them exactly.
+- The fast source contract now pins Showdown's address-before-open and handler-ready-after-open ordering.
+  Local permitted evidence: Authority V2 source contracts 39/39 green, scoped Biome has no errors (repository-
+  baseline warnings/info only), `git diff --check` is clean, and the unchanged 584-line TypeScript baseline has
+  zero diagnostics in all touched files. Remote S5/C5 and full-matrix requalification are required.

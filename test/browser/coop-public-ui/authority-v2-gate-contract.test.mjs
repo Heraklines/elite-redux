@@ -710,6 +710,18 @@ test("replacement controls are proven by the real async PARTY surface and multi-
     ownerAwaitParty > ownerOpenParty && ownerNotifyReady > ownerAwaitParty,
     "the authority owner also proves control only after PARTY is public",
   );
+  const versusBind = switchPhase.indexOf("this.coopV2ControlOperationId = replacementOperationId(", ownerNotifyReady);
+  const versusOpenParty = switchPhase.indexOf("const openedVersusParty = globalScene.ui.setMode(", versusBind);
+  const versusAwaitParty = switchPhase.indexOf("Promise.resolve(openedVersusParty).then(", versusOpenParty);
+  const versusNotifyReady = switchPhase.indexOf("notifyCoopV2InteractionSurfaceReady(versusRuntime)", versusAwaitParty);
+  assert.ok(
+    versusBind > ownerNotifyReady && versusOpenParty > versusBind,
+    "Showdown's vanilla picker is bound to the exact V2 replacement address before it opens",
+  );
+  assert.ok(
+    versusAwaitParty > versusOpenParty && versusNotifyReady > versusAwaitParty,
+    "Showdown proves its authority-local replacement only after the real PARTY handler opens",
+  );
 
   const successorStart = replacementAdapter.indexOf('case "next-replacement":');
   const successorEnd = replacementAdapter.indexOf('\n    case "terminal":', successorStart);
