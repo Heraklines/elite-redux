@@ -524,6 +524,58 @@ describe("authority-v2 shadow harness", () => {
     duo.dispose();
   });
 
+  it("does not re-apply live material when its own synchronous receipt path redelivers the same revision", () => {
+    const clock = new FakeClock();
+    const violations: string[] = [];
+    let host!: CoopAuthorityV2Shadow;
+    let guest!: CoopAuthorityV2Shadow;
+    let deliveredEntry: CoopFrameV2 | null = null;
+    let materialApplications = 0;
+    const liveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: () => true,
+      ownsControl: () => true,
+      admitEntry: () => true,
+      applyMaterial: () => {
+        materialApplications += 1;
+        if (materialApplications === 1 && deliveredEntry != null) {
+          guest.handleInboundFrame(deliveredEntry);
+        }
+        return true;
+      },
+      projectControl: (_ctx, control) => ({ kind: "installed", controlId: controlIdOf(control) }),
+    };
+    host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => {
+        if (frame.t === "authorityEntry") {
+          deliveredEntry = frame;
+        }
+        guest.handleInboundFrame(frame);
+      },
+      scheduler: createCoopScheduler(clock),
+    });
+    guest = new CoopAuthorityV2Shadow({
+      identity: identity(1),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => host.handleInboundFrame(frame),
+      scheduler: createCoopScheduler(clock),
+      liveReplica,
+      onProtocolViolation: violation => violations.push(violation.issues.join(",")),
+    });
+
+    expect(host.tapTurnCommit(turnTap("TURN/reentrant-redelivery"))).not.toBeNull();
+    expect(materialApplications).toBe(1);
+    expect(violations).toEqual([]);
+    expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1 });
+    expect(host.diagnostics().retained).toBe(0);
+
+    host.dispose();
+    guest.dispose();
+  });
+
   it("teardown leaves zero armed timers even with an un-retired entry (no replica)", () => {
     const clock = new FakeClock();
     // A host with NO peer: the delivered entry is never admitted, so its redelivery lease stays armed.

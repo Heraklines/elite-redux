@@ -1057,6 +1057,19 @@ test("every retained V2 interaction proposal is identity-idempotent before any l
   );
 });
 
+test("a synchronous retained redelivery cannot re-enter the same replica material application", () => {
+  assert.match(
+    shadow,
+    /if \(this\.replicaEntriesInFlight\.has\(entry\.revision\)\)[\s\S]*?return false;[\s\S]*?this\.replicaEntriesInFlight\.add\(entry\.revision\)/u,
+    "the replica rejects re-entrant same-revision delivery before admission or materialization",
+  );
+  assert.match(
+    shadow,
+    /try \{[\s\S]*?this\.applyReplicaEntryOnce\(entry\)[\s\S]*?finally \{[\s\S]*?this\.replicaEntriesInFlight\.delete\(entry\.revision\)/u,
+    "the in-flight guard is released on every success, deferral, rejection, and throw path",
+  );
+});
+
 test("Mystery dialogue and quiz verdicts retain the same address-exact human-input lease", () => {
   const mysteryProofStart = operationSurfaceRegistry.indexOf("  ME_PRESENT: {");
   const mysteryProofEnd = operationSurfaceRegistry.indexOf("\n  ME_SUB:", mysteryProofStart);

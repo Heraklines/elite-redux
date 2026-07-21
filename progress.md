@@ -1249,3 +1249,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: public Authority V2 source contracts 36/36 green before the final fail-closed
   assertion was added, scoped Biome reported only repository-baseline warnings/info after formatting, and
   `git diff --check` was clean. Co-op Vitest and browser verification remain remote-only.
+
+2026-07-21 - Retained V2 delivery cannot re-enter its own material application
+
+- Exact-SHA gate 29815603950 reached wave 12 in the heterogeneous Mystery journey, then revision 65's
+  ME_TERMINAL materializer synchronously triggered another retained delivery before the outer application
+  recorded materialApplied. The nested attempt completed the revision; the outer attempt then re-applied the
+  terminal and treated the already-advanced ledger as `materialRejected`, entering a terminal/redelivery loop.
+- The V2 replica now has a per-revision in-flight guard around the complete admission/application attempt.
+  Same-revision synchronous delivery is deferred to the existing authority lease instead of entering the
+  materializer twice; `finally` releases the guard on success, healthy deferral, rejection, and throws.
+- Added a node-pure failure-first test whose live materializer synchronously re-delivers its own frame. It
+  proves exactly one material application, no protocol violation, one completed revision, and authority
+  retirement. A fast source contract pins the guard independently of the remote Vitest lane.
+- Local permitted evidence: public Authority V2 source contracts 37/37 green, scoped Biome has no errors
+  (two repository-baseline complexity infos), `git diff --check` is clean, and zero TypeScript diagnostics
+  mention the touched files against the unchanged 584-line repository baseline.

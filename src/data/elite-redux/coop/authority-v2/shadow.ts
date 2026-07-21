@@ -560,6 +560,8 @@ export class CoopAuthorityV2Shadow {
    * mechanically incomplete revision, so this cannot become a second journal.
    */
   private readonly pendingReplicaEntries = new Map<number, CoopAuthorityEntry>();
+  /** Re-entrant delivery guard: applying material may synchronously emit a receipt and redeliver this revision. */
+  private readonly replicaEntriesInFlight = new Set<number>();
   /** V2-native phase barriers resolved exclusively from authenticated authority-log receipt quorum. */
   private readonly authorityPeerStageWaiters = new Set<AuthorityPeerStageWaiter>();
   /** Guest proposals retained until their exact ordered V2 result is admitted. Never progression authority. */
@@ -1462,6 +1464,7 @@ export class CoopAuthorityV2Shadow {
     }
     this.shadowState.clear();
     this.pendingReplicaEntries.clear();
+    this.replicaEntriesInFlight.clear();
     this.ledger.clear();
   }
 
@@ -1507,6 +1510,20 @@ export class CoopAuthorityV2Shadow {
    * delivery and eager real-surface wakes use this exact path, so receipt order and idempotency cannot drift.
    */
   private applyReplicaEntry(entry: CoopAuthorityEntry): boolean {
+    if (this.replicaEntriesInFlight.has(entry.revision)) {
+      coopLog("v2-replica", `defer re-entrant delivery rev=${entry.revision} kind=${entry.kind}`);
+      return false;
+    }
+    this.replicaEntriesInFlight.add(entry.revision);
+    try {
+      return this.applyReplicaEntryOnce(entry);
+    } finally {
+      this.replicaEntriesInFlight.delete(entry.revision);
+    }
+  }
+
+  /** One non-re-entrant ordered admission/application attempt. */
+  private applyReplicaEntryOnce(entry: CoopAuthorityEntry): boolean {
     const result = this.log.admit(entry);
     this.logReplicaAdmission(entry, result.kind);
     if (result.kind === "rejected") {
