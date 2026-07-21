@@ -230,12 +230,15 @@ const command = (): CoopNextControl => ({
   turn: 1,
   commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
 });
-const awaitInteraction = (afterOperationId = "wave-adv-w3"): Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> => ({
+const awaitInteraction = (
+  afterOperationId = "wave-adv-w3",
+  turn = 2,
+): Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> => ({
   kind: "AWAIT_SUCCESSOR",
   afterOperationId,
   epoch: 1,
   wave: 3,
-  turn: 2,
+  turn,
   allowedKinds: ["INTERACTION_COMMIT"],
   allowNextWaveStart: false,
   expectedOperationId: null,
@@ -258,7 +261,7 @@ function receipt(entry: CoopAuthorityEntry, stage: "admitted" | "materialApplied
 describe("buildWaveAdvanceEntry - destination coverage", () => {
   const cases: [string, CoopNextControl][] = [
     ["COMMAND", command()],
-    ["AWAIT_SUCCESSOR", awaitInteraction("wave-adv-AWAIT_SUCCESSOR")],
+    ["AWAIT_SUCCESSOR", awaitInteraction("wave-adv-w3-AWAIT_SUCCESSOR")],
   ];
 
   for (const [name, destination] of cases) {
@@ -578,7 +581,7 @@ describe("WAVE_ADVANCE supersession at the log", () => {
         context: frameContext(),
         operationId: "wave-adv-w3",
         transition: { ...WIN_TRANSITION, turn: 1 },
-        destination: awaitInteraction("wave-adv-w3") as never,
+        destination: awaitInteraction("wave-adv-w3", 1) as never,
         subsumes,
       }),
     );

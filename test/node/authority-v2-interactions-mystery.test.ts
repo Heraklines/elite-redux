@@ -84,7 +84,7 @@ function address(over: Partial<CoopInteractionAddress> = {}): CoopInteractionAdd
   return { epoch: 1, wave: 12, turn: 1, interactionSeq: 4, ownerSeatId: 0, ...over };
 }
 
-function mysterySuccessor(ownerSeatId = 0): CoopNextControl {
+function mysterySuccessor(ownerSeatId = 0): Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }> {
   return {
     kind: "SHARED_INTERACTION",
     operationId: "me-op-42",
@@ -95,6 +95,17 @@ function mysterySuccessor(ownerSeatId = 0): CoopNextControl {
     surfaceClass: "op:me",
     operationKind: "ME_PRESENT",
     successor: { operationKinds: ["ME_PICK"], operationIds: null },
+  };
+}
+
+function exactMysterySuccessor(
+  operationKind: "ME_PICK" | "ME_TERMINAL",
+  operationId: string,
+  ownerSeatId = 0,
+): Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }> {
+  return {
+    ...mysterySuccessor(ownerSeatId),
+    successor: { operationKinds: [operationKind], operationIds: [operationId] },
   };
 }
 
@@ -288,6 +299,8 @@ describe("ME outcome/terminal", () => {
   it("subsumes the unretired ME option-pick waits on its window via the log frontier", () => {
     const sent: CoopAuthorityWire[] = [];
     const { log } = makeLog(sent);
+    const pick1OperationId = mysteryOptionPickOperationId(address(), 1);
+    const terminalOperationId = mysteryTerminalOperationId(address());
 
     // Two option-pick steps on the SAME window (present + a sub-pick), both unretired.
     const pick0 = log.commit(
@@ -296,7 +309,7 @@ describe("ME outcome/terminal", () => {
         address: address(),
         optionIndex: 1,
         step: 0,
-        successor: MYSTERY_SUCCESSOR,
+        successor: exactMysterySuccessor("ME_PICK", pick1OperationId),
       }).entry,
     );
     const pick1 = log.commit(
@@ -305,21 +318,23 @@ describe("ME outcome/terminal", () => {
         address: address(),
         optionIndex: 0,
         step: 1,
-        successor: MYSTERY_SUCCESSOR,
+        successor: exactMysterySuccessor("ME_TERMINAL", terminalOperationId),
       }).entry,
     );
-    // A pick on a DIFFERENT window (later interaction) must NOT be subsumed.
-    const otherPick = log.commit(
-      buildMysteryOptionPickEntry({
+    // A synthetic retained pick on a DIFFERENT window must NOT be subsumed. It is deliberately not committed
+    // into this mechanical log: one global log cannot interleave an unrelated window into this exact chain.
+    const otherPick: CoopAuthorityEntry = {
+      ...buildMysteryOptionPickEntry({
         context: FRAME,
         address: address({ interactionSeq: 9 }),
         optionIndex: 0,
         successor: MYSTERY_SUCCESSOR,
       }).entry,
-    );
+      revision: 99,
+    };
 
     const window = openMysteryWindow(address());
-    const subsumed = mysteryWindowSubsumes(log.retained(), window);
+    const subsumed = mysteryWindowSubsumes([...log.retained(), otherPick], window);
     expect(subsumed).toEqual([pick0.revision, pick1.revision]);
     expect(subsumed).not.toContain(otherPick.revision);
 
@@ -348,8 +363,12 @@ describe("ME outcome/terminal", () => {
     const { log } = makeLog(sent);
 
     const pick = log.commit(
-      buildMysteryOptionPickEntry({ context: FRAME, address: address(), optionIndex: 1, successor: MYSTERY_SUCCESSOR })
-        .entry,
+      buildMysteryOptionPickEntry({
+        context: FRAME,
+        address: address(),
+        optionIndex: 1,
+        successor: exactMysterySuccessor("ME_TERMINAL", mysteryTerminalOperationId(address())),
+      }).entry,
     );
     // The option pick is retained + unretired (its MYSTERY control is not yet installed).
     expect(log.retained().map(e => e.revision)).toContain(pick.revision);
@@ -733,8 +752,12 @@ describe("zero timers after retire (zero-leak)", () => {
     const { log, scheduler } = makeLog(sent);
 
     const pick = log.commit(
-      buildMysteryOptionPickEntry({ context: FRAME, address: address(), optionIndex: 1, successor: MYSTERY_SUCCESSOR })
-        .entry,
+      buildMysteryOptionPickEntry({
+        context: FRAME,
+        address: address(),
+        optionIndex: 1,
+        successor: exactMysterySuccessor("ME_TERMINAL", mysteryTerminalOperationId(address())),
+      }).entry,
     );
     const terminal = log.commit(
       buildMysteryTerminalEntry({

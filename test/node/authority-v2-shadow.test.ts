@@ -978,25 +978,26 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
 
   it("INTERACTION (pre-built) parity match=true/false by fingerprinting the legacy interaction image", () => {
     const duo = buildDuo(new FakeClock());
-    const rewardAddress = { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal: 0 } as const;
-    const reward = (choice: { kind: "leave" } | { kind: "skip" }) =>
-      buildRewardInteractionEntry({
+    const reward = (choice: { kind: "leave" } | { kind: "skip" }, actionOrdinal: number) => {
+      const rewardAddress = { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal } as const;
+      return buildRewardInteractionEntry({
         context: duo.host.authenticatedFrameContext,
         address: rewardAddress,
         material: { kind: "reward", wave: 6, ownerSeatId: 0, choice, terminal: true },
         successor: awaitSuccessor(rewardOperationId(rewardAddress), 6, 1, true),
       });
+    };
     // Identical legacy image -> match=true.
     duo.host.tapInteraction({
-      entry: reward({ kind: "leave" }),
+      entry: reward({ kind: "leave" }, 0),
       legacyDigest: "tok",
-      legacyImage: reward({ kind: "leave" }),
+      legacyImage: reward({ kind: "leave" }, 0),
     });
-    // A legacy image with a DIFFERENT choice -> states differ -> match=false.
+    // A distinct exact operation with a DIFFERENT legacy choice -> states differ -> match=false.
     duo.host.tapInteraction({
-      entry: reward({ kind: "leave" }),
+      entry: reward({ kind: "leave" }, 1),
       legacyDigest: "tok",
-      legacyImage: reward({ kind: "skip" }),
+      legacyImage: reward({ kind: "skip" }, 1),
     });
     const diag = duo.host.diagnostics();
     expect(diag.parityChecks).toBe(2);

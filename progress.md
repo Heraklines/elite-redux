@@ -1006,5 +1006,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: public source contracts 34/34 green, scoped Biome
   clean, `git diff --check` clean, and zero TypeScript diagnostics in production
   files against the unrelated 222-error repository baseline. The expanded
-  two-engine soak and public-browser reproduction are reserved for the exact-SHA
-  remote gates.
+ two-engine soak and public-browser reproduction are reserved for the exact-SHA
+ remote gates.
+
+2026-07-21 - Node fixtures obey the closed Authority V2 successor graph
+
+- Full gate 29802833582 reached the fast node-pure Authority V2 contracts and
+  exposed seven stale fixtures, while all 177 public source/evidence contracts
+  passed. The failures were test-model debt rather than permission to weaken the
+  production log: fixtures still committed unrelated or repeated operations
+  after controls that did not authorize them.
+- Mystery fixtures now form one exact pick-to-pick-to-terminal chain. A
+  different Mystery window is supplied only to the pure subsumption query; it
+  is no longer illegally interleaved into the single ordered mechanical log.
+  Single-pick retirement and timer-leak cases likewise authorize their exact
+  terminal operation.
+- Interaction parity now uses two distinct action ordinals, so the mismatch
+  sample cannot reuse a committed operation ID with conflicting material.
+  Stormglass explicitly grants the exact following Colosseum commit, and wave
+  waits bind the real predecessor operation ID and transition turn.
+- Local permitted evidence: scoped Biome clean, `git diff --check` clean, and
+  zero TypeScript diagnostics in the four touched fixture files against the
+  unrelated 222-error repository baseline. All co-op Vitest execution remains
+  reserved for GitHub-hosted runners.

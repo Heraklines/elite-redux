@@ -717,7 +717,22 @@ describe("zero-leak teardown through the authority log", () => {
     const log = makeLog(scheduler, sent);
 
     const stormglass = log.commit(
-      buildStormglassInteractionEntry({ ...base, operationId: "sg", weatherIndex: 0, weather: 0 }),
+      buildStormglassInteractionEntry({
+        ...base,
+        operationId: "sg",
+        weatherIndex: 0,
+        weather: 0,
+        successor: {
+          kind: "AWAIT_SUCCESSOR",
+          afterOperationId: "sg",
+          epoch: 1,
+          wave: 1,
+          turn: 1,
+          allowedKinds: ["INTERACTION_COMMIT"],
+          allowNextWaveStart: false,
+          expectedOperationId: "co",
+        },
+      }),
     );
     const colosseum = log.commit(
       buildColosseumBoardInteractionEntry({
