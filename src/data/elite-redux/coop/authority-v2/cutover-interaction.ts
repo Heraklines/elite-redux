@@ -563,9 +563,23 @@ function isCompleteInteractionEnvelope(
     && parsed.kind === operation.kind
     && parsed.owner === operation.owner
     && isCoopOperationSurfaceClass(surfaceClass)
-    && isCompleteCoopOperationAuthorityState(envelope.authoritativeState, envelope.wave, envelope.turn)
+    && isCompleteCoopV2InteractionAuthorityState(envelope)
     && (context == null || context.sessionEpoch === envelope.sessionEpoch)
   );
+}
+
+/**
+ * Validate an interaction's immutable state coordinate independently from its operation address.
+ *
+ * Mystery is one transaction at wave N / turn 0, including terminals authored after an encounter battle
+ * or no-battle effect has advanced `Battle.turn`. The ME_TERMINAL payload and common envelope must still
+ * carry the exact later engine image. Every other interaction remains address-exact.
+ */
+export function isCompleteCoopV2InteractionAuthorityState(envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  const state = envelope.authoritativeState;
+  return envelope.pendingOperation?.kind === "ME_TERMINAL"
+    ? state.wave === envelope.wave && isCompleteCoopOperationAuthorityState(state, state.wave, state.turn)
+    : isCompleteCoopOperationAuthorityState(state, envelope.wave, envelope.turn);
 }
 
 /**
@@ -597,6 +611,7 @@ function successorWait(
   envelope: CoopAuthoritativeEnvelopeV1,
   allowedKinds: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedKinds"],
   allowNextWaveStart: boolean,
+  coordinate: Readonly<{ wave: number; turn: number }> = envelope,
 ): ProjectableControl {
   const operation = envelope.pendingOperation;
   if (operation == null) {
@@ -606,8 +621,8 @@ function successorWait(
     kind: "AWAIT_SUCCESSOR",
     afterOperationId: operation.id,
     epoch: envelope.sessionEpoch,
-    wave: envelope.wave,
-    turn: envelope.turn,
+    wave: coordinate.wave,
+    turn: coordinate.turn,
     allowedKinds,
     allowNextWaveStart,
     expectedOperationId: null,
@@ -853,9 +868,11 @@ export function successorOfCoopV2InteractionEnvelope(
       return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
     case "ME_TERMINAL": {
       const destination = payload != null && isPlainObject(payload.destination) ? payload.destination : null;
-      return wait(
+      return successorWait(
+        envelope,
         ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
         destination?.kind === "continue",
+        envelope.authoritativeState,
       );
     }
     case "COLO_PICK": {

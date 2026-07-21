@@ -821,3 +821,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The test now delegates through the production `setMode` while observing its
   options. The commit must therefore earn the same real phase, UI mode, active
   handler, and actionable-input proof required in a browser.
+
+2026-07-21 - Mystery terminal state no longer collapses onto its transaction address
+
+- Exact gate 29794324283 reached a real guest-owned no-battle Mystery pick, then
+  failed closed with `Mystery no-battle reward settlement could not be
+  retained`. The terminal operation is addressed at the Mystery transaction
+  coordinate (wave N / turn 0), while its immutable post-effect state correctly
+  retained the live battle turn. The generic operation context discarded that
+  supplied state because its turn did not equal the operation address; the V2
+  wrapper then rejected the resulting envelope because its common state no
+  longer matched the typed terminal outcome.
+- Mystery terminal construction now preserves a complete supplied state at its
+  own coordinate while leaving the operation address at turn 0. V2 admission
+  and replica application recognize only this registered ME_TERMINAL exception;
+  every other interaction still requires state and operation addresses to
+  match exactly.
+- The terminal's typed successor wait is installed at the resulting state
+  coordinate rather than turn 0, so a same-wave reward or later control entry
+  can legally succeed it. A focused contract proves the entry stays addressed
+  at wave 12 / turn 0, retains state wave 12 / turn 3, and authorizes the next
+  ordered boundary at wave 12 / turn 3.

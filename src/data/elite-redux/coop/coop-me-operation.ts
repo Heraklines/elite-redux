@@ -51,6 +51,7 @@
 // =============================================================================
 
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
+import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import { captureCoopAuthoritativeBattleState, coopNextStateTick } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
@@ -878,7 +879,15 @@ function controlContext(
   turn: number,
   authoritativeState?: CoopAuthoritativeBattleStateV1 | null,
 ): CoopCommitContext {
-  return coopOperationCommitContext(wave, turn, "MYSTERY_ENCOUNTER", authoritativeState);
+  const context = coopOperationCommitContext(wave, turn, "MYSTERY_ENCOUNTER", authoritativeState);
+  // Mystery's operation address remains at the turn-zero transaction coordinate even when a battle or
+  // post-effect reward has advanced the engine. Its terminal DATA image must retain that later state
+  // coordinate verbatim; replacing it with a synthetic turn-zero capture makes the common envelope and
+  // the typed outcome disagree and prevents the sole V2 log from retaining the terminal at all.
+  return authoritativeState?.wave === wave
+    && isCompleteCoopOperationAuthorityState(authoritativeState, authoritativeState.wave, authoritativeState.turn)
+    ? { ...context, authoritativeState: structuredClone(authoritativeState) }
+    : context;
 }
 
 /** Capture the mechanical image described by the accompanying retained ME presentation. */

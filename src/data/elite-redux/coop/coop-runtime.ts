@@ -63,6 +63,7 @@ import {
   CoopV2InteractionCutover,
   clearActiveCoopV2InteractionCutover,
   decodeCoopV2InteractionEnvelope,
+  isCompleteCoopV2InteractionAuthorityState,
   isCoopV2InteractionCutoverActive,
   isCoopV2InteractionEnabled,
   requiresCoopV2InteractionTerminalProof,
@@ -142,7 +143,6 @@ import {
   setShowdownGuestFlipPredicate,
   setShowdownSeatAuthorityResolver,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
-import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import {
   armCoopBargainJournalMaterialization,
   COOP_BARGAIN_PRESENT_KIND,
@@ -5303,11 +5303,7 @@ function buildCoopV2LiveSeams(
             material == null
             || operation == null
             || !runtime.v2ControlLedger.registerEntry(entry)
-            || !isCompleteCoopOperationAuthorityState(
-              material.envelope.authoritativeState,
-              material.envelope.wave,
-              material.envelope.turn,
-            )
+            || !isCompleteCoopV2InteractionAuthorityState(material.envelope)
           ) {
             return false;
           }

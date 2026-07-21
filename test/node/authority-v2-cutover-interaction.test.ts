@@ -387,6 +387,56 @@ describe("Authority V2 interaction cutover", () => {
     ).toBe(false);
   });
 
+  it("keeps a Mystery terminal's transaction address separate from its later immutable state", () => {
+    const terminalState: CoopAuthoritativeBattleStateV1 = {
+      ...STATE,
+      tick: 3,
+      wave: 12,
+      turn: 3,
+    };
+    const value: CoopAuthoritativeEnvelopeV1 = {
+      ...envelope("ME_TERMINAL", {}, "MYSTERY_ENCOUNTER", 0),
+      wave: 12,
+      turn: 0,
+      pendingOperation: {
+        id: makeCoopOperationId(1, 0, COOP_ME_PUMP_SEQ_BASE * 8000 + 4000, "ME_TERMINAL"),
+        kind: "ME_TERMINAL",
+        owner: 0,
+        status: "applied",
+        payload: {
+          terminal: "leave",
+          outcome: {
+            ...RESYNC,
+            authoritativeState: terminalState,
+          },
+          destination: { kind: "continue", nextWave: 13, selectBiome: false },
+        },
+      },
+      authoritativeState: terminalState,
+    };
+
+    const built = buildCoopV2InteractionEnvelopeEntry({
+      context: FRAME,
+      surfaceClass: "op:me",
+      envelope: value,
+    });
+
+    expect(built).not.toBeNull();
+    expect(built?.material.payload).toMatchObject({
+      envelope: {
+        wave: 12,
+        turn: 0,
+        authoritativeState: { wave: 12, turn: 3 },
+      },
+    });
+    expect(built?.nextControl).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      wave: 12,
+      turn: 3,
+      allowNextWaveStart: true,
+    });
+  });
+
   it("commits a Colosseum decision as a mechanical result before its typed successor wait", () => {
     const value = envelope("COLO_PICK", { type: "decision", round: 0, index: 0 }, "INTERACTION", 0, 1);
     const built = buildCoopV2InteractionEnvelopeEntry({
