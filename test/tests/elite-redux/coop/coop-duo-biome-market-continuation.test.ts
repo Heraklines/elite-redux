@@ -44,11 +44,18 @@ import {
   captureCoopRewardOperationBinding,
   commitRewardOwnerIntent,
 } from "#data/elite-redux/coop/coop-reward-operation";
-import { clearCoopRuntime, isCoopSharedTerminalFrozen, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  getCoopWaveBoundaryStatus,
+  isCoopSharedTerminalFrozen,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { generateModifierTypeOption } from "#data/mystery-encounters/utils/encounter-phase-utils";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -57,17 +64,21 @@ import { UiMode } from "#enums/ui-mode";
 import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  advanceCoopActiveTime,
   buildDuo,
+  type ClientCtx,
+  clearCoopSchedulerActiveTimeClock,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
+  installCoopSchedulerActiveTimeClock,
   installDuoLogCapture,
   pumpDuoDestinations,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
-import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -75,6 +86,67 @@ const RUN = process.env.ER_SCENARIO === "1";
 
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/** Pump BOTH engines' scheduled inboxes once per round (two independent browser event loops). */
+async function pumpBoth(rig: DuoRig, rounds = 1): Promise<void> {
+  for (let i = 0; i < rounds; i++) {
+    await withClient(rig.hostCtx, () => drainLoopback());
+    await withClient(rig.guestCtx, () => drainLoopback());
+  }
+}
+
+/** Wait for one client's real public UI mode while keeping that complete client context installed. */
+async function waitForMode(ctx: ClientCtx, mode: UiMode, label: string): Promise<void> {
+  // Headless Phaser does not tick every fade tween. The bounded production mode transition has a 2s force
+  // path; retain this exact client's globals while that local timer/tween callback settles rather than
+  // alternating the process-global harness context underneath it.
+  await withClient(ctx, async () => {
+    for (let i = 0; i < 320; i++) {
+      if (ctx.scene.ui.getMode() === mode) {
+        return;
+      }
+      await new Promise<void>(resolve => setTimeout(resolve, 10));
+    }
+    throw new Error(`${label} never opened ${UiMode[mode]} (stuck on ${UiMode[ctx.scene.ui.getMode()]})`);
+  });
+}
+
+/** Press one public UI button, bounded by both-engine destination pumps just like two independent browsers. */
+async function pressUntilAccepted(rig: DuoRig, ctx: ClientCtx, button: Button, label: string): Promise<void> {
+  for (let i = 0; i < 80; i++) {
+    const accepted = await withClient(ctx, () => ctx.scene.ui.processInput(button));
+    await pumpBoth(rig);
+    if (accepted) {
+      return;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error(`${label} never accepted ${Button[button]}`);
+}
+
+/**
+ * Bounded proof that the real guest boundary applied the exact retained DATA and, once its public shop
+ * opens, recorded continuationReady. Pumping alternates complete client contexts; it never advances a phase.
+ */
+async function awaitGuestWaveTransaction(rig: DuoRig, wave: number, continuationReady: boolean): Promise<void> {
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const status = getCoopWaveBoundaryStatus(wave, rig.guestRuntime);
+    const current = rig.guestScene.phaseManager.getCurrentPhase();
+    const boundaryReleased = current?.phaseName !== "BattleEndPhase";
+    if (status?.dataApplied === true && boundaryReleased && (!continuationReady || status.continuationReady === true)) {
+      return;
+    }
+    await pumpDuoDestinations(rig, 1);
+  }
+  const status = getCoopWaveBoundaryStatus(wave, rig.guestRuntime);
+  const current = rig.guestScene.phaseManager.getCurrentPhase();
+  throw new Error(
+    `guest retained wave ${wave} did not reach ${continuationReady ? "continuationReady" : "dataApplied/release"} `
+      + `within 24 destination pumps (current=${current?.phaseName ?? "none"} `
+      + `authority=${status?.authority ?? "none"} dataApplied=${status?.dataApplied === true} `
+      + `continuationReady=${status?.continuationReady === true})`,
+  );
 }
 
 /** The private BiomeShopPhase members these probes drive/inspect. */
@@ -134,6 +206,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     setCoopBiomeMarketTestSkip(true);
     setCoopWaveBarrierMs(60_000);
     resetCoopRendezvousWaitMs();
+    clearCoopSchedulerActiveTimeClock();
     logs.dispose();
     clearCoopRuntime();
     initGlobalScene(game.scene);
@@ -518,29 +591,54 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
   // adopts + applies + leaves. The queued continuation must be a PINNED BiomeShopPhase, NO "SKIP
   // unpinned" WARN may fire, and both engines must advance the interaction counter exactly once.
   // ===========================================================================================
-  it("durability: dropped/reordered biomeShop relays still materialize TM buy + leave in ordinal order", async () => {
+  it("durability: a dropped SHOP_BUY commit still materializes the real TM buy + leave exactly once", async () => {
     setCoopBiomeMarketTestSkip(false); // drive the REAL co-op market
+    // The every-ten-waves biome market only rolls on an x0 wave, so this leg starts at wave 10 (the other
+    // deterministic probes in this file stay at the beforeEach default wave 1).
+    game.override.startingWave(10);
+    // Install the deterministic active-time clock BEFORE buildDuo so both shadows' schedulers adopt it: the
+    // host's authority-log redelivery backoff is otherwise never exercisable under the manual pump.
+    installCoopSchedulerActiveTimeClock();
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const scheduledPair = createScheduledCoopPair({ automatic: true });
+
+    // Retarget the fault at the REAL V2 wire artifact: the biome-market SHOP_BUY INTERACTION_COMMIT
+    // authorityEntry (operationId `${epoch}:${owner}:SHOP_BUY:${slot}`). The legacy interactionChoice/biomeShop
+    // carrier is v2ResultCarrierSuppressed under full V2 - never produced - so faulting it dropped nothing.
+    // Drop ONLY the FIRST commit send (the immediate delivery); pass every later one (the host's redelivery).
+    let buyCommitSends = 0;
+    const isShopBuyInteractionCommit = (msg: CoopMessage): boolean =>
+      msg.t === "authorityEntry"
+      && msg.body.kind === "INTERACTION_COMMIT"
+      && typeof msg.body.operationId === "string"
+      && msg.body.operationId.includes(":SHOP_BUY:");
     const pair = wrapCoopFaultPair(
-      scheduledPair,
+      createLoopbackPair(),
       {
         drop: 1,
-        reorder: 1,
+        reorder: 0,
         delay: 0,
-        faultable: msg => msg.t === "interactionChoice" && msg.kind === "biomeShop",
+        faultable: (msg: CoopMessage): boolean => {
+          if (!isShopBuyInteractionCommit(msg)) {
+            return false;
+          }
+          buyCommitSends += 1;
+          return buyCommitSends === 1;
+        },
       },
       { seed: 0xb10e5a },
     );
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
 
+    // Open the interaction control the PRODUCTION way - via the real wave-1 reward boundary (the green model
+    // in coop-duo-reward-operation.test.ts): hostPlayWave -> driveGuestReplayTurn commits the WAVE_ADVANCE
+    // whose settled destination is the AWAIT_SUCCESSOR the market's SHOP_BUY chain rides.
+    const wave = rig.hostScene.currentBattle.waveIndex;
     const turn = rig.hostScene.currentBattle.turn;
     await hostPlayWave(rig);
     await withClient(rig.guestCtx, async () => {
       await driveGuestReplayTurn(rig.guestScene, turn);
     });
-    scheduledPair.setAutomaticDelivery(false);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     // Counter 0 => the HOST owns this interaction (the host buys + relays; the guest is the watcher).
@@ -553,172 +651,140 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     // Track the continuation copy the owner's TM buy queues (its phaseName + carried biome pin).
     const queuedContinuation: { hasBiomeStart: boolean; biomeStart: number }[] = [];
 
-    // Park the watcher's real market surface before the owner can buy or leave. P33 intentionally
-    // retains the terminal until this reciprocal continuation exists; owner-first was the old harness
-    // fiction that let one client cross the market while its partner had not opened it yet.
-    await withClient(rig.guestCtx, async () => {
-      const guestPhase = liveBiomeShop() as unknown as BiomeShopSeam;
-      (guestPhase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
-      const gui = globalScene.ui as unknown as { getHandler: () => Record<string, unknown> };
-      const realGH = gui.getHandler.bind(globalScene.ui);
-      gui.getHandler = () => {
-        const h = realGH();
-        if (h != null && typeof h.setStock !== "function") {
-          h.setStock = () => {};
-        }
-        return h;
-      };
-      guestPhase.start();
-      await drainLoopback();
-      expect(guestPhase.coopBiomeStart, "the watcher opened the exact market interaction").toBe(counterBefore);
-    });
-
     try {
-      await withClient(rig.hostCtx, async () => {
-        const phase = liveBiomeShop() as unknown as BiomeShopSeam;
-        // Inject a TM as the sole stock item (a continuation item) so the buy runs queuesContinuation.
-        (phase as unknown as { buildStock: () => void }).buildStock = function (this: {
-          shopOptions: unknown[];
-          qtys: number[];
-        }) {
-          this.shopOptions = [makeTmOption()];
-          this.qtys = [1];
-        };
-        (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
+      // (1) Reach the OWNER's REAL queued BiomeShopPhase and patch buildStock on THAT phase only so the sole
+      // stock is a single continuation TM (a deterministic slot-0 buy). The guest adopts the streamed stock.
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
+      const hostMarket = rig.hostScene.phaseManager.getCurrentPhase();
+      expect(hostMarket, "host reached the actual queued BiomeShopPhase").toBeInstanceOf(BiomeShopPhase);
+      (hostMarket as unknown as { buildStock(): void }).buildStock = function (this: {
+        shopOptions: unknown[];
+        qtys: number[];
+      }) {
+        this.shopOptions = [makeTmOption()];
+        this.qtys = [1];
+      };
+      const hostMarketSeam = hostMarket as unknown as BiomeShopSeam;
 
-        const pm = globalScene.phaseManager as unknown as { unshiftPhase(p: unknown): void };
-        const origUnshift = pm.unshiftPhase.bind(pm);
-        pm.unshiftPhase = (p: unknown): void => {
-          const pp = p as { coopBiomeStart?: number };
-          // Only the BiomeShopPhase continuation carries coopBiomeStart; a plain SelectModifierPhase does not.
-          if (pp != null && Object.hasOwn(pp, "coopBiomeStart")) {
-            queuedContinuation.push({ hasBiomeStart: true, biomeStart: pp.coopBiomeStart ?? -999 });
-          }
-          origUnshift(p);
-        };
+      const guestMarket = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "BiomeShopPhase", {
+          matches: phase => phase instanceof BiomeShopPhase,
+        }),
+      );
+      expect(guestMarket, "guest reached the actual queued BiomeShopPhase").toBeInstanceOf(BiomeShopPhase);
 
-        const ui = globalScene.ui as unknown as {
-          setMode: (...args: unknown[]) => unknown;
-          setModeBoundedWhen: (...args: unknown[]) => Promise<"completed" | "forced" | "superseded">;
-          setModeWithoutClear: (...args: unknown[]) => unknown;
-          setOverlayMode: (...args: unknown[]) => unknown;
-          showText: (...args: unknown[]) => unknown;
-          getHandler: () => Record<string, unknown>;
-        };
-        const realGetHandler = ui.getHandler.bind(globalScene.ui);
-        ui.getHandler = () => {
-          const h = realGetHandler();
-          if (h != null && typeof h.updateCostText !== "function") {
-            h.updateCostText = () => {};
-          }
-          if (h != null && typeof h.setStock !== "function") {
-            h.setStock = () => {};
-          }
-          return h;
-        };
-        ui.setModeWithoutClear = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.PARTY) {
-            (args[3] as (slotIndex: number, option: number) => void)(0, 0);
-          }
-          if (args[0] === UiMode.CONFIRM) {
-            (args[1] as () => void)(); // co-op bounded confirm callback
-          }
-          return Promise.resolve(true);
-        };
-        let drove = false;
-        ui.setModeBoundedWhen = (...args: unknown[]): Promise<"completed"> => {
-          if (args[0] === UiMode.CONFIRM) {
-            // BiomeShopPhase uses the bounded co-op transition seam for the
-            // leave prompt. The old harness only drove setOverlayMode/
-            // setModeWithoutClear, so it never clicked Yes and therefore never
-            // sent the LEAVE terminal it later expected the watcher to apply.
-            queueMicrotask(() => (args[3] as () => void)());
-          }
-          if (args[0] === UiMode.BIOME_SHOP && !drove) {
-            drove = true;
-            // Production opens the market through the bounded transition seam:
-            // mode, timeout, liveness fence, stock, biome, public selection callback, quantities.
-            const cb = args[5] as (index: number) => boolean;
-            queueMicrotask(() => {
-              cb(0); // buy the TM
-              // A human cannot leave until the party pick has applied and the continuation grid is
-              // available again. Wait for that exact production queue evidence instead of issuing a
-              // second synthetic click in the buy's unresolved microtask.
-              let attempts = 0;
-              const leaveAfterContinuation = (): void => {
-                if (queuedContinuation.length > 0 || attempts++ >= 8) {
-                  cb(-1);
-                  return;
-                }
-                setTimeout(leaveAfterContinuation, 0);
-              };
-              setTimeout(leaveAfterContinuation, 0);
-            });
-          }
-          return Promise.resolve("completed");
-        };
-        ui.showText = (...args: unknown[]): unknown => {
-          const cb = args[2];
-          if (typeof cb === "function") {
-            (cb as () => void)();
-          }
-          return;
-        };
-        ui.setOverlayMode = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.CONFIRM) {
-            (args[1] as () => void)(); // YES: leave the market
-          }
-          return Promise.resolve(true);
-        };
+      // (2) The ordered V2 wave DATA installs before the market presentation exists.
+      await awaitGuestWaveTransaction(rig, wave, false);
 
-        try {
-          phase.start();
-          for (let i = 0; i < 24; i++) {
-            await drainLoopback();
-          }
-        } finally {
-          pm.unshiftPhase = origUnshift;
-        }
+      // (3) Start the WATCHER FIRST so its awaitRewardOptions waiter is live before the owner streams stock,
+      // then start the concrete owner. Both are the clients' REAL current-phase market instances.
+      await withClient(rig.guestCtx, async () => {
+        (guestMarket as unknown as { start(): void }).start();
+        await drainLoopback();
       });
+      await waitForMode(rig.guestCtx, UiMode.MESSAGE, "guest market watcher message");
+
+      // Tap the OWNER phase manager: the TM buy queues a PINNED BiomeShopPhase continuation (carries
+      // coopBiomeStart), never the unpinned plain-SelectModifierPhase orphan.
+      const pm = rig.hostScene.phaseManager as unknown as { unshiftPhase(p: unknown): void };
+      const origUnshift = pm.unshiftPhase.bind(pm);
+      pm.unshiftPhase = (p: unknown): void => {
+        const pp = p as { coopBiomeStart?: number };
+        if (pp != null && Object.hasOwn(pp, "coopBiomeStart")) {
+          queuedContinuation.push({ hasBiomeStart: true, biomeStart: pp.coopBiomeStart ?? -999 });
+        }
+        origUnshift(p);
+      };
+      try {
+        await withClient(rig.hostCtx, async () => {
+          hostMarketSeam.start();
+          await drainLoopback();
+        });
+        await pumpDuoDestinations(rig, 4);
+
+        // (4) OWNER buys the TM through the REAL public BIOME_SHOP UI. The nested party sub-pick reuses the
+        // proven reward plumbing; auto-answer the ONE PARTY open the way the green reward owner driver does
+        // (setModeWithoutClear, NOT the forbidden setModeBoundedWhen).
+        await waitForMode(rig.hostCtx, UiMode.BIOME_SHOP, "host biome market");
+        await withClient(rig.hostCtx, async () => {
+          const ui = globalScene.ui as unknown as { setModeWithoutClear: (...args: unknown[]) => unknown };
+          const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
+          ui.setModeWithoutClear = (...args: unknown[]): unknown => {
+            if (args[0] === UiMode.PARTY) {
+              ui.setModeWithoutClear = realSetModeWithoutClear; // one-shot: restore before picking
+              (args[3] as (slotIndex: number, option: number) => void)(0, 0);
+              return;
+            }
+            return realSetModeWithoutClear(...args);
+          };
+          try {
+            expect(
+              rig.hostScene.ui.processInput(Button.ACTION),
+              "owner buys the TM through the public BIOME_SHOP handler",
+            ).toBe(true);
+            for (let i = 0; i < 12; i++) {
+              await drainLoopback();
+            }
+          } finally {
+            ui.setModeWithoutClear = realSetModeWithoutClear;
+          }
+        });
+
+        // The TM buy queued its pinned continuation copy and sent the SHOP_BUY INTERACTION_COMMIT whose
+        // immediate delivery was DROPPED at the V2 envelope send seam (the guest never received it).
+        expect(queuedContinuation.length, "the TM buy queued a BiomeShopPhase continuation (carries a biome pin)").toBe(
+          1,
+        );
+        expect(queuedContinuation[0].biomeStart, "the continuation inherited the market pin (counter 0)").toBe(
+          counterBefore,
+        );
+        expect(pair.faultsInjected(), "the REAL SHOP_BUY INTERACTION_COMMIT must actually be dropped").toBeGreaterThan(
+          0,
+        );
+        expect(buyCommitSends, "only the immediate delivery has been sent so far (dropped)").toBe(1);
+
+        // (5) Only the host's active-time redelivery backoff can recover the dropped commit - advance active
+        // time to fire the lease tick, then let the microtasks deliver the re-crossed entry to the guest.
+        await withClient(rig.hostCtx, async () => {
+          advanceCoopActiveTime(300);
+          await drainLoopback();
+        });
+        expect(
+          buyCommitSends,
+          "the host's scheduler-owned redelivery re-sent the SHOP_BUY INTERACTION_COMMIT",
+        ).toBeGreaterThanOrEqual(2);
+        await pumpDuoDestinations(rig, 8);
+
+        // (6) OWNER leaves through the REAL public UI: CANCEL -> CONFIRM prompt -> ACTION (Yes).
+        await waitForMode(rig.hostCtx, UiMode.BIOME_SHOP, "host biome market continuation grid");
+        await pressUntilAccepted(rig, rig.hostCtx, Button.CANCEL, "biome market leave");
+        await waitForMode(rig.hostCtx, UiMode.CONFIRM, "biome market leave confirmation");
+        await pressUntilAccepted(rig, rig.hostCtx, Button.ACTION, "biome market confirm yes");
+      } finally {
+        pm.unshiftPhase = origUnshift;
+      }
     } finally {
       Overrides.WAIVE_ROLL_FEE_OVERRIDE = waiveBefore;
     }
 
+    // Pump both destinations through the retry/ACK transaction until BOTH local terminals cross exactly once.
+    let advanced = false;
+    for (let attempt = 0; attempt < 80; attempt++) {
+      await pumpDuoDestinations(rig, 1);
+      if (
+        rig.hostRuntime.controller.interactionCounter() === counterBefore + 1
+        && rig.guestRuntime.controller.interactionCounter() === counterBefore + 1
+      ) {
+        advanced = true;
+        break;
+      }
+    }
     expect(
-      rig.hostRuntime.controller.interactionCounter(),
-      "the owner crosses its own local terminal after the human confirms Leave",
-    ).toBe(counterBefore + 1);
-    expect(pair.faultsInjected(), "the legacy market buy + leave stream must actually be dropped").toBeGreaterThan(0);
-    // The continuation the buy queued is a PINNED BiomeShopPhase (carries coopBiomeStart), not the
-    // unpinned plain-SelectModifierPhase orphan (pre-fix this array is empty - the copy had no coopBiomeStart).
-    expect(queuedContinuation.length, "the TM buy queued a BiomeShopPhase continuation (carries a biome pin)").toBe(1);
-    expect(queuedContinuation[0].biomeStart, "the continuation inherited the market pin (counter 0)").toBe(
-      counterBefore,
-    );
-
-    // WATCHER (guest): adopt the retained stock/result and acknowledge its continuation. Then pump both
-    // destinations through the retry/ACK transaction until the watcher's own local terminal crosses.
-    await withClient(rig.guestCtx, async () => {
-      for (let i = 0; i < 32; i++) {
-        await drainLoopback();
-        if (rig.guestRuntime.controller.interactionCounter() > counterBefore) {
-          break;
-        }
-      }
-    });
-    await withClient(rig.hostCtx, async () => {
-      for (let i = 0; i < 32 && rig.hostRuntime.controller.interactionCounter() === counterBefore; i++) {
-        await drainLoopback();
-      }
-    });
-    await withClient(rig.guestCtx, async () => {
-      for (let i = 0; i < 32 && rig.guestRuntime.controller.interactionCounter() === counterBefore; i++) {
-        await drainLoopback();
-      }
-    });
-    // Fault recovery can require result -> material-applied -> authority release -> final counter broadcast.
-    // Pump the bounded complete transaction, not merely the first result/ACK pair.
-    await pumpDuoDestinations(rig, 8);
+      advanced,
+      `biome market did not advance both counters once (before=${counterBefore} `
+        + `host=${rig.hostRuntime.controller.interactionCounter()} `
+        + `guest=${rig.guestRuntime.controller.interactionCounter()})`,
+    ).toBe(true);
 
     // Both engines advanced the alternating interaction exactly once - lockstep, no asymmetric drift.
     expect(rig.guestRuntime.controller.interactionCounter(), "watcher advanced the interaction once (lockstep)").toBe(
