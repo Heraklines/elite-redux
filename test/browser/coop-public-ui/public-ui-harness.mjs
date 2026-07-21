@@ -64,7 +64,13 @@ const DONDOZO_SPECIES_ID = 977;
 const MAGIKARP_SPECIES_ID = 129;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
-const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
+// Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
+// correctly parked command watcher and the host emitting Explosion's next authoritative HP/faint
+// events. The former 90s watchdog aborted four seconds before that real causal progress and the
+// browsers then completed the turn while failure evidence was being captured. Keep the normal
+// watchdog below the 15-minute absolute ceiling, but above that measured two-Chromium animation
+// gap so a progressing production turn is not mislabeled as a sync failure.
+const POST_TURN_PROGRESS_ALLOWANCE_MS = 150_000;
 // This is an absolute circuit breaker, not the normal liveness timeout. Exact-SHA run
 // 29792007134 was still producing and replaying unique turn events when the previous six-minute
 // wall-clock ceiling fired; TURN_COMMIT landed 31s after that false abort. The rolling

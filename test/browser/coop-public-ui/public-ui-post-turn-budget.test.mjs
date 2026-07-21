@@ -365,6 +365,35 @@ test("post-turn progress refreshes the stall watchdog until a separate absolute 
   assert.equal(budget.hardDeadline(), 1_500);
 });
 
+test("default post-turn watchdog survives the measured two-browser Explosion animation gap", () => {
+  let nowMs = 1_000;
+  const authority = { label: "authority", evidence: new FakeEvidence("authority") };
+  const renderer = { label: "renderer", evidence: new FakeEvidence("renderer") };
+  const rig = { clients: { authority, renderer } };
+  const budget = createPublicBattleProgressBudget(rig, { authority: 0, renderer: 0 }, 1_000, {
+    now: () => nowMs,
+  });
+
+  renderer.evidence.push({
+    at: at(nowMs),
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "command",
+      surfaceId: "command:watcher",
+      phaseInstance: 26,
+      ready: { awaitingActionInput: false },
+    },
+  });
+  const refreshedDeadline = budget.observe();
+
+  nowMs += 95_000;
+  assert.ok(
+    nowMs < refreshedDeadline,
+    "run 29802798087's 94.35s causal gap must not expire the normal public post-turn watchdog",
+  );
+  assert.ok(refreshedDeadline < budget.hardDeadline(), "the immutable absolute ceiling remains independent");
+});
+
 test("repeated semantic projections cannot refresh the same causal progress token", () => {
   let nowMs = 1_000;
   const authority = { label: "authority", evidence: new FakeEvidence("authority") };
