@@ -202,6 +202,24 @@ test("the post-victory seal accepts the exact completed V2 wave transaction afte
   );
 });
 
+test("post-battle continuation identity follows the active V2 wave into completed evidence", () => {
+  const resolverStart = coopRuntime.indexOf("export function resolveCoopRetainedWaveContinuationIdentity(");
+  const resolverEnd = coopRuntime.indexOf("\nexport function ", resolverStart + 1);
+  assert.notEqual(resolverStart, -1, "runtime exposes the retained continuation resolver");
+  assert.ok(resolverEnd > resolverStart, "the retained continuation resolver has a bounded source block");
+  const resolver = coopRuntime.slice(resolverStart, resolverEnd);
+  assert.match(
+    resolver,
+    /settledCoopV2WaveTransaction\(runtime, activeGuestWaveTransition\.wave\)/u,
+    "a completed current wave remains the exact source for TrainerVictory/reward/map tails",
+  );
+  assert.doesNotMatch(
+    resolver,
+    /\.\.\.runtime\.v2CompletedWaveTransactions\.values\(\)/u,
+    "historical completed waves never become competing continuation candidates",
+  );
+});
+
 test("correlated recovery is wired through all four production progression fences", () => {
   assert.match(commandPhase, /isCoopV2CommandAdmissionFrozen\(\)/u);
   assert.match(phaseManager, /replaceWithCoopRecoveryPhase/u);

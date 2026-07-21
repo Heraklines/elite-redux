@@ -2170,7 +2170,18 @@ export function resolveCoopRetainedWaveContinuationIdentity(
     return { kind: "ambient" };
   }
   if (coopV2WaveCutovers.has(runtime)) {
-    const candidates = [...runtime.v2WaveTransactions.values()]
+    const candidateTransactions = [...runtime.v2WaveTransactions.values()];
+    // Installing a wave-owned successor deliberately retires the live projector transaction before the
+    // engine-owned TrainerVictory/reward/map tail consumes its immutable source identity. Preserve only
+    // the completed transaction named by the currently active authoritative transition. Historical
+    // completed waves are proof caches, not continuation candidates; including all of them would turn a
+    // healthy multi-wave run into an ambiguous boundary.
+    const activeSettled =
+      activeGuestWaveTransition == null ? null : settledCoopV2WaveTransaction(runtime, activeGuestWaveTransition.wave);
+    if (activeSettled != null && !candidateTransactions.includes(activeSettled)) {
+      candidateTransactions.push(activeSettled);
+    }
+    const candidates = candidateTransactions
       .map(transaction => ({
         operationId: transaction.operationId,
         turn: transaction.authoritativeState.turn,

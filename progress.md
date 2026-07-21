@@ -1216,3 +1216,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   map or its read-only completed cache. Completed evidence cannot replay material or install control; it only
   proves the immutable wave/turn/image that the seal already requires. A fast source contract pins this
   lifecycle so future projector cleanup cannot again invalidate a later engine-owned seal.
+
+2026-07-21 - Post-battle phases retain the active completed V2 wave identity
+
+- Exact-SHA gate 29815079402 proved the victory-seal repair removed the prior fatal and advanced repeated
+  reward chains through wave 5. TrainerVictoryPhase then terminalized because the shared retained-continuation
+  resolver still enumerated only live V2 wave transactions. Installing AWAIT_SUCCESSOR had already moved the
+  exact current transaction into the bounded completed-evidence cache, so the resolver reported candidates=[].
+- The resolver now adds only the completed transaction named by activeGuestWaveTransition to its candidate
+  set. It never enumerates historical completed waves, preserving strict ambiguity detection while allowing
+  TrainerVictory, reward, and biome tails to prove the same immutable current-wave source after projector
+  retirement.
+- Local permitted evidence: Authority V2 public source contracts 35/35 green, scoped Biome has no errors
+  (repository-baseline warnings/info only), and git diff --check is clean. Co-op engine/browser execution
+  remains remote-only.
