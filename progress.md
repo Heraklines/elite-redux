@@ -1402,3 +1402,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: scoped Biome reports no errors (repository-baseline warnings/info only) and the
   semantic diff is limited to test infrastructure plus the two affected drivers. Remote C1/C3/P2 qualification
   is required; no co-op Vitest/browser workload was run locally.
+
+2026-07-21 - Public-browser post-replacement command address
+
+- Exact-SHA public journey 29825674638 reached a real wave-1 faint, opened the remote-owned PARTY picker,
+  applied the selected replacement, and then entered the shared synchronization terminal at turn 2. The
+  authority diagnostic was exact: `command-open predecessor does not authorize CONTROL_COMMIT after
+  RC/e1827464803163990/w1/t1/o23/f1/s1`.
+- This was a production defect, not a harness timeout. `CoopPushReplacementCheckpointPhase` sealed the
+  complete post-summon material before `TurnInitPhase`, so the carrier still said turn N. The replacement
+  cutover copied that mutable carrier turn into `COMMAND_FRONTIER`; `TurnInitPhase` then opened the real
+  `CommandPhase` at N+1, and the strict V2 predecessor check correctly rejected the mismatched address.
+- A replacement's immutable faint source defines this transition. Whether its complete carrier happens to
+  be captured before or after `TurnInitPhase`, the final replacement resumes command control at source turn
+  N+1. The cutover now derives that address from `source.turn + 1`; it still accepts only carrier N or N+1,
+  and all command actors continue to come from the complete post-summon authority image.
+- Added a node-pure regression for the exact public failure shape: a turn-N post-summon carrier must commit
+  a turn-N+1 command frontier. The existing N+1-carrier case remains unchanged. Local permitted evidence:
+  scoped Biome clean, Authority V2 source contracts 40/40 green, `git diff --check` clean, and the unchanged
+  584-line TypeScript baseline contains zero diagnostics in either touched file. Remote contract and public
+  two-browser requalification are required; no co-op Vitest/browser workload was run locally.

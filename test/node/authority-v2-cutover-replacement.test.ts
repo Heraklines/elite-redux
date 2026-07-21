@@ -147,19 +147,19 @@ function proposal(overrides: Partial<ReplacementProposal> = {}): ReplacementProp
   };
 }
 
-function carrier(): ReplacementAuthorityCarrier {
+function carrier(turn = 5): ReplacementAuthorityCarrier {
   return {
     checkpoint: { tick: 90, field: [{ hp: 51 }, { hp: 73 }] },
     checksum: "replacement-carrier-checksum",
-    preimage: '{"wave":8,"turn":5}',
+    preimage: `{"wave":8,"turn":${turn}}`,
     fullField: [
       { side: "player", fieldIndex: 0, pokemonId: 101 },
       { side: "player", fieldIndex: 1, pokemonId: 202 },
     ],
-    authoritativeState: { version: 1, tick: 91, wave: 8, turn: 5 },
+    authoritativeState: { version: 1, tick: 91, wave: 8, turn },
     epoch: SESSION.epoch,
     wave: 8,
-    turn: 5,
+    turn,
   };
 }
 
@@ -294,6 +294,36 @@ describe("authority-v2 replacement staged transaction", () => {
     expect(cutover.pendingCount).toBe(0);
     expect(duo.host.diagnostics().retained).toBe(0);
     expect(duo.host.diagnostics().pendingTimers).toBe(0);
+    cutover.dispose();
+    duo.dispose();
+  });
+
+  it("states turn N+1 when the post-summon carrier is captured before TurnInit advances", () => {
+    const duo = buildDuo();
+    const cutover = new CoopV2ReplacementCutover(duo.host);
+    expect(stage(cutover, proposal())).toBe(true);
+
+    const result = cutover.commitStagedHostReplacements({
+      // This is the public-browser failure shape: the post-summon phase seals complete material while the
+      // mutable battle is still on source turn N, then TurnInit immediately opens CommandPhase at N+1.
+      authorityCarrier: carrier(4),
+      activeControl: replacementControl(proposal()),
+      commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
+    });
+
+    expect(result.kind).toBe("committed");
+    if (result.kind !== "committed") {
+      throw new Error("expected committed replacement batch");
+    }
+    expect(result.entries[0].material.payload).toMatchObject({
+      authorityCarrier: { wave: 8, turn: 4 },
+    });
+    expect(result.entries[0].nextControl).toMatchObject({
+      kind: "COMMAND_FRONTIER",
+      wave: 8,
+      turn: 5,
+    });
+
     cutover.dispose();
     duo.dispose();
   });

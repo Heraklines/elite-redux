@@ -154,7 +154,9 @@ export class CoopV2ReplacementCutover {
   /**
    * Commit exactly the active proposal whose post-summon carrier just materialized. Same-turn multi-faints
    * are an ordered chain: this entry installs the next executable REPLACEMENT head, while the final entry
-   * states the complete post-summon COMMAND frontier at the carrier's actual (possibly N+1) battle address.
+   * states the complete post-summon COMMAND frontier at the faint source's next turn. The carrier may be
+   * captured before or after TurnInit advances the mutable battle turn, but that scheduling detail cannot
+   * change the immutable successor address: a faint sourced at turn N resumes commands at turn N+1.
    */
   commitStagedHostReplacements(batch: CoopV2ReplacementCommitBatch): CoopV2ReplacementBatchResult {
     if (this.disposed) {
@@ -205,7 +207,7 @@ export class CoopV2ReplacementCutover {
               kind: "resume-command-frontier",
               epoch: carrierEpoch,
               wave: carrierWave,
-              turn: carrierTurn,
+              turn: source.turn + 1,
               commands: batch.commands,
             } as const)
         : ({
