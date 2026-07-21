@@ -75,6 +75,15 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   // never rank a slot as reclaimable garbage - only proven-unresumable CONTENT may be deleted first.
   assert.match(gameData, /failure instanceof CoopResumeReplicaUnavailableError && failure\.contentGarbage/u);
   assert.match(gameData, /transient availability failure, not content garbage/u);
+  // Run 29798984367 received a valid 200 run-status header in ~3s, but a CPU-starved browser
+  // completed response-body parsing after ~8.3s. The persistence timeout owns the complete
+  // response, so restoring the old 5s budget would turn an active checkpoint into start-new.
+  const persistenceNetworkTimeout = gameData.match(/COOP_PERSISTENCE_NETWORK_TIMEOUT_MS = ([\d_]+);/u);
+  assert.ok(persistenceNetworkTimeout, "co-op persistence must retain an explicit bounded network timeout");
+  assert.ok(
+    Number(persistenceNetworkTimeout[1].replaceAll("_", "")) >= 15_000,
+    "co-op resume must allow measured response-body latency before failing closed",
+  );
 
   assert.match(config, /"resume-scan-isolation"/u);
   assert.match(journeys, /async function resumeScanIsolation\(rig\)/u);

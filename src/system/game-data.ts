@@ -221,7 +221,12 @@ const COOP_PERSISTENCE_LOCK_ACQUIRE_TIMEOUT_MS = 15_000;
 // time to wait behind a legitimate in-flight checkpoint transaction; it still uses the same account Web
 // Lock and exact local/head guards, so a concurrent tab can never be erased speculatively.
 const COOP_COMMITTED_DELETE_LOCK_ACQUIRE_TIMEOUT_MS = 30_000;
-const COOP_PERSISTENCE_NETWORK_TIMEOUT_MS = 5_000;
+// This deadline covers the COMPLETE response, including body consumption and validation. The
+// two-browser production journey observed response headers at 3.0s but did not finish consuming the
+// valid run-status body until 8.3s on a CPU-starved client. A 5s race therefore aborted the fetch after
+// its 200 response and reclassified an active checkpoint as transiently unavailable, which sent both
+// players down the start-new path. Keep this bounded, but size it above real response-body latency.
+const COOP_PERSISTENCE_NETWORK_TIMEOUT_MS = 15_000;
 // The GUEST's fresh first-save durability persist chains several SEQUENTIAL real-cloud round-trips
 // (per-slot CAS reads -> run-status guard -> empty-CAS mirror write), each independently bounded by
 // COOP_PERSISTENCE_NETWORK_TIMEOUT_MS, plus a lock acquire and digest hashing. The HOST's ack budget

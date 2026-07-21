@@ -938,3 +938,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - TODO: push this isolated checkpoint, run the exact-SHA remote gate, then
   continue with recovery reconstruction for wave-owned controls and the
   multi-target command-frontier fence.
+
+2026-07-21 - Resume discovery waits for the complete authenticated status response
+
+- The compact two-browser artifact from run 29798984367 proved that the fresh
+  run reached wave 2 and both clients had persisted the same co-op checkpoint.
+  On cold reopen, the host received slot 0 with HTTP 200 and the run-status
+  endpoint returned the exact active run, revision, and digest.
+- The persistence wrapper nevertheless expired at five seconds while the
+  CPU-starved browser was still consuming and validating that successful
+  response body. The active status became a synthetic transient failure, the
+  marker and scan both appeared unavailable, and the next public Space press
+  selected start-new. This was a production timeout inversion, not a battle
+  desync and not a missing save.
+- The complete persistence request budget is now 15 seconds. The trace measured
+  about 8.3 seconds from request to validated status view, so the new value keeps
+  a bounded fail-closed path while covering observed response-body latency.
+  The resume source contract rejects any future regression below that floor.
+- Local permitted evidence: the resume source contract is green. Co-op Vitest
+  and the exact two-browser replay remain remote-only.
