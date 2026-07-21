@@ -49,6 +49,7 @@ import {
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
@@ -57,13 +58,17 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  advanceCoopActiveTime,
   beginRewardShopWatch,
   buildDuo,
+  clearCoopSchedulerActiveTimeClock,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostPartyRewardOwner,
   forceItemRewards,
+  installCoopSchedulerActiveTimeClock,
   installDuoLogCapture,
   reachQueuedRewardShop,
   type ShopPhaseSeam,
@@ -109,6 +114,8 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
   afterEach(() => {
     resetCoopRewardOperationFlag();
     resetCoopRewardOperationState();
+    // Never let the active-time clock override bleed into the next test / file (no-op if never installed).
+    clearCoopSchedulerActiveTimeClock();
     logs.dispose();
     clearCoopRuntime();
     // harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).
@@ -202,19 +209,42 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     logs.flush();
   }, 300_000);
 
-  it("DURABILITY: dropping only the reward relay still applies the committed party-target action on the guest", async () => {
+  it("DURABILITY: dropping the REAL V2 reward INTERACTION_COMMIT forces host redelivery + exactly-once apply", async () => {
     expect(isCoopRewardOperationEnabled(), "the migrated reward-operation path is active for this test").toBe(true);
+
+    // Install the deterministic active-time clock BEFORE buildDuo so both shadows' schedulers adopt it: the
+    // host's authority-log redelivery backoff (250ms) is otherwise never exercisable under the manual pump.
+    installCoopSchedulerActiveTimeClock();
 
     const SLOT = 0;
     forceItemRewards(game.override, [{ name: "LEFTOVERS" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+
+    // Retarget the fault at the REAL V2 wire artifact: the reward INTERACTION_COMMIT authorityEntry
+    // (operationId `${epoch}:${owner}:REWARD:${slot}`). The legacy `interactionChoice`/reward carrier is
+    // v2ResultCarrierSuppressed - never produced under V2 - so faulting it dropped nothing. This closure
+    // drops ONLY the FIRST reward-commit send (the immediate delivery) and passes every later one (the
+    // host's redelivery), and records the send count so the test can prove the host actually re-sent.
+    let rewardCommitSends = 0;
+    const isRewardInteractionCommit = (msg: CoopMessage): boolean =>
+      msg.t === "authorityEntry"
+      && msg.body.kind === "INTERACTION_COMMIT"
+      && typeof msg.body.operationId === "string"
+      && msg.body.operationId.includes(":REWARD:");
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       {
         drop: 1,
         reorder: 0,
         delay: 0,
-        faultable: msg => msg.t === "interactionChoice" && msg.kind === "reward",
+        faultable: (msg: CoopMessage): boolean => {
+          if (!isRewardInteractionCommit(msg)) {
+            return false;
+          }
+          rewardCommitSends += 1;
+          // Drop the first delivery; let the scheduler-owned redelivery (send #2+) cross the wire.
+          return rewardCommitSends === 1;
+        },
       },
       { seed: 0x5e7a2d },
     );
@@ -236,14 +266,35 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     const guestModsBefore = rig.guestScene.modifiers.length;
 
+    // Park the watcher, then let the OWNER commit the reward INTERACTION_COMMIT. Its immediate delivery is
+    // DROPPED at the V2 envelope send seam (the guest never receives it, never gap-requests for it).
     await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
     await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: SLOT }));
-    expect(pair.faultsInjected(), "the legacy reward action must actually be dropped").toBeGreaterThan(0);
+    expect(pair.faultsInjected(), "the REAL reward INTERACTION_COMMIT must actually be dropped").toBeGreaterThan(0);
+    expect(rewardCommitSends, "only the immediate delivery has been sent so far (dropped)").toBe(1);
+
+    // The guest has NOT applied it yet (the sole delivery was lost). Only the host's active-time redelivery
+    // backoff can recover it - advance active time to fire the 250ms lease tick, then let the microtasks
+    // deliver the re-crossed entry into the guest's deferred inbound.
+    expect(rig.guestScene.modifiers.length, "no apply before redelivery (the delivery was dropped)").toBe(
+      guestModsBefore,
+    );
+    await withClient(rig.hostCtx, async () => {
+      advanceCoopActiveTime(300);
+      await drainLoopback();
+    });
+    expect(
+      rewardCommitSends,
+      "the host's scheduler-owned redelivery re-sent the reward INTERACTION_COMMIT",
+    ).toBeGreaterThanOrEqual(2);
+
+    // Pump the guest: it admits the REDELIVERED entry and applies its material - including the nested party
+    // sub-pick - EXACTLY ONCE (dedupe by operation identity), never twice from a repeated redelivery.
     await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
 
     expect(
       rig.guestScene.modifiers.length,
-      "the journal-delivered committed action, including its nested party sub-pick, mutates live guest state",
+      "the journal-redelivered committed action mutates live guest state exactly once",
     ).toBe(guestModsBefore + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "the durable terminal advances the guest once").toBe(
       counterBefore + 1,

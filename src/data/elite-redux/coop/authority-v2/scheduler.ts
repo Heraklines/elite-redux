@@ -53,6 +53,28 @@ const DEFAULT_CLOCK: CoopSchedulerClock = {
   clearTimer: handle => clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
 
+/**
+ * TEST-ONLY clock override consulted by {@link createCoopScheduler} when the caller passes no explicit
+ * clock (the production shadow path, which calls `createCoopScheduler()` with no argument). Null in every
+ * production build - the branch below is behaviour-identical to `DEFAULT_CLOCK` when unset - so this seam
+ * carries nothing behavioural into a real run. It exists so the two-engine duo harness can drive the
+ * authority-log's ACTIVE-time redelivery backoff (250ms) deterministically: a plain real-time wait never
+ * fires it under the manual phase pump, so a duo test installs a deterministic clock (mirroring the node
+ * FakeClock in test/node/authority-v2-duo-delivery.test.ts) and advances it explicitly. An explicit clock
+ * argument (the node-tier unit tests) always wins over this override.
+ */
+let coopSchedulerTestClock: CoopSchedulerClock | null = null;
+
+/**
+ * Install (or clear, with `null`) the process-global test clock the production `createCoopScheduler()`
+ * path adopts. Test-only: production never calls this, and every shadow assembled while it is set shares
+ * the injected clock, so one `advance(ms)` drives every co-op scheduler's active time in lockstep. Callers
+ * MUST clear it (`setCoopSchedulerClockForTesting(null)`) in teardown so it never bleeds across files.
+ */
+export function setCoopSchedulerClockForTesting(clock: CoopSchedulerClock | null): void {
+  coopSchedulerTestClock = clock;
+}
+
 /** The four ACTIVE-time classes that consume time only while unpaused. */
 const PAUSABLE_CLASSES: readonly CoopTimeClass[] = ["connected", "recovery", "renderer", "humanInput"];
 
@@ -339,7 +361,12 @@ export class CoopSchedulerImpl implements CoopScheduler {
   }
 }
 
-/** Build a concrete {@link CoopScheduler}. `clock` is injectable for tests. */
-export function createCoopScheduler(clock: CoopSchedulerClock = DEFAULT_CLOCK): CoopSchedulerImpl {
-  return new CoopSchedulerImpl(clock);
+/**
+ * Build a concrete {@link CoopScheduler}. `clock` is injectable for tests. When no clock is passed (the
+ * production shadow path), a test-installed override ({@link setCoopSchedulerClockForTesting}) is used if
+ * present, else the real `DEFAULT_CLOCK`; the override is always null in production, so this is identical
+ * to `new CoopSchedulerImpl(DEFAULT_CLOCK)` in a real build.
+ */
+export function createCoopScheduler(clock?: CoopSchedulerClock): CoopSchedulerImpl {
+  return new CoopSchedulerImpl(clock ?? coopSchedulerTestClock ?? DEFAULT_CLOCK);
 }

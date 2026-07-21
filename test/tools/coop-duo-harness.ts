@@ -70,6 +70,8 @@ import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import type { CoopSchedulerClock, CoopTimerHandle } from "#data/elite-redux/coop/authority-v2/scheduler";
+import { setCoopSchedulerClockForTesting } from "#data/elite-redux/coop/authority-v2/scheduler";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   applyCoopAuthoritativeBattleState,
@@ -1403,6 +1405,101 @@ export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): v
  */
 export function buildRuntime(endpoint: CoopTransport, username: string, netcodeMode: "authoritative"): CoopRuntime {
   return assembleCoopRuntime(endpoint, { username, netcodeMode });
+}
+
+// ---------------------------------------------------------------------------
+// Authority-v2 ACTIVE-TIME scheduler pump (the duo-harness redelivery seam).
+//
+// The authority-log redelivers a retained committed entry on a 250ms active-time backoff (the guest never
+// gap-requests for a next-expected-revision wait, so a dropped first delivery is recovered ONLY by the
+// host resending on this timer). Under the manual phase pump this timer never fires: a plain real-time
+// wait doesn't advance the pumped scheduler deterministically, so the class "appears paused". The node
+// tier drives it with an injected FakeClock (test/node/authority-v2-duo-delivery.test.ts); this is the
+// same capability for the two-engine harness. `installCoopSchedulerActiveTimeClock()` installs a
+// deterministic clock into the PRODUCTION shadow scheduler (via the test-only override in scheduler.ts),
+// so every shadow assembled afterwards shares it; `advanceCoopActiveTime(ms)` fires whatever redelivery /
+// lease timers are now due, in lockstep across host + guest; teardown MUST call
+// `clearCoopSchedulerActiveTimeClock()`. This adds NOTHING behavioural to production - the override is
+// null in every real build.
+// ---------------------------------------------------------------------------
+
+/**
+ * A fully deterministic wall clock + timer queue (no real time), byte-identical in behaviour to the node
+ * FakeClock the authority-v2 unit tests use. Advancing it fires every armed timer whose deadline is
+ * crossed, in deadline order, so a duo test can drive the redelivery backoff without real time.
+ */
+class CoopHarnessActiveTimeClock implements CoopSchedulerClock {
+  private t = 0;
+  private seq = 1;
+  private readonly pending = new Map<number, { fireAt: number; cb: () => void }>();
+
+  now(): number {
+    return this.t;
+  }
+
+  setTimer(cb: () => void, delayMs: number): CoopTimerHandle {
+    const id = this.seq++;
+    this.pending.set(id, { fireAt: this.t + Math.max(0, delayMs), cb });
+    return id;
+  }
+
+  clearTimer(handle: CoopTimerHandle): void {
+    this.pending.delete(handle as number);
+  }
+
+  advance(ms: number): void {
+    const target = this.t + ms;
+    for (;;) {
+      let nextId = -1;
+      let nextAt = Number.POSITIVE_INFINITY;
+      for (const [id, entry] of this.pending) {
+        if (entry.fireAt <= target && entry.fireAt < nextAt) {
+          nextAt = entry.fireAt;
+          nextId = id;
+        }
+      }
+      if (nextId === -1) {
+        break;
+      }
+      const entry = this.pending.get(nextId);
+      if (!entry) {
+        break;
+      }
+      this.pending.delete(nextId);
+      this.t = entry.fireAt;
+      entry.cb();
+    }
+    this.t = target;
+  }
+}
+
+let installedCoopActiveTimeClock: CoopHarnessActiveTimeClock | null = null;
+
+/**
+ * Install the deterministic active-time clock into the production co-op scheduler path. Call BEFORE
+ * `buildDuo` so both shadows adopt it (the shadow calls `createCoopScheduler()` with no argument, which
+ * consults the test override). Idempotent per install; teardown MUST call
+ * {@link clearCoopSchedulerActiveTimeClock}.
+ */
+export function installCoopSchedulerActiveTimeClock(): void {
+  installedCoopActiveTimeClock = new CoopHarnessActiveTimeClock();
+  setCoopSchedulerClockForTesting(installedCoopActiveTimeClock);
+}
+
+/**
+ * Advance the installed active-time clock by `ms`, firing every co-op scheduler timer (redelivery backoff,
+ * proposal / waiter leases) whose deadline is crossed, across every shadow that shares the clock. No-op if
+ * no clock is installed. Callbacks (a host redelivery `send`) run synchronously; the caller then flushes
+ * the loopback + pumps the destination endpoint to admit + apply the redelivered entry.
+ */
+export function advanceCoopActiveTime(ms: number): void {
+  installedCoopActiveTimeClock?.advance(ms);
+}
+
+/** Remove the active-time clock override so the real clock (and no leftover state) is restored. Teardown. */
+export function clearCoopSchedulerActiveTimeClock(): void {
+  installedCoopActiveTimeClock = null;
+  setCoopSchedulerClockForTesting(null);
 }
 
 // ---------------------------------------------------------------------------
