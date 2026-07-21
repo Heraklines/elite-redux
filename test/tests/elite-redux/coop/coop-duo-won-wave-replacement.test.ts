@@ -163,13 +163,18 @@ describe.skipIf(!RUN)(
         ui.setMode = (...args: unknown[]): unknown => {
           if (args[0] === UiMode.PARTY) {
             ui.setMode = realSetMode; // one-shot
-            setCoopRuntime(rig.hostRuntime);
-            try {
-              (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
-            } finally {
-              setCoopRuntime(rig.guestRuntime);
-            }
-            return;
+            const opened = realSetMode(...args);
+            // Model a public keypress, not a callback injected before PARTY exists (mirrors the faithful
+            // double-faint sibling). The phase attaches its actionability proof to this same completion
+            // promise after setMode returns; nesting the pick one microtask later guarantees the real
+            // handler is active and the exact V2 REPLACEMENT control is proven+installed before the pick.
+            Promise.resolve(opened).then(
+              () => {
+                queueMicrotask(() => (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0));
+              },
+              () => undefined,
+            );
+            return opened;
           }
           if (args[0] === UiMode.MESSAGE) {
             return; // the picker's close transition - a no-op headlessly
