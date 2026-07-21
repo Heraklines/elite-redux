@@ -130,3 +130,55 @@ Implementation notes:
 - All new edges follow the hardened flow rules; every board state gets a
   render golden (fresh 4-bracket, mid-round with an advance, eliminated view,
   champion), including the connecting lines and icon slots.
+
+## P3 — ADMIN OPS + FORMATS (maintainer-validated 2026-07-21; binding)
+
+### Admin surface: the ER EDITOR PAGE (not in-game)
+Tournament creation/handling moves to a Tournaments section on the ER editor
+web page (the same team tool that makes custom trainers), talking to the
+er-telemetry tournament routes with the admin allowlist auth.
+
+### Scenario simulation -> required options (the option matrix)
+1. CREATE: name, entrant cap (up to 64; first real tournament 32), battle
+   format, series format, round window, reward pool, optional scheduled
+   registration close. Sensible defaults for everything.
+2. INACTIVE DURING REGISTRATION: admin KICKS an entrant -> the slot refills
+   (registration reopens if it was auto-closed at cap and the bracket has NOT
+   been generated yet).
+3. INACTIVE MID-TOURNAMENT: admin KICK -> WALKOVER: the opponent of the kicked
+   player auto-advances in the current round (and the kicked player's slot
+   shows eliminated/kicked on the board). Automated activity-resolution at the
+   deadline stays (P2), kick is the manual override.
+4. DELETE/CANCEL a tournament in any state -> entrants notified in-game (the
+   challenge-notification channel), board shows cancelled.
+5. EDIT before start: rewards, cap, window, close-time editable while in
+   registration; format locked once the bracket generates.
+6. DISPUTED RESULT: manual resolve (exists) surfaced in the admin UI.
+7. RE-SEED / REGENERATE bracket while no match has been played yet.
+8. WAITLIST: entries beyond cap queue; a kick during registration promotes the
+   first waitlisted player automatically.
+9. Entrant inspection: list with username, ghost identity, preset name,
+   last-seen, per-entrant kick button.
+10. Reward pool per place (champion / runner-up / semifinalists): the reward
+    definition uses the settlement mutation vocabulary (granted through the
+    existing pipeline on completion).
+
+### Battle formats (per tournament; stored on the tournament record, enforced
+by both clients at match start via the manifest/handshake)
+- FIELD: singles 1v1 (current), DOUBLES 2v2, TRIPLES 3v3. Team size rules stay
+  1-6 picked, field width changes. NOTE: versus doubles/triples ride the coop
+  engine's existing multi-slot support but need their own duo-harness proof —
+  this is the one genuinely deep engine piece; it ships as its own workstream,
+  after the admin/ops layer. Singles tournaments are not blocked on it.
+- SERIES: single game, BEST OF 3, BEST OF 5. The series is a worker-level
+  wrapper: same pairing replays until the series score resolves; each game is
+  a normal attested result; the board shows the series score (e.g. 1-1).
+- Format extras (later, option-flagged): level cap variants, item clause
+  (no duplicate items), species clause, mega clause already exists.
+
+### 64-entry brackets (UI)
+Overall max 64 entries. The single-screen tree stays for <=16. For 32/64 the
+board paginates into BRACKET SECTIONS (quadrants/halves): L/R pages between
+sections, a mini-overview strip shows where you are, your-match card always
+pinned regardless of page. Round-of-64/32 columns never render all on one
+screen.
