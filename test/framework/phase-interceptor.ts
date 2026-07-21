@@ -91,7 +91,11 @@ export class PhaseInterceptor {
           // `start()` returns. In that race PromptHandler marks us interrupted while the phase manager is
           // already sitting on the requested target. A stop-before-target caller must regain control so it
           // can drive that public UI; waiting for the target to end creates an impossible dependency cycle.
-          if (currentPhase.is(this.target) && (!runTarget || this.state !== "interrupted")) {
+          // Observe this invocation's immutable target. `this.target` is only the PromptHandler routing
+          // slot and can be replaced by a nested/asynchronous interceptor request while this wait is
+          // still unwinding. Letting that shared slot define arrival strands the original caller on an
+          // interactive phase it has already reached.
+          if (currentPhase.is(target) && (!runTarget || this.state !== "interrupted")) {
             return true;
           }
 
@@ -119,7 +123,7 @@ export class PhaseInterceptor {
       const stuckPhase = pm.getCurrentPhase()?.phaseName ?? "(none)";
       const uiMode = getEnumStr(UiMode, this.scene.ui.getMode());
       throw new Error(
-        `PhaseInterceptor.to("${this.target}") did not reach its target (soft-lock / freeze?): `
+        `PhaseInterceptor.to("${target}") did not reach its target (soft-lock / freeze?): `
           + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interceptor state "${this.state}".`
           + `\nOriginal: ${err instanceof Error ? err.message : inspect(err)}`,
       );
@@ -127,13 +131,13 @@ export class PhaseInterceptor {
 
     // We hit the target; run as applicable and wrap up.
     if (!runTarget) {
-      this.doLog(`PhaseInterceptor.to: Stopping before running ${this.target}`);
+      this.doLog(`PhaseInterceptor.to: Stopping before running ${target}`);
       return;
     }
 
     await this.run(currentPhase);
     this.doLog(
-      `PhaseInterceptor.to: Stopping ${this.state === "interrupted" ? `after reaching ${getEnumStr(UiMode, this.scene.ui.getMode())} during` : "on completion of"} ${this.target}`,
+      `PhaseInterceptor.to: Stopping ${this.state === "interrupted" ? `after reaching ${getEnumStr(UiMode, this.scene.ui.getMode())} during` : "on completion of"} ${target}`,
     );
   }
 

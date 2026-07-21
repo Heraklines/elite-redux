@@ -119,6 +119,21 @@ describe("Utils - Phase Interceptor - Unit", () => {
       expect(game.phaseInterceptor.log).toEqual(["ApplePhase"]);
     });
 
+    it("observes its requested target even when the shared prompt target is replaced", async () => {
+      vi.spyOn(ApplePhase.prototype, "start").mockImplementation(() => {
+        globalScene.phaseManager.shiftPhase();
+        game.phaseInterceptor.checkMode();
+        // Model a nested/asynchronous request replacing PromptHandler's routing slot while the original
+        // stop-before call is still unwinding from its predecessor.
+        game.phaseInterceptor["target"] = "CoconutPhase" as PhaseString;
+      });
+
+      await to("BananaPhase", false);
+
+      expectAtPhase("BananaPhase");
+      expect(game.phaseInterceptor.log).toEqual(["ApplePhase"]);
+    });
+
     it("should run all phases between start and the first instance of target", async () => {
       await to("CoconutPhase");
 

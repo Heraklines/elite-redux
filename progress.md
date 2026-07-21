@@ -1422,3 +1422,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   scoped Biome clean, Authority V2 source contracts 40/40 green, `git diff --check` clean, and the unchanged
   584-line TypeScript baseline contains zero diagnostics in either touched file. Remote contract and public
   two-browser requalification are required; no co-op Vitest/browser workload was run locally.
+
+2026-07-21 - PhaseInterceptor invocation-local arrival proof
+
+- Exact-SHA gate 29827973780 still left C1/C3 parked on an already-visible MysteryEncounterPhase with the
+  interceptor marked `interrupted`. The previous ordering fix was necessary but still read the mutable
+  PromptHandler routing slot (`this.target`) when deciding whether the original `to()` request had arrived.
+  A nested/asynchronous request can replace that slot while the first call is unwinding, causing the first
+  call to ignore the exact interactive phase it requested and wait until timeout.
+- Each `to()` invocation now uses its immutable argument for arrival, diagnostics, and logging; the shared
+  slot remains only for PromptHandler routing. A failure-first unit regression models the slot being replaced
+  after the target opens and proves the original stop-before call regains control.
+- Remote C1/C3 qualification is required. No co-op Vitest/browser workload was run locally.
