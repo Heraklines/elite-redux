@@ -436,7 +436,10 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         payload: { optionIndex: 0 },
         localRole: "guest",
         wave: rig.guestScene.currentBattle.waveIndex,
-        turn: rig.guestScene.currentBattle.turn,
+        // An ME operation is a transaction pinned on the authority turn sentinel (COOP_ME_AUTHORITY_TURN=0),
+        // NOT the live battle turn: commitMeOwnerIntent fails closed on any other turn. Mirrors the catch-full
+        // sub-pick idiom.
+        turn: meOp.COOP_ME_AUTHORITY_TURN,
         resend: () => relay.sendInteractionChoice(seq, "me", 0, [0]),
       });
       expect(operationId, "the public guest intent enters retained control before its raw proposal").not.toBeNull();
