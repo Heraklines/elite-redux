@@ -1,12 +1,11 @@
 import { consumePendingDevBattleSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
-import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import {
   isCoopAuthoritativeGuestGated,
   isShowdownGuestFlipGated,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { pendingCoopAuthoritativeReplacementReplayTurn } from "#data/elite-redux/coop/coop-runtime";
 import { erRecordAchievementTurnStart } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { BattleType } from "#enums/battle-type";
@@ -36,28 +35,7 @@ export class TurnInitPhase extends FieldPhase {
    * command slot authorized by the committed successor.
    */
   private pendingAuthoritativeReplacementTurn(): number | null {
-    if (!isCoopAuthoritativeGuestGated() || !isCoopV2ReplacementCutoverActive()) {
-      return null;
-    }
-    const controller = getCoopController();
-    const streamer = getCoopBattleStreamer();
-    const battle = globalScene.currentBattle;
-    if (controller == null || streamer == null || battle == null) {
-      return null;
-    }
-    const currentTurn = battle.turn;
-    const currentWave = battle.waveIndex;
-    const pending = streamer.peekCheckpointForTurn(currentTurn, currentWave);
-    if (
-      pending?.reason !== "replacement"
-      || pending.epoch !== controller.sessionEpoch
-      || pending.wave !== currentWave
-      || pending.authoritativeState?.wave !== currentWave
-      || (pending.turn !== currentTurn && pending.turn !== currentTurn + 1)
-    ) {
-      return null;
-    }
-    return currentTurn;
+    return pendingCoopAuthoritativeReplacementReplayTurn();
   }
 
   /**
