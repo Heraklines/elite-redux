@@ -1,6 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
-import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, notifyCoopV2InteractionSurfaceReady } from "#data/elite-redux/coop/coop-runtime";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { Button } from "#enums/buttons";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
@@ -340,6 +340,11 @@ export class MysteryEncounterUiHandler extends UiHandler {
         }
         (this.optionsContainer.getAt(i) as Phaser.GameObjects.Text).setAlpha(1);
       }
+      // The selector is installed while its one-second click-through guard is still active. The V2
+      // projector therefore cannot prove executable control from either of the phase's initial readiness
+      // probes. Publish the actual false -> true actionability edge or ME_PRESENT remains uninstalled and
+      // every later ME_PICK is correctly held behind it as a revision gap.
+      notifyCoopV2InteractionSurfaceReady();
     }
   }
 

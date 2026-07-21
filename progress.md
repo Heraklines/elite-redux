@@ -1265,3 +1265,4 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: public Authority V2 source contracts 37/37 green, scoped Biome has no errors
   (two repository-baseline complexity infos), `git diff --check` is clean, and zero TypeScript diagnostics
   mention the touched files against the unchanged 584-line repository baseline.
+2026-07-21: Exact gate run 29817600158 proved the remaining Mystery P1 hang was an actionability-edge wiring bug, not duplicate ME_PRESENT material. CoopReplayMePhase opened MYSTERY_ENCOUNTER while its one-second click-through guard was active; both readiness probes correctly refused controlInstalled, but MysteryEncounterUiHandler.unblockInput() never retried the V2 proof. Wired that false-to-true edge to notifyCoopV2InteractionSurfaceReady and added a source contract. Local allowed authority-v2 contract is 38/38 green; remote P1 requalification still required.

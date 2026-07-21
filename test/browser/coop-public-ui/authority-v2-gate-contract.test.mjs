@@ -28,6 +28,10 @@ const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
 const mysteryEncounterPhases = readFileSync(new URL("src/phases/mystery-encounter-phases.ts", root), "utf8");
+const mysteryEncounterUiHandler = readFileSync(
+  new URL("src/ui/handlers/mystery-encounter-ui-handler.ts", root),
+  "utf8",
+);
 const erQuizPhase = readFileSync(new URL("src/phases/er-quiz-phase.ts", root), "utf8");
 const guestFaintSwitchPhase = readFileSync(new URL("src/phases/coop-guest-faint-switch-phase.ts", root), "utf8");
 const pushReplacementCheckpointPhase = readFileSync(
@@ -395,6 +399,18 @@ test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must
     /projected exact mystery generation/u,
     "the authenticated successor replaces a stuck local predecessor",
   );
+});
+
+test("Mystery publishes the real actionability edge after its click-through guard expires", () => {
+  const unblockStart = mysteryEncounterUiHandler.indexOf("  unblockInput() {");
+  const unblockEnd = mysteryEncounterUiHandler.indexOf("\n  override isCoopV2InputActionable", unblockStart);
+  assert.notEqual(unblockStart, -1, "Mystery exposes its delayed input release");
+  assert.ok(unblockEnd > unblockStart, "Mystery input release has a bounded source block");
+  const unblock = mysteryEncounterUiHandler.slice(unblockStart, unblockEnd);
+  const release = unblock.indexOf("this.blockInput = false");
+  const proof = unblock.indexOf("notifyCoopV2InteractionSurfaceReady()");
+  assert.ok(release >= 0, "the click-through guard is actually released");
+  assert.ok(proof > release, "controlInstalled is retried only after the real Mystery handler becomes actionable");
 });
 
 test("V2 Mystery waits for its ordered presentation and destructively replaces the local classifier", () => {
