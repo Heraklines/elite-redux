@@ -736,6 +736,7 @@ export class MysteryEncounterPhase extends Phase {
             pinned,
             step: step as number,
             value: choice.choice,
+            operationId: choice.operationId,
             wave,
             turn: COOP_ME_AUTHORITY_TURN,
           });

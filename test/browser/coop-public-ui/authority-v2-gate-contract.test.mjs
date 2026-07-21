@@ -57,6 +57,7 @@ const proposalAdmission = readFileSync(
 );
 const interactionRelay = readFileSync(new URL("src/data/elite-redux/coop/coop-interaction-relay.ts", root), "utf8");
 const rewardOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-reward-operation.ts", root), "utf8");
+const biomeOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-biome-operation.ts", root), "utf8");
 const selectModifierPhase = readFileSync(new URL("src/phases/select-modifier-phase.ts", root), "utf8");
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
@@ -789,7 +790,7 @@ test("guest-owned Mystery control is installed only by an exact authority propos
   );
 });
 
-test("retained V2 shop proposals are identity-idempotent before any later waiter", () => {
+test("every retained V2 interaction proposal is identity-idempotent before any later waiter", () => {
   assert.match(
     proposalAdmission,
     /return existing === proposal\.fingerprint \? "duplicate" : "conflict"/u,
@@ -804,6 +805,16 @@ test("retained V2 shop proposals are identity-idempotent before any later waiter
     interactionRelay,
     /cosmeticOperationId: proposalOperationId/u,
     "the frozen interaction carrier transports the retained proposal's stable operation ID",
+  );
+  assert.match(
+    interactionRelay,
+    /v2GuestProposal[\s\S]*!isValidOperationId\(proposalOperationId\)[\s\S]*onV2AuthorityProposalViolation\(reason\)/u,
+    "a new guest-owned interaction surface cannot silently send an unidentified V2 proposal",
+  );
+  assert.match(
+    interactionRelay,
+    /requiresV2GuestProposalIdentity\(msg\.kind\)[\s\S]*!isValidOperationId\(msg\.cosmeticOperationId\)[\s\S]*onV2AuthorityProposalViolation\(reason\)/u,
+    "the authority rejects a forged unidentified proposal before FIFO admission",
   );
   assert.match(
     interactionRelay,
@@ -829,6 +840,16 @@ test("retained V2 shop proposals are identity-idempotent before any later waiter
     biomeShopPhase,
     /retainCoopV2InteractionProposal\([\s\S]*operationId: preparedOperationId[\s\S]*resend/u,
     "non-terminal market purchases use the same durable identity lease",
+  );
+  assert.match(
+    biomeOperation,
+    /v2InteractionActive\(binding\) && params\.res\.operationId !== opId[\s\S]*proposal-operation-id-mismatch/u,
+    "biome and crossroads choices must match the exact deterministic authority address",
+  );
+  assert.match(
+    meOperation,
+    /params\.operationId !== expectedOperationId[\s\S]*return \{ kind: "failed" \}/u,
+    "Mystery option and sub-option retries cannot be reinterpreted under a later ordinal",
   );
 });
 

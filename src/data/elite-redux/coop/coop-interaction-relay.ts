@@ -25,6 +25,7 @@
 // LoopbackTransport, exactly like CoopBattleStreamer.
 // =============================================================================
 
+import { isValidOperationId } from "#data/elite-redux/coop/authority-v2/authority-entry";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { CoopV2ProposalAdmissionLedger } from "#data/elite-redux/coop/authority-v2/proposal-admission";
 import { isCoopV2ShadowActive, tapCoopV2ShadowInteractionChoice } from "#data/elite-redux/coop/authority-v2/shadow";
@@ -88,6 +89,15 @@ function isCoopMarketProjectionKind(value: unknown): value is CoopMarketProjecti
  * (a fixed field seat), so it is the only band the malicious-peer owner check gates on.
  */
 const COOP_FAINT_SWITCH_SLOT_COUNT = 4;
+
+/**
+ * Only immutable human decisions are V2 proposals. Faint replacement has its own proposal protocol, while
+ * `meBtn` is a non-retrying presentation pump input inside an already-addressed Mystery control lease.
+ * The latter remains a compatibility carrier until the presentation pump moves onto its own typed control.
+ */
+function requiresV2GuestProposalIdentity(kind: string): boolean {
+  return kind !== "switch" && kind !== "meBtn";
+}
 
 /** Keep legacy reward keys byte-identical when no ordered ME surface address exists. */
 const COOP_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
@@ -184,8 +194,16 @@ export function sendCoopRevivalChoice(
   fieldIndex: number,
   partySlot: number,
   data: number[],
+  proposalOperationId?: string,
 ): void {
-  relay?.sendInteractionChoice(COOP_REVIVAL_SEQ_BASE + fieldIndex, "revival", partySlot, [...data]);
+  relay?.sendInteractionChoice(
+    COOP_REVIVAL_SEQ_BASE + fieldIndex,
+    "revival",
+    partySlot,
+    [...data],
+    undefined,
+    proposalOperationId,
+  );
 }
 
 /**
@@ -614,6 +632,14 @@ export class CoopInteractionRelay {
       coopLog("relay", `SEND interactionChoice seq=${seq} kind=${kind} ${summarizeChoice({ choice, data })}`);
     }
     const v2ResultCarrierSuppressed = this.isInteractionAuthorityV2() && this.isLocalAuthority();
+    const v2GuestProposal =
+      this.isInteractionAuthorityV2() && !this.isLocalAuthority() && requiresV2GuestProposalIdentity(kind);
+    if (v2GuestProposal && !isValidOperationId(proposalOperationId)) {
+      const reason = `Authority V2 guest proposal at seq=${seq} kind=${kind} is missing a valid immutable operation ID`;
+      coopWarn("v2-proposal", reason);
+      this.onV2AuthorityProposalViolation(reason);
+      return;
+    }
     if (v2ResultCarrierSuppressed) {
       coopLog("v2-interaction", `suppressed raw authority interactionChoice seq=${seq} kind=${kind}`);
     } else {
@@ -630,7 +656,7 @@ export class CoopInteractionRelay {
         // slot. On the non-authority -> authority direction it identifies the
         // retained V2 proposal; it remains non-mechanical and allocates no log
         // revision. Legacy sends and unretained observations leave it absent.
-        ...(this.isInteractionAuthorityV2() && proposalOperationId != null && proposalOperationId.length > 0
+        ...(this.isInteractionAuthorityV2() && isValidOperationId(proposalOperationId)
           ? { cosmeticOperationId: proposalOperationId }
           : {}),
       });
@@ -1675,7 +1701,18 @@ export class CoopInteractionRelay {
       coopWarn("relay", "RECV interactionChoice -> invalid ordered reward surface");
       return;
     }
-    if (this.isInteractionAuthorityV2() && this.isLocalAuthority() && msg.cosmeticOperationId != null) {
+    if (
+      this.isInteractionAuthorityV2()
+      && this.isLocalAuthority()
+      && requiresV2GuestProposalIdentity(msg.kind)
+      && !isValidOperationId(msg.cosmeticOperationId)
+    ) {
+      const reason = `Authority V2 received an unidentified guest proposal at seq=${msg.seq} kind=${msg.kind}`;
+      coopWarn("v2-proposal", reason);
+      this.onV2AuthorityProposalViolation(reason);
+      return;
+    }
+    if (this.isInteractionAuthorityV2() && this.isLocalAuthority() && isValidOperationId(msg.cosmeticOperationId)) {
       const fingerprint = JSON.stringify([msg.seq, msg.kind, msg.choice, msg.data ?? null, msg.rewardSurface ?? null]);
       const admission = this.authorityProposalAdmissions.admit({
         operationId: msg.cosmeticOperationId,

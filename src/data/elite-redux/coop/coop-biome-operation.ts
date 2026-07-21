@@ -108,6 +108,7 @@ export type CoopBiomeOperationKind = Extract<CoopOperationKind, "BIOME_PICK" | "
 export interface CoopBiomeRelayResult {
   readonly choice: number;
   readonly data?: number[] | undefined;
+  readonly operationId?: string | undefined;
 }
 
 /** The watcher's adoption verdict for a relayed biome/crossroads pick. */
@@ -1355,6 +1356,9 @@ export function adoptBiomeWatcherChoice(
     const s = state(binding);
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const opId = coopBiomeOperationId(params.kind, params.seq, params.pinned, binding);
+    if (params.localRole === "host" && v2InteractionActive(binding) && params.res.operationId !== opId) {
+      return { adopt: false, reason: "proposal-operation-id-mismatch" };
+    }
     const payload: CoopBiomePickPayload | CoopCrossroadsPickPayload =
       params.kind === "BIOME_PICK"
         ? {

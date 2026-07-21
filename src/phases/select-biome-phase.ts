@@ -718,7 +718,7 @@ export class SelectBiomePhase extends BattlePhase {
       operationId,
       pinned,
       role,
-      res == null ? null : { choice: res.choice, data: res.data },
+      res == null ? null : { choice: res.choice, data: res.data, operationId: res.operationId },
       false,
     );
   }
@@ -1603,7 +1603,7 @@ export class SelectBiomePhase extends BattlePhase {
     );
     const relay = getCoopInteractionRelay();
     const resend = (): void => {
-      relay?.sendInteractionChoice(seq, "biomePick", idx, [nextBiome]);
+      relay?.sendInteractionChoice(seq, "biomePick", idx, [nextBiome], undefined, operationId);
     };
     try {
       // Carry both the index AND the biome id: the watcher applies the biome verbatim, so a divergent

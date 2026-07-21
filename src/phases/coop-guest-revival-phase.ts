@@ -118,14 +118,19 @@ export class CoopGuestRevivalPhase extends Phase {
               partySlot: slotIndex,
               speciesId: pickedSpecies,
             };
-            sendCoopRevivalChoice(relay, this.fieldIndex, slotIndex, data);
+            const decisionOperationId =
+              this.coopV2ControlOperationId == null
+                ? null
+                : coopRevivalDecisionOperationId(this.coopV2ControlOperationId, slotIndex);
+            sendCoopRevivalChoice(relay, this.fieldIndex, slotIndex, data, decisionOperationId ?? undefined);
             armCoopRevivalIntentResend(
               {
                 payload: decisionPayload,
                 localRole: "guest",
                 wave,
                 turn,
-                resend: () => sendCoopRevivalChoice(relay, this.fieldIndex, slotIndex, data),
+                resend: () =>
+                  sendCoopRevivalChoice(relay, this.fieldIndex, slotIndex, data, decisionOperationId ?? undefined),
               },
               operationBinding,
             );

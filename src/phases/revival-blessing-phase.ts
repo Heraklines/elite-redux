@@ -6,6 +6,7 @@ import {
   captureCoopRevivalOperationBinding,
   commitCoopRevivalPrompt,
   commitRevivalAuthorityDecision,
+  coopRevivalDecisionOperationId,
   coopRevivalOperationId,
   isCoopRevivalAuthorityV2Active,
   sendCoopRevivalPromptWithOperationId,
@@ -175,10 +176,20 @@ export class RevivalBlessingPhase extends BattlePhase {
     );
     Promise.resolve(watcherMode).then(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
     void relay.awaitInteractionChoice(seq, getCoopFaintSwitchWaitMs(), COOP_REVIVAL_CHOICE_KINDS).then(res => {
+      const v2 = isCoopRevivalAuthorityV2Active(this.coopOperationBinding);
+      const expectedDecisionOperationId =
+        res == null || presentationOperationId === "legacy"
+          ? null
+          : coopRevivalDecisionOperationId(presentationOperationId, res.choice);
+      if (v2 && (expectedDecisionOperationId == null || res?.operationId !== expectedDecisionOperationId)) {
+        failCoopSharedSession("Revival Blessing decision did not match its exact V2 presentation.");
+        this.end();
+        return;
+      }
       const party = globalScene.getPlayerParty();
       let slotIndex = res?.choice ?? -1;
       const pickedSpecies = res?.data?.[1] ?? 0;
-      if (pickedSpecies > 0) {
+      if (!v2 && pickedSpecies > 0) {
         const bySpecies = party.findIndex(p => p.isFainted() && p.species?.speciesId === pickedSpecies);
         if (bySpecies >= 0 && bySpecies !== slotIndex) {
           coopLog(
@@ -188,13 +199,18 @@ export class RevivalBlessingPhase extends BattlePhase {
           slotIndex = bySpecies;
         }
       }
-      if (slotIndex < 0 || slotIndex >= 6 || !party[slotIndex]?.isFainted()) {
+      if (!v2 && (slotIndex < 0 || slotIndex >= 6 || !party[slotIndex]?.isFainted())) {
         // Timeout or invalid: revive the partner's first fainted mon, else any fainted.
         slotIndex = party.findIndex(p => p.isFainted() && p.coopOwner === this.user.coopOwner);
         if (slotIndex < 0) {
           slotIndex = party.findIndex(p => p.isFainted());
         }
         coopLog("replay", `revival owner-pick: fallback -> party[${slotIndex}]`);
+      }
+      if (v2 && (slotIndex < 0 || slotIndex >= 6 || !party[slotIndex]?.isFainted())) {
+        failCoopSharedSession("Revival Blessing V2 decision addressed an invalid target.");
+        this.end();
+        return;
       }
       if (slotIndex >= 0) {
         this.applyRevive(slotIndex, party[slotIndex]);

@@ -707,7 +707,11 @@ export class CoopReplayMePhase extends Phase {
     }
     const step = this.pickStep;
     const pickWave = globalScene.currentBattle?.waveIndex ?? -1;
-    const operationId = commitMeOwnerIntent({
+    let operationId: string | null = null;
+    const resend = (): void => {
+      relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index, [step], undefined, operationId ?? undefined);
+    };
+    operationId = commitMeOwnerIntent({
       kind: "ME_PICK",
       seq: this.seq,
       pinned: this.interactionCounter,
@@ -716,9 +720,7 @@ export class CoopReplayMePhase extends Phase {
       localRole: getCoopController()?.role ?? "guest",
       wave: pickWave,
       turn: 0,
-      resend: isCoopMeOperationJournalActive()
-        ? () => relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index, [step])
-        : undefined,
+      resend: isCoopMeOperationJournalActive() ? resend : undefined,
     });
     if (operationId == null && isCoopMeOperationEnabled()) {
       failCoopSharedSession(`Mystery pick ${this.seq}/${step} could not enter authoritative control`);
@@ -739,7 +741,7 @@ export class CoopReplayMePhase extends Phase {
       kind: ME_CHOICE_KIND,
       index,
     });
-    relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index, [step]); // P1 on seq_me; stable proposal ordinal
+    resend(); // P1 on seq_me; exact operation identity makes retries idempotent at authority
     // #831: for a REPEATED option-select round (delve / Safari) beginNewRound reset pickSent so THIS pick is
     // allowed, and this re-armed race INHERITS the live 9M terminal arm (awaitOutcomeThenTerminal reads
     // this.liveTerminalArm) rather than re-awaiting the inbox - a fast host's buffered LEAVE is never lost.
@@ -879,7 +881,11 @@ export class CoopReplayMePhase extends Phase {
     const step = this.subPickStep;
     // Wave-2c: DUAL-RUN - mint the typed ME_SUB intent (the guest owner's captured slot/index). The step
     // ordinal disambiguates repeated sub-picks that FIFO on the same seq. No-op when the flag is OFF.
-    const operationId = commitMeOwnerIntent({
+    let operationId: string | null = null;
+    const resend = (): void => {
+      relay.sendInteractionChoice(this.seq, ME_SUBPICK_KIND, value, [step], undefined, operationId ?? undefined);
+    };
+    operationId = commitMeOwnerIntent({
       kind: "ME_SUB",
       seq: this.seq,
       pinned: this.interactionCounter,
@@ -888,16 +894,14 @@ export class CoopReplayMePhase extends Phase {
       localRole: getCoopController()?.role ?? "guest",
       wave: globalScene.currentBattle?.waveIndex ?? -1,
       turn: 0,
-      resend: isCoopMeOperationJournalActive()
-        ? () => relay.sendInteractionChoice(this.seq, ME_SUBPICK_KIND, value, [step])
-        : undefined,
+      resend: isCoopMeOperationJournalActive() ? resend : undefined,
     });
     if (operationId == null && isCoopMeOperationEnabled()) {
       failCoopSharedSession(`Mystery sub-pick ${this.seq}/${step} could not enter authoritative control`);
       return false;
     }
     this.subPickStep = step + 1;
-    relay.sendInteractionChoice(this.seq, ME_SUBPICK_KIND, value, [step]); // stable proposal ordinal
+    resend(); // exact operation identity makes retries idempotent at authority
     return true;
   }
 

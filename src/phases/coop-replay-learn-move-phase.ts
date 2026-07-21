@@ -268,7 +268,16 @@ export class CoopReplayLearnMovePhase extends Phase {
       failCoopSharedSession(`Learn-move replay callback for slot ${this.partySlot} lost its captured guest binding`);
       return;
     }
-    relay.sendInteractionChoice(this.seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
+    const decisionOperationId =
+      this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+    relay.sendInteractionChoice(
+      this.seq,
+      LEARN_MOVE_CHOICE_KIND,
+      moveIndex,
+      undefined,
+      undefined,
+      decisionOperationId ?? undefined,
+    );
     armCoopLearnMoveIntentResend(
       {
         payload: {
@@ -280,20 +289,24 @@ export class CoopReplayLearnMovePhase extends Phase {
         },
         wave: globalScene.currentBattle?.waveIndex ?? 0,
         turn: globalScene.currentBattle?.turn ?? 0,
-        resend: () => relay.sendInteractionChoice(this.seq, LEARN_MOVE_CHOICE_KIND, moveIndex),
+        resend: () =>
+          relay.sendInteractionChoice(
+            this.seq,
+            LEARN_MOVE_CHOICE_KIND,
+            moveIndex,
+            undefined,
+            undefined,
+            decisionOperationId ?? undefined,
+          ),
       },
       operationBinding,
     );
-    if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
-      const decisionOperationId =
-        this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
-      if (
-        decisionOperationId == null
-        || !settleCoopV2InteractionOperation(decisionOperationId, this.coopOwningRuntime)
-      ) {
-        failCoopSharedSession(`Learn-move replay for slot ${this.partySlot} lost its exact V2 result address`);
-        return;
-      }
+    if (
+      isCoopLearnMoveAuthorityV2Active(operationBinding)
+      && (decisionOperationId == null || !settleCoopV2InteractionOperation(decisionOperationId, this.coopOwningRuntime))
+    ) {
+      failCoopSharedSession(`Learn-move replay for slot ${this.partySlot} lost its exact V2 result address`);
+      return;
     }
     void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }

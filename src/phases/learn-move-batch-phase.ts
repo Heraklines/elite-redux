@@ -529,6 +529,15 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
     );
     mirror?.endSession();
+    const expectedDecisionOperationId =
+      this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+    if (
+      isCoopLearnMoveAuthorityV2Active(operationBinding)
+      && (expectedDecisionOperationId == null || res?.operationId !== expectedDecisionOperationId)
+    ) {
+      failCoopSharedSession(`Learn-move batch decision for slot ${this.partyMemberIndex} was not exact`);
+      return;
+    }
     if (res == null) {
       coopWarn("learnmove", "guest batch terminal null (timeout/disconnect); keeping current moves (#848)", { seq });
       if (!this.commitCoopBatchResult([], true, "guest", operationBinding)) {

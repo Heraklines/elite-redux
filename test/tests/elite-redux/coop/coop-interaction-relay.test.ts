@@ -197,6 +197,61 @@ describe("co-op alternating-interaction relay (#633)", () => {
     expect(violations[0]).toContain("conflict");
   });
 
+  it("fails the guest locally instead of sending an unidentified V2 proposal", async () => {
+    const { host, guest } = createLoopbackPair();
+    const timer: { fire?: () => void } = {};
+    const guestViolations: string[] = [];
+    const authorityViolations: string[] = [];
+    const owner = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+      onV2AuthorityProposalViolation: reason => guestViolations.push(reason),
+    });
+    const authority = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+      onV2AuthorityProposalViolation: reason => authorityViolations.push(reason),
+      schedule: cb => {
+        timer.fire = cb;
+        return () => {};
+      },
+    });
+
+    const wait = authority.awaitInteractionChoice(3, 1, ["reward"]);
+    owner.sendInteractionChoice(3, "reward", 0, [0]);
+    await Promise.resolve();
+
+    expect(guestViolations).toHaveLength(1);
+    expect(guestViolations[0]).toContain("missing a valid immutable operation ID");
+    expect(authorityViolations).toEqual([]);
+    timer.fire?.();
+    await expect(wait).resolves.toBeNull();
+  });
+
+  it("fails authority before FIFO admission when a peer forges an unidentified V2 proposal", async () => {
+    const { host, guest } = createLoopbackPair();
+    const timer: { fire?: () => void } = {};
+    const violations: string[] = [];
+    const authority = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+      onV2AuthorityProposalViolation: reason => violations.push(reason),
+      schedule: cb => {
+        timer.fire = cb;
+        return () => {};
+      },
+    });
+
+    const wait = authority.awaitInteractionChoice(3, 1, ["reward"]);
+    guest.send({ t: "interactionChoice", seq: 3, kind: "reward", choice: 0, data: [0] });
+    await Promise.resolve();
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain("unidentified guest proposal");
+    timer.fire?.();
+    await expect(wait).resolves.toBeNull();
+  });
+
   it("deduplicates journal-first then raw interaction-choice carriers", async () => {
     const { host, guest } = createLoopbackPair();
     const owner = new CoopInteractionRelay(host);

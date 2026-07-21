@@ -200,6 +200,7 @@ async function awaitCommittedGuestMeSubPick(
       pinned: boundary.pinned,
       step: step as number,
       value: pick.choice,
+      operationId: pick.operationId,
       wave: boundary.wave,
       turn: 0,
     });

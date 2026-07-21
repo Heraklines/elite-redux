@@ -648,6 +648,14 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
 
     const res = await relay.awaitInteractionChoice(seq, COOP_LEARN_MOVE_FWD_WAIT_MS, COOP_LEARN_MOVE_CHOICE_KINDS);
     mirror?.endSession();
+    const expectedDecisionOperationId = coopLearnMoveDecisionOperationId(presentationOperationId);
+    if (
+      isCoopLearnMoveAuthorityV2Active(operationBinding)
+      && (expectedDecisionOperationId == null || res?.operationId !== expectedDecisionOperationId)
+    ) {
+      failCoopSharedSession(`Learn-move decision for slot ${slot} did not match its exact V2 presentation`);
+      return;
+    }
     if (res == null) {
       coopWarn("learnmove", "guest forward pick null (timeout/disconnect); keeping current moves", { slot, seq });
     }
@@ -716,7 +724,6 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       clearCoopLearnMoveForwardInFlight(slot);
       // Relay the human's forget-slot to the host (the sole engine); it applies the forget + learns.
       coopLog("learnmove", "guest relays owned-mon forget-pick (#835)", { seq, moveIndex });
-      relay?.sendInteractionChoice(seq, "learnMove", moveIndex);
       const payload = {
         type: "decision" as const,
         partySlot: slot,
@@ -724,27 +731,33 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         forgetSlot: moveIndex,
         maxMoveCount: pokemon.getMaxMoveCount(),
       };
+      const decisionOperationId =
+        this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+      relay?.sendInteractionChoice(seq, "learnMove", moveIndex, undefined, undefined, decisionOperationId ?? undefined);
       armCoopLearnMoveIntentResend(
         {
           payload,
           wave: globalScene.currentBattle?.waveIndex ?? 0,
           turn: globalScene.currentBattle?.turn ?? 0,
-          resend: () => relay?.sendInteractionChoice(seq, "learnMove", moveIndex),
+          resend: () =>
+            relay?.sendInteractionChoice(
+              seq,
+              "learnMove",
+              moveIndex,
+              undefined,
+              undefined,
+              decisionOperationId ?? undefined,
+            ),
         },
         operationBinding,
       );
-      if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
-        const decisionOperationId =
-          this.coopV2ControlOperationId == null
-            ? null
-            : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
-        if (
-          decisionOperationId == null
-          || !settleCoopV2InteractionOperation(decisionOperationId, this.coopOwningRuntime)
-        ) {
-          failCoopSharedSession(`Guest learn-move picker for slot ${slot} lost its exact V2 result address`);
-          return;
-        }
+      if (
+        isCoopLearnMoveAuthorityV2Active(operationBinding)
+        && (decisionOperationId == null
+          || !settleCoopV2InteractionOperation(decisionOperationId, this.coopOwningRuntime))
+      ) {
+        failCoopSharedSession(`Guest learn-move picker for slot ${slot} lost its exact V2 result address`);
+        return;
       }
       // DEFERRED continuation cleanup: now that the pick is committed, remove the back-out SelectModifier
       // copy + advance the alternation (the same commit the immediate no-op path does, but AFTER the pick

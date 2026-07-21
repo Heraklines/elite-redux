@@ -328,6 +328,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
               turn: globalScene.currentBattle?.turn ?? 0,
             },
         this.coopOperationBinding,
+        operationId ?? undefined,
       )
     ) {
       failCoopSharedSession(`Ability result ${this.coopSeq} could not enter durable authority`);
@@ -367,6 +368,13 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
             },
             this.coopOperationBinding,
           );
+    if (
+      isCoopAbilityPresentationAuthorityActive(this.coopOperationBinding)
+      && (adoption?.accepted !== true || action?.operationId !== adoption.operationId)
+    ) {
+      failCoopSharedSession(`Greater ability result ${this.coopSeq} did not match its exact V2 presentation`);
+      return;
+    }
     const data = adoption?.accepted === true && relayedData != null ? relayedData : [COOP_ABILITY_OP.CANCEL];
     const op = data[0];
     coopLog(

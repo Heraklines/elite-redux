@@ -906,3 +906,35 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   clean, ownership guard green, `git diff --check` clean, and zero TypeScript
   diagnostics in touched files (repository baseline remains non-zero). The
   Vitest regression is intentionally reserved for GitHub-hosted co-op shards.
+
+2026-07-21 - Stable proposal identity is mandatory across the V2 interaction registry
+
+- The reward/market exactly-once fix was still surface-local. Ability pickers,
+  learn-move and batch learn, catch-full, Revival Blessing, Colosseum, biome and
+  Crossroads, Mystery picks/sub-picks, and quiz answers could retain a retry but
+  omit its operation ID from the raw guest-to-authority carrier. A delayed retry
+  could therefore enter a later same-sequence waiter as a second human action.
+- `CoopInteractionRelay` now rejects every unidentified V2 guest decision before
+  send and again before authority FIFO admission. The only explicit exceptions
+  are faint replacement, which has a separate typed proposal protocol, and the
+  non-retrying Mystery presentation button pump, which remains a named V2
+  compatibility debt rather than an accidental exception.
+- Every retrying guest-owned production surface above now sends the exact result
+  operation ID derived from its immutable presentation or deterministic surface
+  address. Host adoption additionally compares the carrier ID with its expected
+  address before mutation for reward/market, biome/Crossroads, Mystery,
+  Colosseum, ability, learn-move, batch learn, catch-full, and revival decisions.
+  Timeouts or unidentified fallbacks no longer become locally invented V2
+  results on those surfaces.
+- Added relay regressions proving a missing ID fails locally without sending and
+  a forged raw frame fails at authority before it can resolve or buffer into a
+  waiter. Expanded the public source contract so future interaction surfaces
+  cannot silently remove the send/receive guards or the exact Mystery/biome
+  checks.
+- Local permitted evidence: public Authority V2 contract 30/30 green, scoped
+  Biome clean, `git diff --check` clean, and zero TypeScript diagnostics in all
+  touched files. Full TypeScript remains at the unrelated 222-error repository
+  baseline. Co-op Vitest/browser evidence remains remote-only.
+- TODO: push this isolated checkpoint, run the exact-SHA remote gate, then
+  continue with recovery reconstruction for wave-owned controls and the
+  multi-target command-frontier fence.

@@ -83,7 +83,19 @@ export class CoopGuestCatchFullPhase extends Phase {
           const partySlot = slotIndex >= 0 && slotIndex < 6 ? slotIndex : -1;
           const wave = globalScene.currentBattle?.waveIndex ?? 0;
           const turn = globalScene.currentBattle?.turn ?? 0;
-          const resend = () => relay.sendInteractionChoice(seq, "catchFull", partySlot);
+          const decisionOperationId =
+            this.coopV2ControlOperationId == null
+              ? null
+              : coopCatchFullDecisionOperationId(this.coopV2ControlOperationId);
+          const resend = () =>
+            relay.sendInteractionChoice(
+              seq,
+              "catchFull",
+              partySlot,
+              undefined,
+              undefined,
+              decisionOperationId ?? undefined,
+            );
           resend();
           armCoopCatchFullIntentResend(
             {
@@ -94,10 +106,6 @@ export class CoopGuestCatchFullPhase extends Phase {
             },
             operationBinding,
           );
-          const decisionOperationId =
-            this.coopV2ControlOperationId == null
-              ? null
-              : coopCatchFullDecisionOperationId(this.coopV2ControlOperationId);
           if (decisionOperationId != null) {
             settleCoopV2InteractionOperation(decisionOperationId, this.coopOwningRuntime);
           }

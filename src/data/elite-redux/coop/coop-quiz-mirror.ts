@@ -121,7 +121,11 @@ export function coopQuizPublishAnswer(index: number, choice: number): void {
   // the legacy quizAns relay above is the fallback and stays live either way. Never throws.
   const relay = getCoopInteractionRelay();
   const localRole = getCoopController()?.role ?? "guest";
-  const operationId = commitMeOwnerIntent({
+  let operationId: string | null = null;
+  const resend = (): void => {
+    relay?.sendInteractionChoice(seq, "quizAns", choice, undefined, undefined, operationId ?? undefined);
+  };
+  operationId = commitMeOwnerIntent({
     kind: "QUIZ_ANSWER",
     seq,
     pinned: counter,
@@ -130,8 +134,7 @@ export function coopQuizPublishAnswer(index: number, choice: number): void {
     localRole,
     wave: globalScene?.currentBattle?.waveIndex ?? -1,
     turn: 0,
-    resend:
-      localRole === "guest" && relay != null ? () => relay.sendInteractionChoice(seq, "quizAns", choice) : undefined,
+    resend: localRole === "guest" && relay != null ? resend : undefined,
   });
   if (operationId == null && isCoopMeOperationEnabled()) {
     failCoopSharedSession(`Quiz answer ${index} could not enter authoritative control`);
@@ -147,7 +150,7 @@ export function coopQuizPublishAnswer(index: number, choice: number): void {
   // Guest-owned answers are proposals and must reach the host. Host-owned answers are journal-led;
   // do not let a raw frame outrun the committed envelope on the follower.
   if (localRole === "guest" || !isCoopMeOperationEnabled() || !isCoopOperationJournalActive()) {
-    relay?.sendInteractionChoice(seq, "quizAns", choice);
+    resend();
   }
 }
 

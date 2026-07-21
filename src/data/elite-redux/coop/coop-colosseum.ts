@@ -60,6 +60,7 @@ import {
   commitColosseumBoard,
   commitColosseumDecision,
   coopColosseumDecisionOperationId,
+  isCoopColosseumAuthorityV2Active,
   isCoopColosseumOperationEnabled,
 } from "#data/elite-redux/coop/coop-colosseum-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -269,6 +270,7 @@ export function coopColosseumSendDecision(index: number, roundOverride?: number)
   }
   const operationEnabled = isCoopColosseumOperationEnabled();
   const operationBinding = operationEnabled ? captureCoopColosseumOperationBinding(controller.role) : null;
+  let proposalOperationId: string | undefined;
   if (operationEnabled) {
     const committed = commitColosseumDecision(
       {
@@ -288,6 +290,7 @@ export function coopColosseumSendDecision(index: number, roundOverride?: number)
     if (committed.kind === "duplicate") {
       return true;
     }
+    proposalOperationId = committed.operationId;
     if (
       controller.role === "host"
       && !setCoopMeColosseumControl(pinned, {
@@ -306,7 +309,14 @@ export function coopColosseumSendDecision(index: number, roundOverride?: number)
     || !operationEnabled
     || !isCoopOperationJournalActiveFor(operationBinding?.durability ?? null)
   ) {
-    getCoopInteractionRelay()?.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index, [round]);
+    getCoopInteractionRelay()?.sendInteractionChoice(
+      seq,
+      COOP_COLOSSEUM_PICK_KIND,
+      index,
+      [round],
+      undefined,
+      proposalOperationId,
+    );
   }
   if (controller.role === "guest") {
     const relay = getCoopInteractionRelay();
@@ -316,7 +326,7 @@ export function coopColosseumSendDecision(index: number, roundOverride?: number)
         round,
         index,
         () => {
-          relay.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index, [round]);
+          relay.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index, [round], undefined, proposalOperationId);
         },
         operationBinding,
       );
@@ -388,6 +398,7 @@ export async function coopColosseumAwaitDecision(
           boardOperationId == null ? null : coopColosseumDecisionOperationId(boardOperationId);
         if (
           decisionOperationId == null
+          || (isCoopColosseumAuthorityV2Active(operationBinding) && pick.operationId !== decisionOperationId)
           || (beforeHostCommit != null && !beforeHostCommit(decisionOperationId, index))
         ) {
           failCoopSharedSession(`Colosseum decision ${seq}/${round} could not prove its phase terminal`);

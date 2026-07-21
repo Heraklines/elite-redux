@@ -123,6 +123,7 @@ export function sendCoopAbilityPickerOutcome(
   data: number[],
   context?: { localRole: CoopRole; wave: number; turn?: number },
   operationBinding?: CoopAbilityOperationBinding | null,
+  proposalOperationId?: string,
 ): boolean {
   const committed =
     context == null || commitAbilityOwnerOutcome({ pinned: shopSeq, data, ...context }, operationBinding);
@@ -135,13 +136,27 @@ export function sendCoopAbilityPickerOutcome(
     return true;
   }
   const derivedSeq = coopAbilityPickerSeq(shopSeq);
-  relay?.sendInteractionChoice(derivedSeq, COOP_ABILITY_KIND, COOP_ABILITY_OUTCOME, [...data]);
+  relay?.sendInteractionChoice(
+    derivedSeq,
+    COOP_ABILITY_KIND,
+    COOP_ABILITY_OUTCOME,
+    [...data],
+    undefined,
+    proposalOperationId,
+  );
   if (context?.localRole === "guest" && relay != null) {
     armCoopAbilityOutcomeResend(
       shopSeq,
       data,
       () => {
-        relay.sendInteractionChoice(derivedSeq, COOP_ABILITY_KIND, COOP_ABILITY_OUTCOME, [...data]);
+        relay.sendInteractionChoice(
+          derivedSeq,
+          COOP_ABILITY_KIND,
+          COOP_ABILITY_OUTCOME,
+          [...data],
+          undefined,
+          proposalOperationId,
+        );
       },
       operationBinding,
     );

@@ -1136,6 +1136,7 @@ export interface CoopMeAuthorityGuestIntentParams {
   readonly pinned: number;
   readonly step: number;
   readonly value: number;
+  readonly operationId: string | undefined;
   readonly wave: number;
   readonly turn: number;
 }
@@ -1147,6 +1148,19 @@ export interface CoopMeAuthorityGuestIntentParams {
  */
 export function commitMeAuthorityGuestIntent(params: CoopMeAuthorityGuestIntentParams): CoopMeAuthorityIntentResult {
   const s = state();
+  const expectedOperationId = makeCoopOperationId(
+    s.epoch,
+    ownerSeatFor(params.kind, params.pinned),
+    meOpAddr(params.kind, params.seq, params.step),
+    params.kind,
+  );
+  if (params.operationId !== expectedOperationId) {
+    coopWarn(
+      "me",
+      `ME authority rejected unidentified/mismatched ${params.kind} proposal expected=${expectedOperationId}`,
+    );
+    return { kind: "failed" };
+  }
   const steps = params.kind === "ME_PICK" ? s.authorityPickSteps : s.authoritySubPickSteps;
   const expected = steps.get(params.pinned) ?? 0;
   if (!Number.isSafeInteger(params.step) || params.step < 0 || params.step > 999) {

@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   type CoopCatchFullOperationBinding,
   captureCoopCatchFullOperationBinding,
@@ -131,6 +132,15 @@ export function coopHostPrepareWildCatchFullDecision(
   return relay
     .awaitInteractionChoice(COOP_CATCH_FULL_SEQ, getCoopFaintSwitchWaitMs(), COOP_CATCH_FULL_CHOICE_KINDS)
     .then(pick => {
+      const expectedDecisionOperationId =
+        promptOperationId === "legacy" ? null : coopCatchFullDecisionOperationId(promptOperationId);
+      if (
+        isCoopV2InteractionCutoverActive(operationBinding.durability)
+        && (expectedDecisionOperationId == null || pick?.operationId !== expectedDecisionOperationId)
+      ) {
+        failCoopSharedSession(`Catch-full decision for species ${speciesId} did not match its exact V2 prompt`);
+        return null;
+      }
       const slot = pick?.choice ?? null;
       const partySize = globalScene.getPlayerParty().length;
       if (slot == null || slot < 0 || slot >= partySize) {

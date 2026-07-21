@@ -213,7 +213,18 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
         mirror?.endSession();
         const { choice, data } = encodeCoopLearnMoveBatchTerminal(learned);
         coopLog("learnmove", "guest relays owned-mon batch terminal (#848)", { seq, count: choice });
-        relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, choice, data);
+        const decisionOperationId =
+          phase.coopV2ControlOperationId == null
+            ? null
+            : coopLearnMoveDecisionOperationId(phase.coopV2ControlOperationId);
+        relay.sendInteractionChoice(
+          seq,
+          LEARN_MOVE_BATCH_CHOICE_KIND,
+          choice,
+          data,
+          undefined,
+          decisionOperationId ?? undefined,
+        );
         armCoopLearnMoveBatchIntentResend(
           {
             payload: {
@@ -224,22 +235,25 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
             },
             wave: globalScene.currentBattle?.waveIndex ?? 0,
             turn: globalScene.currentBattle?.turn ?? 0,
-            resend: () => relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, choice, data),
+            resend: () =>
+              relay.sendInteractionChoice(
+                seq,
+                LEARN_MOVE_BATCH_CHOICE_KIND,
+                choice,
+                data,
+                undefined,
+                decisionOperationId ?? undefined,
+              ),
           },
           operationBinding,
         );
-        if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
-          const decisionOperationId =
-            phase.coopV2ControlOperationId == null
-              ? null
-              : coopLearnMoveDecisionOperationId(phase.coopV2ControlOperationId);
-          if (
-            decisionOperationId == null
-            || !settleCoopV2InteractionOperation(decisionOperationId, phase.owningRuntime())
-          ) {
-            failCoopSharedSession(`Guest batch learn result for slot ${partySlot} lost its exact V2 address`);
-            return;
-          }
+        if (
+          isCoopLearnMoveAuthorityV2Active(operationBinding)
+          && (decisionOperationId == null
+            || !settleCoopV2InteractionOperation(decisionOperationId, phase.owningRuntime()))
+        ) {
+          failCoopSharedSession(`Guest batch learn result for slot ${partySlot} lost its exact V2 address`);
+          return;
         }
         closePanel();
       },
@@ -252,29 +266,42 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
         coopWarn("learnmove", "guest batch panel fallback -> relay FALLBACK terminal (host uses per-move) (#848)", {
           seq,
         });
-        relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, COOP_LEARN_MOVE_BATCH_FALLBACK);
+        const decisionOperationId =
+          phase.coopV2ControlOperationId == null
+            ? null
+            : coopLearnMoveDecisionOperationId(phase.coopV2ControlOperationId);
+        relay.sendInteractionChoice(
+          seq,
+          LEARN_MOVE_BATCH_CHOICE_KIND,
+          COOP_LEARN_MOVE_BATCH_FALLBACK,
+          undefined,
+          undefined,
+          decisionOperationId ?? undefined,
+        );
         armCoopLearnMoveBatchIntentResend(
           {
             payload: { type: "decision", partySlot, assignments: [], fallback: true },
             wave: globalScene.currentBattle?.waveIndex ?? 0,
             turn: globalScene.currentBattle?.turn ?? 0,
             resend: () =>
-              relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, COOP_LEARN_MOVE_BATCH_FALLBACK),
+              relay.sendInteractionChoice(
+                seq,
+                LEARN_MOVE_BATCH_CHOICE_KIND,
+                COOP_LEARN_MOVE_BATCH_FALLBACK,
+                undefined,
+                undefined,
+                decisionOperationId ?? undefined,
+              ),
           },
           operationBinding,
         );
-        if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
-          const decisionOperationId =
-            phase.coopV2ControlOperationId == null
-              ? null
-              : coopLearnMoveDecisionOperationId(phase.coopV2ControlOperationId);
-          if (
-            decisionOperationId == null
-            || !settleCoopV2InteractionOperation(decisionOperationId, phase.owningRuntime())
-          ) {
-            failCoopSharedSession(`Guest batch fallback for slot ${partySlot} lost its exact V2 address`);
-            return;
-          }
+        if (
+          isCoopLearnMoveAuthorityV2Active(operationBinding)
+          && (decisionOperationId == null
+            || !settleCoopV2InteractionOperation(decisionOperationId, phase.owningRuntime()))
+        ) {
+          failCoopSharedSession(`Guest batch fallback for slot ${partySlot} lost its exact V2 address`);
+          return;
         }
         closePanel();
       },

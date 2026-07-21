@@ -570,7 +570,7 @@ export class ErCrossroadsPhase extends Phase {
     const operationId = coopBiomeOperationId("CROSSROADS_PICK", seq, pinned, binding);
     const relay = getCoopInteractionRelay();
     const resend = (): void => {
-      relay?.sendInteractionChoice(seq, "crossroads", choice);
+      relay?.sendInteractionChoice(seq, "crossroads", choice, undefined, undefined, operationId);
     };
     const role = getCoopController()?.role ?? "guest";
     // Freeze and validate the typed intent before publishing the compatibility proposal. Under Authority
@@ -703,7 +703,13 @@ export class ErCrossroadsPhase extends Phase {
       await this.finishCommittedCrossroadsWatcher(operationId, pinned);
       return;
     }
-    this.applyCrossroadsWatcherDecision(pinned, operationId, role, res == null ? null : { choice: res.choice }, false);
+    this.applyCrossroadsWatcherDecision(
+      pinned,
+      operationId,
+      role,
+      res == null ? null : { choice: res.choice, operationId: res.operationId },
+      false,
+    );
   }
 
   private committedCrossroadsChoice(receipt: CoopBiomeCommitReceipt | null, operationId: string): number | null {
