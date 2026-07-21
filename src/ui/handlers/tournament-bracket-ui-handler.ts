@@ -30,9 +30,11 @@
 import { globalScene } from "#app/global-scene";
 import {
   type BracketMatchView,
+  type BracketView,
   formatDeadline,
   formatLastSeen,
   isBracketComplete,
+  isKickedParticipant,
   isPresent,
   nextMatchFor,
   opponentOf,
@@ -109,10 +111,14 @@ export class TournamentBracketUiHandler extends UiHandler {
 
   private config: TournamentBracketConfig | null = null;
   private browse: BrowseCursor = { round: 0, slot: 0 };
+  /** P3 pagination: the current bracket SECTION page (0-based); 0 for the single-tree (<=16) path. */
+  private section = 0;
   /** The match the browse cursor sits on (its pairing card is shown). */
   private browsedMatch: BracketMatchView | null = null;
-  /** Set when the browsed match is YOUR playable match (A enters the lobby). */
+  /** Set when a playable YOUR match is actionable (A enters the lobby). */
   private playableOpponent: string | null = null;
+  /** The match id A acts on (the pinned your-match; may differ from the browsed cell when paginated). */
+  private playableMatchId: string | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private requestedAtlases = new Set<string>();
 
@@ -252,6 +258,8 @@ export class TournamentBracketUiHandler extends UiHandler {
       const round = Phaser.Math.Clamp(forced.round, 0, rounds.length - 1);
       const slot = Phaser.Math.Clamp(forced.slot, 0, (rounds[round]?.length ?? 1) - 1);
       this.browse = { round, slot };
+      // P3: keep the section page in sync with a forced browse cursor (render goldens / realpath).
+      this.section = this.sectionOfMatch(round, slot);
     }
     this.layout();
     this.container.setVisible(true);
@@ -266,6 +274,11 @@ export class TournamentBracketUiHandler extends UiHandler {
       return;
     }
     const t = cfg.tournament;
+    if (t.state === "cancelled") {
+      this.headerStatus.setText("Cancelled");
+      this.headerStatus.setTint(ELIM_RED);
+      return;
+    }
     if (isBracketComplete(t.bracket ?? { size: 0, rounds: [] })) {
       this.headerStatus.setText("Champion crowned");
       this.headerStatus.setTint(GOLD);
@@ -321,11 +334,55 @@ export class TournamentBracketUiHandler extends UiHandler {
     }
     const mine = nextMatchFor(bracket, this.config?.ownParticipant ?? "");
     this.browse = mine ? { round: mine.round, slot: mine.slot } : { round: 0, slot: 0 };
+    // P3: default the section page to the one containing the viewer's match (else page 0).
+    this.section = mine ? this.sectionOfMatch(mine.round, mine.slot) : 0;
   }
 
   private matchAt(round: number, slot: number): BracketMatchView | null {
     const rounds = this.config?.tournament.bracket?.rounds;
     return rounds?.[round]?.[slot] ?? null;
+  }
+
+  // #endregion
+  // #region pagination geometry (P3 — 32/64 bracket sections)
+
+  /**
+   * How many SECTION pages the board splits into: 1 for <=16 (single tree), 2 (HALVES) for a
+   * 32-slot field, 4 (QUADRANTS) for 64. Round-of-32/64 columns never render all on one screen.
+   */
+  private sectionCount(): number {
+    const size = this.config?.tournament.bracket?.size ?? 0;
+    if (size <= 16) {
+      return 1;
+    }
+    return size === 32 ? 2 : 4;
+  }
+
+  /** Round-0 matches per section page (8 for both 32-halves and 64-quadrants — the readable density). */
+  private perSectionRound0(): number {
+    const size = this.config?.tournament.bracket?.size ?? 2;
+    return size / 2 / this.sectionCount();
+  }
+
+  /** The last round a section OWNS on its page (its convergence match); downstream rounds are shared. */
+  private convergeRound(): number {
+    return Math.round(Math.log2(Math.max(1, this.perSectionRound0())));
+  }
+
+  /** The [lo, hi] GLOBAL slot range a section owns at `round` (inclusive). */
+  private sectionSlotRange(section: number, round: number): { lo: number; hi: number } {
+    const per = this.perSectionRound0() >> round;
+    const lo = section * per;
+    return { lo, hi: lo + per - 1 };
+  }
+
+  /** Which section page a (round, slot) belongs to (rounds beyond convergence map to section 0). */
+  private sectionOfMatch(round: number, slot: number): number {
+    if (round > this.convergeRound()) {
+      return 0;
+    }
+    const per = this.perSectionRound0() >> round;
+    return Math.floor(slot / Math.max(1, per));
   }
 
   // #endregion
@@ -340,6 +397,12 @@ export class TournamentBracketUiHandler extends UiHandler {
     const bracket = cfg?.tournament.bracket;
     if (cfg == null || bracket == null) {
       this.layoutCard();
+      return;
+    }
+
+    // P3: 32/64 fields paginate into bracket sections; <=16 keeps the single tree.
+    if (this.sectionCount() > 1) {
+      this.layoutPaginated(cfg, bracket);
       return;
     }
 
@@ -413,9 +476,178 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.layoutCard();
   }
 
+  /**
+   * P3 PAGINATED layout (32/64 fields). Renders ONE bracket SECTION (half for 32, quadrant for 64):
+   * its round-0..convergence columns at the readable single-tree density, plus a compact FINALS
+   * column (the shared downstream rounds + champion), a mini-overview strip showing the current
+   * section, and the your-match card pinned at the bottom regardless of page.
+   */
+  private layoutPaginated(cfg: TournamentBracketConfig, bracket: BracketView): void {
+    const w = globalScene.scaledCanvas.width;
+    const h = globalScene.scaledCanvas.height;
+    const sectionCount = this.sectionCount();
+    const convRound = this.convergeRound();
+    const cols = convRound + 2; // section rounds 0..convRound + the finals/champion column
+    const marginX = 5;
+    const areaTop = 43;
+    const areaBottom = h - BOTTOM_CARD_H - 6;
+    const areaH = areaBottom - areaTop;
+    const colW = (w - 2 * marginX) / cols;
+    const cellW = colW - 6;
+    const cellLeft = (c: number) => marginX + c * colW + 3;
+    const cellRight = (c: number) => cellLeft(c) + cellW;
+    const n0 = this.perSectionRound0();
+    const centerY = (localM: number, count: number) => areaTop + ((localM + 0.5) * areaH) / count;
+    const cellH = Phaser.Math.Clamp(areaH / n0 - 3, 13, 22);
+
+    const own = cfg.ownParticipant;
+    const yourMatch = nextMatchFor(bracket, own);
+
+    // mini-overview strip (which section you are viewing + L/R hint + your-section marker)
+    this.drawSectionStrip(w, sectionCount, yourMatch);
+
+    // round-column banners for the section, then the Finals column
+    for (let r = 0; r <= convRound; r++) {
+      this.drawRoundBanner(cellLeft(r), cellW, roundLabel(r, bracket.rounds.length), false, 33);
+    }
+    this.drawRoundBanner(cellLeft(cols - 1), cellW, "Finals", true, 33);
+
+    // connecting lines within the section (elbow joins), converging into the Finals column
+    for (let r = 0; r <= convRound; r++) {
+      const { lo } = this.sectionSlotRange(this.section, r);
+      const count = n0 >> r;
+      for (let localM = 0; localM < count; localM++) {
+        const match = bracket.rounds[r][lo + localM];
+        const childY = centerY(localM, count);
+        const decided = match.winner !== null;
+        if (r < convRound) {
+          const targetY = centerY(Math.floor(localM / 2), count / 2);
+          this.drawConnector(cellRight(r), childY, cellLeft(r + 1), targetY, decided);
+        } else {
+          this.drawConnector(cellRight(r), childY, cellLeft(cols - 1), centerY(0, 1), decided);
+        }
+      }
+    }
+
+    // section match cells
+    this.browsedMatch = null;
+    for (let r = 0; r <= convRound; r++) {
+      const { lo } = this.sectionSlotRange(this.section, r);
+      const count = n0 >> r;
+      for (let localM = 0; localM < count; localM++) {
+        const gSlot = lo + localM;
+        const match = bracket.rounds[r][gSlot];
+        const cy = centerY(localM, count);
+        const isYour = yourMatch != null && match.id === yourMatch.id;
+        const isBrowsed = this.browse.round === r && this.browse.slot === gSlot;
+        if (isBrowsed) {
+          this.browsedMatch = match;
+        }
+        this.drawMatchCell(match, cellLeft(r), cy - cellH / 2, cellW, cellH, own, isYour, isBrowsed);
+      }
+    }
+
+    // the compact FINALS column (shared downstream rounds + champion pedestal)
+    this.drawFinalsColumn(cellLeft(cols - 1), cellW, bracket, convRound, own, yourMatch);
+
+    if (this.browsedMatch == null) {
+      this.browsedMatch = this.matchAt(this.browse.round, this.browse.slot);
+    }
+
+    if (isBracketComplete(bracket)) {
+      this.drawChampionOverlay(cfg.tournament.champion ?? null, own);
+    }
+
+    this.layoutCard();
+  }
+
+  /** The mini-overview strip: one segment per section, current gold-lit, your section star-marked. */
+  private drawSectionStrip(w: number, sectionCount: number, yourMatch: BracketMatchView | null): void {
+    const y = 24;
+    const stripH = 8;
+    const segW = 22;
+    const gap = 3;
+    const total = sectionCount * segW + (sectionCount - 1) * gap;
+    const startX = (w - total) / 2;
+    const yourSection = yourMatch == null ? -1 : this.sectionOfMatch(yourMatch.round, yourMatch.slot);
+    const sectionName = (i: number): string => (sectionCount === 2 ? (i === 0 ? "TOP" : "BOT") : `Q${i + 1}`);
+    for (let i = 0; i < sectionCount; i++) {
+      const x = startX + i * (segW + gap);
+      const cur = i === this.section;
+      this.plate(this.nodes, x, y, segW, stripH, {
+        fill: cur ? 0x2a2410 : HEADER_FILL,
+        border: cur ? GOLD : GOLD_DEEP,
+        borderW: cur ? 1.3 : 0.8,
+        borderAlpha: cur ? 1 : 0.6,
+      });
+      const label = `${sectionName(i)}${i === yourSection ? "*" : ""}`;
+      const t = addTextObject(x + segW / 2, y + 1, label, TextStyle.PARTY, { fontSize: "20px" });
+      t.setOrigin(0.5, 0);
+      t.setTint(cur ? GOLD : i === yourSection ? NEXT : SUBTLE);
+      this.container.add(t);
+      this.nodes.push(t);
+    }
+    // L / R page hints flanking the strip
+    const lh = addTextObject(startX - 5, y + 1, "◄L", TextStyle.PARTY, { fontSize: "20px" });
+    lh.setOrigin(1, 0);
+    lh.setTint(this.section > 0 ? GOLD : LINE_DIM);
+    const rh = addTextObject(startX + total + 5, y + 1, "R►", TextStyle.PARTY, { fontSize: "20px" });
+    rh.setOrigin(0, 0);
+    rh.setTint(this.section < sectionCount - 1 ? GOLD : LINE_DIM);
+    this.container.add(lh);
+    this.container.add(rh);
+    this.nodes.push(lh, rh);
+  }
+
+  /** True if `section`'s convergence winner feeds the downstream match at (round dr, slot m). */
+  private downstreamFedBySection(dr: number, m: number, section: number, convRound: number): boolean {
+    return Math.floor(section / 2 ** (dr - convRound)) === m;
+  }
+
+  /** The compact Finals column: shared downstream rounds (semis/final) stacked + champion pedestal. */
+  private drawFinalsColumn(
+    x: number,
+    cw: number,
+    bracket: BracketView,
+    convRound: number,
+    own: string,
+    yourMatch: BracketMatchView | null,
+  ): void {
+    const h = globalScene.scaledCanvas.height;
+    const areaTop = 43;
+    const areaBottom = h - BOTTOM_CARD_H - 6;
+    const champH = 30;
+    const dsTop = areaTop;
+    const dsBottom = areaBottom - champH - 4;
+    const items: { dr: number; m: number }[] = [];
+    for (let dr = convRound + 1; dr < bracket.rounds.length; dr++) {
+      for (let m = 0; m < bracket.rounds[dr].length; m++) {
+        items.push({ dr, m });
+      }
+    }
+    const ch = 16;
+    const slotGap = items.length > 0 ? (dsBottom - dsTop - items.length * ch) / (items.length + 1) : 0;
+    let yy = dsTop + Math.max(0, slotGap);
+    for (const it of items) {
+      const match = bracket.rounds[it.dr][it.m];
+      const isYour = yourMatch != null && match.id === yourMatch.id;
+      this.drawMatchCell(match, x, yy, cw, ch, own, isYour, false);
+      // ring only the IMMEDIATE downstream match this section feeds (its convergence target),
+      // so the viewer sees where their half/quadrant lands without over-marking the whole path.
+      if (it.dr === convRound + 1 && this.downstreamFedBySection(it.dr, it.m, this.section, convRound)) {
+        const ring = globalScene.add.rectangle(x - 1.5, yy - 1.5, cw + 3, ch + 3, WHITE, 0).setOrigin(0, 0);
+        ring.setStrokeStyle(1, NEXT, 0.85);
+        this.container.add(ring);
+        this.nodes.push(ring);
+      }
+      yy += ch + slotGap;
+    }
+    this.drawChampionPedestal(x, areaBottom - champH / 2, cw, own);
+  }
+
   /** A small gold-accented banner over a round column. */
-  private drawRoundBanner(x: number, cw: number, label: string, champion: boolean): void {
-    const y = 23;
+  private drawRoundBanner(x: number, cw: number, label: string, champion: boolean, yOverride?: number): void {
+    const y = yOverride ?? 23;
     const bw = Math.min(cw, 58);
     const bx = x + (cw - bw) / 2;
     this.plate(this.nodes, bx, y, bw, 8, {
@@ -509,8 +741,13 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.nodes.push(div);
 
     const emptyLabel = match.round === 0 ? "bye" : "TBD";
-    const aLoser = match.winner !== null && match.a !== null && match.a !== match.winner;
-    const bLoser = match.winner !== null && match.b !== null && match.b !== match.winner;
+    // P3: a KICKED entrant renders as eliminated (dim + X) even while their match is still pending
+    // (waiting for a not-yet-decided opponent) — folded into the loser rendering path.
+    const bracket = this.config?.tournament.bracket;
+    const aKicked = bracket != null && match.a !== match.winner && isKickedParticipant(bracket, match.a);
+    const bKicked = bracket != null && match.b !== match.winner && isKickedParticipant(bracket, match.b);
+    const aLoser = (match.winner !== null && match.a !== null && match.a !== match.winner) || aKicked;
+    const bLoser = (match.winner !== null && match.b !== null && match.b !== match.winner) || bKicked;
     const full = isYour || isBrowsed;
     this.drawSlot(match.a, match.winner, own, x, y, cw, half, emptyLabel, aLoser, full);
     this.drawSlot(match.b, match.winner, own, x, y + half, cw, half, emptyLabel, bLoser, full);
@@ -811,9 +1048,19 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.cardNodes = [];
     const cfg = this.config;
     this.playableOpponent = null;
+    this.playableMatchId = null;
     // Default the hint to the far-right edge; the opponent card (which frames a portrait
     // there) shifts it left so it never collides with the portrait + presence chip.
     this.cardHint.setX(globalScene.scaledCanvas.width - 12);
+    // CANCELLED state (P3 scenario 4): the board reads cancelled regardless of any bracket.
+    if (cfg != null && cfg.tournament.state === "cancelled") {
+      this.cardTitle.setTint(ELIM_RED);
+      this.cardTitle.setText("TOURNAMENT CANCELLED");
+      this.cardBody.setTint(SUBTLE);
+      this.cardBody.setText("This tournament was cancelled by the organizer.");
+      this.cardHint.setText("B: Back");
+      return;
+    }
     if (cfg == null || cfg.tournament.bracket == null) {
       this.cardTitle.setText("");
       this.cardBody.setText("");
@@ -837,6 +1084,21 @@ export class TournamentBracketUiHandler extends UiHandler {
     const match = this.browsedMatch;
     const yourMatch = nextMatchFor(bracket, own);
     const entered = cfg.tournament.entrants.some(e => e.participant === own);
+
+    // P3 PAGINATED: the your-match card is PINNED regardless of which section page you browse.
+    if (this.sectionCount() > 1 && yourMatch != null) {
+      const pinnedOpp = opponentOf(yourMatch, own);
+      if (pinnedOpp == null) {
+        this.cardTitle.setTint(NEXT);
+        this.cardTitle.setText("YOUR NEXT MATCH");
+        this.cardBody.setTint(WHITE);
+        this.cardBody.setText(`Waiting for your opponent    ${formatDeadline(yourMatch.deadline, cfg.now)}`);
+        this.cardHint.setText("B: Back");
+      } else {
+        this.drawOpponentCard(yourMatch, pinnedOpp);
+      }
+      return;
+    }
 
     const isYourBrowsed = match != null && yourMatch != null && match.id === yourMatch.id;
     const opponent = isYourBrowsed ? opponentOf(match, own) : null;
@@ -909,6 +1171,7 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.cardNodes.push(chipT);
 
     this.playableOpponent = opponent;
+    this.playableMatchId = match.id;
     // gold FIGHT prompt, shifted LEFT of the portrait so nothing overlaps.
     this.cardHint.setX(portraitCx - 24);
     this.cardHint.setTint(present ? GOLD : SUBTLE);
@@ -1034,10 +1297,10 @@ export class TournamentBracketUiHandler extends UiHandler {
     }
     switch (button) {
       case Button.ACTION:
-        if (this.playableOpponent != null && this.browsedMatch != null) {
+        if (this.playableOpponent != null && this.playableMatchId != null) {
           globalScene.ui.playSelect();
           this.stopPolling();
-          cfg.onPlayMatch(this.browsedMatch.id, this.playableOpponent);
+          cfg.onPlayMatch(this.playableMatchId, this.playableOpponent);
           return true;
         }
         return false;
@@ -1060,6 +1323,9 @@ export class TournamentBracketUiHandler extends UiHandler {
 
   /** d-pad browse: LEFT/RIGHT change round (column), UP/DOWN change slot within the round. */
   private moveBrowse(button: Button, rounds: BracketMatchView[][]): boolean {
+    if (this.sectionCount() > 1) {
+      return this.moveBrowsePaginated(button);
+    }
     let { round, slot } = this.browse;
     if (button === Button.LEFT || button === Button.RIGHT) {
       round = Phaser.Math.Clamp(round + (button === Button.RIGHT ? 1 : -1), 0, rounds.length - 1);
@@ -1072,6 +1338,53 @@ export class TournamentBracketUiHandler extends UiHandler {
       return false;
     }
     this.browse = { round, slot };
+    globalScene.ui.playSelect();
+    this.layout();
+    return true;
+  }
+
+  /**
+   * Paginated browse (P3): UP/DOWN move slots within the current section column; LEFT/RIGHT move
+   * between the section's round columns and, at the section's horizontal edges, PAGE to the
+   * previous/next section (L/R pages between sections, per the spec).
+   */
+  private moveBrowsePaginated(button: Button): boolean {
+    const convRound = this.convergeRound();
+    const sectionCount = this.sectionCount();
+    let { round, slot } = this.browse;
+    let section = this.section;
+    const clampToSection = (r: number): { lo: number; hi: number } => this.sectionSlotRange(section, r);
+
+    if (button === Button.UP || button === Button.DOWN) {
+      const { lo, hi } = clampToSection(round);
+      slot = Phaser.Math.Clamp(slot + (button === Button.DOWN ? 1 : -1), lo, hi);
+    } else if (button === Button.RIGHT) {
+      if (round < convRound) {
+        round++;
+      } else if (section < sectionCount - 1) {
+        section++;
+        round = 0;
+      } else {
+        return false;
+      }
+      slot = clampToSection(round).lo;
+    } else {
+      // LEFT
+      if (round > 0) {
+        round--;
+      } else if (section > 0) {
+        section--;
+        round = 0;
+      } else {
+        return false;
+      }
+      slot = clampToSection(round).lo;
+    }
+    if (round === this.browse.round && slot === this.browse.slot && section === this.section) {
+      return false;
+    }
+    this.browse = { round, slot };
+    this.section = section;
     globalScene.ui.playSelect();
     this.layout();
     return true;
@@ -1110,7 +1423,7 @@ import { trainerConfigs } from "#data/trainers/trainer-config";
 import { TrainerType } from "#enums/trainer-type";
 
 interface DemoOpts {
-  size: 4 | 8 | 16;
+  size: 4 | 8 | 16 | 32 | 64;
   /** Settle this many full early rounds (top seed wins) — legacy coarse control. */
   advancedRounds?: number;
   /** Force a bye field (odd count). */
@@ -1119,10 +1432,16 @@ interface DemoOpts {
   card?: "playable" | "waiting" | "dueSoon" | "champion" | "none";
   /** Put the browse cursor on a match that is NOT the viewer's (pairing-card golden). */
   browseOther?: boolean;
+  /** P3: force the initial section page (32/64 pagination goldens). */
+  browseSection?: number;
   /** The viewer loses their round-0 match (eliminated read-only view). */
   eliminated?: boolean;
   /** 4-field: settle only the OTHER semifinal (mid-round: advanced icon + dimmed loser). */
   resolvedSemi?: boolean;
+  /** P3: kick a non-viewer entrant mid-tournament (WALKOVER — opponent advances, kicked shown). */
+  kick?: boolean;
+  /** P3: render the tournament in the CANCELLED state (board shows cancelled). */
+  cancelled?: boolean;
 }
 
 /** A spread of PWT trainer classes for the demo ghost icons (resolved to real atlas keys). */
@@ -1190,17 +1509,19 @@ function demoSpriteKey(i: number): string {
 
 function makeBracketView(opts: DemoOpts, own: string, now: number): TournamentView {
   const n = opts.byes ? (opts.size === 8 ? 5 : opts.size === 16 ? 11 : 3) : opts.size;
-  const names = DEMO_USERNAMES;
+  // Usernames + ghost names cycle synthetic handles past the 16 authored ones (32/64 fields).
+  const username = (i: number): string => (i === 0 ? own : (DEMO_USERNAMES[i] ?? `Player${i + 1}`));
+  const ghostName = (i: number): string => DEMO_GHOST_NAMES[i % DEMO_GHOST_NAMES.length];
   const entrants = Array.from({ length: n }, (_, i) => ({
-    participant: names[i],
+    participant: username(i),
     // worker mirrors the account username into `name` — the board renders THIS.
-    name: names[i],
+    name: username(i),
     seed: i + 1,
     ghost: {
       spriteKey: demoSpriteKey(i),
       // DISTINCT authored ghost name (flavor only, never used as identity on the board).
-      name: DEMO_GHOST_NAMES[i],
-      ...(DEMO_TITLES[i] ? { title: DEMO_TITLES[i] } : {}),
+      name: ghostName(i),
+      ...(DEMO_TITLES[i % DEMO_TITLES.length] ? { title: DEMO_TITLES[i % DEMO_TITLES.length] } : {}),
     },
     lastSeen: null as number | null,
   }));
@@ -1306,6 +1627,28 @@ function makeBracketView(opts: DemoOpts, own: string, now: number): TournamentVi
     }
   }
 
+  // P3 KICK (walkover): kick a non-viewer entrant whose round-0 match is unplayed — the opponent
+  // advances by "walkover" and the kicked player is flagged for the board (rendered eliminated).
+  const kicked: string[] = [];
+  if (opts.kick) {
+    const victimMatch = rounds[0].find(m => m.winner === null && m.a && m.b && m.a !== own && m.b !== own);
+    if (victimMatch?.a && victimMatch.b) {
+      const victim = victimMatch.b as string;
+      const survivor = victimMatch.a as string;
+      kicked.push(victim);
+      victimMatch.winner = survivor;
+      victimMatch.resolution = "walkover";
+      if (victimMatch.round + 1 < roundsCount) {
+        const parent = rounds[victimMatch.round + 1][Math.floor(victimMatch.slot / 2)];
+        if (victimMatch.slot % 2 === 0) {
+          parent.a = survivor;
+        } else {
+          parent.b = survivor;
+        }
+      }
+    }
+  }
+
   // presence: mark the viewer's live opponent ONLINE for the opponent card.
   const mine = rounds.flat().find(m => m.winner === null && (m.a === own || m.b === own));
   const oppName = mine ? (mine.a === own ? mine.b : mine.a) : null;
@@ -1316,9 +1659,18 @@ function makeBracketView(opts: DemoOpts, own: string, now: number): TournamentVi
 
   return {
     id: "demo",
-    name: opts.size === 16 ? "Champions League" : opts.size === 4 ? "Sample Cup" : "Spring Showdown Cup",
+    name:
+      opts.size === 64
+        ? "World Grand Prix"
+        : opts.size === 32
+          ? "Continental Masters"
+          : opts.size === 16
+            ? "Champions League"
+            : opts.size === 4
+              ? "Sample Cup"
+              : "Spring Showdown Cup",
     organizer: "maintainer",
-    state: opts.card === "champion" ? "complete" : "in_progress",
+    state: opts.cancelled ? "cancelled" : opts.card === "champion" ? "complete" : "in_progress",
     roundWindowMs: 24 * 3_600_000,
     maxEntrants: opts.size,
     createdAt: now,
@@ -1326,7 +1678,7 @@ function makeBracketView(opts: DemoOpts, own: string, now: number): TournamentVi
     champion,
     entrantCount: n,
     entrants,
-    bracket: { size, rounds },
+    bracket: { size, rounds, ...(kicked.length > 0 ? { kicked } : {}) },
   };
 }
 
@@ -1345,6 +1697,11 @@ export function buildTournamentBracketDemoConfig(
   }
   // browse-other: put the cursor on a match that isn't the viewer's front.
   let initialBrowse: { round: number; slot: number } | undefined;
+  // P3: force a specific SECTION page (32/64 pagination goldens) — land on its first round-0 slot.
+  if (opts.browseSection != null && tournament.bracket) {
+    const perSection = tournament.bracket.size / 2 / (tournament.bracket.size === 32 ? 2 : 4);
+    initialBrowse = { round: 0, slot: opts.browseSection * perSection };
+  }
   if (opts.browseOther && tournament.bracket) {
     const mine = nextMatchFor(tournament.bracket, own);
     outer: for (let r = 0; r < tournament.bracket.rounds.length; r++) {

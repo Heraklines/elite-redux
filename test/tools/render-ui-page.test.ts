@@ -1269,6 +1269,49 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildTournamentBracketDemoConfig({ size: 4, card: "champion" })],
     diffTolerance: 0,
   },
+  // P3 PAGINATION — 32-field board paginated into HALVES. Default page = the viewer's section (TOP);
+  // section columns (R16 .. semifinal) + compact Finals column + mini-overview strip + pinned card.
+  "tournament-bracket-32": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 32, advancedRounds: 1, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // 32-field, viewing the OTHER (BOTTOM) section page — the your-match card stays pinned.
+  "tournament-bracket-32-section2": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [
+      buildTournamentBracketDemoConfig({ size: 32, advancedRounds: 1, browseSection: 1, card: "playable" }),
+    ],
+    diffTolerance: 0,
+  },
+  // P3 PAGINATION — 64-field board paginated into QUADRANTS. Default page = the viewer's quadrant (Q1);
+  // Finals column now stacks the two semifinals + final + champion.
+  "tournament-bracket-64": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 64, advancedRounds: 1, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // 64-field, viewing a FAR quadrant (Q3) — pagination + pinned card across pages.
+  "tournament-bracket-64-q3": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [
+      buildTournamentBracketDemoConfig({ size: 64, advancedRounds: 1, browseSection: 2, card: "playable" }),
+    ],
+    diffTolerance: 0,
+  },
+  // P3 KICK — a non-viewer entrant kicked mid-tournament (WALKOVER): their slot renders eliminated
+  // (dimmed + X) while the opponent advances along the gold line.
+  "tournament-bracket-kicked": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 8, kick: true, browseOther: true, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // P3 CANCELLED — the board reads "TOURNAMENT CANCELLED" over the bracket.
+  "tournament-bracket-cancelled": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 8, advancedRounds: 1, cancelled: true, card: "none" })],
+    diffTolerance: 0,
+  },
   // Showdown SET EDITOR (P1 layout core). The full-screen teambuilder Layer-3 editor for one
   // team slot: top team strip + validity chips, the left identity column (sprite / stage strip /
   // shiny chips / live stat bars / cost), the right field rows (ability / item / moves x4 /
