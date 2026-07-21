@@ -42,6 +42,7 @@ import {
   adoptRewardWatcherChoice,
   type CoopRewardOperationBinding,
   captureCoopRewardOperationBinding,
+  commitRewardOwnerIntent,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { clearCoopRuntime, isCoopSharedTerminalFrozen, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -189,15 +190,37 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       throw new Error("retained market test requires an installed host operation binding");
     }
     phase.coopRewardOperationBinding = binding;
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const turn = globalScene.currentBattle?.turn ?? 0;
+    // Under the all-V2 interaction cutover the host validates the guest proposal by its exact operation
+    // identity (`params.action.operationId === opId`, or `proposal-operation-id-mismatch`). A real
+    // cutover-active guest owner mints that typed intent first and carries the id on the wire; mirror it
+    // here via the production owner-mint helper (mirrors CoopReplayMePhase's commitMeOwnerIntent idiom) so
+    // the retained host intent addresses the same operation. The id is minted through
+    // makeCoopOperationId + coopRewardOperationActionSlot inside commitRewardOwnerIntent.
+    const guestProposal = commitRewardOwnerIntent(
+      {
+        surface: "market",
+        pinned,
+        label: "biomeShop",
+        choice: slot,
+        data,
+        terminal: false,
+        localRole: "guest",
+        wave,
+        turn,
+      },
+      binding,
+    );
     const decision = adoptRewardWatcherChoice(
       {
         surface: "market",
         pinned,
-        action: { choice: slot, data },
+        action: { choice: slot, data, operationId: guestProposal?.operationId },
         terminal: false,
         localRole: "host",
-        wave: globalScene.currentBattle?.waveIndex ?? 0,
-        turn: globalScene.currentBattle?.turn ?? 0,
+        wave,
+        turn,
       },
       binding,
     );

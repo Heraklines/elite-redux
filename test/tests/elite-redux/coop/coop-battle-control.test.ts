@@ -374,11 +374,24 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     const faintedSlot = globalScene.getPlayerParty().indexOf(fainted);
 
     const { getCoopInteractionRelay } = await import("#data/elite-redux/coop/coop-runtime");
+    const { coopRevivalDecisionOperationId } = await import("#data/elite-redux/coop/coop-revival-operation");
+    const { PartyUiMode } = await import("#ui/party-ui-handler");
     const relay = getCoopInteractionRelay()!;
     const promptSpy = vi.spyOn(relay, "promptRevival");
-    const pickSpy = vi
-      .spyOn(relay, "awaitInteractionChoice")
-      .mockResolvedValue({ choice: faintedSlot, data: [0, fainted.species.speciesId] } as never);
+    // Under the all-V2 revival cutover the host validates the partner's pick by the EXACT successor operation
+    // id (`res.operationId !== coopRevivalDecisionOperationId(prompt, slot)` fails the shared session closed).
+    // A real cutover-active partner materializer carries that id on its relayed decision; mirror it by minting
+    // the decision id from the prompt id the phase actually sent (captured off promptSpy).
+    const pickSpy = vi.spyOn(relay, "awaitInteractionChoice").mockImplementation(() => {
+      const promptOperationId = promptSpy.mock.calls.at(-1)?.[1] as string | undefined;
+      const decisionOperationId =
+        promptOperationId == null ? null : coopRevivalDecisionOperationId(promptOperationId, faintedSlot);
+      return Promise.resolve({
+        choice: faintedSlot,
+        data: [0, fainted.species.speciesId],
+        operationId: decisionOperationId ?? undefined,
+      }) as never;
+    });
     const uiSpy = vi.spyOn(globalScene.ui, "setMode");
 
     const { RevivalBlessingPhase } = await import("#phases/revival-blessing-phase");
@@ -394,10 +407,16 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       guestMon.getFieldIndex(),
       expect.any(String),
     );
+    // Under V2 the OWNER (partner) mints the pick and the host is the WATCHER: it opens the PARTY surface only
+    // as the passive REVIVAL_BLESSING spectator (an inert selection callback), never an interactive host
+    // picker. The applied revive is the partner's exact V2-authenticated relay - a mismatched decision
+    // operation id would fail the session closed and leave the mon fainted, so the revive below is the proof
+    // that the host never owned the pick.
+    const partyOpens = uiSpy.mock.calls.filter(c => c[0] === UiMode.PARTY);
     expect(
-      uiSpy.mock.calls.some(c => c[0] === UiMode.PARTY),
-      "the HOST's party screen never opened for the partner's move",
-    ).toBe(false);
+      partyOpens.every(c => c[1] === PartyUiMode.REVIVAL_BLESSING),
+      "any host PARTY open is the passive revival watcher view, never an interactive host picker",
+    ).toBe(true);
     expect(fainted.isFainted(), "the picked mon was revived from the relayed pick").toBe(false);
     expect(fainted.hp, "revived at half HP").toBeGreaterThan(0);
     expect(ended, "phase completed").toBe(true);
