@@ -1573,29 +1573,22 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       }
       const guestMeChanceBeforeNewBiome = rig.guestScene.mysteryEncounterSaveData.encounterSpawnChance;
 
-      // First drive the host through its real encounter/PostSummon queue to the CommandPhase boundary
-      // without starting that phase. This makes the pre-summon wave carrier available, while deliberately
-      // withholding the command-start refresh and rendezvous arrival. Then let the renderer reach and START
-      // its own real CommandPhase first: it consumes that initial carrier, arrives at the reciprocal command
-      // barrier, and must keep public input closed. Starting the already-current host CommandPhase publishes
-      // the refreshed complete state and arrives at the same barrier. Ordered delivery puts that refresh before the arrival;
-      // the guest's crossed-barrier continuation must re-consume it before opening COMMAND. This is the
-      // production guest-first schedule that exposed the entry-stage split; stopping before CommandPhase
-      // start would inspect an intentionally pre-continuation boundary and bypass the recovery seam.
+      // First drive both clients to their first real CommandPhase without starting the authority's phase.
+      // The renderer's first phase represents the host-owned actor, so it must park with public input closed
+      // until the host publishes the ordered command frontier. Only after that exact entry arrives may the
+      // renderer cross the host-owned phase and reach its own actionable CommandPhase. Asking the harness to
+      // skip directly to the guest-owned phase before authority exists is an impossible single-threaded
+      // schedule: the correctly parked predecessor prevents the driver itself from reaching its target.
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
-      const guestCommand = await withClient(rig.guestCtx, () =>
-        driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
-          matches: phase =>
-            phase.phaseName === "CommandPhase"
-            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
-        }),
+      const guestReplicaCommand = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "first replicated CommandPhase"),
       );
       await withClient(rig.guestCtx, async () => {
-        guestCommand.start();
+        guestReplicaCommand.start();
         await drainLoopback();
         expect(
           rig.guestScene.ui.getMode(),
-          "guest-first command remains closed until host post-summon authority is available",
+          "the replicated host-owned command remains closed until ordered host authority is available",
         ).not.toBe(UiMode.COMMAND);
       });
       await withClient(rig.hostCtx, async () => {
@@ -1607,7 +1600,15 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         await drainLoopback();
       });
       const hostCommandReadyState = withClientSync(rig.hostCtx, () => captureCoopChecksumState());
+      const guestCommand = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
+          matches: phase =>
+            phase.phaseName === "CommandPhase"
+            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+        }),
+      );
       await withClient(rig.guestCtx, async () => {
+        guestCommand.start();
         await drainLoopback();
         expect(
           captureCoopChecksumState(),

@@ -86,19 +86,23 @@ export class PhaseInterceptor {
     try {
       await vi.waitUntil(
         async () => {
-          // If we were interrupted by a UI prompt, we assume that the calling code will queue inputs to
-          // end the current phase manually, so we just wait for the phase to end from the caller.
+          currentPhase = pm.getCurrentPhase();
+          // A predecessor can synchronously shift into and start an interactive target before its own
+          // `start()` returns. In that race PromptHandler marks us interrupted while the phase manager is
+          // already sitting on the requested target. A stop-before-target caller must regain control so it
+          // can drive that public UI; waiting for the target to end creates an impossible dependency cycle.
+          if (currentPhase.is(this.target) && (!runTarget || this.state !== "interrupted")) {
+            return true;
+          }
+
+          // If we were interrupted by a UI prompt on an intermediate phase (or a run-target caller reached
+          // an interactive target), the calling code must queue inputs to end that phase manually.
           if (this.state === "interrupted") {
             if (!didLog) {
               this.doLog("PhaseInterceptor.to: Waiting for phase to end after being interrupted!");
               didLog = true;
             }
             return false;
-          }
-
-          currentPhase = pm.getCurrentPhase();
-          if (currentPhase.is(this.target)) {
-            return true;
           }
 
           // Current phase is different; run and wait for it to finish.
@@ -154,12 +158,14 @@ export class PhaseInterceptor {
     try {
       await vi.waitUntil(
         async () => {
-          if (this.state === "interrupted") {
-            return false;
-          }
           currentPhase = pm.getCurrentPhase();
+          // Same synchronous interactive-target race as `to(..., false)`: `toFirst` is explicitly a
+          // stop-before-driving primitive, so an already-open branch target is a successful arrival.
           if (targetSet.has(currentPhase.phaseName)) {
             return true;
+          }
+          if (this.state === "interrupted") {
+            return false;
           }
           await this.run(currentPhase);
           return false;

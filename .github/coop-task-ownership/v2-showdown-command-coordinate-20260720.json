@@ -72,6 +72,7 @@
     "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs",
     "test/browser/coop-public-ui/resume-scan-isolation.test.mjs",
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
+    "test/framework/phase-interceptor.ts",
     "test/node/authority-v2-command-frontier.test.ts",
     "test/node/authority-v2-control-open.test.ts",
     "test/node/authority-v2-control.test.ts",
@@ -98,6 +99,7 @@
     "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts",
     "test/tests/elite-redux/coop/coop-wiring-completeness.test.ts",
     "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts",
+    "test/tests/test-framework/phase-interceptor/unit.test.ts",
     "test/tools/coop-authority-v2-simulator.ts",
     "test/tools/coop-duo-harness.ts",
     "test/tools/coop-soak-driver.ts"

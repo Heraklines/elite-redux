@@ -107,6 +107,18 @@ describe("Utils - Phase Interceptor - Unit", () => {
       expect(game.phaseInterceptor.log).toEqual([]);
     });
 
+    it("returns control when a predecessor synchronously opens the interactive target", async () => {
+      vi.spyOn(ApplePhase.prototype, "start").mockImplementation(() => {
+        globalScene.phaseManager.shiftPhase();
+        game.phaseInterceptor.checkMode();
+      });
+
+      await to("BananaPhase", false);
+
+      expectAtPhase("BananaPhase");
+      expect(game.phaseInterceptor.log).toEqual(["ApplePhase"]);
+    });
+
     it("should run all phases between start and the first instance of target", async () => {
       await to("CoconutPhase");
 
@@ -147,6 +159,22 @@ describe("Utils - Phase Interceptor - Unit", () => {
       expect(reached).toBe("BananaPhase");
       expectAtPhase("BananaPhase");
       expect(getQueuedPhases()).toEqual(["CoconutPhase", "ApplePhase", "CoconutPhase"]);
+      expect(game.phaseInterceptor.log).toEqual(["ApplePhase"]);
+    });
+
+    it("returns an interactive branch target opened synchronously by its predecessor", async () => {
+      vi.spyOn(ApplePhase.prototype, "start").mockImplementation(() => {
+        globalScene.phaseManager.shiftPhase();
+        game.phaseInterceptor.checkMode();
+      });
+
+      const reached = await game.phaseInterceptor.toFirst([
+        "BananaPhase" as PhaseString,
+        "CoconutPhase" as PhaseString,
+      ]);
+
+      expect(reached).toBe("BananaPhase");
+      expectAtPhase("BananaPhase");
       expect(game.phaseInterceptor.log).toEqual(["ApplePhase"]);
     });
 

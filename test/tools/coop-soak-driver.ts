@@ -3357,12 +3357,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             `wave ${wave} could not start the host Mystery surface; current=${phase?.phaseName ?? "none"}`,
           );
         }
-        // `PhaseInterceptor.to(target)` with its default `runTarget=true` does not return when the target is
-        // an interactive phase: it correctly waits for that phase to finish after its prompt interrupts the
-        // interceptor. The caller cannot then drive the prompt, producing a harness-created softlock with
-        // the real MYSTERY_ENCOUNTER UI visibly open. Two browsers keep running at that point, so start the
-        // already-reached real phase and return control to the public-input driver.
-        phase.start();
+        // The preceding phase can synchronously start MysteryEncounterPhase and open its UI before the
+        // interceptor observes the boundary. In that case the real surface is already live and starting the
+        // same phase again would duplicate its presentation. Otherwise this is the ordinary stopped-before-
+        // target path and the real phase still needs to be started once.
+        if (rig.hostScene.ui.getMode() !== UiMode.MYSTERY_ENCOUNTER) {
+          phase.start();
+        }
         await drainLoopback();
       });
     };

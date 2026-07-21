@@ -1383,4 +1383,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   browsers; no product timeout or authority fallback was added.
 - Local permitted evidence: Authority V2 source contracts 40/40 green, scoped Biome has no errors (repository-
   baseline warnings/info only), `git diff --check` is clean, and the unchanged 584-line TypeScript baseline has
-  zero diagnostics in all four touched files. Remote C1/C3/P2 and affected B/A requalification is required.
+ zero diagnostics in all four touched files. Remote C1/C3/P2 and affected B/A requalification is required.
+
+2026-07-21 - Interactive target arrival and post-biome command scheduling
+
+- Exact-SHA gate 29827146085 proved the first Mystery harness correction was incomplete. At wave 15/24 the
+  predecessor synchronously shifted into MysteryEncounterPhase and opened MYSTERY_ENCOUNTER before returning.
+  PromptHandler therefore marked PhaseInterceptor interrupted while the requested stop-before target was
+  already current; `to(target, false)` checked interruption first and waited forever on the visible selector.
+- PhaseInterceptor now recognizes an already-current target before applying the interrupted wait rule for
+  stop-before and branch-target calls. Run-target callers retain the existing wait-for-human-input behavior.
+  Unit regressions cover both `to(..., false)` and `toFirst(...)` with a synchronously opened target. The soak
+  driver also avoids starting MysteryEncounterPhase twice when that real UI is already actionable.
+- P2's remaining Crossroads journey reached wave 11 correctly but then asked the single-process driver to skip
+  the guest replica's parked host-owned CommandPhase before the host had authored command-open. The revised
+  schedule starts that exact replica, proves input remains closed, starts the host authority phase, then crosses
+  to and opens the guest-owned phase. This models two concurrently running browsers without bypassing V2.
+- Local permitted evidence: scoped Biome reports no errors (repository-baseline warnings/info only) and the
+  semantic diff is limited to test infrastructure plus the two affected drivers. Remote C1/C3/P2 qualification
+  is required; no co-op Vitest/browser workload was run locally.
