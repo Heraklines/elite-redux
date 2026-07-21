@@ -38,6 +38,7 @@ import {
   getActiveCoopV2TurnCutover,
   isCoopV2TurnCutoverActive,
   suppressesLegacyTurnAckProgression,
+  suppressesLegacyTurnApplication,
 } from "#data/elite-redux/coop/authority-v2/cutover-turn";
 import {
   type CoopV2ShadowTurnTap,
@@ -2296,9 +2297,8 @@ export class CoopBattleStreamer {
     }
     // authority-v2 turn/command CUTOVER (surface 1). Two disjoint paths, gated on the cutover being active:
     //   - CUTOVER ACTIVE: commit the v2 TURN_COMMIT as the SOLE authority FIRST, then make the legacy carrier
-    //     COSMETIC (sent once, never retained/resent/acked). `v2Committed` false (no live command seat / barred
-    //     / fault) means the v2 commit did not happen, so legacy stays the authority for this turn - never a
-    //     turn with no authority, never two authorities.
+    //     COSMETIC (sent once, never retained/resent/acked/applied). A failed V2 commit is fatal: falling back
+    //     per turn would let transport timing choose between an untyped legacy successor and the global log.
     //   - NOT ACTIVE (legacy or shadow-only): the EXACT original ordering (retain -> send -> shadow tap), so a
     //     capability-off / shadow-only session is byte-identical to the pre-cutover build.
     if (isCoopV2TurnCutoverActive()) {
@@ -2313,7 +2313,21 @@ export class CoopBattleStreamer {
         fullField,
         authoritativeState,
       );
-      if (!this.retainAndRetryTurnCommit(commit, v2Committed)) {
+      if (!v2Committed) {
+        const reason = `Authority V2 could not commit turn ${wave}:${turn}; refusing legacy turn authority.`;
+        coopWarn("v2-turn", reason);
+        this.beginAuthorityTerminal({
+          epoch,
+          wave,
+          turn,
+          revision,
+          boundary: "turnResolution",
+          reason,
+          failureId: `v2-turn-commit:${epoch}:${wave}:${turn}:${revision}`,
+        });
+        return false;
+      }
+      if (!this.retainAndRetryTurnCommit(commit, true)) {
         coopWarn("stream", `host WITHHOLD turn commit e=${epoch} wave=${wave} turn=${turn}: authority terminal active`);
         return false;
       }
@@ -2345,8 +2359,8 @@ export class CoopBattleStreamer {
    * v2 authority path. In CUTOVER mode (authority.v2turn negotiated) the commit is the SOLE authority for the
    * turn and this returns whether it committed; in shadow-only mode it runs the parity tap and returns false
    * (legacy stays the authority). A COMMAND successor is stated only when the settled state has an immediate
-   * command frontier. Faint, victory, defeat, reward, and terminal boundaries state `null`; their following
-   * replacement/wave/interaction entry owns the next control instead.
+   * command frontier. Faint boundaries state an exact ordered replacement control when one is executable;
+   * every other non-command boundary is closed by the adapter's explicit ordered successor wait.
    */
   private emitCoopV2TurnAuthority(
     epoch: number,
@@ -2422,8 +2436,8 @@ export class CoopBattleStreamer {
         replacementControl != null || completeCommands.length === 0 ? "none-non-command-boundary" : "owner-field",
     };
     if (cutoverActive) {
-      // CUTOVER: commit the v2 TURN_COMMIT as the sole authority. A non-null entry => committed (legacy becomes
-      // cosmetic); null => barred/fault, so legacy remains the authority for this turn (never dual, never none).
+      // CUTOVER: commit the v2 TURN_COMMIT as the sole authority. A non-null entry commits; null is a fatal
+      // authority refusal handled by emitTurn. Per-turn legacy fallback would make this a mixed authority graph.
       const committed = getActiveCoopV2TurnCutover()?.commitHostTurn(input) ?? null;
       return committed != null;
     }
@@ -4674,6 +4688,17 @@ export class CoopBattleStreamer {
           fullField: msg.fullField,
           authoritativeState: msg.authoritativeState,
         };
+        if (source === "transport" && suppressesLegacyTurnApplication(activeCoopTurnAuthorityMode())) {
+          // The retained V2 TURN_COMMIT reconstructs this exact complete image together with its global
+          // revision and typed nextControl. The raw copy is deliberately unretained telemetry. Admitting it
+          // here used to let it win the inbox/waiter race; the later V2 copy then classified as an identical
+          // duplicate and could not attach its successor, so faint turns fell through into a phantom command.
+          coopLog(
+            "stream",
+            `guest IGNORE cosmetic turnResolution e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
+          );
+          return;
+        }
         const exactKey = authorityKey(res);
         const completedAck = this.ackedTurnCommits.get(exactKey);
         const admitted = this.seenTurnAuthority.get(exactKey);
@@ -5049,11 +5074,10 @@ export class CoopBattleStreamer {
             return;
           }
           // authority-v2 turn CUTOVER: the host emitted the carrier COSMETICALLY (retainAndRetryTurnCommit
-          // cosmeticOnly => sentTurnCommits is never populated for a cut-over turn), so a staged ACK arriving
-          // with retained==null is EXPECTED, not a violation - the guest's presentation phases ACK the
-          // cosmetic carrier they consumed, but the v2 controlInstalled receipt is the SOLE retirement.
-          // Ignore it, symmetric with the cosmetic send. When v2 FELL BACK for a turn (v2Committed=false),
-          // that turn IS retained under legacy, so retained!=null and the terminal check below stays armed.
+          // cosmeticOnly => sentTurnCommits is never populated for a cut-over turn), so a staged compatibility
+          // ACK arriving with retained==null is EXPECTED, not a violation. It comes from rendering the complete
+          // carrier reconstructed by ingestAuthoritativeV2Turn; the V2 controlInstalled receipt is the SOLE
+          // retirement. The raw transport copy is never mechanically admitted under cutover.
           if (retained == null && suppressesLegacyTurnAckProgression(activeCoopTurnAuthorityMode())) {
             coopLog("stream", `host IGNORE cosmetic turn ACK stage=${stage} key=${key} (v2 owns retirement)`);
             return;

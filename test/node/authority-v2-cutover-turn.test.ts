@@ -41,6 +41,7 @@ import {
   suppressesLegacyGuestTurnRequest,
   suppressesLegacyNextCommandBarrier,
   suppressesLegacyTurnAckProgression,
+  suppressesLegacyTurnApplication,
   suppressesLegacyTurnResend,
 } from "#data/elite-redux/coop/authority-v2/cutover-turn";
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
@@ -214,6 +215,9 @@ describe("authority-v2 turn cutover - suppression predicates", () => {
   it("suppresses every legacy turn loop in v2 mode and NONE in legacy mode", () => {
     for (const suppress of [
       suppressesLegacyTurnResend,
+      // A raw turnResolution has no global revision/typed successor. Under cutover it remains diagnostic
+      // telemetry and only ingestAuthoritativeV2Turn may wake the renderer's mechanical waiter.
+      suppressesLegacyTurnApplication,
       suppressesLegacyGuestTurnRequest,
       suppressesLegacyNextCommandBarrier,
       // The host's legacy turn-ACK terminal check retires under cutover too: the cosmetic carrier's ACK is

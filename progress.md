@@ -1149,3 +1149,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   scoped Biome has no errors (repository-baseline warnings/info only), and full
   TypeScript output contains no touched co-op path. Exact-SHA remote node,
   two-engine, and public-browser qualification is required after push.
+
+2026-07-21 - Raw legacy turn carriers cannot race Authority V2 application
+
+- Exact-SHA full gate 29810940065 reproduced the same-turn double-faint stall after the ordered replacement
+  chain landed. The host committed TURN_COMMIT revision 2 with guest then host replacement controls and
+  subsequently committed both replacements. The guest nevertheless parked in replay/finalization while the
+  V2 projector waited for the first replacement surface.
+- Host/guest logs identified a mixed-authority race: the unretained raw `turnResolution` compatibility copy
+  arrived first and entered the ordinary mechanical inbox without the global V2 revision or typed successor.
+  Finalization therefore derived and queued a local command path. When the retained TURN_COMMIT arrived, its
+  identical material image could not retroactively attach the ordered replacement successor to the already
+  consumed carrier; later revisions remained gaps.
+- Under negotiated turn cutover, transport-origin raw `turnResolution` frames are now ignored mechanically.
+  Only `ingestAuthoritativeV2Turn()` may reconstruct and admit the complete carrier with its global revision
+  and typed successor. The host also terminalizes if a V2 turn commit is refused; per-turn legacy fallback is
+  forbidden because it would let network timing choose the progression authority.
+- Added failure-first coverage proving the raw copy cannot settle `awaitTurn`, while the matching V2 entry
+  settles it with the exact REPLACEMENT control and revision. A public source contract pins both guest
+  suppression and fail-closed host behavior.
+- Local permitted evidence: public Authority V2 source contracts 33/33 green, scoped Biome has no errors
+  (baseline warnings/info only), `git diff --check` clean, and zero TypeScript diagnostics mention touched
+  files against the unchanged 584-line repository baseline. Co-op Vitest and browser verification remain
+  remote-only.

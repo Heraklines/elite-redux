@@ -9,6 +9,11 @@
 // LoopbackTransport (the same "test via spoofing" path the rest of the suite uses).
 
 import {
+  CoopV2TurnCutover,
+  clearActiveCoopV2TurnCutover,
+  setActiveCoopV2TurnCutover,
+} from "#data/elite-redux/coop/authority-v2/cutover-turn";
+import {
   CoopBattleStreamer,
   type CoopCheckpointEnvelope,
   hasCoopV2ImmediateCommandSuccessor,
@@ -2977,6 +2982,61 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 });
 
 describe("stale-turn finalize mark (#790 + regression fix)", () => {
+  it("never lets a raced cosmetic carrier strip the V2 revision/successor from a cut-over turn", async () => {
+    const { host, guest } = createLoopbackPair();
+    let fireTimeout: (() => void) | undefined;
+    const stream = new CoopBattleStreamer(guest, {
+      timeoutMs: 5_000,
+      schedule: cb => {
+        fireTimeout = cb;
+        return () => {};
+      },
+    });
+    const cutover = new CoopV2TurnCutover({} as never);
+    setActiveCoopV2TurnCutover(cutover);
+    const carrier = {
+      t: "turnResolution",
+      epoch: 7,
+      wave: 1,
+      turn: 1,
+      revision: 20,
+      events: [],
+      checkpoint: emptyCheckpoint(),
+      checksum: "deadbeefdeadbeef",
+      preimage: "{}",
+      fullField: emptyFullField(),
+      authoritativeState: emptyAuthoritativeState(1, 1, 20),
+    } satisfies Extract<CoopMessage, { t: "turnResolution" }>;
+    const replacement = {
+      kind: "REPLACEMENT",
+      operationId: "RC/e7/w1/t1/o2/f1/s1",
+      ownerSeatId: 1,
+      epoch: 7,
+      wave: 1,
+      turn: 1,
+      occurrence: 2,
+      fieldIndex: 1,
+      remaining: [],
+    } as const;
+
+    try {
+      const cosmeticOnly = stream.awaitTurn(1, 1);
+      host.send(carrier);
+      fireTimeout?.();
+      expect(await cosmeticOnly, "the raw compatibility copy cannot drive mechanics under V2").toBeNull();
+
+      const authoritative = stream.awaitTurn(1, 1);
+      stream.ingestAuthoritativeV2Turn(carrier, replacement, 2);
+      const admitted = await authoritative;
+      expect(admitted?.authorityNextControl).toEqual(replacement);
+      expect(admitted?.authorityRevision).toBe(2);
+    } finally {
+      clearActiveCoopV2TurnCutover(cutover);
+      cutover.dispose();
+      stream.dispose();
+    }
+  });
+
   it("proves Authority V2 material only after the exact admitted revision completes the real finalize path", async () => {
     const { guest } = createLoopbackPair();
     const current = { epoch: 7, wave: 1, turn: 1 };

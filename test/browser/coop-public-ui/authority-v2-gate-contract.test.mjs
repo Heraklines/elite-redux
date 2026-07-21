@@ -13,6 +13,8 @@ const campaignWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-
 const journeyWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-journey.yml", root), "utf8");
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
+const battleStream = readFileSync(new URL("src/data/elite-redux/coop/coop-battle-stream.ts", root), "utf8");
+const turnCutover = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/cutover-turn.ts", root), "utf8");
 const meOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-operation.ts", root), "utf8");
 const operationSurfaceRegistry = readFileSync(
   new URL("src/data/elite-redux/coop/coop-operation-surface-registry.ts", root),
@@ -585,6 +587,15 @@ test("ordinary replacement projection has an immutable fallback when cosmetic fa
   assert.ok(projectEnd > projectStart, "ordinary interaction projector has a bounded source block");
   const project = coopRuntime.slice(projectStart, projectEnd);
   assert.match(project, /prepareCoopV2OrdinaryReplacementControlSurface\(runtime, control\)/u);
+});
+
+test("a cut-over turn cannot fall back to a raw legacy mechanical carrier", () => {
+  assert.match(turnCutover, /export function suppressesLegacyTurnApplication[\s\S]*return mode === "v2"/u);
+  assert.match(battleStream, /if \(!v2Committed\)[\s\S]*beginAuthorityTerminal[\s\S]*return false/u);
+  assert.match(
+    battleStream,
+    /source === "transport"[\s\S]*suppressesLegacyTurnApplication\(activeCoopTurnAuthorityMode\(\)\)[\s\S]*IGNORE cosmetic turnResolution/u,
+  );
 });
 
 test("replacement controls are proven by the real async PARTY surface and multi-faints advance one picker at a time", () => {

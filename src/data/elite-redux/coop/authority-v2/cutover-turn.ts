@@ -100,6 +100,19 @@ export function suppressesLegacyTurnResend(mode: CoopTurnAuthorityMode): boolean
   return mode === "v2";
 }
 
+/**
+ * GUEST: suppress the legacy turnResolution MECHANICAL apply path.
+ *
+ * A cut-over host may still emit the legacy carrier once for diagnostics, but it does not carry the V2
+ * revision or typed successor. Letting that packet settle the renderer before the retained V2 entry arrives
+ * makes network ordering choose whether the turn finalizer sees REPLACEMENT/AWAIT_SUCCESSOR or derives a
+ * local command. The V2 entry reconstructs the same complete carrier through ingestAuthoritativeV2Turn(),
+ * so the raw packet is presentation telemetry only and must never wake a waiter or enter the authority inbox.
+ */
+export function suppressesLegacyTurnApplication(mode: CoopTurnAuthorityMode): boolean {
+  return mode === "v2";
+}
+
 /** GUEST: suppress the legacy requestTurnCommit RETRY loop (v2 log owns tail requests). */
 export function suppressesLegacyGuestTurnRequest(mode: CoopTurnAuthorityMode): boolean {
   return mode === "v2";
