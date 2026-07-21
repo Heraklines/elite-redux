@@ -1434,3 +1434,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   slot remains only for PromptHandler routing. A failure-first unit regression models the slot being replaced
   after the target opens and proves the original stop-before call regains control.
 - Remote C1/C3 qualification is required. No co-op Vitest/browser workload was run locally.
+
+2026-07-21 - Stop-before timeout-boundary proof and gate wiring
+
+- Exact-SHA C1 replay 29829817225 disproved the first interceptor correction as sufficient. The journey
+  repeatedly crossed Mystery screens correctly, but at wave 24 an overlapping asynchronous harness scope
+  settled on the exact requested MysteryEncounterPhase/UI in the timer turn that expired `waitUntil`.
+- Stop-before arrival now compares the immutable phase name directly and performs one final exact-phase
+  observation before classifying a timeout as a softlock. Run-target calls remain fail-closed. Failure
+  diagnostics now include the requested run mode and the mutable PromptHandler routing target.
+- The PhaseInterceptor unit regression file was not present in any full-gate lane, so neither of the earlier
+  regressions actually ran in the aggregate workflow. It is now explicit Lane B inventory and will execute
+  isolated on hosted runners. This closes the coverage-wiring defect instead of merely adding another inert
+  test file.
+- Remote unit/C1/C3 qualification is required. No co-op Vitest/browser workload was run locally.

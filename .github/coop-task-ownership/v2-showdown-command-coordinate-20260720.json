@@ -9,6 +9,7 @@
     ".github/workflows/coop-public-ui-journey.yml",
     "progress.md",
     "scripts/coop-browser-entry.ts",
+    "scripts/run-coop-gate.mjs",
     "src/data/elite-redux/coop/authority-v2/adapters/control-open.ts",
     "src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts",
     "src/data/elite-redux/coop/authority-v2/adapters/interactions-reward.ts",

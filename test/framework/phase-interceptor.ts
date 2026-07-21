@@ -95,7 +95,7 @@ export class PhaseInterceptor {
           // slot and can be replaced by a nested/asynchronous interceptor request while this wait is
           // still unwinding. Letting that shared slot define arrival strands the original caller on an
           // interactive phase it has already reached.
-          if (currentPhase.is(target) && (!runTarget || this.state !== "interrupted")) {
+          if (currentPhase.phaseName === target && (!runTarget || this.state !== "interrupted")) {
             return true;
           }
 
@@ -120,11 +120,20 @@ export class PhaseInterceptor {
       // because something is waiting on input that never came. Surface the CURRENT
       // phase + active UI mode + interceptor state so the hang is diagnosable
       // instead of a bare "Timed out in waitUntil".
-      const stuckPhase = pm.getCurrentPhase()?.phaseName ?? "(none)";
+      const stuck = pm.getCurrentPhase();
+      const stuckPhase = stuck?.phaseName ?? "(none)";
+      // An asynchronous phase/UI transition can settle on the exact stop-before target in the same timer
+      // turn that expires `waitUntil`. Re-read the phase after the timeout before classifying a softlock:
+      // the requested public surface being current is the complete contract of a stop-before call.
+      if (!runTarget && stuckPhase === target) {
+        this.doLog(`PhaseInterceptor.to: Recovered exact ${target} arrival at timeout boundary`);
+        return;
+      }
       const uiMode = getEnumStr(UiMode, this.scene.ui.getMode());
       throw new Error(
         `PhaseInterceptor.to("${target}") did not reach its target (soft-lock / freeze?): `
           + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interceptor state "${this.state}".`
+          + ` runTarget=${runTarget}, promptTarget="${this.target}".`
           + `\nOriginal: ${err instanceof Error ? err.message : inspect(err)}`,
       );
     }

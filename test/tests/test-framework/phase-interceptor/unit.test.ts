@@ -134,6 +134,26 @@ describe("Utils - Phase Interceptor - Unit", () => {
       expect(game.phaseInterceptor.log).toEqual(["ApplePhase"]);
     });
 
+    it("uses the immutable phase name for stop-before arrival", async () => {
+      const isSpy = vi.spyOn(BananaPhase.prototype, "is").mockReturnValue(false);
+
+      await to("BananaPhase", false);
+      isSpy.mockRestore();
+
+      expectAtPhase("BananaPhase");
+      expect(game.phaseInterceptor.log).toEqual(["ApplePhase"]);
+    });
+
+    it("accepts an exact stop-before target observed at the timeout boundary", async () => {
+      const waitSpy = vi.spyOn(vi, "waitUntil").mockRejectedValueOnce(new Error("timeout boundary"));
+
+      await to("ApplePhase", false);
+      waitSpy.mockRestore();
+
+      expectAtPhase("ApplePhase");
+      expect(game.phaseInterceptor.log).toEqual([]);
+    });
+
     it("should run all phases between start and the first instance of target", async () => {
       await to("CoconutPhase");
 
