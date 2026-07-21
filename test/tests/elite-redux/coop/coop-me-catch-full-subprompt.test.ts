@@ -104,6 +104,33 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
    * party (the helper range-checks the relayed slot against it), and pair a bare GUEST relay on the other
    * loopback end so the test can watch what the guest receives and reply as the guest owner would.
    */
+  /**
+   * Relay a guest ME sub-pick the way the REAL guest materializer does under the retained journal: mint the
+   * typed ME_SUB operation id first (so the host's `commitMeAuthorityGuestIntent` sees the exact successor
+   * address), then carry it on the proposal. A bare `sendInteractionChoice(seq, "meSub", value, [step])`
+   * (no operation id) is a retired legacy raw carrier - the host rejects it as an unidentified proposal and
+   * fails closed. Mirrors `CoopReplayMePhase.relayGuestSubPick`.
+   */
+  const relayGuestSubPick = (
+    relay: CoopInteractionRelay,
+    seqMe: number,
+    pinned: number,
+    step: number,
+    value: number,
+  ) => {
+    const operationId = meOp.commitMeOwnerIntent({
+      kind: "ME_SUB",
+      seq: seqMe,
+      pinned,
+      step,
+      payload: { value },
+      localRole: "guest",
+      wave: globalScene.currentBattle?.waveIndex ?? 7,
+      turn: 0,
+    });
+    relay.sendInteractionChoice(seqMe, "meSub", value, [step], undefined, operationId ?? undefined);
+  };
+
   const hostRig = (start: number, partySize = 6, journal = false) => {
     // Most cases below prove the negotiated raw compatibility carrier with a bare peer relay. The two
     // operation assertions opt into the retained journal explicitly and drive the known seq directly.
@@ -125,7 +152,13 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
       phaseManager: { getCurrentPhase: () => currentPhase },
       getPlayerParty: () => new Array(partySize).fill({}),
     } as unknown as BattleScene);
-    const guestRelay = new CoopInteractionRelay(guest);
+    // Journal mode models a NEGOTIATED V2 interaction session: the guest owner carries the exact operation
+    // identity on its proposal (the `cosmeticOperationId` wire slot the host reads into `pick.operationId`),
+    // exactly as a real cutover-active guest relay does. Absent the identity the host rejects the sub-pick as
+    // an unidentified proposal. The bare (legacy) relay stays for the negotiated-raw-compatibility cases.
+    const guestRelay = journal
+      ? new CoopInteractionRelay(guest, { isInteractionAuthorityV2: () => true, isLocalAuthority: () => false })
+      : new CoopInteractionRelay(guest);
     return { seqMe: COOP_ME_PUMP_SEQ_BASE + start, guestRelay, runtime, committedEnvelopes };
   };
 
@@ -157,7 +190,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
     // Journal mode intentionally emits no raw mePresent. The committed presentation is the carrier;
     // drive its addressed response directly, as a real durability-backed guest materializer would.
-    guestRelay.sendInteractionChoice(seqMe, "meSub", 2, [0]);
+    relayGuestSubPick(guestRelay, seqMe, 3, 0, 2);
     expect(await hostAwait).toBe(2);
 
     const presentationCommits = commitSpy.mock.calls.filter(call => call[0].kind === "ME_PRESENT");
@@ -178,7 +211,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     const { seqMe, guestRelay, committedEnvelopes } = hostRig(3, 6, true);
 
     const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
-    guestRelay.sendInteractionChoice(seqMe, "meSub", 2, [0]);
+    relayGuestSubPick(guestRelay, seqMe, 3, 0, 2);
     expect(await hostAwait).toBe(2);
     await flush();
 

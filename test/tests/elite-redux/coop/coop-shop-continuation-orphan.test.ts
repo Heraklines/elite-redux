@@ -378,11 +378,16 @@ describe("#835 cross-ownership TM-learn softlock - guest-owned mon renders + def
     await flush();
 
     // The forget-index is relayed to the host on the disjoint per-slot channel (the host's forwarded await).
-    expect(sendSpy, "the guest relayed the forget-pick to the host").toHaveBeenCalledWith(
-      COOP_LEARN_MOVE_FWD_SEQ_BASE + SLOT,
-      "learnMove",
-      0,
-    );
+    // Under the V2 successor-graph the carrier gained trailing optionals (rewardSurface, proposalOperationId)
+    // - assert the leading (seq, kind, choice) identity, not the exact arity, so the relayed pick is what
+    // matters, not the presence of the optional V2 slots.
+    expect(sendSpy, "the guest relayed the forget-pick to the host").toHaveBeenCalled();
+    expect(
+      sendSpy.mock.calls.some(
+        call => call[0] === COOP_LEARN_MOVE_FWD_SEQ_BASE + SLOT && call[1] === "learnMove" && call[2] === 0,
+      ),
+      "the guest relayed the forget-pick to the host",
+    ).toBe(true);
     // AND only now is the continuation copy removed (commit) + the phase ended.
     expect(rec.removed, "the continuation copy is removed AFTER the pick (deferred commit)").toContain(
       "SelectModifierPhase",
