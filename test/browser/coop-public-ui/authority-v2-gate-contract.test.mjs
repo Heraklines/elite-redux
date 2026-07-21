@@ -538,6 +538,45 @@ test("Mystery projection construction cannot recursively attest an unopened hand
   );
 });
 
+test("repeated Mystery rounds bind the new log address only when their fresh presentation is consumed", () => {
+  const rebindStart = replayMePhase.indexOf("private rebindLiveCoopV2MePresentation(");
+  const rebindEnd = replayMePhase.indexOf("/**", rebindStart + 1);
+  assert.ok(rebindStart >= 0, "the live replay shell exposes an address handoff for repeated rounds");
+  assert.ok(rebindEnd > rebindStart, "the repeated-round address handoff has a bounded source section");
+  const rebind = replayMePhase.slice(rebindStart, rebindEnd);
+  assert.match(rebind, /boundaryStillLive\(\)/u);
+  assert.match(rebind, /this\.settled/u);
+  assert.match(rebind, /installCoopV2MePresentation\(operationId, this\.interactionCounter, presentation\)/u);
+
+  const outcomeStart = replayMePhase.indexOf("const outcome = winner.outcome;");
+  const repeatStart = replayMePhase.indexOf(
+    'if (outcome != null && outcome.k === "mePresent" && outcome.subPrompt == null',
+    outcomeStart,
+  );
+  assert.ok(outcomeStart >= 0 && repeatStart > outcomeStart, "the repeated presentation branch exists");
+  const outcomeBinding = replayMePhase.slice(outcomeStart, repeatStart);
+  const consume = outcomeBinding.indexOf("consumeCommittedInteractionOutcomeOperationId(this.seq, outcome)");
+  const bind = outcomeBinding.indexOf("rebindLiveCoopV2MePresentation(committedOperationId, outcome)");
+  assert.ok(consume >= 0 && bind > consume, "the FIFO consumer recovers and binds the exact committed address");
+  assert.match(
+    outcomeBinding,
+    /failCoopSharedSession/u,
+    "a journal presentation without an exact operation address fails closed",
+  );
+
+  const projectionStart = coopRuntime.indexOf("function prepareCoopV2OrdinaryInteractionControlSurface(");
+  const projectionEnd = coopRuntime.indexOf(
+    "\n/**\n * Construct the exact engine generation recovery",
+    projectionStart,
+  );
+  const projector = coopRuntime.slice(projectionStart, projectionEnd);
+  assert.doesNotMatch(
+    projector,
+    /rebindLiveCoopV2MePresentation/u,
+    "the projector cannot relabel the old actionable handler before the new FIFO presentation is consumed",
+  );
+});
+
 test("biome-market readiness proves the exact actionable owner or fully armed watcher surface", () => {
   const readinessStart = biomeShopPhase.indexOf("private notifyCoopBiomeContinuationSurfaceReady(");
   const readinessEnd = biomeShopPhase.indexOf(

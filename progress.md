@@ -1267,3 +1267,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   mention the touched files against the unchanged 584-line repository baseline.
 2026-07-21: Exact gate run 29817600158 proved the remaining Mystery P1 hang was an actionability-edge wiring bug, not duplicate ME_PRESENT material. CoopReplayMePhase opened MYSTERY_ENCOUNTER while its one-second click-through guard was active; both readiness probes correctly refused controlInstalled, but MysteryEncounterUiHandler.unblockInput() never retried the V2 proof. Wired that false-to-true edge to notifyCoopV2InteractionSurfaceReady and added a source contract. Local allowed authority-v2 contract is 38/38 green; remote P1 requalification still required.
 2026-07-21: Completed the Bargain V2 remote-result ingress seam. Guest full-state outcomes now carry a stable non-mechanical proposal ID, are admitted only against the exact active BARGAIN_PRESENT address, deduplicate before any phase waiter, and are committed solely by the host. The guest owner no longer ends into its ambient queue after proposal send; it parks on TheBargainPhase until the exact committed BARGAIN result materially applies. Added exact relay regression and static closure contracts. Local static contract 38/38, Biome has no errors, tsc remains baseline-only (584 lines, zero touched-file diagnostics); remote Vitest/gate required.
+
+2026-07-21 - Repeated Mystery presentations hand off their exact V2 address at the FIFO edge
+
+- Gate 29819650683 proved the one-second actionability fix: revision 7's initial ME_PRESENT now installs and
+  the journey reaches its terminal/reward tail. Its repeated-delve case exposed the next real defect:
+  revision 8 materially entered the relay while the live CoopReplayMePhase still carried revision 7's
+  operation ID, so the fresh public selector could never prove its new address.
+- The replay outcome consumer now recovers the immutable operation ID paired with each journal-delivered
+  mePresent and binds that ID before rendering the new top-level round or sub-prompt. The runtime projector
+  deliberately does not relabel the old handler: doing so could attest the previous round's still-actionable
+  selector before the new options render. A journal presentation without its exact address fails closed.
+- Local permitted evidence: Authority V2 source contracts 39/39 green, scoped Biome has no errors
+  (repository-baseline warnings/info only), git diff check is clean, and TypeScript remains the unchanged
+  584-line baseline with zero diagnostics in either touched file. Remote P1/full-gate requalification is next.

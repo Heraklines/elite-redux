@@ -350,6 +350,28 @@ export class CoopReplayMePhase extends Phase {
   }
 
   /**
+   * Move an already-running replay shell onto the next ordered Mystery presentation.
+   *
+   * Repeated delves keep one CoopReplayMePhase alive while every round receives a distinct ME_PRESENT
+   * operation. DATA delivery wakes the existing outcome waiter first; that waiter must bind the new address
+   * before it opens the fresh selector. Updating the address from the runtime projector would be too early:
+   * the previous round's still-actionable handler could then falsely prove controlInstalled for the new
+   * operation before its options were rendered.
+   */
+  private rebindLiveCoopV2MePresentation(
+    operationId: string,
+    presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
+  ): boolean {
+    if (!this.boundaryStillLive() || this.settled) {
+      return false;
+    }
+    if (operationId === this.coopV2ControlOperationId) {
+      return true;
+    }
+    return this.installCoopV2MePresentation(operationId, this.interactionCounter, presentation);
+  }
+
+  /**
    * Supersede the pre-battle replay's waiter before this successor is queued behind any interstitial.
    * The relay permits one waiter per seq, so installing this arm is the atomic ownership transfer.
    */
@@ -1027,6 +1049,13 @@ export class CoopReplayMePhase extends Phase {
         return;
       }
       const outcome = winner.outcome;
+      if (outcome != null && outcome.k === "mePresent" && isCoopMeOperationJournalActive()) {
+        const committedOperationId = relay.consumeCommittedInteractionOutcomeOperationId(this.seq, outcome);
+        if (committedOperationId == null || !this.rebindLiveCoopV2MePresentation(committedOperationId, outcome)) {
+          failCoopSharedSession(`Mystery presentation ${this.seq} could not bind its committed Authority V2 operation`);
+          return;
+        }
+      }
       // #831 (audit P0#1, GROUP REPEAT): a re-fired TOP-LEVEL mePresent (k==="mePresent", subPrompt==null)
       // arriving on a live UNSETTLED phase is the NEXT press-your-luck / Safari ROUND (the host re-fired
       // MysteryEncounterPhase with the round's options: "descend again? / dig again?"), NOT the stray it used
