@@ -1190,3 +1190,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: scoped Biome has no errors (repository-baseline complexity infos only) and
   `git diff --check` is clean. The existing failure-first double-faint engine test remains the remote proof;
   no co-op Vitest was run locally.
+
+2026-07-21 - Replacement fixtures prove the real public PARTY surface before choosing
+
+- Exact-SHA gate 29813767501 showed the post-finalize driver correction was effective: the reconstructed
+  guest-owned picker opened, selected the intended bench member, and sent its exact proposal. Revision 2
+  nevertheless remained `controlDeferred`, correctly blocking revisions 3-4, because the focused tests'
+  `setMode(PARTY)` stubs invoked the callback synchronously and returned without ever installing a PARTY
+  handler. That ordering cannot occur from a browser keypress and made the V2 projector reject fake control.
+- The double-faint and guest-faint fixtures now call the real `setMode`, wait for its completion, and defer
+  the synthetic public choice one additional microtask so the phase's exact actionability proof runs first.
+  The replay driver also stops as soon as that authenticated picker shifts instead of draining a later turn
+  outside the call's requested scope. Production fail-closed semantics are unchanged; only the non-browser
+  fixture now respects the public UI-to-relay ordering.

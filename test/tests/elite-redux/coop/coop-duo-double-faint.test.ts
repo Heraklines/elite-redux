@@ -188,11 +188,17 @@ describe.skipIf(!RUN)(
         ui.setMode = (...args: unknown[]): unknown => {
           if (args[0] === UiMode.PARTY) {
             ui.setMode = realSetMode; // one-shot
-            (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
-            return;
-          }
-          if (args[0] === UiMode.MESSAGE) {
-            return; // the picker's close transition - a no-op headlessly
+            const opened = realSetMode(...args);
+            // Model a public keypress, not a callback injected before PARTY exists. The phase attaches its
+            // actionability proof to this same completion promise after setMode returns; nesting the pick
+            // one microtask later guarantees the real handler is active and the exact V2 control is proven.
+            Promise.resolve(opened).then(
+              () => {
+                queueMicrotask(() => (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0));
+              },
+              () => undefined,
+            );
+            return opened;
           }
           return realSetMode(...args);
         };

@@ -175,11 +175,14 @@ describe.skipIf(!RUN)(
         ui.setMode = (...args: unknown[]): unknown => {
           if (args[0] === UiMode.PARTY) {
             ui.setMode = realSetMode; // one-shot
-            (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
-            return;
-          }
-          if (args[0] === UiMode.MESSAGE) {
-            return;
+            const opened = realSetMode(...args);
+            Promise.resolve(opened).then(
+              () => {
+                queueMicrotask(() => (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0));
+              },
+              () => undefined,
+            );
+            return opened;
           }
           return realSetMode(...args);
         };

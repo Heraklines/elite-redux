@@ -2645,9 +2645,17 @@ export async function driveGuestReplayTurn(
   // drains; never start that same object a second time.
   let startedPhase: Phase | null = replayStarted ? null : replay;
   let lastPhase: Phase | null = null;
+  let postFinalizeReplacement: Phase | null = null;
   let stall = 0;
   for (let i = 0; i < 256; i++) {
     const cur = guestScene.phaseManager.getCurrentPhase();
+    // A call that drives turn N owns only turn N's authenticated replacement picker. Once that picker
+    // shifts, stop at the resulting boundary instead of consuming a newly queued replay for turn N+1.
+    // Continuing here makes the harness wait for a carrier the host has not produced yet and reports an
+    // impossible replay hang even though the requested turn and its human input completed successfully.
+    if (postFinalizeReplacement != null && cur !== postFinalizeReplacement) {
+      return;
+    }
     if (cur == null || !REPLAY_DRAIN_PHASES.has(cur.phaseName)) {
       const queued = guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
       if (queued.includes("CoopFinalizeTurnPhase")) {
@@ -2687,8 +2695,12 @@ export async function driveGuestReplayTurn(
     // then overwrites it and manufactures a "stuck on CoopReplayTurnPhase" failure even though production
     // starts the picker synchronously from shiftPhase(). Continue through only this authenticated human-
     // input successor; every other post-finalize surface remains the caller's next boundary as before.
-    if (wasFinalize && guestScene.phaseManager.getCurrentPhase()?.phaseName !== "CoopGuestFaintSwitchPhase") {
-      return;
+    if (wasFinalize) {
+      const successor = guestScene.phaseManager.getCurrentPhase();
+      if (successor?.phaseName !== "CoopGuestFaintSwitchPhase") {
+        return;
+      }
+      postFinalizeReplacement = successor;
     }
   }
 }
