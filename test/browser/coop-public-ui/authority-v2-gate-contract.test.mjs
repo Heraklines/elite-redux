@@ -159,6 +159,19 @@ test("wave/terminal cutover carries full settled state and retires every legacy 
   assert.match(battleEndPhase, /getCoopPendingRetainedWaveBoundary\(\)/u);
   assert.match(shadow, /waveBoundarySubsumes\(this\.log\.retained\(\), input\.transition\.wave\)/u);
   assert.match(shadow, /terminalSubsumes\(this\.log\.retained\(\)\)/u);
+
+  const boundaryStart = coopRuntime.indexOf("function tryApplyCoopSettledWaveData(");
+  const legacyStart = coopRuntime.indexOf("  const staged = getCoopStagedWaveAdvanceTransaction", boundaryStart);
+  assert.notEqual(boundaryStart, -1, "the V2 wave DATA boundary has an executable integration edge");
+  assert.ok(legacyStart > boundaryStart, "the V2 edge is bounded before the legacy fallback");
+  const v2Boundary = coopRuntime.slice(boundaryStart, legacyStart);
+  const appliesData = v2Boundary.indexOf("applyCoopV2WaveDataAtBoundary(runtime, transaction)");
+  const completesEntry = v2Boundary.indexOf("retryPendingReplicaEntries()");
+  assert.ok(appliesData >= 0, "the boundary first applies the complete immutable V2 wave image");
+  assert.ok(
+    completesEntry > appliesData,
+    "the same boundary then installs AWAIT_SUCCESSOR before a later interaction presentation can deadlock it",
+  );
 });
 
 test("correlated recovery is wired through all four production progression fences", () => {

@@ -1893,6 +1893,16 @@ function tryApplyCoopSettledWaveData(wave: number, binding: CoopWaveAdvanceOpera
     if (!applyCoopV2WaveDataAtBoundary(runtime, transaction)) {
       return false;
     }
+    // Applying the immutable wave image satisfies the material half of the retained V2 entry. Complete
+    // its explicit AWAIT_SUCCESSOR control NOW, before the queued continuation opens. Waiting for that
+    // later public surface creates a causal cycle for presentation entries such as SHOP_PRESENT: the
+    // watcher cannot become actionable until revision N+1 applies, while N+1 cannot be admitted until
+    // this revision N wait has published controlInstalled. The ordered replica ledger still selects the
+    // resume stage, so this eager pace signal cannot reapply DATA or skip a revision.
+    const completed = coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries() ?? 0;
+    if (completed > 0) {
+      coopLog("v2-wave", `DATA boundary completed ${completed} retained V2 entry`);
+    }
     return true;
   }
   const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);

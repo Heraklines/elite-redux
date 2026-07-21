@@ -1071,3 +1071,31 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - TODO: push the exact checkpoint, inspect the remote relay/static and public
   two-browser runs, then triage the live biome/market retained-control gap from
   gate 29803881361 without relaxing the six-lane focused planner.
+
+2026-07-21 - Wave DATA installs its ordered successor before presentation N+1
+
+- Full-gate P2 evidence at both `1076908f8` and `9cb288e37` proved a real
+  Authority V2 cycle at the wave-10 market boundary. Replica revision N applied
+  its complete WAVE_ADVANCE image, but its `AWAIT_SUCCESSOR` remained at
+  `controlInstalled=false`; SHOP_PRESENT revision N+1 was therefore admitted as
+  a gap. The only retry edge lived behind `BiomeShopPhase` watcher actionability,
+  which itself depended on N+1 materializing.
+- The safe BattleEnd DATA edge now immediately paces the already-admitted entry
+  through the ordinary replica ledger. The ledger chooses the durable resume
+  stage, installs the non-UI `AWAIT_SUCCESSOR`, and only then can the queued
+  market/reward/Mystery presentation commit. No revision is skipped and DATA is
+  never applied outside the ordered pipeline.
+- The two-engine biome test now asserts that `continuationReady` belongs to the
+  ordered wait before any market presentation exists. An inactive legacy watcher
+  is proven unable to replace or recreate that completed boundary. A fast public
+  source contract pins apply-before-retry ordering.
+- Exact-SHA gate 29807248279 also separated remaining work: P1 still has two
+  Mystery-chain stalls; B1 contains stale legacy exploration probes plus a real
+  double-KO replacement stall; C5 exposed one wave-3 field mismatch; the native
+  browser lane failed before gameplay because its sealed page bridge never
+  became ready. Those are independent follow-up tracks, not reasons to weaken
+  this ordered wait.
+- Local permitted evidence: Authority V2 contract 32/32 green; scoped Biome has
+  no errors; `git diff --check` green; zero TypeScript diagnostics mention the
+  touched files against the unchanged 584-line repository baseline. Co-op Vitest
+  and all browser execution remain remote-only.

@@ -97,7 +97,7 @@ describe("co-op alternating-interaction relay (#633)", () => {
     // A stale/mixed peer can bypass the local sender, but the authority must drop that frame before it
     // reaches either a live waiter or the early-arrival FIFO.
     guest.send({ t: "interactionChoice", seq: 8_000_012, kind: "meBtn", choice: 5 });
-    expect(receivedRawButtons).toEqual([5]);
+    expect(receivedRawButtons).toEqual([]);
     const wait = authority.awaitInteractionChoice(8_000_012, 1, ["meBtn"]);
     const beforeTimeout = await Promise.race([
       wait.then(() => "settled" as const),

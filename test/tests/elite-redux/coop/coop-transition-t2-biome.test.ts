@@ -339,8 +339,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     );
     expect(
       getCoopWaveBoundaryStatus(10, rig.guestRuntime),
-      "the market cannot open before ordered V2 wave DATA applies",
-    ).toMatchObject({ authority: "v2", dataApplied: true, continuationReady: false });
+      "ordered V2 wave DATA installs its explicit successor wait before the market presentation exists",
+    ).toMatchObject({ authority: "v2", dataApplied: true, continuationReady: true });
+
+    const completedWaveBoundary = getCoopWaveBoundaryStatus(10, rig.guestRuntime);
 
     await withClient(rig.guestCtx, () => {
       (
@@ -350,9 +352,9 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       ).notifyCoopBiomeContinuationSurfaceReady();
     });
     expect(
-      getCoopWaveBoundaryStatus(10, rig.guestRuntime)?.continuationReady,
-      "an inactive watcher cannot attest a public continuation",
-    ).toBe(false);
+      getCoopWaveBoundaryStatus(10, rig.guestRuntime),
+      "an inactive legacy watcher cannot replace or recreate the already-installed ordered wait",
+    ).toEqual(completedWaveBoundary);
 
     // Reproduce the production wave-20/160 shape: a previous public handler is still active when the
     // watcher starts. The watcher must explicitly replace it with a real MESSAGE surface before stock.
