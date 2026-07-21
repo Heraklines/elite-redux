@@ -1287,6 +1287,45 @@ describe("authority-v2 log", () => {
     expect(narrowLog.commit(settlementEntry("narrow-same-turn", "WAVE_ADVANCE", 1)).revision).toBe(2);
   });
 
+  it("admits the deferred automatic-victory advance from a replacement terminal successor wait", () => {
+    // A guest faint-replacement whose wave is WON the SAME turn defers its WAVE_ADVANCE to the settlement
+    // turn N+1 (browser journey 29846903494: "automatic victory settlement deferred sourceTurn=1
+    // settlementTurn=2"). The replacement's terminal successor authorizes a COMPLETE settlement boundary
+    // (both WAVE_ADVANCE and TERMINAL_COMMIT may follow), so - exactly like the turn-boundary wait - it must
+    // accept that settlement at turn N or N+1. Without this the won-wave WAVE_ADVANCE fails closed after the
+    // replacement (RC/.../o2/f1/s1) and terminates the shared session.
+    const terminalReplacementKinds = ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] as const;
+    const settlement = (operationId: string, turn: number) => ({
+      ...entryInput(operationId, {
+        kind: "WAVE_ADVANCE" as const,
+        nextControl: successorWait(operationId, ["CONTROL_COMMIT"]),
+      }),
+      material: { digest: `digest-${operationId}`, payload: { wave: 1, turn } },
+    });
+
+    const log = makeLog(scheduler, []);
+    log.commit(
+      entryInput("replacement-terminal", {
+        kind: "REPLACEMENT_COMMIT",
+        nextControl: successorWait("replacement-terminal", terminalReplacementKinds),
+      }),
+    );
+    expect(
+      log.commit(settlement("deferred-victory", 2)).revision,
+      "the deferred settlement-turn victory is authorized by the replacement terminal boundary",
+    ).toBe(2);
+
+    // A DRIFTED advance (turn N+2) still fails closed.
+    const driftLog = makeLog(scheduler, []);
+    driftLog.commit(
+      entryInput("replacement-terminal-drift", {
+        kind: "REPLACEMENT_COMMIT",
+        nextControl: successorWait("replacement-terminal-drift", terminalReplacementKinds),
+      }),
+    );
+    expect(() => driftLog.commit(settlement("drift-too-late", 3))).toThrow(/not authorized by predecessor control/u);
+  });
+
   it("keeps a replica successor wait until an exact allowed next revision is admitted", () => {
     const log = makeReplicaLog(scheduler, sent);
     const predecessor = fullEntry(1, "op-wait", {
