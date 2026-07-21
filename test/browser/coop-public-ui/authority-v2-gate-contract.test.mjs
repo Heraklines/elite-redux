@@ -753,15 +753,25 @@ test("the duo Mystery split cannot inject a choice before public V2 input is act
   const handlerActionable = helper.indexOf("handler.isCoopV2InputActionable?.() !== true");
   const v2InputGate = helper.indexOf("isCoopV2InteractionHumanInputFrozen()");
   const ownerCommit = helper.indexOf("commitMeOwnerIntent({");
-  const relaySend = helper.indexOf("relay.sendInteractionChoice(");
+  const relayDispatch = helper.indexOf("resend();", ownerCommit);
   assert.ok(handlerActionable >= 0, "the split observes the same actionable Mystery handler as a human");
   assert.ok(
     v2InputGate > handlerActionable,
     "the split crosses the production Authority V2 physical-input gate only after actionability",
   );
   assert.ok(
-    ownerCommit > v2InputGate && relaySend > ownerCommit,
+    ownerCommit > v2InputGate && relayDispatch > ownerCommit,
     "no owner intent or relay packet may precede the installed public control proof",
+  );
+  assert.match(
+    helper,
+    /relay\.sendInteractionChoice\(seam\.seq, "me", index, \[step\], undefined, operationId \?\? undefined\)/u,
+    "the shared-process split must carry the same exact immutable proposal identity as the browser handler",
+  );
+  assert.match(
+    helper,
+    /resend: isCoopMeOperationJournalActive\(\) \? resend : undefined/u,
+    "proposal retries must preserve that exact immutable identity",
   );
 
   const mysteryDriveStart = soakDriver.indexOf("hitMode(UiMode.MYSTERY_ENCOUNTER);");

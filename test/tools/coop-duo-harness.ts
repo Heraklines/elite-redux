@@ -3846,7 +3846,11 @@ export function relayGuestMeOptionIndexOnly(replay: Phase, index: number): void 
     throw new Error(`relayGuestMeOptionIndexOnly: duplicate pick for Mystery ${seam.seq}`);
   }
   const step = seam.pickStep;
-  const operationId = commitMeOwnerIntent({
+  let operationId: string | null = null;
+  const resend = (): void => {
+    relay.sendInteractionChoice(seam.seq, "me", index, [step], undefined, operationId ?? undefined);
+  };
+  operationId = commitMeOwnerIntent({
     kind: "ME_PICK",
     seq: seam.seq,
     pinned: seam.interactionCounter,
@@ -3855,16 +3859,14 @@ export function relayGuestMeOptionIndexOnly(replay: Phase, index: number): void 
     localRole: getCoopRuntime()?.controller.role ?? "guest",
     wave: globalScene.currentBattle?.waveIndex ?? -1,
     turn: 0,
-    resend: isCoopMeOperationJournalActive()
-      ? () => relay.sendInteractionChoice(seam.seq, "me", index, [step])
-      : undefined,
+    resend: isCoopMeOperationJournalActive() ? resend : undefined,
   });
   if (operationId == null && isCoopMeOperationEnabled()) {
     throw new Error(`relayGuestMeOptionIndexOnly: Mystery ${seam.seq}/${step} could not enter retained control`);
   }
   seam.pickStep = step + 1;
   seam.pickSent = true;
-  relay.sendInteractionChoice(seam.seq, "me", index, [step]);
+  resend();
 }
 
 /**

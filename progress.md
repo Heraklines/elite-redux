@@ -1031,3 +1031,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   zero TypeScript diagnostics in the four touched fixture files against the
   unrelated 222-error repository baseline. All co-op Vitest execution remains
   reserved for GitHub-hosted runners.
+
+2026-07-21 - Shared-process Mystery proposals preserve exact V2 identity
+
+- Exhaustive gate 29803881361 showed the representative Mystery soak ending at
+  wave 12 because the guest was deliberately failed closed for a proposal with
+  no immutable operation ID. This was a harness defect, not a production
+  Mystery handler defect: `relayGuestMeOptionIndexOnly` minted the retained
+  ME_PICK ID but omitted it from both its initial packet and retry closure.
+- The context-split helper now mirrors the production handler's `let`-bound
+  resend pattern and carries the exact ID on every send. Its source contract
+  explicitly rejects anonymous first sends and retries, preventing strict V2
+  proposal admission from being misdiagnosed as a gameplay regression again.
+- Local permitted evidence: all 32 Authority V2 public source contracts pass,
+  scoped Biome is clean apart from pre-existing informational complexity notes,
+  and `git diff --check` is clean. Engine and soak execution remains remote-only.
