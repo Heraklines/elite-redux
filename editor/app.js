@@ -4371,6 +4371,8 @@ function render() {
     renderAddMon(root);
   } else if (activeTab === "assets") {
     renderAssets(root);
+  } else if (activeTab === "tournaments") {
+    renderTournaments(root);
   } else {
     renderGame(root);
   }
@@ -5923,6 +5925,494 @@ async function init() {
     undoBtn.addEventListener("click", undo);
   } catch (err) {
     setStatus(`Failed to load data: ${err}`, ERR);
+  }
+}
+
+// =============================================================================
+// TOURNAMENTS tab (P3 admin ops). Talks DIRECTLY to the er-telemetry tournament
+// routes (a SEPARATE worker from er-editor-api). Those routes authenticate with
+// the game's session token (HMAC), NOT the editor password, and gate admin
+// actions by the TOURNAMENT_ADMIN_UIDS allowlist off the token uid. The editor
+// page has no session token of its own, so — per the design handoff's "worst case
+// a token field" — the admin pastes their game session token here (persisted in
+// localStorage) and it is sent as `Authorization: Bearer <token>`. CORS on
+// er-telemetry allows any origin, so this cross-origin call works from the SPA.
+// Self-contained: builds its own DOM + listeners each render; does not touch the
+// egg-move/save pipeline.
+// =============================================================================
+
+const TOURNAMENT_URL = "https://er-telemetry.heraklines.workers.dev";
+const TOUR_TOKEN_KEY = "er-tournament-token";
+
+const tourState = {
+  list: null, // cached /tournament/list result
+  detail: null, // the selected tournament's full view (with bracket)
+  selectedId: null,
+  loading: false,
+  error: null,
+};
+
+function tourToken() {
+  return localStorage.getItem(TOUR_TOKEN_KEY) || "";
+}
+
+function tEsc(s) {
+  return String(s ?? "").replace(
+    /[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+  );
+}
+
+/** Call an er-telemetry tournament route with the pasted session token. Throws on !ok. */
+async function tourApi(path, { method = "GET", body } = {}) {
+  const token = tourToken();
+  if (!token) {
+    throw new Error("Paste your game session token first (the Bearer field).");
+  }
+  const res = await fetch(`${TOURNAMENT_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* non-json (auth text) */
+  }
+  if (!res.ok) {
+    throw new Error((data && data.error) || `${res.status} ${res.statusText}`);
+  }
+  return data;
+}
+
+function tourRelTime(ms) {
+  if (typeof ms !== "number") {
+    return "never";
+  }
+  const d = Math.max(0, Date.now() - ms);
+  if (d < 60_000) {
+    return "just now";
+  }
+  const m = Math.floor(d / 60_000);
+  if (m < 60) {
+    return `${m}m ago`;
+  }
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
+}
+
+async function tourLoadList() {
+  tourState.loading = true;
+  tourState.error = null;
+  render();
+  try {
+    const data = await tourApi("/tournament/list");
+    tourState.list = data.tournaments || [];
+  } catch (e) {
+    tourState.error = e.message || String(e);
+    tourState.list = [];
+  } finally {
+    tourState.loading = false;
+    render();
+  }
+}
+
+async function tourLoadDetail(id) {
+  tourState.loading = true;
+  tourState.error = null;
+  tourState.selectedId = id;
+  render();
+  try {
+    const data = await tourApi(`/tournament/bracket?id=${encodeURIComponent(id)}`);
+    tourState.detail = data.tournament;
+  } catch (e) {
+    tourState.error = e.message || String(e);
+    tourState.detail = null;
+  } finally {
+    tourState.loading = false;
+    render();
+  }
+}
+
+/** Run an async action, surface errors, then reload the current view. */
+async function tourAction(fn, reload = "detail") {
+  try {
+    setStatus("Working…");
+    await fn();
+    setStatus("Done ✓", "var(--ok)");
+    if (reload === "detail" && tourState.selectedId) {
+      await tourLoadDetail(tourState.selectedId);
+    } else {
+      await tourLoadList();
+    }
+  } catch (e) {
+    tourState.error = e.message || String(e);
+    setStatus(tourState.error, ERR);
+    render();
+  }
+}
+
+function renderTournaments(root) {
+  const tokRow = `
+    <div class="tour-tokrow">
+      <label style="color:var(--muted);font-size:12px">Session token (Bearer)</label>
+      <input id="tour-token" type="password" placeholder="paste your game session token…"
+        autocomplete="off" spellcheck="false" value="${tEsc(tourToken())}" />
+      <button type="button" id="tour-refresh">↻ Refresh</button>
+    </div>`;
+  const err = tourState.error ? `<div class="tour-err">⚠ ${tEsc(tourState.error)}</div>` : "";
+
+  if (tourState.selectedId && tourState.detail) {
+    root.innerHTML = `<div class="tour-wrap">${tokRow}${err}${tourDetailHtml(tourState.detail)}</div>`;
+  } else {
+    root.innerHTML = `<div class="tour-wrap">${tokRow}${err}${tourCreateHtml()}${tourListHtml()}</div>`;
+  }
+  tourBind(root);
+}
+
+function tourCreateHtml() {
+  return `
+    <div class="section tour-form">
+      <h2>Create tournament</h2>
+      <fieldset>
+        <legend>Basics</legend>
+        <label>Name <input type="text" id="tc-name" placeholder="Continental Masters" /></label>
+        <label>Cap <input type="number" id="tc-cap" min="2" max="64" value="32" /></label>
+        <label>Round window (h) <input type="number" id="tc-window" min="8" max="48" value="24" /></label>
+        <label>Close at <input type="datetime-local" id="tc-closeat" /></label>
+      </fieldset>
+      <fieldset>
+        <legend>Format</legend>
+        <label>Battle
+          <select id="tc-battle">
+            <option value="singles">Singles</option>
+            <option value="doubles">Doubles</option>
+            <option value="triples">Triples</option>
+          </select>
+        </label>
+        <label>Series
+          <select id="tc-series">
+            <option value="single">Single game</option>
+            <option value="bo3">Best of 3</option>
+            <option value="bo5">Best of 5</option>
+          </select>
+        </label>
+      </fieldset>
+      ${tourRewardFieldsHtml("tc")}
+      <button type="button" class="primary" id="tour-create">Create</button>
+    </div>`;
+}
+
+/** Per-place reward inputs (currency + item). Prefix `p` differs for create (tc) vs edit (te). */
+function tourRewardFieldsHtml(p, pool) {
+  const val = (place, kind, key) => {
+    const entry = (pool || []).find(e => e.place === place);
+    const mut = entry && entry.mutations.find(m => m.kind === kind);
+    return mut ? mut[key] : "";
+  };
+  const row = (place, label) => `
+    <div class="tour-reward-row">
+      <b style="width:110px">${label}</b>
+      <label>💰 currency <input type="number" min="0" id="${p}-rw-${place}-cur" value="${tEsc(val(place, "grantCurrency", "amount"))}" /></label>
+      <label>🎒 item id <input type="text" style="width:130px" id="${p}-rw-${place}-item" value="${tEsc(val(place, "grantItem", "itemId"))}" /></label>
+      <label>× <input type="number" min="1" id="${p}-rw-${place}-itemn" value="${tEsc(val(place, "grantItem", "count"))}" /></label>
+    </div>`;
+  return `
+    <fieldset>
+      <legend>Reward pool (settlement mutation vocabulary)</legend>
+      ${row("champion", "Champion")}
+      ${row("runnerUp", "Runner-up")}
+      ${row("semifinalist", "Semifinalists")}
+    </fieldset>`;
+}
+
+/** Read the reward inputs for prefix `p` into a RewardPool array. */
+function tourReadRewardPool(root, p) {
+  const num = id => {
+    const v = root.querySelector(`#${id}`);
+    return v && v.value !== "" ? Number(v.value) : null;
+  };
+  const str = id => {
+    const v = root.querySelector(`#${id}`);
+    return v ? v.value.trim() : "";
+  };
+  const pool = [];
+  for (const place of ["champion", "runnerUp", "semifinalist"]) {
+    const muts = [];
+    const cur = num(`${p}-rw-${place}-cur`);
+    if (cur && cur > 0) {
+      muts.push({ kind: "grantCurrency", amount: cur });
+    }
+    const item = str(`${p}-rw-${place}-item`);
+    if (item) {
+      muts.push({ kind: "grantItem", itemId: item, count: num(`${p}-rw-${place}-itemn`) || 1 });
+    }
+    if (muts.length > 0) {
+      pool.push({ place, mutations: muts });
+    }
+  }
+  return pool;
+}
+
+function tourListHtml() {
+  if (tourState.loading && !tourState.list) {
+    return `<div class="empty">Loading tournaments…</div>`;
+  }
+  const list = tourState.list || [];
+  if (list.length === 0) {
+    return `<div class="empty">No tournaments yet. Create one above (paste your token first).</div>`;
+  }
+  const items = list
+    .map(t => {
+      const fmt = `${t.battleFormat || "singles"} · ${t.seriesFormat || "single"}`;
+      return `
+      <div class="tour-item" data-tour-open="${tEsc(t.id)}">
+        <div class="tname">${tEsc(t.name)} <span class="tour-state ${tEsc(t.state)}">${tEsc(t.state)}</span></div>
+        <div class="tmeta">${t.entrantCount}/${t.maxEntrants} entrants${(t.waitlist || []).length > 0 ? ` (+${t.waitlist.length} waitlist)` : ""} · ${tEsc(fmt)}${t.champion ? ` · 🏆 ${tEsc(t.champion)}` : ""}</div>
+      </div>`;
+    })
+    .join("");
+  return `<h2 style="margin:16px 0 8px">Tournaments</h2><div class="tour-list">${items}</div>`;
+}
+
+function tourDetailHtml(t) {
+  const b = t.bracket;
+  const closeAt = t.closeAt ? new Date(t.closeAt).toLocaleString() : "—";
+  const meta = `
+    <div class="tmeta" style="color:var(--muted);font-size:13px;margin:6px 0 10px">
+      Cap ${t.maxEntrants} · window ${Math.round((t.roundWindowMs || 0) / 3600000)}h · battle <b>${tEsc(t.battleFormat)}</b>
+      · series <b>${tEsc(t.seriesFormat)}</b> · close ${tEsc(closeAt)}${t.champion ? ` · 🏆 <b>${tEsc(t.champion)}</b>` : ""}
+      ${t.rewardsGranted ? " · rewards granted ✓" : ""}
+    </div>`;
+
+  // action buttons (state-dependent; the worker enforces validity too)
+  const actions = [];
+  if (t.state === "registration") {
+    actions.push(`<button type="button" id="tour-close">Close registration + generate</button>`);
+  }
+  if (t.state === "in_progress") {
+    actions.push(`<button type="button" id="tour-reseed">Re-seed (zero played)</button>`);
+  }
+  if (t.state === "complete") {
+    actions.push(`<button type="button" id="tour-grant"${t.rewardsGranted ? " disabled" : ""}>Grant rewards</button>`);
+  }
+  if (t.state !== "cancelled" && t.state !== "complete") {
+    actions.push(`<button type="button" id="tour-cancel">Cancel</button>`);
+  }
+  actions.push(`<button type="button" id="tour-delete" style="color:#e0556a;border-color:#e0556a">Delete</button>`);
+
+  // entrants table
+  const rows = (t.entrants || [])
+    .map(
+      e => `
+      <tr>
+        <td>${e.seed ?? "—"}</td>
+        <td><b>${tEsc(e.participant)}</b></td>
+        <td>${tEsc(e.ghost?.name || "")}${e.ghost?.title ? ` <small style="color:var(--muted)">"${tEsc(e.ghost.title)}"</small>` : ""}</td>
+        <td>${tEsc(e.presetName || "")}</td>
+        <td>${tEsc(tourRelTime(e.lastSeen))}</td>
+        <td><button type="button" class="tour-kick" data-tour-kick="${tEsc(e.participant)}">Kick</button></td>
+      </tr>`,
+    )
+    .join("");
+  const entrantsTable = `
+    <h3>Entrants (${(t.entrants || []).length})</h3>
+    <table class="tour-table">
+      <thead><tr><th>Seed</th><th>Username</th><th>Ghost identity</th><th>Preset</th><th>Last seen</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="color:var(--muted)">none</td></tr>'}</tbody>
+    </table>`;
+
+  // waitlist
+  const wl = (t.waitlist || [])
+    .map(
+      (e, i) => `
+      <tr>
+        <td>${i + 1}</td><td><b>${tEsc(e.participant)}</b></td><td>${tEsc(e.presetName || "")}</td>
+        <td><button type="button" class="tour-kick" data-tour-kick="${tEsc(e.participant)}">Remove</button></td>
+      </tr>`,
+    )
+    .join("");
+  const waitlistTable =
+    (t.waitlist || []).length > 0
+      ? `<h3>Waitlist (${t.waitlist.length})</h3>
+       <table class="tour-table">
+         <thead><tr><th>#</th><th>Username</th><th>Preset</th><th></th></tr></thead>
+         <tbody>${wl}</tbody></table>`
+      : "";
+
+  // disputed matches
+  const disputed = [];
+  if (b) {
+    for (const round of b.rounds) {
+      for (const m of round) {
+        if (m.disputed && m.winner === null) {
+          disputed.push(m);
+        }
+      }
+    }
+  }
+  const disputedHtml =
+    disputed.length > 0
+      ? `<h3 style="color:var(--warn)">Disputed matches (${disputed.length})</h3>
+       ${disputed
+         .map(
+           m => `<div class="tour-reward-row">
+             <span>${tEsc(m.a)} vs ${tEsc(m.b)}</span>
+             <button type="button" data-tour-resolve="${tEsc(m.id)}|${tEsc(m.a)}">Winner: ${tEsc(m.a)}</button>
+             <button type="button" data-tour-resolve="${tEsc(m.id)}|${tEsc(m.b)}">Winner: ${tEsc(m.b)}</button>
+           </div>`,
+         )
+         .join("")}`
+      : "";
+
+  // edit form (registration only)
+  const editHtml =
+    t.state === "registration"
+      ? `<div class="section tour-form" style="margin:16px 0 0">
+           <h2>Edit (registration only — format locks after generate)</h2>
+           <fieldset><legend>Basics</legend>
+             <label>Name <input type="text" id="te-name" value="${tEsc(t.name)}" /></label>
+             <label>Cap <input type="number" id="te-cap" min="2" max="64" value="${t.maxEntrants}" /></label>
+             <label>Round window (h) <input type="number" id="te-window" min="8" max="48" value="${Math.round((t.roundWindowMs || 0) / 3600000)}" /></label>
+             <label>Close at <input type="datetime-local" id="te-closeat" value="${t.closeAt ? new Date(t.closeAt - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}" /></label>
+           </fieldset>
+           <fieldset><legend>Format</legend>
+             <label>Battle <select id="te-battle">
+               ${["singles", "doubles", "triples"].map(f => `<option value="${f}"${t.battleFormat === f ? " selected" : ""}>${f}</option>`).join("")}
+             </select></label>
+             <label>Series <select id="te-series">
+               ${["single", "bo3", "bo5"].map(f => `<option value="${f}"${t.seriesFormat === f ? " selected" : ""}>${f}</option>`).join("")}
+             </select></label>
+           </fieldset>
+           ${tourRewardFieldsHtml("te", t.rewardPool)}
+           <button type="button" class="primary" id="tour-edit">Save edits</button>
+         </div>`
+      : "";
+
+  return `
+    <button type="button" class="tour-back" id="tour-back">← Back to list</button>
+    <div class="tname" style="font-size:18px">${tEsc(t.name)} <span class="tour-state ${tEsc(t.state)}">${tEsc(t.state)}</span></div>
+    ${meta}
+    <div class="tour-actions">${actions.join("")}</div>
+    ${disputedHtml}
+    ${entrantsTable}
+    ${waitlistTable}
+    ${editHtml}`;
+}
+
+/** Attach listeners to the freshly-rendered tournaments DOM (old listeners die with the old DOM). */
+function tourBind(root) {
+  const tok = root.querySelector("#tour-token");
+  if (tok) {
+    tok.addEventListener("change", () => localStorage.setItem(TOUR_TOKEN_KEY, tok.value.trim()));
+  }
+  const on = (sel, fn) => {
+    const el = root.querySelector(sel);
+    if (el) {
+      el.addEventListener("click", fn);
+    }
+  };
+  on("#tour-refresh", () => (tourState.selectedId ? tourLoadDetail(tourState.selectedId) : tourLoadList()));
+  on("#tour-back", () => {
+    tourState.selectedId = null;
+    tourState.detail = null;
+    tourLoadList();
+  });
+
+  // open a tournament
+  root
+    .querySelectorAll("[data-tour-open]")
+    .forEach(el => el.addEventListener("click", () => tourLoadDetail(el.dataset.tourOpen)));
+
+  // create
+  on("#tour-create", () => {
+    const g = id => root.querySelector(`#${id}`);
+    const closeVal = g("tc-closeat").value;
+    tourAction(
+      () =>
+        tourApi("/tournament/create", {
+          method: "POST",
+          body: {
+            name: g("tc-name").value.trim(),
+            maxEntrants: Number(g("tc-cap").value) || 32,
+            roundWindowMs: (Number(g("tc-window").value) || 24) * 3600000,
+            battleFormat: g("tc-battle").value,
+            seriesFormat: g("tc-series").value,
+            rewardPool: tourReadRewardPool(root, "tc"),
+            ...(closeVal ? { closeAt: new Date(closeVal).getTime() } : {}),
+          },
+        }),
+      "list",
+    );
+  });
+
+  // detail actions
+  const id = tourState.selectedId;
+  on("#tour-close", () =>
+    tourAction(() => tourApi("/tournament/close-registration", { method: "POST", body: { id } })),
+  );
+  on("#tour-reseed", () => tourAction(() => tourApi("/tournament/reseed", { method: "POST", body: { id } })));
+  on("#tour-grant", () =>
+    tourAction(async () => {
+      const r = await tourApi("/tournament/grant-rewards", { method: "POST", body: { id } });
+      setStatus(`Granted ${(r.granted || []).length} reward(s) — ${r.note || ""}`, "var(--ok)");
+    }),
+  );
+  on("#tour-cancel", () => {
+    if (confirm("Cancel this tournament? Entrants are notified in-game and the board shows cancelled.")) {
+      tourAction(() => tourApi("/tournament/cancel", { method: "POST", body: { id } }));
+    }
+  });
+  on("#tour-delete", () => {
+    if (confirm("DELETE this tournament permanently? This cannot be undone.")) {
+      tourAction(() => tourApi("/tournament/delete", { method: "POST", body: { id } }), "list");
+    }
+  });
+  on("#tour-edit", () => {
+    const g = tid => root.querySelector(`#${tid}`);
+    const closeVal = g("te-closeat").value;
+    tourAction(() =>
+      tourApi("/tournament/edit", {
+        method: "POST",
+        body: {
+          id,
+          name: g("te-name").value.trim(),
+          maxEntrants: Number(g("te-cap").value),
+          roundWindowMs: (Number(g("te-window").value) || 24) * 3600000,
+          battleFormat: g("te-battle").value,
+          seriesFormat: g("te-series").value,
+          rewardPool: tourReadRewardPool(root, "te"),
+          closeAt: closeVal ? new Date(closeVal).getTime() : null,
+        },
+      }),
+    );
+  });
+
+  // kick / remove-from-waitlist
+  root.querySelectorAll("[data-tour-kick]").forEach(el =>
+    el.addEventListener("click", () => {
+      const participant = el.dataset.tourKick;
+      if (confirm(`Kick ${participant}?`)) {
+        tourAction(() => tourApi("/tournament/kick", { method: "POST", body: { id, participant } }));
+      }
+    }),
+  );
+
+  // resolve disputed match
+  root.querySelectorAll("[data-tour-resolve]").forEach(el =>
+    el.addEventListener("click", () => {
+      const [matchId, winner] = el.dataset.tourResolve.split("|");
+      tourAction(() => tourApi("/tournament/resolve", { method: "POST", body: { tournamentId: id, matchId, winner } }));
+    }),
+  );
+
+  // lazy-load the list the first time the tab opens
+  if (!tourState.selectedId && tourState.list === null && !tourState.loading) {
+    tourLoadList();
   }
 }
 

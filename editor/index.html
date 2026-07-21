@@ -382,6 +382,33 @@
       .abil-cur { margin-top: 8px; }
       .abil-cur .acur-name { font-weight: 700; }
       .abil-cur .acur-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+      /* ---- Tournaments ---- */
+      .tour-wrap { padding: 16px; max-width: 1100px; }
+      .tour-tokrow { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+      .tour-tokrow input { flex: 1; min-width: 220px; font-family: ui-monospace, monospace; font-size: 12px; }
+      .tour-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+      .tour-item { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+      .tour-item:hover { border-color: var(--accent); }
+      .tour-item .tname { font-weight: 700; font-size: 15px; display: flex; gap: 8px; align-items: center; }
+      .tour-item .tmeta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+      .tour-state { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); text-transform: uppercase; }
+      .tour-state.registration { color: var(--ok); border-color: var(--ok); }
+      .tour-state.in_progress { color: var(--warn); border-color: var(--warn); }
+      .tour-state.complete { color: #9ab8e8; border-color: #9ab8e8; }
+      .tour-state.cancelled { color: #e0556a; border-color: #e0556a; }
+      .tour-form fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; min-width: 0; }
+      .tour-form legend { color: var(--muted); font-size: 12px; padding: 0 6px; }
+      .tour-form label { font-size: 12px; margin-right: 12px; display: inline-flex; gap: 5px; align-items: center; color: var(--muted); }
+      .tour-form input[type="number"] { width: 80px; }
+      .tour-form input[type="text"] { width: 220px; }
+      .tour-table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+      .tour-table th { text-align: left; font-size: 12px; color: var(--muted); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); }
+      .tour-table td { padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+      .tour-table .tour-kick { padding: 2px 8px; font-size: 12px; color: #e0556a; border-color: #e0556a; }
+      .tour-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+      .tour-reward-row { display: flex; gap: 8px; align-items: center; margin: 4px 0; flex-wrap: wrap; }
+      .tour-back { margin-bottom: 10px; }
+      .tour-err { color: #e0556a; font-size: 13px; margin: 8px 0; }
     </style>
   </head>
   <body>
@@ -414,6 +441,7 @@
       <button type="button" data-tab="assets">🎵 Assets</button>
       <button type="button" data-tab="game">🎛 Game</button>
       <button type="button" data-tab="addmon">➕ Add a Mon</button>
+      <button type="button" data-tab="tournaments">🏆 Tournaments</button>
     </nav>
     <main id="content"></main>
     <script src="./app.js"></script>
