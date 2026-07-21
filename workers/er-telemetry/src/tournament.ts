@@ -16,7 +16,15 @@
 // token uid). The bracket ADVANCE is server-authoritative.
 // =============================================================================
 
-import { type Bracket, generateBracket, isComplete, type Participant } from "./tournament-bracket";
+import {
+  applyKickWalkover,
+  type Bracket,
+  computePlacements,
+  generateBracket,
+  hasProgress,
+  isComplete,
+  type Participant,
+} from "./tournament-bracket";
 
 export type TournamentState = "registration" | "in_progress" | "complete" | "cancelled";
 
@@ -25,17 +33,160 @@ export const MIN_ROUND_WINDOW_MS = 8 * 60 * 60 * 1000;
 export const MAX_ROUND_WINDOW_MS = 48 * 60 * 60 * 1000;
 export const DEFAULT_ROUND_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-/** Field-size bounds. */
+/** Field-size bounds. P3: overall max 64 entries (paginated board for 32/64). */
 export const MIN_ENTRANTS = 2;
 export const DEFAULT_MAX_ENTRANTS = 16;
+export const MAX_ENTRANTS = 64;
+
+// =============================================================================
+// P3 — battle / series FORMAT + REWARD POOL vocabulary. Stored on the tournament
+// record; battle/series-format engine enforcement is a separate workstream (this
+// layer is storage + list/bracket exposure only). The reward pool DEFINITION uses
+// the settlement mutation vocabulary (mirrors the client's ShowdownSettlementMutation
+// / the escrow worker's SettlementMutation — the worker cannot import client code, so
+// the shape is re-declared); GRANTING at completion runs through the existing
+// settlement pipeline (see computeRewardGrants + the /tournament/grant-rewards route).
+// =============================================================================
+
+/** Field width at match start (design doc). Singles ships now; doubles/triples are a later engine workstream. */
+export type BattleFormat = "singles" | "doubles" | "triples";
+export const BATTLE_FORMATS: readonly BattleFormat[] = ["singles", "doubles", "triples"];
+export const DEFAULT_BATTLE_FORMAT: BattleFormat = "singles";
+
+/** Series wrapper (design doc): single game, best-of-3, best-of-5. Worker-level; board shows the series score. */
+export type SeriesFormat = "single" | "bo3" | "bo5";
+export const SERIES_FORMATS: readonly SeriesFormat[] = ["single", "bo3", "bo5"];
+export const DEFAULT_SERIES_FORMAT: SeriesFormat = "single";
+
+/** A reward-pool place: podium buckets mapped onto real accounts at completion via computePlacements. */
+export type RewardPlace = "champion" | "runnerUp" | "semifinalist";
+export const REWARD_PLACES: readonly RewardPlace[] = ["champion", "runnerUp", "semifinalist"];
+
+/**
+ * A single settlement mutation in a reward definition. Re-declared from the client's
+ * ShowdownSettlementMutation (the worker cannot import client code). `grantUnlock`/`grantCandy`
+ * are the natural PRIZE grants (a tournament never REMOVES an unlock — prize-only, design doc);
+ * `grantItem`/`grantCurrency` are additive prize kinds a tournament organizer may fund.
+ */
+export type TournamentRewardMutation =
+  | { kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
+  | { kind: "grantCandy"; speciesId: number; candy: number }
+  | { kind: "grantItem"; itemId: string; count: number }
+  | { kind: "grantCurrency"; amount: number };
+
+/** One place's reward: the mutations granted to whoever finishes in that place. */
+export interface RewardPoolEntry {
+  place: RewardPlace;
+  mutations: TournamentRewardMutation[];
+}
+
+/** The full reward pool (per-place mutation lists). Empty = no prizes. */
+export type RewardPool = RewardPoolEntry[];
 
 /** Creation config (validated at create). */
 export interface TournamentConfig {
   name: string;
   /** Per-round self-schedule window, clamped to [MIN,MAX]. */
   roundWindowMs?: number;
-  /** Registration cap (>= MIN_ENTRANTS), default DEFAULT_MAX_ENTRANTS. */
+  /** Registration cap, clamped to [MIN_ENTRANTS, MAX_ENTRANTS]; default DEFAULT_MAX_ENTRANTS. */
   maxEntrants?: number;
+  /** P3: field width at match start (storage + exposure only for now). */
+  battleFormat?: BattleFormat;
+  /** P3: series wrapper (single / best-of-3 / best-of-5). */
+  seriesFormat?: SeriesFormat;
+  /** P3: per-place reward definitions (settlement mutation vocabulary). */
+  rewardPool?: RewardPool;
+  /** P3: optional scheduled registration close (epoch ms); enforced LAZILY on reads. null = none. */
+  closeAt?: number | null;
+}
+
+/** Coerce an arbitrary value to a valid BattleFormat, defaulting. */
+export function coerceBattleFormat(v: unknown): BattleFormat {
+  return BATTLE_FORMATS.includes(v as BattleFormat) ? (v as BattleFormat) : DEFAULT_BATTLE_FORMAT;
+}
+
+/** Coerce an arbitrary value to a valid SeriesFormat, defaulting. */
+export function coerceSeriesFormat(v: unknown): SeriesFormat {
+  return SERIES_FORMATS.includes(v as SeriesFormat) ? (v as SeriesFormat) : DEFAULT_SERIES_FORMAT;
+}
+
+/** Clamp a requested entrant cap into [MIN_ENTRANTS, MAX_ENTRANTS], defaulting when absent/invalid. */
+export function clampMaxEntrants(v: number | undefined): number {
+  if (typeof v !== "number" || !Number.isFinite(v)) {
+    return DEFAULT_MAX_ENTRANTS;
+  }
+  return Math.min(MAX_ENTRANTS, Math.max(MIN_ENTRANTS, Math.floor(v)));
+}
+
+/**
+ * Normalize an untrusted reward-pool payload into a safe RewardPool (drops unknown places / kinds
+ * / malformed entries). Non-negative-clamps numeric amounts. Returns [] when nothing survives.
+ */
+export function sanitizeRewardPool(raw: unknown): RewardPool {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: RewardPool = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const e = entry as Record<string, unknown>;
+    if (!REWARD_PLACES.includes(e.place as RewardPlace)) {
+      continue;
+    }
+    const muts: TournamentRewardMutation[] = [];
+    if (Array.isArray(e.mutations)) {
+      for (const m of e.mutations) {
+        const sm = sanitizeRewardMutation(m);
+        if (sm) {
+          muts.push(sm);
+        }
+      }
+    }
+    out.push({ place: e.place as RewardPlace, mutations: muts });
+  }
+  return out;
+}
+
+function nonNegInt(v: unknown, fallback = 0): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? Math.floor(v) : fallback;
+  return Math.max(0, n);
+}
+
+function sanitizeRewardMutation(raw: unknown): TournamentRewardMutation | null {
+  if (typeof raw !== "object" || raw === null) {
+    return null;
+  }
+  const m = raw as Record<string, unknown>;
+  switch (m.kind) {
+    case "grantUnlock":
+      if (typeof m.speciesId !== "number") {
+        return null;
+      }
+      return {
+        kind: "grantUnlock",
+        speciesId: Math.floor(m.speciesId),
+        shiny: Boolean(m.shiny),
+        variant: nonNegInt(m.variant),
+        erBlackShiny: Boolean(m.erBlackShiny),
+        cost: nonNegInt(m.cost),
+      };
+    case "grantCandy":
+      if (typeof m.speciesId !== "number") {
+        return null;
+      }
+      return { kind: "grantCandy", speciesId: Math.floor(m.speciesId), candy: nonNegInt(m.candy) };
+    case "grantItem":
+      if (typeof m.itemId !== "string" || m.itemId.length === 0) {
+        return null;
+      }
+      return { kind: "grantItem", itemId: m.itemId.slice(0, 64), count: Math.max(1, nonNegInt(m.count, 1)) };
+    case "grantCurrency":
+      return { kind: "grantCurrency", amount: nonNegInt(m.amount) };
+    default:
+      return null;
+  }
 }
 
 /** The authoritative tournament row (plain data; persisted to D1 by the worker). */
@@ -53,6 +204,16 @@ export interface TournamentRecord {
   /** null until registration closes; then the server-authoritative bracket. */
   bracket: Bracket | null;
   champion: Participant | null;
+  /** P3: field width at match start (storage + exposure; engine enforcement separate). */
+  battleFormat: BattleFormat;
+  /** P3: series wrapper (single / bo3 / bo5). LOCKED once the bracket generates. */
+  seriesFormat: SeriesFormat;
+  /** P3: per-place reward definitions (settlement mutation vocabulary). */
+  rewardPool: RewardPool;
+  /** P3: optional scheduled registration close (epoch ms), enforced lazily on reads. null = none. */
+  closeAt: number | null;
+  /** P3: set once the reward pool has been granted at completion (stub-grant marker; prevents double-grant). */
+  rewardsGranted: boolean;
 }
 
 /**
@@ -134,6 +295,8 @@ export interface EntrantRecord {
   ghost?: GhostIconSummary | null;
   /** P1.5: epoch ms of this entrant's last presence ping (additive; null = never seen). */
   lastSeen?: number | null;
+  /** P3: true when this entrant is on the WAITLIST (beyond cap); promoted into the field on a kick. */
+  waitlisted?: boolean;
 }
 
 export type Ok<T> = { ok: true } & T;
@@ -163,10 +326,9 @@ export function createTournament(
   if (!nameOk(config.name)) {
     return { ok: false, error: "invalid tournament name" };
   }
-  const maxEntrants =
-    typeof config.maxEntrants === "number" && Number.isFinite(config.maxEntrants)
-      ? Math.max(MIN_ENTRANTS, Math.floor(config.maxEntrants))
-      : DEFAULT_MAX_ENTRANTS;
+  const maxEntrants = clampMaxEntrants(config.maxEntrants);
+  const closeAt =
+    typeof config.closeAt === "number" && Number.isFinite(config.closeAt) ? Math.floor(config.closeAt) : null;
   return {
     ok: true,
     tournament: {
@@ -180,6 +342,11 @@ export function createTournament(
       startedAt: null,
       bracket: null,
       champion: null,
+      battleFormat: coerceBattleFormat(config.battleFormat),
+      seriesFormat: coerceSeriesFormat(config.seriesFormat),
+      rewardPool: sanitizeRewardPool(config.rewardPool),
+      closeAt,
+      rewardsGranted: false,
     },
   };
 }
@@ -324,4 +491,288 @@ export function syncCompletion(tournament: TournamentRecord): TournamentRecord {
     return { ...tournament, state: "complete", champion: tournament.bracket.rounds.at(-1)?.[0].winner ?? null };
   }
   return tournament;
+}
+
+// =============================================================================
+// P3 — ADMIN OPS: waitlist, kick (registration refill / reopen / walkover), edit,
+// reseed, scheduled close, reward grants. All PURE (the route persists the result).
+// =============================================================================
+
+/** Where a registration attempt lands: an active field slot, the waitlist, or rejected. */
+export type RegistrationOutcome =
+  | { ok: true; kind: "entrant" }
+  | { ok: true; kind: "waitlist" }
+  | { ok: false; error: string };
+
+/**
+ * Decide whether a would-be registrant becomes an active ENTRANT, joins the WAITLIST (beyond
+ * cap), or is rejected — the PURE decision behind the register route (design doc scenario 8).
+ *  - open registration under cap  -> entrant.
+ *  - registration full, OR the field auto-/admin-closed but NO match has been played yet
+ *    (the pre-play window) -> waitlist (auto-promoted on a later kick).
+ *  - a tournament that is underway (a match played), complete, or cancelled -> rejected.
+ * `entrants` is the ACTIVE field; `waitlist` the queued rows. Both are checked for a dup.
+ */
+export function classifyRegistration(
+  tournament: TournamentRecord,
+  entrants: EntrantRecord[],
+  waitlist: EntrantRecord[],
+  participant: Participant,
+  presetName: string,
+): RegistrationOutcome {
+  if (!participant) {
+    return { ok: false, error: "missing participant" };
+  }
+  if (entrants.some(e => e.participant === participant) || waitlist.some(e => e.participant === participant)) {
+    return { ok: false, error: "already registered" };
+  }
+  if (!nameOk(presetName)) {
+    return { ok: false, error: "a saved team preset is required to register" };
+  }
+  if (tournament.state === "registration") {
+    return entrants.length < tournament.maxEntrants ? { ok: true, kind: "entrant" } : { ok: true, kind: "waitlist" };
+  }
+  // Post-close but pre-play: the field is generated but nothing has been played — queue on the
+  // waitlist so a kick can promote. Once a match is played (or complete/cancelled), no new joins.
+  if (tournament.state === "in_progress" && tournament.bracket !== null && !hasProgress(tournament.bracket)) {
+    return { ok: true, kind: "waitlist" };
+  }
+  return { ok: false, error: "registration is closed" };
+}
+
+/** Build a fresh entrant row (active or waitlisted). */
+export function makeEntrant(
+  tournamentId: string,
+  participant: Participant,
+  presetName: string,
+  now: number,
+  waitlisted: boolean,
+): EntrantRecord {
+  return {
+    tournamentId,
+    participant,
+    name: participant,
+    presetName,
+    seed: null,
+    registeredAt: now,
+    waitlisted,
+  };
+}
+
+/** The outcome of an admin KICK (design doc scenarios 2, 3, 8). */
+export type KickResult =
+  | {
+      ok: true;
+      /** "registration" (still open) / "reopen" (was closed at cap, now reopened) / "walkover" (mid-tournament). */
+      kind: "registration" | "reopen" | "walkover";
+      /** The tournament AFTER the kick (state/bracket possibly changed; seeds cleared on reopen). */
+      tournament: TournamentRecord;
+      /** The participant removed from the FIELD (kept as a kicked entrant row on a walkover). */
+      removed: Participant;
+      /** True on a walkover: the removed player stays an entrant row, flagged kicked on the bracket. */
+      keepEntrantRow: boolean;
+      /** A waitlisted participant promoted into the freed slot, or null. */
+      promoted: Participant | null;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Admin KICK of an entrant. Behavior depends on state (design doc):
+ *  - REGISTRATION: remove the entrant; if the waitlist is non-empty, promote its FIRST member into
+ *    the freed slot (scenario 8). Registration stays open (scenario 2).
+ *  - IN-PROGRESS, no match played yet (auto-closed at cap): REOPEN — drop the bracket, revert to
+ *    registration, remove the entrant, promote the first waitlisted member (scenario 2's reopen clause).
+ *  - IN-PROGRESS, a match already played: WALKOVER — the kicked player's opponent auto-advances; the
+ *    kicked player's row is kept and flagged on the bracket so the board shows them kicked (scenario 3).
+ *  - COMPLETE / CANCELLED: rejected.
+ * `waitlist` MUST be ordered by registration time (first = next to promote).
+ */
+export function kickEntrant(
+  tournament: TournamentRecord,
+  entrants: EntrantRecord[],
+  waitlist: EntrantRecord[],
+  target: Participant,
+  now: number,
+): KickResult {
+  const isEntrant = entrants.some(e => e.participant === target);
+  const isWaitlisted = waitlist.some(e => e.participant === target);
+  if (!isEntrant && !isWaitlisted) {
+    return { ok: false, error: "not an entrant" };
+  }
+  if (tournament.state === "complete" || tournament.state === "cancelled") {
+    return { ok: false, error: "tournament already ended" };
+  }
+
+  // Kicking a WAITLISTED player is just a waitlist removal (no field slot freed, no promotion).
+  if (!isEntrant && isWaitlisted) {
+    return { ok: true, kind: "registration", tournament, removed: target, keepEntrantRow: false, promoted: null };
+  }
+
+  const promoted = waitlist[0]?.participant ?? null;
+
+  if (tournament.state === "registration") {
+    return { ok: true, kind: "registration", tournament, removed: target, keepEntrantRow: false, promoted };
+  }
+
+  // state === "in_progress" with a bracket.
+  const bracket = tournament.bracket;
+  if (bracket === null) {
+    return { ok: false, error: "tournament has no bracket" };
+  }
+  if (!hasProgress(bracket)) {
+    // Auto-closed at cap but nothing played yet -> reopen registration (undo the generation).
+    const reopened: TournamentRecord = { ...tournament, state: "registration", startedAt: null, bracket: null };
+    return { ok: true, kind: "reopen", tournament: reopened, removed: target, keepEntrantRow: false, promoted };
+  }
+  // A match has been played -> WALKOVER (opponent advances). Keep the kicked entrant row.
+  const nextBracket = applyKickWalkover(bracket, target, now);
+  const synced = syncCompletion({ ...tournament, bracket: nextBracket });
+  return { ok: true, kind: "walkover", tournament: synced, removed: target, keepEntrantRow: true, promoted: null };
+}
+
+/** An in-registration EDIT patch (design doc scenario 5). Only editable fields; format LOCKED post-generate. */
+export interface TournamentEditPatch {
+  name?: string;
+  roundWindowMs?: number;
+  maxEntrants?: number;
+  closeAt?: number | null;
+  rewardPool?: RewardPool;
+  /** Editable only WHILE in registration (format locks once the bracket generates). */
+  battleFormat?: BattleFormat;
+  seriesFormat?: SeriesFormat;
+}
+
+/**
+ * Edit a tournament's config WHILE IN REGISTRATION (design doc scenario 5): rewards, cap, window,
+ * close-time, name, and (still-unlocked) battle/series format. Rejected once the bracket generates
+ * (format + structure locked). A lowered cap may not drop below the current entrant count.
+ */
+export function editTournament(
+  tournament: TournamentRecord,
+  patch: TournamentEditPatch,
+  entrantCount: number,
+): Result<{ tournament: TournamentRecord }> {
+  if (tournament.state !== "registration") {
+    return { ok: false, error: "can only edit during registration" };
+  }
+  const next: TournamentRecord = { ...tournament };
+  if (patch.name !== undefined) {
+    if (!nameOk(patch.name)) {
+      return { ok: false, error: "invalid tournament name" };
+    }
+    next.name = patch.name.trim();
+  }
+  if (patch.roundWindowMs !== undefined) {
+    next.roundWindowMs = clampRoundWindow(patch.roundWindowMs);
+  }
+  if (patch.maxEntrants !== undefined) {
+    const capped = clampMaxEntrants(patch.maxEntrants);
+    if (capped < entrantCount) {
+      return { ok: false, error: "cap cannot be below the current entrant count" };
+    }
+    next.maxEntrants = capped;
+  }
+  if (patch.closeAt !== undefined) {
+    next.closeAt =
+      typeof patch.closeAt === "number" && Number.isFinite(patch.closeAt) ? Math.floor(patch.closeAt) : null;
+  }
+  if (patch.rewardPool !== undefined) {
+    next.rewardPool = sanitizeRewardPool(patch.rewardPool);
+  }
+  if (patch.battleFormat !== undefined) {
+    next.battleFormat = coerceBattleFormat(patch.battleFormat);
+  }
+  if (patch.seriesFormat !== undefined) {
+    next.seriesFormat = coerceSeriesFormat(patch.seriesFormat);
+  }
+  return { ok: true, tournament: next };
+}
+
+/**
+ * RE-SEED / regenerate the bracket while NO match has been played (design doc scenario 7). Valid
+ * only when the tournament is in_progress with a generated bracket that has zero progress (only
+ * byes may have auto-resolved). Re-runs seeding + generation off the CURRENT active field.
+ */
+export function reseedTournament(
+  tournament: TournamentRecord,
+  entrants: EntrantRecord[],
+  rankOf: (participant: Participant) => number | null,
+  now: number,
+): Result<{ tournament: TournamentRecord; seeded: { participant: Participant; seed: number }[] }> {
+  if (tournament.state !== "in_progress" || tournament.bracket === null) {
+    return { ok: false, error: "can only reseed a started tournament" };
+  }
+  if (hasProgress(tournament.bracket)) {
+    return { ok: false, error: "cannot reseed after a match has been played" };
+  }
+  const active = entrants.filter(e => !e.waitlisted);
+  if (active.length < MIN_ENTRANTS) {
+    return { ok: false, error: "not enough entrants to reseed" };
+  }
+  const seeded = seedEntrants(active, rankOf);
+  const bracket = generateBracket(tournament.id, seeded, tournament.roundWindowMs, now);
+  return { ok: true, tournament: { ...tournament, startedAt: now, bracket }, seeded };
+}
+
+/**
+ * LAZY scheduled-registration-close (design doc scenario 1 / "no cron"): if a closeAt is set and
+ * has passed while the tournament is still in registration with enough entrants, close + generate
+ * NOW (called at the top of every read/register handler). Returns the (possibly) closed tournament
+ * plus the assigned seeds when it fired. `entrants` is the ACTIVE field (waitlist excluded).
+ */
+export function applyScheduledClose(
+  tournament: TournamentRecord,
+  entrants: EntrantRecord[],
+  rankOf: (participant: Participant) => number | null,
+  now: number,
+): { tournament: TournamentRecord; closed: boolean; seeded: { participant: Participant; seed: number }[] } {
+  if (
+    tournament.state !== "registration"
+    || tournament.closeAt === null
+    || now < tournament.closeAt
+    || entrants.length < MIN_ENTRANTS
+  ) {
+    return { tournament, closed: false, seeded: [] };
+  }
+  const res = closeRegistration(tournament, entrants, rankOf, now);
+  if (!res.ok) {
+    return { tournament, closed: false, seeded: [] };
+  }
+  return { tournament: res.tournament, closed: true, seeded: res.seeded };
+}
+
+/** A concrete per-account grant computed from the reward pool + final placements. */
+export interface RewardGrant {
+  participant: Participant;
+  place: RewardPlace;
+  mutations: TournamentRewardMutation[];
+}
+
+/**
+ * Map the reward pool onto real accounts using the final placements (design doc scenario 10).
+ * champion -> the champion; runnerUp -> the final loser; semifinalist -> EACH semifinal loser.
+ * Returns one RewardGrant per (place, account) with mutations. Empty when the tournament is not
+ * complete or the pool is empty. PURE — the actual APPLICATION runs through the settlement pipeline.
+ */
+export function computeRewardGrants(tournament: TournamentRecord): RewardGrant[] {
+  if (tournament.bracket === null || !isComplete(tournament.bracket) || tournament.rewardPool.length === 0) {
+    return [];
+  }
+  const placements = computePlacements(tournament.bracket);
+  const grants: RewardGrant[] = [];
+  for (const entry of tournament.rewardPool) {
+    if (entry.mutations.length === 0) {
+      continue;
+    }
+    if (entry.place === "champion" && placements.champion) {
+      grants.push({ participant: placements.champion, place: "champion", mutations: entry.mutations });
+    } else if (entry.place === "runnerUp" && placements.runnerUp) {
+      grants.push({ participant: placements.runnerUp, place: "runnerUp", mutations: entry.mutations });
+    } else if (entry.place === "semifinalist") {
+      for (const semi of placements.semifinalists) {
+        grants.push({ participant: semi, place: "semifinalist", mutations: entry.mutations });
+      }
+    }
+  }
+  return grants;
 }

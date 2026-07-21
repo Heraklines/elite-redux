@@ -34,7 +34,8 @@ export type MatchResolution =
   | "pending" // no winner yet
   | "bye" // auto-advanced (single real player, opponent was a bye)
   | "reported" // settled by AGREEING dual attestation from both paired accounts
-  | "manual"; // settled by an organizer override
+  | "manual" // settled by an organizer override
+  | "walkover"; // opponent auto-advanced because the other player was KICKED (admin, P3)
 
 /** One player's attestation of a match outcome, with the epoch-ms it first arrived. */
 export interface MatchReport {
@@ -71,6 +72,13 @@ export interface Bracket {
   size: number;
   /** rounds[r] holds the matches of round r; the last round is the final (1 match). */
   rounds: BracketMatch[][];
+  /**
+   * P3: participants KICKED mid-tournament (admin walkover). Their opponent auto-advances
+   * (resolution "walkover"); a kicked player who was WAITING for a not-yet-decided opponent
+   * sits in a pending match until the feeder resolves, then that opponent walks over. The
+   * board renders a kicked participant as eliminated/kicked. Additive (absent on P1 brackets).
+   */
+  kicked?: Participant[];
 }
 
 /** The result of applying a report / resolve to a match. */
@@ -292,4 +300,133 @@ export function manualResolve(bracket: Bracket, id: string, winner: Participant)
   match.disputed = false;
   setWinner(bracket, match, winner, "manual");
   return { bracket, resolution: "settled", matchId: id };
+}
+
+// =============================================================================
+// P3 — ADMIN OPS helpers (kick/walkover, progress guard, placements). PURE.
+// =============================================================================
+
+/** The "played" resolutions — a real contested result, an override, or a walkover advance. */
+const PLAYED_RESOLUTIONS: ReadonlySet<MatchResolution> = new Set<MatchResolution>(["reported", "manual", "walkover"]);
+
+/** Count of matches that have been PLAYED (contested result, manual resolve, or walkover). Byes excluded. */
+export function matchesPlayedCount(bracket: Bracket): number {
+  let n = 0;
+  for (const round of bracket.rounds) {
+    for (const match of round) {
+      if (PLAYED_RESOLUTIONS.has(match.resolution)) {
+        n++;
+      }
+    }
+  }
+  return n;
+}
+
+/**
+ * True once ANY real progress exists (a played/overridden/walkover result). Byes are structural,
+ * not progress. RE-SEED and reopen-on-kick are only permitted while this is false (design doc:
+ * "regenerate while no match has been played yet").
+ */
+export function hasProgress(bracket: Bracket): boolean {
+  return matchesPlayedCount(bracket) > 0;
+}
+
+/** Placement buckets for reward granting (design doc: champion / runner-up / semifinalists). */
+export interface Placements {
+  champion: Participant | null;
+  runnerUp: Participant | null;
+  /** Losers of the semifinal round (the round before the final); empty for a 2-slot bracket. */
+  semifinalists: Participant[];
+}
+
+/** The loser of a decided match (the non-winner real participant), or null (undecided / bye / walkover-empty). */
+function loserOf(match: BracketMatch): Participant | null {
+  if (match.winner === null) {
+    return null;
+  }
+  if (match.a !== null && match.a !== match.winner) {
+    return match.a;
+  }
+  if (match.b !== null && match.b !== match.winner) {
+    return match.b;
+  }
+  return null;
+}
+
+/**
+ * Compute podium placements from the (decided or partial) bracket. Champion = final winner;
+ * runner-up = final loser; semifinalists = the losers of the second-to-last round. Undecided
+ * slots yield null / are omitted. Pure — used to map the reward pool onto real accounts.
+ */
+export function computePlacements(bracket: Bracket): Placements {
+  const final = finalMatch(bracket);
+  const champion = final.winner;
+  const runnerUp = loserOf(final);
+  const semis = bracket.rounds.length >= 2 ? (bracket.rounds.at(-2) ?? []) : [];
+  const semifinalists: Participant[] = [];
+  for (const m of semis) {
+    const l = loserOf(m);
+    if (l !== null) {
+      semifinalists.push(l);
+    }
+  }
+  return { champion, runnerUp, semifinalists };
+}
+
+/**
+ * Apply an admin KICK mid-tournament as a WALKOVER (design doc scenario 3). Adds `participant`
+ * to the bracket's kicked list, then repeatedly advances any undecided match where a KICKED
+ * player faces a KNOWN non-kicked opponent — the opponent wins by "walkover" and advances. A
+ * kicked player whose opponent is still TBD sits in a pending match until the feeder resolves,
+ * at which point a subsequent call (or the same fixpoint loop) advances the arriving opponent.
+ * If BOTH slots are kicked, the match resolves with no winner (neither advances). Mutates + returns.
+ */
+export function applyKickWalkover(bracket: Bracket, participant: Participant, now: number): Bracket {
+  if (bracket.kicked === undefined) {
+    bracket.kicked = [];
+  }
+  if (!bracket.kicked.includes(participant)) {
+    bracket.kicked.push(participant);
+  }
+  const kicked = new Set(bracket.kicked);
+  // Fixpoint: keep advancing walkovers until no undecided match changes.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const round of bracket.rounds) {
+      for (const match of round) {
+        if (match.winner !== null) {
+          continue;
+        }
+        const aKicked = match.a !== null && kicked.has(match.a);
+        const bKicked = match.b !== null && kicked.has(match.b);
+        if (!aKicked && !bKicked) {
+          continue;
+        }
+        const aReal = match.a !== null && !aKicked;
+        const bReal = match.b !== null && !bKicked;
+        if (aKicked && bReal) {
+          setWinner(bracket, match, match.b as Participant, "walkover");
+          match.deadline = now;
+          changed = true;
+        } else if (bKicked && aReal) {
+          setWinner(bracket, match, match.a as Participant, "walkover");
+          match.deadline = now;
+          changed = true;
+        } else if (aKicked && bKicked) {
+          // Both kicked: no one advances. Mark resolved (winner stays null) so it isn't pending forever.
+          match.resolution = "walkover";
+          match.deadline = now;
+          // Does NOT feed the parent (setWinner needs a winner); parent stays TBD (rare edge).
+        }
+        // else: a kicked player vs a null (TBD) opponent — leave pending until the feeder fills it.
+      }
+    }
+  }
+  return bracket;
+}
+
+/** True if `participant` was kicked from this bracket (board renders them as kicked/eliminated). */
+export function isKicked(bracket: Bracket, participant: Participant): boolean {
+  return bracket.kicked?.includes(participant) ?? false;
 }

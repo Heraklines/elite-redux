@@ -25,6 +25,11 @@ interface TourRow {
   started_at: number | null;
   champion: string | null;
   bracket_json: string | null;
+  battle_format: string | null;
+  series_format: string | null;
+  reward_pool_json: string | null;
+  close_at: number | null;
+  rewards_granted: number | null;
 }
 interface EntrantRow {
   tournament_id: string;
@@ -35,6 +40,7 @@ interface EntrantRow {
   registered_at: number;
   ghost_json: string | null;
   last_seen: number | null;
+  waitlisted: number | null;
 }
 
 /** In-memory D1 that recognizes the route module's statements by SQL substring (incl. P1.5 columns). */
@@ -76,6 +82,7 @@ class FakeStmt {
           registered_at: e.registered_at,
           ghost_json: e.ghost_json,
           last_seen: e.last_seen,
+          waitlisted: e.waitlisted,
         }));
       return { results: rows as T[] };
     }
@@ -102,16 +109,29 @@ class FakeStmt {
         started_at: a[7] as number | null,
         champion: a[8] as string | null,
         bracket_json: a[9] as string | null,
+        battle_format: a[10] as string | null,
+        series_format: a[11] as string | null,
+        reward_pool_json: a[12] as string | null,
+        close_at: a[13] as number | null,
+        rewards_granted: a[14] as number | null,
       });
       return;
     }
     if (s.startsWith("UPDATE tournaments SET")) {
       const row = this.db.tournaments.get(String(a[0]));
       if (row) {
-        row.state = String(a[1]);
-        row.started_at = a[2] as number | null;
-        row.champion = a[3] as string | null;
-        row.bracket_json = a[4] as string | null;
+        row.name = String(a[1]);
+        row.state = String(a[2]);
+        row.started_at = a[3] as number | null;
+        row.champion = a[4] as string | null;
+        row.bracket_json = a[5] as string | null;
+        row.round_window_ms = Number(a[6]);
+        row.max_entrants = Number(a[7]);
+        row.battle_format = a[8] as string | null;
+        row.series_format = a[9] as string | null;
+        row.reward_pool_json = a[10] as string | null;
+        row.close_at = a[11] as number | null;
+        row.rewards_granted = a[12] as number | null;
       }
       return;
     }
@@ -125,7 +145,16 @@ class FakeStmt {
         registered_at: Number(a[5]),
         ghost_json: (a[6] as string | null) ?? null,
         last_seen: (a[7] as number | null) ?? null,
+        waitlisted: (a[8] as number | null) ?? null,
       });
+      return;
+    }
+    if (s.startsWith("UPDATE tournament_entrants SET seed=NULL WHERE tournament_id")) {
+      for (const e of this.db.entrants) {
+        if (e.tournament_id === String(a[0])) {
+          e.seed = null;
+        }
+      }
       return;
     }
     if (s.startsWith("UPDATE tournament_entrants SET seed")) {
@@ -142,10 +171,25 @@ class FakeStmt {
       }
       return;
     }
-    if (s.startsWith("DELETE FROM tournament_entrants")) {
+    if (s.startsWith("UPDATE tournament_entrants SET waitlisted")) {
+      const row = this.db.entrants.find(e => e.tournament_id === String(a[0]) && e.participant === String(a[1]));
+      if (row) {
+        row.waitlisted = 0;
+      }
+      return;
+    }
+    if (s.startsWith("DELETE FROM tournament_entrants WHERE tournament_id=?1 AND participant")) {
       this.db.entrants = this.db.entrants.filter(
         e => !(e.tournament_id === String(a[0]) && e.participant === String(a[1])),
       );
+      return;
+    }
+    if (s.startsWith("DELETE FROM tournament_entrants WHERE tournament_id")) {
+      this.db.entrants = this.db.entrants.filter(e => e.tournament_id !== String(a[0]));
+      return;
+    }
+    if (s.startsWith("DELETE FROM tournaments WHERE id")) {
+      this.db.tournaments.delete(String(a[0]));
       return;
     }
   }
@@ -210,14 +254,24 @@ describe("tournament auto-close at cap (P1.5)", () => {
     expect(view.tournament.entrants.every((e: any) => typeof e.seed === "number")).toBe(true);
   });
 
-  it("a 5th registration after auto-close gets 'tournament is full'", async () => {
+  it("a 5th registration after auto-close is WAITLISTED (P3: entries beyond cap queue)", async () => {
     const id = await createCap4();
     for (const p of ["alice", "bob", "carol", "dave"]) {
       await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` });
     }
+    // P3 supersedes the old "tournament is full" reject: the field auto-closed at cap but nothing
+    // has been played, so a 5th join queues on the waitlist (auto-promoted on a later kick).
     const fifth = await call("/tournament/register", "POST", player("eve"), { id, presetName: "eve-team" });
-    expect(fifth.status).toBe(422);
-    expect(((await fifth.json()) as any).error).toBe("tournament is full");
+    expect(fifth.status).toBe(200);
+    expect(((await fifth.json()) as any).waitlisted).toBe(true);
+    const view = (await (await call("/tournament/bracket?id=cup", "GET", player("alice"))).json()) as any;
+    expect(view.tournament.waitlist.map((e: any) => e.participant)).toEqual(["eve"]);
+    // ...but once a match is PLAYED, further joins are rejected outright.
+    const m0 = view.tournament.bracket.rounds[0][0];
+    await call("/tournament/result", "POST", player(m0.a), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    await call("/tournament/result", "POST", player(m0.b), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    const late = await call("/tournament/register", "POST", player("frank"), { id, presetName: "frank-team" });
+    expect(late.status).toBe(422);
   });
 });
 

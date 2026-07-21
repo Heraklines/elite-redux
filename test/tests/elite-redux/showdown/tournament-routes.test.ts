@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 // admin ALLOWLIST and the result ATTESTATION at the HTTP seam). The worker's D1 is
 // stubbed with a minimal in-memory engine that answers only the exact statements the
 // route module issues — enough to exercise the full create -> register -> close ->
-// report -> resolve lifecycle without Cloudflare.
+// report -> resolve lifecycle (+ the P3 admin ops) without Cloudflare.
 import {
   type Caller,
   handleTournamentRoute,
@@ -21,6 +21,11 @@ interface TourRow {
   started_at: number | null;
   champion: string | null;
   bracket_json: string | null;
+  battle_format: string | null;
+  series_format: string | null;
+  reward_pool_json: string | null;
+  close_at: number | null;
+  rewards_granted: number | null;
 }
 interface EntrantRow {
   tournament_id: string;
@@ -29,6 +34,9 @@ interface EntrantRow {
   preset_name: string;
   seed: number | null;
   registered_at: number;
+  ghost_json: string | null;
+  last_seen: number | null;
+  waitlisted: number | null;
 }
 
 /** A tiny in-memory D1 that recognizes the route module's statements by SQL substring. */
@@ -51,8 +59,7 @@ class FakeStmt {
     return new FakeStmt(this.db, this.sql, args);
   }
   async first<T>(): Promise<T | null> {
-    const s = this.sql;
-    if (s.includes("FROM tournaments WHERE id")) {
+    if (this.sql.includes("FROM tournaments WHERE id")) {
       return (this.db.tournaments.get(String(this.args[0])) as T) ?? null;
     }
     return null;
@@ -63,14 +70,7 @@ class FakeStmt {
       const tid = String(this.args[0]);
       const rows = this.db.entrants
         .filter(e => e.tournament_id === tid)
-        .sort((a, b) => a.registered_at - b.registered_at)
-        .map(e => ({
-          participant: e.participant,
-          name: e.name,
-          preset_name: e.preset_name,
-          seed: e.seed,
-          registered_at: e.registered_at,
-        }));
+        .sort((a, b) => a.registered_at - b.registered_at);
       return { results: rows as T[] };
     }
     if (s.includes("FROM tournaments WHERE state IN")) {
@@ -81,7 +81,7 @@ class FakeStmt {
   async run(): Promise<void> {
     const s = this.sql;
     const a = this.args;
-    if (s.startsWith("CREATE")) {
+    if (s.startsWith("CREATE") || s.startsWith("ALTER")) {
       return;
     }
     if (s.startsWith("INSERT INTO tournaments")) {
@@ -96,17 +96,34 @@ class FakeStmt {
         started_at: a[7] as number | null,
         champion: a[8] as string | null,
         bracket_json: a[9] as string | null,
+        battle_format: a[10] as string | null,
+        series_format: a[11] as string | null,
+        reward_pool_json: a[12] as string | null,
+        close_at: a[13] as number | null,
+        rewards_granted: a[14] as number | null,
       });
       return;
     }
     if (s.startsWith("UPDATE tournaments SET")) {
       const row = this.db.tournaments.get(String(a[0]));
       if (row) {
-        row.state = String(a[1]);
-        row.started_at = a[2] as number | null;
-        row.champion = a[3] as string | null;
-        row.bracket_json = a[4] as string | null;
+        row.name = String(a[1]);
+        row.state = String(a[2]);
+        row.started_at = a[3] as number | null;
+        row.champion = a[4] as string | null;
+        row.bracket_json = a[5] as string | null;
+        row.round_window_ms = Number(a[6]);
+        row.max_entrants = Number(a[7]);
+        row.battle_format = a[8] as string | null;
+        row.series_format = a[9] as string | null;
+        row.reward_pool_json = a[10] as string | null;
+        row.close_at = a[11] as number | null;
+        row.rewards_granted = a[12] as number | null;
       }
+      return;
+    }
+    if (s.startsWith("DELETE FROM tournaments WHERE id")) {
+      this.db.tournaments.delete(String(a[0]));
       return;
     }
     if (s.startsWith("INSERT INTO tournament_entrants")) {
@@ -117,7 +134,18 @@ class FakeStmt {
         preset_name: String(a[3]),
         seed: a[4] as number | null,
         registered_at: Number(a[5]),
+        ghost_json: a[6] as string | null,
+        last_seen: a[7] as number | null,
+        waitlisted: a[8] as number | null,
       });
+      return;
+    }
+    if (s.startsWith("UPDATE tournament_entrants SET seed=NULL WHERE tournament_id")) {
+      for (const e of this.db.entrants) {
+        if (e.tournament_id === String(a[0])) {
+          e.seed = null;
+        }
+      }
       return;
     }
     if (s.startsWith("UPDATE tournament_entrants SET seed")) {
@@ -127,10 +155,28 @@ class FakeStmt {
       }
       return;
     }
-    if (s.startsWith("DELETE FROM tournament_entrants")) {
+    if (s.startsWith("UPDATE tournament_entrants SET last_seen")) {
+      const row = this.db.entrants.find(e => e.tournament_id === String(a[0]) && e.participant === String(a[1]));
+      if (row) {
+        row.last_seen = a[2] as number;
+      }
+      return;
+    }
+    if (s.startsWith("UPDATE tournament_entrants SET waitlisted")) {
+      const row = this.db.entrants.find(e => e.tournament_id === String(a[0]) && e.participant === String(a[1]));
+      if (row) {
+        row.waitlisted = 0;
+      }
+      return;
+    }
+    if (s.startsWith("DELETE FROM tournament_entrants WHERE tournament_id=?1 AND participant")) {
       this.db.entrants = this.db.entrants.filter(
         e => !(e.tournament_id === String(a[0]) && e.participant === String(a[1])),
       );
+      return;
+    }
+    if (s.startsWith("DELETE FROM tournament_entrants WHERE tournament_id")) {
+      this.db.entrants = this.db.entrants.filter(e => e.tournament_id !== String(a[0]));
       return;
     }
   }
@@ -179,19 +225,25 @@ describe("tournament routes — auth + admin allowlist", () => {
 });
 
 describe("tournament routes — lifecycle + attestation", () => {
-  async function createTour(): Promise<string> {
-    const res = await call("/tournament/create", "POST", ADMIN, { id: "cup", name: "Cup" });
+  async function createTour(extra: Record<string, unknown> = {}): Promise<string> {
+    const res = await call("/tournament/create", "POST", ADMIN, { id: "cup", name: "Cup", ...extra });
     expect(res.status).toBe(200);
     return "cup";
+  }
+  async function register(id: string, names: string[]) {
+    for (const p of names) {
+      const r = await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` });
+      expect(r.status).toBe(200);
+    }
+  }
+  async function bracketOf(id: string, as = "alice") {
+    const got = await call(`/tournament/bracket?id=${id}`, "GET", player(as));
+    return ((await got.json()) as any).tournament;
   }
 
   it("registers, rejects dup + missing preset, closes, reports with attestation", async () => {
     const id = await createTour();
-    // register 4 players
-    for (const p of ["alice", "bob", "carol", "dave"]) {
-      const r = await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` });
-      expect(r.status).toBe(200);
-    }
+    await register(id, ["alice", "bob", "carol", "dave"]);
     // missing preset -> 422
     expect((await call("/tournament/register", "POST", player("eve"), { id })).status).toBe(422);
     // dup -> 422
@@ -206,11 +258,7 @@ describe("tournament routes — lifecycle + attestation", () => {
     expect(cbody.tournament.state).toBe("in_progress");
     expect(cbody.tournament.bracket.size).toBe(4);
 
-    // GET bracket
-    const got = await call("/tournament/bracket?id=cup", "GET", player("alice"));
-    const gbody = (await got.json()) as any;
-    const bracket = gbody.tournament.bracket;
-    // find a playable round-0 match (4 entrants, no byes)
+    const bracket = (await bracketOf(id)).bracket;
     const m0 = bracket.rounds[0][0];
     const [pa, pb] = [m0.a, m0.b];
 
@@ -221,12 +269,10 @@ describe("tournament routes — lifecycle + attestation", () => {
       winner: pa,
     });
     expect(((await bad.json()) as any).resolution).toBe("pending");
-
-    // lone report from player a -> pending
+    // lone report -> pending
     const lone = await call("/tournament/result", "POST", player(pa), { tournamentId: id, matchId: m0.id, winner: pa });
     expect(((await lone.json()) as any).resolution).toBe("pending");
-
-    // agreeing report from player b -> settled
+    // agreeing report -> settled
     const settle = await call("/tournament/result", "POST", player(pb), {
       tournamentId: id,
       matchId: m0.id,
@@ -239,14 +285,10 @@ describe("tournament routes — lifecycle + attestation", () => {
 
   it("disputed reports need an organizer resolve", async () => {
     const id = await createTour();
-    for (const p of ["alice", "bob", "carol", "dave"]) {
-      await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` });
-    }
+    await register(id, ["alice", "bob", "carol", "dave"]);
     await call("/tournament/close-registration", "POST", ADMIN, { id });
-    const got = await call("/tournament/bracket?id=cup", "GET", player("alice"));
-    const m0 = ((await got.json()) as any).tournament.bracket.rounds[0][0];
+    const m0 = (await bracketOf(id)).bracket.rounds[0][0];
     const [pa, pb] = [m0.a, m0.b];
-    // conflicting reports
     await call("/tournament/result", "POST", player(pa), { tournamentId: id, matchId: m0.id, winner: pa });
     const conflict = await call("/tournament/result", "POST", player(pb), {
       tournamentId: id,
@@ -254,17 +296,11 @@ describe("tournament routes — lifecycle + attestation", () => {
       winner: pb,
     });
     expect(((await conflict.json()) as any).resolution).toBe("disputed");
-    // a random player cannot resolve
     expect(
       (await call("/tournament/resolve", "POST", player("carol"), { tournamentId: id, matchId: m0.id, winner: pa }))
         .status,
     ).toBe(403);
-    // organizer (admin) resolves
-    const resolved = await call("/tournament/resolve", "POST", ADMIN, {
-      tournamentId: id,
-      matchId: m0.id,
-      winner: pb,
-    });
+    const resolved = await call("/tournament/resolve", "POST", ADMIN, { tournamentId: id, matchId: m0.id, winner: pb });
     const rbody = (await resolved.json()) as any;
     expect(rbody.resolution).toBe("settled");
     expect(rbody.match.winner).toBe(pb);
@@ -275,5 +311,164 @@ describe("tournament routes — lifecycle + attestation", () => {
     const id = await createTour();
     expect((await call("/tournament/cancel", "POST", player("bob"), { id })).status).toBe(403);
     expect((await call("/tournament/cancel", "POST", ADMIN, { id })).status).toBe(200);
+  });
+
+  // ---- P3 admin ops ----
+
+  it("CREATE stores + exposes battle/series format + reward pool + closeAt", async () => {
+    const id = await createTour({
+      maxEntrants: 32,
+      battleFormat: "doubles",
+      seriesFormat: "bo3",
+      closeAt: 5_000_000_000_000,
+      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCurrency", amount: 5000 }] }],
+    });
+    const t = await bracketOf(id);
+    expect(t.maxEntrants).toBe(32);
+    expect(t.battleFormat).toBe("doubles");
+    expect(t.seriesFormat).toBe("bo3");
+    expect(t.closeAt).toBe(5_000_000_000_000);
+    expect(t.rewardPool).toEqual([{ place: "champion", mutations: [{ kind: "grantCurrency", amount: 5000 }] }]);
+  });
+
+  it("clamps a > 64 cap down to 64", async () => {
+    const id = await createTour({ maxEntrants: 999 });
+    expect((await bracketOf(id)).maxEntrants).toBe(64);
+  });
+
+  it("EDIT changes rewards/cap/window in registration, locks after close", async () => {
+    const id = await createTour({ maxEntrants: 8 });
+    await register(id, ["alice", "bob"]);
+    const edited = await call("/tournament/edit", "POST", ADMIN, {
+      id,
+      maxEntrants: 16,
+      roundWindowMs: 12 * 3600_000,
+      rewardPool: [{ place: "runnerUp", mutations: [{ kind: "grantCandy", speciesId: 25, candy: 50 }] }],
+    });
+    expect(edited.status).toBe(200);
+    const t = await bracketOf(id);
+    expect(t.maxEntrants).toBe(16);
+    expect(t.roundWindowMs).toBe(12 * 3600_000);
+    expect(t.rewardPool[0].place).toBe("runnerUp");
+    // non-admin cannot edit
+    expect((await call("/tournament/edit", "POST", player("bob"), { id, name: "Hax" })).status).toBe(403);
+    // after close -> 422
+    await call("/tournament/close-registration", "POST", ADMIN, { id });
+    expect((await call("/tournament/edit", "POST", ADMIN, { id, maxEntrants: 32 })).status).toBe(422);
+  });
+
+  it("WAITLIST beyond cap + auto-promote on a registration kick (scenario 8)", async () => {
+    const id = await createTour({ maxEntrants: 4 });
+    // 4 fill the field and auto-close; the 5th and 6th queue on the waitlist.
+    await register(id, ["a", "b", "c", "d"]);
+    // field is now in_progress (auto-closed at cap) but nothing played -> new joins waitlist
+    const w1 = await call("/tournament/register", "POST", player("e"), { id, presetName: "e-team" });
+    expect(((await w1.json()) as any).waitlisted).toBe(true);
+    const w2 = await call("/tournament/register", "POST", player("f"), { id, presetName: "f-team" });
+    expect(((await w2.json()) as any).waitlisted).toBe(true);
+    let t = await bracketOf(id);
+    expect(t.waitlist.map((x: any) => x.participant)).toEqual(["e", "f"]);
+    // kick 'a' (mid pre-play) -> REOPEN + promote the FIRST waitlisted ('e'); field refills to cap -> re-close
+    const kicked = await call("/tournament/kick", "POST", ADMIN, { id, participant: "a" });
+    expect(kicked.status).toBe(200);
+    const kbody = (await kicked.json()) as any;
+    expect(kbody.promoted).toBe("e");
+    t = await bracketOf(id);
+    const active = t.entrants.map((x: any) => x.participant).sort();
+    expect(active).toEqual(["b", "c", "d", "e"]);
+    expect(t.waitlist.map((x: any) => x.participant)).toEqual(["f"]);
+    expect(t.state).toBe("in_progress"); // refilled to cap -> auto-closed again
+  });
+
+  it("KICK during registration (under cap, no waitlist) just frees the slot (scenario 2)", async () => {
+    const id = await createTour({ maxEntrants: 8 });
+    await register(id, ["a", "b", "c"]);
+    const kicked = await call("/tournament/kick", "POST", ADMIN, { id, participant: "b" });
+    expect(kicked.status).toBe(200);
+    expect(((await kicked.json()) as any).promoted).toBe(null);
+    const t = await bracketOf(id);
+    expect(t.entrants.map((x: any) => x.participant).sort()).toEqual(["a", "c"]);
+    expect(t.state).toBe("registration");
+  });
+
+  it("KICK mid-tournament is a WALKOVER — opponent advances, board shows kicked (scenario 3)", async () => {
+    const id = await createTour({ maxEntrants: 4 });
+    await register(id, ["a", "b", "c", "d"]); // auto-closes to a 4-bracket
+    let t = await bracketOf(id);
+    // play ONE match to create progress
+    const m0 = t.bracket.rounds[0][0];
+    await call("/tournament/result", "POST", player(m0.a), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    await call("/tournament/result", "POST", player(m0.b), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    // now kick a player in the OTHER, unplayed match -> walkover
+    t = await bracketOf(id);
+    const m1 = t.bracket.rounds[0][1];
+    const victim = m1.a;
+    const survivor = m1.b;
+    const kicked = await call("/tournament/kick", "POST", ADMIN, { id, participant: victim });
+    expect(kicked.status).toBe(200);
+    expect(((await kicked.json()) as any).kind).toBe("walkover");
+    t = await bracketOf(id);
+    const m1b = t.bracket.rounds[0][1];
+    expect(m1b.winner).toBe(survivor);
+    expect(m1b.resolution).toBe("walkover");
+    expect(t.bracket.kicked).toContain(victim);
+  });
+
+  it("RESEED regenerates while zero played, rejects after a match (scenario 7)", async () => {
+    const id = await createTour({ maxEntrants: 4 });
+    await register(id, ["a", "b", "c", "d"]);
+    // reseed while zero played -> ok
+    const re = await call("/tournament/reseed", "POST", ADMIN, { id });
+    expect(re.status).toBe(200);
+    // play a match, then reseed -> 422
+    const t = await bracketOf(id);
+    const m0 = t.bracket.rounds[0][0];
+    await call("/tournament/result", "POST", player(m0.a), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    await call("/tournament/result", "POST", player(m0.b), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    expect((await call("/tournament/reseed", "POST", ADMIN, { id })).status).toBe(422);
+  });
+
+  it("DELETE removes a tournament in any state (scenario 4)", async () => {
+    const id = await createTour();
+    await register(id, ["a", "b"]);
+    const del = await call("/tournament/delete", "POST", ADMIN, { id });
+    expect(del.status).toBe(200);
+    expect((await call(`/tournament/bracket?id=${id}`, "GET", player("a"))).status).toBe(404);
+  });
+
+  it("GRANT-REWARDS computes per-place grants at completion (scenario 10, stub)", async () => {
+    const id = await createTour({
+      maxEntrants: 4,
+      rewardPool: [
+        { place: "champion", mutations: [{ kind: "grantCurrency", amount: 10000 }] },
+        { place: "semifinalist", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 20 }] },
+      ],
+    });
+    await register(id, ["a", "b", "c", "d"]);
+    // play the whole thing out (seed order: slots [1,4,2,3] -> a,d,b,c)
+    const play = async (mid: string, winner: string) => {
+      const t = await bracketOf(id);
+      const m = t.bracket.rounds.flat().find((x: any) => x.id === mid);
+      await call("/tournament/result", "POST", player(m.a), { tournamentId: id, matchId: mid, winner });
+      await call("/tournament/result", "POST", player(m.b), { tournamentId: id, matchId: mid, winner });
+    };
+    let t = await bracketOf(id);
+    const [r0m0, r0m1] = [t.bracket.rounds[0][0], t.bracket.rounds[0][1]];
+    await play(r0m0.id, r0m0.a);
+    await play(r0m1.id, r0m1.a);
+    t = await bracketOf(id);
+    const finalM = t.bracket.rounds[1][0];
+    await play(finalM.id, finalM.a);
+    t = await bracketOf(id);
+    expect(t.state).toBe("complete");
+    // grant
+    const g = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
+    expect(g.status).toBe(200);
+    const gbody = (await g.json()) as any;
+    const champGrant = gbody.granted.find((x: any) => x.place === "champion");
+    expect(champGrant.participant).toBe(t.champion);
+    expect(gbody.granted.filter((x: any) => x.place === "semifinalist").length).toBe(2);
+    // double-grant guarded
+    expect((await call("/tournament/grant-rewards", "POST", ADMIN, { id })).status).toBe(422);
   });
 });

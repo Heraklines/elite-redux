@@ -18,7 +18,35 @@ export type TournamentParticipant = string;
 
 export type TournamentState = "registration" | "in_progress" | "complete" | "cancelled";
 
-export type MatchResolution = "pending" | "bye" | "reported" | "manual";
+export type MatchResolution = "pending" | "bye" | "reported" | "manual" | "walkover";
+
+/** P3: field width at match start (mirror of the worker BattleFormat). */
+export type BattleFormat = "singles" | "doubles" | "triples";
+/** P3: series wrapper (mirror of the worker SeriesFormat). */
+export type SeriesFormat = "single" | "bo3" | "bo5";
+/** P3: reward-pool place (mirror of the worker RewardPlace). */
+export type RewardPlace = "champion" | "runnerUp" | "semifinalist";
+
+/** P3: a single reward settlement mutation (mirror of the worker TournamentRewardMutation). */
+export type TournamentRewardMutation =
+  | { kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
+  | { kind: "grantCandy"; speciesId: number; candy: number }
+  | { kind: "grantItem"; itemId: string; count: number }
+  | { kind: "grantCurrency"; amount: number };
+
+/** P3: one place's reward definition (mirror of the worker RewardPoolEntry). */
+export interface RewardPoolEntry {
+  place: RewardPlace;
+  mutations: TournamentRewardMutation[];
+}
+
+/** Short human label for a battle/series format (list/board chips). */
+export function battleFormatLabel(f: BattleFormat | undefined): string {
+  return f === "doubles" ? "Doubles" : f === "triples" ? "Triples" : "Singles";
+}
+export function seriesFormatLabel(f: SeriesFormat | undefined): string {
+  return f === "bo3" ? "Best of 3" : f === "bo5" ? "Best of 5" : "Single game";
+}
 
 /** One bracket match (mirror of the worker BracketMatch). */
 export interface BracketMatchView {
@@ -37,6 +65,13 @@ export interface BracketMatchView {
 export interface BracketView {
   size: number;
   rounds: BracketMatchView[][];
+  /** P3: participants KICKED mid-tournament (rendered as kicked/eliminated on the board). */
+  kicked?: TournamentParticipant[];
+}
+
+/** True if `participant` was kicked from this bracket (board renders them as kicked). */
+export function isKickedParticipant(bracket: BracketView, participant: TournamentParticipant | null): boolean {
+  return participant !== null && (bracket.kicked?.includes(participant) ?? false);
 }
 
 /**
@@ -63,6 +98,17 @@ export interface EntrantView {
   ghost?: GhostIconSummary | null;
   /** P1.5: epoch ms of this entrant's last presence ping (null = never seen). */
   lastSeen?: number | null;
+  /** P3: the saved team preset the entrant registered with (admin surface). */
+  presetName?: string;
+}
+
+/** P3: a waitlisted (beyond-cap) entrant summary (admin surface). */
+export interface WaitlistEntryView {
+  participant: TournamentParticipant;
+  name: string;
+  ghost?: GhostIconSummary | null;
+  lastSeen?: number | null;
+  presetName?: string;
 }
 
 /** Field caps (mirror er-ghost-profile GHOST_NAME_MAX / GHOST_TITLE_MAX). */
@@ -152,6 +198,18 @@ export interface TournamentView {
   champion: TournamentParticipant | null;
   entrantCount: number;
   entrants: EntrantView[];
+  /** P3: field width at match start (storage/exposure; engine enforcement separate). */
+  battleFormat?: BattleFormat;
+  /** P3: series wrapper (single / bo3 / bo5). */
+  seriesFormat?: SeriesFormat;
+  /** P3: per-place reward definitions (settlement mutation vocabulary). */
+  rewardPool?: RewardPoolEntry[];
+  /** P3: optional scheduled registration close (epoch ms). null = none. */
+  closeAt?: number | null;
+  /** P3: true once the reward pool has been granted at completion. */
+  rewardsGranted?: boolean;
+  /** P3: entrants queued beyond cap (admin surface). */
+  waitlist?: WaitlistEntryView[];
   /** Present on the bracket endpoint; omitted (undefined) in the list endpoint. */
   bracket?: BracketView | null;
 }
