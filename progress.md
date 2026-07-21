@@ -1302,3 +1302,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   warnings/info only), git diff check is clean, Authority V2 source contracts remain 39/39 green, and the
   unchanged 584-line TypeScript baseline contains zero diagnostics in any touched file. Remote P1 and full
   aggregate requalification are required for this checkpoint.
+
+2026-07-21 - The Mystery transition gate observes Authority V2 rather than retired op:global traffic
+
+- Exact-SHA gate 29822824694 proved both prior product defects closed: the one-round and three-round Mystery
+  journeys each reached wave 13 with matching battle type, biome, party, enemy image, checksum, and durability
+  frontier, with zero fallback remirror and no shared terminal. Their only assertions still expected
+  ME_PRESENT/ME_PICK/ME_TERMINAL through legacy `envelope.pendingOperation`, so both reported an empty set
+  after the intentional interaction-authority cutover.
+- The test now decodes and validates the real `authorityEntry` INTERACTION_COMMIT material for observation,
+  fault injection, retransmission counting, terminal payloads, and the embedded guest-owned reward. It also
+  asserts that ME_PICK remains proposal telemetry and consumes no mechanical global revision, matching the
+  closed V2 design instead of resurrecting a legacy correctness carrier.
+- Local permitted evidence: scoped Biome has no errors (one repository-baseline complexity info), git diff
+  check is clean, and the unchanged 584-line TypeScript baseline contains zero diagnostics in the touched
+  test. Remote P1 requalification is required; no co-op engine test was run locally.

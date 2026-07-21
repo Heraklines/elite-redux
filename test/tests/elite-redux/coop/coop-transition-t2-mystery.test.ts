@@ -12,6 +12,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
+import { decodeCoopV2InteractionEnvelope } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   captureCoopCaptureParty,
   captureCoopChecksum,
@@ -103,18 +104,22 @@ function capturePartyWithAbsentFusionNormalized(): unknown[] {
   });
 }
 
+function committedInteractionOperation(message: CoopMessage) {
+  if (message.t !== "authorityEntry") {
+    return null;
+  }
+  return decodeCoopV2InteractionEnvelope({ ...message.body, context: message.ctx })?.envelope.pendingOperation ?? null;
+}
+
 function retainedOperationKind(message: CoopMessage): string | undefined {
-  return message.t === "envelope" ? message.envelope.pendingOperation?.kind : undefined;
+  return committedInteractionOperation(message)?.kind;
 }
 
 function distinctCommittedMeOperations(calls: readonly (readonly CoopMessage[])[]): Map<string, string> {
   const operations = new Map<string, string>();
   for (const [message] of calls) {
-    if (message?.t !== "envelope") {
-      continue;
-    }
-    const operation = message.envelope.pendingOperation;
-    if (operation?.status === "applied" && operation.kind.startsWith("ME_")) {
+    const operation = message == null ? null : committedInteractionOperation(message);
+    if (operation?.kind.startsWith("ME_")) {
       operations.set(operation.id, operation.kind);
     }
   }
@@ -124,11 +129,8 @@ function distinctCommittedMeOperations(calls: readonly (readonly CoopMessage[])[
 function distinctCommittedMeTerminals(calls: readonly (readonly CoopMessage[])[]): unknown[] {
   const terminals = new Map<string, unknown>();
   for (const [message] of calls) {
-    if (message?.t !== "envelope") {
-      continue;
-    }
-    const operation = message.envelope.pendingOperation;
-    if (operation?.status === "applied" && operation.kind === "ME_TERMINAL") {
+    const operation = message == null ? null : committedInteractionOperation(message);
+    if (operation?.kind === "ME_TERMINAL") {
       terminals.set(operation.id, operation.payload);
     }
   }
@@ -587,7 +589,10 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
 
       const operations = distinctCommittedMeOperations(hostSend.mock.calls);
       expect([...operations.values()].filter(kind => kind === "ME_PRESENT")).toHaveLength(journey.picks.length);
-      expect([...operations.values()].filter(kind => kind === "ME_PICK")).toHaveLength(journey.picks.length);
+      expect(
+        [...operations.values()].filter(kind => kind === "ME_PICK"),
+        "input proposals remain telemetry and never consume a mechanical Authority V2 revision",
+      ).toHaveLength(0);
       expect(
         distinctCommittedMeTerminals(hostSend.mock.calls).map(payload =>
           isCompleteCoopMeTerminalPayload(payload) ? payload.terminal : null,
@@ -597,10 +602,9 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
       expect(
         hostSend.mock.calls.some(
           ([message]) =>
-            message.t === "envelope"
-            && message.envelope.pendingOperation?.kind === "REWARD"
-            && message.envelope.pendingOperation.status === "applied"
-            && message.envelope.pendingOperation.owner === 1,
+            message != null
+            && committedInteractionOperation(message)?.kind === "REWARD"
+            && committedInteractionOperation(message)?.owner === 1,
         ),
         "host validated and retained the guest-owned embedded reward result",
       ).toBe(true);
