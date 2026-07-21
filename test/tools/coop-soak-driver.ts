@@ -2959,6 +2959,46 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     });
   };
 
+  /**
+   * Wait for the exact public handler to accept a human input, not merely for its mode enum to appear.
+   *
+   * Mystery UI deliberately blocks input while its one-second presentation delay runs. A real player cannot
+   * choose during that window. The old one-process driver could call its split relay helper immediately after
+   * `start()`, before the handler became actionable or Authority V2 installed `controlInstalled`; that created
+   * a test-only successor rejection which surfaced later as the generic battle-sync abort.
+   */
+  const awaitClientActionableUiMode = async (ctx: DuoRig["hostCtx"], mode: UiMode, label: string): Promise<void> => {
+    await withClient(ctx, async () => {
+      for (let attempt = 0; attempt < 320; attempt++) {
+        const handler = ctx.scene.ui.getHandler() as
+          | {
+              active?: boolean;
+              isCoopV2InputActionable?: () => boolean;
+            }
+          | undefined;
+        if (
+          ctx.scene.ui.getMode() === mode
+          && handler?.active === true
+          && handler.isCoopV2InputActionable?.() === true
+        ) {
+          return;
+        }
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
+      }
+      const handler = ctx.scene.ui.getHandler() as
+        | {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          }
+        | undefined;
+      throw new Error(
+        `${label} never exposed actionable ${UiMode[mode]} `
+          + `(mode=${UiMode[ctx.scene.ui.getMode()]} active=${String(handler?.active)} `
+          + `actionable=${String(handler?.isCoopV2InputActionable?.())})`,
+      );
+    });
+  };
+
   /** Press one public UI button, bounded by destination-context pumps just like two independent browsers. */
   const pressClientUiUntilAccepted = async (ctx: DuoRig["hostCtx"], button: Button, label: string): Promise<void> => {
     for (let attempt = 0; attempt < 80; attempt++) {
@@ -3313,6 +3353,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // therefore continued while the exploration harness disconnected both transports at wave 32.
         await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
         replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+        await awaitClientActionableUiMode(
+          rig.guestCtx,
+          UiMode.MYSTERY_ENCOUNTER,
+          `wave ${wave} guest-owned Mystery battle`,
+        );
         const setDestinationDelivery = rig.pair.setDestinationContextDelivery;
         if (setDestinationDelivery == null) {
           fail("no-park", wave, "guest-owned ME battle handoff requires destination-context transport scheduling");
@@ -3602,6 +3647,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // resuming under the harness's later host context.
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      await awaitClientActionableUiMode(rig.guestCtx, UiMode.MYSTERY_ENCOUNTER, `wave ${wave} guest-owned Mystery`);
       const scriptedSubPicks = [...(opts.meSubPicks?.get(wave) ?? [])];
 
       if (scriptedSubPicks.length === 0) {

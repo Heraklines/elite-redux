@@ -698,3 +698,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   presentation, both pick owners, the no-battle result, both battle settlement
   paths, the relay handoff, and the guest continuation proof so another
   ambient-turn leak cannot silently reopen this graph hole.
+
+2026-07-21 - Representative Mystery input-causality closure
+
+- Exact-SHA C1 at `9ff36d960` proved the Mystery transaction-coordinate fix:
+  revision 64 `ME_PRESENT` admitted and materialized without any unauthorized
+  predecessor fault. It then exposed a harness-only causality violation. The
+  one-process driver injected the guest's `ME_PICK` immediately after starting
+  `CoopReplayMePhase`, while the real `MYSTERY_ENCOUNTER` handler was still in
+  its deliberate one-second input-blocked presentation window. Consequently no
+  `controlInstalled` proof existed and the production log correctly refused to
+  retain the later terminal.
+- The context-safe split remains necessary because arming its async outcome race
+  under the host's process globals corrupts the two-engine fixture. It can no
+  longer bypass human timing, however: every guest-owned Mystery path first
+  waits for the exact active actionable handler, and the split itself crosses
+  `isCoopV2InteractionHumanInputFrozen`, the same projector/ledger gate used by
+  a physical input, before it may construct an owner intent or send a packet.
+  A source contract inventories all three split call sites and pins this order.

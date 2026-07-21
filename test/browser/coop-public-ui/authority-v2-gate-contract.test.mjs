@@ -681,6 +681,46 @@ test("the learn-move soak proves the real guest UI-to-relay terminal before rebu
   );
 });
 
+test("the duo Mystery split cannot inject a choice before public V2 input is actionable", () => {
+  const helperStart = duoHarness.indexOf("export function relayGuestMeOptionIndexOnly(");
+  const helperEnd = duoHarness.indexOf("\n/**", helperStart + 1);
+  assert.notEqual(helperStart, -1, "the duo harness exposes its context-safe Mystery proposal split");
+  assert.ok(helperEnd > helperStart, "the Mystery proposal split has a bounded source block");
+  const helper = duoHarness.slice(helperStart, helperEnd);
+  const handlerActionable = helper.indexOf("handler.isCoopV2InputActionable?.() !== true");
+  const v2InputGate = helper.indexOf("isCoopV2InteractionHumanInputFrozen()");
+  const ownerCommit = helper.indexOf("commitMeOwnerIntent({");
+  const relaySend = helper.indexOf("relay.sendInteractionChoice(");
+  assert.ok(handlerActionable >= 0, "the split observes the same actionable Mystery handler as a human");
+  assert.ok(
+    v2InputGate > handlerActionable,
+    "the split crosses the production Authority V2 physical-input gate only after actionability",
+  );
+  assert.ok(
+    ownerCommit > v2InputGate && relaySend > ownerCommit,
+    "no owner intent or relay packet may precede the installed public control proof",
+  );
+
+  const mysteryDriveStart = soakDriver.indexOf("hitMode(UiMode.MYSTERY_ENCOUNTER);");
+  const mysteryDriveEnd = soakDriver.indexOf(
+    "\n  // ---------------------------------------------------------------------------",
+    mysteryDriveStart + 1,
+  );
+  assert.notEqual(mysteryDriveStart, -1, "the representative soak exposes its Mystery drive");
+  assert.ok(mysteryDriveEnd > mysteryDriveStart, "the representative Mystery drive has a bounded source block");
+  const mysteryDrive = soakDriver.slice(mysteryDriveStart, mysteryDriveEnd);
+  assert.equal(
+    [...mysteryDrive.matchAll(/relayGuestMeOptionIndexOnly\(/gu)].length,
+    3,
+    "every shared-process guest-owned Mystery path is inventoried",
+  );
+  assert.equal(
+    [...mysteryDrive.matchAll(/awaitClientActionableUiMode\([\s\S]*?UiMode\.MYSTERY_ENCOUNTER/gu)].length,
+    2,
+    "battle-handoff and common flat/nested paths both await the real input boundary before host async work",
+  );
+});
+
 test("the host-faint soak observes the actionable successor without consuming it", () => {
   assert.match(
     hostFaintSoak,

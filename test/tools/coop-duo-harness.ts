@@ -114,6 +114,7 @@ import {
   getCoopRuntime,
   installCoopRuntimeGhostHooks,
   installCoopRuntimeLiveEmitter,
+  isCoopV2InteractionHumanInputFrozen,
   recordCoopV2CommandControlStarted,
   setCoopMeBattleInteractionCounter,
   setCoopRuntime,
@@ -3804,8 +3805,10 @@ export async function driveHostMeRewardShopWithGuestReplay(
  * This shared-process split cannot invoke {@linkcode CoopReplayMePhase.handleGuestOptionSelect} because that
  * method also arms the outcome await immediately. It must nevertheless cross the SAME authoritative owner
  * seam before sending the SAME addressed proposal: mint the retained ME_PICK intent, advance the replay's
- * stable pick ordinal, then carry that ordinal in the "me" interactionChoice data. The browser lane drives
- * the public UI method itself; this engine harness isolates its await only to preserve destination context.
+ * stable pick ordinal, then carry that ordinal in the "me" interactionChoice data. Before doing so it proves
+ * the real Mystery handler is actionable and invokes the same Authority V2 input gate used by a physical
+ * keypress. The browser lane drives the public UI method itself; this engine harness isolates only the async
+ * outcome await to preserve destination context.
  * {@linkcode startGuestMeOutcomeRace} starts that await later in STEP D.
  * MUST be called inside `withClient(guestCtx, ...)`.
  */
@@ -3816,6 +3819,25 @@ export function relayGuestMeOptionIndexOnly(replay: Phase, index: number): void 
     pickStep: number;
     pickSent: boolean;
   };
+  const handler = globalScene.ui.getHandler() as
+    | {
+        active?: boolean;
+        isCoopV2InputActionable?: () => boolean;
+      }
+    | undefined;
+  if (
+    globalScene.ui.getMode() !== UiMode.MYSTERY_ENCOUNTER
+    || handler?.active !== true
+    || handler.isCoopV2InputActionable?.() !== true
+  ) {
+    throw new Error(
+      `relayGuestMeOptionIndexOnly: Mystery ${seam.seq} public handler is not actionable `
+        + `(mode=${UiMode[globalScene.ui.getMode()]} active=${String(handler?.active)})`,
+    );
+  }
+  if (isCoopV2InteractionHumanInputFrozen()) {
+    throw new Error(`relayGuestMeOptionIndexOnly: Mystery ${seam.seq} has no installed Authority V2 input lease`);
+  }
   const relay = getCoopInteractionRelay();
   if (relay == null) {
     throw new Error("relayGuestMeOptionIndexOnly: no live interaction relay (call inside withClient(guestCtx))");
