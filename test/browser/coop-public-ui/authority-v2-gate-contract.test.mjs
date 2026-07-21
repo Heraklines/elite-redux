@@ -716,8 +716,13 @@ test("the duo Mystery split cannot inject a choice before public V2 input is act
   );
   assert.equal(
     [...mysteryDrive.matchAll(/awaitClientActionableUiMode\([\s\S]*?UiMode\.MYSTERY_ENCOUNTER/gu)].length,
+    4,
+    "both owners' battle-handoff and flat/nested paths await the real input boundary before direct helpers",
+  );
+  assert.equal(
+    [...mysteryDrive.matchAll(/assertClientV2HumanInputLease\(rig\.hostCtx,/gu)].length,
     2,
-    "battle-handoff and common flat/nested paths both await the real input boundary before host async work",
+    "both host-owned paths cross the production physical-input projector before their legacy engine helper",
   );
 });
 

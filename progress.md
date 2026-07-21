@@ -716,3 +716,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `isCoopV2InteractionHumanInputFrozen`, the same projector/ledger gate used by
   a physical input, before it may construct an owner intent or send a packet.
   A source contract inventories all three split call sites and pins this order.
+- The two host-owned C3 failures had the symmetric cause: the shared encounter
+  utility deliberately unblocked and called its handler directly before the
+  real presentation delay. Both the battle and non-battle owner paths now open
+  and await the exact public handler, then cross the same V2 physical-input
+  projector before invoking that context-preserving helper. AuthorityLog may
+  retain a successor while a slower replica is still proving presentation, but
+  the local owner can no longer consume a control that its own ledger never
+  installed.

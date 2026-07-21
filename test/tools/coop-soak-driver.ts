@@ -99,6 +99,7 @@ import {
   getCoopRuntime,
   getCoopWaveBoundaryStatus,
   isCoopLearnMoveForwardInFlightEmpty,
+  isCoopV2InteractionHumanInputFrozen,
   setCoopDexSyncDelayMs,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -2999,6 +3000,21 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     });
   };
 
+  /**
+   * Cross the production V2 physical-input gate after the exact handler is actionable.
+   *
+   * Some legacy engine helpers must call the phase handler directly so their asynchronous callbacks stay in
+   * one client realm. This explicit precondition gives those calls the same control-lease admission as
+   * `Ui.processInput`; a missing or stale authority claim fails the representative soak before any choice.
+   */
+  const assertClientV2HumanInputLease = (ctx: DuoRig["hostCtx"], label: string): void => {
+    withClientSync(ctx, () => {
+      if (isCoopV2InteractionHumanInputFrozen()) {
+        throw new Error(`${label} has no installed Authority V2 input lease`);
+      }
+    });
+  };
+
   /** Press one public UI button, bounded by destination-context pumps just like two independent browsers. */
   const pressClientUiUntilAccepted = async (ctx: DuoRig["hostCtx"], button: Button, label: string): Promise<void> => {
     for (let attempt = 0; attempt < 80; attempt++) {
@@ -3340,6 +3356,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // focused handoff tests.
       let replay: Phase;
       if (hostOwns) {
+        await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
+        await awaitClientActionableUiMode(
+          rig.hostCtx,
+          UiMode.MYSTERY_ENCOUNTER,
+          `wave ${wave} host-owned Mystery battle`,
+        );
+        assertClientV2HumanInputLease(rig.hostCtx, `wave ${wave} host-owned Mystery battle`);
         await withClient(rig.hostCtx, async () => {
           await runSelectMysteryEncounterOption(game, option);
           await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
@@ -3479,6 +3502,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // continuous journey). This ordering mirrors production: owner reaches shop -> watcher handoff reaches
       // shop -> barrier opens -> owner terminal -> watcher terminal -> ME terminal.
       let hostShop!: ShopPhaseSeam;
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
+      await awaitClientActionableUiMode(rig.hostCtx, UiMode.MYSTERY_ENCOUNTER, `wave ${wave} host-owned Mystery`);
+      assertClientV2HumanInputLease(rig.hostCtx, `wave ${wave} host-owned Mystery`);
       await withClient(rig.hostCtx, async () => {
         const scriptedSubPicks = [...(opts.meSubPicks?.get(wave) ?? [])];
         const partySlot = scriptedSubPicks.shift();
