@@ -224,6 +224,30 @@ describe("resolveCoopV2ReplacementControl", () => {
     });
   });
 
+  it("derives Showdown's host-side replacement from side ownership without co-op party tags", () => {
+    const result = resolveCoopV2ReplacementControl(
+      8,
+      state(
+        [
+          fieldSeat("player", 0, 42, { ownerSeatId: 7, owner: "host" }),
+          fieldSeat("enemy", 2, 90, { ownerSeatId: 9, owner: "guest" }),
+        ],
+        [
+          { id: 42, hp: 0 },
+          { id: 43, hp: 20 },
+        ],
+        [{ id: 90, hp: 30 }],
+      ),
+      [{ k: "faint", bi: 0 }],
+    );
+
+    expect(result).toMatchObject({
+      operationId: "RC/e8/w1/t1/o0/f0/s7",
+      ownerSeatId: 7,
+      fieldIndex: 0,
+    });
+  });
+
   it("retains every simultaneous human faint as an ordered executable chain", () => {
     const result = resolveCoopV2ReplacementControl(
       6,

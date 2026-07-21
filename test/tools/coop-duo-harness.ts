@@ -2588,7 +2588,15 @@ interface ReplayPumpScene {
 export async function driveGuestReplayTurn(
   guestScene: ReplayPumpScene,
   turn: number,
-  options: { sealRetainedWaveBoundary?: boolean } = {},
+  options: {
+    /**
+     * Return after starting the exact post-finalize replacement picker so a public-input driver can choose
+     * from it. The default remains to drain it: most engine fixtures install a one-shot PARTY handler that
+     * resolves the picker while this pump is running.
+     */
+    returnAtReplacementPicker?: boolean;
+    sealRetainedWaveBoundary?: boolean;
+  } = {},
 ): Promise<void> {
   await maybeSealHostRetainedWaveBoundary(guestScene, options.sealRetainedWaveBoundary !== false);
   // Production-transition journeys arrive here through the guest's real TurnStartPhase, which has already
@@ -2687,6 +2695,17 @@ export async function driveGuestReplayTurn(
     if (guestScene.phaseManager.getCurrentPhase() === cur && peerCtx != null) {
       await withClient(peerCtx, () => drainLoopback());
       await drainLoopback();
+    }
+    // A real PARTY picker is an actionable human-input frontier, not a replay hang. Public-input tests must
+    // regain control only after the address-exact V2 successor has been started; otherwise they cannot press
+    // the UI and the generic replay pump eventually (and incorrectly) reports the intentionally open picker
+    // as stuck. Keep this opt-in because engine fixtures normally auto-pick through a one-shot setMode stub.
+    if (
+      options.returnAtReplacementPicker === true
+      && postFinalizeReplacement === cur
+      && guestScene.phaseManager.getCurrentPhase() === cur
+    ) {
+      return;
     }
     // Authority V2 deliberately retires a faint replay's early, unlogged PARTY picker and reconstructs
     // the exact addressed CoopGuestFaintSwitchPhase only after CoopFinalizeTurnPhase has installed the

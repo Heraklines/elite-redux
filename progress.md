@@ -1317,3 +1317,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: scoped Biome has no errors (one repository-baseline complexity info), git diff
   check is clean, and the unchanged 584-line TypeScript baseline contains zero diagnostics in the touched
   test. Remote P1 requalification is required; no co-op engine test was run locally.
+
+2026-07-21 - Exact Mystery requalification and Showdown replacement-frontier triage
+
+- Exact-SHA full gate 29823424795 requalified P1 green after the test migration. The Mystery transition lane
+  now observes the mechanical Authority V2 entries end to end; static/build, all mutation shards, browser
+  WebRTC/rejoin, and T1-T4 also remain green. The aggregate remains red on separately classified legacy-test
+  migration debt and real P2/C/S defects, so this is not a promotion candidate.
+- Showdown S4's guest-faint cases exposed a harness control inversion. The shared replay pump started the exact
+  post-finalize `CoopGuestFaintSwitchPhase`, then kept pumping the intentionally open human-input phase until
+  declaring it stuck; the caller could not press PARTY until the pump returned. Public-input callers can now
+  opt into returning only after that address-exact picker is started. Default engine-fixture auto-pick behavior
+  and ordinary replay stall detection remain unchanged.
+- Showdown S5 proved a separate production defect. A host-side faint in Showdown published AWAIT_SUCCESSOR
+  because replacement discovery required classic co-op per-mon ownership tags on the host party. The later
+  post-summon carrier found no active REPLACEMENT head, correctly failed closed, and reset both clients to
+  TitlePhase. The canonical mapper now recognizes the explicitly owned enemy field as the human-vs-human
+  marker and treats both Showdown parties as side-owned; classic co-op still requires exact per-mon ownership,
+  preserving the future multi-seat boundary. A failure-first node contract covers the previously missing
+  host-side Showdown replacement.
+- Local permitted evidence: Authority V2 public source contracts remain 39/39 green, scoped Biome has no
+  formatting errors (repository-baseline warnings/info only), `git diff --check` is clean, and the unchanged
+  584-line TypeScript baseline contains zero diagnostics in any touched file. Co-op Vitest/Showdown/browser
+  execution remains remote-only.

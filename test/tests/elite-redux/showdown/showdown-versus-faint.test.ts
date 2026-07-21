@@ -232,7 +232,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         return realSetMode(...args);
       };
       try {
-        await driveGuestReplayTurn(rig.guestScene, turn);
+        await driveGuestReplayTurn(rig.guestScene, turn, { returnAtReplacementPicker: true });
         if (V2_REPLACEMENT_CUTOVER && !pickerOpened) {
           const authorizedPicker = await driveClientPhaseQueueTo(
             rig.guestScene,

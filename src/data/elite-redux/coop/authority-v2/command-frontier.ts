@@ -134,6 +134,14 @@ function hasLegalHumanReplacement(
   ownerSeatId: number,
 ): boolean {
   const party = seat.side === "player" ? state.playerParty : state.enemyParty;
+  // In Showdown each whole side belongs to one authenticated participant. The active enemy seat is the
+  // unambiguous wire marker that this is a human-vs-human state; save-oriented PokemonData records do not
+  // carry classic co-op's per-mon ownership tags. Requiring those tags on the host/player bench made a host
+  // faint publish AWAIT_SUCCESSOR instead of its exact REPLACEMENT head, so the later post-summon commit was
+  // correctly rejected and both browsers entered the shared terminal. Classic co-op has no owned enemy seat
+  // and therefore keeps the strict per-mon ownership check below.
+  const wholePartyOwnedBySeat =
+    seat.side === "enemy" || state.field.some(candidate => candidate.side === "enemy" && roleSeatId(candidate) != null);
   const activeIds = new Set(
     state.field.filter(fieldSeat => fieldSeat.side === seat.side).map(fieldSeat => fieldSeat.pokemonId),
   );
@@ -142,9 +150,9 @@ function hasLegalHumanReplacement(
     if (typeof hp !== "number" || !Number.isFinite(hp) || hp <= 0 || activeIds.has(record.id as number)) {
       return false;
     }
-    // Showdown's authoritative enemy party is wholly owned by its explicitly-owned human seat. Ordinary
-    // co-op player parties carry per-mon ownership and must match it exactly.
-    return seat.side === "enemy" ? true : partyRecordOwnerSeatId(record) === ownerSeatId;
+    // Showdown parties are side-owned. Ordinary co-op player parties carry per-mon ownership and must match
+    // it exactly so one seat can never select another participant's bench as co-op expands beyond two seats.
+    return wholePartyOwnedBySeat || partyRecordOwnerSeatId(record) === ownerSeatId;
   });
 }
 
