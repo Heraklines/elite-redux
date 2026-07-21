@@ -427,6 +427,13 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       guestCrossroads.start();
       await drainLoopback();
     });
+    // `drainLoopback()` intentionally pumps only the currently installed browser context. Starting the
+    // guest consumes the host's arrival and sends the reciprocal arrival back to the host, but that frame
+    // remains in the host inbox until its context runs. Pump both engines before waiting on the guest UI:
+    // the host must cross the same real barrier and author the exact Authority V2 interaction-open entry
+    // that releases the guest-owned picker. Waiting under the guest context here would otherwise model a
+    // suspended host browser, not two independently running production event loops.
+    await pumpBoth(rig, 2);
     await waitForMode(rig.guestCtx, UiMode.OPTION_SELECT, "guest-owned Crossroads");
     if (leave) {
       await pressUntilAccepted(rig, rig.guestCtx, Button.DOWN, "Crossroads Leave cursor");

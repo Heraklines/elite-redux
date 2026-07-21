@@ -1511,14 +1511,14 @@ export function adoptBiomeWatcherChoice(
     // real phase resumed. Its live sink fed the authoritative choice into the local relay and armed this
     // marker. Keep it durable until the phase reports a successful terminal and releases the receipt; this
     // lets a lost UI/tween callback re-adopt safely. An ordinary relay duplicate after release remains a no-op.
-    if (guest(binding).hasApplied(opId)) {
-      if (!s.pendingJournalMaterializations.has(opId)) {
-        coopWarn(
-          "reward",
-          `biome op WATCHER REJECT duplicate id=${opId} pinned=${params.pinned} lastApplied=${s.lastAppliedPinned} (Wave-2a)`,
-        );
-        return { adopt: false, reason: "stale-or-duplicate" };
-      }
+    // Authority V2 deliberately bypasses CoopOperationGuest's legacy revision/deduplication clock. The
+    // production V2 sink publishes `pendingJournalMaterializations` only after the globally ordered entry
+    // has passed full envelope validation, applied through the registered surface sink, and materialized
+    // this exact relay/receipt. Requiring `guest.hasApplied(opId)` as a second proof therefore makes a valid
+    // V2 result impossible to consume and leaves Crossroads/World Map parked forever. The address-exact
+    // materialization receipt is the sole live-consumption permit; the legacy ledger remains only a
+    // duplicate detector after that permit has been released.
+    if (s.pendingJournalMaterializations.has(opId)) {
       s.lastAppliedPinned = params.pinned;
       coopLog("reward", `biome op WATCHER materialize JOURNAL choice kind=${params.kind} id=${opId}`);
       return {
@@ -1528,6 +1528,13 @@ export function adoptBiomeWatcherChoice(
         operationId: opId,
         authoritativeProjection: true,
       };
+    }
+    if (guest(binding).hasApplied(opId)) {
+      coopWarn(
+        "reward",
+        `biome op WATCHER REJECT duplicate id=${opId} pinned=${params.pinned} lastApplied=${s.lastAppliedPinned} (Wave-2a)`,
+      );
+      return { adopt: false, reason: "stale-or-duplicate" };
     }
 
     if (journalActive(binding)) {

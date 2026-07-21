@@ -1347,6 +1347,24 @@ test("biome result materialization cannot invalidate its exact queued transition
   );
 });
 
+test("a V2 biome receipt is consumed without consulting the retired operation revision clock", () => {
+  const watcherStart = biomeOperation.indexOf("export function adoptBiomeWatcherChoice(");
+  const watcherEnd = biomeOperation.indexOf(
+    "\n// -----------------------------------------------------------------------------",
+    watcherStart,
+  );
+  assert.notEqual(watcherStart, -1, "the biome adapter exposes its watcher-consumption boundary");
+  assert.ok(watcherEnd > watcherStart, "the watcher-consumption boundary has a bounded source block");
+  const watcher = biomeOperation.slice(watcherStart, watcherEnd);
+  const v2Receipt = watcher.indexOf("s.pendingJournalMaterializations.has(opId)");
+  const legacyDuplicate = watcher.indexOf("guest(binding).hasApplied(opId)");
+  assert.ok(v2Receipt >= 0, "the watcher accepts one exact V2 materialization receipt");
+  assert.ok(
+    legacyDuplicate > v2Receipt,
+    "the legacy operation ledger is only a post-receipt duplicate detector, never a V2 application permit",
+  );
+});
+
 test("the replacement harness preserves an already-installed command frontier", () => {
   const helperStart = duoHarness.indexOf("export async function materializeGuestInputAfterReplacement(");
   const helperEnd = duoHarness.indexOf("\n/**", helperStart + 1);

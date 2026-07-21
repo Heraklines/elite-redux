@@ -3346,6 +3346,27 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // #849: the guest opens the real MYSTERY_ENCOUNTER screen (the mirrored mode); record it.
     hitMode(UiMode.MYSTERY_ENCOUNTER);
 
+    const startHostMysterySurface = async (): Promise<void> => {
+      await withClient(rig.hostCtx, async () => {
+        if (rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "MysteryEncounterPhase") {
+          await game.phaseInterceptor.to("MysteryEncounterPhase", false);
+        }
+        const phase = rig.hostScene.phaseManager.getCurrentPhase();
+        if (phase?.phaseName !== "MysteryEncounterPhase") {
+          throw new Error(
+            `wave ${wave} could not start the host Mystery surface; current=${phase?.phaseName ?? "none"}`,
+          );
+        }
+        // `PhaseInterceptor.to(target)` with its default `runTarget=true` does not return when the target is
+        // an interactive phase: it correctly waits for that phase to finish after its prompt interrupts the
+        // interceptor. The caller cannot then drive the prompt, producing a harness-created softlock with
+        // the real MYSTERY_ENCOUNTER UI visibly open. Two browsers keep running at that point, so start the
+        // already-reached real phase and return control to the public-input driver.
+        phase.start();
+        await drainLoopback();
+      });
+    };
+
     let mePath: "host-owned" | "guest-owned" | "battle-handoff";
     if (battleSpawning) {
       // BATTLE-HANDOFF: the selected option terminates the ME pump with the dedicated 9M sentinel instead of
@@ -3356,7 +3377,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // focused handoff tests.
       let replay: Phase;
       if (hostOwns) {
-        await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
+        await startHostMysterySurface();
         await awaitClientActionableUiMode(
           rig.hostCtx,
           UiMode.MYSTERY_ENCOUNTER,
@@ -3374,7 +3395,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // no branch for this ownership combination: it drove the guest pick but never let the host finish
         // MysteryEncounterBattlePhase or let the guest consume the retained battle manifest. Real browsers
         // therefore continued while the exploration harness disconnected both transports at wave 32.
-        await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
+        await startHostMysterySurface();
         replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
         await awaitClientActionableUiMode(
           rig.guestCtx,
@@ -3502,7 +3523,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // continuous journey). This ordering mirrors production: owner reaches shop -> watcher handoff reaches
       // shop -> barrier opens -> owner terminal -> watcher terminal -> ME terminal.
       let hostShop!: ShopPhaseSeam;
-      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
+      await startHostMysterySurface();
       await awaitClientActionableUiMode(rig.hostCtx, UiMode.MYSTERY_ENCOUNTER, `wave ${wave} host-owned Mystery`);
       assertClientV2HumanInputLease(rig.hostCtx, `wave ${wave} host-owned Mystery`);
       await withClient(rig.hostCtx, async () => {
@@ -3671,7 +3692,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // Start the host ME first so its authoritative presentation is buffered before the guest divert
       // resolves ownership. This is the production order and prevents a pending guest continuation from
       // resuming under the harness's later host context.
-      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
+      await startHostMysterySurface();
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
       await awaitClientActionableUiMode(rig.guestCtx, UiMode.MYSTERY_ENCOUNTER, `wave ${wave} guest-owned Mystery`);
       const scriptedSubPicks = [...(opts.meSubPicks?.get(wave) ?? [])];

@@ -1359,3 +1359,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Local permitted evidence: Authority V2 source contracts 39/39 green, scoped Biome has no errors (repository-
   baseline warnings/info only), `git diff --check` is clean, and the unchanged 584-line TypeScript baseline has
   zero diagnostics in all touched files. Remote S5/C5 and full-matrix requalification are required.
+
+2026-07-21 - V2 biome receipts and production-faithful interactive harness scheduling
+
+- Exact-SHA gate 29825687971 requalified every Showdown shard S1-S8 green, including the previously failing
+  S4 double-KO and S5 host-faint routes. C5 also went green, proving the enemy-manifest Tera fields survive the
+  real reconstruction path. Browser-native WebRTC/rejoin, static/build, fast contracts, all four mutation
+  shards, T1-T4, and P1 remained green. The aggregate is still red on separately classified A/B/C/P debt and
+  is not a promotion candidate.
+- C1's wave-20 artifact exposed a real V2/legacy ordering seam. The guest validated and materialized the exact
+  CROSSROADS_PICK entry, then `adoptBiomeWatcherChoice` required the retired `CoopOperationGuest` ledger to
+  also report that V2 operation as applied. V2 deliberately bypasses that legacy revision/dedup clock, so the
+  already-authoritative result was rejected until recovery exhausted and the shared session terminalized.
+  The address-exact V2 materialization receipt is now the live-consumption permit; the legacy ledger is only a
+  duplicate detector after the receipt is released. A fast source contract pins that ordering.
+- P2's guest-owned Crossroads failure was a scheduled-harness deadlock: each `drainLoopback` pumps only the
+  currently installed browser context. After the guest sent its reciprocal rendezvous arrival, the driver
+  waited on guest UI without ever running the host inbox, so the host could not cross the barrier and author
+  the required V2 interaction-open entry. The driver now pumps both independent contexts before waiting.
+- C3's Mystery soak similarly called `PhaseInterceptor.to("MysteryEncounterPhase")` and awaited completion of
+  an intentionally interactive target before it could drive the visible selector. The harness now starts the
+  already-reached real phase and returns to the public-input driver, matching two independently running
+  browsers; no product timeout or authority fallback was added.
+- Local permitted evidence: Authority V2 source contracts 40/40 green, scoped Biome has no errors (repository-
+  baseline warnings/info only), `git diff --check` is clean, and the unchanged 584-line TypeScript baseline has
+  zero diagnostics in all four touched files. Remote C1/C3/P2 and affected B/A requalification is required.
