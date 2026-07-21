@@ -771,3 +771,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The source-pure budget contract now proves that real authority and renderer
   progress can cross the former short wall-clock boundary while remaining
   bounded by the separate absolute ceiling.
+
+2026-07-21 - Stormglass gate migration to a real V2 surface
+
+- Gate 29792022305 B7 did not find a product Stormglass failure. Its test built
+  a complete actionable V2 command frontier and then started a detached
+  `ErStormglassPickerPhase`; the ledger correctly rejected the impossible
+  `COMMAND_FRONTIER -> STORMGLASS_PRESENT` edge, so no options were exposed.
+- The test now makes Stormglass the real current phase before pairing, matching
+  EncounterPhase's production insertion point. `buildDuo` therefore does not
+  install an unrelated command control, the authority presentation is the
+  first retained interaction boundary, and the replica receives its picker
+  through the ordinary V2 projector. The test no longer constructs or starts a
+  second detached guest picker after the retained result.
+- This is the migration rule for the remaining broad-gate fanout: establish a
+  real phase/predecessor boundary in the two-engine rig; never relax
+  `controlAllowsSuccessorEntry` or silently bless a legacy direct-handler call.

@@ -16,7 +16,6 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import { ErRelicModifier } from "#modifiers/modifier";
-import { ErStormglassPickerPhase } from "#phases/er-stormglass-picker-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, drainLoopback, withClient, withClientSync } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
@@ -59,6 +58,15 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
 
   it("drops the raw choice, then both real engines persist and apply the host's committed Sandstorm", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    // This operation test used to start a detached picker after buildDuo had already installed an
+    // actionable COMMAND_FRONTIER. Authority V2 correctly rejects that impossible
+    // COMMAND -> STORMGLASS_PRESENT edge. Make the picker the real current phase before pairing, as
+    // EncounterPhase does when a held unconfigured Stormglass opens at a battle boundary. buildDuo
+    // therefore does not manufacture an unrelated initial command control, and V2 projects this
+    // first retained interaction into the replica's real phase manager.
+    game.scene.phaseManager.clearPhaseQueue();
+    game.scene.phaseManager.unshiftNew("ErStormglassPickerPhase");
+    game.scene.phaseManager.shiftPhase();
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       { drop: 1, reorder: 0, delay: 0, faultable: msg => msg.t === "interactionChoice" && msg.kind === "stormglass" },
@@ -84,7 +92,11 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
         }
         return Promise.resolve(true) as never;
       });
-      new ErStormglassPickerPhase().start();
+      const phase = globalScene.phaseManager.getCurrentPhase();
+      expect(phase.phaseName).toBe("ErStormglassPickerPhase");
+      phase.start();
+      await Promise.resolve();
+      await drainLoopback();
       expect(options?.map(option => option.label)).toEqual(["Sun", "Rain", "Sandstorm", "Hail", "Fog"]);
       options?.[2]?.handler();
       await drainLoopback();
@@ -97,7 +109,6 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
     await withClient(rig.guestCtx, async () => {
       vi.spyOn(globalScene.ui, "showText").mockImplementation(() => undefined);
       vi.spyOn(globalScene.ui, "setMode").mockResolvedValue(true as never);
-      new ErStormglassPickerPhase().start();
       await drainLoopback();
       expect(getStormglassWeather()).toBe(WeatherType.SANDSTORM);
       expect(globalScene.arena.weather?.weatherType).toBe(WeatherType.SANDSTORM);
