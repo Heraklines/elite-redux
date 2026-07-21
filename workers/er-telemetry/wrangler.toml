@@ -16,7 +16,10 @@ database_name = "er-telemetry"
 database_id = "e75604f0-bef9-49ef-aba7-d93779e48b8f"   # set after `wrangler d1 create er-telemetry`
 
 # Secrets (set with `wrangler secret put`, DO NOT commit real values):
-#   npx wrangler secret put SESSION_SECRET   # MUST equal er-save-api's SESSION_SECRET
+#   npx wrangler secret put SESSION_SECRET          # MUST equal er-save-api's SESSION_SECRET
+#   npx wrangler secret put EDITOR_PASSWORD         # MUST equal er-editor-api's EDITOR_PASSWORD (team
+#                                                   # editor password) — lets any teammate administer
+#                                                   # tournaments via the editor page (X-Editor-Auth).
 # SESSION_SECRET is the SHARED HMAC key so the client's existing session token verifies here.
 
 [vars]
@@ -24,5 +27,7 @@ database_id = "e75604f0-bef9-49ef-aba7-d93779e48b8f"   # set after `wrangler d1 
 ALLOWED_ORIGIN = "*"
 # Showdown Tournament (P1): comma-separated list of ADMIN account uids (the token `uid`,
 # a stable numeric account id) allowed to create/close/cancel/resolve tournaments. Empty
-# / unset = no admins (creation locked). Set the maintainer's account uid here.
+# / unset = no admins (creation locked). Set the maintainer's account uid here. NOTE: the
+# EDITOR_PASSWORD secret is now an ALTERNATIVE admin credential (the whole team can use it),
+# so this list is no longer the only way to grant admin.
 TOURNAMENT_ADMIN_UIDS = "2"   # staging uid of Heraklines1 (maintainer): tournament create/close/cancel/resolve

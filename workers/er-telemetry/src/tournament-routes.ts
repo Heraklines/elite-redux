@@ -59,12 +59,21 @@ export interface TournamentEnv {
   DB: D1Like;
   /** Comma-separated numeric admin account uids (from wrangler var). */
   TOURNAMENT_ADMIN_UIDS?: string;
+  /**
+   * Shared team EDITOR password (the SAME secret as er-editor-api's EDITOR_PASSWORD). A caller
+   * presenting it in the `X-Editor-Auth` header is granted tournament ADMIN, in addition to the
+   * uid allowlist — so any teammate using the editor page's existing password can administer
+   * tournaments without a personal admin-uid entry. Unset = editor-password auth disabled.
+   */
+  EDITOR_PASSWORD?: string;
 }
 
 /** The authenticated caller (mirrors index.ts TokenPayload). */
 export interface Caller {
   uid: number;
   u: string;
+  /** Set when the caller presented the shared editor password — grants admin regardless of uid. */
+  editorAdmin?: boolean;
 }
 
 type Cors = Record<string, string>;
@@ -72,14 +81,43 @@ function json(body: unknown, status: number, cors: Cors): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...cors } });
 }
 
-function isAdmin(env: TournamentEnv, uid: number): boolean {
+function isAdmin(env: TournamentEnv, caller: Caller): boolean {
+  // The shared editor-password credential grants admin regardless of uid (team access).
+  if (caller.editorAdmin === true) {
+    return true;
+  }
   const raw = env.TOURNAMENT_ADMIN_UIDS ?? "";
   return raw
     .split(",")
     .map(s => s.trim())
     .filter(s => s.length > 0)
-    .some(s => Number(s) === uid);
+    .some(s => Number(s) === caller.uid);
 }
+
+/** Constant-time string compare (both operands are shared secrets, not attacker-chosen hashes). */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+/** True when the request carries a valid `X-Editor-Auth` header matching the shared editor password. */
+function editorAuthValid(request: Request, env: TournamentEnv): boolean {
+  const secret = env.EDITOR_PASSWORD;
+  if (!secret) {
+    return false;
+  }
+  const provided = request.headers.get("X-Editor-Auth");
+  return typeof provided === "string" && provided.length > 0 && timingSafeEqualStr(provided, secret);
+}
+
+/** Synthetic identity for an editor-password-only caller (no personal account). uid < 0 never collides. */
+const EDITOR_ADMIN_CALLER: Caller = { uid: -1, u: "editor", editorAdmin: true };
 
 // #region storage
 
@@ -324,7 +362,7 @@ function tournamentView(t: TournamentRecord, entrants: EntrantRecord[], waitlist
 // #region route handlers
 
 async function handleCreate(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
-  if (!isAdmin(env, caller.uid)) {
+  if (!isAdmin(env, caller)) {
     return json({ error: "not authorized to create tournaments" }, 403, cors);
   }
   const id =
@@ -352,7 +390,7 @@ async function handleCreate(body: any, caller: Caller, env: TournamentEnv, cors:
 }
 
 async function handleCloseRegistration(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
-  if (!isAdmin(env, caller.uid)) {
+  if (!isAdmin(env, caller)) {
     return json({ error: "not authorized" }, 403, cors);
   }
   const t = await loadTournament(env, String(body?.id));
@@ -373,7 +411,7 @@ async function handleCloseRegistration(body: any, caller: Caller, env: Tournamen
 }
 
 async function handleCancel(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
-  if (!isAdmin(env, caller.uid)) {
+  if (!isAdmin(env, caller)) {
     return json({ error: "not authorized" }, 403, cors);
   }
   const t = await loadTournament(env, String(body?.id));
@@ -569,7 +607,7 @@ async function handleResolve(body: any, caller: Caller, env: TournamentEnv, cors
     return json({ error: "tournament not found or not started" }, 404, cors);
   }
   // Organizer-only: the creating admin, or any allowlisted admin.
-  if (!isAdmin(env, caller.uid) && caller.u !== t.organizer) {
+  if (!isAdmin(env, caller) && caller.u !== t.organizer) {
     return json({ error: "not authorized to resolve matches" }, 403, cors);
   }
   const res = manualResolve(t.bracket, String(body?.matchId ?? ""), String(body?.winner ?? ""));
@@ -596,7 +634,7 @@ async function requireAdminOrOrganizer(
   if (!t) {
     return json({ error: "tournament not found" }, 404, cors);
   }
-  if (!isAdmin(env, caller.uid) && caller.u !== t.organizer) {
+  if (!isAdmin(env, caller) && caller.u !== t.organizer) {
     return json({ error: "not authorized" }, 403, cors);
   }
   return { t };
@@ -780,6 +818,15 @@ export async function handleTournamentRoute(
 ): Promise<Response | null> {
   if (!url.pathname.startsWith("/tournament/")) {
     return null;
+  }
+  // The shared editor password (X-Editor-Auth) is an ALTERNATIVE admin credential to the personal
+  // session token: a valid one grants admin whether or not a token is present. When only the editor
+  // password is presented (no token) we act as a synthetic "editor" admin identity.
+  const editorAdmin = editorAuthValid(request, env);
+  if (caller !== null) {
+    caller = { ...caller, editorAdmin };
+  } else if (editorAdmin) {
+    caller = EDITOR_ADMIN_CALLER;
   }
   if (caller === null) {
     return json({ error: "unauthorized" }, 401, cors);

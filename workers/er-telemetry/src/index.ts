@@ -28,6 +28,8 @@ interface Env {
   ALLOWED_ORIGIN?: string;
   /** Comma-separated numeric admin account uids allowed to run tournament admin routes. */
   TOURNAMENT_ADMIN_UIDS?: string;
+  /** Shared team editor password (SAME as er-editor-api's EDITOR_PASSWORD) — an alternate admin credential. */
+  EDITOR_PASSWORD?: string;
 }
 
 interface TokenPayload {
@@ -114,7 +116,7 @@ function corsHeaders(env: Env, origin: string | null): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": value,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Editor-Auth",
     "Access-Control-Max-Age": "86400",
   };
 }

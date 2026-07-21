@@ -188,21 +188,28 @@ function player(u: string, uid = 100): Caller {
   return { uid, u };
 }
 
-function req(method: string, body?: unknown): Request {
+function req(method: string, body?: unknown, headers?: Record<string, string>): Request {
   return new Request("https://x/", {
     method,
+    ...(headers ? { headers } : {}),
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 }
 
 let env: TournamentEnv;
 beforeEach(() => {
-  env = { DB: new FakeD1(), TOURNAMENT_ADMIN_UIDS: "1,7" };
+  env = { DB: new FakeD1(), TOURNAMENT_ADMIN_UIDS: "1,7", EDITOR_PASSWORD: "team-secret" };
 });
 
-async function call(path: string, method: string, caller: Caller | null, body?: unknown) {
+async function call(
+  path: string,
+  method: string,
+  caller: Caller | null,
+  body?: unknown,
+  headers?: Record<string, string>,
+) {
   const url = new URL(`https://x${path}`);
-  const res = await handleTournamentRoute(url, req(method, body), caller, env, cors);
+  const res = await handleTournamentRoute(url, req(method, body, headers), caller, env, cors);
   return res as Response;
 }
 
@@ -221,6 +228,45 @@ describe("tournament routes — auth + admin allowlist", () => {
     const body = (await res.json()) as any;
     expect(body.tournament.state).toBe("registration");
     expect(body.tournament.roundWindowMs).toBe(8 * 3600_000);
+  });
+});
+
+describe("tournament routes — editor-password auth (team credential)", () => {
+  const EDITOR_HDR = { "X-Editor-Auth": "team-secret" };
+
+  it("lets an editor-password-only caller (no token) create — synthetic editor admin", async () => {
+    const res = await call("/tournament/create", "POST", null, { id: "ec", name: "Editor Cup" }, EDITOR_HDR);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.tournament.state).toBe("registration");
+    expect(body.tournament.organizer).toBe("editor");
+  });
+
+  it("rejects a WRONG editor password with no token (401 — unauthorized)", async () => {
+    const res = await call("/tournament/create", "POST", null, { name: "Cup" }, { "X-Editor-Auth": "nope" });
+    expect(res.status).toBe(401);
+  });
+
+  it("a NON-admin token PLUS a valid editor password is granted admin", async () => {
+    const res = await call("/tournament/create", "POST", player("bob"), { id: "bc", name: "Bob Cup" }, EDITOR_HDR);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as any).tournament.organizer).toBe("bob");
+  });
+
+  it("a non-admin token WITHOUT the editor password is still rejected (403)", async () => {
+    const res = await call("/tournament/create", "POST", player("bob"), { name: "Cup" });
+    expect(res.status).toBe(403);
+  });
+
+  it("editor password does nothing when the secret is unset on the worker", async () => {
+    env.EDITOR_PASSWORD = undefined;
+    const res = await call("/tournament/create", "POST", null, { name: "Cup" }, EDITOR_HDR);
+    expect(res.status).toBe(401);
+  });
+
+  it("the uid allowlist path still works alongside editor auth", async () => {
+    const res = await call("/tournament/create", "POST", ADMIN, { id: "uc", name: "Uid Cup" });
+    expect(res.status).toBe(200);
   });
 });
 

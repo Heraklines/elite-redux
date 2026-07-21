@@ -5963,18 +5963,31 @@ function tEsc(s) {
   );
 }
 
-/** Call an er-telemetry tournament route with the pasted session token. Throws on !ok. */
+/**
+ * Call an er-telemetry tournament route. Admin auth is the shared EDITOR PASSWORD (the top-right
+ * field the whole team already uses to save) sent as `X-Editor-Auth` — the PRIMARY path. A pasted
+ * game session token (Bearer) is an optional alternative/addition (attributes the organizer to your
+ * account). Either credential authorizes admin actions. Throws on !ok.
+ */
 async function tourApi(path, { method = "GET", body } = {}) {
   const token = tourToken();
-  if (!token) {
-    throw new Error("Paste your game session token first (the Bearer field).");
+  const editorPw = (document.getElementById("password")?.value || "").trim();
+  if (!editorPw && !token) {
+    throw new Error("Enter the editor password (top right) — or paste a game session token below.");
+  }
+  const headers = {};
+  if (editorPw) {
+    headers["X-Editor-Auth"] = editorPw;
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  if (body) {
+    headers["Content-Type"] = "application/json";
   }
   const res = await fetch(`${TOURNAMENT_URL}${path}`, {
     method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(body ? { "Content-Type": "application/json" } : {}),
-    },
+    headers,
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   let data = null;
@@ -6059,8 +6072,8 @@ async function tourAction(fn, reload = "detail") {
 function renderTournaments(root) {
   const tokRow = `
     <div class="tour-tokrow">
-      <label style="color:var(--muted);font-size:12px">Session token (Bearer)</label>
-      <input id="tour-token" type="password" placeholder="paste your game session token…"
+      <label style="color:var(--muted);font-size:12px">Auth: the <b>editor password</b> (top right) authorizes tournament admin. Optional session token:</label>
+      <input id="tour-token" type="password" placeholder="(optional) paste your game session token…"
         autocomplete="off" spellcheck="false" value="${tEsc(tourToken())}" />
       <button type="button" id="tour-refresh">↻ Refresh</button>
     </div>`;
