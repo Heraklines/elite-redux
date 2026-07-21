@@ -35,4 +35,4 @@ ALLOWED_ORIGIN = "*"
 TOURNAMENT_ADMIN_UIDS = "2"   # staging uid of Heraklines1 (maintainer): tournament create/close/cancel/resolve
 # Base URL of the er-save-api worker (the settlement store). The tournament grant route pushes
 # reward mutations there (POST /showdown/tournament-grant) for the login-sweep delivery.
-SAVE_API_URL = "https://er-save-api.heraklines.workers.dev"
+SAVE_API_URL = "https://er-save-api-staging.heraklines.workers.dev"   # STAGING save worker: tournament grants must land where staging clients sweep; switch to prod er-save-api only at prod rollout
