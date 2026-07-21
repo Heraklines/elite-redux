@@ -3586,7 +3586,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // reward-settled transaction first queues MysteryEncounterRewardsPhase, which then materializes
         // its declared SelectModifierPhase. A browser starts both on successive frames; the headless
         // client must do the same instead of waiting only for the child and declaring a false strand.
-        await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
+        await withClient(rig.guestCtx, () =>
+          startGuestMeShopOwner(rig.guestScene, {
+            pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+          }),
+        );
 
         // Flush the guest arrival under the host context, then commit the already-started owner shop exactly
         // once (do not call driveHostRewardShopOwner: it would start the phase/barrier a second time). A

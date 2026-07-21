@@ -4042,7 +4042,10 @@ export async function drainGuestMeReplayNewRounds(replay: Phase, expected: numbe
  * lane did not model a browser and could strand the host watcher. MUST be called inside withClient(guestCtx)
  * after the host streams its options. Drains until the queued phase is current and its adopted options land.
  */
-export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<ShopPhaseSeam> {
+export async function startGuestMeShopOwner(
+  guestScene: BattleScene,
+  options: { pumpPeer?: () => Promise<void> } = {},
+): Promise<ShopPhaseSeam> {
   // The already-running replay owns its asynchronous handoff. Drain it without re-entering start() until
   // it yields to a production-queued successor; then let the cooperative scheduler execute every real
   // wrapper/interstitial on the way to the shop. Run 29673971204 proved MysteryEncounterRewardsPhase may
@@ -4053,6 +4056,11 @@ export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<Sh
     if (current?.phaseName !== "CoopReplayMePhase") {
       break;
     }
+    // With destination-context delivery enabled, a gap-triggered tailRequest is queued for the authority
+    // browser and cannot be consumed by another guest-only pump. Give the caller the exact reciprocal
+    // scheduler edge, then return to the guest on the next iteration to admit the re-delivered ME terminal.
+    // Two real browsers execute these event loops concurrently; the one-process fixture must alternate them.
+    await options.pumpPeer?.();
   }
 
   const current = guestScene.phaseManager.getCurrentPhase();
