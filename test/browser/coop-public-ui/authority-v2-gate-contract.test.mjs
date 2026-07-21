@@ -19,11 +19,13 @@ const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8")
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
+const mysteryEncounterPhases = readFileSync(new URL("src/phases/mystery-encounter-phases.ts", root), "utf8");
 const guestFaintSwitchPhase = readFileSync(new URL("src/phases/coop-guest-faint-switch-phase.ts", root), "utf8");
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
 const replayMePhase = readFileSync(new URL("src/phases/coop-replay-me-phase.ts", root), "utf8");
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
+const biomeShopPhase = readFileSync(new URL("src/phases/biome-shop-phase.ts", root), "utf8");
 const soakDriver = readFileSync(new URL("test/tools/coop-soak-driver.ts", root), "utf8");
 const hostFaintSoak = readFileSync(new URL("test/tests/elite-redux/coop/coop-soak-host-faint.test.ts", root), "utf8");
 const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "utf8");
@@ -259,12 +261,51 @@ test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must
   const projector = coopRuntime.slice(projectionStart, projectionEnd);
   assert.match(projector, /plan\.kind !== "mystery"/u);
   assert.match(projector, /materializeCoopV2InteractionProjection\(runtime, control, plan\)/u);
-  assert.match(projector, /phaseManager\.clearPhaseQueue\(\)/u);
-  assert.match(projector, /current\.end\(\)/u);
+  assert.match(projector, /phaseManager\.replaceWithCoopAuthoritativePhase\(current, phase\)/u);
+  assert.doesNotMatch(
+    projector,
+    /current\.end\(\)/u,
+    "the obsolete local phase must not derive a successor after the ordered log did",
+  );
   assert.match(
     projector,
     /projected exact mystery generation/u,
     "the authenticated successor replaces a stuck local predecessor",
+  );
+});
+
+test("V2 Mystery waits for its ordered presentation and destructively replaces the local classifier", () => {
+  const guestStart = mysteryEncounterPhases.indexOf("if (isCoopAuthoritativeGuest())");
+  const guestEnd = mysteryEncounterPhases.indexOf(
+    "// Clears out queued phases that are part of standard battle",
+    guestStart,
+  );
+  assert.ok(guestStart >= 0, "the authoritative guest Mystery classifier exists");
+  assert.ok(guestEnd > guestStart, "the guest classifier has a bounded source section");
+  const guestClassifier = mysteryEncounterPhases.slice(guestStart, guestEnd);
+  const cutover = guestClassifier.indexOf("isCoopV2InteractionCutoverActive(getCoopRuntime()?.durability)");
+  const legacyPush = guestClassifier.indexOf('globalScene.phaseManager.pushNew("CoopReplayMePhase"');
+  assert.ok(cutover >= 0, "V2 cutover is checked before deriving a local Mystery successor");
+  assert.ok(legacyPush > cutover, "the legacy replay fallback remains strictly behind the V2 hold");
+  assert.match(
+    guestClassifier.slice(cutover, legacyPush),
+    /return;/u,
+    "V2 holds the classifier until the authenticated ME_PRESENT projector installs its successor",
+  );
+
+  const replacementStart = phaseManager.indexOf("public replaceWithCoopAuthoritativePhase(");
+  const replacementEnd = phaseManager.indexOf("/**", replacementStart + 1);
+  assert.ok(replacementStart >= 0, "the destructive Authority V2 phase replacement exists");
+  assert.ok(replacementEnd > replacementStart, "the replacement has a bounded source section");
+  const replacement = phaseManager.slice(replacementStart, replacementEnd);
+  assert.match(replacement, /this\.currentPhase !== predecessor/u);
+  assert.match(replacement, /this\.clearAllPhases\(\)/u);
+  assert.match(replacement, /this\.currentPhase = successor/u);
+  assert.match(replacement, /this\.startCurrentPhase\(\)/u);
+  assert.doesNotMatch(
+    replacement,
+    /predecessor\.end\(\)/u,
+    "the legacy predecessor never gets another chance to choose progression",
   );
 });
 
@@ -292,6 +333,29 @@ test("Mystery projection construction cannot recursively attest an unopened hand
     /notifyCoopV2InteractionSurfaceReady\(this\.boundRuntime\)/u,
     "only the opened, still-live Mystery handler may attest control",
   );
+});
+
+test("biome-market readiness proves the exact actionable owner or fully armed watcher surface", () => {
+  const readinessStart = biomeShopPhase.indexOf("private notifyCoopBiomeContinuationSurfaceReady(");
+  const readinessEnd = biomeShopPhase.indexOf(
+    "/** Never let a market continue against locally generated stock",
+    readinessStart,
+  );
+  assert.ok(readinessStart >= 0, "the biome-market readiness publisher exists");
+  assert.ok(readinessEnd > readinessStart, "the biome-market publisher has a bounded source section");
+  const readiness = biomeShopPhase.slice(readinessStart, readinessEnd);
+  assert.match(readiness, /coopAsyncBoundaryStillLive\(generation, wave, pinned\)/u);
+  assert.match(readiness, /handler\?\.active === true/u);
+  assert.match(readiness, /handler\.isCoopV2InputActionable\?\.\(\) === true/u);
+  assert.match(readiness, /mode === UiMode\.BIOME_SHOP && actionable/u);
+  assert.match(
+    readiness,
+    /this\.coopBiomeWatcherContinuationReady && mode === UiMode\.MESSAGE && actionable/u,
+    "watcher readiness requires stock materialization and its live terminal consumer",
+  );
+  const interactionReady = readiness.indexOf("notifyCoopV2InteractionSurfaceReady(");
+  const surfaceProof = readiness.indexOf("const publicSurface");
+  assert.ok(interactionReady > surfaceProof, "V2 cannot retire before the concrete market surface is proven");
 });
 
 test("a committed replacement wake cannot be stranded behind its own turn finalizer", () => {

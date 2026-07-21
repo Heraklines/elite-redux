@@ -455,9 +455,9 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     const publisher = source.slice(publisherStart, publisherEnd);
     expect(publisherStart, "the centralized World Map actionability publisher exists").toBeGreaterThanOrEqual(0);
     expect(publisherEnd, "the actionability publisher has a bounded source section").toBeGreaterThan(publisherStart);
-    const exactMode = publisher.indexOf("globalScene.ui.getMode() === UiMode.ER_MAP");
-    const liveHandler = publisher.indexOf("handler?.active === true");
-    const actionableHandler = publisher.indexOf("handler.isCoopV2InputActionable?.() === true");
+    const exactMode = publisher.search(/globalScene\.ui\.getMode\(\)\s*===\s*UiMode\.ER_MAP/);
+    const liveHandler = publisher.search(/handler\?\.active\s*===\s*true/);
+    const actionableHandler = publisher.search(/handler\.isCoopV2InputActionable\?\.\(\)\s*===\s*true/);
     const interactionReady = publisher.indexOf("notifyCoopV2InteractionSurfaceReady(");
     const continuationReady = publisher.indexOf("notifyCoopWaveContinuationSurfaceReady(");
     expect(exactMode, "readiness requires the exact World Map UI mode").toBeGreaterThanOrEqual(0);

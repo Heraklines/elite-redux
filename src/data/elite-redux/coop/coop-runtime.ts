@@ -5836,13 +5836,14 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
   if (phase == null) {
     return false;
   }
-  // The V2 entry is now the sole progression authority. Purge locally-derived siblings before ending the
-  // obsolete predecessor; its async callback is identity-fenced and cannot mutate after the synchronous
-  // shift. The exact replay phase then publishes readiness only after its real Mystery handler opens.
-  phaseManager.clearPhaseQueue();
-  phaseManager.pushPhase(phase);
+  // The V2 entry is now the sole progression authority. Install its exact phase atomically without invoking
+  // the obsolete predecessor's terminal: MysteryEncounterPhase.end() derives another local successor and can
+  // otherwise start an unsanctioned CommandPhase between this commit and the replay handler.
   runtime.v2ProjectedInteractionControlId = controlId;
-  current.end();
+  if (!phaseManager.replaceWithCoopAuthoritativePhase(current, phase)) {
+    runtime.v2ProjectedInteractionControlId = null;
+    return false;
+  }
   coopLog("v2-interaction", `projected exact mystery generation for ${controlId} from ${current.phaseName}`);
   return true;
 }

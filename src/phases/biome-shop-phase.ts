@@ -1278,7 +1278,37 @@ export class BiomeShopPhase extends SelectModifierPhase {
 
   /** Publish readiness only while this phase's scene and runtime are installed together. */
   private notifyCoopBiomeContinuationSurfaceReady(): void {
-    const notify = () => {
+    const runtime = this.coopBiomeOwningRuntime;
+    if (runtime == null) {
+      return;
+    }
+    const generation = coopSessionGeneration();
+    const wave = this.coopBiomeOwningScene.currentBattle?.waveIndex ?? -1;
+    const pinned = this.coopBiomeStart;
+    const notify = (): void => {
+      if (
+        !Number.isSafeInteger(wave)
+        || wave < 0
+        || pinned < 0
+        || !this.coopAsyncBoundaryStillLive(generation, wave, pinned)
+      ) {
+        return;
+      }
+      const handler = this.coopBiomeOwningScene.ui.getHandler() as
+        | {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          }
+        | undefined;
+      const actionable = handler?.active === true && handler.isCoopV2InputActionable?.() === true;
+      const mode = this.coopBiomeOwningScene.ui.getMode();
+      const publicSurface = this.coopBiomeOwner
+        ? mode === UiMode.BIOME_SHOP && actionable
+        : this.coopBiomeWatcherContinuationReady && mode === UiMode.MESSAGE && actionable;
+      if (!publicSurface) {
+        setTimeout(() => runWhenCoopRuntimeActive(runtime, notify), 10);
+        return;
+      }
       notifyCoopWaveContinuationSurfaceReady(
         this.coopSourceAddress?.wave,
         this.coopBiomeOwner ? undefined : "biomeMarketWatcher",
@@ -1286,13 +1316,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
       // SHOP_PRESENT is committed while its concrete market handler is still opening. Bind the immutable
       // presentation to this exact BIOME_SHOP (or watcher MESSAGE) generation once it is genuinely live,
       // so the next SHOP_BUY can consume an installed predecessor instead of racing an unproven claim.
-      notifyCoopV2InteractionSurfaceReady(this.coopBiomeOwningRuntime);
+      notifyCoopV2InteractionSurfaceReady(runtime);
     };
-    if (this.coopBiomeOwningRuntime == null) {
-      notify();
-      return;
-    }
-    runWhenCoopRuntimeActive(this.coopBiomeOwningRuntime, notify);
+    runWhenCoopRuntimeActive(runtime, notify);
   }
 
   /** Never let a market continue against locally generated stock after authority was lost. */

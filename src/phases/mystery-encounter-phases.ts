@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { Egg, type IEggOptions } from "#data/egg";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
@@ -403,6 +404,16 @@ export class MysteryEncounterPhase extends Phase {
       // TRUE across the embedded watcher reward shop too). Cleared at the PostMysteryEncounterPhase
       // guest guard, AFTER the shop drains (MAJOR-3), never at leaveDefensive.
       coopSetMePinForGuest(interactionCounter);
+      if (isCoopV2InteractionCutoverActive(getCoopRuntime()?.durability)) {
+        // The ordered ME_PRESENT entry owns the concrete replay generation. Hold this local classifier
+        // until its projector replaces us atomically; queuing and ending here would let the legacy phase
+        // manager choose a second, unauthenticated successor.
+        coopLog("v2-interaction", "holding local Mystery classifier for the ordered ME_PRESENT successor", {
+          counter: interactionCounter,
+          wave: globalScene.currentBattle?.waveIndex,
+        });
+        return;
+      }
       // #813 (live 'the other person threw out a pokemon'): the guest's LOCAL wave setup may
       // have rolled a normal battle before adopting the host's ME snapshot, leaving a stale
       // summon chain in the queue. This is an ME wave - nothing summons - so PURGE it, or the

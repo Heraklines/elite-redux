@@ -504,6 +504,27 @@ export class PhaseManager {
   }
 
   /**
+   * Atomically replace an obsolete local phase tree with an authenticated Authority V2 successor.
+   *
+   * Unlike {@linkcode overridePhase}, this is not a temporary modal: the predecessor and every locally
+   * inferred queued/standby successor are discarded. Calling `predecessor.end()` here would let legacy
+   * progression choose another phase after the ordered log already chose `successor`.
+   */
+  public replaceWithCoopAuthoritativePhase(predecessor: Phase, successor: Phase): boolean {
+    if (
+      this.currentPhase !== predecessor
+      || this.coopTerminalProgressionFrozen
+      || this.coopRecoveryProgressionFrozen()
+    ) {
+      return false;
+    }
+    this.clearAllPhases();
+    this.currentPhase = successor;
+    this.startCurrentPhase();
+    return true;
+  }
+
+  /**
    * Determine the next phase to run and start it.
    * @privateRemarks
    * This is called by {@linkcode Phase.end} by default, and should not be called by other methods.

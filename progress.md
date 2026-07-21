@@ -652,3 +652,27 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local static validation is 23/23 Authority contracts, scoped formatting has
   no errors, and `git diff --check` is clean. Runtime qualification remains
   GitHub-hosted.
+
+2026-07-20 - Atomic Mystery successor and biome-market actionability closure
+
+- Exact-SHA C1 at `ea93f7d1f` proved the recursion fix through eleven complete
+  waves, then isolated a second Mystery authority seam at wave 12. The
+  authenticated `ME_PRESENT` projector queued `CoopReplayMePhase` and invoked
+  the obsolete `MysteryEncounterPhase.end()`. That legacy async terminal still
+  derived a local `CommandPhase`, producing the visible "battle could not be
+  synced" abort when the ordered Mystery control and local battle frontier
+  disagreed.
+- Authority V2 now destructively replaces the exact current classifier with
+  its authenticated successor. The replacement discards every locally inferred
+  queue and standby phase, starts the ordered generation directly, and never
+  invokes the predecessor terminal. While V2 interaction cutover is active, the
+  guest Mystery classifier also holds instead of locally creating its old
+  replay successor. The legacy fallback remains available only outside cutover.
+- P2's exact oracle independently proved that an inactive biome-market watcher
+  could attest continuation. Market readiness now remains bound to its runtime,
+  wave, pin, and exact live phase; owners require an active actionable
+  `BIOME_SHOP` handler, while watchers require both materialized stock and an
+  active actionable `MESSAGE` terminal. Visibility alone can no longer retire
+  the interaction or wave lease.
+- Source contracts pin both invariants, including the ban on invoking the
+  replaced Mystery predecessor. Runtime qualification remains GitHub-hosted.
