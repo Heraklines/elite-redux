@@ -1172,3 +1172,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   (baseline warnings/info only), `git diff --check` clean, and zero TypeScript diagnostics mention touched
   files against the unchanged 584-line repository baseline. Co-op Vitest and browser verification remain
   remote-only.
+
+2026-07-21 - Two-engine replay driver follows the authenticated post-finalize replacement
+
+- Exact-SHA gate B6 after the raw-turn retirement proved that the cosmetic carrier no longer wins: the
+  replica ignored it, admitted TURN_COMMIT revision 2, rendered all 13 events, applied the matching state
+  image, and released the finalizer through the typed REPLACEMENT successor.
+- The remaining reported hang was a harness lifecycle error. Authority V2 intentionally retires the early
+  faint-event picker and reconstructs its exact addressed `CoopGuestFaintSwitchPhase` after
+  `CoopFinalizeTurnPhase`. Vitest's PhaseInterceptor disables automatic phase starts, but
+  `driveGuestReplayTurn` returned immediately after the finalizer. It therefore left the real picker current
+  but unstarted; the next synthetic replay driver overwrote it and manufactured a turn-2 replay hang while
+  the host auto-picked both replacements.
+- The driver now continues through only that authenticated post-finalize replacement phase. All other
+  post-finalize surfaces remain caller-owned boundaries. This restores the production ordering instead of
+  moving the picker back before the authoritative material fence.
+- Local permitted evidence: scoped Biome has no errors (repository-baseline complexity infos only) and
+  `git diff --check` is clean. The existing failure-first double-faint engine test remains the remote proof;
+  no co-op Vitest was run locally.

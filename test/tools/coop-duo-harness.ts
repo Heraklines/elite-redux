@@ -2680,7 +2680,14 @@ export async function driveGuestReplayTurn(
       await withClient(peerCtx, () => drainLoopback());
       await drainLoopback();
     }
-    if (wasFinalize) {
+    // Authority V2 deliberately retires a faint replay's early, unlogged PARTY picker and reconstructs
+    // the exact addressed CoopGuestFaintSwitchPhase only after CoopFinalizeTurnPhase has installed the
+    // settled TURN_COMMIT. PhaseInterceptor disables PhaseManager.startCurrentPhase() in engine tests, so
+    // returning here leaves that real successor CURRENT but never started. A later synthetic turn driver
+    // then overwrites it and manufactures a "stuck on CoopReplayTurnPhase" failure even though production
+    // starts the picker synchronously from shiftPhase(). Continue through only this authenticated human-
+    // input successor; every other post-finalize surface remains the caller's next boundary as before.
+    if (wasFinalize && guestScene.phaseManager.getCurrentPhase()?.phaseName !== "CoopGuestFaintSwitchPhase") {
       return;
     }
   }
