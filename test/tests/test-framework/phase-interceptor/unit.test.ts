@@ -154,6 +154,19 @@ describe("Utils - Phase Interceptor - Unit", () => {
       expect(game.phaseInterceptor.log).toEqual([]);
     });
 
+    it("reuses the exact interactive target when its public surface is already open", async () => {
+      await to("ApplePhase", false);
+      const phase = game.scene.phaseManager.getCurrentPhase();
+      const startSpy = vi.spyOn(phase, "start");
+      game.phaseInterceptor.checkMode();
+
+      await to("ApplePhase");
+
+      expectAtPhase("ApplePhase");
+      expect(startSpy).not.toHaveBeenCalled();
+      expect(game.phaseInterceptor.log).toEqual([]);
+    });
+
     it("should run all phases between start and the first instance of target", async () => {
       await to("CoconutPhase");
 

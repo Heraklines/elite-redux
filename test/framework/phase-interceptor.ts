@@ -38,6 +38,8 @@ export class PhaseInterceptor {
    * @defaultValue `idling`
    */
   private state: StateType = "idling";
+  /** The exact phase object whose public prompt changed {@linkcode state} to `interrupted`. */
+  private interruptedPhase: Phase | null = null;
   /** The current target that is being ran to. */
   private target: PhaseString;
 
@@ -57,6 +59,7 @@ export class PhaseInterceptor {
     // We do not use `vi.spyOn` as that will reset once the test ends
     this.scene.phaseManager["startCurrentPhase"] = () => {
       this.state = "idling";
+      this.interruptedPhase = null;
     };
   }
 
@@ -79,6 +82,7 @@ export class PhaseInterceptor {
 
     let currentPhase = pm.getCurrentPhase();
     let didLog = false;
+    let targetWasAlreadyInterrupted = false;
 
     // NB: This has to use an interval to wait for UI prompts to activate
     // since our UI code effectively stalls when waiting for input.
@@ -95,8 +99,19 @@ export class PhaseInterceptor {
           // slot and can be replaced by a nested/asynchronous interceptor request while this wait is
           // still unwinding. Letting that shared slot define arrival strands the original caller on an
           // interactive phase it has already reached.
-          if (currentPhase.phaseName === target && (!runTarget || this.state !== "interrupted")) {
-            return true;
+          if (currentPhase.phaseName === target) {
+            if (!runTarget || this.state !== "interrupted") {
+              return true;
+            }
+            // A previous/public driver can deliberately open the exact interactive target before a shared
+            // helper asks to run to it (the continuous Mystery journey does this so it can first prove the
+            // owner surface). That target has already run as far as the interceptor contract permits. Treat
+            // only the same phase OBJECT recorded by checkMode as reached; a matching name with stale global
+            // state is not sufficient, and re-running the phase would duplicate its presentation/authority.
+            if (this.interruptedPhase === currentPhase) {
+              targetWasAlreadyInterrupted = true;
+              return true;
+            }
           }
 
           // If we were interrupted by a UI prompt on an intermediate phase (or a run-target caller reached
@@ -141,6 +156,11 @@ export class PhaseInterceptor {
     // We hit the target; run as applicable and wrap up.
     if (!runTarget) {
       this.doLog(`PhaseInterceptor.to: Stopping before running ${target}`);
+      return;
+    }
+
+    if (targetWasAlreadyInterrupted) {
+      this.doLog(`PhaseInterceptor.to: Reusing already-open ${target} public surface`);
       return;
     }
 
@@ -205,6 +225,7 @@ export class PhaseInterceptor {
   private async run(currentPhase: Phase): Promise<void> {
     try {
       this.state = "running";
+      this.interruptedPhase = null;
       this.logPhase(currentPhase.phaseName);
       currentPhase.start();
       await vi.waitUntil(() => this.state !== "running", { interval: 50, timeout: TEST_TIMEOUT });
@@ -230,6 +251,7 @@ export class PhaseInterceptor {
 
     // Interrupt the phase and return control to the caller
     this.state = "interrupted";
+    this.interruptedPhase = currentPhase;
   }
 
   /**
