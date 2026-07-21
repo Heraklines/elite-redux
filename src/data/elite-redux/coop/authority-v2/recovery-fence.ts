@@ -15,7 +15,16 @@
 //   2. phase / control progression  - no phase/control may advance the frontier.
 //   3. retained-entry materialization- the log must not materialize retained
 //                                      entries under the recovering replica.
-//   4. new authority-wait creation   - no fresh authority wait may be armed.
+//   4. new authority-wait creation   - no fresh authority wait may be armed WHILE the snapshot is
+//                                      in flight. This freeze lifts in the SAME narrow window that
+//                                      unfreezes control-surface start (allowControlProjection): the
+//                                      one control that window green-lights IS a public interaction
+//                                      surface (e.g. the reward watcher's screen) whose whole purpose
+//                                      is to arm the wait for the owner's relayed picks. Refusing that
+//                                      wait strands the surface the window just let land - the Frontier
+//                                      3 deadlock (the watcher nulls its await in ~60ms, leaves the
+//                                      reward screen, and installControl then never observes the
+//                                      surface -> 30s deferred -> shared terminal).
 //
 // This is exactly the class of defect the v1 recovery hit: the v1 fence was
 // entered AFTER the network result, so local progression staled the snapshot
@@ -62,8 +71,10 @@ export interface CoopRecoveryFence {
   /** open -> held. Returns true only on the transition; false if already held/terminal. */
   acquire(): boolean;
   /**
-   * Keep the recovery fence held while allowing only the authority-stated control phase to start. Human
-   * command admission, retained materialization, unrelated progression, and wait creation remain frozen.
+   * Keep the recovery fence held while allowing only the authority-stated control phase to start AND to
+   * arm the single authority wait its own public surface depends on (the projected reward/interaction
+   * screen awaits the owner's relayed picks). Human command admission, retained materialization, and
+   * unrelated progression stay frozen; only the stated control's surface + its wait are let through.
    */
   allowControlProjection(): boolean;
   /** held -> open (happy path). No-op on open; a terminal fence NEVER re-opens. */
