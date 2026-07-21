@@ -1006,7 +1006,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: public source contracts 34/34 green, scoped Biome
   clean, `git diff --check` clean, and zero TypeScript diagnostics in production
   files against the unrelated 222-error repository baseline. The expanded
- two-engine soak and public-browser reproduction are reserved for the exact-SHA
+  two-engine soak and public-browser reproduction are reserved for the exact-SHA
  remote gates.
 
 2026-07-21 - Node fixtures obey the closed Authority V2 successor graph
@@ -1016,15 +1016,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   passed. The failures were test-model debt rather than permission to weaken the
   production log: fixtures still committed unrelated or repeated operations
   after controls that did not authorize them.
-- Mystery fixtures now form one exact pick-to-pick-to-terminal chain. A
-  different Mystery window is supplied only to the pure subsumption query; it
-  is no longer illegally interleaved into the single ordered mechanical log.
-  Single-pick retirement and timer-leak cases likewise authorize their exact
-  terminal operation.
-- Interaction parity now uses two distinct action ordinals, so the mismatch
-  sample cannot reuse a committed operation ID with conflicting material.
-  Stormglass explicitly grants the exact following Colosseum commit, and wave
-  waits bind the real predecessor operation ID and transition turn.
+- The first remote correction showed a second, important distinction: the old
+  adapter-shaped material entries are not live `OPERATION_ENVELOPE_V1` entries,
+  so they cannot legally be chained through any V2 successor control. Mystery
+  subsumption now tests an explicit retained-material frontier, while ordinary
+  log-order retirement remains covered by the live envelope suites. The
+  timer-leak checks commit and retire one independently valid adapter entry.
+- Interaction parity now uses independent mechanical logs for its matching and
+  divergent statements; conflicting or later direct-adapter entries cannot be
+  smuggled past the predecessor graph. Stormglass teardown likewise retires one
+  valid entry. Wave waits still bind the real predecessor operation ID and
+  transition turn.
 - Local permitted evidence: scoped Biome clean, `git diff --check` clean, and
   zero TypeScript diagnostics in the four touched fixture files against the
   unrelated 222-error repository baseline. All co-op Vitest execution remains

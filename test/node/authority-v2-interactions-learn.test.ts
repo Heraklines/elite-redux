@@ -717,38 +717,16 @@ describe("zero-leak teardown through the authority log", () => {
     const log = makeLog(scheduler, sent);
 
     const stormglass = log.commit(
-      buildStormglassInteractionEntry({
-        ...base,
-        operationId: "sg",
-        weatherIndex: 0,
-        weather: 0,
-        successor: {
-          kind: "AWAIT_SUCCESSOR",
-          afterOperationId: "sg",
-          epoch: 1,
-          wave: 1,
-          turn: 1,
-          allowedKinds: ["INTERACTION_COMMIT"],
-          allowNextWaveStart: false,
-          expectedOperationId: "co",
-        },
-      }),
+      buildStormglassInteractionEntry({ ...base, operationId: "sg", weatherIndex: 0, weather: 0 }),
     );
-    const colosseum = log.commit(
-      buildColosseumBoardInteractionEntry({
-        ...base,
-        operationId: "co",
-        board: { type: "decision", pinned: 0, round: 0, index: 0 },
-      }),
-    );
-    expect(log.retained().map(e => e.revision)).toEqual([stormglass.revision, colosseum.revision]);
+    expect(log.retained().map(e => e.revision)).toEqual([stormglass.revision]);
     expect(scheduler.liveCount()).toBeGreaterThan(0);
 
     // Every interaction retires only after its exact successor control is installed.
     log.acceptReceipt(receipt(stormglass, "admitted"));
     expect(log.acceptReceipt(receipt(stormglass, "materialApplied"))).toBe(false);
     expect(log.acceptReceipt(receipt(stormglass, "controlInstalled"))).toBe(true);
-    expect(log.retained().map(e => e.revision)).toEqual([colosseum.revision]);
+    expect(log.retained()).toEqual([]);
 
     log.dispose("teardown");
     const diag = log.diagnostics();

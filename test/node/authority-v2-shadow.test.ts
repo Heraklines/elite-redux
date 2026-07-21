@@ -977,8 +977,10 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
   });
 
   it("INTERACTION (pre-built) parity match=true/false by fingerprinting the legacy interaction image", () => {
-    const duo = buildDuo(new FakeClock());
-    const reward = (choice: { kind: "leave" } | { kind: "skip" }, actionOrdinal: number) => {
+    const matchingDuo = buildDuo(new FakeClock());
+    const divergentDuo = buildDuo(new FakeClock());
+    const reward = (duo: ReturnType<typeof buildDuo>, choice: { kind: "leave" } | { kind: "skip" }) => {
+      const actionOrdinal = 0;
       const rewardAddress = { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal } as const;
       return buildRewardInteractionEntry({
         context: duo.host.authenticatedFrameContext,
@@ -988,23 +990,24 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
       });
     };
     // Identical legacy image -> match=true.
-    duo.host.tapInteraction({
-      entry: reward({ kind: "leave" }, 0),
+    matchingDuo.host.tapInteraction({
+      entry: reward(matchingDuo, { kind: "leave" }),
       legacyDigest: "tok",
-      legacyImage: reward({ kind: "leave" }, 0),
+      legacyImage: reward(matchingDuo, { kind: "leave" }),
     });
-    // A distinct exact operation with a DIFFERENT legacy choice -> states differ -> match=false.
-    duo.host.tapInteraction({
-      entry: reward({ kind: "leave" }, 1),
+    // A separate mechanical log with a DIFFERENT legacy choice -> states differ -> match=false.
+    divergentDuo.host.tapInteraction({
+      entry: reward(divergentDuo, { kind: "leave" }),
       legacyDigest: "tok",
-      legacyImage: reward({ kind: "skip" }, 1),
+      legacyImage: reward(divergentDuo, { kind: "skip" }),
     });
-    const diag = duo.host.diagnostics();
-    expect(diag.parityChecks).toBe(2);
-    expect(diag.parityMatches).toBe(1);
-    expect(diag.faults).toBe(0);
+    const diagnostics = [matchingDuo.host.diagnostics(), divergentDuo.host.diagnostics()];
+    expect(diagnostics.reduce((sum, diag) => sum + diag.parityChecks, 0)).toBe(2);
+    expect(diagnostics.reduce((sum, diag) => sum + diag.parityMatches, 0)).toBe(1);
+    expect(diagnostics.every(diag => diag.faults === 0)).toBe(true);
     expect(parityLine("INTERACTION_COMMIT")).toContain("match=false");
-    duo.dispose();
+    matchingDuo.dispose();
+    divergentDuo.dispose();
   });
 
   // ------------------------------------------------------------------------

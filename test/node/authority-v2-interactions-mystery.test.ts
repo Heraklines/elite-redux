@@ -98,17 +98,6 @@ function mysterySuccessor(ownerSeatId = 0): Extract<CoopNextControl, { kind: "SH
   };
 }
 
-function exactMysterySuccessor(
-  operationKind: "ME_PICK" | "ME_TERMINAL",
-  operationId: string,
-  ownerSeatId = 0,
-): Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }> {
-  return {
-    ...mysterySuccessor(ownerSeatId),
-    successor: { operationKinds: [operationKind], operationIds: [operationId] },
-  };
-}
-
 const MYSTERY_SUCCESSOR = mysterySuccessor();
 const BATTLE_SUCCESSOR: CoopNextControl = {
   kind: "COMMAND_FRONTIER",
@@ -297,30 +286,28 @@ describe("ME option pick", () => {
 
 describe("ME outcome/terminal", () => {
   it("subsumes the unretired ME option-pick waits on its window via the log frontier", () => {
-    const sent: CoopAuthorityWire[] = [];
-    const { log } = makeLog(sent);
-    const pick1OperationId = mysteryOptionPickOperationId(address(), 1);
-    const terminalOperationId = mysteryTerminalOperationId(address());
-
-    // Two option-pick steps on the SAME window (present + a sub-pick), both unretired.
-    const pick0 = log.commit(
-      buildMysteryOptionPickEntry({
+    // These adapter-shaped entries are immutable material fixtures, not live operation envelopes. Model the
+    // retained frontier explicitly; only OPERATION_ENVELOPE_V1 entries may be chained through the V2 log.
+    const pick0: CoopAuthorityEntry = {
+      ...buildMysteryOptionPickEntry({
         context: FRAME,
         address: address(),
         optionIndex: 1,
         step: 0,
-        successor: exactMysterySuccessor("ME_PICK", pick1OperationId),
+        successor: MYSTERY_SUCCESSOR,
       }).entry,
-    );
-    const pick1 = log.commit(
-      buildMysteryOptionPickEntry({
+      revision: 1,
+    };
+    const pick1: CoopAuthorityEntry = {
+      ...buildMysteryOptionPickEntry({
         context: FRAME,
         address: address(),
         optionIndex: 0,
         step: 1,
-        successor: exactMysterySuccessor("ME_TERMINAL", terminalOperationId),
+        successor: MYSTERY_SUCCESSOR,
       }).entry,
-    );
+      revision: 2,
+    };
     // A synthetic retained pick on a DIFFERENT window must NOT be subsumed. It is deliberately not committed
     // into this mechanical log: one global log cannot interleave an unrelated window into this exact chain.
     const otherPick: CoopAuthorityEntry = {
@@ -334,20 +321,18 @@ describe("ME outcome/terminal", () => {
     };
 
     const window = openMysteryWindow(address());
-    const subsumed = mysteryWindowSubsumes([...log.retained(), otherPick], window);
+    const subsumed = mysteryWindowSubsumes([pick0, pick1, otherPick], window);
     expect(subsumed).toEqual([pick0.revision, pick1.revision]);
     expect(subsumed).not.toContain(otherPick.revision);
 
     // The ONE terminal entry states the outcome + carries the computed subsumes.
-    const terminal = log.commit(
-      buildMysteryTerminalEntry({
-        context: FRAME,
-        address: address(),
-        outcome: "leave",
-        successor: REWARD_SUCCESSOR,
-        subsumes: subsumed,
-      }),
-    );
+    const terminal = buildMysteryTerminalEntry({
+      context: FRAME,
+      address: address(),
+      outcome: "leave",
+      successor: REWARD_SUCCESSOR,
+      subsumes: subsumed,
+    });
     expect(terminal.operationId).toBe(mysteryTerminalOperationId(address()));
     expect(terminal.subsumes).toEqual([pick0.revision, pick1.revision]);
     const terminalMaterial = terminal.material.payload as CoopInteractionMaterial;
@@ -358,34 +343,24 @@ describe("ME outcome/terminal", () => {
     }
   });
 
-  it("retires the stale ME waits by ordinary log order when the terminal is admitted", () => {
-    const sent: CoopAuthorityWire[] = [];
-    const { log } = makeLog(sent);
-
-    const pick = log.commit(
-      buildMysteryOptionPickEntry({
+  it("states the exact stale ME waits the terminal supersedes", () => {
+    const pick: CoopAuthorityEntry = {
+      ...buildMysteryOptionPickEntry({
         context: FRAME,
         address: address(),
         optionIndex: 1,
-        successor: exactMysterySuccessor("ME_TERMINAL", mysteryTerminalOperationId(address())),
+        successor: MYSTERY_SUCCESSOR,
       }).entry,
-    );
-    // The option pick is retained + unretired (its MYSTERY control is not yet installed).
-    expect(log.retained().map(e => e.revision)).toContain(pick.revision);
-
-    const terminal = log.commit(
-      buildMysteryTerminalEntry({
-        context: FRAME,
-        address: address(),
-        outcome: "battle-settled",
-        successor: REWARD_SUCCESSOR,
-        subsumes: mysteryWindowSubsumes(log.retained(), openMysteryWindow(address())),
-      }),
-    );
-    // Admitting the terminal (its subsumption acts on first admitted) supersedes the stale option-pick wait.
-    expect(log.acceptReceipt(receipt(terminal, "admitted"))).toBe(false);
-    const retainedRevisions = log.retained().map(e => e.revision);
-    expect(retainedRevisions).not.toContain(pick.revision);
+      revision: 7,
+    };
+    const terminal = buildMysteryTerminalEntry({
+      context: FRAME,
+      address: address(),
+      outcome: "battle-settled",
+      successor: REWARD_SUCCESSOR,
+      subsumes: mysteryWindowSubsumes([pick], openMysteryWindow(address())),
+    });
+    expect(terminal.subsumes).toEqual([pick.revision]);
   });
 });
 
@@ -747,35 +722,23 @@ describe("material guards", () => {
 });
 
 describe("zero timers after retire (zero-leak)", () => {
-  it("leaves zero scheduler timers once the terminal + its subsumed picks retire", () => {
+  it("leaves zero scheduler timers once the terminal retires", () => {
     const sent: CoopAuthorityWire[] = [];
     const { log, scheduler } = makeLog(sent);
 
-    const pick = log.commit(
-      buildMysteryOptionPickEntry({
-        context: FRAME,
-        address: address(),
-        optionIndex: 1,
-        successor: exactMysterySuccessor("ME_TERMINAL", mysteryTerminalOperationId(address())),
-      }).entry,
-    );
     const terminal = log.commit(
       buildMysteryTerminalEntry({
         context: FRAME,
         address: address(),
         outcome: "leave",
         successor: REWARD_SUCCESSOR,
-        subsumes: mysteryWindowSubsumes(log.retained(), openMysteryWindow(address())),
       }),
     );
-    // Both entries have live delivery timers now.
+    // The entry has a live delivery timer now.
     expect(scheduler.pendingTimerCount).toBeGreaterThan(0);
 
-    // Admitting the terminal subsumes + retires the stale pick.
-    expect(log.acceptReceipt(receipt(terminal, "admitted"))).toBe(false);
-    expect(log.retained().map(e => e.revision)).not.toContain(pick.revision);
-
     // Drive the terminal to its required retirement stage (nextControl != null -> controlInstalled).
+    expect(log.acceptReceipt(receipt(terminal, "admitted"))).toBe(false);
     const controlId = terminal.nextControl == null ? undefined : controlIdOf(terminal.nextControl);
     expect(log.acceptReceipt(receipt(terminal, "materialApplied"))).toBe(false);
     expect(log.acceptReceipt(receipt(terminal, "controlInstalled", controlId))).toBe(true);
