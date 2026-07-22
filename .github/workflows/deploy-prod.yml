@@ -1,9 +1,8 @@
 name: Deploy Production
 
-# Rebuilds the standalone (login) bundle and deploys it to the elite-redux
-# PRODUCTION Cloudflare Pages project. Mirror of deploy-staging.yml with two
-# differences: VITE_DEV_TOOLS is NEVER set (the dev test suite must not exist
-# in prod - see CLAUDE.md), and the save API points at the PROD worker.
+# Rebuilds the standalone (login) bundle, deploys the production cloud-save
+# Worker, then deploys the elite-redux PRODUCTION Cloudflare Pages project.
+# VITE_DEV_TOOLS and the co-op bindings are NEVER set in production.
 #
 # Manual dispatch ONLY, and only after the maintainer explicitly approves a
 # production release.
@@ -18,7 +17,8 @@ on:
 
 concurrency:
   group: deploy-prod
-  cancel-in-progress: true
+  # Do not cancel between the Worker and Pages steps and expose mismatched contracts.
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -30,6 +30,9 @@ jobs:
         with:
           ref: ${{ github.ref }}
           # No submodules: standalone asset metadata is vendored (see staging).
+
+      - name: Seal exact promotion source
+        run: echo "PROMOTED_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-deps
 
@@ -43,6 +46,7 @@ jobs:
           {
             echo "VITE_BYPASS_LOGIN=0"
             echo "VITE_SERVER_URL=https://er-save-api.heraklines.workers.dev"
+            echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry.heraklines.workers.dev"
           } > .env.standalone.local
 
       # ER (#431): resolve the CURRENT er-assets HEAD so this deploy's _redirects
@@ -84,11 +88,23 @@ jobs:
       # backgrounds 404'd / fell back to vanilla). Just verify the assembled dist.
       - name: Verify assembled dist (built by build:standalone)
         run: |
-          for f in _redirects _headers service-worker.js; do
+          for f in _redirects _headers service-worker.js manifest.json version.json; do
             test -f "dist/$f" || { echo "MISSING dist/$f"; exit 1; }
           done
           echo "=== er-assets pins in dist/_redirects ==="
           grep -o 'er-assets@[0-9a-f]*' dist/_redirects | sort -u
+
+      - name: Verify production promotion contract
+        run: node --test test/browser/coop-public-ui/deploy-prod-contract.test.mjs
+
+      # The production browser depends on the save/ghost routes from this exact
+      # checkout. Publish the backward-compatible Worker before the browser.
+      - name: Deploy cloud-save API (production)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config workers/er-save-api/wrangler.toml
 
       - name: Deploy to Cloudflare Pages (PRODUCTION)
         uses: cloudflare/wrangler-action@v3
