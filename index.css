@@ -509,3 +509,180 @@ a {
   -ms-animation: blink normal 4s infinite ease-in-out; /* IE */
   animation: blink normal 4s infinite ease-in-out; /* Opera and prob css3 final iteration */
 }
+
+/* Rich inbox entries (patch notes / announcements). This sits above Phaser's
+   canvas and uses native scrolling so long Markdown remains usable on touch. */
+.er-rich-notification-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  box-sizing: border-box;
+  background: rgb(5 9 13 / 82%);
+  font-family: Arial, sans-serif;
+  touch-action: pan-y;
+}
+
+.er-rich-notification {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(760px, calc(100vw - 24px));
+  height: min(820px, calc(100vh - 24px));
+  overflow: hidden;
+  color: #edf4f8;
+  background: #18222d;
+  border: 1px solid #71879a;
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 55%);
+}
+
+.er-rich-notification > header,
+.er-rich-notification > footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #10171e;
+}
+
+.er-rich-notification > header {
+  justify-content: space-between;
+  border-bottom: 1px solid #435666;
+}
+
+.er-rich-notification > header h1 {
+  margin: 0;
+  color: #ffd76a;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.er-rich-notification > footer {
+  justify-content: flex-end;
+  border-top: 1px solid #435666;
+  color: #aebdc8;
+  font-size: 13px;
+}
+
+.er-rich-notification > footer span {
+  margin-right: auto;
+}
+
+.er-rich-notification button {
+  min-height: 36px;
+  color: #f7fbfd;
+  background: #263746;
+  border: 1px solid #71879a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.er-rich-notification button:hover,
+.er-rich-notification button:focus-visible {
+  border-color: #ffd76a;
+  outline: 2px solid #ffd76a;
+  outline-offset: 1px;
+}
+
+.er-rich-notification-close {
+  width: 36px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.er-rich-notification-action {
+  padding: 7px 14px;
+  font-weight: 700;
+  background: #176947 !important;
+  border-color: #55b88a !important;
+}
+
+.er-rich-notification-content {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px clamp(16px, 4vw, 36px) 36px;
+  scrollbar-color: #71879a #10171e;
+  line-height: 1.55;
+  touch-action: pan-y;
+}
+
+.er-rich-notification-content h1,
+.er-rich-notification-content h2,
+.er-rich-notification-content h3 {
+  margin: 1.4em 0 0.55em;
+  color: #ffd76a;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.er-rich-notification-content h1 {
+  margin-top: 0;
+  font-size: 26px;
+}
+
+.er-rich-notification-content h2 {
+  font-size: 20px;
+}
+
+.er-rich-notification-content h3 {
+  font-size: 17px;
+}
+
+.er-rich-notification-content p,
+.er-rich-notification-content li {
+  font-size: 15px;
+}
+
+.er-rich-notification-content li + li {
+  margin-top: 7px;
+}
+
+.er-rich-notification-content a {
+  color: #65bfff;
+  margin: 0;
+}
+
+.er-rich-notification-content img {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  margin: 16px auto 24px;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.er-rich-notification-content blockquote {
+  margin: 16px 0;
+  padding: 4px 14px;
+  color: #c8d4dc;
+  border-left: 3px solid #55b88a;
+}
+
+.er-rich-notification-content code {
+  padding: 2px 4px;
+  background: #0e151b;
+}
+
+@media (max-width: 540px) {
+  .er-rich-notification-backdrop {
+    padding: 6px;
+  }
+
+  .er-rich-notification {
+    width: calc(100vw - 12px);
+    height: calc(100vh - 12px);
+  }
+
+  .er-rich-notification > footer span {
+    display: none;
+  }
+
+  .er-rich-notification-content {
+    padding: 16px 14px 28px;
+  }
+}

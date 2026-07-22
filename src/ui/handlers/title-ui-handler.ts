@@ -4,7 +4,11 @@ import { FAKE_TITLE_LOGO_CHANCE } from "#app/constants";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { ER_VERSION, isBeta, isDev } from "#constants/app-constants";
-import { GHOST_NOTIF_SETTING_KEY, initErNotifications } from "#data/elite-redux/er-ghost-notifications";
+import {
+  GHOST_NOTIF_SETTING_KEY,
+  initErNotifications,
+  patchNotesContentOf,
+} from "#data/elite-redux/er-ghost-notifications";
 import {
   initTournamentNotifications,
   openTournamentDeepLink,
@@ -20,6 +24,7 @@ import { type ErNotification, notificationManager } from "#system/notifications/
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { TimedEventDisplay } from "#ui/event-display";
 import { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
+import { type RichNotificationContent, RichNotificationViewer } from "#ui/rich-notification-viewer";
 import { addTextObject } from "#ui/text";
 import { fixedInt, randInt, randItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -46,6 +51,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   private inboxFocused = false;
   private inboxDetail: Phaser.GameObjects.Container | undefined;
   private detailOpen = false;
+  private richInboxDetail: RichNotificationViewer | undefined;
   /** The notification whose detail panel is currently open (for deep-link on ACTION). */
   private detailNotif: ErNotification | undefined;
 
@@ -199,6 +205,9 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   }
 
   override processInput(button: Button): boolean {
+    if (this.richInboxDetail) {
+      return this.processRichInboxInput(button);
+    }
     // While a notification detail panel is up: ACTION/SUBMIT on a deep-linkable notification
     // (a tournament challenge) opens its board on the match; otherwise confirm/cancel closes
     // it back to the inbox list. All other input is swallowed.
@@ -248,6 +257,32 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     return super.processInput(button);
   }
 
+  /** Mirror the DOM viewer's controls for gamepads while Phaser owns input. */
+  private processRichInboxInput(button: Button): boolean {
+    switch (button) {
+      case Button.UP:
+        this.richInboxDetail?.scrollBy(-90);
+        break;
+      case Button.DOWN:
+        this.richInboxDetail?.scrollBy(90);
+        break;
+      case Button.LEFT:
+        this.richInboxDetail?.scrollBy(-360);
+        break;
+      case Button.RIGHT:
+        this.richInboxDetail?.scrollBy(360);
+        break;
+      case Button.ACTION:
+      case Button.SUBMIT:
+        this.richInboxDetail?.activateAction();
+        break;
+      case Button.CANCEL:
+        this.richInboxDetail?.close();
+        break;
+    }
+    return true;
+  }
+
   /**
    * Open the inbox as a small navigable window (option-select overlay). Selecting
    * an entry marks it read and shows its detail; "Mark all read" clears the
@@ -267,7 +302,14 @@ export class TitleUiHandler extends OptionSelectUiHandler {
         handler: () => {
           notificationManager.markRead(n.id);
           this.redrawInbox();
-          globalScene.ui.revertMode().then(() => this.openInboxDetail(n));
+          globalScene.ui.revertMode().then(() => {
+            const richContent = patchNotesContentOf(n);
+            if (richContent) {
+              this.openRichInboxDetail(richContent);
+            } else {
+              this.openInboxDetail(n);
+            }
+          });
           return true;
         },
         keepOpen: true,
@@ -387,6 +429,20 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     this.titleContainer.bringToTop(panel);
     this.inboxDetail = panel;
     this.detailOpen = true;
+  }
+
+  private openRichInboxDetail(content: RichNotificationContent): void {
+    this.closeRichInboxDetail();
+    this.richInboxDetail = new RichNotificationViewer(content, () => {
+      this.richInboxDetail = undefined;
+      this.openInbox();
+    });
+  }
+
+  /** Remove a rich viewer without reopening the inbox (used during mode cleanup). */
+  private closeRichInboxDetail(): void {
+    this.richInboxDetail?.destroy();
+    this.richInboxDetail = undefined;
   }
 
   /** Render up to 6 party icons for a serialised team at (x, yCentre) into a panel. */
@@ -512,6 +568,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     // they land in this user's bucket, then refresh the badge.
     initErNotifications();
     initTournamentNotifications();
+    this.closeRichInboxDetail();
     this.closeInboxDetail();
     this.setInboxFocused(false);
     this.refreshInbox(); // re-pull notification sources each time the title appears
@@ -581,6 +638,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
 
     const ui = this.getUi();
 
+    this.closeRichInboxDetail();
     this.closeInboxDetail();
     this.eventDisplay?.clear();
 

@@ -2246,7 +2246,8 @@ async function ensureGhostBattlesTable(env: Env): Promise<void> {
 // ---------------------------------------------------------------------------
 // General per-player notifications (rewards / announcements). The client inbox
 // polls /savedata/notifications since its last-seen ts (like ghost-notifications),
-// so the server can push ANY message to ANY player. `payload` is an optional JSON
+// so the server can push to one player or every player with username '*'.
+// `payload` is an optional JSON
 // blob the client renders (e.g. {species, shiny, variant} for a reward icon).
 // Rows are inserted server-side (reward grants / admin).
 // ---------------------------------------------------------------------------
@@ -2284,7 +2285,7 @@ async function handleNotifications(
   const rows = await env.DB.prepare(
     `SELECT id, kind, title, body, payload, created_at
        FROM notifications
-      WHERE lower(username) = lower(?1) AND created_at > ?2
+      WHERE (username = '*' OR lower(username) = lower(?1)) AND created_at > ?2
       ORDER BY created_at DESC
       LIMIT 50`,
   )

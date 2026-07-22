@@ -46,6 +46,7 @@ coverage
 
 # Script outputs
 *.csv
+test-results/
 
 # Local env overrides (Vite convention) - never committed
 .env.local

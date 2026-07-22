@@ -132,8 +132,8 @@ CREATE INDEX IF NOT EXISTS idx_ssb_user ON system_save_backups (user_id, backed_
 -- the worker on first hit, so a deployed DB needs no migration.
 CREATE TABLE IF NOT EXISTS notifications (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  username   TEXT    NOT NULL,         -- target player (matched case-insensitively)
-  kind       TEXT    NOT NULL DEFAULT 'system',   -- 'system' | 'reward'
+  username   TEXT    NOT NULL,         -- target player (case-insensitive), or '*' for everyone
+  kind       TEXT    NOT NULL DEFAULT 'system',   -- 'system' | 'reward' | 'patch-notes'
   title      TEXT    NOT NULL DEFAULT '',
   body       TEXT    NOT NULL DEFAULT '',
   payload    TEXT,                     -- optional JSON (icon/extra)
