@@ -1312,6 +1312,15 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildTournamentBracketDemoConfig({ size: 8, advancedRounds: 1, cancelled: true, card: "none" })],
     diffTolerance: 0,
   },
+  // P2 ACTIVITY WIN — the other semifinal auto-resolved at the deadline (present player advanced); the
+  // browsed pairing card annotates the winner "(Activity win)" and the loser slot dims with an X.
+  "tournament-board-4-activity-win": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [
+      buildTournamentBracketDemoConfig({ size: 4, activityWin: true, browseOther: true, card: "playable" }),
+    ],
+    diffTolerance: 0,
+  },
   // Showdown SET EDITOR (P1 layout core). The full-screen teambuilder Layer-3 editor for one
   // team slot: top team strip + validity chips, the left identity column (sprite / stage strip /
   // shiny chips / live stat bars / cost), the right field rows (ability / item / moves x4 /

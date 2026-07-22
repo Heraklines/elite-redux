@@ -22,7 +22,9 @@ import { loggedInUser } from "#app/account";
 import { SESSION_ID_COOKIE_NAME } from "#app/constants";
 import { getTournamentBracket, listTournaments } from "#data/elite-redux/showdown/tournament-client";
 import {
+  autoResolutionLabel,
   type BracketMatchView,
+  type BracketView,
   isPresent,
   nextMatchFor,
   opponentOf,
@@ -41,10 +43,35 @@ export interface TournamentDeepLink {
 }
 
 interface TournamentNotifData extends TournamentDeepLink {
-  kind: "ready" | "present";
+  kind: "ready" | "present" | "advanced";
   tournamentName: string;
   opponent: string;
   matchId: string;
+  /** For an "advanced" notif: how you advanced without playing (e.g. "Activity win", "Walkover"). */
+  reason?: string;
+}
+
+/** The P2 auto-resolution kinds that advance a player WITHOUT them playing (drives the "advanced" notif). */
+const AUTO_ADVANCE_RESOLUTIONS = new Set(["activity", "seed", "walkover"]);
+
+/**
+ * The LATEST (highest-round) match `me` won via a P2/P3 auto-resolution (activity / seed / walkover) —
+ * i.e. an advance WITHOUT playing. Returns null when the viewer's progress was all real results/byes.
+ */
+function latestAutoAdvance(bracket: BracketView, me: string): BracketMatchView | null {
+  let best: BracketMatchView | null = null;
+  for (const round of bracket.rounds) {
+    for (const match of round) {
+      if (
+        match.winner === me
+        && AUTO_ADVANCE_RESOLUTIONS.has(match.resolution)
+        && (best === null || match.round > best.round)
+      ) {
+        best = match;
+      }
+    }
+  }
+  return best;
 }
 
 // --- deep-link opener singleton (registered by the title phase) --------------
@@ -86,8 +113,9 @@ function makeNotif(
   t: TournamentView,
   match: BracketMatchView,
   opponent: string,
-  kind: "ready" | "present",
+  kind: "ready" | "present" | "advanced",
   now: number,
+  reason?: string,
 ): ErNotification {
   return {
     // Stable id => the manager dedupes to once per state change (not once per poll).
@@ -103,6 +131,7 @@ function makeNotif(
       tournamentName: t.name,
       opponent,
       matchId: match.id,
+      ...(reason ? { reason } : {}),
     } satisfies TournamentNotifData,
   };
 }
@@ -121,21 +150,27 @@ export function actionableTournamentNotifications(t: TournamentView, me: string,
   if (!t.entrants.some(e => e.participant === me)) {
     return [];
   }
-  const match = nextMatchFor(t.bracket, me);
-  if (match == null || match.a == null || match.b == null || match.winner != null) {
-    return [];
-  }
-  const opponent = opponentOf(match, me);
-  if (opponent == null) {
-    return [];
-  }
   const out: ErNotification[] = [];
-  // (a) your pairing is set and undecided => your match is ready to play.
-  out.push(makeNotif(t, match, opponent, "ready", now));
-  // (b) opponent is present in the lobby right now => they are challenging you.
-  const oppEnt = t.entrants.find(e => e.participant === opponent);
-  if (isPresent(oppEnt?.lastSeen, now)) {
-    out.push(makeNotif(t, match, opponent, "present", now));
+
+  // (a/b) your NEXT pairing is set + undecided => ready to play (+ present if the opponent is in the lobby).
+  const match = nextMatchFor(t.bracket, me);
+  if (match != null && match.a != null && match.b != null && match.winner == null) {
+    const opponent = opponentOf(match, me);
+    if (opponent != null) {
+      out.push(makeNotif(t, match, opponent, "ready", now));
+      const oppEnt = t.entrants.find(e => e.participant === opponent);
+      if (isPresent(oppEnt?.lastSeen, now)) {
+        out.push(makeNotif(t, match, opponent, "present", now));
+      }
+    }
+  }
+
+  // (c) P2: you ADVANCED without playing (deadline activity/seed win, or an admin walkover) — inform you.
+  const advance = latestAutoAdvance(t.bracket, me);
+  if (advance != null) {
+    const beaten = opponentOf(advance, me) ?? "your opponent";
+    const reason = autoResolutionLabel(advance.resolution) ?? "Advanced";
+    out.push(makeNotif(t, advance, beaten, "advanced", now, reason));
   }
   return out;
 }
@@ -181,6 +216,9 @@ export function initTournamentNotifications(): void {
     type: TOURNAMENT_NOTIF_TYPE,
     summary(n) {
       const d = n.data as TournamentNotifData;
+      if (d.kind === "advanced") {
+        return `${d.tournamentName}: you advanced without playing (${d.reason ?? "auto"})`;
+      }
       if (d.kind === "present") {
         return `${d.opponent} is in the lobby - ${d.tournamentName}`;
       }
@@ -188,6 +226,15 @@ export function initTournamentNotifications(): void {
     },
     detail(n) {
       const d = n.data as TournamentNotifData;
+      if (d.kind === "advanced") {
+        return {
+          title: "Advanced without playing",
+          body:
+            `${d.reason ?? "You advanced"} — you moved on in the ${d.tournamentName} without a match `
+            + `(${d.opponent} did not play the round).\n\nOpen the bracket to see your next fight.`,
+          customView: TOURNAMENT_NOTIF_TYPE,
+        };
+      }
       const title = d.kind === "present" ? "Opponent is waiting" : "Tournament match ready";
       const body =
         d.kind === "present"

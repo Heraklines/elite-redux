@@ -18,7 +18,26 @@ export type TournamentParticipant = string;
 
 export type TournamentState = "registration" | "in_progress" | "complete" | "cancelled";
 
-export type MatchResolution = "pending" | "bye" | "reported" | "manual" | "walkover";
+export type MatchResolution = "pending" | "bye" | "reported" | "manual" | "walkover" | "activity" | "seed";
+
+/**
+ * Short human label for how a match was decided WITHOUT being played — the board's advance badge
+ * (P2 auto-resolution + P3 walkover). Returns null for a normal played/pending result (no badge).
+ */
+export function autoResolutionLabel(resolution: MatchResolution): string | null {
+  switch (resolution) {
+    case "walkover":
+      return "Walkover";
+    case "activity":
+      return "Activity win";
+    case "seed":
+      return "Advanced on seed";
+    case "bye":
+      return "Bye";
+    default:
+      return null;
+  }
+}
 
 /** P3: field width at match start (mirror of the worker BattleFormat). */
 export type BattleFormat = "singles" | "doubles" | "triples";
@@ -36,6 +55,11 @@ export type TournamentRewardMutation =
 export interface RewardPoolEntry {
   place: RewardPlace;
   mutations: TournamentRewardMutation[];
+}
+
+/** The on-field width (player/enemy active slots) a battle format is played at: singles 1, doubles 2, triples 3. */
+export function battleFormatFieldWidth(f: BattleFormat | undefined): 1 | 2 | 3 {
+  return f === "doubles" ? 2 : f === "triples" ? 3 : 1;
 }
 
 /** Short human label for a battle/series format (list/board chips). */
@@ -57,6 +81,8 @@ export interface BracketMatchView {
   resolution: MatchResolution;
   deadline: number | null;
   disputed: boolean;
+  /** P2: paired players recorded present during the window (drives the activity-win resolver). */
+  present?: TournamentParticipant[];
 }
 
 /** The bracket (mirror of the worker Bracket). */

@@ -29,6 +29,7 @@
 
 import { globalScene } from "#app/global-scene";
 import {
+  autoResolutionLabel,
   type BracketMatchView,
   type BracketView,
   formatDeadline,
@@ -1203,7 +1204,12 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.cardBody.setTint(WHITE);
     let status: string;
     if (match.winner != null) {
-      status = `Winner: ${this.displayName(match.winner)}`;
+      // P2/P3: annotate an advance that happened WITHOUT a played match (walkover / activity / seed / bye).
+      const auto = autoResolutionLabel(match.resolution);
+      status =
+        auto == null
+          ? `Winner: ${this.displayName(match.winner)}`
+          : `Winner: ${this.displayName(match.winner)} (${auto})`;
     } else if (match.a != null && match.b != null) {
       status = `In progress   ${formatDeadline(match.deadline, cfg.now)}`;
     } else {
@@ -1438,6 +1444,8 @@ interface DemoOpts {
   eliminated?: boolean;
   /** 4-field: settle only the OTHER semifinal (mid-round: advanced icon + dimmed loser). */
   resolvedSemi?: boolean;
+  /** P2: settle the OTHER semifinal via a deadline ACTIVITY win (present player advances; pairing-card label). */
+  activityWin?: boolean;
   /** P3: kick a non-viewer entrant mid-tournament (WALKOVER — opponent advances, kicked shown). */
   kick?: boolean;
   /** P3: render the tournament in the CANCELLED state (board shows cancelled). */
@@ -1604,6 +1612,16 @@ function makeBracketView(opts: DemoOpts, own: string, now: number): TournamentVi
     for (const match of rounds[0]) {
       if (match.winner === null && match.a && match.b && match.a !== own && match.b !== own) {
         feed(0, match.slot, seedOf(match.a) <= seedOf(match.b) ? (match.a as string) : (match.b as string), "reported");
+      }
+    }
+  }
+
+  // P2 activity win: settle the NON-viewer semifinal via a deadline activity win (present player advances).
+  if (opts.activityWin) {
+    for (const match of rounds[0]) {
+      if (match.winner === null && match.a && match.b && match.a !== own && match.b !== own) {
+        // the LOWER seed advances "by activity" (they were present; presence beats seed) — the label is the point.
+        feed(0, match.slot, seedOf(match.a) >= seedOf(match.b) ? (match.a as string) : (match.b as string), "activity");
       }
     }
   }

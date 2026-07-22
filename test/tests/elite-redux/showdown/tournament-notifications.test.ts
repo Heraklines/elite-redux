@@ -136,6 +136,47 @@ describe("tournament challenge notifications - derivation", () => {
     expect(out.map(n => (n.data as any).kind)).toEqual(["ready"]);
   });
 
+  it("P2: emits an ADVANCED notification when you moved on without playing (activity win)", () => {
+    const t = view();
+    // Carla's semifinal auto-resolved in her favor (opponent no-show) -> she advanced without playing.
+    t.bracket!.rounds[0][0].winner = "Carla";
+    t.bracket!.rounds[0][0].resolution = "activity";
+    t.bracket!.rounds[1][0].a = "Carla"; // she's now in the final, awaiting the other semi
+    const out = actionableTournamentNotifications(t, "Carla", NOW);
+    const advanced = out.find(n => (n.data as any).kind === "advanced");
+    expect(advanced).toBeDefined();
+    expect((advanced!.data as any).reason).toBe("Activity win");
+    expect((advanced!.data as any).opponent).toBe("AshK");
+    // deep-link points at the match she won.
+    expect(tournamentDeepLinkOf(advanced!)).toEqual({ tournamentId: "cup", round: 0, slot: 0 });
+  });
+
+  it("P2 red-proof: a normal REPORTED win does NOT emit an advanced notification", () => {
+    const t = view();
+    t.bracket!.rounds[0][0].winner = "Carla";
+    t.bracket!.rounds[0][0].resolution = "reported"; // she played + won -> not an auto-advance
+    t.bracket!.rounds[1][0].a = "Carla";
+    const out = actionableTournamentNotifications(t, "Carla", NOW);
+    expect(out.some(n => (n.data as any).kind === "advanced")).toBe(false);
+  });
+
+  it("P2: a walkover advance to CHAMPION still notifies (no next match)", () => {
+    const t = view({ state: "in_progress" });
+    // collapse to a decided final won by Carla via walkover.
+    t.bracket!.rounds[0][0].winner = "Carla";
+    t.bracket!.rounds[0][0].resolution = "reported";
+    t.bracket!.rounds[0][1].winner = "MistyW";
+    t.bracket!.rounds[0][1].resolution = "reported";
+    t.bracket!.rounds[1][0].a = "Carla";
+    t.bracket!.rounds[1][0].b = "MistyW";
+    t.bracket!.rounds[1][0].winner = "Carla";
+    t.bracket!.rounds[1][0].resolution = "walkover";
+    const out = actionableTournamentNotifications(t, "Carla", NOW);
+    const advanced = out.find(n => (n.data as any).kind === "advanced");
+    expect(advanced).toBeDefined();
+    expect((advanced!.data as any).reason).toBe("Walkover");
+  });
+
   it("DEDUPES to once per state change (stable ids across polls)", () => {
     const first = actionableTournamentNotifications(view(), "Carla", NOW);
     const second = actionableTournamentNotifications(view(), "Carla", NOW + 60_000);
