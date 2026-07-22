@@ -104,6 +104,19 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
     expect(masterFactor).toBeGreaterThan(commonFactor);
   });
 
+  it("a MASTER stone prices at the masterball-band factor, dwarfing the flat EVO bucket", () => {
+    // Directive 2 proof: the biome shop prices a resolved stone by ITS strength
+    // tier (getPlayerShopModifierTypeOptionsForWave: FormChangeItemModifierType ->
+    // erMegaStoneTier -> erBiomeTierPrice), so a MASTER stone gets the masterball
+    // band - NOT the flat EVO-category "great" bucket a form-change slot inherits.
+    const masterFactor = ER_SHOP_ITEM_TIER_FACTOR[ModifierTier.MASTER];
+    const evoGreatFactor = ER_SHOP_ITEM_TIER_FACTOR[ModifierTier.GREAT];
+    expect(erMegaStoneTier(FormChangeItem.XERNEASITE)).toBe(ModifierTier.MASTER);
+    expect(ER_SHOP_ITEM_TIER_FACTOR[erMegaStoneTier(FormChangeItem.XERNEASITE)]).toBe(masterFactor);
+    // The masterball band is strictly above the flat EVO "great" bucket.
+    expect(masterFactor).toBeGreaterThan(evoGreatFactor);
+  });
+
   // ---------------------------------------------------------------------------
   // ABSOLUTE APPEARANCE GATE (#mega-rarity, directive 1): a MASTER stone stays
   // genuinely rare EVEN as a party's ONLY eligible stone. The competitive pick
