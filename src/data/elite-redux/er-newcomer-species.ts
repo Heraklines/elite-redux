@@ -102,6 +102,23 @@ export const ER_PARTNER_LEAFEON_SPECIES_ID = 70017;
 export const ER_PARTNER_GLACEON_SPECIES_ID = 70018;
 export const ER_PARTNER_SYLVEON_SPECIES_ID = 70019;
 
+// ---------------------------------------------------------------------------
+// Newcomer BATCH 2 species (70020+). Evolution-only convergents/eeveelutions +
+// one standalone paradox (Webbed Bruiser). Drawclops is a NEW middle stage in
+// the Duskull -> Drawclops -> Dustnoir line, so Dustnoir's evolution edge sources
+// from a NEW numeric species id (handled by the widened evolvesFrom below).
+// ---------------------------------------------------------------------------
+export const ER_DRAWCLOPS_SPECIES_ID = 70020;
+export const ER_DUSTNOIR_SPECIES_ID = 70021;
+export const ER_NIMBEON_SPECIES_ID = 70022;
+export const ER_RYUVEON_SPECIES_ID = 70023;
+export const ER_TITANEON_SPECIES_ID = 70024;
+export const ER_TWINKLETUFF_SPECIES_ID = 70025;
+export const ER_EGOELK_SPECIES_ID = 70026;
+export const ER_FORBIDDRON_SPECIES_ID = 70027;
+export const ER_IDOLFIN_SPECIES_ID = 70028;
+export const ER_WEBBED_BRUISER_SPECIES_ID = 70029;
+
 // ER-custom / vanilla ability ids used below (verified live via ER_ID_MAP at
 // authoring time; the seam test asserts each resolves to a real allAbilities entry).
 const CORROSION = 212; // vanilla
