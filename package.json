@@ -50,6 +50,7 @@
     "er:link-form-sprites": "node scripts/elite-redux/link-er-form-sprites.mjs",
     "er:fixtures": "node scripts/elite-redux/extract-fixtures.mjs",
     "er:build": "node scripts/elite-redux/build-pokerogue-data.mjs",
+    "er:weights": "node scripts/elite-redux/build-custom-species-weights.mjs",
     "er:cluster-archetypes": "node scripts/elite-redux/cluster-archetypes.mjs",
     "er:classify-abilities": "node scripts/elite-redux/classify-abilities.mjs",
     "er:classify-composites": "node scripts/elite-redux/classify-composites.mjs",

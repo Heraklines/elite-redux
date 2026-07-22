@@ -3820,6 +3820,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Custom weights: Heavy Slam reads real body weight",
+    description:
+      "Weight audit (2026-07-22): the ~827 ER-dump customs used to ALL default to a flat\n"
+      + "30.0 kg, which broke every weight move (Heavy Slam / Heat Crash / Grass Knot / Low\n"
+      + "Kick). Weights are now ROM-extracted (gSpeciesInfo dex.hw). Party: a HEAVY custom\n"
+      + "Dreadnaut (700 kg) and a LIGHT custom Corm (3.8 kg), both holding Heavy Slam vs a\n"
+      + "high-HP Chansey (46.8 kg) that survives to show the numbers.\n"
+      + "DO: use Heavy Slam with Dreadnaut and note the damage; switch to Corm and use Heavy\n"
+      + "Slam again.\n"
+      + "EXPECT: Dreadnaut's Heavy Slam is 120 BP (700 kg dwarfs Chansey) while Corm's is\n"
+      + "40 BP (3.8 kg, minimum tier) - about 3x less. Before the fix BOTH customs were a\n"
+      + "flat 30 kg and hit IDENTICALLY, so the gap between the two is the proof the real\n"
+      + "weights are live. (Grass Knot / Low Kick tiering is covered by the vitest\n"
+      + "er-custom-species-weights suite.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        PASSIVE_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_PASSIVE_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(erSpecies(ErSpeciesId.DREADNAUT), {
+          moveset: [MoveId.HEAVY_SLAM, MoveId.PROTECT, MoveId.SPLASH, MoveId.TACKLE],
+        }),
+        makeStarter(erSpecies(ErSpeciesId.CORM), {
+          moveset: [MoveId.HEAVY_SLAM, MoveId.PROTECT, MoveId.SPLASH, MoveId.TACKLE],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================
