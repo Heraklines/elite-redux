@@ -227,6 +227,18 @@ const COOP_COMMITTED_DELETE_LOCK_ACQUIRE_TIMEOUT_MS = 30_000;
 // its 200 response and reclassified an active checkpoint as transiently unavailable, which sent both
 // players down the start-new path. Keep this bounded, but size it above real response-body latency.
 const COOP_PERSISTENCE_NETWORK_TIMEOUT_MS = 15_000;
+// Resume-DISCOVERY cloud-read resilience. A `transient` slot read (network transport error or the
+// COOP_PERSISTENCE_NETWORK_TIMEOUT_MS abort) is NOT a definitive server verdict - unlike
+// conflict/invalid/unauthorized/etc it says nothing about the slot's true state, so the idempotent
+// read is retried a bounded number of times before the scan fails closed. This mirrors the codebase
+// principle "only definitive ownership/version failures terminate a shared run; transport/read
+// outages accrue debt" (coop-cloud-save-tail.ts). Without it a single momentary read outage at co-op
+// launch (a real player's network blip, or a CI tab throttled to ~1fps mid-read) hard-aborted the
+// whole launch before the "Press to start co-op" prompt ever appeared. The retries run per-slot in
+// parallel, so worst-case wall-clock stays ~3x the single-read timeout, well inside the guest's
+// COOP_RESUME_GUEST_WAIT_MS budget. A SUSTAINED transient (every attempt fails) still surfaces as
+// transient -> the scan still throws -> genuine fail-closed is preserved.
+const COOP_RESUME_TRANSIENT_READ_ATTEMPTS = 3;
 // The GUEST's fresh first-save durability persist chains several SEQUENTIAL real-cloud round-trips
 // (per-slot CAS reads -> run-status guard -> empty-CAS mirror write), each independently bounded by
 // COOP_PERSISTENCE_NETWORK_TIMEOUT_MS, plus a lock acquire and digest hashing. The HOST's ack budget
@@ -2749,6 +2761,25 @@ export class GameData {
     );
   }
 
+  /**
+   * Read a cloud slot for RESUME DISCOVERY, retrying only a {@link COOP_PERSISTENCE_NETWORK_TIMEOUT_MS}
+   * transport/timeout (`transient`) outage - never a definitive server verdict (`conflict` / `invalid` /
+   * `unauthorized` / `unsupported` / `too-large`, where a retry is pointless) and never `missing` (that
+   * IS the empty-slot answer). See {@link COOP_RESUME_TRANSIENT_READ_ATTEMPTS}. The read is idempotent,
+   * so this either observes the slot's true state or, after exhausting attempts, returns the last
+   * `transient` result so the caller still fails closed.
+   */
+  private async readCoopCasWithTransientRetry(
+    slot: number,
+    maxAttempts = COOP_RESUME_TRANSIENT_READ_ATTEMPTS,
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.getCoopCas>>> {
+    let read = await this.readCoopCas(slot);
+    for (let attempt = 1; attempt < maxAttempts && !read.ok && read.failureKind === "transient"; attempt++) {
+      read = await this.readCoopCas(slot);
+    }
+    return read;
+  }
+
   private readCoopRunStatus(
     request: Parameters<typeof pokerogueApi.savedata.session.getCoopRunStatus>[0],
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.getCoopRunStatus>>> {
@@ -3018,7 +3049,7 @@ export class GameData {
     if (!scanContextIsCurrent()) {
       throw new CoopResumeReplicaUnavailableError("account changed before co-op cloud scan");
     }
-    const reads = await Promise.all([0, 1, 2, 3, 4].map(slot => this.readCoopCas(slot)));
+    const reads = await Promise.all([0, 1, 2, 3, 4].map(slot => this.readCoopCasWithTransientRetry(slot)));
     if (!scanContextIsCurrent()) {
       throw new CoopResumeReplicaUnavailableError("account/runtime changed during co-op cloud scan");
     }
