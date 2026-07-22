@@ -474,6 +474,13 @@ export class CoopReplayTurnPhase extends Phase {
             // already-resolved marker the sibling finishTurn suppressor (coop-replay-phases.ts)
             // already pairs with the pending check; use sourceWave (this replay's stable turn
             // identity) so a genuine mid-wave replacement (its wave unresolved) is never suppressed.
+            // NOTE ON TEST COVERAGE: this exact ordering is real-browser-timing only. The in-process
+            // two-engine harness applies checkpoints synchronously, so a coherent won-wave frame ALWAYS
+            // has an all-fainted enemy image at eval time - the sibling all-fainted term already fires
+            // and the coop-duo-won-wave-replacement test cannot produce the incoherent pre-materialization
+            // frame that triggers THIS term. That synchronous masking is precisely why the bug reached
+            // the live journey; the public-UI faint-replacement journey (won-wave route) is the designated
+            // regression proof for this branch (RED: journey run 29884428440; GREEN after this fix).
             const waveWon =
               coopHasPendingWaveAdvance()
               || coopWaveAdvanceSignaledFor(this.sourceWave)
