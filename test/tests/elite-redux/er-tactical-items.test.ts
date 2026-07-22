@@ -50,7 +50,7 @@ describe.skipIf(!RUN)("ER tactical held items", () => {
       .battleStyle("single")
       .startingLevel(50)
       .enemyLevel(50)
-      .enemySpecies(SpeciesId.ABRA) // Psychic: Shadow Ball is super effective, Tackle neutral
+      .enemySpecies(SpeciesId.ABRA) // Psychic: Shadow Claw super effective, Tackle neutral
       .enemyMoveset(MoveId.SPLASH)
       .enemyAbility(AbilityId.BALL_FETCH)
       .ability(AbilityId.BALL_FETCH)
@@ -65,9 +65,15 @@ describe.skipIf(!RUN)("ER tactical held items", () => {
     const player = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
 
+    // Probe a NON-ball-named Ghost move (Shadow Claw): the enemy's neutral
+    // ability here is ER Ball Fetch, which "steals Ball-named moves" - so the
+    // ball-named Shadow Ball is intercepted (0x) before damage, which would
+    // break the "SE hit deals damage" premise. Shadow Claw is Ghost, super
+    // effective vs Psychic (Abra), physical like the Tackle neutral probe, and
+    // not ball-named, so it isolates Expert Belt's x1.2 cleanly.
     const seBefore = enemy.getAttackDamage({
       source: player,
-      move: allMoves[MoveId.SHADOW_BALL],
+      move: allMoves[MoveId.SHADOW_CLAW],
       isCritical: false,
       simulated: true,
     }).damage;
@@ -83,7 +89,7 @@ describe.skipIf(!RUN)("ER tactical held items", () => {
 
     const seAfter = enemy.getAttackDamage({
       source: player,
-      move: allMoves[MoveId.SHADOW_BALL],
+      move: allMoves[MoveId.SHADOW_CLAW],
       isCritical: false,
       simulated: true,
     }).damage;
