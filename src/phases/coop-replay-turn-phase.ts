@@ -103,16 +103,6 @@ export class CoopReplayTurnPhase extends Phase {
   private ended = false;
   /** Read-only browser-observer seam: true only after the exact turn waiter has been installed. */
   private awaitingAuthority = false;
-  /**
-   * #Layer4 (public journey run 29895009334): set once this replay took the WON-WAVE replacement suppression
-   * branch and re-parked awaiting the authoritative wave-advance tail. A won-wave WAVE_ADVANCE settles on the
-   * post-win turn cursor (turn N+1), while this replay legitimately holds on the FAINT'S turn (turn N) - so the
-   * retained-terminal unpark's `this.turn >= settledTurn` guard refuses to dissolve it and the boundary wake is
-   * stranded behind the parked pump (24s stall -> resync -> orphaned pending advance -> wave-2 launch deadlock).
-   * A replay in THIS state is, by construction, waiting to be dissolved by exactly that advance regardless of
-   * the turn gap, so {@linkcode abortIfRetainedTerminalSuperseded} treats it as superseded.
-   */
-  private heldForWonWaveAdvance = false;
   /** Immutable source wave for every event presented by this turn pump and its continuations. */
   private readonly sourceWave: number;
 
@@ -159,12 +149,7 @@ export class CoopReplayTurnPhase extends Phase {
    */
   public abortIfRetainedTerminalSuperseded(settledTurn: number, reason: string): boolean {
     return (
-      (this.turn > settledTurn
-        || (this.turn === settledTurn && this.isAwaitingAuthority()) // #Layer4: a replay explicitly holding for the WON-WAVE advance tail is dissolved by that advance even
-        || // when its (faint) turn is BEHIND the settled turn cursor - the wave is over, so no earlier-turn work
-        // remains, and this is the exact terminal it re-parked to await. Gated on the awaiting-authority park so
-        // a still-active pump (mid-render / mid-replacement) is never dropped.
-        (this.heldForWonWaveAdvance && this.isAwaitingAuthority()))
+      (this.turn > settledTurn || (this.turn === settledTurn && this.isAwaitingAuthority()))
       && this.abortPhantom(reason)
     );
   }
@@ -553,9 +538,6 @@ export class CoopReplayTurnPhase extends Phase {
               // Cancel the passive-await turn-commit request the same way the command pivot does: the host
               // has advanced past this turn and will never resolve it, so the ping would otherwise retry.
               streamer.cancelPendingTurnCommitRequests(envelope.epoch, envelope.wave, envelope.turn);
-              // #Layer4: mark this replay as holding for the won-wave advance tail so the retained WAVE_ADVANCE
-              // dissolves it even though its (faint) turn is behind the settled post-win turn cursor.
-              this.heldForWonWaveAdvance = true;
               coopLog(
                 "replay",
                 `guest replay turn=${this.turn}: replacement filled OUR slot ${ownSlot} on a WON wave `
