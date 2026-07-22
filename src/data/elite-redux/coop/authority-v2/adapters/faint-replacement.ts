@@ -417,7 +417,18 @@ export function successorControl(
         epoch: address.epoch,
         wave: address.wave,
         turn: address.turn,
-        allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+        // A replacement with no immediate command frontier was authored before the engine could know which
+        // boundary comes next: a SURVIVING battle opens the refilled slot's next turn through an explicit
+        // CONTROL_COMMIT command-open, while a WON wave / game-over crosses via WAVE_ADVANCE / TERMINAL_COMMIT,
+        // and a further same-turn faint via REPLACEMENT_COMMIT. Omitting CONTROL_COMMIT made this wait REJECT
+        // the surviving battle's turn N+1 command-open (successorWaitAllows -> !allowedKinds.includes -> false),
+        // so a mid-wave replacement whose wave continues (e.g. a second same-wave faint that suppressed the
+        // immediate frontier) deadlocked with the command-open never admissible - recovery then correctly
+        // failed closed ("material could not be applied exactly"). This mirrors the sibling turn-command
+        // no-immediate-frontier wait (turn-command.ts) EXACTLY; broadWaitAllowsControlCommitTurn still pins a
+        // command-open to turn N+1 and the settlement N/N+1 rule still governs WAVE_ADVANCE/TERMINAL_COMMIT, so
+        // the genuine won-wave/terminal case is unchanged. allowNextWaveStart stays false: a same-wave resume.
+        allowedKinds: ["CONTROL_COMMIT", "REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
         allowNextWaveStart: false,
         expectedOperationId: null,
       };

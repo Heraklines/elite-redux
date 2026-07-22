@@ -246,11 +246,14 @@ describe("buildReplacementCommitEntry", () => {
     expect(owner.operationId).toBe(fallback.operationId);
     // ...but the resolution changes the image, so the digest differs.
     expect(owner.material.digest).not.toBe(fallback.material.digest);
-    // A non-executable terminal boundary is still explicit: local phases may not derive the successor.
+    // A non-executable terminal boundary is still explicit: local phases may not derive the successor. Its
+    // allowedKinds mirror the sibling turn-command no-immediate-frontier wait so a SURVIVING battle's next
+    // command-open (CONTROL_COMMIT at turn N+1) is admitted - omitting CONTROL_COMMIT deadlocked a mid-wave
+    // replacement whose wave continued (the DIRTY command-open deadlock, run 29944796250 wave 3).
     expect(owner.nextControl).toMatchObject({
       kind: "AWAIT_SUCCESSOR",
       afterOperationId: owner.operationId,
-      allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      allowedKinds: ["CONTROL_COMMIT", "REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
       expectedOperationId: null,
     });
   });
