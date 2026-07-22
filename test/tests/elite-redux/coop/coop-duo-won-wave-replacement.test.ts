@@ -331,6 +331,11 @@ describe.skipIf(!RUN)(
         await settleDuoPromise(rig, hostAdvance!, "chokepoint won-wave host crossing");
         await withClient(rig.hostCtx, () => drainLoopback());
 
+        // NOTE: the replay-pump WIN fence (coopRetainedWinSupersedesReplay) that closes the guest's
+        // phantom next-turn replay before wave 2 cannot be asserted here - the duo harness CONSUMES the
+        // wave-advance on the guest (nulling pendingWaveAdvance), the exact fidelity gap that masks the
+        // WATCHER won-by-faint timing this whole class only reproduces in the real-browser journey.
+
         // Force the exact hazard window on the guest: the WIN wave-advance is ENDING wave 1 (pending
         // consumption on the WATCHER, or already signaled) while the battle has NOT yet re-based to
         // wave 2, then evaluate the command boundary for the guest's own slot.

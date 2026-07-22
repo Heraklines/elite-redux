@@ -2369,6 +2369,29 @@ export function coopRetainedGameOverSupersedesReplay(wave: number, turn: number)
 }
 
 /**
+ * WIN sibling of {@linkcode coopRetainedGameOverSupersedesReplay}. A retained WON WAVE_ADVANCE resolved
+ * this wave on `settledTurn` and advanced; the host's turn resolution for `settledTurn` (and anything
+ * after it) IS that advance, NOT a normal turnResolution frame. A renderer whose replay for `settledTurn`
+ * (or a queue-empty-manufactured phantom beyond it) `awaitTurn`s a normal resolution therefore hangs
+ * forever, never reaching the next wave's command frontier to install its rendezvous waiter - the
+ * won-by-faint wave-2 launch deadlock (journey runs 29895009334 / 29897908649: the faint replacement
+ * bumps the settled turn to 2, so the guest's `CoopReplayTurnPhase turn=2` IS the settled turn and stalls;
+ * host's cmd:2:1 arrival BUFFERs "no waiter yet" and aborts). Uses `turn >= settledTurn` exactly like the
+ * gameOver fence: once the ordered live-event buffer is drained the settled turn has no further normal
+ * resolution coming, so end into the queued wave-advance boundary. The WIN unpark
+ * (coopActiveReplayTurnAborter) is the one-shot external equivalent; this self-sourced pump check cannot
+ * be missed by that abort's install-timing race.
+ */
+export function coopRetainedWinSupersedesReplay(wave: number, turn: number): boolean {
+  return (
+    pendingWaveAdvance?.wave === wave
+    && pendingWaveAdvance.outcome !== "gameOver"
+    && pendingWaveAdvance.settledTurn != null
+    && turn >= pendingWaveAdvance.settledTurn
+  );
+}
+
+/**
  * Install the engine-owned safe-boundary wake used when a retained WAVE_ADVANCE arrives after finalization.
  * The factory seam avoids a runtime -> replay-phase import cycle while still appending a real Phase instance.
  */
