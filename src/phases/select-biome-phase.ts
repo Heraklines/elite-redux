@@ -33,6 +33,7 @@ import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous"
 import {
   advanceCoopInteractionForContinuation,
   coopSessionGeneration,
+  enterCoopV2BiomeControlBoundary,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
@@ -46,6 +47,7 @@ import {
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_CHOICE_KINDS, COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import {
   type ErRouteNode,
@@ -517,12 +519,13 @@ export class SelectBiomePhase extends BattlePhase {
       this.coopAdvancePinned = controller.interactionCounter();
     }
     const pinned = this.coopAdvancePinned;
-    this.coopV2ControlOperationId = coopBiomeOperationId(
+    const controlOperationId = coopBiomeOperationId(
       "BIOME_PICK",
       COOP_BIOME_PICK_SEQ_BASE + pinned,
       pinned,
       this.requireCoopBiomeOperationBinding(),
     );
+    this.coopV2ControlOperationId = controlOperationId;
     const owns = spoofed || controller.isLocalOwnerAtCounter(pinned);
     // Co-op (#864): record ownership + the node set so the single terminal funnel (setNextBiomeAndEnd)
     // relays whatever biome the owner ends up travelling to - the picker pick OR a fallback.
@@ -532,11 +535,47 @@ export class SelectBiomePhase extends BattlePhase {
       "reward",
       `biome pick owner/watcher decision: pinnedStart=${pinned} role=${controller.role} spoof=${spoofed} chained=${this.coopChained} -> ${owns ? "OWNER" : "WATCHER"} (#848)`,
     );
-    if (owns) {
-      this.coopBiomePickOwner(revealed, origin, pinned);
-    } else {
-      await this.coopBiomePickWatch(revealed, origin, pinned);
+    const openExactSurface = (): void => {
+      if (owns) {
+        this.coopBiomePickOwner(revealed, origin, pinned);
+      } else {
+        this.coopBiomePickWatch(revealed, origin, pinned).catch(error =>
+          coopWarn("reward", `biome pick WATCHER ${pinned} rejected after its Authority V2 control opened`, error),
+        );
+      }
+    };
+    // A chained crossroads-Leave already authored this exact BIOME_PICK interaction-open as its result
+    // successor (and barriered at its own crossroads entry), so its control is already in the ordered log.
+    // A NATURAL biome-end pick has no such predecessor: like ErCrossroadsPhase it must author its OWN
+    // interaction-open before exposing input, or the owner's live ER_MAP handler installs no shared control
+    // and isCoopV2InteractionHumanInputFrozen() never clears. The authority commits the CONTROL_COMMIT now;
+    // a replica parks this exact phase until that ordered entry materializes, then resumes here.
+    if (this.coopChained) {
+      openExactSurface();
+      return;
     }
+    const generation = coopSessionGeneration();
+    const wave = this.requireCoopSourceWave();
+    const controlBoundary = enterCoopV2BiomeControlBoundary({
+      operationId: controlOperationId,
+      ownerSeatId: coopInteractionOwnerSeat(pinned),
+      sourceWave: wave,
+      sourceTurn: this.coopSourceTurn,
+      phaseToken: this,
+      resume: () => {
+        if (this.boundaryStillLive(generation, wave)) {
+          openExactSurface();
+        }
+      },
+    });
+    if (controlBoundary === "failed") {
+      failCoopSharedSession(`natural biome pick ${pinned} could not obtain its Authority V2 input control`);
+      return;
+    }
+    if (controlBoundary === "deferred") {
+      return;
+    }
+    openExactSurface();
   }
 
   /**

@@ -44,6 +44,21 @@ export interface CoopCrossroadsControlProjectionV2 {
   readonly sourceWave: number;
 }
 
+/**
+ * Complete projection capsule for a NATURAL biome-end World-Map pick with no preceding Crossroads.
+ *
+ * Like Crossroads, a natural biome pick has no separate `*_PRESENT` result: its revealed routes are already
+ * on the map, but opening the actionable ER_MAP owner handler is still a mechanical control boundary that
+ * must be authored ahead of input. A chained crossroads-Leave instead authors the same BIOME_PICK control as
+ * its interaction RESULT successor; both decode to the identical `biome` interaction projection.
+ */
+export interface CoopBiomeControlProjectionV2 {
+  readonly kind: "biome";
+  readonly sourceWave: number;
+}
+
+export type CoopInteractionControlProjectionV2 = CoopCrossroadsControlProjectionV2 | CoopBiomeControlProjectionV2;
+
 /** A real shared-interaction chokepoint authored after the preceding result entered an ordered wait. */
 export interface CoopInteractionOpenMaterialV2 {
   readonly kind: "interaction-open";
@@ -54,7 +69,7 @@ export interface CoopInteractionOpenMaterialV2 {
   /** The exact executable control this material opens; included in the digest, not merely beside it. */
   readonly control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }>;
   /** Closed phase-construction material used by recovery. */
-  readonly projection: CoopCrossroadsControlProjectionV2;
+  readonly projection: CoopInteractionControlProjectionV2;
 }
 
 export type CoopControlOpenMaterialV2 = CoopCommandOpenMaterialV2 | CoopInteractionOpenMaterialV2;
@@ -140,29 +155,38 @@ export function isCompleteCommandOpenMaterial(value: unknown): value is CoopComm
   );
 }
 
-/** Validate the complete, recoverable Crossroads control-open image. */
+/** Validate the complete, recoverable Crossroads / natural-biome control-open image. */
 export function isCompleteInteractionOpenMaterial(value: unknown): value is CoopInteractionOpenMaterialV2 {
   if (!isPlainObject(value) || !isPlainObject(value.control) || !isPlainObject(value.projection)) {
     return false;
   }
   const control = value.control as unknown as Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }>;
+  // A control-open opens exactly one deterministic biome-surface picker: the every-five-waves Crossroads or
+  // a natural biome-end World-Map pick. The projection kind and the control's operation/successor kind must
+  // agree; every other field is validated identically for both, so neither can borrow the other's proof.
+  const expectedOperationKind =
+    value.projection.kind === "crossroads"
+      ? "CROSSROADS_PICK"
+      : value.projection.kind === "biome"
+        ? "BIOME_PICK"
+        : null;
   return (
     value.kind === "interaction-open"
     && isPositiveSafeInt(value.wave)
     && isPositiveSafeInt(value.turn)
     && isCompleteCommandOpenState(value.authoritativeState, value.wave, value.turn)
+    && expectedOperationKind != null
     && control.kind === "SHARED_INTERACTION"
     && control.surfaceClass === "op:biome"
-    && control.operationKind === "CROSSROADS_PICK"
+    && control.operationKind === expectedOperationKind
     && isPositiveSafeInt(control.epoch)
     && control.wave === value.wave
     && control.turn === value.turn
     && validateNextControl(control).ok
     && control.successor.operationKinds.length === 1
-    && control.successor.operationKinds[0] === "CROSSROADS_PICK"
+    && control.successor.operationKinds[0] === expectedOperationKind
     && control.successor.operationIds?.length === 1
     && control.successor.operationIds[0] === control.operationId
-    && value.projection.kind === "crossroads"
     && isPositiveSafeInt(value.projection.sourceWave)
     && value.projection.sourceWave === value.wave
   );

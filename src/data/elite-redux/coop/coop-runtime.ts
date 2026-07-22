@@ -6675,18 +6675,35 @@ export function enterCoopV2ReplacementControlBoundary(input: {
 }
 
 /**
- * Park a deterministic Crossroads phase before it exposes input until the one global log explicitly opens
- * its exact result address. The authority authors a complete state + recovery capsule CONTROL_COMMIT; a
- * replica waits for that entry and resumes this same phase generation only after its material applies.
+ * The two deterministic biome-surface pickers that own no separate `*_PRESENT` result but still need a
+ * mechanical interaction-open before exposing input: the every-five-waves Crossroads and a NATURAL
+ * biome-end World-Map pick. Each authors the same-shaped SHARED_INTERACTION[op:biome] control differing
+ * only in its operation kind (and matching recovery projection kind).
  */
-export function enterCoopV2CrossroadsControlBoundary(input: {
-  readonly operationId: string;
-  readonly ownerSeatId: number;
-  readonly sourceWave: number;
-  readonly sourceTurn: number;
-  readonly phaseToken: object;
-  readonly resume: () => void;
-}): CoopV2InteractionBoundaryVerdict {
+interface CoopV2BiomeInteractionOpenSpec {
+  readonly operationKind: Extract<CoopV2InteractionOperationKind, "CROSSROADS_PICK" | "BIOME_PICK">;
+  readonly projectionKind: "crossroads" | "biome";
+  readonly label: string;
+}
+
+/**
+ * Park a deterministic biome-surface picker phase before it exposes input until the one global log
+ * explicitly opens its exact result address. The authority authors a complete state + recovery capsule
+ * CONTROL_COMMIT; a replica waits for that entry and resumes this same phase generation only after its
+ * material applies. Shared by Crossroads and the natural biome-end pick (their control shapes are identical
+ * apart from the operation/projection kind), so neither can inherit the other's proof.
+ */
+function enterCoopV2BiomeInteractionControlBoundary(
+  input: {
+    readonly operationId: string;
+    readonly ownerSeatId: number;
+    readonly sourceWave: number;
+    readonly sourceTurn: number;
+    readonly phaseToken: object;
+    readonly resume: () => void;
+  },
+  spec: CoopV2BiomeInteractionOpenSpec,
+): CoopV2InteractionBoundaryVerdict {
   const runtime = active;
   const battle = globalScene.currentBattle;
   if (
@@ -6709,10 +6726,10 @@ export function enterCoopV2CrossroadsControlBoundary(input: {
   ) {
     return "failed";
   }
-  // Crossroads is enqueued by Victory at the exact post-BattleEnd settlement turn and starts only after
-  // the terminal reward result has installed its wait at that same address. Its constructor-captured
-  // coordinate is also used by the eventual result envelope, so open, result, recovery, and replay remain
-  // one ordered w/t boundary instead of consulting a later speculative battle.
+  // The picker is enqueued at the exact post-BattleEnd settlement turn and starts only after the terminal
+  // reward result has installed its wait at that same address. Its constructor-captured coordinate is also
+  // used by the eventual result envelope, so open, result, recovery, and replay remain one ordered w/t
+  // boundary instead of consulting a later speculative battle.
   const state = captureCoopAuthoritativeBattleState(input.sourceTurn);
   if (state == null || state.wave !== input.sourceWave || state.turn !== input.sourceTurn) {
     return "failed";
@@ -6725,15 +6742,15 @@ export function enterCoopV2CrossroadsControlBoundary(input: {
     epoch: runtime.controller.sessionEpoch,
     wave: state.wave,
     turn: state.turn,
-    operationKind: "CROSSROADS_PICK",
+    operationKind: spec.operationKind,
     successor: {
-      operationKinds: ["CROSSROADS_PICK"],
+      operationKinds: [spec.operationKind],
       operationIds: [input.operationId],
     },
   };
   const controlCheck = validateNextControl(control);
   if (!controlCheck.ok) {
-    coopWarn("v2-control", `Crossroads refused malformed control: ${controlCheck.reason}`);
+    coopWarn("v2-control", `${spec.label} refused malformed control: ${controlCheck.reason}`);
     return "failed";
   }
   const current = runtime.v2ControlLedger.latestControl;
@@ -6749,7 +6766,7 @@ export function enterCoopV2CrossroadsControlBoundary(input: {
     if (cutover == null || frontier?.kind !== "AWAIT_SUCCESSOR" || !frontier.allowedKinds.includes("CONTROL_COMMIT")) {
       coopWarn(
         "v2-control",
-        `Crossroads predecessor is ${frontier?.kind ?? "none"}, expected CONTROL_COMMIT-authorizing wait`,
+        `${spec.label} predecessor is ${frontier?.kind ?? "none"}, expected CONTROL_COMMIT-authorizing wait`,
       );
       return "failed";
     }
@@ -6760,7 +6777,7 @@ export function enterCoopV2CrossroadsControlBoundary(input: {
       authoritativeState: state,
       control,
       projection: {
-        kind: "crossroads",
+        kind: spec.projectionKind,
         sourceWave: input.sourceWave,
       },
     };
@@ -6780,8 +6797,44 @@ export function enterCoopV2CrossroadsControlBoundary(input: {
     phaseToken: input.phaseToken,
     resume: input.resume,
   });
-  coopLog("v2-control", `parked Crossroads until ordered interaction-open ${controlId}`);
+  coopLog("v2-control", `parked ${spec.label} until ordered interaction-open ${controlId}`);
   return "deferred";
+}
+
+/** Author the every-five-waves Crossroads interaction-open. */
+export function enterCoopV2CrossroadsControlBoundary(input: {
+  readonly operationId: string;
+  readonly ownerSeatId: number;
+  readonly sourceWave: number;
+  readonly sourceTurn: number;
+  readonly phaseToken: object;
+  readonly resume: () => void;
+}): CoopV2InteractionBoundaryVerdict {
+  return enterCoopV2BiomeInteractionControlBoundary(input, {
+    operationKind: "CROSSROADS_PICK",
+    projectionKind: "crossroads",
+    label: "Crossroads",
+  });
+}
+
+/**
+ * Author a NATURAL biome-end World-Map interaction-open (no preceding Crossroads). A chained crossroads-Leave
+ * already authors this exact BIOME_PICK control as its interaction RESULT successor; this establisher covers
+ * the natural-boundary path where the preceding reward/market terminal wait is the sole predecessor.
+ */
+export function enterCoopV2BiomeControlBoundary(input: {
+  readonly operationId: string;
+  readonly ownerSeatId: number;
+  readonly sourceWave: number;
+  readonly sourceTurn: number;
+  readonly phaseToken: object;
+  readonly resume: () => void;
+}): CoopV2InteractionBoundaryVerdict {
+  return enterCoopV2BiomeInteractionControlBoundary(input, {
+    operationKind: "BIOME_PICK",
+    projectionKind: "biome",
+    label: "natural biome pick",
+  });
 }
 
 function commandStartKey(wave: number, turn: number, fieldIndex: number, pokemonId: number): string {

@@ -497,6 +497,64 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
   }
 
+  // A NATURAL biome-end pick (no preceding Crossroads) crosses its OWN #858 boundary barrier and must author
+  // its OWN Authority V2 interaction-open. Unlike the chained map above, both engines block at biomepick:<wave>
+  // until the reciprocal arrival is delivered, so pump BOTH after starting them (exactly as driveRealCrossroads
+  // does): the host must cross the barrier and author the exact interaction-open that releases the parked
+  // guest-owned picker. Only then does the guest owner's ER_MAP open.
+  async function driveRealNaturalGuestOwnedMapPick(rig: DuoRig, destination: BiomeId): Promise<void> {
+    const pinned = rig.hostRuntime.controller.interactionCounter();
+    expect(pinned % 2, "the guest owns the odd-parity natural biome pick").toBe(1);
+    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectBiomePhase", false));
+    const hostMap = rig.hostScene.phaseManager.getCurrentPhase();
+    expect(hostMap, "host reached the actual queued natural SelectBiomePhase").toBeInstanceOf(SelectBiomePhase);
+    const guestMap = await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "SelectBiomePhase", {
+        matches: phase => phase instanceof SelectBiomePhase,
+      }),
+    );
+    await withClient(rig.hostCtx, async () => {
+      hostMap.start();
+      await drainLoopback();
+    });
+    await withClient(rig.guestCtx, async () => {
+      setMapTravelTarget(BiomeId.LAKE);
+      guestMap.start();
+      await drainLoopback();
+    });
+    // Cross the reciprocal #858 boundary barrier on BOTH engines. The host authors the natural biome
+    // interaction-open here; the guest (replica owner) parked on it and is released by the ordered entry.
+    await pumpBoth(rig, 8);
+    await waitForMode(rig.guestCtx, UiMode.ER_MAP, "guest-owned natural World Map");
+    await pressUntilAccepted(rig, rig.guestCtx, Button.RIGHT, "World Map second route");
+    await pressUntilAccepted(rig, rig.guestCtx, Button.ACTION, "World Map travel");
+
+    for (let i = 0; i < 120; i++) {
+      await pumpBoth(rig);
+      if (
+        rig.hostRuntime.controller.interactionCounter() === pinned + 1
+        && rig.guestRuntime.controller.interactionCounter() === pinned + 1
+      ) {
+        break;
+      }
+      if (i === 119) {
+        throw new Error("natural guest-owned BIOME_PICK never returned as a host-committed envelope");
+      }
+    }
+    expect(
+      withClientSync(rig.guestCtx, () => getMapTravelTarget()),
+      "stale wrong travel target was consumed",
+    ).toBeNull();
+    expect(withClientSync(rig.hostCtx, () => getCoopBiomeTransitionTailPermit())).toMatchObject({
+      destinationBiomeId: destination,
+      switchAdopted: false,
+    });
+    expect(withClientSync(rig.guestCtx, () => getCoopBiomeTransitionTailPermit())).toMatchObject({
+      destinationBiomeId: destination,
+      switchAdopted: false,
+    });
+  }
+
   it("permit mismatches park SwitchBiome/NewBiome in place without mutation or queue advance", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
@@ -1708,6 +1766,65 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         expect(game.phaseInterceptor.log).toContain("SwitchBiomePhase");
         expect(game.phaseInterceptor.log).toContain("NewBiomeEncounterPhase");
       }
+      logs.flush();
+    } finally {
+      headlessAtlas.restore();
+      resync.restore();
+    }
+  }, 300_000);
+
+  // A NATURAL biome-END pick (no preceding Crossroads) must author its OWN Authority V2 interaction-open, or
+  // the guest owner's live ER_MAP handler installs no shared control and isCoopV2InteractionHumanInputFrozen()
+  // never clears - the owner's RIGHT is never accepted and the pick can never commit. A chained crossroads
+  // -Leave instead inherits the BIOME_PICK control its result already authored (covered by the Leave case
+  // above). restoreErBiomeStructure(10, 1) makes wave 10 a biome END: erIsBiomeEnd(10) true, and
+  // erShouldRaiseCrossroads(10) false (spent 10 == length), so the market is followed by a NATURAL
+  // SelectBiomePhase on both engines rather than a Crossroads.
+  it("wave 10 biome-END -> market -> NATURAL guest-owned biome pick installs its own control and commits", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createScheduledCoopPair({ automatic: true });
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    pair.setAutomaticDelivery(false);
+    const headlessAtlas = withClientSync(rig.guestCtx, () => installHeadlessPlayerAtlasCompletion(rig.guestScene));
+
+    const routes: ErRouteNode[] = [
+      { biome: BiomeId.FOREST, revealed: true },
+      { biome: BiomeId.VOLCANO, revealed: true, source: "upgrade" },
+    ];
+    for (const ctx of [rig.hostCtx, rig.guestCtx]) {
+      await withClient(ctx, () => {
+        restoreErBiomeStructure(10, 1, null);
+        setErPendingNodes(routes.map(node => ({ ...node })));
+      });
+    }
+
+    const resync = installCoopResyncProbe(rig.guestRuntime);
+    try {
+      await driveGuestCommandUi(rig);
+      const turn = rig.hostScene.currentBattle.turn;
+      await withClient(rig.hostCtx, async () => {
+        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
+      });
+      await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+      expect(
+        rig.guestScene.currentBattle.enemyParty.every(mon => mon.isFainted()),
+        "wave-10 battle converged",
+      ).toBe(true);
+
+      // The wave-10 market clears the reward interaction (host-owned, counter 0 -> 1). The natural biome pick
+      // is then the first UNCHAINED interaction: it must install its OWN SHARED_INTERACTION control before the
+      // guest owner (counter 1) can act. driveRealGuestOwnedMapPick presses RIGHT + ACTION through the REAL
+      // ER_MAP and blocks on both counters crossing to 2 - which never happens while the owner is frozen.
+      await driveRealBiomeMarketLeave(rig);
+      await driveRealNaturalGuestOwnedMapPick(rig, BiomeId.VOLCANO);
+
+      expect(rig.hostRuntime.controller.interactionCounter(), "host advanced past the natural biome pick").toBe(2);
+      expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced past the natural biome pick").toBe(2);
       logs.flush();
     } finally {
       headlessAtlas.restore();
