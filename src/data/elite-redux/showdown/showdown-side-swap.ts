@@ -161,6 +161,7 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
     case "statStage":
     case "status":
     case "switch":
+    case "ability":
       return { ...event, bi: swapBi(event.bi, enemyBase) };
     default:
       // message / weather / terrain carry no side.

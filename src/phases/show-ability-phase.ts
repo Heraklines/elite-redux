@@ -1,5 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { isVersusSession } from "#data/elite-redux/coop/coop-runtime";
+import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import type { BattlerIndex } from "#enums/battler-index";
 import { PokemonPhase } from "#phases/pokemon-phase";
 
@@ -69,6 +71,15 @@ export class ShowAbilityPhase extends PokemonPhase {
       globalScene.currentBattle.lastEnemyInvolved = globalScene.currentBattle.arrangement.locate(
         pokemon.getBattlerIndex(),
       ).position;
+    }
+
+    // SHOWDOWN versus (P3 cosmetic): the pure-renderer guest never computes abilities, so it shows NO
+    // ability banner (e.g. a mid-battle switch-in ability). Stream the banner as a cosmetic cue so the
+    // guest animates it like solo does. Versus-host + recording only (co-op guests render their own
+    // banners, so they must NOT also receive this - it would double up). Guarded: a failed emit never
+    // blocks the host's banner.
+    if (isVersusSession() && isCoopRecording()) {
+      recordCoopEvent({ k: "ability", bi: this.battlerIndex, abilityName: this.abilityName, passive: this.passive });
     }
 
     globalScene.abilityBar.showAbility(this.pokemonName, this.abilityName, this.passive, this.player).then(() => {

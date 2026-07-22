@@ -267,6 +267,10 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
       return isSafeAddressPart(event.terrain) && isSafeAddressPart(event.turnsLeft);
     case "switch":
       return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.partySlot);
+    case "ability":
+      return (
+        isValidBattlerIndex(event.bi) && typeof event.abilityName === "string" && typeof event.passive === "boolean"
+      );
     default:
       return false;
   }

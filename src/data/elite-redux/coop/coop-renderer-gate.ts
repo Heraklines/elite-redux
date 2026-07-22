@@ -116,6 +116,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "CoopHpDrainReplayPhase", // hp tween replay
   "CoopStatStageReplayPhase", // stat tween replay (renders the denied StatStageChangePhase)
   "CoopStatusReplayPhase", // status-change replay
+  "CoopAbilityReplayPhase", // ability-banner replay (renders the denied ShowAbilityPhase on the guest)
   "CoopFaintReplayPhase", // faint replay (renders the denied FaintPhase)
   "CoopCaptureReplayPhase", // guest ball-throw replay (renders the denied AttemptCapturePhase)
   "CoopApplyResyncPhase", // applies a host resync snapshot at a safe boundary

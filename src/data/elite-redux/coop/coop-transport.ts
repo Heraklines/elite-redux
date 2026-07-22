@@ -967,7 +967,15 @@ export type CoopBattleEvent =
   /** Terrain changed (`TerrainType` enum). */
   | { k: "terrain"; terrain: number; turnsLeft: number }
   /** A mon switched out for the party member at `partySlot`. */
-  | { k: "switch"; bi: number; partySlot: number };
+  | { k: "switch"; bi: number; partySlot: number }
+  /**
+   * A mon's ability BANNER activated (the "X's <Ability>!" pop-up). Cosmetic-only (the ability's
+   * mechanical effect rides the hp/statStage/weather cues + the checkpoint); this drives the guest's
+   * ability-bar animation so a host-side switch-in ability shows on the guest like it does solo. The
+   * host localizes `abilityName` (shown verbatim); `passive` picks the innate vs active bar styling.
+   * Additive/versus-only - a co-op guest (which renders its own banners) never receives it.
+   */
+  | { k: "ability"; bi: number; abilityName: string; passive: boolean };
 
 // =============================================================================
 // Host-authoritative INTERACTION OUTCOME (#633, TRACK-2 Phase C). Today the owner

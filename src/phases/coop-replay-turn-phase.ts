@@ -774,6 +774,11 @@ export class CoopReplayTurnPhase extends Phase {
           case "status":
             pm.unshiftNew("CoopStatusReplayPhase", event.bi, event.status);
             break;
+          case "ability":
+            // P3 cosmetic: render the ability banner the host streamed (switch-in abilities the
+            // pure-renderer guest never computes). Cosmetic-only; no state the checkpoint owns.
+            pm.unshiftNew("CoopAbilityReplayPhase", event.bi, event.abilityName, event.passive);
+            break;
           case "faint":
             // #691 (host-language leak): pass the `narrate` flag so the faint phase regenerates the
             // "X fainted!" line in the GUEST'S language ONLY for KOs the host actually narrated (a real

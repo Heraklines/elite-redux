@@ -492,6 +492,60 @@ export class CoopStatusReplayPhase extends PokemonPhase {
 }
 
 /**
+ * GUEST (P3 cosmetic): render an ability BANNER for an `ability` event. The pure-renderer versus guest
+ * computes no abilities (its post-summon ability apply is early-returned), so it would show NO ability
+ * pop-up - e.g. a host-side mid-battle switch-in ability. This phase plays the ability-bar animation the
+ * host streamed, so the guest sees it like solo does. Cosmetic ONLY: it shows the bar and ends, mutating
+ * no state the checkpoint owns (no revealAbility / no ability compute). Hardened to always reach `end()`
+ * (a watchdog backs the bar's promise, and an absent mon / empty name is a clean no-op).
+ */
+export class CoopAbilityReplayPhase extends PokemonPhase {
+  public readonly phaseName = "CoopAbilityReplayPhase";
+
+  constructor(
+    battlerIndex: number,
+    private readonly abilityName: string,
+    private readonly passive: boolean,
+  ) {
+    super(battlerIndex);
+  }
+
+  public override start(): void {
+    super.start();
+    if (isCoopDebug()) {
+      coopLog("replay", `present ability bi=${this.battlerIndex} name=${this.abilityName} passive=${this.passive}`);
+    }
+    let ended = false;
+    let watchdog: Phaser.Time.TimerEvent | undefined;
+    const finish = () => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      this.end();
+    };
+    try {
+      const pokemon = fieldMon(this.battlerIndex);
+      if (pokemon == null || this.abilityName.length === 0) {
+        this.end();
+        return;
+      }
+      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
+      // The name is regenerated in the GUEST'S language from its own field mon; only the ability NAME +
+      // passive flag ride the wire. `this.player` is the (side-swapped) presentation side - the bar sits
+      // on the correct half of the screen.
+      globalScene.abilityBar
+        .showAbility(getPokemonNameWithAffix(pokemon), this.abilityName, this.passive, this.player)
+        .then(finish);
+    } catch {
+      coopWarn("replay", `present ability bi=${this.battlerIndex} threw -> finish (handled)`);
+      finish();
+    }
+  }
+}
+
+/**
  * GUEST: PERFORM the visible faint for a host `faint` event (#633, animation-replay redesign). This
  * phase now runs against the still-ALIVE pre-turn field (the checkpoint is deferred to
  * {@linkcode CoopFinalizeTurnPhase}, which drains AFTER this), so it must do BOTH the cosmetic faint

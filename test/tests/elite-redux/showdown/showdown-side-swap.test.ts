@@ -172,6 +172,8 @@ describe("showdown-side-swap: battle events", () => {
     { k: "switch", bi: BattlerIndex.PLAYER, partySlot: 3 },
     { k: "weather", weather: 2, turnsLeft: 5 },
     { k: "terrain", terrain: 1, turnsLeft: 3 },
+    // P3 cosmetic: the ability-banner event carries a bi that must cross the perspective boundary.
+    { k: "ability", bi: BattlerIndex.ENEMY_2, abilityName: "Intimidate", passive: false },
   ];
 
   it("remaps every bi-bearing member (user + targets)", () => {
@@ -183,6 +185,11 @@ describe("showdown-side-swap: battle events", () => {
     expect((swapBattleEvent(events[4]) as Extract<CoopBattleEvent, { k: "statStage" }>).bi).toBe(BattlerIndex.ENEMY_2);
     expect((swapBattleEvent(events[5]) as Extract<CoopBattleEvent, { k: "status" }>).bi).toBe(BattlerIndex.PLAYER);
     expect((swapBattleEvent(events[6]) as Extract<CoopBattleEvent, { k: "switch" }>).bi).toBe(BattlerIndex.ENEMY);
+    // Ability event bi crosses to the guest's local side (ENEMY_2 -> PLAYER_2), name/passive preserved.
+    const ability = swapBattleEvent(events[9]) as Extract<CoopBattleEvent, { k: "ability" }>;
+    expect(ability.bi).toBe(BattlerIndex.PLAYER_2);
+    expect(ability.abilityName).toBe("Intimidate");
+    expect(ability.passive).toBe(false);
   });
 
   it("leaves side-free members (message / weather / terrain) untouched", () => {

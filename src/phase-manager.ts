@@ -42,6 +42,7 @@ import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
 import "#phases/coop-replay-learn-move-batch";
 import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
 import {
+  CoopAbilityReplayPhase,
   CoopApplyResyncPhase,
   CoopCaptureReplayPhase,
   CoopFaintReplayPhase,
@@ -210,6 +211,7 @@ const PHASES = Object.freeze({
   CoopPushReplacementCheckpointPhase,
   CoopTurnCommitPhase,
   CoopApplyResyncPhase,
+  CoopAbilityReplayPhase,
   CoopCaptureReplayPhase,
   CoopFinalizeTurnPhase,
   CoopFaintReplayPhase,
