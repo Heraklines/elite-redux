@@ -332,6 +332,63 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     }
   });
 
+  // #810 launch resilience: a single TRANSIENT cloud slot read at co-op launch must NOT hard-fail the
+  // whole fresh-run discovery. Before the bounded retry, the first `transient` read threw
+  // CoopResumeReplicaUnavailableError out of scanCoopCloudReplicas, which propagated to the title lobby
+  // .catch -> terminalFailure, so the HOST never showed "Press to start co-op" and never emitted
+  // SEND resumeStartNew (the exact animations-skipped-lane launch failure a throttled CI tab exposed).
+  it("resume discovery RETRIES a transient cloud slot read so a momentary launch outage still reaches the fresh-run confirm", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    let slot0Reads = 0;
+    vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request => {
+      if (request.slot === 0) {
+        slot0Reads++;
+        if (slot0Reads === 1) {
+          // One transport/timeout outage: the tab was throttled mid-read (or a real player's network blip).
+          return {
+            ok: false as const,
+            status: null,
+            error: "Cloud temporarily unavailable.",
+            failureKind: "transient" as const,
+          };
+        }
+      }
+      return coopCasMissing();
+    });
+
+    const snapshot = await game.scene.gameData.getCoopResumeLobbySnapshot();
+
+    expect(slot0Reads, "the transient slot-0 read was retried, reaching the true (empty) slot state").toBe(2);
+    expect(snapshot.failures.has(0), "a recoverable transient read does not quarantine the slot").toBe(false);
+    expect(
+      snapshot.sessions.get(0),
+      "slot 0 resolves as empty -> the launch proceeds to the fresh-run confirm",
+    ).toBeUndefined();
+  });
+
+  it("resume discovery still FAILS CLOSED on a SUSTAINED transient read (bounded retry preserves the fail-closed invariant)", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    let slot0Reads = 0;
+    vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request => {
+      if (request.slot === 0) {
+        slot0Reads++;
+        return {
+          ok: false as const,
+          status: null,
+          error: "Cloud temporarily unavailable.",
+          failureKind: "transient" as const,
+        };
+      }
+      return coopCasMissing();
+    });
+
+    await expect(
+      game.scene.gameData.getCoopResumeLobbySnapshot(),
+      "a SUSTAINED transport outage still fails the scan closed rather than hiding an unreadable slot",
+    ).rejects.toThrow(/transient/);
+    expect(slot0Reads, "the read is attempted exactly the bounded number of times, then gives up").toBe(3);
+  });
+
   it("RESUME: host offers -> guest ACCEPTS -> guest boots from the host snapshot and CONVERGES (+ identity gate)", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
