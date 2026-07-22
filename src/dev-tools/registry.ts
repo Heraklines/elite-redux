@@ -204,7 +204,13 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
   const specs =
     fixture === "faint-owner"
       ? [
-          { speciesId: SpeciesId.MAGIKARP, moveset: [MoveId.HEALING_WISH] },
+          // MEMENTO (not HEALING_WISH): an UNCONDITIONAL self-faint on hit (SacrificialAttrOnHit) with no
+          // party-margin dependency. HEALING_WISH's condition (activePlayerParty > getBattlerCount) is at
+          // the exact margin for the 3-mon fixture team vs a 2-battler double, so it intermittently failed
+          // ("But it failed!" -> no self-faint -> replacementCount=0; public journey run 29890984177). Memento
+          // hits the live enemy on the won turn and always faints the user, mirroring the game-over fixture's
+          // proven lone-Memento pattern, so the faint replacement is deterministic.
+          { speciesId: SpeciesId.MAGIKARP, moveset: [MoveId.MEMENTO] },
           { speciesId: SpeciesId.SEEL, moveset: [MoveId.WATER_SPOUT] },
         ]
       : [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }];
