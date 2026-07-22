@@ -71,6 +71,7 @@ import {
 import { FieldPhase } from "#phases/field-phase";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
+import type { CommandUiHandler } from "#ui/command-ui-handler";
 import { canTerastallize } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
@@ -893,6 +894,13 @@ export class CommandPhase extends FieldPhase {
       return;
     }
     this.clearShowdownTurnClock();
+    // Cosmetic: show the countdown on the command UI so the player sees their own clock.
+    try {
+      const commandUi = globalScene.ui.handlers[UiMode.COMMAND] as CommandUiHandler | undefined;
+      commandUi?.startShowdownClock(SHOWDOWN_TURN_TIMER_MS);
+    } catch {
+      /* the countdown is cosmetic; a UI hiccup must never block the turn clock */
+    }
     this.showdownTurnClock = window.setTimeout(() => {
       this.showdownTurnClock = null;
       try {
@@ -913,6 +921,12 @@ export class CommandPhase extends FieldPhase {
     if (this.showdownTurnClock != null) {
       window.clearTimeout(this.showdownTurnClock);
       this.showdownTurnClock = null;
+    }
+    // Hide the cosmetic countdown alongside the authoritative timer.
+    try {
+      (globalScene.ui.handlers[UiMode.COMMAND] as CommandUiHandler | undefined)?.stopShowdownClock();
+    } catch {
+      /* cosmetic only */
     }
   }
 

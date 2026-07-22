@@ -159,6 +159,8 @@ interface Recipe {
   modifierBars?: boolean;
   /** Fully custom page: build + show the UI directly into the render scene. */
   render?: (game: GameManager, ctx: RenderContext) => void | Promise<void>;
+  /** Called on the freshly-shown handler (post-repoint), to drive handler-specific display state. */
+  afterShow?: (handler: any) => void;
   /**
    * Optional input sequence fired AFTER the page renders. Each `Button` is routed to the
    * currently-active handler (so a press that transitions to another screen renders that
@@ -1733,6 +1735,18 @@ const RECIPES: Record<string, Recipe> = {
       return []; // captureActive ignores this; satisfies the prepare return type
     },
   },
+  // Showdown 1v1 host turn-clock: the command menu with the 60s countdown armed (P3 cosmetic).
+  // afterShow arms the clock on the freshly-shown CommandUiHandler; the harness no-ops timers so the
+  // golden captures the full "1:00" state. Guards the countdown chrome (position / text / color).
+  "battle-showdown-clock": {
+    captureActive: true,
+    field: true,
+    afterShow: handler => handler.startShowdownClock?.(60_000),
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.RATTATA);
+      return [];
+    },
+  },
   // The in-battle "Pokémon Stats" overlay (BattleInfoOverlay, opened with the Stats key).
   // `mode` triggers `prepare` PRE-repoint so the overlay reads a live battle (on-field
   // mons, stat stages, crit tag); the custom `render` builds + opens the overlay directly
@@ -2561,6 +2575,7 @@ describe.skipIf(!RUN)("render-ui-page", () => {
           }
           handler.setup();
           handler.show(args);
+          recipe.afterShow?.(handler);
           // Make this the active handler so input driving routes presses to it.
           (game.scene as any).ui.setActiveHandler?.(handler);
         }
