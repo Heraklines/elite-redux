@@ -54,6 +54,14 @@ describe("ER - signature arena-tag flyout display (naming seam)", () => {
     expect(name).not.toContain("arenaFlyout:");
   });
 
+  it("resolves Inverse Room to a proper flyout label, not the raw camelCase key", () => {
+    // Inverse Room is a field-wide tag set by signature ability 5998 (and the
+    // move 844); it had no flyout entry, so it rendered as the raw key.
+    const name = getFieldEffectText(ArenaTagType.INVERSE_ROOM);
+    expect(name).toBe("Inverse Room");
+    expect(name).not.toBe("inverseRoom");
+  });
+
   it("resolves Eerie Fog to a proper flyout label, not the raw camelCase key", () => {
     // Eerie Fog is a pre-existing ER weather (Cracked Vessel, Final Season, Fog
     // Machine, ...) that had no flyout entry, so it rendered as the raw key.
