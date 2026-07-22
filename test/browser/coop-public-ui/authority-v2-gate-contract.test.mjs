@@ -830,13 +830,31 @@ test("Crossroads result envelopes retain the exact V2 control turn instead of a 
     /enterCoopV2CrossroadsControlBoundary\(\{[\s\S]*sourceWave: wave,[\s\S]*sourceTurn: this\.coopSourceTurn/u,
     "the control-open receives the same constructor-captured coordinate as the result",
   );
+  // The exact-turn capture moved into the shared biome-family boundary helper when the natural
+  // biome pick gained its own establisher; pin the invariant there AND pin both wrappers' exact
+  // operation identities so neither surface can borrow the other's proof.
+  const sharedBoundaryStart = coopRuntime.indexOf("function enterCoopV2BiomeInteractionControlBoundary(");
+  const sharedBoundaryEnd = coopRuntime.indexOf("export function enterCoopV2CrossroadsControlBoundary(", sharedBoundaryStart);
+  assert.notEqual(sharedBoundaryStart, -1, "runtime exposes the shared biome-family control boundary");
+  assert.ok(sharedBoundaryEnd > sharedBoundaryStart, "shared control boundary has a bounded source block");
+  const sharedBoundary = coopRuntime.slice(sharedBoundaryStart, sharedBoundaryEnd);
+  assert.match(sharedBoundary, /captureCoopAuthoritativeBattleState\(input\.sourceTurn\)/u);
+  assert.doesNotMatch(sharedBoundary, /captureCoopAuthoritativeBattleState\(battle\.turn\)/u);
   const crossroadsBoundaryStart = coopRuntime.indexOf("export function enterCoopV2CrossroadsControlBoundary(");
   const crossroadsBoundaryEnd = coopRuntime.indexOf("\nfunction commandStartKey(", crossroadsBoundaryStart);
   assert.notEqual(crossroadsBoundaryStart, -1, "runtime exposes the Crossroads control boundary");
   assert.ok(crossroadsBoundaryEnd > crossroadsBoundaryStart, "Crossroads control boundary has a bounded source block");
   const crossroadsBoundary = coopRuntime.slice(crossroadsBoundaryStart, crossroadsBoundaryEnd);
-  assert.match(crossroadsBoundary, /captureCoopAuthoritativeBattleState\(input\.sourceTurn\)/u);
-  assert.doesNotMatch(crossroadsBoundary, /captureCoopAuthoritativeBattleState\(battle\.turn\)/u);
+  assert.match(
+    crossroadsBoundary,
+    /enterCoopV2BiomeInteractionControlBoundary\(input, \{\s*operationKind: "CROSSROADS_PICK",\s*projectionKind: "crossroads",/u,
+    "Crossroads delegates to the shared boundary with its exact operation identity",
+  );
+  assert.match(
+    crossroadsBoundary,
+    /enterCoopV2BiomeInteractionControlBoundary\(input, \{\s*operationKind: "BIOME_PICK",\s*projectionKind: "biome",/u,
+    "the natural biome pick delegates to the shared boundary with its exact operation identity",
+  );
 
   assert.match(
     coopRuntime,
