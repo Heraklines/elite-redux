@@ -38,6 +38,11 @@ export const MIN_ENTRANTS = 2;
 export const DEFAULT_MAX_ENTRANTS = 16;
 export const MAX_ENTRANTS = 64;
 
+/** P3 COMMUNITY tier: a non-admin player may create a small, PRIZE-FREE tournament (cap clamped here). */
+export const COMMUNITY_MAX_ENTRANTS = 16;
+/** Anti-spam: at most this many ACTIVE (registration/in_progress) tournaments per community creator. */
+export const COMMUNITY_ACTIVE_LIMIT = 1;
+
 // =============================================================================
 // P3 — battle / series FORMAT + REWARD POOL vocabulary. Stored on the tournament
 // record; battle/series-format engine enforcement is a separate workstream (this
@@ -286,6 +291,8 @@ export interface TournamentRecord {
   closeAt: number | null;
   /** P3: set once the reward pool has been granted at completion (stub-grant marker; prevents double-grant). */
   rewardsGranted: boolean;
+  /** P3: true when a NON-admin player created this via the community route (prize-free, cap-capped). */
+  community: boolean;
 }
 
 /**
@@ -419,8 +426,40 @@ export function createTournament(
       rewardPool: sanitizeRewardPool(config.rewardPool),
       closeAt,
       rewardsGranted: false,
+      community: false,
     },
   };
+}
+
+/**
+ * P3 COMMUNITY CREATE (maintainer-approved subset): a NON-admin player creates a small, PRIZE-FREE
+ * tournament in-game. Enforced here (PURE): the entrant cap is clamped to COMMUNITY_MAX_ENTRANTS, the
+ * reward pool is FORCED empty (prize tournaments stay admin/editor-gated), and the creator may hold at
+ * most COMMUNITY_ACTIVE_LIMIT active (registration/in_progress) tournaments at once (anti-spam).
+ * `activeByCreator` is the creator's current active-tournament count (the route supplies it).
+ */
+export function createCommunityTournament(
+  id: string,
+  creator: Participant,
+  config: TournamentConfig,
+  activeByCreator: number,
+  now: number,
+): Result<{ tournament: TournamentRecord }> {
+  if (activeByCreator >= COMMUNITY_ACTIVE_LIMIT) {
+    return { ok: false, error: "you already have an active tournament — cancel it before creating another" };
+  }
+  const cappedMax = Math.min(COMMUNITY_MAX_ENTRANTS, clampMaxEntrants(config.maxEntrants));
+  const res = createTournament(
+    id,
+    creator,
+    // community tournaments are PRIZE-FREE and capped; a scheduled close is still allowed.
+    { ...config, maxEntrants: cappedMax, rewardPool: [] },
+    now,
+  );
+  if (!res.ok) {
+    return res;
+  }
+  return { ok: true, tournament: { ...res.tournament, community: true } };
 }
 
 /**

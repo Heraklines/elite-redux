@@ -234,6 +234,8 @@ export interface TournamentView {
   closeAt?: number | null;
   /** P3: true once the reward pool has been granted at completion. */
   rewardsGranted?: boolean;
+  /** P3: true when a non-admin player created this via the community route (prize-free, cap-capped). */
+  community?: boolean;
   /** P3: entrants queued beyond cap (admin surface). */
   waitlist?: WaitlistEntryView[];
   /** Present on the bracket endpoint; omitted (undefined) in the list endpoint. */

@@ -26,6 +26,7 @@ interface TourRow {
   reward_pool_json: string | null;
   close_at: number | null;
   rewards_granted: number | null;
+  community: number | null;
 }
 interface EntrantRow {
   tournament_id: string;
@@ -73,6 +74,13 @@ class FakeStmt {
         .sort((a, b) => a.registered_at - b.registered_at);
       return { results: rows as T[] };
     }
+    if (s.includes("FROM tournaments WHERE organizer")) {
+      const organizer = String(this.args[0]);
+      const active = [...this.db.tournaments.values()].filter(
+        r => r.organizer === organizer && (r.state === "registration" || r.state === "in_progress"),
+      );
+      return { results: active as T[] };
+    }
     if (s.includes("FROM tournaments WHERE state IN")) {
       return { results: [...this.db.tournaments.values()] as T[] };
     }
@@ -101,6 +109,7 @@ class FakeStmt {
         reward_pool_json: a[12] as string | null,
         close_at: a[13] as number | null,
         rewards_granted: a[14] as number | null,
+        community: a[15] as number | null,
       });
       return;
     }
@@ -753,5 +762,58 @@ describe("tournament routes — P2 deadline auto-resolution + champion auto-gran
     expect(deliveries).toHaveLength(1);
     const sent = deliveries[0].settlements as any[];
     expect(sent).toContainEqual({ uid: "a", mutation: { kind: "grantCandy", speciesId: 445, candy: 100 } });
+  });
+});
+
+// ---- P3 COMMUNITY CREATION (any authenticated player; prize-free; anti-spam) ----
+describe("tournament routes — P3 community creation", () => {
+  async function communityCreate(as: Caller, body: Record<string, unknown>) {
+    return call("/tournament/community-create", "POST", as, body);
+  }
+
+  it("lets a NON-admin player create a prize-free tournament, capped + reward-stripped", async () => {
+    const res = await communityCreate(player("bob"), {
+      id: "com1",
+      name: "Bob's Bash",
+      maxEntrants: 64, // over the community cap -> clamped to 16
+      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 99 }] }], // stripped
+    });
+    expect(res.status).toBe(200);
+    const t = ((await res.json()) as any).tournament;
+    expect(t.organizer).toBe("bob");
+    expect(t.community).toBe(true);
+    expect(t.maxEntrants).toBe(16); // clamped to COMMUNITY_MAX_ENTRANTS
+    expect(t.rewardPool).toEqual([]); // prize pool forced empty
+    expect(t.state).toBe("registration");
+  });
+
+  it("requires authentication (401 without a token)", async () => {
+    const res = await communityCreate(null as any, { name: "X" });
+    expect(res.status).toBe(401);
+  });
+
+  it("ANTI-SPAM red-proof: a creator's SECOND active tournament is refused (422)", async () => {
+    expect((await communityCreate(player("carl"), { id: "c1", name: "One" })).status).toBe(200);
+    const second = await communityCreate(player("carl"), { id: "c2", name: "Two" });
+    expect(second.status).toBe(422);
+    expect(((await second.json()) as any).error).toMatch(/already have an active tournament/i);
+    // a DIFFERENT creator is unaffected
+    expect((await communityCreate(player("dana"), { id: "d1", name: "Dana One" })).status).toBe(200);
+  });
+
+  it("the creator can CANCEL their own community tournament, then create again", async () => {
+    expect((await communityCreate(player("erin"), { id: "e1", name: "First" })).status).toBe(200);
+    // non-organizer non-admin cannot cancel it
+    expect((await call("/tournament/cancel", "POST", player("mallory"), { id: "e1" })).status).toBe(403);
+    // the creator cancels their own
+    expect((await call("/tournament/cancel", "POST", player("erin"), { id: "e1" })).status).toBe(200);
+    // with no active tournament, they can create a fresh one
+    expect((await communityCreate(player("erin"), { id: "e2", name: "Second" })).status).toBe(200);
+  });
+
+  it("an admin cancelling a community tournament also frees the creator's slot", async () => {
+    expect((await communityCreate(player("frank"), { id: "f1", name: "Frank Cup" })).status).toBe(200);
+    expect((await call("/tournament/cancel", "POST", ADMIN, { id: "f1" })).status).toBe(200);
+    expect((await communityCreate(player("frank"), { id: "f2", name: "Frank Cup 2" })).status).toBe(200);
   });
 });

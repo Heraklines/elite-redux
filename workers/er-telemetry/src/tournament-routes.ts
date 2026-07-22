@@ -24,6 +24,7 @@ import {
   classifyRegistration,
   closeRegistration,
   computeRewardGrants,
+  createCommunityTournament,
   createTournament,
   type EntrantRecord,
   editTournament,
@@ -222,6 +223,7 @@ async function ensureTournamentTables(env: TournamentEnv): Promise<void> {
   await addColumnIfMissing(env, "tournaments", "reward_pool_json", "TEXT");
   await addColumnIfMissing(env, "tournaments", "close_at", "INTEGER");
   await addColumnIfMissing(env, "tournaments", "rewards_granted", "INTEGER");
+  await addColumnIfMissing(env, "tournaments", "community", "INTEGER");
   tablesReady = true;
 }
 
@@ -250,6 +252,7 @@ interface TournamentRow {
   reward_pool_json: string | null;
   close_at: number | null;
   rewards_granted: number | null;
+  community: number | null;
 }
 
 function parseRewardPool(raw: string | null | undefined): RewardPool {
@@ -280,6 +283,7 @@ function rowToRecord(row: TournamentRow): TournamentRecord {
     rewardPool: parseRewardPool(row.reward_pool_json),
     closeAt: row.close_at ?? null,
     rewardsGranted: row.rewards_granted === 1,
+    community: row.community === 1,
   };
 }
 
@@ -340,8 +344,8 @@ async function loadWaitlist(env: TournamentEnv, id: string): Promise<EntrantReco
 
 async function insertTournament(env: TournamentEnv, t: TournamentRecord): Promise<void> {
   await env.DB.prepare(
-    `INSERT INTO tournaments (id, name, organizer, state, round_window_ms, max_entrants, created_at, started_at, champion, bracket_json, battle_format, series_format, reward_pool_json, close_at, rewards_granted)
-     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)`,
+    `INSERT INTO tournaments (id, name, organizer, state, round_window_ms, max_entrants, created_at, started_at, champion, bracket_json, battle_format, series_format, reward_pool_json, close_at, rewards_granted, community)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)`,
   )
     .bind(
       t.id,
@@ -359,6 +363,7 @@ async function insertTournament(env: TournamentEnv, t: TournamentRecord): Promis
       t.rewardPool.length > 0 ? JSON.stringify(t.rewardPool) : null,
       t.closeAt,
       t.rewardsGranted ? 1 : 0,
+      t.community ? 1 : 0,
     )
     .run();
 }
@@ -407,6 +412,7 @@ function tournamentView(t: TournamentRecord, entrants: EntrantRecord[], waitlist
     rewardPool: t.rewardPool,
     closeAt: t.closeAt,
     rewardsGranted: t.rewardsGranted,
+    community: t.community,
     entrantCount: entrants.length,
     entrants: entrants.map(e => ({
       participant: e.participant,
@@ -459,6 +465,47 @@ async function handleCreate(body: any, caller: Caller, env: TournamentEnv, cors:
   return json({ ok: true, tournament: tournamentView(res.tournament, []) }, 200, cors);
 }
 
+/** Count a creator's ACTIVE (registration / in_progress) tournaments — the community anti-spam gate. */
+async function countActiveByOrganizer(env: TournamentEnv, organizer: string): Promise<number> {
+  const res = await env.DB.prepare(
+    "SELECT id FROM tournaments WHERE organizer = ? AND state IN ('registration','in_progress')",
+  )
+    .bind(organizer)
+    .all<{ id: string }>();
+  return (res.results ?? []).length;
+}
+
+/**
+ * P3 COMMUNITY CREATE: any authenticated player (NOT just admins) may create a small, PRIZE-FREE
+ * tournament in-game. The reward pool is forced empty and the cap is clamped to COMMUNITY_MAX_ENTRANTS
+ * (both enforced in createCommunityTournament); anti-spam limits a creator to one active tournament.
+ */
+async function handleCommunityCreate(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
+  await ensureTournamentTables(env);
+  const active = await countActiveByOrganizer(env, caller.u);
+  const id =
+    typeof body?.id === "string" && body.id.length > 0 ? body.id : `c${Date.now()}${Math.floor(Math.random() * 1e4)}`;
+  const res = createCommunityTournament(
+    id,
+    caller.u,
+    {
+      name: body?.name,
+      roundWindowMs: body?.roundWindowMs,
+      maxEntrants: body?.maxEntrants,
+      battleFormat: body?.battleFormat,
+      seriesFormat: body?.seriesFormat,
+      closeAt: body?.closeAt,
+    },
+    active,
+    Date.now(),
+  );
+  if (!res.ok) {
+    return json({ error: res.error }, 422, cors);
+  }
+  await insertTournament(env, res.tournament);
+  return json({ ok: true, tournament: tournamentView(res.tournament, []) }, 200, cors);
+}
+
 async function handleCloseRegistration(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
   if (!isAdmin(env, caller)) {
     return json({ error: "not authorized" }, 403, cors);
@@ -481,12 +528,13 @@ async function handleCloseRegistration(body: any, caller: Caller, env: Tournamen
 }
 
 async function handleCancel(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
-  if (!isAdmin(env, caller)) {
-    return json({ error: "not authorized" }, 403, cors);
-  }
   const t = await loadTournament(env, String(body?.id));
   if (!t) {
     return json({ error: "tournament not found" }, 404, cors);
+  }
+  // Admin, OR the ORGANIZER themselves (a community creator can cancel their OWN tournament).
+  if (!isAdmin(env, caller) && caller.u !== t.organizer) {
+    return json({ error: "not authorized" }, 403, cors);
   }
   const res = cancelTournament(t);
   if (!res.ok) {
@@ -1087,6 +1135,8 @@ export async function handleTournamentRoute(
   switch (url.pathname) {
     case "/tournament/create":
       return handleCreate(body, caller, env, cors);
+    case "/tournament/community-create":
+      return handleCommunityCreate(body, caller, env, cors);
     case "/tournament/close-registration":
       return handleCloseRegistration(body, caller, env, cors);
     case "/tournament/cancel":
