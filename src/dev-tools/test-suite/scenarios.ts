@@ -48,7 +48,11 @@ import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-red
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
-import { ER_EGOELK_SPECIES_ID, ER_PARTNER_VAPOREON_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
+import {
+  ER_EGOELK_SPECIES_ID,
+  ER_PARTNER_VAPOREON_SPECIES_ID,
+  ER_TITANEON_SPECIES_ID,
+} from "#data/elite-redux/er-newcomer-species";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import {
   type ErDifficulty,
@@ -1653,16 +1657,16 @@ export const DEV_SCENARIOS: DevScenario[] = [
   // Batch-2 maintainer verdicts (2026-07-22)
   // ===========================================================================
   {
-    label: "Batch2: Omniform chains through a NEW eeveelution",
+    label: "Batch2: Omniform chains through a partner-alias eeveelution",
     description:
-      "The three NEW eeveelutions (Nimbeon/Ryuveon/Titaneon) now CARRY Omniform too, so\n"
-      + "the Partner Eevee family can chain THROUGH them - adapt into one, then a next\n"
-      + "typed move chains onward (they used to be dead-ends).\n"
+      "The Partner Eevee family adapts into partner-ALIAS versions of the three new\n"
+      + "eeveelutions (Partner Nimbeon/Ryuveon/Titaneon) and chains THROUGH them. The\n"
+      + "REGULAR Nimbeon/Ryuveon/Titaneon never transform - only the Partner Eevee line does.\n"
       + "DO: turn 1, use Iron Head (a Steel move). Turn 2, open Fight and use Water Gun.\n"
-      + "EXPECT: Iron Head adapts Eevee into Titaneon ('adapted into Titaneon!') and its\n"
-      + "other 3 moves become Titaneon's own set; then Water Gun chains Titaneon onward\n"
-      + "into Partner Vaporeon ('adapted into Partner Vaporeon!'). The chain passes\n"
-      + "THROUGH the new Titaneon form - proof it is no longer terminal.",
+      + "EXPECT: Iron Head adapts Eevee into Partner Titaneon ('adapted into Partner\n"
+      + "Titaneon!') and its other 3 moves become that form's set; then Water Gun chains\n"
+      + "onward into Partner Vaporeon ('adapted into Partner Vaporeon!'). The chain passes\n"
+      + "THROUGH the partner-Titaneon alias - proof it is a full family member, not a dead-end.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1678,6 +1682,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
         makeStarter(SpeciesId.EEVEE, {
           formIndex: formIndexByKey(SpeciesId.EEVEE, "partner"),
           moveset: [MoveId.IRON_HEAD, MoveId.WATER_GUN, MoveId.TACKLE, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Batch2: regular eeveelution does NOT transform (#live-fix)",
+    description:
+      "Live fix (2026-07-22): a REGULAR Titaneon (evolved from a regular Eevee) must NEVER\n"
+      + "transform. It previously turned into a Partner Jolteon on a typed move because the\n"
+      + "[innate + Omniform] composite was grafted onto the REAL species; it now carries a\n"
+      + "plain Stainless Steel innate and has no transform mapping.\n"
+      + "DO: use Water Gun, then Iron Head, then any other typed move on the enemy.\n"
+      + "EXPECT: the mon STAYS Titaneon the whole battle - NO 'adapted into ...' message,\n"
+      + "no form/sprite change, its moveset never swaps. (Even the composite is forced\n"
+      + "ACTIVE here to prove the safety: with no mapping there is nothing to adapt into.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        // Force the composite ACTIVE (worst case: as if the Eevee candy unlocked the
+        // innate). Even so the REAL Titaneon has no registry mapping -> no transform.
+        ABILITY_OVERRIDE: erAbility(6003), // [Stainless Steel + Omniform] (partner-Titaneon composite)
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(ER_TITANEON_SPECIES_ID as SpeciesId, {
+          moveset: [MoveId.WATER_GUN, MoveId.IRON_HEAD, MoveId.THUNDERBOLT, MoveId.TACKLE],
         }),
       ];
     },

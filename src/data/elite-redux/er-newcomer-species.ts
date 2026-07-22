@@ -61,18 +61,18 @@ import { tmSpecies } from "#balance/tm-species-map";
 import { speciesTmMoves } from "#balance/tms";
 import { allSpecies } from "#data/data-lists";
 import {
-  ER_NIMBEON_OMNIFORM_ABILITY_ID,
   ER_PARTNER_EEVEE_ABILITY_ID,
   ER_PARTNER_ESPEON_ABILITY_ID,
   ER_PARTNER_FLAREON_ABILITY_ID,
   ER_PARTNER_GLACEON_ABILITY_ID,
   ER_PARTNER_JOLTEON_ABILITY_ID,
   ER_PARTNER_LEAFEON_ABILITY_ID,
+  ER_PARTNER_NIMBEON_ABILITY_ID,
+  ER_PARTNER_RYUVEON_ABILITY_ID,
   ER_PARTNER_SYLVEON_ABILITY_ID,
+  ER_PARTNER_TITANEON_ABILITY_ID,
   ER_PARTNER_UMBREON_ABILITY_ID,
   ER_PARTNER_VAPOREON_ABILITY_ID,
-  ER_RYUVEON_OMNIFORM_ABILITY_ID,
-  ER_TITANEON_OMNIFORM_ABILITY_ID,
 } from "#data/elite-redux/abilities/composite-newcomers";
 import {
   registerOmniformMapping,
@@ -111,6 +111,16 @@ export const ER_PARTNER_LEAFEON_SPECIES_ID = 70017;
 export const ER_PARTNER_GLACEON_SPECIES_ID = 70018;
 export const ER_PARTNER_SYLVEON_SPECIES_ID = 70019;
 
+// Partner ALIAS species for the three batch-2 eeveelutions (70030+). These are the
+// Omniform transform targets for the Flying/Dragon/Steel move types — built exactly
+// like the 8 partner eeveelutions above (sprite-aliased to the base eeveelution art,
+// composite [innate + Omniform] as their innate, no cost/egg tier). The REAL
+// Nimbeon/Ryuveon/Titaneon (70022-70024) carry a PLAIN innate and never transform, so
+// a regular eeveelution (evolved from a regular Eevee) is inert.
+export const ER_PARTNER_NIMBEON_SPECIES_ID = 70030;
+export const ER_PARTNER_RYUVEON_SPECIES_ID = 70031;
+export const ER_PARTNER_TITANEON_SPECIES_ID = 70032;
+
 // ---------------------------------------------------------------------------
 // Newcomer BATCH 2 species (70020+). Evolution-only convergents/eeveelutions +
 // one standalone paradox (Webbed Bruiser). Drawclops is a NEW middle stage in
@@ -128,16 +138,6 @@ export const ER_FORBIDDRON_SPECIES_ID = 70027;
 export const ER_IDOLFIN_SPECIES_ID = 70028;
 export const ER_WEBBED_BRUISER_SPECIES_ID = 70029;
 
-/**
- * Batch-2 Omniform EXTENSION: the three new eeveelutions the Partner Eevee family
- * can adapt into, keyed by their signature move type. Terminal adapt targets (no
- * Omniform composite of their own — see the injection site FLAG).
- */
-const ER_NEWCOMER_OMNIFORM_EXTENSION: readonly (readonly [PokemonType, number])[] = [
-  [PokemonType.FLYING, ER_NIMBEON_SPECIES_ID],
-  [PokemonType.DRAGON, ER_RYUVEON_SPECIES_ID],
-  [PokemonType.STEEL, ER_TITANEON_SPECIES_ID],
-];
 
 // ER-custom / vanilla ability ids used below (verified live via ER_ID_MAP at
 // authoring time; the seam test asserts each resolves to a real allAbilities entry).
@@ -181,9 +181,13 @@ const TURBOBLAZE = 163; // vanilla
 const FLARE_BOOST = 138; // vanilla
 const BLUR = 5510;
 const MOMENTUM = 5109;
-// Nimbeon/Ryuveon/Titaneon innate[0] is now the [innate + Omniform] composite
-// (ER_NIMBEON/RYUVEON/TITANEON_OMNIFORM_ABILITY_ID), so the bare Fluffy/Stamina/
-// Stainless Steel constituent ids live in composite-newcomers.ts, not here.
+// The REAL Nimbeon/Ryuveon/Titaneon carry their PLAIN innate[0] (no Omniform), so a
+// regular eeveelution never transforms. The [innate + Omniform] composite lives ONLY on
+// the partner ALIAS species (ER_NEWCOMER_PARTNER_FAMILY below). These three ids are the
+// bare constituents (the same ones composite-newcomers.ts folds Omniform onto).
+const FLUFFY = 218; // vanilla — Nimbeon innate[0]
+const STAMINA = 192; // vanilla — Ryuveon innate[0]
+const STAINLESS_STEEL = 5530; // ER custom — Titaneon innate[0]
 const VAPOR_BODY = 5981; // codex signature
 const AERIALIST = 5313;
 const WHIPLASH = 5425;
@@ -404,8 +408,9 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     types: [PokemonType.FLYING],
     stats: [130, 65, 60, 95, 65, 110],
     actives: [FLARE_BOOST, BLUR, MOMENTUM],
-    // innate[0] grafts Omniform onto Fluffy so Nimbeon carries Omniform and chains.
-    innates: [ER_NIMBEON_OMNIFORM_ABILITY_ID, VAPOR_BODY, AERIALIST],
+    // Plain innate[0] (Fluffy). A regular Nimbeon carries NO Omniform and never
+    // transforms; the transform kit lives on the partner alias (Partner Nimbeon).
+    innates: [FLUFFY, VAPOR_BODY, AERIALIST],
     catchRate: 45,
     // Eeveelution-sized (bases ~24-29kg) but a light Flying cumulus form. ~22kg.
     weight: 22.0,
@@ -429,8 +434,9 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     types: [PokemonType.DRAGON],
     stats: [85, 95, 90, 45, 100, 110],
     actives: [WHIPLASH, OVERRULE, UNRELENTING],
-    // innate[0] grafts Omniform onto Stamina so Ryuveon carries Omniform and chains.
-    innates: [ER_RYUVEON_OMNIFORM_ABILITY_ID, DRAGONFLY, SKYHOOK],
+    // Plain innate[0] (Stamina). A regular Ryuveon carries NO Omniform and never
+    // transforms; the transform kit lives on the partner alias (Partner Ryuveon).
+    innates: [STAMINA, DRAGONFLY, SKYHOOK],
     catchRate: 45,
     // Eeveelution-sized Dragon (a sinuous sky-dancer). ~30kg.
     weight: 30.0,
@@ -451,8 +457,9 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     types: [PokemonType.STEEL],
     stats: [65, 110, 95, 60, 65, 130],
     actives: [CHROME_COAT, ELUDE, IMPULSE],
-    // innate[0] grafts Omniform onto Stainless Steel so Titaneon carries Omniform and chains.
-    innates: [ER_TITANEON_OMNIFORM_ABILITY_ID, ANNEAL, LIVING_CHROME],
+    // Plain innate[0] (Stainless Steel). A regular Titaneon carries NO Omniform and never
+    // transforms; the transform kit lives on the partner alias (Partner Titaneon).
+    innates: [STAINLESS_STEEL, ANNEAL, LIVING_CHROME],
     catchRate: 45,
     // Steel "Alloy" eeveelution — a dense metal-bodied form (cf. Steelix-class density
     // scaled to eeveelution size). ~95kg.
@@ -693,6 +700,63 @@ export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
   },
 ];
 
+/**
+ * Base CUSTOM eeveelution -> partner alias transform-target. Same shape as
+ * {@linkcode PartnerFamilyDef} but the base is a CUSTOM species id (the real batch-2
+ * eeveelution, 70022-70024) instead of a vanilla `SpeciesId` — its sprite/kit are read
+ * from that custom species at init time.
+ */
+interface NewcomerPartnerFamilyDef {
+  readonly baseSpeciesId: number;
+  readonly partnerId: number;
+  readonly name: string;
+  readonly compositeId: number;
+  readonly mapType: PokemonType;
+}
+
+/**
+ * The three batch-2 partner ALIAS eeveelutions (Omniform transform targets ONLY — no
+ * starter cost, no egg tier, no wild spawn). Each aliases its base custom eeveelution's
+ * slug art and grafts the [base innate + Omniform] composite onto innate[0], EXACTLY as
+ * the 8 vanilla-based partner eeveelutions do. The REAL Nimbeon/Ryuveon/Titaneon
+ * (baseSpeciesId) stay inert (plain innate, no mapping), so a regular eeveelution never
+ * transforms. `mapType` is the move type that adapts/chains INTO the alias.
+ */
+export const ER_NEWCOMER_PARTNER_FAMILY: readonly NewcomerPartnerFamilyDef[] = [
+  {
+    baseSpeciesId: ER_NIMBEON_SPECIES_ID,
+    partnerId: ER_PARTNER_NIMBEON_SPECIES_ID,
+    name: "Partner Nimbeon",
+    compositeId: ER_PARTNER_NIMBEON_ABILITY_ID,
+    mapType: PokemonType.FLYING,
+  },
+  {
+    baseSpeciesId: ER_RYUVEON_SPECIES_ID,
+    partnerId: ER_PARTNER_RYUVEON_SPECIES_ID,
+    name: "Partner Ryuveon",
+    compositeId: ER_PARTNER_RYUVEON_ABILITY_ID,
+    mapType: PokemonType.DRAGON,
+  },
+  {
+    baseSpeciesId: ER_TITANEON_SPECIES_ID,
+    partnerId: ER_PARTNER_TITANEON_SPECIES_ID,
+    name: "Partner Titaneon",
+    compositeId: ER_PARTNER_TITANEON_ABILITY_ID,
+    mapType: PokemonType.STEEL,
+  },
+];
+
+/**
+ * Every non-head Omniform family transform target as `[mapType, targetSpeciesId]`: the 8
+ * partner eeveelutions + the 3 partner alias eeveelutions. The registry head (Partner
+ * Eevee) maps each type to its target, and every target chains into every OTHER target,
+ * so a transform can chain across the whole family (a self-type map is a same-form no-op).
+ */
+const OMNIFORM_FAMILY_TARGETS: readonly (readonly [PokemonType, number])[] = [
+  ...ER_PARTNER_FAMILY.map(p => [p.mapType, p.partnerId] as const),
+  ...ER_NEWCOMER_PARTNER_FAMILY.map(p => [p.mapType, p.partnerId] as const),
+];
+
 /** Family head: the vanilla Eevee "partner" FORM the Omniform composite is grafted onto. */
 const PARTNER_HEAD_SPECIES = SpeciesId.EEVEE;
 const PARTNER_HEAD_FORM_KEY = "partner";
@@ -897,60 +961,71 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     }
   }
 
+  // --- 3a. Partner ALIAS eeveelutions (Nimbeon/Ryuveon/Titaneon). Same shape as the 8
+  // above, but the base is a CUSTOM eeveelution (70022-70024): the sprite/icon aliases
+  // that custom species' slug art and the kit is cloned from it. The composite [base
+  // innate + Omniform] goes on the ALIAS, so the REAL eeveelution stays inert. Must run
+  // AFTER section 1 registered the base custom species (so getPokemonSpecies resolves and
+  // its starterColors are seeded for the alias to inherit). ---
+  for (const def of ER_NEWCOMER_PARTNER_FAMILY) {
+    const base = getPokemonSpecies(def.baseSpeciesId as SpeciesId);
+    if (!base) {
+      result.errors.push(`partner alias ${def.name}: base species ${def.baseSpeciesId} not found`);
+      continue;
+    }
+    const actives: [number, number, number] = [base.ability1, base.ability2, base.abilityHidden];
+    const baseInnates = [...base.getPassiveAbilities()];
+    const innates: [number, number, number] = [def.compositeId, baseInnates[1] ?? 0, baseInnates[2] ?? 0];
+    const extraTypes = base.getExtraTypes();
+    const added = registerErEditorMon({
+      speciesId: def.partnerId,
+      name: def.name,
+      // No slug: the sprite/icon aliases the base custom eeveelution's slug art.
+      spriteAlias: def.baseSpeciesId,
+      type1: base.type1,
+      type2: base.type2,
+      baseStats: [...base.baseStats] as [number, number, number, number, number, number],
+      abilities: actives,
+      innates,
+      catchRate: base.catchRate,
+      weight: base.weight,
+      extraTypes: extraTypes.length > 0 ? extraTypes : undefined,
+    });
+    if (added) {
+      result.speciesRegistered++;
+    } else {
+      result.speciesAlreadyPresent++;
+    }
+  }
+
   // --- 3b. Partner Eevee HEAD: graft the composite onto the vanilla Eevee "partner"
   // FORM (starter-selectable already; no new species, no starter cost). Base Eevee +
   // the Normal/G-Max forms stay byte-identical. ---
   const partnerFormIndex = graftPartnerEeveeComposite(result);
 
   // --- 4. Production Omniform mappings. The HEAD (Eevee partner form, keyed by
-  // (EEVEE, partnerFormIndex)) maps each element type to the matching partner
-  // eeveelution; every partner eeveelution also chains among the whole set. ---
+  // (EEVEE, partnerFormIndex)) maps each element type to its family target; every target
+  // (8 partner eeveelutions + 3 partner aliases) chains among the whole set, so a
+  // transform can chain freely (Partner Eevee -> Steel -> Partner Titaneon -> Water ->
+  // Partner Vaporeon). The REAL Nimbeon/Ryuveon/Titaneon are NOT holders and have no
+  // mapping — a regular eeveelution never transforms. A self-type map is a no-op. ---
   if (partnerFormIndex >= 0) {
-    for (const target of ER_PARTNER_FAMILY) {
-      registerOmniformMapping(PARTNER_HEAD_SPECIES, partnerFormIndex, target.mapType, target.partnerId as SpeciesId, 0);
-      result.omniformMappings++;
-    }
-    // Batch-2 Omniform EXTENSION: Partner Eevee also adapts into the three new
-    // eeveelutions on their signature move type (Flying->Nimbeon, Dragon->Ryuveon,
-    // Steel->Titaneon). These now CARRY Omniform too (the [innate + Omniform] composite
-    // grafted onto their innate[0] — maintainer verdict 2026-07-22), so they are full
-    // family members that chain onward, not terminal adapt targets.
-    for (const [mapType, speciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
-      registerOmniformMapping(PARTNER_HEAD_SPECIES, partnerFormIndex, mapType, speciesId as SpeciesId, 0);
+    for (const [mapType, targetId] of OMNIFORM_FAMILY_TARGETS) {
+      registerOmniformMapping(PARTNER_HEAD_SPECIES, partnerFormIndex, mapType, targetId as SpeciesId, 0);
       result.omniformMappings++;
     }
   }
-  for (const holder of ER_PARTNER_FAMILY) {
-    for (const target of ER_PARTNER_FAMILY) {
-      registerOmniformMapping(holder.partnerId as SpeciesId, 0, target.mapType, target.partnerId as SpeciesId, 0);
-      result.omniformMappings++;
-    }
-    // Each partner eeveelution also adapts into the three new eeveelutions.
-    for (const [mapType, speciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
-      registerOmniformMapping(holder.partnerId as SpeciesId, 0, mapType, speciesId as SpeciesId, 0);
-      result.omniformMappings++;
-    }
-  }
-  // The three new eeveelutions carry Omniform, so they map OUTWARD into the whole
-  // family too — adapting into one, then using another family type, chains onward
-  // (Partner Eevee -> Steel -> Titaneon -> Water -> Vaporeon). Each holder maps into
-  // all 8 partners (by the partner's own type) AND all three extension eeveelutions
-  // (by their signature type); a self-type map is a same-form no-op, harmless.
-  for (const [, holderSpeciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
-    for (const target of ER_PARTNER_FAMILY) {
-      registerOmniformMapping(holderSpeciesId as SpeciesId, 0, target.mapType, target.partnerId as SpeciesId, 0);
-      result.omniformMappings++;
-    }
-    for (const [mapType, speciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
-      registerOmniformMapping(holderSpeciesId as SpeciesId, 0, mapType, speciesId as SpeciesId, 0);
+  for (const [, holderId] of OMNIFORM_FAMILY_TARGETS) {
+    for (const [mapType, targetId] of OMNIFORM_FAMILY_TARGETS) {
+      registerOmniformMapping(holderId as SpeciesId, 0, mapType, targetId as SpeciesId, 0);
       result.omniformMappings++;
     }
   }
 
   // Partner Eevee is the permanent candy-unlock owner for the whole Omniform
   // family. The transient pre-transform snapshot covers ordinary mid-battle
-  // adaptation; this registry also covers partner Eeveelutions loaded or spawned
-  // directly, which otherwise consult their transform-only species' empty data.
+  // adaptation; this registry also covers partner Eeveelutions (and aliases) loaded or
+  // spawned directly, which otherwise consult their transform-only species' empty data.
   if (partnerFormIndex >= 0) {
     registerOmniformUnlockOwner(
       PARTNER_HEAD_SPECIES,
@@ -958,20 +1033,8 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
       PARTNER_HEAD_SPECIES,
       partnerFormIndex,
     );
-    for (const member of ER_PARTNER_FAMILY) {
-      registerOmniformUnlockOwner(
-        member.partnerId as SpeciesId,
-        0,
-        PARTNER_HEAD_SPECIES,
-        partnerFormIndex,
-      );
-    }
-    // The three new eeveelutions are full family members too; anchor their Omniform
-    // candy-unlock to the Partner Eevee head. (They also root on Eevee via evolution,
-    // so this resolves to the same Eevee passiveAttr as the natural rooting — kept for
-    // explicit family membership and the directly-loaded/spawned case.)
-    for (const [, holderSpeciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
-      registerOmniformUnlockOwner(holderSpeciesId as SpeciesId, 0, PARTNER_HEAD_SPECIES, partnerFormIndex);
+    for (const [, targetId] of OMNIFORM_FAMILY_TARGETS) {
+      registerOmniformUnlockOwner(targetId as SpeciesId, 0, PARTNER_HEAD_SPECIES, partnerFormIndex);
     }
   }
 
@@ -1029,6 +1092,12 @@ export function applyErNewcomerSpeciesLearnsets(): number {
 
   for (const def of ER_PARTNER_FAMILY) {
     table[def.partnerId] = cloneLearnset(def.base);
+    wired++;
+  }
+
+  // Partner alias eeveelutions clone their base CUSTOM eeveelution's learnset verbatim.
+  for (const def of ER_NEWCOMER_PARTNER_FAMILY) {
+    table[def.partnerId] = cloneLearnset(def.baseSpeciesId);
     wired++;
   }
 
@@ -1130,6 +1199,12 @@ export function applyErNewcomerSpeciesTmCompatibility(): number {
 
   for (const def of ER_PARTNER_FAMILY) {
     inheritFrom(def.partnerId, def.base);
+    wired++;
+  }
+
+  // Partner alias eeveelutions inherit their base CUSTOM eeveelution's TM set.
+  for (const def of ER_NEWCOMER_PARTNER_FAMILY) {
+    inheritFrom(def.partnerId, def.baseSpeciesId);
     wired++;
   }
 

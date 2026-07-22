@@ -62,7 +62,10 @@ import {
   ER_PARTNER_GLACEON_SPECIES_ID,
   ER_PARTNER_JOLTEON_SPECIES_ID,
   ER_PARTNER_LEAFEON_SPECIES_ID,
+  ER_PARTNER_NIMBEON_SPECIES_ID,
+  ER_PARTNER_RYUVEON_SPECIES_ID,
   ER_PARTNER_SYLVEON_SPECIES_ID,
+  ER_PARTNER_TITANEON_SPECIES_ID,
   ER_PARTNER_UMBREON_SPECIES_ID,
   ER_PARTNER_VAPOREON_SPECIES_ID,
   ER_REGITUBE_SPECIES_ID,
@@ -249,6 +252,10 @@ describe.skipIf(!RUN)("ER newcomer render sweep (non-empty sprite on every surfa
     { label: "Partner Leafeon", speciesId: ER_PARTNER_LEAFEON_SPECIES_ID },
     { label: "Partner Glaceon", speciesId: ER_PARTNER_GLACEON_SPECIES_ID },
     { label: "Partner Sylveon", speciesId: ER_PARTNER_SYLVEON_SPECIES_ID },
+    // 3 partner ALIAS eeveelutions (alias the base custom eeveelution's slug art).
+    { label: "Partner Nimbeon", speciesId: ER_PARTNER_NIMBEON_SPECIES_ID },
+    { label: "Partner Ryuveon", speciesId: ER_PARTNER_RYUVEON_SPECIES_ID },
+    { label: "Partner Titaneon", speciesId: ER_PARTNER_TITANEON_SPECIES_ID },
     // injected forms (megas / primals / battle-bond) - keyed by baseSpecies + formKey.
     ...ER_NEWCOMER_FORMS.map(def => ({
       label: def.slug,
@@ -257,9 +264,10 @@ describe.skipIf(!RUN)("ER newcomer render sweep (non-empty sprite on every surfa
     })),
   ];
 
-  it("sweeps every newcomer mon/form (14 species + 8 partners + all injected forms)", () => {
-    // 4 batch-1 species + 10 batch-2 species + 8 partner eeveelutions + ER_NEWCOMER_FORMS.
-    expect(entries.length).toBe(22 + ER_NEWCOMER_FORMS.length);
+  it("sweeps every newcomer mon/form (14 species + 8 partners + 3 partner aliases + all injected forms)", () => {
+    // 4 batch-1 species + 10 batch-2 species + 8 partner eeveelutions + 3 partner aliases
+    // (Nimbeon/Ryuveon/Titaneon) + ER_NEWCOMER_FORMS.
+    expect(entries.length).toBe(25 + ER_NEWCOMER_FORMS.length);
   });
 
   it.each(entries)("$label renders a non-empty sprite on every surface", async entry => {

@@ -28,10 +28,10 @@
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allAbilities, allMoves } from "#data/data-lists";
 import {
-  ER_NIMBEON_OMNIFORM_ABILITY_ID,
   ER_PARTNER_EEVEE_ABILITY_ID,
-  ER_RYUVEON_OMNIFORM_ABILITY_ID,
-  ER_TITANEON_OMNIFORM_ABILITY_ID,
+  ER_PARTNER_NIMBEON_ABILITY_ID,
+  ER_PARTNER_RYUVEON_ABILITY_ID,
+  ER_PARTNER_TITANEON_ABILITY_ID,
 } from "#data/elite-redux/abilities/composite-newcomers";
 import { ER_INVERSE_ROOM_ABILITY_ID, ER_METEOR_MASS_ABILITY_ID } from "#data/elite-redux/abilities/newcomer-batch2";
 import {
@@ -39,10 +39,14 @@ import {
   ER_SUPEREGO_ABILITY_ID,
 } from "#data/elite-redux/abilities/newcomer-signature-abilities";
 import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
+import { erOmniformIsHolderIdentity } from "#data/elite-redux/abilities/omniform-registry";
 import {
   ER_EGOELK_SPECIES_ID,
   ER_IDOLFIN_SPECIES_ID,
   ER_NIMBEON_SPECIES_ID,
+  ER_PARTNER_NIMBEON_SPECIES_ID,
+  ER_PARTNER_RYUVEON_SPECIES_ID,
+  ER_PARTNER_TITANEON_SPECIES_ID,
   ER_PARTNER_VAPOREON_SPECIES_ID,
   ER_RYUVEON_SPECIES_ID,
   ER_TITANEON_SPECIES_ID,
@@ -127,30 +131,55 @@ describe.skipIf(!RUN)("Batch-2 maintainer verdicts (2026-07-22)", () => {
     });
   });
 
-  // --- 2. OMNIFORM CHAINING through the three new eeveelutions ------------------
-  describe("Omniform chaining — the three new eeveelutions carry Omniform", () => {
-    it("Nimbeon / Ryuveon / Titaneon carry the [innate + Omniform] composite as innate[0] with real attrs", () => {
-      expect(getPokemonSpecies(ER_NIMBEON_SPECIES_ID as SpeciesId).getPassiveAbilities()[0]).toBe(
-        ER_NIMBEON_OMNIFORM_ABILITY_ID,
+  // --- 2. OMNIFORM ALIASING (CORRECTED 2026-07-22 after the live "regular Titaneon
+  // turned into a partner Jolteon" report). The REAL Nimbeon/Ryuveon/Titaneon are inert
+  // (plain innate, no mapping) so a REGULAR eeveelution never transforms; the transform
+  // kit lives on PARTNER ALIAS species the Partner Eevee family chains through. --------
+  describe("Omniform aliasing — regular eeveelutions are inert; partner aliases chain", () => {
+    it("real Nimbeon/Ryuveon/Titaneon carry a PLAIN innate (no Omniform); the ALIAS carries the composite", () => {
+      // Regular eeveelution innate[0] is the bare ability, NOT a composite with Omniform.
+      for (const realId of [ER_NIMBEON_SPECIES_ID, ER_RYUVEON_SPECIES_ID, ER_TITANEON_SPECIES_ID]) {
+        const innate0 = getPokemonSpecies(realId as SpeciesId).getPassiveAbilities()[0];
+        const names = allAbilities[innate0].attrs.map(a => a.constructor.name);
+        expect(names, `real eeveelution ${realId} innate[0] (${innate0}) must NOT carry Omniform`).not.toContain(
+          "OmniformAbAttr",
+        );
+        // And the real species is NOT a registered Omniform holder (no transform mapping).
+        expect(erOmniformIsHolderIdentity(realId, 0), `real ${realId} must not be an Omniform holder`).toBe(false);
+      }
+      // The ALIAS species carry the [innate + Omniform] composite as innate[0].
+      expect(getPokemonSpecies(ER_PARTNER_NIMBEON_SPECIES_ID as SpeciesId).getPassiveAbilities()[0]).toBe(
+        ER_PARTNER_NIMBEON_ABILITY_ID,
       );
-      expect(getPokemonSpecies(ER_RYUVEON_SPECIES_ID as SpeciesId).getPassiveAbilities()[0]).toBe(
-        ER_RYUVEON_OMNIFORM_ABILITY_ID,
+      expect(getPokemonSpecies(ER_PARTNER_RYUVEON_SPECIES_ID as SpeciesId).getPassiveAbilities()[0]).toBe(
+        ER_PARTNER_RYUVEON_ABILITY_ID,
       );
-      expect(getPokemonSpecies(ER_TITANEON_SPECIES_ID as SpeciesId).getPassiveAbilities()[0]).toBe(
-        ER_TITANEON_OMNIFORM_ABILITY_ID,
+      expect(getPokemonSpecies(ER_PARTNER_TITANEON_SPECIES_ID as SpeciesId).getPassiveAbilities()[0]).toBe(
+        ER_PARTNER_TITANEON_ABILITY_ID,
       );
-      // Each composite carries OmniformAbAttr (the transform driver) plus its base innate.
-      for (const id of [
-        ER_NIMBEON_OMNIFORM_ABILITY_ID,
-        ER_RYUVEON_OMNIFORM_ABILITY_ID,
-        ER_TITANEON_OMNIFORM_ABILITY_ID,
-      ]) {
+      for (const id of [ER_PARTNER_NIMBEON_ABILITY_ID, ER_PARTNER_RYUVEON_ABILITY_ID, ER_PARTNER_TITANEON_ABILITY_ID]) {
         const names = allAbilities[id].attrs.map(a => a.constructor.name);
-        expect(names, `ability ${id} must carry Omniform`).toContain("OmniformAbAttr");
+        expect(names, `alias ability ${id} must carry Omniform`).toContain("OmniformAbAttr");
       }
     });
 
-    it("chains THROUGH a new form: Partner Eevee -> Steel -> Titaneon -> Water -> Vaporeon (moveset swaps)", async () => {
+    it("a REGULAR Titaneon does NOT transform on a typed move, even with Omniform FORCED active", async () => {
+      // Force the composite ACTIVE (the worst case: as if the player's Eevee candy had
+      // unlocked the innate). Even so, the REAL Titaneon has no registry mapping, so a
+      // Water move (which turned it into Partner Jolteon in the live bug) cannot transform it.
+      game.override
+        .moveset([MoveId.WATER_GUN, MoveId.IRON_HEAD, MoveId.TACKLE, MoveId.SPLASH])
+        .ability(ER_PARTNER_TITANEON_ABILITY_ID as AbilityId);
+      await game.classicMode.startBattle(ER_TITANEON_SPECIES_ID as SpeciesId);
+      const holder = game.field.getPlayerPokemon();
+      expect(holder.getSpeciesForm().speciesId).toBe(ER_TITANEON_SPECIES_ID);
+      erOmniformOnMoveStart(holder, allMoves[MoveId.WATER_GUN]);
+      expect(holder.getSpeciesForm().speciesId, "regular Titaneon must stay Titaneon").toBe(ER_TITANEON_SPECIES_ID);
+      erOmniformOnMoveStart(holder, allMoves[MoveId.IRON_HEAD]);
+      expect(holder.getSpeciesForm().speciesId, "regular Titaneon must stay Titaneon").toBe(ER_TITANEON_SPECIES_ID);
+    });
+
+    it("chains THROUGH a partner alias: Partner Eevee -> Steel -> Partner Titaneon -> Water -> Partner Vaporeon", async () => {
       game.override
         .moveset([MoveId.IRON_HEAD, MoveId.WATER_GUN, MoveId.TACKLE, MoveId.SPLASH])
         .starterForms({ [SpeciesId.EEVEE]: partnerFormIndex() })
@@ -160,15 +189,15 @@ describe.skipIf(!RUN)("Batch-2 maintainer verdicts (2026-07-22)", () => {
       expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
       const eeveeMoves = holder.getMoveset().map(m => m?.moveId);
 
-      // Steel move -> Titaneon (a NEW eeveelution, production mapping).
+      // Steel move -> Partner Titaneon (the alias, production mapping).
       erOmniformOnMoveStart(holder, allMoves[MoveId.IRON_HEAD]);
-      expect(holder.getSpeciesForm().speciesId).toBe(ER_TITANEON_SPECIES_ID);
+      expect(holder.getSpeciesForm().speciesId).toBe(ER_PARTNER_TITANEON_SPECIES_ID);
       const titaneonMoves = holder.getMoveset().map(m => m?.moveId);
       expect(titaneonMoves).toContain(MoveId.IRON_HEAD); // the used move stays in its slot
       expect(titaneonMoves.join(",")).not.toBe(eeveeMoves.join(",")); // the rest swapped
 
-      // Chained Water move FROM the new Titaneon form -> Vaporeon (chains onward — the
-      // whole point of the verdict: Titaneon is not terminal).
+      // Chained Water move FROM the Partner Titaneon form -> Partner Vaporeon (chains
+      // onward — the alias is a full family member, not terminal).
       erOmniformOnMoveStart(holder, allMoves[MoveId.WATER_GUN]);
       expect(holder.getSpeciesForm().speciesId).toBe(ER_PARTNER_VAPOREON_SPECIES_ID);
       expect(holder.getMoveset().map(m => m?.moveId)).toContain(MoveId.WATER_GUN);

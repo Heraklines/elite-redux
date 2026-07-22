@@ -93,15 +93,16 @@ export const ER_GLYCOLYSIS_ABILITY_ID = 5970;
 export const ER_CRUDE_STEEL_ABILITY_ID = 5995; // Solid Rock + Steelworker
 export const ER_MINIGUN_ABILITY_ID = 5996; // Quick Draw + Dual Wield
 // 5997 Meteor Mass + 5998 Inverse Room are signature abilities (newcomer-batch2.ts).
-// Batch-2 Omniform EXTENSION (maintainer verdict 2026-07-22): the three NEW eeveelutions
-// Nimbeon / Ryuveon / Titaneon CARRY Omniform too, so the Partner Eevee family can chain
-// THROUGH them (adapt into one, then a next typed move chains onward). Same graft as the
-// 8 partner eeveelutions + the Eevee head: [that species' innate[0] + Omniform] onto
-// innate[0]. These are REAL custom species (no vanilla twin to protect), so the composite
-// goes on the species itself (the Eevee-head pattern), not a separate alias.
-export const ER_NIMBEON_OMNIFORM_ABILITY_ID = 6001; // Fluffy + Omniform
-export const ER_RYUVEON_OMNIFORM_ABILITY_ID = 6002; // Stamina + Omniform
-export const ER_TITANEON_OMNIFORM_ABILITY_ID = 6003; // Stainless Steel + Omniform
+// Batch-2 Omniform EXTENSION (maintainer verdict 2026-07-22, CORRECTED after the live
+// "regular Titaneon transformed" report): the three NEW eeveelutions Nimbeon / Ryuveon /
+// Titaneon get PARTNER ALIAS species (like the 8 partner eeveelutions 70012-70019). The
+// composite [innate + Omniform] is carried by the ALIAS, NOT the real species — so the
+// REGULAR eeveelution (evolved from a regular Eevee) has a PLAIN innate and never
+// transforms, while the Partner Eevee family chains THROUGH the alias. Each composite is
+// [that eeveelution's own innate[0] + Omniform], grafted onto the alias's innate[0].
+export const ER_PARTNER_NIMBEON_ABILITY_ID = 6001; // Fluffy + Omniform
+export const ER_PARTNER_RYUVEON_ABILITY_ID = 6002; // Stamina + Omniform
+export const ER_PARTNER_TITANEON_ABILITY_ID = 6003; // Stainless Steel + Omniform
 
 /**
  * A single manual-composite definition: the display name, the verbatim short
@@ -324,22 +325,23 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     description: "Pixilate + Omniform.",
     constituents: [PIXILATE, OMNIFORM],
   },
-  // Batch-2 Omniform EXTENSION: the three NEW eeveelutions carry Omniform too so they
-  // chain like the original eight (each keeps its own innate[0] name; Omniform grafted).
-  [ER_NIMBEON_OMNIFORM_ABILITY_ID]: {
-    id: ER_NIMBEON_OMNIFORM_ABILITY_ID,
+  // Batch-2 Omniform EXTENSION: the three NEW eeveelutions get PARTNER ALIAS species that
+  // carry Omniform (the real species do NOT — regular eeveelutions never transform). Each
+  // alias keeps its base eeveelution's own innate[0] name; Omniform is grafted on.
+  [ER_PARTNER_NIMBEON_ABILITY_ID]: {
+    id: ER_PARTNER_NIMBEON_ABILITY_ID,
     name: "Fluffy",
     description: "Fluffy + Omniform.",
     constituents: [FLUFFY, OMNIFORM],
   },
-  [ER_RYUVEON_OMNIFORM_ABILITY_ID]: {
-    id: ER_RYUVEON_OMNIFORM_ABILITY_ID,
+  [ER_PARTNER_RYUVEON_ABILITY_ID]: {
+    id: ER_PARTNER_RYUVEON_ABILITY_ID,
     name: "Stamina",
     description: "Stamina + Omniform.",
     constituents: [STAMINA, OMNIFORM],
   },
-  [ER_TITANEON_OMNIFORM_ABILITY_ID]: {
-    id: ER_TITANEON_OMNIFORM_ABILITY_ID,
+  [ER_PARTNER_TITANEON_ABILITY_ID]: {
+    id: ER_PARTNER_TITANEON_ABILITY_ID,
     name: "Stainless Steel",
     description: "Stainless Steel + Omniform.",
     constituents: [STAINLESS_STEEL, OMNIFORM],
