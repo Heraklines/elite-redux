@@ -2377,19 +2377,41 @@ export function coopRetainedGameOverSupersedesReplay(wave: number, turn: number)
  * forever, never reaching the next wave's command frontier to install its rendezvous waiter - the
  * won-by-faint wave-2 launch deadlock (journey runs 29895009334 / 29897908649: the faint replacement
  * bumps the settled turn to 2, so the guest's `CoopReplayTurnPhase turn=2` IS the settled turn and stalls;
- * host's cmd:2:1 arrival BUFFERs "no waiter yet" and aborts). Uses `turn >= settledTurn` exactly like the
- * gameOver fence: once the ordered live-event buffer is drained the settled turn has no further normal
- * resolution coming, so end into the queued wave-advance boundary. The WIN unpark
+ * host's cmd:2:1 arrival BUFFERs "no waiter yet" and aborts).
+ *
+ * A retained WON advance also supersedes the replay one turn BELOW `settledTurn` when the win was DEFERRED
+ * by a faint replacement on its own winning turn: the host's automatic victory boundary settles on
+ * `sourceTurn + 1` (its currentBattle.turn already advanced past the faint before the seal -
+ * stageAutomaticVictory..., `currentTurn === identity.turn + 1`), so the propagated `settledTurn` is one ABOVE
+ * the turn the guest is still replaying, and the guest has ADOPTED that settled cursor
+ * (`adoptCoopV2SettledWaveTurnCursor`) while its parked replay stays at the SOURCE turn = `settledTurn - 1`. A
+ * plain `turn >= settledTurn` floor left that source-turn replay below the fence, awaiting a turn-N resolution
+ * a WON wave never sends (campaign dirty-lane run 29912693840, SHA ad1744d4b: guest stuck at `WAVE_ADVANCE
+ * materialDeferred`, host reward WATCHER network-waits, both seats mutual-wait -> stall watchdog). The
+ * `settledTurn - 1` extension is GATED on the adopted cursor (`currentBattle.turn >= settledTurn`): that is
+ * the exact proof the replay is stale (a turn already behind the advanced cursor). A NORMAL single-turn win
+ * whose cursor is still AT its winning turn (= this replay's turn, with `settledTurn = winningTurn + 1`) is
+ * NOT dissolved early - its replay must still finalize and mirror EXP. The WIN unpark
  * (coopActiveReplayTurnAborter) is the one-shot external equivalent; this self-sourced pump check cannot
  * be missed by that abort's install-timing race.
  */
 export function coopRetainedWinSupersedesReplay(wave: number, turn: number): boolean {
-  return (
-    pendingWaveAdvance?.wave === wave
-    && pendingWaveAdvance.outcome !== "gameOver"
-    && pendingWaveAdvance.settledTurn != null
-    && turn >= pendingWaveAdvance.settledTurn
-  );
+  if (
+    pendingWaveAdvance?.wave !== wave
+    || pendingWaveAdvance.outcome === "gameOver"
+    || pendingWaveAdvance.settledTurn == null
+  ) {
+    return false;
+  }
+  const settledTurn = pendingWaveAdvance.settledTurn;
+  if (turn >= settledTurn) {
+    return true;
+  }
+  // Deferred won-by-faint settlement: the source-turn replay (settledTurn - 1) is superseded ONLY once the
+  // guest has adopted the settled cursor, so a normal single-turn win (cursor still at the winning turn) is
+  // never dissolved before its finalize/EXP.
+  const battleTurn = globalScene.currentBattle?.turn ?? turn;
+  return turn === settledTurn - 1 && battleTurn >= settledTurn;
 }
 
 /**

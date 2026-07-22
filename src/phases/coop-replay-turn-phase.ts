@@ -149,10 +149,23 @@ export class CoopReplayTurnPhase extends Phase {
    * GameOver never emits that normal turn-resolution carrier, so this exact wait is otherwise impossible.
    */
   public abortIfRetainedTerminalSuperseded(settledTurn: number, reason: string): boolean {
-    return (
-      (this.turn > settledTurn || (this.turn === settledTurn && this.isAwaitingAuthority()))
-      && this.abortPhantom(reason)
-    );
+    if (this.turn > settledTurn || (this.turn === settledTurn && this.isAwaitingAuthority())) {
+      return this.abortPhantom(reason);
+    }
+    // Deferred WON settlement (won-by-faint on the winning turn): the automatic victory boundary settles on
+    // `sourceTurn + 1`, so this parked replay sits at the SOURCE turn = `settledTurn - 1`, one below the
+    // numeric fence above yet equally superseded (a WON wave sends no turn-N resolution for it). Wake it too,
+    // but ONLY while it is genuinely awaiting authority and a retained WON advance for the live wave confirms
+    // the supersession (coopRetainedWinSupersedesReplay is gameOver-exclusive, so this never widens the
+    // gameOver terminal path). The self-sourced pump fence is the guaranteed backstop; this is its prompt
+    // external wake so the source-turn replay dissolves the instant the WAVE_ADVANCE lands.
+    if (
+      this.isAwaitingAuthority()
+      && coopRetainedWinSupersedesReplay(globalScene.currentBattle?.waveIndex ?? 0, this.turn)
+    ) {
+      return this.abortPhantom(reason);
+    }
+    return false;
   }
 
   public override end(): void {
