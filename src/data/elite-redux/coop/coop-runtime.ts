@@ -4354,6 +4354,23 @@ function scheduleCoopV2CommandProofRetry(runtime: CoopRuntime): void {
       if (completed > 0) {
         coopLog("v2-control", `real command proof completed ${completed} retained V2 entry`);
       }
+      // Re-release edge for a command that parked AFTER its ordering frontier already committed. A
+      // REPLACEMENT_COMMIT stamps its embedded next-turn COMMAND_FRONTIER materialApplied DIRECTLY
+      // (markCoopV2ControlMaterialApplied), bypassing the projectControl proof gate that a standalone
+      // CONTROL_COMMIT command-open rides. Its ONLY release edge is the one-shot
+      // releaseCoopV2DeferredCommandStarts fired at that materialApplied instant; when the refilled
+      // slot's CommandPhase parks on a LATER pump (the dissolve -> CoopReplayTurnPhase -> CoopFinalize
+      // chain), that edge already fired with nothing parked, and retryPendingReplicaEntries above cannot
+      // recover it (the frontier entry is already applied/retired, not pending). This park scheduled THIS
+      // retry (enterCoopV2CommandControlBoundary), so re-fire the release against the already-applied
+      // frontier here: releaseCoopV2DeferredCommandStarts only wakes parks its immutable commands address,
+      // and only a materialApplied frontier is honored, so it is a no-op unless a park missed its edge. It
+      // does NOT sign the proof - the released CommandPhase still crosses its address-exact V2 boundary and
+      // records recordCoopV2CommandControlStarted before the entry can retire.
+      const latest = runtime.v2ControlLedger.latestControl;
+      if (latest?.kind === "COMMAND_FRONTIER" && runtime.v2ControlLedger.isMaterialApplied(latest)) {
+        releaseCoopV2DeferredCommandStarts(runtime, latest);
+      }
     });
   });
 }
