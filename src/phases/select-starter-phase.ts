@@ -489,9 +489,15 @@ export class SelectStarterPhase extends Phase {
       true,
     );
 
+    // Field-width format for this match (tournament doubles/triples; plain matches are singles).
+    // Read from the tournament match context BEFORE the handshake so it rides the negotiate exchange
+    // and is cross-checked — a stale client that resolved a different width refuses to pair instead
+    // of desyncing a singles field against a doubles one.
+    const matchBattleFormat = getTournamentMatchContext()?.battleFormat ?? "singles";
+
     let result: ShowdownNegotiationResult;
     try {
-      result = await session.negotiate(manifests, ownProfile);
+      result = await session.negotiate(manifests, ownProfile, matchBattleFormat);
     } catch (err) {
       disposePendingShowdownSession();
       disposePendingShowdownRelay();
@@ -887,6 +893,9 @@ function showdownRejectMessage(err: ShowdownNegotiationError): string {
     case "protoMismatch":
       // B7 item 11: a stale cached bundle on one side. Tell BOTH players to hard-refresh.
       return "Your game versions differ - hard-refresh (Ctrl+Shift+R) both clients and retry.";
+    case "formatMismatch":
+      // Both clients resolved a different battle format (one has a stale tournament view).
+      return "Your battle formats differ - refresh the tournament board on both clients and retry.";
     default:
       return "The versus match was cancelled.";
   }

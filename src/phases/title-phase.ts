@@ -53,6 +53,7 @@ import {
 import { buildOwnGhostIconSummary } from "#data/elite-redux/showdown/tournament-ghost-icon";
 import { setTournamentMatchContext } from "#data/elite-redux/showdown/tournament-match-context";
 import { setTournamentFlowOpener, type TournamentDeepLink } from "#data/elite-redux/showdown/tournament-notifications";
+import type { BattleFormat, SeriesFormat } from "#data/elite-redux/showdown/tournament-types";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -591,7 +592,13 @@ export class TitlePhase extends Phase {
       })();
     };
 
-    const enterMatch = (tournamentId: string, matchId: string, opponent: string): void => {
+    const enterMatch = (
+      tournamentId: string,
+      matchId: string,
+      opponent: string,
+      battleFormat?: BattleFormat,
+      seriesFormat?: SeriesFormat,
+    ): void => {
       const presets = gameData.listShowdownTeamPresets();
       if (presets.length === 0) {
         // A saved team preset is REQUIRED - route to the Team Menu to build one.
@@ -601,7 +608,17 @@ export class TitlePhase extends Phase {
       // P1: field the first saved preset (P2 adds a per-match preset picker). The registered team is not
       // locked - the player may re-pick presets per match.
       setPendingShowdownPresetStarters(presets[0].mons.map(manifestToStarter));
-      setTournamentMatchContext({ tournamentId, matchId, expectedOpponent: opponent });
+      // Carry the tournament's field width + series wrapper into the match context. Both clients read
+      // the SAME server-authoritative tournament record, so the format is agreed by construction; the
+      // negotiate handshake cross-checks it (a stale client refuses to pair rather than desync). The
+      // series starts at game 0.
+      setTournamentMatchContext({
+        tournamentId,
+        matchId,
+        expectedOpponent: opponent,
+        ...(battleFormat && battleFormat !== "singles" ? { battleFormat } : {}),
+        ...(seriesFormat && seriesFormat !== "single" ? { seriesFormat, gameIndex: 0 } : {}),
+      });
       this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
     };
 
@@ -616,7 +633,8 @@ export class TitlePhase extends Phase {
         tournament: t,
         ownParticipant: ownName,
         now: Date.now(),
-        onPlayMatch: (matchId: string, opponent: string) => enterMatch(t.id, matchId, opponent),
+        onPlayMatch: (matchId: string, opponent: string) =>
+          enterMatch(t.id, matchId, opponent, t.battleFormat, t.seriesFormat),
         onBack: () => void showList(),
         // P1.5 live board: poll the worker for the advancing bracket + ping presence while open.
         onPoll: async () => {

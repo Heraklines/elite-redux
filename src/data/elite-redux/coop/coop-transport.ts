@@ -1868,6 +1868,14 @@ export type CoopMessage =
        * aborts the versus flow cleanly with a hard-refresh message instead of desyncing one-sided.
        */
       showdownProto?: number;
+      /**
+       * The FIELD width this match is played at (tournament doubles/triples). OMIT-WHEN-ABSENT
+       * discipline: only sent for a non-singles match, and read as "singles" when absent, so a
+       * plain 1v1 match is byte-identical on the wire and old clients are unaffected. Both clients
+       * derive it from the same server-authoritative tournament record; the negotiate handshake
+       * cross-checks it so two clients that resolved DIFFERENT widths refuse to pair (not desync).
+       */
+      battleFormat?: "singles" | "doubles" | "triples";
     }
   /** Either player -> peer: "my team is finalized"; `teamHash` fingerprints it for the anti-cheat cross-check. Connection-scoped. */
   | { t: "showdownReady"; teamHash: string }

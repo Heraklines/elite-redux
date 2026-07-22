@@ -59,8 +59,16 @@ export const SHOWDOWN_READY_RENDEZVOUS_POINT = "showdown-ready";
  * desyncing one-sided (the "showdown doesn't appear for the other person" class - a stale service-worker
  * cache). Separate from {@linkcode COOP_PROTOCOL_VERSION} (which gates co-op pairing) so co-op is
  * unaffected; both clients exchange it, so EITHER can detect the other running an old build.
+ *
+ * Bumped to 2 (2026-07-22): the `showdownTeam` message now carries an optional `battleFormat`
+ * (tournament doubles/triples field width). Any pre-doubles client is a stale bundle for a
+ * doubles/triples tournament, so the proto guard forces a hard-refresh rather than a one-sided
+ * singles-vs-doubles desync; a plain singles match still refuses to pair with a stale build.
  */
-export const SHOWDOWN_PROTO_VERSION = 1;
+export const SHOWDOWN_PROTO_VERSION = 2;
+
+/** The field-width format a versus match is played at. Absent on the wire == "singles". */
+export type ShowdownBattleFormat = "singles" | "doubles" | "triples";
 
 /**
  * The reciprocal rendezvous point both clients cross once both have LOCKED IN at the wager screen (D3).
@@ -87,7 +95,13 @@ export function getShowdownPickWaitMs(): number {
 export type IsMegaFormPredicate = (speciesId: number, formIndex: number) => boolean;
 
 /** Why a showdown negotiation rejected (surfaced to the UI / result flow). */
-export type ShowdownRejectReason = "illegalTeam" | "hashMismatch" | "void" | "timeout" | "protoMismatch";
+export type ShowdownRejectReason =
+  | "illegalTeam"
+  | "hashMismatch"
+  | "void"
+  | "timeout"
+  | "protoMismatch"
+  | "formatMismatch";
 
 /**
  * Default whole-handshake anti-strand timeout: reuses the co-op rendezvous wait convention
@@ -121,6 +135,11 @@ export interface ShowdownNegotiationResult {
   opponentManifest: ShowdownMonManifest[];
   /** The opponent's committed team hash (== the fingerprint of their manifest). */
   opponentTeamHash: string;
+  /**
+   * The AGREED field-width format for this match (both clients validated equal). Always resolved
+   * (defaulting "singles"); the battle bootstrap builds the field to this width.
+   */
+  battleFormat: ShowdownBattleFormat;
   /**
    * Task C7: the opponent's authored ghost-trainer presentation, RE-SANITIZED on receipt (a hostile
    * peer must not bypass sanitize), or null when the opponent sent none. Stashed on the showdown battle
@@ -206,6 +225,10 @@ export class ShowdownSession {
   private opponentManifest: ShowdownMonManifest[] | null = null;
   /** B7 item 11: the opponent's showdown protocol version (arrives on `showdownTeam`), or undefined. */
   private opponentProto: number | undefined;
+  /** The opponent's declared field-width format (arrives on `showdownTeam`); absent == "singles". */
+  private opponentBattleFormat: ShowdownBattleFormat = "singles";
+  /** Our own field-width format for this match (from the tournament record); "singles" for a plain match. */
+  private ownBattleFormat: ShowdownBattleFormat = "singles";
   /** Task C7: the opponent's sanitized presentation (arrives on `showdownTeam`), or null. */
   private opponentProfile: GhostTrainerProfile | null = null;
   /** The opponent's committed hash, or null until `showdownReady` arrives. */
@@ -252,10 +275,12 @@ export class ShowdownSession {
   negotiate(
     ownManifest: ShowdownMonManifest[],
     ownProfile: GhostTrainerProfile | null = null,
+    battleFormat: ShowdownBattleFormat = "singles",
   ): Promise<ShowdownNegotiationResult> {
     if (this.settle != null) {
       return Promise.reject(new ShowdownNegotiationError("void", "negotiate() already in progress"));
     }
+    this.ownBattleFormat = battleFormat;
     const promise = new Promise<ShowdownNegotiationResult>((resolve, reject) => {
       this.settle = { resolve, reject, ownManifest };
     });
@@ -285,12 +310,7 @@ export class ShowdownSession {
     // B7 item 14b: register a rejoin re-sender BEFORE the first send, so a drop between here and the
     // gate is healed. It re-ships our team+ready (+ any rendezvous arrival) idempotently on reconnect.
     this.offRejoin = addShowdownRejoinResender(() => this.resendHandshake());
-    this.transport.send({
-      t: "showdownTeam",
-      manifest: ownManifest,
-      presentation: this.ownProfile,
-      showdownProto: SHOWDOWN_PROTO_VERSION,
-    });
+    this.transport.send(this.buildTeamMessage(ownManifest));
     this.transport.send({ t: "showdownReady", teamHash: showdownTeamHash(ownManifest) });
     // The opponent's messages may already be buffered (they raced ahead); try to settle now.
     this.tryGate();
@@ -309,12 +329,7 @@ export class ShowdownSession {
     if (settle == null || this.done) {
       return; // nothing in flight (never negotiated / already settled)
     }
-    this.transport.send({
-      t: "showdownTeam",
-      manifest: settle.ownManifest,
-      presentation: this.ownProfile,
-      showdownProto: SHOWDOWN_PROTO_VERSION,
-    });
+    this.transport.send(this.buildTeamMessage(settle.ownManifest));
     this.transport.send({ t: "showdownReady", teamHash: showdownTeamHash(settle.ownManifest) });
     // If we already crossed into the ready barrier, re-send our arrival too (the peer may have missed
     // it in the dark window, otherwise both would strand waiting for each other).
@@ -339,6 +354,21 @@ export class ShowdownSession {
     this.done = true;
   }
 
+  /**
+   * Build the `showdownTeam` message. OMIT-WHEN-ABSENT: `battleFormat` is only included for a
+   * non-singles match, so a plain 1v1 is byte-identical to the pre-format wire (and old clients,
+   * which never read the key, are unaffected). The receiver reads an absent key as "singles".
+   */
+  private buildTeamMessage(manifest: ShowdownMonManifest[]): CoopMessage {
+    return {
+      t: "showdownTeam",
+      manifest,
+      presentation: this.ownProfile,
+      showdownProto: SHOWDOWN_PROTO_VERSION,
+      ...(this.ownBattleFormat === "singles" ? {} : { battleFormat: this.ownBattleFormat }),
+    };
+  }
+
   private handle(msg: CoopMessage): void {
     switch (msg.t) {
       case "showdownTeam":
@@ -346,6 +376,8 @@ export class ShowdownSession {
         this.opponentManifest = msg.manifest as ShowdownMonManifest[];
         // B7 item 11: the sender's showdown protocol version (undefined from a pre-guard build).
         this.opponentProto = msg.showdownProto;
+        // Field-width format (absent == singles); cross-checked against ours in tryGate.
+        this.opponentBattleFormat = msg.battleFormat ?? "singles";
         // Task C7: ALWAYS re-sanitize the received presentation before use (the ghost path's rule) -
         // a hostile peer must not bypass the length caps / control-char stripping / enum clamps.
         this.opponentProfile = sanitizeGhostProfile(msg.presentation);
@@ -387,6 +419,17 @@ export class ShowdownSession {
       );
       return;
     }
+    // Field-width format guard: both clients derive the width from the same server-authoritative
+    // tournament record, so a difference means one resolved a STALE record (or a spoofed/plain
+    // lobby pairing collided with a tournament match). Refuse to pair rather than desync one client
+    // into a singles field while the other builds doubles. Checked once the opponent's team arrives.
+    if (this.opponentManifest != null && this.opponentBattleFormat !== this.ownBattleFormat) {
+      this.voidAndReject(
+        "formatMismatch",
+        `showdown battle-format mismatch: ours=${this.ownBattleFormat} opponent=${this.opponentBattleFormat}`,
+      );
+      return;
+    }
     // Need BOTH the opponent's team AND their ready commit before gating.
     if (this.opponentManifest == null || this.opponentTeamHash == null) {
       return;
@@ -422,7 +465,13 @@ export class ShowdownSession {
         this.finishReject(new ShowdownNegotiationError("timeout", "showdown-ready synchronization recovery exhausted"));
         return;
       }
-      this.finishResolve({ ownManifest: settle.ownManifest, opponentManifest, opponentTeamHash, opponentProfile });
+      this.finishResolve({
+        ownManifest: settle.ownManifest,
+        opponentManifest,
+        opponentTeamHash,
+        opponentProfile,
+        battleFormat: this.ownBattleFormat,
+      });
     });
   }
 
