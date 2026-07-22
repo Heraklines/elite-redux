@@ -269,11 +269,11 @@ export class CoopReplayTurnPhase extends Phase {
           return;
         }
         // WON-WAVE sibling of the gameOver fence above: a retained WON WAVE_ADVANCE resolved this wave on
-        // an EARLIER (settled) turn, so the host will never send a resolution for THIS strictly-later
-        // phantom turn (a queue-empty finalize manufactured it). Awaiting one here hangs forever and the
-        // guest never reaches the next wave's command frontier to install its rendezvous waiter (won-by-
-        // faint wave-2 launch deadlock, run 29895009334). End into the queued wave-advance boundary. The
-        // winning turn itself is NOT superseded (it carries the advance), only turns beyond it.
+        // `settledTurn`; the host's resolution for that turn (and beyond) IS the advance, not a normal
+        // turnResolution, so a replay awaiting one here hangs forever and the guest never reaches the next
+        // wave's command frontier to install its rendezvous waiter (won-by-faint wave-2 launch deadlock,
+        // runs 29895009334 / 29897908649 - the faint bumps the settled turn to 2, so the turn-2 replay IS
+        // the settled turn). Buffer already drained above, so end into the queued wave-advance boundary.
         if (coopRetainedWinSupersedesReplay(wave, this.turn)) {
           coopWarn(
             "replay",
