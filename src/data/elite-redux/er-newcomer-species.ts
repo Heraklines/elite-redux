@@ -146,6 +146,64 @@ const PRESSURE_VESSEL = 5914;
 const RAIN_PUMP = 5915;
 const LIFE_PRESERVER = 5916;
 
+// --- Newcomer BATCH 2 ability ids (resolved via the audit + reconciled against
+// the codex signature batch). Signature abilities (real mechanics) live at
+// 5971-5994 (newcomer-signature-abilities.ts); the two designer-spec'd composites
+// at 5995-5996 (composite-newcomers.ts); the two residual placeholders at
+// 5997-5998 (newcomer-batch2.ts). PREDATOR, CORRUPTED_MIND, FRIEND_GUARD are
+// reused from the batch-1 block above. ---
+const SNIPER = 97; // vanilla
+const BOOT_HILL = 5985; // codex signature
+const SPECTRALIZE = 5123;
+const DEADEYE = 5984; // codex "Deadeye Draw" (spec: Deadeye Draw)
+const MINIGUN = 5996; // composite (Quick Draw + Dual Wield)
+const TURBOBLAZE = 163; // vanilla
+const FLARE_BOOST = 138; // vanilla
+const BLUR = 5510;
+const MOMENTUM = 5109;
+const FLUFFY = 218; // vanilla
+const VAPOR_BODY = 5981; // codex signature
+const AERIALIST = 5313;
+const WHIPLASH = 5425;
+const OVERRULE = 5516;
+const UNRELENTING = 5695; // exists ("2-5 hits"); designer flagged "when fixed" — FLAG
+const STAMINA = 192; // vanilla
+const DRAGONFLY = 5050;
+const SKYHOOK = 5978; // codex signature
+const CHROME_COAT = 5267;
+const ELUDE = 5511;
+const IMPULSE = 5274;
+const STAINLESS_STEEL = 5530;
+const ANNEAL = 5979; // codex signature
+const LIVING_CHROME = 5980; // codex signature
+const WATER_COMPACTION = 195; // vanilla
+const POROUS = 5974; // codex signature (bespoke, NOT the composite the spec suggested — FLAG)
+const GLAM_ROCK = 5975; // codex signature
+const FILTER = 111; // vanilla
+const SEDIMENT_BLOOM = 5976; // codex signature
+const POWER_CORE = 5105;
+const INVERSE_ROOM = 5998; // RESIDUAL placeholder (no design; a MOVE named Inverse Room exists)
+const GLEAM_EYES = 5410;
+const ENERGY_HORNS = 5452;
+const EGOIST = 5276;
+const MINDS_EYE = 299; // vanilla
+const HEAVY_METAL = 134; // vanilla
+const REDUCTION = 5991; // codex signature
+const SOUL_TAP = 5521;
+const CRACK_THE_VESSEL = 5992; // codex "Cracked Vessel" (spec: Crack the Vessel)
+const ELEMENTAL_VORTEX = 5369;
+const LIQUIFIED = 5049;
+const PIXILATE = 182; // vanilla
+const ZERO_TO_HERO = 278; // vanilla
+const RADIANCE = 5173;
+const SETLIST = 5989; // codex signature
+const RAGING_BOXER = 5057;
+const BLITZ_BOXER = 5015;
+const MOXIE = 153; // vanilla
+const RING_GENERAL = 5987; // codex signature
+const PROTOSYNTHESIS = 281; // vanilla
+const GILLIE_SUIT = 5986; // codex signature (bespoke "Predator + Protean")
+
 /**
  * A hand-authored EVOLUTION-ONLY new species: reachable only by evolving
  * {@linkcode evolvesFrom} at {@linkcode evolveLevel}. Never in the starter grid,
@@ -161,9 +219,15 @@ interface NewcomerEvoSpeciesDef {
   readonly actives: readonly [number, number, number];
   readonly innates: readonly [number, number, number];
   readonly catchRate: number;
-  /** Existing species this evolves FROM (the level-50 edge source). */
-  readonly evolvesFrom: SpeciesId;
-  /** Evolution level (50 for all three per the patch). */
+  /**
+   * Species this evolves FROM (the level-edge source). Usually a vanilla
+   * `SpeciesId`, but MAY be a hand-authored newcomer species id (a bare number
+   * in the 70000+ band) when the pre-evo is itself a newcomer middle stage
+   * (Drawclops -> Dustnoir). `pokemonEvolutions` is keyed by number, so a numeric
+   * source registers the edge exactly like a vanilla one.
+   */
+  readonly evolvesFrom: SpeciesId | number;
+  /** Evolution level (per the patch; per-entry). */
   readonly evolveLevel: number;
   /** Optional explicit cry-audio key hook (the key `cry()` plays). */
   readonly cryKey?: string;
@@ -248,6 +312,189 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
       [50, MoveId.SURF],
     ],
   },
+  // ===================== NEWCOMER BATCH 2 =====================
+  // Drawclops — NEW middle stage: Duskull (Lv 36) -> Drawclops. Ground/Ghost.
+  // BRANCHES off Duskull alongside the vanilla Duskull->Dusclops line (#240
+  // chooser). Same kit as Dustnoir ("same abilities for now"). FLAG: Duskull
+  // gains a second level edge (36) beside vanilla Dusclops (37).
+  {
+    speciesId: ER_DRAWCLOPS_SPECIES_ID,
+    name: "Drawclops",
+    slug: "drawclops",
+    types: [PokemonType.GROUND, PokemonType.GHOST],
+    stats: [110, 40, 90, 110, 80, 40],
+    actives: [SNIPER, BOOT_HILL, SPECTRALIZE],
+    innates: [DEADEYE, MINIGUN, TURBOBLAZE],
+    catchRate: 60,
+    evolvesFrom: SpeciesId.DUSKULL,
+    evolveLevel: 36,
+    learnsetAdditions: [
+      [36, MoveId.SHADOW_SNEAK],
+      [36, MoveId.MUD_SHOT],
+      [36, MoveId.BONE_RUSH],
+    ],
+  },
+  // Dustnoir — Convergent Dusknoir: Drawclops (Lv 45) -> Dustnoir. Ground/Ghost.
+  // evolvesFrom the NEW Drawclops species id (numeric middle-stage source).
+  {
+    speciesId: ER_DUSTNOIR_SPECIES_ID,
+    name: "Dustnoir",
+    slug: "dustnoir",
+    types: [PokemonType.GROUND, PokemonType.GHOST],
+    stats: [120, 45, 105, 135, 90, 45],
+    actives: [SNIPER, BOOT_HILL, SPECTRALIZE],
+    innates: [DEADEYE, MINIGUN, TURBOBLAZE],
+    catchRate: 45,
+    evolvesFrom: ER_DRAWCLOPS_SPECIES_ID,
+    evolveLevel: 45,
+    learnsetAdditions: [
+      [45, MoveId.EARTHQUAKE],
+      [45, MoveId.SHADOW_BALL],
+      [45, MoveId.EARTH_POWER],
+    ],
+  },
+  // Nimbeon — Cumulus eeveelution: Eevee (Lv 23) -> Nimbeon. Flying.
+  {
+    speciesId: ER_NIMBEON_SPECIES_ID,
+    name: "Nimbeon",
+    slug: "nimbeon",
+    types: [PokemonType.FLYING],
+    stats: [130, 65, 60, 95, 65, 110],
+    actives: [FLARE_BOOST, BLUR, MOMENTUM],
+    innates: [FLUFFY, VAPOR_BODY, AERIALIST],
+    catchRate: 45,
+    evolvesFrom: SpeciesId.EEVEE,
+    evolveLevel: 23,
+    learnsetAdditions: [
+      [23, MoveId.BRAVE_BIRD],
+      [23, MoveId.HURRICANE],
+      [23, MoveId.ROOST],
+      [23, MoveId.AIR_SLASH],
+    ],
+  },
+  // Ryuveon — Sky Dancer eeveelution: Eevee -> Ryuveon. Dragon. FLAG: no level
+  // given by the designer — assumed Lv 23 to match the other new eeveelutions.
+  // Active "Unrelenting" resolves live (5695, "moves hit 2-5 times"); designer
+  // wrote "when its fixed" — wired inert-safe, FLAG.
+  {
+    speciesId: ER_RYUVEON_SPECIES_ID,
+    name: "Ryuveon",
+    slug: "ryuveon",
+    types: [PokemonType.DRAGON],
+    stats: [85, 95, 90, 45, 100, 110],
+    actives: [WHIPLASH, OVERRULE, UNRELENTING],
+    innates: [STAMINA, DRAGONFLY, SKYHOOK],
+    catchRate: 45,
+    evolvesFrom: SpeciesId.EEVEE,
+    evolveLevel: 23,
+    learnsetAdditions: [
+      [23, MoveId.DRAGON_CLAW],
+      [23, MoveId.DRAGON_DANCE],
+      [23, MoveId.DRAGON_PULSE],
+      [23, MoveId.OUTRAGE],
+    ],
+  },
+  // Titaneon — Alloy eeveelution: Eevee (Lv 23) -> Titaneon. Steel.
+  {
+    speciesId: ER_TITANEON_SPECIES_ID,
+    name: "Titaneon",
+    slug: "titaneon",
+    types: [PokemonType.STEEL],
+    stats: [65, 110, 95, 60, 65, 130],
+    actives: [CHROME_COAT, ELUDE, IMPULSE],
+    innates: [STAINLESS_STEEL, ANNEAL, LIVING_CHROME],
+    catchRate: 45,
+    evolvesFrom: SpeciesId.EEVEE,
+    evolveLevel: 23,
+    learnsetAdditions: [
+      [23, MoveId.IRON_HEAD],
+      [23, MoveId.FLASH_CANNON],
+      [23, MoveId.IRON_DEFENSE],
+      [23, MoveId.METEOR_MASH],
+    ],
+  },
+  // Twinkletuff — Jigglypuff (Lv 20) -> Twinkletuff. Normal/Ground.
+  {
+    speciesId: ER_TWINKLETUFF_SPECIES_ID,
+    name: "Twinkletuff",
+    slug: "twinkletuff",
+    types: [PokemonType.NORMAL, PokemonType.GROUND],
+    stats: [140, 90, 100, 65, 90, 30],
+    actives: [WATER_COMPACTION, POROUS, GLAM_ROCK],
+    innates: [FILTER, SEDIMENT_BLOOM, POWER_CORE],
+    catchRate: 60,
+    evolvesFrom: SpeciesId.JIGGLYPUFF,
+    evolveLevel: 20,
+    learnsetAdditions: [
+      [20, MoveId.EARTHQUAKE],
+      [20, MoveId.BODY_SLAM],
+      [20, MoveId.STEALTH_ROCK],
+    ],
+  },
+  // Egoelk — Superego Pokemon: Stantler (Lv 31) -> Egoelk. Normal/Psychic.
+  {
+    speciesId: ER_EGOELK_SPECIES_ID,
+    name: "Egoelk",
+    slug: "egoelk",
+    types: [PokemonType.NORMAL, PokemonType.PSYCHIC],
+    stats: [77, 65, 65, 130, 65, 123],
+    actives: [INVERSE_ROOM, GLEAM_EYES, ENERGY_HORNS],
+    innates: [EGOIST, MINDS_EYE, CORRUPTED_MIND],
+    catchRate: 45,
+    evolvesFrom: SpeciesId.STANTLER,
+    evolveLevel: 31,
+    learnsetAdditions: [
+      [31, MoveId.PSYCHIC],
+      [31, MoveId.CALM_MIND],
+      [31, MoveId.HYPER_VOICE],
+    ],
+  },
+  // Forbiddron — Crawling Cauldron: Ghost/Poison/Steel (BST 550). FLAG (Sinistea
+  // line reading): the spec text "Sinistea (Lv 36) -> Sinistea (Lv 55) ->
+  // Forbiddron" is garbled; implemented as the most coherent reading against the
+  // vanilla Sinistea -> Polteageist (Cracked Pot) line — Forbiddron evolves from
+  // POLTEAGEIST at Lv 55, leaving the vanilla Cracked Pot evo intact.
+  {
+    speciesId: ER_FORBIDDRON_SPECIES_ID,
+    name: "Forbiddron",
+    slug: "forbiddron",
+    types: [PokemonType.GHOST, PokemonType.POISON, PokemonType.STEEL],
+    stats: [113, 75, 75, 134, 114, 39],
+    actives: [HEAVY_METAL, REDUCTION, SOUL_TAP],
+    innates: [CRACK_THE_VESSEL, ELEMENTAL_VORTEX, LIQUIFIED],
+    catchRate: 45,
+    evolvesFrom: SpeciesId.POLTEAGEIST,
+    evolveLevel: 55,
+    learnsetAdditions: [
+      [55, MoveId.SHADOW_BALL],
+      [55, MoveId.SLUDGE_BOMB],
+      [55, MoveId.FLASH_CANNON],
+      [55, MoveId.RECOVER],
+    ],
+  },
+  // Idolfin — Palafin Idol (Superstar), Water. FLAG (Idolfin mechanism): the spec
+  // wants Finizen (Lv 38) -> Palafin, then FEMALE Palafin w/ Zero to Hero ->
+  // Idolfin. A gender+ability-gated edge is not expressible through the plain
+  // level-edge seam, so this registers a LEVEL edge Palafin (Lv 45) -> Idolfin
+  // (obtainable) WITHOUT the gender/ability gate. Needs a custom SpeciesEvolution
+  // condition to enforce female + Zero to Hero — flagged for follow-up.
+  {
+    speciesId: ER_IDOLFIN_SPECIES_ID,
+    name: "Idolfin",
+    slug: "idolfin",
+    types: [PokemonType.WATER],
+    stats: [100, 106, 87, 160, 97, 100],
+    actives: [FRIEND_GUARD, PIXILATE, PREDATOR],
+    innates: [ZERO_TO_HERO, RADIANCE, SETLIST],
+    catchRate: 45,
+    evolvesFrom: SpeciesId.PALAFIN,
+    evolveLevel: 45,
+    learnsetAdditions: [
+      [45, MoveId.SURF],
+      [45, MoveId.ICE_BEAM],
+      [45, MoveId.CALM_MIND],
+    ],
+  },
 ];
 
 /**
@@ -266,9 +513,10 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
  */
 export const ER_NEWCOMER_ICON_SLUGS: readonly string[] = [
   ...ER_NEWCOMER_EVO_SPECIES.map(def => def.slug),
-  // Regitube is registered below with slug "regitube" (kept in sync with its
-  // registerErEditorMon call).
+  // Regitube + Webbed Bruiser are registered below as standalones (kept in sync
+  // with their registerErEditorMon calls).
   "regitube",
+  "webbed_bruiser",
 ];
 
 /**
@@ -392,7 +640,7 @@ export interface InjectErNewcomerSpeciesResult {
 }
 
 /** Add a level evolution edge, branched-safe (a second null-condition edge at the same level => player-choice). */
-function addEvolutionEdge(from: SpeciesId, targetId: number, level: number): boolean {
+function addEvolutionEdge(from: SpeciesId | number, targetId: number, level: number): boolean {
   const table = pokemonEvolutions as Record<number, SpeciesEvolution[]>;
   const list = (table[from] ??= []);
   if (list.some(e => (e.speciesId as number) === targetId)) {
@@ -499,6 +747,32 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     // 0001.png frame; that atlas has since been regenerated with a valid frame, so
     // the front-icon workaround (which rendered oversized on egg-hatch/party/
     // summary) is no longer needed. See ER_NEWCOMER_FRONT_ICON_SLUGS.
+  }
+
+  // --- 2b. Webbed Bruiser — standalone Ariados PAST PARADOX (Boxing Spider),
+  // Fighting/Bug, BST 570. FLAG (obtainability): no batch-1 paradox-specific seam
+  // exists in this pipeline, so it uses the same egg-obtainable standalone shape
+  // as Regitube (egg tier + BST-banded starter cost). If the maintainer wants a
+  // paradox-only source (fixed encounter / no egg), swap this block. ---
+  {
+    const added = registerErEditorMon({
+      speciesId: ER_WEBBED_BRUISER_SPECIES_ID,
+      name: "Webbed Bruiser",
+      slug: "webbed_bruiser",
+      type1: PokemonType.FIGHTING,
+      type2: PokemonType.BUG,
+      baseStats: [95, 150, 105, 59, 130, 31],
+      abilities: [RAGING_BOXER, BLITZ_BOXER, MOXIE],
+      innates: [RING_GENERAL, PROTOSYNTHESIS, GILLIE_SUIT],
+      catchRate: 45,
+    });
+    if (added) {
+      result.speciesRegistered++;
+    } else {
+      result.speciesAlreadyPresent++;
+    }
+    (speciesEggTiers as Record<number, EggTier>)[ER_WEBBED_BRUISER_SPECIES_ID] = EggTier.EPIC;
+    (speciesStarterCosts as Record<number, number>)[ER_WEBBED_BRUISER_SPECIES_ID] = 6;
   }
 
   // --- 3. Partner EEVEELUTIONS (8 transform-target species). Exact clone of the

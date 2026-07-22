@@ -82,11 +82,9 @@ import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abili
 import { ER_LIBRARY_ABILITY_ID, LibraryAbAttr } from "#data/elite-redux/abilities/library";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
-import {
-  ER_BATCH2_PLACEHOLDER_ABILITIES,
-  ER_SPIRIT_PUNCH_ABILITY_ID,
-  ER_SPIRIT_PUNCH_DRAFT,
-} from "#data/elite-redux/abilities/newcomer-batch2";
+import { ER_BATCH2_PLACEHOLDER_ABILITIES } from "#data/elite-redux/abilities/newcomer-batch2";
+import { ER_NEWCOMER_SIGNATURE_ABILITIES } from "#data/elite-redux/abilities/newcomer-signature-abilities";
+import { wireNewcomerSignatureAbility } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { ER_OMNIFORM_ABILITY_ID, OmniformAbAttr } from "#data/elite-redux/abilities/omniform";
 import {
   ClosedCircuitAbAttr,
@@ -139,10 +137,8 @@ import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { DamageReductionAbAttr } from "#data/elite-redux/archetypes/damage-reduction-generic";
 import { EntryTrapOnFoeSideAbAttr } from "#data/elite-redux/archetypes/entry-trap-on-foe-side";
-import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
 import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
 import { TypeAbsorbHighestAttackStatBoostAbAttr } from "#data/elite-redux/archetypes/immunity-with-absorb";
-import { MoveCategoryOverrideAbAttr } from "#data/elite-redux/archetypes/move-category-override";
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
 import { TypeConversionAbAttr, TypeConversionPowerBoostAbAttr } from "#data/elite-redux/archetypes/type-conversion";
 import { ER_ABILITIES, type ErAbilityDraft } from "#data/elite-redux/er-abilities";
@@ -150,7 +146,6 @@ import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/e
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
-import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
@@ -722,15 +717,13 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_PRICKLY_ARMOR_ABILITY_ID,
     },
-    // Newcomer BATCH 2 — Spirit Punch (bespoke; attrs attached in buildCustomAbility).
-    {
-      draft: { ...ER_SPIRIT_PUNCH_DRAFT, archetype: "unknown" as const },
-      pokerogueId: ER_SPIRIT_PUNCH_ABILITY_ID,
-    },
   ];
-  // Newcomer BATCH 2 — parked placeholders (named, battle-inert; no design yet).
-  // Registered so each mon carries the correctly-named ability slot and renders
-  // on every surface; every one is flagged for the designer to define.
+  // Newcomer BATCH 2 — signature abilities (codex batch, ids 5971-5994, real
+  // mechanics attached in buildCustomAbility via wireNewcomerSignatureAbility).
+  manualDrafts.push(...ER_NEWCOMER_SIGNATURE_ABILITIES);
+  // Newcomer BATCH 2 — the TWO residual parked placeholders (Meteor Mass,
+  // Inverse Room) the codex batch does not define. Named + battle-inert so each
+  // mon carries the correctly-named slot; flagged for the designer.
   for (const p of ER_BATCH2_PLACEHOLDER_ABILITIES) {
     manualDrafts.push({
       draft: { id: p.id, name: p.name, description: p.description, archetype: "unknown" },
@@ -1064,13 +1057,9 @@ function buildCustomAbility(
     builder.attr(ShatteredPsycheAbAttr);
   }
 
-  // Spirit Punch (batch 2) — Iron Fist scope of Mystic Blades (er505): punching
-  // moves become fully SPECIAL and deal 30% more damage. Same attr pair Mystic
-  // Blades uses, scoped to PUNCHING_MOVE instead of SLICING_MOVE.
-  if (pokerogueId === ER_SPIRIT_PUNCH_ABILITY_ID) {
-    builder.attr(FlagDamageBoostAbAttr, { flag: MoveFlags.PUNCHING_MOVE, multiplier: 1.3 });
-    builder.attr(MoveCategoryOverrideAbAttr, { flag: MoveFlags.PUNCHING_MOVE, category: MoveCategory.SPECIAL });
-  }
+  // Newcomer BATCH 2 signature abilities (codex batch, 5971-5994): attach the
+  // real mechanics for whichever id matches (no-op for non-signature ids).
+  wireNewcomerSignatureAbility(builder, pokerogueId);
 
   if (pokerogueId === ER_CLOSED_CIRCUIT_ABILITY_ID) {
     builder.attr(ClosedCircuitAbAttr);
