@@ -49,12 +49,19 @@
 
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
-import { pokemonEvolutions, SpeciesEvolution } from "#balance/pokemon-evolutions";
+import {
+  EvoCondKey,
+  type EvolutionConditionData,
+  pokemonEvolutions,
+  SpeciesEvolution,
+} from "#balance/pokemon-evolutions";
+import { Gender } from "#data/gender";
 import { speciesStarterCosts } from "#balance/starters";
 import { tmSpecies } from "#balance/tm-species-map";
 import { speciesTmMoves } from "#balance/tms";
 import { allSpecies } from "#data/data-lists";
 import {
+  ER_NIMBEON_OMNIFORM_ABILITY_ID,
   ER_PARTNER_EEVEE_ABILITY_ID,
   ER_PARTNER_ESPEON_ABILITY_ID,
   ER_PARTNER_FLAREON_ABILITY_ID,
@@ -64,6 +71,8 @@ import {
   ER_PARTNER_SYLVEON_ABILITY_ID,
   ER_PARTNER_UMBREON_ABILITY_ID,
   ER_PARTNER_VAPOREON_ABILITY_ID,
+  ER_RYUVEON_OMNIFORM_ABILITY_ID,
+  ER_TITANEON_OMNIFORM_ABILITY_ID,
 } from "#data/elite-redux/abilities/composite-newcomers";
 import {
   registerOmniformMapping,
@@ -172,19 +181,19 @@ const TURBOBLAZE = 163; // vanilla
 const FLARE_BOOST = 138; // vanilla
 const BLUR = 5510;
 const MOMENTUM = 5109;
-const FLUFFY = 218; // vanilla
+// Nimbeon/Ryuveon/Titaneon innate[0] is now the [innate + Omniform] composite
+// (ER_NIMBEON/RYUVEON/TITANEON_OMNIFORM_ABILITY_ID), so the bare Fluffy/Stamina/
+// Stainless Steel constituent ids live in composite-newcomers.ts, not here.
 const VAPOR_BODY = 5981; // codex signature
 const AERIALIST = 5313;
 const WHIPLASH = 5425;
 const OVERRULE = 5516;
 const UNRELENTING = 5695; // exists ("2-5 hits"); designer flagged "when fixed" — FLAG
-const STAMINA = 192; // vanilla
 const DRAGONFLY = 5050;
 const SKYHOOK = 5978; // codex signature
 const CHROME_COAT = 5267;
 const ELUDE = 5511;
 const IMPULSE = 5274;
-const STAINLESS_STEEL = 5530;
 const ANNEAL = 5979; // codex signature
 const LIVING_CHROME = 5980; // codex signature
 const WATER_COMPACTION = 195; // vanilla
@@ -193,11 +202,12 @@ const GLAM_ROCK = 5975; // codex signature
 const FILTER = 111; // vanilla
 const SEDIMENT_BLOOM = 5976; // codex signature
 const POWER_CORE = 5105;
-const INVERSE_ROOM = 5998; // RESIDUAL placeholder (no design; a MOVE named Inverse Room exists)
+const INVERSE_ROOM = 5998; // Egoelk active — auto-sets the Inverse Room field effect on entry
 const GLEAM_EYES = 5410;
 const ENERGY_HORNS = 5452;
 const EGOIST = 5276;
-const MINDS_EYE = 299; // vanilla
+const SUPEREGO = 5994; // codex signature (Egoelk innate, designer kit update 2026-07-22)
+const CENTER_OF_ATTENTION = 5993; // codex signature (Egoelk innate, designer kit update 2026-07-22)
 const HEAVY_METAL = 134; // vanilla
 const REDUCTION = 5991; // codex signature
 const SOUL_TAP = 5521;
@@ -231,6 +241,12 @@ interface NewcomerEvoSpeciesDef {
   readonly innates: readonly [number, number, number];
   readonly catchRate: number;
   /**
+   * Body weight in kg (canon-relative — reasoned from the pre-evo / nearest vanilla
+   * relative and the species' size lore). Feeds Heavy Slam / Heat Crash / Grass Knot /
+   * Low Kick / Sky Drop and weight-based abilities. FLAG: hand-authored, designer veto.
+   */
+  readonly weight: number;
+  /**
    * Species this evolves FROM (the level-edge source). Usually a vanilla
    * `SpeciesId`, but MAY be a hand-authored newcomer species id (a bare number
    * in the 70000+ band) when the pre-evo is itself a newcomer middle stage
@@ -240,6 +256,12 @@ interface NewcomerEvoSpeciesDef {
   readonly evolvesFrom: SpeciesId | number;
   /** Evolution level (per the patch; per-entry). */
   readonly evolveLevel: number;
+  /**
+   * Optional extra evolution condition(s) layered ON TOP of the level edge. Used by
+   * Idolfin (female Palafin in "hero" form) to gate the edge on the Zero to Hero
+   * switch-out transformation rather than an arbitrary level.
+   */
+  readonly evolutionCondition?: EvolutionConditionData | EvolutionConditionData[];
   /** Optional explicit cry-audio key hook (the key `cry()` plays). */
   readonly cryKey?: string;
   /** Optional cry-audio FILE path on er-assets (loaded under `cryKey`). */
@@ -272,6 +294,8 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     actives: [CORROSION, PREDATOR, TOXIC_CHAIN],
     innates: [PUPPET_STRINGS, MINION_CONTROL, CORRUPTED_MIND],
     catchRate: 60,
+    // Tentacruel is 55kg; Tentalect is a larger evolved jellyfish (BST 600). ~78kg.
+    weight: 78.0,
     evolvesFrom: SpeciesId.TENTACRUEL,
     evolveLevel: 50,
     cryKey: "cry/er_tentalect",
@@ -294,6 +318,8 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     actives: [MYSTIC_POWER, HEADSTRONG, AIR_BLOWER],
     innates: [LIBRARY, BRAINPOWER, FAMILIAR],
     catchRate: 60,
+    // Noctowl is 40.8kg; Astoot is a same-sized Psychic/Flying owl. ~45kg.
+    weight: 45.0,
     evolvesFrom: SpeciesId.NOCTOWL,
     evolveLevel: 50,
     // Psychic/Flying coverage on top of Noctowl's kit.
@@ -314,6 +340,8 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     actives: [POWER_SPOT, RAINBOW_FISH, FRIEND_GUARD],
     innates: [SOULMATE, RENDEZVOUS, HEARTBREAK],
     catchRate: 60,
+    // Luvdisc is 8.7kg; Discupid is a slightly larger Water/Fairy fish. ~12kg.
+    weight: 12.0,
     evolvesFrom: SpeciesId.LUVDISC,
     evolveLevel: 50,
     // Fairy coverage on top of Luvdisc's Water kit.
@@ -337,6 +365,8 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     actives: [SNIPER, BOOT_HILL, SPECTRALIZE],
     innates: [DEADEYE, MINIGUN, TURBOBLAZE],
     catchRate: 60,
+    // Between Dusclops (30.6kg) and Dusknoir (106.6kg) as a new middle stage. ~40kg.
+    weight: 40.0,
     evolvesFrom: SpeciesId.DUSKULL,
     evolveLevel: 36,
     learnsetAdditions: [
@@ -356,6 +386,8 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     actives: [SNIPER, BOOT_HILL, SPECTRALIZE],
     innates: [DEADEYE, MINIGUN, TURBOBLAZE],
     catchRate: 45,
+    // Dusknoir convergent (Ground/Ghost, BST 540). Dusknoir is 106.6kg. ~108kg.
+    weight: 108.0,
     evolvesFrom: ER_DRAWCLOPS_SPECIES_ID,
     evolveLevel: 45,
     learnsetAdditions: [
@@ -372,8 +404,11 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     types: [PokemonType.FLYING],
     stats: [130, 65, 60, 95, 65, 110],
     actives: [FLARE_BOOST, BLUR, MOMENTUM],
-    innates: [FLUFFY, VAPOR_BODY, AERIALIST],
+    // innate[0] grafts Omniform onto Fluffy so Nimbeon carries Omniform and chains.
+    innates: [ER_NIMBEON_OMNIFORM_ABILITY_ID, VAPOR_BODY, AERIALIST],
     catchRate: 45,
+    // Eeveelution-sized (bases ~24-29kg) but a light Flying cumulus form. ~22kg.
+    weight: 22.0,
     evolvesFrom: SpeciesId.EEVEE,
     evolveLevel: 23,
     learnsetAdditions: [
@@ -394,8 +429,11 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     types: [PokemonType.DRAGON],
     stats: [85, 95, 90, 45, 100, 110],
     actives: [WHIPLASH, OVERRULE, UNRELENTING],
-    innates: [STAMINA, DRAGONFLY, SKYHOOK],
+    // innate[0] grafts Omniform onto Stamina so Ryuveon carries Omniform and chains.
+    innates: [ER_RYUVEON_OMNIFORM_ABILITY_ID, DRAGONFLY, SKYHOOK],
     catchRate: 45,
+    // Eeveelution-sized Dragon (a sinuous sky-dancer). ~30kg.
+    weight: 30.0,
     evolvesFrom: SpeciesId.EEVEE,
     evolveLevel: 23,
     learnsetAdditions: [
@@ -413,8 +451,12 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     types: [PokemonType.STEEL],
     stats: [65, 110, 95, 60, 65, 130],
     actives: [CHROME_COAT, ELUDE, IMPULSE],
-    innates: [STAINLESS_STEEL, ANNEAL, LIVING_CHROME],
+    // innate[0] grafts Omniform onto Stainless Steel so Titaneon carries Omniform and chains.
+    innates: [ER_TITANEON_OMNIFORM_ABILITY_ID, ANNEAL, LIVING_CHROME],
     catchRate: 45,
+    // Steel "Alloy" eeveelution — a dense metal-bodied form (cf. Steelix-class density
+    // scaled to eeveelution size). ~95kg.
+    weight: 95.0,
     evolvesFrom: SpeciesId.EEVEE,
     evolveLevel: 23,
     learnsetAdditions: [
@@ -434,6 +476,8 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     actives: [WATER_COMPACTION, POROUS, GLAM_ROCK],
     innates: [FILTER, SEDIMENT_BLOOM, POWER_CORE],
     catchRate: 60,
+    // Wigglytuff is 12kg; Twinkletuff adds a Ground (earthen) body, heavier. ~28kg.
+    weight: 28.0,
     evolvesFrom: SpeciesId.JIGGLYPUFF,
     evolveLevel: 20,
     learnsetAdditions: [
@@ -450,8 +494,12 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     types: [PokemonType.NORMAL, PokemonType.PSYCHIC],
     stats: [77, 65, 65, 130, 65, 123],
     actives: [INVERSE_ROOM, GLEAM_EYES, ENERGY_HORNS],
-    innates: [EGOIST, MINDS_EYE, CORRUPTED_MIND],
+    // Designer kit update 2026-07-22: innates Egoist + Superego + Center of Attention
+    // (Mind's Eye and Corrupted Mind removed).
+    innates: [EGOIST, SUPEREGO, CENTER_OF_ATTENTION],
     catchRate: 45,
+    // Stantler is 71.2kg; Egoelk is a same-sized Normal/Psychic deer. ~75kg.
+    weight: 75.0,
     evolvesFrom: SpeciesId.STANTLER,
     evolveLevel: 31,
     learnsetAdditions: [
@@ -474,6 +522,9 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     actives: [HEAVY_METAL, REDUCTION, SOUL_TAP],
     innates: [CRACK_THE_VESSEL, ELEMENTAL_VORTEX, LIQUIFIED],
     catchRate: 45,
+    // "Crawling Cauldron" — a heavy Ghost/Poison/Steel iron vessel (carries Heavy
+    // Metal). Polteageist is a 0.4kg teapot; Forbiddron is a massive cauldron. ~95kg.
+    weight: 95.0,
     evolvesFrom: SpeciesId.POLTEAGEIST,
     evolveLevel: 55,
     learnsetAdditions: [
@@ -483,12 +534,16 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
       [55, MoveId.RECOVER],
     ],
   },
-  // Idolfin — Palafin Idol (Superstar), Water. FLAG (Idolfin mechanism): the spec
-  // wants Finizen (Lv 38) -> Palafin, then FEMALE Palafin w/ Zero to Hero ->
-  // Idolfin. A gender+ability-gated edge is not expressible through the plain
-  // level-edge seam, so this registers a LEVEL edge Palafin (Lv 45) -> Idolfin
-  // (obtainable) WITHOUT the gender/ability gate. Needs a custom SpeciesEvolution
-  // condition to enforce female + Zero to Hero — flagged for follow-up.
+  // Idolfin — Palafin Idol (Superstar), Water. Idolfin is a "zero to hero" evolution
+  // (maintainer verdict 2026-07-22): it comes from a FEMALE Palafin with Zero to Hero
+  // that has undergone the HERO switch-out transformation. That transform is exactly the
+  // vanilla ZtH form change (PreSwitchOutFormChangeAbAttr -> formIndex 1 "hero"; reverts
+  // to "zero" only at the NEXT battle's PostBattleInit), so the evolution gate hangs off
+  // it directly: the FORM_KEY==="hero" condition IS the record of the switch-out (and it
+  // implies Zero to Hero, the only producer of the hero form). GENDER==FEMALE enforces the
+  // female requirement. The Lv 45 floor is retained (a real Palafin is already >=38); the
+  // CONDITION, not the level, is the gate. A male Palafin fails GENDER; a female that never
+  // switched out is still "zero" and fails FORM_KEY.
   {
     speciesId: ER_IDOLFIN_SPECIES_ID,
     name: "Idolfin",
@@ -498,8 +553,14 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     actives: [FRIEND_GUARD, PIXILATE, PREDATOR],
     innates: [ZERO_TO_HERO, RADIANCE, SETLIST],
     catchRate: 45,
+    // Palafin Hero form is 60.2kg; Idolfin is a same-sized Water superstar dolphin. ~62kg.
+    weight: 62.0,
     evolvesFrom: SpeciesId.PALAFIN,
     evolveLevel: 45,
+    evolutionCondition: [
+      { key: EvoCondKey.GENDER, gender: Gender.FEMALE },
+      { key: EvoCondKey.FORM_KEY, formKey: "hero" },
+    ],
     learnsetAdditions: [
       [45, MoveId.SURF],
       [45, MoveId.ICE_BEAM],
@@ -651,13 +712,18 @@ export interface InjectErNewcomerSpeciesResult {
 }
 
 /** Add a level evolution edge, branched-safe (a second null-condition edge at the same level => player-choice). */
-function addEvolutionEdge(from: SpeciesId | number, targetId: number, level: number): boolean {
+function addEvolutionEdge(
+  from: SpeciesId | number,
+  targetId: number,
+  level: number,
+  condition: EvolutionConditionData | EvolutionConditionData[] | null = null,
+): boolean {
   const table = pokemonEvolutions as Record<number, SpeciesEvolution[]>;
   const list = (table[from] ??= []);
   if (list.some(e => (e.speciesId as number) === targetId)) {
     return false; // idempotent
   }
-  list.push(new SpeciesEvolution(targetId as SpeciesId, level, null, null));
+  list.push(new SpeciesEvolution(targetId as SpeciesId, level, null, condition));
   return true;
 }
 
@@ -718,6 +784,7 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
       abilities: def.actives,
       innates: def.innates,
       catchRate: def.catchRate,
+      weight: def.weight,
       extraTypes: def.types.length > 2 ? def.types.slice(2) : undefined,
       cryKey: def.cryKey,
       cryFile: def.cryFile,
@@ -727,7 +794,7 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     } else {
       result.speciesAlreadyPresent++;
     }
-    if (addEvolutionEdge(def.evolvesFrom, def.speciesId, def.evolveLevel)) {
+    if (addEvolutionEdge(def.evolvesFrom, def.speciesId, def.evolveLevel, def.evolutionCondition ?? null)) {
       result.evolutionEdges++;
     }
   }
@@ -744,6 +811,10 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
       abilities: [SEA_GUARDIAN, DRIZZLE, AFTERMATH],
       innates: [PRESSURE_VESSEL, RAIN_PUMP, LIFE_PRESERVER],
       catchRate: 45,
+      // Regi-class heavyweight (BST 580, Regirock 230 / Registeel 205). ~200kg.
+      // FLAG: as an "Inflatable" Water mon an air-filled reading would argue MUCH
+      // lighter; kept Regi-class-heavy per the maintainer's weight-audit example.
+      weight: 200.0,
     });
     if (added) {
       result.speciesRegistered++;
@@ -776,6 +847,8 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
       abilities: [RAGING_BOXER, BLITZ_BOXER, MOXIE],
       innates: [RING_GENERAL, PROTOSYNTHESIS, GILLIE_SUIT],
       catchRate: 45,
+      // Ariados is 33.5kg; Webbed Bruiser is a heavyweight-boxer paradox (BST 570). ~90kg.
+      weight: 90.0,
     });
     if (added) {
       result.speciesRegistered++;
@@ -812,6 +885,9 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
       abilities: actives,
       innates,
       catchRate: base.catchRate,
+      // Transform-only clone: inherit the base eeveelution's real vanilla weight so
+      // weight-based mechanics behave identically to the base form.
+      weight: base.weight,
       extraTypes: extraTypes.length > 0 ? extraTypes : undefined,
     });
     if (added) {
@@ -836,10 +912,9 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     }
     // Batch-2 Omniform EXTENSION: Partner Eevee also adapts into the three new
     // eeveelutions on their signature move type (Flying->Nimbeon, Dragon->Ryuveon,
-    // Steel->Titaneon). FLAG: these are REAL evolution species (not partner
-    // transform-only clones), so they do NOT carry the Omniform composite and are
-    // TERMINAL adapt targets (they cannot chain onward). Confirm with the designer
-    // whether they should carry Omniform to chain like the partner family.
+    // Steel->Titaneon). These now CARRY Omniform too (the [innate + Omniform] composite
+    // grafted onto their innate[0] — maintainer verdict 2026-07-22), so they are full
+    // family members that chain onward, not terminal adapt targets.
     for (const [mapType, speciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
       registerOmniformMapping(PARTNER_HEAD_SPECIES, partnerFormIndex, mapType, speciesId as SpeciesId, 0);
       result.omniformMappings++;
@@ -853,6 +928,21 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     // Each partner eeveelution also adapts into the three new eeveelutions.
     for (const [mapType, speciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
       registerOmniformMapping(holder.partnerId as SpeciesId, 0, mapType, speciesId as SpeciesId, 0);
+      result.omniformMappings++;
+    }
+  }
+  // The three new eeveelutions carry Omniform, so they map OUTWARD into the whole
+  // family too — adapting into one, then using another family type, chains onward
+  // (Partner Eevee -> Steel -> Titaneon -> Water -> Vaporeon). Each holder maps into
+  // all 8 partners (by the partner's own type) AND all three extension eeveelutions
+  // (by their signature type); a self-type map is a same-form no-op, harmless.
+  for (const [, holderSpeciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
+    for (const target of ER_PARTNER_FAMILY) {
+      registerOmniformMapping(holderSpeciesId as SpeciesId, 0, target.mapType, target.partnerId as SpeciesId, 0);
+      result.omniformMappings++;
+    }
+    for (const [mapType, speciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
+      registerOmniformMapping(holderSpeciesId as SpeciesId, 0, mapType, speciesId as SpeciesId, 0);
       result.omniformMappings++;
     }
   }
@@ -875,6 +965,13 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
         PARTNER_HEAD_SPECIES,
         partnerFormIndex,
       );
+    }
+    // The three new eeveelutions are full family members too; anchor their Omniform
+    // candy-unlock to the Partner Eevee head. (They also root on Eevee via evolution,
+    // so this resolves to the same Eevee passiveAttr as the natural rooting — kept for
+    // explicit family membership and the directly-loaded/spawned case.)
+    for (const [, holderSpeciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
+      registerOmniformUnlockOwner(holderSpeciesId as SpeciesId, 0, PARTNER_HEAD_SPECIES, partnerFormIndex);
     }
   }
 

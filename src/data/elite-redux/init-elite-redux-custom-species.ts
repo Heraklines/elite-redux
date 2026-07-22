@@ -574,6 +574,14 @@ export interface ErEditorMonSpec {
   abilities: readonly [number, number, number];
   innates: readonly [number, number, number];
   catchRate: number;
+  /**
+   * Body weight in kg. Feeds Heavy Slam / Heat Crash / Grass Knot / Low Kick /
+   * Sky Drop and weight-based abilities (Heavy Metal, Meteor Mass, etc.). Optional;
+   * defaults to 30.0 when omitted (the legacy placeholder — a species without an
+   * authored weight keeps the old behaviour). Hand-authored per canon-relative for
+   * the shipped newcomers.
+   */
+  weight?: number;
   /** N-type static model: types 3..N (beyond type1/type2). Optional. */
   extraTypes?: readonly PokemonType[] | undefined;
   /** Explicit cry-audio key hook (hand-authored newcomer species with own cry). */
@@ -608,7 +616,7 @@ export function registerErEditorMon(spec: ErEditorMonSpec): boolean {
     spec.type1,
     spec.type2,
     1.0,
-    30.0,
+    spec.weight ?? 30.0,
     spec.abilities[0],
     spec.abilities[1],
     spec.abilities[2],
@@ -776,7 +784,12 @@ function buildCustomSpecies(draft: ErSpeciesDraft, speciesId: number): PokemonSp
     type1,
     type2,
     1.0, // height (m) — TODO: extract from dex.hw[0]
-    30.0, // weight (kg) — TODO: extract from dex.hw[1]
+    // weight (kg). FLAG (2026-07-22 weight audit): the ER 2.65 dump (ErSpeciesDraft)
+    // carries NO height/weight, so all ~827 dump customs (ids 10000-10880) default to
+    // 30kg. The shipped, named NEWCOMER species get hand-authored canon-relative weights
+    // (registerErEditorMon `weight`); a per-species dex weight pass for the 827 bulk
+    // customs is a SEPARATE data task (deriving them would be a guess, not dex-authoritative).
+    30.0,
     mapAbilityId(draft.abilities[0]),
     mapAbilityId(draft.abilities[1]),
     mapAbilityId(draft.abilities[2]),
