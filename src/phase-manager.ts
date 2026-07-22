@@ -71,6 +71,7 @@ import { ErGreaterAbilityRandomizerPhase } from "#phases/er-greater-ability-rand
 import { ErOmniformTransformWaitPhase } from "#phases/er-omniform-transform-wait-phase";
 import { ErQuizPhase } from "#phases/er-quiz-phase";
 import { ErShatteredPsycheBonusPhase } from "#phases/er-shattered-psyche-bonus-phase";
+import { ErSignatureFollowupPhase } from "#phases/er-signature-followup-phase";
 import { ErStormglassPickerPhase } from "#phases/er-stormglass-picker-phase";
 import { EvolutionPhase } from "#phases/evolution-phase";
 import { ExoticShopPhase } from "#phases/exotic-shop-phase";
@@ -190,6 +191,7 @@ const PHASES = Object.freeze({
   ErClosedCircuitBurstPhase,
   ErOmniformTransformWaitPhase,
   ErShatteredPsycheBonusPhase,
+  ErSignatureFollowupPhase,
   ErCrossroadsPhase,
   ErQuizPhase,
   ErStormglassPickerPhase,

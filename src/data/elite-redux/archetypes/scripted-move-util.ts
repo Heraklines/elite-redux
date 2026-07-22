@@ -32,6 +32,7 @@ import { PokemonMove } from "#data/moves/pokemon-move";
 import type { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
+import type { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 import {
   HitHealAttr,
@@ -66,6 +67,8 @@ export interface ScriptedMoveOptions {
   readonly hpScaledBasePower?: number;
   /** Optional battle-only category override for an ability-scripted move. */
   readonly category?: MoveCategory;
+  /** Optional battle-only primary type override for an ability-scripted move. */
+  readonly type?: PokemonType;
   /**
    * Strip {@linkcode MoveFlags.REFLECTABLE} from the scripted cast so it is NOT
    * bounced back by Magic Bounce / Magic Coat onto the caster. Used by
@@ -117,6 +120,7 @@ class PowerOverriddenPokemonMove extends PokemonMove {
   private readonly nonReflectable: boolean;
   private readonly hpScaledBasePower: number | undefined;
   private readonly category: MoveCategory | undefined;
+  private readonly type: PokemonType | undefined;
   private readonly healMultiplier: number | undefined;
   private cached: Move | undefined;
 
@@ -129,6 +133,7 @@ class PowerOverriddenPokemonMove extends PokemonMove {
     this.noRecharge = opts.noRecharge ?? false;
     this.hpScaledBasePower = opts.hpScaledBasePower;
     this.category = opts.category;
+    this.type = opts.type;
     this.nonReflectable = opts.nonReflectable ?? false;
     this.healMultiplier = opts.healMultiplier;
   }
@@ -146,7 +151,10 @@ class PowerOverriddenPokemonMove extends PokemonMove {
         (clone as unknown as { power: number }).power = this.power;
       }
       if (this.category !== undefined) {
-        (clone as unknown as { category: MoveCategory }).category = this.category;
+        (clone as unknown as { _category: MoveCategory })._category = this.category;
+      }
+      if (this.type !== undefined) {
+        (clone as unknown as { _type: PokemonType })._type = this.type;
       }
       if (this.alwaysHit) {
         // accuracy -1 = "bypasses the accuracy check" (Swift/Aerial Ace style).
@@ -228,6 +236,7 @@ export function scriptedPokemonMove(moveId: MoveId, power?: number, opts: Script
     && !nonReflectable
     && opts.healMultiplier === undefined
     && opts.category === undefined
+    && opts.type === undefined
     ? new PokemonMove(moveId)
     : new PowerOverriddenPokemonMove(moveId, power, opts);
 }

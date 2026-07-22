@@ -50,16 +50,24 @@ export type { DualTypeMoveAttr };
 interface DualTypePrime {
   readonly primaryType: PokemonType;
   readonly secondType: PokemonType;
+  readonly physicalOnly: boolean;
 }
 
 const DUAL_TYPE_PRIME = new WeakMap<Pokemon, DualTypePrime>();
 
 /**
- * Prime `target`'s next PHYSICAL move to become `primaryType`/`secondType`
- * dual-type (Negative Feedback: Electric/Fairy). Overwrites any existing prime.
+ * Prime `target`'s next move to become `primaryType`/`secondType` dual-type
+ * (Negative Feedback: Electric/Fairy). Overwrites any existing prime.
+ * `physicalOnly` (default true) restricts consumption to physical moves; the
+ * batch-2 signature Reduction primes any non-status move.
  */
-export function primeDualTypeMove(target: Pokemon, primaryType: PokemonType, secondType: PokemonType): void {
-  DUAL_TYPE_PRIME.set(target, { primaryType, secondType });
+export function primeDualTypeMove(
+  target: Pokemon,
+  primaryType: PokemonType,
+  secondType: PokemonType,
+  physicalOnly = true,
+): void {
+  DUAL_TYPE_PRIME.set(target, { primaryType, secondType, physicalOnly });
 }
 
 /** The active dual-type prime on `pokemon`, or `undefined`. */
@@ -72,9 +80,12 @@ export function clearDualTypePrime(pokemon: Pokemon): void {
   DUAL_TYPE_PRIME.delete(pokemon);
 }
 
-/** Whether `pokemon` is primed AND `move` is the physical move that consumes it. */
+/** Whether `pokemon` is primed AND `move` is a move that consumes the prime. */
 export function dualTypePrimeApplies(pokemon: Pokemon, move: Move): boolean {
-  return move.category === MoveCategory.PHYSICAL && DUAL_TYPE_PRIME.has(pokemon);
+  const prime = DUAL_TYPE_PRIME.get(pokemon);
+  return (
+    !!prime && (prime.physicalOnly ? move.category === MoveCategory.PHYSICAL : move.category !== MoveCategory.STATUS)
+  );
 }
 
 /**
