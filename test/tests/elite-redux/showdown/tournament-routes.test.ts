@@ -689,6 +689,42 @@ describe("tournament routes — P2 deadline auto-resolution + champion auto-gran
     expect(m1r.winner).toBe(m1.a); // b (seed2) beats c (seed3)
   });
 
+  it("expired BO3 with a 0-1 lead -> SERIES resolution advances the leader (outranks seed) through the read seam", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const id = "dls";
+    expect(
+      (await call("/tournament/create", "POST", ADMIN, { id, name: "Series Cup", maxEntrants: 4, seriesFormat: "bo3" }))
+        .status,
+    ).toBe(200);
+    for (const p of ["a", "b", "c", "d"]) {
+      expect((await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` })).status).toBe(200);
+    }
+    let t = await call(`/tournament/bracket?id=${id}`, "GET", player("a")).then(r => r.json() as any);
+    const m0 = t.tournament.bracket.rounds[0][0]; // a(seed1) vs d(seed4)
+    // both paired players attest game 0 to d (the LOWER seed) -> series 0-1, unclinched (bo3 needs 2).
+    await call("/tournament/result", "POST", player(m0.a), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: m0.b,
+      gameIndex: 0,
+    });
+    const g0 = await call("/tournament/result", "POST", player(m0.b), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: m0.b,
+      gameIndex: 0,
+    });
+    expect(((await g0.json()) as any).match.winner).toBeNull(); // not yet clinched
+    // window expires with no further games -> the leader (d) forfeit-advances by "series", NOT seed.
+    vi.setSystemTime(T0 + WINDOW + 1);
+    t = await call(`/tournament/bracket?id=${id}`, "GET", player("a")).then(r => r.json() as any);
+    const m0r = t.tournament.bracket.rounds[0][0];
+    expect(m0r.winner).toBe(m0.b); // series leader d beats the higher seed a
+    expect(m0r.resolution).toBe("series");
+    expect(t.tournament.bracket.rounds[1][0].a).toBe(m0.b); // advanced into the final
+  });
+
   it("idempotent — a later read never re-resolves an auto-resolved match", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(T0);

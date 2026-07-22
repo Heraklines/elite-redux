@@ -52,7 +52,7 @@ interface TournamentNotifData extends TournamentDeepLink {
 }
 
 /** The P2 auto-resolution kinds that advance a player WITHOUT them playing (drives the "advanced" notif). */
-const AUTO_ADVANCE_RESOLUTIONS = new Set(["activity", "seed", "walkover"]);
+const AUTO_ADVANCE_RESOLUTIONS = new Set(["activity", "seed", "walkover", "series"]);
 
 /**
  * The LATEST (highest-round) match `me` won via a P2/P3 auto-resolution (activity / seed / walkover) —

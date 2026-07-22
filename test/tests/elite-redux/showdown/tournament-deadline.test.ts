@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 // P2 DEADLINE AUTO-RESOLUTION: presence-based activity wins, seed fallback, idempotency.
 import {
   applyResultReport,
+  applySeriesGameReport,
   type Bracket,
+  type BracketMatch,
   generateBracket,
   isComplete,
   type Participant,
   recordPresence,
   resolveExpiredMatches,
+  seriesScore,
   wasPresent,
 } from "../../../../workers/er-telemetry/src/tournament-bracket";
 
@@ -159,5 +162,92 @@ describe("resolveExpiredMatches — kicked-player safety net", () => {
     expect(m0.winner).toBe(m0.b);
     expect(m0.resolution).toBe("walkover");
     expect(resolved[0].kind).toBe("walkover");
+  });
+});
+
+// =============================================================================
+// P2 x SERIES composition — an EXPIRED bo3/bo5 with a partial score.
+// CHOSEN RULE (flagged): a series with games PLAYED and a STRICT game-score leader
+// auto-resolves to that leader ("series"); the no-show forfeits the remaining games.
+// A partial series lead is real, played signal and OUTRANKS presence/seed. A TIED or
+// unplayed series carries no series signal and falls through to activity/seed. A kick
+// (admin elimination) still overrides even a series lead.
+// =============================================================================
+
+/** Drive a settled game into a series match via dual attestation (both paired players agree). */
+function settleGame(b: Bracket, m: BracketMatch, gameIndex: number, gameWinner: Participant, at: number): void {
+  const BO3_CLINCH = 2; // never reached in these partial-lead fixtures
+  applySeriesGameReport(b, m.id, m.a as string, gameWinner, gameIndex, BO3_CLINCH, at);
+  applySeriesGameReport(b, m.id, m.b as string, gameWinner, gameIndex, BO3_CLINCH, at);
+}
+
+describe("resolveExpiredMatches — SERIES lead (expired bo3/bo5 with a partial score)", () => {
+  it("advances the game-score LEADER on expiry, outranking the higher seed", () => {
+    const b = bracket4();
+    const m0 = b.rounds[0][0]; // p1(seed1) vs p4(seed4)
+    // p4 (the LOWER seed) wins game 0 -> series 0-1, still unclinched (bo3 needs 2).
+    settleGame(b, m0, 0, m0.b as string, 100);
+    expect(seriesScore(m0)).toEqual({ a: 0, b: 1 });
+    expect(m0.winner).toBeNull(); // not yet clinched
+    const { resolved } = resolveExpiredMatches(b, seedOf, WINDOW + 1);
+    expect(m0.winner).toBe(m0.b); // the leader (p4) advances, NOT the higher seed p1
+    expect(m0.resolution).toBe("series");
+    expect(resolved[0]).toMatchObject({ kind: "series", winner: m0.b, eliminated: m0.a, contested: false });
+    expect(b.rounds[1][0].a).toBe(m0.b);
+  });
+
+  it("series lead OUTRANKS presence: a lone-present TRAILING player does not steal the win", () => {
+    const b = bracket4();
+    const m0 = b.rounds[0][0]; // p1 vs p4
+    settleGame(b, m0, 0, m0.a as string, 100); // p1 leads 1-0
+    recordPresence(b, m0.b as string, 200); // p4 (trailing) is the only one present
+    const { resolved } = resolveExpiredMatches(b, seedOf, WINDOW + 1);
+    expect(m0.winner).toBe(m0.a); // the LEADER wins despite not being the present one
+    expect(m0.resolution).toBe("series");
+    expect(resolved[0].kind).toBe("series");
+  });
+
+  it("a TIED series (1-1) carries no signal -> falls through to seed", () => {
+    const b = bracket4();
+    const m0 = b.rounds[0][0]; // p1 seed1 vs p4 seed4
+    settleGame(b, m0, 0, m0.a as string, 100); // p1 wins g0
+    settleGame(b, m0, 1, m0.b as string, 200); // p4 wins g1 -> 1-1
+    expect(seriesScore(m0)).toEqual({ a: 1, b: 1 });
+    const { resolved } = resolveExpiredMatches(b, seedOf, WINDOW + 1);
+    expect(m0.winner).toBe("p1"); // higher seed, seed fallback
+    expect(m0.resolution).toBe("seed");
+    expect(resolved[0].kind).toBe("seed");
+  });
+
+  it("an UNPLAYED series (0-0) is normal presence/seed (no series branch)", () => {
+    const b = bracket4();
+    const m0 = b.rounds[0][0];
+    recordPresence(b, m0.b as string, 100); // lone-present p4 -> activity
+    const { resolved } = resolveExpiredMatches(b, seedOf, WINDOW + 1);
+    expect(m0.winner).toBe(m0.b);
+    expect(m0.resolution).toBe("activity");
+    expect(resolved[0].kind).toBe("activity");
+  });
+
+  it("a KICK still overrides a series lead (admin elimination wins)", () => {
+    const b = bracket4();
+    const m0 = b.rounds[0][0]; // p1 vs p4
+    settleGame(b, m0, 0, m0.a as string, 100); // p1 leads 1-0
+    b.kicked = [m0.a as string]; // ...but p1 is kicked
+    const { resolved } = resolveExpiredMatches(b, seedOf, WINDOW + 1);
+    expect(m0.winner).toBe(m0.b); // the kicked leader loses; opponent walks over
+    expect(m0.resolution).toBe("walkover");
+    expect(resolved[0].kind).toBe("walkover");
+  });
+
+  it("is idempotent — a resolved series match is not re-resolved on a later read", () => {
+    const b = bracket4();
+    const m0 = b.rounds[0][0];
+    settleGame(b, m0, 0, m0.b as string, 100); // p4 leads 1-0
+    const first = resolveExpiredMatches(b, seedOf, WINDOW + 1);
+    expect(first.resolved.some(r => r.matchId === m0.id)).toBe(true);
+    const second = resolveExpiredMatches(b, seedOf, WINDOW + 10 * HOUR);
+    expect(second.resolved.some(r => r.matchId === m0.id)).toBe(false);
+    expect(m0.resolution).toBe("series");
   });
 });

@@ -18,7 +18,7 @@ export type TournamentParticipant = string;
 
 export type TournamentState = "registration" | "in_progress" | "complete" | "cancelled";
 
-export type MatchResolution = "pending" | "bye" | "reported" | "manual" | "walkover" | "activity" | "seed";
+export type MatchResolution = "pending" | "bye" | "reported" | "manual" | "walkover" | "activity" | "seed" | "series";
 
 /**
  * Short human label for how a match was decided WITHOUT being played — the board's advance badge
@@ -32,6 +32,8 @@ export function autoResolutionLabel(resolution: MatchResolution): string | null 
       return "Activity win";
     case "seed":
       return "Advanced on seed";
+    case "series":
+      return "Series lead";
     case "bye":
       return "Bye";
     default:

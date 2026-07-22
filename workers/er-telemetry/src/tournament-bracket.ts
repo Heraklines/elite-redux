@@ -37,7 +37,8 @@ export type MatchResolution =
   | "manual" // settled by an organizer override
   | "walkover" // opponent auto-advanced because the other player was KICKED (admin, P3)
   | "activity" // P2 deadline auto-resolution: the ONLY player present in the lobby during the window advances
-  | "seed"; // P2 deadline auto-resolution: neither (or both) present -> the higher seed advances
+  | "seed" // P2 deadline auto-resolution: neither (or both) present -> the higher seed advances
+  | "series"; // P2 deadline auto-resolution of a SERIES (bo3/bo5): the game-score LEADER advances (no-show forfeits the rest)
 
 /** One player's attestation of a match outcome, with the epoch-ms it first arrived. */
 export interface MatchReport {
@@ -443,6 +444,7 @@ const PLAYED_RESOLUTIONS: ReadonlySet<MatchResolution> = new Set<MatchResolution
   "walkover",
   "activity",
   "seed",
+  "series",
 ]);
 
 /** Count of matches that have been PLAYED (contested result, manual resolve, or walkover). Byes excluded. */
@@ -615,8 +617,12 @@ export interface ExpiredResolution {
   round: number;
   slot: number;
   winner: Participant | null;
-  /** "activity" (a lone-present player) or "seed" (neither/both present -> higher seed). */
-  kind: "activity" | "seed" | "walkover";
+  /**
+   * How the expired match was auto-resolved: "series" (a SERIES with a game-score leader -> the leader
+   * advances), "activity" (a lone-present player), "seed" (neither/both present -> higher seed), or
+   * "walkover" (opponent was kicked).
+   */
+  kind: "activity" | "seed" | "walkover" | "series";
   /** The player who advanced without playing (== winner), for the "you advanced" notification. */
   advanced: Participant | null;
   /** The player who was eliminated without playing (the non-winner real player), or null. */
@@ -629,9 +635,12 @@ export interface ExpiredResolution {
  * LAZILY auto-resolve every match whose round window has EXPIRED (now > deadline) without a result
  * (design doc step 6). Processed in ascending round order so an advance feeds the next round in the
  * same pass (a long-abandoned tournament resolves multiple rounds at once). Per expired, playable,
- * undecided match:
- *   - a KICKED player present -> the opponent walks over (safety net for a kick whose opponent
- *     arrived from a later feeder);
+ * undecided match, in PRIORITY order:
+ *   - a KICKED player -> the opponent walks over (admin elimination overrides everything else);
+ *   - a SERIES (bo3/bo5) with games PLAYED and a STRICT game-score leader -> that leader advances by
+ *     "series" (the no-show forfeits the remaining games; a partial series lead is real, played signal
+ *     and must be respected — this composes deadline auto-resolution with series clinching). A TIED or
+ *     unplayed series carries no signal and falls through to presence/seed below;
  *   - exactly ONE player present in the lobby during the window -> that player wins by "activity";
  *   - NEITHER or BOTH present -> the HIGHER seed (lower seed number) advances by "seed" (both-present
  *     is flagged `contested`).
@@ -662,13 +671,14 @@ export function resolveExpiredMatches(
       let winner: Participant;
       let kind: ExpiredResolution["kind"];
       let contested = false;
+      const series = seriesScore(match);
       if (aKicked && !bKicked) {
         winner = b;
         kind = "walkover";
       } else if (bKicked && !aKicked) {
         winner = a;
         kind = "walkover";
-      } else {
+      } else if (series.a === series.b) {
         const aPresent = wasPresent(match, a);
         const bPresent = wasPresent(match, b);
         if (aPresent && !bPresent) {
@@ -683,6 +693,11 @@ export function resolveExpiredMatches(
           winner = seedRank(a) <= seedRank(b) ? a : b;
           kind = "seed";
         }
+      } else {
+        // SERIES with a strict game-score leader: the leader advances (no-show forfeits the rest).
+        // A partial series lead reflects games actually played and outranks presence/seed here.
+        winner = series.a > series.b ? a : b;
+        kind = "series";
       }
       setWinner(bracket, match, winner, kind);
       match.deadline = now;
