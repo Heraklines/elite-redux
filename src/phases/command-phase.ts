@@ -5,6 +5,8 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
+import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   applyCoopAuthoritativeBattleState,
   coopAppliedStateTick,
@@ -20,6 +22,7 @@ import {
 import { ensureCoopAuthoritativeCommandPresentation } from "#data/elite-redux/coop/coop-presentation";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
+  cancelCoopV2DeferredCommandStart,
   coopHasPendingWaveAdvance,
   coopOwnerOfPlayerFieldSlot,
   enterCoopV2CommandControlBoundary,
@@ -35,6 +38,7 @@ import {
   isCoopV2CommandAdmissionFrozen,
   isCoopV2ControlSurfaceStartFrozen,
   isVersusSession,
+  pendingCoopAuthoritativeReplacementReplayTurn,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
   recordCoopV2CommandControlStarted,
@@ -95,6 +99,14 @@ export class CommandPhase extends FieldPhase {
 
   /** Showdown versus-host 60s turn clock (timeout id); null when unarmed. */
   private showdownTurnClock: number | null = null;
+
+  /**
+   * Live {@linkcode CoopBattleStreamer.onCheckpointEnvelope} subscription installed while this authoritative
+   * guest command is PARKED (deferred on its V2 command frontier). A retained REPLACEMENT checkpoint that
+   * lands AFTER the park has no other consumer - this wakes the safe boundary so the parked command dissolves
+   * into a {@linkcode CoopReplayTurnPhase} that applies + finalizes it. Null when not parked / not armed.
+   */
+  private parkedReplacementUnsub: (() => void) | null = null;
 
   constructor(fieldIndex: number) {
     super();
@@ -672,13 +684,89 @@ export class CommandPhase extends FieldPhase {
     return true;
   }
 
+  /**
+   * While this authoritative-guest command is PARKED on its V2 command frontier, watch for the retained
+   * REPLACEMENT carrier that must be consumed before the ordered command-open can ever admit. The bug this
+   * closes (Frontier 4): the guest's own faint pick raced its local engine into TurnInit -> CommandPhase
+   * BEFORE the host's `REPLACEMENT_COMMIT` checkpoint arrived, so TurnInit's pre-command replacement probe
+   * saw nothing and the command parked. The checkpoint then lands ~18s later with NO consumer (no replay
+   * pump, no envelope subscriber), so it stays materialDeferred forever and the command-open ordered AFTER
+   * it can never admit -> hard hang at the turn-2 rendezvous. Arming this envelope subscription supplies the
+   * missing consumer: on the checkpoint's arrival the parked command dissolves into the SAME
+   * `CoopReplayTurnPhase` route TurnInit would have taken, which applies + checksum-verifies + finalizes the
+   * replacement (unblocking the deferred authority revision) and then opens the real command.
+   */
+  private armReplacementReplayDissolveWhileParked(pokemonId: number): void {
+    if (!isCoopAuthoritativeGuestGated() || !isCoopV2ReplacementCutoverActive()) {
+      return;
+    }
+    // The checkpoint may already be buffered at park time (the non-racy window) - route immediately.
+    if (this.dissolveIntoReplacementReplayIfPending(pokemonId)) {
+      return;
+    }
+    if (this.parkedReplacementUnsub != null) {
+      return; // already armed for this park (start() re-runs on every resume attempt)
+    }
+    const streamer = getCoopBattleStreamer();
+    if (streamer == null) {
+      return;
+    }
+    this.parkedReplacementUnsub = streamer.onCheckpointEnvelope(() => {
+      // One-shot + wrong-ambient safety: only act while THIS parked phase is still the current phase. In the
+      // two-engine harness a checkpoint can be delivered while another client's scene is installed; the
+      // current-phase identity check makes that delivery a no-op instead of dissolving the wrong client.
+      if (globalScene.phaseManager.getCurrentPhase() !== this) {
+        return;
+      }
+      this.dissolveIntoReplacementReplayIfPending(pokemonId);
+    });
+  }
+
+  /**
+   * If a retained authoritative REPLACEMENT carrier for this turn is buffered, dissolve this parked command
+   * into the {@linkcode CoopReplayTurnPhase} that consumes it (identical route + args to TurnInit's
+   * pre-command deferral). Returns true when it dissolved. The parked deferred-command entry is retracted
+   * first: its `resume` points at the phase being ended, so leaving it would let a later same-address
+   * command-open re-enter a dead phase and open a phantom second command surface.
+   */
+  private dissolveIntoReplacementReplayIfPending(pokemonId: number): boolean {
+    const replacementReplayTurn = pendingCoopAuthoritativeReplacementReplayTurn();
+    if (replacementReplayTurn == null) {
+      return false;
+    }
+    this.clearParkedReplacementWake();
+    cancelCoopV2DeferredCommandStart(this.fieldIndex, pokemonId);
+    coopLog(
+      "v2-replacement",
+      "guest parked command dissolves into retained replacement replay at "
+        + `wave=${globalScene.currentBattle.waveIndex} turn=${replacementReplayTurn}`,
+    );
+    globalScene.phaseManager.unshiftNew(
+      "CoopReplayTurnPhase",
+      replacementReplayTurn,
+      0,
+      undefined,
+      globalScene.currentBattle.waveIndex,
+    );
+    this.end();
+    return true;
+  }
+
+  private clearParkedReplacementWake(): void {
+    this.parkedReplacementUnsub?.();
+    this.parkedReplacementUnsub = null;
+  }
+
   public override start(): void {
     const boundaryPokemon = globalScene.getPlayerField()[this.fieldIndex];
     if (boundaryPokemon != null) {
       const boundary = enterCoopV2CommandControlBoundary(this.fieldIndex, boundaryPokemon.id, () => this.start());
       if (boundary === "deferred") {
+        this.armReplacementReplayDissolveWhileParked(boundaryPokemon.id);
         return;
       }
+      // Un-parked normally (command frontier admitted): drop any parked-replacement wake armed above.
+      this.clearParkedReplacementWake();
       if (boundary === "failed") {
         failCoopSharedSession(
           `Authority V2 could not install command control for field ${this.fieldIndex} `
@@ -1805,6 +1893,7 @@ export class CommandPhase extends FieldPhase {
 
   end() {
     this.clearShowdownTurnClock();
+    this.clearParkedReplacementWake();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
   }
 }

@@ -75,6 +75,7 @@ import {
   type CoopV2ReplacementBatchResult,
   CoopV2ReplacementCutover,
   clearActiveCoopV2ReplacementCutover,
+  isCoopV2ReplacementCutoverActive,
   isCoopV2ReplacementEnabled,
   setActiveCoopV2ReplacementCutover,
 } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
@@ -141,6 +142,7 @@ import {
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import {
   type CoopShowdownSeatAuthority,
+  isCoopAuthoritativeGuestGated,
   setCoopAuthoritativeGuestPredicate,
   setShowdownGuestFlipPredicate,
   setShowdownSeatAuthorityResolver,
@@ -7057,6 +7059,62 @@ function releaseCoopV2DeferredCommandStarts(
       pending.resume();
     } catch (error) {
       coopWarn("v2-control", `deferred CommandPhase resume threw key=${key}`, error);
+    }
+  }
+}
+
+/**
+ * The immutable REPLACEMENT carrier that an authoritative guest replica must route through a
+ * {@linkcode CoopReplayTurnPhase} (its checkpoint branch applies + checksum-verifies + settles it) BEFORE
+ * opening the ordinary next-turn command. Returns the replay turn (== the guest's current battle turn) when
+ * a retained replacement checkpoint for this turn (or its exact N+1 post-summon frontier) is buffered but
+ * not yet consumed, else null. CommandPhase's parked-command re-trigger (a checkpoint that lands AFTER the
+ * command already parked) routes through this. It MIRRORS, byte-for-byte, TurnInitPhase's inline
+ * `pendingAuthoritativeReplacementTurn` predicate (which the browser gate contract
+ * authority-v2-gate-contract.test.mjs pins in place and therefore cannot be collapsed into this shared
+ * helper), so the pre-command deferral and the parked re-trigger reach the identical verdict. Keep the two
+ * in lockstep if either changes.
+ */
+export function pendingCoopAuthoritativeReplacementReplayTurn(): number | null {
+  if (!isCoopAuthoritativeGuestGated() || !isCoopV2ReplacementCutoverActive()) {
+    return null;
+  }
+  const controller = getCoopController();
+  const streamer = getCoopBattleStreamer();
+  const battle = globalScene.currentBattle;
+  if (controller == null || streamer == null || battle == null) {
+    return null;
+  }
+  const currentTurn = battle.turn;
+  const currentWave = battle.waveIndex;
+  const pending = streamer.peekCheckpointForTurn(currentTurn, currentWave);
+  if (
+    pending?.reason !== "replacement"
+    || pending.epoch !== controller.sessionEpoch
+    || pending.wave !== currentWave
+    || pending.authoritativeState?.wave !== currentWave
+    || (pending.turn !== currentTurn && pending.turn !== currentTurn + 1)
+  ) {
+    return null;
+  }
+  return currentTurn;
+}
+
+/**
+ * Drop any parked local CommandPhase deferred-start entry addressed to this exact field slot + pokemon, at
+ * ANY turn key. A parked CommandPhase that dissolves itself into a replacement replay (its checkpoint
+ * arrived after it parked) must retract its stale entry: its `resume` points at the phase it is ending, so
+ * leaving the entry lets a later same-address command-open re-enter a dead phase and open a phantom second
+ * command surface. Idempotent - a no-op when nothing is parked for the slot.
+ */
+export function cancelCoopV2DeferredCommandStart(fieldIndex: number, pokemonId: number): void {
+  const runtime = active;
+  if (runtime == null) {
+    return;
+  }
+  for (const [key, pending] of [...runtime.v2DeferredCommandStarts]) {
+    if (pending.fieldIndex === fieldIndex && pending.pokemonId === pokemonId) {
+      runtime.v2DeferredCommandStarts.delete(key);
     }
   }
 }
