@@ -9,6 +9,16 @@ import { erBatch3OnTargetHit } from "#data/elite-redux/abilities/batch3-on-hit";
 import { erBatch4OnTargetHit } from "#data/elite-redux/abilities/batch4-on-hit";
 import { consumeDualTypePrimeOnUse, dualTypePrimeApplies } from "#data/elite-redux/abilities/dual-type-move";
 import { erCapacitorBankConsumeOnElectricUse } from "#data/elite-redux/abilities/electivire";
+import {
+  applyCenterOfAttentionPenalty,
+  finishReductionMove,
+  finishSetlistMove,
+  finishTwoFacedMove,
+  prepareReductionMove,
+  prepareTwoFacedMove,
+  recordSignatureExecutedMove,
+  signatureFollowupSuppressesKoEffects,
+} from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { requestedFieldNormalizesAbilityAccuracy } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import {
   ConditionalAlwaysHitAbAttr,
@@ -48,7 +58,7 @@ import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
 import { MoveTarget } from "#enums/move-target";
-import { isReflected, MoveUseMode } from "#enums/move-use-mode";
+import { isReflected, isVirtual, MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 
@@ -175,10 +185,6 @@ export class MoveEffectPhase extends PokemonPhase {
 
     const move = this.move;
 
-    // ER Negative Feedback (5923): snapshot whether the user began this move
-    // already dual-type-primed, so only a move that STARTED primed consumes it.
-    this.erStartedPrimed = dualTypePrimeApplies(user, move);
-
     /**
      * Does an effect from this move override other effects on this turn?
      * e.g. Charging moves (Fly, etc.) on their first turn of use.
@@ -196,6 +202,14 @@ export class MoveEffectPhase extends PokemonPhase {
       this.end();
       return;
     }
+
+    // Batch-2 signatures: Reduction consumes/snapshots the field and Two-Faced
+    // arms its alternating unleash BEFORE type/damage resolution. Then snapshot
+    // whether the user began this move already dual-type-primed (ER Negative
+    // Feedback 5923: only a move that STARTED primed consumes the prime).
+    prepareReductionMove(user, move);
+    prepareTwoFacedMove(user, move);
+    this.erStartedPrimed = dualTypePrimeApplies(user, move);
 
     // Lapse `MOVE_EFFECT` effects (i.e. semi-invulnerability) when applicable
     user.lapseTags(BattlerTagLapseType.MOVE_EFFECT);
@@ -352,6 +366,9 @@ export class MoveEffectPhase extends PokemonPhase {
     // Add to the move history entry
     if (this.firstHit && this.useMode !== MoveUseMode.DELAYED_ATTACK) {
       user.pushMoveHistory(this.moveHistoryEntry);
+      if (!isVirtual(this.useMode)) {
+        recordSignatureExecutedMove(user, this.move);
+      }
       applyAbAttrs("ExecutedMoveAbAttr", { pokemon: user });
     }
 
@@ -721,12 +738,9 @@ export class MoveEffectPhase extends PokemonPhase {
       this.applyOnTargetEffects(user, target, firstTarget, result);
     }
     if (this.lastHit) {
-      // ER Negative Feedback (5923) prime: consume the holder's dual-type prime
-      // once its (physical) move has fully resolved — but ONLY if the move began
-      // primed (not the move that just SET the prime in its own PostAttack).
-      if (this.erStartedPrimed) {
-        consumeDualTypePrimeOnUse(user, this.move);
-      }
+      // ER Negative Feedback (5923) prime consumption + batch-2 Reduction/Setlist/
+      // Two-Faced finalization moved to the end-of-move block below (after all hits
+      // and the damage tuple resolve).
       globalScene.triggerPokemonFormChange(user, SpeciesFormChangePostMoveTrigger);
 
       // Multi-hit check for Wimp Out/Emergency Exit
@@ -930,7 +944,11 @@ export class MoveEffectPhase extends PokemonPhase {
     // emits it), so a KO from ANY source animates on the guest - not only a direct move hit. This
     // move-only recorder is removed; `damage()` already emitted the faint before this runs.
 
-    globalScene.phaseManager.queueFaintPhase(target.getBattlerIndex(), false, user);
+    globalScene.phaseManager.queueFaintPhase(
+      target.getBattlerIndex(),
+      false,
+      signatureFollowupSuppressesKoEffects(this.move) ? undefined : user,
+    );
 
     target.destroySubstitute();
     target.lapseTag(BattlerTagType.COMMANDED);
@@ -971,6 +989,7 @@ export class MoveEffectPhase extends PokemonPhase {
     this.applyHeldItemFlinchCheck(user, target, dealsDamage);
     this.applyOnGetHitAbEffects(user, target, dmgTuple);
     applyAbAttrs("PostAttackAbAttr", { pokemon: user, opponent: target, move: this.move, hitResult, damage });
+    applyCenterOfAttentionPenalty(user, target, this.move, damage);
 
     // ER Batch 3 same-turn "linked/aligned pair" effects (Rendezvous heal,
     // Synchronized Current paralysis, Closed Circuit extra hit) + turn-attack
@@ -1086,6 +1105,16 @@ export class MoveEffectPhase extends PokemonPhase {
       super.end();
       return;
     }
+
+    // ER Negative Feedback (5923) prime consumption (only if the move STARTED
+    // primed) + batch-2 Reduction/Setlist/Two-Faced finalization, once every hit
+    // of the move has resolved.
+    if (this.erStartedPrimed) {
+      consumeDualTypePrimeOnUse(user, this.move);
+    }
+    finishReductionMove(user, this.move);
+    finishSetlistMove(user, this.move);
+    finishTwoFacedMove(user, this.move);
 
     /**
      * All hits of the move have resolved by now.
@@ -1203,12 +1232,8 @@ function isMoveReflectableBy(move: Move, target: Pokemon, useMode: MoveUseMode):
   return (
     !isReflected(useMode)
     && !target.getTag(SemiInvulnerableTag)
-    && move.hasFlag(MoveFlags.REFLECTABLE) // Elite Redux: several vanilla REFLECTABLE status moves are reworked into // DAMAGING moves (Growl/Poison Gas/Flash/Captivate -> Special/Physical), // but the runtime category patch does not clear the stale REFLECTABLE flag.
-    && // Magic Coat / Magic Bounce only ever bounce STATUS moves, so gate on the
-    // move's EFFECTIVE (ER-overridden) category to stop a damaging Growl being
-    // reflected. Every genuinely-reflectable vanilla move is STATUS, so this is
-    // a no-op for vanilla.
-    move.category === MoveCategory.STATUS
+    && move.hasFlag(MoveFlags.REFLECTABLE) // Elite Redux: several vanilla REFLECTABLE status moves are reworked into // DAMAGING moves (Growl/Poison Gas/Flash/Captivate -> Special/Physical), // but the runtime category patch does not clear the stale REFLECTABLE flag. // Magic Coat / Magic Bounce only ever bounce STATUS moves, so gate on the // move's EFFECTIVE (ER-overridden) category to stop a damaging Growl being // reflected. Every genuinely-reflectable vanilla move is STATUS, so this is // a no-op for vanilla.
+    && move.category === MoveCategory.STATUS
     && (!!target.getTag(BattlerTagType.MAGIC_COAT) || target.hasAbilityWithAttr("ReflectStatusMoveAbAttr"))
   );
 }

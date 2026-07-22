@@ -2,6 +2,7 @@ import { applyAbAttrs, applyOnGainAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
+import { processSedimentBlooms } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { lapseTimedAbilitySuppressions } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { syncBlisteringSunFieldPair } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { isToxicTerrainProtected } from "#data/elite-redux/archetypes/ability-meta-consumers";
@@ -150,6 +151,7 @@ export class TurnEndPhase extends FieldPhase {
 
     if (!this.upcomingInterlude) {
       this.executeForAll(handlePokemon);
+      processSedimentBlooms();
 
       // ER relic (#439): Field Medic - once per turn, every 3 turns, the benched
       // player mons in party slots 2 and 3 recover 1/12 max HP (no-op unless the
