@@ -6997,22 +6997,31 @@ export function enterCoopV2CommandControlBoundary(
   }
 
   const current = runtime.v2ControlLedger.latestControl;
-  // Won-wave phantom backstop (public journey run 29886905322 wave-2 launch deadlock). When a wave
-  // has already been advance-signaled (its WAVE_ADVANCE tail ran -> `wave <= lastResolvedWave`) but
+  // Won-wave phantom backstop (public journey runs 29886905322 / 29891671221 wave-2 launch deadlock).
+  // When this wave is ENDING - its WAVE_ADVANCE is pending consumption (`coopHasPendingWaveAdvance()`)
+  // or already consumed (`coopWaveAdvanceSignaledFor(state.wave)` == `wave <= lastResolvedWave`) - but
   // the local battle has NOT yet re-based to the next wave, a queue-empty finalize can make Phaser
   // MANUFACTURE a TurnInit -> CommandPhase for the OLD wave (coop-replay-phases.ts notes this exact
   // hazard). As a replica that stale command parks on `v2DeferredCommandStarts` at an address the
   // next-wave COMMAND_FRONTIER control never equals, so it never un-parks, the wave-2 command proof
   // is never recorded, and the deferred control deadlocks into the "material could not be applied
-  // exactly" terminal. No legitimate command exists for an already-signaled wave at ANY turn, so
-  // dissolve it here (the single chokepoint every stale-wave command funnels through) instead of
-  // parking: the already-admitted next-wave boundary queued behind it then proceeds. `state.wave`
-  // was proven == battle.waveIndex above, so this reads the phantom's OLD wave (signaled) pre-rebase
-  // and the real wave (not signaled) after. Classic co-op only: Showdown has no wave-advance model.
-  if (!runtime.controller.isVersusSession() && coopWaveAdvanceSignaledFor(state.wave)) {
+  // exactly" terminal. No legitimate command exists for an ending wave at ANY turn, so dissolve it
+  // here (the single chokepoint every stale-wave command funnels through) instead of parking: the
+  // already-admitted next-wave boundary queued behind it then proceeds. This is the SAME predicate
+  // the sibling finishTurn turn-end suppressor (coop-replay-phases.ts) uses - both orderings are
+  // load-bearing: the WATCHER guest never runs consumeCoopPendingWaveAdvance() before this phantom,
+  // so lastResolvedWave stays unbumped and only the pending term catches it (run 29891671221).
+  // `state.wave` was proven == battle.waveIndex above, so pre-rebase it reads the phantom's OLD wave
+  // (ending) and post-rebase the real wave (not ending). Classic co-op only: Showdown has no
+  // wave-advance model.
+  if (
+    !runtime.controller.isVersusSession()
+    && (coopHasPendingWaveAdvance() || coopWaveAdvanceSignaledFor(state.wave))
+  ) {
     coopLog(
       "v2-control",
-      `command-open dissolved: wave ${state.wave} already advance-signaled (turn ${state.turn} field ${fieldIndex})`,
+      `command-open dissolved: wave ${state.wave} is ending (pending=${coopHasPendingWaveAdvance()} `
+        + `signaled=${coopWaveAdvanceSignaledFor(state.wave)}) turn ${state.turn} field ${fieldIndex}`,
     );
     return "dissolved";
   }

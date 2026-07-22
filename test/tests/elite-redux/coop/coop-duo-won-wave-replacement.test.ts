@@ -41,7 +41,7 @@ import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   clearCoopRuntime,
-  consumeCoopPendingWaveAdvance,
+  coopHasPendingWaveAdvance,
   coopWaveAdvanceSignaledFor,
   enterCoopV2CommandControlBoundary,
   setCoopRuntime,
@@ -332,14 +332,17 @@ describe.skipIf(!RUN)(
         await settleDuoPromise(rig, hostAdvance!, "chokepoint won-wave host crossing");
         await withClient(rig.hostCtx, () => drainLoopback());
 
-        // Force the exact hazard window on the guest: WIN consumed (wave 1 signaled) with the battle NOT
-        // yet re-based to wave 2, then evaluate the command boundary for the guest's own slot.
+        // Force the exact hazard window on the guest: the WIN wave-advance is ENDING wave 1 (pending
+        // consumption on the WATCHER, or already signaled) while the battle has NOT yet re-based to
+        // wave 2, then evaluate the command boundary for the guest's own slot.
         const verdict = await withClient(rig.guestCtx, async () => {
           await driveGuestReplayTurn(rig.guestScene, turn + 1).catch(() => undefined);
-          consumeCoopPendingWaveAdvance();
           rig.guestScene.currentBattle.waveIndex = 1;
           rig.guestScene.currentBattle.turn = turn + 1;
-          expect(coopWaveAdvanceSignaledFor(1), "wave 1 is advance-signaled after the WIN was consumed").toBe(true);
+          expect(
+            coopHasPendingWaveAdvance() || coopWaveAdvanceSignaledFor(1),
+            "wave 1 is ending on the guest (its WIN advance is pending or already signaled)",
+          ).toBe(true);
           const mon = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
           return enterCoopV2CommandControlBoundary(COOP_GUEST_FIELD_INDEX, mon.id, () => undefined);
         });
