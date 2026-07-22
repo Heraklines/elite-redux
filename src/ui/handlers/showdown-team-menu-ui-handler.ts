@@ -1144,12 +1144,12 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     const folder = row.folder ?? "";
     this.fill(LEFT_X, y, LEFT_W, HEADER_ROW_H, focused ? ACCENT : HEADER_BAND, focused ? 0.95 : 0.9);
     this.outline(LEFT_X, y, LEFT_W, HEADER_ROW_H, focused ? GOLD : 0x2b3a5c);
-    // Chevron: ▾ expanded / ▸ collapsed.
-    this.text(LEFT_X + 5, y + 2, row.collapsed ? "▸" : "▾", TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
+    // Expand/collapse marker ([+] collapsed / [-] expanded) - ASCII so the pixel font always has it.
+    this.text(LEFT_X + 5, y + 2, row.collapsed ? "[+]" : "[-]", TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
     this.text(
-      LEFT_X + 13,
+      LEFT_X + 20,
       y + 2,
-      this.clip(folder, 20),
+      this.clip(folder, 19),
       focused ? TextStyle.SUMMARY_GOLD : TextStyle.WINDOW,
       0,
       FONT_TINY,

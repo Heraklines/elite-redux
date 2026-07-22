@@ -1465,6 +1465,36 @@ const RECIPES: Record<string, Recipe> = {
     ],
     diffTolerance: 0,
   },
+  // P3 SUGGESTED SETS: your OWN winning full-sets (applied whole) + COMMUNITY popular item+form hints
+  // (overlaid, keeping your moves). Deterministic via injected demoWinningSets + demoCommunitySuggestions.
+  "showdown-editor-suggested": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        initialSetMenu: "suggested",
+        demoWinningSets: [
+          "Garchomp @ Life Orb  [Stage: Base]\nAbility: Rough Skin\nNature: Adamant\n- Earthquake\n- Scale Shot\n- Swords Dance\n- Stone Edge",
+        ],
+        demoCommunitySuggestions: [
+          { speciesId: SpeciesId.GARCHOMP, formIndex: 0, item: "ER_LIFE_ORB", wins: 12 },
+          { speciesId: SpeciesId.GARCHOMP, formIndex: 0, item: "LEFTOVERS", wins: 5 },
+        ],
+      }),
+    ],
+    diffTolerance: 0,
+  },
+  // P3 SEARCH OPERATORS: the move pane filtered by an operator (type:ground) - only ground moves remain.
+  "showdown-editor-operator-filter": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        initialField: EditorField.MOVE0,
+        initialPaneOpen: true,
+        initialFilter: "type:ground",
+      }),
+    ],
+    diffTolerance: 0,
+  },
   // Showdown TEAM PRESET MENU (addendum): the pre-pairing entry screen. Left = stylish preset boxes
   // (name + validity marker + 6 mini icons) with a trailing create box; right = the hovered mon's
   // full sprite + ability/innates + item + moveset (live preview). Multi-team with hover preview on
@@ -1472,6 +1502,19 @@ const RECIPES: Record<string, Recipe> = {
   "showdown-team-menu": {
     mode: UiMode.SHOWDOWN_TEAM_MENU,
     prepare: () => [buildShowdownTeamMenuDemoConfig()],
+    diffTolerance: 0,
+  },
+  // P3 FOLDERS: presets grouped under collapsible headers - "Rain" expanded (its two presets shown),
+  // "Squad" collapsed (header only). Cursor on the Rain header; the header/collapse chrome is the golden.
+  "showdown-team-menu-folders": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => {
+      const base = buildShowdownTeamMenuDemoConfig();
+      const presets = base.presets.map((p, i) =>
+        i === 0 ? { ...p, folder: "Rain" } : i === 1 ? { ...p, folder: "Rain" } : { ...p, folder: "Squad" },
+      );
+      return [{ ...base, presets, initialTeam: 0, initialCollapsedFolders: ["Squad"] }];
+    },
     diffTolerance: 0,
   },
   // Empty state: no saved presets -> the large "create your first team" affordance, cursor on it,
