@@ -180,29 +180,22 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 /**
- * Save compression (#storage). system_saves blobs are JSON that gzips ~12x, and
- * the DB was hitting the D1 500MB cap. Stored form: "GZ1:" + base64(gzip(save)).
- * A plaintext save starts with "{", so reads detect the format unambiguously and
- * legacy plaintext rows keep working until their next write (or the one-time
- * migration) compresses them. Uses the deadlock-safe stream pattern (begin the
- * read before writing) so large saves don't stall on backpressure.
+ * Save storage format (#storage). system_saves blobs are now stored UNCOMPRESSED
+ * (plaintext JSON) going forward. Save compression was originally added to keep the
+ * DB under the D1 free-tier 500MB cap (gzip ~12x, stored as "GZ1:" + base64(gzip)),
+ * but the account is now on the paid plan (10GB/db; er-saves sits at ~4% of that), so
+ * saves no longer have to be compressed — and compression added a decode/decompress
+ * failure surface on read (a corrupt or truncated "GZ1:" blob is unreadable and
+ * throws, forcing {@linkcode handleSystemGet} to reject the load) plus a
+ * compression-aware clobber guard, which caused issues in practice.
+ *
+ * READ stays backward-compatible: {@linkcode decompressSave} still transparently
+ * inflates any legacy "GZ1:" blob already in the DB (a plaintext save starts with
+ * "{", so the format is detected unambiguously by the prefix). The migration is
+ * LAZY — an existing account's next system-save write re-stores it uncompressed, so
+ * no bulk migration is needed and no existing save is ever broken.
  */
 const SAVE_GZIP_PREFIX = "GZ1:";
-
-async function compressSave(plain: string): Promise<string> {
-  try {
-    const cs = new CompressionStream("gzip");
-    const read = new Response(cs.readable).arrayBuffer();
-    const writer = cs.writable.getWriter();
-    await writer.write(enc.encode(plain));
-    await writer.close();
-    return SAVE_GZIP_PREFIX + toBase64(new Uint8Array(await read));
-  } catch (err) {
-    // A compression failure must never break a save: fall back to plaintext.
-    console.error("compressSave failed, storing plaintext:", err);
-    return plain;
-  }
-}
 
 async function decompressSave(stored: string): Promise<string> {
   if (!stored.startsWith(SAVE_GZIP_PREFIX)) {
@@ -211,9 +204,17 @@ async function decompressSave(stored: string): Promise<string> {
   const ds = new DecompressionStream("gzip");
   const read = new Response(ds.readable).arrayBuffer();
   const writer = ds.writable.getWriter();
-  await writer.write(fromBase64(stored.slice(SAVE_GZIP_PREFIX.length)));
-  await writer.close();
-  return dec.decode(await read);
+  // Feed the compressed bytes. A tampered/truncated "GZ1:" blob makes the gzip
+  // stream error (unexpected EOF); both `read` and the write/close promise then
+  // reject. Await them TOGETHER so BOTH settle and NEITHER leaks an unhandled
+  // rejection — Promise.all attaches a handler to each, so the caller's try/catch
+  // sees exactly one graceful failure and the corrupt bytes are rejected cleanly.
+  const pump = (async () => {
+    await writer.write(fromBase64(stored.slice(SAVE_GZIP_PREFIX.length)));
+    await writer.close();
+  })();
+  const [buf] = await Promise.all([read, pump]);
+  return dec.decode(buf);
 }
 
 // #endregion
@@ -595,9 +596,8 @@ async function ensureBackupTable(env: Env): Promise<void> {
 }
 
 /**
- * Snapshot the about-to-be-overwritten save (stored form is already gzip'd, so the
- * backup is small) and prune to the most recent BACKUP_KEEP per user. Rate-limited
- * per user. Best-effort: never throws into the caller.
+ * Snapshot the about-to-be-overwritten save and prune to the most recent BACKUP_KEEP
+ * per user. Rate-limited per user. Best-effort: never throws into the caller.
  */
 async function maybeBackupSystemSave(env: Env, userId: number, previous: SystemSaveRow): Promise<void> {
   try {
@@ -711,7 +711,9 @@ async function handleSystemUpdate(
   if (guard) {
     return guard;
   }
-  const stored = await compressSave(data);
+  // Store uncompressed (lazy migration): a legacy "GZ1:" row is replaced with
+  // plaintext here on its next write; reads stay back-compat via decompressSave.
+  const stored = data;
   const trainerId = Number.parseInt(url.searchParams.get("trainerId") ?? "", 10);
   const secretId = Number.parseInt(url.searchParams.get("secretId") ?? "", 10);
   await env.DB.prepare(
@@ -1979,7 +1981,8 @@ async function handleUpdateAll(
     if (guard) {
       return guard;
     }
-    storedSystem = await compressSave(sys);
+    // Store uncompressed (lazy migration); reads stay back-compat via decompressSave.
+    storedSystem = sys;
   }
   const slotRaw = String(payload.sessionSlotId ?? "");
   const slot = /^\d+$/u.test(slotRaw) ? Number(slotRaw) : Number.NaN;
