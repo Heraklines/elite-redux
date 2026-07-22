@@ -48,7 +48,7 @@ import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-red
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
-import { ER_PARTNER_VAPOREON_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
+import { ER_EGOELK_SPECIES_ID, ER_PARTNER_VAPOREON_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import {
   type ErDifficulty,
@@ -1647,6 +1647,159 @@ export const DEV_SCENARIOS: DevScenario[] = [
         eeveeData.passiveAttr = unlockSlot(unlockSlot(0, 0), 2);
       }
       globalScene.getPlayerPokemon()?.updateInfo();
+    },
+  },
+  // ===========================================================================
+  // Batch-2 maintainer verdicts (2026-07-22)
+  // ===========================================================================
+  {
+    label: "Batch2: Omniform chains through a NEW eeveelution",
+    description:
+      "The three NEW eeveelutions (Nimbeon/Ryuveon/Titaneon) now CARRY Omniform too, so\n"
+      + "the Partner Eevee family can chain THROUGH them - adapt into one, then a next\n"
+      + "typed move chains onward (they used to be dead-ends).\n"
+      + "DO: turn 1, use Iron Head (a Steel move). Turn 2, open Fight and use Water Gun.\n"
+      + "EXPECT: Iron Head adapts Eevee into Titaneon ('adapted into Titaneon!') and its\n"
+      + "other 3 moves become Titaneon's own set; then Water Gun chains Titaneon onward\n"
+      + "into Partner Vaporeon ('adapted into Partner Vaporeon!'). The chain passes\n"
+      + "THROUGH the new Titaneon form - proof it is no longer terminal.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5946), // [Fluffy + Omniform] Partner Eevee composite
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          formIndex: formIndexByKey(SpeciesId.EEVEE, "partner"),
+          moveset: [MoveId.IRON_HEAD, MoveId.WATER_GUN, MoveId.TACKLE, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Batch2: Meteor Mass (weight-centric)",
+    description:
+      "Meteor Mass (Metagross Battle Bond innate) triples the holder's weight, maxing its\n"
+      + "Heavy Slam / Heat Crash weight ratio and making its heavy/punching hits crush\n"
+      + "lighter foes (incoming Grass Knot / Low Kick also read the huge weight). Forced\n"
+      + "ACTIVE here (an innate is inert on the player without a candy unlock).\n"
+      + "DO: use Heavy Slam on the (light) enemy Jolteon.\n"
+      + "EXPECT: Heavy Slam hits at its maximum weight tier and OHKOs the frail, light\n"
+      + "target. (Weight number 3x is flagged for designer sign-off.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5997), // Meteor Mass
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.JOLTEON,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.METAGROSS, {
+          formIndex: formIndexByKey(SpeciesId.METAGROSS, "battle-bond"),
+          moveset: [MoveId.HEAVY_SLAM, MoveId.METEOR_MASH, MoveId.SPLASH, MoveId.TACKLE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Batch2: Inverse Room (Egoelk on entry)",
+    description:
+      "Inverse Room (Egoelk active ability) now auto-sets the SAME field effect the move\n"
+      + "'Inverse Room' sets: on entry, type matchups are REVERSED field-wide for 5 turns.\n"
+      + "Forced ACTIVE here.\n"
+      + "DO: on entry (no input needed), a super-effective matchup is inverted. Use Surf\n"
+      + "(Water) on the enemy Charizard (Fire/Flying).\n"
+      + "EXPECT: Surf, normally super effective vs Charizard, is now 'not very effective'\n"
+      + "(resisted) while Inverse Room is up. The room lasts 5 turns.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5998), // Inverse Room
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHARIZARD,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(ER_EGOELK_SPECIES_ID as SpeciesId, {
+          moveset: [MoveId.SURF, MoveId.PSYCHIC, MoveId.HYPER_VOICE, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Batch2: Egoelk new kit (Superego)",
+    description:
+      "Egoelk's official kit update: innates are now Egoist + Superego + Center of\n"
+      + "Attention (Mind's Eye and Corrupted Mind removed). Superego (forced ACTIVE here)\n"
+      + "steals a foe's stat boost.\n"
+      + "DO: open Info -> Abilities and confirm the three innates read Egoist, Superego,\n"
+      + "Center of Attention. Then use Splash while the enemy Snorlax uses Swords Dance.\n"
+      + "EXPECT: 'Egoelk's Superego seized the boost!' - Egoelk ends the turn with the +2\n"
+      + "Attack and Snorlax is left without it.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5994), // Superego
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SWORDS_DANCE],
+      });
+      return [
+        makeStarter(ER_EGOELK_SPECIES_ID as SpeciesId, {
+          moveset: [MoveId.SPLASH, MoveId.PSYCHIC, MoveId.HYPER_VOICE, MoveId.TACKLE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Batch2: Idolfin - Zero to Hero gate",
+    description:
+      "Idolfin comes from a FEMALE Palafin with Zero to Hero that has undergone the HERO\n"
+      + "switch-out transformation - NOT an ungated level evolution. The party has a female\n"
+      + "Palafin (Zero to Hero) and a MALE Palafin control; the shop stocks Rare Candy.\n"
+      + "DO: switch the female Palafin OUT then back IN (it becomes Hero form via Zero to\n"
+      + "Hero). Win the battle, then in the shop use Rare Candy on the female Palafin.\n"
+      + "EXPECT: the female (now Hero-form) Palafin evolves into Idolfin. The MALE Palafin,\n"
+      + "even after switching, does NOT evolve (gender gate); a female that never switched\n"
+      + "out (still Zero form) does NOT evolve (hero-form gate).",
+    shopItems: [modifierTypes.RARE_CANDY],
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.ZERO_TO_HERO,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PALAFIN, {
+          female: true,
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.WAVE_CRASH, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.PALAFIN, {
+          female: false,
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.WAVE_CRASH, MoveId.SPLASH],
+        }),
+      ];
     },
   },
   // ===========================================================================

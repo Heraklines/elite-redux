@@ -25,9 +25,12 @@
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { allMoves } from "#data/data-lists";
 import {
+  ER_NIMBEON_SPECIES_ID,
   ER_PARTNER_FLAREON_SPECIES_ID,
   ER_PARTNER_JOLTEON_SPECIES_ID,
   ER_PARTNER_VAPOREON_SPECIES_ID,
+  ER_RYUVEON_SPECIES_ID,
+  ER_TITANEON_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
 import {
   canFormLearnMove,
@@ -171,8 +174,13 @@ describe.skipIf(!RUN)("ER Omniform pooled level-up learn union (Partner Eevee fa
     const union = omniformUnionLevelMoves(holder);
     const unionIds = new Set(union.map(([, m]) => m));
     const family = omniformFamilyForms(holder);
-    // Base Eevee + 8 partner eeveelutions.
-    expect(family.length).toBe(9);
+    // Base Eevee + 8 partner eeveelutions + the three new eeveelutions Nimbeon /
+    // Ryuveon / Titaneon (which now carry Omniform too — maintainer verdict 2026-07-22).
+    expect(family.length).toBe(12);
+    const familyIds = new Set(family.map(f => f.speciesId as number));
+    for (const id of [ER_NIMBEON_SPECIES_ID, ER_RYUVEON_SPECIES_ID, ER_TITANEON_SPECIES_ID]) {
+      expect(familyIds.has(id), `family includes ${id}`).toBe(true);
+    }
 
     for (const { move } of reps) {
       // Present in the pooled union offer set.
