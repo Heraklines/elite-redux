@@ -840,7 +840,10 @@ test("Crossroads result envelopes retain the exact V2 control turn instead of a 
   // biome pick gained its own establisher; pin the invariant there AND pin both wrappers' exact
   // operation identities so neither surface can borrow the other's proof.
   const sharedBoundaryStart = coopRuntime.indexOf("function enterCoopV2BiomeInteractionControlBoundary(");
-  const sharedBoundaryEnd = coopRuntime.indexOf("export function enterCoopV2CrossroadsControlBoundary(", sharedBoundaryStart);
+  const sharedBoundaryEnd = coopRuntime.indexOf(
+    "export function enterCoopV2CrossroadsControlBoundary(",
+    sharedBoundaryStart,
+  );
   assert.notEqual(sharedBoundaryStart, -1, "runtime exposes the shared biome-family control boundary");
   assert.ok(sharedBoundaryEnd > sharedBoundaryStart, "shared control boundary has a bounded source block");
   const sharedBoundary = coopRuntime.slice(sharedBoundaryStart, sharedBoundaryEnd);
