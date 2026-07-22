@@ -1508,6 +1508,45 @@ export const DEV_SCENARIOS: DevScenario[] = [
   ...BG_BIOME_SCENARIOS,
   ...EASY_ABILITY_ADDITION_SCENARIOS,
   // ===========================================================================
+  // Ability - Overrule does NOT bypass absorb/immunity abilities (WORKING AS
+  // INTENDED). Overrule's 2.65 dex text: "When this Pokemon's moves land critical
+  // hits, they ignore defensive abilities that would normally REDUCE damage and
+  // their attacks deal double damage if they are resisted." An absorb ability (Sap
+  // Sipper, Volt/Water Absorb, Flash Fire, Earth Eater) does not reduce damage - it
+  // NULLIFIES the move (immunity) and grants a benefit. That is out of Overrule's
+  // contract, so an Overrule crit is still absorbed. (Overrule is NOT Mold Breaker.)
+  // ===========================================================================
+  {
+    label: "Ability: Overrule vs Sap Sipper (absorbed, WAI)",
+    description:
+      "Overrule (2.65 dex): on a CRIT, ignore abilities that REDUCE damage + deal 2x\n"
+      + "vs resists. It is NOT Mold Breaker - it does NOT bypass ABSORB / immunity\n"
+      + "abilities (Sap Sipper, Volt/Water Absorb, Flash Fire, Earth Eater), which\n"
+      + "nullify the move instead of reducing damage.\n"
+      + "DO: use Razor Leaf (Grass, always crits here) on the Sap Sipper Snorlax.\n"
+      + "EXPECT: the move is ABSORBED - zero damage AND the foe's Attack rises +1 (Sap\n"
+      + "Sipper feeds). Overrule's crit effects never apply because an absorbed move\n"
+      + "never reaches damage calc. This is correct / working as intended.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.OVERRULE),
+        CRITICAL_HIT_OVERRIDE: true, // force the crit so Overrule is fully "on"
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX, // Sap Sipper still grants Grass immunity
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.SAP_SIPPER,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SCEPTILE, {
+          moveset: [MoveId.RAZOR_LEAF, MoveId.LEAF_BLADE, MoveId.DRAGON_CLAW, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Ability - Discipline lets you switch out WHILE rampaging (Outrage/Thrash)
   // ===========================================================================
   {
