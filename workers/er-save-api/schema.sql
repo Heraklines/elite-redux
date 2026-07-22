@@ -86,6 +86,10 @@ CREATE TABLE IF NOT EXISTS runs (
   presentation        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created_at);
+-- Ghost-pool fetch (handleRunSample) walks the (wave, rowid) keyset over EVERY
+-- eligible run; a (wave) index carries rowid implicitly so `ORDER BY wave, rowid`
+-- is served straight from it and only the eligible wave band is scanned.
+CREATE INDEX IF NOT EXISTS idx_runs_wave ON runs (wave);
 
 -- Shared dev TEST-SUITE progress (staging only). So the QA team doesn't re-run
 -- each other's scenarios: every Pass / Fail / Send-Logs from the in-game test

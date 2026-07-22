@@ -2365,6 +2365,19 @@ async function ensureRunsGhostIndex(env: Env): Promise<void> {
 }
 
 /**
+ * Lazily index runs by `wave` so the ghost-sample keyset walk (handleRunSample)
+ * scans only the eligible wave band, not the whole table. The (wave) index carries
+ * rowid implicitly, so `ORDER BY wave, rowid` is served straight from it.
+ */
+async function ensureRunSampleIndex(env: Env): Promise<void> {
+  try {
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_runs_wave ON runs (wave)").run();
+  } catch {
+    // Index is an optimization only; the query is correct without it.
+  }
+}
+
+/**
  * ER ghost notifications: the battles where the CALLER's ghost fought another
  * player, since `?since=<ts>` (the client tracks last-seen locally — no write).
  *
@@ -2478,6 +2491,63 @@ type RunSampleRow = {
   presentation?: string | null;
 };
 
+/**
+ * Endless contamination guard (CORRECTNESS): a classic/challenge run ends at wave 200
+ * (game-mode.ts isWaveFinal); ENDLESS runs go to 250/500/1000+ with absurd kits. A
+ * hard `wave <= 200` ceiling drops already-stored endless rows that predate the `mode`
+ * tag. No classic run exceeds 200, so this never drops a legitimate team.
+ */
+export const GHOST_SAMPLE_MAX_WAVE = 200;
+/** Modes that must never seed the ghost pool (endless/daily contamination). */
+const NON_GHOST_MODES_SQL = "'endless', 'spliced_endless', 'daily'";
+
+/**
+ * Enumerate the rowid of EVERY ghost-eligible run — the FULL, de-restricted candidate
+ * pool. A run is eligible when it isn't the caller's own (`user_id != uid`), reached at
+ * least `minWave` (its team is only proven viable up to where it died), stayed at/below
+ * the endless ceiling, and isn't an endless/daily contamination row.
+ *
+ * Full breadth, still efficient (NOT one unbounded blob): walk the (wave, rowid) KEYSET
+ * over idx_runs_wave, one bounded page at a time, so only the eligible wave band is
+ * scanned and the result streams page by page. Every eligible run is considered; no wave
+ * band or uploader is unreachable. This replaces the old capped `min(count*2, 40)`
+ * random-rowid seeks + shallow top-up that were optimized for the free-tier rows-read
+ * budget and caused the stale/repetitive-ghost class. The paid plan lifts that budget.
+ */
+export async function enumerateEligibleRunRowids(
+  env: Env,
+  uid: number,
+  minWave: number,
+  pageSize = 2000,
+): Promise<number[]> {
+  const rowids: number[] = [];
+  let cursorWave = minWave - 1;
+  let cursorRowid = 0;
+  for (;;) {
+    const page = await env.DB.prepare(
+      `SELECT rowid AS rid, wave FROM runs
+         WHERE wave >= ?1 AND wave <= ?2 AND user_id != ?3
+           AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+           AND (wave > ?4 OR (wave = ?4 AND rowid > ?5))
+         ORDER BY wave, rowid LIMIT ?6`,
+    )
+      .bind(minWave, GHOST_SAMPLE_MAX_WAVE, uid, cursorWave, cursorRowid, pageSize)
+      .all<{ rid: number; wave: number }>();
+    const rows = page.results ?? [];
+    for (const row of rows) {
+      rowids.push(row.rid);
+      // Rows are ordered (wave, rowid), so the last iteration leaves the cursor on
+      // the last row of the page — the keyset start for the next page.
+      cursorWave = row.wave;
+      cursorRowid = row.rid;
+    }
+    if (rows.length < pageSize) {
+      break;
+    }
+  }
+  return rowids;
+}
+
 /** Sample winning runs (excluding the caller's own) as ghost-team snapshots. */
 async function handleRunSample(
   url: URL,
@@ -2499,67 +2569,45 @@ async function handleRunSample(
   // compat and as a display fallback but no longer restricts the pool.) The wave
   // floor + re-levelling on spawn keep the opponent appropriately strong
   // regardless of its origin tier.
-  // ER (#131): the old `ORDER BY RANDOM() LIMIT ?` had NO usable index for its
-  // `user_id != ? AND wave >= ?` filter, so D1 read the ENTIRE runs table on every
-  // ghost fetch and blew past the rows-read budget; the query errored and the client
-  // SILENTLY fell back to the player's OWN teams ("same ghost over and over").
-  // The first fix replaced it with ONE random-rowid window - a seek + walk forward for
-  // `count` CONSECUTIVE eligible rows. That reads ~count rows (good) but returns a
-  // temporally-adjacent BLOCK (bad): each run's pool was clustered, so the thin
-  // high-wave bands (wave 137/163) were missed ~half the time and the ghost challenge
-  // then fielded a far-deeper team that had to be devolved (the "unevolved ghosts").
-  // Now: many INDEPENDENT random-rowid seeks, each taking the FIRST eligible row at/after
-  // its point (LIMIT 1) via the PK index, run as one batch. Still ~constant rows read,
-  // but a uniform SPREAD across the whole table - diverse uploaders, every wave band
-  // reachable. Dedup by id; top up from the table start only if the eligible set is sparse.
-  // Endless contamination guard: a classic/challenge run ends at wave 200 (game-mode.ts
-  // isWaveFinal), while ENDLESS runs go to 250, 500, 1000+ with absurdly over-levelled,
-  // over-itemed teams. Fielding one as a ghost in a classic run is the reported bug.
-  // Exclude them two ways: (a) `mode` (new uploads tag classic/challenge; endless/daily
-  // never upload now) - `mode IS NULL` keeps legacy rows; (b) a hard `wave <= 200` ceiling,
-  // which catches already-stored endless rows that predate the `mode` tag (their depth is
-  // the only signal). No classic run exceeds 200, so this never drops a legitimate team.
-  const MAX_GHOST_SAMPLE_WAVE = 200;
-  const NON_GHOST_MODES = "'endless', 'spliced_endless', 'daily'";
+  //
+  // DE-RESTRICTION (maintainer, capacity upgrade): the ghost fetch was previously
+  // OPTIMIZED for the free-tier D1 rows-read budget — first `ORDER BY RANDOM()`
+  // (#131: full-table scan, blew the budget, errored → client fell back to the
+  // player's OWN teams), then a bounded set of `min(count*2, 40)` random-rowid
+  // seeks plus a shallow top-up read from the START of the table. That capped the
+  // candidate pool to ~40 biased probes and over-fielded the same old shallow runs
+  // (the "stale / repetitive ghosts" class), and systematically missed eligible
+  // runs beyond the probe window. The account is now on the paid plan (er-saves at
+  // ~4% of the 10GB ceiling, and a full-breadth scan is a rounding error against the
+  // paid rows-read budget), so we no longer restrict ourselves: the candidate pool
+  // is EVERY eligible run.
+  //
+  // Full breadth, still efficient (not one unbounded blob): enumerate the rowid of
+  // every eligible run via KEYSET PAGINATION (enumerateEligibleRunRowids), then
+  // uniformly sample `count` of them and fetch only those `count` full rows. Every
+  // eligible run has an equal chance; no wave band or uploader is unreachable.
   const cols =
     "id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation";
-  const maxRow = await env.DB.prepare("SELECT MAX(rowid) AS m FROM runs").first<{ m: number | null }>();
-  const maxRowId = maxRow?.m ?? 0;
-  const seen = new Set<string>();
-  let results: RunSampleRow[] = [];
-  if (maxRowId > 0) {
-    const seekStmt = (start: number) =>
-      env.DB.prepare(
-        `SELECT ${cols} FROM runs WHERE rowid >= ?1 AND user_id != ?2 AND wave >= ?3 AND wave <= ?4 AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES})) ORDER BY rowid LIMIT 1`,
-      ).bind(start, auth.uid, minWave, MAX_GHOST_SAMPLE_WAVE);
-    const seeks = Math.min(count * 2, 40);
-    const stmts = Array.from({ length: seeks }, () => seekStmt(Math.floor(Math.random() * (maxRowId + 1))));
-    const batched = await env.DB.batch<RunSampleRow>(stmts);
-    for (const r of batched) {
-      for (const row of r.results ?? []) {
-        if (!seen.has(row.id)) {
-          seen.add(row.id);
-          results.push(row);
-        }
-      }
-    }
-    if (results.length < count) {
-      // Sparse eligible set: some seeks landed past the last eligible row. Top up from
-      // the start of the table (a contiguous read of the shallow end) to reach `count`.
-      const fill = await env.DB.prepare(
-        `SELECT ${cols} FROM runs WHERE user_id != ?1 AND wave >= ?2 AND wave <= ?3 AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES})) ORDER BY rowid LIMIT ?4`,
-      )
-        .bind(auth.uid, minWave, MAX_GHOST_SAMPLE_WAVE, count * 2)
-        .all<RunSampleRow>();
-      for (const row of fill.results ?? []) {
-        if (!seen.has(row.id)) {
-          seen.add(row.id);
-          results.push(row);
-        }
-      }
-    }
+  // Index the (wave, rowid) keyset walk. Cheap no-op once created; lazy so an
+  // already-deployed prod DB gains it without a manual migration (mirrors
+  // ensureRunsGhostIndex). schema.sql declares it for a fresh DB.
+  await ensureRunSampleIndex(env);
+  const eligibleRowids = await enumerateEligibleRunRowids(env, auth.uid, minWave);
+  // Uniform random sample of `count` distinct eligible rowids (partial Fisher-Yates).
+  const k = Math.min(count, eligibleRowids.length);
+  for (let i = 0; i < k; i++) {
+    const j = i + Math.floor(Math.random() * (eligibleRowids.length - i));
+    [eligibleRowids[i], eligibleRowids[j]] = [eligibleRowids[j], eligibleRowids[i]];
   }
-  results = results.slice(0, count);
+  const chosen = eligibleRowids.slice(0, k);
+  let results: RunSampleRow[] = [];
+  if (chosen.length > 0) {
+    const placeholders = chosen.map((_, i) => `?${i + 1}`).join(", ");
+    const fetched = await env.DB.prepare(`SELECT ${cols} FROM runs WHERE rowid IN (${placeholders})`)
+      .bind(...chosen)
+      .all<RunSampleRow>();
+    results = fetched.results ?? [];
+  }
   const teams = (results ?? [])
     .map(row => {
       try {
