@@ -463,6 +463,20 @@ describe("complete retained Mystery terminal transaction", () => {
     ]);
   });
 
+  it("sanctions the wave-advance continuation on a non-battle ME's final leave terminal", () => {
+    // A non-battle ME emits reward-settled/battle-settled (its own reward tail) THEN a final leave/continue
+    // terminal that RE-SETS the sanction. That final terminal is the last op before the next wave, so it must
+    // sanction NewBattlePhase AND its NextEncounterPhase companion (battle-scene.newBattle pushes it). Omitting
+    // NextEncounterPhase let strict-tails ENFORCE neutralize it -> drained queue -> phantom CommandPhase ->
+    // empty-frontier shared-session terminal at the next ME wave's turn 1 (10-wave mystery-gauntlet lane).
+    expect(coopMeTerminalSanctionedTails(leavePayload(12))).toEqual(["NewBattlePhase", "NextEncounterPhase"]);
+    expect(coopMeTerminalSanctionedTails(leavePayload(12, /* selectBiome */ true))).toEqual([
+      "SelectBiomePhase",
+      "NewBattlePhase",
+      "NextEncounterPhase",
+    ]);
+  });
+
   it("applies DATA once, withholds completion for a late destination receiver, then executes once after reconnect", () => {
     const receiver = new CoopMeTerminalTransactionReceiver();
     const receipt = { operationId: terminalId(7, 0), pinned: 7, step: 0, payload: leavePayload(12) };

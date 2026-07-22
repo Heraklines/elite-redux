@@ -294,7 +294,16 @@ export function coopMeTerminalSanctionedTails(
         ...(destination.continuation !== "rewards" && destination.trainerVictory ? ["BattleEndPhase"] : []),
       ];
     }
-    return destination.selectBiome ? ["SelectBiomePhase", "NewBattlePhase"] : ["NewBattlePhase"];
+    // A non-battle ME's final `continue`/`leave` terminal is the LAST op before the next wave: after
+    // PostMysteryEncounter the run advances directly (NewBattlePhase -> battle-scene.newBattle() pushes
+    // NextEncounterPhase) with NO intervening WAVE_ADVANCE op to re-sanction. Omitting NextEncounterPhase
+    // let strict-tails ENFORCE neutralize it, draining the queue so TurnInit manufactured a phantom
+    // CommandPhase whose empty command frontier fail-closed the session at the next ME wave's turn 1. Mirror
+    // coopWaveAdvanceSanctionedTails, which sanctions NewBattlePhase + NextEncounterPhase as one atomic
+    // advance (the biome case is covered by SelectBiomePhase + the biomeTransitionTailPermit).
+    return destination.selectBiome
+      ? ["SelectBiomePhase", "NewBattlePhase", "NextEncounterPhase"]
+      : ["NewBattlePhase", "NextEncounterPhase"];
   }
   if (terminal === "battle") {
     return ["MysteryEncounterBattlePhase", "MysteryEncounterBattleStartCleanupPhase", "VictoryPhase", "BattleEndPhase"];
