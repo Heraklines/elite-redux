@@ -1223,6 +1223,67 @@ class HotCoalsTag extends EntryHazardTag {
 }
 
 /**
+ * Elite Redux — Sediment Bloom (signature ability 5976). A removable per-side
+ * field effect: while present it drains a fraction of every Pokemon on its side
+ * each turn and heals the opposing side (driven by `processSedimentBlooms` at
+ * turn end). This is a plain state marker so the effect appears per-side in the
+ * battle info flyout and survives a mid-battle save; the drain logic lives with
+ * the ability. Not created by a move, so its trigger messages are suppressed.
+ */
+class SedimentBloomTag extends SerializableArenaTag {
+  public readonly tagType = ArenaTagType.SEDIMENT_BLOOM;
+
+  constructor(sourceId: number | undefined, side: ArenaTagSide) {
+    super(0, undefined, sourceId, side);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "";
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+
+  /** Refresh the planter so a newer Sediment Bloom owns the drain attribution. */
+  override onOverlap(source?: Pokemon): void {
+    if (source) {
+      this.sourceId = source.id;
+    }
+  }
+}
+
+/**
+ * Elite Redux — Grave Marker (Boot Hill signature ability 5985). A one-use marker
+ * placed on the opposing side by a direct knockout; the next foe entering that
+ * side is struck (handled by `applyGraveMarkerOnEntry` on switch-in) and the
+ * marker is spent. A plain state marker so it appears per-side in the battle info
+ * flyout and survives a mid-battle save; not created by a move, so silent.
+ */
+class GraveMarkerTag extends SerializableArenaTag {
+  public readonly tagType = ArenaTagType.GRAVE_MARKER;
+
+  constructor(sourceId: number | undefined, side: ArenaTagSide) {
+    super(0, undefined, sourceId, side);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "";
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+
+  /** Refresh the planter so the most recent knockout owns the marker. */
+  override onOverlap(source?: Pokemon): void {
+    if (source) {
+      this.sourceId = source.id;
+    }
+  }
+}
+
+/**
  * Arena Tag class for {@link https://bulbapedia.bulbagarden.net/wiki/Sticky_Web_(move) | Sticky Web}.
  * Applies a single-layer trap that lowers the Speed of all grounded Pokémon switching in.
  */
@@ -2188,6 +2249,10 @@ export function getArenaTag(
       return new CreepingThornsTag(sourceId, side);
     case ArenaTagType.ER_INFESTATION_TRAP:
       return new ErEntryTrapTag(sourceId, side);
+    case ArenaTagType.SEDIMENT_BLOOM:
+      return new SedimentBloomTag(sourceId, side);
+    case ArenaTagType.GRAVE_MARKER:
+      return new GraveMarkerTag(sourceId, side);
     case ArenaTagType.ER_WEATHER_LOCK:
       return new ErWeatherLockTag(turnCount, sourceId, side);
     case ArenaTagType.STEALTH_ROCK:
@@ -2267,6 +2332,8 @@ export type ArenaTagTypeMap = {
   [ArenaTagType.FOAMY_WEB]: FoamyWebTag;
   [ArenaTagType.CREEPING_THORNS]: CreepingThornsTag;
   [ArenaTagType.ER_INFESTATION_TRAP]: ErEntryTrapTag;
+  [ArenaTagType.SEDIMENT_BLOOM]: SedimentBloomTag;
+  [ArenaTagType.GRAVE_MARKER]: GraveMarkerTag;
   [ArenaTagType.ER_WEATHER_LOCK]: ErWeatherLockTag;
   [ArenaTagType.STEALTH_ROCK]: StealthRockTag;
   [ArenaTagType.STICKY_WEB]: StickyWebTag;

@@ -13,6 +13,7 @@
   "heavyRain": "Heavy Rain",
   "harshSun": "Harsh Sun",
   "strongWinds": "Strong Winds",
+  "eerieFog": "Eerie Fog",
 
   "neutralizingGas": "Neutralizing Gas",
 
@@ -49,5 +50,8 @@
   "waterFirePledge": "Rainbow",
   "grassWaterPledge": "Swamp",
   "fairyLock": "Fairy Lock",
-  "imprison": "Imprison"
+  "imprison": "Imprison",
+
+  "sedimentBloom": "Sediment Bloom",
+  "graveMarker": "Grave Marker"
 }

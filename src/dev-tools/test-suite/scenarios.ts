@@ -32,6 +32,7 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import { ER_CRACKED_VESSEL_ABILITY_ID } from "#data/elite-redux/abilities/newcomer-signature-abilities";
 import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnedCount } from "#data/elite-redux/coop/coop-session";
@@ -69,6 +70,8 @@ import {
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
+import { ArenaTagSide } from "#enums/arena-tag-side";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
 import { BerryType } from "#enums/berry-type";
 import { BiomeId } from "#enums/biome-id";
@@ -886,6 +889,48 @@ function woundPlayerField(fraction: number): void {
 }
 
 const EASY_ABILITY_ADDITION_SCENARIOS: DevScenario[] = [
+  easyAbilityAdditionScenario({
+    label: "Info flyout: Sediment Bloom + Grave Marker",
+    description:
+      "The newcomer signature hazards (Twinkletuff's Sediment Bloom, Dustnoir's Boot Hill Grave Marker) now appear in the battle info screen. They used to work but were invisible there.\n"
+      + "DO: open the Active Battle Effects info flyout (the field-effects panel, toggled with the info button).\n"
+      + "EXPECT: the Enemy side lists both 'Sediment Bloom' and 'Grave Marker'. The Bloom also drains a little of the foe's HP at each turn's end.",
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+    },
+    party: () => [
+      makeStarter(SpeciesId.WIGGLYTUFF, {
+        moveset: [MoveId.SPLASH, MoveId.DAZZLING_GLEAM, MoveId.PROTECT, MoveId.MOONBLAST],
+      }),
+    ],
+    onBattleStart: () => {
+      // Plant both signature field effects on the ENEMY side, exactly as the
+      // abilities do, so the tester can confirm they now render in the flyout.
+      const player = globalScene.getPlayerField()[0];
+      if (player) {
+        globalScene.arena.addTag(ArenaTagType.SEDIMENT_BLOOM, 0, undefined, player.id, ArenaTagSide.ENEMY, true);
+        globalScene.arena.addTag(ArenaTagType.GRAVE_MARKER, 0, undefined, player.id, ArenaTagSide.ENEMY, true);
+      }
+    },
+  }),
+  easyAbilityAdditionScenario({
+    label: "Cracked Vessel: survive + Eerie Fog shows",
+    description:
+      "Cracked Vessel (Forbiddron, signature 5992): a lethal direct hit leaves it at 1 HP and raises Eerie Fog for 4 turns. Eerie Fog now shows a proper label in the battle info screen.\n"
+      + "DO: let the foe land a hit that would KO your Pokemon (it starts near-fainted). Use Splash, then open the Active Battle Effects info flyout.\n"
+      + "EXPECT: your Pokemon survives the KO at 1 HP and the Field lists 'Eerie Fog' (previously a raw 'eerieFog' key). The foe is also badly poisoned.",
+    ability: ER_CRACKED_VESSEL_ABILITY_ID as unknown as AbilityId,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.BODY_SLAM],
+    },
+    party: () => [
+      makeStarter(SpeciesId.COFAGRIGUS, {
+        moveset: [MoveId.SPLASH, MoveId.SHADOW_BALL, MoveId.PROTECT, MoveId.NASTY_PLOT],
+      }),
+    ],
+    onBattleStart: () => woundPlayerField(0.05),
+  }),
   easyAbilityAdditionScenario({
     label: "Ability+: Healer always cures both",
     description:

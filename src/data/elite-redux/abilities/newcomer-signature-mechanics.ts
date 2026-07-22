@@ -427,40 +427,35 @@ export class GlamRockAbAttr extends PostTurnAbAttr {
   }
 }
 
-interface BloomState {
-  source: Pokemon;
-  side: ArenaTagSide;
-}
-const BLOOMS = new Map<ArenaTagSide, BloomState>();
-let bloomBattle: object | undefined;
-function ensureBloomBattle(): void {
-  if (bloomBattle !== globalScene.currentBattle) {
-    BLOOMS.clear();
-    bloomBattle = globalScene.currentBattle;
-  }
-}
 export function notifyHazardRemovedBy(pokemon: Pokemon): void {
-  ensureBloomBattle();
   if (!hasAttr(pokemon, "SedimentBloomMarkerAbAttr")) {
     return;
   }
-  BLOOMS.set(foeSide(pokemon), { source: pokemon, side: foeSide(pokemon) });
+  // Plant the Bloom as a real, per-side arena tag so it shows in the battle info
+  // flyout and survives a mid-battle save. Its drain runs in `processSedimentBlooms`.
+  globalScene.arena.addTag(ArenaTagType.SEDIMENT_BLOOM, 0, undefined, pokemon.id, foeSide(pokemon), true);
   globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} planted a Sediment Bloom!`);
 }
 export class SedimentBloomMarkerAbAttr extends AbAttr {
   override apply(): void {}
 }
 export function processSedimentBlooms(): void {
-  ensureBloomBattle();
-  for (const bloomState of BLOOMS.values()) {
-    const pokemon = bloomState.source;
+  for (const side of [ArenaTagSide.PLAYER, ArenaTagSide.ENEMY]) {
+    const bloom = globalScene.arena.getTagOnSide(ArenaTagType.SEDIMENT_BLOOM, side);
+    if (!bloom) {
+      continue;
+    }
+    const source = globalScene.getPokemonById(bloom.sourceId);
     let drained = 0;
-    const foes = bloomState.side === ArenaTagSide.PLAYER ? globalScene.getPlayerField() : globalScene.getEnemyField();
+    const foes = side === ArenaTagSide.PLAYER ? globalScene.getPlayerField() : globalScene.getEnemyField();
     for (const foe of foes.filter(mon => mon.isActive(true))) {
       const amount = Math.max(1, Math.floor(foe.getMaxHp() / 16));
-      drained += foe.damageAndUpdate(amount, { result: HitResult.INDIRECT, source: pokemon });
+      drained += foe.damageAndUpdate(
+        amount,
+        source ? { result: HitResult.INDIRECT, source } : { result: HitResult.INDIRECT },
+      );
     }
-    const allies = bloomState.side === ArenaTagSide.PLAYER ? globalScene.getEnemyField() : globalScene.getPlayerField();
+    const allies = side === ArenaTagSide.PLAYER ? globalScene.getEnemyField() : globalScene.getPlayerField();
     for (const ally of allies) {
       ally.heal(drained);
     }
@@ -908,18 +903,6 @@ export function applyPendingSkyhookEntryBoost(pokemon: Pokemon): void {
   }
 }
 
-interface GraveMarkerState {
-  source: Pokemon;
-  side: ArenaTagSide;
-}
-const GRAVE_MARKERS = new Map<ArenaTagSide, GraveMarkerState>();
-let graveMarkerBattle: object | undefined;
-function ensureGraveMarkerBattle(): void {
-  if (graveMarkerBattle !== globalScene.currentBattle) {
-    GRAVE_MARKERS.clear();
-    graveMarkerBattle = globalScene.currentBattle;
-  }
-}
 export class BootHillAbAttr extends PostAttackAbAttr {
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     return (
@@ -927,24 +910,23 @@ export class BootHillAbAttr extends PostAttackAbAttr {
     );
   }
   override apply({ pokemon }: PostMoveInteractionAbAttrParams): void {
-    ensureGraveMarkerBattle();
-    const side = foeSide(pokemon);
-    GRAVE_MARKERS.set(side, { source: pokemon, side });
+    // Plant the marker as a real, per-side arena tag so it shows in the battle
+    // info flyout and survives a mid-battle save. Consumed in `applyGraveMarkerOnEntry`.
+    globalScene.arena.addTag(ArenaTagType.GRAVE_MARKER, 0, undefined, pokemon.id, foeSide(pokemon), true);
     globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} planted a Grave Marker!`);
   }
 }
 export function applyGraveMarkerOnEntry(pokemon: Pokemon): void {
-  ensureGraveMarkerBattle();
   const side = ownSide(pokemon);
-  const marker = GRAVE_MARKERS.get(side);
+  const marker = globalScene.arena.getTagOnSide(ArenaTagType.GRAVE_MARKER, side);
   if (!marker) {
     return;
   }
-  const { source } = marker;
-  GRAVE_MARKERS.delete(side);
+  const source = globalScene.getPokemonById(marker.sourceId);
+  globalScene.arena.removeTagOnSide(ArenaTagType.GRAVE_MARKER, side, true);
   globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} was struck by the Grave Marker!`);
   const damage = Math.max(1, Math.floor(pokemon.getMaxHp() / 8));
-  pokemon.damageAndUpdate(damage, { result: HitResult.INDIRECT, source });
+  pokemon.damageAndUpdate(damage, source ? { result: HitResult.INDIRECT, source } : { result: HitResult.INDIRECT });
   if (!pokemon.isFainted()) {
     pokemon.setStatStage(Stat.SPD, Math.max(-6, pokemon.getStatStage(Stat.SPD) - 1));
     globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()}'s Speed fell!`);
@@ -1203,8 +1185,7 @@ export function applyCenterOfAttentionPenalty(attacker: Pokemon, target: Pokemon
 const CENTER_PENALTY_RECORD = new WeakMap<Pokemon, object>();
 
 export function notifySignatureHazardRemoval(user: Pokemon, removed: number): void {
-  const side = ownSide(user);
-  const removedBloom = BLOOMS.delete(side);
+  const removedBloom = globalScene.arena.removeTagOnSide(ArenaTagType.SEDIMENT_BLOOM, ownSide(user), true);
   if (removed > 0 || removedBloom) {
     notifyHazardRemovedBy(user);
   }

@@ -89,4 +89,19 @@ export enum ArenaTagType {
    * effects without a new ArenaTagType.
    */
   ER_INFESTATION_TRAP = "ER_INFESTATION_TRAP",
+  /**
+   * Elite Redux — Sediment Bloom (signature ability 5976): a removable field
+   * effect planted on a side when a Sediment Bloom Pokemon consumes or removes an
+   * entry hazard from its own side. At each turn's end the Bloom drains a fraction
+   * of every Pokemon on its side and heals the opposing side by the amount drained.
+   * Persists until cleared; shown per-side in the battle info flyout.
+   */
+  SEDIMENT_BLOOM = "SEDIMENT_BLOOM",
+  /**
+   * Elite Redux — Grave Marker (Boot Hill signature ability 5985): a one-use marker
+   * planted on the opposing side by a direct knockout. The next foe to enter that
+   * side takes Ghost-typed chip damage and loses 1 Speed, then the marker is spent.
+   * Shown per-side in the battle info flyout.
+   */
+  GRAVE_MARKER = "GRAVE_MARKER",
 }
