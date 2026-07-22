@@ -132,6 +132,27 @@ export function coerceSeriesFormat(v: unknown): SeriesFormat {
   return SERIES_FORMATS.includes(v as SeriesFormat) ? (v as SeriesFormat) : DEFAULT_SERIES_FORMAT;
 }
 
+/**
+ * Game wins needed to CLINCH a series match: single -> 1, best-of-3 -> 2, best-of-5 -> 3
+ * (a strict majority of the max games). Fed into {@linkcode applySeriesGameReport} so the pure
+ * bracket engine stays agnostic of the format vocabulary.
+ */
+export function winsNeededForSeries(seriesFormat: SeriesFormat): number {
+  switch (seriesFormat) {
+    case "bo5":
+      return 3;
+    case "bo3":
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+/** Total games in a series (single -> 1, bo3 -> 3, bo5 -> 5). Board/label helper. */
+export function seriesGameCount(seriesFormat: SeriesFormat): number {
+  return seriesFormat === "bo5" ? 5 : seriesFormat === "bo3" ? 3 : 1;
+}
+
 /** Clamp a requested entrant cap into [MIN_ENTRANTS, MAX_ENTRANTS], defaulting when absent/invalid. */
 export function clampMaxEntrants(v: number | undefined): number {
   if (typeof v !== "number" || !Number.isFinite(v)) {

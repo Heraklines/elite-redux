@@ -40,9 +40,19 @@ import {
   type TournamentGrantSettlement,
   type TournamentRecord,
   tournamentGrantSettlements,
+  winsNeededForSeries,
   withdrawEntrant,
 } from "./tournament";
-import { applyResultReport, type Bracket, findMatch, manualResolve } from "./tournament-bracket";
+import {
+  applyResultReport,
+  applySeriesGameReport,
+  type Bracket,
+  findMatch,
+  manualResolve,
+  recordPresence,
+  resolveExpiredMatches,
+  seriesScore,
+} from "./tournament-bracket";
 
 // Minimal structural D1 surface (the subset this module uses). Declared locally so
 // the module stays free of `@cloudflare/workers-types` and imports cleanly into a
@@ -573,6 +583,75 @@ async function enforceScheduledClose(env: TournamentEnv, t: TournamentRecord, no
   return res.tournament;
 }
 
+/** Build a seed lookup (participant -> seed) from the active field, for the deadline resolver. */
+function seedLookup(entrants: EntrantRecord[]): (participant: string) => number | null {
+  const bySeed = new Map<string, number | null>();
+  for (const e of entrants) {
+    bySeed.set(e.participant, e.seed);
+  }
+  return (p: string) => bySeed.get(p) ?? null;
+}
+
+/**
+ * P2 LAZY DEADLINE AUTO-RESOLUTION (no cron): resolve every expired, undecided match on this read
+ * (presence-based activity win; higher seed when neither/both present). IDEMPOTENT — a decided match
+ * is never re-resolved. Persists the advanced bracket + any completion, then fires reward granting
+ * automatically if the final resolved. Returns the possibly-updated record. Safe on non-started
+ * tournaments (no-op). Called alongside {@link enforceScheduledClose} at the top of read handlers.
+ */
+async function enforceDeadlines(env: TournamentEnv, t: TournamentRecord, now: number): Promise<TournamentRecord> {
+  if (t.state !== "in_progress" || t.bracket === null) {
+    return t;
+  }
+  const entrants = await loadEntrants(env, t.id);
+  const { resolved } = resolveExpiredMatches(t.bracket, seedLookup(entrants), now);
+  if (resolved.length === 0) {
+    return t;
+  }
+  const synced = syncCompletion({ ...t, bracket: t.bracket });
+  await updateTournament(env, synced);
+  return maybeAutoGrantRewards(env, synced);
+}
+
+/** Scheduled close THEN deadline auto-resolution — the full lazy refresh applied on every read. */
+async function refreshTournament(env: TournamentEnv, t: TournamentRecord, now: number): Promise<TournamentRecord> {
+  const closed = await enforceScheduledClose(env, t, now);
+  return enforceDeadlines(env, closed, now);
+}
+
+/**
+ * Deliver a completed tournament's reward pool through the settlement pipeline (er-save-api's
+ * pending-settlement store — same trusted client-apply as stakes). Idempotent server-side, so a
+ * retry after a partial failure never double-grants. Shared by the manual /grant-rewards route and
+ * the automatic on-completion grant.
+ */
+async function deliverRewards(env: TournamentEnv, t: TournamentRecord): Promise<GrantDeliveryResult> {
+  const settlements = tournamentGrantSettlements(t);
+  const sink = env.grantSink ?? ((id, s) => defaultGrantSink(env, id, s));
+  return sink(t.id, settlements);
+}
+
+/**
+ * P2 CHAMPION COMPLETION: when a tournament is complete with an ungranted, non-empty reward pool,
+ * grant + deliver the rewards AUTOMATICALLY (no admin click needed) — invoked after any path that can
+ * complete the tournament (result report, manual resolve, kick-walkover, deadline auto-resolution).
+ * Delivery runs BEFORE the rewardsGranted flag is set and is idempotent server-side, so a failure
+ * leaves the flag false (retried on the next completing read or via the manual route). Returns the
+ * (possibly flag-updated) record.
+ */
+async function maybeAutoGrantRewards(env: TournamentEnv, t: TournamentRecord): Promise<TournamentRecord> {
+  if (t.state !== "complete" || t.rewardsGranted || t.rewardPool.length === 0) {
+    return t;
+  }
+  const delivery = await deliverRewards(env, t);
+  if (!delivery.ok) {
+    return t; // leave rewardsGranted false — retryable
+  }
+  const granted: TournamentRecord = { ...t, rewardsGranted: true };
+  await updateTournament(env, granted);
+  return granted;
+}
+
 async function handleWithdraw(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
   const t = await loadTournament(env, String(body?.id));
   if (!t) {
@@ -600,9 +679,15 @@ async function handlePing(body: any, caller: Caller, env: TournamentEnv, cors: C
   if (!t) {
     return json({ error: "tournament not found" }, 404, cors);
   }
+  const now = Date.now();
   await env.DB.prepare("UPDATE tournament_entrants SET last_seen=?3 WHERE tournament_id=?1 AND participant=?2")
-    .bind(t.id, caller.u, Date.now())
+    .bind(t.id, caller.u, now)
     .run();
+  // P2: stamp the per-window presence aggregate on this player's open match(es) so the deadline
+  // resolver can award an activity win to a lone-present player. Persist the bracket only if changed.
+  if (t.bracket !== null && t.state === "in_progress" && recordPresence(t.bracket, caller.u, now)) {
+    await updateTournament(env, t);
+  }
   return json({ ok: true }, 200, cors);
 }
 
@@ -615,8 +700,8 @@ async function handleList(env: TournamentEnv, cors: Cors): Promise<Response> {
   const now = Date.now();
   const list: Record<string, unknown>[] = [];
   for (const row of rows) {
-    // P3: enforce any elapsed scheduled close lazily on the list read (no cron).
-    const t = await enforceScheduledClose(env, rowToRecord(row), now);
+    // P3 scheduled close + P2 deadline auto-resolution, enforced lazily on the list read (no cron).
+    const t = await refreshTournament(env, rowToRecord(row), now);
     const entrants = await loadEntrants(env, t.id);
     const waitlist = await loadWaitlist(env, t.id);
     // list view is light: no full bracket
@@ -632,7 +717,7 @@ async function handleBracket(url: URL, env: TournamentEnv, cors: Cors): Promise<
   if (!loaded) {
     return json({ error: "tournament not found" }, 404, cors);
   }
-  const t = await enforceScheduledClose(env, loaded, Date.now());
+  const t = await refreshTournament(env, loaded, Date.now());
   const entrants = await loadEntrants(env, t.id);
   const waitlist = await loadWaitlist(env, t.id);
   return json({ ok: true, tournament: tournamentView(t, entrants, waitlist) }, 200, cors);
@@ -649,16 +734,47 @@ async function handleResult(body: any, caller: Caller, env: TournamentEnv, cors:
   if (!match) {
     return json({ error: "match not found" }, 404, cors);
   }
-  // ATTESTATION: the reporter is the authenticated account, and must be one of the
-  // two paired players of this match (applyResultReport enforces winner ∈ {a,b} too).
-  const res = applyResultReport(t.bracket, matchId, caller.u, winner, Date.now());
+  // ATTESTATION: the reporter is the authenticated account, and must be one of the two paired
+  // players of this match (both engines enforce winner ∈ {a,b} too). SERIES (bo3/bo5): each game
+  // is dual-attested at GAME granularity via `gameIndex`; the match only settles once a player
+  // clinches the series (winsNeededForSeries). A single-game tournament keeps the original path.
+  const winsToClinch = winsNeededForSeries(t.seriesFormat);
+  const now = Date.now();
+  const res =
+    winsToClinch <= 1
+      ? applyResultReport(t.bracket, matchId, caller.u, winner, now)
+      : applySeriesGameReport(
+          t.bracket,
+          matchId,
+          caller.u,
+          winner,
+          coerceGameIndex(body?.gameIndex),
+          winsToClinch,
+          now,
+        );
   const synced = syncCompletion({ ...t, bracket: res.bracket });
   await updateTournament(env, synced);
+  // P2: champion completion -> auto-grant rewards (no admin click), idempotent + retryable.
+  await maybeAutoGrantRewards(env, synced);
+  const settledMatch = findMatch(synced.bracket as Bracket, matchId);
   return json(
-    { ok: true, resolution: res.resolution, match: findMatch(synced.bracket as Bracket, matchId) },
+    {
+      ok: true,
+      resolution: res.resolution,
+      match: settledMatch,
+      // The board's live series score after this report (0-0 for a single game). The client uses it
+      // to render "1-0" and to gate the series intermission vs the return to title.
+      seriesScore: settledMatch ? seriesScore(settledMatch) : { a: 0, b: 0 },
+    },
     200,
     cors,
   );
+}
+
+/** Clamp an untrusted gameIndex to a non-negative integer (defaults to game 0). */
+function coerceGameIndex(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
 }
 
 async function handleResolve(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
@@ -673,6 +789,8 @@ async function handleResolve(body: any, caller: Caller, env: TournamentEnv, cors
   const res = manualResolve(t.bracket, String(body?.matchId ?? ""), String(body?.winner ?? ""));
   const synced = syncCompletion({ ...t, bracket: res.bracket });
   await updateTournament(env, synced);
+  // P2: a manual resolve that decides the final also auto-grants rewards.
+  await maybeAutoGrantRewards(env, synced);
   return json(
     { ok: true, resolution: res.resolution, match: findMatch(synced.bracket as Bracket, res.matchId) },
     200,
@@ -724,6 +842,8 @@ async function handleKick(body: any, caller: Caller, env: TournamentEnv, cors: C
   if (res.kind === "walkover") {
     // Keep the kicked entrant row; persist the advanced bracket + any completion.
     await updateTournament(env, res.tournament);
+    // P2: a walkover that decides the final auto-grants rewards.
+    await maybeAutoGrantRewards(env, res.tournament);
   } else {
     // registration / reopen: remove the kicked field row, promote the first waitlisted member.
     if (!res.keepEntrantRow) {
@@ -889,8 +1009,7 @@ async function handleGrantRewards(body: any, caller: Caller, env: TournamentEnv,
   const settlements = tournamentGrantSettlements(t);
   // Deliver FIRST (idempotent on the save-api side), then mark granted — so a delivery failure leaves
   // rewardsGranted false (retryable) and a re-run can't double-insert the settlement rows.
-  const sink = env.grantSink ?? ((id, s) => defaultGrantSink(env, id, s));
-  const delivery = await sink(t.id, settlements);
+  const delivery = await deliverRewards(env, t);
   if (!delivery.ok) {
     return json({ error: `reward delivery failed: ${delivery.error ?? "unknown"}` }, 502, cors);
   }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Route-boundary tests for the tournament worker (escrow-test discipline: prove the
 // admin ALLOWLIST and the result ATTESTATION at the HTTP seam). The worker's D1 is
 // stubbed with a minimal in-memory engine that answers only the exact statements the
@@ -347,6 +347,54 @@ describe("tournament routes — lifecycle + attestation", () => {
     expect(sbody.match.winner).toBe(pa);
   });
 
+  it("BO3 series: per-game reports accumulate, clinch at 2-0, advance the bracket", async () => {
+    const id = await createTour({ seriesFormat: "bo3" });
+    await register(id, ["alice", "bob", "carol", "dave"]);
+    await call("/tournament/close-registration", "POST", ADMIN, { id });
+    const bracket = (await bracketOf(id)).bracket;
+    const m0 = bracket.rounds[0][0];
+    const [pa, pb] = [m0.a, m0.b];
+
+    // Game 0: both report pa. A single agreeing game must NOT settle the Bo3.
+    await call("/tournament/result", "POST", player(pa), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: pa,
+      gameIndex: 0,
+    });
+    const g0 = await call("/tournament/result", "POST", player(pb), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: pa,
+      gameIndex: 0,
+    });
+    const g0body = (await g0.json()) as any;
+    expect(g0body.resolution).toBe("pending"); // 1-0 does not clinch
+    expect(g0body.match.winner).toBeNull();
+    expect(g0body.seriesScore).toEqual(m0.a === pa ? { a: 1, b: 0 } : { a: 0, b: 1 });
+
+    // Game 1: both report pa again -> 2-0 clinch + advance.
+    await call("/tournament/result", "POST", player(pa), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: pa,
+      gameIndex: 1,
+    });
+    const g1 = await call("/tournament/result", "POST", player(pb), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: pa,
+      gameIndex: 1,
+    });
+    const g1body = (await g1.json()) as any;
+    expect(g1body.resolution).toBe("settled");
+    expect(g1body.match.winner).toBe(pa);
+    // The winner advanced into the next round.
+    const advanced = (await bracketOf(id)).bracket;
+    const feeds = advanced.rounds[1].some((mm: any) => mm.a === pa || mm.b === pa);
+    expect(feeds).toBe(true);
+  });
+
   it("disputed reports need an organizer resolve", async () => {
     const id = await createTour();
     await register(id, ["alice", "bob", "carol", "dave"]);
@@ -522,24 +570,25 @@ describe("tournament routes — lifecycle + attestation", () => {
     return { id, champion: t.champion };
   }
 
-  it("GRANT-REWARDS computes per-place grants at completion (scenario 10)", async () => {
+  it("AUTO-GRANTS per-place settlements the moment the final resolves (P2 champion completion)", async () => {
     const { id, champion } = await playOutSampleCup({
       rewardPool: [
         { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 100 }] },
         { place: "semifinalist", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 20 }] },
       ],
     });
-    const g = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
-    expect(g.status).toBe(200);
-    const gbody = (await g.json()) as any;
-    const champGrant = gbody.granted.find((x: any) => x.place === "champion");
-    expect(champGrant.participant).toBe(champion);
-    expect(gbody.granted.filter((x: any) => x.place === "semifinalist").length).toBe(2);
-    // double-grant guarded
+    // P2: the completing result AUTO-delivered the pool — no admin click needed.
+    expect(deliveries).toHaveLength(1);
+    const sent = deliveries[0].settlements as any[];
+    expect(sent.filter(s => s.uid === champion && s.mutation.speciesId === 445)).toHaveLength(1);
+    // two semifinalists each get their candy
+    expect(sent.filter(s => s.mutation.speciesId === 1)).toHaveLength(2);
+    // the manual route is now idempotent-refused (rewards already granted) and NEVER re-delivers.
     expect((await call("/tournament/grant-rewards", "POST", ADMIN, { id })).status).toBe(422);
+    expect(deliveries).toHaveLength(1);
   });
 
-  it("GRANT-REWARDS DELIVERS chosen-shiny + candy settlements through the sink, once", async () => {
+  it("AUTO-GRANT delivers chosen-shiny + candy + random-shiny settlements, exactly once", async () => {
     const { id, champion } = await playOutSampleCup({
       rewardPool: [
         {
@@ -555,14 +604,10 @@ describe("tournament routes — lifecycle + attestation", () => {
         },
       ],
     });
-    const g = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
-    expect(g.status).toBe(200);
-    const gbody = (await g.json()) as any;
-    // Delivered exactly once
+    // Delivered exactly once, automatically, on completion.
     expect(deliveries).toHaveLength(1);
     expect(deliveries[0].tournamentId).toBe(id);
     const sent = deliveries[0].settlements as any[];
-    // champion gets a black-shiny grantUnlock + a candy grant; two semifinalists each get a shiny-151.
     const champSettlements = sent.filter(s => s.uid === champion);
     expect(champSettlements).toContainEqual({
       uid: champion,
@@ -574,24 +619,103 @@ describe("tournament routes — lifecycle + attestation", () => {
     });
     const semiShinies = sent.filter(s => s.mutation.kind === "grantUnlock" && s.mutation.speciesId === 151);
     expect(semiShinies).toHaveLength(2);
-    expect(gbody.delivered).toBe(sent.length);
-
-    // Idempotent: a second grant is refused (rewardsGranted) and NEVER delivers again.
+    // A manual re-grant is refused and NEVER re-delivers.
     expect((await call("/tournament/grant-rewards", "POST", ADMIN, { id })).status).toBe(422);
     expect(deliveries).toHaveLength(1);
   });
 
-  it("GRANT-REWARDS leaves rewardsGranted FALSE on a delivery failure (retryable)", async () => {
+  it("AUTO-GRANT failure leaves rewardsGranted FALSE — the manual route retries (red-proof)", async () => {
+    // Sink fails DURING the completing result -> auto-grant can't mark granted (nothing delivered).
+    sinkFails = true;
     const { id } = await playOutSampleCup({
       rewardPool: [{ place: "champion", mutations: [{ kind: "grantShinyChosen", speciesId: 6, tier: 1 }] }],
     });
-    sinkFails = true;
-    const fail = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
-    expect(fail.status).toBe(502);
-    // rewards NOT marked granted -> a retry (now succeeding) delivers.
+    expect(deliveries).toHaveLength(0);
+    // rewards NOT marked granted -> the manual route (now succeeding) delivers.
     sinkFails = false;
     const retry = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
     expect(retry.status).toBe(200);
     expect(deliveries).toHaveLength(1);
+    // and is idempotent afterwards.
+    expect((await call("/tournament/grant-rewards", "POST", ADMIN, { id })).status).toBe(422);
+    expect(deliveries).toHaveLength(1);
+  });
+});
+
+// ---- P2 DEADLINE AUTO-RESOLUTION at the HTTP seam (lazy on read, no cron) ----
+describe("tournament routes — P2 deadline auto-resolution + champion auto-grant", () => {
+  const HOUR = 3_600_000;
+  const WINDOW = 24 * HOUR;
+  const T0 = 1_700_000_000_000;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function autoCloseCup(rewardPool?: unknown): Promise<string> {
+    const id = "dl";
+    const r = await call("/tournament/create", "POST", ADMIN, { id, name: "Deadline Cup", maxEntrants: 4, rewardPool });
+    expect(r.status).toBe(200);
+    for (const p of ["a", "b", "c", "d"]) {
+      const rr = await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` });
+      expect(rr.status).toBe(200);
+    }
+    return id;
+  }
+  async function bracketOf(id: string) {
+    const got = await call(`/tournament/bracket?id=${id}`, "GET", player("a"));
+    return ((await got.json()) as any).tournament;
+  }
+
+  it("expired + one present -> ACTIVITY win; neither present -> SEED (higher seed advances)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const id = await autoCloseCup();
+    let t = await bracketOf(id);
+    expect(t.state).toBe("in_progress");
+    // round-0: m0 = a(seed1) vs d(seed4); m1 = b(seed2) vs c(seed3)
+    const m0 = t.bracket.rounds[0][0];
+    const m1 = t.bracket.rounds[0][1];
+    // 'a' pings in during the window -> present on m0
+    expect((await call("/tournament/ping", "POST", player("a"), { id })).status).toBe(200);
+    // window expires
+    vi.setSystemTime(T0 + WINDOW + 1);
+    t = await bracketOf(id);
+    const m0r = t.bracket.rounds[0][0];
+    const m1r = t.bracket.rounds[0][1];
+    expect(m0r.winner).toBe(m0.a); // 'a' present -> activity win
+    expect(m0r.resolution).toBe("activity");
+    expect(m1r.resolution).toBe("seed"); // neither present -> higher seed
+    expect(m1r.winner).toBe(m1.a); // b (seed2) beats c (seed3)
+  });
+
+  it("idempotent — a later read never re-resolves an auto-resolved match", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const id = await autoCloseCup();
+    vi.setSystemTime(T0 + WINDOW + 1);
+    const first = await bracketOf(id);
+    const w0 = first.bracket.rounds[0][0].winner;
+    vi.setSystemTime(T0 + WINDOW + 10 * HOUR);
+    const second = await bracketOf(id);
+    expect(second.bracket.rounds[0][0].winner).toBe(w0);
+    expect(second.bracket.rounds[0][0].resolution).toBe("seed");
+  });
+
+  it("cascades to the FINAL and AUTO-GRANTS the champion reward with no organizer action", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const id = await autoCloseCup([
+      { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 100 }] },
+    ]);
+    // blow past BOTH the round-0 and final windows in one jump
+    vi.setSystemTime(T0 + 2 * WINDOW + 1);
+    const t = await bracketOf(id);
+    expect(t.state).toBe("complete");
+    expect(t.champion).toBe("a"); // seed-1 advances all the way with no presence
+    // champion reward auto-delivered exactly once
+    expect(deliveries).toHaveLength(1);
+    const sent = deliveries[0].settlements as any[];
+    expect(sent).toContainEqual({ uid: "a", mutation: { kind: "grantCandy", speciesId: 445, candy: 100 } });
   });
 });
