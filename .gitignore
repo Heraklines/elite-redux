@@ -96,3 +96,7 @@ progress.md
 
 # Tier-1 minimal transport bundle output
 dist-coop-transport-min/
+
+# Transient agent scratch artifacts (batch-2 work)
+scratch_*
+scratch_view/

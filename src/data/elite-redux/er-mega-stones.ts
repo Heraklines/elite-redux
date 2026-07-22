@@ -266,6 +266,10 @@ const ER_STONE_DEFS: ReadonlyArray<readonly [string, string]> = [
   ["KINGDRANITE_Y", "lucarionite"],
   ["DURALUDONITE", "lucarionite"],
   ["FIDOUGHITE", "lucarionite"],
+  // Newcomer BATCH 2 stones (placeholder icon until art lands).
+  ["LUXRAYITE_Y", "lucarionite"],
+  ["YVELTALITE_Z", "lucarionite"],
+  ["METAGROSSITE_BOND", "lucarionite"],
 ];
 
 type FcRecord = Record<string, number>;
