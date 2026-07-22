@@ -383,6 +383,7 @@ import {
   COOP_MAX_REACHABLE_COUNTER,
   COOP_ME_PICK_CHOICE_KINDS,
   COOP_ME_PUMP_SEQ_BASE,
+  COOP_ME_SUB_CHOICE_KINDS,
   COOP_ME_TERM_SEQ_BASE,
   COOP_REJOIN_SYNC_SEQ_BASE,
   COOP_REVIVAL_CHOICE_KINDS,
@@ -4917,14 +4918,17 @@ function projectCoopV2WaveControl(
   }
 }
 
-interface CoopV2AuthorityProposalWaitSpec {
+export interface CoopV2AuthorityProposalWaitSpec {
   readonly relaySequence: number;
   readonly acceptedKinds: readonly string[];
   readonly expectedRewardSurface?: CoopRewardSurfaceIdentity | null | undefined;
 }
 
-/** Derive the authority's remote-input ingress solely from the immutable projection capsule. */
-function coopV2AuthorityProposalWaitSpec(
+/**
+ * Derive the authority's remote-input ingress solely from the immutable projection capsule. Exported for
+ * the focused proposal-wait-spec regression ({@link file coop-me-subprompt-proposal-wait.test.ts}).
+ */
+export function coopV2AuthorityProposalWaitSpec(
   control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
   plan: CoopV2InteractionProjectionPlan,
 ): CoopV2AuthorityProposalWaitSpec | null {
@@ -4965,13 +4969,34 @@ function coopV2AuthorityProposalWaitSpec(
         relaySequence: COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE + plan.partySlot,
         acceptedKinds: COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
       };
-    case "mystery":
-      return control.surfaceClass === "op:me" && control.operationKind === "ME_PRESENT"
-        ? {
-            relaySequence: COOP_ME_PUMP_SEQ_BASE + plan.pinned,
-            acceptedKinds: COOP_ME_PICK_CHOICE_KINDS,
-          }
-        : null;
+    case "mystery": {
+      // The ME catch-FULL replace picker (#855) projects the ME_PRESENT + `catchFull` sub-prompt onto a
+      // dedicated op:catchFull / CATCH_FULL control; like the party/secondary sub-prompt it awaits the guest
+      // owner's relayed slot as a `meSub` sub-pick on the ME pump seq.
+      if (control.surfaceClass === "op:catchFull" && control.operationKind === "CATCH_FULL") {
+        return { relaySequence: COOP_ME_PUMP_SEQ_BASE + plan.pinned, acceptedKinds: COOP_ME_SUB_CHOICE_KINDS };
+      }
+      if (control.surfaceClass !== "op:me" || control.operationKind !== "ME_PRESENT") {
+        // The quiz sub-prompt arms an op:me / QUIZ_ANSWER control and drives its own session on the distinct
+        // quiz seq, so it never awaits on this pump seq.
+        return null;
+      }
+      // The armed ME presentation decides which relayed pick kind the authority legitimately awaits on the ME
+      // pump seq. A party/secondary `subPrompt` is a SUB-prompt: the guest owner relays a `meSub` sub-pick. The
+      // top-level option list (no subPrompt) awaits the `me` option pick. Without this branch every ME_PRESENT
+      // resolved to `me` only, so the authority's `meSub` party/secondary wait was unaddressable and refused
+      // ("refused unaddressed remote proposal wait ... expected=[meSub]" -> "Mystery party choice ...
+      // unavailable after bounded wait" shared-session terminal).
+      const subPromptKind = plan.presentation.subPrompt?.kind;
+      const acceptedKinds =
+        subPromptKind === "party" || subPromptKind === "secondary"
+          ? COOP_ME_SUB_CHOICE_KINDS
+          : COOP_ME_PICK_CHOICE_KINDS;
+      return {
+        relaySequence: COOP_ME_PUMP_SEQ_BASE + plan.pinned,
+        acceptedKinds,
+      };
+    }
     case "revival":
       return {
         relaySequence: COOP_REVIVAL_SEQ_BASE + plan.fieldIndex,
