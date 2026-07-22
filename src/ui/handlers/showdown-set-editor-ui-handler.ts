@@ -44,6 +44,11 @@ import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-re
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
 import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import { rankByFilter } from "#data/elite-redux/showdown/showdown-search-normalize";
+import {
+  type MoveSearchMeta,
+  matchesMoveSearch,
+  parseMoveSearch,
+} from "#data/elite-redux/showdown/showdown-search-operators";
 import { exportShowdownSet, importShowdownSet } from "#data/elite-redux/showdown/showdown-set-codec";
 import {
   listNamedSpeciesSets,
@@ -293,6 +298,17 @@ interface MovePaneEntry {
 /** Short single-line label for a move's category. */
 function categoryLabel(cat: MoveCategory): string {
   return MoveCategory[cat]?.charAt(0) ?? "?";
+}
+
+/** Map a `Move` onto the metadata the search operators read (`type:`/`bp>`/`acc=`/`cat:`/`pp<=`). */
+function moveSearchMetaOf(move: {
+  type: PokemonType;
+  power: number;
+  accuracy: number;
+  category: MoveCategory;
+  pp: number;
+}): MoveSearchMeta {
+  return { type: move.type, power: move.power, accuracy: move.accuracy, category: move.category, pp: move.pp };
 }
 
 // The separator-insensitive name normalization + typeahead ranking now live in the PURE
@@ -1129,6 +1145,17 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       if (move) {
         list.push({ moveId, name: move.name, locked: false, reason: "" });
       }
+    }
+    // Search operators (P3): `type:fire`, `cat:phys`, `bp>90`, `acc=100`, `pp<=10`. A filter with NO
+    // recognized operator token parses to `operators: []`, so the plain path below stays BYTE-IDENTICAL.
+    const parsed = parseMoveSearch(this.filter);
+    if (parsed.operators.length > 0) {
+      const filtered = list.filter(e => {
+        const move = allMoves[e.moveId];
+        return move != null && matchesMoveSearch(moveSearchMetaOf(move), parsed);
+      });
+      // Residual plain text still ranks the survivors by name (empty residual => alphabetical).
+      return rankByFilter(filtered, e => e.name, parsed.residual);
     }
     return this.filter
       ? rankByFilter(list, e => e.name, this.filter)

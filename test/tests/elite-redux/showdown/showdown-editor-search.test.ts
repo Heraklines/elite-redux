@@ -105,6 +105,78 @@ function buildEditor(game: GameManager, field: EditorField): EditorInternals {
   return handler as unknown as EditorInternals;
 }
 
+describe.runIf(RUN)("showdown editor search - OPERATORS filter the real move pane (type:/bp>/acc=/cat:)", () => {
+  let phaserGame: Phaser.Game;
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+  afterAll(() => phaserGame.destroy(true));
+
+  type Internals = Omit<EditorInternals, "moveEntries"> & { moveEntries(): { name: string; moveId: number }[] };
+  const buildMoveEditor = (game: GameManager): Internals => buildEditor(game, EditorField.MOVE0) as Internals;
+
+  it("type:ground keeps ONLY ground moves (demo mon is Garchomp); a plain query is unaffected", async () => {
+    const { allMoves } = await import("#data/data-lists");
+    const { PokemonType } = await import("#enums/pokemon-type");
+    const game = new GameManager(phaserGame);
+    const ed = buildMoveEditor(game);
+
+    // Baseline plain query: the whole legal pool, alphabetical - many moves of many types.
+    ed.setFilter("");
+    const plainCount = ed.moveEntries().length;
+    expect(plainCount).toBeGreaterThan(4);
+
+    ed.setFilter("type:ground");
+    const ground = ed.moveEntries();
+    expect(ground.length, "Garchomp knows at least one ground move").toBeGreaterThan(0);
+    expect(ground.length, "the operator narrowed the pool").toBeLessThan(plainCount);
+    for (const entry of ground) {
+      expect(allMoves[entry.moveId].type, `${entry.name} is ground-typed`).toBe(PokemonType.GROUND);
+    }
+  });
+
+  it("cat:phys keeps only physical moves; acc=100 only perfectly-accurate moves", async () => {
+    const { allMoves } = await import("#data/data-lists");
+    const { MoveCategory } = await import("#enums/move-category");
+    const game = new GameManager(phaserGame);
+    const ed = buildMoveEditor(game);
+
+    ed.setFilter("cat:phys");
+    const phys = ed.moveEntries();
+    expect(phys.length).toBeGreaterThan(0);
+    for (const entry of phys) {
+      expect(allMoves[entry.moveId].category).toBe(MoveCategory.PHYSICAL);
+    }
+
+    ed.setFilter("acc=100");
+    const acc = ed.moveEntries();
+    expect(acc.length).toBeGreaterThan(0);
+    for (const entry of acc) {
+      expect(allMoves[entry.moveId].accuracy).toBe(100);
+    }
+  });
+
+  it("RED-PROOF: an impossible bp>=400 yields ZERO moves while a plain '' yields the full pool", () => {
+    const game = new GameManager(phaserGame);
+    const ed = buildMoveEditor(game);
+    ed.setFilter("");
+    expect(ed.moveEntries().length).toBeGreaterThan(0);
+    // Remove the operator branch in moveEntries() and this filter would be a plain name search for the
+    // literal "bp>=400", still 0 - so pair it with the positive type: assertion above as the real proof.
+    ed.setFilter("bp>=400");
+    expect(ed.moveEntries().length, "no legal move has >= 400 BP").toBe(0);
+  });
+
+  it("a plain (operator-free) filter still ranks by name - operators are strictly additive", () => {
+    const game = new GameManager(phaserGame);
+    const ed = buildMoveEditor(game);
+    ed.setFilter("earth");
+    const r = ed.moveEntries();
+    expect(r.length, "at least Earthquake surfaces").toBeGreaterThan(0);
+    expect(r[0].name.toLowerCase().startsWith("earth"), "top match is the prefix hit").toBe(true);
+  });
+});
+
 describe.runIf(RUN)("showdown editor search - highlight resets to the top match on every filter change", () => {
   let phaserGame: Phaser.Game;
   beforeAll(() => {
