@@ -21,11 +21,12 @@ import { globalScene } from "#app/global-scene";
 import { WeatherType } from "#enums/weather-type";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
+// Uses the default `showAbility = true`: summoning Eerie Fog on being hit is a
+// discrete, player-visible activation, so the ability banner must flash —
+// matching vanilla convention for weather-setting abilities (same popup-display
+// defect class as the counter-attack archetype). A prior explicit `super(false)`
+// suppressed that banner.
 export class SetFogOnHitAbAttr extends PostDefendAbAttr {
-  constructor() {
-    super(false);
-  }
-
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { move } = params;
     if (!move?.is("AttackMove")) {

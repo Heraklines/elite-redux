@@ -79,7 +79,11 @@ export interface PostSummonScriptedMoveOptions {
 
 export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
   constructor(private readonly opts: PostSummonScriptedMoveOptions) {
-    super(false);
+    // showAbility = true (default): casting a scripted move on switch-in is a
+    // discrete, player-visible activation, so the ability banner must flash —
+    // matching vanilla convention for on-entry abilities (see the popup-display
+    // defect class fixed alongside the counter-attack archetype).
+    super();
   }
 
   /** The move this ability casts on switch-in. */

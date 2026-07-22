@@ -1544,6 +1544,40 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Ability popup - Ultra Instinct / Deflect flashes its banner when it counters
+  // ===========================================================================
+  {
+    label: "Popup: Ultra Instinct / Deflect banner",
+    description:
+      "Bug: on Mega Lucario Z the ability POPUP (the name banner that announces an\n"
+      + "activating ability) never appeared for its counter-attack ability, even though\n"
+      + "the counter itself fired. Root cause: the counter archetype was built with\n"
+      + "showAbility=false, so the banner was suppressed.\n"
+      + "DO: turn 1, use Splash (idle). Let Chansey's Tackle hit Mega Lucario Z.\n"
+      + "EXPECT: the 'Deflect' ability BANNER flashes at the top-left AND Lucario counters\n"
+      + "with a 20BP Vacuum Wave that chips Chansey. Before the fix the counter still fired\n"
+      + "but NO banner showed. (Deflect is forced as the active ability here so the counter\n"
+      + "is testable - on a real run it is one of Mega Lucario Z's innates.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145, // past the BST-cap ladder so the mega isn't devolved
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5723), // Deflect - the Ultra Instinct counter mechanic
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, survives the counter to keep testing
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE], // contact attack that triggers the counter
+      });
+      return [
+        makeStarter(SpeciesId.LUCARIO, {
+          formIndex: formIndexByKey(SpeciesId.LUCARIO, "mega"), // Mega Z (formKey "mega")
+          moveset: [MoveId.SPLASH, MoveId.AURA_SPHERE, MoveId.CLOSE_COMBAT, MoveId.EXTREME_SPEED],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Ability - Radiance is immune to Dark moves, incl. moves made Dark at runtime
   // ===========================================================================
   {

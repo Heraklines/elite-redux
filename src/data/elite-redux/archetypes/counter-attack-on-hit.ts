@@ -85,7 +85,13 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
   private readonly healMultiplier: number | undefined;
 
   constructor(options: CounterAttackOnHitOptions) {
-    super(false);
+    // showAbility = true (default): the counter is a discrete, player-visible
+    // triggered action, so its ability banner must flash when it fires — matching
+    // vanilla convention (stat-change / status / retaliation abilities announce
+    // themselves). A prior `super(false)` suppressed the popup for Ultra Instinct
+    // (er-660) and Deflect (er-1022, Mega Lucario Z's innate), so the Vacuum Wave
+    // counter fired silently with no on-screen ability flash (maintainer report).
+    super();
     this.moveId = options.moveId;
     this.power = options.power;
     this.chance = options.chance ?? 100;
