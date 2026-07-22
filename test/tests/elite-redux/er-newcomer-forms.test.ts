@@ -132,8 +132,10 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     expect(moves.some(([, moveId]) => moveId === MoveId.LEAF_BLADE)).toBe(true);
   });
 
-  it("covers all 17 newcomer and Alpha forms incl. the additive mega-z rows", () => {
-    expect(ER_NEWCOMER_FORMS).toHaveLength(17);
+  it("covers all 20 newcomer and Alpha forms incl. the additive mega-z rows", () => {
+    // 17 batch-1/Alpha forms + 3 batch-2 forms (Metagross Battle Bond,
+    // Yveltal Mega Z, Mega Luxray Y).
+    expect(ER_NEWCOMER_FORMS).toHaveLength(20);
 
     // Mega Skarmory Z is ADDITIVE: it does not disturb the existing ER Mega
     // Skarmory Y, and lands on a distinct `mega-z` formIndex.
