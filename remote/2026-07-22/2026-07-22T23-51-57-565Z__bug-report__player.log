@@ -1,0 +1,34 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:6126a2a244301ecc20666dfd21a3d31c49f3f6e5:run-29963199854.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36
+platform: Linux armv81
+screen:   832x384 @2.8125x  devmem:4 GB
+boot:     boot-start@0ms -> loading-complete@30372ms -> title-shown@35302ms
+lastSess: ok (reached title)
+mode:     0  wave:null  difficulty:ace
+seed:     ihBuShnEHXnCepZSj1QcHOQt
+party:    
+
+----- DESCRIPTION -----
+World Tournament  Freeze
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:6126a2a244301ecc20666dfd21a3d31c49f3f6e5:run-29963199854.1","source":"github","sha":"6126a2a244301ecc20666dfd21a3d31c49f3f6e5","workflow":{"provider":"github-actions","runId":"29963199854","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"prod-2026-07-23-6126a2a24"},"deployment":null}
+
+----- CONSOLE -----
+[23:50:12.438] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[23:50:13.401] LOG: [ER] build {"version":1,"id":"github:6126a2a244301ecc20666dfd21a3d31c49f3f6e5:run-29963199854.1","source":"github","sha":"6126a2a244301ecc20666dfd21a3d31c49f3f6e5","workflow":{"provider":"github-actions","runId":"29963199854","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"prod-2026-07-23-6126a2a24"},"deployment":null}
+[23:50:40.885] DEBUG: Destroying loading scene
+[23:50:40.885] DEBUG: Destroyed loading scene
+[23:50:41.005] LOG: Seed: ihBuShnEHXnCepZSj1QcHOQt
+[23:50:41.005] LOG: Wave Seed: ihBuShnEHXnCepZSj1QcHOQt 0
+[23:50:44.418] LOG: %cStart Phase LoginPhase color:green;
+[23:50:44.841] LOG: Client Session: blqJaUnwltfEm9CdU9roImv4T76ZhkPl
+[23:50:45.765] LOG: %cStart Phase TitlePhase color:green;
+[23:50:45.767] LOG: Getting Session Slot id: %d 2
+[23:50:45.786] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
