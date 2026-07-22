@@ -4,8 +4,14 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync as readFileRaw } from "node:fs";
 import { test } from "node:test";
+
+// These contracts slice product source by structural markers ("\n}\n", "\n/**\n * ...").
+// Read every file as LF so the pins resolve identically on CI (LF checkout) and on a
+// CRLF (Windows autocrlf) working tree; normalization changes no assertion, only the
+// line-ending bytes the boundary markers scan across.
+const readFileSync = (path, encoding) => readFileRaw(path, encoding).replace(/\r\n/gu, "\n");
 
 const root = new URL("../../../", import.meta.url);
 const gateWorkflow = readFileSync(new URL(".github/workflows/coop-gate-sharded.yml", root), "utf8");
