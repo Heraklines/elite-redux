@@ -305,6 +305,17 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
         this.end();
         return;
       }
+      // Co-op animations-off FAST-FORWARD (replay pacing): collapse the HP drain to an INSTANT set.
+      // The drain phase already knows its authoritative target (`toHp`), so when move animations are
+      // disabled we skip the hit sound + floating damage number + the pre-hit restore and snap the
+      // bar straight to the host's value with `updateInfo(true)` (tween duration 0). The END STATE is
+      // byte-identical to the animated path (`mon.hp === toHp`, idempotent with the finalize
+      // checkpoint), so the per-turn checksum is unchanged - only the human-pace drain WAIT is gone.
+      if (!globalScene.moveAnimations) {
+        mon.hp = Math.max(0, Math.min(Math.trunc(this.toHp), Math.trunc(this.maxHp) || mon.getMaxHp()));
+        void mon.updateInfo(true).then(() => this.end());
+        return;
+      }
       const amount = Math.max(0, Math.trunc(this.fromHp) - Math.trunc(this.toHp));
       // Restore the pre-hit value so the bar visibly drains from it to the host's hp.
       mon.hp = Math.max(0, Math.min(Math.trunc(this.fromHp), Math.trunc(this.maxHp) || mon.getMaxHp()));
@@ -487,6 +498,14 @@ export class CoopStatusReplayPhase extends PokemonPhase {
             `present status bi=${this.battlerIndex} status=${this.status} NO-OP end (mon=${pokemon != null} none/faint=${effect === StatusEffect.NONE || effect === StatusEffect.FAINT})`,
           );
         }
+        this.end();
+        return;
+      }
+      // Co-op animations-off FAST-FORWARD (replay pacing): the status common-anim is a move-anim-class
+      // dwell, so when move animations are disabled skip it and end immediately. The status STATE rides
+      // the finalize checkpoint (this phase never mutates it) and the obtain TEXT already rode as a
+      // `message` event, so nothing but the animation WAIT is dropped.
+      if (!globalScene.moveAnimations) {
         this.end();
         return;
       }
@@ -730,6 +749,16 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       if (this.narrate) {
         coopNarrateFaint(this.battlerIndex);
       }
+      // Co-op animations-off FAST-FORWARD (replay pacing): skip the faint cry + the 500ms drop tween
+      // and go STRAIGHT to `finish()`, which performs the exact same side-effect-free removal
+      // (hp 0 -> FAINT status -> leaveField) the animated path ends at AND still runs
+      // `maybeOpenOwnReplacementPicker` (the #786 relay/counter path is PRESERVED - only the human-pace
+      // cry/drop WAIT is removed). The narration line above already rode (instant via MessagePhase),
+      // and the end-of-turn field composition + checksum are byte-identical to the animated path.
+      if (!globalScene.moveAnimations) {
+        finish();
+        return;
+      }
       watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
       pokemon.faintCry(() => {
         try {
@@ -828,6 +857,26 @@ export class CoopCaptureReplayPhase extends Phase {
     };
     try {
       const pokeballType = this.presentation.pokeballType as PokeballType;
+      // Co-op animations-off FAST-FORWARD (replay pacing): the ball throw / open / bounce / stars are
+      // a move-anim-class dwell. When move animations are disabled, skip the whole tween chain and just
+      // show the "X was caught!" line (the SOLE source of that line on the guest - the checkpoint owns
+      // all field/party state) instantly, then finish. No field/party state is touched either way.
+      if (!globalScene.moveAnimations) {
+        try {
+          const species = getPokemonSpecies(this.presentation.speciesId);
+          globalScene.ui.showText(
+            i18next.t("battle:pokemonCaught", { pokemonName: species.name }),
+            null,
+            finish,
+            null,
+            true,
+          );
+        } catch {
+          coopWarn("replay", "present capture (fast-forward) message threw -> finish (handled)");
+          finish();
+        }
+        return;
+      }
       const pokeballAtlasKey = getPokeballAtlasKey(pokeballType);
       // The throw ANCHOR only (cosmetic): aim at the live field mon if its slot is still occupied,
       // else the default enemy position. Never read/mutate any state off this mon (REVISION #1).

@@ -61,11 +61,22 @@ export class MessagePhase extends Phase {
       }
     }
 
+    // Co-op animations-off FAST-FORWARD (replay pacing): when a co-op run has move animations
+    // disabled, collapse the per-message DWELL - reveal the whole line INSTANTLY (char-reveal
+    // delay 0) instead of the ~20ms/char typewriter + the trailing read-hold. Mirrors the
+    // `globalScene.moveAnimations` gate the co-op replay ANIM phases use, so the guest's per-event
+    // narration (and the host turn narration it replays) stops paying human-pace text dwell on BOTH
+    // seats. PRESENTATION ONLY: delay 0 still routes through the SAME showText/showDialogue path,
+    // still shows any PROMPT (the instant branch invokes the wrapped callback that calls showPrompt)
+    // and never removes/reorders a phase or an interaction-counter advance - it only removes the
+    // human-pace WAIT. Solo (isCoop false) and animations-on runs are byte-identical (textDelay stays
+    // null -> the default typewriter reveal).
+    const textDelay = globalScene.gameMode.isCoop && !globalScene.moveAnimations ? 0 : null;
     if (this.speaker) {
       globalScene.ui.showDialogue(
         this.text,
         this.speaker,
-        null,
+        textDelay,
         () => this.end(),
         this.callbackDelay || (this.prompt ? 0 : 1500),
         this.promptDelay ?? 0,
@@ -73,7 +84,7 @@ export class MessagePhase extends Phase {
     } else {
       globalScene.ui.showText(
         this.text,
-        null,
+        textDelay,
         () => this.end(),
         this.callbackDelay || (this.prompt ? 0 : 1500),
         this.prompt,
