@@ -13,6 +13,7 @@ import {
   notifyCoopOperationContinuationSurface,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
+  coopHostEngineDialogueMessageAdvanceAllowed,
   coopHostStreamMeMessage,
   getCoopBattleStreamer,
   getCoopController,
@@ -379,12 +380,6 @@ export class UI extends Phaser.GameObjects.Container {
     // short-circuits in solo, and `isActive(this.mode)` is false on any non-shared screen
     // (incl. the battle command menu), so the dispatch below is byte-for-byte unchanged.
     if (globalScene.gameMode.isCoop) {
-      // Authority V2 grants a shared interaction to one exact phase/handler generation. An ordered successor
-      // wait, stale handler, wrong owner, or merely queued phase is not a human-input lease. Programmatic peer
-      // replay uses processInputInner and therefore remains able to drive the watcher after authenticated input.
-      if (isCoopV2InteractionHumanInputFrozen()) {
-        return false;
-      }
       // Co-op (#633): inside a MYSTERY-ENCOUNTER interactive phase, the input PUMP governs
       // input AUTHORITATIVELY - the WATCHER's local presses are blocked, and the OWNER relays
       // every handler-READY press (never a scroll-skip) for the partner to replay in lockstep,
@@ -392,7 +387,28 @@ export class UI extends Phaser.GameObjects.Container {
       // rewards stay identical. Gated on the ME-interactive phase set, so embedded battles +
       // the end-of-ME reward shop fall through to their own owners.
       const mePump = getCoopMePump();
-      if (mePump != null && mePump.isSessionActive() && this.coopMeInteractivePhase()) {
+      const meInteractiveSurfaceActive = mePump != null && mePump.isSessionActive() && this.coopMeInteractivePhase();
+      // Authority V2 grants a shared interaction to one exact phase/handler generation. An ordered successor
+      // wait, stale handler, wrong owner, or merely queued phase is not a human-input lease. Programmatic peer
+      // replay uses processInputInner and therefore remains able to drive the watcher after authenticated input.
+      // #816 CARVE-OUT (run 29933294323 mystery lane): the freeze governs the guest-owned CHOICE surfaces, but
+      // the authoritative host must still advance its OWN engine MESSAGE dialogue on a guest-owned ME (pure
+      // text-advance) - else the post-pick narration parks forever and the guest never reaches the next round.
+      // The bypass mirrors the #816 branch below exactly, so only that case slips the freeze; every CHOICE
+      // surface (never MESSAGE) and the host-OWNED ME stay frozen.
+      const hostEngineDialogueAdvance = coopHostEngineDialogueMessageAdvanceAllowed({
+        isMessageMode: this.getMode() === UiMode.MESSAGE,
+        netcodeMode: getCoopNetcodeMode(),
+        meInProgress: coopMeInProgress(),
+        meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        meBespokeHostDrives: coopMeBespokeHostDrives(),
+        localSeatOwnsMe: getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? true,
+        meInteractiveSurfaceActive,
+      });
+      if (isCoopV2InteractionHumanInputFrozen() && !hostEngineDialogueAdvance) {
+        return false;
+      }
+      if (meInteractiveSurfaceActive) {
         // Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2): the host runs the sole engine
         // (beginOwner, never a watcher in authoritative mode), but the GUEST makes the pick - the
         // host applies the relayed index PROGRAMMATICALLY (mystery-encounter-phases coopHostAwaitGuestIndex).

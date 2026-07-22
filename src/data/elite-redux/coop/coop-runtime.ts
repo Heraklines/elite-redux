@@ -5362,6 +5362,42 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
   return !ledger.allowsHumanInput(runtime.controller.localSeatId, observeCoopV2InteractionSurface(contract));
 }
 
+/**
+ * #816 under Authority V2 (run 29933294323 mystery-gauntlet lane): the authoritative co-op host must be
+ * able to advance its OWN engine MESSAGE dialogue on a GUEST-owned Mystery encounter. That advance is pure
+ * text-advance with no choice semantics (the option-selected outcome narration, the press-your-luck round
+ * prompt, etc.), so it stays authorized even while {@linkcode isCoopV2InteractionHumanInputFrozen} freezes
+ * the guest-owned CHOICE surfaces. Without this carve-out the V2 freeze shadows the pre-existing #816 host
+ * self-advance: the host's post-pick narration is never dismissed, so no subsequent round / terminal is
+ * ever streamed and the guest owner strands in CoopReplayMePhase re-sending its pick until the between-wave
+ * deadline (the exact mystery-lane park observed on this SHA).
+ *
+ * Pure + engine-free so it is directly regression-testable; the UI gate ({@linkcode Ui.processInputCoopAware})
+ * supplies the live scene/pump/controller state. Mirrors the EXACT #816 branch condition in that gate so
+ * the freeze bypass and the advance stay in lockstep - a CHOICE surface (options / party / secondary / quiz)
+ * is never `isMessageMode`, so it is never let through, and a host-OWNED ME (`localSeatOwnsMe`) drives off
+ * its own input and never reaches this bypass.
+ */
+export function coopHostEngineDialogueMessageAdvanceAllowed(ctx: {
+  isMessageMode: boolean;
+  netcodeMode: CoopNetcodeMode;
+  meInProgress: boolean;
+  meHandoffBattleStarted: boolean;
+  meBespokeHostDrives: boolean;
+  localSeatOwnsMe: boolean;
+  meInteractiveSurfaceActive: boolean;
+}): boolean {
+  return (
+    ctx.isMessageMode
+    && ctx.netcodeMode === "authoritative"
+    && ctx.meInProgress
+    && !ctx.meHandoffBattleStarted
+    && !ctx.meBespokeHostDrives
+    && !ctx.localSeatOwnsMe
+    && ctx.meInteractiveSurfaceActive
+  );
+}
+
 /** Retry the exact retained interaction claim after a real phase reports that its public handler is active. */
 export function notifyCoopV2InteractionSurfaceReady(runtime: CoopRuntime | null = active): boolean {
   if (runtime == null || !coopV2ShadowHarnesses.has(runtime)) {
