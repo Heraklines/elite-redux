@@ -29,6 +29,7 @@ const operationSurfaceRegistry = readFileSync(
 const sessionController = readFileSync(new URL("src/data/elite-redux/coop/coop-session-controller.ts", root), "utf8");
 const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root), "utf8");
 const publicUiHarness = readFileSync(new URL("test/browser/coop-public-ui/public-ui-harness.mjs", root), "utf8");
+const campaignDriver = readFileSync(new URL("test/browser/coop-public-ui/campaign.mjs", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root), "utf8");
@@ -1313,6 +1314,16 @@ test("the public post-turn scanner never infers replacement ownership from a pha
   assert.ok(scanEnd > scanStart, "the post-turn outcome scanner has a bounded source block");
   const scan = publicUiHarness.slice(scanStart, scanEnd);
   assert.match(scan, /findOwnedReadyReplacement\(client, from\[client\.label\]\)/u);
+  assert.doesNotMatch(scan, /GUEST_FAINT_PICKER|HOST_SWITCH_PHASE/u);
+});
+
+test("the campaign outcome wait never infers replacement ownership from a phase name", () => {
+  const scanStart = campaignDriver.indexOf("export async function waitForOutcomeBounded(");
+  const scanEnd = campaignDriver.indexOf("\nasync function driveBattleWave(", scanStart);
+  assert.notEqual(scanStart, -1, "the campaign driver exposes its bounded outcome scanner");
+  assert.ok(scanEnd > scanStart, "the campaign outcome scanner has a bounded source block");
+  const scan = campaignDriver.slice(scanStart, scanEnd);
+  assert.match(scan, /findOwnedActionableReplacementSurface\(client, from\[client\.label\]\)/u);
   assert.doesNotMatch(scan, /GUEST_FAINT_PICKER|HOST_SWITCH_PHASE/u);
 });
 

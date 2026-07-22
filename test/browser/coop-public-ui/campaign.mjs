@@ -31,8 +31,6 @@ const OUTCOME_PROGRESS_PHASE = /Start Phase ([A-Za-z0-9]+Phase)/u;
 const OUTCOME_PROGRESS_AUTHORITY = /\[coop:turn\] host recorder: append turn=\d+ seq=\d+/u;
 const OUTCOME_PROGRESS_RENDERER = /\[coop:replay\] guest replay turn=\d+: live increment seq=\d+\.\.\d+/u;
 const OUTCOME_PROGRESS_RESOLUTION = /\[coop:replay\] guest (?:RECV turnResolution|awaitTurn turn=\d+ RESOLVE)/u;
-const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
-const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
 const AUTHORITY_MOVE_EFFECT = /Start Phase MoveEffectPhase/u;
 const RENDERER_MOVE_REPLAY = /Start Phase CoopMoveAnimReplayPhase/u;
@@ -936,13 +934,17 @@ export async function waitForOutcomeBounded(
       return { kind: "reward" };
     }
     for (const client of clients) {
+      // Ownership-PROVEN faint detection only: the semantic party:replacement mirror carries the
+      // exact localSeat/ownerSeat/actionability proof of which seat owes a pick. Phase-name/log
+      // evidence is NOT ownership evidence - the sole authoritative host runs "Start Phase
+      // SwitchPhase" even for a GUEST-owned (or already-resolved / stale) faint, so classifying a
+      // faint from that host log mis-routed driveReplacement to the host, which then hung on a
+      // host-owned picker that never opens (run 29912693840 depth lane: both leads alive and
+      // commanding at wave 2 while the driver timed out waiting for an owned host picker). This is
+      // the same semantic-only contract the post-turn journey scanner already holds
+      // (waitForPostTurnOutcome); the outcome loop below waits for a lagging picker to become
+      // actionable rather than trusting a bare phase name.
       if (findOwnedActionableReplacementSurface(client, from[client.label])) {
-        return { kind: "faint", client };
-      }
-      if (
-        client.evidence.find(GUEST_FAINT_PICKER, from[client.label])
-        || client.evidence.find(HOST_SWITCH_PHASE, from[client.label])
-      ) {
         return { kind: "faint", client };
       }
     }

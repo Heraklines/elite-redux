@@ -978,6 +978,46 @@ test("the campaign outcome wait accepts the first owned command frontier without
   );
 });
 
+test("the campaign outcome wait never infers a faint from a host authority SwitchPhase log", async () => {
+  const command = localSeat => ({
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:command",
+      operationClass: "command",
+      phase: "CommandPhase",
+      phaseInstance: 5,
+      uiMode: "COMMAND",
+      localSeat,
+      seatsWithInput: [localSeat],
+      ready: { handlerActive: true },
+      address: { epoch: 7, wave: 2, turn: 1 },
+    },
+  });
+  // The host is the sole authoritative engine, so it logs "Start Phase SwitchPhase" even for a
+  // GUEST-owned or already-resolved faint. That console line is NOT ownership proof that the HOST
+  // owns an actionable replacement picker. Both seats are actually at their healthy wave-2 command
+  // surface (the depth-lane run 29912693840 final capture: both leads alive, both commanding).
+  const authority = fakeClient("authority", ["Start Phase SwitchPhase"]);
+  authority.publicSeat = 0;
+  authority.evidence.events.push({ ...command(0), index: authority.evidence.events.length });
+  const renderer = fakeClient("renderer");
+  renderer.publicSeat = 1;
+  renderer.evidence.events.push({ ...command(1), index: renderer.evidence.events.length });
+  const rig = {
+    host: authority,
+    clients: { authority, renderer },
+    config: { faintOwnerSeat: "guest-seat" },
+  };
+
+  assert.deepEqual(
+    await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 50, {
+      stopOnOwnedCommandFrontier: true,
+    }),
+    { kind: "command" },
+    "a host authority SwitchPhase with no owned actionable replacement surface must not be a faint",
+  );
+});
+
 test("a newer semantic surface supersedes a transient command frontier and its legacy console line", async () => {
   const authority = fakeClient("authority", ["CommandPhase regression -> LOCAL UI"]);
   authority.publicSeat = 0;
