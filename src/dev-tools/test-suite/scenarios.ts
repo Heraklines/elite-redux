@@ -1547,6 +1547,49 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // UI - Pokemon Stats overlay now labels + wires the Acc / Eva / Crit rows
+  // (maintainer request). The Crit row reads the true crit stage and updates live.
+  // ===========================================================================
+  {
+    label: "UI: Pokemon Stats — Acc/Eva/Crit rows",
+    description:
+      "The in-battle Pokemon Stats info page (open it from the command menu) now\n"
+      + "LABELS the extra arrow rows and wires them: Acc, Eva and Crit sit below the\n"
+      + "5 main stats. The Crit row reads the real crit stage and updates LIVE.\n"
+      + "DO: turn 1, open Pokemon Stats. Verify the left arrow grid labels Atk/Def/SpA/\n"
+      + "SpD/Spe AND Acc/Eva/Crit, with green up-arrows on Atk/SpA/SpD/Eva and red\n"
+      + "down-arrows on Def/Spe/Acc; the Crit row is empty. Close, use Focus Energy,\n"
+      + "then on turn 2 re-open Pokemon Stats.\n"
+      + "EXPECT: the Crit row now shows 2 green up-arrows (Focus Energy = +2 crit). The\n"
+      + "arrows MOVED live - before the fix the crit row never updated / was unlabeled.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, survives so you can take two turns
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.FOCUS_ENERGY, MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.SPLASH],
+        }),
+      ];
+    },
+    onBattleStart: () =>
+      boostPlayer([
+        [Stat.ATK, 2],
+        [Stat.DEF, -1],
+        [Stat.SPATK, 3],
+        [Stat.SPDEF, 1],
+        [Stat.SPD, -2],
+        [Stat.EVA, 2],
+        [Stat.ACC, -1],
+      ]),
+  },
+  // ===========================================================================
   // Ability - Discipline lets you switch out WHILE rampaging (Outrage/Thrash)
   // ===========================================================================
   {

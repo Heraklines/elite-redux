@@ -63,6 +63,7 @@ import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-te
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
@@ -72,6 +73,7 @@ import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import {
@@ -98,6 +100,7 @@ import {
   repointGlobalScene,
   restoreGlobalScene,
 } from "#test/tools/render-harness";
+import { BattleInfoOverlay } from "#ui/battle-info-overlay";
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
@@ -1728,6 +1731,39 @@ const RECIPES: Record<string, Recipe> = {
     prepare: async game => {
       await game.classicMode.startBattle(SpeciesId.RATTATA);
       return []; // captureActive ignores this; satisfies the prepare return type
+    },
+  },
+  // The in-battle "Pokémon Stats" overlay (BattleInfoOverlay, opened with the Stats key).
+  // `mode` triggers `prepare` PRE-repoint so the overlay reads a live battle (on-field
+  // mons, stat stages, crit tag); the custom `render` builds + opens the overlay directly
+  // (it is a standalone container class, not a UiMode handler). The lead is pre-boosted on
+  // EVERY arrow row so the golden proves all eight rows render with labels + arrows:
+  // Atk/Def/SpA/SpD/Spe AND the newly-wired Acc / Eva / Crit. Focus Energy (CRIT_BOOST,
+  // +2) populates the Crit row - the maintainer's "crit arrows don't update" repro. No
+  // `field` (the overlay draws its own full-screen scrim + panel), so the golden is a
+  // clean, deterministic capture of the panel itself.
+  "battle-info-stats": {
+    mode: UiMode.COMMAND,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+      const mon = game.scene.getPlayerPokemon();
+      if (!mon) {
+        throw new Error("battle-info-stats: no player pokemon after startBattle");
+      }
+      mon.setStatStage(Stat.ATK, 2);
+      mon.setStatStage(Stat.DEF, -1);
+      mon.setStatStage(Stat.SPATK, 3);
+      mon.setStatStage(Stat.SPDEF, 1);
+      mon.setStatStage(Stat.SPD, -2);
+      mon.setStatStage(Stat.ACC, -1);
+      mon.setStatStage(Stat.EVA, 2);
+      mon.addTag(BattlerTagType.CRIT_BOOST); // Focus Energy → +2 crit stage on the Crit row
+      return [];
+    },
+    render: game => {
+      const overlay = new BattleInfoOverlay();
+      overlay.open();
+      (game.scene as any).ui.setActiveHandler?.(overlay);
     },
   },
   // Showdown construction-time vanilla mega. A vanilla-species mega built AT its mega

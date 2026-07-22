@@ -17,7 +17,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { allAbilities } from "#data/data-lists";
+import { allAbilities, allMoves } from "#data/data-lists";
 import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptions";
 import {
   cycleErGiftAbility,
@@ -35,6 +35,7 @@ import { ArenaTagType } from "#enums/arena-tag-type";
 import type { Button } from "#enums/buttons";
 import { Button as Btn } from "#enums/buttons";
 import { MoveCategory } from "#enums/move-category";
+import { MoveId } from "#enums/move-id";
 import { PokemonType as PokemonTypeEnum } from "#enums/pokemon-type";
 import { type EffectiveStat, Stat } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
@@ -105,6 +106,33 @@ const STAT_GRID: { stat: Stat; label: string }[] = [
   { stat: Stat.SPDEF, label: "SpD" },
   { stat: Stat.SPD, label: "Spe" },
 ];
+
+/**
+ * The left arrow-grid rows for the Pokémon Stats page, in ROM-panel order: the 5
+ * main battle stats, then (after the panel's separator gap) Accuracy, Evasion and
+ * Crit. `stage` is the value the up/down arrow chips visualise (-6..+6 for the stat
+ * stages, 0..+ for Crit which only ever rises).
+ *
+ * Crit has no Stat-enum stage — it reads {@linkcode Pokemon.getCritStage}, the true
+ * source that folds Focus Energy / Dragon Cheer, Scope Lens / Razor Claw, Super Luck,
+ * the ER Battle Aura, Pretentious KO-stacks and the Abyss biome bonus. Reusing it (not
+ * re-deriving) is what makes the Crit row track every mid-battle change live (a Dragon
+ * Cheer landing moves the arrows). A neutral reference move (Tackle, no HighCritAttr)
+ * is used so ONLY the persistent crit sources count, not a move's own high-crit ratio.
+ */
+export function computeBattleInfoStatRows(mon: Pokemon): { label: string; stage: number }[] {
+  const neutralMove = allMoves[MoveId.TACKLE];
+  return [
+    { label: "Atk", stage: mon.getStatStage(Stat.ATK) },
+    { label: "Def", stage: mon.getStatStage(Stat.DEF) },
+    { label: "SpA", stage: mon.getStatStage(Stat.SPATK) },
+    { label: "SpD", stage: mon.getStatStage(Stat.SPDEF) },
+    { label: "Spe", stage: mon.getStatStage(Stat.SPD) },
+    { label: "Acc", stage: mon.getStatStage(Stat.ACC) },
+    { label: "Eva", stage: mon.getStatStage(Stat.EVA) },
+    { label: "Crit", stage: mon.getCritStage(mon, neutralMove) },
+  ];
+}
 
 // Cream-box layouts per page (drawn as the fallback panel; content placed inside).
 const STATS_BOXES: Box[] = [
@@ -463,18 +491,23 @@ export class BattleInfoOverlay {
     typeText.setOrigin(0, 0);
     c.add(typeText);
 
-    // Stat-stage rows (label + up/down arrow chips) in the left box.
-    const ROWS = [76, 88, 100, 112, 124];
-    STAT_GRID.forEach((row, ri) => {
-      const ry = ROWS[ri];
-      const lbl = addTextObject(68, ry - 5, row.label, TextStyle.WINDOW_ALT, { fontSize: "46px" });
+    // Stat-stage rows (label + up/down arrow chips), aligned to the ROM panel's dot
+    // grid: the 5 main battle stats at 8px pitch, the panel's separator gap, then
+    // Acc / Eva / Crit (labels + live arrows). The Crit row reads the true crit stage
+    // (getCritStage) so a Focus Energy / Dragon Cheer / Scope Lens bump moves the
+    // arrows. The arrow columns sit on the ROM art's pre-printed dots.
+    const rows = computeBattleInfoStatRows(mon);
+    const ROW_Y = [76, 84, 92, 100, 108, 124, 132, 140];
+    rows.forEach((row, ri) => {
+      const ry = ROW_Y[ri];
+      const lbl = addTextObject(66, ry - 5, row.label, TextStyle.WINDOW_ALT, { fontSize: "46px" });
       lbl.setOrigin(0, 0);
       c.add(lbl);
-      const stage = mon.getStatStage(row.stat); // -6..+6
+      const stage = row.stage; // -6..+6 for stat stages; 0..+ for Crit
       const g = globalScene.add.graphics();
       for (let d = 0; d < 6; d++) {
         const on = d < Math.abs(stage);
-        const cx = 94 + d * 8;
+        const cx = 91 + d * 8;
         if (on) {
           g.fillStyle(stage >= 0 ? 0x3aa83a : 0xd64a4a, 1);
           if (stage >= 0) {
