@@ -2244,7 +2244,10 @@ export class GameData {
       }
       return { sessions, failures };
     }
-    const cloud = await this.scanCoopCloudReplicas(accountIdentity!);
+    // Resume discovery retries a transient (transport/timeout) slot read rather than hard-failing the
+    // whole launch; the fresh-slot scan (3559) keeps the default no-retry contract (it fails soft to
+    // null and its gating test pins exactly 5 reads).
+    const cloud = await this.scanCoopCloudReplicas(accountIdentity!, true);
     for (let slot = 0; slot < 5; slot++) {
       try {
         sessions.set(slot, await this.reconcileCoopResumeSlot(slot, accountIdentity!, cloud.get(slot) ?? null));
@@ -3036,7 +3039,10 @@ export class GameData {
    * documented survivor policy is highest checkpoint revision; byte-identical equal revisions use
    * the lowest slot. Equal-revision different bytes or different participant/seat lineage conflict.
    */
-  private async scanCoopCloudReplicas(accountIdentity: string): Promise<Map<number, CoopClassifiedReplica | null>> {
+  private async scanCoopCloudReplicas(
+    accountIdentity: string,
+    retryTransientReads = false,
+  ): Promise<Map<number, CoopClassifiedReplica | null>> {
     const scanRuntime = getCoopRuntime();
     const scanController = scanRuntime?.controller ?? null;
     const scanGeneration = coopSessionGeneration();
@@ -3049,7 +3055,11 @@ export class GameData {
     if (!scanContextIsCurrent()) {
       throw new CoopResumeReplicaUnavailableError("account changed before co-op cloud scan");
     }
-    const reads = await Promise.all([0, 1, 2, 3, 4].map(slot => this.readCoopCasWithTransientRetry(slot)));
+    const reads = await Promise.all(
+      [0, 1, 2, 3, 4].map(slot =>
+        retryTransientReads ? this.readCoopCasWithTransientRetry(slot) : this.readCoopCas(slot),
+      ),
+    );
     if (!scanContextIsCurrent()) {
       throw new CoopResumeReplicaUnavailableError("account/runtime changed during co-op cloud scan");
     }
