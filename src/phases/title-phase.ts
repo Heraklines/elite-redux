@@ -75,6 +75,19 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
 const NO_SAVE_SLOT = -1;
+export const SHOWDOWN_MODES_ENABLED = false;
+const SHOWDOWN_MODE_OVERRIDE_PARAM = "enableShowdown";
+
+export function areShowdownModesEnabled(search = typeof window === "undefined" ? "" : window.location.search): boolean {
+  const override = new URLSearchParams(search).get(SHOWDOWN_MODE_OVERRIDE_PARAM);
+  if (override === "1") {
+    return true;
+  }
+  if (override === "0") {
+    return false;
+  }
+  return SHOWDOWN_MODES_ENABLED;
+}
 
 export class TitlePhase extends Phase {
   public readonly phaseName = "TitlePhase";
@@ -179,8 +192,10 @@ export class TitlePhase extends Phase {
   private async showOptions(lastSessionSlot: number): Promise<void> {
     // Register the tournament deep-link opener while at the title (cleared on teardown). A
     // challenge notification in the inbox uses this to jump straight to the board on its match.
-    setTournamentFlowOpener((target: TournamentDeepLink) =>
-      this.openShowdownTournaments(gm => this.launchGameMode(gm), target),
+    setTournamentFlowOpener(
+      areShowdownModesEnabled()
+        ? (target: TournamentDeepLink) => this.openShowdownTournaments(gm => this.launchGameMode(gm), target)
+        : null,
     );
     const options: OptionSelectItem[] = [];
     // Add a "continue" menu if the session slot ID is >-1
@@ -202,6 +217,21 @@ export class TitlePhase extends Phase {
           const setModeAndEnd = (gameMode: GameModes) => this.launchGameMode(gameMode);
           const { gameData } = globalScene;
           const options: OptionSelectItem[] = [];
+          const showGameModeOptions = () =>
+            globalScene.ui.showText(i18next.t("menu:selectGameMode"), null, () =>
+              globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options }),
+            );
+          const showTemporarilyDisabled = () => {
+            globalScene.ui.setMode(UiMode.MESSAGE);
+            globalScene.ui.resetModeChain();
+            globalScene.ui.showText(
+              "Temporarily disabled. It will be back soon.",
+              null,
+              () => globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options }),
+              null,
+              true,
+            );
+          };
           options.push({
             semanticId: "classic",
             label: GameMode.getModeName(GameModes.CLASSIC),
@@ -238,8 +268,13 @@ export class TitlePhase extends Phase {
             // carrying the chosen preset, so both clients arrive pre-built and pairing leads
             // near-immediately to the wager (no 10-minute in-lobby pick wait).
             options.push({
+              semanticId: "showdown",
               label: GameMode.getModeName(GameModes.SHOWDOWN),
               handler: () => {
+                if (!areShowdownModesEnabled()) {
+                  showTemporarilyDisabled();
+                  return true;
+                }
                 this.openShowdownTeamMenu(setModeAndEnd);
                 return true;
               },
@@ -247,8 +282,13 @@ export class TitlePhase extends Phase {
             // Showdown TOURNAMENTS (beside the Team Menu path): async single-elim brackets. Opens the
             // tournament LIST (worker-backed); register / view bracket / play a bracket match from there.
             options.push({
+              semanticId: "showdown-tournaments",
               label: "Showdown Tournaments",
               handler: () => {
+                if (!areShowdownModesEnabled()) {
+                  showTemporarilyDisabled();
+                  return true;
+                }
                 this.openShowdownTournaments(setModeAndEnd);
                 return true;
               },
@@ -346,11 +386,7 @@ export class TitlePhase extends Phase {
               return true;
             },
           });
-          globalScene.ui.showText(i18next.t("menu:selectGameMode"), null, () =>
-            globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
-              options,
-            }),
-          );
+          showGameModeOptions();
           return true;
         },
       },
