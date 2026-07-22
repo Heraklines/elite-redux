@@ -219,6 +219,17 @@ function makeFormat(id: string, playerCap: number, enemyCap: number, enemyBase: 
   return { id, sides, localPlayerSide: 0, adjacency: lineAdjacency(sides) };
 }
 
+// --- ER TRIPLES ROLL tuning ---------------------------------------------------
+//
+// Maintainer directive: "abt 20% of ghost battles should be made triples and 5% of
+// all battles wild or trainer should be triples." These are 1-in-N rarities consumed
+// by the seeded triple roll in BattleScene.resolveBattleFormat.
+
+/** 1-in-N chance a natural WILD or TRAINER battle is upgraded to a triple (20 => ~5%). */
+export const TRIPLE_BATTLE_RARITY = 20;
+/** 1-in-N chance a GHOST battle (>=3-mon roster) is upgraded to a triple (5 => ~20%). */
+export const TRIPLE_BATTLE_GHOST_RARITY = 5;
+
 /** Single battle (1v1). Player @0, enemy @2 - identical to legacy. */
 export const SINGLE_FORMAT: BattleFormat = makeFormat("single", 1, 1, BattlerIndex.ENEMY);
 /** Double battle (2v2). Player @0,1, enemy @2,3 - identical to legacy. */

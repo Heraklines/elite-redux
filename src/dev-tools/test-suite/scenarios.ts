@@ -20112,4 +20112,45 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // ===========================================================================
+  // Battle format - TRIPLES are now a natural part of runs
+  // ===========================================================================
+  {
+    label: "Triples: natural triple wild battle",
+    description:
+      "Triples are now a natural part of runs. A seeded roll upgrades ~5% of all wild\n"
+      + "AND trainer battles, and ~20% of GHOST battles, into a 3v3 triple (needs >=3\n"
+      + "able party mons; bosses / finales / MEs / co-op / Doubles-Only are excluded;\n"
+      + "Triples-Only stays 100%). The roll can't be forced deterministically in-game, so\n"
+      + "this scenario forces the SAME triple a natural roll produces (BATTLE_STYLE 'triple').\n"
+      + "DO: play the battle - command all THREE of your mons each turn against the 3 foes.\n"
+      + "EXPECT: a full 3v3 field (3 back sprites + 3 HP bars per side), target selection\n"
+      + "offers the 3 foes, and the turn resolves with no soft-lock. (note) The natural roll\n"
+      + "RATES are verified headlessly: test/tests/elite-redux/er-triples-roll.test.ts\n"
+      + "(measured ~4.65% wild, ~4.65% trainer, ~19.7% ghost over 2000 seeded rolls) and the\n"
+      + "forced-format field slice er-triple-wild-spawn.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 15,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "triple",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.METAGROSS, {
+          moveset: [MoveId.METEOR_MASH, MoveId.ZEN_HEADBUTT, MoveId.BULLET_PUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
 ];
