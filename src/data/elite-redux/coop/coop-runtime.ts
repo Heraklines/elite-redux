@@ -6602,7 +6602,7 @@ export function commitCoopV2ReplacementAuthority(
   });
 }
 
-export type CoopV2CommandBoundaryVerdict = "ready" | "deferred" | "failed";
+export type CoopV2CommandBoundaryVerdict = "ready" | "deferred" | "failed" | "dissolved";
 export type CoopV2InteractionBoundaryVerdict = "ready" | "deferred" | "failed";
 
 /**
@@ -6997,6 +6997,25 @@ export function enterCoopV2CommandControlBoundary(
   }
 
   const current = runtime.v2ControlLedger.latestControl;
+  // Won-wave phantom backstop (public journey run 29886905322 wave-2 launch deadlock). When a wave
+  // has already been advance-signaled (its WAVE_ADVANCE tail ran -> `wave <= lastResolvedWave`) but
+  // the local battle has NOT yet re-based to the next wave, a queue-empty finalize can make Phaser
+  // MANUFACTURE a TurnInit -> CommandPhase for the OLD wave (coop-replay-phases.ts notes this exact
+  // hazard). As a replica that stale command parks on `v2DeferredCommandStarts` at an address the
+  // next-wave COMMAND_FRONTIER control never equals, so it never un-parks, the wave-2 command proof
+  // is never recorded, and the deferred control deadlocks into the "material could not be applied
+  // exactly" terminal. No legitimate command exists for an already-signaled wave at ANY turn, so
+  // dissolve it here (the single chokepoint every stale-wave command funnels through) instead of
+  // parking: the already-admitted next-wave boundary queued behind it then proceeds. `state.wave`
+  // was proven == battle.waveIndex above, so this reads the phantom's OLD wave (signaled) pre-rebase
+  // and the real wave (not signaled) after. Classic co-op only: Showdown has no wave-advance model.
+  if (!runtime.controller.isVersusSession() && coopWaveAdvanceSignaledFor(state.wave)) {
+    coopLog(
+      "v2-control",
+      `command-open dissolved: wave ${state.wave} already advance-signaled (turn ${state.turn} field ${fieldIndex})`,
+    );
+    return "dissolved";
+  }
   const claim = runtime.controller.isVersusSession()
     ? resolveShowdownReplicaCommandClaim(
         runtime,

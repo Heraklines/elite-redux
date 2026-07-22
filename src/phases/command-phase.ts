@@ -767,6 +767,15 @@ export class CommandPhase extends FieldPhase {
       }
       // Un-parked normally (command frontier admitted): drop any parked-replacement wake armed above.
       this.clearParkedReplacementWake();
+      if (boundary === "dissolved") {
+        // Stale command for an already-advance-signaled wave (a queue-empty TurnInit->Command
+        // manufacture for the OLD wave before the local battle re-based). Parking it would deadlock
+        // the next-wave control that never addresses it; end cleanly (no super.start, no command
+        // proof) exactly like the generated-skip path below, letting the already-queued next-wave
+        // boundary proceed.
+        this.end();
+        return;
+      }
       if (boundary === "failed") {
         failCoopSharedSession(
           `Authority V2 could not install command control for field ${this.fieldIndex} `

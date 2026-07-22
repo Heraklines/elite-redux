@@ -39,7 +39,13 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  consumeCoopPendingWaveAdvance,
+  coopWaveAdvanceSignaledFor,
+  enterCoopV2CommandControlBoundary,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
@@ -64,6 +70,13 @@ import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+// The wave-2 command-open chokepoint only exists when the Authority V2 CONTROL cutover is active,
+// which requires all four V2 surfaces enabled at process start (module-level flags, read at import).
+// The gate lane B / the public journey build supply these; a bare ER_SCENARIO run skips that case.
+const V2_CONTROL_ENABLED = ["TURN", "WAVE", "REPLACEMENT", "INTERACTION"].every(
+  surface => process.env[`COOP_AUTHORITY_V2_${surface}`] === "on",
+);
 
 /** The guest picks party slot 3 (CHARIZARD) as its own faint replacement (a guest-owned bench mon). */
 const GUEST_PICK_SLOT = 3;
@@ -244,5 +257,101 @@ describe.skipIf(!RUN)(
 
       logs.flush();
     }, 240_000);
+
+    // ---------------------------------------------------------------------------------------------
+    // WAVE-2 LAUNCH CHOKEPOINT (public journey run 29886905322). The waveWon fix above keeps the guest
+    // on the replay path, but a SECOND source still deadlocked wave-2 launch live: a queue-empty
+    // finalize can make Phaser MANUFACTURE a TurnInit -> CommandPhase for the OLD (already-won) wave
+    // before the local battle re-bases to wave 2. As a replica that stale command parks on
+    // v2DeferredCommandStarts at a wave-1-turn-2 address the wave-2 COMMAND_FRONTIER never equals ->
+    // it never un-parks -> the wave-2 command proof is never recorded -> the deferred control
+    // deadlocks into the "material could not be applied exactly" terminal. The fix backstops the
+    // single chokepoint every stale-wave command funnels through (enterCoopV2CommandControlBoundary):
+    // a command for an already-advance-signaled wave DISSOLVES instead of parking.
+    //
+    // Proxy: after the WIN is consumed (wave 1 signaled: lastResolvedWave >= 1) but BEFORE the battle
+    // re-bases to wave 2 (waveIndex still 1), a command boundary for the guest slot must return
+    // "dissolved" (pre-fix: "deferred" -> parks a doomed 1:2:* key).
+    it.skipIf(!V2_CONTROL_ENABLED)(
+      "dissolves a command-open for an already-advance-signaled wave instead of parking a doomed 1:2 phantom",
+      async () => {
+        await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
+        const pair = createLoopbackPair();
+        const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+        wireGuestCommand(rig);
+
+        for (const scene of [rig.hostScene, rig.guestScene]) {
+          scene.getPlayerParty()[2].coopOwner = "guest";
+          scene.getPlayerParty()[3].coopOwner = "guest";
+        }
+        rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+        withClientSync(rig.guestCtx, () => {
+          rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+        });
+
+        const turn = rig.hostScene.currentBattle.turn;
+
+        await withClient(rig.hostCtx, async () => {
+          game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
+          game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
+          await game.phaseInterceptor.to("CoopTurnCommitPhase");
+        });
+
+        await withClient(rig.guestCtx, async () => {
+          const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+          const realSetMode = ui.setMode.bind(ui);
+          ui.setMode = (...args: unknown[]): unknown => {
+            if (args[0] === UiMode.PARTY) {
+              ui.setMode = realSetMode;
+              const opened = realSetMode(...args);
+              Promise.resolve(opened).then(
+                () => {
+                  queueMicrotask(() => (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0));
+                },
+                () => undefined,
+              );
+              return opened;
+            }
+            if (args[0] === UiMode.MESSAGE) {
+              return;
+            }
+            return realSetMode(...args);
+          };
+          try {
+            await driveGuestReplayTurn(rig.guestScene, turn, { sealRetainedWaveBoundary: false });
+          } finally {
+            ui.setMode = realSetMode;
+          }
+        });
+
+        let hostAdvance: Promise<void> | undefined;
+        await withClient(rig.hostCtx, async () => {
+          hostAdvance = game.phaseInterceptor.to("SelectModifierPhase", false);
+          await drainLoopback();
+        });
+        await settleDuoPromise(rig, hostAdvance!, "chokepoint won-wave host crossing");
+        await withClient(rig.hostCtx, () => drainLoopback());
+
+        // Force the exact hazard window on the guest: WIN consumed (wave 1 signaled) with the battle NOT
+        // yet re-based to wave 2, then evaluate the command boundary for the guest's own slot.
+        const verdict = await withClient(rig.guestCtx, async () => {
+          await driveGuestReplayTurn(rig.guestScene, turn + 1).catch(() => undefined);
+          consumeCoopPendingWaveAdvance();
+          rig.guestScene.currentBattle.waveIndex = 1;
+          rig.guestScene.currentBattle.turn = turn + 1;
+          expect(coopWaveAdvanceSignaledFor(1), "wave 1 is advance-signaled after the WIN was consumed").toBe(true);
+          const mon = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+          return enterCoopV2CommandControlBoundary(COOP_GUEST_FIELD_INDEX, mon.id, () => undefined);
+        });
+
+        expect(
+          verdict,
+          "a command-open for an already-advance-signaled wave dissolves (never parks a doomed 1:2 phantom)",
+        ).toBe("dissolved");
+
+        logs.flush();
+      },
+      240_000,
+    );
   },
 );
