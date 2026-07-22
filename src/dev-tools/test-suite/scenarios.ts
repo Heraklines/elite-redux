@@ -3848,6 +3848,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Showdown VERSUS doubles/triples (tournament) - two-client, not solo-drivable",
+    description:
+      "NETCODE increment - a two-CLIENT versus match, so it can't be driven from this single-player suite.\n"
+      + "Verify LIVE with a partner in a DOUBLES (or TRIPLES) tournament match (Title -> Showdown ->\n"
+      + "Tournaments -> a doubles-format bracket -> Play match). CHECK:\n"
+      + "1) BOTH clients field the format's width (2 for doubles, 3 for triples), not singles.\n"
+      + "2) Each turn you pick a move (and, for a single-target move, a TARGET) for EACH of your active mons;\n"
+      + "   the opponent's mons act on THEIR picks (not an AI) - the battle log matches on both screens.\n"
+      + "3) When one of your mons faints with a bench, YOUR replacement picker opens for THAT slot (the other\n"
+      + "   slot is untouched); the mon you choose is the one the opponent sees summoned.\n"
+      + "4) A stale/old client is REFUSED at team exchange (hard-refresh message), never a one-sided desync.\n"
+      + "Reproduced + red-proofed headlessly in the two-engine duo harness:\n"
+      + "test/tests/elite-redux/showdown/showdown-versus-doubles.test.ts (doubles full turn + per-slot faint,\n"
+      + "triples smoke; checksum parity), showdown-command-relay.test.ts (per-slot relay keying), and\n"
+      + "showdown-side-swap.test.ts (3-wide perspective flip). Singles versus is unchanged (regression net:\n"
+      + "showdown-duo / showdown-versus-faint).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.OUTRAGE, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Showdown Team Menu + Set Editor: G-V cycling / grid-exit / rename Backspace / rank chip",
     description:
       "UI/FLOW fixes - NON-battle screens, so verify at Title -> Showdown (the TEAM MENU) and inside a mon's\n"
