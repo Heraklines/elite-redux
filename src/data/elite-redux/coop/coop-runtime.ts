@@ -7068,9 +7068,12 @@ function releaseCoopV2DeferredCommandStarts(
  * {@linkcode CoopReplayTurnPhase} (its checkpoint branch applies + checksum-verifies + settles it) BEFORE
  * opening the ordinary next-turn command. Returns the replay turn (== the guest's current battle turn) when
  * a retained replacement checkpoint for this turn (or its exact N+1 post-summon frontier) is buffered but
- * not yet consumed, else null. This is the single source of truth for TurnInit's pre-command deferral AND
- * CommandPhase's parked re-trigger (a checkpoint that lands AFTER the command already parked), so the two
- * decisions can never drift.
+ * not yet consumed, else null. CommandPhase's parked-command re-trigger (a checkpoint that lands AFTER the
+ * command already parked) routes through this. It MIRRORS, byte-for-byte, TurnInitPhase's inline
+ * `pendingAuthoritativeReplacementTurn` predicate (which the browser gate contract
+ * authority-v2-gate-contract.test.mjs pins in place and therefore cannot be collapsed into this shared
+ * helper), so the pre-command deferral and the parked re-trigger reach the identical verdict. Keep the two
+ * in lockstep if either changes.
  */
 export function pendingCoopAuthoritativeReplacementReplayTurn(): number | null {
   if (!isCoopAuthoritativeGuestGated() || !isCoopV2ReplacementCutoverActive()) {
