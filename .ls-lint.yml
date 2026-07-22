@@ -38,6 +38,9 @@ ignore:
    - assets
    - locales
    - dist
+   # Transient agent scratch artifacts (never committed; own naming scheme).
+   - scratch_view
+   - scratchpad
    # Tier-1 minimal transport bundle output (hashed chunk names).
    - dist-coop-transport-min
    - .devcontainer

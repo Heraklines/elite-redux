@@ -119,6 +119,17 @@ export const ER_FORBIDDRON_SPECIES_ID = 70027;
 export const ER_IDOLFIN_SPECIES_ID = 70028;
 export const ER_WEBBED_BRUISER_SPECIES_ID = 70029;
 
+/**
+ * Batch-2 Omniform EXTENSION: the three new eeveelutions the Partner Eevee family
+ * can adapt into, keyed by their signature move type. Terminal adapt targets (no
+ * Omniform composite of their own — see the injection site FLAG).
+ */
+const ER_NEWCOMER_OMNIFORM_EXTENSION: readonly (readonly [PokemonType, number])[] = [
+  [PokemonType.FLYING, ER_NIMBEON_SPECIES_ID],
+  [PokemonType.DRAGON, ER_RYUVEON_SPECIES_ID],
+  [PokemonType.STEEL, ER_TITANEON_SPECIES_ID],
+];
+
 // ER-custom / vanilla ability ids used below (verified live via ER_ID_MAP at
 // authoring time; the seam test asserts each resolves to a real allAbilities entry).
 const CORROSION = 212; // vanilla
@@ -823,10 +834,25 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
       registerOmniformMapping(PARTNER_HEAD_SPECIES, partnerFormIndex, target.mapType, target.partnerId as SpeciesId, 0);
       result.omniformMappings++;
     }
+    // Batch-2 Omniform EXTENSION: Partner Eevee also adapts into the three new
+    // eeveelutions on their signature move type (Flying->Nimbeon, Dragon->Ryuveon,
+    // Steel->Titaneon). FLAG: these are REAL evolution species (not partner
+    // transform-only clones), so they do NOT carry the Omniform composite and are
+    // TERMINAL adapt targets (they cannot chain onward). Confirm with the designer
+    // whether they should carry Omniform to chain like the partner family.
+    for (const [mapType, speciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
+      registerOmniformMapping(PARTNER_HEAD_SPECIES, partnerFormIndex, mapType, speciesId as SpeciesId, 0);
+      result.omniformMappings++;
+    }
   }
   for (const holder of ER_PARTNER_FAMILY) {
     for (const target of ER_PARTNER_FAMILY) {
       registerOmniformMapping(holder.partnerId as SpeciesId, 0, target.mapType, target.partnerId as SpeciesId, 0);
+      result.omniformMappings++;
+    }
+    // Each partner eeveelution also adapts into the three new eeveelutions.
+    for (const [mapType, speciesId] of ER_NEWCOMER_OMNIFORM_EXTENSION) {
+      registerOmniformMapping(holder.partnerId as SpeciesId, 0, mapType, speciesId as SpeciesId, 0);
       result.omniformMappings++;
     }
   }

@@ -368,4 +368,11 @@ export enum FormChangeItem {
   KINGDRANITE_Y,
   DURALUDONITE,
   FIDOUGHITE,
+  // Newcomer BATCH 2 (2026-07). Appended for save compatibility. Luxrayite Y +
+  // Yveltal's Z stone are mega stones; Metagrossite Bond is the (FLAGGED) item
+  // trigger for the Metagross Battle Bond form (true mechanism should be a
+  // Greninja-style Battle Bond KO ability trigger — see er-newcomer-forms.ts).
+  LUXRAYITE_Y,
+  YVELTALITE_Z,
+  METAGROSSITE_BOND,
 }

@@ -105,6 +105,22 @@ const MEGA_DRILL = 5684; // ER draft
 const WEIGHTED_SCALES = 5938; // composite (Steelworker + Multiscale)
 const KNIGHTS_HONOR = 5939; // bespoke (Def/SpDef King's Wrath)
 const POWER_CORE = 5105; // ER draft
+// --- Newcomer BATCH 2 form ability ids (codex signatures 5971-5994 + composites
+// 5995-5996 + residual placeholders 5997-5998; resolved via the batch-2 audit). ---
+const SPIRIT_PUNCH = 5983; // codex signature (Iron Fist Mystic Blades)
+const EARTH_EATER = 297; // vanilla
+const LEAD_COAT = 5034; // ER
+const CRUDE_STEEL = 5995; // composite (Solid Rock + Steelworker)
+const METEOR_MASS = 5997; // PLACEHOLDER (no design)
+const FAE_HUNTER = 5178; // ER
+const ECLIPSE_WING = 5971; // codex signature
+const REAPERS_EMBRACE = 5726; // dump draft "Reaper's Embarce" (spec: Reaper's Embrace)
+const HYPER_AGGRESSIVE = 5096; // ER
+const ELECTRO_SURGE = 5000; // ER
+const MOSH_PIT = 5376; // ER
+const FIGHTING_SPIRIT = 5038; // ER
+const TWO_FACED_UNLEASHED = 5977; // codex signature
+const BRUTE_FORCE = 5459; // ER
 
 /**
  * A hand-authored newcomer mega/primal form. Injected onto {@linkcode baseSpecies}
@@ -396,6 +412,48 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     innates: [ab(ER_GLYCOLYSIS_ABILITY_ID), ab(5356), ab(5969)],
     item: FormChangeItem.FIDOUGHITE,
     preFormKeys: ["partner"],
+  },
+  // ===================== NEWCOMER BATCH 2 =====================
+  // Metagross Battle Bond — Steel/Psychic/Rock (N-type). FLAG (mechanism): a true
+  // Battle Bond form should transform on a KO via a Greninja-style
+  // SpeciesFormChangeAbilityTrigger; wired here with an item trigger
+  // (Metagrossite Bond) for obtainability until that trigger is added.
+  {
+    baseSpecies: SpeciesId.METAGROSS,
+    formKey: "battle-bond",
+    formName: "Battle Bond",
+    slug: "metagross_battle_bond",
+    types: [PokemonType.STEEL, PokemonType.PSYCHIC, PokemonType.ROCK],
+    stats: [80, 150, 150, 155, 135, 30],
+    actives: [ab(SPIRIT_PUNCH), ab(EARTH_EATER), ab(LEAD_COAT)],
+    innates: [ab(CRUDE_STEEL), ab(METEOR_MASS), AbilityId.BATTLE_BOND],
+    item: FormChangeItem.METAGROSSITE_BOND,
+  },
+  // Yveltal Mega Z — Dark/Flying. Active Fae Hunter; innates Dark Aura, Eclipse
+  // Wing (5971), Reaper's Embrace (5726). Stone Yveltalite Z.
+  {
+    baseSpecies: SpeciesId.YVELTAL,
+    formKey: "mega-z",
+    formName: "Mega Z",
+    slug: "yveltal_mega_z",
+    types: [PokemonType.DARK, PokemonType.FLYING],
+    stats: [126, 179, 95, 131, 98, 151],
+    actives: [ab(FAE_HUNTER), ab(FAE_HUNTER), ab(FAE_HUNTER)],
+    innates: [AbilityId.DARK_AURA, ab(ECLIPSE_WING), ab(REAPERS_EMBRACE)],
+    item: FormChangeItem.YVELTALITE_Z,
+  },
+  // Mega Luxray Y — Electric. Active Hyper Aggressive / Electro Surge / Mosh Pit;
+  // innates Fighting Spirit, Two-Faced Unleashed (5977), Brute Force. Stone Luxrayite Y.
+  {
+    baseSpecies: SpeciesId.LUXRAY,
+    formKey: "mega-y",
+    formName: "Mega Y",
+    slug: "luxray_mega_y",
+    types: [PokemonType.ELECTRIC],
+    stats: [90, 150, 100, 110, 100, 110],
+    actives: [ab(HYPER_AGGRESSIVE), ab(ELECTRO_SURGE), ab(MOSH_PIT)],
+    innates: [ab(FIGHTING_SPIRIT), ab(TWO_FACED_UNLEASHED), ab(BRUTE_FORCE)],
+    item: FormChangeItem.LUXRAYITE_Y,
   },
 ];
 
