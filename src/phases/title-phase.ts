@@ -1425,19 +1425,30 @@ export class TitlePhase extends Phase {
             if (marker == null) {
               // Release the guest only when the host actually presses Start. Sending this before
               // the prompt caused the live split: guest in team select, host still in the lobby.
-              globalScene.ui.showText(
-                "Connected to your partner!\nPress to start co-op.",
-                null,
-                hostStartNew,
-                null,
-                true,
-              );
+              // Resume discovery is asynchronous and can settle while the previous "checking saves"
+              // MessagePhase still owns its timer/handler. Replace that mode atomically before installing
+              // the launch callback; otherwise the prompt stays visually stale and real Space presses are
+              // swallowed (the two-browser campaign never observes SEND resumeStartNew).
+              await globalScene.ui.setMode(UiMode.MESSAGE);
+              if (!isCurrentSession()) {
+                return;
+              }
+              globalScene.ui.resetModeChain();
+              globalScene.ui.showText("Connected to your partner!\nPress to start co-op.", 0, hostStartNew, null, true);
               return;
             }
             // Offer the HOST a real RESUME / NEW GAME choice.
+            // The offer crosses the same asynchronous MessagePhase boundary as the fresh-run prompt;
+            // install it with the same atomic mode reset so Continue/New Game can never be visually
+            // present while an older lobby handler still owns keyboard input.
+            await globalScene.ui.setMode(UiMode.MESSAGE);
+            if (!isCurrentSession()) {
+              return;
+            }
+            globalScene.ui.resetModeChain();
             globalScene.ui.showText(
               `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
-              null,
+              0,
               () => {
                 if (!isCurrentSession()) {
                   return;

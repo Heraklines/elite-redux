@@ -1448,3 +1448,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   isolated on hosted runners. This closes the coverage-wiring defect instead of merely adding another inert
   test file.
 - Remote unit/C1/C3 qualification is required. No co-op Vitest/browser workload was run locally.
+
+2026-07-23 - Public-lobby asynchronous prompt ownership
+
+- Exact-SHA two-browser campaign 29962958374 failed both completed co-op profiles before starter select.
+  The transport was connected, the P33 binding and fingerprints matched, and all five cloud-slot reads
+  completed, but the screenshot remained on `Connected! Checking for a co-op save...`; twelve real Space
+  presses produced no `SEND resumeStartNew`.
+- The resume scan completed asynchronously while the earlier lobby MessagePhase still owned its timer and
+  keyboard callback. The no-save and saved-run branches called `showText` directly, unlike the already-fixed
+  conflict branch, so their visible decision could be stale/inert. Both host decision surfaces now await a
+  MESSAGE transition, re-check exact-session identity, reset the mode chain, and install their callback with
+  zero delay as one atomic UI boundary.
+- Failure-first evidence is the real-browser dirty/depth artifact pair from run 29962958374. Local scoped
+  Biome and `git diff --check` are clean; repository TypeScript completes with zero diagnostics. No local
+  co-op Vitest/browser workload was run. The superseded campaign was cancelled once this shared signature
+  was attributed; exact-SHA remote requalification is required.
