@@ -180,6 +180,54 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     expect(grid.starterSelectContainer.visible, "the grid container is VISIBLE after cancel").toBe(true);
   });
 
+  it("submitting an edited in-party set returns to the grid and can reopen the editor", async () => {
+    await openMenuWithPreset();
+    cycle(Button.CYCLE_ABILITY); // E -> seeded EDIT build
+    await wait(700);
+    expect(mode()).toBe(UiMode.STARTER_SELECT);
+
+    const grid: any = game.scene.ui.handlers[UiMode.STARTER_SELECT];
+    await grid.showdownSeedInFlight;
+    expect(grid.starterSpecies.length, "the preset mon is present in the grid party").toBe(1);
+
+    // Confirming a line that is already in the party opens the Edit Set / Remove menu.
+    grid.handleShowdownGridConfirm(true, 0, true);
+    await wait(100);
+    expect(mode()).toBe(UiMode.OPTION_SELECT);
+    press(Button.ACTION); // Edit Set
+    await wait(300);
+    expect(mode(), "the first edit opens").toBe(UiMode.SHOWDOWN_SET_EDITOR);
+
+    press(Button.SUBMIT); // Done
+    await wait(600);
+    const editor: any = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR];
+    expect(mode(), "Done returns to the live grid, not the consumed option menu").toBe(UiMode.STARTER_SELECT);
+    expect(editor.container.visible, "the completed editor is hidden").toBe(false);
+    expect(grid.starterSelectContainer.visible, "the grid is visible after Done").toBe(true);
+
+    // Back from the in-party menu is a real cancel; it must not remove the mon or strand the menu.
+    grid.handleShowdownGridConfirm(true, 0, true);
+    await wait(100);
+    press(Button.CANCEL);
+    await wait(100);
+    expect(mode(), "Back from the in-party menu returns to the grid").toBe(UiMode.STARTER_SELECT);
+    expect(grid.starterSpecies.length, "Back does not remove the team mon").toBe(1);
+
+    // The same team slot can immediately be edited again and still accepts navigation input.
+    grid.handleShowdownGridConfirm(true, 0, true);
+    await wait(100);
+    press(Button.ACTION);
+    await wait(300);
+    expect(mode(), "the second edit opens instead of dead-ending").toBe(UiMode.SHOWDOWN_SET_EDITOR);
+    const before = editor.field;
+    press(Button.DOWN);
+    expect(editor.field, "the reopened editor accepts movement input").not.toBe(before);
+
+    press(Button.CANCEL);
+    await wait(600);
+    expect(mode(), "the regression leaves the real UI stack settled on the grid").toBe(UiMode.STARTER_SELECT);
+  });
+
   it("Issue 2: backing out of the build returns to the Team Menu and restores the gameMode", async () => {
     const phase = new TitlePhase();
     // NO phase.gameMode stamp: at the live title it is undefined - the exact fix-#5 condition.

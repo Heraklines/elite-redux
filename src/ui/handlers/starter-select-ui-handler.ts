@@ -4065,7 +4065,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         {
           label: "Edit Set",
           handler: () => {
-            this.openShowdownEditor(removeIndex);
+            // OPTION_SELECT is transient. Dismiss it back to the live grid before opening the editor,
+            // otherwise the editor chains onto this consumed menu and Done returns to an invisible,
+            // input-dead OPTION_SELECT handler.
+            void ui.revertMode().then(() => this.openShowdownEditor(removeIndex));
             return true;
           },
         },
@@ -4073,14 +4076,19 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           label: i18next.t("starterSelectUiHandler:removeFromParty"),
           handler: () => {
             this.popStarter(removeIndex);
-            ui.setMode(UiMode.STARTER_SELECT);
+            void ui.revertMode();
+            return true;
+          },
+        },
+        {
+          label: i18next.t("menu:cancel"),
+          handler: () => {
+            void ui.revertMode();
             return true;
           },
         },
       ];
-      ui.setMode(UiMode.STARTER_SELECT).then(() =>
-        ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options, maxOptions: 8, yOffset: 47 }),
-      );
+      ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 8, yOffset: 47 });
       return;
     }
     // New pick: the field-legality gate fires BEFORE the editor opens (same messages as the validator).
