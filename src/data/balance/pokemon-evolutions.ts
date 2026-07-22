@@ -73,7 +73,7 @@ export enum EvolutionItem {
 }
 
 
-const EvoCondKey = {
+export const EvoCondKey = {
   FRIENDSHIP: 1,
   TIME: 2,
   MOVE: 3,
@@ -88,9 +88,10 @@ const EvoCondKey = {
   GENDER: 13,
   NATURE: 14,
   HELD_ITEM: 15, // Currently checks only for species stat booster items
+  FORM_KEY: 16, // Current form key match (Elite Redux — e.g. Idolfin: Palafin in "hero" form)
 } as const;
 
-type EvolutionConditionData =
+export type EvolutionConditionData =
   {key: typeof EvoCondKey.FRIENDSHIP | typeof EvoCondKey.RANDOM_FORM | typeof EvoCondKey.EVO_TREASURE_TRACKER, value: number} |
   {key: typeof EvoCondKey.MOVE, move: MoveId} |
   {key: typeof EvoCondKey.TIME, time: TimeOfDay[]} |
@@ -101,6 +102,7 @@ type EvolutionConditionData =
   {key: typeof EvoCondKey.HELD_ITEM, itemKey: SpeciesStatBoosterItem} |
   {key: typeof EvoCondKey.NATURE, nature: Nature[]} |
   {key: typeof EvoCondKey.WEATHER, weather: WeatherType[]} |
+  {key: typeof EvoCondKey.FORM_KEY, formKey: string} |
   {key: typeof EvoCondKey.SHEDINJA};
 
 export class SpeciesEvolutionCondition {
@@ -145,6 +147,8 @@ export class SpeciesEvolutionCondition {
           return i18next.t(`pokemonEvolutions:heldItem.${toCamelCase(cond.itemKey)}`);
         case EvoCondKey.RANDOM_FORM:
           return null;
+        case EvoCondKey.FORM_KEY:
+          return null; // stringless — the paired visible condition (e.g. gender) carries the label
         default:
           cond satisfies never;
           return null;
@@ -190,6 +194,8 @@ export class SpeciesEvolutionCondition {
           return !!globalScene.gameData.dexData[cond.speciesCaught].caughtAttr;
         case EvoCondKey.HELD_ITEM:
           return pokemon.getHeldItems().some(m => m.is("SpeciesStatBoosterModifier") && (m.type as SpeciesStatBoosterModifierType).key === cond.itemKey);
+        case EvoCondKey.FORM_KEY:
+          return pokemon.getFormKey() === cond.formKey;
         default:
           cond satisfies never;
           return false;
