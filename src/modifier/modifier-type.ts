@@ -17,7 +17,7 @@ import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { getErTemporaryLuck } from "#data/elite-redux/er-fairy-luck";
 import { greaterCapsuleHasAnyOption } from "#data/elite-redux/er-greater-ability-capsule";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
-import { erMegaStoneTier, pickErMegaStoneWeighted } from "#data/elite-redux/er-mega-tiers";
+import { erMegaStoneAppearsAtGate, erMegaStoneTier, pickErMegaStoneWeighted } from "#data/elite-redux/er-mega-tiers";
 import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
@@ -3290,6 +3290,26 @@ export function getPlayerShopModifierTypeOptionsForWave(
             "er-biome-shop-gen",
           );
         }
+        // ABSOLUTE APPEARANCE GATE (er-mega-tiers): a mega/primal stone rolled into
+        // a biome-shop form-change slot must clear its tier's absolute appearance
+        // rate, so a MASTER stone stays genuinely rare even as the party's ONLY
+        // eligible stone. On a gate MISS the slot is skipped (yields nothing) - it
+        // never leaves an empty slot uncomputed. Rolled under the SAME wave seed the
+        // stock roll uses, so the reward phase and the UI handler agree on the stock.
+        if (mt instanceof FormChangeItemModifierType) {
+          let appears = true;
+          const stone = mt.formChangeItem;
+          globalScene.executeWithSeedOffset(
+            () => {
+              appears = erMegaStoneAppearsAtGate(stone);
+            },
+            waveIndex,
+            "er-biome-shop-mega-gate",
+          );
+          if (!appears) {
+            mt = null;
+          }
+        }
         if (mt != null) {
           // CRITICAL: set the id first. getOrInferTier reverse-looks-up the
           // item in the reward pools BY id; without it every item returns a
@@ -3578,6 +3598,17 @@ function getNewModifierTypeOption(
       }
       return getNewModifierTypeOption(party, poolType, tier, upgradeCount, ++retryCount);
     }
+  }
+
+  // ABSOLUTE APPEARANCE GATE (er-mega-tiers): a RANDOMLY-rolled mega/primal stone
+  // must clear its tier's absolute appearance rate to materialize, so a MASTER
+  // stone stays genuinely rare even as a party's ONLY eligible stone (weight-1-of-1
+  // in the competitive pick). On a gate MISS, re-roll this tier - the slot yields a
+  // normal (non-form-change) in-tier reward instead of nothing. This is the RANDOM
+  // reward-pool channel only; guaranteed/forced FORM_CHANGE_ITEM funcs (dev-suite
+  // shopItems, ME-guaranteed rewards) resolve via getModifiers() and are NEVER gated.
+  if (modifierType instanceof FormChangeItemModifierType && !erMegaStoneAppearsAtGate(modifierType.formChangeItem)) {
+    return getNewModifierTypeOption(party, poolType, tier, upgradeCount, ++retryCount);
   }
 
   console.log(modifierType, player ? "" : "(enemy)");

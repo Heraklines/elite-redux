@@ -20,10 +20,13 @@
 
 import { ER_SHOP_ITEM_TIER_FACTOR } from "#data/elite-redux/er-biome-economy";
 import {
+  erMegaStoneAppearanceRate,
+  erMegaStoneAppearsAtGate,
   erMegaStoneGenWeight,
   erMegaStoneTier,
   pickErMegaStoneWeighted,
   resetErMegaTierCache,
+  TIER_APPEARANCE_RATE,
   TIER_GEN_WEIGHT,
 } from "#data/elite-redux/er-mega-tiers";
 import { FormChangeItem } from "#enums/form-change-item";
@@ -99,5 +102,70 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
     const masterFactor = ER_SHOP_ITEM_TIER_FACTOR[erMegaStoneTier(FormChangeItem.XERNEASITE)];
     const commonFactor = ER_SHOP_ITEM_TIER_FACTOR[erMegaStoneTier(FormChangeItem.SNORLAXITE)];
     expect(masterFactor).toBeGreaterThan(commonFactor);
+  });
+
+  // ---------------------------------------------------------------------------
+  // ABSOLUTE APPEARANCE GATE (#mega-rarity, directive 1): a MASTER stone stays
+  // genuinely rare EVEN as a party's ONLY eligible stone. The competitive pick
+  // (above) suppresses a strong stone only when it competes; the gate is the
+  // orthogonal knob that suppresses it absolutely.
+  // ---------------------------------------------------------------------------
+
+  it("appearance-rate ladder is strictly ordered; MASTER ~2%, COMMON near-certain", () => {
+    expect(TIER_APPEARANCE_RATE[ModifierTier.COMMON]).toBeGreaterThan(TIER_APPEARANCE_RATE[ModifierTier.GREAT]);
+    expect(TIER_APPEARANCE_RATE[ModifierTier.GREAT]).toBeGreaterThan(TIER_APPEARANCE_RATE[ModifierTier.ULTRA]);
+    expect(TIER_APPEARANCE_RATE[ModifierTier.ULTRA]).toBeGreaterThan(TIER_APPEARANCE_RATE[ModifierTier.ROGUE]);
+    expect(TIER_APPEARANCE_RATE[ModifierTier.ROGUE]).toBeGreaterThan(TIER_APPEARANCE_RATE[ModifierTier.MASTER]);
+    // MASTER in the 1-3% band the maintainer specified; every rate is > 0 (reachable).
+    expect(TIER_APPEARANCE_RATE[ModifierTier.MASTER]).toBeGreaterThan(0);
+    expect(TIER_APPEARANCE_RATE[ModifierTier.MASTER]).toBeLessThanOrEqual(0.03);
+    expect(TIER_APPEARANCE_RATE[ModifierTier.COMMON]).toBeGreaterThanOrEqual(0.95);
+    // A MASTER stone reports the MASTER rate through the resolver.
+    expect(erMegaStoneAppearanceRate(FormChangeItem.XERNEASITE)).toBe(TIER_APPEARANCE_RATE[ModifierTier.MASTER]);
+  });
+
+  it("a sole MASTER stone materializes at ~its low rate (<=3%), NOT ~100%; red-proof vs the pre-gate pick", () => {
+    // A party whose ONLY mega mon is a MASTER-tier one: the competitive pick is a
+    // pool of ONE, so it ALWAYS returns the master stone (the pre-gate defect).
+    const soleMasterPool = [FormChangeItem.XERNEASITE];
+    let preGatePicks = 0; // RED-PROOF: without the gate, the sole stone is guaranteed.
+    let materialized = 0; // GREEN: with the gate, it rarely actually appears.
+    const N = 6000;
+    for (let i = 0; i < N; i++) {
+      const picked = pickErMegaStoneWeighted(soleMasterPool);
+      expect(picked).toBe(FormChangeItem.XERNEASITE);
+      preGatePicks++;
+      if (erMegaStoneAppearsAtGate(picked)) {
+        materialized++;
+      }
+    }
+    // Red-proof: the competitive pick alone yields the master stone 100% of the time.
+    expect(preGatePicks).toBe(N);
+    // Green: the absolute gate makes it materialize only ~2% (well under 3%)...
+    expect(materialized / N).toBeLessThanOrEqual(0.03);
+    // ...but non-zero, so a mono-master party can still eventually obtain it.
+    expect(materialized).toBeGreaterThan(0);
+  });
+
+  it("a COMMON-tier stone materializes on nearly every eligible slot", () => {
+    // Find a real COMMON-tier stone (unknown / non-stone items resolve to ULTRA,
+    // never COMMON, so a COMMON match is a genuine low-BST mega).
+    const commonStone = (Object.values(FormChangeItem) as FormChangeItem[]).find(
+      v => typeof v === "number" && erMegaStoneTier(v) === ModifierTier.COMMON,
+    );
+    if (commonStone === undefined) {
+      // No COMMON-tier stone in the live set: assert the contract directly - a
+      // rate-1.0 tier always materializes (short-circuit, no RNG draw).
+      expect(TIER_APPEARANCE_RATE[ModifierTier.COMMON]).toBeGreaterThanOrEqual(0.95);
+      return;
+    }
+    let materialized = 0;
+    const N = 2000;
+    for (let i = 0; i < N; i++) {
+      if (erMegaStoneAppearsAtGate(commonStone)) {
+        materialized++;
+      }
+    }
+    expect(materialized / N).toBeGreaterThanOrEqual(0.95);
   });
 });

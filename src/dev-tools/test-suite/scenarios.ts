@@ -2153,19 +2153,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) Mega stones are strength-tiered (top tier rare + expensive)",
+    label: "(note) Mega stones are strength-tiered + gated (top tier genuinely rare)",
     description:
       "Mega/primal stones now carry a STRENGTH tier (BST of the mega form + a curated\n"
       + "override list). Reward rolls are weighted toward WEAKER megas, and biome shops price\n"
       + "+ stock a stone by ITS OWN tier - so a box legendary / primal orb / '-Z' ultra mega\n"
       + "(Xerneas, Yveltal, Red/Blue Orb, Charizardite Z...) is masterball-tier: ~12x wave\n"
       + "income and only 1 in stock, and almost never wins a reward roll when weaker megas are\n"
-      + "eligible. A plain mega (e.g. Snorlaxite) stays cheap + common. Reachability is intact:\n"
-      + "every stone keeps a non-zero weight, so a mono-mega party can still get its stone.\n"
+      + "eligible. A plain mega (e.g. Snorlaxite) stays cheap + common.\n"
+      + "NEW - ABSOLUTE APPEARANCE GATE: strength weighting only suppressed a strong stone\n"
+      + "when it COMPETED with weaker ones. If a MASTER-tier mega is your ONLY mega mon, its\n"
+      + "stone used to be the sole candidate and appeared in EVERY form-change slot. Now a\n"
+      + "rolled stone must ALSO clear an absolute per-tier rate (MASTER ~2%, ROGUE ~12%, up to\n"
+      + "COMMON ~certain) to actually appear - so a mono-master party gets its stone only\n"
+      + "genuinely rarely (reward slot rolls a normal item, shop/mining slot yields nothing).\n"
+      + "It stays REACHABLE (non-zero rate), just rare. Guaranteed/forced FORM_CHANGE_ITEM\n"
+      + "scenarios (the 'Store: Mega stone' tests) are NOT gated - they always show the stone.\n"
       + "WHERE TO CHECK: hold a Mega Bracelet + a legendary-mega line, reach a biome market\n"
       + "that stocks the EVO/FORM_CHANGE_ITEM slot, and confirm the elite stone shows at the\n"
-      + "masterball tier + high price. Data table + rationale:\n"
-      + "docs/plans/2026-07-22-item-economy-tuning.md. Unit-tested:\n"
+      + "masterball tier + high price (and appears only rarely). Data table + rationale + the\n"
+      + "appearance-rate ladder: docs/plans/2026-07-22-item-economy-tuning.md. Unit-tested\n"
+      + "(rate ladder, ~2% MASTER materialize + red-proof, price band):\n"
       + "test/tests/elite-redux/er-mega-tiers.test.ts.",
     setup: () => {
       resetDevOverrides();

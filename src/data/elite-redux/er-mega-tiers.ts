@@ -131,6 +131,38 @@ export const TIER_GEN_WEIGHT: Readonly<Record<ModifierTier, number>> = {
   [ModifierTier.LUXURY]: 12,
 };
 
+/**
+ * ABSOLUTE per-tier APPEARANCE RATE (0..1) - maintainer-editable, documented in
+ * docs/plans/2026-07-22-item-economy-tuning.md.
+ *
+ * This is a DIFFERENT knob from TIER_GEN_WEIGHT. TIER_GEN_WEIGHT is the
+ * COMPETITIVE weighting - it decides WHICH stone wins when several are eligible
+ * (a MASTER stone almost never beats a COMMON one in the same pool). But when a
+ * MASTER-tier mega is a party's ONLY mega-capable mon, its stone is the sole
+ * candidate (weight-1-of-1) and the competitive pick returns it every time -
+ * which made a genuinely-elite stone effectively GUARANTEED in any form-change
+ * slot for a mono-elite party.
+ *
+ * This table is the fix: after the competitive pick chooses a stone, its tier is
+ * rolled against an ABSOLUTE probability to decide whether the stone MATERIALIZES
+ * AT ALL. A MASTER stone clears the gate ~2% of the time even as the sole
+ * candidate, so it stays genuinely rare; a COMMON stone is near-certain. On a
+ * gate MISS the form-change slot yields NOTHING (the reward roll re-rolls a
+ * non-form-change item in-tier; the biome-shop slot is skipped; a mining dig
+ * turns up nothing) - it never crashes an empty slot.
+ *
+ * Reachability is preserved: every rate is > 0, so a mono-elite party can still
+ * obtain its stone - it is just genuinely rare, not gated out entirely.
+ */
+export const TIER_APPEARANCE_RATE: Readonly<Record<ModifierTier, number>> = {
+  [ModifierTier.COMMON]: 1.0, // abundant filler: always materializes
+  [ModifierTier.GREAT]: 0.72,
+  [ModifierTier.ULTRA]: 0.4,
+  [ModifierTier.ROGUE]: 0.12,
+  [ModifierTier.MASTER]: 0.02, // box legendaries / primal orbs / "-Z" ultra megas: ~2%, genuinely rare
+  [ModifierTier.LUXURY]: 0.4,
+};
+
 /** Fallback tier for a stone whose triggered form can't be resolved. */
 const DEFAULT_UNKNOWN_TIER = ModifierTier.ULTRA;
 
@@ -221,4 +253,32 @@ export function pickErMegaStoneWeighted(items: readonly FormChangeItem[]): FormC
     }
   }
   return items[items.length - 1];
+}
+
+/** The absolute appearance rate (0..1) for a stone, by its strength tier. */
+export function erMegaStoneAppearanceRate(item: FormChangeItem): number {
+  return TIER_APPEARANCE_RATE[erMegaStoneTier(item)] ?? TIER_APPEARANCE_RATE[ModifierTier.ULTRA];
+}
+
+/**
+ * The ABSOLUTE appearance gate, applied AFTER the competitive pick has chosen a
+ * stone: roll the stone's tier against its `TIER_APPEARANCE_RATE`. Returns true
+ * when the stone should MATERIALIZE, false when the form-change slot should yield
+ * nothing this roll.
+ *
+ * This is independent of pool competition, so a MASTER stone stays genuinely rare
+ * even when it is a party's ONLY eligible stone (weight-1-of-1 in the competitive
+ * pick). Runs off the seeded RNG (`randSeedInt`), so callers already inside
+ * `executeWithSeedOffset` stay deterministic (biome-shop parity across the reward
+ * phase and the UI handler). Every rate is > 0, so reachability holds.
+ */
+export function erMegaStoneAppearsAtGate(item: FormChangeItem): boolean {
+  const rate = erMegaStoneAppearanceRate(item);
+  if (rate >= 1) {
+    return true; // near-certain tiers short-circuit (no RNG draw, no cursor shift)
+  }
+  if (rate <= 0) {
+    return false;
+  }
+  return randSeedInt(10000) < Math.round(rate * 10000);
 }

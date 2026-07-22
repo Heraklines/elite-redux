@@ -131,6 +131,46 @@ units) that a stone now inherits: COMMON 0.35x, GREAT 1.0x, ULTRA 2.6x, ROGUE 6x
 **MASTER 1**. So a masterball-tier stone in a biome shop is ~12 waves of income
 and one-in-stock - "very low chance, rare + expensive" per the mandate.
 
+#### Table 1d - ABSOLUTE appearance rate per tier  (`TIER_APPEARANCE_RATE`)
+
+> maintainer directive 2026-07-23: "a master tier item should be genuinely rare
+> even if it's the only mon on the team."
+
+`TIER_GEN_WEIGHT` (Table 1c) is the COMPETITIVE knob: it only decides WHICH stone
+wins when several are eligible. It does nothing when a strong mega is a party's
+ONLY mega-capable mon - then its stone is the sole candidate (weight-1-of-1) and
+the weighted pick returns it every time, so a mono-elite party got its masterball
+stone in effectively EVERY form-change slot. Table 1d is the fix: an **absolute**
+per-tier gate applied AFTER the competitive pick. Once a stone is chosen, its tier
+is rolled against this rate to decide whether it MATERIALIZES AT ALL. This is
+orthogonal to the weighting - the weighting picks the stone, the gate decides if
+that stone appears.
+
+| Tier | Appearance rate | Meaning |
+|---|---|---|
+| COMMON | 1.00 | abundant filler - always materializes |
+| GREAT | 0.72 | usually appears |
+| ULTRA | 0.40 | appears less than half the time |
+| ROGUE | 0.12 | rare |
+| MASTER | 0.02 | ~2% - box legendaries / primal orbs / '-Z' ultra megas: genuinely rare |
+
+On a gate MISS the form-change slot yields nothing: the post-battle REWARD roll
+re-rolls a normal (non-form-change) in-tier item; the BIOME-SHOP form-change slot
+is skipped; a MINING dig turns up no stone. It never crashes an empty slot, and
+every rate is > 0 so a mono-master party can still eventually obtain its stone -
+just genuinely rarely, not gated out.
+
+**Scope - RANDOM channels only.** The gate applies to the three random circulation
+channels (reward-pool roll `getNewModifierTypeOption`, biome-shop random slot in
+`getPlayerShopModifierTypeOptionsForWave`, and mining `rollMegaStone`). It does
+NOT apply to GUARANTEED / forced stones (dev-suite `shopItems: [FORM_CHANGE_ITEM]`,
+ME-guaranteed rewards, or a pregen-specified stone) - those resolve through the
+generator's forced path and always appear, since forcing a specific stone is an
+explicit design decision, not a random roll. Verified:
+`test/tests/elite-redux/er-mega-tiers.test.ts` (rate ladder strictly ordered,
+MASTER materializes <=3% + red-proof that the pre-gate pick is 100%, COMMON near-
+certain).
+
 ---
 
 ## Mandate 2 - redistribute the 27 tactical items
