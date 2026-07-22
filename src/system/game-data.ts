@@ -2062,24 +2062,13 @@ export class GameData {
       if (selectedSolo.session == null) {
         throw new CoopResumeReplicaUnavailableError(`solo slot ${slotId} could not be parsed`, true);
       }
-      if (local == null) {
-        const encryptedCloud = encrypt(selectedSolo.raw, bypassLogin);
-        const cached = await this.withSessionPersistenceLease(
-          async () => {
-            if (localStorage.getItem(storageKey) !== localRaw) {
-              return false;
-            }
-            return (
-              trySetLocalStorageItem(storageKey, encryptedCloud) && localStorage.getItem(storageKey) === encryptedCloud
-            );
-          },
-          false,
-          accountIdentity,
-        );
-        if (cached !== true) {
-          throw new CoopResumeReplicaUnavailableError(`cloud solo slot ${slotId} could not be cached safely`);
-        }
-      }
+      // Co-op lobby discovery only needs the classified immutable bytes to prove this slot is
+      // occupied by a solo run. Caching a cloud-only solo row here is an unrelated mutation and,
+      // more importantly, serializes the launch behind the account-wide persistence Web Lock.
+      // A title/login cache or another tab can legitimately own that lock; waiting up to 15s per
+      // occupied slot left a full account on "Checking for a co-op save..." even though all five
+      // cloud reads and classifications had completed. Keep discovery read-only for solo rows.
+      // The ordinary solo load path remains responsible for populating its local cache.
       return { session: selectedSolo.session, sessionJson: selectedSolo.raw };
     }
 

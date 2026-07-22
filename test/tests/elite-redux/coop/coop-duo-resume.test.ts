@@ -389,6 +389,31 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     expect(slot0Reads, "the read is attempted exactly the bounded number of times, then gives up").toBe(3);
   });
 
+  it("classifies cloud-only SOLO slots without waiting for or mutating the account persistence cache", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const soloJson = JSON.stringify(game.scene.gameData.getSessionSaveData());
+    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    keys.forEach(key => localStorage.removeItem(key));
+    vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasFound(soloJson));
+    const lockRequest = vi.fn(() => new Promise<never>(() => {}));
+    Object.defineProperty(globalThis.navigator, "locks", {
+      configurable: true,
+      value: { request: lockRequest },
+    });
+
+    const snapshot = await game.scene.gameData.getCoopResumeLobbySnapshot();
+
+    expect(snapshot.failures.size, "healthy solo occupancy is fully classified").toBe(0);
+    expect([...snapshot.sessions.values()].every(session => session?.session.gameMode === GameModes.CLASSIC)).toBe(
+      true,
+    );
+    expect(
+      lockRequest,
+      "read-only co-op discovery never waits behind an unrelated cache writer",
+    ).not.toHaveBeenCalled();
+    keys.forEach(key => expect(localStorage.getItem(key), `${key} remains absent`).toBeNull());
+  });
+
   it("RESUME: host offers -> guest ACCEPTS -> guest boots from the host snapshot and CONVERGES (+ identity gate)", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
