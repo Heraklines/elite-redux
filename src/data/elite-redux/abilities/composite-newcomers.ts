@@ -84,6 +84,13 @@ export const ER_PARTNER_GLACEON_ABILITY_ID = 5953;
 export const ER_PARTNER_SYLVEON_ABILITY_ID = 5954;
 // 5955-5969 are allocated by type-nativization and other newcomer abilities.
 export const ER_GLYCOLYSIS_ABILITY_ID = 5970;
+// --- Newcomer BATCH 2 composites (fakemon newcomer patch, batch 2). ---
+// Each is the union of its two constituents' attrs, resolved by the same wire
+// pass; both constituents stay fully active with their own gates.
+export const ER_CRUDE_STEEL_ABILITY_ID = 5971; // Solid Rock + Steelworker
+export const ER_MINIGUN_ABILITY_ID = 5972; // Quick Draw + Dual Wield
+export const ER_POROUS_ABILITY_ID = 5973; // Rocky Exterior + Evaporate
+export const ER_GILLIE_SUIT_ABILITY_ID = 5974; // Predator + Protean
 
 /**
  * A single manual-composite definition: the display name, the verbatim short
@@ -118,6 +125,12 @@ const AIR_BLOWER = 5058;
 const HARUKAZE = 5534;
 const PARASITIC_SPORES = 5314;
 const ITCHY_DEFENSE = 5207;
+// Batch-2 composite constituents (ER-custom live pokerogue ids, verified via the
+// ability audit against ER_ID_MAP; the seam test asserts each resolves).
+const DUAL_WIELD = 5169; // Minigun constituent (ER custom)
+const ROCKY_EXTERIOR = 5620; // Porous constituent (ER custom)
+const EVAPORATE = 5180; // Porous constituent (ER custom)
+const PREDATOR = 5101; // Gillie Suit constituent (ER custom, draft 363)
 // Omniform (5929) — the graft constituent for the partner-Eevee family. Resolved
 // live via `allAbilities[5929]`; its `OmniformAbAttr` is copied into every partner
 // composite so the composite drives the adaptive transform AND keeps the base
@@ -153,6 +166,35 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     name: "Glycolysis",
     description: "Harvest + Well-Baked Body.",
     constituents: [AbilityId.HARVEST, AbilityId.WELL_BAKED_BODY],
+  },
+  // --- Newcomer BATCH 2 composites (spec'd inline by the designer). ---
+  // Crude Steel (Metagross Battle Bond innate) = Solid Rock + Steelworker.
+  [ER_CRUDE_STEEL_ABILITY_ID]: {
+    id: ER_CRUDE_STEEL_ABILITY_ID,
+    name: "Crude Steel",
+    description: "Solid Rock + Steelworker.",
+    constituents: [AbilityId.SOLID_ROCK, AbilityId.STEELWORKER],
+  },
+  // Minigun (Dustnoir/Drawclops innate) = Quick Draw + Dual Wield.
+  [ER_MINIGUN_ABILITY_ID]: {
+    id: ER_MINIGUN_ABILITY_ID,
+    name: "Minigun",
+    description: "Quick Draw + Dual Wield.",
+    constituents: [AbilityId.QUICK_DRAW, DUAL_WIELD],
+  },
+  // Porous (Twinkletuff active) = Rocky Exterior + Evaporate.
+  [ER_POROUS_ABILITY_ID]: {
+    id: ER_POROUS_ABILITY_ID,
+    name: "Porous",
+    description: "Rocky Exterior + Evaporate.",
+    constituents: [ROCKY_EXTERIOR, EVAPORATE],
+  },
+  // Gillie Suit (Webbed Bruiser innate) = Predator + Protean.
+  [ER_GILLIE_SUIT_ABILITY_ID]: {
+    id: ER_GILLIE_SUIT_ABILITY_ID,
+    name: "Gillie Suit",
+    description: "Predator + Protean.",
+    constituents: [PREDATOR, AbilityId.PROTEAN],
   },
   [ER_FIRST_SERPENT_ABILITY_ID]: {
     id: ER_FIRST_SERPENT_ABILITY_ID,
