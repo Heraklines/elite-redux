@@ -898,11 +898,19 @@ export class EvidenceSink {
     allowedConsoleErrors = [],
     expectedMissingSystemSaveErrors = 0,
     freshAccountMissingSaves = false,
+    pixelCheckpointCapture = true,
   ) {
     this.label = label;
     this.dir = resolve(artifactDir, label);
     this.allowedConsoleErrors = allowedConsoleErrors;
     this.expectedMissingSystemSaveErrors = expectedMissingSystemSaveErrors;
+    // Per-profile checkpoint capture (replay-pacing harness trim). Default true = every checkpoint's
+    // FIRST occurrence of a surface shape captures a pixel-inspected PNG (the surface/mystery lanes).
+    // The DEPTH lane passes false: no per-checkpoint PNG (DOM-only) to cut the ~9s pixel readback/decode,
+    // while the DOM/cookie/canvas isolation proof below still runs EVERY checkpoint (no evidence-class
+    // weakening). A forced `full:true` (failure path) or COOP_UI_CHECKPOINT_MODE=full overrides this to
+    // still capture the PNG, so triage evidence is never lost.
+    this.pixelCheckpointCapture = pixelCheckpointCapture !== false;
     // Track R cycle-11 dirty lane (run 29654429335): the pre-seeded dirty account is FRESHLY
     // registered (session slots seeded, NO system save ever persisted) and then logged in visibly.
     // So its system/session reads legitimately 404 exactly like a register-mode fresh account, even
@@ -1632,8 +1640,13 @@ export class EvidenceSink {
     // capture-everything diagnostic behavior.
     const surfaceKey = step.replaceAll(/\d+/gu, "N");
     this.fullCheckpointSurfaces ??= new Set();
-    const captureFull =
-      full === true || process.env.COOP_UI_CHECKPOINT_MODE === "full" || !this.fullCheckpointSurfaces.has(surfaceKey);
+    // Per-profile pixel skip (replay-pacing harness trim): a DOM-only seat (pixelCheckpointCapture
+    // false = the depth lane) NEVER takes the per-checkpoint PNG unless a caller FORCES it (failure
+    // path `full: true`) or COOP_UI_CHECKPOINT_MODE=full is set. Surface/mystery lanes
+    // (pixelCheckpointCapture true) keep the existing first-occurrence pixel oracle unchanged.
+    const forcedFull = full === true || process.env.COOP_UI_CHECKPOINT_MODE === "full";
+    const firstOccurrence = !this.fullCheckpointSurfaces.has(surfaceKey);
+    const captureFull = forcedFull || (this.pixelCheckpointCapture && firstOccurrence);
     if (captureFull) {
       this.fullCheckpointSurfaces.add(surfaceKey);
       // WebGL canvases in a background Chromium page can capture as mostly black/partial tiles even
@@ -1652,6 +1665,10 @@ export class EvidenceSink {
       if (capture.attempt > 1) {
         this.record("checkpoint-pixel-recovered", { name: step, cleanAttempt: capture.attempt });
       }
+    } else if (!this.pixelCheckpointCapture && firstOccurrence) {
+      // DOM-only by profile: record the deliberate skip distinctly (not a missing/failed capture). The
+      // DOM/cookie/canvas isolation proof below still runs for THIS checkpoint - only the PNG is dropped.
+      this.record("checkpoint-pixel-skipped", { name: step, surfaceKey, reason: "profile-dom-only" });
     } else {
       this.record("checkpoint-semantic", { name: step, surfaceKey });
     }

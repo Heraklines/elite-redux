@@ -920,6 +920,9 @@ export class PublicUiClient {
       // registered with only SESSION slots seeded and NO system save, so its system/session reads
       // 404 like a fresh account. expectReclaim is that lane's unique signal (run 29654429335).
       config.expectReclaim === true,
+      // Per-profile checkpoint pixel-integrity capture (replay-pacing harness trim): the depth lane
+      // passes false -> DOM-only checkpoints; surface + mystery keep the PNG pixel oracle.
+      config.checkpointPixelCapture,
     );
   }
 

@@ -171,6 +171,18 @@ export function loadConfig() {
     artifactDir: resolve(ROOT, "dev-logs", "coop-public-ui", runId),
     headless: boolean("COOP_UI_HEADLESS", true),
     chromeTrace: boolean("COOP_UI_CHROME_TRACE", true),
+    // Per-profile checkpoint capture cost (replay-pacing harness trim): the DEPTH lane
+    // (animations-skipped-depth) runs animations OFF and does NOT need the expensive per-checkpoint
+    // pixel-integrity PNG (a headed SwiftShader screenshot readback + in-page pixel decode measured
+    // ~9s/checkpoint). It captures DOM-only instead (the DOM/cookie/canvas isolation proof still runs
+    // every checkpoint - no evidence-class weakening). The SURFACE + mystery lanes KEEP the pixel oracle.
+    // Config-driven: default is derived from COOP_UI_RENDER_PROFILE, overridable via
+    // COOP_UI_CHECKPOINT_PIXEL (a forced `full:true` failure capture and COOP_UI_CHECKPOINT_MODE=full
+    // still take the PNG regardless, so triage evidence is never lost).
+    checkpointPixelCapture: boolean(
+      "COOP_UI_CHECKPOINT_PIXEL",
+      (process.env.COOP_UI_RENDER_PROFILE?.trim() || "animations-on-surface") !== "animations-skipped-depth",
+    ),
     // Dirty-account fidelity lane: the accounts were pre-seeded full (4 solo saves + 1 divergent
     // remnant in slot 4), so the launch MUST visibly reclaim - and reclaim the remnant FIRST.
     expectReclaim: boolean("COOP_UI_EXPECT_RECLAIM", false),
