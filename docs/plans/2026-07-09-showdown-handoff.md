@@ -206,7 +206,11 @@ All shipped to staging, each with a red-proofed harness test:
   in-game (loading-scene), berry/type-booster/vitamin item families (generator-keyed),
   replay-loader tooling polish, i18n keys for showdown strings, host clock visual
   countdown.
-- **Ops flag:** `er-saves` D1 was at ~402MB / 500MB free-tier hard cap. Watch it.
+- **Ops (capacity RESOLVED 2026-07-22):** the account is on the Workers Paid plan,
+  so D1 is 10GB/db and the free-tier 500MB/db cap is gone. `er-saves` measured at
+  **431 MB (~4% of 10GB)**, `er-saves-staging` at **68.7 MB**. Saves are now stored
+  UNCOMPRESSED (the gzip that existed only to fit the 500MB cap was removed; reads
+  stay back-compat with legacy `GZ1:` blobs). No capacity watch needed.
   Telemetry writes to a separate `er-telemetry` DB.
 - **Maintainer-gated:** production worker deploys + prod site deploy
   (`deploy-prod.yml`) — NEVER without explicit permission. The `/devtest/*` save-API

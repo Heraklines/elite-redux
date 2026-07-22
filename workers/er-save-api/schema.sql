@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS system_saves (
 );
 
 -- Up to 5 session (run) saves per user, one per slot. Composite PK keeps an
--- UPSERT per (user, slot) cheap — one D1 write per sync, which is what keeps
--- us inside the free-tier write budget.
+-- UPSERT per (user, slot) cheap — one D1 write per sync, comfortably inside the
+-- paid-plan write budget.
 CREATE TABLE IF NOT EXISTS session_saves (
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   slot       INTEGER NOT NULL,

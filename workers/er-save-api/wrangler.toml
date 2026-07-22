@@ -1,6 +1,7 @@
 # Cloudflare Worker — Elite Redux cloud-save + account API (#229).
-# Deploy: see README.md. Free tier (Workers + D1) hosts ~1,000-1,500 daily-active
-# players with debounced sync; the $5/mo Workers Paid plan scales to ~40,000.
+# Deploy: see README.md. On the Workers Paid plan: D1 is 10GB/db (er-saves ~4% used;
+# the old free-tier 500MB/db cap no longer applies) and the write/read budgets scale
+# to tens of thousands of daily-active players with debounced sync.
 
 name = "er-save-api"
 main = "src/index.ts"

@@ -18,17 +18,17 @@
 // Auth model: username + password. Passwords are stored only as a PBKDF2-SHA256
 // hash. A successful login returns a stateless HMAC-signed token; the client
 // sends it back verbatim in the `Authorization` header. Verifying the token is a
-// pure HMAC check (no DB read), which keeps us well inside the free-tier request
-// budget.
+// pure HMAC check (no DB read), which keeps request cost low.
 //
 // Storage: D1 (SQLite). One row per account in `users`, one `system_saves` row
 // per user, up to five `session_saves` rows per user. Saves are opaque blobs
 // (the client encrypts them); the server never inspects them.
 //
-// Capacity (free tier): the binding limit is D1 writes (100k/day) and Worker
-// requests (100k/day). With the client's debounced sync (~40 writes/day/active
-// player) that comfortably hosts ~1,000-1,500 daily-active players; the $5/mo
-// Workers Paid plan (50M writes/mo) scales to ~40,000.
+// Capacity: the account is on the Workers Paid plan. D1 storage is 10GB per
+// database (er-saves sits at ~4% of that; the old free-tier 500MB/db cap no longer
+// applies), and the paid write/read budgets (50M D1 writes/mo, ~25B rows read/mo)
+// are far above the client's debounced sync (~40 writes/day/active player) — good
+// for tens of thousands of daily-active players.
 // =============================================================================
 
 import { BiomeId } from "../../../src/enums/biome-id";
