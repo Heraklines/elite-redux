@@ -156,7 +156,13 @@ export function projectionPlanOfCoopV2InteractionEntry(
           operationId: control.operationId,
           sourceWave: controlOpen.projection.sourceWave,
         }
-      : null;
+      : controlOpen.projection.kind === "biome"
+        ? {
+            kind: "biome",
+            operationId: control.operationId,
+            sourceWave: controlOpen.projection.sourceWave,
+          }
+        : null;
   }
   const material = decodeCoopV2InteractionEnvelope(entry);
   if (material == null) {
