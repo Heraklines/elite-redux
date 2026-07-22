@@ -262,38 +262,38 @@ export class TitlePhase extends Phase {
                 return true;
               },
             });
-            // Showdown (C1): a 1v1 PvP "versus" match. Entry flow is INVERTED (addendum 2026-07-11):
-            // clicking Showdown opens the TEAM PRESET MENU first (build/select a team BEFORE pairing),
-            // not the lobby. "Enter lobby with this team" then routes into the SAME lobby/pairing flow
-            // carrying the chosen preset, so both clients arrive pre-built and pairing leads
-            // near-immediately to the wager (no 10-minute in-lobby pick wait).
-            options.push({
-              semanticId: "showdown",
-              label: GameMode.getModeName(GameModes.SHOWDOWN),
-              handler: () => {
-                if (!areShowdownModesEnabled()) {
-                  showTemporarilyDisabled();
-                  return true;
-                }
-                this.openShowdownTeamMenu(setModeAndEnd);
-                return true;
-              },
-            });
-            // Showdown TOURNAMENTS (beside the Team Menu path): async single-elim brackets. Opens the
-            // tournament LIST (worker-backed); register / view bracket / play a bracket match from there.
-            options.push({
-              semanticId: "showdown-tournaments",
-              label: "Showdown Tournaments",
-              handler: () => {
-                if (!areShowdownModesEnabled()) {
-                  showTemporarilyDisabled();
-                  return true;
-                }
-                this.openShowdownTournaments(setModeAndEnd);
-                return true;
-              },
-            });
           }
+          // Showdown (C1): a 1v1 PvP "versus" match. Entry flow is INVERTED (addendum 2026-07-11):
+          // clicking Showdown opens the TEAM PRESET MENU first (build/select a team BEFORE pairing),
+          // not the lobby. "Enter lobby with this team" then routes into the SAME lobby/pairing flow
+          // carrying the chosen preset, so both clients arrive pre-built and pairing leads
+          // near-immediately to the wager (no 10-minute in-lobby pick wait).
+          options.push({
+            semanticId: "showdown",
+            label: GameMode.getModeName(GameModes.SHOWDOWN),
+            handler: () => {
+              if (!areShowdownModesEnabled()) {
+                showTemporarilyDisabled();
+                return true;
+              }
+              this.openShowdownTeamMenu(setModeAndEnd);
+              return true;
+            },
+          });
+          // Showdown TOURNAMENTS (beside the Team Menu path): async single-elim brackets. Opens the
+          // tournament LIST (worker-backed); register / view bracket / play a bracket match from there.
+          options.push({
+            semanticId: "showdown-tournaments",
+            label: "Showdown Tournaments",
+            handler: () => {
+              if (!areShowdownModesEnabled()) {
+                showTemporarilyDisabled();
+                return true;
+              }
+              this.openShowdownTournaments(setModeAndEnd);
+              return true;
+            },
+          });
           if (gameData.isUnlocked(Unlockables.ENDLESS_MODE)) {
             options.push({
               label: GameMode.getModeName(GameModes.CHALLENGE),

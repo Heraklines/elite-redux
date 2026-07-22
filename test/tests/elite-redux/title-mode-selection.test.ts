@@ -60,13 +60,15 @@ describe("title mode selection", () => {
     expect(labels).not.toContain(GameMode.getModeName(GameModes.ENDLESS));
     expect(labels).not.toContain(GameMode.getModeName(GameModes.SPLICED_ENDLESS));
     expect(modeOptions).not.toContainEqual(expect.objectContaining({ semanticId: "daily-run" }));
+    expect(modeOptions).toContainEqual(expect.objectContaining({ semanticId: "showdown" }));
+    expect(modeOptions).toContainEqual(expect.objectContaining({ semanticId: "showdown-tournaments" }));
+    expect(modeOptions).not.toContainEqual(expect.objectContaining({ semanticId: "co-op" }));
   });
 
   it.each([
     "showdown",
     "showdown-tournaments",
   ])("keeps %s visible but returns disabled clicks to the modes", async semanticId => {
-    vi.stubEnv("VITE_DEV_TOOLS", "1");
     let titleOptions: OptionSelectItem[] = [];
     let modeOptions: OptionSelectItem[] = [];
     const showText = vi.fn((_message, _delay, callback?: () => void) => callback?.());
