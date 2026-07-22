@@ -2369,6 +2369,27 @@ export function coopRetainedGameOverSupersedesReplay(wave: number, turn: number)
 }
 
 /**
+ * WIN sibling of {@linkcode coopRetainedGameOverSupersedesReplay}. A retained WON WAVE_ADVANCE means
+ * the host resolved `settledTurn` as the wave's LAST turn and advanced; it will never send a resolution
+ * for any turn STRICTLY AFTER it. A renderer that (queue-empty) manufactured a replay for such a phantom
+ * next turn would `awaitTurn` that impossible resolution forever, never reaching the next wave's command
+ * frontier to install its rendezvous waiter - the won-by-faint wave-2 launch deadlock (public journey
+ * run 29895009334: guest stuck in `CoopReplayTurnPhase turn=2` of a wave won on turn 1, host's cmd:2:1
+ * arrival BUFFERs with "no waiter yet" and aborts). Unlike gameOver, the WINNING turn itself DOES carry
+ * a resolution (the advance), so this supersedes only `turn > settledTurn` - the winning turn's own
+ * replay finalizes normally. The WIN unpark (coopActiveReplayTurnAborter) is the one-shot external
+ * equivalent; this self-sourced pump check cannot be missed by that abort's install-timing race.
+ */
+export function coopRetainedWinSupersedesReplay(wave: number, turn: number): boolean {
+  return (
+    pendingWaveAdvance?.wave === wave
+    && pendingWaveAdvance.outcome !== "gameOver"
+    && pendingWaveAdvance.settledTurn != null
+    && turn > pendingWaveAdvance.settledTurn
+  );
+}
+
+/**
  * Install the engine-owned safe-boundary wake used when a retained WAVE_ADVANCE arrives after finalization.
  * The factory seam avoids a runtime -> replay-phase import cycle while still appending a real Phase instance.
  */
