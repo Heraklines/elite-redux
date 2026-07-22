@@ -515,33 +515,25 @@ export class CoopAbilityReplayPhase extends PokemonPhase {
     if (isCoopDebug()) {
       coopLog("replay", `present ability bi=${this.battlerIndex} name=${this.abilityName} passive=${this.passive}`);
     }
-    let ended = false;
-    let watchdog: Phaser.Time.TimerEvent | undefined;
-    const finish = () => {
-      if (ended) {
-        return;
-      }
-      ended = true;
-      watchdog?.remove();
-      this.end();
-    };
     try {
       const pokemon = fieldMon(this.battlerIndex);
-      if (pokemon == null || this.abilityName.length === 0) {
-        this.end();
-        return;
+      if (pokemon != null && this.abilityName.length > 0) {
+        // FIRE-AND-FORGET: kick the ability-bar tween and END IMMEDIATELY. The bar's tween runs on the
+        // render layer independent of this phase, so the banner still animates; NOT awaiting its promise
+        // keeps the guest's replay pump deterministic - a headless / muted client whose showAbility promise
+        // never resolves must never stall the turn (the #633 replay layer is best-effort cosmetic). The name
+        // is regenerated in the GUEST'S language from its own field mon; `this.player` is the swapped side.
+        void globalScene.abilityBar.showAbility(
+          getPokemonNameWithAffix(pokemon),
+          this.abilityName,
+          this.passive,
+          this.player,
+        );
       }
-      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
-      // The name is regenerated in the GUEST'S language from its own field mon; only the ability NAME +
-      // passive flag ride the wire. `this.player` is the (side-swapped) presentation side - the bar sits
-      // on the correct half of the screen.
-      globalScene.abilityBar
-        .showAbility(getPokemonNameWithAffix(pokemon), this.abilityName, this.passive, this.player)
-        .then(finish);
     } catch {
-      coopWarn("replay", `present ability bi=${this.battlerIndex} threw -> finish (handled)`);
-      finish();
+      coopWarn("replay", `present ability bi=${this.battlerIndex} threw (handled)`);
     }
+    this.end();
   }
 }
 

@@ -2067,6 +2067,9 @@ export const REPLAY_DRAIN_PHASES = new Set([
   "CoopHpDrainReplayPhase",
   "CoopStatStageReplayPhase",
   "CoopStatusReplayPhase",
+  // P3 cosmetic: the guest's ability-banner replay (a host-side switch-in ability). Cosmetic + self-ending
+  // like the other replay phases, so the pump must drive it or it strands ahead of the finalize tree.
+  "CoopAbilityReplayPhase",
   "CoopFaintReplayPhase",
   "CoopGuestFaintSwitchPhase",
   // The renderer gate replaces a forbidden local resolution phase (commonly MovePhase) with this
