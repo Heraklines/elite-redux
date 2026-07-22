@@ -4,6 +4,11 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { SubstituteTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
 import { markChivalryRedirect, pokemonCarriesChivalry } from "#data/elite-redux/abilities/chivalry";
+import {
+  applyGraveMarkerOnEntry,
+  applyPendingSkyhookEntryBoost,
+  markGenuineVoluntaryEntry,
+} from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { getSaltCircleEscapeSource } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
@@ -325,6 +330,15 @@ export class SwitchSummonPhase extends SummonPhase {
       pokemon.resetTurnData();
       pokemon.turnData.switchedInThisTurn = true;
     }
+
+    if (
+      this.switchType === SwitchType.SWITCH
+      && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON
+    ) {
+      markGenuineVoluntaryEntry(pokemon);
+    }
+    applyPendingSkyhookEntryBoost(pokemon);
+    applyGraveMarkerOnEntry(pokemon);
 
     this.lastPokemon.resetSummonData();
 

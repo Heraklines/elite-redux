@@ -31,10 +31,17 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import {
+  applyFoulHarvestDrainBonus,
+  applyVaporBodyAccuracy,
+  notifySignatureHazardRemoval,
+  // biome-ignore lint/suspicious/noImportCycles: Signature hooks run at the universal accuracy/heal/hazard chokepoints.
+} from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { erRendezvousPowerMultiplier } from "#data/elite-redux/abilities/rendezvous";
 import { hasCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { getMoveHpCostFraction } from "#data/elite-redux/ability-upgrades/attrs/move-hp-cost";
 import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
+// biome-ignore lint/suspicious/noImportCycles: cycle closes through the batch-2 signature battle-chokepoint hooks (move -> mechanics -> scripted-move-util -> move).
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
@@ -1184,6 +1191,7 @@ export abstract class Move implements Localizable {
       move: this,
       accuracy: moveAccuracy,
     });
+    applyVaporBodyAccuracy(user, target, this, moveAccuracy);
 
     if (moveAccuracy.value === -1) {
       return moveAccuracy.value;
@@ -3208,7 +3216,7 @@ export class HitHealAttr extends MoveEffectAttr {
       return false;
     }
 
-    let healAmount = this.getHealAmount(user, target);
+    let healAmount = applyFoulHarvestDrainBonus(user, move, this.getHealAmount(user, target));
     const gunmanId = ER_ID_MAP.abilities[780] as AbilityId | undefined;
     if (
       gunmanId !== undefined
@@ -8167,7 +8175,10 @@ export class RemoveArenaTagsAttr extends MoveEffectAttr {
       return false;
     }
 
-    globalScene.arena.removeTagsOnSide(this.tagTypes, this.getTagSideFunc(user, target));
+    const side = this.getTagSideFunc(user, target);
+    const before = globalScene.arena.findTagsOnSide(tag => this.tagTypes.includes(tag.tagType), side).length;
+    globalScene.arena.removeTagsOnSide(this.tagTypes, side);
+    notifySignatureHazardRemoval(user, before);
 
     return true;
   }

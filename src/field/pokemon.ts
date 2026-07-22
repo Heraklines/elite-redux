@@ -51,7 +51,6 @@ import {
   SemiInvulnerableTag,
   SubstituteTag,
   TarShotTag,
-  TrappedTag,
   TypeImmuneTag,
 } from "#data/battler-tags";
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
@@ -68,6 +67,17 @@ import {
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
+import {
+  clearDeadeyeMarksFor,
+  hasEffectiveMoveTrap,
+  isSignatureFollowup,
+  recordLivingChromeTransformation,
+  shouldDeadeyeUseLowerDefense,
+  signatureFollowupIgnoresDefenseBoosts,
+  tryCrackedVessel,
+  tryEclipseWing,
+  // biome-ignore lint/suspicious/noImportCycles: Battle hooks must run at the universal damage/typing chokepoints.
+} from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { erOmniformRevertOnLeaveField } from "#data/elite-redux/abilities/omniform";
 import {
   erOmniformOriginalIdentity,
@@ -3597,7 +3607,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     return (
       trapped.value
-      || !!this.getTag(TrappedTag) // ER FEAR traps the bearer (ROM). Ghost's early-return above still lets // Ghosts switch out, matching vanilla trap rules.
+      || hasEffectiveMoveTrap(this) // Ring General (5987) trap + vanilla TrappedTag; Shed Shell / Ghost still switch.
       || !!this.getTag(BattlerTagType.ER_FEAR) // ER Overloaded (5927): the holder cannot voluntarily switch while at 4 stacks.
       || erOverloadedSelfLocked(this)
       || !!globalScene.arena.getTagOnSide(ArenaTagType.FAIRY_LOCK, side)
@@ -5151,6 +5161,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         statHolder: defensiveStatHolder,
       });
     }
+    // Batch-2 Deadeye Draw (5984): a cannon move against the marked foe uses that
+    // foe's WEAKER defensive stat (source-side, mark-gated).
+    if (!ignoreSourceAbility && shouldDeadeyeUseLowerDefense(source, this, move)) {
+      defensiveStatHolder.value =
+        this.getEffectiveStat(Stat.DEF) <= this.getEffectiveStat(Stat.SPDEF) ? Stat.DEF : Stat.SPDEF;
+    }
     // Elite Redux: Exploit Weakness (284) retargets the defender's WEAKER
     // defensive stat when the defender is statused. Source-side; gated on the
     // cheap status check so the hot path only fires the dispatch vs statused foes.
@@ -5170,7 +5186,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         ignoreAbility,
         ignoreSourceAbility,
         ignoreSourceAllyAbility,
-        isCritical,
+        isCritical || signatureFollowupIgnoresDefenseBoosts(move),
         simulated,
       ),
     );
@@ -5844,6 +5860,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns Whether the move will critically hit the defender.
    */
   getCriticalHitResult(source: Pokemon, move: Move): boolean {
+    if (isSignatureFollowup(move)) {
+      return false;
+    }
     if (move.hasAttr("FixedDamageAttr")) {
       // fixed damage moves (Dragon Rage, etc.) will never crit
       return false;
@@ -6048,6 +6067,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // carries the ability — and the attacker is Drenched. Direct hits only
     // (indirect chip does not trigger it), and only when this hit is lethal.
     if (!isIndirectDamage && source && damage > 0 && this.hp - damage <= 0 && erTryLifePreserver(this, source)) {
+      damage = this.hp - 1;
+    }
+    if (!isIndirectDamage && source && damage > 0 && this.hp - damage <= 0 && tryEclipseWing(this, source)) {
+      damage = this.hp - 1;
+    }
+    if (!isIndirectDamage && source && damage > 0 && this.hp - damage <= 0 && tryCrackedVessel(this, source)) {
       damage = this.hp - 1;
     }
     damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase);
@@ -6628,6 +6653,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns A Promise that resolves once the form change has completed.
    */
   public async changeForm(formChange: SpeciesFormChange): Promise<void> {
+    recordLivingChromeTransformation(this, this.getTypes(), this.formIndex);
     this.formIndex = Math.max(
       this.species.forms.findIndex(f => f.formKey === formChange.formKey),
       0,
@@ -7952,6 +7978,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param hideInfo - Indicates if this should also play the animation to hide the Pokemon's info container
    */
   leaveField(clearEffects = true, hideInfo = true, destroy = false) {
+    clearDeadeyeMarksFor(this);
     this.resetSprite();
     this.resetTurnData();
     for (const p of inSpeedOrder(ArenaTagSide.BOTH)) {
@@ -8713,6 +8740,7 @@ export class PlayerPokemon extends Pokemon {
 
   changeForm(formChange: SpeciesFormChange): Promise<void> {
     return new Promise(resolve => {
+      recordLivingChromeTransformation(this, this.getTypes(), this.formIndex);
       this.formIndex = Math.max(
         this.species.forms.findIndex(f => f.formKey === formChange.formKey),
         0,
