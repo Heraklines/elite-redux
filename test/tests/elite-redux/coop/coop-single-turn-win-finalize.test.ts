@@ -33,6 +33,7 @@ import {
   type CoopRuntime,
   clearCoopRuntime,
   coopHasPendingWaveAdvance,
+  coopRetainedWinSupersedesReplay,
   getCoopController,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -115,7 +116,7 @@ function makeStubScene(): BattleScene {
  * host->guest `waveResolved("win")` over its peer transport so the runtime's wired handler
  * sets the module's pendingWaveAdvance for THIS wave. Returns once the loopback has drained.
  */
-async function startGuestWithPendingWin(): Promise<CoopRuntime> {
+async function startGuestWithPendingWin(settledTurn = 1): Promise<CoopRuntime> {
   const { runtime, peer } = startGuestRuntime();
   const controller = getCoopController();
   if (controller == null) {
@@ -132,7 +133,7 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
     version: 1,
     tick: 0,
     wave: WAVE,
-    turn: 1,
+    turn: settledTurn,
     playerParty: [],
     enemyParty: [],
     field: [],
@@ -153,7 +154,7 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
       sessionEpoch: epoch,
       revision: 1,
       wave: WAVE,
-      turn: 1,
+      turn: settledTurn,
       logicalPhase: "WAVE_VICTORY",
       pendingOperation: {
         id: makeCoopOperationId(epoch, 0, WAVE, "WAVE_ADVANCE"),
@@ -279,5 +280,72 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
     expect(rec.turn).toBe(2);
     expect(rec.queueTurnEndCalls).toBe(0);
     expect(rec.pushedPhases).not.toContain("VictoryPhase");
+  });
+});
+
+// Dirty-lane won-by-faint DEFERRED-settlement supersession (campaign run 29912693840, SHA ad1744d4b,
+// wave-2-turn-3 mutual-wait deadlock). When a faint on the wave's winning turn co-wins the wave, the host's
+// automatic victory boundary settles on `sourceTurn + 1` (the host's currentBattle.turn already advanced past
+// the faint before the seal - see stageAutomaticVictory..., `currentTurn === identity.turn + 1`). The guest's
+// pure-renderer replay for that same wave is still parked at the SOURCE (faint) turn = `settledTurn - 1`, one
+// BELOW the propagated settledTurn. Pre-fix the WIN supersession fence used `turn >= settledTurn`, so the
+// parked source-turn replay (2) tested `2 >= 3` = false and never dissolved into the queued wave-advance
+// boundary; it awaited a turn-2 resolution that a WON wave never sends. The guest thus never reached its
+// wave-2 reward SelectModifierPhase (it is the reward OWNER there), the host WATCHER network-waited on the
+// guest's pick, and BOTH engines mutual-waited -> the STALL WATCHDOG fired repeatedly on each seat and the
+// campaign harness timed out on the phantom wave-2-turn-3 command. The duo harness cannot reproduce this: it
+// CONSUMES the wave-advance on the guest (nulling pendingWaveAdvance), the exact fidelity gap documented in
+// coop-duo-won-wave-replacement.test.ts. This engine-free fixture pins pendingWaveAdvance.settledTurn through
+// the REAL wired receive path, so the fence is asserted directly with no browser dispatch.
+describe("dirty-lane won-by-faint: deferred WIN settlement supersedes the source-turn replay", () => {
+  let prevGlobalScene: BattleScene;
+
+  afterEach(() => {
+    clearCoopRuntime();
+    guestPeer?.close();
+    guestPeer = null;
+    initGlobalScene(prevGlobalScene);
+  });
+
+  it("a deferred WON settlement supersedes the stranded source-turn replay ONLY once the settled cursor is adopted", async () => {
+    prevGlobalScene = globalScene;
+    // Model the guest AFTER the replacement adopted the settled cursor: currentBattle.turn = 3 (= settledTurn),
+    // while the parked replay is still CoopReplayTurnPhase turn=2 = settledTurn-1 (the faint's own winning turn).
+    rec.turn = 3;
+    initGlobalScene(makeStubScene());
+    // settledTurn = 3 models the deferred automatic-victory boundary (faint on the winning turn 2 bumped the
+    // host cursor to 3 before the seal).
+    await startGuestWithPendingWin(3);
+    expect(coopHasPendingWaveAdvance(), "a WON advance is pending for the wave").toBe(true);
+
+    // The stranded SOURCE-turn replay (2), now behind the adopted cursor, must be recognized as superseded so
+    // it ends into the queued wave-advance boundary instead of awaiting a turn-2 resolution a won wave never sends.
+    expect(
+      coopRetainedWinSupersedesReplay(WAVE, 2),
+      "the source-turn (settledTurn-1) replay is superseded once the settled cursor is adopted",
+    ).toBe(true);
+    // The settled turn itself and any speculative phantom beyond it remain superseded (unchanged behavior).
+    expect(coopRetainedWinSupersedesReplay(WAVE, 3), "the settled turn is superseded").toBe(true);
+    expect(coopRetainedWinSupersedesReplay(WAVE, 4), "a phantom turn beyond the settled turn is superseded").toBe(true);
+    // Never supersede a genuinely earlier, still-unresolved turn (two below the settled turn) or another wave.
+    expect(
+      coopRetainedWinSupersedesReplay(WAVE, 1),
+      "a turn two below the settled turn is NOT dissolved (only the exact source turn)",
+    ).toBe(false);
+    expect(coopRetainedWinSupersedesReplay(WAVE + 1, 2), "a different wave's replay is never dissolved").toBe(false);
+  });
+
+  it("a NORMAL single-turn win (cursor still AT the winning turn) does NOT dissolve the winning-turn replay early", async () => {
+    prevGlobalScene = globalScene;
+    // No faint deferral: the guest cursor is still at the winning turn. The host invariant still settles on
+    // winningTurn + 1 (= 3), but the winning-turn replay (2) must FINALIZE (mirror EXP), never dissolve early.
+    rec.turn = 2;
+    initGlobalScene(makeStubScene());
+    await startGuestWithPendingWin(3);
+    expect(coopHasPendingWaveAdvance(), "a WON advance is pending for the wave").toBe(true);
+    expect(
+      coopRetainedWinSupersedesReplay(WAVE, 2),
+      "the winning-turn replay is NOT superseded while its cursor has not adopted the settled turn",
+    ).toBe(false);
   });
 });
