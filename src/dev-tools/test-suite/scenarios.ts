@@ -1578,6 +1578,75 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Ability - Steelworker: a Steel-type holder takes HALF from Ghost and Dark
+  // ===========================================================================
+  {
+    label: "Ability: Steelworker resists Ghost/Dark",
+    description:
+      "ER 2.65 Steelworker: 'Normal moves become Steel. Steel resists Ghost and Dark.'\n"
+      + "On a Steel-type holder (Mega Duraludon is Steel/Dragon) it takes HALF damage from\n"
+      + "Ghost and Dark moves. This is an ABILITY resist (like Thick Fat), NOT a type-chart\n"
+      + "change - so there is intentionally NO 'not very effective' text; the damage is just\n"
+      + "quietly halved (verified: Ghost/Dark deal exactly 0.5x). Steelworker is forced as the\n"
+      + "active ability here (on a real run it is one of Mega Duraludon's innates).\n"
+      + "DO: let Gengar hit Mega Duraludon with Shadow Ball (Ghost) and Dark Pulse (Dark);\n"
+      + "note how little HP each takes.\n"
+      + "EXPECT: both hits are roughly HALF what a non-Steel-holder would take. No 'not very\n"
+      + "effective' message appears (correct - it is an ability resist, not a chart resist).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145, // past the BST-cap ladder so Gengar isn't devolved
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.STEELWORKER, // Mega Duraludon's innate, forced active
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GENGAR, // SpAtk 130, real Ghost/Dark damage
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SHADOW_BALL, MoveId.DARK_PULSE],
+      });
+      return [
+        makeStarter(SpeciesId.DURALUDON, {
+          formIndex: formIndexByKey(SpeciesId.DURALUDON, "mega"), // Steel/Dragon
+          moveset: [MoveId.PROTECT, MoveId.STEEL_BEAM, MoveId.DRAGON_PULSE, MoveId.FLASH_CANNON],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability - Draco Morale casts Dragon Cheer on entry (crit boost, not a stat)
+  // ===========================================================================
+  {
+    label: "Ability: Draco Morale Dragon Cheer on entry",
+    description:
+      "ER 2.65 Draco Morale: 'Uses Dragon Cheer on switch-in.' Dragon Cheer raises the\n"
+      + "holder's CRIT STAGE (a Dragon type gets +2). A crit-stage boost is NOT one of the 7\n"
+      + "stat stages, so it correctly shows NO stat-arrow on the battle screen - exactly like\n"
+      + "Focus Energy. Its feedback is the 'is getting pumped!' message plus the ability\n"
+      + "banner. Draco Morale is forced active here (it is one of Mega Duraludon's abilities).\n"
+      + "DO: start the battle and watch the switch-in.\n"
+      + "EXPECT: the 'Draco Morale' ability BANNER flashes AND the 'Duraludon is getting\n"
+      + "pumped!' message shows. There is NO +Atk/+SpAtk arrow (correct - crit stage is not a\n"
+      + "stat stage). The higher crit chance is visible on the summary's crit ratio.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5374), // Draco Morale
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, survives so you can keep testing
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.DURALUDON, {
+          formIndex: formIndexByKey(SpeciesId.DURALUDON, "mega"),
+          moveset: [MoveId.DRAGON_PULSE, MoveId.FLASH_CANNON, MoveId.STEEL_BEAM, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Ability - Radiance is immune to Dark moves, incl. moves made Dark at runtime
   // ===========================================================================
   {
