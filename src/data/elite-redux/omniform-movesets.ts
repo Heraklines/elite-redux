@@ -228,12 +228,11 @@ export function omniformUnionLevelMoves(mon: Pokemon): LevelMoves {
 
 /**
  * Every move `form` can legally learn through ANY source: its OWN level-up
- * learnset (full), its OWN TM/tutor table (ER merges tutor moves into
- * `speciesTmMoves`), and its root's egg moves. This is the per-evolution legality
- * predicate the teach path enforces — and, because each evolution species carries
- * its own TM list, it structurally resolves the open "Partner Eevee TM list"
- * question: per-evolution TM compatibility just IS each partner evolution
- * species' own TM table.
+ * learnset (full), the shared Omniform-family TM/tutor table (ER merges tutor
+ * moves into `speciesTmMoves`), and its root's egg moves. This is the
+ * per-evolution legality predicate the teach path enforces. Partner Eevee's family
+ * TM tables are initialized to the same union, so a TM accepted by one partner
+ * evolution is accepted by all nine family members.
  */
 export function omniformFormLearnableMoves(form: OmniformTarget): Set<MoveId> {
   const speciesForm = resolveForm(form);

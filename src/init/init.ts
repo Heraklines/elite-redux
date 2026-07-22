@@ -423,8 +423,9 @@ function initPhaseErTiersFinal(): void {
 
   // Newcomer SPECIES TM compatibility (a SEPARATE data path from the level-up
   // learnsets: tmSpecies / speciesTmMoves). Evolution species inherit the pre-evo's
-  // full TM set + type additions; Regitube gets a hand Water set; partner
-  // eeveelutions inherit their base's. Without this the 70000+ band had no TMs.
+  // full TM set + type additions; Regitube gets a hand Water set; Partner Eevee
+  // and every partner eeveelution receive the union of the family's TM pools.
+  // Without this the 70000+ band had no TMs.
   // MUST run LAST — after initEliteReduxPokedexOverrides finalizes the base/pre-evo
   // TM lists (which the editor TM overrides can extend), so the inherited superset
   // is complete.

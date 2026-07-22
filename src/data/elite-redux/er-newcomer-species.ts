@@ -1139,7 +1139,8 @@ const REGITUBE_TM_MOVES: readonly MoveId[] = [
  * Derivation (per the newcomer patch): each evolution species inherits its
  * PRE-EVO's full TM compatibility, plus the type-appropriate coverage moves from
  * its `learnsetAdditions` that are themselves TMs. Regitube (no pre-evo) gets the
- * hand set above. Partner eeveelutions inherit their base eeveelution's TM set.
+ * hand set above. Partner Eevee and all eight partner eeveelutions share the
+ * union of the whole partner family's TM/tutor compatibility.
  * Mega/primal FORMS need no wiring here: `Pokemon.generateCompatibleTms` matches
  * a plain `tmSpecies` entry against `this.species.speciesId` regardless of form,
  * so a form inherits its base species' TM compatibility automatically.
@@ -1153,33 +1154,66 @@ const REGITUBE_TM_MOVES: readonly MoveId[] = [
  * only touch species listed in er-tm-learnsets.json, which the 70000+ band is not.
  */
 export function applyErNewcomerSpeciesTmCompatibility(): number {
-  const tmByMove = tmSpecies as Record<number, (SpeciesId | [SpeciesId | string, string])[]>;
+  type FormTmSpeciesEntry = [SpeciesId, ...string[]];
+  const tmByMove = tmSpecies as Record<number, (SpeciesId | FormTmSpeciesEntry)[]>;
   const movesBySpecies = speciesTmMoves as Record<number, (MoveId | [unknown, MoveId])[]>;
   let wired = 0;
 
-  /** Plain (non-form-gated) TM move ids the species carries. */
+  /** Plain (non-form-gated) TM/tutor move ids the species carries. */
   const plainTms = (speciesId: number): MoveId[] =>
+    (movesBySpecies[speciesId] ?? []).filter(e => !Array.isArray(e)) as MoveId[];
+
+  /** Complete species TM/tutor table, flattening any form-gated entries. */
+  const allTms = (speciesId: number): MoveId[] =>
     (movesBySpecies[speciesId] ?? []).map(e => (Array.isArray(e) ? e[1] : e));
 
-  const addTm = (speciesId: number, moveId: number): void => {
+  /** Effective TM/tutor pool for one concrete form (plain + form-gated entries). */
+  const formTms = (speciesId: number, formKey: string): MoveId[] =>
+    (movesBySpecies[speciesId] ?? [])
+      .filter(e => !Array.isArray(e) || e[0] === formKey)
+      .map(e => (Array.isArray(e) ? e[1] : e));
+
+  const addTm = (speciesId: number, moveId: number, formKey?: string): void => {
     // Always record in the per-species table (drives Pokedex / AI / Showdown).
     const moves = (movesBySpecies[speciesId] ??= []);
-    if (!moves.some(e => (Array.isArray(e) ? e[1] : e) === moveId)) {
-      moves.push(moveId as MoveId);
+    const hasPlainEntry = moves.some(e => !Array.isArray(e) && e === moveId);
+    const hasFormEntry = moves.some(e => Array.isArray(e) && e[0] === formKey && e[1] === moveId);
+    if (!hasPlainEntry && !hasFormEntry) {
+      moves.push(formKey === undefined ? moveId as MoveId : [formKey, moveId as MoveId]);
     }
     // Mirror into the TM-item table only when this move is an actual TM (some
     // ER-added per-species entries aren't in the vanilla TM map; those stay
     // display-only, exactly as they are for the base species).
     const list = tmByMove[moveId];
-    if (list && !list.some(p => (Array.isArray(p) ? p[0] === speciesId : p === speciesId))) {
-      list.push(speciesId as SpeciesId);
+    if (!list) {
+      return;
+    }
+    const hasPlainTm = list.some(p => !Array.isArray(p) && p === speciesId);
+    if (formKey === undefined) {
+      if (!hasPlainTm) {
+        list.push(speciesId as SpeciesId);
+      }
+      return;
+    }
+    if (hasPlainTm) {
+      return;
+    }
+    const formEntry = list.find(
+      (p): p is FormTmSpeciesEntry => Array.isArray(p) && p[0] === speciesId,
+    );
+    if (formEntry) {
+      if (!formEntry.slice(1).includes(formKey)) {
+        formEntry.push(formKey);
+      }
+    } else {
+      list.push([speciesId as SpeciesId, formKey]);
     }
   };
 
   // Inherit the base/pre-evo's full TM set from the authoritative per-species
   // table (a superset of the TM-item map — includes ER-added display TMs).
   const inheritFrom = (speciesId: number, baseId: number): void => {
-    for (const moveId of plainTms(baseId)) {
+    for (const moveId of allTms(baseId)) {
       addTm(speciesId, moveId);
     }
   };
@@ -1197,8 +1231,29 @@ export function applyErNewcomerSpeciesTmCompatibility(): number {
   }
   wired++;
 
+  // Seed each partner evolution from its corresponding vanilla evolution before
+  // taking the family snapshot, so editor/base TM additions enter the union.
   for (const def of ER_PARTNER_FAMILY) {
     inheritFrom(def.partnerId, def.base);
+  }
+
+  // Partner Eevee is a form of EEVEE; its eight transformation targets are
+  // standalone custom species. Apply one snapshot of all nine effective pools to
+  // every member. The head uses form-gated entries so ordinary Eevee is unchanged.
+  const partnerTmUnion = new Set<MoveId>(formTms(PARTNER_HEAD_SPECIES, PARTNER_HEAD_FORM_KEY));
+  for (const def of ER_PARTNER_FAMILY) {
+    for (const moveId of plainTms(def.partnerId)) {
+      partnerTmUnion.add(moveId);
+    }
+  }
+  for (const moveId of partnerTmUnion) {
+    addTm(PARTNER_HEAD_SPECIES, moveId, PARTNER_HEAD_FORM_KEY);
+  }
+  wired++;
+  for (const def of ER_PARTNER_FAMILY) {
+    for (const moveId of partnerTmUnion) {
+      addTm(def.partnerId, moveId);
+    }
     wired++;
   }
 

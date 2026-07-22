@@ -16,8 +16,8 @@
 // For each, as far as is cheaply checkable headlessly:
 //   (a) mini icon resolves via the shared UI accessor (save/party/starter/egg all
 //       funnel through Pokemon.getIconAtlasKey/getIconId -> species/form override);
-//   (b) TM learnset non-empty and a superset of the pre-evo/base (forms inherit
-//       the base species' TM compatibility via generateCompatibleTms);
+//   (b) TM learnset non-empty and a superset of the pre-evo/base; the entire
+//       Partner Eevee family shares one unioned TM pool;
 //   (c) level-up learnset non-empty;
 //   (e) sprite atlas keys resolve front + back + shiny without throwing;
 //   (f) cry key resolves without crashing (silent fallback is OK);
@@ -42,7 +42,8 @@ import {
   ER_REGITUBE_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
 import { AbilityId } from "#enums/ability-id";
-import type { SpeciesId } from "#enums/species-id";
+import type { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
@@ -50,10 +51,16 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
-/** Plain (non-form-gated) move ids a species carries in the TM table. */
+/** Plain (non-form-gated) move ids a species carries in the TM/tutor table. */
 function plainTmMoves(speciesId: number): number[] {
   const entries = (speciesTmMoves as Record<number, (number | [unknown, number])[]>)[speciesId] ?? [];
-  return entries.map(e => (Array.isArray(e) ? e[1] : e));
+  return entries.filter(e => !Array.isArray(e)) as number[];
+}
+
+/** Effective TM/tutor ids for one concrete form. */
+function formTmMoves(speciesId: number, formKey: string): number[] {
+  const entries = (speciesTmMoves as Record<number, (number | [unknown, number])[]>)[speciesId] ?? [];
+  return entries.filter(e => !Array.isArray(e) || e[0] === formKey).map(e => (Array.isArray(e) ? e[1] : e));
 }
 
 describe.skipIf(!RUN)("ER newcomer patch — full integration sweep", () => {
@@ -121,8 +128,16 @@ describe.skipIf(!RUN)("ER newcomer patch — full integration sweep", () => {
     expect(speciesEggTiers[ER_REGITUBE_SPECIES_ID], "Regitube IS egg-obtainable").toBeDefined();
   });
 
-  // --- Partner eeveelutions (8) --------------------------------------------
-  it("partner eeveelutions: icon resolves, TM (base superset), level-up, no starter/egg leak", () => {
+  // --- Partner Eevee family (head + 8 transformations) ---------------------
+  it("Partner Eevee and all partner eeveelutions share one TM pool without leaking into ordinary Eevee", () => {
+    const eevee = getPokemonSpecies(SpeciesId.EEVEE);
+    const partnerFormIndex = eevee.forms.findIndex(form => form.formKey === "partner");
+    expect(partnerFormIndex).toBeGreaterThanOrEqual(0);
+
+    const partnerHeadTms = new Set(formTmMoves(SpeciesId.EEVEE, "partner"));
+    const ordinaryEeveeTms = new Set(formTmMoves(SpeciesId.EEVEE, ""));
+    expect(partnerHeadTms.size).toBeGreaterThan(ordinaryEeveeTms.size);
+
     for (const def of ER_PARTNER_FAMILY) {
       const sp = getPokemonSpecies(def.partnerId as SpeciesId);
       expect(sp, `partner ${def.partnerId} registered`).toBeDefined();
@@ -131,11 +146,12 @@ describe.skipIf(!RUN)("ER newcomer patch — full integration sweep", () => {
       expect(() => sp.getIconAtlasKey(0, false, 0)).not.toThrow();
       expect(sp.getIconAtlasKey(0, false, 0)).toBeTruthy();
 
-      // (b) TM: non-empty and a superset of the base eeveelution's TM set.
-      const tm = plainTmMoves(def.partnerId);
-      expect(tm.length, `partner ${def.partnerId} has TMs`).toBeGreaterThan(0);
+      // (b) TM: every partner has the exact same family union, including the
+      // corresponding vanilla eeveelution's complete pool.
+      const tm = new Set(plainTmMoves(def.partnerId));
+      expect(tm, `partner ${def.partnerId} has the family TM union`).toEqual(partnerHeadTms);
       for (const baseTm of plainTmMoves(def.base)) {
-        expect(tm, `partner ${def.partnerId} inherits base TM ${baseTm}`).toContain(baseTm);
+        expect(tm.has(baseTm), `partner ${def.partnerId} inherits base TM ${baseTm}`).toBe(true);
       }
 
       // (c) level-up non-empty.
@@ -145,6 +161,26 @@ describe.skipIf(!RUN)("ER newcomer patch — full integration sweep", () => {
       expect(speciesStarterCosts[def.partnerId as SpeciesId]).toBeUndefined();
       expect(speciesEggTiers[def.partnerId]).toBeUndefined();
     }
+
+    // Exercise the live TM-item path as well as the transposed data table. The
+    // partner head and a partner evolution receive identical actual-TM lists;
+    // ordinary Eevee does not receive the partner-only additions.
+    const ordinary = game.scene.addPlayerPokemon(eevee, 50, undefined, 0);
+    const partnerHead = game.scene.addPlayerPokemon(eevee, 50, undefined, partnerFormIndex);
+    const partnerEvolutionSpecies = getPokemonSpecies(ER_PARTNER_FAMILY[0].partnerId as SpeciesId);
+    const partnerEvolution = game.scene.addPlayerPokemon(partnerEvolutionSpecies, 50, undefined, 0);
+    ordinary.generateCompatibleTms();
+    partnerHead.generateCompatibleTms();
+    partnerEvolution.generateCompatibleTms();
+
+    expect(new Set(partnerHead.compatibleTms)).toEqual(new Set(partnerEvolution.compatibleTms));
+    const partnerOnlyTm = partnerHead.compatibleTms.find(moveId => !ordinary.compatibleTms.includes(moveId));
+    expect(partnerOnlyTm, "the union contains an actual TM ordinary Eevee cannot learn").toBeDefined();
+    expect(ordinary.compatibleTms).not.toContain(partnerOnlyTm as MoveId);
+
+    ordinary.destroy();
+    partnerHead.destroy();
+    partnerEvolution.destroy();
   });
 
   // --- Mega / primal newcomer FORMS (12) -----------------------------------
