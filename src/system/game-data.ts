@@ -85,6 +85,7 @@ import {
   renamePreset,
   type ShowdownTeamPreset,
   sanitizeShowdownTeamPresets,
+  setPresetFolder,
   upsertPreset,
 } from "#data/elite-redux/showdown/showdown-team-preset";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -656,7 +657,12 @@ export class GameData {
    * otherwise a new preset is appended (capped). Returns the 0-based index of the saved preset.
    */
   public saveShowdownTeamPreset(name: string, mons: ShowdownMonManifest[], index?: number): number {
-    const preset = makeShowdownTeamPreset(name, mons);
+    // Editing in place preserves the existing preset's folder (P3); a fresh preset is ungrouped.
+    const existingFolder =
+      index !== undefined && index >= 0 && index < this.showdownTeamPresets.length
+        ? this.showdownTeamPresets[index]?.folder
+        : undefined;
+    const preset = makeShowdownTeamPreset(name, mons, existingFolder);
     this.showdownTeamPresets = upsertPreset(this.showdownTeamPresets, preset, index);
     const savedIndex =
       index !== undefined && index >= 0 && index < this.showdownTeamPresets.length
@@ -675,6 +681,12 @@ export class GameData {
   /** Delete the preset at `index`, persisting the change. */
   public deleteShowdownTeamPreset(index: number): void {
     this.showdownTeamPresets = deletePreset(this.showdownTeamPresets, index);
+    void this.saveSystem();
+  }
+
+  /** Assign (or clear, with an empty name) the FOLDER of the preset at `index` (P3), persisting it. */
+  public setShowdownTeamPresetFolder(index: number, folder: string): void {
+    this.showdownTeamPresets = setPresetFolder(this.showdownTeamPresets, index, folder);
     void this.saveSystem();
   }
 

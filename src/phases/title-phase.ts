@@ -536,6 +536,7 @@ export class TitlePhase extends Phase {
         },
         onRename: (idx, name) => gameData.renameShowdownTeamPreset(idx, name),
         onDelete: idx => gameData.deleteShowdownTeamPreset(idx),
+        onSetFolder: (idx, folder) => gameData.setShowdownTeamPresetFolder(idx, folder),
         onCreate: () => this.openShowdownPresetBuild(undefined, showMenu),
         onEdit: idx => this.openShowdownPresetBuild(idx, showMenu),
         // EXPORT (V): copy the hovered team's PS text to the clipboard (the handler shows the banner).

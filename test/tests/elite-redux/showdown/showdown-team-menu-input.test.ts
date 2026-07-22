@@ -254,3 +254,117 @@ describe.runIf(RUN)("showdown team menu - cursor model + routing", () => {
     expect(internals.config.presets.length).toBeGreaterThan(0);
   });
 });
+
+// =============================================================================
+// FOLDERS (P3): the cursor lands on collapsible folder headers, ACTION toggles collapse,
+// and G assigns a folder (regrouping the team live). Byte-identical for a folderless account.
+// =============================================================================
+describe.runIf(RUN)("showdown team menu - folders (P3)", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(async () => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    game = new GameManager(phaserGame);
+    await game.importData("./test/utils/saves/everything.prsv");
+    stubPrompts(game);
+  });
+  afterAll(() => phaserGame?.destroy(true));
+
+  type FolderInternals = MenuInternals & {
+    collapsedFolders: Set<string>;
+    renameMode: "name" | "folder";
+    rowsList(): { kind: string; folder?: string; presetIndex?: number }[];
+  };
+
+  const viewMon = () => ({
+    speciesId: 3,
+    formIndex: 0,
+    level: 100,
+    shiny: false,
+    variant: 0,
+    abilityIndex: 0,
+    ivs: [31, 31, 31, 31, 31, 31],
+    moveset: [33],
+    item: "LEFTOVERS",
+    rootSpeciesId: 3,
+    erBlackShiny: false,
+    baseCost: 4,
+  });
+  const view = (name: string, folder?: string) => ({
+    name,
+    mons: [viewMon()],
+    invalidReason: null,
+    ...(folder ? { folder } : {}),
+  });
+
+  /** A menu with one ungrouped team + two in the "Rain" folder. */
+  function buildFolderMenu(overrides: Partial<ShowdownTeamMenuConfig> = {}) {
+    const registered = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU] as ShowdownTeamMenuUiHandler;
+    const handler = new (registered.constructor as new () => ShowdownTeamMenuUiHandler)();
+    handler.setup();
+    handler.setTextInput(new FakeTextInput());
+    const config = buildShowdownTeamMenuDemoConfig({
+      presets: [view("Loose"), view("Rain A", "Rain"), view("Rain B", "Rain")],
+      ...overrides,
+    });
+    handler.show([config]);
+    return { handler, internals: handler as unknown as FolderInternals, config };
+  }
+
+  it("groups into rows: ungrouped preset, folder header, its two presets, then create", () => {
+    const { internals } = buildFolderMenu();
+    expect(internals.rowsList().map(r => r.kind)).toEqual(["preset", "header", "preset", "preset", "create"]);
+  });
+
+  it("UP/DOWN can land the cursor on the folder HEADER row", () => {
+    const { internals } = buildFolderMenu();
+    internals.processInput(Button.DOWN); // row 1 = the Rain header
+    expect(internals.rowsList()[internals.teamCursor].kind).toBe("header");
+    expect(internals.hoveredMon()).toBeNull(); // a header has no preview mon
+  });
+
+  it("CONFIRM on a folder header toggles collapse (hiding its presets), keeping the cursor on the header", () => {
+    const { internals } = buildFolderMenu();
+    internals.processInput(Button.DOWN); // onto the Rain header
+    internals.processInput(Button.ACTION); // collapse
+    expect(internals.collapsedFolders.has("Rain")).toBe(true);
+    expect(internals.rowsList().map(r => r.kind)).toEqual(["preset", "header", "create"]);
+    expect(internals.rowsList()[internals.teamCursor].kind, "cursor stays on the header").toBe("header");
+    internals.processInput(Button.ACTION); // expand again
+    expect(internals.collapsedFolders.has("Rain")).toBe(false);
+  });
+
+  it("G assigns a folder to the hovered team, regrouping it live (onSetFolder called with the index)", () => {
+    const onSetFolder = vi.fn();
+    const input = new FakeTextInput();
+    const registered = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU] as ShowdownTeamMenuUiHandler;
+    const handler = new (registered.constructor as new () => ShowdownTeamMenuUiHandler)();
+    handler.setup();
+    handler.setTextInput(input);
+    const config = buildShowdownTeamMenuDemoConfig({ presets: [view("Loose"), view("Rain A", "Rain")], onSetFolder });
+    handler.show([config]);
+    const internals = handler as unknown as FolderInternals;
+
+    // Cursor on the ungrouped "Loose" (row 0). G opens the folder overlay in FOLDER mode.
+    internals.processInput(Button.CYCLE_GENDER);
+    expect(internals.renaming).toBe(true);
+    expect(internals.renameMode).toBe("folder");
+
+    // Type a folder name into the DOM capture, then Enter commits.
+    input.value = "Rain";
+    (input as unknown as { onChange?: (v: string) => void }).onChange?.("Rain");
+    // drive the change handler the handler registered
+    internals.renameBuffer = "Rain";
+    internals.processInput(Button.ACTION);
+
+    expect(onSetFolder).toHaveBeenCalledWith(0, "Rain");
+    expect(config.presets[0].folder).toBe("Rain"); // local view updated
+    expect(internals.renaming).toBe(false);
+  });
+
+  it("a folderless account is byte-identical: rows are just presets + create (no headers)", () => {
+    const { internals } = buildFolderMenu({ presets: [view("A"), view("B")] });
+    expect(internals.rowsList().map(r => r.kind)).toEqual(["preset", "preset", "create"]);
+  });
+});
