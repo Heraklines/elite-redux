@@ -64,8 +64,14 @@ export const SHOWDOWN_READY_RENDEZVOUS_POINT = "showdown-ready";
  * (tournament doubles/triples field width). Any pre-doubles client is a stale bundle for a
  * doubles/triples tournament, so the proto guard forces a hard-refresh rather than a one-sided
  * singles-vs-doubles desync; a plain singles match still refuses to pair with a stale build.
+ *
+ * Bumped to 3 (2026-07-22): the enemy-command relay (`showdownCommand`/`showdownCommandRequest`) now
+ * carries an optional per-slot `fieldIndex` so a doubles/triples match relays one command PER active
+ * slot. A proto-2 client can negotiate a doubles format but cannot key its relay by slot (both slots
+ * would collide on turn alone), so it is a stale bundle for a multi-slot match; the proto guard forces
+ * a hard-refresh. A singles match stays byte-identical on the wire (fieldIndex omitted == 0).
  */
-export const SHOWDOWN_PROTO_VERSION = 2;
+export const SHOWDOWN_PROTO_VERSION = 3;
 
 /** The field-width format a versus match is played at. Absent on the wire == "singles". */
 export type ShowdownBattleFormat = "singles" | "doubles" | "triples";
@@ -298,7 +304,7 @@ export class ShowdownSession {
     // own team is voided immediately and never sent: it should never happen for an honest
     // client, and short-circuiting here makes the mutual-void deterministic (a client never
     // resolves on the opponent's legal team while shipping an illegal one of its own).
-    const ownViolations = validateShowdownTeam(ownManifest, PERMISSIVE_UNLOCKS, this.isMegaForm);
+    const ownViolations = validateShowdownTeam(ownManifest, PERMISSIVE_UNLOCKS, this.isMegaForm, this.ownFieldWidth());
     if (ownViolations.length > 0) {
       this.voidAndReject("illegalTeam", `own team failed validation: ${ownViolations[0].message}`, ownViolations);
       return promise;
@@ -352,6 +358,11 @@ export class ShowdownSession {
     }
     this.settle = null;
     this.done = true;
+  }
+
+  /** The on-field width our negotiated format is played at (singles 1, doubles 2, triples 3). */
+  private ownFieldWidth(): number {
+    return this.ownBattleFormat === "triples" ? 3 : this.ownBattleFormat === "doubles" ? 2 : 1;
   }
 
   /**
@@ -437,8 +448,14 @@ export class ShowdownSession {
     const opponentManifest = this.opponentManifest;
     const opponentTeamHash = this.opponentTeamHash;
 
-    // Gate 1: the opponent's manifest must pass the FORMAT rules (permissive collection).
-    const violations = validateShowdownTeam(opponentManifest, PERMISSIVE_UNLOCKS, this.isMegaForm);
+    // Gate 1: the opponent's manifest must pass the FORMAT rules (permissive collection), including
+    // the negotiated field-width team-size rule (a doubles/triples match needs >= 2/3 mons).
+    const violations = validateShowdownTeam(
+      opponentManifest,
+      PERMISSIVE_UNLOCKS,
+      this.isMegaForm,
+      this.ownFieldWidth(),
+    );
     if (violations.length > 0) {
       this.voidAndReject("illegalTeam", `opponent team failed validation: ${violations[0].message}`, violations);
       return;

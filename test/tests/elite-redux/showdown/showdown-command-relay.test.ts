@@ -104,4 +104,93 @@ describe("Showdown enemy-command relay (C4)", () => {
     hostRelay.dispose();
     expect(await second).toBeNull();
   });
+
+  // ---------------------------------------------------------------------------
+  // MULTI-SLOT keying (doubles/triples). RED-PROOF: revert the (turn,fieldIndex)
+  // key to turn-only and these fail - the two per-turn awaits collide / the wrong
+  // slot's command satisfies an await. A 1v1 keeps fieldIndex 0 (the tests above).
+  // ---------------------------------------------------------------------------
+
+  it("doubles: two per-turn awaits (slot 0 + slot 1) each resolve to THEIR OWN slot's command", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostRelay = new ShowdownCommandRelay(host, { schedule: noTimer });
+    const peerRelay = new ShowdownCommandRelay(guest, { schedule: noTimer });
+
+    // The peer answers each slot with a distinct move so a cross-slot leak is observable.
+    peerRelay.onCommandRequest(({ fieldIndex }) => ({ command: 0, cursor: fieldIndex, moveId: 100 + fieldIndex }));
+
+    // The host awaits BOTH enemy slots on the SAME turn (the doubles case that turn-only keying breaks).
+    const slot0 = hostRelay.requestEnemyCommand(4, 0);
+    const slot1 = hostRelay.requestEnemyCommand(4, 1);
+    await flush();
+    await flush();
+
+    expect(await slot0, "slot 0 await resolves to slot 0's command").toMatchObject({ cursor: 0, moveId: 100 });
+    expect(await slot1, "slot 1 await resolves to slot 1's command").toMatchObject({ cursor: 1, moveId: 101 });
+
+    hostRelay.dispose();
+    peerRelay.dispose();
+  });
+
+  it("doubles: unprompted per-slot sendCommand routes each command to its matching slot await", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostRelay = new ShowdownCommandRelay(host, { schedule: noTimer });
+    const peerRelay = new ShowdownCommandRelay(guest, { schedule: noTimer });
+
+    // Peer ships both own-slot commands UNPROMPTED (the live guest path: it picks then ships each slot).
+    peerRelay.sendCommand(7, { command: 0, cursor: 0, moveId: 200 }, 0);
+    peerRelay.sendCommand(7, { command: 0, cursor: 1, moveId: 201 }, 1);
+    await flush();
+
+    // The host consumes each slot's buffered command - slot 1's command must NOT satisfy slot 0's request.
+    expect(await hostRelay.requestEnemyCommand(7, 1), "slot 1 request gets slot 1's move").toMatchObject({
+      moveId: 201,
+    });
+    expect(await hostRelay.requestEnemyCommand(7, 0), "slot 0 request gets slot 0's move").toMatchObject({
+      moveId: 200,
+    });
+
+    hostRelay.dispose();
+    peerRelay.dispose();
+  });
+
+  it("triples: three per-turn slots stay distinct (no collision/stall across 0/1/2)", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostRelay = new ShowdownCommandRelay(host, { schedule: noTimer });
+    const peerRelay = new ShowdownCommandRelay(guest, { schedule: noTimer });
+
+    peerRelay.onCommandRequest(({ fieldIndex }) => ({ command: 0, cursor: fieldIndex, moveId: 300 + fieldIndex }));
+
+    const awaits = [0, 1, 2].map(fi => hostRelay.requestEnemyCommand(9, fi));
+    await flush();
+    await flush();
+    const results = await Promise.all(awaits);
+
+    expect(results.map(r => r?.moveId)).toEqual([300, 301, 302]);
+
+    hostRelay.dispose();
+    peerRelay.dispose();
+  });
+
+  it("a request that races ahead of the responder is buffered PER SLOT and answered on install", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostRelay = new ShowdownCommandRelay(host, { schedule: noTimer });
+    const peerRelay = new ShowdownCommandRelay(guest, { schedule: noTimer });
+
+    // Host asks for BOTH slots before the peer installs its responder (#812-mirror, per slot).
+    const slot0 = hostRelay.requestEnemyCommand(2, 0);
+    const slot1 = hostRelay.requestEnemyCommand(2, 1);
+    await flush();
+
+    // Now the peer installs its responder - both buffered requests must drain to their own slot.
+    peerRelay.onCommandRequest(({ fieldIndex }) => ({ command: 0, cursor: fieldIndex, moveId: 400 + fieldIndex }));
+    await flush();
+    await flush();
+
+    expect(await slot0).toMatchObject({ moveId: 400 });
+    expect(await slot1).toMatchObject({ moveId: 401 });
+
+    hostRelay.dispose();
+    peerRelay.dispose();
+  });
 });

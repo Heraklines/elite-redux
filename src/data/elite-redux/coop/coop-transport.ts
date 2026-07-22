@@ -1879,10 +1879,20 @@ export type CoopMessage =
     }
   /** Either player -> peer: "my team is finalized"; `teamHash` fingerprints it for the anti-cheat cross-check. Connection-scoped. */
   | { t: "showdownReady"; teamHash: string }
-  /** Host -> peer: the peer's command is needed for this `turn` (the 1v1 analogue of `commandRequest`). Connection-scoped. */
-  | { t: "showdownCommandRequest"; turn: number }
-  /** A player's battle command for their own mon this `turn` (reply to `showdownCommandRequest`). Connection-scoped. */
-  | { t: "showdownCommand"; turn: number; command: SerializedCommand }
+  /**
+   * Host -> peer: the peer's command is needed for this `turn` (the 1v1 analogue of `commandRequest`).
+   * `fieldIndex` is the peer's OWN field slot the command is needed for (doubles/triples relay TWO/THREE
+   * commands per turn, one per slot). OMIT-WHEN-ABSENT: only sent for slot >= 1, and read as 0 when
+   * absent, so a singles match is byte-identical on the wire and an old client is unaffected. Connection-scoped.
+   */
+  | { t: "showdownCommandRequest"; turn: number; fieldIndex?: number }
+  /**
+   * A player's battle command for their own mon this `turn` (reply to `showdownCommandRequest`). `fieldIndex`
+   * is the OWN field slot the command belongs to (same omit-when-absent discipline as the request). A
+   * doubles/triples guest ships one `showdownCommand` per own slot; the host resolves each into its matching
+   * enemy slot. Connection-scoped.
+   */
+  | { t: "showdownCommand"; turn: number; command: SerializedCommand; fieldIndex?: number }
   /** Host -> peer: the match resolved. `winner` is the winning role; `reason` is how it ended. `matchId` is null for a friendly (no escrow). */
   | { t: "showdownResult"; matchId: string | null; winner: CoopRole; reason: "victory" | "forfeit" | "timeout" }
   /** Either player -> peer: the match is VOIDED (no winner) - `reason` is why. `matchId` is null for a friendly (no escrow). */
@@ -2055,9 +2065,9 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "showdownReady":
       return `hash=${msg.teamHash}`;
     case "showdownCommandRequest":
-      return `turn=${msg.turn}`;
+      return `turn=${msg.turn} slot=${msg.fieldIndex ?? 0}`;
     case "showdownCommand":
-      return `turn=${msg.turn} cmd=${msg.command.command} cursor=${msg.command.cursor}`;
+      return `turn=${msg.turn} slot=${msg.fieldIndex ?? 0} cmd=${msg.command.command} cursor=${msg.command.cursor}`;
     case "showdownResult":
       return `match=${msg.matchId} winner=${msg.winner} reason=${msg.reason}`;
     case "showdownVoid":
