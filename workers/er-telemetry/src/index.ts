@@ -17,6 +17,7 @@
 // the denormalized columns + summary for direct SQL.
 // =============================================================================
 
+import { aggregateSpeciesSuggestions, parseSuggestionRow, type SuggestionRow } from "./species-suggestions";
 import { TELEMETRY_MAX_BODY, type TelemetryRow, validateTelemetryPayload } from "./telemetry-ingest";
 import { handleTournamentRoute } from "./tournament-routes";
 
@@ -239,6 +240,42 @@ async function handleBattle(request: Request, auth: TokenPayload, env: Env, cors
   return json({ ok: true }, 200, cors);
 }
 
+/**
+ * PUBLIC read: the "popular sets" aggregate for one line ROOT. Reads only `winner` + `summary_json`
+ * (no usernames) over recent WINNING rows and returns the top form+item combos. Unauthenticated (the
+ * data is non-PII aggregate counts) + degrades to an empty result on any storage error so the client's
+ * "Suggested sets" surface stays silent when telemetry is sparse/unavailable. Query: ?species=<rootId>&limit=N.
+ */
+async function handleSuggestions(url: URL, env: Env, cors: Record<string, string>): Promise<Response> {
+  const speciesParam = url.searchParams.get("species");
+  const species = speciesParam == null ? Number.NaN : Number.parseInt(speciesParam, 10);
+  if (!Number.isInteger(species) || species <= 0) {
+    return json({ error: "species (a positive integer) is required" }, 400, cors);
+  }
+  const limitRaw = Number.parseInt(url.searchParams.get("limit") ?? "6", 10);
+  const limit = Number.isInteger(limitRaw) ? Math.max(1, Math.min(12, limitRaw)) : 6;
+
+  let rows: SuggestionRow[] = [];
+  try {
+    await ensureTables(env);
+    // Survey the most recent decisive wins; the aggregation filters to the requested species.
+    const result = await env.DB.prepare(
+      "SELECT winner, summary_json FROM showdown_battles WHERE winner IS NOT NULL ORDER BY created_at DESC LIMIT 800",
+    ).all<{ winner: string; summary_json: string }>();
+    for (const row of result.results ?? []) {
+      const parsed = parseSuggestionRow(row.winner, row.summary_json);
+      if (parsed != null) {
+        rows.push(parsed);
+      }
+    }
+  } catch (err) {
+    // Sparse / missing table / storage hiccup -> honest empty result (no console spam client-side).
+    console.warn("telemetry suggestions read failed, returning empty:", err);
+    rows = [];
+  }
+  return json(aggregateSpeciesSuggestions(rows, species, limit), 200, cors);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -253,6 +290,10 @@ export default {
           return text("Unauthorized.", 401, cors);
         }
         return await handleBattle(request, auth, env, cors);
+      }
+      // PUBLIC read: popular-sets suggestions for one species (aggregate, no PII).
+      if (url.pathname === "/telemetry/species-suggestions" && request.method === "GET") {
+        return await handleSuggestions(url, env, cors);
       }
       // Showdown Tournament (P1): /tournament/* routes. Auth is verified here (the
       // route module gates admin actions by the token uid allowlist + attestation).

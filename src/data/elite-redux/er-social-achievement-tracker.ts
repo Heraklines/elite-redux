@@ -47,6 +47,7 @@ import {
   onRankedTierFirstReached,
 } from "#data/elite-redux/showdown/showdown-rank-events";
 import { SHOWDOWN_RANK_TIER } from "#data/elite-redux/showdown/showdown-rank-types";
+import { recordShowdownWinningTeam } from "#data/elite-redux/showdown/showdown-winning-sets";
 import type { Pokemon } from "#field/pokemon";
 import { type Achv, achvs } from "#system/achv";
 
@@ -335,6 +336,12 @@ export function erRecordShowdownResult(won: boolean, voided: boolean): void {
 
     const ownManifest = getShowdownOwnManifest();
     const ownSpeciesIds = ownManifest ? ownManifest.map(mon => mon.speciesId) : [];
+    // P3 (Suggested sets): on a decisive WIN, remember this client's own full sets locally per species
+    // so the Set Editor can suggest genuine sets the player actually won with (telemetry only stores
+    // fingerprints, so the full-set half of the flagship is the player's own recorded wins). Guarded.
+    if (won && !voided) {
+      recordShowdownWinningTeam(ownManifest);
+    }
     const ctx: ShowdownResultContext = {
       won,
       voided,
