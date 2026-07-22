@@ -2825,14 +2825,11 @@ export class DuoPublicUiRig {
         if (!allowFaint) {
           throw new Error("Unexpected faint picker in the wave-1 journey; use faint-replacement with prepared saves");
         }
-        await this.driveReplacement(outcome.client, outcomeCursors);
-        // The cursors which found the faint necessarily precede the just-consumed PARTY
-        // picker and the original turn's command surfaces. Starting the next owner wait
-        // there can re-admit those stale commands. A real player resumes from the completed
-        // replacement boundary, so establish the same fresh public evidence floor.
-        commandCursors = Object.fromEntries(
-          Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
-        );
+        const faintTail = await this.driveFaintReplacementTail(outcome, outcomeCursors);
+        if (faintTail.route === "won") {
+          return turn;
+        }
+        commandCursors = faintTail.floor;
         continue;
       }
       if (outcome.kind === "command") {
@@ -2844,6 +2841,82 @@ export class DuoPublicUiRig {
       commandCursors = outcomeCursors;
     }
     throw new Error(`Battle did not reach rewards in ${this.config.maxTurns} public command rounds`);
+  }
+
+  /**
+   * Drive the faint-replacement tail and report which wave route followed it. Route-aware: a faint
+   * that CO-WON the wave (both engines commit WAVE_ADVANCE -> SelectModifierPhase) has NO turn-2
+   * command - its milestone chain is the reward rendezvous then the wave-2 command frontier, which
+   * this drives in full (shared reward surface + leaveRewardsAndReachWave2's confirm rendezvous,
+   * retained reward terminal and both-seat wave-2 command). A continuing wave instead opens the
+   * next sequential command frontier; the caller drives it from the returned floor. Never a generic
+   * timeout relaxation - each route asserts its OWN complete chain.
+   */
+  async driveFaintReplacementTail(outcome, outcomeCursors) {
+    // Anchor the post-faint public evidence floor at faint DETECTION, before the replacement drive:
+    // it sits above the just-consumed turn-1 commands (the faint follows turn-1 resolution) yet
+    // below the picker's later re-renders. Capturing the floor via evidence.cursor() AFTER
+    // driveReplacement (the prior approach) RACES the one-shot surface the wave opens next and LOSES
+    // on a throttled runner - the slow replacement-applied checkpoint completes only after the next
+    // CommandPhase (continuing wave) or SelectModifierPhase (won wave) has already logged its
+    // surface, so the floor lands ABOVE it and the next round hangs forever (run 29880978259 turn-2;
+    // run 29878928360 won-wave).
+    const faintFloor = Object.fromEntries(
+      Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
+    );
+    await this.driveReplacement(outcome.client, outcomeCursors);
+    // Advance the floor just past each seat's last consumed replacement picker (deterministic,
+    // checkpoint-timing independent) so the next round neither re-drives the committed picker nor
+    // skips the fresh one-shot surface immediately above it.
+    const floor = Object.fromEntries(
+      Object.values(this.clients).map(client => {
+        const lastPicker = client.evidence.findLastSemanticSurface(faintFloor[client.label], "party:replacement");
+        return [client.label, lastPicker == null ? faintFloor[client.label] : lastPicker.index + 1];
+      }),
+    );
+    const route = await this.classifyPostReplacementRoute(floor);
+    if (route === "won") {
+      await this.assertSharedSurface("reward", floor, `wave-${this.activeBattleWave}-won-faint-reward`, {
+        expectedWave: this.activeBattleWave,
+      });
+      await this.leaveRewardsAndReachWave2();
+      return { route, floor };
+    }
+    return { route, floor };
+  }
+
+  /**
+   * Classify the wave route AFTER a faint replacement has been applied: "won" when the faint
+   * co-won the wave (both engines commit WAVE_ADVANCE -> SelectModifierPhase, so the next surface
+   * is the reward shop, not a turn-2 command) or "continuing" when the wave opens the next
+   * sequential command frontier. The two are mutually exclusive in the product: a won wave never
+   * opens an actionable owned CommandPhase surface (the guest parks its CommandPhase and advances
+   * straight to the reward shop), and a continuing wave never reaches SelectModifierPhase this
+   * turn. `cursors` must already sit above the consumed replacement picker so a stale picker does
+   * not shadow the observation. Read-only: it drives nothing, so the caller's own milestone driver
+   * (assertSharedSurface / driveSequentialCommandRound) still consumes the surface with full
+   * assertions. A bounded no-signal fall-through returns "continuing" so the sequential command
+   * round surfaces the precise turn-N-first-move stall - never a new silent route.
+   */
+  async classifyPostReplacementRoute(cursors) {
+    const values = Object.values(this.clients);
+    const progressBudget = createPublicBattleProgressBudget(this, cursors, this.config.timeoutMs);
+    while (Date.now() < progressBudget.observe()) {
+      if (values.every(client => client.evidence.find(REWARD_PHASE, cursors[client.label]) != null)) {
+        for (const client of values) {
+          client.evidence.record("post-replacement-route-proof", { route: "won" });
+        }
+        return "won";
+      }
+      if (values.some(client => findOwnedCommandOrTerminal(client, cursors[client.label] ?? 0) != null)) {
+        for (const client of values) {
+          client.evidence.record("post-replacement-route-proof", { route: "continuing" });
+        }
+        return "continuing";
+      }
+      await delay(100);
+    }
+    return "continuing";
   }
 
   /**

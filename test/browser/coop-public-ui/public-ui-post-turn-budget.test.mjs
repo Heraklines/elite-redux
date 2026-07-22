@@ -73,6 +73,24 @@ function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
   };
 }
 
+function replacementPicker(ownerSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
+  return {
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "replacement",
+      surfaceId: "party:replacement",
+      ownerModel: "interaction",
+      phase: "SwitchPhase",
+      uiMode: "PARTY",
+      address,
+      localSeat: ownerSeat,
+      ownerSeat,
+      seatsWithInput: [ownerSeat],
+      ready: { handlerActive: true },
+    },
+  };
+}
+
 function commandFrontierObservation(
   localSeat,
   kind,
@@ -1015,4 +1033,108 @@ test("reward terminal proof binds host retention to guest application and materi
     ownerSeat: 0,
     expectedAddress: { epoch: 73, wave: 1, turn: 4 },
   });
+});
+
+test("post-replacement route classifies a fresh owned command frontier as a continuing wave", async () => {
+  const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
+  const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };
+  host.evidence.push(ownedCommand(0));
+  guest.evidence.push(ownedCommand(1));
+  const rig = { clients: { host, guest }, config: { timeoutMs: 1_000 } };
+
+  const route = await DuoPublicUiRig.prototype.classifyPostReplacementRoute.call(rig, { host: 0, guest: 0 });
+  assert.equal(route, "continuing");
+});
+
+test("post-replacement route classifies both-seat SelectModifierPhase as a won wave", async () => {
+  const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
+  const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };
+  host.evidence.push({ kind: "console", text: "%cStart Phase SelectModifierPhase color:green;" });
+  guest.evidence.push({ kind: "console", text: "%cStart Phase SelectModifierPhase color:green;" });
+  const rig = { clients: { host, guest }, config: { timeoutMs: 1_000 } };
+
+  const route = await DuoPublicUiRig.prototype.classifyPostReplacementRoute.call(rig, { host: 0, guest: 0 });
+  assert.equal(route, "won");
+});
+
+test("faint tail keeps a post-checkpoint one-shot command surface reachable from its floor (run 29880978259)", async () => {
+  const hostEvidence = new FakeEvidence("host");
+  const guestEvidence = new FakeEvidence("guest");
+  const host = { label: "host", publicSeat: 0, evidence: hostEvidence, checkpoint: async () => {} };
+  const guest = { label: "guest", publicSeat: 1, evidence: guestEvidence, checkpoint: async () => {} };
+  // Faint detection: the owner's replacement picker is already open on the faint seat.
+  guestEvidence.push(replacementPicker(1));
+  const rig = {
+    clients: { host, guest },
+    activeBattleWave: 1,
+    config: { timeoutMs: 1_000 },
+    classifyPostReplacementRoute: DuoPublicUiRig.prototype.classifyPostReplacementRoute,
+    async driveReplacement() {
+      // The picker re-renders during the drive, THEN the continuing wave opens the one-shot turn-2
+      // command surface on both seats, and only AFTER that does the slow replacement-applied
+      // checkpoint land - exactly the ordering that made the raw post-drive cursor skip the command
+      // surface in run 29880978259 (checkpoint event index > command surface index).
+      guestEvidence.push(replacementPicker(1));
+      guestEvidence.push(ownedCommand(1));
+      hostEvidence.push(ownedCommand(0));
+      guestEvidence.push({ kind: "checkpoint", name: "page-1-replacement-applied" });
+      hostEvidence.push({ kind: "checkpoint", name: "page-1-replacement-applied" });
+    },
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveFaintReplacementTail.call(
+    rig,
+    { kind: "faint", client: guest },
+    { host: 0, guest: 0 },
+  );
+
+  assert.equal(result.route, "continuing");
+  // The regression guard: the floor must sit above the consumed picker yet below the one-shot
+  // command surface, so both seats' turn-2 command surfaces stay reachable. A raw post-drive cursor
+  // (the prior approach) would land past them because the checkpoint events were appended last.
+  const hostCommand = hostEvidence.findLastSemanticSurface(result.floor.host, "command:command");
+  const guestCommand = guestEvidence.findLastSemanticSurface(result.floor.guest, "command:command");
+  assert.ok(hostCommand, "host turn-2 command surface must remain reachable from the post-faint floor");
+  assert.ok(guestCommand, "guest turn-2 command surface must remain reachable from the post-faint floor");
+});
+
+test("faint tail drives the won-wave reward-to-wave-2 chain when the faint co-wins the wave", async () => {
+  const hostEvidence = new FakeEvidence("host");
+  const guestEvidence = new FakeEvidence("guest");
+  const host = { label: "host", publicSeat: 0, evidence: hostEvidence, checkpoint: async () => {} };
+  const guest = { label: "guest", publicSeat: 1, evidence: guestEvidence, checkpoint: async () => {} };
+  guestEvidence.push(replacementPicker(1));
+  const calls = [];
+  const rig = {
+    clients: { host, guest },
+    host,
+    guest,
+    activeBattleWave: 1,
+    config: { timeoutMs: 1_000 },
+    classifyPostReplacementRoute: DuoPublicUiRig.prototype.classifyPostReplacementRoute,
+    async driveReplacement() {
+      guestEvidence.push(replacementPicker(1));
+      // Won wave: both engines commit WAVE_ADVANCE -> SelectModifierPhase; NO turn-2 command opens.
+      hostEvidence.push({ kind: "console", text: "%cStart Phase SelectModifierPhase color:green;" });
+      guestEvidence.push({ kind: "console", text: "%cStart Phase SelectModifierPhase color:green;" });
+    },
+    async assertSharedSurface(surface, _floor, proofName, options) {
+      calls.push(["assertSharedSurface", surface, proofName, options.expectedWave]);
+    },
+    async leaveRewardsAndReachWave2() {
+      calls.push(["leaveRewardsAndReachWave2"]);
+    },
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveFaintReplacementTail.call(
+    rig,
+    { kind: "faint", client: guest },
+    { host: 0, guest: 0 },
+  );
+
+  assert.equal(result.route, "won");
+  assert.deepEqual(calls, [
+    ["assertSharedSurface", "reward", "wave-1-won-faint-reward", 1],
+    ["leaveRewardsAndReachWave2"],
+  ]);
 });

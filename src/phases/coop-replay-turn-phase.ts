@@ -27,6 +27,7 @@ import {
   coopLocalOwnedPlayerFieldSlot,
   coopRetainedGameOverSupersedesReplay,
   coopSessionGeneration,
+  coopWaveAdvanceSignaledFor,
   getCoopBattleStreamer,
   getCoopController,
   isCoopAuthoritativeGuest,
@@ -460,8 +461,29 @@ export class CoopReplayTurnPhase extends Phase {
             // replay frame that has not yet installed the authoritative enemy party) makes `[].every()`
             // vacuously true, which would wrongly suppress the legitimate replacement command.
             const enemyParty = globalScene.getEnemyParty();
+            // `waveWon` decides whether the just-refilled own slot opens a real command (continuing
+            // wave) or holds for the authoritative wave-advance tail (won wave). The pending-advance
+            // and live-all-fainted signals both MISS one real ordering: a WIN WAVE_ADVANCE that was
+            // already ADMITTED AND CONSUMED (lastResolvedWave bumped, pendingWaveAdvance nulled)
+            // before this replacement carrier's replay re-evaluates, while `getEnemyParty()` at that
+            // instant is a pre-materialization frame that is not observably all-fainted. That combo
+            // opened a PHANTOM command for the already-won turn; as a replica it parks forever on a
+            // stale wave:turn the next-wave control never addresses -> the wave-2 command proof is
+            // never produced and the session dies "material could not be applied exactly" (won-wave
+            // faint replacement -> wave 2). `coopWaveAdvanceSignaledFor(sourceWave)` is the
+            // already-resolved marker the sibling finishTurn suppressor (coop-replay-phases.ts)
+            // already pairs with the pending check; use sourceWave (this replay's stable turn
+            // identity) so a genuine mid-wave replacement (its wave unresolved) is never suppressed.
+            // NOTE ON TEST COVERAGE: this exact ordering is real-browser-timing only. The in-process
+            // two-engine harness applies checkpoints synchronously, so a coherent won-wave frame ALWAYS
+            // has an all-fainted enemy image at eval time - the sibling all-fainted term already fires
+            // and the coop-duo-won-wave-replacement test cannot produce the incoherent pre-materialization
+            // frame that triggers THIS term. That synchronous masking is precisely why the bug reached
+            // the live journey; the public-UI faint-replacement journey (won-wave route) is the designated
+            // regression proof for this branch (RED: journey run 29884428440; GREEN after this fix).
             const waveWon =
               coopHasPendingWaveAdvance()
+              || coopWaveAdvanceSignaledFor(this.sourceWave)
               || (enemyParty.length > 0 && enemyParty.every(mon => mon == null || mon.isFainted()));
             if (
               ownSlot >= 0
