@@ -15,7 +15,8 @@ itself desync/softlock/deadlock-proof. Showdown (versus) rides the same V2 stack
 ## 1. WHERE EVERYTHING IS
 
 - **Working branch**: `ci/coop/v2-showdown-command-coordinate-20260720` on remote `heraklines`
-  (`Heraklines/elite-redux`). **Current tip: `c9c6d6d602b52bb391cb639ad36f41ccd3fee163`.**
+  (`Heraklines/elite-redux`). **Current tip: `982d7367e` (scoping fix) — this handoff doc commit sits
+  just above it.**
 - **This integration worktree**: `C:\Users\Hafida\pokerogue\.worktrees\elite-redux`. tsc reads
   ~213-216 here; agent worktrees read ~222. The invariant is DELTA-0 per change measured in the
   SAME worktree, never the absolute number. `pnpm test:node` = **515 passed** at the tip.
@@ -31,11 +32,18 @@ itself desync/softlock/deadlock-proof. Showdown (versus) rides the same V2 stack
 
 ## 2. IN FLIGHT AT HANDOFF (check these FIRST)
 
-A qualification pair was dispatched on the handoff tip `c9c6d6d60`:
-- **Gate**: run `29961408051`. **Campaign**: run `29961409516`.
+A qualification pair is running on the CURRENT tip `982d7367e`:
+- **Gate**: run `29962956889`. **Campaign**: run `29962958374`. READ THESE (not the earlier
+  29961408051/29961409516 pair — those ran on the pre-scoping tip and will show the fresh-slot
+  5-read regression that `982d7367e` fixes; ignore them).
 - `gh run view <id> -R Heraklines/elite-redux --json jobs -q '.jobs[] | "\(.conclusion) \(.name)"'`
-- This is the first roll carrying: both lockstep deadlock fixes + the fresh-run cloud-read retry.
-  Read it FIRST; it tells you which lanes the latest merges cleared and what the new frontiers are.
+- Carries: both lockstep deadlock fixes + fresh-run cloud-read retry (now SCOPED to resume discovery
+  only). Read FIRST; it names which lanes the latest merges cleared and the new frontiers.
+- NOTE (process lesson, already in the addendum): the fresh-run fix `7f4a113aa` shipped an
+  unconditional retry that broke the fresh-slot scan's 5-read gating contract; the agent caught it
+  in its own post-merge report and `982d7367e` scoped it (retryTransientReads param, default false;
+  only `getCoopResumeLobbySnapshot` opts in). coop-duo-resume 40/40. This is exactly the
+  blast-radius miss the pre-merge checklist targets — do the checklist.
 
 ## 3. WHAT IS DONE (V2 cutover + convergence — ~40 product fixes, none regressed once landed)
 
