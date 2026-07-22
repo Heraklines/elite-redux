@@ -376,6 +376,7 @@ export function validateShowdownTeam(
   team: ShowdownMonManifest[],
   unlocks: UnlockSnapshot,
   isMegaForm: (speciesId: number, formIndex: number) => boolean,
+  fieldWidth = 1,
 ): ShowdownRuleViolation[] {
   // Structural guard: the team may be untrusted deserialized JSON. A non-array
   // input is unrecoverable — reject outright rather than throwing on `.length`.
@@ -390,6 +391,17 @@ export function validateShowdownTeam(
     violations.push({
       rule: "teamSize",
       message: `Team must have ${MIN_TEAM_SIZE}-${MAX_TEAM_SIZE} Pokemon (has ${team.length}).`,
+    });
+  }
+
+  // formatSize (tournament doubles/triples): a match fields `fieldWidth` mons per side at once, so the
+  // team must carry AT LEAST that many fieldable mons (black shinies are already barred from a team by
+  // checkBlackShiny, so team.length is the fieldable count). A doubles team needs >= 2, triples >= 3;
+  // singles (width 1) is a no-op. Without this a short team boots a doubles field with an empty slot.
+  if (fieldWidth > 1 && team.length < fieldWidth) {
+    violations.push({
+      rule: "teamSize",
+      message: `A ${fieldWidth}-wide match needs at least ${fieldWidth} Pokemon (has ${team.length}).`,
     });
   }
 

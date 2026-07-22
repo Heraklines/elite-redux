@@ -539,7 +539,15 @@ export class SelectStarterPhase extends Phase {
       ownUsername: runtime.controller.localName(),
       opponentUsername: runtime.controller.partnerName ?? "",
       onCommit: (matchId: string | null, ranked) => {
-        beginShowdownBattle(manifests, result.opponentManifest, relay, result.opponentProfile, matchId, ranked);
+        beginShowdownBattle(
+          manifests,
+          result.opponentManifest,
+          relay,
+          result.opponentProfile,
+          matchId,
+          ranked,
+          result.battleFormat,
+        );
         // D5: begin the HOST-side battle telemetry record (no-op for the guest). hostTeam is the
         // host's own team; guestTeam the opponent's - correct because begin only records for the host.
         beginShowdownTelemetry({

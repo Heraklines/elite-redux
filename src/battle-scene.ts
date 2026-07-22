@@ -97,6 +97,7 @@ import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import {
+  getShowdownBattleFormat,
   getShowdownOpponentManifest,
   getShowdownOpponentProfile,
 } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -2135,6 +2136,18 @@ export class BattleScene extends SceneBase {
    * @returns Whether the battle should be a double battle.
    */
   private checkIsDouble({ double: forcedDouble, battleType, waveIndex, trainer }: NewBattleConstructedProps): boolean {
+    // Showdown VERSUS (tournament doubles/triples): the field width is the NEGOTIATED format, not any
+    // wave/challenge/override roll. A doubles or triples match forces multi (>= 2 active per side); a
+    // singles match stays single. Authoritative over everything below (both clients agreed the width in
+    // the negotiate handshake). resolveBattleFormat then upgrades a triple to the 3-wide format. Only the
+    // HOST builds a battle here (the guest boots from the host's launch snapshot); guarded on isShowdown.
+    if (this.gameMode.isShowdown) {
+      const showdownFormat = getShowdownBattleFormat();
+      if (showdownFormat != null) {
+        return showdownFormat !== "singles";
+      }
+    }
+
     // TODO: enforce using the proper override depending on whether it's a trainer or a wild battle
     const doubleBattleOverride = this.doCheckDoubleOverride(waveIndex);
     if (doubleBattleOverride != null) {
@@ -2225,6 +2238,17 @@ export class BattleScene extends SceneBase {
    * @param double - The already-resolved legacy double flag.
    */
   private resolveBattleFormat(props: NewBattleConstructedProps, double: boolean): BattleFormat {
+    // Showdown VERSUS: the negotiated field-width format is authoritative (checked FIRST so it never
+    // collides with the ER triples roll or a stale challenge flag). A doubles match -> DOUBLE_FORMAT,
+    // triples -> TRIPLE_FORMAT, singles -> SINGLE_FORMAT (via legacyFormat with double=false). Only the
+    // HOST reaches here (guest boots from the snapshot); guarded on isShowdown.
+    if (this.gameMode.isShowdown) {
+      const showdownFormat = getShowdownBattleFormat();
+      if (showdownFormat != null) {
+        return showdownFormat === "triples" ? TRIPLE_FORMAT : legacyFormat(showdownFormat === "doubles");
+      }
+    }
+
     // Triples Only / dev override: any battle that reached the force point (double === true, set in
     // checkIsDouble) becomes a triple. The single edges (finale / endless boss / ME) return
     // double === false there, so they correctly stay single - never upgraded.
