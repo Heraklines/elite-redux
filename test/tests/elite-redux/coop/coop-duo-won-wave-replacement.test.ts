@@ -41,8 +41,7 @@ import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   clearCoopRuntime,
-  coopHasPendingWaveAdvance,
-  coopWaveAdvanceSignaledFor,
+  coopWaveAdvanceEndsWave,
   enterCoopV2CommandControlBoundary,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -340,9 +339,10 @@ describe.skipIf(!RUN)(
           rig.guestScene.currentBattle.waveIndex = 1;
           rig.guestScene.currentBattle.turn = turn + 1;
           expect(
-            coopHasPendingWaveAdvance() || coopWaveAdvanceSignaledFor(1),
-            "wave 1 is ending on the guest (its WIN advance is pending or already signaled)",
+            coopWaveAdvanceEndsWave(1),
+            "wave 1 is ending on the guest (its WIN advance is pending for wave 1 or already signaled)",
           ).toBe(true);
+          expect(coopWaveAdvanceEndsWave(2), "the genuine next wave (2) is NOT ending - never dissolved").toBe(false);
           const mon = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
           return enterCoopV2CommandControlBoundary(COOP_GUEST_FIELD_INDEX, mon.id, () => undefined);
         });
