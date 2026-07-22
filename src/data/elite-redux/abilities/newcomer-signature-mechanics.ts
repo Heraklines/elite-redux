@@ -14,11 +14,13 @@ import {
   PostAttackAbAttr,
   PostDefendAbAttr,
   PostSummonAbAttr,
+  PostSummonAddArenaTagAbAttr,
   PostTurnAbAttr,
   type PreDefendModifyDamageAbAttrParams,
   ReceivedMoveDamageMultiplierAbAttr,
   SetMoveAccuracyAbAttr,
   type SetMoveAccuracyAbAttrParams,
+  WeightMultiplierAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
@@ -50,6 +52,7 @@ import type {
   PreAttackModifyPowerAbAttrParams,
 } from "#types/ability-types";
 import type { NumberHolder } from "#utils/value-holder";
+import { ER_INVERSE_ROOM_ABILITY_ID, ER_METEOR_MASS_ABILITY_ID } from "./newcomer-batch2";
 import {
   ER_ANNEAL_ABILITY_ID,
   ER_BOOT_HILL_ABILITY_ID,
@@ -347,6 +350,13 @@ export class AnnealAbAttr extends PostDefendAbAttr {
 export class VaporBodyAccuracyAbAttr extends AbAttr {
   override apply(): void {}
 }
+
+// Meteor Mass (5997) weight multiplier. FLAG (designer sign-off): no 2.65 dex text
+// exists for this slot, so 3x is a chosen number — it matches the established ER
+// Lead Coat / Chrome Coat `WeightMultiplierAbAttr(3)` precedent and maxes the holder's
+// Heavy Slam / Heat Crash weight ratio while inflating incoming Grass Knot / Low Kick.
+const METEOR_MASS_WEIGHT_MULTIPLIER = 3;
+const INVERSE_ROOM_TURNS = 5;
 
 const WEIGHT_THRESHOLDS = [10, 25, 50, 100, 200];
 function weightClass(weight: number): number {
@@ -1332,6 +1342,22 @@ export function wireNewcomerSignatureAbility(
       break;
     case ER_SUPEREGO_ABILITY_ID:
       builder.attr(SuperegoMarkerAbAttr);
+      break;
+    case ER_METEOR_MASS_ABILITY_ID:
+      // Weight-centric signature (Metagross Battle Bond innate). Tripling the holder's
+      // weight (via getWeight -> WeightMultiplierAbAttr) both maxes its own Heavy Slam /
+      // Heat Crash weight RATIO and makes incoming Grass Knot / Low Kick read the huge
+      // weight; HeavyweightPowerAbAttr adds the flat weight-class power boost for Heavy
+      // Slam / Heat Crash / punching moves (its signature Meteor Mash reads as a meteor).
+      builder.attr(WeightMultiplierAbAttr, METEOR_MASS_WEIGHT_MULTIPLIER);
+      builder.attr(HeavyweightPowerAbAttr);
+      break;
+    case ER_INVERSE_ROOM_ABILITY_ID:
+      // On entry, auto-set the SAME Inverse Room field effect the MOVE "Inverse Room"
+      // (id 844) sets — the Drought pattern, reusing InverseRoomTag as the one source of
+      // truth for the reversed type chart (5 turns, field-wide). Room-overlap semantics
+      // are faithful: re-entering while its own room is still up toggles it off.
+      builder.attr(PostSummonAddArenaTagAbAttr, true, ArenaTagType.INVERSE_ROOM, INVERSE_ROOM_TURNS);
       break;
   }
 }
