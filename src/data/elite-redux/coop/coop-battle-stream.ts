@@ -3596,6 +3596,19 @@ export class CoopBattleStreamer {
   }
 
   /**
+   * GUEST park signal (depth-lane learn-move deadlock): whether ANY {@linkcode awaitEnemyParty} is
+   * currently in flight - i.e. the guest renderer is PARKED at a cross-wave encounter boundary awaiting
+   * the host's authoritative enemy material. A waiter exists in {@linkcode enemyPartyWaiters} for exactly
+   * the window an EncounterPhase.start is blocked inside its adopt-and-wait, so a `true` here means the
+   * local phase queue cannot drain until that party arrives. Used by the learn-move-forward listener to
+   * decide whether a queue-owned CoopReplayLearnMovePhase would strand behind the parked renderer (it
+   * would) and must instead open INLINE over it. Pure read, no mutation.
+   */
+  hasPendingEnemyPartyWait(): boolean {
+    return this.enemyPartyWaiters.size > 0;
+  }
+
+  /**
    * GUEST (#633 M4 push-snapshot launch): await the host's authoritative full session snapshot
    * for `wave`. Resolves immediately with the buffered snapshot if the host raced ahead, else
    * waits for the host's PUSH or requests the retained snapshot again, and resolves `null` on timeout

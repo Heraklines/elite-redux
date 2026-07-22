@@ -2856,10 +2856,18 @@ export function advanceCoopInteractionForContinuation(fromSeq: number): void {
   }
 }
 
-let learnMovePickerOpener: ((partySlot: number, moveId: number, maxMoveCount: number) => void) | null = null;
+let learnMovePickerOpener:
+  | ((partySlot: number, moveId: number, maxMoveCount: number, ownerIsGuest?: boolean, operationId?: string) => void)
+  | null = null;
 
 export function setCoopLearnMovePickerOpener(
-  opener: (partySlot: number, moveId: number, maxMoveCount: number) => void,
+  opener: (
+    partySlot: number,
+    moveId: number,
+    maxMoveCount: number,
+    ownerIsGuest?: boolean,
+    operationId?: string,
+  ) => void,
 ): void {
   learnMovePickerOpener = opener;
 }
@@ -3919,15 +3927,36 @@ function wireCoopLearnMoveForward(relay: CoopInteractionRelay): void {
       );
       return;
     }
+    // Depth-lane deadlock (run 29933294323): the guest renderer speculatively advances to the NEXT wave's
+    // NextEncounterPhase and PARKS inside `adoptCoopHostEnemyParty` -> `awaitEnemyParty`, awaiting cross-wave
+    // enemy material the host cannot build until this very forget-pick relays. A queue-owned CoopReplayLearnMovePhase
+    // `unshiftNew`d here would sit BEHIND that parked renderer and never start -> the circular stall. Detect the
+    // park via the streamer's live in-flight enemy-party wait (phase/park state, not a timer): while parked, the
+    // queue is not drainable, so V2 must open the picker INLINE (overridePhase) over the parked renderer - the same
+    // parked-queue immunity the batch path (#848) has - THREADING the operationId so the inline surface still
+    // carries the exact immutable address and proves controlInstalled. When the queue IS drainable (non-parked) the
+    // normal queue-owned `unshiftNew` path is preserved.
+    const parkedAwaitingCrossWaveMaterial = getCoopBattleStreamer()?.hasPendingEnemyPartyWait() === true;
+    const openInlineOverParkedRenderer =
+      operationId != null && parkedAwaitingCrossWaveMaterial && learnMovePickerOpener != null;
     coopLog(
       "learnmove",
       `recv learnMoveForward slot=${partySlot} moveId=${moveId} maxMoveCount=${maxMoveCount} -> open picker ${
-        learnMovePickerOpener == null ? "via CoopReplayLearnMovePhase" : "INLINE"
+        openInlineOverParkedRenderer
+          ? "INLINE (parked-queue immunity, operationId threaded)"
+          : operationId != null || learnMovePickerOpener == null
+            ? "via CoopReplayLearnMovePhase"
+            : "INLINE"
       }`,
     );
     learnMoveForwardInFlight.add(partySlot);
     try {
-      if (operationId != null || learnMovePickerOpener == null) {
+      if (openInlineOverParkedRenderer) {
+        // #787 INLINE over the parked next-wave renderer, but THREADING the operationId + ownerIsGuest so the
+        // inline picker installs a CoopReplayLearnMovePhase via overridePhase (queue-owned identity + immunity)
+        // and proves the exact SAME operation address - never minting a new one.
+        learnMovePickerOpener!(partySlot, moveId, maxMoveCount, ownerIsGuest, operationId);
+      } else if (operationId != null || learnMovePickerOpener == null) {
         // V2 needs a queue-owned phase token carrying the exact immutable operation address. The legacy
         // detached overlay has neither and therefore can never prove controlInstalled or recovery.
         globalScene.phaseManager.unshiftNew(

@@ -45,7 +45,29 @@ const LEARN_MOVE_CHOICE_KIND = "learnMove";
  * 20-minute fallback ("it worked after a while"). `setModeWithoutClear` overlays the picker and
  * `revertMode` restores whatever screen was up (the parked shop) once the pick relays.
  */
-export function openCoopLearnMovePickerInline(partySlot: number, moveId: number, maxMoveCount: number): void {
+export function openCoopLearnMovePickerInline(
+  partySlot: number,
+  moveId: number,
+  maxMoveCount: number,
+  ownerIsGuest = true,
+  operationId?: string,
+): void {
+  // V2 (operationId present) over a PARKED next-wave renderer (the depth-lane deadlock): install the picker as
+  // a real CoopReplayLearnMovePhase via `overridePhase` so it becomes the current phase OVER the parked
+  // NextEncounterPhase (kept on standby, resumed once this picker ends). This gives the V2 inline surface the
+  // SAME queue-owned identity + parked-queue immunity the batch path (#848) has - it carries the exact immutable
+  // operationId and proves controlInstalled through the phase's own start()/notifyCoopV2InteractionSurfaceReady,
+  // never minting a new address. The detached-overlay branch below (legacy #787, no operationId) is unchanged.
+  if (operationId != null) {
+    const phase = new CoopReplayLearnMovePhase(partySlot, moveId, maxMoveCount, operationId, ownerIsGuest);
+    if (!globalScene.phaseManager.overridePhase(phase)) {
+      // An override is refused only if another modal override is already standing (rare). Drop the in-flight
+      // mark so the host's finite forward await falls back to "keep current moves" - never a hang.
+      clearCoopLearnMoveForwardInFlight(partySlot);
+      coopWarn("learnmove", `inline V2 learn-move override refused slot=${partySlot} (host await falls back)`);
+    }
+    return;
+  }
   const relay = getCoopInteractionRelay();
   const pokemon = globalScene.getPlayerParty()[partySlot];
   const seq = COOP_LEARN_MOVE_FWD_SEQ_BASE + partySlot;
