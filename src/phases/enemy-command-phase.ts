@@ -83,7 +83,7 @@ export class EnemyCommandPhase extends FieldPhase {
   private async resolveVersusEnemyCommand(): Promise<void> {
     const relay = getShowdownRelay();
     const turn = globalScene.currentBattle.turn;
-    const command = relay == null ? null : await relay.requestEnemyCommand(turn);
+    const command = relay == null ? null : await relay.requestEnemyCommand(turn, this.fieldIndex);
     // Host-authoritative validation: an out-of-range / illegal relayed pick falls back to the AI
     // (same as a timeout), so a hostile/buggy peer can never force an illegal enemy action.
     if (command == null || !this.isRelayedCommandLegal(command)) {
@@ -109,12 +109,13 @@ export class EnemyCommandPhase extends FieldPhase {
         command: Command.FIGHT,
         move: {
           move: moveId,
-          // Host-authoritative targets (#4): IGNORE the relayed `command.targets` and RE-DERIVE them
-          // from the engine's own resolver. In a 1v1 the target set is deterministic (the sole opponent
-          // for an enemy move, or self for a self-target move), so a hostile/buggy peer can't aim a move
-          // at an illegal battler. A move that genuinely needs a live choice is still host-resolvable via
-          // the normal SelectTargetPhase; getMoveTargets gives the canonical set for the 1v1 case.
-          targets: getMoveTargets(enemyPokemon, moveId).targets,
+          // Host-authoritative targets: the engine's resolver gives the LEGAL target set. In a 1v1 (and
+          // for spread moves / a single candidate) that set is DETERMINISTIC, so the relayed target is
+          // ignored - a hostile/buggy peer can't aim at an illegal battler. In doubles/triples a
+          // single-target move has MULTIPLE legal candidates, so the guest's chosen target (carried as
+          // stable `targetRefs`, mapped across the perspective flip by pokemonId) is honored IF it is in
+          // the legal set, else it falls back to the canonical default.
+          targets: this.resolveRelayedEnemyTargets(enemyPokemon, moveId, command),
           // SerializedCommand.useMode is a MoveUseMode value carried as a plain number on the wire.
           useMode: (command.useMode as MoveUseMode | undefined) ?? MoveUseMode.NORMAL,
         },
@@ -160,6 +161,35 @@ export class EnemyCommandPhase extends FieldPhase {
       slotFieldIndex: slot,
       command: kind,
     });
+  }
+
+  /**
+   * Resolve the target set for a relayed enemy FIGHT, host-authoritatively. `getMoveTargets` gives the
+   * LEGAL candidate set: a spread move (`multiple`) or a single legal candidate is DETERMINISTIC, so the
+   * relayed choice is ignored. For a single-target move with MULTIPLE candidates (doubles/triples), the
+   * guest's chosen target is carried as stable `targetRefs` ({side, pokemonId}); each is mapped to the
+   * host's battler index by pokemonId (globally unique, shared across clients via the launch snapshot),
+   * which handles the perspective flip. A mapped target is honored only if it is in the legal set; an
+   * absent/illegal choice falls back to the canonical first legal target.
+   */
+  private resolveRelayedEnemyTargets(enemyPokemon: EnemyPokemon, moveId: number, command: SerializedCommand): number[] {
+    const legal = getMoveTargets(enemyPokemon, moveId);
+    // Deterministic set: spread move, or 0/1 legal candidate. No live choice to honor.
+    if (legal.multiple || legal.targets.length <= 1) {
+      return legal.targets;
+    }
+    // Multiple single-target candidates (doubles/triples). Map the relayed stable refs to host indices.
+    const field = [...globalScene.getPlayerField(), ...globalScene.getEnemyField()];
+    const legalSet = new Set(legal.targets);
+    for (const ref of command.targetRefs ?? []) {
+      const mon = field.find(p => p.id === ref.pokemonId);
+      const bi = mon?.getBattlerIndex();
+      if (bi != null && legalSet.has(bi)) {
+        return [bi]; // a single-target move commits to exactly one chosen foe
+      }
+    }
+    // No valid relayed choice: use the engine's canonical default (first legal target).
+    return [legal.targets[0]];
   }
 
   /**

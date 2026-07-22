@@ -777,28 +777,79 @@ export class CommandPhase extends FieldPhase {
     if (!isVersusSession() || getCoopController()?.role !== "guest") {
       return false;
     }
-    let serialized: SerializedCommand;
     if (command === Command.FIGHT || command === Command.TERA) {
-      const moveId = this.getPokemon().getMoveset()[cursor]?.moveId;
+      const mon = this.getPokemon();
+      const moveId = mon.getMoveset()[cursor]?.moveId;
       if (moveId == null) {
         return false;
       }
-      serialized = buildShowdownFightCommand(cursor, moveId);
-      if (typeof useMode !== "boolean") {
-        serialized.useMode = useMode;
+      const tera = command === Command.TERA;
+      const resolvedUseMode = typeof useMode === "boolean" ? undefined : useMode;
+      // DOUBLES/TRIPLES targeting: a single-target move with MORE THAN ONE legal candidate needs the
+      // human's choice, so run the game's REAL target selector and ship the RESOLVED target. Singles
+      // (one opposing slot) and spread moves (`multiple`) have a deterministic target set the host
+      // re-derives, so they ship immediately with no target UI.
+      const moveTargets = getMoveTargets(mon, moveId);
+      const needsChoice = moveTargets.targets.length > 1 && !moveTargets.multiple;
+      if (needsChoice) {
+        globalScene.ui.setMode(UiMode.TARGET_SELECT, this.fieldIndex, moveId, (targets: BattlerIndex[]) => {
+          globalScene.ui.setMode(UiMode.MESSAGE);
+          if (targets.length === 0) {
+            // Cancelled / restricted: reopen this slot's command menu so the player re-picks.
+            globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
+            return;
+          }
+          this.shipShowdownGuestFight(cursor, moveId, [...targets], resolvedUseMode, tera);
+        });
+        return true;
       }
-      if (command === Command.TERA) {
-        serialized.tera = true;
-      }
-    } else if (command === Command.POKEMON) {
-      serialized = buildShowdownSwitchCommand(cursor);
-      serialized.baton = typeof useMode === "boolean" ? useMode : false;
-    } else {
-      // BALL / RUN / SHIFT have no meaning in a versus trainer 1v1; let them fall through (they are
-      // not selectable in this mode, so this branch is unreachable in practice).
-      return false;
+      this.shipShowdownGuestFight(cursor, moveId, moveTargets.targets, resolvedUseMode, tera);
+      return true;
     }
-    getShowdownRelay()?.sendCommand(globalScene.currentBattle.turn, serialized);
+    if (command === Command.POKEMON) {
+      const serialized = buildShowdownSwitchCommand(cursor);
+      serialized.baton = typeof useMode === "boolean" ? useMode : false;
+      this.finishShowdownGuestShip(serialized);
+      return true;
+    }
+    // BALL / RUN / SHIFT have no meaning in a versus trainer match; let them fall through (they are
+    // not selectable in this mode, so this branch is unreachable in practice).
+    return false;
+  }
+
+  /**
+   * Ship a versus-guest FIGHT with its resolved targets. Builds the STABLE `targetRefs` ({side,
+   * pokemonId}) from the guest's chosen LOCAL battler indices so the host maps them across the
+   * perspective flip by pokemonId; the numeric `targets` ride along for presentation. Then finalizes
+   * the ship (relay + inert skip + waiting notice).
+   */
+  private shipShowdownGuestFight(
+    cursor: number,
+    moveId: number,
+    targets: number[],
+    useMode: MoveUseMode | undefined,
+    tera: boolean,
+  ): void {
+    const targetRefs = targets.map(bi => this.coopTargetRef(bi)).filter((r): r is CoopBattleTargetRef => r != null);
+    const serialized = buildShowdownFightCommand(cursor, moveId, targets, targetRefs);
+    if (useMode != null) {
+      serialized.useMode = useMode;
+    }
+    if (tera) {
+      serialized.tera = true;
+    }
+    this.finishShowdownGuestShip(serialized);
+  }
+
+  /**
+   * Finalize a versus-guest ship: relay the serialized command to the host (keyed by this own field
+   * slot), write an inert skip so the phase queue stays well-formed (TurnStartPhase diverts to
+   * CoopReplayTurnPhase and the guest renders the host's authoritative outcome), show the waiting
+   * notice, and end the phase.
+   */
+  private finishShowdownGuestShip(serialized: SerializedCommand): void {
+    this.clearShowdownTurnClock();
+    getShowdownRelay()?.sendCommand(globalScene.currentBattle.turn, serialized, this.fieldIndex);
     globalScene.currentBattle.turnCommands[this.fieldIndex] = {
       command: Command.FIGHT,
       move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
@@ -813,7 +864,6 @@ export class CommandPhase extends FieldPhase {
       true,
     );
     this.end();
-    return true;
   }
 
   /** Open THIS client's own-slot command UI (FIGHT for a skip-to-fight ME, else the COMMAND menu). */
