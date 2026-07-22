@@ -21,6 +21,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import type { CoopAuthorityFailure, CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { hasPendingCoopFaintSwitchReplacementIntent } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { beginCoopAuthoritativeProjectionSettlement } from "#data/elite-redux/coop/coop-presentation";
 import {
   coopHasPendingWaveAdvance,
@@ -217,9 +218,24 @@ export class CoopReplayTurnPhase extends Phase {
       streamer.isTurnFinalized(wave, this.turn)
       && !streamer.hasConsumableReplacementForTurn(this.turn, this.sourceWave)
     ) {
-      coopWarn("replay", `guest replay turn=${this.turn}: STALE duplicate (already finalized this wave) -> end`);
-      this.end();
-      return;
+      // Campaign run 29933294323 dirty lane: a same-turn OWN-faint replacement the guest just relayed
+      // (its authoritative REPLACEMENT_COMMIT carrier still in-flight) is NOT a stale duplicate the host
+      // will never resend - the carrier IS coming. Bailing here re-queues TurnInit -> TurnStart -> here
+      // synchronously (the PhaseManager re-populates a fresh TurnInitPhase on the emptied queue) and grows
+      // the JS stack until it overflows (guest RangeError -> both-seat command-owner timeout). Fall through
+      // to the pump instead: its `awaitTurnOrLiveEvent` PARKS on the pending checkpoint waiter and applies
+      // the replacement the moment its carrier lands. hasConsumableReplacementForTurn already covers the
+      // BUFFERED carrier; this covers the IN-FLIGHT one (buffered-yet? no; coming? yes).
+      if (hasPendingCoopFaintSwitchReplacementIntent(wave, this.turn)) {
+        coopLog(
+          "replay",
+          `guest replay turn=${this.turn}: finalized but an own-faint replacement carrier is in-flight -> park (no stale bail)`,
+        );
+      } else {
+        coopWarn("replay", `guest replay turn=${this.turn}: STALE duplicate (already finalized this wave) -> end`);
+        this.end();
+        return;
+      }
     }
     if (this.rendered === 0) {
       coopLog("replay", `guest replay turn=${this.turn}: live pump start (awaiting host events/resolution)`);

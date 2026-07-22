@@ -13,6 +13,7 @@ import {
   captureCoopFaintSwitchOperationBinding,
   commitFaintSwitchAuthorityIntent,
   coopFaintSwitchOperationAddress,
+  hasPendingCoopFaintSwitchReplacementIntent,
   markCoopFaintSwitchPickerSettled,
   materializeCoopFaintSwitchPickerTerminal,
   materializeCoopV2ReplacementPickerTerminal,
@@ -263,6 +264,53 @@ describe("co-op faint-switch operation migration", () => {
 
     setActiveCoopRuntimeOpState(null);
     expect(() => captureCoopFaintSwitchOperationBinding("guest")).toThrow(/no runtime installed/);
+  });
+
+  it("reports an armed own-faint replacement intent per exact wave+turn (dirty lane 29933294323 park signal)", () => {
+    // The signal CoopReplayTurnPhase reads to PARK for an in-flight replacement carrier instead of bailing
+    // the finalized turn as a stale duplicate (which synchronously re-queues TurnInit->TurnStart->replay and
+    // overflows the guest's stack). It must be exact per (wave, turn) so a stale/other-turn intent can't
+    // wrongly hold a genuinely-finalized turn open.
+    setCoopFaintSwitchRetryMs(60_000); // keep the armed timer from firing/resending during the test
+    const guestState = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(guestState);
+    const binding = captureCoopFaintSwitchOperationBinding("guest");
+
+    expect(hasPendingCoopFaintSwitchReplacementIntent(2, 1, binding), "no intent armed yet").toBe(false);
+
+    let resends = 0;
+    armCoopFaintSwitchIntentResend(
+      {
+        payload: { fieldIndex: COOP_GUEST_FIELD_INDEX, partySlot: 3, data: [0, 6] },
+        localRole: "guest",
+        wave: 2,
+        turn: 1,
+        resend: () => {
+          resends++;
+        },
+      },
+      binding,
+    );
+
+    expect(hasPendingCoopFaintSwitchReplacementIntent(2, 1, binding), "armed for this exact wave+turn").toBe(true);
+    expect(hasPendingCoopFaintSwitchReplacementIntent(2, 2, binding), "a different turn is NOT held").toBe(false);
+    expect(hasPendingCoopFaintSwitchReplacementIntent(3, 1, binding), "a different wave is NOT held").toBe(false);
+
+    // The flag gate short-circuits before touching state (solo / capability-blocked never parks).
+    setCoopFaintSwitchOperationEnabled(false);
+    expect(hasPendingCoopFaintSwitchReplacementIntent(2, 1, binding), "flag off -> never pending").toBe(false);
+    setCoopFaintSwitchOperationEnabled(true);
+
+    // Once the authority applies the replacement the resend is cancelled, so the park signal clears and the
+    // finalized turn may legitimately close.
+    resetCoopFaintSwitchOperationState();
+    expect(hasPendingCoopFaintSwitchReplacementIntent(2, 1, binding), "cleared after apply/reset").toBe(false);
+    expect(resends, "the resend timer was suppressed by the large retry interval").toBe(0);
+  });
+
+  it("returns false with no runtime installed (no active op-state to inspect)", () => {
+    setActiveCoopRuntimeOpState(null);
+    expect(hasPendingCoopFaintSwitchReplacementIntent(2, 1)).toBe(false);
   });
 
   it("keeps the pure legacy switch carrier working when the operation flag is off", async () => {

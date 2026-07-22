@@ -319,6 +319,46 @@ function cancelRetry(s: FaintSwitchOpState, retryWindow: string, operationId: st
 }
 
 /**
+ * Whether a guest own-faint replacement intent is ARMED (relayed to the authority, resend-pending, not yet
+ * applied) for this exact wave+turn.
+ *
+ * Campaign run 29933294323 dirty lane: after the guest picks its own-faint replacement,
+ * {@linkcode armCoopFaintSwitchIntentResend} keeps resending the switch until the authority's
+ * REPLACEMENT_COMMIT carrier lands. While that carrier is in-flight the guest's finalized turn has NO
+ * consumable replacement buffered yet, so CoopReplayTurnPhase's stale-duplicate guard used to bail and
+ * `end()`, which re-queues TurnInit -> TurnStart -> CoopReplayTurnPhase SYNCHRONOUSLY (the PhaseManager
+ * re-populates a fresh TurnInitPhase on the emptied queue) and grows the JS stack until it overflows
+ * (guest RangeError: Maximum call stack size exceeded -> the guest never reaches the turn-2 command surface
+ * -> the host times out waiting for both sequential command owners). A pending intent here is the exact
+ * "the authoritative carrier is coming" signal: the replay phase must PARK for it instead of bailing. It
+ * clears the moment the authority applies the replacement ({@linkcode cancelRetry}).
+ */
+export function hasPendingCoopFaintSwitchReplacementIntent(
+  wave: number,
+  turn: number,
+  binding?: CoopFaintSwitchOperationBinding | null,
+): boolean {
+  if (!isCoopFaintSwitchOperationEnabled()) {
+    return false;
+  }
+  const opState = binding?.opState ?? getActiveCoopRuntimeOpState();
+  if (opState == null) {
+    return false;
+  }
+  const s = requireCoopOpSurfaceStateFor<FaintSwitchOpState>(opState, "faintSwitch");
+  const w = Math.trunc(wave);
+  const t = Math.trunc(turn);
+  for (const key of s.retries.keys()) {
+    // retryKey shape: `${epoch}:${seat}:${wave}:${turn}:${occurrence}:${fieldIndex}:FAINT_SWITCH_PROPOSAL`.
+    const parts = key.split(":");
+    if (parts.length >= 4 && Number(parts[2]) === w && Number(parts[3]) === t) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Add the immutable proposal address to the legacy numeric metadata. This keeps the wire union stable
  * while preventing a delayed same-slot raw proposal from being consumed by a later replacement window.
  */
