@@ -55,12 +55,16 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
   driveClientPhaseQueueTo,
   driveGuestReplayTurn,
+  driveGuestRewardWatch,
+  driveRewardShopOwnerLeaveViaUi,
   installDuoLogCapture,
+  type ShopPhaseSeam,
   settleDuoPromise,
   withClient,
   withClientSync,
@@ -256,6 +260,140 @@ describe.skipIf(!RUN)(
 
       logs.flush();
     }, 240_000);
+
+    // ---------------------------------------------------------------------------------------------
+    // WAVE-2 LAUNCH (public journey run 29895009334 "Layer 4"). The `dissolved` backstop below stops the
+    // doomed 1:2 phantom from PARKING, but dissolving alone is NOT a launch: it ends the phantom into a
+    // queue that (on the won-by-faint variant) has NO wave-advance boundary queued - the guest's pending
+    // WIN advance was never consumed - so Phaser re-manufactures TurnInit->Command->dissolve forever and
+    // the guest's OWN wave-2 CommandPhase is never opened (the frontier stays WATCHER-only; rev-7 loops
+    // "awaiting 1/1 local-seat real CommandPhase proofs"). The GREEN paths (host + coop-duo-multiwave)
+    // launch wave 2 by running the wave-advance victory tail (VictoryPhase -> reward -> NewBattle ->
+    // NextEncounter -> real wave-2 CommandPhase). This test drives the won-by-faint guest through the
+    // reward LEAVE and asserts it CONSTRUCTS THAT SAME LAUNCH: it re-bases to wave 2 and opens its OWN
+    // wave-2 command surface, exactly like multiwave's non-faint crossing.
+    //
+    // RED before the fix: driveClientPhaseQueueTo(guest, "CommandPhase") stalls - the guest never leaves
+    // wave 1 (pending advance orphaned, dissolve loop). GREEN after: the guest re-bases to wave 2 and its
+    // own CommandPhase opens.
+    it.skipIf(!V2_CONTROL_ENABLED)(
+      "constructs its own wave-2 launch after the won-by-faint reward LEAVE (opens its OWN wave-2 CommandPhase, not a WATCHER-only frontier)",
+      async () => {
+        await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
+        const pair = createLoopbackPair();
+        const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+        wireGuestCommand(rig);
+
+        for (const scene of [rig.hostScene, rig.guestScene]) {
+          scene.getPlayerParty()[2].coopOwner = "guest";
+          scene.getPlayerParty()[3].coopOwner = "guest";
+        }
+        rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+        withClientSync(rig.guestCtx, () => {
+          rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+        });
+
+        const turn = rig.hostScene.currentBattle.turn;
+
+        // TURN 1 (host): the spread EARTHQUAKE wins the wave the same turn the guest-owned slot faints.
+        await withClient(rig.hostCtx, async () => {
+          game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
+          game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
+          await game.phaseInterceptor.to("CoopTurnCommitPhase");
+        });
+
+        // GUEST renders turn 1: the faint opens the guest's OWN picker; pick CHARIZARD (slot 3).
+        await withClient(rig.guestCtx, async () => {
+          const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+          const realSetMode = ui.setMode.bind(ui);
+          ui.setMode = (...args: unknown[]): unknown => {
+            if (args[0] === UiMode.PARTY) {
+              ui.setMode = realSetMode;
+              const opened = realSetMode(...args);
+              Promise.resolve(opened).then(
+                () => {
+                  queueMicrotask(() => (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0));
+                },
+                () => undefined,
+              );
+              return opened;
+            }
+            if (args[0] === UiMode.MESSAGE) {
+              return;
+            }
+            return realSetMode(...args);
+          };
+          try {
+            await driveGuestReplayTurn(rig.guestScene, turn, { sealRetainedWaveBoundary: false });
+          } finally {
+            ui.setMode = realSetMode;
+          }
+        });
+
+        // HOST: summon the replacement + WIN, crossing THROUGH BattleEnd into the reward shop.
+        let hostAdvance: Promise<void> | undefined;
+        await withClient(rig.hostCtx, async () => {
+          hostAdvance = game.phaseInterceptor.to("SelectModifierPhase", false);
+          await drainLoopback();
+        });
+        await settleDuoPromise(rig, hostAdvance!, "wave-2-launch won-wave host crossing");
+        await withClient(rig.hostCtx, () => drainLoopback());
+        const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        expect(hostShop.phaseName, "host reached the wave-1 reward shop").toBe("SelectModifierPhase");
+
+        // GUEST: drive the replay through the WON-WAVE replacement pivot, THEN its OWN victory tail to the
+        // reward shop. CRITICAL (Layer 4 fidelity): the replacement replay holds on the FAINT'S turn (turn 1),
+        // while the host's won-wave WAVE_ADVANCE settled on turn 2 (the post-win turn cursor advanced). This
+        // held-turn < settled-turn mismatch is exactly the live journey ordering (run 29895009334): the
+        // bootstrap unpark refuses to dissolve a held replay whose turn is behind the settled turn, so the
+        // boundary wake is stranded behind the parked replay. Driving on `turn` (not `turn + 1`) reproduces it.
+        const guestShop = (await withClient(rig.guestCtx, async () => {
+          await driveGuestReplayTurn(rig.guestScene, turn);
+          return (await driveClientPhaseQueueTo(rig.guestScene, "SelectModifierPhase")) as unknown as ShopPhaseSeam;
+        })) as ShopPhaseSeam;
+        expect(guestShop.phaseName, "guest reached its OWN wave-1 reward shop via the victory tail").toBe(
+          "SelectModifierPhase",
+        );
+
+        // Reward shop: host owns (even counter after the guest-owned faint interaction), skip-leave; guest
+        // watches. This is the exact reward-LEAVE boundary the live guest crossed via a stall-resync.
+        const counterBefore = rig.hostRuntime.controller.interactionCounter();
+        expect(counterBefore % 2, "wave-1 reward is host-owned (even interaction counter)").toBe(0);
+        const watcherPinned = await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+        expect(watcherPinned, "watcher parked on the owner's reward interaction").toBe(counterBefore);
+        const ownerPinned = await withClient(rig.hostCtx, () => driveRewardShopOwnerLeaveViaUi(hostShop));
+        await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+        await withClient(rig.hostCtx, () => drainLoopback());
+        expect(ownerPinned, "the owner pinned the reward shop to the shared counter").toBe(counterBefore);
+        expect(
+          rig.guestRuntime.controller.interactionCounter(),
+          "guest advanced the reward interaction counter once (lockstep)",
+        ).toBe(counterBefore + 1);
+
+        // HOST crosses into wave 2 (NewBattle -> NextEncounter rolls wave 2 + publishes the carrier).
+        await withClient(rig.hostCtx, async () => {
+          await game.phaseInterceptor.to("CommandPhase", false);
+        });
+        expect(rig.hostScene.currentBattle.waveIndex, "host launched wave 2").toBe(2);
+
+        // GUEST: the whole point. After the reward LEAVE it must run its OWN NewBattle -> NextEncounter ->
+        // wave-2 CommandPhase, re-basing to wave 2 - NOT loop dissolving a stale wave-1 command.
+        const guestCommand = await withClient(rig.guestCtx, () =>
+          driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"),
+        );
+
+        expect(rig.guestScene.currentBattle.waveIndex, "guest re-based to wave 2 (constructed its own launch)").toBe(2);
+        expect(guestCommand.phaseName, "guest opened its OWN wave-2 command surface").toBe("CommandPhase");
+        const allLogs = [...logs.host, ...logs.guest];
+        expect(
+          allLogs.some(l => /command-open dissolved: wave 2 is ending/.test(l)),
+          "the genuine wave-2 command is NEVER dissolved (only the stale wave-1 phantom may be)",
+        ).toBe(false);
+
+        logs.flush();
+      },
+      240_000,
+    );
 
     // ---------------------------------------------------------------------------------------------
     // WAVE-2 LAUNCH CHOKEPOINT (public journey run 29886905322). The waveWon fix above keeps the guest
