@@ -20,7 +20,7 @@
  *   node scripts/run-ui-scenario.mjs --surface pokedex                # pokedex page render check
  *   node scripts/run-ui-scenario.mjs CALYREX --surface pokedex        # one species' dex page
  *
- * Surfaces: starter-select (default), starter-black-shiny, pokedex. A species is a SpeciesId name, an
+ * Surfaces: starter-select (default), starter-black-shiny, pokedex, biome-background. A species is a SpeciesId name, an
  * ErSpeciesId name (e.g. RATTATA_REDUX), or a numeric id. Omitted = the surface's
  * built-in demo (vanilla baseline + the live repro species).
  */

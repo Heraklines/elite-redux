@@ -135,7 +135,7 @@ import { TrainerVariant } from "#enums/trainer-variant";
 import { UiTheme } from "#enums/ui-theme";
 import { WeatherType } from "#enums/weather-type";
 import { NewArenaEvent } from "#events/battle-scene";
-import { Arena, biomeHasBgVariants } from "#field/arena";
+import { Arena } from "#field/arena";
 import { ArenaBase } from "#field/arena-base";
 import { DamageNumberHandler } from "#field/damage-number-handler";
 import type { Pokemon } from "#field/pokemon";
@@ -2354,9 +2354,8 @@ export class BattleScene extends SceneBase {
 
     this.arenaBg.pipelineData = {
       terrainColorRatio: this.arena.bgTerrainColorRatioForBiome,
-      // Variant biomes ship hand-painted day/dusk/night art, so skip the day/night
-      // shader tint on the background (otherwise the night art is double-darkened).
-      ignoreTimeTint: biomeHasBgVariants(biome),
+      // Arena.init updates this after selecting the visit's background scene.
+      ignoreTimeTint: this.arena.getBgIgnoreTimeTint(),
     };
 
     return this.arena;

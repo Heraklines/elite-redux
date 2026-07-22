@@ -54,14 +54,18 @@ import { allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
 import { BARGAIN_SIN_ORDER, DISABLED_BARGAIN_SINS } from "#data/elite-redux/er-bargain-sins";
+import { getErBiomeBackgroundSets, resolveErBiomeBackground } from "#data/elite-redux/er-biome-backgrounds";
 import type { PokemonSpecies } from "#data/pokemon-species";
+import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
 import { SpeciesId } from "#enums/species-id";
+import { TimeOfDay } from "#enums/time-of-day";
 import { UiMode } from "#enums/ui-mode";
+import { Arena } from "#field/arena";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
 import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
@@ -778,6 +782,55 @@ describe.skipIf(!RUN)("headless UI runner", () => {
     console.log("\nRESULT", JSON.stringify({ surface: "biome-shop", errors }));
     expect(errors, errors.join("\n")).toEqual([]);
   });
+
+  it.skipIf(SURFACE !== "biome-background")(
+    "biome-background: resolves every scene and time frame through the real Arena",
+    () => {
+      console.log("\n===== UI SURFACE: biome-background =====");
+      // Constructing GameManager initializes the real biome registry used by Arena.
+      new GameManager(phaserGame);
+      const errors: string[] = [];
+      const states: { biome: number; set: number; time: string; textureKey: string; ignoreTimeTint: boolean }[] = [];
+      const times = [TimeOfDay.DAY, TimeOfDay.DUSK, TimeOfDay.NIGHT] as const;
+
+      for (const biomeId of Object.values(BiomeId)) {
+        const sets = getErBiomeBackgroundSets(biomeId);
+        for (let setIndex = 0; setIndex < sets.length; setIndex++) {
+          const arena = new Arena(biomeId);
+          (arena as unknown as { backgroundSetIndex: number }).backgroundSetIndex = setIndex;
+          let timeOfDay: TimeOfDay = TimeOfDay.DAY;
+          vi.spyOn(arena, "getTimeOfDay").mockImplementation(() => timeOfDay);
+
+          for (const time of times) {
+            timeOfDay = time;
+            const expected = resolveErBiomeBackground(biomeId, setIndex, time);
+            const actual = {
+              biome: biomeId,
+              set: setIndex,
+              time: TimeOfDay[time],
+              textureKey: arena.getBgTextureKey(),
+              ignoreTimeTint: arena.getBgIgnoreTimeTint(),
+            };
+            states.push(actual);
+            if (
+              !expected
+              || actual.textureKey !== expected.textureKey
+              || actual.ignoreTimeTint !== expected.ignoreTimeTint
+            ) {
+              errors.push(
+                `biome ${biomeId} set ${setIndex} ${TimeOfDay[time]} resolved ${actual.textureKey}/${actual.ignoreTimeTint}`,
+              );
+            }
+          }
+        }
+      }
+
+      console.log("STATE", JSON.stringify({ checks: states.length, scenes: states.length / times.length }));
+      console.log("\nRESULT", JSON.stringify({ surface: "biome-background", errors }));
+      expect(states.length).toBeGreaterThan(0);
+      expect(errors, errors.join("\n")).toEqual([]);
+    },
+  );
 
   it.skipIf(SURFACE !== "bargain")("bargain: renders Giratina's bargain screen (#550 diagnostic)", () => {
     console.log("\n===== UI SURFACE: bargain =====");
