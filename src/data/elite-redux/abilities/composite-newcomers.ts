@@ -228,10 +228,13 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
   // onto the base eeveelution's FIRST innate: the original innate stays fully
   // active (its detailed description surfaces via #201) AND the composite carries
   // Omniform's adaptive-transform attr so the partner form can chain across the
-  // family. The `name` keeps the base innate's name (no invented pitch names).
+  // family. The eeveelutions keep the base innate's name; the Partner Eevee HEAD
+  // is renamed to "Adaptive Fur" (maintainer directive 2026-07-22) — display name
+  // only, mechanics + constituents (Fluffy + Omniform) unchanged, and the
+  // constituent parts stay visible via the description + the card chips.
   [ER_PARTNER_EEVEE_ABILITY_ID]: {
     id: ER_PARTNER_EEVEE_ABILITY_ID,
-    name: "Fluffy",
+    name: "Adaptive Fur",
     description: "Fluffy + Omniform.",
     constituents: [FLUFFY, OMNIFORM],
   },

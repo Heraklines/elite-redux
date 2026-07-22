@@ -1874,6 +1874,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Primal Regigigas is SIX types (Normal/Rock/Ice/Steel/Electric/Dragon) - no Water",
+    description:
+      "Primal Regigigas lost its Water type (maintainer directive 2026-07-22). It is now SIX\n"
+      + "types: Normal/Rock/Ice/Steel/Electric/Dragon. Previously it was seven (with Water).\n"
+      + "This scenario fields a Primal Regigigas on YOUR side vs a Vaporeon spamming a Water move.\n"
+      + "DO: look at your Primal Regigigas's type icons (battle info strip + its Summary page), then\n"
+      + "let the Vaporeon hit it with WATER GUN a couple of times.\n"
+      + "EXPECT: exactly SIX type badges - Normal, Rock, Ice, Steel, Electric, Dragon - and NO Water\n"
+      + "badge anywhere. Water Gun lands as 'not very effective' (0.5x: Rock x2, Steel x0.5, Dragon\n"
+      + "x0.5) - it is NO LONGER double-resisted the way a part-Water Regigigas resisted it (0.25x).\n"
+      + "Type-chart effectiveness is unit-asserted in test/tests/elite-redux/er-n-type-static-model.test.ts\n"
+      + "('a 6-type form (Primal Regigigas typing)') and the form typing in er-newcomer-forms.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.VAPOREON,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.WATER_GUN],
+      });
+      return [
+        makeStarter(SpeciesId.REGIGIGAS, {
+          formIndex: formIndexContaining(SpeciesId.REGIGIGAS, "primal"),
+          moveset: [MoveId.GIGA_IMPACT, MoveId.STONE_EDGE, MoveId.THUNDER_PUNCH, MoveId.ICE_PUNCH],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) New game over an occupied SOLO slot overwrites (does not boot to title)",
     description:
       "SAVE-SLOT flow fix (P0, not a battle behavior) - starting a NEW run and overwriting an\n"

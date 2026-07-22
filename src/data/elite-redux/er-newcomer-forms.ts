@@ -265,10 +265,10 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     innates: [AbilityId.PLUS, ab(SYNCHRONIZED_CURRENT), ab(POSITIVE_FEEDBACK)],
     item: FormChangeItem.PLUSLEITE,
   },
-  // #3 Primal Regigigas — Normal/Rock/Ice/Steel/Electric/Dragon/Water (SEVEN types).
-  // Water is native (Regitube is lore-part of the mon; maintainer directive). This is
-  // the 7-type stress case for the N-type UI (Pass B) and adds a 6th REMOVABLE type to
-  // World in Pieces' pool (every non-Normal type is removable).
+  // #3 Primal Regigigas — Normal/Rock/Ice/Steel/Electric/Dragon (SIX types).
+  // (Water was removed per maintainer directive 2026-07-22 — no longer native.) This
+  // is the 6-type stress case for the N-type UI (Pass B); every non-Normal type is
+  // removable, so World in Pieces has FIVE removable types in its pool here.
   // Active Predator / Stall / Raging Boxer; innates Titan (5934), World in Pieces
   // (5917), Self Repair. Orb Planetary Orb. Reversion form (like other primals):
   // holding the orb triggers the "primal" form, Mega-Bracelet gated in the pool.
@@ -284,7 +284,6 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
       PokemonType.STEEL,
       PokemonType.ELECTRIC,
       PokemonType.DRAGON,
-      PokemonType.WATER,
     ],
     stats: [140, 170, 145, 70, 145, 100],
     actives: [ab(PREDATOR), AbilityId.STALL, ab(RAGING_BOXER)],
