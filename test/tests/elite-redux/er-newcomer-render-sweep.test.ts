@@ -51,6 +51,12 @@ import { ER_NEWCOMER_FORMS } from "#data/elite-redux/er-newcomer-forms";
 import {
   ER_ASTOOT_SPECIES_ID,
   ER_DISCUPID_SPECIES_ID,
+  ER_DRAWCLOPS_SPECIES_ID,
+  ER_DUSTNOIR_SPECIES_ID,
+  ER_EGOELK_SPECIES_ID,
+  ER_FORBIDDRON_SPECIES_ID,
+  ER_IDOLFIN_SPECIES_ID,
+  ER_NIMBEON_SPECIES_ID,
   ER_PARTNER_ESPEON_SPECIES_ID,
   ER_PARTNER_FLAREON_SPECIES_ID,
   ER_PARTNER_GLACEON_SPECIES_ID,
@@ -60,7 +66,11 @@ import {
   ER_PARTNER_UMBREON_SPECIES_ID,
   ER_PARTNER_VAPOREON_SPECIES_ID,
   ER_REGITUBE_SPECIES_ID,
+  ER_RYUVEON_SPECIES_ID,
   ER_TENTALECT_SPECIES_ID,
+  ER_TITANEON_SPECIES_ID,
+  ER_TWINKLETUFF_SPECIES_ID,
+  ER_WEBBED_BRUISER_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
 import { ErCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import type { SpeciesId } from "#enums/species-id";
@@ -214,11 +224,22 @@ describe.skipIf(!RUN)("ER newcomer render sweep (non-empty sprite on every surfa
   });
 
   const entries: SweepEntry[] = [
-    // 4 hand-authored newcomer species.
+    // 4 hand-authored batch-1 newcomer species.
     { label: "Tentalect", speciesId: ER_TENTALECT_SPECIES_ID },
     { label: "Astoot", speciesId: ER_ASTOOT_SPECIES_ID },
     { label: "Discupid", speciesId: ER_DISCUPID_SPECIES_ID },
     { label: "Regitube", speciesId: ER_REGITUBE_SPECIES_ID },
+    // 10 batch-2 newcomer species (9 evolution-only + Webbed Bruiser standalone).
+    { label: "Drawclops", speciesId: ER_DRAWCLOPS_SPECIES_ID },
+    { label: "Dustnoir", speciesId: ER_DUSTNOIR_SPECIES_ID },
+    { label: "Nimbeon", speciesId: ER_NIMBEON_SPECIES_ID },
+    { label: "Ryuveon", speciesId: ER_RYUVEON_SPECIES_ID },
+    { label: "Titaneon", speciesId: ER_TITANEON_SPECIES_ID },
+    { label: "Twinkletuff", speciesId: ER_TWINKLETUFF_SPECIES_ID },
+    { label: "Egoelk", speciesId: ER_EGOELK_SPECIES_ID },
+    { label: "Forbiddron", speciesId: ER_FORBIDDRON_SPECIES_ID },
+    { label: "Idolfin", speciesId: ER_IDOLFIN_SPECIES_ID },
+    { label: "Webbed Bruiser", speciesId: ER_WEBBED_BRUISER_SPECIES_ID },
     // 8 partner eeveelutions (alias vanilla base eeveelution art).
     { label: "Partner Vaporeon", speciesId: ER_PARTNER_VAPOREON_SPECIES_ID },
     { label: "Partner Jolteon", speciesId: ER_PARTNER_JOLTEON_SPECIES_ID },
@@ -228,7 +249,7 @@ describe.skipIf(!RUN)("ER newcomer render sweep (non-empty sprite on every surfa
     { label: "Partner Leafeon", speciesId: ER_PARTNER_LEAFEON_SPECIES_ID },
     { label: "Partner Glaceon", speciesId: ER_PARTNER_GLACEON_SPECIES_ID },
     { label: "Partner Sylveon", speciesId: ER_PARTNER_SYLVEON_SPECIES_ID },
-    // 12 injected forms (megas / primals) - keyed by baseSpecies + formKey.
+    // injected forms (megas / primals / battle-bond) - keyed by baseSpecies + formKey.
     ...ER_NEWCOMER_FORMS.map(def => ({
       label: def.slug,
       speciesId: def.baseSpecies as number,
@@ -236,8 +257,9 @@ describe.skipIf(!RUN)("ER newcomer render sweep (non-empty sprite on every surfa
     })),
   ];
 
-  it("sweeps 24 newcomer mons/forms", () => {
-    expect(entries.length).toBe(24);
+  it("sweeps every newcomer mon/form (14 species + 8 partners + all injected forms)", () => {
+    // 4 batch-1 species + 10 batch-2 species + 8 partner eeveelutions + ER_NEWCOMER_FORMS.
+    expect(entries.length).toBe(22 + ER_NEWCOMER_FORMS.length);
   });
 
   it.each(entries)("$label renders a non-empty sprite on every surface", async entry => {

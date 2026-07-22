@@ -68,7 +68,41 @@ import {
 } from "#app/dev-tools/test-suite/scenario-spec";
 import { getGameMode } from "#app/game-mode";
 import Overrides from "#app/overrides";
+import { allMoves } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import {
+  ER_ANNEAL_ABILITY_ID,
+  ER_BOOT_HILL_ABILITY_ID,
+  ER_CENTER_OF_ATTENTION_ABILITY_ID,
+  ER_CRACKED_VESSEL_ABILITY_ID,
+  ER_DEADEYE_DRAW_ABILITY_ID,
+  ER_ECLIPSE_WING_ABILITY_ID,
+  ER_ENCORE_SET_ABILITY_ID,
+  ER_FAN_FAVORITE_ABILITY_ID,
+  ER_FINAL_SEASON_ABILITY_ID,
+  ER_FOUL_HARVEST_ABILITY_ID,
+  ER_GILLIE_SUIT_ABILITY_ID,
+  ER_GLAM_ROCK_ABILITY_ID,
+  ER_HEAVYWEIGHT_ABILITY_ID,
+  ER_LIVING_CHROME_ABILITY_ID,
+  ER_POROUS_ABILITY_ID,
+  ER_REDUCTION_ABILITY_ID,
+  ER_RING_GENERAL_ABILITY_ID,
+  ER_SEDIMENT_BLOOM_ABILITY_ID,
+  ER_SETLIST_ABILITY_ID,
+  ER_SKYHOOK_ABILITY_ID,
+  ER_SPIRIT_PUNCH_ABILITY_ID,
+  ER_SUPEREGO_ABILITY_ID,
+  ER_TWO_FACED_UNLEASHED_ABILITY_ID,
+  ER_VAPOR_BODY_ABILITY_ID,
+} from "#data/elite-redux/abilities/newcomer-signature-abilities";
+import {
+  applyGraveMarkerOnEntry,
+  foulHarvestCharges,
+  hasEffectiveMoveTrap,
+  porousCharges,
+  recordLivingChromeTransformation,
+} from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { isInnateSlotSuppressed } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { getErPendingNodes, resetErRouting, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { TerrainType } from "#data/terrain";
@@ -99,7 +133,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
-import type { Pokemon } from "#field/pokemon";
+import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import { Move } from "#moves/move";
 import type { CommandPhase } from "#phases/command-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
@@ -2511,7 +2545,12 @@ function writeJsonOut(result: RunResult): void {
 // =============================================================================
 
 const EASY_ABILITY_ADDITION_CHECK = process.env.ER_ABILITY_EASY_ADDITIONS === "1";
-const SELF_CHECK = process.env.ER_SCENARIO === "1" && !process.env.ER_RUN_SCENARIO && !EASY_ABILITY_ADDITION_CHECK;
+const NEWCOMER_SIGNATURE_CHECK = process.env.ER_NEWCOMER_SIGNATURE_CHECK === "1";
+const SELF_CHECK =
+  process.env.ER_SCENARIO === "1"
+  && !process.env.ER_RUN_SCENARIO
+  && !EASY_ABILITY_ADDITION_CHECK
+  && !NEWCOMER_SIGNATURE_CHECK;
 
 /** Run one inline spec through the full pipeline and return the summary + the game. */
 async function runInline(
@@ -3978,4 +4017,747 @@ describe.skipIf(!EASY_ABILITY_ADDITION_CHECK)("headless scenario runner - easy a
     },
     180_000,
   );
+});
+
+describe.skipIf(!NEWCOMER_SIGNATURE_CHECK)("headless scenario runner - newcomer signature abilities", () => {
+  const NEUTRAL_ABILITY = { ability: AbilityId.HONEY_GATHER, passiveAbility: AbilityId.HONEY_GATHER } as const;
+  let phaserGame: Phaser.Game;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  async function playTurn(game: GameManager, action: TurnAction): Promise<void> {
+    const actionLog: string[] = [];
+    doPlayerActions(game, action, null, actionLog);
+    if (hasEnemyForce(action)) {
+      await forceEnemyActions(game, action, actionLog);
+    }
+    await game.toEndOfTurn();
+  }
+
+  it("Eclipse Wing uses Sturdy timing, counters, and boosts low-HP Dark damage", async () => {
+    const endureSpec: RunnerInput = {
+      v: 1,
+      name: "Eclipse Wing direct lethal counter",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [
+        {
+          species: SpeciesId.SUNKERN,
+          ability: ER_ECLIPSE_WING_ABILITY_ID,
+          moves: [MoveId.NASTY_PLOT, MoveId.DARK_PULSE],
+        },
+      ],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 200, moves: [MoveId.HYPER_BEAM], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const endureGame = await launchScenario(phaserGame, endureSpec, { noMiss: true, noCrit: true });
+    const holder = endureGame.scene.getPlayerField()[0];
+    const attacker = endureGame.scene.getEnemyField()[0];
+    await playTurn(endureGame, {
+      move: "NASTY_PLOT",
+      enemyMove: "HYPER_BEAM",
+      enemyTarget: BattlerIndex.PLAYER,
+    });
+    expect(holder.hp).toBe(1);
+    expect(attacker.hp).toBeLessThan(attacker.getMaxHp());
+    const darkPulse = allMoves[MoveId.DARK_PULSE];
+    const boostedPower = darkPulse.calculateBattlePower(holder, attacker, true);
+    holder.summonData.ability = AbilityId.BALL_FETCH;
+    const controlPower = darkPulse.calculateBattlePower(holder, attacker, true);
+    expect(boostedPower / controlPower).toBeCloseTo(1.5, 5);
+  }, 180_000);
+
+  it("Final Season only arms on a voluntary switch and sets owned Eerie Fog at turn end", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Final Season voluntary entry",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [
+        { species: SpeciesId.SNORLAX, moves: [MoveId.SPLASH] },
+        { species: SpeciesId.MANDIBUZZ, ability: ER_FINAL_SEASON_ABILITY_ID, moves: [MoveId.DARK_PULSE] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 100, moves: [MoveId.SPLASH], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    game.scene.getPlayerParty()[1].setAbilityOverrideForSlot(0, ER_FINAL_SEASON_ABILITY_ID as AbilityId);
+    expect(game.scene.arena.weather?.weatherType).not.toBe(WeatherType.EERIE_FOG);
+    await playTurn(game, { switch: 1, enemyMove: "SPLASH" });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    expect(holder.getAbility().name).toBe("Final Season");
+    expect(enemy.getTag(BattlerTagType.ER_QUASHED)).toBeDefined();
+    expect(game.scene.arena.weather?.weatherType).toBe(WeatherType.EERIE_FOG);
+    await game.toNextTurn();
+    const hpBefore = enemy.hp;
+    await playTurn(game, { move: "DARK_PULSE", enemyMove: "SPLASH" });
+    const fogDamage = hpBefore - enemy.hp;
+    expect(fogDamage).toBeGreaterThan(0);
+  }, 180_000);
+
+  it("Foul Harvest drains the last used PP, stores charges, and refunds only its draining move", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Foul Harvest PP and drain charge",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [
+        {
+          species: SpeciesId.VENUSAUR,
+          ability: ER_FOUL_HARVEST_ABILITY_ID,
+          moves: [MoveId.TACKLE, MoveId.GIGA_DRAIN],
+        },
+      ],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 100, moves: [MoveId.RECOVER], ...NEUTRAL_ABILITY }],
+      },
+      start: { playerHpPct: 50 },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    await playTurn(game, { move: "TACKLE", enemyMove: "RECOVER" });
+    expect(enemy.getMoveset()[0].ppUsed).toBeGreaterThanOrEqual(2);
+    expect(foulHarvestCharges(holder)).toBe(1);
+    await game.toNextTurn();
+    await playTurn(game, { move: "GIGA_DRAIN", enemyMove: "RECOVER" });
+    expect(holder.getMoveset()[1].ppUsed).toBe(0);
+    expect(foulHarvestCharges(holder)).toBe(1);
+  }, 180_000);
+
+  it("Porous halves sound damage and spends accumulated direct-hit power on Ground", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Porous reduction and charge",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [
+        { species: SpeciesId.SNORLAX, ability: ER_POROUS_ABILITY_ID, moves: [MoveId.NASTY_PLOT, MoveId.EARTHQUAKE] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.BLISSEY, level: 150, moves: [MoveId.HYPER_VOICE, MoveId.TACKLE], ...NEUTRAL_ABILITY },
+        ],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    await playTurn(game, { move: "NASTY_PLOT", enemyMove: "HYPER_VOICE", enemyTarget: BattlerIndex.PLAYER });
+    const reducedSoundDamage = holder.getMaxHp() - holder.hp;
+    await game.toNextTurn();
+    holder.summonData.ability = AbilityId.BALL_FETCH;
+    const hpBeforeSoundControl = holder.hp;
+    await playTurn(game, { move: "NASTY_PLOT", enemyMove: "HYPER_VOICE", enemyTarget: BattlerIndex.PLAYER });
+    const controlSoundDamage = hpBeforeSoundControl - holder.hp;
+    expect(reducedSoundDamage).toBeLessThanOrEqual(Math.ceil(controlSoundDamage * 0.55));
+    holder.summonData.ability = ER_POROUS_ABILITY_ID as AbilityId;
+    await game.toNextTurn();
+    await playTurn(game, { move: "NASTY_PLOT", enemyMove: "TACKLE", enemyTarget: BattlerIndex.PLAYER });
+    await game.toNextTurn();
+    const earthquake = allMoves[MoveId.EARTHQUAKE];
+    const chargedPower = earthquake.calculateBattlePower(holder, enemy, true);
+    holder.summonData.ability = AbilityId.BALL_FETCH;
+    const controlPower = earthquake.calculateBattlePower(holder, enemy, true);
+    holder.summonData.ability = ER_POROUS_ABILITY_ID as AbilityId;
+    expect(chargedPower / controlPower).toBeCloseTo(1.5, 5);
+    await playTurn(game, { move: "EARTHQUAKE", enemyMove: "SPLASH" });
+    expect(porousCharges(holder)).toBe(0);
+  }, 180_000);
+
+  it("Glam Rock consumes one hazard layer, raises both defenses, and anchors the holder", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Glam Rock hazard and anchor",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [
+        { species: SpeciesId.SHUCKLE, ability: ER_GLAM_ROCK_ABILITY_ID, moves: [MoveId.SPLASH] },
+        { species: SpeciesId.SNORLAX, moves: [MoveId.SPLASH] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.SKARMORY, level: 100, moves: [MoveId.SPIKES, MoveId.ROAR], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    await playTurn(game, { move: "SPLASH", enemyMove: "SPIKES" });
+    expect(game.scene.arena.getTagOnSide(ArenaTagType.SPIKES, ArenaTagSide.PLAYER)).toBeUndefined();
+    await game.toNextTurn();
+    expect(holder.getStatStage(Stat.DEF)).toBe(1);
+    expect(holder.getStatStage(Stat.SPDEF)).toBe(1);
+    await playTurn(game, { move: "SPLASH", enemyMove: "ROAR", enemyTarget: BattlerIndex.PLAYER });
+    expect(game.scene.getPlayerField()[0]).toBe(holder);
+  }, 180_000);
+
+  it("Sediment Bloom is planted by Rapid Spin, drains the foe, and heals the holder's side", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Sediment Bloom hazard removal",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [
+        {
+          species: SpeciesId.BLASTOISE,
+          ability: ER_SEDIMENT_BLOOM_ABILITY_ID,
+          moves: [MoveId.SPLASH, MoveId.RAPID_SPIN],
+        },
+      ],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 100, moves: [MoveId.SPIKES, MoveId.SPLASH], ...NEUTRAL_ABILITY }],
+      },
+      start: { playerHpPct: 50 },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    await playTurn(game, { move: "SPLASH", enemyMove: "SPIKES" });
+    await game.toNextTurn();
+    const hpBefore = holder.hp;
+    const enemyBefore = enemy.hp;
+    await playTurn(game, { move: "RAPID_SPIN", enemyMove: "SPLASH" });
+    expect(game.scene.arena.getTagOnSide(ArenaTagType.SPIKES, ArenaTagSide.PLAYER)).toBeUndefined();
+    expect(holder.hp).toBeGreaterThan(hpBefore);
+    expect(enemyBefore - enemy.hp).toBeGreaterThan(Math.floor(enemy.getMaxHp() / 16));
+  }, 180_000);
+
+  it("Two-Faced Unleashed alternates its Dark boost and nonlethal recoil", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Two-Faced alternating unleash",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.SNORLAX, ability: ER_TWO_FACED_UNLEASHED_ABILITY_ID, moves: [MoveId.DARK_PULSE] }],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 300, moves: [MoveId.SUNNY_DAY], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    const damages: number[] = [];
+    const recoil: number[] = [];
+    for (let turn = 0; turn < 3; turn++) {
+      const enemyHp = enemy.hp;
+      const playerHp = holder.hp;
+      await playTurn(game, { move: "DARK_PULSE", enemyMove: "SUNNY_DAY" });
+      damages.push(enemyHp - enemy.hp);
+      recoil.push(playerHp - holder.hp);
+      if (turn < 2) {
+        await game.toNextTurn();
+      }
+    }
+    expect(damages[0]).toBeGreaterThanOrEqual(Math.floor(damages[1] * 1.7));
+    expect(damages[2]).toBeGreaterThanOrEqual(Math.floor(damages[1] * 1.7));
+    expect(recoil[0]).toBe(Math.floor(holder.getMaxHp() * 0.15));
+    expect(recoil[1]).toBe(0);
+    expect(recoil[2]).toBe(Math.floor(holder.getMaxHp() * 0.15));
+    expect(holder.hp).toBeGreaterThan(0);
+  }, 180_000);
+
+  it("Skyhook pivots after a direct hit and applies the seeded 20% Speed entry boost", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Skyhook free pivot",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.BLISSEY, moves: [MoveId.RECOVER] }],
+      enemy: { kind: "trainer", trainerType: TrainerType.YOUNGSTER },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true, minRng: true });
+    const outgoing = game.scene.getEnemyField()[0] as EnemyPokemon;
+    for (const member of game.scene.getEnemyParty() as EnemyPokemon[]) {
+      member.setAbilityOverrideForSlot(0, AbilityId.BALL_FETCH);
+      member.trainerSlot = outgoing.trainerSlot;
+    }
+    outgoing.setAbilityOverrideForSlot(0, ER_SKYHOOK_ABILITY_ID as AbilityId);
+    expect(game.scene.getEnemyParty().some(mon => !mon.isOnField() && !mon.isFainted())).toBe(true);
+    await playTurn(game, { move: "RECOVER", enemyMove: "TACKLE", enemyTarget: BattlerIndex.PLAYER });
+    await game.toNextTurn();
+    const incoming = game.scene.getEnemyField()[0];
+    expect(incoming).not.toBe(outgoing);
+    expect(incoming.getStatStage(Stat.SPD)).toBe(1);
+  }, 180_000);
+
+  it("Anneal raises the matching defense once per resisted move and caps at two per entry", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Anneal resisted hit cap",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.BLASTOISE, ability: ER_ANNEAL_ABILITY_ID, moves: [MoveId.RECOVER] }],
+      enemy: {
+        kind: "party",
+        party: [
+          {
+            species: SpeciesId.CHARIZARD,
+            level: 100,
+            moves: [MoveId.FLAME_CHARGE, MoveId.FLAMETHROWER],
+            ...NEUTRAL_ABILITY,
+          },
+        ],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    await playTurn(game, { move: "RECOVER", enemyMove: "FLAME_CHARGE", enemyTarget: BattlerIndex.PLAYER });
+    await game.toNextTurn();
+    expect(holder.getStatStage(Stat.DEF)).toBe(1);
+    await playTurn(game, { move: "RECOVER", enemyMove: "FLAMETHROWER", enemyTarget: BattlerIndex.PLAYER });
+    await game.toNextTurn();
+    expect(holder.getStatStage(Stat.SPDEF)).toBe(1);
+    await playTurn(game, { move: "RECOVER", enemyMove: "FLAMETHROWER", enemyTarget: BattlerIndex.PLAYER });
+    await game.toNextTurn();
+    expect(holder.getStatStage(Stat.SPDEF)).toBe(1);
+  }, 180_000);
+
+  it("Living Chrome grants one-turn prior-type Shape Memory without changing typing", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Living Chrome type memory",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.SNORLAX, ability: ER_LIVING_CHROME_ABILITY_ID, moves: [MoveId.NASTY_PLOT] }],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.KANGASKHAN, level: 100, moves: [MoveId.BODY_SLAM], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const originalTypes = holder.getTypes();
+    recordLivingChromeTransformation(holder, [PokemonType.NORMAL], 1);
+    await playTurn(game, { move: "NASTY_PLOT", enemyMove: "BODY_SLAM", enemyTarget: BattlerIndex.PLAYER });
+    const reducedDamage = holder.getMaxHp() - holder.hp;
+    expect(holder.getTypes()).toEqual(originalTypes);
+    await game.toNextTurn();
+    const hpBeforeControl = holder.hp;
+    await playTurn(game, { move: "NASTY_PLOT", enemyMove: "BODY_SLAM", enemyTarget: BattlerIndex.PLAYER });
+    const controlDamage = hpBeforeControl - holder.hp;
+    expect(reducedDamage).toBeLessThanOrEqual(Math.ceil(controlDamage * 0.55));
+  }, 180_000);
+
+  it("Vapor Body makes 100-accuracy contact miss and ignores only contact traps", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Vapor Body contact accuracy and trap",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.VAPOREON, ability: ER_VAPOR_BODY_ABILITY_ID, moves: [MoveId.NASTY_PLOT] }],
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.KANGASKHAN, level: 100, moves: [MoveId.TACKLE, MoveId.SWIFT], ...NEUTRAL_ABILITY },
+        ],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    await playTurn(game, { move: "NASTY_PLOT", enemyMove: "TACKLE", enemyTarget: BattlerIndex.PLAYER });
+    expect(holder.hp).toBe(holder.getMaxHp());
+    holder.addTag(BattlerTagType.BIND, 3, MoveId.WRAP, enemy.id);
+    expect(hasEffectiveMoveTrap(holder)).toBe(false);
+    holder.removeTag(BattlerTagType.BIND);
+    holder.addTag(BattlerTagType.SAND_TOMB, 3, MoveId.SAND_TOMB, enemy.id);
+    expect(hasEffectiveMoveTrap(holder)).toBe(true);
+    await game.toNextTurn();
+    await playTurn(game, { move: "NASTY_PLOT", enemyMove: "SWIFT", enemyTarget: BattlerIndex.PLAYER });
+    expect(holder.hp).toBeLessThan(holder.getMaxHp());
+  }, 180_000);
+
+  it("Heavyweight reaches the recommended 1.5x cap and drops Defense once", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Heavyweight scaling",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.SNORLAX, ability: ER_HEAVYWEIGHT_ABILITY_ID, moves: [MoveId.MACH_PUNCH] }],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.DIGLETT, level: 300, moves: [MoveId.SUNNY_DAY], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    const machPunch = allMoves[MoveId.MACH_PUNCH];
+    const boostedPower = machPunch.calculateBattlePower(holder, enemy, true);
+    holder.summonData.ability = AbilityId.BALL_FETCH;
+    const controlPower = machPunch.calculateBattlePower(holder, enemy, true);
+    holder.summonData.ability = ER_HEAVYWEIGHT_ABILITY_ID as AbilityId;
+    expect(boostedPower / controlPower).toBeCloseTo(1.5, 5);
+    await playTurn(game, { move: "MACH_PUNCH", enemyMove: "SUNNY_DAY" });
+    await game.toNextTurn();
+    expect(enemy.getStatStage(Stat.DEF)).toBe(-1);
+  }, 180_000);
+
+  it("Spirit Punch adds its noncritical Ghost echo without recursive KO attribution", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Spirit Punch echo",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.HITMONCHAN, ability: ER_SPIRIT_PUNCH_ABILITY_ID, moves: [MoveId.MACH_PUNCH] }],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.MEWTWO, level: 300, moves: [MoveId.SUNNY_DAY], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    const hpBeforeEcho = enemy.hp;
+    await playTurn(game, { move: "MACH_PUNCH", enemyMove: "SUNNY_DAY" });
+    const echoDamage = hpBeforeEcho - enemy.hp;
+    await game.toNextTurn();
+    holder.summonData.ability = AbilityId.BALL_FETCH;
+    const hpBeforeControl = enemy.hp;
+    await playTurn(game, { move: "MACH_PUNCH", enemyMove: "SUNNY_DAY" });
+    expect(echoDamage).toBeGreaterThanOrEqual(Math.floor((hpBeforeControl - enemy.hp) * 1.25));
+  }, 180_000);
+
+  it("Deadeye Draw marks with an arrow, guarantees cannon crits, and clears on exit", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Deadeye mark lifecycle",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [
+        {
+          species: SpeciesId.BLASTOISE,
+          ability: ER_DEADEYE_DRAW_ABILITY_ID,
+          moves: [MoveId.PIN_MISSILE, MoveId.WATER_PULSE],
+        },
+        { species: SpeciesId.SNORLAX, moves: [MoveId.RECOVER] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 300, moves: [MoveId.RECOVER], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    await playTurn(game, { move: "PIN_MISSILE", enemyMove: "RECOVER" });
+    const cannon = allMoves[MoveId.WATER_PULSE];
+    expect(enemy.getCriticalHitResult(holder, cannon)).toBe(true);
+    await game.toNextTurn();
+    await playTurn(game, { switch: 1, enemyMove: "RECOVER" });
+    expect(enemy.getCriticalHitResult(holder, cannon)).toBe(false);
+  }, 180_000);
+
+  it("Boot Hill plants a one-use Grave Marker after a direct knockout", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Boot Hill entry marker",
+      run: { wave: 146, level: 100, difficulty: "ace", double: true },
+      party: [
+        { species: SpeciesId.MEWTWO, ability: ER_BOOT_HILL_ABILITY_ID, moves: [MoveId.PSYCHIC] },
+        { species: SpeciesId.SNORLAX, moves: [MoveId.NASTY_PLOT] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.MAGIKARP, level: 1, moves: [MoveId.SUNNY_DAY], ...NEUTRAL_ABILITY },
+          { species: SpeciesId.BLISSEY, level: 100, moves: [MoveId.NASTY_PLOT], ...NEUTRAL_ABILITY },
+        ],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const [outgoing, incoming] = game.scene.getEnemyField();
+    outgoing.hp = 1;
+    await playTurn(game, {
+      move: "PSYCHIC",
+      move2: "NASTY_PLOT",
+      enemyMove: "SUNNY_DAY",
+      enemyMove2: "NASTY_PLOT",
+    });
+    expect(outgoing.isFainted()).toBe(true);
+    applyGraveMarkerOnEntry(incoming);
+    expect(incoming.getMaxHp() - incoming.hp).toBeGreaterThanOrEqual(Math.floor(incoming.getMaxHp() / 8));
+    expect(incoming.getStatStage(Stat.SPD)).toBe(-1);
+    const hpAfterEntry = incoming.hp;
+    applyGraveMarkerOnEntry(incoming);
+    expect(incoming.hp).toBe(hpAfterEntry);
+  }, 180_000);
+
+  it("Gillie Suit changes to the move type and heals one quarter after its direct KO", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Gillie Suit composite",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.VENUSAUR, ability: ER_GILLIE_SUIT_ABILITY_ID, moves: [MoveId.WATER_PULSE] }],
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.MAGIKARP, level: 1, moves: [MoveId.SUNNY_DAY], ...NEUTRAL_ABILITY },
+          { species: SpeciesId.BLISSEY, level: 100, moves: [MoveId.SUNNY_DAY] },
+        ],
+      },
+      start: { playerHpPct: 50 },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    await playTurn(game, { move: "WATER_PULSE", enemyMove: "SUNNY_DAY" });
+    expect(holder.getTypes()).toContain(PokemonType.WATER);
+    expect(holder.getHpRatio()).toBeGreaterThanOrEqual(0.74);
+  }, 180_000);
+
+  it("Ring General delays its above-half non-Ghost trap until the turn after entry", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Ring General delayed trap",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.MACHAMP, ability: ER_RING_GENERAL_ABILITY_ID, moves: [MoveId.NASTY_PLOT] }],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 100, moves: [MoveId.SUNNY_DAY], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const enemy = game.scene.getEnemyField()[0];
+    expect(enemy.isTrapped()).toBe(false);
+    await playTurn(game, { move: "NASTY_PLOT", enemyMove: "SUNNY_DAY" });
+    await game.toNextTurn();
+    expect(enemy.isTrapped()).toBe(true);
+  }, 180_000);
+
+  it("Encore Set echoes the prior different damaging move at 40% power", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Encore Set previous move echo",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [
+        { species: SpeciesId.BLASTOISE, ability: ER_ENCORE_SET_ABILITY_ID, moves: [MoveId.TACKLE, MoveId.WATER_GUN] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 300, moves: [MoveId.SUNNY_DAY], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    await playTurn(game, { move: "TACKLE", enemyMove: "SUNNY_DAY" });
+    await game.toNextTurn();
+    const hpBeforeEcho = enemy.hp;
+    await playTurn(game, { move: "WATER_GUN", enemyMove: "SUNNY_DAY" });
+    const echoTurnDamage = hpBeforeEcho - enemy.hp;
+    await game.toNextTurn();
+    holder.summonData.ability = AbilityId.BALL_FETCH;
+    const hpBeforeControl = enemy.hp;
+    await playTurn(game, { move: "WATER_GUN", enemyMove: "SUNNY_DAY" });
+    expect(echoTurnDamage).toBeGreaterThan(hpBeforeControl - enemy.hp);
+  }, 180_000);
+
+  it("Setlist records two moves then applies 20% and 40% alternating crescendos", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Setlist alternating crescendo",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [
+        { species: SpeciesId.BLASTOISE, ability: ER_SETLIST_ABILITY_ID, moves: [MoveId.TACKLE, MoveId.WATER_GUN] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 500, moves: [MoveId.SUNNY_DAY], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    await playTurn(game, { move: "TACKLE", enemyMove: "SUNNY_DAY" });
+    await game.toNextTurn();
+    await playTurn(game, { move: "WATER_GUN", enemyMove: "SUNNY_DAY" });
+    await game.toNextTurn();
+    const tackle = holder.getMoveset()[0].getMove();
+    const thirdPower = tackle.calculateBattlePower(holder, enemy, true);
+    holder.summonData.ability = AbilityId.BALL_FETCH;
+    const tackleControl = tackle.calculateBattlePower(holder, enemy, true);
+    holder.summonData.ability = ER_SETLIST_ABILITY_ID as AbilityId;
+    expect(thirdPower / tackleControl).toBeCloseTo(1.2, 5);
+    await playTurn(game, { move: "TACKLE", enemyMove: "SUNNY_DAY" });
+    await game.toNextTurn();
+    const waterGun = holder.getMoveset()[1].getMove();
+    const fourthPower = waterGun.calculateBattlePower(holder, enemy, true);
+    holder.summonData.ability = AbilityId.BALL_FETCH;
+    const waterControl = waterGun.calculateBattlePower(holder, enemy, true);
+    expect(fourthPower / waterControl).toBeCloseTo(1.4, 5);
+  }, 180_000);
+
+  it("Fan Favorite uses all five living bench cheers for accuracy and special damage", async () => {
+    const party: SpecMon[] = [
+      { species: SpeciesId.ALAKAZAM, ability: ER_FAN_FAVORITE_ABILITY_ID, moves: [MoveId.HYDRO_PUMP] },
+      ...Array.from({ length: 5 }, () => ({ species: SpeciesId.MAGIKARP, moves: [MoveId.SUNNY_DAY] })),
+    ];
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Fan Favorite full bench",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party,
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.BLISSEY, level: 300, moves: [MoveId.SUNNY_DAY], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    const hydroPump = allMoves[MoveId.HYDRO_PUMP];
+    const cheeredPower = hydroPump.calculateBattlePower(holder, enemy, true);
+    const cheeredAccuracy = hydroPump.calculateBattleAccuracy(holder, enemy, true);
+    holder.summonData.ability = AbilityId.BALL_FETCH;
+    const controlPower = hydroPump.calculateBattlePower(holder, enemy, true);
+    const controlAccuracy = hydroPump.calculateBattleAccuracy(holder, enemy, true);
+    holder.summonData.ability = ER_FAN_FAVORITE_ABILITY_ID as AbilityId;
+    expect(cheeredPower / controlPower).toBeCloseTo(1.25, 5);
+    expect(cheeredAccuracy / controlAccuracy).toBeCloseTo(1.25, 5);
+    await playTurn(game, { move: "HYDRO_PUMP", enemyMove: "SUNNY_DAY" });
+    expect(enemy.hp).toBeLessThan(enemy.getMaxHp());
+  }, 180_000);
+
+  it("Reduction consumes both fields and gives terrain precedence for the dual type", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Reduction terrain precedence",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.SNORLAX, ability: ER_REDUCTION_ABILITY_ID, moves: [MoveId.TACKLE] }],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.DIGLETT, level: 100, moves: [MoveId.NASTY_PLOT], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    game.scene.arena.trySetWeather(WeatherType.RAIN, holder);
+    game.scene.arena.trySetTerrain(TerrainType.ELECTRIC, true, holder);
+    const enemy = game.scene.getEnemyField()[0];
+    await playTurn(game, { move: "TACKLE", enemyMove: "NASTY_PLOT" });
+    expect(enemy.hp).toBe(enemy.getMaxHp());
+    expect(game.scene.arena.weather).toBeNull();
+    expect(game.scene.arena.terrain).toBeNull();
+  }, 180_000);
+
+  it("Cracked Vessel removes only the last type and toxics every adjacent battler", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Cracked Vessel adjacent spill",
+      // Wave 1 keeps the enemy attacking (past the ~wave-100 BST ladder a `party`
+      // enemy resolves to a SWITCHING trainer that withdraws instead of firing, so
+      // the lethal hit Cracked Vessel keys off never lands). The lethal attacker is
+      // a low-BST NON-Steel/Poison species (Rattata) so the #419 wave-1 cap leaves
+      // it un-devolved - a >420-BST attacker (the codex fixture used Mewtwo) is
+      // devolved into a Steel replacement here, which would make TWO Steel-immune
+      // adjacent mons. Metagross stays the sole intended Steel-immune adjacent, and
+      // the forced max-roll L500 Hyper Beam is still lethal to the frail holder.
+      run: { wave: 1, level: 100, difficulty: "ace", triple: true },
+      party: [
+        { species: SpeciesId.CHARIZARD, ability: ER_CRACKED_VESSEL_ABILITY_ID, moves: [MoveId.NASTY_PLOT] },
+        { species: SpeciesId.DIGLETT, moves: [MoveId.NASTY_PLOT] },
+        { species: SpeciesId.DIGLETT, moves: [MoveId.NASTY_PLOT] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.RATTATA, level: 500, moves: [MoveId.HYPER_BEAM], ...NEUTRAL_ABILITY },
+          { species: SpeciesId.METAGROSS, level: 100, moves: [MoveId.NASTY_PLOT] },
+          { species: SpeciesId.DIGLETT, level: 100, moves: [MoveId.NASTY_PLOT] },
+        ],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    game.scene.arena.removeTagOnSide(ArenaTagType.SAFEGUARD, ArenaTagSide.PLAYER, true);
+    game.scene.arena.removeTagOnSide(ArenaTagType.SAFEGUARD, ArenaTagSide.ENEMY, true);
+    const [holder] = game.scene.getPlayerField();
+    const adjacent = [...holder.getAdjacentAllies(), ...holder.getAdjacentOpponents()];
+    const poisonImmuneAdjacent = adjacent.filter(
+      pokemon => pokemon.isOfType(PokemonType.POISON) || pokemon.isOfType(PokemonType.STEEL),
+    );
+    const eligibleAdjacent = adjacent.filter(pokemon => !poisonImmuneAdjacent.includes(pokemon));
+    const nonAdjacent = [...game.scene.getPlayerField(true), ...game.scene.getEnemyField(true)].filter(
+      pokemon => pokemon !== holder && !adjacent.includes(pokemon),
+    );
+    const typesBefore = holder.getTypes();
+    await playTurn(game, {
+      move: "NASTY_PLOT",
+      move2: "NASTY_PLOT",
+      move3: "NASTY_PLOT",
+      enemyMove: "HYPER_BEAM",
+      enemyTarget: BattlerIndex.PLAYER,
+      enemyMove2: "NASTY_PLOT",
+      enemyMove3: "NASTY_PLOT",
+    });
+    expect(holder.hp).toBe(1);
+    expect(holder.getTypes()).toEqual(typesBefore.slice(0, -1));
+    expect(game.scene.arena.weather?.weatherType).toBe(WeatherType.EERIE_FOG);
+    expect(poisonImmuneAdjacent).toHaveLength(1);
+    for (const pokemon of eligibleAdjacent) {
+      expect(
+        pokemon.status?.effect,
+        `${pokemon.getNameToRender()} pending=${pokemon.turnData.pendingStatus} types=${pokemon.getTypes().join(",")}`,
+      ).toBe(StatusEffect.TOXIC);
+    }
+    for (const pokemon of [...poisonImmuneAdjacent, ...nonAdjacent]) {
+      expect(pokemon.status).toBeUndefined();
+    }
+  }, 180_000);
+
+  it("Center of Attention penalizes ally targeting and reduces spread damage without double-penalizing", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Center of Attention doubles behavior",
+      run: { wave: 146, level: 100, difficulty: "ace", double: true },
+      party: [
+        { species: SpeciesId.BLISSEY, ability: ER_CENTER_OF_ATTENTION_ABILITY_ID, moves: [MoveId.NASTY_PLOT] },
+        { species: SpeciesId.BLISSEY, moves: [MoveId.NASTY_PLOT] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.ALAKAZAM, level: 100, moves: [MoveId.THUNDERBOLT, MoveId.SURF], ...NEUTRAL_ABILITY },
+          { species: SpeciesId.MAGIKARP, level: 100, moves: [MoveId.NASTY_PLOT] },
+        ],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    Overrides.ABILITY_OVERRIDE = AbilityId.NONE;
+    const [holder, ally] = game.scene.getPlayerField();
+    holder.setAbilityOverrideForSlot(0, ER_CENTER_OF_ATTENTION_ABILITY_ID as AbilityId);
+    ally.setAbilityOverrideForSlot(0, AbilityId.BALL_FETCH);
+    const attacker = game.scene.getEnemyField()[0];
+    await playTurn(game, {
+      move: "NASTY_PLOT",
+      move2: "NASTY_PLOT",
+      enemyMove: "THUNDERBOLT",
+      enemyTarget: BattlerIndex.PLAYER_2,
+      enemyMove2: "NASTY_PLOT",
+    });
+    await game.toNextTurn();
+    expect(attacker.getStatStage(Stat.SPATK)).toBe(-1);
+    const before = [holder.hp, ally.hp];
+    await playTurn(game, { move: "NASTY_PLOT", move2: "NASTY_PLOT", enemyMove: "SURF", enemyMove2: "NASTY_PLOT" });
+    const damages = [before[0] - holder.hp, before[1] - ally.hp];
+    expect(damages[0]).toBeLessThan(damages[1]);
+    await game.toNextTurn();
+    expect(attacker.getStatStage(Stat.SPATK)).toBe(-1);
+  }, 180_000);
+
+  it("Superego transfers a foe's boost to its prior stage", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "Superego stat transfer",
+      run: { wave: 146, level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.SHUCKLE, ability: ER_SUPEREGO_ABILITY_ID, moves: [MoveId.NASTY_PLOT] }],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.SNORLAX, level: 100, moves: [MoveId.SWORDS_DANCE], ...NEUTRAL_ABILITY }],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    const holder = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    await playTurn(game, { move: "NASTY_PLOT", enemyMove: "SWORDS_DANCE" });
+    await game.toNextTurn();
+    expect(holder.getStatStage(Stat.ATK)).toBe(2);
+    expect(enemy.getStatStage(Stat.ATK)).toBe(0);
+  }, 180_000);
 });
