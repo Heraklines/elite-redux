@@ -14512,7 +14512,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "   abilities/innates are unchanged, and a future run is back to normal. It survives a\n"
       + "   mid-run reload (Save & Quit -> Continue).\n"
       + " - There is NO lock cost (unlike Curiosity, nothing is disabled).\n"
-      + " - Backing out of the slot pick or the 4-ability chooser does NOT consume the item.",
+      + " - Backing out of the slot pick or the 4-ability chooser does NOT consume the item.\n"
+      + "ANTI-REROLL REGRESSION: note the four offered abilities, cancel the ability chooser,\n"
+      + "cancel the slot picker ALL THE WAY back to the reward shop, then select the SAME pink\n"
+      + "item for Garchomp again. EXPECT: the exact same four abilities in the same order.\n"
+      + "The second pink item is a separate offer and may roll a different set.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

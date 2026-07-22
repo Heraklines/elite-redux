@@ -43,8 +43,9 @@ import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/co
 import { COOP_ABILITY_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import type { BargainAbilityChoice } from "#data/elite-redux/er-bargain-sins";
 import {
+  type GreaterAbilityRandomizerChoiceCache,
+  getOrRollGreaterRandomizerAbilities,
   greaterRandomizerReplaceSlot,
-  rollGreaterRandomizerAbilities,
 } from "#data/elite-redux/er-greater-ability-randomizer";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -60,13 +61,8 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   private readonly partyIndex: number;
   /** The UI mode active when this phase started; sub-menus restore to it. */
   private baseMode: UiMode = UiMode.MESSAGE;
-  /**
-   * The 4 rolled abilities, cached on first open and reused for the phase's lifetime.
-   * Without this, backing out of the ability picker (-> slot picker -> re-pick the slot)
-   * re-rolls a fresh set, letting the player reroll indefinitely until they like the
-   * options. The roll is per-mon (slot-independent), so one cache for the phase is correct.
-   */
-  private rolledChoices: BargainAbilityChoice[] | null = null;
+  /** Shared by every continuation of this specific reward offer. */
+  private readonly choiceCache: GreaterAbilityRandomizerChoiceCache;
 
   // ---- Co-op (#633 B9c): owner-drives / watcher-applies (see ErAbilityCapsulePhase) ----
   private readonly coopSeq: number;
@@ -75,11 +71,17 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   private readonly coopOperationBinding: CoopAbilityOperationBinding | null;
   private coopOutcome: number[] = [COOP_ABILITY_OP.CANCEL];
 
-  constructor(partyIndex: number, coopSeq = -1, coopIsWatcher = false) {
+  constructor(
+    partyIndex: number,
+    coopSeq = -1,
+    coopIsWatcher = false,
+    choiceCache: GreaterAbilityRandomizerChoiceCache = new Map(),
+  ) {
     super();
     this.partyIndex = partyIndex;
     this.coopSeq = coopSeq;
     this.coopIsWatcher = coopIsWatcher;
+    this.choiceCache = choiceCache;
     this.coopOperationBinding = coopSeq >= 0 ? captureCoopAbilityOperationBinding() : null;
   }
 
@@ -160,9 +162,9 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
    * un-consumed).
    */
   private openAbilityPicker(mon: PlayerPokemon, slot: number): void {
-    // Roll ONCE and reuse for this phase: re-opening (after a back-out to the slot picker)
-    // must show the SAME set, otherwise the player can reroll freely by cancelling.
-    const choices = (this.rolledChoices ??= rollGreaterRandomizerAbilities(mon));
+    // Roll once per reward offer + target. The cache outlives this phase through the
+    // SelectModifierPhase continuation, so even a full exit to the shop cannot reroll.
+    const choices = getOrRollGreaterRandomizerAbilities(mon, this.choiceCache);
     this.log(
       `openAbilityPicker slot=${slot} rolled=${choices.length} ids=[${choices.map(c => c.abilityId).join(",")}]`,
     );

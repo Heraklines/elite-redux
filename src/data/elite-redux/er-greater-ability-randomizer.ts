@@ -30,6 +30,13 @@ import type { PlayerPokemon } from "#field/pokemon";
 export const GREATER_RANDOMIZER_ABILITY_CHOICES = 4;
 
 /**
+ * Rolls already shown for one Greater Ability Randomizer reward offer, keyed by
+ * the target Pokemon's run-local id. The reward-screen continuation copies share
+ * this map so leaving the item entirely and re-entering it cannot reroll the menu.
+ */
+export type GreaterAbilityRandomizerChoiceCache = Map<number, BargainAbilityChoice[]>;
+
+/**
  * Roll {@linkcode GREATER_RANDOMIZER_ABILITY_CHOICES} (4) DISTINCT abilities for the
  * player to choose from, excluding the abilities the mon's slots already hold (so a
  * roll never offers a duplicate of a slot it could land in) plus any extra ids in
@@ -42,6 +49,21 @@ export function rollGreaterRandomizerAbilities(
 ): BargainAbilityChoice[] {
   const present = pokemon.getAbilitySlots().map(s => s.ability.id);
   return rollCuriosityAbilities([...present, ...exclude], GREATER_RANDOMIZER_ABILITY_CHOICES);
+}
+
+/** Return the roll already shown for this offer/target, or create it exactly once. */
+export function getOrRollGreaterRandomizerAbilities(
+  pokemon: PlayerPokemon,
+  cache: GreaterAbilityRandomizerChoiceCache,
+): BargainAbilityChoice[] {
+  const cached = cache.get(pokemon.id);
+  if (cached != null) {
+    return cached;
+  }
+
+  const choices = rollGreaterRandomizerAbilities(pokemon);
+  cache.set(pokemon.id, choices);
+  return choices;
 }
 
 /**
