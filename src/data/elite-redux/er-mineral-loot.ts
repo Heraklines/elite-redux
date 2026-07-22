@@ -33,6 +33,7 @@ import { globalScene } from "#app/global-scene";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { modifierTypes } from "#data/data-lists";
 import { ER_RESIST_BERRY_BY_TYPE, erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
+import { erMegaStoneTier, pickErMegaStoneWeighted } from "#data/elite-redux/er-mega-tiers";
 import { type ErWardStoneTier, erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -352,10 +353,15 @@ export function rollMegaStone(haul: MineralLootHaul, d: number, chancePct: numbe
   if (stones.length === 0) {
     return false;
   }
-  const opt = generateModifierTypeOption(modifierTypes.FORM_CHANGE_ITEM, [randSeedItem(stones)]);
+  // STRENGTH-TIERED rarity (er-mega-tiers): the deep find is a WEIGHTED pick, so
+  // a masterball-tier stone (legendary / primal / "-Z" ultra mega) is a very-
+  // low-chance unearth even when eligible, and reads at its true rarity tier.
+  const stone = pickErMegaStoneWeighted(stones);
+  const opt = generateModifierTypeOption(modifierTypes.FORM_CHANGE_ITEM, [stone]);
   if (!opt) {
     return false;
   }
+  opt.type.setTier(erMegaStoneTier(stone));
   haul.options.push(opt);
   haul.megaFound = true;
   return true;

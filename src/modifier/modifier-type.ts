@@ -17,6 +17,7 @@ import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { getErTemporaryLuck } from "#data/elite-redux/er-fairy-luck";
 import { greaterCapsuleHasAnyOption } from "#data/elite-redux/er-greater-ability-capsule";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
+import { erMegaStoneTier, pickErMegaStoneWeighted } from "#data/elite-redux/er-mega-tiers";
 import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
@@ -2086,8 +2087,11 @@ export class FormChangeItemModifierTypeGenerator extends ModifierTypeGenerator {
           return null;
         }
 
-        // TODO: should this use `randSeedItem`?
-        return new FormChangeItemModifierType(formChangeItemPool[randSeedInt(formChangeItemPool.length)]);
+        // STRENGTH-TIERED rarity (er-mega-tiers): a weighted pick biased hard
+        // toward the common tiers, so when several stones are eligible the
+        // strong ones (Mega Xerneas/Yveltal-Z class, primal orbs) almost never
+        // win the roll. Every stone keeps weight >= 1, so reachability holds.
+        return new FormChangeItemModifierType(pickErMegaStoneWeighted(formChangeItemPool));
       },
       isRareFormChangeItem ? "RARE_FORM_CHANGE_ITEM" : "FORM_CHANGE_ITEM",
     );
@@ -3295,7 +3299,14 @@ export function getPlayerShopModifierTypeOptionsForWave(
           // costs far more than an Ultra-tier Quick Claw, balls escalate Poke <
           // Great < Ultra < Rogue) x the biome discount - not a flat per-category
           // rate. Explicit map covers staples (balls) that aren't pooled.
-          const tier = erBiomeShopResolveTier(entry.key, mt.getOrInferTier(), entry.category);
+          // Mega/primal stones price + stock by their STRENGTH tier
+          // (er-mega-tiers): a masterball-tier stone in the EVO slot costs the
+          // masterball factor and stocks 1, instead of the flat ULTRA the
+          // FORM_CHANGE_ITEM pool slot would infer.
+          const tier =
+            mt instanceof FormChangeItemModifierType
+              ? erMegaStoneTier(mt.formChangeItem)
+              : erBiomeShopResolveTier(entry.key, mt.getOrInferTier(), entry.category);
           // Cache the resolved tier on the type so the phase's stock calc
           // (o.type.getOrInferTier()) reads the SAME tier the price used.
           mt.setTier(tier);
