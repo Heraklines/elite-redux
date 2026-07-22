@@ -1,5 +1,68 @@
 {
   "MULTI_LENS": {
     "tier": "MASTER"
+  },
+  "ER_COVERT_CLOAK": {
+    "weight": 0
+  },
+  "ER_RED_CARD": {
+    "weight": 0
+  },
+  "ER_EJECT_BUTTON": {
+    "weight": 0
+  },
+  "ER_EJECT_PACK": {
+    "weight": 0
+  },
+  "ER_ROOM_SERVICE": {
+    "weight": 0
+  },
+  "ER_IRON_BALL": {
+    "weight": 0
+  },
+  "ER_STICKY_BARB": {
+    "weight": 0
+  },
+  "ER_SMOKE_BALL": {
+    "weight": 0
+  },
+  "ER_SHED_SHELL": {
+    "weight": 0
+  },
+  "ER_BLUNDER_POLICY": {
+    "weight": 0
+  },
+  "ER_ADRENALINE_ORB": {
+    "weight": 0
+  },
+  "ER_THROAT_SPRAY": {
+    "weight": 0
+  },
+  "ER_UTILITY_UMBRELLA": {
+    "weight": 0
+  },
+  "ER_AIR_BALLOON": {
+    "weight": 1
+  },
+  "ER_SAFETY_GOGGLES": {
+    "weight": 1
+  },
+  "ER_HEAVY_DUTY_BOOTS": {
+    "weight": 1
+  },
+  "ER_CLEAR_AMULET": {
+    "weight": 1
+  },
+  "ER_ABILITY_SHIELD": {
+    "weight": 1
+  },
+  "ER_FLOAT_STONE": {
+    "weight": 1
+  },
+  "ER_MENTAL_HERB": {
+    "weight": 1
+  },
+  "ER_ZOOM_LENS": {
+    "weight": 1
   }
 }
