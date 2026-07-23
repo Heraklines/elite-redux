@@ -30,15 +30,11 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { type CoopChecksumState, checksumState } from "#data/elite-redux/coop/coop-battle-checksum";
-import {
-  applyCoopFullSnapshot,
-  captureCoopChecksumState,
-  captureCoopFullSnapshot,
-} from "#data/elite-redux/coop/coop-battle-engine";
+import { checksumState } from "#data/elite-redux/coop/coop-battle-checksum";
+import { captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -46,12 +42,19 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  advanceCoopActiveTime,
+  beginRewardShopWatch,
   buildDuo,
+  clearCoopSchedulerActiveTimeClock,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
+  driveGuestRewardWatch,
   driveHostPartyRewardOwner,
   forceItemRewards,
+  installCoopSchedulerActiveTimeClock,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -67,11 +70,6 @@ const REVIVE_SLOT = 2;
 
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
-}
-
-/** Copy a checksum state with its bench hp/fainted coverage stripped (the pre-fix hash shape). */
-function withoutBenchHp(state: CoopChecksumState): CoopChecksumState {
-  return { ...state, benchHp: [] };
 }
 
 describe.skipIf(!RUN)(
@@ -100,6 +98,7 @@ describe.skipIf(!RUN)(
     });
 
     afterEach(() => {
+      clearCoopSchedulerActiveTimeClock();
       logs.dispose();
       clearCoopRuntime();
       // #710 harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).
@@ -130,6 +129,7 @@ describe.skipIf(!RUN)(
     }
 
     it("a dropped revive relay is DETECTED by the per-turn checksum + HEALED by the resync backstop", async () => {
+      installCoopSchedulerActiveTimeClock();
       forceItemRewards(game.override, [{ name: "REVIVE" }]);
       await game.classicMode.startBattle(
         SpeciesId.SNORLAX, // 0 host lead
@@ -175,15 +175,27 @@ describe.skipIf(!RUN)(
       });
       const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
+      await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
 
-      // DROP the owner's revive relay: a party-target reward pick relays an `interactionChoice`
-      // ([COOP_ACT_REWARD, slot, option]) to the watcher. Faulting exactly that message (drop 100%)
-      // reproduces the #787 lost-relay class - the watcher never receives the revive.
+      // DROP the first immutable V2 reward commit. Raw interactionChoice is deliberately suppressed after
+      // cutover, so faulting that obsolete carrier made this regression vacuous.
+      let rewardCommitSends = 0;
       const dropReviveRelay: CoopFaultProfile = {
         drop: 1,
         reorder: 0,
         delay: 0,
-        faultable: msg => msg.t === "interactionChoice",
+        faultable: (msg: CoopMessage): boolean => {
+          if (
+            msg.t !== "authorityEntry"
+            || msg.body.kind !== "INTERACTION_COMMIT"
+            || !msg.body.operationId.includes(":REWARD:")
+          ) {
+            return false;
+          }
+          rewardCommitSends += 1;
+          return rewardCommitSends === 1;
+        },
       };
       faultPair.setProfile(dropReviveRelay);
 
@@ -191,73 +203,45 @@ describe.skipIf(!RUN)(
       // which the transport DROPS (never reaches the guest watcher).
       await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: REVIVE_SLOT }));
 
-      // Stop dropping so the resync backbone (the heal below) can flow.
-      faultPair.setProfile(COOP_NO_FAULT_PROFILE);
-
       // The revive relay was GENUINELY dropped by the transport (the fault was real, not vacuous).
       expect(
         faultPair.counters.host.dropped,
-        "the owner's revive relay (interactionChoice) was dropped",
+        "the owner's immutable revive INTERACTION_COMMIT was dropped",
       ).toBeGreaterThan(0);
+      expect(rewardCommitSends).toBe(1);
 
       // OWNER: the fainted bench mon is now ALIVE on the host.
       const hostRevived = rig.hostScene.getPlayerParty()[REVIVE_SLOT];
       expect(hostRevived.hp > 0 && !hostRevived.isFainted(), "owner (host) revived the bench mon").toBe(true);
 
-      // WATCHER (the dropped-relay desync): the SAME bench mon stayed FAINTED on the guest.
+      // WATCHER has not applied the lost first delivery yet.
       withClientSync(rig.guestCtx, () => {
         expect(
           rig.guestScene.getPlayerParty()[REVIVE_SLOT].isFainted(),
-          "watcher (guest) never saw the revive - its bench mon is still fainted (relay dropped)",
+          "watcher remains fainted before the retained entry is redelivered",
         ).toBe(true);
       });
 
-      // DETECTION (the fix): capture both checksum states post-divergence.
-      const hostState1 = await withClient(rig.hostCtx, () => captureCoopChecksumState());
-      const guestState1 = await withClient(rig.guestCtx, () => captureCoopChecksumState());
-      // The guest state is UNCHANGED from the converged baseline (the relay never touched it).
-      expect(guestState1.benchHp, "guest bench state unchanged (dropped relay)").toEqual(guestState0.benchHp);
-      // The bench hp/fainted now DIVERGES: host slot-2 alive (hp>0, flag 0) vs guest slot-2 fainted (flag 1).
-      expect(hostState1.benchHp, "host bench mon reads revived in the checksum").toEqual([
-        [REVIVE_SLOT, hostRevived.hp, 0],
-      ]);
-      expect(hostState1.benchHp, "the bench hp/fainted diverges between the two engines").not.toEqual(
-        guestState1.benchHp,
-      );
-      // The per-turn checksum now DETECTS the divergence (the whole point of the fix).
-      expect(checksumState(guestState1), "the per-turn checksum DETECTS the dropped-revive divergence").not.toBe(
-        checksumState(hostState1),
-      );
-      // FAILS-BEFORE: the divergence is SOLELY the new bench-hp coverage - strip `benchHp` (the pre-fix hash
-      // shape) and the two states are byte-identical, so before this fix the mismatch was INVISIBLE to the
-      // checksum and no resync ever fired -> the mon stayed fainted on the partner forever.
-      expect(
-        checksumState(withoutBenchHp(guestState1)),
-        "without the benchHp coverage the states are identical (pre-fix: undetected)",
-      ).toBe(checksumState(withoutBenchHp(hostState1)));
-
-      // HEAL: the checksum mismatch triggers the full-snapshot resync (the backstop). Apply the host's real
-      // authoritative snapshot on the guest (authoritativeGuest) - its benchParty reconcile revives the mon.
-      const snapshot = await withClient(rig.hostCtx, () => captureCoopFullSnapshot());
-      expect(snapshot, "host produced a full resync snapshot").not.toBeNull();
-      if (snapshot == null) {
-        throw new Error("host full snapshot was null - cannot drive the resync heal");
-      }
-      await withClient(rig.guestCtx, () => {
-        applyCoopFullSnapshot(snapshot, true);
+      // The authority log, not a later checksum repair, owns recovery: advance its active-time lease and
+      // consume the same immutable result on the already-open watcher surface.
+      await withClient(rig.hostCtx, async () => {
+        advanceCoopActiveTime(300);
+        await drainLoopback();
       });
+      expect(rewardCommitSends, "the authority log redelivered the exact revive commit").toBeGreaterThanOrEqual(2);
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
 
-      // WATCHER healed: the bench mon is now ALIVE on the guest too (revived on BOTH engines).
+      // WATCHER converged directly from the retained entry; no raw carrier or manual snapshot is involved.
       withClientSync(rig.guestCtx, () => {
         const guestHealed = rig.guestScene.getPlayerParty()[REVIVE_SLOT];
         expect(
           guestHealed.hp > 0 && !guestHealed.isFainted(),
-          "the resync backstop revived the guest bench mon (alive on both engines)",
+          "the redelivered V2 result revived the guest bench mon",
         ).toBe(true);
         expect(guestHealed.hp, "both engines agree on the revived mon's HP after the heal").toBe(hostRevived.hp);
       });
 
-      // The two engines' checksums RE-CONVERGE after the heal (the divergence is closed).
+      // The complete state remains byte-converged after retained exactly-once materialization.
       const hostState2 = await withClient(rig.hostCtx, () => captureCoopChecksumState());
       const guestState2 = await withClient(rig.guestCtx, () => captureCoopChecksumState());
       expect(guestState2.benchHp, "post-heal: both engines agree the bench mon is revived").toEqual(hostState2.benchHp);

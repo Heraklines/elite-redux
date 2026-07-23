@@ -2075,6 +2075,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   co-op integration-test directory. Subsequent migration batches can fan out immediately while production
   ownership and the frozen protocol-schema guard remain unchanged.
 
+# 2026-07-23 - Turn and Revive durability regressions use V2 carriers
+
+- The hand-assembled two-engine turn spike no longer requires the suppressed raw `turnResolution` message.
+  Under cutover it requires no raw correctness carrier, an applied V2 entry, converged battle state, and the
+  real ordered victory continuation; the legacy fallback keeps its original assertion.
+- The lost-Revive regression now drops the first reward `INTERACTION_COMMIT`, opens the real watcher before
+  the owner commits, advances the authority-log lease, and requires retained redelivery to revive the guest
+  exactly once. It no longer faults an unproduced `interactionChoice` or manually invokes snapshot recovery.
+- The reciprocal biome-runtime isolation case retains its suite-standard bounded timeout instead of inheriting
+  Vitest's 20-second default, which had expired during a healthy heavyweight duo boot on a shared runner.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real

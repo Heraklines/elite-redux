@@ -21,7 +21,7 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -262,6 +262,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // V2 intentionally bypasses that function and proves the immutable carrier reached its material boundary.
     const applyCheckpointSpy = vi.spyOn(coopEngine, "applyCoopCheckpoint");
     let guestTurnResolution: Extract<CoopMessage, { t: "turnResolution" }> | null = null;
+    const guestV2AppliedBefore = getCoopV2Shadow(guestRuntime)?.diagnostics().applied ?? 0;
     pair.guest.onMessage(msg => {
       if (msg.t === "turnResolution") {
         guestTurnResolution = msg;
@@ -276,8 +277,13 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     });
     await drainLoopback();
 
-    // The host EMITted + the guest RECVd the turnResolution over the loopback.
-    expect(guestTurnResolution, "the guest received the host's turnResolution").not.toBeNull();
+    // V2 owns the mechanical carrier, so its legacy turnResolution twin must be absent. A legacy fallback
+    // keeps the original assertion. The real material proof happens after the guest replay below.
+    if (V2_TURN_CUTOVER) {
+      expect(guestTurnResolution, "Authority V2 suppresses the raw turnResolution correctness carrier").toBeNull();
+    } else {
+      expect(guestTurnResolution, "the legacy guest received the host's turnResolution").not.toBeNull();
+    }
 
     // The spike predates buildDuo's sequential-boundary bridge. Finish the real host BattleEnd seam and its
     // retained automatic-victory seal now so the COMPLETE post-victory WAVE_ADVANCE transaction exists
@@ -305,14 +311,10 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // The guest RESOLVEd + applied the host's authoritative material (rendered the host's outcome). The
     // assertion follows the negotiated implementation instead of demanding an obsolete legacy helper call.
     if (V2_TURN_CUTOVER) {
-      const resolution = guestTurnResolution;
-      if (resolution == null) {
-        throw new Error("the guest lost the received Authority V2 turn carrier");
-      }
       expect(
-        guestRuntime.battleStream.hasFinalizedAuthoritativeV2Turn(resolution),
-        "the exact V2 carrier completed the guest's live material/finalize boundary",
-      ).toBe(true);
+        getCoopV2Shadow(guestRuntime)?.diagnostics().applied ?? 0,
+        "the Authority V2 entry completed the guest's live material/finalize boundary",
+      ).toBeGreaterThan(guestV2AppliedBefore);
     } else {
       expect(applyCheckpointSpy, "the guest applied the host's streamed legacy checkpoint").toHaveBeenCalled();
     }

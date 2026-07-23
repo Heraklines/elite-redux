@@ -387,7 +387,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       () => decision(7, "host", BiomeId.LAKE, guestBinding),
       "a callback cannot execute host authority against a captured guest runtime",
     ).toThrow(/binding role=guest.*localRole=host/);
-  });
+  }, 300_000);
 
   it("DURABILITY: dropping the first V2 entry still materializes the committed op through the real guest travel path", async () => {
     expect(isCoopBiomeOperationEnabled(), "the migrated biome-operation path is active for this test").toBe(true);
