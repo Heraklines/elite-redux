@@ -13,8 +13,10 @@ import {
   endCoopFaintSwitchWindow,
   getCoopFaintSwitchWaitMs,
 } from "#data/elite-redux/coop/coop-interaction-relay";
-import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, getCoopInteractionRelay, isShowdownSyncSession } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
+import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import { Command } from "#enums/command";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
@@ -59,6 +61,31 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
     }
 
     const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
+    if (isShowdownSyncSession() && getCoopController()?.role === "guest") {
+      scene.ui.setMode(UiMode.SHOWDOWN_SYNC_COMMAND, {
+        turn: scene.currentBattle.turn,
+        fieldIndex: this.fieldIndex,
+        initialLevel: "switch",
+        onCommand: (_turn: number, command: SerializedCommand) => {
+          if (scene.phaseManager.getCurrentPhase() !== this || command.command !== Command.POKEMON) {
+            return;
+          }
+          const picked = scene.getEnemyParty()[command.cursor];
+          if (picked == null || picked.isFainted() || picked.isOnField()) {
+            return;
+          }
+          relay.sendInteractionChoice(faintSeq, "switch", command.cursor, [0, picked.species.speciesId]);
+          this.unshiftSummon(scene, command.cursor);
+          const finish = (): void => {
+            if (scene.phaseManager.getCurrentPhase() === this) {
+              scene.phaseManager.shiftPhase();
+            }
+          };
+          void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(finish, finish);
+        },
+      });
+      return;
+    }
     coopLog("replay", `versus host awaiting opponent replacement pick slot=${this.fieldIndex} seq=${faintSeq}`);
     scene.ui.showText("Waiting for the opponent to choose their next Pokemon...");
     // Suppress the stall watchdog for the whole await: a slow-but-alive opponent parks BOTH engines in
@@ -135,6 +162,8 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
    */
   private unshiftSummon(scene: BattleScene, slotIndex: number): void {
     scene.phaseManager.unshiftNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, slotIndex, false, false);
-    scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+    if (!isShowdownSyncSession()) {
+      scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+    }
   }
 }

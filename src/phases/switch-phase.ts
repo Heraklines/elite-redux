@@ -17,6 +17,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
+  isShowdownSyncSession,
   isVersusSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
@@ -100,6 +101,10 @@ export class SwitchPhase extends BattlePhase {
       || globalScene.getPokemonAllowedInBattle().length > 1
         ? this.fieldIndex
         : 0;
+
+    if (this.tryShowdownSyncPlayerFaintSwitch(fieldIndex)) {
+      return;
+    }
 
     // Co-op (#633): a replacement is chosen ONLY by the player who owns the field slot
     // (host = slot 0, guest = slot 1). The partner must NOT pick the other player's
@@ -344,9 +349,80 @@ export class SwitchPhase extends BattlePhase {
    * SwitchPhase); the checkpoint phase is host-role-gated + a no-op besides. Solo / co-op never enter here.
    */
   private maybePushVersusHostReplacementCheckpoint(): void {
-    if (isVersusSession() && getCoopController()?.role === "host") {
+    if (isVersusSession() && getCoopNetcodeMode() === "authoritative" && getCoopController()?.role === "host") {
       globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
     }
+  }
+
+  /**
+   * Canonical Sync replacement for the player side, which is owned by the host on both engines.
+   * The host opens the normal party picker and relays its slot; the guest mirrors that exact slot
+   * without ever exposing the host's team as locally controllable.
+   */
+  private tryShowdownSyncPlayerFaintSwitch(fieldIndex: number): boolean {
+    if (!isShowdownSyncSession() || !this.isModal || this.doReturn) {
+      return false;
+    }
+    const controller = getCoopController();
+    const relay = getCoopInteractionRelay();
+    if (controller == null || relay == null) {
+      return false;
+    }
+    const scene = globalScene;
+    const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
+    const finish = (slotIndex: number): void => {
+      const picked = scene.getPlayerParty()[slotIndex];
+      if (picked != null && !picked.isFainted() && !picked.isOnField()) {
+        scene.phaseManager.unshiftNew("SwitchSummonPhase", this.switchType, fieldIndex, slotIndex, this.doReturn);
+      }
+      const close = (): void => {
+        if (scene.phaseManager.getCurrentPhase() === this) {
+          scene.phaseManager.shiftPhase();
+        }
+      };
+      void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(close, close);
+    };
+
+    if (controller.role === "host") {
+      scene.ui.setMode(
+        UiMode.PARTY,
+        PartyUiMode.FAINT_SWITCH,
+        fieldIndex,
+        (slotIndex: number) => {
+          if (scene.phaseManager.getCurrentPhase() !== this) {
+            return;
+          }
+          const picked = scene.getPlayerParty()[slotIndex];
+          relay.sendInteractionChoice(faintSeq, "switch", slotIndex, [0, picked?.species?.speciesId ?? 0]);
+          finish(slotIndex);
+        },
+        PartyUiHandler.FilterNonFainted,
+      );
+      return true;
+    }
+
+    scene.ui.showText("Waiting for the opponent to choose their next Pokemon...");
+    beginCoopFaintSwitchWindow();
+    void relay.awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs(), COOP_SWITCH_CHOICE_KINDS).then(result => {
+      endCoopFaintSwitchWindow();
+      if (scene.phaseManager.getCurrentPhase() !== this) {
+        return;
+      }
+      let slotIndex = result?.choice ?? -1;
+      const pickedSpecies = result?.data?.[1] ?? 0;
+      if (pickedSpecies > 0 && scene.getPlayerParty()[slotIndex]?.species?.speciesId !== pickedSpecies) {
+        const bySpecies = scene
+          .getPlayerParty()
+          .findIndex(
+            pokemon => !pokemon.isFainted() && !pokemon.isOnField() && pokemon.species.speciesId === pickedSpecies,
+          );
+        if (bySpecies >= 0) {
+          slotIndex = bySpecies;
+        }
+      }
+      finish(slotIndex);
+    });
+    return true;
   }
 
   /**

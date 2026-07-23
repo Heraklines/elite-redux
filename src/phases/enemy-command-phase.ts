@@ -1,11 +1,17 @@
 import { globalScene } from "#app/global-scene";
 import { isReleasedCommander } from "#data/elite-redux/ability-upgrades/requested-field-effects";
-import { getCoopController, isAuthoritativeBattleSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopController,
+  isAuthoritativeBattleSession,
+  isShowdownSyncSession,
+  isVersusSession,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { isReplayRecording, recordReplayCommand } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
+import { applyShowdownSyncCommand, hasShowdownSyncCommand } from "#data/elite-redux/showdown/showdown-sync-command";
 import { getMoveTargets } from "#data/moves/move-utils";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -64,6 +70,16 @@ export class EnemyCommandPhase extends FieldPhase {
       return this.end();
     }
 
+    // The Sync guest selected and applied its own canonical enemy-side command while its preceding
+    // CommandPhase awaited the host's player-side command. Do not overwrite that human choice with AI.
+    if (
+      isShowdownSyncSession()
+      && getCoopController()?.role === "guest"
+      && hasShowdownSyncCommand("enemy", this.fieldIndex)
+    ) {
+      return this.end();
+    }
+
     // Showdown 1v1 (C4): the HOST awaits the REMOTE player's command for this enemy slot instead
     // of rolling the AI (the enemy side is a real human). On a timeout/null (disconnect) it falls
     // back to the AI so the turn never hangs. The guest short-circuit above already handled the
@@ -83,7 +99,16 @@ export class EnemyCommandPhase extends FieldPhase {
   private async resolveVersusEnemyCommand(): Promise<void> {
     const relay = getShowdownRelay();
     const turn = globalScene.currentBattle.turn;
-    const command = relay == null ? null : await relay.requestEnemyCommand(turn, this.fieldIndex);
+    const sync = isShowdownSyncSession();
+    const command =
+      relay == null
+        ? null
+        : await (sync ? relay.awaitCommand(turn, this.fieldIndex) : relay.requestEnemyCommand(turn, this.fieldIndex));
+    if (sync && command != null && applyShowdownSyncCommand("enemy", this.fieldIndex, command)) {
+      this.recordVersusEnemyCommand();
+      this.end();
+      return;
+    }
     // Host-authoritative validation: an out-of-range / illegal relayed pick falls back to the AI
     // (same as a timeout), so a hostile/buggy peer can never force an illegal enemy action.
     if (command == null || !this.isRelayedCommandLegal(command)) {

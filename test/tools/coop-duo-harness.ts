@@ -119,6 +119,7 @@ import { captureCoopTrainerVictoryBoundary } from "#data/elite-redux/coop/coop-t
 import {
   type CoopActiveMysteryEncounterSnapshotV1,
   type CoopMessage,
+  type CoopNetcodeMode,
   type CoopRole,
   type CoopTransport,
   createLoopbackPair,
@@ -3892,17 +3893,19 @@ export async function buildShowdownDuo(
   pair: { host: CoopTransport; guest: CoopTransport },
   setCoopRuntimeFn: (r: CoopRuntime) => void,
   toShowdownGameMode: (scene: BattleScene) => void,
+  opts: { netcodeMode?: CoopNetcodeMode } = {},
 ): Promise<ShowdownDuoRig> {
   const hostScene = hostGame.scene;
+  const netcodeMode = opts.netcodeMode ?? "authoritative";
   neutralizeCoopCandyBar(hostScene);
   const hostRuntime = assembleCoopRuntime(pair.host, {
     username: "Host",
-    netcodeMode: "authoritative",
+    netcodeMode,
     kind: "versus",
   });
   const guestRuntime = assembleCoopRuntime(pair.guest, {
     username: "Guest",
-    netcodeMode: "authoritative",
+    netcodeMode,
     kind: "versus",
   });
   const scheduledPair = pair as typeof pair & { flush?: (role: "host" | "guest", limit?: number) => number };
@@ -3959,19 +3962,19 @@ export async function buildShowdownDuo(
     // The mirror reconstructs the guest's world in its LOCAL (flipped) orientation (Task F1): its OWN
     // team is its local PLAYER party (bottom) and the opponent (host team) its local ENEMY party (top).
     mirrorHostBattleToGuest(hostScene, guestScene);
-    // Reconstruct the guest's persistent-modifier stacks in its LOCAL (flipped) orientation. The mirror's
-    // adoptCoopHostRunConfig rebuilt the host's PLAYER-wide modifiers onto the guest PLAYER side (correct
-    // for co-op, WRONG for versus where they are the opponent's), so CLEAR both lists and repopulate from
-    // the host's cloned stacks flipped: guest PLAYER <- host ENEMY (own team), guest ENEMY <- host PLAYER
-    // (opponent). This mirrors the launch-snapshot swap, so the egress un-swap reproduces the host's hash.
+    // Reconstruct the guest's persistent-modifier stacks in the mode's world orientation. Authoritative
+    // Showdown flips the guest (guest PLAYER <- host ENEMY); Sync deliberately preserves the canonical
+    // host world (guest PLAYER <- host PLAYER) so side-sensitive ER mechanics execute identically.
     const guestPlayerModifiers = (guestScene as unknown as { modifiers: PersistentModifier[] }).modifiers;
     const guestEnemyModifiers = (guestScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers;
     guestPlayerModifiers.length = 0;
     guestEnemyModifiers.length = 0;
-    for (const m of clonedHostEnemyModifiers) {
+    const playerModifiers = netcodeMode === "lockstep" ? clonedHostPlayerModifiers : clonedHostEnemyModifiers;
+    const enemyModifiers = netcodeMode === "lockstep" ? clonedHostEnemyModifiers : clonedHostPlayerModifiers;
+    for (const m of playerModifiers) {
       guestPlayerModifiers.push(m);
     }
-    for (const m of clonedHostPlayerModifiers) {
+    for (const m of enemyModifiers) {
       guestEnemyModifiers.push(m);
     }
     guestScene.updateModifiers(false);
