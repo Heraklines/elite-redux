@@ -24,6 +24,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { TitlePhase } from "#phases/title-phase";
 import { GameManager } from "#test/framework/game-manager";
+import { EditorField } from "#ui/showdown-set-editor-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -198,12 +199,26 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     await wait(300);
     expect(mode(), "the first edit opens").toBe(UiMode.SHOWDOWN_SET_EDITOR);
 
+    const editor: any = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR];
+    // The headless rex InputText mock has no setFocus(); move selection itself remains the real handler path.
+    editor.setTextInput(null);
+    editor.field = EditorField.MOVE0;
+    expect(editor.processInput(Button.ACTION), "ACTION opens the first move dropdown").toBe(true);
+    const originalMove = editor.config.set.moves[0];
+    const entries = editor.moveEntries();
+    const targetIndex = entries.findIndex((entry: any) => !entry.locked && entry.moveId !== originalMove);
+    expect(targetIndex, "the seeded mon has another legal move").toBeGreaterThanOrEqual(0);
+    editor.paneCursor = targetIndex;
+    const editedMove = entries[targetIndex].moveId;
+    press(Button.SUBMIT); // select the highlighted move with Enter
+    expect(editor.config.set.moves[0], "Enter writes the selected move into the editor draft").toBe(editedMove);
+
     press(Button.SUBMIT); // Done
     await wait(600);
-    const editor: any = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR];
     expect(mode(), "Done returns to the live grid, not the consumed option menu").toBe(UiMode.STARTER_SELECT);
     expect(editor.container.visible, "the completed editor is hidden").toBe(false);
     expect(grid.starterSelectContainer.visible, "the grid is visible after Done").toBe(true);
+    expect(grid.starters[0].moveset[0], "Done writes the edited move into the team slot").toBe(editedMove);
 
     // Back from the in-party menu is a real cancel; it must not remove the mon or strand the menu.
     grid.handleShowdownGridConfirm(true, 0, true);
@@ -219,6 +234,7 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     press(Button.ACTION);
     await wait(300);
     expect(mode(), "the second edit opens instead of dead-ending").toBe(UiMode.SHOWDOWN_SET_EDITOR);
+    expect(editor.config.set.moves[0], "reopening the same set preserves the edited move").toBe(editedMove);
     const before = editor.field;
     press(Button.DOWN);
     expect(editor.field, "the reopened editor accepts movement input").not.toBe(before);

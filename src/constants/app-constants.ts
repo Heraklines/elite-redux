@@ -37,4 +37,4 @@ export function setBypassLoginForTesting(value: boolean | null): void {
  * PokeRogue `package.json` version. Bump this with each player-facing patch
  * (keep it in sync with the matching `docs/patch-notes/<version>.md`).
  */
-export const ER_VERSION = "0.0.5.6";
+export const ER_VERSION = "0.0.6";

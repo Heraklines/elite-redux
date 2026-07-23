@@ -1035,6 +1035,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         }
         break;
       case Button.ACTION:
+      case Button.SUBMIT:
         handled = this.selectPaneRow();
         break;
       case Button.CANCEL:

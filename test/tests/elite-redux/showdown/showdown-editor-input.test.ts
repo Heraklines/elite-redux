@@ -39,7 +39,10 @@ type EditorInternals = {
   filter: string;
   field: EditorField;
   paneCursor: number;
-  config: { set: { abilityIndex: number }; unlocks: { unlockedAbilityIndices: number[] } };
+  config: {
+    set: { abilityIndex: number; moves: (MoveId | null)[] };
+    unlocks: { unlockedAbilityIndices: number[] };
+  };
   setFilter(value: string): void;
   moveEntries(): { moveId: MoveId; name: string; locked: boolean }[];
   selectPaneRow(): boolean;
@@ -117,6 +120,37 @@ describe.skipIf(!RUN)("Showdown Set Editor type-to-search input model", () => {
     expect(internals.paneOpen, "picking closes the dropdown").toBe(false);
     expect(internals.filter, "no lingering filter after a pick").toBe("");
     expect(allMoves[chosen], "the chosen move resolves").toBeDefined();
+  });
+
+  it("Enter selects the highlighted move, then Enter/Done commits that edited move", () => {
+    const game = new GameManager(phaserGame);
+    const registered = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR] as ShowdownSetEditorUiHandler;
+    const handler = new (registered.constructor as new () => ShowdownSetEditorUiHandler)();
+    handler.setup();
+    let committedMoves: (MoveId | null)[] | null = null;
+    const config = buildShowdownEditorDemoConfig({
+      initialField: EditorField.MOVE0,
+      onDone: result => {
+        committedMoves = [...result.set.moves];
+      },
+    });
+    handler.show([config]);
+    const internals = handler as unknown as EditorInternals;
+
+    expect(internals.processInput(Button.ACTION), "ACTION opens the move dropdown").toBe(true);
+    const original = internals.config.set.moves[0];
+    const entries = internals.moveEntries();
+    const targetIndex = entries.findIndex(entry => !entry.locked && entry.moveId !== original);
+    expect(targetIndex, "the fixture offers another legal move").toBeGreaterThanOrEqual(0);
+    internals.paneCursor = targetIndex;
+    const chosen = entries[targetIndex].moveId;
+
+    expect(internals.processInput(Button.SUBMIT), "Enter selects the highlighted move").toBe(true);
+    expect(internals.paneOpen, "selecting the move closes the dropdown").toBe(false);
+    expect(internals.config.set.moves[0], "the editor draft contains the selected move").toBe(chosen);
+
+    expect(internals.processInput(Button.SUBMIT), "a second Enter activates Done").toBe(true);
+    expect(committedMoves?.[0], "Done commits the move selected with Enter").toBe(chosen);
   });
 
   // RED-PROOF (round 4): the ability search DROPDOWN is gone - the ACTIVE ability is CYCLED in place.

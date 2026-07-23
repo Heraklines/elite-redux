@@ -6,9 +6,23 @@
 import type { BattleScene } from "#app/battle-scene";
 import { GameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
+import { ER_VERSION } from "#constants/app-constants";
+import { setPendingShowdownPresetStarters } from "#data/elite-redux/showdown/showdown-battle-state";
+import {
+  clearTournamentMatchContext,
+  getTournamentMatchContext,
+} from "#data/elite-redux/showdown/tournament-match-context";
 import { GameModes } from "#enums/game-modes";
-import { areShowdownTournamentsEnabled, isShowdown1v1Enabled, TitlePhase } from "#phases/title-phase";
+import { UiMode } from "#enums/ui-mode";
+import {
+  areShowdownTournamentsEnabled,
+  isShowdown1v1Enabled,
+  SHOWDOWN_NETCODE_MODE,
+  TitlePhase,
+} from "#phases/title-phase";
 import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
+import { getCoopLobbyStageTitle } from "#ui/coop-lobby-stage";
+import { buildTournamentBracketDemoConfig, type TournamentBracketConfig } from "#ui/tournament-bracket-ui-handler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("title mode selection", () => {
@@ -19,8 +33,11 @@ describe("title mode selection", () => {
   });
 
   afterEach(() => {
+    clearTournamentMatchContext();
+    setPendingShowdownPresetStarters(null);
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     if (previousScene != null) {
       initGlobalScene(previousScene);
     }
@@ -152,7 +169,64 @@ describe("title mode selection", () => {
     expect(showdownOption?.label).toBe(GameMode.getModeName(GameModes.SHOWDOWN));
     expect(modeOptions).not.toContainEqual(expect.objectContaining({ semanticId: "showdown-sync" }));
     showdownOption?.handler();
-    expect(teamMenuSpy).toHaveBeenCalledWith(expect.any(Function), "lockstep");
+    expect(teamMenuSpy).toHaveBeenCalledWith(expect.any(Function), SHOWDOWN_NETCODE_MODE);
+  });
+
+  it("routes a scheduled tournament match through the same lockstep versus lobby", async () => {
+    vi.stubEnv("VITE_SERVER_URL_TELEMETRY", "https://telemetry.test");
+    const tournament = buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" }).tournament;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ tournament }),
+      }),
+    );
+
+    let bracketConfig: TournamentBracketConfig | undefined;
+    const scene = {
+      gameData: {
+        listShowdownTeamPresets: vi.fn().mockReturnValue([{ version: 1, name: "Tournament Team", mons: [] }]),
+      },
+      ui: {
+        setMode: vi.fn(async (mode: UiMode, config?: TournamentBracketConfig) => {
+          if (mode === UiMode.TOURNAMENT_BRACKET) {
+            bracketConfig = config;
+          }
+        }),
+        resetModeChain: vi.fn(),
+        showText: vi.fn(),
+      },
+    } as unknown as BattleScene;
+    initGlobalScene(scene);
+
+    const phase = new TitlePhase();
+    const testablePhase = phase as unknown as {
+      openShowdownTournaments(
+        setModeAndEnd: (gameMode: GameModes) => void,
+        deepLink: { tournamentId: string; round: number; slot: number },
+      ): void;
+      openCoopLobby: ReturnType<typeof vi.fn>;
+    };
+    const lobbySpy = vi.spyOn(testablePhase, "openCoopLobby").mockImplementation(() => {});
+    const launch = vi.fn();
+    testablePhase.openShowdownTournaments(launch, { tournamentId: tournament.id, round: 0, slot: 0 });
+
+    await vi.waitFor(() => expect(bracketConfig).toBeDefined());
+    bracketConfig?.onPlayMatch?.("cup-r0-m0", "Rival");
+
+    expect(getTournamentMatchContext()).toMatchObject({
+      tournamentId: tournament.id,
+      matchId: "cup-r0-m0",
+      expectedOpponent: "Rival",
+    });
+    expect(lobbySpy).toHaveBeenCalledWith(launch, SHOWDOWN_NETCODE_MODE, "versus", GameModes.SHOWDOWN);
+  });
+
+  it("shows the v0.0.6 title version and labels versus lobbies as Showdown", () => {
+    expect(ER_VERSION).toBe("0.0.6");
+    expect(getCoopLobbyStageTitle("coop")).toBe("CO-OP LOBBY");
+    expect(getCoopLobbyStageTitle("showdown")).toBe("SHOWDOWN LOBBY");
   });
 
   it("supports explicit URL overrides for testing and emergency shutdown", () => {

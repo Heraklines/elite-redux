@@ -121,7 +121,7 @@ export function pingTournamentPresence(id: string): Promise<ClientResult<unknown
 }
 
 /**
- * Report a finished authoritative tournament match result (winner is a username).
+ * Report a finished tournament match result (winner is a username).
  * The worker enforces attestation: the reporter is the authenticated account and
  * must be one of the two paired players; a result settles only on agreeing dual
  * reports. Safe to call from both clients.
