@@ -66,6 +66,7 @@
     "test/scripts/coop-presentation-authority.test.mjs",
     "test/tests/elite-redux/coop/coop-battle-events.test.ts",
     "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-commander-command-phase.test.ts",
     "test/tests/elite-redux/coop/coop-duo-fault.test.ts",
     "test/tests/elite-redux/coop/coop-duo-reward-reroll.test.ts",
     "test/tests/elite-redux/coop/coop-duo-seating.test.ts",

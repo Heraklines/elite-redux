@@ -31,7 +31,6 @@ import {
 } from "#data/elite-redux/coop/coop-capabilities";
 import { adoptCoopEnemiesStructural, buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { CoopInteractionRelay, setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { clearCoopAuthoritativeGuestPlayerTrainer } from "#data/elite-redux/coop/coop-presentation";
 import {
   isCoopRendererGateEnforced,
@@ -40,7 +39,6 @@ import {
 } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   clearCoopRuntime,
-  consumeCoopPendingWaveAdvance,
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
@@ -48,12 +46,7 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import type {
-  CoopAuthoritativeBattleStateV1,
-  CoopBattleCheckpoint,
-  CoopTransport,
-  CoopWaveOutcome,
-} from "#data/elite-redux/coop/coop-transport";
+import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
@@ -125,69 +118,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     setCoopWaveTailSanction(null);
     clearCoopRuntime();
   });
-
-  /** Production wave completion is the legacy cue plus one committed authoritative envelope. */
-  function sendWaveAdvance(
-    partner: CoopTransport,
-    outcome: CoopWaveOutcome,
-    authoritativeStateOverride?: CoopAuthoritativeBattleStateV1,
-  ): void {
-    const controller = getCoopController();
-    if (controller == null) {
-      throw new Error("missing co-op controller");
-    }
-    const wave = globalScene.currentBattle.waveIndex;
-    const turn = globalScene.currentBattle.turn;
-    const logicalPhase = outcome === "gameOver" ? "GAME_OVER" : outcome === "flee" ? "WAVE_FLEE" : "WAVE_VICTORY";
-    const authoritativeState: CoopAuthoritativeBattleStateV1 = authoritativeStateOverride ?? {
-      version: 1,
-      tick: 0,
-      wave,
-      turn,
-      playerParty: [],
-      enemyParty: [],
-      field: [],
-      weather: 0,
-      weatherTurnsLeft: 0,
-      terrain: 0,
-      terrainTurnsLeft: 0,
-      arenaTags: [],
-      money: globalScene.money,
-      pokeballCounts: [],
-      playerModifiers: [],
-      enemyModifiers: [],
-    };
-    partner.send({ t: "waveResolved", wave, outcome });
-    partner.send({
-      t: "envelope",
-      envelope: {
-        version: 1,
-        sessionEpoch: controller.sessionEpoch,
-        revision: 1,
-        wave,
-        turn,
-        logicalPhase,
-        pendingOperation: {
-          id: makeCoopOperationId(controller.sessionEpoch, 0, wave, "WAVE_ADVANCE"),
-          kind: "WAVE_ADVANCE",
-          owner: 0,
-          status: "applied",
-          payload: {
-            wave,
-            outcome,
-            nextLogicalPhase: logicalPhase,
-            nextWave: outcome === "gameOver" ? wave : wave + 1,
-            biomeChange: false,
-            eggLapse: false,
-            meBoundary: "none",
-            ...(outcome === "win" || outcome === "capture" ? { victoryKind: "wild" as const } : {}),
-            settledStateTick: authoritativeState.tick,
-          },
-        },
-        authoritativeState,
-      },
-    });
-  }
 
   /** Start a co-op double, then flip the LOCAL engine into the GUEST role. */
   const setFixtureRole = (role: "host" | "guest"): void => {
@@ -920,100 +850,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(pushedMove, "solo resolves the turn normally (MovePhase pushed)").toBe(true);
   });
 
-  // (A) WAVE-ADVANCE / no-hang (#633, authoritative wave-advance handshake): the guest renderer
-  // never runs a FaintPhase, so it never gets the VictoryPhase -> NewBattlePhase -> next
-  // EncounterPhase tail that advances the wave - it would loop the won wave forever (a HANG). The
-  // host's explicit `waveResolved` signal makes the guest's CoopReplayTurnPhase run the SAME
-  // victory tail lockstep co-op runs, so it reaches the next wave. This asserts the handler
-  // enqueues the victory tail exactly ONCE (idempotent on a duplicate `waveResolved`).
-  it("WAVE-ADVANCE (#633): the host's waveResolved makes the guest queue the victory tail (no infinite TurnInit loop)", async () => {
-    await startCoopGuest();
-    const turn = globalScene.currentBattle.turn;
-    const partner = getCoopRuntime()!.partnerTransport!;
-
-    // The host RESOLVED this wave (a WIN). Deliver the signal over the loopback peer - the runtime's
-    // waveResolved handler records it as a one-shot pending flag (NOT applied mid-message).
-    sendWaveAdvance(partner, "win");
-    await new Promise(r => setTimeout(r, 0));
-
-    // Inject the turn's resolution so the replay phase's awaitTurn resolves and reaches finishTurn,
-    // which consumes the pending wave-advance and runs the victory tail.
-    partner.send({
-      t: "turnResolution",
-      turn,
-      ...completeTurnCarrier(turn),
-      events: [{ k: "message", text: "Foe fainted!" }],
-    });
-    await new Promise(r => setTimeout(r, 0));
-
-    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    // Drive the replay turn + drain the deferred finalize, which consumes the pending wave-advance.
-    await driveReplayTurn(turn);
-
-    // The finalize phase queued its turn-end (run loops) AND the VictoryPhase tail (wave advances).
-    const victoryPushes = pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase");
-    expect(victoryPushes.length, "the guest queues the VictoryPhase tail to advance the wave").toBe(1);
-    // #698 softlock fix: on a resolved wave the finalize is TERMINAL - it runs the VictoryPhase tail
-    // (which advances the wave) and queues NO turn-end, so it cannot loop into a phantom next turn the
-    // host already passed. The wave advances via the tail above, not a queued TurnEndPhase.
-    const queuedTurnEnd = pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase");
-    expect(queuedTurnEnd, "no phantom turn-end on a resolved wave (#698 terminal finalize)").toBe(false);
-  });
-
-  // (A2) POST-BATTLE SOFTLOCK / phantom turn (#633/#698/#696/#697): the live "frozen after battle"
-  // deadlock. On the wave's FINAL turn the host sends waveResolved(win) for wave N BEFORE the final
-  // turnResolution, then ends the battle + parks as the reward WATCHER. On the guest the racy order is:
-  // an EARLIER turn's finalize consumes the pending wave-advance and runs the VictoryPhase tail (wave
-  // advanced, lastResolvedWave := N), THEN the wave's FINAL turn's late turnResolution is replayed. Its
-  // finalize must be TERMINAL - it must STILL render the final turn + apply the checkpoint, but must NOT
-  // queueTurnEndPhases (whose trailing TurnEndPhase loops into a phantom next CommandPhase for turn N+1
-  // the host already passed; the guest would then broadcast a command + awaitTurn for that phantom turn
-  // the host never resolves -> deadlock). This asserts: the final turn renders + finalizes, runs NO second
-  // VictoryPhase, and queues NO TurnEndPhase (no phantom turn).
-  it("POST-BATTLE SOFTLOCK (#633): a wave-resolved final turn renders then terminates without a phantom loop", async () => {
-    await startCoopGuest();
-    const finalTurn = globalScene.currentBattle.turn;
-    const partner = getCoopRuntime()!.partnerTransport!;
-
-    // The host resolves the wave immediately before its final addressed turn commit (the live wire order).
-    sendWaveAdvance(partner, "win");
-    await new Promise(r => setTimeout(r, 0));
-    partner.send({
-      t: "turnResolution",
-      turn: finalTurn,
-      ...completeTurnCarrier(finalTurn),
-      events: [{ k: "message", text: "Critical hit!" }],
-    });
-    await new Promise(r => setTimeout(r, 0));
-
-    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    const queueMessageSpy = vi.spyOn(globalScene.phaseManager, "queueMessage");
-    const queueTurnEndSpy = vi.spyOn(globalScene.phaseManager, "queueTurnEndPhases");
-    const turnBeforeFinalize = globalScene.currentBattle.turn;
-    // Drive the FINAL turn's replay + its deferred finalize. With the fix it is terminal.
-    await driveReplayTurn(finalTurn);
-
-    // The final turn STILL rendered its events (a `message` event renders via queueMessage) - the
-    // guest does not skip the KO turn's animation.
-    const renderedFinalTurnEvent = queueMessageSpy.mock.calls.some(([text]) => text === "Critical hit!");
-    expect(renderedFinalTurnEvent, "the final turn still renders its events (no skipped KO turn)").toBe(true);
-    // It did NOT queue the guest's turn-end phases -> NO phantom next turn -> no command broadcast /
-    // awaitTurn for turn N+1 the host already passed (the deadlock is broken).
-    expect(queueTurnEndSpy, "the terminal final turn does NOT loop into a phantom turn-end").not.toHaveBeenCalled();
-    expect(
-      pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase"),
-      "no TurnEndPhase queued on the terminal final turn (no phantom turn N+1)",
-    ).toBe(false);
-    expect(
-      globalScene.currentBattle.turn,
-      "the renderer still mirrors the host's already-settled numeric turn boundary",
-    ).toBe(turnBeforeFinalize + 1);
-    // Exactly one victory tail is queued for this final addressed commit.
-    expect(
-      pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase").length,
-      "the wave advances exactly once",
-    ).toBe(1);
-  });
+  // Wave/terminal progression is intentionally absent from this one-engine renderer fixture. Those cases
+  // now run through authenticated two-engine V2 authority in coop-duo-engine, coop-duo-wild-flee, and
+  // coop-duo-wave-operation; manufacturing raw waveResolved + legacy envelopes here tested a path the
+  // release architecture rejects and repeatedly produced false gate failures.
 
   // (B) SWITCH-MIRROR (#633, enemy-switch mirror): a host trainer SWITCH swaps party[fieldIndex]
   // with a bench slot, keeping the same battler index but bringing a DIFFERENT species on-field.
@@ -1161,93 +1001,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(globalScene.money).toBe(824);
   });
 
-  // (D) FLEE TERMINAL (#633 GAP 5): a successful flee on the host emits waveResolved("flee"); the
-  // guest renderer never runs an AttemptRunPhase, so without handling it the guest loops the fled
-  // wave. The guest's maybeRunCoopWaveAdvance now mirrors the host's flee tail (BattleEnd ->
-  // optional biome -> NewBattle), NOT VictoryPhase (a flee gives no exp / rewards).
-  it('FLEE TERMINAL (#633 GAP 5): waveResolved("flee") makes the guest run the flee tail (BattleEnd + NewBattle, no VictoryPhase)', async () => {
-    await startCoopGuest();
-    const turn = globalScene.currentBattle.turn;
-    const partner = getCoopRuntime()!.partnerTransport!;
-
-    // The host RESOLVED this wave as a FLEE. Deliver the signal, then the turn resolution so the
-    // replay phase reaches finishTurn (which consumes the pending wave-advance).
-    sendWaveAdvance(partner, "flee");
-    await new Promise(r => setTimeout(r, 0));
-    partner.send({
-      t: "turnResolution",
-      turn,
-      ...completeTurnCarrier(turn),
-      events: [{ k: "message", text: "Got away safely!" }],
-    });
-    await new Promise(r => setTimeout(r, 0));
-
-    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    // Drive the replay turn + drain the deferred finalize, which consumes the pending flee outcome.
-    await driveReplayTurn(turn);
-
-    // The guest ran the flee tail (BattleEnd -> NewBattle) and did NOT grant a VictoryPhase.
-    const pushedBattleEnd = pushNewSpy.mock.calls.some(([name]) => name === "BattleEndPhase");
-    const pushedNewBattle = pushNewSpy.mock.calls.some(([name]) => name === "NewBattlePhase");
-    const pushedVictory = pushNewSpy.mock.calls.some(([name]) => name === "VictoryPhase");
-    expect(pushedBattleEnd, "the guest queues BattleEndPhase for the flee").toBe(true);
-    expect(pushedNewBattle, "the guest queues NewBattlePhase to advance past the fled wave").toBe(true);
-    expect(pushedVictory, "a flee grants NO VictoryPhase (no exp / rewards)").toBe(false);
-    // #698 terminal finalize: the flee tail (BattleEnd -> NewBattle) advances the run; the finalize
-    // queues NO turn-end (a phantom next turn the host already passed would deadlock the guest).
-    expect(
-      pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase"),
-      "no phantom turn-end on a fled wave (#698 terminal finalize)",
-    ).toBe(false);
-  });
-
-  // (E) GAME-OVER RENDER (#633 GAP 6): the host's run ended; the guest renderer must show the
-  // game-over screen instead of hanging the lost wave. The retained WAVE_ADVANCE transaction (not
-  // the legacy raw cue) queues the guest's GameOverPhase (isVictory=false) at a safe phase boundary -
-  // the coop-safe render path (no per-client retry prompt).
-  it("GAME-OVER RENDER (#633 GAP 6): retained gameOver transaction makes the guest queue GameOverPhase", async () => {
-    await startCoopGuest();
-    const turn = globalScene.currentBattle.turn;
-    const partner = getCoopRuntime()!.partnerTransport!;
-
-    const carrier = completeTurnCarrier(turn);
-    // This test drives the replay phase manually rather than advancing the whole battle fixture.
-    // Remove setup's unrelated static tail first so the retained transaction's safe-boundary wake is
-    // the only continuation behind replay, matching the production ordering under test.
-    globalScene.phaseManager.clearPhaseQueue();
-    sendWaveAdvance(partner, "gameOver", {
-      ...carrier.authoritativeState,
-      tick: carrier.authoritativeState.tick + 1,
-    });
-    await new Promise(r => setTimeout(r, 0));
-    expect(
-      globalScene.phaseManager.getQueuedPhaseNames(),
-      "the retained terminal appends exactly one safe-boundary continuation",
-    ).toEqual(["CoopFinalizeTurnPhase"]);
-    partner.send({
-      t: "turnResolution",
-      turn,
-      ...carrier,
-      events: [{ k: "message", text: "The run ended." }],
-    });
-    await new Promise(r => setTimeout(r, 0));
-
-    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    // Drive the replay through the real phase queue. The retained terminal supersedes the impossible
-    // resolution wait and the already-appended boundary consumes the pending gameOver outcome.
-    await driveReplayTurn(turn);
-
-    // The guest queued the game-over render (so a lost run shows the screen, not a hang), and NOT a
-    // wave-advancing VictoryPhase.
-    const gameOverPush = pushNewSpy.mock.calls.find(([name]) => name === "GameOverPhase");
-    expect(gameOverPush, "the guest queues GameOverPhase to render the game-over screen").toBeDefined();
-    expect(gameOverPush?.[1], "isVictory=false (a lost run)").toBe(false);
-    expect(
-      pushNewSpy.mock.calls.some(([name]) => name === "VictoryPhase"),
-      "no wave-advancing VictoryPhase",
-    ).toBe(false);
-  });
-
   // (F) TRAINER-VICTORY DEADLOCK (#633 trainer-victory deadlock): after a host KOs the last enemy in
   // an authoritative TRAINER battle, the guest's host-KOd enemy is removed by reconcileCoopEnemyField
   // with hp=0. BEFORE the fix that removal did NOT stamp StatusEffect.FAINT, so VictoryPhase's
@@ -1302,46 +1055,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(pushed("SelectModifierPhase"), "the guest reaches the reward shop (no deadlock)").toBe(true);
     // It does NOT skip straight to a next-wave CommandPhase (the deadlock symptom).
     expect(pushed("CommandPhase"), "the guest does NOT jump to a next-wave CommandPhase").toBe(false);
-  });
-
-  it("retained normal victory cannot be reclassified by a speculative next-wave Mystery Battle", async () => {
-    await startCoopGuest();
-    const sourceWave = 11;
-    globalScene.currentBattle.waveIndex = sourceWave;
-    globalScene.currentBattle.battleType = BattleType.WILD;
-    for (const enemy of globalScene.getEnemyParty()) {
-      enemy.hp = 0;
-      enemy.doSetStatus(StatusEffect.FAINT);
-    }
-    const partner = getCoopRuntime()!.partnerTransport!;
-    sendWaveAdvance(partner, "win");
-    await new Promise(resolve => setTimeout(resolve, 0));
-    expect(
-      consumeCoopPendingWaveAdvance()?.transition?.wave,
-      "the test adopts the retained transition before constructing its host-stated VictoryPhase",
-    ).toBe(sourceWave);
-
-    // Reproduce C1 exactly: the retained source is ordinary wave 11, while mutable ambient state already
-    // advertises wave 12 as MYSTERY_ENCOUNTER without an encounter object. The old ambient classifier called
-    // handleMysteryEncounterVictory and dereferenced `continuousEncounter` on undefined.
-    globalScene.currentBattle.waveIndex = sourceWave + 1;
-    globalScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;
-    globalScene.currentBattle.mysteryEncounter = undefined;
-    setCoopWaveTailSanction([
-      "VictoryPhase",
-      "BattleEndPhase",
-      "CoopVictorySealPhase",
-      "NewBattlePhase",
-      "NextEncounterPhase",
-    ]);
-    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    const lastEnemy = globalScene.getEnemyParty().at(-1)!;
-    const victory = game.scene.phaseManager.create("VictoryPhase", lastEnemy.id, false, sourceWave);
-
-    expect(() => victory.start(), "retained normal victory never enters Mystery Encounter handling").not.toThrow();
-    const pushed = (name: string) => pushNewSpy.mock.calls.some(([phase]) => phase === name);
-    expect(pushed("BattleEndPhase"), "the immutable normal-wave tail continues through BattleEnd").toBe(true);
-    expect(pushed("SelectModifierPhase"), "wave 11 opens its normal reward continuation").toBe(true);
   });
 
   // (F2) VOUCHER CREDIT (#633 trainer-victory deadlock): because the guest now runs its OWN

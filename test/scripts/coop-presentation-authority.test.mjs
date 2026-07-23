@@ -70,6 +70,14 @@ test("ordinary co-op and Showdown both replay retained entry presentation before
   assert.doesNotMatch(turnInit, /isShowdownGuestFlipGated\(\) && globalScene\.currentBattle\.turn === 1/u);
 });
 
+test("renderer fixtures cannot manufacture legacy wave authority", () => {
+  const rendererFixture = read("test/tests/elite-redux/coop/coop-guest-renderer.test.ts");
+
+  assert.doesNotMatch(rendererFixture, /makeCoopOperationId/u);
+  assert.doesNotMatch(rendererFixture, /partner\.send\(\{\s*t:\s*"waveResolved"/u);
+  assert.doesNotMatch(rendererFixture, /pendingOperation:\s*\{[\s\S]*kind:\s*"WAVE_ADVANCE"/u);
+});
+
 test("every authority event receives an ordered renderer-completion receipt in the exact-browser build", () => {
   const recorder = read("src/data/elite-redux/coop/coop-turn-recorder.ts");
   const replay = read("src/phases/coop-replay-turn-phase.ts");

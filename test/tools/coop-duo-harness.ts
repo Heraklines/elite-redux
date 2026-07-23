@@ -2631,6 +2631,31 @@ export async function buildDuo(
   await drainLoopback();
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
+  // Production installs both runtimes before Encounter/Summon. This direct-mirror fixture deliberately
+  // pairs after the solo host already reached CommandPhase, so it must migrate BOTH boundaries it skipped:
+  // publish the complete retained wave-start carrier and open the scoped turn recorder before the guest's
+  // real TurnInit queues its mandatory entry-presentation replay. The prefix is intentionally empty because
+  // the fixture did not observe summon presentation; tests that prove ability/environment identity boot via
+  // the real two-browser launch. Omitting this carrier strands every migrated V2 fixture in
+  // CoopReplayTurnPhase waiting for an Encounter message no synthetic host can ever produce.
+  await withClient(hostCtx, async () => {
+    const battle = hostScene.currentBattle;
+    const authoritativeState = captureCoopAuthoritativeBattleState(battle.turn);
+    if (authoritativeState == null) {
+      throw new Error("direct-mirror co-op fixture could not capture its pre-command authoritative state");
+    }
+    hostRuntime.battleStream.sendEnemyParty(
+      battle.waveIndex,
+      captureCoopEnemies(),
+      battle.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+      battle.battleType,
+      authoritativeState,
+      captureCoopEncounterAuthority(battle),
+      [],
+    );
+    beginCoopRecording(battle.turn, `${hostRuntime.controller.sessionEpoch}:${battle.waveIndex}`);
+    await drainLoopback();
+  });
   // `buildDuo` is handed an already-open solo host input phase, while production negotiates before battle
   // construction. Adopt only that exact live phase, then materialize the guest's omitted real TurnInit ->
   // Command chain. Starting the guest-owned CommandPhase supplies the replica's address-exact proof; restarting

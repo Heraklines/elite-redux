@@ -22,6 +22,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { CommandPhase } from "#phases/command-phase";
+import { rebroadcastCoopWaveStartAuthorityAfterEntryEffects } from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, drainLoopback, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -143,18 +144,8 @@ describe.skipIf(!RUN)("co-op Commander automatic command materialization", () =>
     const wave = rig.guestScene.currentBattle.waveIndex;
     const turn = rig.guestScene.currentBattle.turn;
     const point = `cmd:${wave}:${turn}`;
-    const commander = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-    const commandedAlly = commander.getAllies()[0];
-    const commandedTag = new CommandedTag(commander.id);
-    let authoritativeTagReady = false;
-    const originalGetTag = commandedAlly.getTag.bind(commandedAlly);
-    const getTagSpy = vi
-      .spyOn(commandedAlly, "getTag")
-      .mockImplementation(tagType =>
-        tagType === BattlerTagType.COMMANDED && authoritativeTagReady
-          ? (commandedTag as never)
-          : originalGetTag(tagType),
-      );
+    const guestCommander = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+    const guestCommandedAlly = guestCommander.getAllies()[0];
     const setModeSpy = vi.spyOn(rig.guestScene.ui, "setMode");
 
     rig.guestScene.currentBattle.turnCommands = {};
@@ -167,10 +158,17 @@ describe.skipIf(!RUN)("co-op Commander automatic command materialization", () =>
       "the early guest check legitimately precedes the host's post-summon Commander materialization",
     ).toBeUndefined();
 
-    // This models the host's post-summon refresh becoming authoritative while the guest is sealed at
-    // cmd:<wave>:<turn>. The arrival releases that same boundary; no local command UI may flash open.
-    authoritativeTagReady = true;
     await withClient(rig.hostCtx, () => {
+      // Materialize the late relationship on the AUTHORITY'S real field, then publish it through the
+      // production post-summon carrier. The old fixture flipped a guest-local mock after the early check;
+      // that bypassed the exact serialized sourceId + consume/apply chain this regression exists to prove.
+      const hostCommander = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      const hostCommandedAlly = hostCommander.getAllies()[0];
+      hostCommandedAlly.summonData.tags.push(new CommandedTag(hostCommander.id));
+      expect(
+        rebroadcastCoopWaveStartAuthorityAfterEntryEffects(),
+        "the authoritative post-summon Commander relationship is retained for the guest",
+      ).toBe(true);
       rig.hostRuntime.rendezvous.arrive(point);
     });
     await withClient(rig.guestCtx, async () => {
@@ -178,8 +176,9 @@ describe.skipIf(!RUN)("co-op Commander automatic command materialization", () =>
       await Promise.resolve();
     });
 
-    expect(getTagSpy.mock.calls.length, "Commander ownership is re-evaluated after reciprocal release").toBeGreaterThan(
-      1,
+    const adoptedTag = guestCommandedAlly.getTag(BattlerTagType.COMMANDED);
+    expect(adoptedTag?.sourceId, "the guest adopted the authoritative Commander source identity").toBe(
+      guestCommander.id,
     );
     expect(rig.guestScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX]).toMatchObject({
       command: Command.FIGHT,
