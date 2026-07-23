@@ -11,6 +11,7 @@ import {
   requiresCoopV2InteractionTerminalProof,
   successorOfCoopV2InteractionEnvelope,
 } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
+import { successorWaitAllows } from "#data/elite-redux/coop/authority-v2/next-control";
 import type {
   CoopAuthoritativeEnvelopeV1,
   CoopLogicalPhase,
@@ -32,6 +33,7 @@ import {
   COOP_BIOME_PICK_SEQ_BASE,
   COOP_CROSSROADS_SEQ_BASE,
   COOP_ME_PUMP_SEQ_BASE,
+  COOP_ME_TERM_SEQ_BASE,
 } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -464,6 +466,101 @@ describe("Authority V2 interaction cutover", () => {
       turn: 1,
       allowedControlAddresses: [{ materialKind: "command-open", wave: 32, turn: 1, operationId: null }],
     });
+  });
+
+  it("states the exact final terminal after a settled Mystery tail with no reward operations", () => {
+    const settledState: CoopAuthoritativeBattleStateV1 = { ...STATE, tick: 5, wave: 39, turn: 1 };
+    const pinned = 42;
+    const operationId = makeCoopOperationId(1, 0, (COOP_ME_TERM_SEQ_BASE + pinned) * 8000 + 4000, "ME_TERMINAL");
+    const finalOperationId = makeCoopOperationId(1, 0, (COOP_ME_TERM_SEQ_BASE + pinned) * 8000 + 4001, "ME_TERMINAL");
+    const value: CoopAuthoritativeEnvelopeV1 = {
+      ...envelope("ME_TERMINAL", {}, "MYSTERY_ENCOUNTER", 0),
+      wave: 39,
+      turn: 0,
+      pendingOperation: {
+        id: operationId,
+        kind: "ME_TERMINAL",
+        owner: 0,
+        status: "applied",
+        payload: {
+          terminal: "reward-settled",
+          outcome: { ...RESYNC, authoritativeState: settledState },
+          destination: {
+            kind: "reward",
+            hostTurn: 1,
+            result: "victory",
+            continuation: "none",
+            trainerVictory: false,
+            rewardSurfaces: [],
+            eggLapse: false,
+          },
+        },
+      },
+      authoritativeState: settledState,
+    };
+
+    const successor = successorOfCoopV2InteractionEnvelope("op:me", value);
+    expect(successor).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      wave: 39,
+      turn: 1,
+      allowedKinds: ["INTERACTION_COMMIT"],
+      allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: 39, turn: 0 }],
+      expectedOperationId: finalOperationId,
+    });
+    if (successor?.kind !== "AWAIT_SUCCESSOR") {
+      throw new Error("settled no-reward Mystery terminal did not produce an ordered wait");
+    }
+    const terminalMaterial = (candidateOperationId: string, operationKind = "ME_TERMINAL", turn = 0) => ({
+      kind: "OPERATION_ENVELOPE_V1",
+      surfaceClass: "op:me",
+      envelope: {
+        sessionEpoch: 1,
+        wave: 39,
+        turn,
+        pendingOperation: { id: candidateOperationId, kind: operationKind },
+      },
+    });
+    expect(
+      successorWaitAllows(
+        successor,
+        operationId,
+        "INTERACTION_COMMIT",
+        finalOperationId,
+        1,
+        terminalMaterial(finalOperationId),
+      ),
+    ).toBe(true);
+    expect(
+      successorWaitAllows(
+        successor,
+        operationId,
+        "INTERACTION_COMMIT",
+        `${finalOperationId}-wrong-step`,
+        1,
+        terminalMaterial(`${finalOperationId}-wrong-step`),
+      ),
+    ).toBe(false);
+    expect(
+      successorWaitAllows(
+        successor,
+        operationId,
+        "INTERACTION_COMMIT",
+        finalOperationId,
+        1,
+        terminalMaterial(finalOperationId, "ME_PRESENT"),
+      ),
+    ).toBe(false);
+    expect(
+      successorWaitAllows(
+        successor,
+        operationId,
+        "INTERACTION_COMMIT",
+        finalOperationId,
+        1,
+        terminalMaterial(finalOperationId, "ME_TERMINAL", 1),
+      ),
+    ).toBe(false);
   });
 
   it("commits a Colosseum decision as a mechanical result before its typed successor wait", () => {

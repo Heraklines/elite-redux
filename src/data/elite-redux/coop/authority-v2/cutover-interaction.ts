@@ -627,6 +627,7 @@ function successorWait(
   coordinate: Readonly<{ wave: number; turn: number }> = envelope,
   allowedInteractionAddresses?: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedInteractionAddresses"],
   allowedControlAddresses?: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedControlAddresses"],
+  expectedOperationId: string | null = null,
 ): ProjectableControl {
   const operation = envelope.pendingOperation;
   if (operation == null) {
@@ -642,7 +643,7 @@ function successorWait(
     ...(allowedInteractionAddresses == null ? {} : { allowedInteractionAddresses }),
     ...(allowedControlAddresses == null ? {} : { allowedControlAddresses }),
     allowNextWaveStart,
-    expectedOperationId: null,
+    expectedOperationId,
   };
 }
 
@@ -896,6 +897,34 @@ export function successorOfCoopV2InteractionEnvelope(
       return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
     case "ME_TERMINAL": {
       const destination = payload != null && isPlainObject(payload.destination) ? payload.destination : null;
+      const terminal = payload?.terminal;
+      const parsed = parseCoopOperationId(operation.id);
+      // `battle-settled` / `reward-settled` can have no mechanical reward surface at all. In that case the
+      // public reward tail immediately authors the transaction's final `leave` at the ME address (turn 0),
+      // while the settled image itself deliberately keys its ordered wait to the later engine-state turn.
+      // A broad same-turn interaction rule therefore cannot represent this edge. State the one predictable
+      // next terminal operation exactly; a wrong step, kind, wave, or turn remains fail-closed. When an
+      // ordered reward surface exists, its own result becomes the predecessor and already states the nested
+      // ME_TERMINAL return address, so do not bypass it here.
+      const directTerminalSuccessor =
+        (terminal === "battle-settled" || terminal === "reward-settled")
+        && destination?.kind === "reward"
+        && Array.isArray(destination.rewardSurfaces)
+        && destination.rewardSurfaces.length === 0
+        && parsed?.kind === "ME_TERMINAL"
+          ? makeCoopOperationId(parsed.epoch, parsed.owner, parsed.pinnedSeq + 1, "ME_TERMINAL")
+          : null;
+      if (directTerminalSuccessor != null) {
+        return successorWait(
+          envelope,
+          ["INTERACTION_COMMIT"],
+          false,
+          envelope.authoritativeState,
+          [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: envelope.wave, turn: envelope.turn }],
+          undefined,
+          directTerminalSuccessor,
+        );
+      }
       return successorWait(
         envelope,
         ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
