@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "9197520d77055ab7f09ddd3be8f7c85bc569f8b1",
+  "baseSha": "c790a57e799084fc0155c2e18e416d09a56a46d6",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -23,6 +23,7 @@
     "src/data/elite-redux/coop/authority-v2/next-control.ts",
     "src/data/elite-redux/coop/authority-v2/shadow.ts",
     "src/data/elite-redux/coop/coop-battle-stream.ts",
+    "src/data/elite-redux/coop/coop-renderer-gate.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
     "src/data/elite-redux/coop/coop-transport.ts",
     "src/data/elite-redux/er-biome-routing.ts",
@@ -63,6 +64,7 @@
     "test/tests/elite-redux/coop/coop-duo-reward-reroll.test.ts",
     "test/tests/elite-redux/coop/coop-duo-seating.test.ts",
     "test/tests/elite-redux/coop/coop-p33-mutation-victims.test.ts",
+    "test/tests/elite-redux/coop/coop-renderer-allowlist.test.ts",
     "test/tests/elite-redux/coop/coop-session-controller.test.ts",
     "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts",
     "test/tests/elite-redux/er-doubles-only-all-battles.test.ts",
@@ -80,7 +82,5 @@
     "test/tools/repro-triple-battle-bugs.test.ts",
     "test/visual/rich-notification-qa.mjs"
   ],
-  "lockedSchemaFiles": [
-    "src/data/elite-redux/coop/coop-transport.ts"
-  ]
+  "lockedSchemaFiles": []
 }

@@ -12,12 +12,14 @@ const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), "ut
 test("switch presentation is host-authored and the renderer never predicts its own switch", () => {
   const producer = read("src/phases/switch-summon-phase.ts");
   const replay = read("src/phases/coop-replay-turn-phase.ts");
+  const rendererGate = read("src/data/elite-redux/coop/coop-renderer-gate.ts");
   const guestTurn = read("src/phases/turn-start-phase.ts");
 
   assert.match(producer, /recordCoopEvent\(\{\s*k:\s*"switch"/u);
   assert.match(producer, /pokemonId:\s*incoming\.id/u);
   assert.match(producer, /speciesId:\s*incomingSpeciesId/u);
   assert.match(replay, /case\s+"switch":\s*pm\.unshiftNew\("CoopSwitchReplayPhase",\s*event\)/u);
+  assert.match(rendererGate, /"CoopSwitchReplayPhase"/u);
   assert.doesNotMatch(guestTurn, /mirrorGuestOwnSwitch|summonCoopPlayerField/u);
 });
 

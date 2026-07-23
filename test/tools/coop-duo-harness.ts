@@ -2841,6 +2841,7 @@ export const REPLAY_DRAIN_PHASES = new Set([
   // Exact host-authored ability flyout. It owns a bounded presentation promise and must be driven before
   // the harness can call a replayed turn complete (the real renderer gate permits the same phase).
   "CoopShowAbilityReplayPhase",
+  "CoopSwitchReplayPhase",
   "CoopFaintReplayPhase",
   "CoopGuestFaintSwitchPhase",
   // The renderer gate replaces a forbidden local resolution phase (commonly MovePhase) with this

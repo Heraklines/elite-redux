@@ -1817,3 +1817,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   classifying months of unrelated branch changes as this candidate's delta. Full static now uses the exact push
   base, or the checked-out first parent for manual dispatch, while retaining the full-repository diagnostic
   ratchet and global co-op-scope enforcement.
+- The first post-push bypass audit caught the new replay phase missing from the default-enforced renderer
+  allowlist. That would have replaced it with `CoopInertPhase` and left a replacement presentation watermark
+  unopened. The phase is now present in the production allowlist, the empirical observed-phase contract, and
+  the two-engine replay driver; the fast source contract also requires that wiring for every future edit.
