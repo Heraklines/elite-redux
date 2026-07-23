@@ -59,6 +59,7 @@ import {
   coopAppliedStateTick,
   reapplyAcceptedCoopAuthoritativeBattleState,
   resetCoopStateTicks,
+  // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates battle-engine callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync, type CoopCommandTimeout } from "#data/elite-redux/coop/coop-battle-sync";
@@ -133,6 +134,7 @@ import {
   receiveCoopMeTerminalTransactionFor,
   resetCoopMeOperationState,
   setCoopMeOperationRevisionFloor,
+  // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates ME operation callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
   canMaterializeCoopMeCommittedTerminal,
@@ -179,6 +181,7 @@ import type {
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { COOP_ME_BATTLE_SETTLED_CHOICE, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+// biome-ignore lint/suspicious/noImportCycles: Epoch application is owned by the runtime composition root.
 import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-epoch";
 import {
   coopOperationDurabilityHooks,
@@ -212,6 +215,7 @@ import {
   isValidCoopRewardSurfaceIdentity,
   resetCoopRewardOperationState,
   setCoopRewardOperationRevisionFloor,
+  // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates reward callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-reward-operation";
 import {
   COOP_BARGAIN_SEQ_BASE,
@@ -314,6 +318,7 @@ import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { UiMode } from "#enums/ui-mode";
+// biome-ignore lint/suspicious/noImportCycles: Runtime ghost-pool synchronization serializes live Pokemon data.
 import { PokemonData } from "#system/pokemon-data";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
 

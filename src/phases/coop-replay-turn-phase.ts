@@ -729,7 +729,9 @@ export class CoopReplayTurnPhase extends Phase {
     // at RENDER time (the guest's own context), covering both the live per-event and batched paths that
     // merge into here. No-op off the versus-guest path.
     if (isShowdownGuestFlipGated()) {
-      events = events.map(swapBattleEvent);
+      // Do not pass swapBattleEvent directly to map: its optional second argument is
+      // enemyBase, while Array.map supplies the event index as its second callback argument.
+      events = events.map(event => swapBattleEvent(event));
     }
     coopLog("replay", `guest replay turn=${this.turn}: rendering ${events.length} event(s)`);
     // Running per-mon hp so multi-hit drains chain (hit1: cur->hp1, hit2: hp1->hp2, ...). Seeded
