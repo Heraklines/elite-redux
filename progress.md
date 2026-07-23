@@ -2086,6 +2086,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The reciprocal biome-runtime isolation case retains its suite-standard bounded timeout instead of inheriting
   Vitest's 20-second default, which had expired during a healthy heavyweight duo boot on a shared runner.
 
+# 2026-07-23 - Stormglass regression follows installed public V2 control
+
+- The Stormglass suite no longer invokes a captured option callback before `setMode` has installed the real
+  actionable control. It waits for the public option handler and selects Sandstorm with DOWN/DOWN/ACTION.
+- The assertion now requires the raw `interactionChoice` carrier to be absent under V2 while both engines
+  apply the immutable result. The prior fault assertion demanded a carrier the cutover intentionally suppresses.
+- Focused static evidence also corrected the biome-choice suite's V2-shadow accessor import to the runtime
+  facade that owns it; run `30041271018` had caught that migration typo before executing a deployable checkpoint.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real

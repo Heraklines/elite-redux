@@ -10,6 +10,7 @@ import { modifierTypes } from "#data/data-lists";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getStormglassWeather } from "#data/elite-redux/er-relics";
+import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -56,7 +57,7 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
     initGlobalScene(game.scene);
   });
 
-  it("drops the raw choice, then both real engines persist and apply the host's committed Sandstorm", async () => {
+  it("suppresses the raw choice while both real engines apply the committed Sandstorm", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     // This operation test used to start a detached picker after buildDuo had already installed an
     // actionable COMMAND_FRONTIER. Authority V2 correctly rejects that impossible
@@ -101,13 +102,22 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
       await Promise.resolve();
       await drainLoopback();
       expect(options?.map(option => option.label)).toEqual(["Sun", "Rain", "Sandstorm", "Hail", "Fog"]);
-      options?.[2]?.handler();
+      await vi.waitUntil(
+        () => globalScene.ui.getMode() === UiMode.OPTION_SELECT && globalScene.ui.getHandler()?.active === true,
+        { timeout: 5_000, interval: 5 },
+      );
+      // Drive the same public input path a player uses. Invoking the captured callback directly raced the
+      // setMode promise and attempted to settle STORMGLASS_PRESENT before its control was installed.
+      expect(globalScene.ui.processInput(Button.DOWN)).toBe(true);
+      expect(globalScene.ui.processInput(Button.DOWN)).toBe(true);
+      expect(globalScene.ui.processInput(Button.ACTION)).toBe(true);
+      await Promise.resolve();
       await drainLoopback();
       expect(getStormglassWeather()).toBe(WeatherType.SANDSTORM);
       expect(globalScene.arena.weather?.weatherType).toBe(WeatherType.SANDSTORM);
     });
 
-    expect(pair.faultsInjected(), "the low-latency stormglass choice was actually dropped").toBe(1);
+    expect(pair.faultsInjected(), "Authority V2 emits no raw stormglass correctness carrier").toBe(0);
 
     await withClient(rig.guestCtx, async () => {
       vi.spyOn(globalScene.ui, "showText").mockImplementation(() => undefined);

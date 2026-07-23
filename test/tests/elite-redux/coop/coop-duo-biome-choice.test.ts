@@ -34,7 +34,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { getCoopV2Shadow } from "#data/elite-redux/coop/authority-v2/shadow";
 import { applyCoopFullSnapshot, captureCoopFullSnapshot } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   coopBiomeOperationId,
@@ -56,7 +55,7 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopBiomeTransitionTailPermit } from "#data/elite-redux/coop/coop-renderer-gate";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_SEQ_BASE, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
