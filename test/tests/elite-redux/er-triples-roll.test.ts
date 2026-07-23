@@ -29,10 +29,12 @@ import { TRIPLE_BATTLE_GHOST_RARITY, TRIPLE_BATTLE_RARITY, TRIPLE_FORMAT } from 
 import {
   type GhostMember,
   type GhostTeamSnapshot,
+  ghostWavesForCurrentRun,
   hasErGhostOverride,
   resetErGhostRunState,
   setPrefetchedGhostTeamsForTests,
 } from "#data/elite-redux/er-ghost-teams";
+import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -125,6 +127,7 @@ describe.skipIf(!RUN)("ER triples roll - observed rates + rolled-path constructi
   afterEach(() => {
     setPrefetchedGhostTeamsForTests([]);
     resetErGhostRunState(); // clear the per-run ghost cache so wave 5 doesn't reuse a prior test's ghost
+    resetErDifficulty();
     for (const c of game.scene.gameMode?.challenges ?? []) {
       c.value = 0;
     }
@@ -150,6 +153,24 @@ describe.skipIf(!RUN)("ER triples roll - observed rates + rolled-path constructi
     const expected = 1 / TRIPLE_BATTLE_RARITY; // 0.05
     expect(rate).toBeGreaterThan(expected - 0.015);
     expect(rate).toBeLessThan(expected + 0.015);
+  });
+
+  it("bounds ordinary triple candidates to one per 20-wave cadence", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+
+    const wins: number[] = [];
+    for (let wave = 1; wave <= 200; wave++) {
+      globalScene.resetSeed(wave);
+      if (rollTriple(globalScene, { battleType: BattleType.WILD, waveIndex: wave })) {
+        wins.push(wave);
+      }
+    }
+
+    expect(wins.length).toBeGreaterThanOrEqual(9); // a finale can consume one cadence slot
+    expect(wins.length).toBeLessThanOrEqual(10);
+    for (let i = 1; i < wins.length; i++) {
+      expect(wins[i] - wins[i - 1]).toBeGreaterThanOrEqual(TRIPLE_BATTLE_RARITY);
+    }
   });
 
   it("ghost battles roll a triple ~20% of the time (1-in-5)", async () => {
@@ -189,6 +210,31 @@ describe.skipIf(!RUN)("ER triples roll - observed rates + rolled-path constructi
       trainer: ghostTrainer as Trainer,
     }));
     expect(rate).toBe(0);
+  });
+
+  it("schedules roughly one in five gauntlet ghosts without adjacent ghost candidates", async () => {
+    setErDifficulty("hell");
+    setPrefetchedGhostTeamsForTests([GHOST_SNAPSHOT]);
+    game.override.startingWave(5);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+
+    const ghostTrainer = globalScene.currentBattle.trainer as Trainer;
+    const schedule = ghostWavesForCurrentRun();
+    const winningIndexes = schedule
+      .map((wave, index) => {
+        globalScene.resetSeed(wave);
+        return rollTriple(globalScene, { battleType: BattleType.TRAINER, waveIndex: wave, trainer: ghostTrainer })
+          ? index
+          : -1;
+      })
+      .filter(index => index >= 0);
+
+    expect(winningIndexes.length).toBeGreaterThanOrEqual(Math.floor(schedule.length / TRIPLE_BATTLE_GHOST_RARITY));
+    expect(winningIndexes.length).toBeLessThanOrEqual(Math.ceil(schedule.length / TRIPLE_BATTLE_GHOST_RARITY));
+    for (let i = 1; i < winningIndexes.length; i++) {
+      expect(winningIndexes[i] - winningIndexes[i - 1]).toBeGreaterThanOrEqual(TRIPLE_BATTLE_GHOST_RARITY);
+    }
   });
 
   it("a party of < 3 able mons never rolls a triple (party-size gate)", async () => {

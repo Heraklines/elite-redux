@@ -75,6 +75,7 @@ import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import {
   applyGhostTrainerPresentation,
   getErGhostSnapshotSpecies,
+  ghostWavesForCurrentRun,
   hasErGhostOverride,
   markTrainerAsGhost,
   maybePrefetchGhostTeams,
@@ -2276,7 +2277,8 @@ export class BattleScene extends SceneBase {
 
   /**
    * ER TRIPLES roll: decide whether an eligible new battle should be upgraded to a 3-wide triple.
-   * Deterministic per wave seed (isolated sub-stream, so non-triple waves are byte-identical).
+   * Deterministic per run. Natural battles use a bounded cadence instead of independent rolls,
+   * preventing several nominally 5% triples from clustering into the same short stretch.
    *
    * Rate: 1-in-{@linkcode TRIPLE_BATTLE_GHOST_RARITY} (~20%) for a ghost battle with a full
    * (>=3-mon) roster, otherwise 1-in-{@linkcode TRIPLE_BATTLE_RARITY} (~5%) for a wild/trainer
@@ -2321,15 +2323,37 @@ export class BattleScene extends SceneBase {
       }
     }
     const oneInN = ghost ? TRIPLE_BATTLE_GHOST_RARITY : TRIPLE_BATTLE_RARITY;
-    let win = false;
+
+    // Scheduled ghosts are indexed by their position in the ghost gauntlet, not by raw wave
+    // number. This keeps 20% meaningful even where the endgame schedule has adjacent waves.
+    // Ghost Trainers challenge encounters do not have a stable precomputed encounter index, so
+    // they retain the isolated per-wave 1-in-5 roll below.
+    const scheduledGhostIndex = ghost ? ghostWavesForCurrentRun().indexOf(waveIndex) : -1;
+    if (ghost && scheduledGhostIndex < 0) {
+      let challengeGhostWin = false;
+      this.executeWithSeedOffset(
+        () => {
+          challengeGhostWin = randSeedInt(oneInN) === 0;
+        },
+        TRIPLE_ROLL_SEED_OFFSET,
+        this.waveSeed,
+      );
+      return challengeGhostWin;
+    }
+
+    // Pick one seeded phase for the whole run, then admit exactly one slot in each N-slot
+    // cadence. Ordinary encounters therefore remain 5% across players/runs but can no longer
+    // produce adjacent or bursty triple candidates. A scripted/finale/ineligible slot can only
+    // reduce the realized rate; it cannot move or duplicate the candidate.
+    const cadenceIndex = scheduledGhostIndex >= 0 ? scheduledGhostIndex : waveIndex;
+    let phase = 0;
     this.executeWithSeedOffset(
       () => {
-        win = randSeedInt(oneInN) === 0;
+        phase = randSeedInt(oneInN);
       },
-      TRIPLE_ROLL_SEED_OFFSET,
-      this.waveSeed,
+      TRIPLE_ROLL_SEED_OFFSET + (ghost ? 1 : 0),
     );
-    return win;
+    return (((cadenceIndex - phase) % oneInN) + oneInN) % oneInN === 0;
   }
 
   // TODO: Split this up and move it to a "post battle phase"

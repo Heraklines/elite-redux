@@ -43,11 +43,17 @@ interface PatchNotesPayload {
 
 /** Return the rich content carried by a patch-notes notification, if valid. */
 export function patchNotesContentOf(notification: ErNotification): RichNotificationContent | null {
-  if (notification.type !== PATCH_NOTES_TYPE) {
-    return null;
-  }
   const data = notification.data as { title?: unknown; body?: unknown; payload?: unknown } | null;
   const payload = data?.payload as PatchNotesPayload | null;
+  // Production clients that fetched the launch announcement before updating to
+  // the rich-notification build persisted the unknown kind as `system`. The
+  // server cursor and stable row id then correctly prevent a duplicate fetch,
+  // so recognize that legacy entry by the rich Markdown payload it retained.
+  const legacyRichSystemNotification =
+    notification.type === SYSTEM_TYPE && typeof payload?.markdown === "string" && payload.markdown.trim().length > 0;
+  if (notification.type !== PATCH_NOTES_TYPE && !legacyRichSystemNotification) {
+    return null;
+  }
   const markdownSource = typeof payload?.markdown === "string" ? payload.markdown : data?.body;
   const markdown = typeof markdownSource === "string" ? markdownSource.slice(0, MAX_PATCH_NOTES_LENGTH) : "";
   if (!markdown.trim()) {

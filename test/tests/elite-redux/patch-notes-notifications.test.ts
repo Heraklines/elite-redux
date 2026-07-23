@@ -41,4 +41,29 @@ describe("patch-notes notifications", () => {
     expect(patchNotesContentOf(notification({ body: "Fallback" }, "system"))).toBeNull();
     expect(patchNotesContentOf(notification({ body: "   " }))).toBeNull();
   });
+
+  it("upgrades a launch announcement persisted as a legacy system notification", () => {
+    expect(
+      patchNotesContentOf(
+        notification(
+          {
+            title: "PokeRogue Redux v0.0.6.0",
+            body: "Open the full v0.0.6.0 patch notes.",
+            payload: {
+              announcementId: "patch-notes:0.0.6.0",
+              markdown: "# Full notes\n\n![Battle](https://example.com/battle.png)",
+              actionLabel: "Join PokeRogue Redux Discord",
+              actionUrl: "https://discord.gg/q8d2jq5dE",
+            },
+          },
+          "system",
+        ),
+      ),
+    ).toEqual({
+      title: "PokeRogue Redux v0.0.6.0",
+      markdown: "# Full notes\n\n![Battle](https://example.com/battle.png)",
+      actionLabel: "Join PokeRogue Redux Discord",
+      actionUrl: "https://discord.gg/q8d2jq5dE",
+    });
+  });
 });
