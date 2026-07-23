@@ -2640,15 +2640,20 @@ export async function buildDuo(
   if (adoptedPrePairCommand) {
     await withClient(guestCtx, async () => {
       await drainLoopback();
-      materializeMirroredGuestInputTurn(guestScene);
-      const guestOwnCommand = await driveClientPhaseQueueTo(guestScene, "initial guest-owned CommandPhase", {
-        matches: phase =>
-          phase.phaseName === "CommandPhase"
-          && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
-      });
-      guestOwnCommand.start();
-      await drainLoopback();
-      markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
+      // Classic final-boss stage one has one real player actor even in co-op; the guest-owned party mon
+      // remains on the bench until phase two. Production therefore exposes no guest CommandPhase and the
+      // harness must not fabricate one merely to satisfy its ordinary doubles bootstrap.
+      if (guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX] != null) {
+        materializeMirroredGuestInputTurn(guestScene);
+        const guestOwnCommand = await driveClientPhaseQueueTo(guestScene, "initial guest-owned CommandPhase", {
+          matches: phase =>
+            phase.phaseName === "CommandPhase"
+            && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+        });
+        guestOwnCommand.start();
+        await drainLoopback();
+        markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
+      }
     });
     await withClient(hostCtx, async () => {
       await drainLoopback();
