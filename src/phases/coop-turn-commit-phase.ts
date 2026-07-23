@@ -10,6 +10,7 @@ import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-autho
 import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  captureCoopDeferredWaveOutcomeForTurnCommit,
   coopSessionGeneration,
   flushCoopWaveResolvedAfterTurnCommit,
   getCoopBattleStreamer,
@@ -98,6 +99,7 @@ export class CoopTurnCommitPhase extends Phase {
         fatal(`Host could not capture complete turn authority for wave ${wave}, turn ${recording.turn}.`);
         return;
       }
+      const deferredWaveOutcome = captureCoopDeferredWaveOutcomeForTurnCommit(carrier.authoritativeState.wave);
       const retained = streamer.emitTurn(
         controller.sessionEpoch,
         carrier.authoritativeState.wave,
@@ -108,7 +110,10 @@ export class CoopTurnCommitPhase extends Phase {
         carrier.preimage,
         carrier.fullField,
         carrier.authoritativeState,
-        { mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true },
+        {
+          mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true,
+          ...(deferredWaveOutcome == null ? {} : { deferredWaveOutcome }),
+        },
       );
       if (!retained) {
         fatal(`Host could not retain complete turn authority for wave ${wave}, turn ${recording.turn}.`);

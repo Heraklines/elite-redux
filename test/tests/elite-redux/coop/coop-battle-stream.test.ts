@@ -16,6 +16,7 @@ import {
 import {
   CoopBattleStreamer,
   type CoopCheckpointEnvelope,
+  deferredCoopV2WaveSuccessorWait,
   hasCoopV2ImmediateCommandSuccessor,
 } from "#data/elite-redux/coop/coop-battle-stream";
 import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -150,6 +151,35 @@ describe("Authority V2 turn successor classification", () => {
         ],
       }),
     ).toBe(true);
+  });
+
+  it("lets a staged normal victory override the otherwise-ambiguous wild co-faint snapshot", () => {
+    const operationId = "TURN/e7/w4/t1";
+    const wait = deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
+      mysteryBattle: false,
+      deferredWaveOutcome: "win",
+    });
+    expect(wait).toEqual({
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: operationId,
+      epoch: 7,
+      wave: 4,
+      turn: 2,
+      allowedKinds: ["WAVE_ADVANCE"],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    });
+    expect(
+      deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
+        mysteryBattle: false,
+      }),
+    ).toBeNull();
+    expect(() =>
+      deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
+        mysteryBattle: true,
+        deferredWaveOutcome: "win",
+      }),
+    ).toThrow("cannot also stage");
   });
 
   it("states a REPLACEMENT boundary (not COMMAND) for a co-fainted enemy seat WITH a living reserve", () => {

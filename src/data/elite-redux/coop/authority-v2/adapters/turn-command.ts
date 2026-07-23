@@ -214,12 +214,16 @@ function resolveTurnNextControl(
   if (statedSuccessorCount > 1) {
     throw new Error("[authority-v2/turn-command] a turn must state exactly one successor control");
   }
+  const exactDeferredWaveWait =
+    input.nextSuccessorWait?.allowedKinds.length === 1 && input.nextSuccessorWait.allowedKinds[0] === "WAVE_ADVANCE";
   if (
     input.nextSuccessorWait != null
     && (input.nextSuccessorWait.afterOperationId !== input.operationId
       || input.nextSuccessorWait.epoch !== input.context.sessionEpoch
       || input.nextSuccessorWait.wave !== sourceWave
-      || input.nextSuccessorWait.turn !== sourceTurn)
+      || (exactDeferredWaveWait
+        ? input.nextSuccessorWait.turn !== (sourceTurn as number) + 1
+        : input.nextSuccessorWait.turn !== sourceTurn))
   ) {
     throw new Error("[authority-v2/turn-command] ordered successor wait is not bound to the resolved turn");
   }

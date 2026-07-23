@@ -119,6 +119,15 @@ export interface CoopTurnResolution {
 export interface CoopTurnBoundaryIdentity {
   /** True only for a battle spawned inside a retained Mystery encounter transaction. */
   readonly mysteryBattle: boolean;
+  /**
+   * A normal victory already staged by the runtime while this material turn was still recording.
+   *
+   * This is stronger evidence than the captured party/field image: a double battle can transiently retain
+   * one apparently-living enemy seat after VictoryPhase has already selected the win branch. In that case
+   * re-deriving the successor from the image opens a phantom COMMAND_FRONTIER and the log correctly refuses
+   * the real WAVE_ADVANCE. Only the runtime that owns the staged transition may set this marker.
+   */
+  readonly deferredWaveOutcome?: "win";
 }
 
 /** Complete pre-command cosmetic prefix paired with the post-summon state image that authored it. */
@@ -551,6 +560,33 @@ export function hasCoopV2ImmediateCommandSuccessor(state: CoopAuthoritativeBattl
     // the next real successor is the command frontier and must NOT be classified as a gated replacement.
     return hp != null && hp <= 0 && sideHasLivingOffFieldReserve(state, seat.side);
   });
+}
+
+/** Exact ordered successor for a normal victory staged before its material turn commit. */
+export function deferredCoopV2WaveSuccessorWait(
+  operationId: string,
+  epoch: number,
+  wave: number,
+  turn: number,
+  boundary: CoopTurnBoundaryIdentity,
+): Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null {
+  if (boundary.deferredWaveOutcome == null) {
+    return null;
+  }
+  if (boundary.mysteryBattle) {
+    throw new Error("a Mystery battle cannot also stage a normal deferred wave victory");
+  }
+  return {
+    kind: "AWAIT_SUCCESSOR",
+    afterOperationId: operationId,
+    epoch,
+    wave,
+    // BattleEnd freezes the automatic-victory settlement at exactly the resolving turn + 1.
+    turn: turn + 1,
+    allowedKinds: ["WAVE_ADVANCE"],
+    allowNextWaveStart: false,
+    expectedOperationId: null,
+  };
 }
 
 function hasCompleteAuthorityCompanions(
@@ -2612,7 +2648,14 @@ export class CoopBattleStreamer {
     if (!cutoverActive && !isCoopV2ShadowActive()) {
       return false;
     }
-    const hasImmediateCommand = hasCoopV2ImmediateCommandSuccessor(authoritativeState);
+    const hasDeferredWaveAdvance = boundary.deferredWaveOutcome === "win";
+    if (hasDeferredWaveAdvance && boundary.mysteryBattle) {
+      coopWarn("v2-turn", "host refused conflicting Mystery and deferred-wave turn boundary");
+      return false;
+    }
+    // The runtime's already-staged transition owns this choice. The state image remains the complete
+    // material payload, but it must not overrule a VictoryPhase decision by re-guessing COMMAND here.
+    const hasImmediateCommand = !hasDeferredWaveAdvance && hasCoopV2ImmediateCommandSuccessor(authoritativeState);
     const commandFrontier = hasImmediateCommand
       ? resolveCoopV2CommandFrontier(authoritativeState)
       : { commands: [], unresolved: [] };
@@ -2646,16 +2689,19 @@ export class CoopBattleStreamer {
     // post-replacement commits. This includes Showdown's explicitly-owned authoritative enemy side while
     // omitting ordinary AI enemies; an unowned human seat fails the whole commit instead of being guessed.
     const completeCommands = [...commandFrontier.commands];
-    const replacementControl = hasImmediateCommand
-      ? null
-      : resolveCoopV2ReplacementControl(epoch, authoritativeState, events);
+    const replacementControl =
+      hasImmediateCommand || hasDeferredWaveAdvance
+        ? null
+        : resolveCoopV2ReplacementControl(epoch, authoritativeState, events);
     const operationId = `TURN/e${epoch}/w${wave}/t${turn}`;
+    const deferredWaveWait = deferredCoopV2WaveSuccessorWait(operationId, epoch, wave, turn, boundary);
     // A Mystery-spawned battle terminates through the retained ME transaction, not WAVE_ADVANCE. That
     // transaction deliberately lives at the encounter's wave/turn-0 address even though the battle may end
     // on turn N. State the inverse edge exactly here; a generic turn-N wait correctly rejects turn 0 and used
     // to terminate an otherwise checksum-converged run at the post-battle reward handoff (gate C1 wave 32).
     const nextSuccessorWait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null =
-      !hasImmediateCommand
+      deferredWaveWait
+      ?? (!hasImmediateCommand
       && replacementControl == null
       && boundary.mysteryBattle
       && authoritativePartyIsDefeated(authoritativeState.enemyParty)
@@ -2671,7 +2717,7 @@ export class CoopBattleStreamer {
             allowNextWaveStart: false,
             expectedOperationId: null,
           }
-        : null;
+        : null);
     const input: CoopV2ShadowTurnTap = {
       operationId,
       capture,

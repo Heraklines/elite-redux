@@ -8373,6 +8373,35 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
   sendCoopWaveResolvedCompatibility(wave, outcome, captureParty, presentation, transition);
 }
 
+/**
+ * Capture the exact normal-victory marker owned by the runtime at the immutable turn boundary.
+ *
+ * A missing marker is ordinary (most turns). If one exists, every identity must still match the active
+ * host runtime and its staged transition; returning a best-effort value after any mismatch would let a
+ * stale map entry choose the next V2 control, so inconsistent state throws and the commit phase terminates
+ * the shared session fail-closed.
+ */
+export function captureCoopDeferredWaveOutcomeForTurnCommit(wave: number): "win" | null {
+  const deferred = deferredHostWaveResolved.get(wave);
+  if (deferred == null) {
+    return null;
+  }
+  const staged = pendingHostWaveTransitions.get(wave);
+  if (
+    active == null
+    || active.controller.role !== "host"
+    || deferred.outcome !== "win"
+    || deferred.transition.wave !== wave
+    || staged == null
+    || staged !== deferred.transition
+    || staged.wave !== wave
+    || staged.outcome !== "win"
+  ) {
+    throw new Error(`the deferred normal-victory marker for wave ${wave} lost its staged transition identity`);
+  }
+  return "win";
+}
+
 // Keep the universal move engine independent from this orchestration module. In any co-op session the
 // runtime is loaded before battle input can begin, so forced-flee mechanics reach this exact host-authority
 // boundary without introducing move -> runtime -> field -> ability -> move dependency cycles.

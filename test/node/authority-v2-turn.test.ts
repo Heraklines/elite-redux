@@ -267,6 +267,44 @@ describe("buildTurnCommitEntry - shape + digest", () => {
       }),
     ).toThrow("not bound to the resolved turn");
   });
+
+  it("accepts only the exact turn-N+1 WAVE successor for a deferred normal victory", () => {
+    const wait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "turn-op-1",
+      epoch: 1,
+      wave: 3,
+      turn: 6,
+      allowedKinds: ["WAVE_ADVANCE" as const],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    expect(
+      buildCommitted({ capture: CAPTURE_WITH_COMPANIONS, nextCommandFrontier: null, nextSuccessorWait: wait })
+        .nextControl,
+    ).toEqual(wait);
+    expect(() =>
+      buildCommitted({
+        capture: CAPTURE_WITH_COMPANIONS,
+        nextCommandFrontier: null,
+        nextSuccessorWait: { ...wait, turn: 5 },
+      }),
+    ).toThrow("not bound to the resolved turn");
+    expect(() =>
+      buildCommitted({
+        capture: CAPTURE_WITH_COMPANIONS,
+        nextCommandFrontier: null,
+        nextSuccessorWait: { ...wait, turn: 7 },
+      }),
+    ).toThrow("not bound to the resolved turn");
+    expect(() =>
+      buildCommitted({
+        capture: CAPTURE_WITH_COMPANIONS,
+        nextCommandFrontier: null,
+        nextSuccessorWait: { ...wait, allowedKinds: ["WAVE_ADVANCE", "TERMINAL_COMMIT"] },
+      }),
+    ).toThrow("not bound to the resolved turn");
+  });
 });
 
 // ---------------------------------------------------------------------------

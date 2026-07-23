@@ -1693,3 +1693,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   adds the confirmed divergent-save overwrite repair, bounded/restored triple layouts and summon behavior,
   forced-format/map fixes, and their regressions without changing Authority V2 ownership. No push occurs
   until public journey `29975873789` releases the shared browser accounts.
+
+# 2026-07-23 - staged normal victory owns the final turn successor
+
+- Public fresh/resume journey `29975873789` completed green on `d69346fea`: both real browsers registered,
+  paired, played through wave 1, crossed the reward boundary, reached wave-2 command, reloaded, re-paired,
+  resumed, and installed live command control. The compact evidence is assertion-clean and both final
+  screenshots show the same double battle/command frontier in the peers' different locales.
+- Full-gate C5 on the same SHA exposed a separate real product defect at wave 4. VictoryPhase had already
+  staged a normal retained win while the material turn was recording, but its checkpoint transiently kept
+  one enemy at positive HP. The TURN adapter re-guessed from that ambiguous image, emitted COMMAND_FRONTIER,
+  and the log correctly rejected the later WAVE_ADVANCE. Earlier fully-fainted waves took the non-command
+  path and passed, which is why this appeared only when X Attack produced that exact double-battle ordering.
+- The immutable turn boundary now captures the active runtime's exact deferred-win identity and treats it as
+  stronger than snapshot inference. It states only WAVE_ADVANCE at the already-defined BattleEnd settlement
+  coordinate (same wave, resolving turn + 1), suppresses replacement/command derivation, and fails closed if
+  the marker loses its staged transition or conflicts with a Mystery battle. The intentional wild co-faint
+  case remains COMMAND when no victory was staged.
+- Focused contracts cover the exact N+1 WAVE wait, reject N/N+2 and broadened kinds, and cover the marker's
+  null/conflicting shapes. Per repository policy no co-op Vitest ran locally. Scoped Biome has no errors,
+  `git diff --check` is clean, and full TypeScript still reports the inherited ability/feat baseline (581
+  lines) with zero diagnostic in the six touched implementation/test paths. Hosted C5/full qualification is
+  required on the pushed candidate.
