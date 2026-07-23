@@ -182,6 +182,10 @@ test("the journey executes a reciprocal switch plus two attacks and requires eve
   assert.match(turn, /for \(let round = 1; round <= 2; round\+\+\)/u);
   assert.match(turn, /waitForPostTurnOutcome\(/u);
   assert.match(turn, /outcome\.kind !== "command"/u);
+  assert.match(turn, /const switchNextCommandAddress = nextCommandAddress\(switchCommandAddress\)/u);
+  assert.match(turn, /const nextAddress = nextCommandAddress\(expectedCommandAddress\)/u);
+  assert.match(turn, /expectedAddress: switchNextCommandAddress/u);
+  assert.match(turn, /expectedAddress: nextAddress/u);
   assert.match(turn, /assertSharedCommandFrontier\(outcomeCursors, `\$\{label\}-next-command`/u);
   assert.match(turn, /assertRetainedContinuation\(outcomeCursors, `\$\{label\}-next-command`/u);
   assert.match(turn, /showdown-turn-3-synchronized/u);

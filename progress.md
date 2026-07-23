@@ -2135,3 +2135,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   actor fingerprint) instead of inferring success from queue position. Static contracts reject malformed
   failure evidence and a focused engine regression proves a late animation callback cannot overwrite a
   watchdog failure. Remaining non-identity events will adopt the same outcome contract in the next slice.
+
+# 2026-07-23 - Showdown next-command proof rejects the submitted address
+
+- Exact run `30042537289` on the detached-sprite fix completed all twelve ordered authority/renderer events
+  without a page error, proving the renderer crash was closed. The oracle then matched a transient command
+  re-open at the already-submitted turn-1 address while the real turn-2 frontier arrived later.
+- Every Showdown round now derives the exact numeric successor from the submitted public command address and
+  requires both browsers to converge there before slicing its presentation ledger. Same-wave or same-address
+  command observations can no longer produce an early false red or a false next-turn proof.

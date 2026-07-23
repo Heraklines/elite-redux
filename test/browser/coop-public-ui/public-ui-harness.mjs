@@ -415,6 +415,21 @@ function sameAddress(left, right) {
   return left?.epoch === right?.epoch && left?.wave === right?.wave && left?.turn === right?.turn;
 }
 
+/** Exact numeric command successor; a transient re-open of the submitted address is never a new turn. */
+function nextCommandAddress(address) {
+  const match = /^(\d+):(\d+):(\d+)$/u.exec(address ?? "");
+  if (match == null) {
+    throw new Error(`Cannot derive the next command address from ${String(address)}`);
+  }
+  const epoch = Number(match[1]);
+  const wave = Number(match[2]);
+  const turn = Number(match[3]);
+  if (![epoch, wave, turn].every(Number.isSafeInteger) || epoch <= 0 || wave <= 0 || turn <= 0) {
+    throw new Error(`Submitted command address is not a positive safe tuple: ${address}`);
+  }
+  return `${epoch}:${wave}:${turn + 1}`;
+}
+
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
@@ -2642,10 +2657,13 @@ export class DuoPublicUiRig {
     if (switchOutcome.kind !== "command") {
       throw new Error(`Showdown voluntary switch reached ${switchOutcome.kind} instead of the next command frontier`);
     }
-    await this.assertSharedCommandFrontier(switchOutcomeCursors, `${switchLabel}-next-command`, { expectedWave: 1 });
+    const switchNextCommandAddress = nextCommandAddress(switchCommandAddress);
+    await this.assertSharedCommandFrontier(switchOutcomeCursors, `${switchLabel}-next-command`, {
+      expectedAddress: switchNextCommandAddress,
+    });
     const switchMatch = findSharedCommandFrontierMatch(this.host, this.guest, switchOutcomeCursors, null, {
       allowAddressRepeat: true,
-      expectedWave: 1,
+      expectedAddress: switchNextCommandAddress,
     });
     if (switchMatch == null) {
       throw new Error(`${switchLabel}: could not recover the matched command boundary for presentation proof`);
@@ -2685,12 +2703,13 @@ export class DuoPublicUiRig {
           `Showdown turn ${round + 1} reached ${outcome.kind} instead of the next synchronized command frontier`,
         );
       }
+      const nextAddress = nextCommandAddress(expectedCommandAddress);
       await this.assertSharedCommandFrontier(outcomeCursors, `${label}-next-command`, {
-        expectedWave: 1,
+        expectedAddress: nextAddress,
       });
       const commandMatch = findSharedCommandFrontierMatch(this.host, this.guest, outcomeCursors, null, {
         allowAddressRepeat: true,
-        expectedWave: 1,
+        expectedAddress: nextAddress,
       });
       if (commandMatch == null) {
         throw new Error(`${label}: could not recover the matched command boundary for presentation proof`);
