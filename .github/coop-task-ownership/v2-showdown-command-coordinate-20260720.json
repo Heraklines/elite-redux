@@ -57,6 +57,7 @@
     "test/tests/elite-redux/showdown/showdown-versus-doubles.test.ts",
     "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts",
     "test/tools/coop-duo-harness.ts",
+    "test/tools/coop-soak-driver.ts",
     "test/tools/repro-triple-battle-bugs-3.test.ts",
     "test/tools/repro-triple-battle-bugs.test.ts",
     "test/visual/rich-notification-qa.mjs"

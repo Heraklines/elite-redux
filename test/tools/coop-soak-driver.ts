@@ -4439,7 +4439,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // that synthetic old prompt to slot 1. Rebuild this SAME turn through TurnInitPhase (which queues both
     // player commands, enemy commands, and TurnStart; it does not increment the battle turn) so combat
     // resumes from a complete clean queue rather than only the two UI phases.
-    withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
+    withClientSync(rig.guestCtx, () => {
+      const pm = rig.guestScene.phaseManager;
+      pm.clearPhaseQueue();
+      pm.unshiftPhase(pm.create("TurnInitPhase"));
+      pm.shiftPhase();
+    });
     await withClient(rig.hostCtx, async () => {
       await rig.hostScene.ui.setMode(UiMode.MESSAGE);
       rig.hostScene.ui.resetModeChain();
@@ -4448,6 +4453,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       pm.shiftPhase();
       await game.phaseInterceptor.to("CommandPhase");
     });
+    await crossCommandBoundaryWithReplayGuest(wave, rig.hostScene.currentBattle.turn, undefined, true);
     await playWave(wave);
     await assertPostTurnConverged(wave);
     await driveRewardShop(wave);
