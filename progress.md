@@ -1464,3 +1464,101 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Biome and `git diff --check` are clean; repository TypeScript completes with zero diagnostics. No local
   co-op Vitest/browser workload was run. The superseded campaign was cancelled once this shared signature
   was attributed; exact-SHA remote requalification is required.
+2026-07-23 - Showdown summon and environment presentation stream completion (unqualified working tree)
+
+- The authoritative renderer already converged mechanically, but its ordered turn stream had no ability-flyout
+  event, never emitted its declared weather/terrain events, and opened recording only at TurnStart after lead
+  and switch-in presentation could already run. Protocol 44 now carries an immutable Pokemon/ability identity
+  plus host-resolved environment animation cues; the guest resolves localized names without executing ability
+  mechanics or RNG.
+- Showdown's authority opens the recorder at SummonPhase and the recorder preserves a same-turn prefix when
+  TurnStart reopens it at the exact same session-epoch/wave scope. Repeated numeric turns across waves or
+  sessions replace stale material. Classic co-op's initial summon path is unchanged, preventing duplicate lead flyouts.
+  Side swapping remaps the ability battler index while stable Pokemon/ability IDs remain untouched.
+- The replay phase follows the ordinary ability-bar hide/requeue discipline, locates an off-field switch-in by
+  immutable Pokemon ID before its checkpoint, and is guarded by the shared five-second presentation watchdog.
+  Weather/terrain reuse the authority's resolved CommonAnim cue while their mechanical state remains checkpoint-
+  owned.
+- The dedicated two-real-browser Showdown journey now fails unless the authority visibly enters its ordinary
+  ability phase, the renderer visibly enters the new streamed replay phase, and both browsers execute the same
+  resolved environment animation over the same weather/terrain state. Silent checkpoint convergence is no longer
+  sufficient evidence for this feature.
+- Permitted local validation is green: TypeScript reports zero diagnostics in every touched-file filter,
+  scoped Biome reports no errors (repository-baseline warnings/info only), and `git diff --check` is clean. Runtime
+  TypeScript still has the documented unrelated repository baseline. Co-op/Showdown runtime validation
+  remains remote-only and will be dispatched only after the currently frozen resume-prompt browser campaign.
+# 2026-07-23 — dirty-account co-op launch: read-only solo classification
+
+- Exact two-browser dirty-account evidence on `a4ce1a3e6` showed all five cloud slot reads and migrations completing, followed by no resume decision while the host remained in `TitlePhase/MESSAGE`.
+- Removed the unrelated cloud-solo local-cache write from co-op resume discovery. A full cloud account is now classified from its immutable read result without encryption, local mutation, or waiting behind the account-wide persistence Web Lock; ordinary solo loading still owns cache population.
+- Added a failure-first DUO contract that holds the Web Lock forever and proves five cloud-only solo slots still classify, leave local storage untouched, and never request the lock.
+
+# 2026-07-23 — stale-audit closure and exact-SHA qualification
+
+- Rechecked the `a4ce1a3e6` deep audit against current source. Its three P0 mechanisms were genuine on that
+  anchor: Mystery battle lacked an exact same-turn command edge, V2 replacement settlement left the precise
+  guest proposal retry alive, and recovery claimed `controlInstalled` before the reconstructed handler was
+  actionable. All three are now isolated commits with failure-first contracts. Recovery reuses the ordinary
+  control proof and keeps revision N pending while N+1 remains a gap.
+- The audit also exposed a nested immutability consequence it did not name: AuthorityLog's shallow successor
+  clone would deep-freeze caller-owned address arrays after the new Mystery edge. Retention now structured-
+  clones the complete successor, with a regression proving caller mutation cannot rewrite or be frozen by it.
+- Focused resume-scan journey `29967750608` is green on exact SHA `f96f7840d`; the read-only cloud discovery
+  correction is no longer merely source-plausible. Current integrated tip `af55ebe49` is under full sharded
+  gate `29969525053`, mutation run `29969439789`, and public journey `29969439764`.
+- The automatic focused gate is a known invalid signal for this long-lived integration branch: its original
+  narrow-task manifest is 71 files behind the branch's actual integration delta and categorically forbids the
+  protocol file that `er-coop-44` must change. Keep the full sharded gate authoritative for this SHA, then
+  reroute or version the focused ownership contract instead of waiving real product shards.
+
+# 2026-07-23 - current feat integration and full-gate signal audit
+
+- Merged current `heraklines/feat/elite-redux-port` (`f689fce1e`) into the V2 worktree as `b3d8eb987`, resolving
+  fourteen overlap conflicts without restoring legacy progression ownership. The merge preserves V2 ordered
+  control/proof, feat's doubles/triples targeting and side swaps, Commander and biome fixes, and shared
+  Greater Ability Randomizer choice caching. The obsolete localized-name Showdown ability replay was removed
+  in favor of the exact ID/slot presentation stream.
+- The merged feat's GIFT ability sources can use slots above 2, so the presentation validator now accepts a
+  bounded numeric source slot rather than rejecting mechanically valid shared abilities. Exact folder clearing
+  and tournament fixtures were also corrected in `b07408dfd`; touched co-op/Showdown paths have zero TypeScript
+  diagnostics and scoped Biome has no errors. The repository still has a separate large feat typecheck baseline.
+- Full gate `29969525053` on pre-merge `af55ebe49` is not a release verdict: 21 jobs passed and 111 distinct
+  engine tests failed. Two fast Mystery fixtures and one real Showdown stream type defect are corrected locally.
+  Most remaining failures are tests that enable mandatory all-V2 authority while still constructing legacy
+  relay fixtures or asserting retired carriers. They must be migrated, not waived wholesale; only a mechanism-
+  proven harness failure may be classified out of a staging decision.
+- Public journey `29969439764` remains active on `af55ebe49`; no branch push is permitted until its shared
+  journey slot exits. Focused resume journey `29967750608` already proves the cloud resume/lobby callback chain.
+
+# 2026-07-23 - direct-mirror Showdown harness restores skipped production boundaries
+
+- Thirteen Showdown engine failures shared one setup mechanism. Their host finished Encounter and Summon while
+  still solo, then `buildShowdownDuo` installed the pair and restarted CommandPhase. Mandatory presentation
+  authority correctly failed because the fixture had neither Encounter's retained wave-start carrier nor
+  Summon's open recorder; the guest subsequently waited in `CoopReplayTurnPhase` for material the fixture could
+  never publish.
+- The direct-mirror adapter now publishes the complete carrier from the already-settled immutable host state,
+  opens the exact epoch/wave-scoped recorder, drains delivery, and only then re-enters CommandPhase. It seals an
+  intentionally empty presentation prefix because the prior summon events cannot be reconstructed honestly.
+  Exact ability/weather/terrain event identity remains owned by the two-real-browser launch journey, which runs
+  the real Encounter/Summon chain rather than this abbreviated fixture.
+- Permitted local evidence: scoped TypeScript reports no diagnostics for `coop-duo-harness.ts`, Biome has no
+  errors (repository-baseline complexity infos only), and `git diff --check` is clean. Runtime proof remains the
+  remote Showdown shards after the active public journey releases the no-push freeze.
+
+# 2026-07-23 - interaction terminal proofs are runtime-owned
+
+- Public two-browser journey `29969439764` completed green on exact SHA `af55ebe49`: fresh login, pairing,
+  save discovery, shared launch, and resume all crossed only public UI in two isolated Chromium processes.
+  This closes the earlier lobby/resume uncertainty and releases the shared-journey no-push freeze.
+- The dominant reward/market failures in full-gate B1/B3/B10 were not incomplete state captures. Their exact
+  Authority V2 verdict was `authority-local successor reservation refused`: after an async UI transition,
+  `SelectModifierPhase` proved settlement through the process-global active runtime instead of the runtime that
+  constructed the phase. In the two-engine harness this could settle the replica while the authority attempted
+  the commit and correctly refused an unproved result.
+- Reward, Bargain, Mystery terminal, and the three ability-picker watcher paths now publish their phase terminal
+  through an explicitly captured owning runtime. This matches the already-correct Learn Move, Revival,
+  Colosseum, Crossroads, Biome, Catch Full, and Stormglass implementations and removes one ambient authority seam.
+- Permitted local evidence: all touched-file TypeScript filters report zero diagnostics, semantic diffs are
+  narrow, and `git diff --check` is clean. Remote S shards plus affected B/C/P shards are required before this
+  failure cluster is considered closed.
