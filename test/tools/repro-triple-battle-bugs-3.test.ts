@@ -180,8 +180,10 @@ describe.skipIf(!RUN)("repro: triple-battle bugs round 3 (2026-07-07 report)", (
 
     // The CENTRE quakes (hits all adjacent); the two WING foes sit at 1 HP and faint in
     // the SAME MoveEffectPhase. My Pidgeot wings are airborne (Earthquake immune) and
-    // just Harden. The centre foe keeps enough HP to survive.
+    // just Harden. Give the centre foe an explicit fixture-only HP reserve so species/defence
+    // randomization cannot silently turn this two-vacancy case into three KOs with only two reserves.
     field[0].hp = 1;
+    field[1].hp = 10_000;
     field[2].hp = 1;
     game.move.select(MoveId.HARDEN, 0);
     game.move.select(MoveId.EARTHQUAKE, 1);

@@ -652,10 +652,25 @@ export class CommandPhase extends FieldPhase {
           );
           return false;
         }
-        applyCoopEncounterAuthority(globalScene.currentBattle, encounter);
-        // #818: STRUCTURAL adopt - an ME-spawned battle's party exists only on the host,
-        // so the guest must be able to BUILD it (species/count/shape), not just correct it.
-        adoptCoopEnemiesStructural(enemies);
+        if (isVersusSession()) {
+          // A Showdown guest already installed the complete, side-swapped launch snapshot: host ENEMY is
+          // its LOCAL PLAYER team and host PLAYER is its LOCAL ENEMY team. The ordinary enemy-party
+          // fallback cannot represent both halves of that swap. Applying it here clears the guest's real
+          // opponent and rebuilds that side from host ENEMY, duplicating the guest's own team on BOTH
+          // sides. Consume the retained carrier as ordering evidence, but leave party/encounter material to
+          // the immutable versus launch snapshot; the complete battle state below is side-swapped by the
+          // authoritative state applier and still seals the exact turn-one image.
+          coopLog(
+            "stream",
+            `guest retained Showdown enemyParty carrier wave=${waveIndex} count=${enemies.length} `
+              + "preserved side-swapped launch parties",
+          );
+        } else {
+          applyCoopEncounterAuthority(globalScene.currentBattle, encounter);
+          // #818: STRUCTURAL adopt - an ME-spawned battle's party exists only on the host,
+          // so the guest must be able to BUILD it (species/count/shape), not just correct it.
+          adoptCoopEnemiesStructural(enemies);
+        }
       }
       // The party image and its complete state are intentionally separate one-shot buffers. EncounterPhase
       // can consume the repeated party first while a newer post-PostSummon carrier is delivered afterward;

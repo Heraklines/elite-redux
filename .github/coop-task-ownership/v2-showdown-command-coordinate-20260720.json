@@ -9,6 +9,7 @@
     "progress.md",
     "scripts/run-coop-gate.mjs",
     "src/data/elite-redux/coop/authority-v2/next-control.ts",
+    "src/phases/command-phase.ts",
     "test/scripts/coop-focused-static-workflow.test.mjs",
     "test/tests/elite-redux/showdown/showdown-versus-doubles.test.ts",
     "test/tools/repro-triple-battle-bugs-3.test.ts"

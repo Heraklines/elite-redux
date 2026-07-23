@@ -1608,3 +1608,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   impact and tripped the five-shard cap. Ownership metadata is now excluded from runtime impact only; actual
   workflows/actions still select all lanes. A node-pure contract proves this batch's product paths resolve to
   A/B/P/S/T while a workflow edit continues to require A/B/C/P/S/T.
+# 2026-07-23 - exact Showdown versus wave-start orientation
+
+- Exact full-gate S8 evidence on `ff838fee8` showed the direct-mirror versus guest booting with its own
+  team on both sides (`host=[Munchlax,Blastoise]/[Snorlax,Lapras]`, guest egress
+  `[Snorlax,Lapras]/[Snorlax,Lapras]`). The retained ordinary `enemyPartySync` fallback applied the host's
+  ENEMY manifest to the versus guest's LOCAL ENEMY side after the complete side-swapped launch snapshot.
+- `CommandPhase.tryCoopCheckpointSync()` now consumes that retained carrier for ordering but preserves the
+  complete Showdown launch parties/encounter. The carrier's complete authoritative state still applies via
+  the existing side-swap adapter before input opens.
+- The same exact rerun disproved the first T3 classification: the pinned passive removed the random
+  Aftermath path, but Earthquake still KO'd all three generated foes. The #5c fixture now gives the centre
+  foe an explicit high HP reserve so it deterministically owns exactly two vacancies and two reserves.
+- No local Showdown/triples/co-op Vitest run (repository policy). Static/ownership checks only; remote S8/T3
+  requalification required after the active public journey releases the branch push lock.
