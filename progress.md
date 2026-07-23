@@ -2008,6 +2008,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   current, operation-addressed `CoopGuestRevivalPhase` projected by V2. It no longer searches or manually
   starts the retired legacy queued phase after the real public picker has already opened.
 
+# 2026-07-23 - Biome-operation fixtures use the global V2 log
+
+- Isolated wave-11 biome cases now boot at wave 11 and retire their real initial command into an ordered
+  successor wait before opening the map. Mutating `waveIndex` after a wave-1 command had left the fixture's
+  interaction address outside the authority graph.
+- The stale-proposal adapter supplies the mandatory immutable operation identity under V2. The durability
+  leg now drops one `authorityEntry` and requires its retained redelivery, instead of expecting a raw
+  `biomePick` result carrier that the cutover correctly suppresses.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real

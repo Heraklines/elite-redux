@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "a343af82d21782729172cd8f124a16b0990f349f",
+  "baseSha": "2cc1554a4e1f2bd06176c6c3485dbe6940bf672f",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -76,6 +76,7 @@
     "test/tests/elite-redux/coop/coop-battle-events.test.ts",
     "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
     "test/tests/elite-redux/coop/coop-battle-sync.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-biome-operation.test.ts",
     "test/tests/elite-redux/coop/coop-duo-commander-command-phase.test.ts",
     "test/tests/elite-redux/coop/coop-duo-enemy-faint-chain.test.ts",
     "test/tests/elite-redux/coop/coop-duo-fault.test.ts",

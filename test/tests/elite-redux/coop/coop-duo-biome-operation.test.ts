@@ -32,6 +32,7 @@ import { initGlobalScene } from "#app/global-scene";
 import {
   adoptBiomeWatcherChoice,
   captureCoopBiomeOperationBinding,
+  coopBiomeOperationId,
   isCoopBiomeOperationEnabled,
   resetCoopBiomeOperationFlag,
   resetCoopBiomeOperationState,
@@ -69,6 +70,7 @@ import {
   type DuoRig,
   drainLoopback,
   installDuoLogCapture,
+  retireDuoInitialCommandForBoundaryTest,
   withClient,
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
@@ -209,11 +211,10 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
   it("END-TO-END: owner travels, watcher ADOPTS through the primitive; a STALE previous-op pick is REJECTED (#861 shape)", async () => {
     expect(isCoopBiomeOperationEnabled(), "the migrated biome-operation path is active for this test").toBe(true);
 
+    game.override.startingWave(11);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-
-    rig.hostScene.currentBattle.waveIndex = 11;
-    rig.guestScene.currentBattle.waveIndex = 11;
+    await retireDuoInitialCommandForBoundaryTest(rig);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const { ownerCtx, watcherCtx, watcherRole } = rolesFor(rig, counterBefore);
@@ -361,7 +362,11 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
           kind: "BIOME_PICK",
           seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
           pinned,
-          res: { choice: 0, data: [biomeId] },
+          res: {
+            choice: 0,
+            data: [biomeId],
+            operationId: coopBiomeOperationId("BIOME_PICK", COOP_BIOME_PICK_SEQ_BASE + pinned, pinned, binding),
+          },
           localRole,
           wave: 11,
           turn: 0,
@@ -384,24 +389,22 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     ).toThrow(/binding role=guest.*localRole=host/);
   });
 
-  it("DURABILITY: dropping only biomePick still materializes the committed op through the real guest travel path", async () => {
+  it("DURABILITY: dropping the first V2 entry still materializes the committed op through the real guest travel path", async () => {
     expect(isCoopBiomeOperationEnabled(), "the migrated biome-operation path is active for this test").toBe(true);
 
+    game.override.startingWave(11);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       {
-        drop: 1,
+        drop: 0,
         reorder: 0,
         delay: 0,
-        faultable: msg => msg.t === "interactionChoice" && msg.kind === "biomePick",
       },
       { seed: 0xb10e },
     );
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-
-    rig.hostScene.currentBattle.waveIndex = 11;
-    rig.guestScene.currentBattle.waveIndex = 11;
+    await retireDuoInitialCommandForBoundaryTest(rig);
 
     const pinned = rig.hostRuntime.controller.interactionCounter();
     expect(pinned % 2, "this leg requires the host to own the biome interaction").toBe(0);
@@ -409,6 +412,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     const fallbackBiome = BiomeId.SWAMP;
     const guestSwitch = vi.spyOn(rig.guestScene.phaseManager, "unshiftNew");
     vi.spyOn(rig.guestScene, "generateRandomBiome").mockReturnValue(fallbackBiome);
+    pair.armNextDrop("authorityEntry", "host");
 
     const ownerCap = installUiCapture(rig.hostScene);
     try {
@@ -426,7 +430,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     } finally {
       ownerCap.restore();
     }
-    expect(pair.faultsInjected(), "the legacy biomePick relay must actually be dropped").toBeGreaterThan(0);
+    expect(pair.counters.host.oneShotDropped, "the first immutable V2 biome entry was actually dropped").toBe(1);
 
     const watcherCap = installUiCapture(rig.guestScene);
     try {
@@ -451,7 +455,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
 
     expect(
       biomeArg(guestSwitch),
-      "the journal-delivered committed op, not the dropped legacy relay or deterministic fallback, drives travel",
+      "the redelivered immutable V2 entry, not a raw relay or deterministic fallback, drives travel",
     ).toBe(ownerBiome);
     expect(biomeArg(guestSwitch)).not.toBe(fallbackBiome);
     logs.flush();
