@@ -437,6 +437,35 @@ describe("Authority V2 interaction cutover", () => {
     });
   });
 
+  it("states the embedded Mystery battle's exact same-turn command-open edge", () => {
+    const battleState: CoopAuthoritativeBattleStateV1 = { ...STATE, tick: 4, wave: 32, turn: 1 };
+    const value: CoopAuthoritativeEnvelopeV1 = {
+      ...envelope("ME_TERMINAL", {}, "MYSTERY_ENCOUNTER", 0),
+      wave: 32,
+      turn: 0,
+      pendingOperation: {
+        id: makeCoopOperationId(1, 0, COOP_ME_PUMP_SEQ_BASE * 8000 + 4000, "ME_TERMINAL"),
+        kind: "ME_TERMINAL",
+        owner: 0,
+        status: "applied",
+        payload: {
+          terminal: "battle",
+          outcome: { ...RESYNC, authoritativeState: battleState },
+          destination: { kind: "battle", hostTurn: 1, encounterMode: 0, disableSwitch: false },
+        },
+      },
+      authoritativeState: battleState,
+    };
+
+    const successor = successorOfCoopV2InteractionEnvelope("op:me", value);
+    expect(successor).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      wave: 32,
+      turn: 1,
+      allowedControlAddresses: [{ materialKind: "command-open", wave: 32, turn: 1, operationId: null }],
+    });
+  });
+
   it("commits a Colosseum decision as a mechanical result before its typed successor wait", () => {
     const value = envelope("COLO_PICK", { type: "decision", round: 0, index: 0 }, "INTERACTION", 0, 1);
     const built = buildCoopV2InteractionEnvelopeEntry({

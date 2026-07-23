@@ -227,6 +227,49 @@ describe("ordered-wait nested interaction addresses", () => {
   });
 });
 
+describe("ordered-wait exact control addresses", () => {
+  const commandOpen = (wave: number, turn: number) => ({ kind: "command-open", wave, turn });
+
+  it("admits only the explicitly stated same-turn Mystery battle command-open", () => {
+    const wait = successorWait({
+      wave: 32,
+      turn: 1,
+      allowedKinds: ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      allowedControlAddresses: [{ materialKind: "command-open", wave: 32, turn: 1, operationId: null }],
+      allowNextWaveStart: false,
+    });
+    expect(successorWaitAllows(wait, "me-terminal", "CONTROL_COMMIT", "command-32-1", 1, commandOpen(32, 1))).toBe(
+      true,
+    );
+    expect(successorWaitAllows(wait, "me-terminal", "CONTROL_COMMIT", "command-32-2", 1, commandOpen(32, 2))).toBe(
+      false,
+    );
+    expect(successorWaitAllows(wait, "me-terminal", "CONTROL_COMMIT", "command-33-1", 1, commandOpen(33, 1))).toBe(
+      false,
+    );
+  });
+
+  it("does not weaken an ordinary broad reward wait or an exact operation id", () => {
+    const ordinary = successorWait({ wave: 32, turn: 1, allowNextWaveStart: false });
+    expect(successorWaitAllows(ordinary, "reward-terminal", "CONTROL_COMMIT", "same-turn", 1, commandOpen(32, 1))).toBe(
+      false,
+    );
+
+    const exact = successorWait({
+      wave: 32,
+      turn: 1,
+      allowedControlAddresses: [{ materialKind: "command-open", wave: 32, turn: 1, operationId: "expected-command" }],
+      allowNextWaveStart: false,
+    });
+    expect(successorWaitAllows(exact, "me-terminal", "CONTROL_COMMIT", "wrong-command", 1, commandOpen(32, 1))).toBe(
+      false,
+    );
+    expect(successorWaitAllows(exact, "me-terminal", "CONTROL_COMMIT", "expected-command", 1, commandOpen(32, 1))).toBe(
+      true,
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // controlId
 // ---------------------------------------------------------------------------
@@ -246,6 +289,16 @@ describe("controlIdOf", () => {
       }),
     );
     expect(nested).not.toBe(base);
+  });
+
+  it("includes alternate typed control addresses in ordered-wait identity", () => {
+    const base = controlIdOf(successorWait());
+    const exact = controlIdOf(
+      successorWait({
+        allowedControlAddresses: [{ materialKind: "command-open", wave: 3, turn: 7, operationId: null }],
+      }),
+    );
+    expect(exact).not.toBe(base);
   });
 
   it("distinguishes every field (id equality == structural equality)", () => {
@@ -439,6 +492,26 @@ describe("validateNextControl", () => {
         ...successorWait({ allowedKinds: ["CONTROL_COMMIT"] }),
         allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: 3, turn: 0 }],
       }).ok,
+    ).toBe(false);
+  });
+
+  it("rejects malformed, duplicate, cross-wave, or ungranted exact control addresses", () => {
+    const address = { materialKind: "command-open" as const, wave: 3, turn: 7, operationId: null };
+    expect(validateNextControl(successorWait({ allowedControlAddresses: [address] })).ok).toBe(true);
+    expect(
+      validateNextControl(successorWait({ allowedKinds: ["INTERACTION_COMMIT"], allowedControlAddresses: [address] }))
+        .ok,
+    ).toBe(false);
+    expect(validateNextControl(successorWait({ allowedControlAddresses: [{ ...address, turn: 0 }] })).ok).toBe(false);
+    expect(validateNextControl(successorWait({ allowedControlAddresses: [{ ...address, operationId: "" }] })).ok).toBe(
+      false,
+    );
+    expect(validateNextControl(successorWait({ allowedControlAddresses: [address, address] })).ok).toBe(false);
+    expect(validateNextControl(successorWait({ allowedControlAddresses: [{ ...address, wave: 4 }] })).ok).toBe(true);
+    expect(
+      validateNextControl(
+        successorWait({ allowNextWaveStart: false, allowedControlAddresses: [{ ...address, wave: 4 }] }),
+      ).ok,
     ).toBe(false);
   });
 

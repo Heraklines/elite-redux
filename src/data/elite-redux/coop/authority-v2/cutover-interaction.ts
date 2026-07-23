@@ -626,6 +626,7 @@ function successorWait(
   allowNextWaveStart: boolean,
   coordinate: Readonly<{ wave: number; turn: number }> = envelope,
   allowedInteractionAddresses?: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedInteractionAddresses"],
+  allowedControlAddresses?: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedControlAddresses"],
 ): ProjectableControl {
   const operation = envelope.pendingOperation;
   if (operation == null) {
@@ -639,6 +640,7 @@ function successorWait(
     turn: coordinate.turn,
     allowedKinds,
     ...(allowedInteractionAddresses == null ? {} : { allowedInteractionAddresses }),
+    ...(allowedControlAddresses == null ? {} : { allowedControlAddresses }),
     allowNextWaveStart,
     expectedOperationId: null,
   };
@@ -899,6 +901,23 @@ export function successorOfCoopV2InteractionEnvelope(
         ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
         destination?.kind === "continue",
         envelope.authoritativeState,
+        undefined,
+        destination?.kind === "battle"
+          && typeof destination.hostTurn === "number"
+          && Number.isSafeInteger(destination.hostTurn)
+          && destination.hostTurn > 0
+          ? [
+              {
+                materialKind: "command-open",
+                wave: envelope.authoritativeState.wave,
+                turn: destination.hostTurn,
+                // The command-open capture mints a later monotonic state tick after entry effects, so its
+                // operation id is not knowable at the terminal commit. The complete material kind+address
+                // remains exact; null permits only the id at that one stated coordinate.
+                operationId: null,
+              },
+            ]
+          : undefined,
       );
     }
     case "COLO_PICK": {

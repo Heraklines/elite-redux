@@ -341,6 +341,19 @@ export type CoopNextControl =
         readonly turn: number;
       }[];
       /**
+       * Exact CONTROL_COMMIT destinations that legitimately differ from the generic settlement-turn rule.
+       * A Mystery terminal that boots an embedded battle is already addressed at that battle's turn 1, so
+       * its first command-open is same-turn. Stating the complete material/address tuple here authorizes
+       * only that edge; it never grants TURN_COMMIT or lets a local phase choose a successor.
+       */
+      readonly allowedControlAddresses?: readonly {
+        readonly materialKind: "command-open" | "interaction-open";
+        readonly wave: number;
+        readonly turn: number;
+        /** Exact entry id when predictable; null is an explicit wildcard at this complete material address. */
+        readonly operationId: string | null;
+      }[];
+      /**
        * Whether one of the stated kinds may be addressed at exactly wave N+1, turn 1. False keeps the wait
        * within its source wave. This is explicit because reward/market terminals cross the wave boundary,
        * while turn/replacement and mid-interaction waits must not.

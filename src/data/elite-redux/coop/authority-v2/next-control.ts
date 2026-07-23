@@ -96,6 +96,7 @@ export function controlIdOf(control: ProjectableControl): string {
         + `/e${control.epoch}/w${control.wave}/t${control.turn}`
         + `/${canonicalSuccessorKinds(control.allowedKinds).join(",")}`
         + `/interactionAddresses:${canonicalAllowedInteractionAddresses(control.allowedInteractionAddresses)}`
+        + `/controlAddresses:${canonicalAllowedControlAddresses(control.allowedControlAddresses)}`
         + `/nextWave:${control.allowNextWaveStart ? "1" : "0"}`
         + `/next:${control.expectedOperationId == null ? "*" : encodeURIComponent(control.expectedOperationId)}`
       );
@@ -169,6 +170,20 @@ export function successorWaitAllows(
         && allowed.operationKind === interactionOperationKind
         && allowed.wave === address.wave
         && allowed.turn === address.turn,
+    )
+  ) {
+    return true;
+  }
+  const controlMaterial = objectRecord(nextMaterial);
+  if (
+    nextKind === "CONTROL_COMMIT"
+    && (controlMaterial?.kind === "command-open" || controlMaterial?.kind === "interaction-open")
+    && wait.allowedControlAddresses?.some(
+      allowed =>
+        allowed.materialKind === controlMaterial.kind
+        && allowed.wave === address.wave
+        && allowed.turn === address.turn
+        && (allowed.operationId == null || allowed.operationId === nextOperationId),
     )
   ) {
     return true;
@@ -835,6 +850,23 @@ function canonicalAllowedInteractionAddresses(
     .join(",");
 }
 
+function canonicalAllowedControlAddresses(
+  addresses: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedControlAddresses"],
+): string {
+  if (addresses == null) {
+    return "*";
+  }
+  return [...addresses]
+    .map(
+      address =>
+        `${address.materialKind}:w${address.wave}:t${address.turn}:id${
+          address.operationId == null ? "*" : encodeURIComponent(address.operationId)
+        }`,
+    )
+    .sort()
+    .join(",");
+}
+
 function successorWaitIssues(control: Record<string, unknown>): string[] {
   const issues: string[] = [];
   addIssue(issues, "afterOperationId", isNonEmptyString(control.afterOperationId));
@@ -893,6 +925,41 @@ function successorWaitIssues(control: Record<string, unknown>): string[] {
           issues.push(`allowedInteractionAddresses[${index}]`);
         } else if (seen.has(key)) {
           issues.push(`allowedInteractionAddresses[${index}]: duplicate`);
+        }
+        seen.add(key);
+      }
+    }
+  }
+  if (control.allowedControlAddresses !== undefined) {
+    if (
+      !Array.isArray(control.allowedControlAddresses)
+      || control.allowedControlAddresses.length === 0
+      || !Array.isArray(control.allowedKinds)
+      || !control.allowedKinds.includes("CONTROL_COMMIT")
+    ) {
+      issues.push("allowedControlAddresses");
+    } else {
+      const seen = new Set<string>();
+      for (const [index, candidate] of control.allowedControlAddresses.entries()) {
+        if (!isPlainObject(candidate)) {
+          issues.push(`allowedControlAddresses[${index}]`);
+          continue;
+        }
+        const operationIdValid = candidate.operationId === null || isNonEmptyString(candidate.operationId);
+        const waveValid =
+          isNonNegativeInt(candidate.wave)
+          && (candidate.wave === control.wave
+            || (control.allowNextWaveStart === true && candidate.wave === (control.wave as number) + 1));
+        const key = `${String(candidate.materialKind)}:${String(candidate.wave)}:${String(candidate.turn)}:${String(candidate.operationId)}`;
+        if (
+          (candidate.materialKind !== "command-open" && candidate.materialKind !== "interaction-open")
+          || !waveValid
+          || !isPositiveInt(candidate.turn)
+          || !operationIdValid
+        ) {
+          issues.push(`allowedControlAddresses[${index}]`);
+        } else if (seen.has(key)) {
+          issues.push(`allowedControlAddresses[${index}]: duplicate`);
         }
         seen.add(key);
       }
