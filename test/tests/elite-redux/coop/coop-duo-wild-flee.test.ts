@@ -20,11 +20,12 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, getCoopWaveBoundaryStatus, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { BattlerIndex } from "#enums/battler-index";
+import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -101,7 +102,7 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
     // Submit the guest-owned Tackle through its real reciprocal COMMAND/FIGHT/TARGET_SELECT handlers before
     // the host chooses Roar. This is the same two-engine public-input path used by the multiwave journeys;
     // no command-request stub or detached phase stands in for the guest player.
-    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: false });
 
     // Spy on the host's authoritative wave-resolved send (the exact wire call broadcastCoopWaveResolved
     // makes). Before the #838 fix this fired for win/capture/AttemptRunPhase-flee but NEVER for the
@@ -111,7 +112,19 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
     await withClient(rig.hostCtx, async () => {
       // The guest's public UI already committed TACKLE on enemy 2. Host lead ROARs enemy 1, resolving
       // last after that KO so the remaining wild has no active ally and the forced-flee branch fires.
-      game.move.select(MoveId.ROAR, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+      expect(rig.hostScene.ui.getMode(), "the host Roar choice starts on public COMMAND").toBe(UiMode.COMMAND);
+      expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
+      expect(rig.hostScene.ui.getMode()).toBe(UiMode.FIGHT);
+      expect(rig.hostScene.ui.processInput(Button.RIGHT), "the host selects its second move, Roar").toBe(true);
+      expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
+      const postMove = await driveClientPhaseQueueTo(rig.hostScene, "Roar target or turn commit", {
+        matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "CoopTurnCommitPhase",
+      });
+      if (postMove.phaseName === "SelectTargetPhase") {
+        postMove.start();
+        expect(rig.hostScene.ui.getMode()).toBe(UiMode.TARGET_SELECT);
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "the host targets the first wild with Roar").toBe(true);
+      }
       await game.phaseInterceptor.to("BattleEndPhase", false);
     });
 

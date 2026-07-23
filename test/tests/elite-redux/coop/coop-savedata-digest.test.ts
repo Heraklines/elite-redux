@@ -179,8 +179,8 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
 
   async function hostPlayWave(rig: DuoRig, guestCommandAlreadyCommitted = false): Promise<void> {
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       if (!guestCommandAlreadyCommitted) {
+        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
         game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
       }
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
@@ -281,7 +281,10 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
         hostStart.saveDataDigest,
       );
 
-      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: w === 1 });
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        submitHostTackle: true,
+      });
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig, true);
       await withClient(rig.guestCtx, async () => {

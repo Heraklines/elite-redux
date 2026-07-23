@@ -105,8 +105,8 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
 
   async function hostPlayWave(rig: DuoRig, guestCommandAlreadyCommitted = false): Promise<void> {
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       if (!guestCommandAlreadyCommitted) {
+        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
         game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
       }
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
@@ -164,7 +164,10 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
 
     // ===== Wave 1: host plays to a win + guest replays (reach the reward shop, counter 0 = host owns). =====
     const turn = rig.hostScene.currentBattle.turn;
-    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+    });
     await hostPlayWave(rig, true);
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
     // From this point onward, deliver each retained continuation under its addressed client's

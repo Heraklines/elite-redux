@@ -614,7 +614,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     });
     const turn = rig.hostScene.currentBattle.turn;
     const guestBroadcastSpy = vi.spyOn(rig.guestRuntime.battleSync, "broadcastLocalCommand");
-    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: false });
     expect(
       guestBroadcastSpy.mock.calls.some(
         ([fieldIndex, sentTurn, command]) =>
