@@ -1989,6 +1989,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   A failure-first delayed-renderer regression proves an ordinary guest `MessagePhase` cannot skip that player,
   the complete presentation ledger is checked, and the renderer's eventual public command is submitted.
 
+# 2026-07-23 - Showdown authority wait is not command collection closure
+
+- Exact two-browser run `30035702783` advanced past the renderer-message false close and proved the guest
+  replayed weather, text, and ability. It then exposed the companion authority-side seam: the host's
+  `EnemyCommandPhase` is the live rendezvous which requests and waits for the opponent command, not evidence
+  that the reciprocal command owner does not exist.
+- The sequential public driver now keeps collection open across that exact addressed authority wait. Its
+  failure-first regression publishes both the authority `EnemyCommandPhase` and renderer presentation before
+  the delayed peer command, and proves presentation is checked before the real second command is submitted.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real

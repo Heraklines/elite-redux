@@ -856,6 +856,16 @@ test("renderer presentation cannot close command collection before its delayed S
     checkpoint: async () => {},
     sequence: async () => {
       order.push("authority-command");
+      authorityEvidence.push({
+        kind: "browser-surface2",
+        observation: {
+          operationClass: "battle-progress",
+          surfaceId: "battle:message",
+          phase: "EnemyCommandPhase",
+          localRole: "host",
+          address,
+        },
+      });
       rendererEvidence.push({
         kind: "browser-surface2",
         observation: {

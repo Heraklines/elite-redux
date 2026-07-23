@@ -289,9 +289,14 @@ function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
     const observation = event.kind === "browser-surface2" ? event.observation : null;
     const authorityAdvanced =
       observation?.localRole === "host" || (observation?.localRole == null && client.publicRole === "host");
+    // In Showdown the authority enters EnemyCommandPhase while it waits for the peer's command.
+    // That is an addressed, authority-owned battle-progress surface, but it is the reciprocal command
+    // rendezvous rather than proof that command collection ended. A throttled renderer can finish the
+    // retained entry presentation tens of seconds later and then expose its real CommandPhase.
+    const awaitingShowdownPeerCommand = observation?.phase === "EnemyCommandPhase";
     return (
       (observation?.operationClass === "reward"
-        || (observation?.operationClass === "battle-progress" && authorityAdvanced))
+        || (observation?.operationClass === "battle-progress" && authorityAdvanced && !awaitingShowdownPeerCommand))
       && observation.phase !== "CommandPhase"
       && sameAddress(observation.address, expectedAddress)
     );
@@ -3672,11 +3677,12 @@ export class DuoPublicUiRig {
             }))
             .find(candidate => candidate.event != null) ?? null;
         if (commandCollectionClosed != null) {
-          // Only an AUTHORITY non-command phase (or a structural reward) at the exact submitted address
-          // proves that no reciprocal command owner exists for this round. The renderer can still expose
-          // MessagePhase/CommonAnimPhase while draining the immutable presentation stream before its real
-          // command opens; treating that ordinary replay as collection-close skipped a live Showdown owner
-          // in run 30033867894. Never invent a second owner after authoritative collection has closed.
+          // Only an AUTHORITY phase that is not Showdown's peer-command rendezvous (or a structural reward)
+          // at the exact submitted address proves that no reciprocal command owner exists for this round.
+          // The renderer can still expose MessagePhase/CommonAnimPhase, and the authority can expose
+          // EnemyCommandPhase, while the immutable presentation stream drains before the peer's real command
+          // opens. Treating either as collection-close skipped live Showdown owners in runs 30033867894 and
+          // 30035702783. Never invent a second owner after authoritative collection has actually closed.
           for (const label of pending) {
             // Preserve the pre-round cursor: a one-shot reward/terminal surface may itself be the exact
             // collection-close event and must remain visible to the following outcome scan.
