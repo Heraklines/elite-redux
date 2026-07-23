@@ -788,6 +788,18 @@ export class CommandPhase extends FieldPhase {
   }
 
   public override start(): void {
+    // The host's final turn-one entry image must exist BEFORE Authority V2 authors command-open.
+    // PostSummon can mutate weather, terrain, HP, forms, stages, and presentation after the encounter's
+    // original wave-start carrier. Previously the V2 gate captured that older image first, then
+    // tryCoopCheckpointSync() published a newer post-summon tick below. A replica that consumed the newer
+    // carrier correctly rejected the older command-open as stale and terminalized the shared battle.
+    //
+    // Only the authority moves this seal ahead of the gate. A replica must still cross the ordered V2 gate
+    // before it may consume/reassert any host material. The later call remains the sole path for guests.
+    const entryAuthorityPrepared = getCoopController()?.role === "host";
+    if (entryAuthorityPrepared && !this.tryCoopCheckpointSync()) {
+      return;
+    }
     const boundaryPokemon = globalScene.getPlayerField()[this.fieldIndex];
     if (boundaryPokemon != null) {
       const boundary = enterCoopV2CommandControlBoundary(this.fieldIndex, boundaryPokemon.id, () => this.start());
@@ -826,7 +838,7 @@ export class CommandPhase extends FieldPhase {
     // membership must come from an authoritative seat manifest, never a local presentation guess.
     ensureCoopAuthoritativeCommandPresentation();
 
-    if (!this.tryCoopCheckpointSync()) {
+    if (!entryAuthorityPrepared && !this.tryCoopCheckpointSync()) {
       return;
     }
 

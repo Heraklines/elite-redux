@@ -767,16 +767,18 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         });
         earlyPicker.start();
         await drainLoopback();
-        let picker = earlyPicker;
+        const picker = earlyPicker;
         if (V2_REPLACEMENT_CUTOVER) {
-          expect(pickerOpens, "the speculative picker retired without exposing unlogged input").toBe(0);
-          picker = await driveClientPhaseQueueTo(rig.guestScene, "Showdown ordered idle guest picker", {
-            matches: phase => phase.phaseName === "CoopGuestFaintSwitchPhase" && phase !== earlyPicker,
-            perPhaseTimeoutMs: 5_000,
-            pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
-          });
-          picker.start();
-          await drainLoopback();
+          // The replay driver has already run CoopFinalizeTurnPhase before it returns this current phase.
+          // Its TURN_COMMIT's typed REPLACEMENT successor is therefore material-applied and projected; this
+          // first real picker is the ordered control, not a speculative pre-commit generation that should be
+          // destroyed and recreated. Requiring a second picker made the completed V2 path fail precisely
+          // because it now opens one address-exact surface without flicker.
+          expect(pickerOpens, "the ordered V2 replacement picker opened without a speculative duplicate").toBe(1);
+          expect(
+            (picker as Phase & { coopV2ControlOperationId?: string | null }).coopV2ControlOperationId,
+            "the public picker is bound to its immutable replacement operation",
+          ).toMatch(/^RC\//u);
         }
         await vi.waitUntil(() => pickerOpens === 1 && rig.guestScene.ui.getMode() === UiMode.PARTY, {
           timeout: 5_000,

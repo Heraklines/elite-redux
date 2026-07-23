@@ -1734,3 +1734,46 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   neither peer terminalizes and retention remains live until `continuationReady`. Full repository TypeScript
   remains on the unrelated ability/feat baseline with no diagnostic in the four implementation/test files
   touched here; scoped Biome has no new error and `git diff --check` is clean. Co-op tests remain hosted-only.
+
+# 2026-07-23 - mutation victim keeps its causal marker at every ACK boundary
+
+- Mutation run `29978609820` still killed the `full-address-wave` mutant, but the new monotonic ACK path made
+  the final `continuationReady` assertion expose the deliberate cross-wave key collision before the victim's
+  earlier marked assertion. The mutation runner therefore reported `targetedFailure=true` but `marker=false`.
+- Every second-wave ACK assertion now carries the same `P33_MUTATION_CAUGHT[full-address]` causal marker. This
+  does not weaken or reclassify the victim: removing `wave` must still fail the exact targeted test, and the
+  runner can now recognize the protection whichever ACK stage first observes the collision.
+
+# 2026-07-23 - Showdown command-open follows the complete entry image
+
+- Hosted S3 evidence showed the replica accepting the Showdown post-summon wave-start image at tick 5, then
+  rejecting Authority V2's older command-open image at tick 4 and terminalizing. `CommandPhase` had authored
+  the V2 frontier before its host-only post-summon seal/rebroadcast. The authority now publishes that final
+  entry state first; replica ordering remains gated, so command-open is always at least as new as the carrier
+  a guest can have applied.
+- Hosted S8 also exposed a direct-fixture-only multi-format gap: mirrored doubles/triples started only the
+  first real guest CommandPhase although the seat-owned V2 frontier required two/three address proofs. The
+  fixture now crosses every real sequential local CommandPhase, advances only intermediate renderer phases
+  with inert skips (the test relay still owns commands), and leaves the final public surface actionable.
+- S1's remaining red was an obsolete expectation: its trace shows the TURN_COMMIT replacement successor
+  material-applied and projected before the first picker starts, yet the test expected that authorized phase
+  to retire as "speculative" and a duplicate generation to open. It now requires exactly one public PARTY
+  surface bound to the immutable `RC/...` operation and retains all close/material-order assertions.
+
+# 2026-07-23 - public journey trigger covers gameplay phase boundaries
+
+- The public two-browser workflow previously watched only three named phase files. A production authority
+  fix in `CommandPhase` therefore would not automatically receive player-path qualification on branch push,
+  despite changing the exact boundary where command control becomes actionable.
+- The push filter now covers `src/phases/**`. Co-op authority is deliberately distributed through ordinary
+  gameplay phases, and future screens or migrated interactions must not silently bypass the production-built,
+  keyboard-only two-browser journey because a workflow allowlist was not updated in parallel.
+- The journey's owned static slice now includes `CommandPhase` as well, so this exact ordering repair cannot
+  build into browser evidence while a TypeScript or Biome defect in its production boundary is being ignored.
+- A node-pure workflow contract pins both guarantees: the broad phase trigger and `CommandPhase`'s owned
+  TypeScript/Biome slice. CI wiring can no longer drift back to the blind spot without a causal fast-gate red.
+- The focused gate treats this branch as the integration train and therefore requires each push manifest to
+  anchor at `github.event.before`, not at the train's older batch origin. Its previous red stopped in ownership
+  planning before any test ran (`declared base d69346f... does not match resolved train base ff57332...`). The
+  next exact batch is re-anchored to the current remote tip `8d7cedd34`; this preserves fail-closed ownership
+  while allowing the planner to qualify only the new seven-file delta.

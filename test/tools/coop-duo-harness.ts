@@ -193,6 +193,8 @@ import type { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
+import { MoveUseMode } from "#enums/move-use-mode";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Stat } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -2019,6 +2021,62 @@ export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
   scene.phaseManager.clearPhaseQueue();
   scene.phaseManager.unshiftPhase(scene.phaseManager.create("TurnInitPhase"));
   scene.phaseManager.shiftPhase();
+}
+
+/**
+ * Cross every real local-player CommandPhase created by the mirrored Showdown TurnInit.
+ *
+ * A doubles/triples seat owns a sequential command frontier: slot 1 cannot become the current public
+ * surface until slot 0 is finished. Authority V2 nevertheless requires proof from every stated local
+ * target before retiring command-open. The direct-mirror fixtures intentionally source their commands from
+ * ShowdownCommandRelay responders rather than this renderer, so advance only the already-proven intermediate
+ * surfaces with inert local skips and leave the final real CommandPhase actionable. Production never calls
+ * this helper; a real browser supplies the same progression by choosing each command through its UI.
+ */
+async function materializeMirroredShowdownGuestCommandFrontier(scene: BattleScene): Promise<Phase> {
+  materializeMirroredGuestInputTurn(scene);
+  const localFieldIndices = scene
+    .getPlayerField()
+    .map((pokemon, fieldIndex) => ({ pokemon, fieldIndex }))
+    .filter(({ pokemon }) => pokemon.isActive())
+    .map(({ fieldIndex }) => fieldIndex);
+  if (localFieldIndices.length === 0) {
+    throw new Error("mirrored Showdown guest has no active local command targets");
+  }
+
+  let finalCommand: Phase | null = null;
+  for (const [position, fieldIndex] of localFieldIndices.entries()) {
+    const command = await driveClientPhaseQueueTo(scene, `initial Showdown guest CommandPhase field=${fieldIndex}`, {
+      matches: phase =>
+        phase.phaseName === "CommandPhase"
+        && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === fieldIndex,
+    });
+    command.start();
+    await drainLoopback();
+    if (scene.phaseManager.getCurrentPhase() !== command || scene.ui.getMode() !== UiMode.COMMAND) {
+      throw new Error(
+        `initial Showdown guest command control field=${fieldIndex} was not publicly actionable `
+          + `(phase=${scene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}, `
+          + `ui=${UiMode[scene.ui.getMode()] ?? scene.ui.getMode()})`,
+      );
+    }
+    finalCommand = command;
+    if (position < localFieldIndices.length - 1) {
+      // The fixture's relay responder owns the actual command sent to the authority. This renderer-only
+      // skip merely exposes the next real sequential CommandPhase so its address-exact proof can be made.
+      scene.currentBattle.turnCommands[fieldIndex] = {
+        command: Command.FIGHT,
+        move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
+        skip: true,
+      };
+      command.end();
+      await drainLoopback();
+    }
+  }
+  if (finalCommand == null) {
+    throw new Error("mirrored Showdown guest did not materialize its final local command target");
+  }
+  return finalCommand;
 }
 
 /**
@@ -5005,21 +5063,7 @@ export async function buildShowdownDuo(
   // mirrored state and phase queue with the serialized launch snapshot, exactly like a fresh browser boot.
   await withClient(guestCtx, async () => {
     await drainLoopback();
-    materializeMirroredGuestInputTurn(guestScene);
-    const guestOwnCommand = await driveClientPhaseQueueTo(guestScene, "initial Showdown guest CommandPhase", {
-      matches: phase =>
-        phase.phaseName === "CommandPhase"
-        && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_HOST_FIELD_INDEX,
-    });
-    guestOwnCommand.start();
-    await drainLoopback();
-    if (guestScene.phaseManager.getCurrentPhase() !== guestOwnCommand || guestScene.ui.getMode() !== UiMode.COMMAND) {
-      throw new Error(
-        "initial Showdown guest command control was not publicly actionable "
-          + `(phase=${guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}, `
-          + `ui=${UiMode[guestScene.ui.getMode()] ?? guestScene.ui.getMode()})`,
-      );
-    }
+    await materializeMirroredShowdownGuestCommandFrontier(guestScene);
     markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
   });
   // Deliver the controlInstalled receipt and its acknowledgement under each destination's complete context.

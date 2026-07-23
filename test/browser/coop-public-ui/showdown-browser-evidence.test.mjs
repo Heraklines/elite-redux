@@ -29,7 +29,11 @@ test("the exact-SHA workflow exposes and seals a dedicated Showdown battle journ
   assert.match(workflow, /VITE_COOP_BROWSER_FIXTURE:.*inputs\.journey == 'showdown-battle'.*'showdown-battle'.*'off'/u);
   assert.match(workflow, /Verify exact two-browser Showdown admission and turn contracts/u);
   assert.match(workflow, /- "src\/data\/elite-redux\/showdown\/\*\*"/u);
-  assert.match(workflow, /- "src\/phases\/title-phase\.ts"/u);
+  assert.match(
+    workflow,
+    /- "src\/phases\/\*\*"/u,
+    "Showdown and shared-control phase edits all trigger the exact two-browser journey",
+  );
   assert.match(workflow, /- "src\/ui\/handlers\/showdown-\*\.ts"/u);
   assert.match(workflow, /src\/phases\/title-phase\|src\/system\/game-data/u);
   assert.match(workflow, /src\/phases\/title-phase\.ts \\/u);

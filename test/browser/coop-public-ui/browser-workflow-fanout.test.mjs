@@ -65,6 +65,26 @@ test("journey bundle resolves one validated asset SHA even when the GitHub API i
   assert.match(build, /grep -Eq '\^\[0-9a-f\]\{40\}\$'/u, "either lookup path must produce an exact commit SHA");
 });
 
+test("journey push qualification covers ordinary gameplay phases and statically owns CommandPhase", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
+  assert.match(
+    workflow,
+    /- "src\/phases\/\*\*"/u,
+    "a new or migrated gameplay phase cannot bypass the production two-browser journey",
+  );
+  const build = jobBlock(workflow, "browser-build");
+  assert.match(
+    build,
+    /owned=.*src\/phases\/command-phase/u,
+    "the journey rejects CommandPhase TypeScript diagnostics instead of treating them as baseline",
+  );
+  assert.match(
+    build,
+    /pnpm exec biome check[\s\S]*src\/phases\/command-phase\.ts/u,
+    "the exact command-control boundary is part of the journey's format gate",
+  );
+});
+
 test("exact GameOver gate runs the retained guest-renderer phase-queue regression", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   const build = jobBlock(workflow, "browser-build");

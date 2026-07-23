@@ -138,8 +138,14 @@ describe.sequential("protocol-33 mutation victims", () => {
         guest.acknowledgeTurnCommit(second!, "materialApplied"),
         "P33_MUTATION_CAUGHT[full-address]: epoch/wave/turn/revision must identify independent authority",
       ).toBe(true);
-      expect(guest.acknowledgeTurnCommit(second!, "presentationReady")).toBe(true);
-      expect(guest.acknowledgeTurnCommit(second!, "continuationReady")).toBe(true);
+      expect(
+        guest.acknowledgeTurnCommit(second!, "presentationReady"),
+        "P33_MUTATION_CAUGHT[full-address]: epoch/wave/turn/revision must identify independent authority",
+      ).toBe(true);
+      expect(
+        guest.acknowledgeTurnCommit(second!, "continuationReady"),
+        "P33_MUTATION_CAUGHT[full-address]: epoch/wave/turn/revision must identify independent authority",
+      ).toBe(true);
     } finally {
       host.dispose();
       guest.dispose();
