@@ -513,6 +513,44 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(globalScene.field.getIndex(displayed), "the superseded display object was removed").toBe(-1);
   });
 
+  it("turn-one structural adoption repairs a same-species party/display identity split", async () => {
+    await startCoopGuest();
+    const battle = globalScene.currentBattle;
+    const displayed = battle.enemyParty[0];
+    const displayedFieldIndex = globalScene.field.getIndex(displayed);
+    const authoritativeId = displayed.id;
+    game.override.enemySpecies(null);
+
+    // A retained state apply may rebuild the authoritative party object without replacing the Phaser
+    // field child.  Both objects can already carry the same immutable id and species, so a species-only
+    // fast path would preserve the split and later HP/faint presentation would mutate the invisible one.
+    const detachedParty = globalScene.addEnemyPokemon(displayed.species, displayed.level, displayed.trainerSlot, false);
+    detachedParty.id = authoritativeId;
+    battle.enemyParty[0] = detachedParty;
+    expect(globalScene.field.getIndex(detachedParty)).toBe(-1);
+    expect(globalScene.field.getIndex(displayed)).toBe(displayedFieldIndex);
+    vi.spyOn(EnemyPokemon.prototype, "loadAssets").mockResolvedValue(undefined);
+
+    adoptCoopEnemiesStructural([
+      {
+        fieldIndex: 0,
+        data: { id: authoritativeId, speciesId: displayed.species.speciesId, level: displayed.level },
+      },
+      { fieldIndex: 1, data: { speciesId: battle.enemyParty[1].species.speciesId, level: 5 } },
+    ]);
+
+    const repaired = battle.enemyParty[0];
+    expect(repaired, "the detached party reference was replaced").not.toBe(detachedParty);
+    expect(repaired, "the stale display identity was replaced").not.toBe(displayed);
+    expect(repaired.id).toBe(authoritativeId);
+    expect(repaired.species.speciesId).toBe(displayed.species.speciesId);
+    expect(globalScene.field.getIndex(repaired), "one party-owned identity occupies the original field slot").toBe(
+      displayedFieldIndex,
+    );
+    expect(globalScene.field.getIndex(displayed), "the stale same-species display object was removed").toBe(-1);
+    expect(globalScene.field.getIndex(detachedParty), "the detached party object never became visible").toBe(-1);
+  });
+
   it("ENEMY-FIELD RECONCILE (#633): a host-KOd enemy the guest still has ALIVE is removed + the checksum converges", async () => {
     await startCoopGuest();
     // The two enemies on the double field. enemy0 = bi2, enemy1 = bi3.

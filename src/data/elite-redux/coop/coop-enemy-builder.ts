@@ -240,13 +240,23 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       const authoritativeId = coopNum(entry.data, "id");
       const displayedIdentity = globalScene.field.list.find(
         child => child instanceof EnemyPokemon && authoritativeId !== undefined && child.id === authoritativeId >>> 0,
-      );
+      ) as EnemyPokemon | undefined;
       const activeEnemy = existing != null && globalScene.field.getIndex(existing) >= 0 ? existing : displayedIdentity;
       // Pre-summon ME/colosseum adoption has no active object, so it deliberately stays inactive and still
       // follows its ordinary SummonPhase.
       const activeFieldIndex = activeEnemy == null ? -1 : globalScene.field.getIndex(activeEnemy);
       const wantSpecies = coopNum(entry.data, "speciesId");
-      if (existing != null && (wantSpecies === undefined || existing.species.speciesId === wantSpecies)) {
+      // A material-state apply can reconstruct the party member before this retained manifest arrives,
+      // leaving a distinct object with the SAME id/species on Phaser's field.  Species equality is not
+      // sufficient in that shape: HP/status updates would hit the detached party object while the player
+      // keeps seeing the stale displayed object.  Rebuild whenever the display identity and party identity
+      // are split, even when their species already agree.
+      const detachedDisplayedIdentity = displayedIdentity != null && displayedIdentity !== existing;
+      if (
+        existing != null
+        && !detachedDisplayedIdentity
+        && (wantSpecies === undefined || existing.species.speciesId === wantSpecies)
+      ) {
         continue; // same mon - the corrector pass below converges its state
       }
       const level = coopNum(entry.data, "level") ?? existing?.level ?? battle.enemyLevels?.[entry.fieldIndex] ?? 1;
@@ -254,13 +264,21 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       if (built == null) {
         continue; // unresolvable blob - leave the local mon (corrector will warn on mismatch)
       }
-      try {
-        existing?.leaveField(true, true, true);
-        if (activeEnemy != null && activeEnemy !== existing) {
-          activeEnemy.leaveField(true, true, true);
+      // Renderer adoption is a structural projection, not a battle switch.  Pokemon.leaveField runs
+      // mechanics (PreLeaveField abilities/form changes) and may throw before removing the stale child;
+      // either outcome is invalid on a pure renderer.  Remove the obsolete objects directly, exactly as
+      // the later authoritative presenter does, so teardown cannot prevent the new identity being seated.
+      for (const stale of new Set([existing, activeEnemy])) {
+        if (stale == null) {
+          continue;
         }
-      } catch {
-        /* stale sprite teardown must not block the adopt */
+        try {
+          stale.hideInfo();
+          stale.setVisible(false);
+          globalScene.field.remove(stale, true);
+        } catch {
+          /* stale sprite teardown must not block the adopt */
+        }
       }
       battle.enemyParty[entry.fieldIndex] = built;
       if (activeFieldIndex >= 0) {

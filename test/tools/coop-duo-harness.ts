@@ -2310,8 +2310,13 @@ export async function driveDuoGuestTackleThroughPublicUi(
         postMovePhase.start();
         await drainLoopback();
         expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
-        expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest moves to the second enemy target").toBe(true);
-        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
+        // A real player may confirm the default target. Requiring RIGHT conflated command-relay coverage
+        // with the fixture having a second selectable foe: when only one target is legal, production
+        // correctly returns false and leaves the default cursor actionable. Dedicated target-navigation
+        // suites own multi-target cursor behavior; this helper owns the public Command -> Fight -> submit chain.
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the default legal enemy target").toBe(
+          true,
+        );
         await drainLoopback();
       } else {
         expect(rig.guestScene.ui.getMode(), "single-target command closes into the authoritative replay wait").toBe(
@@ -2780,6 +2785,7 @@ export async function buildDuo(
  */
 export async function retireDuoInitialCommandForBoundaryTest(rig: DuoRig): Promise<void> {
   let retiredTurn = -1;
+  let committedWaitOperationId: string | null = null;
   await withClient(rig.hostCtx, () => {
     const recording = endCoopRecording();
     const battle = rig.hostScene.currentBattle;
@@ -2825,6 +2831,10 @@ export async function retireDuoInitialCommandForBoundaryTest(rig: DuoRig): Promi
     if (committed == null) {
       throw new Error("boundary fixture could not commit its complete Authority V2 TURN_COMMIT predecessor");
     }
+    if (committed.nextControl.kind !== "AWAIT_SUCCESSOR") {
+      throw new Error(`boundary fixture predecessor stated ${committed.nextControl.kind}, expected AWAIT_SUCCESSOR`);
+    }
+    committedWaitOperationId = committed.nextControl.afterOperationId;
   });
   await pumpDuoDestinations(rig, 4);
   await withClient(rig.guestCtx, () =>
@@ -2833,17 +2843,20 @@ export async function retireDuoInitialCommandForBoundaryTest(rig: DuoRig): Promi
     }),
   );
   await pumpDuoDestinations(rig, 4);
-  const hostControl = getCoopV2Shadow(rig.hostRuntime)?.authorityFrontier()?.nextControl;
   const guestControl = rig.guestRuntime.v2ControlLedger.latestControl;
   const guestActiveControl = rig.guestRuntime.v2ControlLedger.activeControl;
+  const guestControlAddress =
+    guestControl?.kind === "AWAIT_SUCCESSOR" ? guestControl.afterOperationId : (guestControl?.kind ?? "none");
   if (
-    hostControl?.kind !== "AWAIT_SUCCESSOR"
+    committedWaitOperationId == null
     || guestControl?.kind !== "AWAIT_SUCCESSOR"
-    || guestActiveControl?.kind !== "AWAIT_SUCCESSOR"
+    || guestControl.afterOperationId !== committedWaitOperationId
+    || guestActiveControl != null
   ) {
     throw new Error(
-      `boundary fixture turn predecessor did not converge: host=${hostControl?.kind ?? "none"} `
-        + `guest=${guestControl?.kind ?? "none"} active=${guestActiveControl?.kind ?? "none"}`,
+      `boundary fixture turn predecessor did not converge: committed=${committedWaitOperationId ?? "none"} `
+        + `guest=${guestControlAddress} `
+        + `active=${guestActiveControl?.kind ?? "none"}`,
     );
   }
 }

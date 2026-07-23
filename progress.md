@@ -2198,3 +2198,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The Stormglass fixture explicitly starts the installed override because PhaseInterceptor suppresses the
   production PhaseManager auto-start in engine tests. The T2 suite also clears any runtime restored while its
   reused Phaser scene resets, closing the remaining cross-test replica bootstrap leak.
+
+# 2026-07-24 - Exact gate roots: displayed identity, stale actor addresses, and V2 fixture semantics
+
+- Full exact-SHA gate `30047250004` on `6169779e7` kept the public V2 contracts, all mutation shards, native
+  WebRTC, lane A, every turn shard, and Showdown S1-S7 green. Its C4 resume artifact exposed a real renderer
+  defect rather than a harness stall: authoritative apply could rebuild `enemyParty[index]` while a distinct
+  same-id/same-species Pokemon remained in Phaser's field, so HP/faint replay mutated an invisible object and
+  final presentation proof aborted despite a matching mechanical checksum.
+- Structural enemy adoption now treats party/display identity separation as a required rebuild and performs
+  projection-only stale removal (no `leaveField` mechanics). Replay resolves a detached logical party member
+  back to the actually displayed immutable id. Failure-first regressions cover both same-species adoption and
+  HP replay against a split identity.
+- Showdown S8 had already converged mechanically before clearing itself on presentation failure. Replay had a
+  hard-coded binary battler-index ceiling and trusted stale party-derived indices after in-turn reordering;
+  ability/Tera now resolve their immutable Pokemon ids across both parties/actual field, triples use the live
+  arrangement, and a uniquely identified legacy faint uses its resolved local field slot for the per-seat
+  replacement picker.
+- Forty-eight B/C/P failures shared one obsolete fixture assertion: it required an `AWAIT_SUCCESSOR` ordered
+  permit to become an active human control and queried an authority head that may already be receipt-compacted.
+  The helper now proves the actual committed predecessor, exact guest wait address, and absence of a fabricated
+  active surface. Seventeen more failures required RIGHT to select a nonexistent second target; the public input
+  helper now confirms the default legal target and leaves cursor-navigation coverage to its dedicated suites.
+- B13's sole red also modeled an impossible ability bar: `isVisible=true` before phase entry exercised the
+  hide-and-requeue path while expecting the new flyout synchronously. It now models closed-before-show and
+  visible-after-show, preserving the throttled-tween regression without a false signal.

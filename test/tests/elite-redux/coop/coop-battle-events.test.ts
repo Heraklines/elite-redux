@@ -188,7 +188,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       finishTween = resolve;
     });
     vi.spyOn(globalScene.abilityBar, "showAbility").mockReturnValue(throttledTween);
-    vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(true);
+    vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValueOnce(false).mockReturnValue(true);
 
     const phase = new CoopShowAbilityReplayPhase(
       pokemon.getBattlerIndex(),
@@ -207,6 +207,34 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     finishTween();
     await Promise.resolve();
+  });
+
+  it("an exact ability identity survives a stale post-reorder battler index", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[0];
+    const partySlot = globalScene.getPlayerParty().indexOf(pokemon);
+    const token = createCoopPresentationOutcomeToken();
+    const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility").mockResolvedValue();
+    vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(false);
+    const staleBenchDerivedIndex = 11;
+
+    const phase = new CoopShowAbilityReplayPhase(
+      staleBenchDerivedIndex,
+      pokemon.id,
+      partySlot,
+      pokemon.getAbility().id,
+      false,
+      0,
+      token,
+    );
+    phase.start();
+    await Promise.resolve();
+
+    expect(
+      showSpy,
+      "the immutable Pokemon id, not a stale party-derived bi, selects the flyout actor",
+    ).toHaveBeenCalled();
+    expect(coopPresentationOutcome(token)?.kind).toBe("rendered");
   });
 
   /** Start a co-op authoritative double as the HOST and tag field ownership. */
@@ -892,6 +920,35 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     updateSpy.mockRestore();
     addEventSpy.mockRestore();
     endSpy.mockRestore();
+  });
+
+  it("replays HP against the displayed identity when material apply detached the party reference", async () => {
+    await startCoopGuest();
+    const battle = globalScene.currentBattle;
+    const displayed = battle.enemyParty[0];
+    const battlerIndex = displayed.getBattlerIndex();
+    const maxHp = displayed.getMaxHp();
+    const fromHp = maxHp;
+    const toHp = maxHp - 7;
+    displayed.hp = fromHp;
+
+    const detachedParty = globalScene.addEnemyPokemon(displayed.species, displayed.level, displayed.trainerSlot, false);
+    detachedParty.id = displayed.id;
+    detachedParty.hp = fromHp;
+    battle.enemyParty[0] = detachedParty;
+    expect(globalScene.field.getIndex(displayed)).toBeGreaterThanOrEqual(0);
+    expect(globalScene.field.getIndex(detachedParty)).toBe(-1);
+    globalScene.moveAnimations = false;
+    vi.spyOn(displayed, "updateInfo").mockResolvedValue(undefined);
+    const phase = new CoopHpDrainReplayPhase(battlerIndex, fromHp, toHp, maxHp, displayed.species.speciesId);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(displayed.hp, "the visible authority identity receives the immutable HP target").toBe(toHp);
+    expect(detachedParty.hp, "replay never mutates the invisible logical-party replacement").toBe(fromHp);
+    expect(endSpy, "the repaired replay path releases normally").toHaveBeenCalledTimes(1);
   });
 
   it("(Step 2) an upward HP event plays HEALTH_UP, shows a green amount, and finishes at authority HP", async () => {

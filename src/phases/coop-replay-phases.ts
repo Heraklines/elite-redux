@@ -72,6 +72,7 @@ import {
   captureCoopFaintSwitchOperationBinding,
   markCoopFaintSwitchPickerSettled,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
+import { getActuallyFieldedCoopPokemon } from "#data/elite-redux/coop/coop-field-presentation";
 import { isCoopFaintSwitchSeq, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
 import {
@@ -156,10 +157,24 @@ const COOP_AUTHORITY_PRESENTATION_DEADLINE_MS = 15_000;
  */
 function fieldMon(bi: number): ReturnType<typeof globalScene.getField>[number] | null {
   try {
-    if (bi < 0 || bi > BattlerIndex.ENEMY_2) {
+    const arrangement = globalScene.currentBattle?.arrangement;
+    if (arrangement == null || arrangement.locate(bi).side < 0) {
       return null;
     }
-    return globalScene.getField()[bi] ?? null;
+    const partyMon = globalScene.getField()[bi] ?? null;
+    if (partyMon == null) {
+      return null;
+    }
+    if (globalScene.field.getIndex(partyMon) >= 0) {
+      return partyMon;
+    }
+    // Material-state apply may already have rebuilt the logical party member while the preceding
+    // presentation identity is still seated in Phaser's field container.  Replaying against the party
+    // slice in that window mutates an invisible object: the player sees no HP/faint animation and the
+    // final presentation proof aborts even though the mechanical checksum matches.  Immutable Pokemon
+    // identity is the only safe bridge; if it is absent, let the checkpoint/adopter materialize the actor.
+    const side = arrangement.ownerOf(bi) === SideKind.PLAYER ? "player" : "enemy";
+    return getActuallyFieldedCoopPokemon(side).find(candidate => candidate.id === partyMon.id) ?? null;
   } catch {
     return null;
   }
@@ -276,23 +291,17 @@ export class CoopShowAbilityReplayPhase extends Phase {
   public override start(): void {
     super.start();
 
-    const playerSide = globalScene.currentBattle.arrangement.ownerOf(this.bi) === SideKind.PLAYER;
-    const party: readonly Pokemon[] = playerSide ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-    const pokemonAtSlot = party[this.partySlot];
-    const pokemon = party.find(candidate => candidate.id === this.pokemonId);
-    const fieldPokemon = fieldMon(this.bi);
+    const playerMatches = globalScene.getPlayerParty().filter(candidate => candidate.id === this.pokemonId);
+    const enemyMatches = globalScene.getEnemyParty().filter(candidate => candidate.id === this.pokemonId);
+    const identityMatches = [...playerMatches, ...enemyMatches];
+    const pokemon = identityMatches.length === 1 ? identityMatches[0] : null;
+    const playerSide = pokemon?.isPlayer() ?? false;
     const ability = allAbilities[this.abilityId];
     const actorFingerprint = `${playerSide ? "player" : "enemy"}:bi${this.bi}:slot${this.partySlot}:p${this.pokemonId}`;
-    if (
-      pokemon == null
-      || pokemonAtSlot?.id !== this.pokemonId
-      || fieldPokemon?.id !== this.pokemonId
-      || ability == null
-      || !ability.name
-    ) {
+    if (pokemon == null || ability == null || !ability.name) {
       coopWarn(
         "replay",
-        `present ability bi=${this.bi} pokemonId=${this.pokemonId} abilityId=${this.abilityId} identity mismatch`,
+        `present ability bi=${this.bi} pokemonId=${this.pokemonId} abilityId=${this.abilityId} identity mismatch matches=${identityMatches.length}`,
       );
       settleCoopPresentationOutcome(this.outcomeToken, {
         kind: "failed",
@@ -398,16 +407,17 @@ export class CoopTeraReplayPhase extends Phase {
   public override start(): void {
     super.start();
 
-    const playerSide = globalScene.currentBattle.arrangement.ownerOf(this.bi) === SideKind.PLAYER;
-    const party: readonly Pokemon[] = playerSide ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-    const pokemonAtSlot = party[this.partySlot];
-    const pokemon = party.find(candidate => candidate.id === this.pokemonId);
-    const fieldPokemon = fieldMon(this.bi);
+    const partyMatches = [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()].filter(
+      candidate => candidate.id === this.pokemonId,
+    );
+    const fieldMatches = getActuallyFieldedCoopPokemon().filter(candidate => candidate.id === this.pokemonId);
+    const pokemon = fieldMatches.length === 1 ? fieldMatches[0] : null;
+    const playerSide = pokemon?.isPlayer() ?? partyMatches[0]?.isPlayer() ?? false;
     const actorFingerprint = `${playerSide ? "player" : "enemy"}:bi${this.bi}:slot${this.partySlot}:p${this.pokemonId}`;
-    if (pokemon == null || pokemonAtSlot?.id !== this.pokemonId || fieldPokemon?.id !== this.pokemonId) {
+    if (partyMatches.length !== 1 || pokemon == null) {
       coopWarn(
         "replay",
-        `present tera bi=${this.bi} pokemonId=${this.pokemonId} partySlot=${this.partySlot} identity mismatch`,
+        `present tera bi=${this.bi} pokemonId=${this.pokemonId} partySlot=${this.partySlot} identity mismatch party=${partyMatches.length} field=${fieldMatches.length}`,
       );
       settleCoopPresentationOutcome(this.outcomeToken, {
         kind: "failed",
@@ -1147,17 +1157,28 @@ function fieldMonByIdentity(bi: number, sp: number | undefined): ReturnType<type
   if (slotMon != null && slotMon.species?.speciesId === sp) {
     return slotMon;
   }
-  const field = globalScene.getField();
-  const isEnemySide = bi >= 2;
-  for (let i = 0; i < field.length; i++) {
-    const mon = field[i];
-    if (mon == null || i === bi || i >= 2 !== isEnemySide) {
-      continue;
-    }
-    if (mon.species?.speciesId === sp && mon.isOnField()) {
-      coopWarn("replay", `event actor resolved by IDENTITY sp=${sp} bi=${bi} -> field slot ${i} (slot drift, #796)`);
-      return mon;
-    }
+  const owner = globalScene.currentBattle?.arrangement.ownerOf(bi) ?? SideKind.OTHER;
+  const field =
+    owner === SideKind.PLAYER
+      ? getActuallyFieldedCoopPokemon("player")
+      : owner === SideKind.ENEMY
+        ? getActuallyFieldedCoopPokemon("enemy")
+        : getActuallyFieldedCoopPokemon();
+  const identityMatches = field.filter(mon => mon !== slotMon && mon.species?.speciesId === sp && mon.isOnField());
+  if (identityMatches.length === 1) {
+    const mon = identityMatches[0];
+    coopWarn(
+      "replay",
+      `event actor resolved by IDENTITY sp=${sp} bi=${bi} -> displayed actor ${mon.id} (slot drift, #796)`,
+    );
+    return mon;
+  }
+  if (identityMatches.length > 1) {
+    coopWarn(
+      "replay",
+      `event actor sp=${sp} bi=${bi} is ambiguous across ${identityMatches.length} displayed identities`,
+    );
+    return null;
   }
   if (slotMon != null) {
     coopWarn(
@@ -1177,15 +1198,15 @@ export class CoopFaintReplayPhase extends PokemonPhase {
    * unshift: the picker runs right after this faint phase, pausing the rest of the replay until
    * the player answers (or the host's wait elapses and auto-picks - the run never stalls).
    */
-  private maybeOpenOwnReplacementPicker(): void {
+  private maybeOpenOwnReplacementPicker(fieldIndex = this.battlerIndex): void {
     try {
       const controller = getCoopController();
       if (controller == null) {
-        coopLog("replay", `own-faint picker gate bi=${this.battlerIndex}: no controller -> skip`);
+        coopLog("replay", `own-faint picker gate bi=${fieldIndex}: no controller -> skip`);
         return;
       }
       const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 0;
-      if (this.battlerIndex >= battlerCount) {
+      if (fieldIndex >= battlerCount) {
         return; // enemy-side faint
       }
       // Showdown 1v1 (versus faint-replacement, guest side): the F1 data-level side swap makes the
@@ -1194,11 +1215,11 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       // site (do NOT change the co-op semantics of `coopOwnerOfPlayerFieldSlot`): in versus-guest the
       // slot is always own, so the same picker flow opens and relays to the awaiting host.
       const versusGuest = isShowdownGuestFlip();
-      const isOwnSlot = versusGuest ? true : coopOwnerOfPlayerFieldSlot(this.battlerIndex) === controller.role;
+      const isOwnSlot = versusGuest ? true : coopOwnerOfPlayerFieldSlot(fieldIndex) === controller.role;
       if (!isOwnSlot) {
         coopLog(
           "replay",
-          `own-faint picker gate bi=${this.battlerIndex}: owner=${coopOwnerOfPlayerFieldSlot(this.battlerIndex)} != ${controller.role} -> skip`,
+          `own-faint picker gate bi=${fieldIndex}: owner=${coopOwnerOfPlayerFieldSlot(fieldIndex)} != ${controller.role} -> skip`,
         );
         return; // the partner's mon - the partner (or the host fallback) picks
       }
@@ -1218,7 +1239,7 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       if (!hasBench) {
         coopLog(
           "replay",
-          `own-faint picker gate bi=${this.battlerIndex}: no legal bench -> skip (bc=${battlerCount} party=[${party
+          `own-faint picker gate bi=${fieldIndex}: no legal bench -> skip (bc=${battlerCount} party=[${party
             .map((m, i) => `${i}:sp${m?.species?.speciesId}/fnt${m?.isFainted() ? 1 : 0}/own${m?.coopOwner ?? "-"}`)
             .join(" ")}])`,
         );
@@ -1237,34 +1258,34 @@ export class CoopFaintReplayPhase extends PokemonPhase {
         const { wave: sourceWave, turn: sourceTurn, occurrence } = sourceAddress;
         // The renderer has now materially proved that no picker surface exists for this exact faint.
         // Record that proof before relaying NONE; the retained terminal may ACK only this occurrence.
-        markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.battlerIndex, operationBinding, occurrence);
+        markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, fieldIndex, operationBinding, occurrence);
         const data = addressCoopFaintSwitchChoiceData(
           [0],
           {
             wave: sourceWave,
             turn: sourceTurn,
             occurrence,
-            fieldIndex: this.battlerIndex,
+            fieldIndex,
             partySlot: -1,
             resolution: COOP_FAINT_SWITCH_RESOLUTION_NONE,
           },
           operationBinding,
         );
-        sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data);
+        sendCoopFaintSwitchChoice(relay, fieldIndex, -1, data);
         armCoopFaintSwitchIntentResend(
           {
-            payload: { fieldIndex: this.battlerIndex, partySlot: -1, data },
+            payload: { fieldIndex, partySlot: -1, data },
             localRole: controller.role,
             wave: sourceWave,
             turn: sourceTurn,
             occurrence,
-            resend: () => sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data),
+            resend: () => sendCoopFaintSwitchChoice(relay, fieldIndex, -1, data),
           },
           operationBinding,
         );
         return; // nothing to send out - the host's flow decides (wipe / lone survivor)
       }
-      globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", this.battlerIndex, this.faintSourceAddress);
+      globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", fieldIndex, this.faintSourceAddress);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("[coop-op]")) {
         coopWarn("replay", `own-faint picker gate bi=${this.battlerIndex} lost its runtime binding`, error);
@@ -1298,6 +1319,7 @@ export class CoopFaintReplayPhase extends PokemonPhase {
     let ended = false;
     let watchdog: Phaser.Time.TimerEvent | undefined;
     const victim = fieldMonByIdentity(this.battlerIndex, this.sp);
+    const resolvedFieldIndex = victim?.getBattlerIndex() ?? this.battlerIndex;
     const finish = () => {
       if (ended) {
         return;
@@ -1319,7 +1341,7 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       }
       // #786: OUR mon just fainted with a legal bench - open OUR replacement picker (relay-only;
       // the host's out-of-band replacement checkpoint materializes the pick on this renderer).
-      this.maybeOpenOwnReplacementPicker();
+      this.maybeOpenOwnReplacementPicker(resolvedFieldIndex);
       this.end();
     };
     if (isCoopDebug()) {
