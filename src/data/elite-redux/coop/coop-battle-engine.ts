@@ -1282,6 +1282,10 @@ export function captureCoopEnemies(): CoopSerializedEnemy[] {
           // ER generation hooks and run modifiers can alter the constructor's final stat array differently
           // on two clients. Carry the finished values so the renderer never derives battle geometry locally.
           stats: [...enemy.stats],
+          // The by-index manifest corrector runs after the complete wave-start state apply. Carry the
+          // live stages here as well so that reconstruction/stat recalculation can never reopen command
+          // input with a zeroed local array after an entry ability already changed battle math.
+          statStages: [...enemy.getStatStages()],
           hp: enemy.hp,
           // Boss adopt (#633, A/BLOCKING-2): boss state lives ONLY on EnemyPokemon and is hardcoded
           // `false` on the guest's `addEnemyPokemon` reconstruct, so an adopted boss renders normal
@@ -1604,6 +1608,17 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
           const stats = (d.stats as unknown[]).filter((n): n is number => typeof n === "number").slice(0, 6);
           if (stats.length === 6 && stats.every(stat => Number.isFinite(stat) && stat > 0)) {
             enemy.stats = stats.map(stat => Math.trunc(stat));
+          }
+        }
+        if (Array.isArray(d.statStages)) {
+          const stages = (d.statStages as unknown[])
+            .filter((stage): stage is number => typeof stage === "number" && Number.isFinite(stage))
+            .slice(0, 7);
+          if (stages.length === 7) {
+            const liveStages = enemy.getStatStages();
+            for (let index = 0; index < 7 && index < liveStages.length; index++) {
+              liveStages[index] = Math.max(-6, Math.min(6, Math.trunc(stages[index])));
+            }
           }
         }
         // Boss adopt mirror (#633, A/MINOR-2): the mid-wave by-index overwrite must ALSO re-assert

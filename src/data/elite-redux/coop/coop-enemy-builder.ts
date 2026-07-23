@@ -123,6 +123,17 @@ export function buildCoopEnemy(
       enemy.stats = stats.map(stat => Math.trunc(stat));
     }
   }
+  if (Array.isArray(data.statStages)) {
+    const stages = (data.statStages as unknown[])
+      .filter((stage): stage is number => typeof stage === "number" && Number.isFinite(stage))
+      .slice(0, 7);
+    if (stages.length === 7) {
+      const liveStages = enemy.getStatStages();
+      for (let index = 0; index < 7 && index < liveStages.length; index++) {
+        liveStages[index] = Math.max(-6, Math.min(6, Math.trunc(stages[index])));
+      }
+    }
+  }
   enemy.generateName();
   // Boss adopt (#633, A/BLOCKING-2): boss state lives ONLY on EnemyPokemon and `addEnemyPokemon`
   // reconstructs with boss hardcoded `false`, so an adopted boss renders normal bars. Re-assert the

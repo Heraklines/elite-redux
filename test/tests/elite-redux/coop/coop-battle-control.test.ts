@@ -637,10 +637,19 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       expect(rig.hostScene.ui.processInput(Button.ACTION), "host opens Fight through COMMAND UI").toBe(true);
       expect(rig.hostScene.ui.getMode(), "the host reaches its real move picker").toBe(UiMode.FIGHT);
       expect(rig.hostScene.ui.processInput(Button.ACTION), "host picks Tackle through FIGHT UI").toBe(true);
-      const targetPhase = await driveClientPhaseQueueTo(rig.hostScene, "SelectTargetPhase");
-      targetPhase.start();
-      expect(rig.hostScene.ui.getMode(), "the host reaches its real target picker").toBe(UiMode.TARGET_SELECT);
-      expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms enemy slot 1 through TARGET UI").toBe(true);
+      const postMovePhase = await driveClientPhaseQueueTo(rig.hostScene, "SelectTargetPhase or turn commit", {
+        matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "CoopTurnCommitPhase",
+      });
+      if (postMovePhase.phaseName === "SelectTargetPhase") {
+        postMovePhase.start();
+        expect(rig.hostScene.ui.getMode(), "the host reaches its real target picker").toBe(UiMode.TARGET_SELECT);
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms enemy slot 1 through TARGET UI").toBe(true);
+      } else {
+        expect(
+          rig.hostScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.targets,
+          "the one-legal-target command auto-submits without inventing a target picker",
+        ).toEqual([BattlerIndex.ENEMY]);
+      }
       expect(
         rig.hostScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.targets,
         "the host selected the first 1-HP enemy",

@@ -55,7 +55,6 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import {
   captureCoopAuthoritativeBattleState,
-  captureCoopEnemies,
   coopWaveStartEntryEffectSignature,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -68,19 +67,8 @@ import { ErAbilityId } from "#enums/er-ability-id";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import {
-  captureCoopEncounterAuthority,
-  rebroadcastCoopWaveStartAuthorityAfterEntryEffects,
-} from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
-import {
-  buildDuo,
-  type DuoRig,
-  drainLoopback,
-  driveClientPhaseQueueTo,
-  installDuoLogCapture,
-  withClient,
-} from "#test/tools/coop-duo-harness";
+import { buildDuo, type DuoRig, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -223,7 +211,7 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
     expect((wireEnemy?.summonData as { statStages?: number[] } | undefined)?.statStages?.[1]).toBe(1);
   });
 
-  it("guest adopts a Cheap Tactics pre-command HP mutation from the refreshed retained carrier", async () => {
+  it("guest adopts Cheap Tactics damage from the immutable wave-entry carrier", async () => {
     game.override
       .enemySpecies(SpeciesId.SKWOVET)
       .enemyLevel(2)
@@ -240,62 +228,14 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
 
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    pair.setAutomaticDelivery(false);
-
-    await withClient(rig.guestCtx, () => {
-      for (const mon of rig.guestScene.getPlayerParty()) {
-        mon.hp = mon.getMaxHp();
-      }
-    });
-
-    const staleState = await withClient(rig.hostCtx, () => captureCoopAuthoritativeBattleState(1));
-    expect(staleState).not.toBeNull();
-    for (const raw of staleState!.playerParty) {
-      const stats = raw.stats as number[];
-      raw.hp = stats[0];
-    }
     const wave = rig.hostScene.currentBattle.waveIndex;
-    await withClient(rig.hostCtx, () => {
-      const battle = rig.hostScene.currentBattle;
-      const encounter = captureCoopEncounterAuthority(battle);
-      rig.hostRuntime.battleStream.sendEnemyParty(
-        wave,
-        captureCoopEnemies(),
-        encounter.mysteryEncounterType,
-        battle.battleType,
-        staleState!,
-        encounter,
-      );
-      // Reproduce the level-soak carrier shape directly: the retained party was already sent with zero
-      // stages, then a PostSummon entry effect changed the live battler before the refreshed state capture.
-      rig.hostScene.getEnemyField()[0].getStatStages()[1] = 1;
-      rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
-    });
-
-    const refreshed = rig.hostRuntime.battleStream.peekSentEnemyPartyAuthoritativeState(wave);
-    expect(refreshed, "host retained a post-Cheap-Tactics carrier").toBeDefined();
-    expect(refreshed!.playerParty.map(raw => Number(raw.hp))).toEqual(damagedHostHp);
-
-    await withClient(rig.guestCtx, async () => {
-      await drainLoopback();
-      expect(
-        rig.guestRuntime.battleStream.consumeEnemyParty(wave),
-        "encounter setup can consume the repeated party before its refreshed state",
-      ).not.toBeNull();
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-      const command = await driveClientPhaseQueueTo(rig.guestScene, "CommandPhase");
-      command.start();
-      await drainLoopback();
-    });
+    const sealed = rig.hostRuntime.battleStream.peekSentEnemyPartyAuthoritativeState(wave);
+    expect(sealed, "host retained the sealed post-entry authority carrier").toBeDefined();
+    expect(sealed!.playerParty.map(raw => Number(raw.hp))).toEqual(damagedHostHp);
     expect(
       rig.guestScene.getPlayerParty().map(mon => mon.hp),
-      "guest applies the refreshed automatic-move result before opening cmd:1:1",
+      "guest applies the automatic-move result before opening cmd:1:1",
     ).toEqual(damagedHostHp);
-    expect(
-      rig.guestScene.getEnemyField()[0].getStatStages()[1],
-      "guest applies the refreshed entry stat stage even after the repeated party was consumed",
-    ).toBe(1);
 
     logs.flush();
   }, 300_000);

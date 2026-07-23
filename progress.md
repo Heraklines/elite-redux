@@ -1824,3 +1824,35 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The public-browser push trigger was also too narrow: changes to the battle stream, transport, renderer gate,
   field event producers, phase manager, or a new UI could skip the real-browser journey. On `ci/coop/**` it now
   covers the whole co-op and Showdown cores plus field, phases, and UI; a source contract pins that breadth.
+
+# 2026-07-23 - migrate command tests to the production optional-target branch
+
+- Current objective: finish the legacy co-op test migration and close Showdown/combat presentation gaps using
+  hosted engine shards and the keyboard-only two-browser journey as the release oracle.
+- Showdown browser run `30023709176` completed two reciprocal turns with exact ability, weather, damage, message,
+  move, and HP presentation receipts on both browsers. Its final screenshots were visually inspected and show
+  the correct reciprocal Pelipper battlefield; this is strong evidence for the covered path, not yet proof of
+  voluntary switch, forced switch, faint replacement, Tera, or form-change presentation.
+- The shared duo command driver now follows the production branch where one legal target submits immediately;
+  T2 biome and Mystery tests no longer manufacture a nonexistent `SelectTargetPhase`. The remaining battle-end
+  journey used the same stale assumption for the host, so it now accepts either the real target picker or the
+  already-open `CoopTurnCommitPhase` and still asserts the exact authoritative target.
+- Focused run `30026154754` is the current hosted diagnostic for canonical trainer launch-state divergence. The
+  strengthened assertion compares the complete checksum material before its opaque digest, so the next failure
+  identifies the actual diverging field instead of presenting matching summaries plus two unexplained hashes.
+- That run identified the exact missing material: an entry effect left the authority enemy at stat stage `-1`
+  while the renderer's same enemy reopened command at `0`. The enemy manifest now carries and reapplies all
+  seven live stages in both same-species correction and structural reconstruction, making the manifest pass
+  monotonic with the complete wave-start image instead of allowing reconstruction to zero later battle math.
+
+# 2026-07-23 - entry-effect authority carrier and fixture migration
+
+- Remote B8 evidence identified a real post-entry state loss: the complete authority state applied an
+  entry ability's enemy stat stage, then the structural enemy-manifest corrector reconstructed/recalculated
+  the battler from a manifest which did not carry that live stage. The manifest now carries and validates
+  all seven stages in both its in-place and reconstruction paths.
+- Migrated the Cheap Tactics regression away from an invalid post-seal rewrite. Wave-entry authority is
+  immutable; the test now proves the actual sealed carrier already contains the automatic entry damage and
+  that the guest has applied it before command control opens.
+- The remaining optional-target command fixture now accepts both valid production paths: an explicit target
+  picker when multiple targets exist, and the direct replay commit when only one legal target exists.
