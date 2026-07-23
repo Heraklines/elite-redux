@@ -1715,3 +1715,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `git diff --check` is clean, and full TypeScript still reports the inherited ability/feat baseline (581
   lines) with zero diagnostic in the six touched implementation/test paths. Hosted C5/full qualification is
   required on the pushed candidate.
+
+# 2026-07-23 - live turn-successor parity and stale staged ACK idempotency
+
+- Exact public fresh/resume `29977644679` proved the staged-victory marker reached production, then exposed
+  a live-consumer split: the pure TURN adapter correctly authored its WAVE-only `AWAIT_SUCCESSOR` at turn
+  N+1, while `CoopFinalizeTurnPhase` still hard-coded every ordered wait to turn N and terminalized both real
+  browsers at wave 1. The adapter now exports one canonical successor-address validator used by both entry
+  construction and the renderer; staged victory, normal wait, replacement, and command rules cannot drift
+  independently again.
+- Full-gate C5 `29977670560` found a second at-least-once boundary. Both randomized and X Attack soaks applied
+  turn material, reached `presentationReady`, then revisited the exact `materialApplied` stage while the V2
+  entry was still retained. A lower exact stage is stale evidence, not a new authority claim: the monotonic
+  ledger now ignores it while still failing skipped-forward stages and same-stage conflicting bytes. The live
+  finalizer also reads its exact emitted-stage cursor and resumes after material/presentation instead of
+  reapplying an already-proven stage.
+- Failure-first stream coverage recreates `materialApplied -> presentationReady -> materialApplied`, proves
+  neither peer terminalizes and retention remains live until `continuationReady`. Full repository TypeScript
+  remains on the unrelated ability/feat baseline with no diagnostic in the four implementation/test files
+  touched here; scoped Biome has no new error and `git diff --check` is clean. Co-op tests remain hosted-only.

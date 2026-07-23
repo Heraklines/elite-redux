@@ -814,7 +814,18 @@ function classifyAckProgress<T>(
   if (stage === prior.stage) {
     return canonical === prior.canonical ? "duplicate" : "invalid";
   }
-  return AUTHORITY_ACK_STAGE_ORDER[stage] === AUTHORITY_ACK_STAGE_ORDER[prior.stage] + 1 ? "advance" : "invalid";
+  const nextOrder = AUTHORITY_ACK_STAGE_ORDER[stage];
+  const priorOrder = AUTHORITY_ACK_STAGE_ORDER[prior.stage];
+  if (nextOrder < priorOrder) {
+    // ACK evidence rides an at-least-once transport and the renderer may also revisit an exact
+    // already-applied phase while a later stage is settling. Once the immutable address, material
+    // identity, and supersession tuple have passed the caller's checks, an older stage contains no
+    // new claim and cannot roll progression back. Treat it as stale duplicate evidence. Fatalizing
+    // this ordinary reordering tore down healthy V2 sessions when materialApplied was replayed after
+    // presentationReady; skipped FORWARD stages and same-stage conflicting bytes remain invalid.
+    return "duplicate";
+  }
+  return nextOrder === priorOrder + 1 ? "advance" : "invalid";
 }
 
 /** Rehydrate a disposable JSON wire value from the immutable canonical admission bytes. */
@@ -2976,6 +2987,23 @@ export class CoopBattleStreamer {
   onTurnCommit(handler: (resolution: CoopTurnResolution) => void): () => void {
     this.turnCommitHandlers.add(handler);
     return () => this.turnCommitHandlers.delete(handler);
+  }
+
+  /**
+   * Read the furthest local renderer evidence already emitted for this exact immutable turn.
+   *
+   * A retained V2 retry can revisit a live finalizer while its async presentation proof is settling.
+   * The phase uses this read-only cursor to resume after the completed stage instead of re-applying
+   * material or replaying an older ACK. Identity is checked against the immutable admission ledger;
+   * a foreign or merely same-address carrier never inherits another commit's progress.
+   */
+  turnCommitAckStage(resolution: CoopTurnResolution): CoopAuthorityAckStage | null {
+    const key = authorityKey(resolution);
+    const admitted = this.seenTurnAuthority.get(key);
+    if (admitted == null || !sameAuthorityAckIdentity(admitted.value, resolution)) {
+      return null;
+    }
+    return this.ackedTurnCommits.get(key)?.stage ?? null;
   }
 
   private failLocalAckProgression(

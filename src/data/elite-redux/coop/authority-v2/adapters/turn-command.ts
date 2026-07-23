@@ -202,6 +202,39 @@ export type BuildTurnCommitResult =
 /** The entry kind this adapter commits. */
 export const TURN_COMMIT_KIND: CoopAuthorityEntryKind = "TURN_COMMIT";
 
+export interface TurnCommitSuccessorSource {
+  readonly operationId: string;
+  readonly epoch: number;
+  readonly wave: number;
+  readonly turn: number;
+}
+
+/**
+ * Canonical address validator for the successor carried by a settled TURN_COMMIT.
+ *
+ * Both entry construction and the live renderer consume this function. Keeping the staged-victory
+ * N+1 exception here prevents a pure adapter from accepting a successor that the engine phase later
+ * rejects (the public-browser wave-1 terminal exposed by ff5733291).
+ */
+export function isTurnCommitSuccessorForSource(control: CoopNextControl, source: TurnCommitSuccessorSource): boolean {
+  if (control.kind === "COMMAND_FRONTIER") {
+    return control.epoch === source.epoch && control.wave === source.wave && control.turn === source.turn + 1;
+  }
+  if (control.kind === "REPLACEMENT") {
+    return control.epoch === source.epoch && control.wave === source.wave && control.turn === source.turn;
+  }
+  if (control.kind !== "AWAIT_SUCCESSOR") {
+    return false;
+  }
+  const exactDeferredWaveWait = control.allowedKinds.length === 1 && control.allowedKinds[0] === "WAVE_ADVANCE";
+  return (
+    control.afterOperationId === source.operationId
+    && control.epoch === source.epoch
+    && control.wave === source.wave
+    && control.turn === source.turn + (exactDeferredWaveWait ? 1 : 0)
+  );
+}
+
 function resolveTurnNextControl(
   input: BuildTurnCommitInput,
   sourceWave: unknown,
@@ -214,16 +247,14 @@ function resolveTurnNextControl(
   if (statedSuccessorCount > 1) {
     throw new Error("[authority-v2/turn-command] a turn must state exactly one successor control");
   }
-  const exactDeferredWaveWait =
-    input.nextSuccessorWait?.allowedKinds.length === 1 && input.nextSuccessorWait.allowedKinds[0] === "WAVE_ADVANCE";
   if (
     input.nextSuccessorWait != null
-    && (input.nextSuccessorWait.afterOperationId !== input.operationId
-      || input.nextSuccessorWait.epoch !== input.context.sessionEpoch
-      || input.nextSuccessorWait.wave !== sourceWave
-      || (exactDeferredWaveWait
-        ? input.nextSuccessorWait.turn !== (sourceTurn as number) + 1
-        : input.nextSuccessorWait.turn !== sourceTurn))
+    && !isTurnCommitSuccessorForSource(input.nextSuccessorWait, {
+      operationId: input.operationId,
+      epoch: input.context.sessionEpoch,
+      wave: sourceWave as number,
+      turn: sourceTurn as number,
+    })
   ) {
     throw new Error("[authority-v2/turn-command] ordered successor wait is not bound to the resolved turn");
   }
@@ -314,6 +345,16 @@ export function buildTurnCommitEntry(input: BuildTurnCommitInput): BuildTurnComm
     throw new Error("[authority-v2/turn-command] a non-command successor requires exact source wave/turn");
   }
   const nextControl = resolveTurnNextControl(input, sourceWave, sourceTurn);
+  if (
+    !isTurnCommitSuccessorForSource(nextControl, {
+      operationId: input.operationId,
+      epoch: input.context.sessionEpoch,
+      wave: sourceWave as number,
+      turn: sourceTurn as number,
+    })
+  ) {
+    throw new Error("[authority-v2/turn-command] resolved successor is not bound to the settled turn");
+  }
 
   const entry: Omit<CoopAuthorityEntry, "revision"> = {
     context: input.context,

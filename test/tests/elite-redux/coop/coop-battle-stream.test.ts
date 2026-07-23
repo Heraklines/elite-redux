@@ -1274,6 +1274,38 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("ignores an exact stale material ACK after presentation-ready without rolling back or terminalizing", async () => {
+      const { host, guest } = createLoopbackPair();
+      const authorityContext = () => ({ epoch: 7, wave: 1, turn: 1 });
+      const hostStream = new CoopBattleStreamer(host, { authorityContext });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext });
+      const awaited = guestStream.awaitTurn(1);
+      emitCompleteTurn(hostStream, 1, [], emptyCheckpoint(), "deadbeefdeadbeef");
+      const resolution = await awaited;
+
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "materialApplied")).toBe(true);
+      await flushWire();
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "presentationReady")).toBe(true);
+      await flushWire();
+
+      // This is the exact C5 soak ordering: a retained/safe-boundary replay revisits the immutable
+      // material stage after presentation already settled. It is stale evidence, not a new authority
+      // claim, and must be harmless at both the local and host receive-side monotonic ledgers.
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "materialApplied")).toBe(true);
+      await flushWire();
+      await flushWire();
+      expect(guestStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+      expect(hostStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+      expect(hostStream.retainedAuthorityDiagnostics().turnCommits).toBe(1);
+
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "continuationReady")).toBe(true);
+      await flushWire();
+      expect(hostStream.retainedAuthorityDiagnostics().turnCommits).toBe(0);
+
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it.each([
       ["missing stage", undefined, 20],
       ["wrong address", "materialApplied", 21],

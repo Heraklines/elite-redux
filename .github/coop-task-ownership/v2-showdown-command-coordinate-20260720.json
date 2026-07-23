@@ -26,6 +26,7 @@
     "src/modifier/modifier.ts",
     "src/phases/command-phase.ts",
     "src/phases/coop-push-replacement-checkpoint-phase.ts",
+    "src/phases/coop-replay-phases.ts",
     "src/phases/coop-turn-commit-phase.ts",
     "src/phases/er-custom-trainer-install.ts",
     "src/phases/toggle-double-position-phase.ts",

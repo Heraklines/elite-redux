@@ -34,6 +34,7 @@ import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
 import { SideKind } from "#data/battle-format";
 import { allAbilities } from "#data/data-lists";
+import { isTurnCommitSuccessorForSource } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import type { CoopAuthorityEntryKind, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2WaveCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
@@ -1587,7 +1588,19 @@ export class CoopFinalizeTurnPhase extends Phase {
     resolution: CoopTurnResolution,
   ): void {
     this.clearTurnCommitRetry();
-    if (!streamer.acknowledgeTurnCommit(resolution, "materialApplied", this.turnCommitSupersededBy)) {
+    const acknowledgedStage = streamer.turnCommitAckStage(resolution);
+    if (acknowledgedStage === "continuationReady") {
+      this.end();
+      return;
+    }
+    if (acknowledgedStage === "presentationReady") {
+      this.completeModernTurnPresentation(streamer, resolution);
+      return;
+    }
+    if (
+      acknowledgedStage !== "materialApplied"
+      && !streamer.acknowledgeTurnCommit(resolution, "materialApplied", this.turnCommitSupersededBy)
+    ) {
       return;
     }
     // Material convergence is not continuation.  Hold this finalize phase while the actual atlases,
@@ -1638,57 +1651,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         if (!streamer.acknowledgeTurnCommit(resolution, "presentationReady", this.turnCommitSupersededBy)) {
           return;
         }
-        const statedControl = this.authorityNextControl;
-        if (
-          statedControl !== undefined
-          && (statedControl === null
-            || (statedControl.kind === "COMMAND_FRONTIER"
-              ? statedControl.epoch !== resolution.epoch
-                || statedControl.wave !== resolution.wave
-                || statedControl.turn !== resolution.turn + 1
-              : statedControl.kind === "REPLACEMENT"
-                ? statedControl.epoch !== resolution.epoch
-                  || statedControl.wave !== resolution.wave
-                  || statedControl.turn !== resolution.turn
-                : statedControl.kind !== "AWAIT_SUCCESSOR"
-                  || statedControl.afterOperationId
-                    !== `TURN/e${resolution.epoch}/w${resolution.wave}/t${resolution.turn}`
-                  || statedControl.epoch !== resolution.epoch
-                  || statedControl.wave !== resolution.wave
-                  || statedControl.turn !== resolution.turn))
-        ) {
-          this.failModernTurnCommit(streamer, `Turn ${this.turn} carried an invalid Authority V2 successor control.`);
-          return;
-        }
-        const legacyWaveEnding = coopWaveAdvanceSignaledFor(resolution.wave) || coopHasPendingWaveAdvance();
-        const v2SharedBoundary = statedControl?.kind === "AWAIT_SUCCESSOR";
-        const waveEnding = statedControl === undefined ? legacyWaveEnding : v2SharedBoundary;
-        const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
-        const expectation =
-          waveEnding || meBattleWon
-            ? { kind: "sharedBoundary" as const, epoch: resolution.epoch, wave: resolution.wave, turn: resolution.turn }
-            : { kind: "command" as const, epoch: resolution.epoch, wave: resolution.wave, turn: resolution.turn + 1 };
-        if (!streamer.registerTurnContinuation(resolution, this.turnCommitSupersededBy, expectation)) {
-          return;
-        }
-        // Mark replay consumption now so a detached duplicate cannot reconstruct the same turn while the
-        // real next UI is still opening.  This does NOT release host retention; only continuationReady does.
-        if (!streamer.markAuthoritativeTurnFinalized(resolution)) {
-          this.failModernTurnCommit(streamer, `Turn ${this.turn} could not prove its exact V2 material identity.`);
-          return;
-        }
-        const completedEntries = retryCoopV2PendingAuthorityAtSafeBoundary();
-        if (completedEntries > 0) {
-          coopLog(
-            "v2-turn",
-            `safe-boundary retry completed ${completedEntries} ordered V2 entr${completedEntries === 1 ? "y" : "ies"} after turn=${this.turn}`,
-          );
-        }
-        coopLog(
-          "checksum",
-          `guest finalize presentationReady e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,
-        );
-        this.finishTurn();
+        this.completeModernTurnPresentation(streamer, resolution);
       },
       error => {
         if (this.presentationSettled || this.ended || generation !== coopSessionGeneration()) {
@@ -1701,6 +1664,60 @@ export class CoopFinalizeTurnPhase extends Phase {
         this.failModernTurnCommit(streamer, `Turn ${this.turn} renderer projection failed.`);
       },
     );
+  }
+
+  /** Resume after the exact presentation-ready stage without replaying material or an older ACK. */
+  private completeModernTurnPresentation(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    resolution: CoopTurnResolution,
+  ): void {
+    if (this.ended) {
+      return;
+    }
+    const statedControl = this.authorityNextControl;
+    const operationId = `TURN/e${resolution.epoch}/w${resolution.wave}/t${resolution.turn}`;
+    if (
+      statedControl !== undefined
+      && (statedControl === null
+        || !isTurnCommitSuccessorForSource(statedControl, {
+          operationId,
+          epoch: resolution.epoch,
+          wave: resolution.wave,
+          turn: resolution.turn,
+        }))
+    ) {
+      this.failModernTurnCommit(streamer, `Turn ${this.turn} carried an invalid Authority V2 successor control.`);
+      return;
+    }
+    const legacyWaveEnding = coopWaveAdvanceSignaledFor(resolution.wave) || coopHasPendingWaveAdvance();
+    const v2SharedBoundary = statedControl?.kind === "AWAIT_SUCCESSOR";
+    const waveEnding = statedControl === undefined ? legacyWaveEnding : v2SharedBoundary;
+    const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
+    const expectation =
+      waveEnding || meBattleWon
+        ? { kind: "sharedBoundary" as const, epoch: resolution.epoch, wave: resolution.wave, turn: resolution.turn }
+        : { kind: "command" as const, epoch: resolution.epoch, wave: resolution.wave, turn: resolution.turn + 1 };
+    if (!streamer.registerTurnContinuation(resolution, this.turnCommitSupersededBy, expectation)) {
+      return;
+    }
+    // Mark replay consumption now so a detached duplicate cannot reconstruct the same turn while the
+    // real next UI is still opening. This does NOT release host retention; only continuationReady does.
+    if (!streamer.markAuthoritativeTurnFinalized(resolution)) {
+      this.failModernTurnCommit(streamer, `Turn ${this.turn} could not prove its exact V2 material identity.`);
+      return;
+    }
+    const completedEntries = retryCoopV2PendingAuthorityAtSafeBoundary();
+    if (completedEntries > 0) {
+      coopLog(
+        "v2-turn",
+        `safe-boundary retry completed ${completedEntries} ordered V2 entr${completedEntries === 1 ? "y" : "ies"} after turn=${this.turn}`,
+      );
+    }
+    coopLog(
+      "checksum",
+      `guest finalize presentationReady e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,
+    );
+    this.finishTurn();
   }
 
   private clearTurnCommitRetry(): void {
