@@ -1639,7 +1639,9 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       // schedule: the correctly parked predecessor prevents the driver itself from reaching its target.
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
       const guestReplicaCommand = await withClient(rig.guestCtx, () =>
-        driveClientPhaseQueueTo(rig.guestScene, "first replicated CommandPhase"),
+        driveClientPhaseQueueTo(rig.guestScene, "first replicated CommandPhase", {
+          matches: phase => phase.phaseName === "CommandPhase",
+        }),
       );
       await withClient(rig.guestCtx, async () => {
         guestReplicaCommand.start();
