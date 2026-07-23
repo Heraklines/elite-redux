@@ -7,7 +7,6 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
-import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -66,7 +65,7 @@ function installTurnStart(scene: BattleScene): void {
   phase.start();
 }
 
-describe.skipIf(!RUN)("Showdown Sync - canonical dual-engine simulation", () => {
+describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let previousScene: BattleScene;
@@ -89,7 +88,7 @@ describe.skipIf(!RUN)("Showdown Sync - canonical dual-engine simulation", () => 
     initGlobalScene(previousScene);
   });
 
-  it("exchanges both human commands and resolves the same turn on both canonical engines", async () => {
+  it("fields each player's own team and resolves mirrored commands on both engines", async () => {
     await game.runToTitle();
     game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
       toShowdown(game.scene);
@@ -108,11 +107,10 @@ describe.skipIf(!RUN)("Showdown Sync - canonical dual-engine simulation", () => 
 
     const pair = createLoopbackPair();
     const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown, { netcodeMode: "lockstep" });
-    const hostStart = await withClient(rig.hostCtx, () => captureCoopChecksum());
-    const guestStart = await withClient(rig.guestCtx, () => captureCoopChecksum());
-    expect(guestStart).toBe(hostStart);
-    expect(rig.guestScene.getPlayerParty()[0].species.speciesId).toBe(SpeciesId.PIKACHU);
-    expect(rig.guestScene.getEnemyParty()[0].species.speciesId).toBe(SpeciesId.MAGIKARP);
+    expect(rig.hostScene.getPlayerParty()[0].species.speciesId).toBe(SpeciesId.PIKACHU);
+    expect(rig.hostScene.getEnemyParty()[0].species.speciesId).toBe(SpeciesId.MAGIKARP);
+    expect(rig.guestScene.getPlayerParty()[0].species.speciesId).toBe(SpeciesId.MAGIKARP);
+    expect(rig.guestScene.getEnemyParty()[0].species.speciesId).toBe(SpeciesId.PIKACHU);
 
     const turn = rig.hostScene.currentBattle.turn;
     const playerCommand = {
@@ -148,8 +146,8 @@ describe.skipIf(!RUN)("Showdown Sync - canonical dual-engine simulation", () => 
       installTurnStart(rig.hostScene);
     });
     await withClient(rig.guestCtx, () => {
-      expect(applyShowdownSyncCommand("player", 0, playerAtGuest)).toBe(true);
-      expect(applyShowdownSyncCommand("enemy", 0, enemyCommand)).toBe(true);
+      expect(applyShowdownSyncCommand("player", 0, enemyCommand)).toBe(true);
+      expect(applyShowdownSyncCommand("enemy", 0, playerAtGuest)).toBe(true);
       installTurnStart(rig.guestScene);
     });
 
@@ -157,18 +155,18 @@ describe.skipIf(!RUN)("Showdown Sync - canonical dual-engine simulation", () => 
     await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "TurnEndPhase"));
 
     const hostEnd = await withClient(rig.hostCtx, () => ({
-      checksum: captureCoopChecksum(),
       playerHp: rig.hostScene.getPlayerField()[0].hp,
       enemyHp: rig.hostScene.getEnemyField()[0].hp,
       enemyMaxHp: rig.hostScene.getEnemyField()[0].getMaxHp(),
     }));
     const guestEnd = await withClient(rig.guestCtx, () => ({
-      checksum: captureCoopChecksum(),
       playerHp: rig.guestScene.getPlayerField()[0].hp,
       enemyHp: rig.guestScene.getEnemyField()[0].hp,
       enemyMaxHp: rig.guestScene.getEnemyField()[0].getMaxHp(),
     }));
-    expect(guestEnd).toEqual(hostEnd);
+    expect(guestEnd.playerHp).toBe(hostEnd.enemyHp);
+    expect(guestEnd.enemyHp).toBe(hostEnd.playerHp);
+    expect(guestEnd.enemyMaxHp).toBe(rig.hostScene.getPlayerField()[0].getMaxHp());
     expect(hostEnd.enemyHp).toBeLessThan(hostEnd.enemyMaxHp);
     logs.flush();
   }, 300_000);
@@ -187,18 +185,25 @@ describe.skipIf(!RUN)("Showdown Sync - canonical dual-engine simulation", () => 
     const pair = createLoopbackPair();
     const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown, { netcodeMode: "lockstep" });
     const hostReplacementId = rig.hostScene.getEnemyParty()[1].id;
-    const guestReplacementId = rig.guestScene.getEnemyParty()[1].id;
-    expect(guestReplacementId).toBe(hostReplacementId);
+    const guestReplacementSpecies = rig.guestScene.getPlayerParty()[1].species.speciesId;
+    expect(guestReplacementSpecies).toBe(rig.hostScene.getEnemyParty()[1].species.speciesId);
 
-    const installReplacementPhase = (scene: BattleScene): Phase => {
+    const installHostReplacementPhase = (scene: BattleScene): Phase => {
       scene.getEnemyParty()[0].hp = 0;
       scene.phaseManager.clearAllPhases();
       const phase = scene.phaseManager.create("ShowdownEnemyFaintSwitchPhase", 0);
       (scene.phaseManager as unknown as { currentPhase: Phase }).currentPhase = phase;
       return phase;
     };
-    const hostPhase = withClientSync(rig.hostCtx, () => installReplacementPhase(rig.hostScene));
-    const guestPhase = withClientSync(rig.guestCtx, () => installReplacementPhase(rig.guestScene));
+    const installGuestReplacementPhase = (scene: BattleScene): Phase => {
+      scene.getPlayerParty()[0].hp = 0;
+      scene.phaseManager.clearAllPhases();
+      const phase = scene.phaseManager.create("SwitchPhase", 0, 0, true, false);
+      (scene.phaseManager as unknown as { currentPhase: Phase }).currentPhase = phase;
+      return phase;
+    };
+    const hostPhase = withClientSync(rig.hostCtx, () => installHostReplacementPhase(rig.hostScene));
+    const guestPhase = withClientSync(rig.guestCtx, () => installGuestReplacementPhase(rig.guestScene));
 
     // Keep the host context ambient while loopback microtasks deliver the guest's choice.
     initGlobalScene(rig.hostScene);
@@ -206,9 +211,12 @@ describe.skipIf(!RUN)("Showdown Sync - canonical dual-engine simulation", () => 
     withClientSync(rig.hostCtx, () => hostPhase.start());
     withClientSync(rig.guestCtx, () => {
       guestPhase.start();
-      const handler = rig.guestScene.ui.handlers[UiMode.SHOWDOWN_SYNC_COMMAND] as unknown as {
+      const handler = rig.guestScene.ui.handlers[UiMode.PARTY] as unknown as {
+        setCursor(cursor: number): boolean;
         processInput(button: Button): boolean;
       };
+      expect(handler.setCursor(1)).toBe(true);
+      expect(handler.processInput(Button.ACTION)).toBe(true);
       expect(handler.processInput(Button.ACTION)).toBe(true);
     });
     await drainLoopback();
@@ -217,9 +225,9 @@ describe.skipIf(!RUN)("Showdown Sync - canonical dual-engine simulation", () => 
     await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "TurnInitPhase"));
 
     expect(rig.hostScene.getEnemyParty()[0].id).toBe(hostReplacementId);
-    expect(rig.guestScene.getEnemyParty()[0].id).toBe(guestReplacementId);
+    expect(rig.guestScene.getPlayerParty()[0].species.speciesId).toBe(guestReplacementSpecies);
     expect(rig.hostScene.getEnemyField()[0].id).toBe(hostReplacementId);
-    expect(rig.guestScene.getEnemyField()[0].id).toBe(guestReplacementId);
+    expect(rig.guestScene.getPlayerField()[0].species.speciesId).toBe(guestReplacementSpecies);
     logs.flush();
   }, 300_000);
 });

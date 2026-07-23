@@ -21,7 +21,6 @@ import {
   getShowdownOpponentManifest,
   getShowdownOpponentProfile,
   getShowdownOwnManifest,
-  setShowdownFieldOpponent,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import { type ShowdownUnlockGameData, starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
@@ -56,7 +55,7 @@ describe("Showdown Sync mode routing", () => {
       gameData,
     );
 
-  it("honors the explicitly selected lockstep mode and keeps the guest world canonical", () => {
+  it("honors the explicitly selected lockstep mode without enabling authoritative ingress swapping", () => {
     const { guest } = createLoopbackPair();
     const runtime = assembleCoopRuntime(guest, { kind: "versus", netcodeMode: "lockstep" });
 
@@ -66,7 +65,7 @@ describe("Showdown Sync mode routing", () => {
     expect(getCoopNetcodeMode()).toBe("lockstep");
     expect(isShowdownSyncSession()).toBe(true);
     expect(isShowdownGuestFlip()).toBe(false);
-    expect(localShowdownResult(true)).toBe(false);
+    expect(localShowdownResult(true)).toBe(true);
   });
 
   it("leaves authoritative Showdown's guest perspective flip unchanged", () => {
@@ -88,7 +87,7 @@ describe("Showdown Sync mode routing", () => {
     expect(shouldAwaitShowdownLaunchSnapshot("host", "lockstep")).toBe(false);
   });
 
-  it("gives both Sync engines the same host-oriented field and deterministic seed", () => {
+  it("gives both Sync engines their own player side and the same deterministic seed", () => {
     const host = [manifest(4)];
     const guest = [manifest(7)];
 
@@ -97,26 +96,24 @@ describe("Showdown Sync mode routing", () => {
       enemyManifest: guest,
     });
     expect(showdownLaunchSides("guest", "lockstep", guest, host)).toEqual({
-      playerManifest: host,
-      enemyManifest: guest,
+      playerManifest: guest,
+      enemyManifest: host,
     });
     expect(showdownSyncBattleSeed("host", host, guest)).toBe(showdownSyncBattleSeed("guest", guest, host));
   });
 
-  it("reorients the Sync guest field without changing logical account ownership", () => {
+  it("keeps the opponent team and trainer on the guest's enemy side", () => {
     const host = [manifest(4)];
     const guest = [manifest(7)];
     const hostProfile = { displayName: "Host" } as never;
-    const guestProfile = { displayName: "Guest" } as never;
 
     beginShowdownBattle(guest, host, null, hostProfile);
-    setShowdownFieldOpponent(guest, guestProfile, "Guest account");
 
     expect(getShowdownOwnManifest()).toBe(guest);
     expect(getShowdownOpponentManifest()).toBe(host);
     expect(getShowdownOpponentProfile()).toBe(hostProfile);
-    expect(getShowdownFieldOpponentManifest()).toBe(guest);
-    expect(getShowdownFieldOpponentProfile()).toBe(guestProfile);
-    expect(getShowdownFieldOpponentName()).toBe("Guest account");
+    expect(getShowdownFieldOpponentManifest()).toBe(host);
+    expect(getShowdownFieldOpponentProfile()).toBe(hostProfile);
+    expect(getShowdownFieldOpponentName()).toBeNull();
   });
 });

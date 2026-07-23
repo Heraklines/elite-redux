@@ -5,9 +5,10 @@
 
 import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
-import { getCoopController, isShowdownSyncSession } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopBattleTargetRef, SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import { isShowdownSyncSession } from "#data/elite-redux/coop/coop-runtime";
+import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
+import { swapBi } from "#data/elite-redux/showdown/showdown-side-swap";
 import { Command } from "#enums/command";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
@@ -28,30 +29,32 @@ function partyFor(side: ShowdownSyncSide): Pokemon[] {
   return side === "player" ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
 }
 
-function targetRef(target: number): CoopBattleTargetRef | null {
-  const pokemon = globalScene.getField(true).find(candidate => candidate.getBattlerIndex() === target);
-  if (pokemon == null) {
-    return null;
-  }
-  return { side: pokemon.isPlayer() ? "player" : "enemy", pokemonId: pokemon.id };
-}
-
-function resolveTargets(pokemon: Pokemon, moveId: MoveId, command: SerializedCommand): number[] {
+function resolveTargets(
+  pokemon: Pokemon,
+  moveId: MoveId,
+  command: SerializedCommand,
+  remotePerspective: boolean,
+): number[] {
   const legal = getMoveTargets(pokemon, moveId);
   if (legal.multiple || legal.targets.length <= 1) {
     return legal.targets;
   }
   const legalSet = new Set<number>(legal.targets);
-  for (const ref of command.targetRefs ?? []) {
-    const target = globalScene.getField(true).find(candidate => candidate.id === ref.pokemonId);
-    const battlerIndex = target?.getBattlerIndex();
-    if (battlerIndex != null && legalSet.has(battlerIndex)) {
-      return [battlerIndex];
+  for (const battlerIndex of command.targets ?? []) {
+    const localIndex = remotePerspective
+      ? swapBi(battlerIndex, globalScene.currentBattle.arrangement.enemyOffset)
+      : battlerIndex;
+    if (legalSet.has(localIndex)) {
+      return [localIndex];
     }
   }
-  for (const battlerIndex of command.targets ?? []) {
-    if (legalSet.has(battlerIndex)) {
-      return [battlerIndex];
+  if (!remotePerspective) {
+    for (const ref of command.targetRefs ?? []) {
+      const target = globalScene.getField(true).find(candidate => candidate.id === ref.pokemonId);
+      const battlerIndex = target?.getBattlerIndex();
+      if (battlerIndex != null && legalSet.has(battlerIndex)) {
+        return [battlerIndex];
+      }
     }
   }
   return legal.targets.length === 0 ? [] : [legal.targets[0]];
@@ -93,7 +96,7 @@ export function applyShowdownSyncCommand(
     cursor: command.cursor,
     move: {
       move: move.moveId,
-      targets: resolveTargets(pokemon, move.moveId, command),
+      targets: resolveTargets(pokemon, move.moveId, command, side === "enemy"),
       useMode,
     },
     args: [useMode],
@@ -105,46 +108,15 @@ export function applyShowdownSyncCommand(
   return true;
 }
 
-/** Deterministic disconnect fallback for a remote side: first usable move with engine-derived targets. */
-export function applyShowdownSyncFallback(side: ShowdownSyncSide, fieldIndex: number): boolean {
-  const pokemon = pokemonAt(side, fieldIndex);
-  if (pokemon == null) {
-    return false;
-  }
-  const cursor = pokemon.getMoveset().findIndex(candidate => !candidate.isOutOfPp());
-  const move = cursor >= 0 ? pokemon.getMoveset()[cursor] : null;
-  if (move == null) {
-    return false;
-  }
-  return applyShowdownSyncCommand(side, fieldIndex, {
-    command: Command.FIGHT,
-    cursor,
-    moveId: move.moveId,
-    targets: getMoveTargets(pokemon, move.moveId).targets,
-    useMode: MoveUseMode.NORMAL,
-  });
-}
-
-/** Send a host player-side command to the Sync guest, including stable target identities. */
+/** Send this client's player-side command; the receiver mirrors its selected battler indices. */
 export function broadcastShowdownSyncPlayerCommand(fieldIndex: number, command: SerializedCommand): void {
-  if (!isShowdownSyncSession() || getCoopController()?.role !== "host") {
+  if (!isShowdownSyncSession()) {
     return;
   }
-  const targets = command.targets ?? [];
-  const targetRefs = targets.map(targetRef).filter((ref): ref is CoopBattleTargetRef => ref != null);
-  getShowdownRelay()?.sendCommand(
-    globalScene.currentBattle.turn,
-    { ...command, ...(targetRefs.length > 0 ? { targetRefs } : {}) },
-    fieldIndex,
-  );
+  getShowdownRelay()?.sendCommand(globalScene.currentBattle.turn, command, fieldIndex);
 }
 
-/** True when the guest already populated its canonical enemy command for this slot. */
-export function hasShowdownSyncCommand(side: ShowdownSyncSide, fieldIndex: number): boolean {
-  return globalScene.currentBattle.turnCommands[commandSlot(side, fieldIndex)] != null;
-}
-
-/** Map the canonical host-player result to this client's local result in Sync mode. */
-export function localShowdownResult(canonicalPlayerWon: boolean): boolean {
-  return isShowdownSyncSession() && getCoopController()?.role === "guest" ? !canonicalPlayerWon : canonicalPlayerWon;
+/** Each Sync engine resolves its own local player result. */
+export function localShowdownResult(playerWon: boolean): boolean {
+  return playerWon;
 }
