@@ -4008,6 +4008,7 @@
   "TRAINER_70022": {
     "battleType": "single",
     "challenge": "none",
+    "defeatDialogue": "test",
     "difficulties": [
       "ace",
       "elite",
@@ -4015,6 +4016,7 @@
     ],
     "endless": false,
     "id": 70022,
+    "introDialogue": "test",
     "maxWave": 10,
     "minWave": 5,
     "name": "Jordan",
@@ -4028,8 +4030,9 @@
         "species": 263
       }
     ],
-    "trainerClass": "ACE_TRAINER",
+    "trainerClass": "MODEL",
     "trainerSprite": "model_1",
+    "victoryDialogue": "test",
     "weight": 1
   }
 }
