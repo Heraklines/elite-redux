@@ -17,6 +17,7 @@
 
 import type {
   CoopAuthorityEntry,
+  CoopCommandControlTarget,
   CoopFrameContextV2,
   CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
