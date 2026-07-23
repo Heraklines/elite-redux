@@ -26,6 +26,8 @@ import type { Starter } from "#types/save-data";
 interface ShowdownBattleState {
   ownManifest: ShowdownMonManifest[];
   opponentManifest: ShowdownMonManifest[];
+  /** Engine-facing enemy side. Differs from the logical opponent only on a Sync guest. */
+  fieldOpponentManifest: ShowdownMonManifest[];
   relay: ShowdownCommandRelay | null;
   /**
    * The AGREED field-width format for this match (both clients validated equal in the negotiate
@@ -40,6 +42,10 @@ interface ShowdownBattleState {
    * applies it to the flipped-top trainer; the result phase reads its win/lose dialogue lines.
    */
   opponentProfile: GhostTrainerProfile | null;
+  /** Engine-facing trainer presentation. Differs from the logical opponent only on a Sync guest. */
+  fieldOpponentProfile: GhostTrainerProfile | null;
+  /** Explicit engine-facing fallback name; null means use the connected partner name. */
+  fieldOpponentName: string | null;
   /**
    * Task D1/D2: the escrow server's match id for a STAKED match, or null for a FRIENDLY match
    * (no escrow). The result phase reports the outcome + applies settlement only when this is set;
@@ -191,7 +197,18 @@ export function beginShowdownBattle(
     pendingRelay.dispose();
   }
   pendingRelay = null;
-  state = { ownManifest, opponentManifest, relay, opponentProfile, matchId, ranked, battleFormat };
+  state = {
+    ownManifest,
+    opponentManifest,
+    fieldOpponentManifest: opponentManifest,
+    relay,
+    opponentProfile,
+    fieldOpponentProfile: opponentProfile,
+    fieldOpponentName: null,
+    matchId,
+    ranked,
+    battleFormat,
+  };
 }
 
 /** The live match state, or null when no showdown match is active. */
@@ -202,6 +219,11 @@ export function getShowdownBattleState(): Readonly<ShowdownBattleState> | null {
 /** The OPPONENT's team (the host's enemy party is built from this), or null. */
 export function getShowdownOpponentManifest(): ShowdownMonManifest[] | null {
   return state?.opponentManifest ?? null;
+}
+
+/** The manifest currently occupying the engine's enemy side. */
+export function getShowdownFieldOpponentManifest(): ShowdownMonManifest[] | null {
+  return state?.fieldOpponentManifest ?? null;
 }
 
 /** THIS client's own team, or null. */
@@ -216,6 +238,33 @@ export function getShowdownOwnManifest(): ShowdownMonManifest[] | null {
  */
 export function getShowdownOpponentProfile(): GhostTrainerProfile | null {
   return state?.opponentProfile ?? null;
+}
+
+/** The profile currently presenting the engine's enemy trainer. */
+export function getShowdownFieldOpponentProfile(): GhostTrainerProfile | null {
+  return state?.fieldOpponentProfile ?? null;
+}
+
+/** Explicit enemy-trainer fallback name for the current field orientation. */
+export function getShowdownFieldOpponentName(): string | null {
+  return state?.fieldOpponentName ?? null;
+}
+
+/**
+ * Reorient only the simulated field. Logical own/opponent identity remains untouched for result
+ * inversion, ranked reporting, achievements, and winning-set persistence.
+ */
+export function setShowdownFieldOpponent(
+  manifest: ShowdownMonManifest[],
+  profile: GhostTrainerProfile | null,
+  fallbackName: string | null,
+): void {
+  if (state == null) {
+    return;
+  }
+  state.fieldOpponentManifest = manifest;
+  state.fieldOpponentProfile = profile;
+  state.fieldOpponentName = fallbackName;
 }
 
 /** The enemy-command relay (C4), or null (host-solo bootstrap / no match). */

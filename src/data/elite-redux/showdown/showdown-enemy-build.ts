@@ -27,7 +27,7 @@
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { normalizeErShinyLabSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
-import { getShowdownOpponentManifest } from "#data/elite-redux/showdown/showdown-battle-state";
+import { getShowdownFieldOpponentManifest } from "#data/elite-redux/showdown/showdown-battle-state";
 import { showdownHeldItemKey } from "#data/elite-redux/showdown/showdown-enemy";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { Nature } from "#enums/nature";
@@ -136,7 +136,7 @@ export function applyShowdownOverride(trainer: Trainer, index: number): EnemyPok
   if (!SHOWDOWN_TRAINERS.has(trainer)) {
     return null;
   }
-  const manifest = getShowdownOpponentManifest();
+  const manifest = getShowdownFieldOpponentManifest();
   if (manifest == null || index >= manifest.length) {
     return null;
   }
