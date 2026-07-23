@@ -2588,12 +2588,27 @@ export class DuoPublicUiRig {
       timeoutMs: this.config.timeoutMs,
       fromCursor,
     });
+    // Selecting a party slot and opening its action submenu are two distinct renderer observations with
+    // the same surface id. Do not let the next selector reuse the still-latest slot-list observation: at
+    // low CI frame rates the real SEND OUT menu appears a fraction of a second after the key ACK. Wait for
+    // the post-submit surface whose option set proves the submenu is actually actionable.
+    const actionMenuCursor = client.evidence.cursor();
+    const actionMenu = await client.evidence.waitForCondition(
+      sink => {
+        const event = sink.findLastSemanticSurface(actionMenuCursor, "party");
+        return event?.observation.optionIds?.includes("party-option:send-out") ? event : null;
+      },
+      {
+        timeoutMs: this.config.timeoutMs,
+        description: `${purpose} actionable party SEND OUT submenu`,
+      },
+    );
     await selectOptionById(client, {
       surfaceId: "party",
       targetId: "party-option:send-out",
       navKeys: ["ArrowDown", "ArrowUp"],
       timeoutMs: this.config.timeoutMs,
-      fromCursor,
+      fromCursor: actionMenu.index,
     });
     client.evidence.record("showdown-voluntary-switch-command", { purpose, partySlot: 1 });
   }

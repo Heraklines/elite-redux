@@ -149,6 +149,8 @@ test("the journey executes a reciprocal switch plus two attacks and requires eve
   );
   assert.match(switchDrive, /targetId: "command:pokemon"/u);
   assert.match(switchDrive, /party-slot:1/u);
+  assert.match(switchDrive, /actionable party SEND OUT submenu/u);
+  assert.match(switchDrive, /optionIds\?\.includes\("party-option:send-out"\)/u);
   assert.match(switchDrive, /party-option:send-out/u);
   assert.match(turn, /driveSequentialCommandRound\(/u);
   assert.match(turn, /driveShowdownVoluntarySwitch/u);

@@ -1931,3 +1931,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The remote-command relay now has three minutes of bounded renderer grace in addition to the player's 60s
   input clock. A peer cannot be replaced by AI while mandatory authoritative presentation prevents its menu
   from opening, while disconnect and the combined four-minute ceiling still guarantee liveness.
+
+# 2026-07-23 - biome journey public-input migration and terminal isolation
+
+- The T2 biome journey no longer follows its guest public UI choice with a private host `move.select` call.
+  The shared duo driver can now submit both seats' Tackle choices through the real Command, Fight, and
+  conditional target handlers, preserving the exact reciprocal command and V2 commit chain.
+- Harness context restoration no longer reactivates a runtime whose transport was closed by a fail-closed
+  terminal inside the scoped callback. Duo teardown now disposes both client runtimes even after closing the
+  first endpoint closes its peer; transport state was not proof that the peer's timers/listeners were retired.
+- A source contract pins both rules: the production-transition journey contains no private move selection,
+  and closed runtimes cannot be skipped or resurrected by the shared-process scheduler.
+
+# 2026-07-23 - Showdown public switch submenu synchronization
+
+- Exact two-browser run `30032611935` proved the first-seat command is now acted on before its clock expires;
+  the host reached the real Gyarados action menu with SEND OUT visibly selected. The driver nevertheless read
+  its preceding party-slot observation and declared SEND OUT unavailable before the newer frame arrived.
+- The voluntary-switch oracle now waits for a post-submit party observation whose actual option set contains
+  SEND OUT, then navigates from that exact surface. This is an observer pacing fix; the screenshot and semantic
+  trace prove production had already opened the correct public menu.

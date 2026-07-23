@@ -155,3 +155,17 @@ test("every co-op renderer boundary triggers the production two-browser journey"
     assert.match(workflow, new RegExp(`- "${path.replaceAll("*", "\\*")}"`, "u"));
   }
 });
+
+test("production-transition fixtures use public commands and terminal teardown cannot resurrect a dead client", () => {
+  const harness = read("test/tools/coop-duo-harness.ts");
+  const biomeJourney = read("test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts");
+
+  assert.match(harness, /options\.submitHostTackle[\s\S]+host selects Fight through COMMAND UI/u);
+  assert.match(harness, /prev\.runtime\.localTransport\.state !== "closed"/u);
+  assert.doesNotMatch(
+    harness,
+    /for \(const runtime of \[rig\.guestRuntime, rig\.hostRuntime\]\) \{\s*if \(runtime\.localTransport\.state === "closed"\)/u,
+  );
+  assert.match(biomeJourney, /submitHostTackle:\s*true/u);
+  assert.doesNotMatch(biomeJourney, /game\.move\.select\(/u);
+});

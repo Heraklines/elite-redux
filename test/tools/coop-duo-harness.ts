@@ -675,7 +675,10 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
     activeClientCtx = prevClientCtx;
-    if (prev.runtime != null) {
+    // A fail-closed terminal may dispose the previously installed peer while this client owns the
+    // scoped callback. Never resurrect that dead runtime on scope exit: doing so reinstalled its guest
+    // predicates and replay hooks into the following test even though both transports were closed.
+    if (prev.runtime != null && prev.runtime.localTransport.state !== "closed") {
       setCoopRuntime(prev.runtime);
       installCoopHooksForActive(prev.runtime);
     }
@@ -753,7 +756,7 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
     activeClientCtx = prevClientCtx;
-    if (prev.runtime != null) {
+    if (prev.runtime != null && prev.runtime.localTransport.state !== "closed") {
       setCoopRuntime(prev.runtime);
       installCoopHooksForActive(prev.runtime);
     }
@@ -2212,7 +2215,7 @@ export async function materializeGuestInputAfterReplacement(scene: BattleScene):
 export async function driveDuoGuestTackleThroughPublicUi(
   hostGame: GameManager,
   rig: DuoRig,
-  options: { restartAlreadyOpenHost?: boolean } = {},
+  options: { restartAlreadyOpenHost?: boolean; submitHostTackle?: boolean } = {},
 ): Promise<void> {
   const guestOwnCommand = await withClient(rig.guestCtx, () =>
     driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
@@ -2287,6 +2290,34 @@ export async function driveDuoGuestTackleThroughPublicUi(
       }
       await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
     });
+
+    if (options.submitHostTackle) {
+      await withClient(rig.hostCtx, async () => {
+        await drainLoopback();
+        expect(rig.hostScene.ui.getMode(), "host command UI remains actionable after the guest submits").toBe(
+          UiMode.COMMAND,
+        );
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Fight through COMMAND UI").toBe(true);
+        expect(rig.hostScene.ui.getMode(), "host reaches the move picker").toBe(UiMode.FIGHT);
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Tackle through FIGHT UI").toBe(true);
+
+        const postMovePhase = await driveClientPhaseQueueTo(rig.hostScene, "SelectTargetPhase or turn commit", {
+          matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "CoopTurnCommitPhase",
+        });
+        if (postMovePhase.phaseName === "SelectTargetPhase") {
+          postMovePhase.start();
+          await drainLoopback();
+          expect(rig.hostScene.ui.getMode(), "host reaches the real target picker").toBe(UiMode.TARGET_SELECT);
+          expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms the first enemy target").toBe(true);
+          await drainLoopback();
+        } else {
+          expect(
+            rig.hostScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.targets,
+            "a sole legal target is normalized by the public command handler",
+          ).toEqual([BattlerIndex.ENEMY]);
+        }
+      });
+    }
     await withClient(rig.hostCtx, () => drainLoopback());
   } finally {
     rig.pair.setDestinationContextDelivery?.(false);
@@ -2442,9 +2473,10 @@ export function disposeDuoRig(rig: DuoRig): void {
   }
   duoCtxPinDisposers.delete(rig);
   for (const runtime of [rig.guestRuntime, rig.hostRuntime]) {
-    if (runtime.localTransport.state === "closed") {
-      continue;
-    }
+    // Closing either loopback endpoint closes its peer too. Transport state therefore cannot tell us
+    // whether THIS runtime's controller/stream/relay/watchdogs were disposed; skipping the second side
+    // leaked exactly those continuations into the next test. Every subsystem teardown is idempotent, so
+    // select and clear both runtimes even when the shared channel is already closed.
     setCoopRuntime(runtime);
     clearCoopRuntime();
   }

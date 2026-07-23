@@ -49,7 +49,7 @@ import {
   getCoopWaveBoundaryStatus,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import {
   type ErRouteNode,
   getErPendingNodes,
@@ -64,7 +64,6 @@ import {
   setMapTravelTarget,
 } from "#data/elite-redux/er-map-nodes";
 import { BattleType } from "#enums/battle-type";
-import { BattlerIndex } from "#enums/battler-index";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
@@ -295,7 +294,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
   }
 
   async function driveGuestCommandUi(rig: DuoRig): Promise<void> {
-    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: true,
+      submitHostTackle: true,
+    });
   }
 
   async function driveRealBiomeMarketLeave(rig: DuoRig): Promise<void> {
@@ -1551,10 +1553,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     try {
       await driveGuestCommandUi(rig);
       const turn = rig.hostScene.currentBattle.turn;
-      await withClient(rig.hostCtx, async () => {
-        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-        await game.phaseInterceptor.to("CoopTurnCommitPhase");
-      });
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CoopTurnCommitPhase"));
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
       expect(
         rig.guestScene.currentBattle.enemyParty.every(mon => mon.isFainted()),
@@ -1761,10 +1760,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     try {
       await driveGuestCommandUi(rig);
       const turn = rig.hostScene.currentBattle.turn;
-      await withClient(rig.hostCtx, async () => {
-        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-        await game.phaseInterceptor.to("CoopTurnCommitPhase");
-      });
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CoopTurnCommitPhase"));
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
       expect(
         rig.guestScene.currentBattle.enemyParty.every(mon => mon.isFainted()),
