@@ -2243,8 +2243,13 @@ export async function driveDuoGuestTackleThroughPublicUi(
       await drainLoopback();
       if (options.restartAlreadyOpenHost) {
         // Wave 1 opened before buildDuo installed the live runtime. Re-enter that untouched public phase
-        // once so it participates in the now-live reciprocal rendezvous.
-        rig.hostScene.phaseManager.getCurrentPhase().start();
+        // once so it participates in the now-live reciprocal rendezvous. Modern buildDuo already performs
+        // that adoption/re-entry; callers retained this flag during the V2 migration. Preserve an already
+        // actionable menu instead of starting the same command rendezvous twice and putting its UI back into
+        // MESSAGE while the helper waits for a second arrival that can never exist.
+        if (rig.hostScene.ui.getMode() !== UiMode.COMMAND && rig.hostScene.ui.getMode() !== UiMode.FIGHT) {
+          rig.hostScene.phaseManager.getCurrentPhase().start();
+        }
         await drainLoopback();
       } else if (rig.hostScene.phaseManager.getCurrentPhase().phaseName === "CommandPhase") {
         // Between-wave callers deliberately stop BEFORE this exact phase so both clients can materialize

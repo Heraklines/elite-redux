@@ -1997,3 +1997,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The duo harness now has one narrow non-journey helper which captures complete turn authority and commits a
   real `TURN_COMMIT` into an exact `AWAIT_SUCCESSOR`. The wave-operation matrix boots at each tested wave and
   follows `COMMAND -> TURN_COMMIT -> WAVE_ADVANCE/TERMINAL_COMMIT`; UI journey suites remain public-input only.
+- The public duo command helper's legacy `restartAlreadyOpenHost` option is now idempotent. `buildDuo` already
+  adopts and re-enters the pre-pair host command; starting that live menu again after guest arrival reset it to
+  MESSAGE and manufactured the shared P1/P2/reward/multiwave “stuck at CommandPhase” signature.
