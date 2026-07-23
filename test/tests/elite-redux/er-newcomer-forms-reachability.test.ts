@@ -45,6 +45,9 @@ describe.skipIf(!RUN)("ER newcomer forms reachability (dex + reward pool)", () =
   it("every newcomer form has a stone edge whose preFormKey matches a live base form key", () => {
     const broken: string[] = [];
     for (const def of ER_NEWCOMER_FORMS) {
+      if (def.item === undefined) {
+        continue;
+      }
       const species = getPokemonSpecies(def.baseSpecies);
       // The form keys a live/party base mon can actually be in (exclude injected megas).
       const baseKeys = new Set(species.forms.map(f => f.formKey ?? "").filter(k => !/mega|primal/.test(k)));

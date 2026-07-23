@@ -19,21 +19,50 @@
 // it writes NO permanent dex unlock (starterData untouched).
 // =============================================================================
 
-import { allAbilities } from "#data/data-lists";
+import { allAbilities, modifierTypes } from "#data/data-lists";
 import {
   GREATER_RANDOMIZER_ABILITY_CHOICES,
+  type GreaterAbilityRandomizerChoiceCache,
+  getOrRollGreaterRandomizerAbilities,
   greaterRandomizerReplaceSlot,
   rollGreaterRandomizerAbilities,
 } from "#data/elite-redux/er-greater-ability-randomizer";
 import { CustomPokemonData } from "#data/pokemon/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
+import type { PlayerPokemon } from "#field/pokemon";
+import type { ErGreaterAbilityRandomizerModifier } from "#modifiers/modifier";
+import type { ErGreaterAbilityRandomizerModifierType } from "#modifiers/modifier-type";
+import { ModifierTypeOption } from "#modifiers/modifier-type";
+import { ErGreaterAbilityRandomizerPhase } from "#phases/er-greater-ability-randomizer-phase";
+import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { unlockSlot } from "#utils/passive-utils";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+type GreaterRandomizerSelectPhaseSeam = {
+  typeOptions: ModifierTypeOption[];
+  greaterAbilityRandomizerChoiceCaches: Map<string, GreaterAbilityRandomizerChoiceCache>;
+  copy(): SelectModifierPhase;
+  buildPokemonModifier(
+    modifierType: ErGreaterAbilityRandomizerModifierType,
+    slotIndex: number,
+    option: number,
+    offerKey: string,
+  ): ErGreaterAbilityRandomizerModifier;
+};
+
+type GreaterRandomizerModifierSeam = {
+  choiceCache: GreaterAbilityRandomizerChoiceCache;
+};
+
+type GreaterRandomizerPickerPhaseSeam = {
+  openAbilityPicker(mon: PlayerPokemon, slot: number): void;
+};
 
 describe.skipIf(!RUN)("ER Greater Ability Randomizer - live effects", () => {
   let phaserGame: Phaser.Game;
@@ -82,6 +111,58 @@ describe.skipIf(!RUN)("ER Greater Ability Randomizer - live effects", () => {
     for (const c of choices) {
       expect(banned).not.toContain(c.abilityId);
     }
+  });
+
+  it("keeps one roll after fully leaving the item while separate offers stay independent", async () => {
+    await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+    const mon = game.scene.getPlayerPokemon()!;
+    const firstType = modifierTypes.ER_GREATER_ABILITY_RANDOMIZER();
+    const secondType = modifierTypes.ER_GREATER_ABILITY_RANDOMIZER();
+    const original = new SelectModifierPhase() as unknown as GreaterRandomizerSelectPhaseSeam;
+    original.typeOptions = [new ModifierTypeOption(firstType, 0), new ModifierTypeOption(secondType, 0)];
+
+    const firstModifier = original.buildPokemonModifier(firstType, 0, 0, "reward:0");
+    const firstCache = original.greaterAbilityRandomizerChoiceCaches.get("reward:0")!;
+    expect((firstModifier as unknown as GreaterRandomizerModifierSeam).choiceCache).toBe(firstCache);
+
+    const setMode = vi.spyOn(game.scene.ui, "setMode").mockResolvedValue(undefined);
+    const firstPicker = new ErGreaterAbilityRandomizerPhase(
+      0,
+      -1,
+      false,
+      firstCache,
+    ) as unknown as GreaterRandomizerPickerPhaseSeam;
+    firstPicker.openAbilityPicker(mon, 0);
+    const firstPickerCall = setMode.mock.calls.at(-1)!;
+    expect(firstPickerCall[0]).toBe(UiMode.ER_BARGAIN);
+    const firstOptions = (firstPickerCall[1] as { options: unknown[] }).options;
+    const firstRoll = firstCache.get(mon.id)!;
+
+    // A full cancel ends the item phase and resumes this continuation copy. It must
+    // carry the exact cache object populated by the first picker phase.
+    const continued = original.copy() as unknown as GreaterRandomizerSelectPhaseSeam;
+    const reopenedModifier = continued.buildPokemonModifier(firstType, 0, 0, "reward:0");
+    const reopenedCache = continued.greaterAbilityRandomizerChoiceCaches.get("reward:0")!;
+    const reopenedPicker = new ErGreaterAbilityRandomizerPhase(
+      0,
+      -1,
+      false,
+      reopenedCache,
+    ) as unknown as GreaterRandomizerPickerPhaseSeam;
+    reopenedPicker.openAbilityPicker(mon, 0);
+    const reopenedOptions = (setMode.mock.calls.at(-1)![1] as { options: unknown[] }).options;
+    const reopenedRoll = getOrRollGreaterRandomizerAbilities(mon, reopenedCache);
+    expect(continued.greaterAbilityRandomizerChoiceCaches).toBe(original.greaterAbilityRandomizerChoiceCaches);
+    expect(reopenedCache).toBe(firstCache);
+    expect(reopenedRoll).toBe(firstRoll);
+    expect(reopenedOptions).toEqual(firstOptions);
+    expect((reopenedModifier as unknown as GreaterRandomizerModifierSeam).choiceCache).toBe(firstCache);
+
+    // A second pink item on the same screen is a different offer, not a shared roll.
+    const secondModifier = continued.buildPokemonModifier(secondType, 0, 0, "reward:1");
+    const secondCache = continued.greaterAbilityRandomizerChoiceCaches.get("reward:1")!;
+    expect(secondCache).not.toBe(firstCache);
+    expect((secondModifier as unknown as GreaterRandomizerModifierSeam).choiceCache).toBe(secondCache);
   });
 
   it("the chosen ability REPLACES the ACTIVE slot (slot 0) via the run-state override", async () => {

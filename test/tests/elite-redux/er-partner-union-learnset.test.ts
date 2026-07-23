@@ -25,9 +25,15 @@
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { allMoves } from "#data/data-lists";
 import {
+  ER_NIMBEON_SPECIES_ID,
   ER_PARTNER_FLAREON_SPECIES_ID,
   ER_PARTNER_JOLTEON_SPECIES_ID,
+  ER_PARTNER_NIMBEON_SPECIES_ID,
+  ER_PARTNER_RYUVEON_SPECIES_ID,
+  ER_PARTNER_TITANEON_SPECIES_ID,
   ER_PARTNER_VAPOREON_SPECIES_ID,
+  ER_RYUVEON_SPECIES_ID,
+  ER_TITANEON_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
 import {
   canFormLearnMove,
@@ -171,8 +177,18 @@ describe.skipIf(!RUN)("ER Omniform pooled level-up learn union (Partner Eevee fa
     const union = omniformUnionLevelMoves(holder);
     const unionIds = new Set(union.map(([, m]) => m));
     const family = omniformFamilyForms(holder);
-    // Base Eevee + 8 partner eeveelutions.
-    expect(family.length).toBe(9);
+    // Base Eevee + 8 partner eeveelutions + the three PARTNER ALIAS eeveelutions (Partner
+    // Nimbeon / Ryuveon / Titaneon carry Omniform; the REAL eeveelutions do NOT and are
+    // therefore NOT family members — corrected 2026-07-22 after the live transform bug).
+    expect(family.length).toBe(12);
+    const familyIds = new Set(family.map(f => f.speciesId as number));
+    for (const id of [ER_PARTNER_NIMBEON_SPECIES_ID, ER_PARTNER_RYUVEON_SPECIES_ID, ER_PARTNER_TITANEON_SPECIES_ID]) {
+      expect(familyIds.has(id), `family includes alias ${id}`).toBe(true);
+    }
+    // The REAL eeveelutions are inert — never Omniform family members.
+    for (const id of [ER_NIMBEON_SPECIES_ID, ER_RYUVEON_SPECIES_ID, ER_TITANEON_SPECIES_ID]) {
+      expect(familyIds.has(id), `family EXCLUDES real ${id}`).toBe(false);
+    }
 
     for (const { move } of reps) {
       // Present in the pooled union offer set.

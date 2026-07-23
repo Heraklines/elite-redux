@@ -1,0 +1,35 @@
+{
+  "v": 1,
+  "name": "Berserk raises higher offense on Enrage",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "berserk-enrage-higher-offense"
+  },
+  "party": [
+    {
+      "species": "ALAKAZAM",
+      "ability": "BERSERK",
+      "passiveAbility": "NO_GUARD",
+      "moves": ["CALM_MIND"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "RATTATA",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["SWAGGER"]
+      }
+    ]
+  },
+  "script": [{ "move": "CALM_MIND", "enemyMove": "SWAGGER" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerStage": { "stat": "SPATK", "value": 2 },
+    "playerTags": ["ER_ENRAGE"]
+  }
+}

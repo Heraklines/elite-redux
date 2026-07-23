@@ -44,13 +44,24 @@ import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-re
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
 import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import { rankByFilter } from "#data/elite-redux/showdown/showdown-search-normalize";
+import {
+  type MoveSearchMeta,
+  matchesMoveSearch,
+  parseMoveSearch,
+} from "#data/elite-redux/showdown/showdown-search-operators";
 import { exportShowdownSet, importShowdownSet } from "#data/elite-redux/showdown/showdown-set-codec";
 import {
   listNamedSpeciesSets,
   type ShowdownNamedSet,
   saveNamedSpeciesSet,
 } from "#data/elite-redux/showdown/showdown-species-sets";
+import {
+  fetchShowdownSpeciesSuggestions,
+  isSpeciesSuggestionsConfigured,
+  type ShowdownSpeciesSuggestion,
+} from "#data/elite-redux/showdown/showdown-species-suggestions-client";
 import { MEGA_STONE_ITEM, type ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import { listWinningSets } from "#data/elite-redux/showdown/showdown-winning-sets";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { Button } from "#enums/buttons";
 import { MoveCategory } from "#enums/move-category";
@@ -180,10 +191,32 @@ export interface ShowdownSetEditorConfig {
   initialSetMenuNotice?: string;
   /** Deterministic named-set list injected for the load-list render recipe (production reads localStorage). */
   demoNamedSets?: { name: string; text: string }[];
+  /** Deterministic LOCAL winning-set texts for the Suggested-sets recipe (production reads localStorage). */
+  demoWinningSets?: string[];
+  /**
+   * Deterministic COMMUNITY suggestions for the Suggested-sets recipe. When DEFINED the live telemetry
+   * fetch is skipped and this exact list is used (production fetches from the er-telemetry worker).
+   */
+  demoCommunitySuggestions?: ShowdownSpeciesSuggestion[];
 }
 
-/** The Set Menu sub-state: closed, the option list, the paste-import modal, the load list, or the save-name prompt. */
-export type SetMenuView = "closed" | "menu" | "import" | "load" | "save";
+/**
+ * The Set Menu sub-state: closed, the option list, the paste-import modal, the load list, the save-name
+ * prompt, or the P3 "Suggested sets" list (your winning sets + community popular items).
+ */
+export type SetMenuView = "closed" | "menu" | "import" | "load" | "save" | "suggested";
+
+/** One row in the Suggested-sets list: your own winning FULL set, or a community popular item+form. */
+interface SuggestedEntry {
+  /** Main label (species + item). */
+  label: string;
+  /** Secondary line (moves for a local set, or the win count for a community hint). */
+  detail: string;
+  /** Provenance tag shown as a small chip. */
+  source: "yours" | "popular";
+  /** Apply this suggestion to the editor's current set (same effect as Load set / stage cycle). */
+  apply: () => void;
+}
 
 /** The edited result the flow wiring writes back into the team (stage + set). */
 export interface ShowdownEditorResult {
@@ -295,6 +328,17 @@ function categoryLabel(cat: MoveCategory): string {
   return MoveCategory[cat]?.charAt(0) ?? "?";
 }
 
+/** Map a `Move` onto the metadata the search operators read (`type:`/`bp>`/`acc=`/`cat:`/`pp<=`). */
+function moveSearchMetaOf(move: {
+  type: PokemonType;
+  power: number;
+  accuracy: number;
+  category: MoveCategory;
+  pp: number;
+}): MoveSearchMeta {
+  return { type: move.type, power: move.power, accuracy: move.accuracy, category: move.category, pp: move.pp };
+}
+
 // The separator-insensitive name normalization + typeahead ranking now live in the PURE
 // `showdown-search-normalize` module so the PS-format text codec resolves names through the SAME
 // comparison. Re-exported here (from the local import above) so existing importers - the
@@ -333,6 +377,14 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private setMenuBuffer = "";
   /** A transient Set Menu notice (export confirmation / import error), cleared on the next input. */
   private setMenuNotice: string | null = null;
+  /** Cursor within the Suggested-sets list (P3). */
+  private suggestedCursor = 0;
+  /** The Suggested-sets list (your winning sets + community popular items), rebuilt when the view opens. */
+  private suggestedList: SuggestedEntry[] = [];
+  /** Community suggestions fetched from telemetry (null = not yet fetched / fetch in flight). */
+  private communitySuggestions: ShowdownSpeciesSuggestion[] | null = null;
+  /** Whether the community fetch is currently in flight (for the "Loading..." affordance). */
+  private suggestedLoading = false;
 
   constructor() {
     super(UiMode.SHOWDOWN_SET_EDITOR);
@@ -384,6 +436,14 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.setLoadList = this.setMenu === "load" ? this.currentNamedSets() : [];
     this.setMenuBuffer = config.initialSetMenuBuffer ?? "";
     this.setMenuNotice = config.initialSetMenuNotice ?? null;
+    // Suggested-sets view: seed from injected demo data (recipes) or the local winning sets.
+    this.suggestedCursor = 0;
+    this.communitySuggestions = config.demoCommunitySuggestions ?? null;
+    this.suggestedLoading = false;
+    this.suggestedList = [];
+    if (this.setMenu === "suggested") {
+      this.rebuildSuggestedList();
+    }
     this.container.setVisible(true);
     if (this.paneOpen) {
       this.ensurePaneCursorVisible();
@@ -519,7 +579,13 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
 
   // ---- Set Menu: Save / Load / Export / Import this single set ---------------------------------
 
-  private static readonly SET_MENU_OPTIONS = ["Export set", "Import set", "Save set", "Load set"] as const;
+  private static readonly SET_MENU_OPTIONS = [
+    "Export set",
+    "Import set",
+    "Save set",
+    "Load set",
+    "Suggested sets",
+  ] as const;
 
   /** The current set as a wire manifest, so it can be exported / remembered / round-tripped through the codec. */
   private currentManifest(): ShowdownMonManifest {
@@ -576,6 +642,8 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         return this.processSetSaveInput(button);
       case "load":
         return this.processSetLoadInput(button);
+      case "suggested":
+        return this.processSuggestedInput(button);
       default:
         return this.processSetMenuListInput(button);
     }
@@ -622,6 +690,9 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         break;
       case "Load set":
         this.beginSetLoad();
+        break;
+      case "Suggested sets":
+        this.beginSuggested();
         break;
     }
   }
@@ -808,6 +879,129 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
           this.getUi().playError();
           this.render();
         }
+        return true;
+      }
+      case Button.CANCEL:
+      case Button.MENU:
+        this.setMenu = "menu";
+        this.render();
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  // -- Suggested sets (P3): your winning sets (full) + community popular items (item+form overlay) ----
+
+  /** This species' locally-recorded winning set texts (recipe injects `demoWinningSets`). */
+  private currentWinningSets(): string[] {
+    return this.config?.demoWinningSets ?? listWinningSets(this.config!.rootSpeciesId);
+  }
+
+  /** Open the Suggested-sets list: build the LOCAL half now, kick the async community fetch. */
+  private beginSuggested(): void {
+    this.setMenu = "suggested";
+    this.suggestedCursor = 0;
+    this.setMenuNotice = null;
+    // A pinned demo list (recipe) is used verbatim; otherwise use whatever community data we already have.
+    this.communitySuggestions = this.config?.demoCommunitySuggestions ?? this.communitySuggestions;
+    this.rebuildSuggestedList();
+    // Live fetch only when no demo list is pinned and telemetry is configured (silent degrade otherwise).
+    if (this.config?.demoCommunitySuggestions === undefined && isSpeciesSuggestionsConfigured()) {
+      this.suggestedLoading = this.communitySuggestions == null;
+      const root = this.config!.rootSpeciesId;
+      void fetchShowdownSpeciesSuggestions(root).then(list => {
+        // Ignore a stale response (the editor moved to another species / closed the menu).
+        if (this.config?.rootSpeciesId !== root) {
+          return;
+        }
+        this.communitySuggestions = list;
+        this.suggestedLoading = false;
+        if (this.setMenu === "suggested") {
+          this.rebuildSuggestedList();
+          this.render();
+        }
+      });
+    }
+    this.render();
+  }
+
+  /** (Re)build the Suggested list from the local winning sets + the (maybe-fetched) community data. */
+  private rebuildSuggestedList(): void {
+    const cfg = this.config!;
+    const entries: SuggestedEntry[] = [];
+
+    // YOUR winning sets (full sets - real moves/ability/nature/item), most-recent first, capped.
+    for (const text of this.currentWinningSets().slice(0, 5)) {
+      const parsed = importShowdownSet(text);
+      const mon = parsed.manifest;
+      if (mon == null || mon.rootSpeciesId !== cfg.rootSpeciesId) {
+        continue;
+      }
+      const speciesName = getPokemonSpecies(mon.speciesId as SpeciesId)?.name ?? `#${mon.speciesId}`;
+      const moveNames = mon.moveset
+        .map(id => allMoves[id]?.name)
+        .filter(Boolean)
+        .join(", ");
+      entries.push({
+        label: `${speciesName} @ ${this.itemName(mon.item as ShowdownItemKey)}`,
+        detail: moveNames.length > 0 ? moveNames : "(no moves)",
+        source: "yours",
+        apply: () => this.applyManifest(mon),
+      });
+    }
+
+    // COMMUNITY popular ITEM + FORM among winners (honest partial - overlays item+stage, keeps your moves).
+    for (const s of this.communitySuggestions ?? []) {
+      const speciesName = getPokemonSpecies(s.speciesId as SpeciesId)?.name ?? `#${s.speciesId}`;
+      entries.push({
+        label: `${speciesName} @ ${this.itemName(s.item as ShowdownItemKey)}`,
+        detail: `${s.wins} recent win${s.wins === 1 ? "" : "s"}`,
+        source: "popular",
+        apply: () => this.applyCommunitySuggestion(s),
+      });
+    }
+
+    this.suggestedList = entries;
+    this.suggestedCursor = Math.min(this.suggestedCursor, Math.max(0, entries.length - 1));
+  }
+
+  /** Overlay a community suggestion: field the winning STAGE + ITEM, KEEPING the current moves/nature/ability. */
+  private applyCommunitySuggestion(s: ShowdownSpeciesSuggestion): void {
+    const cfg = this.config!;
+    cfg.stage = { speciesId: s.speciesId, formIndex: s.formIndex };
+    // A mega stage force-locks the stone; otherwise adopt the popular item.
+    if (!isMegaStage(s.speciesId, s.formIndex)) {
+      cfg.set.item = s.item;
+    }
+    this.validationError = null;
+  }
+
+  private processSuggestedInput(button: Button): boolean {
+    const n = this.suggestedList.length;
+    switch (button) {
+      case Button.UP:
+        if (n > 0) {
+          this.suggestedCursor = (this.suggestedCursor - 1 + n) % n;
+          this.render();
+        }
+        return true;
+      case Button.DOWN:
+        if (n > 0) {
+          this.suggestedCursor = (this.suggestedCursor + 1) % n;
+          this.render();
+        }
+        return true;
+      case Button.ACTION:
+      case Button.SUBMIT: {
+        const entry = this.suggestedList[this.suggestedCursor];
+        if (entry == null) {
+          this.getUi().playError();
+          return true;
+        }
+        entry.apply();
+        this.closeSetMenu();
+        this.getUi().playSelect();
         return true;
       }
       case Button.CANCEL:
@@ -1130,6 +1324,17 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         list.push({ moveId, name: move.name, locked: false, reason: "" });
       }
     }
+    // Search operators (P3): `type:fire`, `cat:phys`, `bp>90`, `acc=100`, `pp<=10`. A filter with NO
+    // recognized operator token parses to `operators: []`, so the plain path below stays BYTE-IDENTICAL.
+    const parsed = parseMoveSearch(this.filter);
+    if (parsed.operators.length > 0) {
+      const filtered = list.filter(e => {
+        const move = allMoves[e.moveId];
+        return move != null && matchesMoveSearch(moveSearchMetaOf(move), parsed);
+      });
+      // Residual plain text still ranks the survivors by name (empty residual => alphabetical).
+      return rankByFilter(filtered, e => e.name, parsed.residual);
+    }
     return this.filter
       ? rankByFilter(list, e => e.name, this.filter)
       : list.sort((a, b) => a.name.localeCompare(b.name));
@@ -1304,7 +1509,58 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       this.renderSetLoadList();
       return;
     }
+    if (this.setMenu === "suggested") {
+      this.renderSuggestedList();
+      return;
+    }
     this.renderSetMenuList();
+  }
+
+  /** The Suggested-sets list: your winning sets + community popular items (P3). */
+  private renderSuggestedList(): void {
+    const bw = 232;
+    const rows = Math.max(1, Math.min(this.suggestedList.length, 6));
+    const bh = 26 + rows * 16;
+    const bx = (SCREEN_W - bw) / 2;
+    const by = (SCREEN_H - bh) / 2;
+    this.add(addWindow(bx, by, bw, bh));
+    this.fill(bx + 2, by + 2, bw - 4, bh - 4, 0x0d1524, 1);
+    this.text(bx + 8, by + 5, "SUGGESTED SETS", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    if (this.suggestedList.length === 0) {
+      const empty = this.suggestedLoading ? "Loading suggestions..." : "No suggestions yet - win some matches!";
+      this.text(bx + 8, by + 18, empty, TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    } else {
+      this.suggestedList.slice(0, 6).forEach((entry, i) => {
+        const ly = by + 15 + i * 16;
+        const focused = i === this.suggestedCursor;
+        this.fill(bx + 6, ly, bw - 12, 14, focused ? ACCENT : CELL_DIM, 1);
+        if (focused) {
+          this.fill(bx + 6, ly, 2, 14, GOLD, 1);
+        }
+        // Provenance chip (YOURS gold / POPULAR blue).
+        const chip = entry.source === "yours" ? "YOURS" : "POPULAR";
+        const chipW = chip.length * 3.0 + 6;
+        this.fill(bx + bw - 12 - chipW, ly + 1, chipW, 6, entry.source === "yours" ? 0x3a2f0d : 0x0d2338, 1);
+        this.text(
+          bx + bw - 9 - chipW,
+          ly,
+          chip,
+          entry.source === "yours" ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY_BLUE,
+          0,
+          FONT_TINY,
+        );
+        this.text(
+          bx + 12,
+          ly + 1,
+          this.clip(entry.label, 34),
+          focused ? TextStyle.SUMMARY_GOLD : TextStyle.WINDOW,
+          0,
+          FONT_TINY,
+        );
+        this.text(bx + 12, ly + 8, this.clip(entry.detail, 44), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+      });
+    }
+    this.text(bx + 8, by + bh - 9, "Enter: apply    Esc: back", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
   }
 
   private renderSetMenuList(): void {

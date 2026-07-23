@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
+import { grantErShinyLabSavedLookToSave } from "#data/elite-redux/er-shiny-lab-effects";
 import { DexAttr } from "#enums/dex-attr";
 import type { DexData, DexEntry } from "#types/dex-data";
 import type { StarterData, StarterDataEntry } from "#types/save-data";
@@ -30,12 +31,15 @@ import type { StarterData, StarterDataEntry } from "#types/save-data";
  * A settlement mutation off the wire. Structurally mirrors the worker's
  * `SettlementMutation` (`workers/er-save-api/src/showdown-escrow.ts`) — the client
  * cannot import worker code, so the shape is re-declared. `grantCandy` is accepted
- * for completeness but the server currently only ever emits remove/grantUnlock.
+ * for completeness but the escrow server only ever emits remove/grantUnlock;
+ * `grantCandy`/`grantShinyLabLook` are emitted by the TOURNAMENT reward path
+ * (er-telemetry pushes them into the same settlement store).
  */
 export type ShowdownSettlementMutation =
   | { kind: "removeUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
   | { kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
-  | { kind: "grantCandy"; speciesId: number; candy: number };
+  | { kind: "grantCandy"; speciesId: number; candy: number }
+  | { kind: "grantShinyLabLook"; speciesId: number; savedLook: number[] };
 
 /**
  * The structural subset of `GameData` settlement touches. The real `GameData`
@@ -235,6 +239,20 @@ export function applySettlementMutations(
           gameData.addStarterCandy(gameData.getRootStarterSpeciesId(mut.speciesId), mut.candy);
           n++;
           break;
+        case "grantShinyLabLook": {
+          // Grant a shiny-lab effect/look on the awarded species: marks the effect owned on that
+          // mon (evolution-line root) and auto-equips it if the mon has no current look. Idempotent
+          // (already-owned effects are skipped by grantErShinyLabSavedLookToSave).
+          const rootId = gameData.getRootStarterSpeciesId(mut.speciesId);
+          const entry = gameData.getStarterDataEntry(rootId);
+          entry.erShinyLab ??= {};
+          grantErShinyLabSavedLookToSave(entry.erShinyLab, mut.savedLook, {
+            equipIfEmpty: true,
+            claimCompletionRewards: true,
+          });
+          n++;
+          break;
+        }
       }
     }
     // I2: record the applied row ids in the ledger (deduped, newest-200 FIFO) in the SAME batch,

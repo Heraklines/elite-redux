@@ -30,7 +30,10 @@ import type { PostMoveUsedAbAttrParams } from "#types/ability-types";
 
 export class PostWeatherMoveFollowUpAbAttr extends PostMoveUsedAbAttr {
   constructor(private readonly followUpMoveId: MoveId) {
-    super(false);
+    // showAbility = true (default): the weather-triggered follow-up move is a
+    // discrete, player-visible activation, so the ability banner must flash
+    // (same popup-display defect class as the counter-attack archetype).
+    super();
   }
 
   /** Read-only accessor for the follow-up move id (used in tests). */

@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "name": "Grappler binds with every damaging move",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "grappler-all-move-binding"
+  },
+  "party": [
+    {
+      "species": "SNORLAX",
+      "ability": 5252,
+      "moves": ["TACKLE", "SPLASH", "REST", "GROWL"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["SPLASH"]
+      }
+    ]
+  },
+  "script": [{ "move": "TACKLE", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "enemyTags": ["BIND"],
+    "enemyDamaged": true
+  }
+}

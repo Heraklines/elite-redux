@@ -448,7 +448,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     this.pendingIndex = index;
     this.coopResolvedModifierOption = 0;
     const noop: ModifierSelectCallback = () => false;
-    return this.applyChosenModifier(option.type, cost, noop);
+    return this.applyChosenModifier(option.type, cost, noop, `biome:${index}`);
   }
 
   /**
@@ -687,6 +687,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         partySlot,
         nestedOption,
         validatedCost,
+        `biome:${slot}`,
       );
       if (this.modifierQueuesContinuation(modifierType) && !continuation) {
         throw new Error(`projected continuation could not open for stock ${slot}`);
@@ -1231,7 +1232,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         }
         const modifier =
           opt.type instanceof PokemonModifierType
-            ? this.buildPokemonModifier(opt.type, partySlot, nestedOption)
+            ? this.buildPokemonModifier(opt.type, partySlot, nestedOption, `biome:${slot}`)
             : opt.type.newModifier();
         if (modifier == null) {
           failCoopSharedSession(
@@ -1720,9 +1721,10 @@ export class BiomeShopPhase extends SelectModifierPhase {
     modifierType: PokemonModifierType,
     cost: number,
     cb: ModifierSelectCallback,
+    offerKey: string,
   ): void {
     this.hideShopForOverlay();
-    super.openModifierMenu(modifierType, cost, cb);
+    super.openModifierMenu(modifierType, cost, cb, offerKey);
   }
 
   protected override openFusionMenu(modifierType: PokemonModifierType, cost: number, cb: ModifierSelectCallback): void {

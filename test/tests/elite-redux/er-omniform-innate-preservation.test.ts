@@ -5,18 +5,17 @@
  */
 
 // =============================================================================
-// ER Omniform (5929) — innate-unlock PRESERVATION across a mid-battle transform.
+// ER Omniform (5929) — Partner Eevee family innate-unlock ownership.
 //
 // Maintainer directive: "if you unlock innates on partner eevee those same
 // innates need to be unlocked on all its mid battle evos". Partner Eevee is the
 // vanilla Eevee "partner" FORM; it adapts mid-battle into standalone partner
 // eeveelution species (ids 70012+). Those target species are transform-only — the
 // player never candy-unlocks them — so their `starterData[...].passiveAttr` is 0.
-// The bug: after transform the innate-unlock gate read the TARGET species' (0)
-// unlock mask, silently LOCKING every innate the player had unlocked on Partner
-// Eevee. The fix routes `innateSlotPassiveAttr` through the pre-transform SOURCE
-// species (Partner Eevee) while transformed, so the unlocked-innate set carries
-// to every form it adapts into, per slot, and reverts exactly on leaveField.
+// The original fix used the pre-transform SOURCE while adapting, but a saved or
+// directly-instantiated partner Eeveelution has no transform snapshot. The family
+// unlock-owner registry makes both paths read Partner Eevee's exact per-slot mask
+// and preserves it across chained transforms and leaveField reverts.
 //
 // This exercises the REAL production Omniform mappings + the REAL partner family
 // composites (NOT forced active — the innate CANDY-UNLOCK path is the whole point,
@@ -30,7 +29,11 @@ import {
   ER_PARTNER_VAPOREON_ABILITY_ID,
 } from "#data/elite-redux/abilities/composite-newcomers";
 import { erOmniformOnMoveStart, erOmniformRevertOnLeaveField } from "#data/elite-redux/abilities/omniform";
-import { ER_PARTNER_FLAREON_SPECIES_ID, ER_PARTNER_VAPOREON_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
+import {
+  ER_PARTNER_FAMILY,
+  ER_PARTNER_FLAREON_SPECIES_ID,
+  ER_PARTNER_VAPOREON_SPECIES_ID,
+} from "#data/elite-redux/er-newcomer-species";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -90,6 +93,36 @@ describe.skipIf(!RUN)("ER Omniform (5929) — innate-unlock preservation across 
     const target = getPokemonSpecies(ER_PARTNER_VAPOREON_SPECIES_ID as SpeciesId);
     expect(target.getRootSpeciesId()).not.toBe(SpeciesId.EEVEE);
     expect(game.scene.gameData.starterData[target.getRootSpeciesId()]?.passiveAttr ?? 0).toBe(0);
+  });
+
+  const directUnlockCases = ER_PARTNER_FAMILY.flatMap(member => [
+    { ...member, maskName: "all locked", unlockedSlots: [] as const, expected: [false, false, false] as const },
+    {
+      ...member,
+      maskName: "only slot 2 unlocked",
+      unlockedSlots: [1] as const,
+      expected: [false, true, false] as const,
+    },
+    { ...member, maskName: "all unlocked", unlockedSlots: [0, 1, 2] as const, expected: [true, true, true] as const },
+  ]);
+
+  it.each(directUnlockCases)("a directly-instantiated $name keeps Partner Eevee's $maskName mask", async ({
+    partnerId,
+    unlockedSlots,
+    expected,
+  }) => {
+    await game.classicMode.startBattle(partnerId as SpeciesId);
+    const holder = game.field.getPlayerPokemon();
+    const eeveeAttr = unlockEeveeSlots(...unlockedSlots);
+
+    // A saved/restored or directly-created partner Eeveelution has no transient
+    // Omniform source snapshot. It must still use the registered family head
+    // (Partner Eevee) as its permanent candy-unlock owner.
+    expect(holder.getSpeciesForm().speciesId).toBe(partnerId);
+    for (const slot of [0, 1, 2] as const) {
+      expect(holder.innateSlotPassiveAttr(slot)).toBe(eeveeAttr);
+      expect(isSlotActive(holder.innateSlotPassiveAttr(slot), slot)).toBe(expected[slot]);
+    }
   });
 
   it("(a) an innate unlocked on Partner Eevee stays ACTIVE after it adapts into a partner eeveelution", async () => {

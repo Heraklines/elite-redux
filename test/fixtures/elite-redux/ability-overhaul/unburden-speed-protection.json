@@ -1,0 +1,38 @@
+{
+  "v": 1,
+  "name": "Unburden ignores Speed drops and paralysis penalty",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "unburden-speed-protection"
+  },
+  "party": [
+    {
+      "species": "TREECKO",
+      "ability": "UNBURDEN",
+      "moves": ["SPLASH", "QUICK_ATTACK", "PROTECT", "LEAF_BLADE"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "PIKACHU",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["SCARY_FACE", "THUNDER_WAVE", "SPLASH"]
+      }
+    ]
+  },
+  "start": {
+    "playerStatus": 3
+  },
+  "script": [{ "move": "SPLASH", "enemyMove": "SCARY_FACE" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Unburden",
+    "playerStage": { "stat": "SPD", "value": 0 },
+    "playerStatus": "PARALYSIS"
+  }
+}

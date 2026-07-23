@@ -27,7 +27,13 @@ import { STARTING_WAVE } from "#balance/misc";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
 import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets } from "#data/battle-anims";
-import { type BattleFormat, legacyFormat, TRIPLE_FORMAT } from "#data/battle-format";
+import {
+  type BattleFormat,
+  legacyFormat,
+  TRIPLE_BATTLE_GHOST_RARITY,
+  TRIPLE_BATTLE_RARITY,
+  TRIPLE_FORMAT,
+} from "#data/battle-format";
 import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
@@ -68,6 +74,8 @@ import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redu
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import {
   applyGhostTrainerPresentation,
+  getErGhostSnapshotSpecies,
+  hasErGhostOverride,
   markTrainerAsGhost,
   maybePrefetchGhostTeams,
   takeGhostForWave,
@@ -89,6 +97,7 @@ import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import {
+  getShowdownBattleFormat,
   getShowdownOpponentManifest,
   getShowdownOpponentProfile,
 } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -135,7 +144,7 @@ import { TrainerVariant } from "#enums/trainer-variant";
 import { UiTheme } from "#enums/ui-theme";
 import { WeatherType } from "#enums/weather-type";
 import { NewArenaEvent } from "#events/battle-scene";
-import { Arena, biomeHasBgVariants } from "#field/arena";
+import { Arena } from "#field/arena";
 import { ArenaBase } from "#field/arena-base";
 import { DamageNumberHandler } from "#field/damage-number-handler";
 import type { Pokemon } from "#field/pokemon";
@@ -256,6 +265,13 @@ export interface InfoToggle {
   toggleInfo(force?: boolean): void;
   isActive(): boolean;
 }
+
+/**
+ * Fixed RNG sub-stream offset for the ER TRIPLES roll (see {@linkcode BattleScene.rollTripleBattle}).
+ * Combined with the per-wave `waveSeed` in {@linkcode BattleScene.executeWithSeedOffset}, it gives a
+ * deterministic-per-wave triple decision that does NOT perturb the main wave RNG stream.
+ */
+const TRIPLE_ROLL_SEED_OFFSET = 0x74_72_70_6c; // "trpl"
 
 /**
  * The `BattleScene` is the primary scene for the game.
@@ -1693,8 +1709,18 @@ export class BattleScene extends SceneBase {
     }
     resolved.double = this.checkIsDouble(resolved as NewBattleConstructedProps);
     // Multi-format: resolve the full battle format. Gated - only produces a >2-wide
-    // (triple+) format when explicitly requested; otherwise the legacy single/double.
-    resolved.format = this.resolveBattleFormat(resolved.double);
+    // (triple+) format when explicitly requested (dev override / Triples Only) OR when the
+    // seeded ER TRIPLES roll fires for an eligible wild/trainer/ghost battle; otherwise the
+    // legacy single/double.
+    resolved.format = this.resolveBattleFormat(resolved as NewBattleConstructedProps, resolved.double);
+    // A rolled or challenge-forced triple reaches the SAME force point Triples Only uses: mark
+    // the transient `double` true so pre-battle transition cleanup + Battle construction match
+    // the proven Triples-Only path (Battle re-derives the real double=false from the 3-wide
+    // arrangement). The dev `BATTLE_STYLE_OVERRIDE === "triple"` path deliberately keeps
+    // `double === false` (see doCheckDoubleOverride), so it is left untouched.
+    if (resolved.format === TRIPLE_FORMAT && Overrides.BATTLE_STYLE_OVERRIDE !== "triple") {
+      resolved.double = true;
+    }
 
     const lastBattle: Battle | null = this.currentBattle;
     const maxExpLevel = this.getMaxExpLevel();
@@ -2121,6 +2147,18 @@ export class BattleScene extends SceneBase {
    * @returns Whether the battle should be a double battle.
    */
   private checkIsDouble({ double: forcedDouble, battleType, waveIndex, trainer }: NewBattleConstructedProps): boolean {
+    // Showdown VERSUS (tournament doubles/triples): the field width is the NEGOTIATED format, not any
+    // wave/challenge/override roll. A doubles or triples match forces multi (>= 2 active per side); a
+    // singles match stays single. Authoritative over everything below (both clients agreed the width in
+    // the negotiate handshake). resolveBattleFormat then upgrades a triple to the 3-wide format. Only the
+    // HOST builds a battle here (the guest boots from the host's launch snapshot); guarded on isShowdown.
+    if (this.gameMode.isShowdown) {
+      const showdownFormat = getShowdownBattleFormat();
+      if (showdownFormat != null) {
+        return showdownFormat !== "singles";
+      }
+    }
+
     // TODO: enforce using the proper override depending on whether it's a trainer or a wild battle
     const doubleBattleOverride = this.doCheckDoubleOverride(waveIndex);
     if (doubleBattleOverride != null) {
@@ -2207,19 +2245,97 @@ export class BattleScene extends SceneBase {
    * (triple+) when explicitly requested (dev/headless override today; a player-facing
    * trigger later). Otherwise it returns the legacy single/double derived from `double`,
    * so production stays provably single/double.
+   * @param props - The constructed new-battle props (battle type / wave / trainer).
    * @param double - The already-resolved legacy double flag.
    */
-  private resolveBattleFormat(double: boolean): BattleFormat {
-    // Triples Only: any battle that reached the force point (double === true, set in checkIsDouble)
-    // becomes a triple. The single edges (finale / endless boss / ME) return double === false there,
-    // so they correctly stay single - never upgraded.
+  private resolveBattleFormat(props: NewBattleConstructedProps, double: boolean): BattleFormat {
+    // Showdown VERSUS: the negotiated field-width format is authoritative (checked FIRST so it never
+    // collides with the ER triples roll or a stale challenge flag). A doubles match -> DOUBLE_FORMAT,
+    // triples -> TRIPLE_FORMAT, singles -> SINGLE_FORMAT (via legacyFormat with double=false). Only the
+    // HOST reaches here (guest boots from the snapshot); guarded on isShowdown.
+    if (this.gameMode.isShowdown) {
+      const showdownFormat = getShowdownBattleFormat();
+      if (showdownFormat != null) {
+        return showdownFormat === "triples" ? TRIPLE_FORMAT : legacyFormat(showdownFormat === "doubles");
+      }
+    }
+
+    // Triples Only / dev override: any battle that reached the force point (double === true, set in
+    // checkIsDouble) becomes a triple. The single edges (finale / endless boss / ME) return
+    // double === false there, so they correctly stay single - never upgraded.
     if (
       Overrides.BATTLE_STYLE_OVERRIDE === "triple"
       || (double && this.gameMode.hasChallenge(Challenges.TRIPLES_ONLY))
     ) {
       return TRIPLE_FORMAT;
     }
+    // ER TRIPLES roll (maintainer: ~5% of wild/trainer battles, ~20% of ghost battles). Rolled
+    // AFTER the double logic but taking PRECEDENCE over it: an eligible battle that wins the
+    // seeded roll upgrades to the 3-wide format regardless of the double result (Battle re-derives
+    // double=false from the arrangement). The roll draws from an ISOLATED seed sub-stream, so a
+    // wave that does NOT become a triple stays byte-identical to before this feature.
+    if (this.rollTripleBattle(props)) {
+      return TRIPLE_FORMAT;
+    }
     return legacyFormat(double);
+  }
+
+  /**
+   * ER TRIPLES roll: decide whether an eligible new battle should be upgraded to a 3-wide triple.
+   * Deterministic per wave seed (isolated sub-stream, so non-triple waves are byte-identical).
+   *
+   * Rate: 1-in-{@linkcode TRIPLE_BATTLE_GHOST_RARITY} (~20%) for a ghost battle with a full
+   * (>=3-mon) roster, otherwise 1-in-{@linkcode TRIPLE_BATTLE_RARITY} (~5%) for a wild/trainer
+   * battle. Honors the same exclusions the double roll does plus the challenge/co-op constraints:
+   * - only natural WILD / TRAINER battles (MEs, finales, endless bosses stay single);
+   * - never when a dev battle-style override is set (it is authoritative);
+   * - never in co-op (kept at current behavior - flagged), Doubles Only (no surprise triples), or
+   *   Triples Only (already forced to triple upstream);
+   * - needs >= 3 able player mons to field a full triple (mirrors the party-fill the double path
+   *   relies on);
+   * - a ghost with a < 3-mon roster falls back gracefully (cannot field a 3-wide ghost side).
+   * @param props - The constructed new-battle props.
+   */
+  private rollTripleBattle(props: NewBattleConstructedProps): boolean {
+    const { battleType, waveIndex, trainer } = props;
+    // Only natural wild / trainer battles are eligible.
+    if (battleType !== BattleType.WILD && battleType !== BattleType.TRAINER) {
+      return false;
+    }
+    // Authoritative / challenge / co-op paths must never be surprised into a triple.
+    if (
+      Overrides.BATTLE_STYLE_OVERRIDE != null
+      || this.gameMode.isCoop
+      || this.gameMode.hasChallenge(Challenges.DOUBLES_ONLY)
+      || this.gameMode.hasChallenge(Challenges.TRIPLES_ONLY)
+      || this.gameMode.isWaveFinal(waveIndex)
+      || this.gameMode.isEndlessBoss(waveIndex)
+    ) {
+      return false;
+    }
+    // Need three able player mons to field a full triple.
+    if (this.getPokemonAllowedInBattle().length < 3) {
+      return false;
+    }
+    // Ghost battle? (an uploaded roster fielded as a trainer.) 20% for a full (>=3) roster; a
+    // shorter roster can't fill a 3-wide side, so it falls back to a normal (non-triple) battle.
+    const ghost = trainer != null && hasErGhostOverride(trainer);
+    if (ghost) {
+      const roster = trainer == null ? null : getErGhostSnapshotSpecies(trainer);
+      if (roster == null || roster.length < 3) {
+        return false;
+      }
+    }
+    const oneInN = ghost ? TRIPLE_BATTLE_GHOST_RARITY : TRIPLE_BATTLE_RARITY;
+    let win = false;
+    this.executeWithSeedOffset(
+      () => {
+        win = randSeedInt(oneInN) === 0;
+      },
+      TRIPLE_ROLL_SEED_OFFSET,
+      this.waveSeed,
+    );
+    return win;
   }
 
   // TODO: Split this up and move it to a "post battle phase"
@@ -2365,9 +2481,8 @@ export class BattleScene extends SceneBase {
 
     this.arenaBg.pipelineData = {
       terrainColorRatio: this.arena.bgTerrainColorRatioForBiome,
-      // Variant biomes ship hand-painted day/dusk/night art, so skip the day/night
-      // shader tint on the background (otherwise the night art is double-darkened).
-      ignoreTimeTint: biomeHasBgVariants(biome),
+      // Arena.init updates this after selecting the visit's background scene.
+      ignoreTimeTint: this.arena.getBgIgnoreTimeTint(),
     };
 
     return this.arena;

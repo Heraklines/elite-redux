@@ -31,13 +31,13 @@ export class PostSummonPhasePriorityQueue extends PokemonPhasePriorityQueue<Post
 
     const phasePokemon = phase.getPokemon();
 
-    phasePokemon.getAbilityPriorities().forEach((priority, idx) => {
+    for (const source of phasePokemon.getActiveAbilitySources()) {
       const activateAbilityPhase = new PostSummonActivateAbilityPhase(
         phasePokemon.getBattlerIndex(),
-        priority,
-        idx !== 0,
+        source.ability.postSummonPriority,
+        source.passiveSlot,
       );
       globalScene.phaseManager.unshiftPhase(activateAbilityPhase);
-    });
+    }
   }
 }

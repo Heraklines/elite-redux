@@ -14,6 +14,7 @@ import {
   injectErNewcomerSpecies,
 } from "#data/elite-redux/er-newcomer-species";
 import { applyErTypeNativization } from "#data/elite-redux/er-type-nativization";
+import { initEliteReduxAbilityUpgrades } from "#data/elite-redux/init-elite-redux-ability-upgrades";
 import {
   initEliteReduxCSourceCorrections,
   remapEliteReduxMoveIdsByName,
@@ -260,6 +261,12 @@ function initPhaseErSpritesRebalance(): void {
   console.info(
     `[er-manual-composite] wired ${manualCompositeResult.wired} newcomer composites${manualCompositeResult.emptyConstituents.length > 0 ? ` (${manualCompositeResult.emptyConstituents.length} empty constituents: ${manualCompositeResult.emptyConstituents.map(e => `${e.compositeId}<-${e.constituentId}`).join(", ")})` : ""}`,
   );
+  // Final ability-upgrade pass. This must run after both composite passes so
+  // additions copy the final patched packages and are not overwritten later.
+  const abilityUpgradeResult = initEliteReduxAbilityUpgrades();
+  console.info(
+    `[er-ability-upgrades] applied ${abilityUpgradeResult.applied} upgrades${abilityUpgradeResult.missingDraftIds.length > 0 ? ` (${abilityUpgradeResult.missingDraftIds.length} missing draft ids)` : ""}`,
+  );
 }
 
 function initPhaseErTrainersForms(): void {
@@ -416,8 +423,9 @@ function initPhaseErTiersFinal(): void {
 
   // Newcomer SPECIES TM compatibility (a SEPARATE data path from the level-up
   // learnsets: tmSpecies / speciesTmMoves). Evolution species inherit the pre-evo's
-  // full TM set + type additions; Regitube gets a hand Water set; partner
-  // eeveelutions inherit their base's. Without this the 70000+ band had no TMs.
+  // full TM set + type additions; Regitube gets a hand Water set; Partner Eevee
+  // and every partner eeveelution receive the union of the family's TM pools.
+  // Without this the 70000+ band had no TMs.
   // MUST run LAST — after initEliteReduxPokedexOverrides finalizes the base/pre-evo
   // TM lists (which the editor TM overrides can extend), so the inherited superset
   // is complete.

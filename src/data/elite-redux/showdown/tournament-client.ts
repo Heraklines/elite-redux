@@ -13,7 +13,12 @@
 // =============================================================================
 
 import { SESSION_ID_COOKIE_NAME } from "#app/constants";
-import type { TournamentView } from "#data/elite-redux/showdown/tournament-types";
+import type {
+  BattleFormat,
+  GhostIconSummary,
+  SeriesFormat,
+  TournamentView,
+} from "#data/elite-redux/showdown/tournament-types";
 import { getCookie } from "#utils/cookies";
 
 export type ClientResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -60,14 +65,59 @@ export function getTournamentBracket(id: string): Promise<ClientResult<{ tournam
   return request("GET", `/tournament/bracket?id=${encodeURIComponent(id)}`);
 }
 
-/** Register for a tournament with a saved team preset (a preset name is REQUIRED). */
-export function registerForTournament(id: string, presetName: string): Promise<ClientResult<unknown>> {
-  return request("POST", "/tournament/register", { id, presetName });
+/**
+ * Register for a tournament with a saved team preset (a preset name is REQUIRED). The optional
+ * ghost-icon summary (sprite key / name / title) is carried into the entrants table so the board
+ * can draw the entrant's ghost-trainer identity (P1.5). The worker sanitizes it on receipt.
+ */
+export function registerForTournament(
+  id: string,
+  presetName: string,
+  ghost?: GhostIconSummary,
+): Promise<ClientResult<{ autoClosed?: boolean }>> {
+  return request("POST", "/tournament/register", { id, presetName, ...(ghost ? { ghost } : {}) });
 }
 
 /** Withdraw from a tournament (before registration closes). */
 export function withdrawFromTournament(id: string): Promise<ClientResult<unknown>> {
   return request("POST", "/tournament/withdraw", { id });
+}
+
+/** Fields an in-game community creator can set (prize-free; cap clamped to 16 by the worker). */
+export interface CommunityCreateInput {
+  name: string;
+  /** Entrant cap; the worker clamps to the community max (16). */
+  maxEntrants?: number;
+  roundWindowMs?: number;
+  battleFormat?: BattleFormat;
+  seriesFormat?: SeriesFormat;
+  /** Optional scheduled registration close (epoch ms). */
+  closeAt?: number | null;
+}
+
+/**
+ * P3 COMMUNITY CREATION: any authenticated player creates a small, PRIZE-FREE tournament in-game.
+ * The worker forces the reward pool empty, clamps the cap to the community max, and enforces the
+ * one-active-tournament-per-creator anti-spam limit (a 422 with the reason on refusal).
+ */
+export function communityCreateTournament(
+  input: CommunityCreateInput,
+): Promise<ClientResult<{ tournament: TournamentView }>> {
+  return request("POST", "/tournament/community-create", input);
+}
+
+/** Cancel a tournament you organize (a community creator can cancel their OWN); admins can cancel any. */
+export function cancelTournament(id: string): Promise<ClientResult<unknown>> {
+  return request("POST", "/tournament/cancel", { id });
+}
+
+/**
+ * Presence ping (P1.5): stamp the caller's last-seen on this tournament while they sit on the
+ * board / in the tournament lobby, so an opponent's board shows "A: FIGHT" vs "last seen <ago>".
+ * Best-effort and display-only (the P2 activity-win logic is out of scope).
+ */
+export function pingTournamentPresence(id: string): Promise<ClientResult<unknown>> {
+  return request("POST", "/tournament/ping", { id });
 }
 
 /**

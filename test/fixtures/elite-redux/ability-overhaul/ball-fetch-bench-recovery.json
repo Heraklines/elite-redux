@@ -1,0 +1,47 @@
+{
+  "v": 1,
+  "name": "Benched Ball Fetch restores used Poke Balls",
+  "run": {
+    "wave": 1,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "ball-fetch-bench-recovery",
+    "waves": 2
+  },
+  "party": [
+    {
+      "species": "YAMPER",
+      "ability": "BALL_FETCH",
+      "moves": ["SPLASH", "TACKLE", "BITE", "ROAR"]
+    },
+    {
+      "species": "MEWTWO",
+      "ability": "PICKUP",
+      "moves": ["PSYCHIC", "AURA_SPHERE", "ICE_BEAM", "RECOVER"]
+    }
+  ],
+  "enemy": {
+    "kind": "wild",
+    "wild": {
+      "species": "MAGIKARP",
+      "level": 100,
+      "moves": ["SPLASH", "TACKLE", "FLAIL", "BOUNCE"]
+    }
+  },
+  "items": {
+    "pokeballs": {
+      "POKEBALL": 3
+    }
+  },
+  "script": [
+    { "switch": 1, "enemyMove": "SPLASH" },
+    { "ball": "POKEBALL", "enemyMove": "SPLASH" },
+    { "move": "PSYCHIC", "enemyMove": "SPLASH" }
+  ],
+  "expect": {
+    "outcome": "max-waves",
+    "pokeballs": {
+      "POKEBALL": 3
+    }
+  }
+}

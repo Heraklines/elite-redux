@@ -13,6 +13,7 @@
   "heavyRain": "Heavy Rain",
   "harshSun": "Harsh Sun",
   "strongWinds": "Strong Winds",
+  "eerieFog": "Eerie Fog",
 
   "neutralizingGas": "Neutralizing Gas",
 
@@ -32,6 +33,7 @@
   "stealthRock": "Stealth Rock",
   "stickyWeb": "Sticky Web",
   "trickRoom": "Trick Room",
+  "inverseRoom": "Inverse Room",
   "gravity": "Gravity",
   "reflect": "Reflect",
   "lightScreen": "Light Screen",
@@ -49,5 +51,8 @@
   "waterFirePledge": "Rainbow",
   "grassWaterPledge": "Swamp",
   "fairyLock": "Fairy Lock",
-  "imprison": "Imprison"
+  "imprison": "Imprison",
+
+  "sedimentBloom": "Sediment Bloom",
+  "graveMarker": "Grave Marker"
 }

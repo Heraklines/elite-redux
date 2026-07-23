@@ -19,6 +19,8 @@
 // Cleared when the match ends or aborts.
 // =============================================================================
 
+import type { BattleFormat, SeriesFormat } from "#data/elite-redux/showdown/tournament-types";
+
 export interface TournamentMatchContext {
   /** The tournament this match belongs to. */
   tournamentId: string;
@@ -26,6 +28,22 @@ export interface TournamentMatchContext {
   matchId: string;
   /** The account username of the bracket opponent this match MUST be against. */
   expectedOpponent: string;
+  /**
+   * The field width this match is played at (from the tournament record's battleFormat). Both
+   * clients read the SAME server-authoritative TournamentView, so this is agreed by construction;
+   * it is ALSO cross-checked over the negotiate handshake (a stale client that resolves a different
+   * width refuses to pair rather than desync). Absent = singles (back-compat with old contexts).
+   */
+  battleFormat?: BattleFormat;
+  /**
+   * SERIES (bo3/bo5): the series wrapper this match is played under, and the CURRENT game number
+   * (0-based) within it. Absent/0 = a single game. The worker is authoritative for the series
+   * clinch; the client carries these to report each game with its index and to drive the
+   * intermission between games.
+   */
+  seriesFormat?: SeriesFormat;
+  /** 0-based index of the current game within the series (0 for a single game). */
+  gameIndex?: number;
 }
 
 let context: TournamentMatchContext | null = null;

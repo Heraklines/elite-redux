@@ -26,6 +26,8 @@
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
+import type { MoveCategory } from "#enums/move-category";
+import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
@@ -43,6 +45,8 @@ export interface CounterAttackFilter {
    * @defaultValue `false` — counters fire on any damaging hit.
    */
   readonly contactRequired?: boolean;
+  /** When set, only moves with this flag trigger the counter. */
+  readonly flag?: MoveFlags;
 }
 
 /** Construction options for {@linkcode CounterAttackOnHitAbAttr}. */
@@ -58,6 +62,10 @@ export interface CounterAttackOnHitOptions {
   readonly chance?: number;
   /** Optional filter restricting which incoming moves trigger the counter. */
   readonly filter?: CounterAttackFilter;
+  /** Optional battle-only category override for the scripted counter. */
+  readonly category?: MoveCategory;
+  /** Optional healing multiplier for scripted healing/status counters. */
+  readonly healMultiplier?: number;
 }
 
 /**
@@ -73,13 +81,23 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
   private readonly power: number | undefined;
   private readonly chance: number;
   private readonly filter: CounterAttackFilter;
+  private readonly category: MoveCategory | undefined;
+  private readonly healMultiplier: number | undefined;
 
   constructor(options: CounterAttackOnHitOptions) {
-    super(false);
+    // showAbility = true (default): the counter is a discrete, player-visible
+    // triggered action, so its ability banner must flash when it fires — matching
+    // vanilla convention (stat-change / status / retaliation abilities announce
+    // themselves). A prior `super(false)` suppressed the popup for Ultra Instinct
+    // (er-660) and Deflect (er-1022, Mega Lucario Z's innate), so the Vacuum Wave
+    // counter fired silently with no on-screen ability flash (maintainer report).
+    super();
     this.moveId = options.moveId;
     this.power = options.power;
     this.chance = options.chance ?? 100;
     this.filter = options.filter ?? {};
+    this.category = options.category;
+    this.healMultiplier = options.healMultiplier;
     if (!(this.chance >= 0 && this.chance <= 100)) {
       throw new Error(`[CounterAttackOnHitAbAttr] chance must be in [0..100]; got ${this.chance}`);
     }
@@ -109,6 +127,9 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
       return false;
     }
     if (this.filter.contactRequired && !move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
+      return false;
+    }
+    if (this.filter.flag !== undefined && !move.hasFlag(this.filter.flag)) {
       return false;
     }
     if (this.filter.category === "physical" && !move.is("AttackMove")) {
@@ -143,7 +164,10 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
       "MovePhase",
       pokemon,
       [opponent.getBattlerIndex()],
-      scriptedPokemonMove(this.moveId, this.power),
+      scriptedPokemonMove(this.moveId, this.power, {
+        ...(this.category === undefined ? {} : { category: this.category }),
+        ...(this.healMultiplier === undefined ? {} : { healMultiplier: this.healMultiplier }),
+      }),
       MoveUseMode.INDIRECT,
     );
   }

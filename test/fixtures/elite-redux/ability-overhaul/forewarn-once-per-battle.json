@@ -1,0 +1,47 @@
+{
+  "v": 1,
+  "name": "Forewarn does not re-arm after switching",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "forewarn-once-per-battle"
+  },
+  "party": [
+    {
+      "species": "ALAKAZAM",
+      "ability": "FOREWARN",
+      "moves": ["SPLASH"]
+    },
+    {
+      "species": "SNORLAX",
+      "ability": "BALL_FETCH",
+      "moves": ["SPLASH"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "UMBREON",
+        "level": 100,
+        "ability": "RUN_AWAY",
+        "moves": ["ASTONISH"]
+      }
+    ]
+  },
+  "script": [
+    { "move": "SPLASH" },
+    { "switch": 1 },
+    { "switch": 1 },
+    { "move": "SPLASH", "enemyMove": "ASTONISH", "enemyTarget": 0 }
+  ],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Forewarn",
+    "playerDamaged": true,
+    "playerEntryEffectsFired": ["upgrade:forewarn:two-turn-soothsayer"],
+    "playerAbilityEntryWindowsAbsent": ["upgrade:forewarn:two-turn-soothsayer"],
+    "logIncludes": ["not very effective"]
+  }
+}

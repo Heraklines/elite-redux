@@ -56,17 +56,19 @@
 
 import type { PostKnockOutAbAttrParams } from "#abilities/ab-attrs";
 import { PostAttackAbAttr, PostKnockOutAbAttr } from "#abilities/ab-attrs";
+import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
 import type { BattlerTagType } from "#enums/battler-tag-type";
+import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
-import { toDmgValue } from "#utils/common";
+import { BooleanHolder, toDmgValue } from "#utils/common";
 import i18next from "i18next";
 
 /**
@@ -79,6 +81,38 @@ import i18next from "i18next";
 function koLandedByDirectHit(params: PostKnockOutAbAttrParams): boolean {
   const lastAttack = params.victim.turnData.attacksReceived?.[0];
   return !!lastAttack && lastAttack.sourceId === params.pokemon.id;
+}
+
+/**
+ * Applies an ability-driven drain payout, reversing it into indirect damage
+ * when the drained Pokemon has Liquid Ooze. Held-item healing such as Shell
+ * Bell never calls this helper and is therefore deliberately unaffected.
+ */
+export function applyAbilityDrainRecovery(
+  drainer: Pokemon,
+  drainedPokemon: Pokemon,
+  amount: number,
+  message: string,
+  simulated = false,
+): void {
+  if (simulated || amount <= 0) {
+    return;
+  }
+
+  const reversesDrain = drainedPokemon
+    .getPostBattleAbilitySources()
+    .some(source => source.ability.hasAttr("ReverseDrainAbAttr"));
+  if (reversesDrain) {
+    const cancelled = new BooleanHolder(false);
+    applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon: drainer, cancelled });
+    if (!cancelled.value) {
+      drainer.damageAndUpdate(amount, { result: HitResult.INDIRECT });
+      drainer.turnData.damageTaken += amount;
+    }
+    return;
+  }
+
+  globalScene.phaseManager.unshiftNew("PokemonHealPhase", drainer.getBattlerIndex(), amount, message, true);
 }
 
 /**
@@ -120,6 +154,10 @@ export interface LifestealOnHitOptions {
    * style). When set, only moves matching the filter trigger the heal.
    */
   readonly filter?: LifestealFilter;
+  /** Optional target types that replace the base fraction with a larger one. */
+  readonly boostedTargetTypes?: readonly PokemonType[];
+  /** Recovery fraction used when the target matches {@linkcode boostedTargetTypes}. */
+  readonly boostedHealFraction?: number;
 }
 
 /**
@@ -146,6 +184,8 @@ export interface LifestealOnHitOptions {
 export class LifestealOnHitAbAttr extends PostAttackAbAttr {
   private readonly hitHealFraction: number;
   private readonly hitFilter: LifestealFilter;
+  private readonly boostedTargetTypes: readonly PokemonType[];
+  private readonly boostedHealFraction: number | null;
 
   constructor(opts: LifestealOnHitOptions) {
     if (!(opts.healFraction > 0 && opts.healFraction <= 1)) {
@@ -153,6 +193,12 @@ export class LifestealOnHitAbAttr extends PostAttackAbAttr {
     }
     if (opts.filter?.flag === MoveFlags.NONE) {
       throw new Error("[LifestealOnHitAbAttr] filter.flag must be a non-NONE MoveFlags bit when set");
+    }
+    if (
+      opts.boostedHealFraction !== undefined
+      && (!(opts.boostedHealFraction > 0 && opts.boostedHealFraction <= 1) || opts.boostedTargetTypes?.length === 0)
+    ) {
+      throw new Error("[LifestealOnHitAbAttr] boostedHealFraction requires target types and must be in (0, 1]");
     }
     const filter = opts.filter ?? {};
     super((user, target, move) => {
@@ -171,6 +217,8 @@ export class LifestealOnHitAbAttr extends PostAttackAbAttr {
     });
     this.hitHealFraction = opts.healFraction;
     this.hitFilter = filter;
+    this.boostedTargetTypes = opts.boostedTargetTypes ?? [];
+    this.boostedHealFraction = opts.boostedHealFraction ?? null;
   }
 
   /** Read-only accessor for the configured heal fraction. */
@@ -205,20 +253,25 @@ export class LifestealOnHitAbAttr extends PostAttackAbAttr {
     if (simulated) {
       return;
     }
-    const healAmount = toDmgValue(damage * this.hitHealFraction);
+    const fraction =
+      this.boostedHealFraction !== null
+      && params.opponent.getTypes().some(type => this.boostedTargetTypes.includes(type))
+        ? this.boostedHealFraction
+        : this.hitHealFraction;
+    const healAmount = toDmgValue(damage * fraction);
     if (healAmount <= 0) {
       return;
     }
     const abilityName = pokemon.getAbility()?.name ?? "";
-    globalScene.phaseManager.unshiftNew(
-      "PokemonHealPhase",
-      pokemon.getBattlerIndex(),
+    applyAbilityDrainRecovery(
+      pokemon,
+      params.opponent,
       healAmount,
       i18next.t("abilityTriggers:postAttackHeal", {
         pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
         abilityName,
       }),
-      true,
+      simulated,
     );
   }
 
@@ -340,15 +393,15 @@ export class LifestealOnKoAbAttr extends PostKnockOutAbAttr {
       return;
     }
     const abilityName = pokemon.getAbility()?.name ?? "";
-    globalScene.phaseManager.unshiftNew(
-      "PokemonHealPhase",
-      pokemon.getBattlerIndex(),
+    applyAbilityDrainRecovery(
+      pokemon,
+      params.victim,
       healAmount,
       i18next.t("abilityTriggers:postAttackHeal", {
         pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
         abilityName,
       }),
-      true,
+      simulated,
     );
   }
 }

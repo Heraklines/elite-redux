@@ -82,6 +82,27 @@ export const ER_PARTNER_UMBREON_ABILITY_ID = 5951;
 export const ER_PARTNER_LEAFEON_ABILITY_ID = 5952;
 export const ER_PARTNER_GLACEON_ABILITY_ID = 5953;
 export const ER_PARTNER_SYLVEON_ABILITY_ID = 5954;
+// 5955-5969 are allocated by type-nativization and other newcomer abilities.
+export const ER_GLYCOLYSIS_ABILITY_ID = 5970;
+// --- Newcomer BATCH 2 composites (fakemon newcomer patch, batch 2). ---
+// Each is the union of its two constituents' attrs, resolved by the same wire
+// pass; both constituents stay fully active with their own gates. Ids 5971-5994
+// are owned by the codex signature batch (newcomer-signature-abilities.ts), so
+// these two designer-spec'd composites live at 5995+ (Porous + Gillie Suit are
+// NOT composites in the codex batch — they are bespoke signature abilities there).
+export const ER_CRUDE_STEEL_ABILITY_ID = 5995; // Solid Rock + Steelworker
+export const ER_MINIGUN_ABILITY_ID = 5996; // Quick Draw + Dual Wield
+// 5997 Meteor Mass + 5998 Inverse Room are signature abilities (newcomer-batch2.ts).
+// Batch-2 Omniform EXTENSION (maintainer verdict 2026-07-22, CORRECTED after the live
+// "regular Titaneon transformed" report): the three NEW eeveelutions Nimbeon / Ryuveon /
+// Titaneon get PARTNER ALIAS species (like the 8 partner eeveelutions 70012-70019). The
+// composite [innate + Omniform] is carried by the ALIAS, NOT the real species — so the
+// REGULAR eeveelution (evolved from a regular Eevee) has a PLAIN innate and never
+// transforms, while the Partner Eevee family chains THROUGH the alias. Each composite is
+// [that eeveelution's own innate[0] + Omniform], grafted onto the alias's innate[0].
+export const ER_PARTNER_NIMBEON_ABILITY_ID = 6001; // Fluffy + Omniform
+export const ER_PARTNER_RYUVEON_ABILITY_ID = 6002; // Stamina + Omniform
+export const ER_PARTNER_TITANEON_ABILITY_ID = 6003; // Stainless Steel + Omniform
 
 /**
  * A single manual-composite definition: the display name, the verbatim short
@@ -116,13 +137,18 @@ const AIR_BLOWER = 5058;
 const HARUKAZE = 5534;
 const PARASITIC_SPORES = 5314;
 const ITCHY_DEFENSE = 5207;
+// Batch-2 composite constituents (ER-custom live pokerogue ids, verified via the
+// ability audit against ER_ID_MAP; the seam test asserts each resolves).
+const DUAL_WIELD = 5169; // Minigun constituent (ER custom)
 // Omniform (5929) — the graft constituent for the partner-Eevee family. Resolved
 // live via `allAbilities[5929]`; its `OmniformAbAttr` is copied into every partner
 // composite so the composite drives the adaptive transform AND keeps the base
 // innate's own effect. The remaining constituents are each base eeveelution's
 // FIRST innate (verified live from the ER-patched kit at authoring time).
 const OMNIFORM = 5929;
-const FLUFFY = 218; // base Eevee innate[0]
+const FLUFFY = 218; // base Eevee innate[0] (also Nimbeon innate[0])
+const STAMINA = 192; // Ryuveon innate[0] (vanilla)
+const STAINLESS_STEEL = 5530; // Titaneon innate[0] (ER custom)
 const WATER_VEIL = 41; // base Vaporeon innate[0]
 const SHORT_CIRCUIT = 5060; // base Jolteon innate[0] (ER custom)
 const FLASH_FIRE = 18; // base Flareon innate[0]
@@ -146,6 +172,27 @@ const MOUNTAINEER = 5052; // ER custom (immune to Rock moves + Stealth Rock)
  * (attrs) and `getErCompositeDetailedDescription` (constituent detail text).
  */
 export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>> = {
+  [ER_GLYCOLYSIS_ABILITY_ID]: {
+    id: ER_GLYCOLYSIS_ABILITY_ID,
+    name: "Glycolysis",
+    description: "Harvest + Well-Baked Body.",
+    constituents: [AbilityId.HARVEST, AbilityId.WELL_BAKED_BODY],
+  },
+  // --- Newcomer BATCH 2 composites (spec'd inline by the designer). ---
+  // Crude Steel (Metagross Battle Bond innate) = Solid Rock + Steelworker.
+  [ER_CRUDE_STEEL_ABILITY_ID]: {
+    id: ER_CRUDE_STEEL_ABILITY_ID,
+    name: "Crude Steel",
+    description: "Solid Rock + Steelworker.",
+    constituents: [AbilityId.SOLID_ROCK, AbilityId.STEELWORKER],
+  },
+  // Minigun (Dustnoir/Drawclops innate) = Quick Draw + Dual Wield.
+  [ER_MINIGUN_ABILITY_ID]: {
+    id: ER_MINIGUN_ABILITY_ID,
+    name: "Minigun",
+    description: "Quick Draw + Dual Wield.",
+    constituents: [AbilityId.QUICK_DRAW, DUAL_WIELD],
+  },
   [ER_FIRST_SERPENT_ABILITY_ID]: {
     id: ER_FIRST_SERPENT_ABILITY_ID,
     name: "First Serpent",
@@ -220,10 +267,13 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
   // onto the base eeveelution's FIRST innate: the original innate stays fully
   // active (its detailed description surfaces via #201) AND the composite carries
   // Omniform's adaptive-transform attr so the partner form can chain across the
-  // family. The `name` keeps the base innate's name (no invented pitch names).
+  // family. The eeveelutions keep the base innate's name; the Partner Eevee HEAD
+  // is renamed to "Adaptive Fur" (maintainer directive 2026-07-22) — display name
+  // only, mechanics + constituents (Fluffy + Omniform) unchanged, and the
+  // constituent parts stay visible via the description + the card chips.
   [ER_PARTNER_EEVEE_ABILITY_ID]: {
     id: ER_PARTNER_EEVEE_ABILITY_ID,
-    name: "Fluffy",
+    name: "Adaptive Fur",
     description: "Fluffy + Omniform.",
     constituents: [FLUFFY, OMNIFORM],
   },
@@ -274,6 +324,27 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     name: "Pixilate",
     description: "Pixilate + Omniform.",
     constituents: [PIXILATE, OMNIFORM],
+  },
+  // Batch-2 Omniform EXTENSION: the three NEW eeveelutions get PARTNER ALIAS species that
+  // carry Omniform (the real species do NOT — regular eeveelutions never transform). Each
+  // alias keeps its base eeveelution's own innate[0] name; Omniform is grafted on.
+  [ER_PARTNER_NIMBEON_ABILITY_ID]: {
+    id: ER_PARTNER_NIMBEON_ABILITY_ID,
+    name: "Fluffy",
+    description: "Fluffy + Omniform.",
+    constituents: [FLUFFY, OMNIFORM],
+  },
+  [ER_PARTNER_RYUVEON_ABILITY_ID]: {
+    id: ER_PARTNER_RYUVEON_ABILITY_ID,
+    name: "Stamina",
+    description: "Stamina + Omniform.",
+    constituents: [STAMINA, OMNIFORM],
+  },
+  [ER_PARTNER_TITANEON_ABILITY_ID]: {
+    id: ER_PARTNER_TITANEON_ABILITY_ID,
+    name: "Stainless Steel",
+    description: "Stainless Steel + Omniform.",
+    constituents: [STAINLESS_STEEL, OMNIFORM],
   },
   // -----------------------------------------------------------------------
   // Type-nativization (Pass A) composite replacements (5955-5962). Each is the

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  COMMUNITY_MAX_ENTRANTS,
   cancelTournament,
   clampRoundWindow,
   closeRegistration,
+  createCommunityTournament,
   createTournament,
   DEFAULT_MAX_ENTRANTS,
   DEFAULT_ROUND_WINDOW_MS,
@@ -197,5 +199,43 @@ describe("syncCompletion — end to end", () => {
     expect(tour.state).toBe("complete");
     expect(tour.champion).toBe("player1");
     expect(champion(b)).toBe("player1");
+  });
+});
+
+describe("createCommunityTournament (P3 community tier)", () => {
+  it("clamps the cap to the community max and FORCES the reward pool empty", () => {
+    const res = createCommunityTournament(
+      "com",
+      "bob",
+      {
+        name: "Bob's Bash",
+        maxEntrants: 64,
+        rewardPool: [{ place: "champion", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 99 }] }],
+      },
+      0,
+      1000,
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) {
+      return;
+    }
+    expect(res.tournament.community).toBe(true);
+    expect(res.tournament.maxEntrants).toBe(COMMUNITY_MAX_ENTRANTS);
+    expect(res.tournament.rewardPool).toEqual([]);
+    expect(res.tournament.organizer).toBe("bob");
+  });
+
+  it("anti-spam red-proof: refuses when the creator already has an active tournament", () => {
+    const res = createCommunityTournament("com2", "bob", { name: "Second" }, 1, 1000);
+    expect(res.ok).toBe(false);
+    if (res.ok) {
+      return;
+    }
+    expect(res.error).toMatch(/already have an active tournament/i);
+  });
+
+  it("still validates the name (empty name rejected)", () => {
+    const res = createCommunityTournament("com3", "bob", { name: "   " }, 0, 1000);
+    expect(res.ok).toBe(false);
   });
 });

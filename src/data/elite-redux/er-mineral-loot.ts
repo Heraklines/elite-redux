@@ -33,6 +33,7 @@ import { globalScene } from "#app/global-scene";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { modifierTypes } from "#data/data-lists";
 import { ER_RESIST_BERRY_BY_TYPE, erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
+import { erMegaStoneAppearsAtGate, erMegaStoneTier, pickErMegaStoneWeighted } from "#data/elite-redux/er-mega-tiers";
 import { type ErWardStoneTier, erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -352,10 +353,22 @@ export function rollMegaStone(haul: MineralLootHaul, d: number, chancePct: numbe
   if (stones.length === 0) {
     return false;
   }
-  const opt = generateModifierTypeOption(modifierTypes.FORM_CHANGE_ITEM, [randSeedItem(stones)]);
+  // STRENGTH-TIERED rarity (er-mega-tiers): the deep find is a WEIGHTED pick, so
+  // a masterball-tier stone (legendary / primal / "-Z" ultra mega) is a very-
+  // low-chance unearth even when eligible, and reads at its true rarity tier.
+  const stone = pickErMegaStoneWeighted(stones);
+  // ABSOLUTE APPEARANCE GATE (er-mega-tiers): even after the weighted pick, the
+  // chosen stone must clear its tier's absolute appearance rate, so a masterball-
+  // tier find stays genuinely rare even when the party's ONLY mega line is a
+  // MASTER one (weight-1-of-1). On a gate MISS the dig turns up no stone.
+  if (!erMegaStoneAppearsAtGate(stone)) {
+    return false;
+  }
+  const opt = generateModifierTypeOption(modifierTypes.FORM_CHANGE_ITEM, [stone]);
   if (!opt) {
     return false;
   }
+  opt.type.setTier(erMegaStoneTier(stone));
   haul.options.push(opt);
   haul.megaFound = true;
   return true;

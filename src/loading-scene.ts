@@ -2,12 +2,13 @@ import { timedEventManager } from "#app/global-event-manager";
 import { initializeGame, initializeGameYielding } from "#app/init/init";
 import { SceneBase } from "#app/scene-base";
 import { isMobile } from "#app/touch-controls";
+import { getErBiomeBackgroundTextureKeys } from "#data/elite-redux/er-biome-backgrounds";
 import { markBootMilestone } from "#data/elite-redux/er-boot-diagnostics";
 import { isIOSDevice } from "#data/elite-redux/er-ios";
 import { getEliteReduxCustomIconLoads } from "#data/elite-redux/er-ios-icon-preload";
 import { BiomeId } from "#enums/biome-id";
 import { GachaType } from "#enums/gacha-types";
-import { BG_VARIANT_SUFFIXES, biomeHasBgVariants, getBiomeHasProps } from "#field/arena";
+import { getBiomeHasProps } from "#field/arena";
 import { CacheBustedLoaderPlugin } from "#plugins/cache-busted-loader-plugin";
 import { ER_BIOME_SHOP_KEEPERS } from "#ui/biome-shop-ui-handler";
 import { getWindowVariantSuffix, WindowVariant } from "#ui/ui-theme";
@@ -738,11 +739,11 @@ export class LoadingScene extends SceneBase {
       const baseAKey = `${btKey}_a`;
       const baseBKey = `${btKey}_b`;
       this.loadImage(`${btKey}_bg`, "arenas");
-      // Biomes with hand-painted day/dusk/night art (ER staging) preload each
-      // variant; the arena picks the right one by time of day. See arena.ts.
-      if (biomeHasBgVariants(bt)) {
-        for (const suffix of BG_VARIANT_SUFFIXES) {
-          this.loadImage(`${btKey}_bg_${suffix}`, "arenas");
+      // ER backgrounds may provide several coherent scenes and hand-painted
+      // time-of-day frames. The base key above remains the universal fallback.
+      for (const backgroundKey of getErBiomeBackgroundTextureKeys(bt)) {
+        if (backgroundKey !== `${btKey}_bg`) {
+          this.loadImage(backgroundKey, "arenas");
         }
       }
       if (isBaseAnimated) {

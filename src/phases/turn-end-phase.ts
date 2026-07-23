@@ -1,7 +1,11 @@
-import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { applyAbAttrs, applyOnGainAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
+import { processSedimentBlooms } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
+import { lapseTimedAbilitySuppressions } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
+import { syncBlisteringSunFieldPair } from "#data/elite-redux/ability-upgrades/requested-field-effects";
+import { isToxicTerrainProtected } from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { isCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
@@ -46,6 +50,7 @@ export class TurnEndPhase extends FieldPhase {
 
     globalScene.phaseManager.hideAbilityBar();
 
+    const timedSuppressionHolders: Pokemon[] = [];
     const handlePokemon = (pokemon: Pokemon) => {
       if (!pokemon.switchOutStatus) {
         pokemon.lapseTags(BattlerTagLapseType.TURN_END);
@@ -133,6 +138,7 @@ export class TurnEndPhase extends FieldPhase {
         }
 
         applyAbAttrs("PostTurnAbAttr", { pokemon });
+        timedSuppressionHolders.push(pokemon);
       }
 
       globalScene.applyModifiers(TurnStatusEffectModifier, pokemon.isPlayer(), pokemon);
@@ -140,10 +146,12 @@ export class TurnEndPhase extends FieldPhase {
 
       pokemon.tempSummonData.turnCount++;
       pokemon.tempSummonData.waveTurnCount++;
+      pokemon.tempSummonData.erTelekineticStruggle = false;
     };
 
     if (!this.upcomingInterlude) {
       this.executeForAll(handlePokemon);
+      processSedimentBlooms();
 
       // ER relic (#439): Field Medic - once per turn, every 3 turns, the benched
       // player mons in party slots 2 and 3 recover 1/12 max HP (no-op unless the
@@ -163,11 +171,27 @@ export class TurnEndPhase extends FieldPhase {
     // Freeze the lapse for TOXIC terrain in that case; everything else lapses.
     const activeTerrain = globalScene.arena.terrain;
     if (activeTerrain) {
-      const stenchFreezesToxic =
-        activeTerrain.terrainType === TerrainType.TOXIC
-        && globalScene.getField(true).some(p => p?.hasAbility(AbilityId.STENCH));
+      const stenchFreezesToxic = activeTerrain.terrainType === TerrainType.TOXIC && isToxicTerrainProtected();
       if (!stenchFreezesToxic && !activeTerrain.lapse()) {
         globalScene.arena.trySetTerrain(TerrainType.NONE);
+      }
+    }
+    syncBlisteringSunFieldPair();
+
+    // A suppression lasting N turns remains active through all end-of-turn work for
+    // the Nth turn, then expires before the next command can be chosen.
+    for (const pokemon of timedSuppressionHolders) {
+      const reactivatedIds = new Set(lapseTimedAbilitySuppressions(pokemon));
+      if (reactivatedIds.size > 0) {
+        for (const source of pokemon.getActiveAbilitySources()) {
+          if (reactivatedIds.has(source.ability.id)) {
+            applyOnGainAbAttrs({
+              pokemon,
+              passive: source.passive,
+              passiveSlot: source.passiveSlot,
+            });
+          }
+        }
       }
     }
 

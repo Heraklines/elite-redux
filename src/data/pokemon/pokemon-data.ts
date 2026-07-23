@@ -216,12 +216,22 @@ interface SerializedIllusionData extends Omit<IllusionData, "fusionSpecies"> {
   fusionSpecies?: SpeciesId | undefined;
 }
 
+export interface TimedAbilitySuppression {
+  abilityId: AbilityId;
+  sourceAbilityId: AbilityId;
+  turnsRemaining: number;
+}
+
 interface SerializedPokemonSummonData {
   statStages: number[];
   moveQueue: TurnMove[];
   tags: BattlerTag[];
   abilitySuppressed: boolean;
   abilitiesApplied: AbilityId[];
+  erSuppressedInnateSlots: boolean[];
+  erTimedAbilitySuppressions: TimedAbilitySuppression[];
+  erAbilityProvenance: string[];
+  erImposterCopiedAttackBoost: boolean;
   speciesForm?: SerializedSpeciesForm | undefined;
   fusionSpeciesForm?: SerializedSpeciesForm | undefined;
   ability?: AbilityId | undefined;
@@ -267,6 +277,14 @@ export class PokemonSummonData {
   public tags: BattlerTag[] = [];
   public abilitySuppressed = false;
   public abilitiesApplied: Set<AbilityId> = new Set();
+  /** Exact ER innate slots disabled until this summon data is replaced on switch. */
+  public erSuppressedInnateSlots: boolean[] = [false, false, false];
+  /** Source-aware ability-id suppressions that lapse once per completed turn. */
+  public erTimedAbilitySuppressions: TimedAbilitySuppression[] = [];
+  /** Reusable once-per-entry markers for ability mechanics. */
+  public erAbilityProvenance: string[] = [];
+  /** Imposter transformed this summon, so copied damaging moves retain its 1.3x rider. */
+  public erImposterCopiedAttackBoost = false;
   /**
    * Whether this Pokémon's ER {@linkcode AbilityId.CHUCKSTER} (864) has already
    * spent its once-per-ENTRY charge (the contact-hit 50% damage reduction). As
@@ -451,6 +469,15 @@ export class PokemonTempSummonData {
    * {@linkcode MoveId.FAKE_OUT | Fake Out} and {@linkcode MoveId.FIRST_IMPRESSION | First Impression}).
    */
   waveTurnCount = 1;
+  /**
+   * Active entry-scoped ability windows. This set is cleared on switch while
+   * the corresponding spent keys remain in waveData for the whole battle.
+   */
+  public abilityEntryWindows: Set<string> = new Set<string>();
+  /** Toxic Spill entry snapshot; clears with this temporary summon state on switch. */
+  public erPoisonWeakness = false;
+  /** Telekinetic forces this battler's next turn to resolve through Struggle. */
+  public erTelekineticStruggle = false;
 }
 
 /**
@@ -600,6 +627,9 @@ export class PokemonTurnData {
    * Used to prevent infinite loops from form change abilities triggering their own transformation conditions.
    */
   public formChangeAbilitiesApplied = new Set<AbilityId>();
+
+  /** Reusable markers scoped to this Pokémon's current selected command/turn. */
+  public erAbilityProvenance: string[] = [];
 
   /**
    * Tracker for a pending status effect.

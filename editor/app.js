@@ -1843,9 +1843,33 @@ const CTR_MEMBER_FIELDS = [
   "insanity",
   "fusion",
   "heldItems",
+  "vitamins",
   "shiny",
   "sanityOff",
 ];
+
+const CTR_VITAMIN_OPTIONS = [
+  { key: "hp", item: "HP Up", stat: "HP" },
+  { key: "atk", item: "Protein", stat: "Attack" },
+  { key: "def", item: "Iron", stat: "Defense" },
+  { key: "spatk", item: "Calcium", stat: "Sp. Atk" },
+  { key: "spdef", item: "Zinc", stat: "Sp. Def" },
+  { key: "spd", item: "Carbos", stat: "Speed" },
+];
+
+function clampCtrVitaminCount(value) {
+  const count = Number(value);
+  return Number.isFinite(count) ? Math.max(0, Math.min(31, Math.floor(count))) : 0;
+}
+
+function ctrNormVitamins(value) {
+  const raw = value && typeof value === "object" ? value : {};
+  const out = {};
+  for (const { key } of CTR_VITAMIN_OPTIONS) {
+    out[key] = clampCtrVitaminCount(raw[key]);
+  }
+  return out;
+}
 
 /** Coerce a raw/edit shiny value into the editor shape { palette, surface, around, name }
  *  (strings; empty = none). Accepts null/undefined and the saved JSON shape alike. */
@@ -1902,6 +1926,7 @@ function blankCtrMemberFields() {
     insanity: null,
     fusion: null,
     heldItems: [],
+    vitamins: ctrNormVitamins(null),
     // Shiny Lab visual effect the mon fields with (empty = none).
     shiny: ctrNormShiny(null),
     // Editor metadata: when true, this member's moves are NOT legality-checked.
@@ -1921,6 +1946,7 @@ function ctrCopyMemberFields(src) {
     insanity: ctrNormInsanity(src.insanity),
     fusion: src.fusion ? { ...src.fusion } : null,
     heldItems: (src.heldItems || []).map(h => ({ item: h.item || "", count: Number.isInteger(h.count) ? h.count : 1 })),
+    vitamins: ctrNormVitamins(src.vitamins),
     shiny: ctrNormShiny(src.shiny),
     sanityOff: src.sanityOff === true,
   };
@@ -2082,6 +2108,7 @@ function ctrLiveMemberFieldsToEdit(m) {
       item: h.item || "",
       count: Number.isInteger(h.count) ? h.count : 1,
     })),
+    vitamins: ctrNormVitamins(m.vitamins),
     shiny: ctrNormShiny(m.shiny),
     sanityOff: m.sanityOff === true,
   };
@@ -2729,6 +2756,14 @@ function ctrMemberHtml(m, i) {
         <button type="button" class="ctr-held-del" data-idx="${i}" data-heldidx="${hi}">✕</button></span>`,
     )
     .join("");
+  m.vitamins = ctrNormVitamins(m.vitamins);
+  const vitaminInputs = CTR_VITAMIN_OPTIONS.map(
+    ({ key, item, stat }) =>
+      `<label class="ctr-vitamin" title="${item} raises ${stat}; maximum 31 per Pokemon.">
+        <span>${item}</span><small>${stat}</small>
+        <input type="number" class="ctr-vitamin-count" data-idx="${i}" data-stat="${key}" value="${m.vitamins[key]}" min="0" max="31" step="1" />
+      </label>`,
+  ).join("");
   const fus = m.fusion;
   const insanity = ctrNormInsanity(m.insanity);
   const insanityInput = (label, value, slot) => {
@@ -2775,6 +2810,10 @@ function ctrMemberHtml(m, i) {
       }
     </div>
     <div class="ctr-held">Held items: ${heldRows}<button type="button" class="ctr-held-add" data-idx="${i}">＋ item</button></div>
+    <div class="ctr-vitamins">
+      <span class="ctr-vitamins-title">Vitamins</span>
+      <div class="ctr-vitamin-grid">${vitaminInputs}</div>
+    </div>
     ${ctrShinyPickerHtml(m, i)}
   </fieldset>`;
 }
@@ -3329,6 +3368,9 @@ function onCustomTrainerInput(el) {
     if (h) {
       h.count = Number(el.value) || 1;
     }
+  } else if (el.classList.contains("ctr-vitamin-count") && m) {
+    m.vitamins = ctrNormVitamins(m.vitamins);
+    m.vitamins[el.dataset.stat] = el.value === "" ? 0 : clampCtrVitaminCount(el.value);
   } else if (el.classList.contains("ctr-shiny-name") && m) {
     m.shiny = ctrNormShiny(m.shiny);
     m.shiny.name = el.value;
@@ -3505,6 +3547,10 @@ function onCustomTrainerChange(el) {
   } else if (el.classList.contains("ctr-move") && m) {
     // Blur after a manual move edit: re-render so the error line + set dropdown
     // reflect the change (the live red border already updated on input).
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-vitamin-count") && m) {
+    m.vitamins = ctrNormVitamins(m.vitamins);
     render();
     return true;
   } else if (el.classList.contains("ctr-diff")) {
@@ -3748,21 +3794,58 @@ function renderAssets(root) {
     <section class="asset-panel">
       <h2>Battle music</h2>
       <div class="asset-form">
-        <label>YouTube videos or playlists<textarea id="asset-media-urls" placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/playlist?list=..."></textarea></label>
-        <div class="asset-row">
-          <label>Key prefix <input id="asset-media-prefix" value="battle_custom" maxlength="40" /></label>
-          <label>Staff name <input id="asset-media-author" maxlength="40" /></label>
+        <div class="asset-source-tabs">
+          <button type="button" class="active" data-media-source="youtube">YouTube</button>
+          <button type="button" data-media-source="upload">Upload file</button>
         </div>
-        <div class="asset-row">
-          <label><input type="checkbox" id="asset-split" checked /> Split chapters and timestamps</label>
-          <label><input type="checkbox" id="asset-require-cc" /> Require Creative Commons</label>
-          <label><input type="checkbox" id="asset-deploy" checked /> Deploy staging</label>
+        <div class="asset-source-pane" data-media-pane="youtube">
+          <div class="asset-form">
+            <label>YouTube videos or playlists<textarea id="asset-media-urls" placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/playlist?list=..."></textarea></label>
+            <div class="asset-row">
+              <label>Key prefix <input id="asset-media-prefix" value="battle_custom" maxlength="40" /></label>
+              <label>Staff name <input id="asset-media-author" maxlength="40" /></label>
+            </div>
+            <div class="asset-row">
+              <label><input type="checkbox" id="asset-split" checked /> Split chapters and timestamps</label>
+              <label><input type="checkbox" id="asset-require-cc" /> Require Creative Commons</label>
+              <label><input type="checkbox" id="asset-deploy" checked /> Deploy staging</label>
+            </div>
+            <label><span><input type="checkbox" id="asset-media-rights" /> I confirm we may use and store this audio.</span></label>
+            <button type="button" id="asset-import" class="primary">Queue import</button>
+          </div>
         </div>
-        <label><span><input type="checkbox" id="asset-media-rights" /> I confirm we may use and store this audio.</span></label>
-        <div class="asset-row">
-          <button type="button" id="asset-import" class="primary">Queue import</button>
-          <button type="button" id="asset-refresh-jobs">Refresh jobs</button>
+        <div class="asset-source-pane" data-media-pane="upload" hidden>
+          <div class="asset-form">
+            <label class="asset-upload-box">
+              Audio or video file
+              <input id="asset-media-file" type="file" accept="audio/*,video/*,.mp3,.mp4,.m4a,.aac,.ogg,.oga,.opus,.wav,.flac,.webm,.mov,.mkv,.avi,.mpeg,.mpg,.ts,.wma,.aiff,.aif,.caf,.3gp" />
+              <span id="asset-media-file-name" class="asset-upload-file">No file selected</span>
+            </label>
+            <div class="asset-row">
+              <label>Title <input id="asset-upload-title" maxlength="160" /></label>
+              <label>Artist <input id="asset-upload-artist" maxlength="120" /></label>
+            </div>
+            <div class="asset-row">
+              <label>License <select id="asset-upload-license"><option value="original">Original</option><option value="permission">Permission</option><option value="cc0">CC0</option><option value="cc-by">CC BY</option><option value="unknown">Unknown</option></select></label>
+              <label>Source URL <input id="asset-upload-source" type="url" maxlength="500" /></label>
+            </div>
+            <label>Attribution <input id="asset-upload-attribution" maxlength="500" /></label>
+            <div class="asset-row">
+              <label>Key prefix <input id="asset-upload-prefix" value="battle_custom" maxlength="40" /></label>
+              <label>Staff name <input id="asset-upload-author" maxlength="40" /></label>
+            </div>
+            <div class="asset-row">
+              <label><input type="checkbox" id="asset-upload-rights" /> I confirm we may use and store this audio.</label>
+              <label><input type="checkbox" id="asset-upload-deploy" checked /> Deploy staging</label>
+            </div>
+            <button type="button" id="asset-upload-media" class="primary">Upload and convert</button>
+            <div class="asset-upload-progress">
+              <progress id="asset-upload-progress" max="100" value="0"></progress>
+              <small id="asset-upload-progress-label">Ready</small>
+            </div>
+          </div>
         </div>
+        <button type="button" id="asset-refresh-jobs">Refresh jobs</button>
         <div id="asset-jobs" class="asset-jobs"></div>
       </div>
       <h2 style="margin-top:18px">Music catalog</h2>
@@ -3981,6 +4064,172 @@ async function queueMediaImport() {
   await refreshMediaJobs();
 }
 
+function setMediaSource(source) {
+  document.querySelectorAll("[data-media-source]").forEach(button => {
+    button.classList.toggle("active", button.dataset.mediaSource === source);
+  });
+  document.querySelectorAll("[data-media-pane]").forEach(pane => {
+    pane.hidden = pane.dataset.mediaPane !== source;
+  });
+}
+
+function mediaFileTitle(fileName) {
+  return fileName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatMediaBytes(bytes) {
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KiB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(bytes >= 100 * 1024 * 1024 ? 0 : 1)} MiB`;
+}
+
+function setMediaUploadProgress(value, label) {
+  const progress = document.getElementById("asset-upload-progress");
+  const text = document.getElementById("asset-upload-progress-label");
+  if (progress) {
+    progress.value = Math.max(0, Math.min(100, value));
+  }
+  if (text) {
+    text.textContent = label;
+  }
+}
+
+function onMediaFileChange(input) {
+  const file = input.files?.[0];
+  const name = document.getElementById("asset-media-file-name");
+  if (!file) {
+    if (name) {
+      name.textContent = "No file selected";
+    }
+    setMediaUploadProgress(0, "Ready");
+    return;
+  }
+  if (name) {
+    name.textContent = `${file.name} | ${formatMediaBytes(file.size)}`;
+  }
+  const title = document.getElementById("asset-upload-title");
+  if (title && !title.value.trim()) {
+    title.value = mediaFileTitle(file.name);
+  }
+  setMediaUploadProgress(0, "Ready");
+}
+
+async function responseJson(response) {
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.error || `HTTP ${response.status}`);
+  }
+  return result;
+}
+
+async function abortMediaUpload(password, session) {
+  if (!session?.id || !session?.uploadId) {
+    return;
+  }
+  await fetch(`${WORKER_URL}/media-upload/abort`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password, id: session.id, uploadId: session.uploadId }),
+  }).catch(() => {});
+}
+
+async function uploadMediaFile() {
+  const password = (document.getElementById("password")?.value || "").trim();
+  const file = document.getElementById("asset-media-file")?.files?.[0];
+  if (!file) {
+    throw new Error("Choose an audio or video file");
+  }
+  if (!document.getElementById("asset-upload-rights")?.checked) {
+    throw new Error("Rights confirmation is required");
+  }
+  const title = document.getElementById("asset-upload-title")?.value.trim();
+  if (!title) {
+    throw new Error("Track title is required");
+  }
+  const license = document.getElementById("asset-upload-license")?.value;
+  const sourceUrl = document.getElementById("asset-upload-source")?.value.trim();
+  const attribution = document.getElementById("asset-upload-attribution")?.value.trim();
+  if (license === "cc-by" && (!sourceUrl || !attribution)) {
+    throw new Error("CC BY uploads require attribution and a public source URL");
+  }
+
+  let session = null;
+  try {
+    setMediaUploadProgress(0, "Opening upload");
+    session = await responseJson(
+      await fetch(`${WORKER_URL}/media-upload/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          fileName: file.name,
+          fileSize: file.size,
+          contentType: file.type || "application/octet-stream",
+        }),
+      }),
+    );
+    const partSize = Number(session.partSize);
+    if (!Number.isSafeInteger(partSize) || partSize < 5 * 1024 * 1024) {
+      throw new Error("Upload service returned an invalid part size");
+    }
+
+    const parts = [];
+    const totalParts = Math.ceil(file.size / partSize);
+    for (let index = 0; index < totalParts; index++) {
+      const partNumber = index + 1;
+      const chunk = file.slice(index * partSize, Math.min(file.size, partNumber * partSize));
+      setMediaUploadProgress(Math.round((index / totalParts) * 90), `Uploading ${partNumber}/${totalParts}`);
+      const result = await responseJson(
+        await fetch(
+          `${WORKER_URL}/media-upload/${encodeURIComponent(session.id)}/parts/${partNumber}?uploadId=${encodeURIComponent(session.uploadId)}`,
+          {
+            method: "POST",
+            headers: { "X-Editor-Password": password },
+            body: chunk,
+          },
+        ),
+      );
+      parts.push(result.part);
+    }
+
+    setMediaUploadProgress(94, "Queueing conversion");
+    const result = await responseJson(
+      await fetch(`${WORKER_URL}/media-upload/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          id: session.id,
+          uploadId: session.uploadId,
+          parts,
+          title,
+          artist: document.getElementById("asset-upload-artist")?.value.trim(),
+          license,
+          sourceUrl,
+          attribution,
+          keyPrefix: document.getElementById("asset-upload-prefix")?.value.trim(),
+          author: document.getElementById("asset-upload-author")?.value.trim(),
+          deployStaging: document.getElementById("asset-upload-deploy")?.checked,
+          rightsConfirmed: true,
+        }),
+      }),
+    );
+    session = null;
+    setMediaUploadProgress(100, "Queued for conversion");
+    setStatus(`${result.fileName || file.name} uploaded. Conversion is queued.`);
+    await refreshMediaJobs();
+  } catch (error) {
+    await abortMediaUpload(password, session);
+    setMediaUploadProgress(0, "Upload failed");
+    throw error;
+  }
+}
+
 async function refreshMediaJobs() {
   const password = (document.getElementById("password")?.value || "").trim();
   const response = await fetch(`${WORKER_URL}/media-jobs`, {
@@ -4052,6 +4301,11 @@ async function uploadTrainerSprite() {
 }
 
 function onAssetsClick(event) {
+  const mediaSource = event.target.closest("[data-media-source]");
+  if (mediaSource) {
+    setMediaSource(mediaSource.dataset.mediaSource);
+    return true;
+  }
   const bgm = event.target.closest("[data-asset-bgm]");
   if (bgm) {
     bgmPlay(bgm.dataset.assetBgm);
@@ -4084,6 +4338,10 @@ function onAssetsClick(event) {
     void action(refreshMediaJobs);
     return true;
   }
+  if (event.target.closest("#asset-upload-media")) {
+    void action(uploadMediaFile);
+    return true;
+  }
   if (event.target.closest("#asset-upload-sprite")) {
     void action(uploadTrainerSprite);
     return true;
@@ -4113,6 +4371,8 @@ function render() {
     renderAddMon(root);
   } else if (activeTab === "assets") {
     renderAssets(root);
+  } else if (activeTab === "tournaments") {
+    renderTournaments(root);
   } else {
     renderGame(root);
   }
@@ -4907,6 +5167,16 @@ function buildDeltas() {
       if (held.length > 0) {
         out.heldItems = held;
       }
+      const vitamins = ctrNormVitamins(m.vitamins);
+      const savedVitamins = {};
+      for (const { key: vitaminKey } of CTR_VITAMIN_OPTIONS) {
+        if (vitamins[vitaminKey] > 0) {
+          savedVitamins[vitaminKey] = vitamins[vitaminKey];
+        }
+      }
+      if (Object.keys(savedVitamins).length > 0) {
+        out.vitamins = savedVitamins;
+      }
       // Shiny Lab look: serialize only the non-empty categories (+ trimmed name)
       // when at least one effect is picked; otherwise omit (renders normally).
       const shiny = ctrNormShiny(m.shiny);
@@ -5562,6 +5832,10 @@ async function init() {
     // `change` fires once per completed edit (blur / pick from list) → one undo step,
     // and on the Trainers tab it refreshes the default/overridden badges.
     content.addEventListener("change", e => {
+      if (activeTab === "assets" && e.target.id === "asset-media-file") {
+        onMediaFileChange(e.target);
+        return;
+      }
       if (activeTab === "assets" && e.target.id?.startsWith("asset-file-")) {
         void onAssetFileChange(e.target);
         return;
@@ -5651,6 +5925,615 @@ async function init() {
     undoBtn.addEventListener("click", undo);
   } catch (err) {
     setStatus(`Failed to load data: ${err}`, ERR);
+  }
+}
+
+// =============================================================================
+// TOURNAMENTS tab (P3 admin ops). Talks DIRECTLY to the er-telemetry tournament
+// routes (a SEPARATE worker from er-editor-api). Those routes authenticate with
+// the game's session token (HMAC), NOT the editor password, and gate admin
+// actions by the TOURNAMENT_ADMIN_UIDS allowlist off the token uid. The editor
+// page has no session token of its own, so — per the design handoff's "worst case
+// a token field" — the admin pastes their game session token here (persisted in
+// localStorage) and it is sent as `Authorization: Bearer <token>`. CORS on
+// er-telemetry allows any origin, so this cross-origin call works from the SPA.
+// Self-contained: builds its own DOM + listeners each render; does not touch the
+// egg-move/save pipeline.
+// =============================================================================
+
+const TOURNAMENT_URL = "https://er-telemetry.heraklines.workers.dev";
+const TOUR_TOKEN_KEY = "er-tournament-token";
+
+const tourState = {
+  list: null, // cached /tournament/list result
+  detail: null, // the selected tournament's full view (with bracket)
+  selectedId: null,
+  loading: false,
+  error: null,
+};
+
+function tourToken() {
+  return localStorage.getItem(TOUR_TOKEN_KEY) || "";
+}
+
+function tEsc(s) {
+  return String(s ?? "").replace(
+    /[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+  );
+}
+
+/**
+ * Call an er-telemetry tournament route. Admin auth is the shared EDITOR PASSWORD (the top-right
+ * field the whole team already uses to save) sent as `X-Editor-Auth` — the PRIMARY path. A pasted
+ * game session token (Bearer) is an optional alternative/addition (attributes the organizer to your
+ * account). Either credential authorizes admin actions. Throws on !ok.
+ */
+async function tourApi(path, { method = "GET", body } = {}) {
+  const token = tourToken();
+  const editorPw = (document.getElementById("password")?.value || "").trim();
+  if (!editorPw && !token) {
+    throw new Error("Enter the editor password (top right) — or paste a game session token below.");
+  }
+  const headers = {};
+  if (editorPw) {
+    headers["X-Editor-Auth"] = editorPw;
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  if (body) {
+    headers["Content-Type"] = "application/json";
+  }
+  const res = await fetch(`${TOURNAMENT_URL}${path}`, {
+    method,
+    headers,
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* non-json (auth text) */
+  }
+  if (!res.ok) {
+    throw new Error((data && data.error) || `${res.status} ${res.statusText}`);
+  }
+  return data;
+}
+
+function tourRelTime(ms) {
+  if (typeof ms !== "number") {
+    return "never";
+  }
+  const d = Math.max(0, Date.now() - ms);
+  if (d < 60_000) {
+    return "just now";
+  }
+  const m = Math.floor(d / 60_000);
+  if (m < 60) {
+    return `${m}m ago`;
+  }
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
+}
+
+async function tourLoadList() {
+  tourState.loading = true;
+  tourState.error = null;
+  render();
+  try {
+    const data = await tourApi("/tournament/list");
+    tourState.list = data.tournaments || [];
+  } catch (e) {
+    tourState.error = e.message || String(e);
+    tourState.list = [];
+  } finally {
+    tourState.loading = false;
+    render();
+  }
+}
+
+async function tourLoadDetail(id) {
+  tourState.loading = true;
+  tourState.error = null;
+  tourState.selectedId = id;
+  render();
+  try {
+    const data = await tourApi(`/tournament/bracket?id=${encodeURIComponent(id)}`);
+    tourState.detail = data.tournament;
+  } catch (e) {
+    tourState.error = e.message || String(e);
+    tourState.detail = null;
+  } finally {
+    tourState.loading = false;
+    render();
+  }
+}
+
+/** Run an async action, surface errors, then reload the current view. */
+async function tourAction(fn, reload = "detail") {
+  try {
+    setStatus("Working…");
+    await fn();
+    setStatus("Done ✓", "var(--ok)");
+    if (reload === "detail" && tourState.selectedId) {
+      await tourLoadDetail(tourState.selectedId);
+    } else {
+      await tourLoadList();
+    }
+  } catch (e) {
+    tourState.error = e.message || String(e);
+    setStatus(tourState.error, ERR);
+    render();
+  }
+}
+
+function renderTournaments(root) {
+  const tokRow = `
+    <div class="tour-tokrow">
+      <label style="color:var(--muted);font-size:12px">Auth: the <b>editor password</b> (top right) authorizes tournament admin. Optional session token:</label>
+      <input id="tour-token" type="password" placeholder="(optional) paste your game session token…"
+        autocomplete="off" spellcheck="false" value="${tEsc(tourToken())}" />
+      <button type="button" id="tour-refresh">↻ Refresh</button>
+    </div>`;
+  const err = tourState.error ? `<div class="tour-err">⚠ ${tEsc(tourState.error)}</div>` : "";
+
+  if (tourState.selectedId && tourState.detail) {
+    root.innerHTML = `<div class="tour-wrap">${tokRow}${err}${tourDetailHtml(tourState.detail)}</div>`;
+  } else {
+    root.innerHTML = `<div class="tour-wrap">${tokRow}${err}${tourCreateHtml()}${tourListHtml()}</div>`;
+  }
+  tourBind(root);
+}
+
+function tourCreateHtml() {
+  return `
+    <div class="section tour-form">
+      <h2>Create tournament</h2>
+      <fieldset>
+        <legend>Basics</legend>
+        <label>Name <input type="text" id="tc-name" placeholder="Continental Masters" /></label>
+        <label>Cap <input type="number" id="tc-cap" min="2" max="64" value="32" /></label>
+        <label>Round window (h) <input type="number" id="tc-window" min="8" max="48" value="24" /></label>
+        <label>Close at <input type="datetime-local" id="tc-closeat" /></label>
+      </fieldset>
+      <fieldset>
+        <legend>Format</legend>
+        <label>Battle
+          <select id="tc-battle">
+            <option value="singles">Singles</option>
+            <option value="doubles">Doubles</option>
+            <option value="triples">Triples</option>
+          </select>
+        </label>
+        <label>Series
+          <select id="tc-series">
+            <option value="single">Single game</option>
+            <option value="bo3">Best of 3</option>
+            <option value="bo5">Best of 5</option>
+          </select>
+        </label>
+      </fieldset>
+      ${tourRewardFieldsHtml("tc")}
+      <button type="button" class="primary" id="tour-create">Create</button>
+    </div>`;
+}
+
+// Reward pool editor — TYPE-SELECTABLE rows (shiny chosen / shiny random / lab effect / candies /
+// currency / item), each mapping onto the settlement mutation vocabulary the tournament worker
+// accepts. Prefix `p` differs for create (tc) vs edit (te).
+const TOUR_REWARD_PLACES = [
+  ["champion", "Champion"],
+  ["runnerUp", "Runner-up"],
+  ["semifinalist", "Semifinalists"],
+];
+const TOUR_ROWS_PER_PLACE = 4;
+// Which fields each reward TYPE uses (drives per-row show/hide + serialization).
+const TOUR_REWARD_FIELDS = {
+  "shiny-chosen": ["species", "tier"],
+  "shiny-random": ["tier", "unowned", "pool"],
+  "lab-effect": ["species", "effect"],
+  candies: ["species", "amount"],
+};
+
+/** Build the grouped shiny-lab effect <option> list; each value encodes `category:index` (1-based). */
+function tourEffectOptions(selected) {
+  const group = (cat, list) => {
+    if (!list || list.length === 0) {
+      return "";
+    }
+    const opts = list
+      .map((e, i) => {
+        const val = `${cat}:${i + 1}`;
+        return `<option value="${val}"${val === selected ? " selected" : ""}>${tEsc(e.label || e.id)}</option>`;
+      })
+      .join("");
+    return `<optgroup label="${cat}">${opts}</optgroup>`;
+  };
+  return (
+    `<option value="">— pick effect —</option>`
+    + group("palette", SHINY_EFFECTS.palette)
+    + group("surface", SHINY_EFFECTS.surface)
+    + group("around", SHINY_EFFECTS.around)
+  );
+}
+
+/** Map an existing mutation to a {type, species, tier, unowned, pool, effect, amount, item, count} row model. */
+function tourMutToRow(m) {
+  switch (m && m.kind) {
+    case "grantShinyChosen":
+      return { type: "shiny-chosen", species: m.speciesId, tier: m.tier };
+    case "grantShinyRandom":
+      return { type: "shiny-random", tier: m.tier, unowned: m.unownedOnly, pool: (m.speciesPool || []).join(",") };
+    case "grantLabEffect":
+      return { type: "lab-effect", species: m.speciesId, effect: `${m.category}:${m.effectIndex}` };
+    case "grantCandy":
+      return { type: "candies", species: m.speciesId, amount: m.candy };
+    default:
+      return { type: "" };
+  }
+}
+
+/** One reward row (all fields present; JS toggles visibility by the selected type). */
+function tourRewardRowHtml(p, place, idx, row) {
+  const id = f => `${p}-rw-${place}-${idx}-${f}`;
+  const typeOpt = (v, label) => `<option value="${v}"${row.type === v ? " selected" : ""}>${label}</option>`;
+  return `
+    <div class="tour-reward-row" data-rwrow="${p}-${place}-${idx}">
+      <select class="rw-type" id="${id("type")}">
+        ${typeOpt("", "— none —")}
+        ${typeOpt("shiny-chosen", "Shiny (chosen)")}
+        ${typeOpt("shiny-random", "Shiny (random)")}
+        ${typeOpt("lab-effect", "Shiny-lab effect")}
+        ${typeOpt("candies", "Candies")}
+      </select>
+      <span data-f="species"><input type="number" min="0" placeholder="species id" id="${id("species")}" value="${tEsc(row.species ?? "")}" /></span>
+      <span data-f="tier"><select id="${id("tier")}">
+        <option value="1"${row.tier === 1 ? " selected" : ""}>T1</option>
+        <option value="2"${row.tier === 2 ? " selected" : ""}>T2</option>
+        <option value="3"${row.tier === 3 ? " selected" : ""}>T3</option>
+        <option value="4"${row.tier === 4 ? " selected" : ""}>Black (T4)</option>
+      </select></span>
+      <span data-f="unowned"><label style="font-size:12px"><input type="checkbox" id="${id("unowned")}"${row.unowned ? " checked" : ""} /> unowned only</label></span>
+      <span data-f="pool"><input type="text" style="width:120px" placeholder="pool ids (opt)" id="${id("pool")}" value="${tEsc(row.pool ?? "")}" /></span>
+      <span data-f="effect"><select id="${id("effect")}">${tourEffectOptions(row.effect || "")}</select></span>
+      <span data-f="amount"><input type="number" min="0" placeholder="amount" id="${id("amount")}" value="${tEsc(row.amount ?? "")}" /></span>
+      <span data-f="count"><input type="number" min="1" placeholder="×" style="width:60px" id="${id("count")}" value="${tEsc(row.count ?? "")}" /></span>
+    </div>`;
+}
+
+function tourRewardFieldsHtml(p, pool) {
+  const placeBlock = (place, label) => {
+    const muts = ((pool || []).find(e => e.place === place)?.mutations || []).map(tourMutToRow);
+    const rows = [];
+    for (let i = 0; i < TOUR_ROWS_PER_PLACE; i++) {
+      rows.push(tourRewardRowHtml(p, place, i, muts[i] || { type: "" }));
+    }
+    return `<div class="tour-reward-place"><b style="display:block;margin:6px 0 4px">${label}</b>${rows.join("")}</div>`;
+  };
+  return `
+    <fieldset>
+      <legend>Reward pool — champion / runner-up / semifinalists (delivered on next login sweep)</legend>
+      ${TOUR_REWARD_PLACES.map(([pl, lbl]) => placeBlock(pl, lbl)).join("")}
+    </fieldset>`;
+}
+
+/** Show only the fields the selected reward TYPE uses (called on render + on every type change). */
+function tourSyncRewardRow(rowEl) {
+  const type = rowEl.querySelector(".rw-type")?.value || "";
+  const fields = TOUR_REWARD_FIELDS[type] || [];
+  rowEl.querySelectorAll("[data-f]").forEach(span => {
+    span.style.display = fields.includes(span.dataset.f) ? "" : "none";
+  });
+}
+
+/** Read the reward rows for prefix `p` into a RewardPool array of the settlement mutation vocabulary. */
+function tourReadRewardPool(root, p) {
+  const q = (place, idx, f) => root.querySelector(`#${p}-rw-${place}-${idx}-${f}`);
+  const numOf = el => (el && el.value !== "" ? Number(el.value) : 0);
+  const pool = [];
+  for (const [place] of TOUR_REWARD_PLACES) {
+    const muts = [];
+    for (let i = 0; i < TOUR_ROWS_PER_PLACE; i++) {
+      const type = q(place, i, "type")?.value || "";
+      if (!type) {
+        continue;
+      }
+      const species = numOf(q(place, i, "species"));
+      const tier = Number(q(place, i, "tier")?.value) || 1;
+      if (type === "shiny-chosen" && species > 0) {
+        muts.push({ kind: "grantShinyChosen", speciesId: species, tier });
+      } else if (type === "shiny-random") {
+        const poolIds = (q(place, i, "pool")?.value || "")
+          .split(",")
+          .map(s => Number(s.trim()))
+          .filter(n => Number.isFinite(n) && n > 0);
+        muts.push({
+          kind: "grantShinyRandom",
+          tier,
+          unownedOnly: !!q(place, i, "unowned")?.checked,
+          speciesPool: poolIds,
+        });
+      } else if (type === "lab-effect" && species > 0) {
+        const [cat, idx] = (q(place, i, "effect")?.value || "").split(":");
+        if (cat && idx) {
+          muts.push({ kind: "grantLabEffect", speciesId: species, category: cat, effectIndex: Number(idx) });
+        }
+      } else if (type === "candies" && species > 0) {
+        muts.push({ kind: "grantCandy", speciesId: species, candy: numOf(q(place, i, "amount")) });
+      }
+    }
+    if (muts.length > 0) {
+      pool.push({ place, mutations: muts });
+    }
+  }
+  return pool;
+}
+
+function tourListHtml() {
+  if (tourState.loading && !tourState.list) {
+    return `<div class="empty">Loading tournaments…</div>`;
+  }
+  const list = tourState.list || [];
+  if (list.length === 0) {
+    return `<div class="empty">No tournaments yet. Create one above (paste your token first).</div>`;
+  }
+  const items = list
+    .map(t => {
+      const fmt = `${t.battleFormat || "singles"} · ${t.seriesFormat || "single"}`;
+      return `
+      <div class="tour-item" data-tour-open="${tEsc(t.id)}">
+        <div class="tname">${tEsc(t.name)} <span class="tour-state ${tEsc(t.state)}">${tEsc(t.state)}</span></div>
+        <div class="tmeta">${t.entrantCount}/${t.maxEntrants} entrants${(t.waitlist || []).length > 0 ? ` (+${t.waitlist.length} waitlist)` : ""} · ${tEsc(fmt)}${t.champion ? ` · 🏆 ${tEsc(t.champion)}` : ""}</div>
+      </div>`;
+    })
+    .join("");
+  return `<h2 style="margin:16px 0 8px">Tournaments</h2><div class="tour-list">${items}</div>`;
+}
+
+function tourDetailHtml(t) {
+  const b = t.bracket;
+  const closeAt = t.closeAt ? new Date(t.closeAt).toLocaleString() : "—";
+  const meta = `
+    <div class="tmeta" style="color:var(--muted);font-size:13px;margin:6px 0 10px">
+      Cap ${t.maxEntrants} · window ${Math.round((t.roundWindowMs || 0) / 3600000)}h · battle <b>${tEsc(t.battleFormat)}</b>
+      · series <b>${tEsc(t.seriesFormat)}</b> · close ${tEsc(closeAt)}${t.champion ? ` · 🏆 <b>${tEsc(t.champion)}</b>` : ""}
+      ${t.rewardsGranted ? " · rewards granted ✓" : ""}
+    </div>`;
+
+  // action buttons (state-dependent; the worker enforces validity too)
+  const actions = [];
+  if (t.state === "registration") {
+    actions.push(`<button type="button" id="tour-close">Close registration + generate</button>`);
+  }
+  if (t.state === "in_progress") {
+    actions.push(`<button type="button" id="tour-reseed">Re-seed (zero played)</button>`);
+  }
+  if (t.state === "complete") {
+    actions.push(`<button type="button" id="tour-grant"${t.rewardsGranted ? " disabled" : ""}>Grant rewards</button>`);
+  }
+  if (t.state !== "cancelled" && t.state !== "complete") {
+    actions.push(`<button type="button" id="tour-cancel">Cancel</button>`);
+  }
+  actions.push(`<button type="button" id="tour-delete" style="color:#e0556a;border-color:#e0556a">Delete</button>`);
+
+  // entrants table
+  const rows = (t.entrants || [])
+    .map(
+      e => `
+      <tr>
+        <td>${e.seed ?? "—"}</td>
+        <td><b>${tEsc(e.participant)}</b></td>
+        <td>${tEsc(e.ghost?.name || "")}${e.ghost?.title ? ` <small style="color:var(--muted)">"${tEsc(e.ghost.title)}"</small>` : ""}</td>
+        <td>${tEsc(e.presetName || "")}</td>
+        <td>${tEsc(tourRelTime(e.lastSeen))}</td>
+        <td><button type="button" class="tour-kick" data-tour-kick="${tEsc(e.participant)}">Kick</button></td>
+      </tr>`,
+    )
+    .join("");
+  const entrantsTable = `
+    <h3>Entrants (${(t.entrants || []).length})</h3>
+    <table class="tour-table">
+      <thead><tr><th>Seed</th><th>Username</th><th>Ghost identity</th><th>Preset</th><th>Last seen</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="color:var(--muted)">none</td></tr>'}</tbody>
+    </table>`;
+
+  // waitlist
+  const wl = (t.waitlist || [])
+    .map(
+      (e, i) => `
+      <tr>
+        <td>${i + 1}</td><td><b>${tEsc(e.participant)}</b></td><td>${tEsc(e.presetName || "")}</td>
+        <td><button type="button" class="tour-kick" data-tour-kick="${tEsc(e.participant)}">Remove</button></td>
+      </tr>`,
+    )
+    .join("");
+  const waitlistTable =
+    (t.waitlist || []).length > 0
+      ? `<h3>Waitlist (${t.waitlist.length})</h3>
+       <table class="tour-table">
+         <thead><tr><th>#</th><th>Username</th><th>Preset</th><th></th></tr></thead>
+         <tbody>${wl}</tbody></table>`
+      : "";
+
+  // disputed matches
+  const disputed = [];
+  if (b) {
+    for (const round of b.rounds) {
+      for (const m of round) {
+        if (m.disputed && m.winner === null) {
+          disputed.push(m);
+        }
+      }
+    }
+  }
+  const disputedHtml =
+    disputed.length > 0
+      ? `<h3 style="color:var(--warn)">Disputed matches (${disputed.length})</h3>
+       ${disputed
+         .map(
+           m => `<div class="tour-reward-row">
+             <span>${tEsc(m.a)} vs ${tEsc(m.b)}</span>
+             <button type="button" data-tour-resolve="${tEsc(m.id)}|${tEsc(m.a)}">Winner: ${tEsc(m.a)}</button>
+             <button type="button" data-tour-resolve="${tEsc(m.id)}|${tEsc(m.b)}">Winner: ${tEsc(m.b)}</button>
+           </div>`,
+         )
+         .join("")}`
+      : "";
+
+  // edit form (registration only)
+  const editHtml =
+    t.state === "registration"
+      ? `<div class="section tour-form" style="margin:16px 0 0">
+           <h2>Edit (registration only — format locks after generate)</h2>
+           <fieldset><legend>Basics</legend>
+             <label>Name <input type="text" id="te-name" value="${tEsc(t.name)}" /></label>
+             <label>Cap <input type="number" id="te-cap" min="2" max="64" value="${t.maxEntrants}" /></label>
+             <label>Round window (h) <input type="number" id="te-window" min="8" max="48" value="${Math.round((t.roundWindowMs || 0) / 3600000)}" /></label>
+             <label>Close at <input type="datetime-local" id="te-closeat" value="${t.closeAt ? new Date(t.closeAt - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}" /></label>
+           </fieldset>
+           <fieldset><legend>Format</legend>
+             <label>Battle <select id="te-battle">
+               ${["singles", "doubles", "triples"].map(f => `<option value="${f}"${t.battleFormat === f ? " selected" : ""}>${f}</option>`).join("")}
+             </select></label>
+             <label>Series <select id="te-series">
+               ${["single", "bo3", "bo5"].map(f => `<option value="${f}"${t.seriesFormat === f ? " selected" : ""}>${f}</option>`).join("")}
+             </select></label>
+           </fieldset>
+           ${tourRewardFieldsHtml("te", t.rewardPool)}
+           <button type="button" class="primary" id="tour-edit">Save edits</button>
+         </div>`
+      : "";
+
+  return `
+    <button type="button" class="tour-back" id="tour-back">← Back to list</button>
+    <div class="tname" style="font-size:18px">${tEsc(t.name)} <span class="tour-state ${tEsc(t.state)}">${tEsc(t.state)}</span></div>
+    ${meta}
+    <div class="tour-actions">${actions.join("")}</div>
+    ${disputedHtml}
+    ${entrantsTable}
+    ${waitlistTable}
+    ${editHtml}`;
+}
+
+/** Attach listeners to the freshly-rendered tournaments DOM (old listeners die with the old DOM). */
+function tourBind(root) {
+  const tok = root.querySelector("#tour-token");
+  if (tok) {
+    tok.addEventListener("change", () => localStorage.setItem(TOUR_TOKEN_KEY, tok.value.trim()));
+  }
+  // Reward rows: show only the fields the selected reward TYPE uses; re-sync on every type change.
+  root.querySelectorAll("[data-rwrow]").forEach(rowEl => {
+    tourSyncRewardRow(rowEl);
+    const sel = rowEl.querySelector(".rw-type");
+    if (sel) {
+      sel.addEventListener("change", () => tourSyncRewardRow(rowEl));
+    }
+  });
+  const on = (sel, fn) => {
+    const el = root.querySelector(sel);
+    if (el) {
+      el.addEventListener("click", fn);
+    }
+  };
+  on("#tour-refresh", () => (tourState.selectedId ? tourLoadDetail(tourState.selectedId) : tourLoadList()));
+  on("#tour-back", () => {
+    tourState.selectedId = null;
+    tourState.detail = null;
+    tourLoadList();
+  });
+
+  // open a tournament
+  root
+    .querySelectorAll("[data-tour-open]")
+    .forEach(el => el.addEventListener("click", () => tourLoadDetail(el.dataset.tourOpen)));
+
+  // create
+  on("#tour-create", () => {
+    const g = id => root.querySelector(`#${id}`);
+    const closeVal = g("tc-closeat").value;
+    tourAction(
+      () =>
+        tourApi("/tournament/create", {
+          method: "POST",
+          body: {
+            name: g("tc-name").value.trim(),
+            maxEntrants: Number(g("tc-cap").value) || 32,
+            roundWindowMs: (Number(g("tc-window").value) || 24) * 3600000,
+            battleFormat: g("tc-battle").value,
+            seriesFormat: g("tc-series").value,
+            rewardPool: tourReadRewardPool(root, "tc"),
+            ...(closeVal ? { closeAt: new Date(closeVal).getTime() } : {}),
+          },
+        }),
+      "list",
+    );
+  });
+
+  // detail actions
+  const id = tourState.selectedId;
+  on("#tour-close", () =>
+    tourAction(() => tourApi("/tournament/close-registration", { method: "POST", body: { id } })),
+  );
+  on("#tour-reseed", () => tourAction(() => tourApi("/tournament/reseed", { method: "POST", body: { id } })));
+  on("#tour-grant", () =>
+    tourAction(async () => {
+      const r = await tourApi("/tournament/grant-rewards", { method: "POST", body: { id } });
+      setStatus(`Granted ${(r.granted || []).length} reward(s) — ${r.note || ""}`, "var(--ok)");
+    }),
+  );
+  on("#tour-cancel", () => {
+    if (confirm("Cancel this tournament? Entrants are notified in-game and the board shows cancelled.")) {
+      tourAction(() => tourApi("/tournament/cancel", { method: "POST", body: { id } }));
+    }
+  });
+  on("#tour-delete", () => {
+    if (confirm("DELETE this tournament permanently? This cannot be undone.")) {
+      tourAction(() => tourApi("/tournament/delete", { method: "POST", body: { id } }), "list");
+    }
+  });
+  on("#tour-edit", () => {
+    const g = tid => root.querySelector(`#${tid}`);
+    const closeVal = g("te-closeat").value;
+    tourAction(() =>
+      tourApi("/tournament/edit", {
+        method: "POST",
+        body: {
+          id,
+          name: g("te-name").value.trim(),
+          maxEntrants: Number(g("te-cap").value),
+          roundWindowMs: (Number(g("te-window").value) || 24) * 3600000,
+          battleFormat: g("te-battle").value,
+          seriesFormat: g("te-series").value,
+          rewardPool: tourReadRewardPool(root, "te"),
+          closeAt: closeVal ? new Date(closeVal).getTime() : null,
+        },
+      }),
+    );
+  });
+
+  // kick / remove-from-waitlist
+  root.querySelectorAll("[data-tour-kick]").forEach(el =>
+    el.addEventListener("click", () => {
+      const participant = el.dataset.tourKick;
+      if (confirm(`Kick ${participant}?`)) {
+        tourAction(() => tourApi("/tournament/kick", { method: "POST", body: { id, participant } }));
+      }
+    }),
+  );
+
+  // resolve disputed match
+  root.querySelectorAll("[data-tour-resolve]").forEach(el =>
+    el.addEventListener("click", () => {
+      const [matchId, winner] = el.dataset.tourResolve.split("|");
+      tourAction(() => tourApi("/tournament/resolve", { method: "POST", body: { tournamentId: id, matchId, winner } }));
+    }),
+  );
+
+  // lazy-load the list the first time the tab opens
+  if (!tourState.selectedId && tourState.list === null && !tourState.loading) {
+    tourLoadList();
   }
 }
 

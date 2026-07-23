@@ -42,11 +42,16 @@ export function buildTeamMenuPresetViews(gameData: ShowdownTeamMenuGameData): Sh
   const snapshot = buildUnlockSnapshot(gameData);
   return gameData.listShowdownTeamPresets().map(preset => {
     const violations = validateShowdownTeam(preset.mons, snapshot, isMegaStage);
-    return {
+    const view: ShowdownTeamMenuPresetView = {
       name: preset.name,
       mons: preset.mons,
       invalidReason: violations.length > 0 ? violations[0].message : null,
     };
+    // P3 folders: carry the optional folder through so the menu can group by it (omitted when absent).
+    if (preset.folder) {
+      view.folder = preset.folder;
+    }
+    return view;
   });
 }
 

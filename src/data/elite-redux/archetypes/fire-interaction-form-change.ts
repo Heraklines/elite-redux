@@ -67,7 +67,10 @@ export class FireUseFormChangeAbAttr extends PostAttackAbAttr {
   constructor(targetFormKey: string) {
     // Fire on any USE of a qualifying move (incl. status Fire moves like
     // Will-O-Wisp): the dex says "when using Fire-type moves", not "damaging".
-    super((_user, _target, _move) => true, false);
+    // showAbility = true (2nd arg): the form change is a discrete, player-visible
+    // activation, so the ability banner must flash (same popup-display defect
+    // class as the counter-attack archetype).
+    super((_user, _target, _move) => true, true);
     this.targetFormKey = targetFormKey;
   }
 
@@ -105,7 +108,11 @@ export class FireHitFormChangeAbAttr extends PostDefendAbAttr {
   private readonly warnState = { warned: false };
 
   constructor(targetFormKey: string) {
-    super(false);
+    // showAbility = true (default): the fire-interaction form change is a
+    // discrete, player-visible activation, so the ability banner must flash —
+    // matching vanilla convention for form-change abilities (same popup-display
+    // defect class as the counter-attack archetype).
+    super();
     this.targetFormKey = targetFormKey;
   }
 

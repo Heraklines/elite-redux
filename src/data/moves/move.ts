@@ -31,8 +31,17 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import {
+  applyFoulHarvestDrainBonus,
+  applyVaporBodyAccuracy,
+  notifySignatureHazardRemoval,
+  // biome-ignore lint/suspicious/noImportCycles: Signature hooks run at the universal accuracy/heal/hazard chokepoints.
+} from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { erRendezvousPowerMultiplier } from "#data/elite-redux/abilities/rendezvous";
+import { hasCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
+import { getMoveHpCostFraction } from "#data/elite-redux/ability-upgrades/attrs/move-hp-cost";
 import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
+// biome-ignore lint/suspicious/noImportCycles: cycle closes through the batch-2 signature battle-chokepoint hooks (move -> mechanics -> scripted-move-util -> move).
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
@@ -41,6 +50,7 @@ import {
   erLuckyHeartChanceBonus,
 } from "#data/elite-redux/er-community-items";
 import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { clearErAilments } from "#data/elite-redux/er-status-cure";
 import {
   erCovertCloakGuards,
@@ -1181,6 +1191,7 @@ export abstract class Move implements Localizable {
       move: this,
       accuracy: moveAccuracy,
     });
+    applyVaporBodyAccuracy(user, target, this, moveAccuracy);
 
     if (moveAccuracy.value === -1) {
       return moveAccuracy.value;
@@ -1265,6 +1276,9 @@ export abstract class Move implements Localizable {
       // centre has two adjacent allies). Binary has just the single ally, so this is identical.
       for (const ally of source.getAdjacentAllies()) {
         applyAbAttrs("AllyMoveCategoryPowerBoostAbAttr", { ...abAttrParams, pokemon: ally });
+      }
+      if (source.summonData.erImposterCopiedAttackBoost && source.isTransformed()) {
+        power.value *= 1.3;
       }
     }
 
@@ -2654,8 +2668,9 @@ export class AddSubstituteAttr extends MoveEffectAttr {
    * @param user - The {@linkcode Pokemon} using the move
    * @returns The amount of HP that is required to create a substitute.
    */
-  private getHpCost(user: Pokemon): number {
-    return (this.roundUp ? Math.ceil : toDmgValue)(user.getMaxHp() * this.hpCost);
+  private getHpCost(user: Pokemon, move: Move): number {
+    const costFraction = getMoveHpCostFraction(user, move, this.hpCost);
+    return (this.roundUp ? Math.ceil : toDmgValue)(user.getMaxHp() * costFraction);
   }
 
   /**
@@ -2671,7 +2686,7 @@ export class AddSubstituteAttr extends MoveEffectAttr {
       return false;
     }
 
-    const dmgTaken = this.getHpCost(user);
+    const dmgTaken = this.getHpCost(user, move);
     user.damageAndUpdate(dmgTaken, { result: HitResult.INDIRECT, ignoreSegments: true, ignoreFaintPhase: true });
     user.addTag(BattlerTagType.SUBSTITUTE, 0, move.id, user.id);
     return true;
@@ -2685,14 +2700,14 @@ export class AddSubstituteAttr extends MoveEffectAttr {
   }
 
   public override getCondition(): MoveConditionFunc {
-    return user => !user.getTag(SubstituteTag) && user.hp > this.getHpCost(user);
+    return (user, _target, move) => !user.getTag(SubstituteTag) && user.hp > this.getHpCost(user, move);
   }
 
-  public override getFailedText(user: Pokemon): string | undefined {
+  public override getFailedText(user: Pokemon, _target: Pokemon, move: Move): string | undefined {
     if (user.getTag(SubstituteTag)) {
       return i18next.t("moveTriggers:substituteOnOverlap", { pokemonName: getPokemonNameWithAffix(user) });
     }
-    if (user.hp <= this.getHpCost(user)) {
+    if (user.hp <= this.getHpCost(user, move)) {
       return i18next.t("moveTriggers:substituteNotEnoughHp");
     }
   }
@@ -3177,12 +3192,14 @@ export class HealUserAndAllyAttr extends HealAttr {
 export class HitHealAttr extends MoveEffectAttr {
   private readonly healRatio: number;
   private readonly healStat: EffectiveStat | null;
+  private readonly healMultiplier: number;
 
-  constructor(healRatio?: number | null, healStat?: EffectiveStat) {
+  constructor(healRatio?: number | null, healStat?: EffectiveStat, healMultiplier = 1) {
     super(true);
 
     this.healRatio = healRatio ?? 0.5;
     this.healStat = healStat ?? null;
+    this.healMultiplier = healMultiplier;
   }
   /**
    * Heals the user the determined amount and possibly displays a message about regaining health.
@@ -3194,12 +3211,21 @@ export class HitHealAttr extends MoveEffectAttr {
    * @param args N/A
    * @returns true if the function succeeds
    */
-  apply(user: Pokemon, target: Pokemon, _move: Move, _args: any[]): boolean {
+  apply(user: Pokemon, target: Pokemon, move: Move, _args: any[]): boolean {
     if (target.hasAbilityWithAttr("ReverseDrainAbAttr")) {
       return false;
     }
 
-    const healAmount = this.getHealAmount(user, target);
+    let healAmount = applyFoulHarvestDrainBonus(user, move, this.getHealAmount(user, target));
+    const gunmanId = ER_ID_MAP.abilities[780] as AbilityId | undefined;
+    if (
+      gunmanId !== undefined
+      && user.hasAbility(gunmanId)
+      && move.hasFlag(MoveFlags.PULSE_MOVE)
+      && (hasCommandAbilityProvenance(user, "quick-draw:proc") || hasCommandAbilityProvenance(user, "quick-claw:proc"))
+    ) {
+      healAmount = Math.floor(healAmount * 1.2);
+    }
     let message = "";
     if (this.healStat === null) {
       message = i18next.t("battle:regainHealth", { pokemonName: getPokemonNameWithAffix(user) });
@@ -3236,7 +3262,15 @@ export class HitHealAttr extends MoveEffectAttr {
         (attr as unknown as { fire: (holder: NumberHolder) => void }).fire(multiplier);
       }
     }
-    return Math.floor(healAmount * multiplier.value);
+    return Math.floor(healAmount * multiplier.value * this.healMultiplier);
+  }
+
+  public getHealRatio(): number {
+    return this.healRatio;
+  }
+
+  public getHealStat(): EffectiveStat | null {
+    return this.healStat;
   }
 }
 
@@ -8141,7 +8175,10 @@ export class RemoveArenaTagsAttr extends MoveEffectAttr {
       return false;
     }
 
-    globalScene.arena.removeTagsOnSide(this.tagTypes, this.getTagSideFunc(user, target));
+    const side = this.getTagSideFunc(user, target);
+    const before = globalScene.arena.findTagsOnSide(tag => this.tagTypes.includes(tag.tagType), side).length;
+    globalScene.arena.removeTagsOnSide(this.tagTypes, side);
+    notifySignatureHazardRemoval(user, before);
 
     return true;
   }

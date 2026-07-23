@@ -63,6 +63,7 @@ import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-te
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
@@ -72,6 +73,7 @@ import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import {
@@ -98,6 +100,7 @@ import {
   repointGlobalScene,
   restoreGlobalScene,
 } from "#test/tools/render-harness";
+import { BattleInfoOverlay } from "#ui/battle-info-overlay";
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
@@ -156,6 +159,8 @@ interface Recipe {
   modifierBars?: boolean;
   /** Fully custom page: build + show the UI directly into the render scene. */
   render?: (game: GameManager, ctx: RenderContext) => void | Promise<void>;
+  /** Called on the freshly-shown handler (post-repoint), to drive handler-specific display state. */
+  afterShow?: (handler: any) => void;
   /**
    * Optional input sequence fired AFTER the page renders. Each `Button` is routed to the
    * currently-active handler (so a press that transitions to another screen renders that
@@ -1210,6 +1215,12 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildTournamentBracketDemoConfig({ size: 16, advancedRounds: 2, card: "playable" })],
     diffTolerance: 0,
   },
+  // Bracket tree (4-field, the Sample Cup shape): semifinals + final, fresh bracket.
+  "tournament-bracket-4": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" })],
+    diffTolerance: 0,
+  },
   // Bracket with BYES (5-field padded to 8): top seeds auto-advance, "(bye)" slots shown.
   "tournament-bracket-byes": {
     mode: UiMode.TOURNAMENT_BRACKET,
@@ -1226,6 +1237,93 @@ const RECIPES: Record<string, Recipe> = {
   "tournament-bracket-champion": {
     mode: UiMode.TOURNAMENT_BRACKET,
     prepare: () => [buildTournamentBracketDemoConfig({ size: 8, advancedRounds: 3, card: "champion" })],
+    diffTolerance: 0,
+  },
+  // P1.5 BOARD — the Sample Cup (4-field) player-journey states. Ghost-trainer icons + connecting
+  // lines + champion slot column throughout; trainer atlases resolve via the two-pass injector.
+  // Fresh 4-bracket, YOUR fight gold-highlighted + VS marker, opponent card (portrait + presence).
+  "tournament-board-4-yourfight": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // Mid-round: the OTHER semifinal resolved — winner advanced into the final slot along the gold
+  // line, loser slot dimmed with an X; your semi still live.
+  "tournament-board-4-midround": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, resolvedSemi: true, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // Browsing ANOTHER match (cyan cursor on a non-your match): its pairing card shows read-only.
+  "tournament-board-4-browse-other": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [
+      buildTournamentBracketDemoConfig({ size: 4, resolvedSemi: true, browseOther: true, card: "playable" }),
+    ],
+    diffTolerance: 0,
+  },
+  // Eliminated: your round-0 match lost (dimmed + X); read-only spectator card, no fight.
+  "tournament-board-4-eliminated": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, eliminated: true, card: "none" })],
+    diffTolerance: 0,
+  },
+  // Champion (4-field): winner's trainer art center-stage over the dimmed bracket + "CHAMPION - <name>".
+  "tournament-board-4-champion": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, card: "champion" })],
+    diffTolerance: 0,
+  },
+  // P3 PAGINATION — 32-field board paginated into HALVES. Default page = the viewer's section (TOP);
+  // section columns (R16 .. semifinal) + compact Finals column + mini-overview strip + pinned card.
+  "tournament-bracket-32": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 32, advancedRounds: 1, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // 32-field, viewing the OTHER (BOTTOM) section page — the your-match card stays pinned.
+  "tournament-bracket-32-section2": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [
+      buildTournamentBracketDemoConfig({ size: 32, advancedRounds: 1, browseSection: 1, card: "playable" }),
+    ],
+    diffTolerance: 0,
+  },
+  // P3 PAGINATION — 64-field board paginated into QUADRANTS. Default page = the viewer's quadrant (Q1);
+  // Finals column now stacks the two semifinals + final + champion.
+  "tournament-bracket-64": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 64, advancedRounds: 1, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // 64-field, viewing a FAR quadrant (Q3) — pagination + pinned card across pages.
+  "tournament-bracket-64-q3": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [
+      buildTournamentBracketDemoConfig({ size: 64, advancedRounds: 1, browseSection: 2, card: "playable" }),
+    ],
+    diffTolerance: 0,
+  },
+  // P3 KICK — a non-viewer entrant kicked mid-tournament (WALKOVER): their slot renders eliminated
+  // (dimmed + X) while the opponent advances along the gold line.
+  "tournament-bracket-kicked": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 8, kick: true, browseOther: true, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // P3 CANCELLED — the board reads "TOURNAMENT CANCELLED" over the bracket.
+  "tournament-bracket-cancelled": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 8, advancedRounds: 1, cancelled: true, card: "none" })],
+    diffTolerance: 0,
+  },
+  // P2 ACTIVITY WIN — the other semifinal auto-resolved at the deadline (present player advanced); the
+  // browsed pairing card annotates the winner "(Activity win)" and the loser slot dims with an X.
+  "tournament-board-4-activity-win": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [
+      buildTournamentBracketDemoConfig({ size: 4, activityWin: true, browseOther: true, card: "playable" }),
+    ],
     diffTolerance: 0,
   },
   // Showdown SET EDITOR (P1 layout core). The full-screen teambuilder Layer-3 editor for one
@@ -1367,6 +1465,36 @@ const RECIPES: Record<string, Recipe> = {
     ],
     diffTolerance: 0,
   },
+  // P3 SUGGESTED SETS: your OWN winning full-sets (applied whole) + COMMUNITY popular item+form hints
+  // (overlaid, keeping your moves). Deterministic via injected demoWinningSets + demoCommunitySuggestions.
+  "showdown-editor-suggested": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        initialSetMenu: "suggested",
+        demoWinningSets: [
+          "Garchomp @ Life Orb  [Stage: Base]\nAbility: Rough Skin\nNature: Adamant\n- Earthquake\n- Scale Shot\n- Swords Dance\n- Stone Edge",
+        ],
+        demoCommunitySuggestions: [
+          { speciesId: SpeciesId.GARCHOMP, formIndex: 0, item: "ER_LIFE_ORB", wins: 12 },
+          { speciesId: SpeciesId.GARCHOMP, formIndex: 0, item: "LEFTOVERS", wins: 5 },
+        ],
+      }),
+    ],
+    diffTolerance: 0,
+  },
+  // P3 SEARCH OPERATORS: the move pane filtered by an operator (type:ground) - only ground moves remain.
+  "showdown-editor-operator-filter": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        initialField: EditorField.MOVE0,
+        initialPaneOpen: true,
+        initialFilter: "type:ground",
+      }),
+    ],
+    diffTolerance: 0,
+  },
   // Showdown TEAM PRESET MENU (addendum): the pre-pairing entry screen. Left = stylish preset boxes
   // (name + validity marker + 6 mini icons) with a trailing create box; right = the hovered mon's
   // full sprite + ability/innates + item + moveset (live preview). Multi-team with hover preview on
@@ -1374,6 +1502,19 @@ const RECIPES: Record<string, Recipe> = {
   "showdown-team-menu": {
     mode: UiMode.SHOWDOWN_TEAM_MENU,
     prepare: () => [buildShowdownTeamMenuDemoConfig()],
+    diffTolerance: 0,
+  },
+  // P3 FOLDERS: presets grouped under collapsible headers - "Rain" expanded (its two presets shown),
+  // "Squad" collapsed (header only). Cursor on the Rain header; the header/collapse chrome is the golden.
+  "showdown-team-menu-folders": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => {
+      const base = buildShowdownTeamMenuDemoConfig();
+      const presets = base.presets.map((p, i) =>
+        i === 0 ? { ...p, folder: "Rain" } : i === 1 ? { ...p, folder: "Rain" } : { ...p, folder: "Squad" },
+      );
+      return [{ ...base, presets, initialTeam: 0, initialCollapsedFolders: ["Squad"] }];
+    },
     diffTolerance: 0,
   },
   // Empty state: no saved presets -> the large "create your first team" affordance, cursor on it,
@@ -1635,6 +1776,51 @@ const RECIPES: Record<string, Recipe> = {
     prepare: async game => {
       await game.classicMode.startBattle(SpeciesId.RATTATA);
       return []; // captureActive ignores this; satisfies the prepare return type
+    },
+  },
+  // Showdown 1v1 host turn-clock: the command menu with the 60s countdown armed (P3 cosmetic).
+  // afterShow arms the clock on the freshly-shown CommandUiHandler; the harness no-ops timers so the
+  // golden captures the full "1:00" state. Guards the countdown chrome (position / text / color).
+  "battle-showdown-clock": {
+    captureActive: true,
+    field: true,
+    afterShow: handler => handler.startShowdownClock?.(60_000),
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.RATTATA);
+      return [];
+    },
+  },
+  // The in-battle "Pokémon Stats" overlay (BattleInfoOverlay, opened with the Stats key).
+  // `mode` triggers `prepare` PRE-repoint so the overlay reads a live battle (on-field
+  // mons, stat stages, crit tag); the custom `render` builds + opens the overlay directly
+  // (it is a standalone container class, not a UiMode handler). The lead is pre-boosted on
+  // EVERY arrow row so the golden proves all eight rows render with labels + arrows:
+  // Atk/Def/SpA/SpD/Spe AND the newly-wired Acc / Eva / Crit. Focus Energy (CRIT_BOOST,
+  // +2) populates the Crit row - the maintainer's "crit arrows don't update" repro. No
+  // `field` (the overlay draws its own full-screen scrim + panel), so the golden is a
+  // clean, deterministic capture of the panel itself.
+  "battle-info-stats": {
+    mode: UiMode.COMMAND,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+      const mon = game.scene.getPlayerPokemon();
+      if (!mon) {
+        throw new Error("battle-info-stats: no player pokemon after startBattle");
+      }
+      mon.setStatStage(Stat.ATK, 2);
+      mon.setStatStage(Stat.DEF, -1);
+      mon.setStatStage(Stat.SPATK, 3);
+      mon.setStatStage(Stat.SPDEF, 1);
+      mon.setStatStage(Stat.SPD, -2);
+      mon.setStatStage(Stat.ACC, -1);
+      mon.setStatStage(Stat.EVA, 2);
+      mon.addTag(BattlerTagType.CRIT_BOOST); // Focus Energy → +2 crit stage on the Crit row
+      return [];
+    },
+    render: game => {
+      const overlay = new BattleInfoOverlay();
+      overlay.open();
+      (game.scene as any).ui.setActiveHandler?.(overlay);
     },
   },
   // Showdown construction-time vanilla mega. A vanilla-species mega built AT its mega
@@ -2432,6 +2618,7 @@ describe.skipIf(!RUN)("render-ui-page", () => {
           }
           handler.setup();
           handler.show(args);
+          recipe.afterShow?.(handler);
           // Make this the active handler so input driving routes presses to it.
           (game.scene as any).ui.setActiveHandler?.(handler);
         }

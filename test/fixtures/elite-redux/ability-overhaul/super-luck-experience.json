@@ -1,0 +1,37 @@
+{
+  "v": 1,
+  "name": "Super Luck grants 1.2x experience",
+  "run": {
+    "wave": 1,
+    "level": 50,
+    "difficulty": "ace",
+    "seed": "super-luck-exp"
+  },
+  "party": [
+    {
+      "species": "MEWTWO",
+      "ability": "SUPER_LUCK",
+      "moves": ["PSYCHIC", "AURA_SPHERE", "ICE_BEAM", "RECOVER"]
+    },
+    {
+      "species": "SNORLAX",
+      "ability": "SUPER_LUCK",
+      "moves": ["BODY_SLAM", "CRUNCH", "EARTHQUAKE", "REST"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "MAGIKARP",
+        "level": 5,
+        "moves": ["SPLASH", "TACKLE", "FLAIL", "BOUNCE"]
+      }
+    ]
+  },
+  "script": [{ "move": "PSYCHIC", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "victory",
+    "partyProgress": [{ "slot": 0, "exp": 135156 }, { "slot": 1, "species": "Snorlax", "exp": 135156 }]
+  }
+}

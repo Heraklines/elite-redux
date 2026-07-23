@@ -53,6 +53,7 @@ import {
   ER_DECOMPOSER_ABILITY_ID,
   ER_FIRST_SERPENT_ABILITY_ID,
   ER_GALE_BLOOM_ABILITY_ID,
+  ER_GLYCOLYSIS_ABILITY_ID,
   ER_PURE_GOOD_ABILITY_ID,
   ER_TITAN_ABILITY_ID,
   ER_BRAIN_FOOD_ABILITY_ID,
@@ -104,6 +105,22 @@ const MEGA_DRILL = 5684; // ER draft
 const WEIGHTED_SCALES = 5938; // composite (Steelworker + Multiscale)
 const KNIGHTS_HONOR = 5939; // bespoke (Def/SpDef King's Wrath)
 const POWER_CORE = 5105; // ER draft
+// --- Newcomer BATCH 2 form ability ids (codex signatures 5971-5994 + composites
+// 5995-5996 + residual placeholders 5997-5998; resolved via the batch-2 audit). ---
+const SPIRIT_PUNCH = 5983; // codex signature (Iron Fist Mystic Blades)
+const EARTH_EATER = 297; // vanilla
+const LEAD_COAT = 5034; // ER
+const CRUDE_STEEL = 5995; // composite (Solid Rock + Steelworker)
+const METEOR_MASS = 5997; // PLACEHOLDER (no design)
+const FAE_HUNTER = 5178; // ER
+const ECLIPSE_WING = 5971; // codex signature
+const REAPERS_EMBRACE = 5726; // dump draft "Reaper's Embarce" (spec: Reaper's Embrace)
+const HYPER_AGGRESSIVE = 5096; // ER
+const ELECTRO_SURGE = 5000; // ER
+const MOSH_PIT = 5376; // ER
+const FIGHTING_SPIRIT = 5038; // ER
+const TWO_FACED_UNLEASHED = 5977; // codex signature
+const BRUTE_FORCE = 5459; // ER
 
 /**
  * A hand-authored newcomer mega/primal form. Injected onto {@linkcode baseSpecies}
@@ -127,7 +144,10 @@ export interface NewcomerFormDef {
   /** INNATE (passive) triple. */
   readonly innates: readonly [AbilityId, AbilityId, AbilityId];
   /** Mega stone / primal orb that triggers the form (a FormChangeItem enum value). */
-  readonly item: FormChangeItem;
+  readonly item?: FormChangeItem;
+  readonly preFormKeys?: readonly string[];
+  readonly isStarterSelectable?: boolean;
+  readonly replaceExisting?: boolean;
   /**
    * Extra level-1 learnset moves to append to the BASE species (learnsets are
    * per-species, not per-form). Applied AFTER `initEliteReduxMovesets` (which
@@ -261,10 +281,10 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     innates: [AbilityId.PLUS, ab(SYNCHRONIZED_CURRENT), ab(POSITIVE_FEEDBACK)],
     item: FormChangeItem.PLUSLEITE,
   },
-  // #3 Primal Regigigas — Normal/Rock/Ice/Steel/Electric/Dragon/Water (SEVEN types).
-  // Water is native (Regitube is lore-part of the mon; maintainer directive). This is
-  // the 7-type stress case for the N-type UI (Pass B) and adds a 6th REMOVABLE type to
-  // World in Pieces' pool (every non-Normal type is removable).
+  // #3 Primal Regigigas — Normal/Rock/Ice/Steel/Electric/Dragon (SIX types).
+  // (Water was removed per maintainer directive 2026-07-22 — no longer native.) This
+  // is the 6-type stress case for the N-type UI (Pass B); every non-Normal type is
+  // removable, so World in Pieces has FIVE removable types in its pool here.
   // Active Predator / Stall / Raging Boxer; innates Titan (5934), World in Pieces
   // (5917), Self Repair. Orb Planetary Orb. Reversion form (like other primals):
   // holding the orb triggers the "primal" form, Mega-Bracelet gated in the pool.
@@ -280,7 +300,6 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
       PokemonType.STEEL,
       PokemonType.ELECTRIC,
       PokemonType.DRAGON,
-      PokemonType.WATER,
     ],
     stats: [140, 170, 145, 70, 145, 100],
     actives: [ab(PREDATOR), AbilityId.STALL, ab(RAGING_BOXER)],
@@ -331,6 +350,110 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     actives: [ab(CHIVALRY), ab(MEGA_DRILL), AbilityId.STAMINA],
     innates: [ab(WEIGHTED_SCALES), ab(KNIGHTS_HONOR), ab(POWER_CORE)],
     item: FormChangeItem.DRAGONINITE_Z,
+  },
+  // Alpha-dex additions. Lucario's newer Mega Y is published as Mega Z and
+  // replaces the older imported `mega` record in place.
+  {
+    baseSpecies: SpeciesId.LUCARIO,
+    formKey: "mega",
+    formName: "Mega Z",
+    slug: "lucario_mega_z",
+    types: [PokemonType.FIGHTING, PokemonType.ELECTRIC],
+    stats: [70, 142, 65, 142, 86, 120],
+    actives: [ab(5064), AbilityId.ANTICIPATION, ab(5160)],
+    innates: [ab(5364), ab(5365), ab(5363)],
+    item: FormChangeItem.LUCARIONITE_Z,
+    preFormKeys: [""],
+    replaceExisting: true,
+  },
+  {
+    baseSpecies: SpeciesId.KINGDRA,
+    formKey: "mega-y",
+    formName: "Mega Y",
+    slug: "mega_kingdra_y",
+    types: [PokemonType.WATER, PokemonType.DRAGON],
+    stats: [75, 105, 95, 125, 95, 145],
+    actives: [AbilityId.SURGE_SURFER, ab(5275), ab(5288)],
+    innates: [AbilityId.TRANSISTOR, ab(5478), AbilityId.MULTISCALE],
+    item: FormChangeItem.KINGDRANITE_Y,
+    preFormKeys: [""],
+  },
+  {
+    baseSpecies: SpeciesId.DURALUDON,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "duraludon_partner_mega",
+    types: [PokemonType.STEEL, PokemonType.DRAGON],
+    stats: [70, 155, 135, 110, 75, 90],
+    actives: [AbilityId.MIRROR_ARMOR, AbilityId.LIGHT_METAL, ab(5374)],
+    innates: [AbilityId.STEELWORKER, AbilityId.MEGA_LAUNCHER, AbilityId.LONG_REACH],
+    item: FormChangeItem.DURALUDONITE,
+    preFormKeys: [""],
+  },
+  {
+    baseSpecies: SpeciesId.FIDOUGH,
+    formKey: "partner",
+    formName: "Partner",
+    slug: "fidough_partner",
+    types: [PokemonType.FAIRY],
+    stats: [80, 75, 70, 50, 85, 75],
+    actives: [ab(5290), ab(5215), ab(5332)],
+    innates: [AbilityId.WELL_BAKED_BODY, AbilityId.REGENERATOR, AbilityId.PICKUP],
+    isStarterSelectable: true,
+  },
+  {
+    baseSpecies: SpeciesId.FIDOUGH,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "fidough_partner_mega",
+    types: [PokemonType.FAIRY],
+    stats: [80, 110, 110, 55, 110, 70],
+    actives: [AbilityId.MISTY_SURGE, ab(5453), ab(5332)],
+    innates: [ab(ER_GLYCOLYSIS_ABILITY_ID), ab(5356), ab(5969)],
+    item: FormChangeItem.FIDOUGHITE,
+    preFormKeys: ["partner"],
+  },
+  // ===================== NEWCOMER BATCH 2 =====================
+  // Metagross Battle Bond — Steel/Psychic/Rock (N-type). FLAG (mechanism): a true
+  // Battle Bond form should transform on a KO via a Greninja-style
+  // SpeciesFormChangeAbilityTrigger; wired here with an item trigger
+  // (Metagrossite Bond) for obtainability until that trigger is added.
+  {
+    baseSpecies: SpeciesId.METAGROSS,
+    formKey: "battle-bond",
+    formName: "Battle Bond",
+    slug: "metagross_battle_bond",
+    types: [PokemonType.STEEL, PokemonType.PSYCHIC, PokemonType.ROCK],
+    stats: [80, 150, 150, 155, 135, 30],
+    actives: [ab(SPIRIT_PUNCH), ab(EARTH_EATER), ab(LEAD_COAT)],
+    innates: [ab(CRUDE_STEEL), ab(METEOR_MASS), AbilityId.BATTLE_BOND],
+    item: FormChangeItem.METAGROSSITE_BOND,
+  },
+  // Yveltal Mega Z — Dark/Flying. Active Fae Hunter; innates Dark Aura, Eclipse
+  // Wing (5971), Reaper's Embrace (5726). Stone Yveltalite Z.
+  {
+    baseSpecies: SpeciesId.YVELTAL,
+    formKey: "mega-z",
+    formName: "Mega Z",
+    slug: "yveltal_mega_z",
+    types: [PokemonType.DARK, PokemonType.FLYING],
+    stats: [126, 179, 95, 131, 98, 151],
+    actives: [ab(FAE_HUNTER), ab(FAE_HUNTER), ab(FAE_HUNTER)],
+    innates: [AbilityId.DARK_AURA, ab(ECLIPSE_WING), ab(REAPERS_EMBRACE)],
+    item: FormChangeItem.YVELTALITE_Z,
+  },
+  // Mega Luxray Y — Electric. Active Hyper Aggressive / Electro Surge / Mosh Pit;
+  // innates Fighting Spirit, Two-Faced Unleashed (5977), Brute Force. Stone Luxrayite Y.
+  {
+    baseSpecies: SpeciesId.LUXRAY,
+    formKey: "mega-y",
+    formName: "Mega Y",
+    slug: "luxray_mega_y",
+    types: [PokemonType.ELECTRIC],
+    stats: [90, 150, 100, 110, 100, 110],
+    actives: [ab(HYPER_AGGRESSIVE), ab(ELECTRO_SURGE), ab(MOSH_PIT)],
+    innates: [ab(FIGHTING_SPIRIT), ab(TWO_FACED_UNLEASHED), ab(BRUTE_FORCE)],
+    item: FormChangeItem.LUXRAYITE_Y,
   },
 ];
 
@@ -420,6 +543,9 @@ function seedBaseForm(species: ReturnType<typeof getPokemonSpecies>): void {
  * form key so the mega is offered whatever form the base is currently in.
  */
 function registerFormChangeEdge(def: NewcomerFormDef, result: InjectNewcomerFormsResult): void {
+  if (def.item === undefined) {
+    return;
+  }
   if (!pokemonFormChanges[def.baseSpecies]) {
     pokemonFormChanges[def.baseSpecies] = [];
   }
@@ -428,7 +554,7 @@ function registerFormChangeEdge(def: NewcomerFormDef, result: InjectNewcomerForm
   const baseKeys = (species?.forms ?? [])
     .map(f => f.formKey ?? "")
     .filter(k => k !== def.formKey && !/mega|primal/.test(k));
-  const preKeys = baseKeys.length > 0 ? [...new Set(baseKeys)] : [""];
+  const preKeys = def.preFormKeys ?? (baseKeys.length > 0 ? [...new Set(baseKeys)] : [""]);
   for (const preKey of preKeys) {
     if (list.some(fc => fc.preFormKey === preKey && fc.formKey === def.formKey)) {
       continue;
@@ -454,7 +580,8 @@ export function injectNewcomerForms(): InjectNewcomerFormsResult {
     // Always register the stone edge (reachability/dex), even if the form was
     // already injected on a prior run.
     registerFormChangeEdge(def, result);
-    if (species.forms.some(f => f.formKey === def.formKey)) {
+    const existingForm = species.forms.find(f => f.formKey === def.formKey);
+    if (existingForm && !def.replaceExisting) {
       result.skippedExisting++;
       continue;
     }
@@ -486,7 +613,7 @@ export function injectNewcomerForms(): InjectNewcomerFormsResult {
       species.baseExp,
       false, // genderDiffs
       null, // formSpriteKey — redirected to the ER slug below
-      false, // isStarterSelectable — battle/evolution-only form
+      def.isStarterSelectable ?? false,
       false, // isUnobtainable
     );
     form.setPassives([def.innates[0], def.innates[1], def.innates[2]]);
@@ -496,9 +623,13 @@ export function injectNewcomerForms(): InjectNewcomerFormsResult {
     }
     const formMut = form as unknown as { speciesId: number; formIndex: number; generation: number };
     formMut.speciesId = species.speciesId;
-    formMut.formIndex = species.forms.length;
+    formMut.formIndex = existingForm?.formIndex ?? species.forms.length;
     formMut.generation = species.generation;
-    (species.forms as unknown as PokemonForm[]).push(form);
+    if (existingForm) {
+      (species.forms as unknown as PokemonForm[])[existingForm.formIndex] = form;
+    } else {
+      (species.forms as unknown as PokemonForm[]).push(form);
+    }
 
     // #287 sprite/icon redirect to the ER slug (placeholder until art lands).
     installErFormSpriteRedirect(form, def.slug);

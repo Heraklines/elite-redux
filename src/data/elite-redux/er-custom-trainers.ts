@@ -49,6 +49,7 @@
 //         "abilitySlot": 0,            // 0 | 1 | 2
 //         "fusion": { "species": 384, "formIndex": 0, "abilitySlot": 0 }, // optional
 //         "heldItems": [{ "item": "LEFTOVERS", "count": 1 }], // enemy-legal keys
+//         "vitamins": { "hp": 3, "atk": 5, "spd": 2 }, // each stat 0-31
 //         "slotChance": 100            // slots 2-6 only: integer 1-100 chance the slot
 //                                      // is FILLED this run (absent/slot-1 => 100). A
 //                                      // failed roll omits the slot (party shrinks).
@@ -103,6 +104,14 @@ import { isDevToolsEnabled } from "#app/dev-tools/registry";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
+import {
+  hasErCustomTrainerBeenUsed,
+  hasErCustomTrainerWindowBeenUsed,
+  markErCustomTrainerUsed,
+  markErCustomTrainerWindowUsed,
+  resetErCustomTrainerTracking,
+  resetErCustomTrainerWindowTracking,
+} from "#data/elite-redux/er-custom-trainer-run-state";
 import { getErCustomTrainerSprite } from "#data/elite-redux/er-custom-trainer-sprites";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
@@ -120,10 +129,12 @@ import { Challenges } from "#enums/challenges";
 import { Gender } from "#data/gender";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
+import { PERMANENT_STATS } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
+import { BaseStatBoosterModifierType } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { resolveHeldItemKey } from "#system/llm-director/held-item-resolver";
 import type { HeldModifierConfig } from "#types/held-modifier-config";
@@ -243,6 +254,16 @@ export interface ErCustomTrainerHeldItem {
   count?: number;
 }
 
+/** Per-stat vitamin stack counts authored for one team member (0-31 each). */
+export interface ErCustomTrainerVitamins {
+  hp?: number;
+  atk?: number;
+  def?: number;
+  spatk?: number;
+  spdef?: number;
+  spd?: number;
+}
+
 /**
  * Per-battle ability substitutions for one authored team member. Missing slots
  * keep the species/form's normal ability. These are copied onto the spawned
@@ -275,6 +296,8 @@ export interface ErCustomTrainerMember {
   insanity?: ErCustomTrainerInsanity | null;
   fusion?: ErCustomTrainerFusion | null;
   heldItems?: readonly ErCustomTrainerHeldItem[];
+  /** HP Up, Protein, Iron, Calcium, Zinc and Carbos stack counts. */
+  vitamins?: ErCustomTrainerVitamins;
   /** Shiny Lab visual effect the mon fields with (see {@linkcode ErCustomTrainerShiny}). */
   shiny?: ErCustomTrainerShiny | null;
   /**
@@ -426,6 +449,8 @@ export interface ErCustomTrainerMemberResolved {
   } | null;
   fusion: { speciesId: number; formIndex: number; abilitySlot: number } | null;
   heldItemKeys: readonly { key: string; count: number }[];
+  /** Vitamin counts in Stat.HP, ATK, DEF, SPATK, SPDEF, SPD order. */
+  vitaminCounts: readonly [number, number, number, number, number, number];
   /** Serialized Shiny Lab look this member fields with, or `null` (renders normally). */
   shinyLook: ErShinyLabSavedLook | null;
   /** Sanitized name-prefix carried by the shiny look ("" when none). */
@@ -532,7 +557,7 @@ let activeSpawnConfig: ErCustomTrainerSpawnConfig = normalizeErCustomTrainerSpaw
 export function setErCustomTrainersForTesting(trainers?: ErCustomTrainers): void {
   activeTrainers = trainers ?? (customTrainersJson as ErCustomTrainers);
   resolvedCache = null;
-  USED_CUSTOM_TRAINER_WINDOWS.clear();
+  resetErCustomTrainerWindowTracking();
 }
 
 /** The active (normalized) global spawn-density config. */
@@ -543,7 +568,7 @@ export function getErCustomTrainerSpawnConfig(): ErCustomTrainerSpawnConfig {
 /** Test hook: replace (or with `undefined` restore) the active spawn-density config. */
 export function setErCustomTrainerSpawnConfigForTesting(config?: Partial<ErCustomTrainerSpawnConfig>): void {
   activeSpawnConfig = normalizeErCustomTrainerSpawnConfig(config ?? customTrainersConfigJson);
-  USED_CUSTOM_TRAINER_WINDOWS.clear();
+  resetErCustomTrainerWindowTracking();
 }
 
 /** Move enum NAME -> pokerogue MoveId, vanilla + ER customs (mirror of er-trainer-tuning.ts). */
@@ -777,6 +802,16 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
   const heldItemKeys = (m.heldItems ?? [])
     .filter(h => h && typeof h.item === "string" && h.item.length > 0)
     .map(h => ({ key: h.item, count: Number.isInteger(h.count) && (h.count as number) > 0 ? (h.count as number) : 1 }));
+  const vitaminCount = (value: unknown): number =>
+    Number.isInteger(value) ? Math.max(0, Math.min(31, value as number)) : 0;
+  const vitaminCounts = [
+    vitaminCount(m.vitamins?.hp),
+    vitaminCount(m.vitamins?.atk),
+    vitaminCount(m.vitamins?.def),
+    vitaminCount(m.vitamins?.spatk),
+    vitaminCount(m.vitamins?.spdef),
+    vitaminCount(m.vitamins?.spd),
+  ] as const;
   const shiny = resolveShinyLook(m.shiny);
   const rawInsanity = m.insanity && typeof m.insanity === "object" ? m.insanity : null;
   const resolveAbilityId = (value: unknown): AbilityId | null =>
@@ -802,6 +837,7 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
     insanity,
     fusion,
     heldItemKeys,
+    vitaminCounts,
     shinyLook: shiny ? shiny.look : null,
     shinyName: shiny ? shiny.name : "",
   };
@@ -945,28 +981,9 @@ export function getErCustomTrainers(): readonly ErCustomTrainerResolved[] {
 // window, no repeats per run. Both the used-key set and the used-window set are
 // run-scoped (cleared at run start via resetErCustomTrainerTracking); everything
 // derives from the run seed so a save reload — and a future co-op adoption —
-// land identically (NO Math.random).
+// land identically (NO Math.random). The two sets live in the dependency-free
+// er-custom-trainer-run-state module so session save/load can persist them.
 // -----------------------------------------------------------------------------
-const USED_CUSTOM_TRAINER_KEYS = new Set<string>();
-
-/** Windows (0-based indices) that have already fielded a custom trainer this run. */
-const USED_CUSTOM_TRAINER_WINDOWS = new Set<number>();
-
-/** Reset per-run custom-trainer state (used keys + used windows); call at run start. */
-export function resetErCustomTrainerTracking(): void {
-  USED_CUSTOM_TRAINER_KEYS.clear();
-  USED_CUSTOM_TRAINER_WINDOWS.clear();
-}
-
-/** Mark a custom trainer as fielded this run (no repeats). */
-export function markErCustomTrainerUsed(key: string): void {
-  USED_CUSTOM_TRAINER_KEYS.add(key);
-}
-
-/** Mark a spawn window (0-based index) as having fielded its one custom trainer. */
-export function markErCustomTrainerWindowUsed(windowIndex: number): void {
-  USED_CUSTOM_TRAINER_WINDOWS.add(windowIndex);
-}
 
 /** Deterministic FNV-1a hash of a seed string (mirrors runtime-hook selection seeding). */
 function hashSeed(seed: string): number {
@@ -1309,7 +1326,7 @@ function isErCustomTrainerEligible(
   difficulty: string,
   ignoreChallenge = false,
 ): boolean {
-  if (USED_CUSTOM_TRAINER_KEYS.has(trainer.key)) {
+  if (hasErCustomTrainerBeenUsed(trainer.key)) {
     return false;
   }
   if (!trainer.difficulties.includes(difficulty)) {
@@ -1423,7 +1440,7 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
   const config = getErCustomTrainerSpawnConfig();
   const windowIndex = erCustomTrainerWindowIndex(waveIndex, config.windowSize);
   // At most one custom trainer per window.
-  if (USED_CUSTOM_TRAINER_WINDOWS.has(windowIndex)) {
+  if (hasErCustomTrainerWindowBeenUsed(windowIndex)) {
     return null;
   }
   // Global-density roll: does this window field a custom trainer at all?
@@ -1457,6 +1474,7 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
 // runtime hook can read it without an import cycle; re-exported here so callers
 // have a single custom-trainer entry point.
 export { isErCustomTrainerBstBypassActive, setErCustomTrainerBstBypass } from "#data/elite-redux/er-custom-trainer-bst-flag";
+export { markErCustomTrainerUsed, resetErCustomTrainerTracking };
 
 // -----------------------------------------------------------------------------
 // Enemy construction (the exact-party guarantee).
@@ -1586,39 +1604,49 @@ export function applyErCustomTrainerPresentation(trainer: Trainer, resolved: ErC
 }
 
 /**
- * Apply the authored custom-trainer name without reversing named NPC titles.
- * Generic classes keep the engine's normal "class + authored name" behavior.
- * Named classes (Gym Leaders, Elite Four, Champions, etc.) already own a
- * canonical personal name, so the authored value is their prefix/title:
- * `Leader + Sabrina` must render as `Leader Sabrina`, never `Sabrina Leader`.
+ * Apply the authored custom-trainer name. Editor-created custom trainers show ONLY
+ * their authored name on EVERY surface (the "wants to battle!" intro, the in-battle
+ * trainer title, the intro/victory/defeat dialogue attributions, and every other
+ * place that composes class + name) — the trainer CLASS / sprite title is SUPPRESSED,
+ * for both generic classes (no "Ace Trainer <Name>") and named NPC classes (no
+ * "Leader Sabrina"), per the maintainer directive.
+ *
+ * All those surfaces funnel through the single {@linkcode Trainer.getName} seam, so
+ * we mark the instance ({@linkcode Trainer.erCustomTrainerName}) and override that one
+ * getter to return the authored name for every slot/title combination. A plain
+ * (vanilla / non-editor) trainer never reaches this function, so its naming stays
+ * byte-identical.
  */
 export function applyErCustomTrainerDisplayName(trainer: Trainer, authoredName: string): void {
   const customName = authoredName.trim();
   if (!customName) {
     return;
   }
-  if (!trainer.config.title) {
-    trainer.name = customName;
-    return;
-  }
-
-  const config = trainer.config;
-  const variant = trainer.variant;
-  trainer.name = config.getTitle(TrainerSlot.TRAINER, variant);
-  trainer.partnerName = config.getTitle(TrainerSlot.TRAINER_PARTNER, variant);
-  trainer.getName = (slot: TrainerSlot = TrainerSlot.NONE, includeTitle = false): string => {
-    const name = config.getTitle(slot, variant);
-    return includeTitle ? `${customName} ${name}`.trim() : name;
-  };
+  // Robust editor-custom marker (not a string heuristic): its presence is what the
+  // suppression keys off, and it keeps the instance introspectable/testable.
+  trainer.erCustomTrainerName = customName;
+  trainer.name = customName;
+  trainer.partnerName = customName;
+  trainer.getName = (_slot: TrainerSlot = TrainerSlot.NONE, _includeTitle = false): string => customName;
 }
 
-/** Resolve one member's authored held items to `HeldModifierConfig[]` (enemy-legal pool). */
+/** Resolve one member's authored held items and vitamins to enemy modifier configs. */
 export function erCustomTrainerHeldModifierConfigs(member: ErCustomTrainerMemberResolved): HeldModifierConfig[] {
   const out: HeldModifierConfig[] = [];
   for (const held of member.heldItemKeys) {
     const config = resolveHeldItemKey(held.key);
     if (config) {
       out.push({ ...config, stackCount: held.count });
+    }
+  }
+  for (const stat of PERMANENT_STATS) {
+    const stackCount = member.vitaminCounts[stat];
+    if (stackCount > 0) {
+      out.push({
+        modifier: new BaseStatBoosterModifierType(stat),
+        stackCount,
+        isTransferable: false,
+      });
     }
   }
   return out;

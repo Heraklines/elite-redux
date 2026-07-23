@@ -92,15 +92,20 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     priceMod: 1,
     buysDear: "HELD",
   },
-  [BiomeId.FOREST]: { cheap: ["BERRY", "EVO"], dear: ["BATTLE"], signature: ["LEEK", "SOOTHE_BELL", "ER_GRASSY_SEED", "ER_BUG_GEM"], priceMod: 1 },
-  [BiomeId.SEA]: { cheap: ["BALLS"], dear: ["EVO"], signature: ["SHELL_BELL", "SOUL_DEW", "ER_WATER_GEM", "ER_ABSORB_BULB"], priceMod: 1 },
-  [BiomeId.SWAMP]: { cheap: ["BERRY"], dear: ["TM"], signature: ["TOXIC_ORB", "QUICK_CLAW", "ER_POISON_GEM"], priceMod: 1.1 },
+  // Safety Goggles vs the forest's spore/powder movesets (also stocked in the Desert sandstorm).
+  [BiomeId.FOREST]: { cheap: ["BERRY", "EVO"], dear: ["BATTLE"], signature: ["LEEK", "SOOTHE_BELL", "ER_GRASSY_SEED", "ER_BUG_GEM", "ER_SAFETY_GOGGLES"], priceMod: 1 },
+  // Utility Umbrella lives where the rain does (SEA), neutralizing weather swings.
+  [BiomeId.SEA]: { cheap: ["BALLS"], dear: ["EVO"], signature: ["SHELL_BELL", "SOUL_DEW", "ER_WATER_GEM", "ER_ABSORB_BULB", "ER_UTILITY_UMBRELLA"], priceMod: 1 },
+  // Shed Shell reads as "slip free of the mire" (escape the trapping swamp).
+  [BiomeId.SWAMP]: { cheap: ["BERRY"], dear: ["TM"], signature: ["TOXIC_ORB", "QUICK_CLAW", "ER_POISON_GEM", "ER_SHED_SHELL"], priceMod: 1.1 },
   [BiomeId.BEACH]: { cheap: ["BERRY", "BALLS"], dear: ["TM"], signature: ["SOOTHE_BELL", "SHELL_BELL"], priceMod: 0.9 },
   [BiomeId.LAKE]: { cheap: ["BALLS", "BERRY"], dear: ["HELD"], signature: ["SHELL_BELL", "SOUL_DEW"], priceMod: 0.9 },
   [BiomeId.SEABED]: { cheap: [], dear: ["EVO"], signature: ["SOUL_DEW", "EVIOLITE", "ER_WATER_GEM"], priceMod: 1.2 },
-  [BiomeId.MOUNTAIN]: { cheap: ["BATTLE"], dear: ["BERRY"], signature: ["KINGS_ROCK", "QUICK_CLAW", "ER_ROCK_GEM"], priceMod: 1.1 },
+  // Adrenaline Orb where the intimidating apex predators roam the peaks.
+  [BiomeId.MOUNTAIN]: { cheap: ["BATTLE"], dear: ["BERRY"], signature: ["KINGS_ROCK", "QUICK_CLAW", "ER_ROCK_GEM", "ER_ADRENALINE_ORB"], priceMod: 1.1 },
   [BiomeId.BADLANDS]: { cheap: ["BATTLE"], dear: ["BERRY"], signature: ["QUICK_CLAW", "KINGS_ROCK", "ER_GROUND_GEM"], priceMod: 1.1 },
-  [BiomeId.CAVE]: { cheap: ["BALLS"], dear: ["BALLS"], signature: ["EVOLUTION_ITEM", "EVIOLITE", "ER_ROCK_GEM", "ER_GROUND_GEM"], priceMod: 1 },
+  // Heavy-Duty Boots for the hazard-laced caves; Throat Spray reads off the cave echo (sound).
+  [BiomeId.CAVE]: { cheap: ["BALLS"], dear: ["BALLS"], signature: ["EVOLUTION_ITEM", "EVIOLITE", "ER_ROCK_GEM", "ER_GROUND_GEM", "ER_HEAVY_DUTY_BOOTS", "ER_THROAT_SPRAY"], priceMod: 1 },
   [BiomeId.DESERT]: {
     // The caravan: everything pricey, but it stocks exotics (extra ULTRA
     // wildcard rolls; see stock builder).
@@ -111,38 +116,45 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
   },
   [BiomeId.ICE_CAVE]: { cheap: ["EVO"], dear: ["BERRY"], signature: ["FROSTBITE_ORB", "EVIOLITE", "ER_ICE_GEM", "ER_SNOWBALL"], priceMod: 1.2 },
   [BiomeId.MEADOW]: { cheap: ["MINT", "BERRY", "VITAMIN"], dear: ["BATTLE"], signature: ["SOOTHE_BELL", "BERRY", "ER_GRASSY_SEED", "ER_MENTAL_HERB"], priceMod: 0.9 },
-  [BiomeId.POWER_PLANT]: { cheap: ["TM", "BATTLE"], dear: ["BERRY"], signature: ["MULTI_LENS", "WIDE_LENS", "ER_ELECTRIC_GEM", "ER_CELL_BATTERY", "ER_ELECTRIC_SEED"], priceMod: 1 },
+  // The gadget bench: Eject Button + Air Balloon read as manufactured tech tools.
+  [BiomeId.POWER_PLANT]: { cheap: ["TM", "BATTLE"], dear: ["BERRY"], signature: ["MULTI_LENS", "WIDE_LENS", "ER_ELECTRIC_GEM", "ER_CELL_BATTERY", "ER_ELECTRIC_SEED", "ER_EJECT_BUTTON", "ER_AIR_BALLOON"], priceMod: 1 },
   [BiomeId.VOLCANO]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["FLAME_ORB", "ER_CHILI_SAMPLE", "ER_FIRE_GEM"], priceMod: 1.1 },
   // Covert Cloak is SHOP-ONLY for players (maintainer 2026-07-16): it never
   // enters the random reward pools, only these signature slots.
   [BiomeId.GRAVEYARD]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["REVIVER_SEED", "ER_RUSTY_CLAW", "ER_GHOST_GEM", "ER_COVERT_CLOAK"], priceMod: 1 },
   // The training hall: vitamins are the headline, and martial mastery puts the
   // Mega Bracelet (KEYSTONE) on offer here too.
-  [BiomeId.DOJO]: { cheap: ["BATTLE", "VITAMIN", "KEYSTONE"], dear: ["TM"], signature: ["FOCUS_BAND", "KINGS_ROCK", "ER_FIGHTING_GEM", "ER_WEAKNESS_POLICY", "ER_EXPERT_BELT", "ER_MUSCLE_BAND"], priceMod: 1 },
-  [BiomeId.FACTORY]: { cheap: ["HELD"], dear: ["BERRY"], signature: ["WHITE_HERB", "ER_LOADED_DICE", "ER_STEEL_GEM", "ER_CELL_BATTERY"], priceMod: 1 },
+  [BiomeId.DOJO]: { cheap: ["BATTLE", "VITAMIN", "KEYSTONE"], dear: ["TM"], signature: ["FOCUS_BAND", "KINGS_ROCK", "ER_FIGHTING_GEM", "ER_WEAKNESS_POLICY", "ER_EXPERT_BELT", "ER_MUSCLE_BAND", "ER_PUNCHING_GLOVE"], priceMod: 1 },
+  // The machine shop: Iron Ball (dead weight) + Metronome (rhythmic machinery).
+  [BiomeId.FACTORY]: { cheap: ["HELD"], dear: ["BERRY"], signature: ["WHITE_HERB", "ER_LOADED_DICE", "ER_STEEL_GEM", "ER_CELL_BATTERY", "ER_IRON_BALL", "ER_METRONOME_ITEM"], priceMod: 1 },
   // Ancient arcane power: Omni Gem / Move Slot Expander / Ability Randomizer.
-  [BiomeId.RUINS]: { cheap: ["ARCANE"], dear: ["BALLS"], signature: ["RELIC_GOLD", "REVIVER_SEED", "ER_PSYCHIC_GEM", "ER_PSYCHIC_SEED", "ER_WISE_GLASSES"], priceMod: 1.1 },
+  // Room Service reads off the Trick Room / psychic-space theme of the ruins.
+  [BiomeId.RUINS]: { cheap: ["ARCANE"], dear: ["BALLS"], signature: ["RELIC_GOLD", "REVIVER_SEED", "ER_PSYCHIC_GEM", "ER_PSYCHIC_SEED", "ER_WISE_GLASSES", "ER_ROOM_SERVICE"], priceMod: 1.1 },
   [BiomeId.WASTELAND]: { cheap: ["BATTLE"], dear: ["BALLS"], signature: ["DNA_SPLICERS", "REVIVER_SEED"], priceMod: 1.2 },
   [BiomeId.ABYSS]: { cheap: [], dear: [], signature: [], priceMod: 1, noShop: true },
   // Cosmic mutation: the observatory tinkers with abilities/moves (ARCANE).
-  [BiomeId.SPACE]: { cheap: ["HELD", "ARCANE"], dear: ["BERRY", "TM"], signature: ["MINI_BLACK_HOLE", "MULTI_LENS", "ER_PSYCHIC_SEED"], priceMod: 1.2 },
+  // Zero-g Float Stone + Booster Energy where the future-paradox mons drift in.
+  [BiomeId.SPACE]: { cheap: ["HELD", "ARCANE"], dear: ["BERRY", "TM"], signature: ["MINI_BLACK_HOLE", "MULTI_LENS", "ER_PSYCHIC_SEED", "ER_FLOAT_STONE", "ER_BOOSTER_ENERGY"], priceMod: 1.2 },
   [BiomeId.CONSTRUCTION_SITE]: {
     // The work site: heavy discount (everything 50% off) + one extra reward slot
     // (see ErBiomeRule.extraRewardSlots) - a place to stock up cheaply.
     cheap: ["BATTLE", "VITAMIN"],
     dear: ["MINT"],
-    signature: ["GOLDEN_PUNCH", "FOCUS_BAND", "ER_STEEL_GEM", "ER_HEAVY_DUTY_BOOTS"],
+    signature: ["GOLDEN_PUNCH", "FOCUS_BAND", "ER_STEEL_GEM", "ER_HEAVY_DUTY_BOOTS", "ER_EJECT_PACK"],
     priceMod: 0.5,
   },
-  [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["BALLS"], signature: ["LUCKY_EGG", "BERRY", "ER_GRASS_GEM", "ER_GRASSY_SEED"], priceMod: 1.1 },
-  [BiomeId.FAIRY_CAVE]: { cheap: ["MINT"], dear: ["BATTLE"], signature: ["ER_LUCKY_HEART", "SOOTHE_BELL", "ER_FAIRY_GEM", "ER_MISTY_SEED"], priceMod: 1 },
-  [BiomeId.TEMPLE]: { cheap: [], dear: [], signature: ["LEFTOVERS", "RELIC_GOLD"], priceMod: 1 },
+  // Sticky Barb among the jungle thorns.
+  [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["BALLS"], signature: ["LUCKY_EGG", "BERRY", "ER_GRASS_GEM", "ER_GRASSY_SEED", "ER_STICKY_BARB"], priceMod: 1.1 },
+  // Clear Amulet as a protective fairy charm against stat-lowering hexes.
+  [BiomeId.FAIRY_CAVE]: { cheap: ["MINT"], dear: ["BATTLE"], signature: ["ER_LUCKY_HEART", "SOOTHE_BELL", "ER_FAIRY_GEM", "ER_MISTY_SEED", "ER_CLEAR_AMULET"], priceMod: 1 },
+  // Ability Shield as a temple ward that no hex can strip.
+  [BiomeId.TEMPLE]: { cheap: [], dear: [], signature: ["LEFTOVERS", "RELIC_GOLD", "ER_ABILITY_SHIELD"], priceMod: 1 },
   [BiomeId.SLUM]: {
     // The den: everything is 25% off, no markups. (The "used goods" twist
     // ships with the curse system, not in P1.)
     cheap: [],
     dear: [],
-    signature: ["WIDE_LENS", "ER_LOADED_DICE", "ER_COVERT_CLOAK", "ER_SMOKE_BALL"],
+    signature: ["WIDE_LENS", "ER_LOADED_DICE", "ER_COVERT_CLOAK", "ER_SMOKE_BALL", "ER_BLUNDER_POLICY"],
     priceMod: 0.75,
     buysDear: "EVO",
   },
@@ -153,7 +165,8 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
   [BiomeId.LABORATORY]: {
     cheap: ["CANDY", "ARCANE"],
     dear: ["BALLS"],
-    signature: ["ER_ABILITY_CAPSULE", "ER_LEARNERS_SHROOM"],
+    // Zoom Lens as precision lab optics.
+    signature: ["ER_ABILITY_CAPSULE", "ER_LEARNERS_SHROOM", "ER_ZOOM_LENS"],
     priceMod: 1,
   },
 };

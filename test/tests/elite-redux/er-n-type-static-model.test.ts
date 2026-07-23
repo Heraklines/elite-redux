@@ -104,21 +104,20 @@ describe.skipIf(!RUN)("ER N-type static species model", () => {
     expect(karp.getAttackTypeEffectiveness(PokemonType.GROUND, {})).toBe(4);
   });
 
-  it("a 7-type form (Primal Regigigas typing): all seven types stack in effectiveness", async () => {
-    // Normal/Rock/Ice/Steel/Electric/Dragon/Water (Water added per maintainer: Regitube
-    // is lore-part of the mon). This is the N-type stress case.
+  it("a 6-type form (Primal Regigigas typing): all six types stack in effectiveness", async () => {
+    // Normal/Rock/Ice/Steel/Electric/Dragon (Water was removed per maintainer directive
+    // 2026-07-22). This is the N-type stress case.
     retype(SpeciesId.MAGIKARP, PokemonType.NORMAL, PokemonType.ROCK, [
       PokemonType.ICE,
       PokemonType.STEEL,
       PokemonType.ELECTRIC,
       PokemonType.DRAGON,
-      PokemonType.WATER,
     ]);
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const karp = game.scene.getPlayerPokemon()!;
 
     const types = karp.getTypes();
-    expect(new Set(types).size).toBe(7);
+    expect(new Set(types).size).toBe(6);
     for (const t of [
       PokemonType.NORMAL,
       PokemonType.ROCK,
@@ -126,12 +125,13 @@ describe.skipIf(!RUN)("ER N-type static species model", () => {
       PokemonType.STEEL,
       PokemonType.ELECTRIC,
       PokemonType.DRAGON,
-      PokemonType.WATER,
     ]) {
       expect(types).toContain(t);
     }
+    // Water is gone: no Water typing on the primal form.
+    expect(types).not.toContain(PokemonType.WATER);
 
-    // Fighting: x2 vs Normal, Rock, Ice, Steel; x1 vs Electric, Dragon, Water -> x16.
+    // Fighting: x2 vs Normal, Rock, Ice, Steel; x1 vs Electric, Dragon -> x16.
     expect(karp.getAttackTypeEffectiveness(PokemonType.FIGHTING, {})).toBe(16);
   });
 });

@@ -716,6 +716,10 @@ export const NO_TINT = new Set([
   "fairydust",
   "glitterstorm",
   "prismrain",
+  "chronoshift",
+  "starrynight",
+  "anaglyph",
+  "koipond",
 ]);
 
 const G = {
@@ -1148,6 +1152,38 @@ export const PALETTE = {
     c
       ? clusterTone(["0a0a2a", "4a1a8a", "b02ad0", "2ac8e8", "f0f4ff"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b))
       : [r, g, b],
+  // ============== v8 exotic batch ==============
+  // Bismuth: hopper-crystal metal - luma collapses into hard STAIRS and each stair
+  // flips to the next iridescent oxide hue; thin glints ride the step boundaries.
+  bismuth: (r, g, b) => {
+    const L = Math.pow(luma(r, g, b), 0.85);
+    const step = Math.floor(L * 7.99) / 8;
+    const edge = smooth(0.05, 0.0, Math.abs(fract(L * 8) - 0.5) - 0.43);
+    const c = hsv2rgb(fract(0.52 + step * 3.25), 0.72, clamp(0.2 + step * 0.84));
+    return mix3(c, [1, 1, 1], clamp(edge * 0.45 + smooth(0.94, 1, L) * 0.5));
+  },
+  // Solarized: Sabattier darkroom reversal - mid/bright tones partially invert per
+  // channel while shadows stay, then a silver-gelatin tone unifies the print.
+  solarized: (r, g, b) => {
+    const f = v => mix(v, 1 - v, smooth(0.42, 0.8, v) * 0.85);
+    const c = [f(r), f(g), f(b)];
+    const L = luma(c[0], c[1], c[2]);
+    return mix3(c, [clamp(L * 1.06), L, clamp(L * 0.9)], 0.55);
+  },
+  // Scarlet Letter: the frame drops to a soft grayscale EXCEPT truly red/orange
+  // pixels, which keep their hue and gain bite (the film selective-color look).
+  scarlet: (r, g, b) => {
+    const [h, s, v] = rgb2hsv(r, g, b);
+    const dh = Math.min(Math.abs(h - 0.03), 1 - Math.abs(h - 0.03));
+    const keep = smooth(0.15, 0.06, dh) * smooth(0.1, 0.28, s);
+    const L = Math.pow(luma(r, g, b), 0.92);
+    const grey = [clamp(L * 1.02), clamp(L * 0.99), clamp(L * 0.94)];
+    const red = hsv2rgb(0.015, clamp(s * 1.3 + 0.12), clamp(v * 1.06));
+    return mix3(grey, red, keep);
+  },
+  // Tri Aurora: cluster 3-tone - deep arctic teal / aurora green / magnetic violet.
+  triaurora: (r, g, b, c) =>
+    c ? clusterTone(["062228", "17d489", "9b4ae8"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
 };
 export const PALETTE_ALPHA = { spectral: 0.62, glassbody: 0.6, phantom: 0.55 };
 export const CLUSTER_PAL = new Set([
@@ -1180,6 +1216,7 @@ export const CLUSTER_PAL = new Set([
   "quadcyber",
   "pentaretro",
   "pentagalaxy",
+  "triaurora",
 ]);
 
 // ===========================================================================
@@ -3010,6 +3047,211 @@ AURA.phosphor = (r, g, b, x, y, t) => {
   return [clamp(base[0] + glow * 0.25), clamp(base[1] + glow), clamp(base[2] + glow * 0.45), 1];
 };
 
+// --- v8 exotic batch (surface) ---
+// Aquarium: the body becomes a backlit tank - deep graded water, drifting god-ray
+// bands, and small fish cruising across the silhouette on seeded lanes.
+AURA.aquarium = (r, g, b, x, y, t, ctx) => {
+  const L = luma(r, g, b);
+  let col = mix3(hx("0a3d55"), hx("0e6a80"), clamp(0.2 + L * 0.55 + (1 - y) * 0.25));
+  col = mix3(col, hx("031320"), smooth(0.55, 1, y) * 0.5);
+  const ray = Math.pow(Math.max(0, Math.sin(x * 7 + Math.sin(y * 4 + t * 0.4) * 1.2 + t * 0.22)), 6) * (1 - y) * 0.45;
+  col = [clamp(col[0] + ray * 0.4), clamp(col[1] + ray * 0.65), clamp(col[2] + ray * 0.75)];
+  let fish = 0;
+  let belly = 0;
+  for (let i = 0; i < 3; i++) {
+    const lane = 0.28 + i * 0.22 + (h2(i, 7 + FXSEED) - 0.5) * 0.06;
+    const dir = i % 2 === 0 ? 1 : -1;
+    const spd = 0.045 + h2(i + 11, 3) * 0.04;
+    const fx0 = dir > 0 ? fract(h2(i, 13) + t * spd) : 1 - fract(h2(i, 13) + t * spd);
+    const bob = Math.sin(t * 1.7 + i * 4.2) * 0.016;
+    const lx = (x - fx0) * dir;
+    const ly = (y - lane - bob) * 2.2;
+    const wig = Math.sin(t * 5 + i * 3) * 0.02 * clamp(0.5 - lx * 4, 0.2, 1);
+    // body ellipse (half-length ~0.065) + a tail-fin ellipse trailing behind
+    const body = Math.hypot(lx / 0.065, (ly - wig) / 0.024) - 1;
+    const tail = Math.hypot((lx + 0.088) / 0.036, (ly - wig * 2.2) / 0.018) - 1;
+    const d = Math.min(body, tail);
+    const f = smooth(0.25, -0.15, d);
+    fish = Math.max(fish, f);
+    belly = Math.max(belly, f * smooth(0.004, 0.016, -(ly - wig)) * 0.9);
+  }
+  col = mix3(col, hx("020d14"), clamp(fish * 0.92));
+  col = mix3(col, hx("d8f4e8"), clamp(belly * 0.55));
+  const top = smooth(0.1, 0.02, y) * (0.5 + 0.5 * Math.sin(x * 30 + t * 2)) * 0.2;
+  return [clamp(col[0] + top * 0.4), clamp(col[1] + top * 0.7), clamp(col[2] + top * 0.8), 1];
+};
+// Starry Night: the sprite repainted as swirling post-impressionist brushwork -
+// the sampler rides a slow curl field, colors bend toward cobalt + moon-gold, and
+// a directional stroke texture follows the flow like impasto ridges.
+AURA.starrynight = (r, g, b, x, y, t, ctx) => {
+  const sw = fbm(x * 2.6 + 3, y * 2.6 - t * 0.04) - 0.5;
+  const a = sw * 3.2 + Math.sin(t * 0.11) * 0.12;
+  const dx = x - 0.5;
+  const dy = y - 0.5;
+  const ca = Math.cos(a * 0.65);
+  const sa = Math.sin(a * 0.65);
+  const ux = 0.5 + dx * ca - dy * sa + Math.sin(y * 26 + a * 5) * 0.006;
+  const uy = 0.5 + dx * sa + dy * ca + Math.cos(x * 22 - a * 4) * 0.006;
+  const s = ctx.sa(ux, uy);
+  const src = s[3] > 0.02 ? [s[0], s[1], s[2]] : [r, g, b];
+  const L = luma(src[0], src[1], src[2]);
+  const [h, sat] = rgb2hsv(src[0], src[1], src[2]);
+  let col = mix3(hx("101f4d"), hx("f0c838"), clamp(L * 1.25 - 0.06));
+  col = mix3(col, hsv2rgb(h, clamp(sat * 0.9), clamp(L + 0.08)), 0.3);
+  const stroke = Math.sin((x * Math.sin(a) + y * Math.cos(a)) * 80 + sw * 30) * 0.5 + 0.5;
+  col = col.map(v => clamp(v * (0.78 + stroke * 0.46) + stroke * stroke * 0.03));
+  return [col[0], col[1], col[2], 1];
+};
+// Anaglyph 3D: a red/cyan stereo pair built from the silhouette itself - the edge
+// field becomes the depth map (the rim pops toward you), so the mon reads as relief.
+AURA.anaglyph = (r, g, b, x, y, t, ctx) => {
+  const depth = 1 - (ctx?.e ?? 0);
+  const off = (0.25 + depth * 0.75) * 0.016 + 0.0025 * Math.sin(t * 0.7);
+  const sR = ctx.sa(x + off, y);
+  const sC = ctx.sa(x - off, y);
+  const lR = sR[3] > 0.02 ? luma(sR[0], sR[1], sR[2]) : luma(r, g, b);
+  const lC = sC[3] > 0.02 ? luma(sC[0], sC[1], sC[2]) : luma(r, g, b);
+  return [clamp(Math.pow(lR, 0.9)), clamp(Math.pow(lC, 0.9) * 0.92), clamp(Math.pow(lC, 0.9)), 1];
+};
+// Infinite Zoom: a TRUE log-polar Droste tunnel - the outer ring shows the sprite
+// itself, and each inward ring (one factor of ZOOM smaller in radius) shows the
+// next radial slice, so concentric copies shrink seamlessly into the vanishing
+// point, endlessly zooming inward.
+AURA.droste = (r, g, b, x, y, t, ctx) => {
+  const ZOOM = 2.6;
+  const RMAX = 0.42; // ~outer radius of the sprite in frame uv
+  const dx = x - 0.5;
+  const dy = y - 0.5;
+  const rr = Math.hypot(dx, dy) + 1e-4;
+  const ux = dx / rr;
+  const uy = dy / rr;
+  const u = Math.log(RMAX / rr) / Math.log(ZOOM) + t * 0.09;
+  const fr = fract(u);
+  const rho = RMAX * Math.pow(ZOOM, -fr);
+  const samp = rad => {
+    const s = ctx.sa(0.5 + ux * rad, 0.5 + uy * rad);
+    return s[3] > 0.02 ? [s[0], s[1], s[2]] : [0.03, 0.04, 0.09];
+  };
+  let col = samp(rho);
+  // seamless crossfade where the ring wraps (sampled radius jumps ZOOMx)
+  const seam = smooth(0.88, 1, fr);
+  if (seam > 0) {
+    col = mix3(col, samp(Math.min(rho * ZOOM, 0.6)), seam);
+  }
+  // tunnel depth shading toward the vanishing point
+  const depth = smooth(0.45, 0.03, rr);
+  col = mix3(col, [0.02, 0.03, 0.08], depth * 0.6);
+  return [clamp(col[0]), clamp(col[1]), clamp(col[2]), 1];
+};
+// Ferrofluid: glossy near-black liquid metal; the rim bristles with magnetic
+// spikes (angular cells keyed to the edge field) whose tips catch the light.
+AURA.ferrofluid = (r, g, b, x, y, t, ctx) => {
+  const e = ctx?.e ?? 0;
+  const L = luma(r, g, b);
+  const ang = Math.atan2(y - 0.5, x - 0.5) / (Math.PI * 2) + 0.5;
+  const N = 22;
+  const cell = Math.floor(ang * N);
+  const cf = fract(ang * N) - 0.5;
+  const hh = h2(cell, 5 + FXSEED);
+  // each spike: a long triangle peaking at the rim, breathing slowly
+  const len = (0.35 + hh * 0.65) * (0.75 + 0.25 * Math.sin(t * 1.1 + hh * 14));
+  const tri = Math.pow(Math.max(0, 1 - Math.abs(cf) * 2), 0.8);
+  const prof = e - (1 - len * tri);
+  const spike = smooth(0.0, 0.12, prof) * tri;
+  // oil-black base with a slow iridescent swirl
+  const sheen = hsv2rgb(fract(L * 1.5 + t * 0.04), 0.5, 0.05 + L * 0.1);
+  const base = mix3([0.012, 0.012, 0.022], sheen, 0.55);
+  // spikes read as glossy ridges: soft flank light + a hot tip
+  const flank = spike * 0.16;
+  const tip = Math.pow(smooth(0.55, 1, spike), 2.5) * 0.6;
+  const spec = Math.pow(Math.max(0, Math.sin((x * 0.7 - y) * 5 - t * 0.5)), 26);
+  return [
+    clamp(base[0] + flank * 0.5 + spec * 0.4 + tip * 0.8),
+    clamp(base[1] + flank * 0.6 + spec * 0.45 + tip * 0.9),
+    clamp(base[2] + flank * 0.9 + spec * 0.55 + tip * 1.2),
+    1,
+  ];
+};
+// Plasma Globe: violet streamers leap from the core to the inside of the
+// silhouette, forking like a Tesla ball; the core itself breathes.
+AURA.plasmaglobe = (r, g, b, x, y, t, ctx) => {
+  const dx = x - 0.5;
+  const dy = y - 0.5;
+  const rr = Math.hypot(dx, dy) + 1e-4;
+  const ang = Math.atan2(dy, dx);
+  const e = ctx?.e ?? 0;
+  const n = fbm(ang * 1.6 + 9, rr * 2.4 - t * 0.5);
+  const ridge = 1 - Math.abs(n - 0.5) * 2;
+  const stream = Math.pow(smooth(0.72, 0.97, ridge), 1.7);
+  const reach = smooth(0.03, 0.12, rr) * (0.35 + 0.65 * smooth(0.05, 0.75, e));
+  const flick = 0.65 + 0.35 * Math.sin(t * 8 + n * 26);
+  const core = smooth(0.09, 0.01, rr) * (0.7 + 0.3 * Math.sin(t * 3));
+  const base = [r * 0.1 + 0.04, g * 0.08 + 0.02, b * 0.2 + 0.08];
+  const k = clamp(stream * reach * flick + core);
+  return [clamp(base[0] + k * 0.95), clamp(base[1] + k * 0.45), clamp(base[2] + k * 1.35), 1];
+};
+// Trapped in Amber: warm fossil resin - honey translucency with dark gnarl
+// inclusions, tiny suspended bubbles, and a slow glossy light band.
+AURA.amber = (r, g, b, x, y, t, ctx) => {
+  const L = luma(r, g, b);
+  let col = ramp(["241102", "6a3a06", "c8860f", "ffd668"].map(hx), clamp(0.16 + L * 0.8));
+  const gn = fbm(x * 3.6 + 11, y * 3.6);
+  col = mix3(col, hx("160a01"), smooth(0.58, 0.74, gn) * 0.5);
+  const cell = 22 * FXSCALE;
+  const bx = Math.floor(x * cell);
+  const by = Math.floor(y * cell);
+  let bub = 0;
+  if (h2(bx + FXSEED, by - FXSEED) > 0.5) {
+    const ax = (bx + 0.25 + h2(bx, by + 5) * 0.5) / cell;
+    const ay = (by + 0.25 + h2(by, bx + 9) * 0.5) / cell;
+    const d = Math.hypot(x - ax, y - ay);
+    bub = smooth(0.009, 0.004, d) * 0.85 - smooth(0.0035, 0.001, d) * 0.6;
+  }
+  const gloss = Math.pow(Math.max(0, 1 - Math.abs(x * 0.8 + y * 0.5 - fract(t * 0.06) * 1.9) * 3.2), 9) * 0.4;
+  return [
+    clamp(col[0] + bub * 0.9 + gloss),
+    clamp(col[1] + bub * 0.7 + gloss * 0.85),
+    clamp(col[2] + bub * 0.35 + gloss * 0.5),
+    1,
+  ];
+};
+// Moonlit: cold silver moonlight from high right; slow cloud shadows drift across
+// the body and the upper rim catches a pale glow.
+AURA.moonlit = (r, g, b, x, y, t, ctx) => {
+  const L = luma(r, g, b);
+  const e = ctx?.e ?? 0;
+  const cr = L * 0.66;
+  const cg = L * 0.74;
+  const cb = clamp(L * 0.95 + 0.07);
+  const mglow = smooth(0.85, 0.15, Math.hypot(x - 0.8, y - 0.16)) * 0.4;
+  const cl = fbm(x * 3.2 - t * 0.1, y * 3.2 + 4);
+  const shadow = smooth(0.42, 0.66, cl) * 0.55;
+  const rim = smooth(0.3, 0.9, e) * smooth(0.6, 0.1, y) * 0.4;
+  const lit = mglow + rim;
+  return [
+    clamp((cr + lit * 0.85) * (1 - shadow)),
+    clamp((cg + lit * 0.95) * (1 - shadow)),
+    clamp((cb + lit * 1.1) * (1 - shadow * 0.85)),
+    1,
+  ];
+};
+// Chronoshift: three eras sweep across the body - sepia PAST, true-color PRESENT,
+// neon FUTURE - with bright scan seams where the timelines meet.
+AURA.chronoshift = (r, g, b, x, y, t) => {
+  const L = luma(r, g, b);
+  const zone = fract(x - t * 0.12 + Math.sin(y * 2.5 + t * 0.4) * 0.04);
+  const past = [clamp(L * 1.08 + 0.04), clamp(L * 0.84 + 0.02), clamp(L * 0.56)];
+  const [h, s, v] = rgb2hsv(r, g, b);
+  const future = hsv2rgb(fract(h + 0.52), clamp(s * 1.35 + 0.18), clamp(v * 1.12 + 0.08));
+  const wPres = smooth(0.3, 0.36, zone) - smooth(0.63, 0.69, zone);
+  const wFut = smooth(0.63, 0.69, zone);
+  let col = mix3(past, [r, g, b], wPres);
+  col = mix3(col, future, wFut);
+  const seam =
+    smooth(0.02, 0.0, Math.abs(zone - 0.33)) + smooth(0.02, 0.0, Math.abs(zone - 0.66)) + smooth(0.025, 0.0, Math.min(zone, 1 - zone));
+  return [clamp(col[0] + seam * 0.9), clamp(col[1] + seam), clamp(col[2] + seam * 0.8), 1];
+};
+
 // --- v6 around ---
 // Around FX in AROUND_OVERLAY are ALSO evaluated on sprite pixels (df=0) and
 // composited OVER the mon - so an orbit can pass in front of and behind the body.
@@ -3030,6 +3272,8 @@ export const AROUND_OVERLAY = new Set([
   "runeorbit",
   "fogbank",
   "zaps",
+  "koipond",
+  "saturnrings",
 ]);
 // Energy Helix: a double strand winding around the mon, front arcs over the sprite.
 AROUND.helix = (nx, ny, df, t, c) => {
@@ -4368,6 +4612,554 @@ AROUND.paperlanterns = (nx, ny, df, t) => {
   return [1, 0.7, 0.3, glow * warm * m];
 };
 
+// --- v8 exotic batch (around) ---
+// Magnetosphere: dipole field lines loop from pole to pole around the body,
+// shimmering as charge slides along them (iso-bands of the dipole stream function).
+AROUND.magnetosphere = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = ny - c.cy;
+  const rr = Math.hypot(dx, dy) + 1e-3;
+  const psi = (dx * dx) / (rr * rr) / rr;
+  const iso = Math.abs(fract(psi * 1.1 + 0.5) - 0.5) * 2;
+  const line = smooth(0.16, 0.03, iso);
+  const flow = 0.5 + 0.5 * Math.sin(t * 1.8 - psi * 9);
+  const m = clamp(1 - df / 30) * smooth(0.08, 0.2, rr);
+  return [0.42, 0.78, 1.0, line * (0.4 + 0.6 * flow) * m * 0.6];
+};
+// Sun Dogs: the 22-degree ice halo ring with two bright parhelia flanking the mon,
+// crystals glinting along the circle.
+AROUND.sundogs = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = (ny - (c.cy - 0.04)) * 1.06;
+  const rr = Math.hypot(dx, dy);
+  const R = 0.3;
+  const shim = 0.55 + 0.45 * Math.sin(Math.atan2(dy, dx) * 5 + t * 0.7);
+  const halo = smooth(0.016, 0.004, Math.abs(rr - R)) * shim * 0.55;
+  const dL = Math.hypot(nx - (c.cx - R), ny - (c.cy - 0.04));
+  const dR = Math.hypot(nx - (c.cx + R), ny - (c.cy - 0.04));
+  const dogs = smooth(0.05, 0.008, Math.min(dL, dR)) * (0.7 + 0.3 * Math.sin(t * 1.3));
+  const col = mix3(hx("cfe4ff"), hx("fff3cf"), clamp(dogs * 1.4));
+  return [col[0], col[1], col[2], clamp(halo + dogs) * clamp(1 - df / 40) * 0.85];
+};
+// Light Pillars: tall shimmering columns of light at seeded positions - the
+// ice-crystal optics of a freezing night.
+AROUND.lightpillars = (nx, ny, df, t) => {
+  let a = 0;
+  for (let i = 0; i < 4; i++) {
+    const px = 0.16 + i * 0.225 + (h2(i, 3 + FXSEED) - 0.5) * 0.08;
+    const w = 0.005 + h2(i, 9) * 0.008;
+    const pillar = smooth(w * 3.2, w * 0.4, Math.abs(nx - px));
+    const flick = 0.45 + 0.55 * Math.sin(t * (0.9 + h2(i, 5) * 1.3) + h2(i, 7) * 20);
+    const vert = smooth(0.05, 0.22, ny) * smooth(0.98, 0.72, ny);
+    a = Math.max(a, pillar * vert * (0.2 + 0.8 * flick));
+  }
+  return [0.72, 0.86, 1.0, a * clamp(1 - df / 40) * 0.55];
+};
+// Koi Pond: three koi circle the mon at different depths - near fish sweep IN
+// FRONT of the body (overlay pass), far fish stay behind; a ripple marks the lane.
+AROUND.koipond = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 3; i++) {
+    const rad = 0.17 + i * 0.068;
+    const dir = i % 2 === 0 ? 1 : -1;
+    const th = t * (0.5 - i * 0.09) * dir + i * 2.4;
+    const px = c.cx + Math.cos(th) * rad;
+    const py = c.cy + Math.sin(th) * rad * 0.85;
+    const front = Math.sin(th) * dir > 0;
+    if (!front && df <= 0.01) {
+      continue;
+    }
+    const hdx = -Math.sin(th) * dir;
+    const hdy = Math.cos(th) * dir * 0.85;
+    const hl = Math.hypot(hdx, hdy) + 1e-5;
+    const ux = hdx / hl;
+    const uy = hdy / hl;
+    const lx = (nx - px) * ux + (ny - py) * uy;
+    const ly = -(nx - px) * uy + (ny - py) * ux;
+    const wig = Math.sin(t * 5.5 + i * 3.1) * 0.006 * clamp(1 - lx * 30, 0.3, 1.4);
+    // koi SDF: body ellipse + trailing tail-fin ellipse + small head bump
+    const body = Math.hypot(lx / 0.036, (ly - wig) / 0.013) - 1;
+    const tail = Math.hypot((lx + 0.052) / 0.024, (ly - wig * 2.2) / 0.011) - 1;
+    const d = Math.min(body, tail);
+    const f = smooth(0.35, -0.2, d);
+    if (f <= 0) {
+      continue;
+    }
+    // koi patterning: white base with orange-gold patches along the back
+    const patch = h2(i + FXSEED, Math.floor((lx + 0.06) * 90)) > 0.45 ? 1 : 0;
+    const back = smooth(0.002, 0.008, -(ly - wig));
+    const kcol = mix3(hx("f2ede2"), hx("e87a1a"), clamp(patch * back * 1.2 + 0.08 * back));
+    const shade = front ? 1 : 0.5;
+    const a = f * (front ? 0.95 : 0.55);
+    if (a > out[3]) {
+      out = [kcol[0] * shade, kcol[1] * shade, kcol[2] * shade, a];
+    }
+  }
+  const rip =
+    smooth(0.012, 0.003, Math.abs(Math.hypot(nx - c.cx, (ny - c.cy) * 1.18) - 0.235))
+    * (0.4 + 0.6 * Math.sin(t * 1.6 + nx * 24))
+    * 0.14;
+  const m = df > 0.01 ? clamp(1 - df / 34) : 1;
+  return [
+    out[0] + rip * 0.6,
+    out[1] + rip * 0.75,
+    out[2] + rip * 0.9,
+    clamp(out[3] * m + rip * clamp(1 - df / 30)),
+  ];
+};
+// Ring System: a tilted, banded ring plane girdles the mon - the near arc sweeps
+// in FRONT (overlay pass), Cassini-style gaps split the rings.
+AROUND.saturnrings = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = ny - (c.cy + 0.07);
+  const rr = Math.hypot(dx, dy / 0.38);
+  const R0 = 0.24;
+  const R1 = 0.37;
+  if (rr < R0 * 0.9 || rr > R1 * 1.12) {
+    return [0, 0, 0, 0];
+  }
+  const front = dy > 0;
+  if (!front && df <= 0.01) {
+    return [0, 0, 0, 0];
+  }
+  const band = (rr - R0) / (R1 - R0);
+  const gap = smooth(0.02, 0.005, Math.abs(band - 0.6)) * 0.85 + smooth(0.012, 0.003, Math.abs(band - 0.27)) * 0.6;
+  const bands =
+    (0.45 + 0.55 * Math.sin(band * 15 + Math.sin(band * 5.2) * 1.6)) * smooth(-0.02, 0.1, band) * (1 - smooth(0.9, 1.02, band));
+  const a = clamp(bands * (1 - gap)) * (front ? 0.85 : 0.42);
+  const col = mix3(hx("6a5238"), hx("e8d4a0"), clamp(0.25 + band * 0.55 + (front ? 0.18 : 0)));
+  return [col[0], col[1], col[2], a];
+};
+// Raindrop Puddle: rings expand across still water at the mon's feet, each seeded
+// drop fading as it spreads, plus a soft sheen on the surface.
+AROUND.puddle = (nx, ny, df, t, c) => {
+  const gy = c?.fy ?? 0.82;
+  let a = 0;
+  for (let i = 0; i < 4; i++) {
+    const seedx = c.cx + (h2(i, 4 + FXSEED) - 0.5) * 0.4;
+    const ph = fract(t * 0.45 + h2(i, 8));
+    const rad = 0.015 + ph * 0.085;
+    const rr = Math.hypot(nx - seedx, (ny - gy) * 2.6);
+    const ring = smooth(0.014, 0.004, Math.abs(rr - rad)) * (1 - ph * ph);
+    a = Math.max(a, ring);
+  }
+  const sheen = smooth(0.035, 0.006, Math.abs(ny - gy)) * 0.22 * (0.7 + 0.3 * Math.sin(t * 1.7 + nx * 20));
+  const m = clamp(1 - df / 26);
+  return [0.62, 0.78, 0.95, clamp(a * 0.95 + sheen) * m];
+};
+// Void Rifts: two jagged tears in space slowly open and close beside the mon -
+// swirling dark cores rimmed with violet fire.
+AROUND.voidrift = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 2; i++) {
+    const cx0 = c.cx + (i === 0 ? -1 : 1) * 0.25 * (0.85 + h2(i, 3) * 0.3);
+    const cy0 = c.cy + (h2(i, 5) - 0.5) * 0.34;
+    const open = smooth(0.1, 0.45, Math.sin(t * 0.4 + i * 2.4) * 0.5 + 0.5);
+    if (open < 0.04) {
+      continue;
+    }
+    const dx = nx - cx0;
+    const dy = ny - cy0;
+    const ang = Math.atan2(dy, dx) + i * 1.7;
+    const rr = Math.hypot(dx, dy * 2.4);
+    const jag = (fbm(ang * 1.4 + i * 7, t * 0.12) - 0.5) * 0.02;
+    const R = 0.035 + open * 0.055 + jag;
+    const inside = smooth(0.01, -0.012, rr - R);
+    const rim = smooth(0.018, 0.003, Math.abs(rr - R));
+    const swirl = fbm(ang * 2 - t * 0.6, rr * 9);
+    // deep-violet core with glowing swirl veins (reads on dark backdrops too),
+    // edged in brighter violet fire
+    const core = inside * (0.75 + swirl * 0.25);
+    const col = mix3(hx("1a0b2e"), hx("b05aff"), clamp(rim * 1.6 + swirl * inside * 0.5));
+    const aa = clamp(core * 0.9 + rim * (0.75 + 0.25 * Math.sin(t * 2 + i)));
+    if (aa > out[3]) {
+      out = [col[0], col[1], col[2], aa];
+    }
+  }
+  return [out[0], out[1], out[2], out[3] * clamp(1 - df / 32)];
+};
+// Solar Wind: charged streaks stream radially outward from the mon, bending
+// slightly as they escape - warm at the root, cooling as they fly.
+AROUND.solarwind = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = ny - c.cy;
+  const rr = Math.hypot(dx, dy) + 1e-4;
+  const ang = Math.atan2(dy, dx);
+  const bend = Math.sin(t * 0.5 + ang * 2.5) * 0.4 * rr;
+  const v = (ang + bend) * 9;
+  const u = rr * 14 - t * 2.6;
+  const ph = fract(u * 0.09 + h2(Math.floor(v), 3));
+  const line = smooth(0.0, 0.1, ph) * smooth(0.42, 0.14, ph);
+  const density = h2(Math.floor(v), 11) > 0.35 ? 1 : 0;
+  const m = clamp(1 - df / 34) * smooth(0.06, 0.16, rr);
+  const warm = clamp(1.3 - rr * 2.4);
+  return [1.0, 0.55 + warm * 0.35, 0.2 + warm * 0.35, line * density * m * 0.55];
+};
+// Sand Timer: fine golden grains sift down around the mon and a glowing pile
+// shimmers at the feet line - time literally pouring past.
+AROUND.sandtimer = (nx, ny, df, t, c) => {
+  const gy = c?.fy ?? 0.82;
+  // fine round grains sifting down: dense sub-pixel cells with soft dot profiles
+  const cell = 70;
+  const fy2 = ny + t * 0.16;
+  const sway = Math.sin(fy2 * 9 + t * 0.6) * 0.012 * smooth(0.9, 0.2, ny);
+  const cx0 = Math.floor((nx + sway) * cell);
+  const cy0 = Math.floor(fy2 * cell);
+  let grain = 0;
+  if (h2(cx0 * 1.3 + FXSEED, cy0 * 1.7) > 0.55) {
+    const ax = (cx0 + 0.2 + h2(cx0, cy0) * 0.6) / cell - sway;
+    const ay = (cy0 + 0.2 + h2(cy0, cx0) * 0.6) / cell;
+    grain = smooth(0.02, 0.006, Math.hypot(nx - ax, ny - ay));
+  }
+  const waist = smooth(0.5, 0.2, Math.abs(nx - c.cx));
+  // grains fall far from the silhouette too - a long df leash, the app-side
+  // edgeFalloff handles the frame border
+  const m = clamp(1 - df / 60);
+  // glowing mound shimmering at the feet line, slowly swelling and draining
+  const swell = 0.6 + 0.4 * Math.sin(t * 0.35);
+  const mound = smooth(0.028 * swell + 0.012, 0.004, Math.abs(ny - gy)) * smooth(0.3, 0.05, Math.abs(nx - c.cx));
+  const spark = mound * (0.5 + 0.5 * Math.sin(t * 2.2 + nx * 40));
+  const a = grain * waist + mound * 0.25 + spark * 0.3;
+  return [1.0, 0.9, 0.58, a * m * 0.9];
+};
+
+// ===========================================================================
+// Exotic topology effects - ported from the in-game Shiny Lab (Phase D,
+// 2026-07-20). These need silhouette topology (inside-distance SDF, interior
+// Voronoi midline, edge normals, matcap z, per-pixel id) computed lazily per
+// frame by app.js and handed in via ctx.topo / ctx.px / ctx.py, plus stable
+// animation anchors via ac.stableCx/stableCy. Each degrades to a no-op when
+// the topology/anchor ctx is absent.
+// ===========================================================================
+const EXOTIC_DEEP = 22;
+const INSIDE_INF = 1e6;
+
+/** Two-pass chamfer INSIDE distance (0 outside -> grows inward). */
+function computeInsideDist(buf, W, H) {
+  const d = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      d[y * W + x] = buf[(y * W + x) * 4 + 3] > 0.02 ? INSIDE_INF : 0;
+    }
+  }
+  const A = 1;
+  const B = Math.SQRT2;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let v = d[y * W + x];
+      if (x > 0) v = Math.min(v, d[y * W + x - 1] + A);
+      if (y > 0) v = Math.min(v, d[(y - 1) * W + x] + A);
+      if (x > 0 && y > 0) v = Math.min(v, d[(y - 1) * W + x - 1] + B);
+      if (x < W - 1 && y > 0) v = Math.min(v, d[(y - 1) * W + x + 1] + B);
+      d[y * W + x] = v;
+    }
+  }
+  for (let y = H - 1; y >= 0; y--) {
+    for (let x = W - 1; x >= 0; x--) {
+      let v = d[y * W + x];
+      if (x < W - 1) v = Math.min(v, d[y * W + x + 1] + A);
+      if (y < H - 1) v = Math.min(v, d[(y + 1) * W + x] + A);
+      if (x < W - 1 && y < H - 1) v = Math.min(v, d[(y + 1) * W + x + 1] + B);
+      if (x > 0 && y < H - 1) v = Math.min(v, d[(y + 1) * W + x - 1] + B);
+      d[y * W + x] = v;
+    }
+  }
+  return d;
+}
+
+/**
+ * Interior Voronoi border field ("medial axis strength"): every edge pixel is
+ * a seed propagated inward with the chamfer; a pixel whose 4-neighbour carries
+ * a DIFFERENT seed sits on the internal midline between limbs/edges. The
+ * midline is dilated ~2 px so strokes riding it have width.
+ */
+function computeVoroField(buf, W, H) {
+  const N = W * H;
+  const seed = new Int32Array(N);
+  const dist = new Float32Array(N);
+  let nextSeed = 1;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (buf[i * 4 + 3] <= 0.02) {
+        seed[i] = 0;
+        dist[i] = 0;
+        continue;
+      }
+      const edge =
+        x === 0 || y === 0 || x === W - 1 || y === H - 1
+        || buf[(y * W + x - 1) * 4 + 3] <= 0.02
+        || buf[(y * W + x + 1) * 4 + 3] <= 0.02
+        || buf[((y - 1) * W + x) * 4 + 3] <= 0.02
+        || buf[((y + 1) * W + x) * 4 + 3] <= 0.02;
+      if (edge) {
+        seed[i] = nextSeed++;
+        dist[i] = 0;
+      } else {
+        seed[i] = -1;
+        dist[i] = INSIDE_INF;
+      }
+    }
+  }
+  const spread = (x, y, nx, ny, w) => {
+    if (nx < 0 || ny < 0 || nx >= W || ny >= H) return;
+    const i = y * W + x;
+    const j = ny * W + nx;
+    if (seed[j] === 0) return;
+    const nd = dist[i] + w;
+    if (seed[i] > 0 && (seed[j] < 0 || nd < dist[j] - 0.5)) {
+      seed[j] = seed[i];
+      dist[j] = nd;
+    }
+  };
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (seed[y * W + x] <= 0) continue;
+      spread(x, y, x - 1, y, 1);
+      spread(x, y, x, y - 1, 1);
+      spread(x, y, x - 1, y - 1, Math.SQRT2);
+      spread(x, y, x + 1, y - 1, Math.SQRT2);
+    }
+  }
+  for (let y = H - 1; y >= 0; y--) {
+    for (let x = W - 1; x >= 0; x--) {
+      if (seed[y * W + x] <= 0) continue;
+      spread(x, y, x + 1, y, 1);
+      spread(x, y, x, y + 1, 1);
+      spread(x, y, x + 1, y + 1, Math.SQRT2);
+      spread(x, y, x - 1, y + 1, Math.SQRT2);
+    }
+  }
+  const border = new Float32Array(N);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (seed[i] <= 0) continue;
+      const s = seed[i];
+      const diff =
+        (x > 0 && seed[i - 1] > 0 && seed[i - 1] !== s)
+        || (x < W - 1 && seed[i + 1] > 0 && seed[i + 1] !== s)
+        || (y > 0 && seed[i - W] > 0 && seed[i - W] !== s)
+        || (y < H - 1 && seed[i + W] > 0 && seed[i + W] !== s);
+      if (diff) {
+        border[i] = 1;
+      }
+    }
+  }
+  for (let pass = 0; pass < 2; pass++) {
+    const src = border.slice();
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
+        if (src[i] > 0) continue;
+        const m = Math.max(src[i - 1], src[i + 1], src[i - W], src[i + W]);
+        if (m > 0) {
+          border[i] = m * 0.55;
+        }
+      }
+    }
+  }
+  return border;
+}
+
+/** Outward normals + tangents from the inside-distance gradient. */
+function computeFxNormals(sdf, W, H) {
+  const N = W * H;
+  const nx = new Float32Array(N);
+  const ny = new Float32Array(N);
+  const tx = new Float32Array(N);
+  const ty = new Float32Array(N);
+  const at = (x, y) => {
+    const cx = x < 0 ? 0 : x >= W ? W - 1 : x;
+    const cy = y < 0 ? 0 : y >= H ? H - 1 : y;
+    return sdf[cy * W + cx];
+  };
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      // sdf grows INWARD, so the outward normal is the negative gradient.
+      const gx = at(x + 1, y) - at(x - 1, y);
+      const gy = at(x, y + 1) - at(x, y - 1);
+      const len = Math.hypot(gx, gy);
+      if (len > 1e-5) {
+        nx[i] = -gx / len;
+        ny[i] = -gy / len;
+        tx[i] = gy / len;
+        ty[i] = -gx / len;
+      }
+    }
+  }
+  return { nx, ny, tx, ty };
+}
+
+/** Fake relief-sphere z: 0 at the silhouette rim, 1 once ~12 px deep. */
+function computeMatcapZ(sdf, W, H) {
+  const z = new Float32Array(W * H);
+  const R = 12;
+  for (let i = 0; i < W * H; i++) {
+    const dd = Math.min(sdf[i], R) / R;
+    z[i] = Math.sqrt(Math.max(0, 1 - (1 - dd) * (1 - dd)));
+  }
+  return z;
+}
+
+/** Deterministic per-pixel identity (integer lattice hash -> [0,1)). */
+function computePixId(W, H) {
+  const id = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let h = (x * 0x85ebca6b) ^ (y * 0xc2b2ae35) ^ 0x27d4eb2f;
+      h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+      h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
+      h ^= h >>> 15;
+      id[y * W + x] = (h >>> 0) / 4294967296;
+    }
+  }
+  return id;
+}
+
+/**
+ * Compute the topology bundle for one frame buffer. app.js caches this per
+ * animation frame and passes it as ctx.topo. Only the exotic effects read it.
+ */
+export function computeFxTopology(buf, W, H) {
+  const sdf = computeInsideDist(buf, W, H);
+  return {
+    sdf,
+    voro: computeVoroField(buf, W, H),
+    ...computeFxNormals(sdf, W, H),
+    matcapZ: computeMatcapZ(sdf, W, H),
+    pixId: computePixId(W, H),
+  };
+}
+
+// Gilded Bones: engraved gold inlay following the mon's TRUE midline skeleton
+// (the interior Voronoi border field), fading to dark lacquer near the rim.
+AURA.gildedbones = (r, g, b, x, y, t, ctx) => {
+  const topo = ctx?.topo;
+  if (!topo) return [r, g, b, 1];
+  const i = ctx.py * ctx.W + ctx.px;
+  const v = topo.voro[i];
+  const d = Math.min(topo.sdf[i], EXOTIC_DEEP) / EXOTIC_DEEP;
+  const wire = smooth(0.45, 0.95, v);
+  const echo = smooth(0.2, 0.5, v) * 0.35;
+  const shimmer = 0.75 + 0.25 * Math.sin(d * 9 - t * 1.4);
+  const gold = ramp(G.gold, clamp(wire * shimmer + echo));
+  const lacq = [r * 0.5, g * 0.48, b * 0.52];
+  const m = clamp(wire * (0.4 + 0.6 * d) + echo * d);
+  return [mix(lacq[0], gold[0], m), mix(lacq[1], gold[1], m), mix(lacq[2], gold[2], m), 1];
+};
+
+// Carved Relief: flat pixel art re-lit as cast metal / carved gem. A fake
+// relief sphere (matcapZ from the inside-distance) is lit by a fixed key light
+// against the outward normals, with a cool rim at the silhouette.
+AURA.carvedrelief = (r, g, b, x, y, t, ctx) => {
+  const topo = ctx?.topo;
+  if (!topo) return [r, g, b, 1];
+  const i = ctx.py * ctx.W + ctx.px;
+  const nx = topo.nx[i];
+  const ny = topo.ny[i];
+  const z = topo.matcapZ[i];
+  const key = clamp(0.5 + 0.55 * (-nx * 0.7 - ny * 0.7) * z + 0.35 * z);
+  const rim = Math.pow(1 - z, 2.5) * 0.35;
+  const [h, s, v] = rgb2hsv(r, g, b);
+  const lit = hsv2rgb(h, s, clamp(v * (0.35 + 0.85 * key)));
+  return [clamp(lit[0] + rim * 0.6), clamp(lit[1] + rim * 0.75), clamp(lit[2] + rim), 1];
+};
+
+// Inner Ember: translucent skin over a breathing furnace. A depth-normalized
+// glow lives DEEP inside the body; rim pixels keep the body's own shading.
+AURA.innerember = (r, g, b, x, y, t, ctx) => {
+  const topo = ctx?.topo;
+  if (!topo) return [r, g, b, 1];
+  const i = ctx.py * ctx.W + ctx.px;
+  const d = Math.min(topo.sdf[i], EXOTIC_DEEP) / EXOTIC_DEEP;
+  const n = vnoise(x * 3.1 + t * 0.13, y * 3.1 - t * 0.09);
+  const breathe = 0.72 + 0.28 * Math.sin(t * 0.9 + topo.pixId[i] * 0.6);
+  const fire = Math.pow(d, 1.8) * (0.55 + 0.75 * n) * breathe;
+  const hot = ramp(G.inferno, clamp(fire * 1.15));
+  const m = Math.pow(d, 2.1) * 0.85;
+  const skin = mix3([r * 0.8, g * 0.8, b * 0.8], hot, m);
+  return [skin[0], skin[1], skin[2], 1];
+};
+
+// Nested Portrait: a dim ghost-plaque near the chest holds a recursively scaled
+// miniature of the whole sprite, 2 levels deep. The window tracks the BODY
+// (frame anchors) so it moves with the chest; the live pixel stays partially
+// present so the window never reads as a hole.
+AURA.nestedportrait = (r, g, b, x, y, t, ctx) => {
+  const a = ctx?.anchors;
+  if (!a) return [r, g, b, 1];
+  const wx = a.frameCx;
+  const wy = a.frameCy * 0.92;
+  const dx = x - wx;
+  const dy = y - wy;
+  const rad = Math.hypot(dx, dy);
+  const R = 0.2;
+  if (rad >= R) return [r, g, b, 1];
+  const ghostify = s => {
+    const [h, sat, val] = rgb2hsv(s[0], s[1], s[2]);
+    return hsv2rgb(mix(h, 0.62, 0.75), clamp(sat * 0.5 + 0.1), clamp(val * 0.55 + 0.28));
+  };
+  const span = 0.62;
+  const map = (u, v) => [
+    clamp(wx + (u - 0.5) * span, 0.005, 0.995),
+    clamp(wy + (v - 0.5) * span * (ctx.H / Math.max(ctx.W, 1)), 0.005, 0.995),
+  ];
+  const u = (dx / R) * 0.5 + 0.5;
+  const v = (dy / R) * 0.5 + 0.5;
+  let [mu, mv] = map(u, v);
+  let s = ctx.sa(mu, mv);
+  if (rad < R * 0.48) {
+    const u2 = (dx / (R * 0.48)) * 0.5 + 0.5;
+    const v2 = (dy / (R * 0.48)) * 0.5 + 0.5;
+    [mu, mv] = map(u2, v2);
+    const s2 = ctx.sa(mu, mv);
+    if (s2[3] > 0.02) s = s2;
+  }
+  const pulse = 0.92 + 0.08 * Math.sin(t * 1.1);
+  if (s[3] <= 0.02) {
+    return [r * 0.55 + 0.04, g * 0.55 + 0.05, b * 0.6 + 0.09, 1];
+  }
+  const gh = ghostify(s);
+  const m = 0.82 * pulse;
+  return [mix(r, gh[0] * pulse, m), mix(g, gh[1] * pulse, m), mix(b, gh[2] * pulse, m), 1];
+};
+
+// Warp Well: an orbiting void whose horizon lens-bends a copy of the sprite
+// toward it. Anchored to the STABLE union centroid so the well does not wobble
+// across the animation. (Distinct from the game's static locked eventhorizon.)
+AROUND.warpwell = (nx, ny, df, t, ctx) => {
+  const ang = t * 0.35;
+  const mxp = (ctx?.stableCx ?? 0.5) + Math.cos(ang) * 0.16;
+  const myp = (ctx?.stableCy ?? 0.45) * 0.75 + Math.sin(ang) * 0.1;
+  const dx = nx - mxp;
+  const dy = ny - myp;
+  const r = Math.hypot(dx, dy);
+  const horizon = 0.045;
+  const reach = 0.24;
+  if (r > reach) return [0, 0, 0, 0];
+  if (r < horizon) {
+    const rimGlow = smooth(horizon * 0.6, horizon, r);
+    return [0.02 + rimGlow * 0.14, 0.0, 0.05 + rimGlow * 0.22, 1];
+  }
+  const pull = (reach - r) / (reach - horizon);
+  const bend = pull * pull * 0.55;
+  const s = ctx?.spr ? ctx.spr(nx - dx * bend, ny - dy * bend) : [0, 0, 0, 0];
+  const fade = 1 - smooth(horizon, reach, r);
+  const glow = smooth(horizon, horizon * 1.6, r) * (1 - smooth(horizon * 1.6, reach * 0.7, r));
+  if (s[3] > 0.02) {
+    const lum = luma(s[0], s[1], s[2]);
+    return [
+      s[0] * 0.85 + glow * 0.25,
+      s[1] * 0.8 + glow * 0.18,
+      clamp(s[2] * 0.9 + glow * 0.4 + lum * 0.05),
+      s[3] * (0.3 + 0.6 * fade),
+    ];
+  }
+  return [glow * 0.3, glow * 0.2, glow * 0.5, glow * 0.6 * fade];
+};
+
 export const ALL_PALETTE = Object.keys(PALETTE);
 export const ALL_AURA = Object.keys(AURA);
 export const ALL_AROUND = Object.keys(AROUND);
@@ -4696,6 +5488,11 @@ export const LABELS = {
   demake: "Demake",
   marchingants: "Marching Ants",
   phosphor: "Phosphor",
+  // exotic topology (2026-07-20)
+  gildedbones: "Gilded Bones",
+  carvedrelief: "Carved Relief",
+  innerember: "Inner Ember",
+  nestedportrait: "Nested Portrait",
   // v7 around
   meteors: "Meteor Shower",
   stormstrikes: "Thunderstorm",
@@ -4746,6 +5543,7 @@ export const LABELS = {
   shockpulse: "Shock Pulse",
   fogbank: "Fog Bank",
   paperlanterns: "Paper Lanterns",
+  warpwell: "Warp Well",
   cometorbit: "Comet Orbit",
   petalvortex: "Petal Vortex",
   emberspiral: "Ember Spiral",
@@ -4756,6 +5554,29 @@ export const LABELS = {
   astral: "Astral Form",
   triecho: "Double Team Tri",
   genone: "Gen 1",
+  // v8 exotic batch
+  bismuth: "Bismuth",
+  solarized: "Solarized",
+  scarlet: "Scarlet Letter",
+  triaurora: "Tri Aurora",
+  aquarium: "Aquarium",
+  starrynight: "Starry Night",
+  anaglyph: "Anaglyph 3D",
+  droste: "Infinite Zoom",
+  ferrofluid: "Ferrofluid",
+  plasmaglobe: "Plasma Globe",
+  amber: "Trapped in Amber",
+  moonlit: "Moonlit",
+  chronoshift: "Chronoshift",
+  magnetosphere: "Magnetosphere",
+  sundogs: "Sun Dogs",
+  lightpillars: "Light Pillars",
+  koipond: "Koi Pond",
+  saturnrings: "Saturn Rings",
+  puddle: "Raindrop Puddle",
+  voidrift: "Void Rifts",
+  solarwind: "Solar Wind",
+  sandtimer: "Sand Timer",
 };
 
 // effects that read the edge field / are inherently "partial" (for tagging in UI)
@@ -4791,4 +5612,5 @@ export const PARTIAL = new Set([
   "rustcreep",
   "mossgrow",
   "frostcore",
+  "ferrofluid",
 ]);

@@ -341,7 +341,20 @@ export class Egg {
       }
 
       // This function has way to many optional parameters
-      ret = globalScene.addPlayerPokemon(pokemonSpecies, 1, abilityIndex, undefined, undefined, false);
+      // Partner Fidough is the hatchable form. Hatching it records the partner
+      // form unlock, after which starter select can cycle to it with F.
+      const hatchFormIndex =
+        pokemonSpecies.speciesId === SpeciesId.FIDOUGH
+          ? pokemonSpecies.forms.findIndex(form => form.formKey === "partner")
+          : -1;
+      ret = globalScene.addPlayerPokemon(
+        pokemonSpecies,
+        1,
+        abilityIndex,
+        hatchFormIndex >= 0 ? hatchFormIndex : undefined,
+        undefined,
+        false,
+      );
       ret.shiny = this._isShiny;
       ret.variant = this._variantTier;
       // ER Black Shinies (#349): an EPIC egg hatch rolls the 1/50 t4 upgrade

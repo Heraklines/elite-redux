@@ -47,9 +47,13 @@ import { buildTeamMenuPresetViews, runShowdownPresetBuild } from "#data/elite-re
 import {
   getTournamentBracket,
   listTournaments,
+  pingTournamentPresence,
   registerForTournament,
 } from "#data/elite-redux/showdown/tournament-client";
+import { buildOwnGhostIconSummary } from "#data/elite-redux/showdown/tournament-ghost-icon";
 import { setTournamentMatchContext } from "#data/elite-redux/showdown/tournament-match-context";
+import { setTournamentFlowOpener, type TournamentDeepLink } from "#data/elite-redux/showdown/tournament-notifications";
+import type { BattleFormat, SeriesFormat } from "#data/elite-redux/showdown/tournament-types";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -71,6 +75,19 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
 const NO_SAVE_SLOT = -1;
+export const SHOWDOWN_MODES_ENABLED = false;
+const SHOWDOWN_MODE_OVERRIDE_PARAM = "enableShowdown";
+
+export function areShowdownModesEnabled(search = typeof window === "undefined" ? "" : window.location.search): boolean {
+  const override = new URLSearchParams(search).get(SHOWDOWN_MODE_OVERRIDE_PARAM);
+  if (override === "1") {
+    return true;
+  }
+  if (override === "0") {
+    return false;
+  }
+  return SHOWDOWN_MODES_ENABLED;
+}
 
 export class TitlePhase extends Phase {
   public readonly phaseName = "TitlePhase";
@@ -161,7 +178,25 @@ export class TitlePhase extends Phase {
     }
   }
 
+  /** Set the launch game mode + tear the title menu down into the run (shared by every entry). */
+  private launchGameMode(gameMode: GameModes): void {
+    // Disable the tournament deep-link the moment we leave the title for a run, so a challenge
+    // notification can NEVER open the board mid-battle (re-armed by showOptions back at title).
+    setTournamentFlowOpener(null);
+    this.gameMode = gameMode;
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.clearText();
+    this.end();
+  }
+
   private async showOptions(lastSessionSlot: number): Promise<void> {
+    // Register the tournament deep-link opener while at the title (cleared on teardown). A
+    // challenge notification in the inbox uses this to jump straight to the board on its match.
+    setTournamentFlowOpener(
+      areShowdownModesEnabled()
+        ? (target: TournamentDeepLink) => this.openShowdownTournaments(gm => this.launchGameMode(gm), target)
+        : null,
+    );
     const options: OptionSelectItem[] = [];
     // Add a "continue" menu if the session slot ID is >-1
     if (lastSessionSlot > NO_SAVE_SLOT) {
@@ -179,14 +214,24 @@ export class TitlePhase extends Phase {
         semanticId: "new-game",
         label: i18next.t("menu:newGame"),
         handler: () => {
-          const setModeAndEnd = (gameMode: GameModes) => {
-            this.gameMode = gameMode;
-            globalScene.ui.setMode(UiMode.MESSAGE);
-            globalScene.ui.clearText();
-            this.end();
-          };
+          const setModeAndEnd = (gameMode: GameModes) => this.launchGameMode(gameMode);
           const { gameData } = globalScene;
           const options: OptionSelectItem[] = [];
+          const showGameModeOptions = () =>
+            globalScene.ui.showText(i18next.t("menu:selectGameMode"), null, () =>
+              globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options }),
+            );
+          const showTemporarilyDisabled = () => {
+            globalScene.ui.setMode(UiMode.MESSAGE);
+            globalScene.ui.resetModeChain();
+            globalScene.ui.showText(
+              "Temporarily disabled. It will be back soon.",
+              null,
+              () => globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options }),
+              null,
+              true,
+            );
+          };
           options.push({
             semanticId: "classic",
             label: GameMode.getModeName(GameModes.CLASSIC),
@@ -217,34 +262,35 @@ export class TitlePhase extends Phase {
                 return true;
               },
             });
-            // Showdown (C1): a 1v1 PvP "versus" match. Entry flow is INVERTED (addendum 2026-07-11):
-            // clicking Showdown opens the TEAM PRESET MENU first (build/select a team BEFORE pairing),
-            // not the lobby. "Enter lobby with this team" then routes into the SAME lobby/pairing flow
-            // carrying the chosen preset, so both clients arrive pre-built and pairing leads
-            // near-immediately to the wager (no 10-minute in-lobby pick wait).
-            options.push({
-              semanticId: "showdown",
-              label: GameMode.getModeName(GameModes.SHOWDOWN),
-              handler: () => {
-                this.openShowdownTeamMenu(setModeAndEnd);
-                return true;
-              },
-            });
-            // Showdown TOURNAMENTS (beside the Team Menu path): async single-elim brackets. Opens the
-            // tournament LIST (worker-backed); register / view bracket / play a bracket match from there.
-            options.push({
-              label: "Showdown Tournaments",
-              handler: () => {
-                this.openShowdownTournaments(setModeAndEnd);
-                return true;
-              },
-            });
           }
+          // Showdown (C1): a 1v1 PvP "versus" match. Entry flow is INVERTED (addendum 2026-07-11):
+          // clicking Showdown opens the TEAM PRESET MENU first (build/select a team BEFORE pairing),
+          // not the lobby. "Enter lobby with this team" then routes into the SAME lobby/pairing flow
+          // carrying the chosen preset, so both clients arrive pre-built and pairing leads
+          // near-immediately to the wager (no 10-minute in-lobby pick wait).
           options.push({
-            semanticId: "daily-run",
-            label: i18next.t("menu:dailyRun"),
+            semanticId: "showdown",
+            label: GameMode.getModeName(GameModes.SHOWDOWN),
             handler: () => {
-              this.initDailyRun();
+              if (!areShowdownModesEnabled()) {
+                showTemporarilyDisabled();
+                return true;
+              }
+              this.openShowdownTeamMenu(setModeAndEnd);
+              return true;
+            },
+          });
+          // Showdown TOURNAMENTS (beside the Team Menu path): async single-elim brackets. Opens the
+          // tournament LIST (worker-backed); register / view bracket / play a bracket match from there.
+          options.push({
+            semanticId: "showdown-tournaments",
+            label: "Showdown Tournaments",
+            handler: () => {
+              if (!areShowdownModesEnabled()) {
+                showTemporarilyDisabled();
+                return true;
+              }
+              this.openShowdownTournaments(setModeAndEnd);
               return true;
             },
           });
@@ -329,22 +375,6 @@ export class TitlePhase extends Phase {
                 return true;
               },
             });
-            options.push({
-              label: GameMode.getModeName(GameModes.ENDLESS),
-              handler: () => {
-                setModeAndEnd(GameModes.ENDLESS);
-                return true;
-              },
-            });
-            if (gameData.isUnlocked(Unlockables.SPLICED_ENDLESS_MODE)) {
-              options.push({
-                label: GameMode.getModeName(GameModes.SPLICED_ENDLESS),
-                handler: () => {
-                  setModeAndEnd(GameModes.SPLICED_ENDLESS);
-                  return true;
-                },
-              });
-            }
           }
           // Cancel button = back to title
           options.push({
@@ -356,11 +386,7 @@ export class TitlePhase extends Phase {
               return true;
             },
           });
-          globalScene.ui.showText(i18next.t("menu:selectGameMode"), null, () =>
-            globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
-              options,
-            }),
-          );
+          showGameModeOptions();
           return true;
         },
       },
@@ -524,6 +550,7 @@ export class TitlePhase extends Phase {
         },
         onRename: (idx, name) => gameData.renameShowdownTeamPreset(idx, name),
         onDelete: idx => gameData.deleteShowdownTeamPreset(idx),
+        onSetFolder: (idx, folder) => gameData.setShowdownTeamPresetFolder(idx, folder),
         onCreate: () => this.openShowdownPresetBuild(undefined, showMenu),
         onEdit: idx => this.openShowdownPresetBuild(idx, showMenu),
         // EXPORT (V): copy the hovered team's PS text to the clipboard (the handler shows the banner).
@@ -572,7 +599,7 @@ export class TitlePhase extends Phase {
    * the inter-screen hops are instant. A worker fetch failure (offline / unconfigured endpoint) drops to a
    * message and back to the title - it never strands a blank screen.
    */
-  private openShowdownTournaments(setModeAndEnd: (gameMode: GameModes) => void): void {
+  private openShowdownTournaments(setModeAndEnd: (gameMode: GameModes) => void, deepLink?: TournamentDeepLink): void {
     const { gameData } = globalScene;
     const ownName = loggedInUser?.username ?? "Player";
 
@@ -592,7 +619,13 @@ export class TitlePhase extends Phase {
       })();
     };
 
-    const enterMatch = (tournamentId: string, matchId: string, opponent: string): void => {
+    const enterMatch = (
+      tournamentId: string,
+      matchId: string,
+      opponent: string,
+      battleFormat?: BattleFormat,
+      seriesFormat?: SeriesFormat,
+    ): void => {
       const presets = gameData.listShowdownTeamPresets();
       if (presets.length === 0) {
         // A saved team preset is REQUIRED - route to the Team Menu to build one.
@@ -602,11 +635,21 @@ export class TitlePhase extends Phase {
       // P1: field the first saved preset (P2 adds a per-match preset picker). The registered team is not
       // locked - the player may re-pick presets per match.
       setPendingShowdownPresetStarters(presets[0].mons.map(manifestToStarter));
-      setTournamentMatchContext({ tournamentId, matchId, expectedOpponent: opponent });
+      // Carry the tournament's field width + series wrapper into the match context. Both clients read
+      // the SAME server-authoritative tournament record, so the format is agreed by construction; the
+      // negotiate handshake cross-checks it (a stale client refuses to pair rather than desync). The
+      // series starts at game 0.
+      setTournamentMatchContext({
+        tournamentId,
+        matchId,
+        expectedOpponent: opponent,
+        ...(battleFormat && battleFormat !== "singles" ? { battleFormat } : {}),
+        ...(seriesFormat && seriesFormat !== "single" ? { seriesFormat, gameIndex: 0 } : {}),
+      });
       this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
     };
 
-    const openBracket = async (id: string): Promise<void> => {
+    const openBracket = async (id: string, initialBrowse?: { round: number; slot: number }): Promise<void> => {
       const res = await getTournamentBracket(id);
       if (!res.ok) {
         notice(res.error, () => void showList());
@@ -617,8 +660,16 @@ export class TitlePhase extends Phase {
         tournament: t,
         ownParticipant: ownName,
         now: Date.now(),
-        onPlayMatch: (matchId: string, opponent: string) => enterMatch(t.id, matchId, opponent),
+        onPlayMatch: (matchId: string, opponent: string) =>
+          enterMatch(t.id, matchId, opponent, t.battleFormat, t.seriesFormat),
         onBack: () => void showList(),
+        // P1.5 live board: poll the worker for the advancing bracket + ping presence while open.
+        onPoll: async () => {
+          const fresh = await getTournamentBracket(t.id);
+          return fresh.ok ? fresh.data.tournament : null;
+        },
+        onPing: () => void pingTournamentPresence(t.id),
+        ...(initialBrowse ? { initialBrowse } : {}),
       });
     };
 
@@ -628,7 +679,9 @@ export class TitlePhase extends Phase {
         notice("You need a saved team preset to register. Build one in the Showdown menu.", () => void showList());
         return;
       }
-      void registerForTournament(id, presets[0].name).then(res => {
+      // P1.5: carry the player's ghost-trainer appearance summary so the board can draw their
+      // slot icon + name + title. Registering may AUTO-CLOSE the tournament at cap (server-side).
+      void registerForTournament(id, presets[0].name, buildOwnGhostIconSummary()).then(res => {
         if (res.ok) {
           void showList();
         } else {
@@ -656,7 +709,12 @@ export class TitlePhase extends Phase {
     void (async () => {
       await globalScene.ui.setMode(UiMode.MESSAGE);
       globalScene.ui.resetModeChain();
-      await showList();
+      // Deep-link (from a challenge notification): jump straight to the board on the match.
+      if (deepLink == null) {
+        await showList();
+      } else {
+        await openBracket(deepLink.tournamentId, { round: deepLink.round, slot: deepLink.slot });
+      }
     })();
   }
 

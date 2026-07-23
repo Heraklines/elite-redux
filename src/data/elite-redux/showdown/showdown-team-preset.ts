@@ -26,6 +26,7 @@
 // =============================================================================
 
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import { normalizeFolderName } from "#data/elite-redux/showdown/showdown-team-folders";
 
 /** Bump when the on-disk preset shape changes so a future migration can branch on it. */
 export const SHOWDOWN_TEAM_PRESET_VERSION = 1;
@@ -47,6 +48,12 @@ export interface ShowdownTeamPreset {
   version: number;
   name: string;
   mons: ShowdownMonManifest[];
+  /**
+   * OPTIONAL folder (P3): a named, collapsible group in the Team Menu. Additive/migration-safe -
+   * an older save has no folder (treated as ungrouped), and the field is OMITTED when absent so a
+   * preset never carries an empty/undefined folder key.
+   */
+  folder?: string;
 }
 
 /** Trim + clamp a proposed preset name to a sane, non-empty display string. */
@@ -64,12 +71,34 @@ export function normalizePresetName(name: string): string {
  * mon carries only JSON-safe wire fields, matching the transport-canonical shape - an
  * `undefined`-valued optional field is dropped, so the preset hashes like the wire).
  */
-export function makeShowdownTeamPreset(name: string, mons: ShowdownMonManifest[]): ShowdownTeamPreset {
-  return {
+export function makeShowdownTeamPreset(name: string, mons: ShowdownMonManifest[], folder?: string): ShowdownTeamPreset {
+  const preset: ShowdownTeamPreset = {
     version: SHOWDOWN_TEAM_PRESET_VERSION,
     name: normalizePresetName(name),
     mons: cloneManifests(mons),
   };
+  // OMIT-WHEN-ABSENT: a folder key rides only when a non-empty name is given.
+  const cleanFolder = normalizeFolderName(folder ?? "");
+  if (cleanFolder) {
+    preset.folder = cleanFolder;
+  }
+  return preset;
+}
+
+/**
+ * Assign (or CLEAR) the folder of the preset at `index`. An empty/whitespace name clears it (the key is
+ * removed so an ungrouped preset never carries an empty folder). Returns a NEW array; a bad index is a
+ * no-op copy.
+ */
+export function setPresetFolder(list: ShowdownTeamPreset[], index: number, folder: string): ShowdownTeamPreset[] {
+  const next = list.slice();
+  if (index < 0 || index >= next.length) {
+    return next;
+  }
+  const cleanFolder = normalizeFolderName(folder);
+  const { folder: _drop, ...rest } = next[index];
+  next[index] = cleanFolder ? { ...rest, folder: cleanFolder } : rest;
+  return next;
 }
 
 /** Deep-clone manifests via JSON (drops undefined-valued optionals, matching the wire). */
@@ -162,11 +191,17 @@ function sanitizePreset(entry: unknown): ShowdownTeamPreset | null {
     }
     mons.push(mon);
   }
-  return {
+  const preset: ShowdownTeamPreset = {
     version: isInt(e.version) ? (e.version as number) : SHOWDOWN_TEAM_PRESET_VERSION,
     name: normalizePresetName(typeof e.name === "string" ? e.name : ""),
     mons,
   };
+  // OMIT-WHEN-ABSENT: keep a folder only when it is a non-empty string (a corrupt/absent one drops).
+  const folder = typeof e.folder === "string" ? normalizeFolderName(e.folder) : "";
+  if (folder) {
+    preset.folder = folder;
+  }
+  return preset;
 }
 
 /**

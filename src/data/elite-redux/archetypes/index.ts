@@ -23,6 +23,48 @@
 // =============================================================================
 
 // biome-ignore lint/performance/noBarrelFile: archetype layer is intentionally a barrel for Phase C tests + ER ability wiring; small module set
+export {
+  type AbilityAttrFactory,
+  appendAbilityAttrsOnce,
+  BallRecoveryAbAttr,
+  BiomeRevealBonusAbAttr,
+  canTriggerFollowUpMove,
+  claimCommandAbilityProvenance,
+  claimSummonAbilityProvenance,
+  EncounterTypeWeightAbAttr,
+  ExperienceGainMultiplierAbAttr,
+  FirstEntryPartyHealAbAttr,
+  type FirstEntryPartyHealOptions,
+  FirstTurnDirectDamageMultiplierAbAttr,
+  getMoveHpCostFraction,
+  HolderAndAlliesRecoveryAbAttr,
+  hasCommandAbilityProvenance,
+  hasSummonAbilityProvenance,
+  IgnoreOptionalMoveEffectsAbAttr,
+  type InnateSlot,
+  isAbilityIdSuppressed,
+  isInnateSlotSuppressed,
+  lapseTimedAbilitySuppressions,
+  MoneyGainMultiplierAbAttr,
+  MoveHpCostModifierAbAttr,
+  onSuccessfulStatDrop,
+  ProvenanceBypassSpeedChanceAbAttr,
+  replaceAbilityAttrsOnce,
+  replaceMatchingAbilityAttrOnce,
+  type SuccessfulStatDropCallback,
+  selectHigherDefenseStat,
+  selectHigherOffenseStat,
+  suppressAbilityIdForTurns,
+  suppressInnateSlotUntilSwitch,
+  UserFieldIgnoreOptionalMoveEffectsAbAttr,
+} from "../ability-upgrades/attrs/index";
+export {
+  getBattleMoneyGainMultiplier,
+  getBiomeRevealBonus,
+  getEncounterSpeciesWeightMultiplier,
+  getExperienceGainMultiplier,
+  recoverUsedPokeballsAfterBattle,
+} from "./ability-meta-consumers";
 export { AbsorbantAbAttr } from "./absorbant";
 // =============================================================================
 // New primitives (round-30+ batch) for remaining bespoke ability wires.

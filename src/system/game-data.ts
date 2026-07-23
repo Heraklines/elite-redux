@@ -57,6 +57,11 @@ import {
   setCommunityAllowedSpecies,
   setFounderRunState,
 } from "#data/elite-redux/er-community-run-state";
+import {
+  getErUsedCustomTrainerKeys,
+  getErUsedCustomTrainerWindows,
+  restoreErCustomTrainerTracking,
+} from "#data/elite-redux/er-custom-trainer-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
@@ -80,6 +85,7 @@ import {
   renamePreset,
   type ShowdownTeamPreset,
   sanitizeShowdownTeamPresets,
+  setPresetFolder,
   upsertPreset,
 } from "#data/elite-redux/showdown/showdown-team-preset";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -683,7 +689,12 @@ export class GameData {
    * otherwise a new preset is appended (capped). Returns the 0-based index of the saved preset.
    */
   public saveShowdownTeamPreset(name: string, mons: ShowdownMonManifest[], index?: number): number {
-    const preset = makeShowdownTeamPreset(name, mons);
+    // Editing in place preserves the existing preset's folder (P3); a fresh preset is ungrouped.
+    const existingFolder =
+      index !== undefined && index >= 0 && index < this.showdownTeamPresets.length
+        ? this.showdownTeamPresets[index]?.folder
+        : undefined;
+    const preset = makeShowdownTeamPreset(name, mons, existingFolder);
     this.showdownTeamPresets = upsertPreset(this.showdownTeamPresets, preset, index);
     const savedIndex =
       index !== undefined && index >= 0 && index < this.showdownTeamPresets.length
@@ -702,6 +713,12 @@ export class GameData {
   /** Delete the preset at `index`, persisting the change. */
   public deleteShowdownTeamPreset(index: number): void {
     this.showdownTeamPresets = deletePreset(this.showdownTeamPresets, index);
+    void this.saveSystem();
+  }
+
+  /** Assign (or clear, with an empty name) the FOLDER of the preset at `index` (P3), persisting it. */
+  public setShowdownTeamPresetFolder(index: number, folder: string): void {
+    this.showdownTeamPresets = setPresetFolder(this.showdownTeamPresets, index, folder);
     void this.saveSystem();
   }
 
@@ -1875,6 +1892,11 @@ export class GameData {
       // ER: persist the set of trainers already fought this run, so reloading
       // doesn't wipe the no-repeat tracking and re-field the same trainers.
       erUsedTrainerKeys: getErUsedTrainerKeys(),
+      // ER custom trainers use separate authored keys and one-per-window density.
+      // Persist both sets so refresh/Continue cannot repeat a trainer or consume
+      // adjacent waves from the same spawn window.
+      erUsedCustomTrainerKeys: getErUsedCustomTrainerKeys(),
+      erUsedCustomTrainerWindows: getErUsedCustomTrainerWindows(),
       // ER (#348): persist per-mon faint-free money streaks across save/load.
       erMoneyStreaks: getErMoneyStreakEntries(),
       // ER achievement-expansion catalog-v2 (#900): persist run-local achievement state
@@ -5011,6 +5033,7 @@ export class GameData {
     // run keeps its no-repeat history (older saves have no keys → fresh pool).
     setErDifficulty(fromSession.erDifficulty ?? "ace");
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
+    restoreErCustomTrainerTracking(fromSession.erUsedCustomTrainerKeys, fromSession.erUsedCustomTrainerWindows);
     restoreErMoneyStreaks(fromSession.erMoneyStreaks);
     // ER achievement-expansion catalog-v2 (#900): restore run-local achievement state so a
     // mid-run reload keeps an in-progress feat (bargain flags, black-market credit, etc.).

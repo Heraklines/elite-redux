@@ -47,6 +47,22 @@ describe("showdown-side-swap: primitives", () => {
     }
   });
 
+  it("swapBi maps TRIPLES seats when given the 3-wide enemy base (player 0/1/2 <-> enemy 3/4/5)", () => {
+    // The multi-slot fix: with enemyBase=3 every player seat p reflects to enemy seat 3+p and back.
+    // (Red-proof: the old hardcoded-2 swapBi mis-mapped these - swapBi(2)->0, swapBi(3)->1, 4/5 passthrough.)
+    expect(swapBi(0, 3)).toBe(3);
+    expect(swapBi(1, 3)).toBe(4);
+    expect(swapBi(2, 3)).toBe(5);
+    expect(swapBi(3, 3)).toBe(0);
+    expect(swapBi(4, 3)).toBe(1);
+    expect(swapBi(5, 3)).toBe(2);
+    // Still an involution at the 3-wide width, and the ATTACKER sentinel passes through.
+    for (const bi of [0, 1, 2, 3, 4, 5, -1]) {
+      expect(swapBi(swapBi(bi, 3), 3)).toBe(bi);
+    }
+    expect(swapBi(-1, 3)).toBe(-1);
+  });
+
   it("swapArenaTagSide reflects PLAYER<->ENEMY and leaves BOTH", () => {
     expect(swapArenaTagSide(ArenaTagSide.PLAYER)).toBe(ArenaTagSide.ENEMY);
     expect(swapArenaTagSide(ArenaTagSide.ENEMY)).toBe(ArenaTagSide.PLAYER);

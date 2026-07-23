@@ -1,0 +1,36 @@
+{
+  "v": 1,
+  "name": "Hyper Aggressive gains second strike only while enraged",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "hyper-aggressive-enrage"
+  },
+  "party": [
+    {
+      "species": "BLASTOISE",
+      "ability": 5096,
+      "passiveAbility": "NO_GUARD",
+      "moves": ["TAIL_WHIP", "TACKLE"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["SWAGGER", "SWORDS_DANCE"]
+      }
+    ]
+  },
+  "script": [{ "move": "TAIL_WHIP", "enemyMove": "SWAGGER" }, { "move": "TACKLE", "enemyMove": "SWORDS_DANCE" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "maxHits": 2,
+    "playerTags": ["ER_ENRAGE"],
+    "enemyDamaged": true
+  }
+}

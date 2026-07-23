@@ -1,0 +1,36 @@
+{
+  "v": 1,
+  "name": "Mimicry chooses Terrain Pulse's strongest legal type",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "terrain": "PSYCHIC",
+    "difficulty": "ace",
+    "seed": "mimicry-terrain-pulse"
+  },
+  "party": [
+    {
+      "species": "MEW",
+      "ability": "MIMICRY",
+      "moves": ["TERRAIN_PULSE"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "GYARADOS",
+        "level": 100,
+        "ability": "RUN_AWAY",
+        "moves": ["SPLASH"]
+      }
+    ]
+  },
+  "script": [{ "move": "TERRAIN_PULSE", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "victory",
+    "playerAbility": "Mimicry",
+    "enemyDamaged": true,
+    "logIncludes": ["super effective"]
+  }
+}

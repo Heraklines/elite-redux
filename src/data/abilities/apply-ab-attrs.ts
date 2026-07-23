@@ -60,7 +60,7 @@ function applySingleAbAttrs<T extends AbAttrString>(
   const { simulated = false, passive = false, pokemon } = params;
   // ER 3-passive: resolve the requested slot. Default to slot 0 for callers
   // that set `passive: true` without specifying a slot (legacy behavior).
-  const slot = (params.passiveSlot ?? 0) as 0 | 1 | 2;
+  const slot = params.passiveSlot ?? 0;
   if (!pokemon.canApplyAbility(passive, slot)) {
     return;
   }
@@ -152,39 +152,9 @@ function applyAbAttrsInternal<T extends CallableAbAttrString>(
     return;
   }
 
-  // Apply the active ability first.
-  params.passive = false;
-  params.passiveSlot = undefined;
-  applySingleAbAttrs(attrType, params, config);
-
-  // Then iterate each non-empty passive slot (ER 3-passive model).
-  // Empty slots return null from getPassiveAbilities() and are skipped.
-  // Track ability ids we've already dispatched in this call so that:
-  //   (a) a passive slot matching the active ability id is skipped (legacy invariant), AND
-  //   (b) duplicate ids across passive slots — e.g. data-entry mistake where
-  //       `inns[]` lists the same ability twice — fire only once.
-  // The per-slot id check inside applySingleAbAttrs remains as defensive belt-and-suspenders
-  // for callers that invoke applySingleAbAttrs directly with `passive: true`.
-  const seenIds = new Set<number>();
-  seenIds.add(params.pokemon.getAbility().id);
-  const passiveAbilities = params.pokemon.getPassiveAbilities();
-  // ER difficulty scaling: enemy pokemon unlock passive slots progressively
-  // with level so wave-1 encounters don't punch above their weight with all
-  // 3 innates active. Player passives stay gated by candy unlock as designed.
-  const enemySlotLimit = getEnemyPassiveSlotLimit(params.pokemon);
-  // ER Black Shinies (#349): slots >= 3 are GIFT slots (own + shared ally
-  // gift) — they ignore the enemy level slot limit and candy gates.
-  for (let slot = 0; slot < passiveAbilities.length; slot++) {
-    if (slot < 3 && slot >= enemySlotLimit) {
-      continue;
-    }
-    const slotAbility = passiveAbilities[slot];
-    if (slotAbility == null || seenIds.has(slotAbility.id)) {
-      continue;
-    }
-    seenIds.add(slotAbility.id);
-    params.passive = true;
-    params.passiveSlot = slot as 0 | 1 | 2;
+  for (const source of params.pokemon.getActiveAbilitySources()) {
+    params.passive = source.passive;
+    params.passiveSlot = source.passiveSlot;
     applySingleAbAttrs(attrType, params, config);
   }
 
@@ -217,36 +187,19 @@ export function applyFilteredAbAttrs<T extends CallableAbAttrString>(
 }
 
 /**
- * Apply `PostSummonAbAttr` for ALL of a Pokémon's passive (innate) slots.
- *
- * The switch-in flow queues one "passive" {@linkcode PostSummonActivateAbilityPhase}
- * that called `applyAbAttrs("PostSummonAbAttr", { passive: true })` with no
- * `passiveSlot`, which defaults to slot 0 — so ER innate slots 1 and 2 (e.g.
- * Grimmsnarl's Intimidate in slot 1 and Scare in slot 2) never fired on entry,
- * even though slot-0 passives (e.g. Gyarados's Intimidate) did. This iterates
- * every non-empty slot with the same gating as {@linkcode applyAbAttrsInternal}'s
- * passive loop (enemy slot-limit + dedup vs the active ability and across slots),
- * matching the form-change path that already handles all 3 slots.
+ * Apply `PostSummonAbAttr` once for every currently eligible passive source.
+ * Uses the centralized source enumeration so slot gates, suppression, GIFT
+ * sources, and duplicate ability ids match normal attribute dispatch.
  */
 export function applyPostSummonPassiveAbAttrs(pokemon: AbAttrBaseParams["pokemon"]): void {
-  const seenIds = new Set<number>();
-  seenIds.add(pokemon.getAbility().id);
-  const passiveAbilities = pokemon.getPassiveAbilities();
-  const enemySlotLimit = getEnemyPassiveSlotLimit(pokemon);
-  // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy level limit.
-  for (let slot = 0; slot < passiveAbilities.length; slot++) {
-    if (slot < 3 && slot >= enemySlotLimit) {
+  for (const source of pokemon.getActiveAbilitySources()) {
+    if (!source.passive) {
       continue;
     }
-    const slotAbility = passiveAbilities[slot];
-    if (slotAbility == null || seenIds.has(slotAbility.id)) {
-      continue;
-    }
-    seenIds.add(slotAbility.id);
     applySingleAbAttrs("PostSummonAbAttr", {
       pokemon,
       passive: true,
-      passiveSlot: slot as 0 | 1 | 2,
+      passiveSlot: source.passiveSlot,
     } as AbAttrParamMap["PostSummonAbAttr"]);
   }
 }
@@ -284,46 +237,20 @@ export function applyOnGainAbAttrs(params: AbAttrBaseParams): void {
 export function applyPostFormChangeAbAttrs(params: Omit<AbAttrBaseParams, "passive">): void {
   const { pokemon } = params;
   const { formChangeAbilitiesApplied } = pokemon.turnData;
-  const activeId = pokemon.getAbility().id;
-  const passiveAbilities = pokemon.getPassiveAbilities();
-
   const attrFilter = (attr: AbAttrMap["PostSummonAbAttr"]) =>
     !attr.is("PostSummonFormChangeAbAttr") && !attr.is("PostSummonFormChangeByWeatherAbAttr");
 
-  // Apply the active ability if its id has not yet been applied this turn.
-  // Per-id idempotence prevents the form-change re-application from double-firing
-  // (e.g. Mega Tyranitar re-applies Sand Stream once even if a prior trigger already ran it).
-  if (!formChangeAbilitiesApplied.has(activeId)) {
-    formChangeAbilitiesApplied.add(activeId);
-    const activeParams = {
-      ...params,
-      passive: false as const,
-      passiveSlot: undefined,
-    } as AbAttrParamMap["PostSummonAbAttr"];
-    applySingleAbAttrs("PostSummonAbAttr", activeParams, { attrFilter });
-  }
-
-  // Apply each non-empty passive slot whose id has not yet been applied.
-  // Form change abilities currently don't work as passives, but we future-proof here
-  // by iterating all 3 ER slots. The per-id idempotence is enforced via
-  // formChangeAbilitiesApplied — we re-check on each slot (not a pre-snapshot)
-  // so two slots sharing the same id don't double-fire within a single call.
-  const enemySlotLimitFC = getEnemyPassiveSlotLimit(pokemon);
-  for (let slot = 0; slot < 3; slot++) {
-    if (slot >= enemySlotLimitFC) {
+  for (const source of pokemon.getActiveAbilitySources()) {
+    if (formChangeAbilitiesApplied.has(source.ability.id)) {
       continue;
     }
-    const slotAbility = passiveAbilities[slot];
-    if (slotAbility === null || formChangeAbilitiesApplied.has(slotAbility.id)) {
-      continue;
-    }
-    formChangeAbilitiesApplied.add(slotAbility.id);
-    const passiveParams = {
+    formChangeAbilitiesApplied.add(source.ability.id);
+    const sourceParams = {
       ...params,
-      passive: true as const,
-      passiveSlot: slot as 0 | 1 | 2,
+      passive: source.passive,
+      passiveSlot: source.passiveSlot,
     } as AbAttrParamMap["PostSummonAbAttr"];
-    applySingleAbAttrs("PostSummonAbAttr", passiveParams, { attrFilter });
+    applySingleAbAttrs("PostSummonAbAttr", sourceParams, { attrFilter });
   }
 }
 

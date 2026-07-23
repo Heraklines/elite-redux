@@ -7,7 +7,7 @@
 // =============================================================================
 // Pass B capture: composite the REAL `types` atlas badges at the computed
 // paired-column positions (via the production geometry) so the layout can be
-// eyeballed at 2 / 3 / 6 / 7 types. Writes PNGs under the scratchpad captures dir.
+// eyeballed at 2 / 3 / 6 types. Writes PNGs under the scratchpad captures dir.
 //
 // Faithful: uses computeTypeIconStripLayout (the production geometry) + the exact
 // badge art the game ships (er-assets/images/types.png). Not gated - a plain
@@ -30,16 +30,15 @@ const OPTS: TypeIconStripOptions = { x0: 8, y0: 98, baseScale: 0.5, baseStride: 
 
 // A representative type set for each count (real mons):
 //   2 = Water/Ground (any dual), 3 = Tentalect (Water/Poison/Psychic),
-//   6/7 = Primal Regigigas (Normal/Rock/Ice/Steel/Electric/Dragon[/Water]).
+//   6 = Primal Regigigas (Normal/Rock/Ice/Steel/Electric/Dragon).
 const SETS: Record<string, string[]> = {
   "2": ["water", "ground"],
   "3": ["water", "poison", "psychic"],
   "6": ["normal", "rock", "ice", "steel", "electric", "dragon"],
-  "7": ["normal", "rock", "ice", "steel", "electric", "dragon", "water"],
 };
 
 describe("Pass B N-type strip capture", () => {
-  it("renders 2/3/6/7-type strips to PNG for visual review", async () => {
+  it("renders 2/3/6-type strips to PNG for visual review", async () => {
     if (!existsSync(TYPES_PNG)) {
       // No local er-assets checkout (CI) - skip the pixel capture, keep it green.
       expect(true).toBe(true);
@@ -82,6 +81,6 @@ describe("Pass B N-type strip capture", () => {
       writeFileSync(out, canvas.toBuffer("image/png"));
       console.log(`WROTE ${out}  scale=${scale.toFixed(3)} placements=${JSON.stringify(placements)}`);
     }
-    expect(existsSync(join(OUT_DIR, "type-strip-7types.png"))).toBe(true);
+    expect(existsSync(join(OUT_DIR, "type-strip-6types.png"))).toBe(true);
   });
 });

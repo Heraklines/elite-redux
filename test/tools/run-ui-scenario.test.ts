@@ -54,12 +54,18 @@ import { allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
 import { BARGAIN_SIN_ORDER, DISABLED_BARGAIN_SINS } from "#data/elite-redux/er-bargain-sins";
+import { getErBiomeBackgroundSets, resolveErBiomeBackground } from "#data/elite-redux/er-biome-backgrounds";
 import type { PokemonSpecies } from "#data/pokemon-species";
+import { BiomeId } from "#enums/biome-id";
+import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { Nature } from "#enums/nature";
 import { SpeciesId } from "#enums/species-id";
+import { TimeOfDay } from "#enums/time-of-day";
 import { UiMode } from "#enums/ui-mode";
+import { Arena } from "#field/arena";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
 import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
@@ -83,6 +89,8 @@ const SURFACE = (process.env.ER_UI_SURFACE ?? "starter-select").trim();
 const DEMO_BY_SURFACE: Record<string, string[]> = {
   // wrong-sprite (#337/#338) + ER-custom-form crash classes.
   "starter-select": ["RATTATA", "RATTATA_REDUX", "MINCCINO_REDUX", "FLOETTE_ETERNAL_FLOWER", "MIMIKYU_BUSTED"],
+  // Black Shiny starter-select state: real t4 preview, Luck 5, and one-per-team cap.
+  "starter-black-shiny": ["BULBASAUR", "CHARMANDER"],
   // pokedex page render: ER-custom crash (#113), multi-form legendary (#291-adjacent),
   // ER custom multi-form.
   pokedex: ["RATTATA", "RATTATA_REDUX", "CALYREX", "FLOETTE_ETERNAL_FLOWER", "MIMIKYU_BUSTED"],
@@ -191,6 +199,100 @@ interface SpeciesSnapshot {
   spriteKey: string;
   spriteAtlas: string;
   iconId: string;
+}
+
+interface BlackShinyStarterSnapshot {
+  enteredBlack: boolean;
+  previewKey: string;
+  requestedKeys: string[];
+  luck: string;
+  firstAdded: boolean;
+  secondAdded: boolean;
+  partySize: number;
+  blackCount: number;
+  partyBlackFlags: boolean[];
+}
+
+type BlackShinyHandlerInternals = HandlerInternals & {
+  starterPreferences: Record<number, { shiny?: boolean; variant?: number; erBlackShiny?: boolean }>;
+  originalStarterPreferences: Record<number, { shiny?: boolean; variant?: number; erBlackShiny?: boolean }>;
+  pokemonSprite: { pipelineData: Record<string, unknown> };
+  pokemonLuckText: { text: string };
+  spriteLoadAttempts: Map<string, number>;
+  starters: Array<{ erBlackShiny?: boolean }>;
+};
+
+/**
+ * Drive the real starter-select handler through epic -> Black Shiny, then try to
+ * add two Black Shinies. This is the reported stale-preview/luck + team-cap path.
+ */
+async function snapBlackShinyStarters(game: GameManager): Promise<BlackShinyStarterSnapshot> {
+  const species = [SpeciesId.BULBASAUR, SpeciesId.CHARMANDER].map(id => {
+    const found = allSpecies.find(s => s.speciesId === id);
+    if (!found) {
+      throw new Error(`missing starter species ${id}`);
+    }
+    const dexEntry = game.scene.gameData.dexData[id];
+    const starterEntry = game.scene.gameData.starterData[id];
+    dexEntry.caughtAttr = DexAttr.NON_SHINY | DexAttr.SHINY | DexAttr.MALE | DexAttr.VARIANT_3 | DexAttr.DEFAULT_FORM;
+    dexEntry.seenAttr = dexEntry.caughtAttr;
+    starterEntry.abilityAttr = 1;
+    starterEntry.erBlackShiny = true;
+    return found;
+  });
+
+  const handler = game.scene.ui.handlers[UiMode.STARTER_SELECT] as StarterSelectUiHandler;
+  expect(handler.show([() => {}]), "starter-select must open in the headless harness").toBe(true);
+  const internals = handler as unknown as BlackShinyHandlerInternals;
+
+  const selectEpic = (target: PokemonSpecies): void => {
+    internals.starterPreferences[target.speciesId] = { shiny: true, variant: 2, erBlackShiny: false };
+    internals.originalStarterPreferences[target.speciesId] = { shiny: true, variant: 2, erBlackShiny: false };
+    handler.setSpecies(target);
+  };
+
+  selectEpic(species[0]);
+  const enteredBlack = handler.processInput(Button.CYCLE_SHINY);
+  const previewKey = String(internals.pokemonSprite.pipelineData["requestedTextureKey"] ?? "");
+  await vi.waitFor(() => expect(internals.spriteLoadAttempts.has(previewKey)).toBe(true), {
+    timeout: 12000,
+    interval: 50,
+  });
+  const requestedKeys = [...internals.spriteLoadAttempts.keys()];
+  const luck = internals.pokemonLuckText.text;
+  const firstAdded = handler.addToParty(
+    species[0],
+    handler.getCurrentDexProps(species[0].speciesId),
+    0,
+    Nature.HARDY,
+    [] as never,
+    species[0].type1,
+    true,
+  );
+
+  selectEpic(species[1]);
+  handler.processInput(Button.CYCLE_SHINY);
+  const secondAdded = handler.addToParty(
+    species[1],
+    handler.getCurrentDexProps(species[1].speciesId),
+    0,
+    Nature.HARDY,
+    [] as never,
+    species[1].type1,
+    true,
+  );
+
+  return {
+    enteredBlack,
+    previewKey,
+    requestedKeys,
+    luck,
+    firstAdded,
+    secondAdded,
+    partySize: internals.starters.length,
+    blackCount: internals.starters.filter(s => s.erBlackShiny).length,
+    partyBlackFlags: internals.starters.map(s => !!s.erBlackShiny),
+  };
 }
 
 /** A single non-alnum-stripped lowercase token from the species' display name (e.g. "rattata"). */
@@ -581,6 +683,30 @@ describe.skipIf(!RUN)("headless UI runner", () => {
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
+  it.skipIf(SURFACE !== "starter-black-shiny")(
+    "starter-black-shiny: refreshes the real t4 look and caps the selected team at one",
+    async () => {
+      console.log("\n===== UI SURFACE: starter-black-shiny =====");
+      const game = new GameManager(phaserGame);
+      const snap = await snapBlackShinyStarters(game);
+      console.log("STATE", JSON.stringify(snap));
+
+      expect(snap.enteredBlack, "epic -> Black Shiny cycle must be handled").toBe(true);
+      expect(snap.previewKey, "the preview refresh must publish its requested texture key").toMatch(/-erblack$/);
+      expect(snap.requestedKeys, "the single-flight loader must request the Black Shiny atlas").toContain(
+        snap.previewKey,
+      );
+      expect(snap.luck, "selected Black Shiny must display Luck 5 immediately").toBe("5");
+      expect(snap.firstAdded, "the first Black Shiny pick must be accepted").toBe(true);
+      expect(snap.secondAdded, "a second Black Shiny pick must be rejected").toBe(false);
+      expect(snap.partySize).toBe(1);
+      expect(snap.blackCount).toBe(1);
+      expect(snap.partyBlackFlags).toEqual([true]);
+
+      console.log("\nRESULT", JSON.stringify({ surface: "starter-black-shiny", errors: [], warnings: [] }));
+    },
+  );
+
   it.skipIf(SURFACE !== "pokedex")("pokedex: renders the target species page", () => {
     console.log("\n===== UI SURFACE: pokedex =====");
     console.log(`species: ${TARGET_TOKENS.length} target(s)`);
@@ -656,6 +782,55 @@ describe.skipIf(!RUN)("headless UI runner", () => {
     console.log("\nRESULT", JSON.stringify({ surface: "biome-shop", errors }));
     expect(errors, errors.join("\n")).toEqual([]);
   });
+
+  it.skipIf(SURFACE !== "biome-background")(
+    "biome-background: resolves every scene and time frame through the real Arena",
+    () => {
+      console.log("\n===== UI SURFACE: biome-background =====");
+      // Constructing GameManager initializes the real biome registry used by Arena.
+      new GameManager(phaserGame);
+      const errors: string[] = [];
+      const states: { biome: number; set: number; time: string; textureKey: string; ignoreTimeTint: boolean }[] = [];
+      const times = [TimeOfDay.DAY, TimeOfDay.DUSK, TimeOfDay.NIGHT] as const;
+
+      for (const biomeId of Object.values(BiomeId)) {
+        const sets = getErBiomeBackgroundSets(biomeId);
+        for (let setIndex = 0; setIndex < sets.length; setIndex++) {
+          const arena = new Arena(biomeId);
+          (arena as unknown as { backgroundSetIndex: number }).backgroundSetIndex = setIndex;
+          let timeOfDay: TimeOfDay = TimeOfDay.DAY;
+          vi.spyOn(arena, "getTimeOfDay").mockImplementation(() => timeOfDay);
+
+          for (const time of times) {
+            timeOfDay = time;
+            const expected = resolveErBiomeBackground(biomeId, setIndex, time);
+            const actual = {
+              biome: biomeId,
+              set: setIndex,
+              time: TimeOfDay[time],
+              textureKey: arena.getBgTextureKey(),
+              ignoreTimeTint: arena.getBgIgnoreTimeTint(),
+            };
+            states.push(actual);
+            if (
+              !expected
+              || actual.textureKey !== expected.textureKey
+              || actual.ignoreTimeTint !== expected.ignoreTimeTint
+            ) {
+              errors.push(
+                `biome ${biomeId} set ${setIndex} ${TimeOfDay[time]} resolved ${actual.textureKey}/${actual.ignoreTimeTint}`,
+              );
+            }
+          }
+        }
+      }
+
+      console.log("STATE", JSON.stringify({ checks: states.length, scenes: states.length / times.length }));
+      console.log("\nRESULT", JSON.stringify({ surface: "biome-background", errors }));
+      expect(states.length).toBeGreaterThan(0);
+      expect(errors, errors.join("\n")).toEqual([]);
+    },
+  );
 
   it.skipIf(SURFACE !== "bargain")("bargain: renders Giratina's bargain screen (#550 diagnostic)", () => {
     console.log("\n===== UI SURFACE: bargain =====");

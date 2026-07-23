@@ -1,0 +1,38 @@
+{
+  "v": 1,
+  "name": "Tummyache suppresses its direct attacker",
+  "run": {
+    "wave": 146,
+    "level": 20,
+    "difficulty": "ace",
+    "seed": "tummyache-direct-faint"
+  },
+  "party": [
+    {
+      "species": "MAGIKARP",
+      "ability": 5653,
+      "moves": ["SPLASH"]
+    },
+    {
+      "species": "CHANSEY",
+      "ability": "BALL_FETCH",
+      "moves": ["SOFT_BOILED", "GROWL", "POUND", "SPLASH"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["GIGA_IMPACT"]
+      }
+    ]
+  },
+  "script": [{ "move": "SPLASH", "enemyMove": "GIGA_IMPACT" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "enemyAbilitySuppressed": true
+  }
+}

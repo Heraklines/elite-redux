@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Route-boundary tests for the tournament worker (escrow-test discipline: prove the
 // admin ALLOWLIST and the result ATTESTATION at the HTTP seam). The worker's D1 is
 // stubbed with a minimal in-memory engine that answers only the exact statements the
 // route module issues — enough to exercise the full create -> register -> close ->
-// report -> resolve lifecycle without Cloudflare.
+// report -> resolve lifecycle (+ the P3 admin ops) without Cloudflare.
 import {
   type Caller,
   handleTournamentRoute,
@@ -21,6 +21,12 @@ interface TourRow {
   started_at: number | null;
   champion: string | null;
   bracket_json: string | null;
+  battle_format: string | null;
+  series_format: string | null;
+  reward_pool_json: string | null;
+  close_at: number | null;
+  rewards_granted: number | null;
+  community: number | null;
 }
 interface EntrantRow {
   tournament_id: string;
@@ -29,6 +35,9 @@ interface EntrantRow {
   preset_name: string;
   seed: number | null;
   registered_at: number;
+  ghost_json: string | null;
+  last_seen: number | null;
+  waitlisted: number | null;
 }
 
 /** A tiny in-memory D1 that recognizes the route module's statements by SQL substring. */
@@ -51,8 +60,7 @@ class FakeStmt {
     return new FakeStmt(this.db, this.sql, args);
   }
   async first<T>(): Promise<T | null> {
-    const s = this.sql;
-    if (s.includes("FROM tournaments WHERE id")) {
+    if (this.sql.includes("FROM tournaments WHERE id")) {
       return (this.db.tournaments.get(String(this.args[0])) as T) ?? null;
     }
     return null;
@@ -63,15 +71,15 @@ class FakeStmt {
       const tid = String(this.args[0]);
       const rows = this.db.entrants
         .filter(e => e.tournament_id === tid)
-        .sort((a, b) => a.registered_at - b.registered_at)
-        .map(e => ({
-          participant: e.participant,
-          name: e.name,
-          preset_name: e.preset_name,
-          seed: e.seed,
-          registered_at: e.registered_at,
-        }));
+        .sort((a, b) => a.registered_at - b.registered_at);
       return { results: rows as T[] };
+    }
+    if (s.includes("FROM tournaments WHERE organizer")) {
+      const organizer = String(this.args[0]);
+      const active = [...this.db.tournaments.values()].filter(
+        r => r.organizer === organizer && (r.state === "registration" || r.state === "in_progress"),
+      );
+      return { results: active as T[] };
     }
     if (s.includes("FROM tournaments WHERE state IN")) {
       return { results: [...this.db.tournaments.values()] as T[] };
@@ -81,7 +89,7 @@ class FakeStmt {
   async run(): Promise<void> {
     const s = this.sql;
     const a = this.args;
-    if (s.startsWith("CREATE")) {
+    if (s.startsWith("CREATE") || s.startsWith("ALTER")) {
       return;
     }
     if (s.startsWith("INSERT INTO tournaments")) {
@@ -96,17 +104,35 @@ class FakeStmt {
         started_at: a[7] as number | null,
         champion: a[8] as string | null,
         bracket_json: a[9] as string | null,
+        battle_format: a[10] as string | null,
+        series_format: a[11] as string | null,
+        reward_pool_json: a[12] as string | null,
+        close_at: a[13] as number | null,
+        rewards_granted: a[14] as number | null,
+        community: a[15] as number | null,
       });
       return;
     }
     if (s.startsWith("UPDATE tournaments SET")) {
       const row = this.db.tournaments.get(String(a[0]));
       if (row) {
-        row.state = String(a[1]);
-        row.started_at = a[2] as number | null;
-        row.champion = a[3] as string | null;
-        row.bracket_json = a[4] as string | null;
+        row.name = String(a[1]);
+        row.state = String(a[2]);
+        row.started_at = a[3] as number | null;
+        row.champion = a[4] as string | null;
+        row.bracket_json = a[5] as string | null;
+        row.round_window_ms = Number(a[6]);
+        row.max_entrants = Number(a[7]);
+        row.battle_format = a[8] as string | null;
+        row.series_format = a[9] as string | null;
+        row.reward_pool_json = a[10] as string | null;
+        row.close_at = a[11] as number | null;
+        row.rewards_granted = a[12] as number | null;
       }
+      return;
+    }
+    if (s.startsWith("DELETE FROM tournaments WHERE id")) {
+      this.db.tournaments.delete(String(a[0]));
       return;
     }
     if (s.startsWith("INSERT INTO tournament_entrants")) {
@@ -117,7 +143,18 @@ class FakeStmt {
         preset_name: String(a[3]),
         seed: a[4] as number | null,
         registered_at: Number(a[5]),
+        ghost_json: a[6] as string | null,
+        last_seen: a[7] as number | null,
+        waitlisted: a[8] as number | null,
       });
+      return;
+    }
+    if (s.startsWith("UPDATE tournament_entrants SET seed=NULL WHERE tournament_id")) {
+      for (const e of this.db.entrants) {
+        if (e.tournament_id === String(a[0])) {
+          e.seed = null;
+        }
+      }
       return;
     }
     if (s.startsWith("UPDATE tournament_entrants SET seed")) {
@@ -127,10 +164,28 @@ class FakeStmt {
       }
       return;
     }
-    if (s.startsWith("DELETE FROM tournament_entrants")) {
+    if (s.startsWith("UPDATE tournament_entrants SET last_seen")) {
+      const row = this.db.entrants.find(e => e.tournament_id === String(a[0]) && e.participant === String(a[1]));
+      if (row) {
+        row.last_seen = a[2] as number;
+      }
+      return;
+    }
+    if (s.startsWith("UPDATE tournament_entrants SET waitlisted")) {
+      const row = this.db.entrants.find(e => e.tournament_id === String(a[0]) && e.participant === String(a[1]));
+      if (row) {
+        row.waitlisted = 0;
+      }
+      return;
+    }
+    if (s.startsWith("DELETE FROM tournament_entrants WHERE tournament_id=?1 AND participant")) {
       this.db.entrants = this.db.entrants.filter(
         e => !(e.tournament_id === String(a[0]) && e.participant === String(a[1])),
       );
+      return;
+    }
+    if (s.startsWith("DELETE FROM tournament_entrants WHERE tournament_id")) {
+      this.db.entrants = this.db.entrants.filter(e => e.tournament_id !== String(a[0]));
       return;
     }
   }
@@ -142,21 +197,44 @@ function player(u: string, uid = 100): Caller {
   return { uid, u };
 }
 
-function req(method: string, body?: unknown): Request {
+function req(method: string, body?: unknown, headers?: Record<string, string>): Request {
   return new Request("https://x/", {
     method,
+    ...(headers ? { headers } : {}),
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 }
 
 let env: TournamentEnv;
+// Records every reward delivery the grant route pushes (the server-to-server settlement sink stub).
+let deliveries: { tournamentId: string; settlements: unknown[] }[];
+let sinkFails: boolean;
 beforeEach(() => {
-  env = { DB: new FakeD1(), TOURNAMENT_ADMIN_UIDS: "1,7" };
+  deliveries = [];
+  sinkFails = false;
+  env = {
+    DB: new FakeD1(),
+    TOURNAMENT_ADMIN_UIDS: "1,7",
+    EDITOR_PASSWORD: "team-secret",
+    grantSink: async (tournamentId, settlements) => {
+      if (sinkFails) {
+        return { ok: false, delivered: 0, error: "stub failure" };
+      }
+      deliveries.push({ tournamentId, settlements });
+      return { ok: true, delivered: settlements.length };
+    },
+  };
 });
 
-async function call(path: string, method: string, caller: Caller | null, body?: unknown) {
+async function call(
+  path: string,
+  method: string,
+  caller: Caller | null,
+  body?: unknown,
+  headers?: Record<string, string>,
+) {
   const url = new URL(`https://x${path}`);
-  const res = await handleTournamentRoute(url, req(method, body), caller, env, cors);
+  const res = await handleTournamentRoute(url, req(method, body, headers), caller, env, cors);
   return res as Response;
 }
 
@@ -178,20 +256,67 @@ describe("tournament routes — auth + admin allowlist", () => {
   });
 });
 
+describe("tournament routes — editor-password auth (team credential)", () => {
+  const EDITOR_HDR = { "X-Editor-Auth": "team-secret" };
+
+  it("lets an editor-password-only caller (no token) create — synthetic editor admin", async () => {
+    const res = await call("/tournament/create", "POST", null, { id: "ec", name: "Editor Cup" }, EDITOR_HDR);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.tournament.state).toBe("registration");
+    // organizer is the synthetic editor identity
+    expect(body.tournament.organizer).toBe("editor");
+  });
+
+  it("rejects a WRONG editor password with no token (401 — unauthorized)", async () => {
+    const res = await call("/tournament/create", "POST", null, { name: "Cup" }, { "X-Editor-Auth": "nope" });
+    expect(res.status).toBe(401);
+  });
+
+  it("a NON-admin token PLUS a valid editor password is granted admin", async () => {
+    const res = await call("/tournament/create", "POST", player("bob"), { id: "bc", name: "Bob Cup" }, EDITOR_HDR);
+    expect(res.status).toBe(200);
+    // organizer is the real token identity (bob), but admin came from the editor password
+    expect(((await res.json()) as any).tournament.organizer).toBe("bob");
+  });
+
+  it("a non-admin token WITHOUT the editor password is still rejected (403)", async () => {
+    const res = await call("/tournament/create", "POST", player("bob"), { name: "Cup" });
+    expect(res.status).toBe(403);
+  });
+
+  it("editor password does nothing when the secret is unset on the worker", async () => {
+    env.EDITOR_PASSWORD = undefined;
+    const res = await call("/tournament/create", "POST", null, { name: "Cup" }, EDITOR_HDR);
+    expect(res.status).toBe(401);
+  });
+
+  it("the uid allowlist path still works alongside editor auth", async () => {
+    const res = await call("/tournament/create", "POST", ADMIN, { id: "uc", name: "Uid Cup" });
+    expect(res.status).toBe(200);
+  });
+});
+
 describe("tournament routes — lifecycle + attestation", () => {
-  async function createTour(): Promise<string> {
-    const res = await call("/tournament/create", "POST", ADMIN, { id: "cup", name: "Cup" });
+  async function createTour(extra: Record<string, unknown> = {}): Promise<string> {
+    const res = await call("/tournament/create", "POST", ADMIN, { id: "cup", name: "Cup", ...extra });
     expect(res.status).toBe(200);
     return "cup";
+  }
+  async function register(id: string, names: string[]) {
+    for (const p of names) {
+      const r = await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` });
+      expect(r.status).toBe(200);
+    }
+  }
+  async function bracketOf(id: string, as = "alice") {
+    const got = await call(`/tournament/bracket?id=${id}`, "GET", player(as));
+    return ((await got.json()) as any).tournament;
   }
 
   it("registers, rejects dup + missing preset, closes, reports with attestation", async () => {
     const id = await createTour();
-    // register 4 players
-    for (const p of ["alice", "bob", "carol", "dave"]) {
-      const r = await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` });
-      expect(r.status).toBe(200);
-    }
+    await register(id, ["alice", "bob", "carol", "dave"]);
     // missing preset -> 422
     expect((await call("/tournament/register", "POST", player("eve"), { id })).status).toBe(422);
     // dup -> 422
@@ -206,11 +331,7 @@ describe("tournament routes — lifecycle + attestation", () => {
     expect(cbody.tournament.state).toBe("in_progress");
     expect(cbody.tournament.bracket.size).toBe(4);
 
-    // GET bracket
-    const got = await call("/tournament/bracket?id=cup", "GET", player("alice"));
-    const gbody = (await got.json()) as any;
-    const bracket = gbody.tournament.bracket;
-    // find a playable round-0 match (4 entrants, no byes)
+    const bracket = (await bracketOf(id)).bracket;
     const m0 = bracket.rounds[0][0];
     const [pa, pb] = [m0.a, m0.b];
 
@@ -221,12 +342,10 @@ describe("tournament routes — lifecycle + attestation", () => {
       winner: pa,
     });
     expect(((await bad.json()) as any).resolution).toBe("pending");
-
-    // lone report from player a -> pending
+    // lone report -> pending
     const lone = await call("/tournament/result", "POST", player(pa), { tournamentId: id, matchId: m0.id, winner: pa });
     expect(((await lone.json()) as any).resolution).toBe("pending");
-
-    // agreeing report from player b -> settled
+    // agreeing report -> settled
     const settle = await call("/tournament/result", "POST", player(pb), {
       tournamentId: id,
       matchId: m0.id,
@@ -237,16 +356,60 @@ describe("tournament routes — lifecycle + attestation", () => {
     expect(sbody.match.winner).toBe(pa);
   });
 
+  it("BO3 series: per-game reports accumulate, clinch at 2-0, advance the bracket", async () => {
+    const id = await createTour({ seriesFormat: "bo3" });
+    await register(id, ["alice", "bob", "carol", "dave"]);
+    await call("/tournament/close-registration", "POST", ADMIN, { id });
+    const bracket = (await bracketOf(id)).bracket;
+    const m0 = bracket.rounds[0][0];
+    const [pa, pb] = [m0.a, m0.b];
+
+    // Game 0: both report pa. A single agreeing game must NOT settle the Bo3.
+    await call("/tournament/result", "POST", player(pa), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: pa,
+      gameIndex: 0,
+    });
+    const g0 = await call("/tournament/result", "POST", player(pb), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: pa,
+      gameIndex: 0,
+    });
+    const g0body = (await g0.json()) as any;
+    expect(g0body.resolution).toBe("pending"); // 1-0 does not clinch
+    expect(g0body.match.winner).toBeNull();
+    expect(g0body.seriesScore).toEqual(m0.a === pa ? { a: 1, b: 0 } : { a: 0, b: 1 });
+
+    // Game 1: both report pa again -> 2-0 clinch + advance.
+    await call("/tournament/result", "POST", player(pa), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: pa,
+      gameIndex: 1,
+    });
+    const g1 = await call("/tournament/result", "POST", player(pb), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: pa,
+      gameIndex: 1,
+    });
+    const g1body = (await g1.json()) as any;
+    expect(g1body.resolution).toBe("settled");
+    expect(g1body.match.winner).toBe(pa);
+    // The winner advanced into the next round.
+    const advanced = (await bracketOf(id)).bracket;
+    const feeds = advanced.rounds[1].some((mm: any) => mm.a === pa || mm.b === pa);
+    expect(feeds).toBe(true);
+  });
+
   it("disputed reports need an organizer resolve", async () => {
     const id = await createTour();
-    for (const p of ["alice", "bob", "carol", "dave"]) {
-      await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` });
-    }
+    await register(id, ["alice", "bob", "carol", "dave"]);
     await call("/tournament/close-registration", "POST", ADMIN, { id });
-    const got = await call("/tournament/bracket?id=cup", "GET", player("alice"));
-    const m0 = ((await got.json()) as any).tournament.bracket.rounds[0][0];
+    const m0 = (await bracketOf(id)).bracket.rounds[0][0];
     const [pa, pb] = [m0.a, m0.b];
-    // conflicting reports
     await call("/tournament/result", "POST", player(pa), { tournamentId: id, matchId: m0.id, winner: pa });
     const conflict = await call("/tournament/result", "POST", player(pb), {
       tournamentId: id,
@@ -254,17 +417,11 @@ describe("tournament routes — lifecycle + attestation", () => {
       winner: pb,
     });
     expect(((await conflict.json()) as any).resolution).toBe("disputed");
-    // a random player cannot resolve
     expect(
       (await call("/tournament/resolve", "POST", player("carol"), { tournamentId: id, matchId: m0.id, winner: pa }))
         .status,
     ).toBe(403);
-    // organizer (admin) resolves
-    const resolved = await call("/tournament/resolve", "POST", ADMIN, {
-      tournamentId: id,
-      matchId: m0.id,
-      winner: pb,
-    });
+    const resolved = await call("/tournament/resolve", "POST", ADMIN, { tournamentId: id, matchId: m0.id, winner: pb });
     const rbody = (await resolved.json()) as any;
     expect(rbody.resolution).toBe("settled");
     expect(rbody.match.winner).toBe(pb);
@@ -275,5 +432,388 @@ describe("tournament routes — lifecycle + attestation", () => {
     const id = await createTour();
     expect((await call("/tournament/cancel", "POST", player("bob"), { id })).status).toBe(403);
     expect((await call("/tournament/cancel", "POST", ADMIN, { id })).status).toBe(200);
+  });
+
+  // ---- P3 admin ops ----
+
+  it("CREATE stores + exposes battle/series format + reward pool + closeAt", async () => {
+    const id = await createTour({
+      maxEntrants: 32,
+      battleFormat: "doubles",
+      seriesFormat: "bo3",
+      closeAt: 5_000_000_000_000,
+      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 50 }] }],
+    });
+    const t = await bracketOf(id);
+    expect(t.maxEntrants).toBe(32);
+    expect(t.battleFormat).toBe("doubles");
+    expect(t.seriesFormat).toBe("bo3");
+    expect(t.closeAt).toBe(5_000_000_000_000);
+    expect(t.rewardPool).toEqual([
+      { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 50 }] },
+    ]);
+  });
+
+  it("clamps a > 64 cap down to 64", async () => {
+    const id = await createTour({ maxEntrants: 999 });
+    expect((await bracketOf(id)).maxEntrants).toBe(64);
+  });
+
+  it("EDIT changes rewards/cap/window in registration, locks after close", async () => {
+    const id = await createTour({ maxEntrants: 8 });
+    await register(id, ["alice", "bob"]);
+    const edited = await call("/tournament/edit", "POST", ADMIN, {
+      id,
+      maxEntrants: 16,
+      roundWindowMs: 12 * 3600_000,
+      rewardPool: [{ place: "runnerUp", mutations: [{ kind: "grantCandy", speciesId: 25, candy: 50 }] }],
+    });
+    expect(edited.status).toBe(200);
+    const t = await bracketOf(id);
+    expect(t.maxEntrants).toBe(16);
+    expect(t.roundWindowMs).toBe(12 * 3600_000);
+    expect(t.rewardPool[0].place).toBe("runnerUp");
+    // non-admin cannot edit
+    expect((await call("/tournament/edit", "POST", player("bob"), { id, name: "Hax" })).status).toBe(403);
+    // after close -> 422
+    await call("/tournament/close-registration", "POST", ADMIN, { id });
+    expect((await call("/tournament/edit", "POST", ADMIN, { id, maxEntrants: 32 })).status).toBe(422);
+  });
+
+  it("WAITLIST beyond cap + auto-promote on a registration kick (scenario 8)", async () => {
+    const id = await createTour({ maxEntrants: 4 });
+    // 4 fill the field and auto-close; the 5th and 6th queue on the waitlist.
+    await register(id, ["a", "b", "c", "d"]);
+    // field is now in_progress (auto-closed at cap) but nothing played -> new joins waitlist
+    const w1 = await call("/tournament/register", "POST", player("e"), { id, presetName: "e-team" });
+    expect(((await w1.json()) as any).waitlisted).toBe(true);
+    const w2 = await call("/tournament/register", "POST", player("f"), { id, presetName: "f-team" });
+    expect(((await w2.json()) as any).waitlisted).toBe(true);
+    let t = await bracketOf(id);
+    expect(t.waitlist.map((x: any) => x.participant)).toEqual(["e", "f"]);
+    // kick 'a' (mid pre-play) -> REOPEN + promote the FIRST waitlisted ('e'); field refills to cap -> re-close
+    const kicked = await call("/tournament/kick", "POST", ADMIN, { id, participant: "a" });
+    expect(kicked.status).toBe(200);
+    const kbody = (await kicked.json()) as any;
+    expect(kbody.promoted).toBe("e");
+    t = await bracketOf(id);
+    const active = t.entrants.map((x: any) => x.participant).sort();
+    expect(active).toEqual(["b", "c", "d", "e"]);
+    expect(t.waitlist.map((x: any) => x.participant)).toEqual(["f"]);
+    expect(t.state).toBe("in_progress"); // refilled to cap -> auto-closed again
+  });
+
+  it("KICK during registration (under cap, no waitlist) just frees the slot (scenario 2)", async () => {
+    const id = await createTour({ maxEntrants: 8 });
+    await register(id, ["a", "b", "c"]);
+    const kicked = await call("/tournament/kick", "POST", ADMIN, { id, participant: "b" });
+    expect(kicked.status).toBe(200);
+    expect(((await kicked.json()) as any).promoted).toBe(null);
+    const t = await bracketOf(id);
+    expect(t.entrants.map((x: any) => x.participant).sort()).toEqual(["a", "c"]);
+    expect(t.state).toBe("registration");
+  });
+
+  it("KICK mid-tournament is a WALKOVER — opponent advances, board shows kicked (scenario 3)", async () => {
+    const id = await createTour({ maxEntrants: 4 });
+    await register(id, ["a", "b", "c", "d"]); // auto-closes to a 4-bracket
+    let t = await bracketOf(id);
+    // play ONE match to create progress
+    const m0 = t.bracket.rounds[0][0];
+    await call("/tournament/result", "POST", player(m0.a), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    await call("/tournament/result", "POST", player(m0.b), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    // now kick a player in the OTHER, unplayed match -> walkover
+    t = await bracketOf(id);
+    const m1 = t.bracket.rounds[0][1];
+    const victim = m1.a;
+    const survivor = m1.b;
+    const kicked = await call("/tournament/kick", "POST", ADMIN, { id, participant: victim });
+    expect(kicked.status).toBe(200);
+    expect(((await kicked.json()) as any).kind).toBe("walkover");
+    t = await bracketOf(id);
+    const m1b = t.bracket.rounds[0][1];
+    expect(m1b.winner).toBe(survivor);
+    expect(m1b.resolution).toBe("walkover");
+    expect(t.bracket.kicked).toContain(victim);
+  });
+
+  it("RESEED regenerates while zero played, rejects after a match (scenario 7)", async () => {
+    const id = await createTour({ maxEntrants: 4 });
+    await register(id, ["a", "b", "c", "d"]);
+    // reseed while zero played -> ok
+    const re = await call("/tournament/reseed", "POST", ADMIN, { id });
+    expect(re.status).toBe(200);
+    // play a match, then reseed -> 422
+    const t = await bracketOf(id);
+    const m0 = t.bracket.rounds[0][0];
+    await call("/tournament/result", "POST", player(m0.a), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    await call("/tournament/result", "POST", player(m0.b), { tournamentId: id, matchId: m0.id, winner: m0.a });
+    expect((await call("/tournament/reseed", "POST", ADMIN, { id })).status).toBe(422);
+  });
+
+  it("DELETE removes a tournament in any state (scenario 4)", async () => {
+    const id = await createTour();
+    await register(id, ["a", "b"]);
+    const del = await call("/tournament/delete", "POST", ADMIN, { id });
+    expect(del.status).toBe(200);
+    expect((await call(`/tournament/bracket?id=${id}`, "GET", player("a"))).status).toBe(404);
+  });
+
+  async function playOutSampleCup(extra: Record<string, unknown>): Promise<{ id: string; champion: string }> {
+    const id = await createTour({ maxEntrants: 4, ...extra });
+    await register(id, ["a", "b", "c", "d"]);
+    const play = async (mid: string, winner: string) => {
+      const t = await bracketOf(id);
+      const m = t.bracket.rounds.flat().find((x: any) => x.id === mid);
+      await call("/tournament/result", "POST", player(m.a), { tournamentId: id, matchId: mid, winner });
+      await call("/tournament/result", "POST", player(m.b), { tournamentId: id, matchId: mid, winner });
+    };
+    let t = await bracketOf(id);
+    const [r0m0, r0m1] = [t.bracket.rounds[0][0], t.bracket.rounds[0][1]];
+    await play(r0m0.id, r0m0.a);
+    await play(r0m1.id, r0m1.a);
+    t = await bracketOf(id);
+    await play(t.bracket.rounds[1][0].id, t.bracket.rounds[1][0].a);
+    t = await bracketOf(id);
+    expect(t.state).toBe("complete");
+    return { id, champion: t.champion };
+  }
+
+  it("AUTO-GRANTS per-place settlements the moment the final resolves (P2 champion completion)", async () => {
+    const { id, champion } = await playOutSampleCup({
+      rewardPool: [
+        { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 100 }] },
+        { place: "semifinalist", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 20 }] },
+      ],
+    });
+    // P2: the completing result AUTO-delivered the pool — no admin click needed.
+    expect(deliveries).toHaveLength(1);
+    const sent = deliveries[0].settlements as any[];
+    expect(sent.filter(s => s.uid === champion && s.mutation.speciesId === 445)).toHaveLength(1);
+    // two semifinalists each get their candy
+    expect(sent.filter(s => s.mutation.speciesId === 1)).toHaveLength(2);
+    // the manual route is now idempotent-refused (rewards already granted) and NEVER re-delivers.
+    expect((await call("/tournament/grant-rewards", "POST", ADMIN, { id })).status).toBe(422);
+    expect(deliveries).toHaveLength(1);
+  });
+
+  it("AUTO-GRANT delivers chosen-shiny + candy + random-shiny settlements, exactly once", async () => {
+    const { id, champion } = await playOutSampleCup({
+      rewardPool: [
+        {
+          place: "champion",
+          mutations: [
+            { kind: "grantShinyChosen", speciesId: 6, tier: 4 },
+            { kind: "grantCandy", speciesId: 1, candy: 25 },
+          ],
+        },
+        {
+          place: "semifinalist",
+          mutations: [{ kind: "grantShinyRandom", tier: 2, unownedOnly: true, speciesPool: [151] }],
+        },
+      ],
+    });
+    // Delivered exactly once, automatically, on completion.
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0].tournamentId).toBe(id);
+    const sent = deliveries[0].settlements as any[];
+    const champSettlements = sent.filter(s => s.uid === champion);
+    expect(champSettlements).toContainEqual({
+      uid: champion,
+      mutation: { kind: "grantUnlock", speciesId: 6, shiny: true, variant: 2, erBlackShiny: true, cost: 0 },
+    });
+    expect(champSettlements).toContainEqual({
+      uid: champion,
+      mutation: { kind: "grantCandy", speciesId: 1, candy: 25 },
+    });
+    const semiShinies = sent.filter(s => s.mutation.kind === "grantUnlock" && s.mutation.speciesId === 151);
+    expect(semiShinies).toHaveLength(2);
+    // A manual re-grant is refused and NEVER re-delivers.
+    expect((await call("/tournament/grant-rewards", "POST", ADMIN, { id })).status).toBe(422);
+    expect(deliveries).toHaveLength(1);
+  });
+
+  it("AUTO-GRANT failure leaves rewardsGranted FALSE — the manual route retries (red-proof)", async () => {
+    // Sink fails DURING the completing result -> auto-grant can't mark granted (nothing delivered).
+    sinkFails = true;
+    const { id } = await playOutSampleCup({
+      rewardPool: [{ place: "champion", mutations: [{ kind: "grantShinyChosen", speciesId: 6, tier: 1 }] }],
+    });
+    expect(deliveries).toHaveLength(0);
+    // rewards NOT marked granted -> the manual route (now succeeding) delivers.
+    sinkFails = false;
+    const retry = await call("/tournament/grant-rewards", "POST", ADMIN, { id });
+    expect(retry.status).toBe(200);
+    expect(deliveries).toHaveLength(1);
+    // and is idempotent afterwards.
+    expect((await call("/tournament/grant-rewards", "POST", ADMIN, { id })).status).toBe(422);
+    expect(deliveries).toHaveLength(1);
+  });
+});
+
+// ---- P2 DEADLINE AUTO-RESOLUTION at the HTTP seam (lazy on read, no cron) ----
+describe("tournament routes — P2 deadline auto-resolution + champion auto-grant", () => {
+  const HOUR = 3_600_000;
+  const WINDOW = 24 * HOUR;
+  const T0 = 1_700_000_000_000;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function autoCloseCup(rewardPool?: unknown): Promise<string> {
+    const id = "dl";
+    const r = await call("/tournament/create", "POST", ADMIN, { id, name: "Deadline Cup", maxEntrants: 4, rewardPool });
+    expect(r.status).toBe(200);
+    for (const p of ["a", "b", "c", "d"]) {
+      const rr = await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` });
+      expect(rr.status).toBe(200);
+    }
+    return id;
+  }
+  async function bracketOf(id: string) {
+    const got = await call(`/tournament/bracket?id=${id}`, "GET", player("a"));
+    return ((await got.json()) as any).tournament;
+  }
+
+  it("expired + one present -> ACTIVITY win; neither present -> SEED (higher seed advances)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const id = await autoCloseCup();
+    let t = await bracketOf(id);
+    expect(t.state).toBe("in_progress");
+    // round-0: m0 = a(seed1) vs d(seed4); m1 = b(seed2) vs c(seed3)
+    const m0 = t.bracket.rounds[0][0];
+    const m1 = t.bracket.rounds[0][1];
+    // 'a' pings in during the window -> present on m0
+    expect((await call("/tournament/ping", "POST", player("a"), { id })).status).toBe(200);
+    // window expires
+    vi.setSystemTime(T0 + WINDOW + 1);
+    t = await bracketOf(id);
+    const m0r = t.bracket.rounds[0][0];
+    const m1r = t.bracket.rounds[0][1];
+    expect(m0r.winner).toBe(m0.a); // 'a' present -> activity win
+    expect(m0r.resolution).toBe("activity");
+    expect(m1r.resolution).toBe("seed"); // neither present -> higher seed
+    expect(m1r.winner).toBe(m1.a); // b (seed2) beats c (seed3)
+  });
+
+  it("expired BO3 with a 0-1 lead -> SERIES resolution advances the leader (outranks seed) through the read seam", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const id = "dls";
+    expect(
+      (await call("/tournament/create", "POST", ADMIN, { id, name: "Series Cup", maxEntrants: 4, seriesFormat: "bo3" }))
+        .status,
+    ).toBe(200);
+    for (const p of ["a", "b", "c", "d"]) {
+      expect((await call("/tournament/register", "POST", player(p), { id, presetName: `${p}-team` })).status).toBe(200);
+    }
+    let t = await call(`/tournament/bracket?id=${id}`, "GET", player("a")).then(r => r.json() as any);
+    const m0 = t.tournament.bracket.rounds[0][0]; // a(seed1) vs d(seed4)
+    // both paired players attest game 0 to d (the LOWER seed) -> series 0-1, unclinched (bo3 needs 2).
+    await call("/tournament/result", "POST", player(m0.a), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: m0.b,
+      gameIndex: 0,
+    });
+    const g0 = await call("/tournament/result", "POST", player(m0.b), {
+      tournamentId: id,
+      matchId: m0.id,
+      winner: m0.b,
+      gameIndex: 0,
+    });
+    expect(((await g0.json()) as any).match.winner).toBeNull(); // not yet clinched
+    // window expires with no further games -> the leader (d) forfeit-advances by "series", NOT seed.
+    vi.setSystemTime(T0 + WINDOW + 1);
+    t = await call(`/tournament/bracket?id=${id}`, "GET", player("a")).then(r => r.json() as any);
+    const m0r = t.tournament.bracket.rounds[0][0];
+    expect(m0r.winner).toBe(m0.b); // series leader d beats the higher seed a
+    expect(m0r.resolution).toBe("series");
+    expect(t.tournament.bracket.rounds[1][0].a).toBe(m0.b); // advanced into the final
+  });
+
+  it("idempotent — a later read never re-resolves an auto-resolved match", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const id = await autoCloseCup();
+    vi.setSystemTime(T0 + WINDOW + 1);
+    const first = await bracketOf(id);
+    const w0 = first.bracket.rounds[0][0].winner;
+    vi.setSystemTime(T0 + WINDOW + 10 * HOUR);
+    const second = await bracketOf(id);
+    expect(second.bracket.rounds[0][0].winner).toBe(w0);
+    expect(second.bracket.rounds[0][0].resolution).toBe("seed");
+  });
+
+  it("cascades to the FINAL and AUTO-GRANTS the champion reward with no organizer action", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const id = await autoCloseCup([
+      { place: "champion", mutations: [{ kind: "grantCandy", speciesId: 445, candy: 100 }] },
+    ]);
+    // blow past BOTH the round-0 and final windows in one jump
+    vi.setSystemTime(T0 + 2 * WINDOW + 1);
+    const t = await bracketOf(id);
+    expect(t.state).toBe("complete");
+    expect(t.champion).toBe("a"); // seed-1 advances all the way with no presence
+    // champion reward auto-delivered exactly once
+    expect(deliveries).toHaveLength(1);
+    const sent = deliveries[0].settlements as any[];
+    expect(sent).toContainEqual({ uid: "a", mutation: { kind: "grantCandy", speciesId: 445, candy: 100 } });
+  });
+});
+
+// ---- P3 COMMUNITY CREATION (any authenticated player; prize-free; anti-spam) ----
+describe("tournament routes — P3 community creation", () => {
+  async function communityCreate(as: Caller, body: Record<string, unknown>) {
+    return call("/tournament/community-create", "POST", as, body);
+  }
+
+  it("lets a NON-admin player create a prize-free tournament, capped + reward-stripped", async () => {
+    const res = await communityCreate(player("bob"), {
+      id: "com1",
+      name: "Bob's Bash",
+      maxEntrants: 64, // over the community cap -> clamped to 16
+      rewardPool: [{ place: "champion", mutations: [{ kind: "grantCandy", speciesId: 1, candy: 99 }] }], // stripped
+    });
+    expect(res.status).toBe(200);
+    const t = ((await res.json()) as any).tournament;
+    expect(t.organizer).toBe("bob");
+    expect(t.community).toBe(true);
+    expect(t.maxEntrants).toBe(16); // clamped to COMMUNITY_MAX_ENTRANTS
+    expect(t.rewardPool).toEqual([]); // prize pool forced empty
+    expect(t.state).toBe("registration");
+  });
+
+  it("requires authentication (401 without a token)", async () => {
+    const res = await communityCreate(null as any, { name: "X" });
+    expect(res.status).toBe(401);
+  });
+
+  it("ANTI-SPAM red-proof: a creator's SECOND active tournament is refused (422)", async () => {
+    expect((await communityCreate(player("carl"), { id: "c1", name: "One" })).status).toBe(200);
+    const second = await communityCreate(player("carl"), { id: "c2", name: "Two" });
+    expect(second.status).toBe(422);
+    expect(((await second.json()) as any).error).toMatch(/already have an active tournament/i);
+    // a DIFFERENT creator is unaffected
+    expect((await communityCreate(player("dana"), { id: "d1", name: "Dana One" })).status).toBe(200);
+  });
+
+  it("the creator can CANCEL their own community tournament, then create again", async () => {
+    expect((await communityCreate(player("erin"), { id: "e1", name: "First" })).status).toBe(200);
+    // non-organizer non-admin cannot cancel it
+    expect((await call("/tournament/cancel", "POST", player("mallory"), { id: "e1" })).status).toBe(403);
+    // the creator cancels their own
+    expect((await call("/tournament/cancel", "POST", player("erin"), { id: "e1" })).status).toBe(200);
+    // with no active tournament, they can create a fresh one
+    expect((await communityCreate(player("erin"), { id: "e2", name: "Second" })).status).toBe(200);
+  });
+
+  it("an admin cancelling a community tournament also frees the creator's slot", async () => {
+    expect((await communityCreate(player("frank"), { id: "f1", name: "Frank Cup" })).status).toBe(200);
+    expect((await call("/tournament/cancel", "POST", ADMIN, { id: "f1" })).status).toBe(200);
+    expect((await communityCreate(player("frank"), { id: "f2", name: "Frank Cup 2" })).status).toBe(200);
   });
 });

@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "name": "Frost Dragon follows Ice with Breaking Swipe",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "frost-dragon-breaking-swipe"
+  },
+  "party": [
+    {
+      "species": "GLACEON",
+      "ability": 5710,
+      "moves": ["ICE_BEAM", "DRAGON_PULSE", "PROTECT", "GROWL"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["SPLASH"]
+      }
+    ]
+  },
+  "script": [{ "move": "ICE_BEAM", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "enemyStage": { "stat": "ATK", "value": -1 },
+    "enemyDamaged": true
+  }
+}

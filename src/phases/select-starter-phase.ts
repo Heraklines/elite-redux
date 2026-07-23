@@ -9,7 +9,11 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
 import { allMoves, modifierTypes } from "#data/data-lists";
-import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import {
+  applyErBlackShinyKit,
+  ER_BLACK_SHINY_LUCK,
+  enforceErBlackShinyStarterLimit,
+} from "#data/elite-redux/er-black-shinies";
 import { isErCustomTrainerDevForceArmed, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
 import { PokemonMove } from "#moves/pokemon-move";
 import { installErCustomTrainerForCurrentWave } from "#phases/er-custom-trainer-install";
@@ -485,9 +489,15 @@ export class SelectStarterPhase extends Phase {
       true,
     );
 
+    // Field-width format for this match (tournament doubles/triples; plain matches are singles).
+    // Read from the tournament match context BEFORE the handshake so it rides the negotiate exchange
+    // and is cross-checked — a stale client that resolved a different width refuses to pair instead
+    // of desyncing a singles field against a doubles one.
+    const matchBattleFormat = getTournamentMatchContext()?.battleFormat ?? "singles";
+
     let result: ShowdownNegotiationResult;
     try {
-      result = await session.negotiate(manifests, ownProfile);
+      result = await session.negotiate(manifests, ownProfile, matchBattleFormat);
     } catch (err) {
       disposePendingShowdownSession();
       disposePendingShowdownRelay();
@@ -529,7 +539,15 @@ export class SelectStarterPhase extends Phase {
       ownUsername: runtime.controller.localName(),
       opponentUsername: runtime.controller.partnerName ?? "",
       onCommit: (matchId: string | null, ranked) => {
-        beginShowdownBattle(manifests, result.opponentManifest, relay, result.opponentProfile, matchId, ranked);
+        beginShowdownBattle(
+          manifests,
+          result.opponentManifest,
+          relay,
+          result.opponentProfile,
+          matchId,
+          ranked,
+          result.battleFormat,
+        );
         // D5: begin the HOST-side battle telemetry record (no-op for the guest). hostTeam is the
         // host's own team; guestTeam the opponent's - correct because begin only records for the host.
         beginShowdownTelemetry({
@@ -637,6 +655,11 @@ export class SelectStarterPhase extends Phase {
     showdownManifests?: ShowdownMonManifest[],
     startingLevels?: readonly number[],
   ) {
+    const cappedStarters = enforceErBlackShinyStarterLimit(starters);
+    if (cappedStarters.some((starter, index) => starter !== starters[index])) {
+      console.warn("[er-black-shiny] starter team contained multiple Black Shinies; later picks were demoted");
+      starters = cappedStarters;
+    }
     const party = globalScene.getPlayerParty();
     const loadPokemonAssets: Promise<void>[] = [];
     // Showdown 1v1 (staging fix 2026-07-07): the HOST's OWN party must be fielded from the
@@ -878,6 +901,9 @@ function showdownRejectMessage(err: ShowdownNegotiationError): string {
     case "protoMismatch":
       // B7 item 11: a stale cached bundle on one side. Tell BOTH players to hard-refresh.
       return "Your game versions differ - hard-refresh (Ctrl+Shift+R) both clients and retry.";
+    case "formatMismatch":
+      // Both clients resolved a different battle format (one has a stale tournament view).
+      return "Your battle formats differ - refresh the tournament board on both clients and retry.";
     default:
       return "The versus match was cancelled.";
   }
@@ -992,7 +1018,7 @@ function coopOwnerSnapshot(s: Starter): { coopPassiveAttr: number[]; coopLuck: n
   const rootId = species.getRootSpeciesId();
   const passiveAttr = globalScene.gameData.starterData[rootId]?.passiveAttr ?? 0;
   const caughtAttr = globalScene.gameData.dexData[species.speciesId]?.caughtAttr ?? 0;
-  const luck = globalScene.gameData.getDexAttrLuck(caughtAttr);
+  const luck = s.erBlackShiny ? ER_BLACK_SHINY_LUCK : globalScene.gameData.getDexAttrLuck(caughtAttr);
   return { coopPassiveAttr: [passiveAttr, passiveAttr, passiveAttr], coopLuck: luck };
 }
 

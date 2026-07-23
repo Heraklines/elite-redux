@@ -5,6 +5,7 @@ import type { EntryHazardTag, SuppressAbilitiesTag } from "#data/arena-tag";
 import { type BattlerTag, CritBoostTag } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeAbilityTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
 import { getPokeballName } from "#data/pokeball";
@@ -48,6 +49,7 @@ import { BerryModifierType } from "#modifiers/modifier-type";
 import { getMoveTargets } from "#moves/move-utils";
 import { PokemonMove } from "#moves/pokemon-move";
 import type { MoveReflectPhase } from "#phases/move-reflect-phase";
+import type { StatStageChangeCallback } from "#phases/stat-stage-change-phase";
 import type {
   AbAttrCondition,
   AbAttrMap,
@@ -95,16 +97,11 @@ export interface AbAttrBaseParams {
   passive?: boolean | undefined;
 
   /**
-   * (For callers of {@linkcode applyAbAttrs}): The passive slot (0, 1, or 2) being applied.
-   * Only meaningful when {@linkcode passive} is `true`. When undefined and `passive` is true,
-   * slot 0 (the legacy single-passive slot) is used.
-   *
-   * (For implementations of {@linkcode AbAttr}): When iterating during a default
-   * `applyAbAttrs` call this will be `0 | 1 | 2` for passive triggers and `undefined`
-   * for the active ability trigger. Implementations should almost never need to read this
-   * directly — it exists so the dispatcher can iterate all 3 ER passive slots.
+   * Passive-source index for an innate trigger, or `undefined` for the active
+   * ability. Slots 0-2 are the real ER innates; later indexes are shared GIFT
+   * sources appended by {@linkcode Pokemon.getPassiveAbilities}.
    */
-  passiveSlot?: 0 | 1 | 2 | undefined;
+  passiveSlot?: number | undefined;
 }
 
 export interface AbAttrParamsWithCancel extends AbAttrBaseParams {
@@ -135,7 +132,7 @@ function resolveTriggerAbility(params: AbAttrBaseParams) {
   if (!params.passive) {
     return params.pokemon.getAbility();
   }
-  const slot = (params.passiveSlot ?? 0) as 0 | 1 | 2;
+  const slot = params.passiveSlot ?? 0;
   return params.pokemon.getPassiveAbilities()[slot];
 }
 
@@ -375,12 +372,19 @@ export class StabBoostAbAttr extends AbAttr {
 export class ReceivedMoveDamageMultiplierAbAttr extends PreDefendAbAttr {
   protected readonly condition: PokemonDefendCondition;
   private readonly damageMultiplier: number;
+  private readonly affectsFixedDamage: boolean;
 
-  constructor(condition: PokemonDefendCondition, damageMultiplier: number, showAbility = false) {
+  constructor(
+    condition: PokemonDefendCondition,
+    damageMultiplier: number,
+    showAbility = false,
+    affectsFixedDamage = false,
+  ) {
     super(showAbility);
 
     this.condition = condition;
     this.damageMultiplier = damageMultiplier;
+    this.affectsFixedDamage = affectsFixedDamage;
   }
 
   override canApply({ pokemon, opponent: attacker, move }: PreDefendModifyDamageAbAttrParams): boolean {
@@ -389,6 +393,10 @@ export class ReceivedMoveDamageMultiplierAbAttr extends PreDefendAbAttr {
 
   override apply({ damage }: PreDefendModifyDamageAbAttrParams): void {
     damage.value = toDmgValue(damage.value * this.damageMultiplier);
+  }
+
+  public appliesToFixedDamage(): boolean {
+    return this.affectsFixedDamage;
   }
 }
 
@@ -1293,6 +1301,10 @@ export class PostDefendAbilitySwapAbAttr extends PostDefendAbAttr {
     return (
       move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
       && attacker.getAbility().swappable
+      && !(
+        pokemon.hasAbility(AbilityId.WANDERING_SPIRIT)
+        && [AbilityId.MUMMY, AbilityId.LINGERING_AROMA, AbilityId.WANDERING_SPIRIT].some(id => attacker.hasAbility(id))
+      )
     );
   }
 
@@ -1320,10 +1332,14 @@ export class PostDefendAbilityGiveAbAttr extends PostDefendAbAttr {
   }
 
   override canApply({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    const mummyFamily =
+      [AbilityId.MUMMY, AbilityId.LINGERING_AROMA].includes(this.ability)
+      && [AbilityId.MUMMY, AbilityId.LINGERING_AROMA, AbilityId.WANDERING_SPIRIT].some(id => attacker.hasAbility(id));
     return (
       move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
       && attacker.getAbility().suppressable
       && !attacker.getAbility().hasAttr("PostDefendAbilityGiveAbAttr")
+      && !mummyFamily
     );
   }
 
@@ -1825,6 +1841,11 @@ export class MovePowerBoostAbAttr extends VariableMovePowerAbAttr {
     power.value *= this.powerMultiplier;
   }
 
+  /** Whether this power multiplier also applies to direct fixed-damage moves. */
+  public appliesToFixedDamage(): boolean {
+    return false;
+  }
+
   /** Read-only accessor for the configured power multiplier (used in tests). */
   public getPowerMultiplier(): number {
     return this.powerMultiplier;
@@ -2013,6 +2034,8 @@ export class StatMultiplierAbAttr extends AbAttr {
 }
 
 export interface AllyStatMultiplierAbAttrParams extends StatMultiplierAbAttrParams {
+  /** The ally whose stat is being calculated. */
+  target: Pokemon;
   /**
    * Whether abilities are being ignored during the interaction (e.g. due to a Mold-Breaker like effect).
    *
@@ -2271,11 +2294,11 @@ export class PostAttackApplyBattlerTagAbAttr extends PostAttackAbAttr {
     );
   }
 
-  override apply({ pokemon, simulated, opponent }: PostMoveInteractionAbAttrParams): void {
+  override apply({ pokemon, simulated, opponent, move }: PostMoveInteractionAbAttrParams): void {
     if (!simulated) {
       const effect =
         this.effects.length === 1 ? this.effects[0] : this.effects[pokemon.randBattleSeedInt(this.effects.length)];
-      opponent.addTag(effect);
+      opponent.addTag(effect, 0, move.id, pokemon.id);
     }
   }
 }
@@ -2726,16 +2749,17 @@ export class PostSummonRemoveArenaTagAbAttr extends PostSummonAbAttr {
    * hazards from YOUR side only). When false (default), tags are stripped from
    * BOTH sides (vanilla Screen Cleaner behavior).
    */
-  private readonly ownSideOnly: boolean;
+  private readonly sideMode: "both" | "own" | "opponent";
 
   /**
    * @param tagTypes - The arena tags that this attribute should remove
-   * @param ownSideOnly - Restrict removal to the holder's own side (default `false` = both sides)
+   * @param sideMode - Restrict removal to one side. Boolean values preserve the
+   * legacy API (`true` = own, `false` = both).
    */
-  constructor(tagTypes: NonEmptyTuple<ArenaTagType>, ownSideOnly = false) {
+  constructor(tagTypes: NonEmptyTuple<ArenaTagType>, sideMode: "both" | "own" | "opponent" | boolean = "both") {
     super(true);
     this.arenaTags = tagTypes;
-    this.ownSideOnly = ownSideOnly;
+    this.sideMode = typeof sideMode === "boolean" ? (sideMode ? "own" : "both") : sideMode;
   }
 
   override canApply(_params: AbAttrBaseParams): boolean {
@@ -2746,7 +2770,9 @@ export class PostSummonRemoveArenaTagAbAttr extends PostSummonAbAttr {
     if (simulated) {
       return;
     }
-    const side = this.ownSideOnly ? (pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY) : ArenaTagSide.BOTH;
+    const ownSide = pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
+    const opponentSide = pokemon.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER;
+    const side = this.sideMode === "own" ? ownSide : this.sideMode === "opponent" ? opponentSide : ArenaTagSide.BOTH;
     globalScene.arena.removeTagsOnSide(this.arenaTags, side);
   }
 }
@@ -2862,14 +2888,22 @@ export class PostSummonStatStageChangeAbAttr extends PostSummonAbAttr {
   private readonly stages: number;
   private readonly selfTarget: boolean;
   private readonly intimidate: boolean;
+  private readonly onChange: StatStageChangeCallback | null;
 
-  constructor(stats: readonly BattleStat[], stages: number, selfTarget = false, intimidate = false) {
+  constructor(
+    stats: readonly BattleStat[],
+    stages: number,
+    selfTarget = false,
+    intimidate = false,
+    onChange: StatStageChangeCallback | null = null,
+  ) {
     super(true);
 
     this.stats = stats;
     this.stages = stages;
     this.selfTarget = selfTarget;
     this.intimidate = intimidate;
+    this.onChange = onChange;
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
@@ -2929,6 +2963,10 @@ export class PostSummonStatStageChangeAbAttr extends PostSummonAbAttr {
           false,
           this.stats,
           this.stages,
+          true,
+          false,
+          true,
+          this.onChange,
         );
       }
     }
@@ -3233,7 +3271,9 @@ export class PostSummonCopyAbilityAbAttr extends PostSummonAbAttr {
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     // Protect against this somehow being called before canApply by ensuring target is defined
     if (!simulated && this.target) {
-      pokemon.setTempAbility(this.target.getAbility());
+      const copiedAbility = this.target.getAbility();
+      pokemon.setTempAbility(copiedAbility);
+      suppressAbilityIdForTurns(this.target, copiedAbility.id, 2, AbilityId.TRACE);
       this.target.revealAbility();
       pokemon.updateInfo();
     }
@@ -3753,8 +3793,12 @@ export class ProtectStatAbAttr extends PreStatStageChangeAbAttr {
  * Intimidate normally.
  */
 export class SelfStatDropImmunityAbAttr extends PreStatStageChangeAbAttr {
-  override canApply({ cancelled, stages }: PreStatStageChangeAbAttrParams): boolean {
-    return !cancelled.value && stages < 0;
+  constructor(private readonly protectedStat?: BattleStat) {
+    super();
+  }
+
+  override canApply({ cancelled, stat, stages }: PreStatStageChangeAbAttrParams): boolean {
+    return !cancelled.value && stages < 0 && (this.protectedStat == null || stat === this.protectedStat);
   }
 
   override apply({ cancelled }: PreStatStageChangeAbAttrParams): void {
@@ -3765,7 +3809,7 @@ export class SelfStatDropImmunityAbAttr extends PreStatStageChangeAbAttr {
     return i18next.t("abilityTriggers:protectStat", {
       pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
       abilityName,
-      statName: i18next.t("battle:stats"),
+      statName: this.protectedStat ? i18next.t(getStatKey(this.protectedStat)) : i18next.t("battle:stats"),
     });
   }
 }
@@ -5946,7 +5990,7 @@ export class ArenaTrapAbAttr extends CheckTrappedAbAttr {
     return (
       this.arenaTrapCondition(pokemon, opponent)
       && !opponent.isOfType(PokemonType.GHOST, true, true)
-      && !opponent.hasAbility(AbilityId.RUN_AWAY)
+      && !opponent.hasAbilityWithAttr("RunSuccessAbAttr")
     );
   }
 

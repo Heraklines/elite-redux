@@ -26,6 +26,8 @@
  */
 
 import type { SessionSaveData } from "#app/@types/save-data";
+import { globalScene } from "#app/global-scene";
+import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopAuthoritativeFieldSeat,
@@ -39,24 +41,48 @@ import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattlerIndex } from "#enums/battler-index";
 
 /**
- * The width of one battle side in the standard field arrangement (PLAYER, PLAYER_2 | ENEMY,
- * ENEMY_2). `BattlerIndex.ENEMY` (== 2) is the offset between a player seat and the mirrored
- * enemy seat, DERIVED from the enum rather than hardcoded so the 1v1 (PLAYER<->ENEMY) and the
- * doubles (PLAYER_2<->ENEMY_2) shapes both fall out of the same arithmetic.
+ * The DEFAULT offset between a player seat and the mirrored enemy seat in the legacy binary field
+ * arrangement (single/doubles): `BattlerIndex.ENEMY` (== 2). Player slots occupy 0..enemyBase-1 and
+ * the enemy slots begin at `enemyBase`. TRIPLES shift the enemy base to 3 (player 0,1,2 / enemy
+ * 3,4,5), so every bi-level swap takes an `enemyBase`; it DEFAULTS to {@linkcode liveEnemyBase} so a
+ * caller that does not pass one picks up the live field width.
  */
 const SIDE_OFFSET = BattlerIndex.ENEMY;
 
 /**
- * Reflect a battler index across the side boundary: PLAYER<->ENEMY (0<->2), PLAYER_2<->ENEMY_2
- * (1<->3). Any other value (the `ATTACKER` -1 sentinel, an unexpected index) passes through
- * unchanged so a malformed payload can never map to a bogus seat.
+ * The LIVE player<->enemy seat offset for the versus-guest flip: the guest's current battle
+ * arrangement enemy base (singles/doubles 2, triples 3). Every bi-level swap DEFAULTS its
+ * `enemyBase` to this, so the versus-guest ingress/egress swap sites (in coop-battle-engine /
+ * coop-presentation / coop-replay-turn-phase) get the correct field width WITHOUT threading it
+ * through every call - those sites already run under the guest's own scene, so
+ * `globalScene.currentBattle.arrangement` is the guest's field.
+ *
+ * GATED on {@linkcode isShowdownGuestFlipGated}: only a LIVE versus guest reads the live width. Every
+ * OTHER context - solo/co-op/host (which never call these swaps) AND the pure-logic unit tests (no
+ * versus runtime) - gets the binary {@linkcode SIDE_OFFSET} (2), so singles/doubles behavior + the
+ * involution tests are byte-identical and deterministic (never reading a leaked scene's arrangement).
  */
-export function swapBi(bi: number): number {
-  if (bi === BattlerIndex.PLAYER || bi === BattlerIndex.PLAYER_2) {
-    return bi + SIDE_OFFSET;
+function liveEnemyBase(): number {
+  if (!isShowdownGuestFlipGated()) {
+    return SIDE_OFFSET;
   }
-  if (bi === BattlerIndex.ENEMY || bi === BattlerIndex.ENEMY_2) {
-    return bi - SIDE_OFFSET;
+  return globalScene?.currentBattle?.arrangement?.enemyOffset ?? SIDE_OFFSET;
+}
+
+/**
+ * Reflect a battler index across the side boundary for a field whose enemy side begins at
+ * `enemyBase`: a player seat `p` (0..enemyBase-1) maps to enemy seat `enemyBase + p`, and back. Any
+ * other value (the `ATTACKER` -1 sentinel, an out-of-range index) passes through unchanged so a
+ * malformed payload can never map to a bogus seat. Defaults to the binary offset (2), which
+ * reproduces the legacy PLAYER<->ENEMY (0<->2) / PLAYER_2<->ENEMY_2 (1<->3) mapping exactly;
+ * triples pass `enemyBase = 3` so 0<->3, 1<->4, 2<->5. Its own inverse for symmetric formats.
+ */
+export function swapBi(bi: number, enemyBase: number = liveEnemyBase()): number {
+  if (bi >= 0 && bi < enemyBase) {
+    return bi + enemyBase; // player seat -> mirrored enemy seat
+  }
+  if (bi >= enemyBase && bi < enemyBase * 2) {
+    return bi - enemyBase; // enemy seat -> mirrored player seat
   }
   return bi;
 }
@@ -96,8 +122,8 @@ function swapArenaTag(tag: CoopSerializedArenaTag): CoopSerializedArenaTag {
 }
 
 /** Reflect one authoritative field seat: side + bi cross the boundary; identity + order preserved. */
-function swapFieldSeat(seat: CoopAuthoritativeFieldSeat): CoopAuthoritativeFieldSeat {
-  return { ...seat, side: swapSeatSide(seat.side), bi: swapBi(seat.bi) };
+function swapFieldSeat(seat: CoopAuthoritativeFieldSeat, enemyBase: number): CoopAuthoritativeFieldSeat {
+  return { ...seat, side: swapSeatSide(seat.side), bi: swapBi(seat.bi, enemyBase) };
 }
 
 /**
@@ -106,14 +132,17 @@ function swapFieldSeat(seat: CoopAuthoritativeFieldSeat): CoopAuthoritativeField
  * every field seat is mirrored (side + bi), and arena-tag sides flip. Money / score / weather /
  * terrain / seeds / substrates are side-agnostic and pass through untouched.
  */
-export function swapAuthoritativeState(state: CoopAuthoritativeBattleStateV1): CoopAuthoritativeBattleStateV1 {
+export function swapAuthoritativeState(
+  state: CoopAuthoritativeBattleStateV1,
+  enemyBase: number = liveEnemyBase(),
+): CoopAuthoritativeBattleStateV1 {
   return {
     ...state,
     playerParty: state.enemyParty,
     enemyParty: state.playerParty,
     playerModifiers: reflagModifierBlobs(state.enemyModifiers, true),
     enemyModifiers: reflagModifierBlobs(state.playerModifiers, false),
-    field: state.field.map(swapFieldSeat),
+    field: state.field.map(seat => swapFieldSeat(seat, enemyBase)),
     arenaTags: state.arenaTags.map(swapArenaTag),
   };
 }
@@ -123,17 +152,17 @@ export function swapAuthoritativeState(state: CoopAuthoritativeBattleStateV1): C
  * bi-bearing member is remapped (moveUsed carries a user `bi` AND a `targets` list); the side-free
  * members (message / weather / terrain) pass through.
  */
-export function swapBattleEvent(event: CoopBattleEvent): CoopBattleEvent {
+export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = liveEnemyBase()): CoopBattleEvent {
   switch (event.k) {
     case "moveUsed":
-      return { ...event, bi: swapBi(event.bi), targets: event.targets.map(swapBi) };
+      return { ...event, bi: swapBi(event.bi, enemyBase), targets: event.targets.map(t => swapBi(t, enemyBase)) };
     case "hp":
     case "faint":
     case "statStage":
     case "status":
     case "showAbility":
     case "switch":
-      return { ...event, bi: swapBi(event.bi) };
+      return { ...event, bi: swapBi(event.bi, enemyBase) };
     default:
       // message / weather / terrain carry no side.
       return event;
@@ -147,10 +176,10 @@ export function swapBattleEvent(event: CoopBattleEvent): CoopBattleEvent {
  * on both sides of the swap (an on-field mon's slot tracks its field position, which the bi swap
  * already carries). Weather / terrain / money pass through.
  */
-export function swapCheckpoint(cp: CoopBattleCheckpoint): CoopBattleCheckpoint {
+export function swapCheckpoint(cp: CoopBattleCheckpoint, enemyBase: number = liveEnemyBase()): CoopBattleCheckpoint {
   return {
     ...cp,
-    field: cp.field.map(mon => ({ ...mon, bi: swapBi(mon.bi) })),
+    field: cp.field.map(mon => ({ ...mon, bi: swapBi(mon.bi, enemyBase) })),
     ...(cp.arenaTags === undefined ? {} : { arenaTags: cp.arenaTags.map(swapArenaTag) }),
   };
 }
@@ -162,8 +191,11 @@ export function swapCheckpoint(cp: CoopBattleCheckpoint): CoopBattleCheckpoint {
  * too. Keeping the transform here prevents a future ingress path from swapping two of the three
  * carriers while silently writing HP, PP, tags, or held items onto the opposite local side.
  */
-export function swapFullField(field: readonly CoopFullMonSnapshot[]): CoopFullMonSnapshot[] {
-  return field.map(mon => ({ ...mon, bi: swapBi(mon.bi) }));
+export function swapFullField(
+  field: readonly CoopFullMonSnapshot[],
+  enemyBase: number = liveEnemyBase(),
+): CoopFullMonSnapshot[] {
+  return field.map(mon => ({ ...mon, bi: swapBi(mon.bi, enemyBase) }));
 }
 
 /**
@@ -174,14 +206,17 @@ export function swapFullField(field: readonly CoopFullMonSnapshot[]): CoopFullMo
  * fields have no enemy counterpart to trade with and are left as-is (ignored whenever
  * `authoritativeState` is present, which the showdown host always sends).
  */
-export function swapFullSnapshot(snap: CoopFullBattleSnapshot): CoopFullBattleSnapshot {
+export function swapFullSnapshot(
+  snap: CoopFullBattleSnapshot,
+  enemyBase: number = liveEnemyBase(),
+): CoopFullBattleSnapshot {
   return {
     ...snap,
-    field: swapFullField(snap.field),
+    field: swapFullField(snap.field, enemyBase),
     arenaTags: snap.arenaTags.map(swapArenaTag),
     ...(snap.authoritativeState === undefined
       ? {}
-      : { authoritativeState: swapAuthoritativeState(snap.authoritativeState) }),
+      : { authoritativeState: swapAuthoritativeState(snap.authoritativeState, enemyBase) }),
   };
 }
 

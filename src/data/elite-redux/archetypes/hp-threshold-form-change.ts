@@ -91,7 +91,11 @@ export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
   private warnedMissingForm = false;
 
   constructor(options: HpThresholdFormChangeOptions) {
-    super(false);
+    // showAbility = true (default): the HP-threshold form change is a discrete,
+    // player-visible activation, so the ability banner must flash — matching
+    // vanilla convention for form-change abilities (same popup-display defect
+    // class as the counter-attack archetype).
+    super();
     if (!(options.hpThreshold > 0 && options.hpThreshold <= 1)) {
       throw new Error(`[HpThresholdFormChangeAbAttr] hpThreshold must be in (0, 1]; got ${options.hpThreshold}`);
     }

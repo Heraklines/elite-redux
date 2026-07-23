@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "name": "Ball Fetch intercepts and returns ball moves",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "ball-fetch-intercept"
+  },
+  "party": [
+    {
+      "species": "BLASTOISE",
+      "ability": "BALL_FETCH",
+      "moves": ["SWORDS_DANCE"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "RATTATA",
+        "level": 1,
+        "ability": "RUN_AWAY",
+        "moves": ["AURA_SPHERE"]
+      }
+    ]
+  },
+  "script": [{ "move": "SWORDS_DANCE", "enemyMove": "AURA_SPHERE" }],
+  "expect": {
+    "outcome": "victory",
+    "playerDamaged": false,
+    "enemyDamaged": true
+  }
+}

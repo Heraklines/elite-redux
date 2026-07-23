@@ -56,6 +56,7 @@ import {
 import type { CoopRewardSurfaceIdentity } from "#data/elite-redux/coop/coop-transport";
 import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import type { GreaterAbilityRandomizerChoiceCache } from "#data/elite-redux/er-greater-ability-randomizer";
 import {
   erMerchantsSealExtraSlots,
   erMerchantsSealRerollMultiplier,
@@ -73,6 +74,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { Modifier } from "#modifiers/modifier";
 import {
+  ErGreaterAbilityRandomizerModifier,
   ExtraModifierModifier,
   HealShopCostModifier,
   PokemonFormChangeItemModifier,
@@ -220,6 +222,12 @@ export class SelectModifierPhase extends BattlePhase {
   private isCopy: boolean;
 
   private typeOptions: ModifierTypeOption[];
+
+  /**
+   * One roll cache per option on this reward surface. Continuation copies share the
+   * outer map; separate Greater Randomizer items on the same screen remain independent.
+   */
+  private greaterAbilityRandomizerChoiceCaches = new Map<string, GreaterAbilityRandomizerChoiceCache>();
 
   // ---- Co-op alternating reward shop (#633) ----
   /** True only on the WATCHER's phase: it replays the owner's relayed picks with NO interactive UI. */
@@ -648,7 +656,7 @@ export class SelectModifierPhase extends BattlePhase {
     // decision point (behavior-preserving passive push); a hard no-op unless recording / in co-op. A
     // party-target reward's resolved slot is a DOCUMENTED replay-gap (the loader picks a non-party reward).
     recordSinglePlayerInteraction("reward", cursor);
-    return this.applyChosenModifier(modifierType, -1, modifierSelectCallback);
+    return this.applyChosenModifier(modifierType, -1, modifierSelectCallback, `reward:${cursor}`);
   }
 
   // Pick a modifier from the shop and apply it
@@ -695,7 +703,7 @@ export class SelectModifierPhase extends BattlePhase {
     // Co-op (#633): capture the shop purchase (row+cursor identify the option on the
     // watcher's identical stock) so it is relayed once any party target is resolved.
     this.coopBeginPending("shop", cursor, rowCursor);
-    return this.applyChosenModifier(modifierType, cost, modifierSelectCallback);
+    return this.applyChosenModifier(modifierType, cost, modifierSelectCallback, `shop:${rowCursor}:${cursor}`);
   }
 
   /**
@@ -713,12 +721,13 @@ export class SelectModifierPhase extends BattlePhase {
     modifierType: ModifierType,
     cost: number,
     modifierSelectCallback: ModifierSelectCallback,
+    offerKey: string,
   ): boolean {
     if (modifierType instanceof PokemonModifierType) {
       if (modifierType instanceof FusePokemonModifierType) {
         this.openFusionMenu(modifierType, cost, modifierSelectCallback);
       } else {
-        this.openModifierMenu(modifierType, cost, modifierSelectCallback);
+        this.openModifierMenu(modifierType, cost, modifierSelectCallback, offerKey);
       }
     } else {
       // Co-op (#633): a non-party item resolves immediately - relay the pick now (the
@@ -948,6 +957,7 @@ export class SelectModifierPhase extends BattlePhase {
     slotIndex: number,
     option: number,
     cost: number,
+    offerKey: string,
   ): boolean {
     const target = globalScene.getPlayerParty()[slotIndex];
     if (target == null) {
@@ -999,7 +1009,13 @@ export class SelectModifierPhase extends BattlePhase {
     } else if (modifierType instanceof ErGreaterAbilityRandomizerModifierType) {
       if (!v2ProjectsAbilitySurface) {
         const { seq, watcher } = this.coopAbilityContext();
-        globalScene.phaseManager.unshiftNew("ErGreaterAbilityRandomizerPhase", slotIndex, seq, watcher);
+        globalScene.phaseManager.unshiftNew(
+          "ErGreaterAbilityRandomizerPhase",
+          slotIndex,
+          seq,
+          watcher,
+          this.getGreaterAbilityRandomizerChoiceCache(offerKey),
+        );
       }
     } else {
       queued = false;
@@ -1215,6 +1231,7 @@ export class SelectModifierPhase extends BattlePhase {
     modifierType: PokemonModifierType,
     cost: number,
     modifierSelectCallback: ModifierSelectCallback,
+    offerKey: string,
   ): void {
     const pokemonModifierType = modifierType as PokemonModifierType;
     const isMoveModifier = modifierType instanceof PokemonMoveModifierType;
@@ -1250,7 +1267,7 @@ export class SelectModifierPhase extends BattlePhase {
     // never opening the party UI on a mon it does not drive.
     if (this.coopWatcher) {
       this.coopResolvedModifierOption = this.coopRelayedOption;
-      const modifier = this.buildPokemonModifier(modifierType, this.coopRelayedSlot, this.coopRelayedOption);
+      const modifier = this.buildPokemonModifier(modifierType, this.coopRelayedSlot, this.coopRelayedOption, offerKey);
       if (modifier != null) {
         this.applyModifier(modifier, cost, true);
       }
@@ -1268,7 +1285,7 @@ export class SelectModifierPhase extends BattlePhase {
             if (this.coopFlushPending([slotIndex, option], cost)) {
               return;
             }
-            const modifier = this.buildPokemonModifier(modifierType, slotIndex, option);
+            const modifier = this.buildPokemonModifier(modifierType, slotIndex, option, offerKey);
             this.applyModifier(modifier!, cost, true); // TODO: is the bang correct?
           });
         } else {
@@ -1481,6 +1498,7 @@ export class SelectModifierPhase extends BattlePhase {
     // here, the copy's terminal advance is from-pinned + idempotent (a duplicate no-ops on both sides).
     copied.coopInteractionStart = this.coopInteractionStart;
     copied.coopRewardOperationBinding = this.coopRewardOperationBinding;
+    copied.greaterAbilityRandomizerChoiceCaches = this.greaterAbilityRandomizerChoiceCaches;
     return copied;
   }
 
@@ -1502,6 +1520,7 @@ export class SelectModifierPhase extends BattlePhase {
     modifierType: PokemonModifierType,
     slotIndex: number,
     option: number,
+    offerKey: string,
   ): Modifier | null {
     const target = globalScene.getPlayerParty()[slotIndex];
     if (target == null) {
@@ -1517,6 +1536,13 @@ export class SelectModifierPhase extends BattlePhase {
     if (modifierType instanceof PokemonAbilityModifierType) {
       return modifierType.newModifier(target, option - PartyOption.ABILITY_SLOT_0);
     }
+    if (modifierType instanceof ErGreaterAbilityRandomizerModifierType) {
+      return new ErGreaterAbilityRandomizerModifier(
+        modifierType,
+        target.id,
+        this.getGreaterAbilityRandomizerChoiceCache(offerKey),
+      );
+    }
     if (
       modifierType instanceof RememberMoveModifierType
       || modifierType instanceof PokemonAddMoveSlotModifierType
@@ -1526,6 +1552,15 @@ export class SelectModifierPhase extends BattlePhase {
       return modifierType.newModifier(target, option);
     }
     return modifierType.newModifier(target);
+  }
+
+  private getGreaterAbilityRandomizerChoiceCache(offerKey: string): GreaterAbilityRandomizerChoiceCache {
+    let cache = this.greaterAbilityRandomizerChoiceCaches.get(offerKey);
+    if (cache == null) {
+      cache = new Map();
+      this.greaterAbilityRandomizerChoiceCaches.set(offerKey, cache);
+    }
+    return cache;
   }
 
   /** OWNER only: relay one reward-screen pick to the watcher on this interaction's seq.
@@ -2570,7 +2605,13 @@ export class SelectModifierPhase extends BattlePhase {
         const modifierType = this.typeOptions[action.choice]?.type;
         const continuation =
           modifierType != null
-          && this.queueCoopProjectedModifierFollowUp(modifierType, this.coopRelayedSlot, this.coopRelayedOption, -1);
+          && this.queueCoopProjectedModifierFollowUp(
+            modifierType,
+            this.coopRelayedSlot,
+            this.coopRelayedOption,
+            -1,
+            `reward:${action.choice}`,
+          );
         this.coopRelayedMoney = -1;
         this.coopEndMirror();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
@@ -2609,6 +2650,7 @@ export class SelectModifierPhase extends BattlePhase {
             this.coopRelayedSlot,
             this.coopRelayedOption,
             relayedCost,
+            `shop:${row}:${action.choice}`,
           );
         }
         this.coopRelayedMoney = -1;

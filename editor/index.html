@@ -162,8 +162,15 @@
       .ctr-form legend { color: var(--muted); font-size: 12px; padding: 0 6px; }
       .ctr-form label { font-size: 12px; margin-right: 10px; display: inline-block; }
       .ctr-member { background: var(--panel2); }
-      .ctr-member .ctr-moves, .ctr-member .ctr-fusion, .ctr-member .ctr-held { margin-top: 6px; }
+      .ctr-member .ctr-moves, .ctr-member .ctr-fusion, .ctr-member .ctr-held, .ctr-member .ctr-vitamins { margin-top: 6px; }
       .ctr-held-row { display: inline-flex; gap: 3px; align-items: center; margin-right: 8px; }
+      .ctr-vitamins { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+      .ctr-vitamins-title { color: var(--muted); font-size: 12px; }
+      .ctr-vitamin-grid { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 6px; flex: 1; max-width: 780px; }
+      .ctr-form label.ctr-vitamin { display: grid; grid-template-columns: minmax(0, 1fr) 46px; gap: 2px 5px; align-items: center; margin: 0; padding: 5px 6px; border-left: 2px solid var(--line); background: rgba(255,255,255,.025); }
+      .ctr-vitamin > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+      .ctr-vitamin > small { grid-column: 1; color: var(--muted); }
+      .ctr-vitamin input { grid-column: 2; grid-row: 1 / span 2; width: 46px; min-width: 0; padding: 4px; }
       .ctr-sprite-preview { display: inline-flex; gap: 8px; align-items: flex-end; vertical-align: bottom; margin-left: 8px; min-height: 48px; }
       .ctr-sprite-frame { background-color: var(--panel2); border: 1px solid var(--line); border-radius: 4px; image-rendering: pixelated; color: var(--muted); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; }
       .ctr-warn { color: var(--warn, #d68910); font-size: 12px; margin-top: 8px; line-height: 1.5; }
@@ -195,6 +202,8 @@
       @media (max-width: 760px) {
         .ctr-insanity-fields label { width: 100%; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; }
         .ctr-insanity-fields input { width: 100%; min-width: 0; }
+        .ctr-vitamins { align-items: flex-start; }
+        .ctr-vitamin-grid { grid-template-columns: repeat(2, minmax(112px, 1fr)); width: 100%; }
       }
       /* Per-member Shiny Lab effect picker + swatch approximation. */
       .ctr-shiny { margin-top: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -216,6 +225,17 @@
       .asset-form textarea { min-height: 100px; resize: vertical; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: 12px/1.5 ui-monospace, monospace; }
       .asset-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
       .asset-row > label { display: inline-flex; flex-direction: row; align-items: center; gap: 5px; }
+      .asset-source-tabs { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+      .asset-source-tabs button { border: 0; border-radius: 0; min-height: 34px; }
+      .asset-source-tabs button + button { border-left: 1px solid var(--line); }
+      .asset-source-tabs button.active { background: var(--accent); color: #08080d; }
+      .asset-source-pane[hidden] { display: none; }
+      .asset-upload-box { display: grid; gap: 7px; padding: 10px; border: 1px dashed var(--line); border-radius: 6px; background: var(--panel2); }
+      .asset-upload-box input[type="file"] { width: 100%; }
+      .asset-upload-file { color: var(--text); font-size: 12px; overflow-wrap: anywhere; }
+      .asset-upload-progress { display: grid; gap: 4px; }
+      .asset-upload-progress progress { width: 100%; height: 8px; accent-color: var(--accent); }
+      .asset-upload-progress small { color: var(--muted); }
       .asset-catalog { display: grid; gap: 6px; max-height: 430px; overflow: auto; }
       .asset-track { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); }
       .asset-track strong, .asset-track small { display: block; overflow-wrap: anywhere; }
@@ -362,6 +382,36 @@
       .abil-cur { margin-top: 8px; }
       .abil-cur .acur-name { font-weight: 700; }
       .abil-cur .acur-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+      /* ---- Tournaments ---- */
+      .tour-wrap { padding: 16px; max-width: 1100px; }
+      .tour-tokrow { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+      .tour-tokrow input { flex: 1; min-width: 220px; font-family: ui-monospace, monospace; font-size: 12px; }
+      .tour-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+      .tour-item { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+      .tour-item:hover { border-color: var(--accent); }
+      .tour-item .tname { font-weight: 700; font-size: 15px; display: flex; gap: 8px; align-items: center; }
+      .tour-item .tmeta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+      .tour-state { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); text-transform: uppercase; }
+      .tour-state.registration { color: var(--ok); border-color: var(--ok); }
+      .tour-state.in_progress { color: var(--warn); border-color: var(--warn); }
+      .tour-state.complete { color: #9ab8e8; border-color: #9ab8e8; }
+      .tour-state.cancelled { color: #e0556a; border-color: #e0556a; }
+      .tour-form fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; min-width: 0; }
+      .tour-form legend { color: var(--muted); font-size: 12px; padding: 0 6px; }
+      .tour-form label { font-size: 12px; margin-right: 12px; display: inline-flex; gap: 5px; align-items: center; color: var(--muted); }
+      .tour-form input[type="number"] { width: 80px; }
+      .tour-form input[type="text"] { width: 220px; }
+      .tour-table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+      .tour-table th { text-align: left; font-size: 12px; color: var(--muted); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); }
+      .tour-table td { padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+      .tour-table .tour-kick { padding: 2px 8px; font-size: 12px; color: #e0556a; border-color: #e0556a; }
+      .tour-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+      .tour-reward-row { display: flex; gap: 6px; align-items: center; margin: 4px 0; flex-wrap: wrap; }
+      .tour-reward-row .rw-type { min-width: 130px; }
+      .tour-reward-row input[type="number"] { width: 80px; }
+      .tour-reward-place { padding: 4px 0 6px; border-bottom: 1px dashed var(--line); margin-bottom: 4px; }
+      .tour-back { margin-bottom: 10px; }
+      .tour-err { color: #e0556a; font-size: 13px; margin: 8px 0; }
     </style>
   </head>
   <body>
@@ -394,6 +444,7 @@
       <button type="button" data-tab="assets">🎵 Assets</button>
       <button type="button" data-tab="game">🎛 Game</button>
       <button type="button" data-tab="addmon">➕ Add a Mon</button>
+      <button type="button" data-tab="tournaments">🏆 Tournaments</button>
     </nav>
     <main id="content"></main>
     <script src="./app.js"></script>

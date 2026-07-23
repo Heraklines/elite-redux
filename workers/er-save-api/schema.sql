@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS system_saves (
 );
 
 -- Up to 5 session (run) saves per user, one per slot. Composite PK keeps an
--- UPSERT per (user, slot) cheap — one D1 write per sync, which is what keeps
--- us inside the free-tier write budget.
+-- UPSERT per (user, slot) cheap — one D1 write per sync, comfortably inside the
+-- paid-plan write budget.
 CREATE TABLE IF NOT EXISTS session_saves (
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   slot       INTEGER NOT NULL,
@@ -86,6 +86,10 @@ CREATE TABLE IF NOT EXISTS runs (
   presentation        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created_at);
+-- Ghost-pool fetch (handleRunSample) walks the (wave, rowid) keyset over EVERY
+-- eligible run; a (wave) index carries rowid implicitly so `ORDER BY wave, rowid`
+-- is served straight from it and only the eligible wave band is scanned.
+CREATE INDEX IF NOT EXISTS idx_runs_wave ON runs (wave);
 
 -- Shared dev TEST-SUITE progress (staging only). So the QA team doesn't re-run
 -- each other's scenarios: every Pass / Fail / Send-Logs from the in-game test
@@ -128,8 +132,8 @@ CREATE INDEX IF NOT EXISTS idx_ssb_user ON system_save_backups (user_id, backed_
 -- the worker on first hit, so a deployed DB needs no migration.
 CREATE TABLE IF NOT EXISTS notifications (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  username   TEXT    NOT NULL,         -- target player (matched case-insensitively)
-  kind       TEXT    NOT NULL DEFAULT 'system',   -- 'system' | 'reward'
+  username   TEXT    NOT NULL,         -- target player (case-insensitive), or '*' for everyone
+  kind       TEXT    NOT NULL DEFAULT 'system',   -- 'system' | 'reward' | 'patch-notes'
   title      TEXT    NOT NULL DEFAULT '',
   body       TEXT    NOT NULL DEFAULT '',
   payload    TEXT,                     -- optional JSON (icon/extra)

@@ -4,7 +4,16 @@ import { FAKE_TITLE_LOGO_CHANCE } from "#app/constants";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { ER_VERSION, isBeta, isDev } from "#constants/app-constants";
-import { GHOST_NOTIF_SETTING_KEY, initErNotifications } from "#data/elite-redux/er-ghost-notifications";
+import {
+  GHOST_NOTIF_SETTING_KEY,
+  initErNotifications,
+  patchNotesContentOf,
+} from "#data/elite-redux/er-ghost-notifications";
+import {
+  initTournamentNotifications,
+  openTournamentDeepLink,
+  tournamentDeepLinkOf,
+} from "#data/elite-redux/showdown/tournament-notifications";
 import { getSplashMessages } from "#data/splash-messages";
 import { Button } from "#enums/buttons";
 import { PlayerGender } from "#enums/player-gender";
@@ -15,6 +24,7 @@ import { type ErNotification, notificationManager } from "#system/notifications/
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { TimedEventDisplay } from "#ui/event-display";
 import { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
+import { type RichNotificationContent, RichNotificationViewer } from "#ui/rich-notification-viewer";
 import { addTextObject } from "#ui/text";
 import { fixedInt, randInt, randItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -41,6 +51,9 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   private inboxFocused = false;
   private inboxDetail: Phaser.GameObjects.Container | undefined;
   private detailOpen = false;
+  private richInboxDetail: RichNotificationViewer | undefined;
+  /** The notification whose detail panel is currently open (for deep-link on ACTION). */
+  private detailNotif: ErNotification | undefined;
 
   private titleStatsTimer: NodeJS.Timeout | null;
 
@@ -192,10 +205,25 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   }
 
   override processInput(button: Button): boolean {
-    // While a notification detail panel is up, any confirm/cancel closes it and
-    // returns to the inbox list; all other input is swallowed.
+    if (this.richInboxDetail) {
+      return this.processRichInboxInput(button);
+    }
+    // While a notification detail panel is up: ACTION/SUBMIT on a deep-linkable notification
+    // (a tournament challenge) opens its board on the match; otherwise confirm/cancel closes
+    // it back to the inbox list. All other input is swallowed.
     if (this.detailOpen) {
-      if (button === Button.ACTION || button === Button.CANCEL || button === Button.SUBMIT) {
+      if (button === Button.ACTION || button === Button.SUBMIT) {
+        const link = this.detailNotif ? tournamentDeepLinkOf(this.detailNotif) : null;
+        if (link != null) {
+          this.getUi().playSelect();
+          this.closeInboxDetail();
+          if (openTournamentDeepLink(link)) {
+            return true;
+          }
+        }
+        this.closeInboxDetail();
+        this.openInbox();
+      } else if (button === Button.CANCEL) {
         this.closeInboxDetail();
         this.openInbox();
       }
@@ -229,6 +257,32 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     return super.processInput(button);
   }
 
+  /** Mirror the DOM viewer's controls for gamepads while Phaser owns input. */
+  private processRichInboxInput(button: Button): boolean {
+    switch (button) {
+      case Button.UP:
+        this.richInboxDetail?.scrollBy(-90);
+        break;
+      case Button.DOWN:
+        this.richInboxDetail?.scrollBy(90);
+        break;
+      case Button.LEFT:
+        this.richInboxDetail?.scrollBy(-360);
+        break;
+      case Button.RIGHT:
+        this.richInboxDetail?.scrollBy(360);
+        break;
+      case Button.ACTION:
+      case Button.SUBMIT:
+        this.richInboxDetail?.activateAction();
+        break;
+      case Button.CANCEL:
+        this.richInboxDetail?.close();
+        break;
+    }
+    return true;
+  }
+
   /**
    * Open the inbox as a small navigable window (option-select overlay). Selecting
    * an entry marks it read and shows its detail; "Mark all read" clears the
@@ -248,7 +302,14 @@ export class TitleUiHandler extends OptionSelectUiHandler {
         handler: () => {
           notificationManager.markRead(n.id);
           this.redrawInbox();
-          globalScene.ui.revertMode().then(() => this.openInboxDetail(n));
+          globalScene.ui.revertMode().then(() => {
+            const richContent = patchNotesContentOf(n);
+            if (richContent) {
+              this.openRichInboxDetail(richContent);
+            } else {
+              this.openInboxDetail(n);
+            }
+          });
           return true;
         },
         keepOpen: true,
@@ -299,12 +360,14 @@ export class TitleUiHandler extends OptionSelectUiHandler {
    */
   private openInboxDetail(n: ErNotification): void {
     this.closeInboxDetail();
+    this.detailNotif = n;
     const def = notificationManager.getType(n.type);
     const detail = def?.detail?.(n);
     const summary = def ? def.summary(n) : n.type;
     const title = this.clipInbox(detail?.title ?? summary, 36);
     const isGhost = detail?.customView === "ghost-battle";
     const isReward = detail?.customView === "reward";
+    const isTournament = detail?.customView === "tournament" && tournamentDeepLinkOf(n) != null;
 
     const w = 150;
     const h = isGhost ? 104 : isReward ? 96 : 74;
@@ -360,11 +423,26 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       panel.add(bodyText);
     }
 
-    panel.add(addTextObject(0, h / 2 - 9, "B: Back", TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0.5, 0));
+    const footer = isTournament ? "A: Open bracket    B: Back" : "B: Back";
+    panel.add(addTextObject(0, h / 2 - 9, footer, TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0.5, 0));
     this.titleContainer.add(panel);
     this.titleContainer.bringToTop(panel);
     this.inboxDetail = panel;
     this.detailOpen = true;
+  }
+
+  private openRichInboxDetail(content: RichNotificationContent): void {
+    this.closeRichInboxDetail();
+    this.richInboxDetail = new RichNotificationViewer(content, () => {
+      this.richInboxDetail = undefined;
+      this.openInbox();
+    });
+  }
+
+  /** Remove a rich viewer without reopening the inbox (used during mode cleanup). */
+  private closeRichInboxDetail(): void {
+    this.richInboxDetail?.destroy();
+    this.richInboxDetail = undefined;
   }
 
   /** Render up to 6 party icons for a serialised team at (x, yCentre) into a panel. */
@@ -423,6 +501,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     this.inboxDetail?.destroy();
     this.inboxDetail = undefined;
     this.detailOpen = false;
+    this.detailNotif = undefined;
   }
 
   private clipInbox(s: string, max: number): string {
@@ -488,6 +567,8 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     // Register types/sources + seed welcome/demo notifications now (logged in), so
     // they land in this user's bucket, then refresh the badge.
     initErNotifications();
+    initTournamentNotifications();
+    this.closeRichInboxDetail();
     this.closeInboxDetail();
     this.setInboxFocused(false);
     this.refreshInbox(); // re-pull notification sources each time the title appears
@@ -536,6 +617,10 @@ export class TitleUiHandler extends OptionSelectUiHandler {
 
     this.titleStatsTimer = setInterval(() => {
       this.updateTitleStats();
+      // Bounded background poll (title/menu-scoped, 60s): re-pull notification sources so a
+      // tournament CHALLENGE (bracket advanced / opponent now present) surfaces while the
+      // player idles at the title, without navigating. Never runs mid-battle (title-only).
+      this.refreshInbox();
     }, 60000);
 
     globalScene.tweens.add({
@@ -553,6 +638,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
 
     const ui = this.getUi();
 
+    this.closeRichInboxDetail();
     this.closeInboxDetail();
     this.eventDisplay?.clear();
 

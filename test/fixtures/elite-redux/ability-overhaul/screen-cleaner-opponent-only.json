@@ -1,0 +1,43 @@
+{
+  "v": 1,
+  "name": "Screen Cleaner removes only opposing screens",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "screen-cleaner-opponent-only"
+  },
+  "party": [
+    {
+      "species": "MR_RIME",
+      "ability": "SCREEN_CLEANER",
+      "moves": ["LIGHT_SCREEN", "SPLASH", "PROTECT", "BODY_SLAM"]
+    },
+    {
+      "species": "SNORLAX",
+      "moves": ["SPLASH", "PROTECT", "PSYCHIC", "ICE_BEAM"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "MR_RIME",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["REFLECT", "SPLASH"]
+      }
+    ]
+  },
+  "script": [
+    { "move": "LIGHT_SCREEN", "enemyMove": "REFLECT" },
+    { "switch": 1, "enemyMove": "SPLASH" },
+    { "move": "SPLASH", "enemyMove": "SPLASH" }
+  ],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Screen Cleaner",
+    "playerArenaTags": ["LIGHT_SCREEN"],
+    "enemyArenaTagsAbsent": ["REFLECT"]
+  }
+}

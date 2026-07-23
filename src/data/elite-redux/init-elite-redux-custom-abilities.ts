@@ -32,8 +32,10 @@
 import {
   type AbAttr,
   ConditionalCritAbAttr,
+  MovePowerBoostAbAttr,
   PostDefendContactDamageAbAttr,
   PostFaintAbAttr,
+  ReceivedMoveDamageMultiplierAbAttr,
   RedirectTypeMoveAbAttr,
 } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
@@ -66,6 +68,12 @@ import {
   OverloadedPowerAbAttr,
   OverloadedPriorityAbAttr,
 } from "#data/elite-redux/abilities/electivire";
+import {
+  ER_SUGAR_RUSH_ABILITY_ID,
+  ER_UPCYCLE_ABILITY_ID,
+  holderHasUpcycle,
+  isErFoodPokemon,
+} from "#data/elite-redux/abilities/food-based";
 import { ER_GENESIS_SUPERNOVA_ABILITY_ID, GenesisSupernovaAbAttr } from "#data/elite-redux/abilities/genesis-supernova";
 import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/abilities/heartbreak";
 import { ER_HYDRAPEX_ABILITY_ID, HydrapexAbAttr } from "#data/elite-redux/abilities/hydrapex";
@@ -74,6 +82,9 @@ import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abili
 import { ER_LIBRARY_ABILITY_ID, LibraryAbAttr } from "#data/elite-redux/abilities/library";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
+import { ER_BATCH2_PLACEHOLDER_ABILITIES } from "#data/elite-redux/abilities/newcomer-batch2";
+import { ER_NEWCOMER_SIGNATURE_ABILITIES } from "#data/elite-redux/abilities/newcomer-signature-abilities";
+import { wireNewcomerSignatureAbility } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { ER_OMNIFORM_ABILITY_ID, OmniformAbAttr } from "#data/elite-redux/abilities/omniform";
 import {
   ClosedCircuitAbAttr,
@@ -540,6 +551,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     },
     {
       draft: {
+        id: ER_UPCYCLE_ABILITY_ID,
+        name: "Upcycle",
+        description:
+          "All Pokemon on the field count as Food. With Sugar Rush, Poison-type targets take 2x damage instead of 1.5x.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_UPCYCLE_ABILITY_ID,
+    },
+    {
+      draft: {
         id: ER_CLOSED_CIRCUIT_ABILITY_ID,
         name: "Closed Circuit",
         description:
@@ -697,6 +718,18 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       pokerogueId: ER_PRICKLY_ARMOR_ABILITY_ID,
     },
   ];
+  // Newcomer BATCH 2 — signature abilities (codex batch, ids 5971-5994, real
+  // mechanics attached in buildCustomAbility via wireNewcomerSignatureAbility).
+  manualDrafts.push(...ER_NEWCOMER_SIGNATURE_ABILITIES);
+  // Newcomer BATCH 2 — the TWO residual parked placeholders (Meteor Mass,
+  // Inverse Room) the codex batch does not define. Named + battle-inert so each
+  // mon carries the correctly-named slot; flagged for the designer.
+  for (const p of ER_BATCH2_PLACEHOLDER_ABILITIES) {
+    manualDrafts.push({
+      draft: { id: p.id, name: p.name, description: p.description, archetype: "unknown" },
+      pokerogueId: p.id,
+    });
+  }
   // Newcomer-patch composite abilities (5933+). Registered as placeholders here
   // (the ability instance + AbilityId reverse-map key + verbatim description);
   // their constituent AbAttrs are attached later by
@@ -786,7 +819,7 @@ export function refreshEliteReduxComposites(): RefreshEliteReduxCompositesResult
   const result: RefreshEliteReduxCompositesResult = { refreshed: 0, errors: [] };
   for (const draft of ER_ABILITIES) {
     const row = ER_ABILITY_ARCHETYPES[draft.id];
-    if (row === undefined || row.archetype !== "composite-vanilla-mashup") {
+    if (row === undefined || row.archetype !== "composite-vanilla-mashup" || draft.id === 652) {
       continue;
     }
     const pokerogueId = ER_ID_MAP.abilities[draft.id];
@@ -864,8 +897,29 @@ function buildCustomAbility(
   // to the dispatcher so composite-vanilla-mashup rows can find their
   // resolved-parts entry in `ER_COMPOSITE_PARTS`.
   const archetypeRow = ER_ABILITY_ARCHETYPES[draft.id];
-  if (archetypeRow !== undefined) {
+  if (archetypeRow !== undefined && pokerogueId !== ER_SUGAR_RUSH_ABILITY_ID) {
     wireArchetypeAttrs(builder, draft.id, archetypeRow.archetype, archetypeRow.params, result);
+  }
+
+  if (pokerogueId === ER_SUGAR_RUSH_ABILITY_ID) {
+    builder.attr(
+      MovePowerBoostAbAttr,
+      (user, target) =>
+        !!target
+        && (holderHasUpcycle(user) || isErFoodPokemon(target))
+        && !(holderHasUpcycle(user) && target.isOfType(PokemonType.POISON)),
+      1.5,
+    );
+    builder.attr(
+      MovePowerBoostAbAttr,
+      (user, target) => !!target && holderHasUpcycle(user) && target.isOfType(PokemonType.POISON),
+      2,
+    );
+    builder.attr(
+      ReceivedMoveDamageMultiplierAbAttr,
+      (holder, attacker) => !!attacker && (holderHasUpcycle(holder) || isErFoodPokemon(attacker)),
+      0.5,
+    );
   }
 
   // ER abilities whose ROM text marks them uncopiable / unsuppressable. Keyed by
@@ -1003,6 +1057,10 @@ function buildCustomAbility(
     builder.attr(ShatteredPsycheAbAttr);
   }
 
+  // Newcomer BATCH 2 signature abilities (codex batch, 5971-5994): attach the
+  // real mechanics for whichever id matches (no-op for non-signature ids).
+  wireNewcomerSignatureAbility(builder, pokerogueId);
+
   if (pokerogueId === ER_CLOSED_CIRCUIT_ABILITY_ID) {
     builder.attr(ClosedCircuitAbAttr);
   }
@@ -1111,7 +1169,10 @@ function buildCustomAbility(
     writable: false,
   });
   Object.defineProperty(ability, "description", {
-    value: draft.description,
+    value:
+      pokerogueId === ER_SUGAR_RUSH_ABILITY_ID
+        ? "Deals 1.5x damage to Food Pokemon and takes 0.5x damage from them. With Upcycle, Poison targets take 2x damage."
+        : draft.description,
     configurable: true,
     enumerable: true,
     writable: false,

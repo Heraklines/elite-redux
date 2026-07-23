@@ -71,6 +71,7 @@ import { ErGreaterAbilityRandomizerPhase } from "#phases/er-greater-ability-rand
 import { ErOmniformTransformWaitPhase } from "#phases/er-omniform-transform-wait-phase";
 import { ErQuizPhase } from "#phases/er-quiz-phase";
 import { ErShatteredPsycheBonusPhase } from "#phases/er-shattered-psyche-bonus-phase";
+import { ErSignatureFollowupPhase } from "#phases/er-signature-followup-phase";
 import { ErStormglassPickerPhase } from "#phases/er-stormglass-picker-phase";
 import { EvolutionPhase } from "#phases/evolution-phase";
 import { ExoticShopPhase } from "#phases/exotic-shop-phase";
@@ -190,6 +191,7 @@ const PHASES = Object.freeze({
   ErClosedCircuitBurstPhase,
   ErOmniformTransformWaitPhase,
   ErShatteredPsycheBonusPhase,
+  ErSignatureFollowupPhase,
   ErCrossroadsPhase,
   ErQuizPhase,
   ErStormglassPickerPhase,
@@ -666,12 +668,12 @@ export class PhaseManager {
    * @param pokemon - The {@linkcode Pokemon} whose ability is being activated
    * @param passive - Whether the ability is a passive
    * @param show - If `true`, show the bar. Otherwise, hide it
-   * @param passiveSlot - When `passive` is `true`, which of the 3 ER passive slots
-   *   (0, 1, or 2) is being displayed. Defaults to slot 0 for legacy callers.
-   *   Ignored when `passive` is `false` or `show` is `false` (hide doesn't read
-   *   the slot — the bar is just being dismissed).
+   * @param passiveSlot - When `passive` is `true`, which passive-source index is
+   *   being displayed. Slots 0-2 are ER innates; later indexes are shared GIFT
+   *   sources. Defaults to slot 0 for legacy callers. Ignored when `passive` is
+   *   `false` or `show` is `false` (hide doesn't read the slot).
    */
-  public queueAbilityDisplay(pokemon: Pokemon, passive: boolean, show: boolean, passiveSlot: 0 | 1 | 2 = 0): void {
+  public queueAbilityDisplay(pokemon: Pokemon, passive: boolean, show: boolean, passiveSlot = 0): void {
     this.unshiftPhase(
       show ? new ShowAbilityPhase(pokemon.getBattlerIndex(), passive, passiveSlot) : new HideAbilityPhase(),
     );

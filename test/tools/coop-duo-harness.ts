@@ -176,6 +176,7 @@ import type { ReplayCommandEvent, ReplayTrace } from "#data/elite-redux/replay-t
 import { isReplayCommandEvent, isReplayInteractionEvent, validateReplayTrace } from "#data/elite-redux/replay-trace";
 import {
   beginShowdownBattle,
+  getShowdownBattleFormat,
   getShowdownOpponentManifest,
   getShowdownOwnManifest,
 } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -4950,11 +4951,13 @@ export async function buildShowdownDuo(
   const hostRelay = new ShowdownCommandRelay(pair.host);
   const guestPeer = new ShowdownCommandRelay(pair.guest);
   // Re-stash the live match with the HOST relay so the host's EnemyCommandPhase (getShowdownRelay) awaits
-  // the guest's pick. The manifests were stashed by the C3 bootstrap; reuse them verbatim.
+  // the guest's pick. The manifests were stashed by the C3 bootstrap; reuse them verbatim. PRESERVE the
+  // negotiated battle format (doubles/triples) - the default re-stash would reset it to singles.
   const own = getShowdownOwnManifest();
   const opponent = getShowdownOpponentManifest();
+  const battleFormat = getShowdownBattleFormat() ?? "singles";
   if (own != null && opponent != null) {
-    beginShowdownBattle(own, opponent, hostRelay);
+    beginShowdownBattle(own, opponent, hostRelay, null, null, null, battleFormat);
   }
 
   // Connect both controllers over the live loopback (exchange hello / runConfig).

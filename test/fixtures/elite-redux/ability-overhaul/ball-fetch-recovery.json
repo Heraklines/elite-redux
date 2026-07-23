@@ -1,0 +1,40 @@
+{
+  "v": 1,
+  "name": "Ball Fetch restores used Poke Balls after battle",
+  "run": {
+    "wave": 1,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "ball-fetch-recovery",
+    "waves": 2
+  },
+  "party": [
+    {
+      "species": "MEWTWO",
+      "ability": "BALL_FETCH",
+      "moves": ["PSYCHIC", "AURA_SPHERE", "ICE_BEAM", "RECOVER"]
+    }
+  ],
+  "enemy": {
+    "kind": "wild",
+    "wild": {
+      "species": "MAGIKARP",
+      "level": 100,
+      "moves": ["SPLASH", "TACKLE", "FLAIL", "BOUNCE"]
+    }
+  },
+  "items": {
+    "pokeballs": {
+      "POKEBALL": 3,
+      "ULTRA_BALL": 2
+    }
+  },
+  "script": [{ "ball": "POKEBALL", "enemyMove": "SPLASH" }, { "move": "PSYCHIC", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "max-waves",
+    "pokeballs": {
+      "POKEBALL": 3,
+      "ULTRA_BALL": 2
+    }
+  }
+}

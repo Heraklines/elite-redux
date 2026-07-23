@@ -39,6 +39,15 @@ const ASSET_ROOTS = ["../er-assets", "public"];
 // Pure key==basename loads resolve automatically via the index; these few are renamed.
 const KEY_FILE_OVERRIDES: Record<string, string> = {
   er_bargain_giratina: "images/elite-redux/the-bargain/giratina.png",
+  // BW2 Pokemon World Tournament chrome (Colosseum + Tournament screens). Loaded as
+  // loadImage("er_pwt_*"/"er_colosseum_bg", "elite-redux/colosseum", "*.png") - key != basename,
+  // so map them explicitly. Injecting these lets the PWT-themed goldens (colosseum, tournament
+  // list/board) render the REAL navy/gold chrome instead of the addWindow white fallback.
+  er_pwt_panel: "images/elite-redux/colosseum/pwt_panel.png",
+  er_pwt_button: "images/elite-redux/colosseum/pwt_button.png",
+  er_pwt_crest: "images/elite-redux/colosseum/pwt_crest.png",
+  er_pwt_trophy: "images/elite-redux/colosseum/pwt_trophy.png",
+  er_colosseum_bg: "images/elite-redux/colosseum/colosseum_bg.png",
   // Shiny sparkle icons load as loadImage("shiny_star*", "ui", "shiny*.png") - key != basename.
   shiny_star: "images/ui/shiny.png",
   shiny_star_1: "images/ui/shiny_1.png",
@@ -47,6 +56,18 @@ const KEY_FILE_OVERRIDES: Record<string, string> = {
   shiny_star_small_1: "images/ui/shiny_small_1.png",
   shiny_star_small_2: "images/ui/shiny_small_2.png",
 };
+
+/**
+ * Guarded chrome keys pre-injected before pass 1 (see renderTwoPass) so `textures.exists()`
+ * gates open and the real PWT navy/gold nineslice + crest + trophy render in the goldens.
+ */
+const PREINJECT_CHROME_KEYS = [
+  "er_pwt_panel",
+  "er_pwt_button",
+  "er_pwt_crest",
+  "er_pwt_trophy",
+  "er_colosseum_bg",
+] as const;
 
 // ---------------------------------------------------------------------------
 // DOM + font shims (sidestep vitest-canvas-mock; give Phaser a real canvas/Image)
@@ -1244,6 +1265,15 @@ export async function renderTwoPass(
 ): Promise<{ injected: string[]; unresolved: string[] }> {
   // Pass 1: collect requested texture keys.
   await registerBitmapFonts(ctx.scene);
+  // Pre-inject GUARDED chrome so `textures.exists(key)` is true when the handler's setup()
+  // runs. Handlers that gate PWT/CDN chrome behind `if (textures.exists(...))` (colosseum,
+  // tournament list/board) would otherwise never REQUEST the key in pass 1 (the guard skips
+  // the add.* call), so the two-pass injector never sees it and the golden shows the bare
+  // fallback. Seeding this small allowlist up front lets those goldens render the real
+  // navy/gold PWT nineslice + crest + trophy the game ships. Missing files no-op.
+  for (const key of PREINJECT_CHROME_KEYS) {
+    await injectTextureByKey(ctx.scene, key);
+  }
   purgeSceneTimers();
   ctx.uiInner.removeAll(true);
   ctx.fieldRoot.removeAll(true);

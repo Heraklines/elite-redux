@@ -31,8 +31,13 @@ import {
   ER_BLACK_SHINY_POOL_BORDERLINE,
   ER_BLACK_SHINY_POOL_CORE,
 } from "#data/elite-redux/er-black-shiny-gift-pool";
+import {
+  erBlackSpritePath,
+  erBlackSpritePathFromBase,
+} from "#data/elite-redux/er-black-sprite-manifest";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import type { PokemonSpecies } from "#data/pokemon-species";
 import type { Pokemon } from "#field/pokemon";
 import { randSeedInt } from "#utils/common";
 
@@ -53,6 +58,77 @@ export const ER_BLACK_SHINY_DENOMINATOR = 50;
 
 /** Interim battle-sprite tint until the generated t4 assets land. */
 export const ER_BLACK_SHINY_TINT = 0x35323d;
+
+/** Black Shinies always contribute five luck. */
+export const ER_BLACK_SHINY_LUCK = 5;
+
+export interface ErBlackShinySpriteSource {
+  key: string;
+  atlasPath: string;
+}
+
+interface ErBlackShinyStarterState {
+  shiny?: boolean | undefined;
+  variant?: number | undefined;
+  erBlackShiny?: boolean | undefined;
+}
+
+/**
+ * Resolve the generated FRONT atlas used by a Black Shiny outside battle.
+ * Mirrors Pokemon's battle resolver: numeric base forms use `black/{id}`;
+ * Redux/custom forms use their plain slug atlas under `black/`.
+ */
+export function getErBlackShinySpriteSource(
+  species: PokemonSpecies,
+  female: boolean,
+  formIndex: number,
+): ErBlackShinySpriteSource | null {
+  const plainAtlasPath = species.getSpriteAtlasPath(female, formIndex, false, 0);
+  const atlasPath =
+    (formIndex === 0 ? erBlackSpritePath(species.speciesId, false) : null)
+    ?? erBlackSpritePathFromBase(plainAtlasPath);
+  if (!atlasPath) {
+    return null;
+  }
+  return {
+    key: `${species.getSpriteKey(female, formIndex, false, 0)}-erblack`,
+    atlasPath,
+  };
+}
+
+/** True only for a valid selected t4 starter state. */
+export function isErBlackShinyStarterSelection(
+  starter: ErBlackShinyStarterState,
+): boolean {
+  return starter.erBlackShiny === true && starter.shiny === true && starter.variant === 2;
+}
+
+/** Number of Black Shinies in a starter team. */
+export function countErBlackShinyStarters(
+  starters: readonly ErBlackShinyStarterState[],
+): number {
+  return starters.reduce((count, starter) => count + (starter.erBlackShiny === true ? 1 : 0), 0);
+}
+
+/**
+ * Final fail-safe for restored/merged starter data: preserve the first selected
+ * Black Shiny and demote every later one to its underlying epic shiny.
+ */
+export function enforceErBlackShinyStarterLimit<T extends ErBlackShinyStarterState>(
+  starters: readonly T[],
+): T[] {
+  let found = false;
+  return starters.map(starter => {
+    if (starter.erBlackShiny !== true) {
+      return starter;
+    }
+    if (!found) {
+      found = true;
+      return starter;
+    }
+    return { ...starter, erBlackShiny: false };
+  });
+}
 
 /** True when this mon is a Black Shiny. */
 export function isErBlackShiny(pokemon: Pokemon | null | undefined): boolean {

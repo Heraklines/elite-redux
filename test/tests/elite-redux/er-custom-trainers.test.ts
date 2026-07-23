@@ -68,10 +68,12 @@ import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { PERMANENT_STATS } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerVariant } from "#enums/trainer-variant";
-import type { Trainer } from "#field/trainer";
-import { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { Trainer } from "#field/trainer";
+import { BaseStatModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatBoosterModifierType } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -231,33 +233,63 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(translatePreparedGhostLevels(members, 150)).toEqual([150, 147, 136]);
   });
 
-  it("renders an authored title before a named trainer class", () => {
-    const namedTrainer = {
-      config: {
-        title: "Gym Leader",
-        getTitle: () => "Sabrina",
-      },
+  it("suppresses the CLASS prefix for a generic-class custom trainer on every surface", () => {
+    // Vanilla baseline (the RED half): the real getName composes "<class> <name>".
+    const trainer = {
+      config: { title: undefined, getTitle: () => "Ace Trainer" },
       variant: TrainerVariant.DEFAULT,
-      name: "",
+      name: "Ace Rico",
       partnerName: "",
     } as unknown as Trainer;
+    trainer.getName = Trainer.prototype.getName;
+    expect(trainer.getName(TrainerSlot.NONE, true)).toBe("Ace Trainer Ace Rico");
 
-    applyErCustomTrainerDisplayName(namedTrainer, "Leader");
+    // Flip the flag: applying the custom-trainer name suppresses the class prefix.
+    applyErCustomTrainerDisplayName(trainer, "Ace Rico");
 
-    expect(namedTrainer.getName(TrainerSlot.NONE, false)).toBe("Sabrina");
-    expect(namedTrainer.getName(TrainerSlot.NONE, true)).toBe("Leader Sabrina");
+    expect(trainer.erCustomTrainerName).toBe("Ace Rico");
+    expect(trainer.name).toBe("Ace Rico");
+    // Every (slot, includeTitle) combination now renders ONLY the authored name.
+    expect(trainer.getName(TrainerSlot.NONE, false)).toBe("Ace Rico");
+    expect(trainer.getName(TrainerSlot.NONE, true)).toBe("Ace Rico");
+    expect(trainer.getName(TrainerSlot.TRAINER, true)).toBe("Ace Rico");
+    expect(trainer.getName(TrainerSlot.TRAINER_PARTNER, true)).toBe("Ace Rico");
   });
 
-  it("keeps generic trainer classes on their normal naming path", () => {
-    const genericTrainer = {
-      config: { title: undefined },
-      name: "",
+  it("suppresses the named-NPC title for a named-class custom trainer on every surface", () => {
+    // Vanilla baseline (the RED half): a named class renders "<title> <personal name>".
+    const namedTrainer = {
+      config: { title: "Gym Leader", getTitle: () => "Sabrina" },
+      variant: TrainerVariant.DEFAULT,
+      name: "Sabrina",
+      partnerName: "",
     } as unknown as Trainer;
+    namedTrainer.getName = Trainer.prototype.getName;
+    expect(namedTrainer.getName(TrainerSlot.NONE, true)).toContain("Sabrina");
 
-    applyErCustomTrainerDisplayName(genericTrainer, "Calvin");
+    // Flip the flag: only the authored custom name shows; "Sabrina" / the title vanish.
+    applyErCustomTrainerDisplayName(namedTrainer, "Rico");
 
-    expect(genericTrainer.name).toBe("Calvin");
-    expect(Object.hasOwn(genericTrainer, "getName")).toBe(false);
+    expect(namedTrainer.erCustomTrainerName).toBe("Rico");
+    expect(namedTrainer.getName(TrainerSlot.NONE, false)).toBe("Rico");
+    expect(namedTrainer.getName(TrainerSlot.NONE, true)).toBe("Rico");
+    expect(namedTrainer.getName(TrainerSlot.TRAINER, true)).toBe("Rico");
+  });
+
+  it("leaves a vanilla (non-editor) trainer's class+name composition untouched", () => {
+    // The suppression is gated on going THROUGH applyErCustomTrainerDisplayName: a
+    // trainer that never does keeps the real class+name composition (byte-identical).
+    const vanilla = {
+      config: { title: undefined, getTitle: () => "Veteran" },
+      variant: TrainerVariant.DEFAULT,
+      name: "Cliff",
+      partnerName: "",
+    } as unknown as Trainer;
+    vanilla.getName = Trainer.prototype.getName;
+
+    expect(vanilla.erCustomTrainerName).toBeUndefined();
+    expect(vanilla.getName(TrainerSlot.NONE, true)).toBe("Veteran Cliff");
+    expect(vanilla.getName(TrainerSlot.NONE, false)).toBe("Cliff");
   });
 
   it("restores sampled ghost held items with their stack counts", () => {
@@ -444,6 +476,57 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     } finally {
       globalScene.gameMode.challenges.pop();
     }
+  });
+
+  it("persists used trainers and consumed windows across a real session reload", async () => {
+    const TWO = {
+      A: {
+        id: 70059,
+        name: "Alpha",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 500,
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      B: {
+        id: 70060,
+        name: "Bravo",
+        trainerClass: "VETERAN",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 500,
+        team: [{ species: SpeciesId.SNORLAX }],
+      },
+    };
+    setErCustomTrainersForTesting(TWO as never);
+    globalScene.seed = "reload-repeat";
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
+    resetErCustomTrainerTracking();
+    setErDifficulty("ace");
+
+    const anchor = erCustomTrainerWindowWave(globalScene.seed, 0, 10);
+    expect(anchor).toBeLessThan(10);
+    const first = selectErCustomTrainerForWave(anchor);
+    expect(first).not.toBeNull();
+    if (first === null) {
+      throw new Error("expected a custom trainer in the first forced window");
+    }
+    markErCustomTrainerUsed(first.key);
+
+    const snapshot = game.scene.gameData.getSessionSaveData();
+    expect(snapshot.erUsedCustomTrainerKeys).toEqual([first.key]);
+    expect(snapshot.erUsedCustomTrainerWindows).toEqual([0]);
+    await game.scene.gameData.saveAll();
+
+    // A page refresh starts with empty module memory before the session is restored.
+    resetErCustomTrainerTracking();
+    await game.reload.reloadSession();
+
+    // The already-consumed window cannot field another trainer on the next wave.
+    expect(selectErCustomTrainerForWave(anchor + 1)).toBeNull();
+    // Later windows may field the other trainer, but never the one already fought.
+    expect(playRun(11, 200).some(p => p.key === first.key)).toBe(false);
   });
 
   it("at most one custom trainer per window (density caps density, not trainer count)", () => {
@@ -888,6 +971,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
       abilitySlot: 0,
       fusion: null,
       heldItemKeys: [],
+      vitaminCounts: [0, 0, 0, 0, 0, 0],
       shinyLook: null,
       shinyName: "",
     };
@@ -1210,6 +1294,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
         { key: "ER_FIRE_GEM", count: 2 }, // plain ER elemental-gem key (already resolved)
         { key: "LEFTOVERS", count: 1 }, // plain fixed held item (back-compat)
       ],
+      vitaminCounts: [0, 0, 0, 0, 0, 0],
       shinyLook: null,
       shinyName: "",
     };
@@ -1226,6 +1311,41 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // berry/booster typo does too (never crashes, never a phantom item).
     const bogus: ErCustomTrainerMemberResolved = { ...member, heldItemKeys: [{ key: "NOT_A_REAL_ITEM", count: 1 }] };
     expect(erCustomTrainerHeldModifierConfigs(bogus).length).toBe(0);
+  });
+
+  it("vitamins resolve all six authored stat counts into serializable base-stat modifiers", () => {
+    const VITAMINS = {
+      VITAMIN_USER: {
+        id: 70031,
+        name: "Vitamin User",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [
+          {
+            species: SpeciesId.PIKACHU,
+            vitamins: { hp: 1, atk: 2, def: 3, spatk: 4, spdef: 40, spd: 6 },
+          },
+        ],
+      },
+    };
+    setErCustomTrainersForTesting(VITAMINS as never);
+    const member = getErCustomTrainers()[0].members[0];
+    expect(member.vitaminCounts).toEqual([1, 2, 3, 4, 31, 6]);
+
+    const configs = erCustomTrainerHeldModifierConfigs(member);
+    expect(configs.map(config => config.stackCount)).toEqual([1, 2, 3, 4, 31, 6]);
+    expect(configs.every(config => config.modifier instanceof BaseStatBoosterModifierType)).toBe(true);
+    expect(configs.every(config => config.isTransferable === false)).toBe(true);
+
+    const enemy = buildErCustomTrainerMember(member, 0, 50, false)!;
+    const modifiers = configs.map(config => {
+      const modifier = (config.modifier as BaseStatBoosterModifierType).newModifier(enemy);
+      modifier.stackCount = config.stackCount!;
+      return modifier;
+    });
+    expect(modifiers.every(modifier => modifier instanceof BaseStatModifier)).toBe(true);
+    expect(modifiers.map(modifier => modifier.getArgs().at(-1))).toEqual(PERMANENT_STATS);
+    expect(modifiers.every(modifier => modifier.type.id === "BASE_STAT_BOOSTER")).toBe(true);
   });
 
   // ---- ROUND 10 / FEATURE 7: fusion move-pool union (RLA/RLNA) --------------
@@ -1248,6 +1368,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
       abilitySlot: 0,
       fusion,
       heldItemKeys: [],
+      vitaminCounts: [0, 0, 0, 0, 0, 0],
       shinyLook: null,
       shinyName: "",
     });

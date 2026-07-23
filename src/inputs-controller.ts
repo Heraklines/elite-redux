@@ -81,6 +81,17 @@ export class InputsController {
   public events: Phaser.Events.EventEmitter;
 
   private buttonLock: Button[] = [];
+  /**
+   * KeyCodes of PRINTABLE keys we DROPPED on the way down because a DOM text field held focus (see
+   * {@linkcode isDomTextInputFocused}). The matching keyUP must mirror that exact decision - even though
+   * focus may have changed in between - so the suppression stays SYMMETRIC per physical key. Without this,
+   * a keydown fired while nothing was focused (NOT suppressed -> it arms the auto-repeat interval + locks
+   * the button) can be followed by a keyup fired while a text field IS focused (suppressed -> returns
+   * early), stranding the repeat timer + buttonLock. That is the Showdown Set Editor's "open the moves
+   * pane -> it opens/closes endlessly" bug: opening the pane focuses the hidden search capture BETWEEN the
+   * ACTION (Space) keydown and its keyup.
+   */
+  private readonly suppressedPrintableKeyCodes = new Set<number>();
   private readonly interactions: Partial<Record<Button, Interaction>> = {};
   private configs: Record<string, InterfaceConfig> = {};
 
@@ -352,9 +363,14 @@ export class InputsController {
     this.lastSource = "keyboard";
     this.ensureKeyboardIsInit();
     // Printable keys belong to a focused DOM text field's text, not to game buttons (see isDomTextInputFocused).
-    if (isPrintableKeyEvent(event) && isDomTextInputFocused()) {
+    const printable = isPrintableKeyEvent(event);
+    if (printable && isDomTextInputFocused()) {
+      // Remember we suppressed THIS key so its keyup mirrors the decision (see suppressedPrintableKeyCodes).
+      this.suppressedPrintableKeyCodes.add(event.keyCode);
       return;
     }
+    // This down was NOT suppressed (it will arm the auto-repeat + lock below), so its keyup must clear them.
+    this.suppressedPrintableKeyCodes.delete(event.keyCode);
     const buttonDown = getButtonWithKeycode(this.getActiveConfig(Device.KEYBOARD)!, event.keyCode);
     if (buttonDown != null) {
       if (this.buttonLock.includes(buttonDown)) {
@@ -366,6 +382,13 @@ export class InputsController {
       });
       clearInterval(this.inputInterval[buttonDown]);
       this.inputInterval[buttonDown] = setInterval(() => {
+        // A held PRINTABLE key stops auto-repeating as a game button the instant a DOM text field grabs
+        // focus (e.g. opening the Set Editor's search pane focuses its hidden capture): the key now belongs
+        // to that field's text. Without this a held ACTION (Space) auto-toggles the pane several times a
+        // second. The key's own keyup still clears this interval (symmetric with suppressedPrintableKeyCodes).
+        if (printable && isDomTextInputFocused()) {
+          return;
+        }
         this.events.emit("input_down", {
           controller_type: "keyboard",
           button: buttonDown,
@@ -383,8 +406,13 @@ export class InputsController {
   keyboardKeyUp(event: KeyboardEvent): void {
     this.lastSource = "keyboard";
     // Symmetric with keyboardKeyDown: a printable key suppressed on the way down must not emit a stray
-    // input_up (which would also mis-splice buttonLock, since its down was never locked).
-    if (isPrintableKeyEvent(event) && isDomTextInputFocused()) {
+    // input_up (which would also mis-splice buttonLock, since its down was never locked). The decision is
+    // MIRRORED from the recorded keydown (NOT re-evaluated against current focus), so a keydown that was
+    // NOT suppressed - because focus was later stolen by opening the search pane - still clears its armed
+    // auto-repeat interval + buttonLock here. Re-checking isDomTextInputFocused() at keyup time is the
+    // asymmetry that stranded the timer and caused the endless open/close.
+    if (this.suppressedPrintableKeyCodes.has(event.keyCode)) {
+      this.suppressedPrintableKeyCodes.delete(event.keyCode);
       return;
     }
     // Bang is safe here; can't receive keyboard input if no active keyboard
@@ -531,6 +559,9 @@ export class InputsController {
       clearInterval(value);
     }
     this.buttonLock = [];
+    // A window blur / device switch can eat the keyup of a suppressed printable key; drop the tracking so a
+    // stale entry can't wrongly suppress that key's NEXT keyup (kept symmetric with buttonLock/intervals).
+    this.suppressedPrintableKeyCodes.clear();
   }
 
   /**

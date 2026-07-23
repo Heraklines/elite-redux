@@ -14,6 +14,7 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { modifierTypes } from "#data/data-lists";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -24,6 +25,7 @@ import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-ut
 import {
   leaveEncounterWithoutBattle,
   selectPokemonForOption,
+  setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
   updatePlayerMoney,
 } from "#mystery-encounters/encounter-phase-utils";
@@ -31,8 +33,20 @@ import { isPokemonValidForEncounterOptionSelection } from "#mystery-encounters/e
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
+import type { ModifierTypeFunc } from "#types/modifier-types";
+import { randSeedItem } from "#utils/common";
 
 const namespace = "mysteryEncounters/highNoon";
+
+/**
+ * The gunslinger's speed-duel prize: one speed-flavored tactical item. These are
+ * the reactive Speed items that were pulled OUT of the post-battle reward pool
+ * (er-item-tuning), so the duel is a thematic home for them. Lazy (resolved at
+ * option time) - modifierTypes is populated at game init, not module load.
+ */
+function highNoonPrizeFuncs(): ModifierTypeFunc[] {
+  return [modifierTypes.ER_ADRENALINE_ORB, modifierTypes.ER_BLUNDER_POLICY, modifierTypes.ER_FLOAT_STONE];
+}
 
 /** The outlaw draws as fast as a roughly base-85-Speed Pokemon at this wave's level. */
 const OUTLAW_BASE_SPD = 85;
@@ -105,6 +119,11 @@ export const HighNoonEncounter: MysteryEncounter = MysteryEncounterBuilder.withE
         updatePlayerMoney(-ante, true, false);
         if (duelist.getStat(Stat.SPD) >= outlawSpeed) {
           updatePlayerMoney(ante * 2, true, false); // net +ante (your stake back + the pot)
+          // The fastest draw also claims a speed-flavored tactical prize.
+          setEncounterRewards({
+            guaranteedModifierTypeFuncs: [randSeedItem(highNoonPrizeFuncs())],
+            fillRemaining: false,
+          });
           queueEncounterMessage(`${namespace}:win`);
         } else {
           queueEncounterMessage(`${namespace}:lose`);

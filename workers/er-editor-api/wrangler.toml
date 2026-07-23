@@ -19,10 +19,15 @@ GITHUB_REPO = "Heraklines/elite-redux"
 GITHUB_BRANCH = "feat/elite-redux-port"
 GITHUB_WORKFLOW_FILE = "deploy-staging.yml"
 MEDIA_IMPORT_WORKFLOW_FILE = "deploy-staging.yml"
+MEDIA_IMPORT_BRANCH = "feat/elite-redux-port"
 ALLOWED_ORIGIN = "*"
 # Sprite repo for the Add-a-Mon upload route (/upload-assets).
 ASSETS_REPO = "Heraklines/er-assets"
 ASSETS_BRANCH = "main"
+
+[[r2_buckets]]
+binding = "MEDIA_UPLOADS"
+bucket_name = "er-editor-media-uploads"
 
 # Secrets (set via `wrangler secret put`, NOT here):
 #   GITHUB_TOKEN     — fine-grained PAT, Contents: read & write + Actions: read & write (deploy

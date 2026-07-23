@@ -29,10 +29,13 @@
 import { globalScene } from "#app/global-scene";
 import { FirstMoveCondition } from "#data/moves/move-condition";
 import { PokemonMove } from "#data/moves/pokemon-move";
+import type { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
+import type { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 import {
+  HitHealAttr,
   HpPowerAttr,
   MagnitudePowerAttr,
   type Move,
@@ -62,6 +65,10 @@ export interface ScriptedMoveOptions {
    * Volcano Rage's "50 BP Eruption follow-up that scales with HP".
    */
   readonly hpScaledBasePower?: number;
+  /** Optional battle-only category override for an ability-scripted move. */
+  readonly category?: MoveCategory;
+  /** Optional battle-only primary type override for an ability-scripted move. */
+  readonly type?: PokemonType;
   /**
    * Strip {@linkcode MoveFlags.REFLECTABLE} from the scripted cast so it is NOT
    * bounced back by Magic Bounce / Magic Coat onto the caster. Used by
@@ -71,6 +78,8 @@ export interface ScriptedMoveOptions {
    * move on a Magic-Bounce target. No-op for moves without the flag.
    */
   readonly nonReflectable?: boolean;
+  /** Scales healing attrs on this scripted cast without mutating the registered move. */
+  readonly healMultiplier?: number;
 }
 
 function getMagnitudeLevel(range: readonly [min: number, max: number]): number {
@@ -110,6 +119,9 @@ class PowerOverriddenPokemonMove extends PokemonMove {
   private readonly noRecharge: boolean;
   private readonly nonReflectable: boolean;
   private readonly hpScaledBasePower: number | undefined;
+  private readonly category: MoveCategory | undefined;
+  private readonly type: PokemonType | undefined;
+  private readonly healMultiplier: number | undefined;
   private cached: Move | undefined;
 
   constructor(moveId: MoveId, power: number | undefined, opts: ScriptedMoveOptions) {
@@ -120,7 +132,10 @@ class PowerOverriddenPokemonMove extends PokemonMove {
     this.magnitudeRange = opts.magnitudeRange;
     this.noRecharge = opts.noRecharge ?? false;
     this.hpScaledBasePower = opts.hpScaledBasePower;
+    this.category = opts.category;
+    this.type = opts.type;
     this.nonReflectable = opts.nonReflectable ?? false;
+    this.healMultiplier = opts.healMultiplier;
   }
 
   public override getMove(): Move {
@@ -134,6 +149,12 @@ class PowerOverriddenPokemonMove extends PokemonMove {
       const clone = Object.assign(Object.create(Object.getPrototypeOf(base)), base) as Move;
       if (this.power !== undefined) {
         (clone as unknown as { power: number }).power = this.power;
+      }
+      if (this.category !== undefined) {
+        (clone as unknown as { _category: MoveCategory })._category = this.category;
+      }
+      if (this.type !== undefined) {
+        (clone as unknown as { _type: PokemonType })._type = this.type;
       }
       if (this.alwaysHit) {
         // accuracy -1 = "bypasses the accuracy check" (Swift/Aerial Ace style).
@@ -163,6 +184,14 @@ class PowerOverriddenPokemonMove extends PokemonMove {
         // bounce it back onto the holder as if the holder chose to use it.
         const cloneFlags = clone as unknown as { flags: number };
         cloneFlags.flags &= ~MoveFlags.REFLECTABLE;
+      }
+      if (this.healMultiplier !== undefined) {
+        const multiplier = this.healMultiplier;
+        clone.attrs = clone.attrs.map(attr =>
+          attr instanceof HitHealAttr
+            ? new HitHealAttr(attr.getHealRatio(), attr.getHealStat() ?? undefined, multiplier)
+            : attr,
+        );
       }
       if (this.magnitudeRange !== undefined) {
         const range = this.magnitudeRange;
@@ -205,6 +234,9 @@ export function scriptedPokemonMove(moveId: MoveId, power?: number, opts: Script
     && magnitudeRange === undefined
     && !noRecharge
     && !nonReflectable
+    && opts.healMultiplier === undefined
+    && opts.category === undefined
+    && opts.type === undefined
     ? new PokemonMove(moveId)
     : new PowerOverriddenPokemonMove(moveId, power, opts);
 }

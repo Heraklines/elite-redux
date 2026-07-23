@@ -115,7 +115,9 @@ export type SettlementMutation =
       erBlackShiny: boolean;
       cost: number;
     }
-  | { uid: Participant; kind: "grantCandy"; speciesId: number; candy: number };
+  | { uid: Participant; kind: "grantCandy"; speciesId: number; candy: number }
+  // Tournament reward path: grant a shiny-lab effect/look on a species (er-telemetry pushes these).
+  | { uid: Participant; kind: "grantShinyLabLook"; speciesId: number; savedLook: number[] };
 
 /** The result of registering a match: the fresh record, or a validation error. */
 export type RegisterResult = { ok: true; match: ShowdownMatchRecord } | { ok: false; error: string };

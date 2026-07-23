@@ -15,12 +15,15 @@ import { loggedInUser } from "#app/account";
 import { bypassLogin } from "#constants/app-constants";
 import { SpeciesId } from "#enums/species-id";
 import { type ErNotification, notificationManager } from "#system/notifications/notification-manager";
+import type { RichNotificationContent } from "#ui/rich-notification-viewer";
 import { sessionIdKey } from "#utils/common";
 import { getCookie } from "#utils/cookies";
 
 const GHOST_TYPE = "ghost-battle";
 const SYSTEM_TYPE = "system";
 const REWARD_TYPE = "reward";
+export const PATCH_NOTES_TYPE = "patch-notes";
+const MAX_PATCH_NOTES_LENGTH = 60_000;
 /** Settings key gating ghost-battle notifications (registered in settings.ts). */
 export const GHOST_NOTIF_SETTING_KEY = "ghostNotifications";
 
@@ -30,6 +33,38 @@ interface GhostNotifData {
   endedRun: boolean;
   victimTeam: unknown;
   ghostTeam: unknown;
+}
+
+interface PatchNotesPayload {
+  markdown?: unknown;
+  actionLabel?: unknown;
+  actionUrl?: unknown;
+}
+
+/** Return the rich content carried by a patch-notes notification, if valid. */
+export function patchNotesContentOf(notification: ErNotification): RichNotificationContent | null {
+  if (notification.type !== PATCH_NOTES_TYPE) {
+    return null;
+  }
+  const data = notification.data as { title?: unknown; body?: unknown; payload?: unknown } | null;
+  const payload = data?.payload as PatchNotesPayload | null;
+  const markdownSource = typeof payload?.markdown === "string" ? payload.markdown : data?.body;
+  const markdown = typeof markdownSource === "string" ? markdownSource.slice(0, MAX_PATCH_NOTES_LENGTH) : "";
+  if (!markdown.trim()) {
+    return null;
+  }
+
+  const content: RichNotificationContent = {
+    title: typeof data?.title === "string" && data.title.trim() ? data.title : "Patch notes",
+    markdown,
+  };
+  if (typeof payload?.actionLabel === "string" && payload.actionLabel.trim()) {
+    content.actionLabel = payload.actionLabel;
+  }
+  if (typeof payload?.actionUrl === "string" && payload.actionUrl.trim()) {
+    content.actionUrl = payload.actionUrl;
+  }
+  return content;
 }
 
 function serverBase(): string {
@@ -95,8 +130,8 @@ async function fetchGhostNotifications(since: number): Promise<ErNotification[]>
  * Login pull source for server-pushed rewards + system announcements (e.g. a
  * black-shiny grant). Mirrors {@linkcode fetchGhostNotifications}: same base/token
  * guards, fetch `${base}/savedata/notifications?since=${since}`, parse `{items}`.
- * `kind:"reward"` maps to the icon-rendering REWARD_TYPE, anything else to the
- * text-only SYSTEM_TYPE.
+ * Known rich kinds keep their own renderer; unknown kinds safely fall back to
+ * the text-only SYSTEM_TYPE.
  */
 async function fetchSystemNotifications(since: number): Promise<ErNotification[]> {
   const base = serverBase();
@@ -121,7 +156,7 @@ async function fetchSystemNotifications(since: number): Promise<ErNotification[]
       const when = typeof it.when === "number" ? it.when : Date.now();
       return {
         id: String(it.id),
-        type: it.kind === "reward" ? REWARD_TYPE : SYSTEM_TYPE,
+        type: it.kind === "reward" ? REWARD_TYPE : it.kind === PATCH_NOTES_TYPE ? PATCH_NOTES_TYPE : SYSTEM_TYPE,
         timestamp: when,
         read: false,
         data: {
@@ -177,6 +212,16 @@ export function initErNotifications(): void {
       // customView tells the inbox UI to render the granted mon's icon (single
       // large sprite) from data.payload; body stays as a text fallback.
       return { title: d?.title ?? "Reward", body: d?.body ?? "", customView: "reward" };
+    },
+  });
+  notificationManager.registerType({
+    type: PATCH_NOTES_TYPE,
+    summary(n) {
+      return (n.data as { title?: string })?.title ?? "Patch notes";
+    },
+    detail(n) {
+      const d = n.data as { title?: string; body?: string };
+      return { title: d?.title ?? "Patch notes", body: d?.body ?? "", customView: PATCH_NOTES_TYPE };
     },
   });
   notificationManager.registerSource(GHOST_TYPE, fetchGhostNotifications, GHOST_NOTIF_SETTING_KEY);

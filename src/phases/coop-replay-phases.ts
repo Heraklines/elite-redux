@@ -223,7 +223,7 @@ export class CoopShowAbilityReplayPhase extends Phase {
   private readonly partySlot: number;
   private readonly abilityId: number;
   private readonly passive: boolean;
-  private readonly passiveSlot: 0 | 1 | 2;
+  private readonly passiveSlot: number;
 
   constructor(
     bi: number,
@@ -231,7 +231,7 @@ export class CoopShowAbilityReplayPhase extends Phase {
     partySlot: number,
     abilityId: number,
     passive: boolean,
-    passiveSlot: 0 | 1 | 2,
+    passiveSlot: number,
   ) {
     super();
     this.bi = bi;

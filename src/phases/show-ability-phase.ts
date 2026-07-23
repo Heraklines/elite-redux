@@ -9,11 +9,10 @@ export class ShowAbilityPhase extends PokemonPhase {
   public readonly phaseName = "ShowAbilityPhase";
   private readonly passive: boolean;
   /**
-   * ER 3-passive: which passive slot (0/1/2) this display refers to.
-   * Only meaningful when {@linkcode passive} is `true`; ignored otherwise.
-   * Defaults to slot 0 for legacy single-passive callers.
+   * Passive-source index for this display. Slots 0-2 are ER innates; later
+   * indexes are shared GIFT sources. Ignored when {@linkcode passive} is false.
    */
-  private readonly passiveSlot: 0 | 1 | 2;
+  private readonly passiveSlot: number;
   private readonly pokemonName: string;
   private readonly abilityName: string;
   private readonly abilityId: number;
@@ -21,7 +20,7 @@ export class ShowAbilityPhase extends PokemonPhase {
   private readonly partySlot: number;
   private readonly pokemonOnField: boolean;
 
-  constructor(battlerIndex: BattlerIndex, passive = false, passiveSlot: 0 | 1 | 2 = 0) {
+  constructor(battlerIndex: BattlerIndex, passive = false, passiveSlot = 0) {
     super(battlerIndex);
 
     this.passive = passive;

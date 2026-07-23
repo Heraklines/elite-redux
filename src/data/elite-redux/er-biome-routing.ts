@@ -27,6 +27,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
+import { getBiomeRevealBonus } from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { erCartographersLensExtraNodes } from "#data/elite-redux/er-relics";
 import { BiomeId } from "#enums/biome-id";
 import { MapModifier } from "#modifiers/modifier";
@@ -136,6 +137,17 @@ export function erPendingNodesReady(): boolean {
 
 /** The stored next-biome nodes (empty if none rolled yet this biome). */
 export function getErPendingNodes(): ErRouteNode[] {
+  // The starting biome's graph is rolled before the player's party is created.
+  // Apply newly eligible reveal sources the first time the graph is consumed;
+  // once a route is learned it remains learned for the rest of this biome.
+  const visibleCount = getErVisibleNodeCount();
+  for (let index = 0; index < Math.min(visibleCount, pendingNodes.length); index++) {
+    const node = pendingNodes[index];
+    if (!node.revealed) {
+      node.revealed = true;
+      node.source = index < BASE_VISIBLE_NODES ? "base" : "upgrade";
+    }
+  }
   return pendingNodes;
 }
 
@@ -224,6 +236,13 @@ export function erMapUpgradeTier(): number {
   return globalScene
     .findModifiers(m => m instanceof MapModifier)
     .reduce((sum, m) => sum + m.getStackCount(), 0);
+}
+
+function getErVisibleNodeCount(): number {
+  return Math.max(
+    1,
+    BASE_VISIBLE_NODES + erMapUpgradeTier() + erCartographersLensExtraNodes() + getBiomeRevealBonus(),
+  );
 }
 
 /** Biomes that are never valid travel destinations on the graph. */
@@ -315,7 +334,7 @@ export function rollErNextBiomeNodes(
   // revealed so the player can never be soft-locked. A node revealed only because of
   // the upgrade band is tagged "upgrade" (green); the base-visible ones are "base"
   // (gold). Hidden ones render dim "???".
-  const visibleCount = Math.max(1, BASE_VISIBLE_NODES + erMapUpgradeTier() + erCartographersLensExtraNodes());
+  const visibleCount = getErVisibleNodeCount();
   const nodes: ErRouteNode[] = chosen.map((biome, i) => ({
     biome,
     revealed: i < visibleCount,

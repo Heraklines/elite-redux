@@ -43,6 +43,11 @@ import {
   type ShowdownMonManifest,
   type ShowdownRuleViolation,
 } from "#data/elite-redux/showdown/showdown-team";
+import {
+  buildTeamMenuRows,
+  normalizeFolderName,
+  type TeamMenuRow,
+} from "#data/elite-redux/showdown/showdown-team-folders";
 import { Button } from "#enums/buttons";
 import { MoveCategory } from "#enums/move-category";
 import { PokemonType } from "#enums/pokemon-type";
@@ -70,6 +75,8 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 export interface ShowdownTeamMenuPresetView {
   name: string;
   mons: ShowdownMonManifest[];
+  /** OPTIONAL folder (P3): groups the preset under a collapsible header in the menu. */
+  folder?: string;
   /**
    * Non-null when the preset is currently INVALID against the live collection / format rules
    * (mon released, unlock changed, rule broken). The menu shows an invalid marker + this reason,
@@ -116,6 +123,12 @@ export interface ShowdownTeamMenuConfig {
   onRename?: (index: number, newName: string) => void;
   /** Delete (N) a saved preset - the flow persists it. The handler updates its own view live. */
   onDelete?: (index: number) => void;
+  /** Set/clear (G) a preset's FOLDER (P3) - the flow persists it. The handler updates its own view live. */
+  onSetFolder?: (index: number, folder: string) => void;
+  /** Deterministic initial set of COLLAPSED folder names (P3 render recipes). */
+  initialCollapsedFolders?: string[];
+  /** Deterministic initial FOLDER-rename overlay state (P3 set-folder render recipe). */
+  initialFoldering?: boolean;
   /** Back out (Esc / B) to the title. */
   onExit?: () => void;
   /** EXPORT (V): copy the given PS-format team text to the clipboard (production wires navigator.clipboard). */
@@ -151,8 +164,8 @@ const RIGHT_W = SCREEN_W - RIGHT_X - MARGIN; // 135
 const LIST_H = SCREEN_H - BODY_Y - 2; // 151
 const BOX_H = 33;
 const BOX_GAP = 3;
-const BOX_PITCH = BOX_H + BOX_GAP; // 36
-const VISIBLE_BOXES = Math.floor(LIST_H / BOX_PITCH); // 4
+/** Compact height of a collapsible folder HEADER row (P3). */
+const HEADER_ROW_H = 13;
 
 // Shared palette with the Set Editor (dark composed chrome + gold accent).
 const ACCENT = 0x3d5a80;
@@ -184,6 +197,10 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   /** In-handler rename overlay state (backed by the same DOM input seam as the editor search). */
   private renaming = false;
   private renameBuffer = "";
+  /** Whether the active text overlay is renaming the TEAM or setting its FOLDER (P3). */
+  private renameMode: "name" | "folder" = "name";
+  /** Collapsed folder names (P3); a collapsed folder hides its presets under its header. */
+  private collapsedFolders = new Set<string>();
   /** A transient explain/notice banner (e.g. confirming an invalid team) - cleared on next input. */
   private notice: string | null = null;
   /**
@@ -240,13 +257,19 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
       return false;
     }
     this.config = config;
+    this.collapsedFolders = new Set((config.initialCollapsedFolders ?? []).map(normalizeFolderName).filter(Boolean));
     this.teamCursor = Math.min(config.initialTeam ?? 0, this.rowCount() - 1);
     this.monCursor = config.initialMon ?? 0;
     this.clampMonCursor();
     this.scroll = 0;
     this.ensureRowVisible();
-    this.renaming = config.initialRenaming ?? false;
-    this.renameBuffer = this.renaming ? (this.hoveredPreset()?.name ?? "") : "";
+    this.renameMode = config.initialFoldering ? "folder" : "name";
+    this.renaming = (config.initialRenaming ?? false) || (config.initialFoldering ?? false);
+    this.renameBuffer = this.renaming
+      ? this.renameMode === "folder"
+        ? (this.hoveredPreset()?.folder ?? "")
+        : (this.hoveredPreset()?.name ?? "")
+      : "";
     this.notice = null;
     this.promptText = config.initialPromptText ?? null;
     this.importing = config.initialImporting ?? false;
@@ -273,20 +296,43 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
 
   // ---- derived state --------------------------------------------------------------------------
 
-  /** Total list rows = saved presets + 1 trailing create box. */
+  /**
+   * The display ROWS (P3 folders): ungrouped presets first (headerless), then each folder as a
+   * collapsible header + its presets, then the trailing create row. With no folders this is exactly
+   * `[preset0, ..., create]` - identical to the pre-folders flat model, so the cursor + render are
+   * byte-identical for an account that never made a folder.
+   */
+  private rowsList(): TeamMenuRow[] {
+    return buildTeamMenuRows(this.config?.presets ?? [], this.collapsedFolders);
+  }
+
+  /** Total list rows (presets + folder headers + trailing create). */
   private rowCount(): number {
-    return (this.config?.presets.length ?? 0) + 1;
+    return this.rowsList().length;
+  }
+
+  private currentRow(): TeamMenuRow | null {
+    return this.rowsList()[this.teamCursor] ?? null;
   }
 
   private get onCreateRow(): boolean {
-    return this.teamCursor === (this.config?.presets.length ?? 0);
+    return this.currentRow()?.kind === "create";
+  }
+
+  /** True when the cursor sits on a collapsible folder HEADER row. */
+  private get onHeaderRow(): boolean {
+    return this.currentRow()?.kind === "header";
+  }
+
+  /** The flat preset index the cursor points at, or -1 on a header / create row. */
+  private currentPresetIndex(): number {
+    const row = this.currentRow();
+    return row?.kind === "preset" ? (row.presetIndex ?? -1) : -1;
   }
 
   private hoveredPreset(): ShowdownTeamMenuPresetView | null {
-    if (this.config == null || this.onCreateRow) {
-      return null;
-    }
-    return this.config.presets[this.teamCursor] ?? null;
+    const idx = this.currentPresetIndex();
+    return idx < 0 ? null : (this.config?.presets[idx] ?? null);
   }
 
   private hoveredMon(): ShowdownMonManifest | null {
@@ -302,11 +348,38 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.monCursor = mons === 0 ? 0 : Math.min(this.monCursor, mons - 1);
   }
 
+  /** Per-row drawn height (a folder header is compact; presets + create box are full-height). */
+  private rowHeight(row: TeamMenuRow): number {
+    return row.kind === "header" ? HEADER_ROW_H : BOX_H;
+  }
+
+  /**
+   * Keep the cursor row visible, honoring VARIABLE row heights (folder headers are shorter). Scrolls up
+   * to reveal a row above the window, or advances the scroll one row at a time until the cursor row fits
+   * within the list viewport from the new scroll offset. With uniform heights (no folders) this reduces
+   * to the old fixed-pitch behavior, so scrolling is unchanged for a folderless account.
+   */
   private ensureRowVisible(): void {
+    const rows = this.rowsList();
     if (this.teamCursor < this.scroll) {
       this.scroll = this.teamCursor;
-    } else if (this.teamCursor >= this.scroll + VISIBLE_BOXES) {
-      this.scroll = this.teamCursor - VISIBLE_BOXES + 1;
+      return;
+    }
+    while (this.scroll < this.teamCursor) {
+      let y = 0;
+      let fits = false;
+      for (let i = this.scroll; i <= this.teamCursor; i++) {
+        const h = this.rowHeight(rows[i]);
+        if (i === this.teamCursor) {
+          fits = y + h <= LIST_H;
+          break;
+        }
+        y += h + BOX_GAP;
+      }
+      if (fits) {
+        break;
+      }
+      this.scroll++;
     }
   }
 
@@ -359,6 +432,10 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
       case Button.CYCLE_NATURE:
         handled = this.requestDelete();
         break;
+      case Button.CYCLE_GENDER:
+        // G: set/clear the hovered team's FOLDER (P3).
+        handled = this.beginSetFolder();
+        break;
       case Button.CYCLE_FORM:
         // F: IMPORT a team from pasted PS text (reachable in the empty state too - import your first team).
         handled = this.beginImport();
@@ -402,6 +479,12 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   /** CONFIRM: create (create box) / explain (invalid team) / enter-lobby prompt (valid team). */
   private confirmRow(): boolean {
     const cfg = this.config!;
+    // A folder HEADER row toggles its collapse (P3).
+    const row = this.currentRow();
+    if (row?.kind === "header" && row.folder) {
+      this.toggleFolder(row.folder);
+      return true;
+    }
     if (this.onCreateRow) {
       // Maintainer (live, 2026-07-10): NO yes/no prompt on create - confirm goes STRAIGHT into the
       // build flow. This also removes the revertMode()-race the prompt introduced (the unawaited
@@ -420,24 +503,25 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
       this.render();
       return true;
     }
-    const idx = this.teamCursor;
+    const idx = this.currentPresetIndex();
     this.prompt("Enter the lobby with this team?", () => cfg.onEnterLobby?.(idx));
     return true;
   }
 
   private beginEdit(): boolean {
-    if (this.onCreateRow) {
+    const idx = this.currentPresetIndex();
+    if (idx < 0) {
       return false;
     }
-    this.config!.onEdit?.(this.teamCursor);
+    this.config!.onEdit?.(idx);
     return true;
   }
 
   private requestDelete(): boolean {
-    if (this.onCreateRow) {
+    const idx = this.currentPresetIndex();
+    if (idx < 0) {
       return false;
     }
-    const idx = this.teamCursor;
     const name = this.hoveredPreset()?.name ?? "this team";
     this.prompt(`Delete "${name}"?`, () => this.doDelete(idx));
     return true;
@@ -482,9 +566,10 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   // ---- rename overlay (same DOM-input seam as the editor search) --------------------------------
 
   private beginRename(): boolean {
-    if (this.onCreateRow) {
+    if (this.currentPresetIndex() < 0) {
       return false;
     }
+    this.renameMode = "name";
     this.renaming = true;
     this.renameBuffer = this.hoveredPreset()?.name ?? "";
     this.textInput?.open(this.renameBuffer, value => {
@@ -493,6 +578,41 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     });
     this.render();
     return true;
+  }
+
+  /** G: open the FOLDER text overlay for the hovered preset (empty submit clears the folder). P3. */
+  private beginSetFolder(): boolean {
+    if (this.currentPresetIndex() < 0) {
+      return false;
+    }
+    this.renameMode = "folder";
+    this.renaming = true;
+    this.renameBuffer = this.hoveredPreset()?.folder ?? "";
+    this.textInput?.open(this.renameBuffer, value => {
+      this.renameBuffer = value;
+      this.render();
+    });
+    this.render();
+    return true;
+  }
+
+  /** Toggle a folder's collapsed state, keeping the cursor on its header row. P3. */
+  private toggleFolder(folder: string): void {
+    if (this.collapsedFolders.has(folder)) {
+      this.collapsedFolders.delete(folder);
+    } else {
+      this.collapsedFolders.add(folder);
+    }
+    // Re-clamp the cursor onto the (still-present) header row for this folder.
+    const rows = this.rowsList();
+    const headerRow = rows.findIndex(r => r.kind === "header" && r.folder === folder);
+    if (headerRow >= 0) {
+      this.teamCursor = headerRow;
+    }
+    this.teamCursor = Math.min(this.teamCursor, this.rowCount() - 1);
+    this.monCursor = 0;
+    this.ensureRowVisible();
+    this.render();
   }
 
   private processRenameInput(button: Button): boolean {
@@ -525,7 +645,30 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   }
 
   private commitRename(): void {
-    const idx = this.teamCursor;
+    const idx = this.currentPresetIndex();
+    if (idx < 0) {
+      this.closeRename();
+      return;
+    }
+    if (this.renameMode === "folder") {
+      // Empty submit CLEARS the folder (ungroups the team).
+      const folder = normalizeFolderName(this.renameBuffer);
+      this.config!.onSetFolder?.(idx, folder);
+      const preset = this.config!.presets[idx];
+      if (preset != null) {
+        // The VIEW is ephemeral (never hashed/persisted); the SAVE path omits the key via setPresetFolder.
+        preset.folder = folder ? folder : undefined;
+      }
+      // Keep the cursor on the moved team so the preview does not jump.
+      const rows = this.rowsList();
+      const to = rows.findIndex(r => r.kind === "preset" && r.presetIndex === idx);
+      if (to >= 0) {
+        this.teamCursor = to;
+      }
+      this.ensureRowVisible();
+      this.closeRename();
+      return;
+    }
     const name = this.renameBuffer.trim();
     if (name.length > 0) {
       this.config!.onRename?.(idx, name);
@@ -562,6 +705,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
 
   private closeRename(): void {
     this.renaming = false;
+    this.renameMode = "name";
     this.textInput?.close();
     this.render();
   }
@@ -908,13 +1052,15 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   private renderHotkeyBar(): void {
     this.fill(0, HOTKEY_Y, SCREEN_W, HOTKEY_H, BAR_BG, 1);
     this.fill(0, HOTKEY_Y, SCREEN_W, 1, 0x1a2740, 1);
-    const onSaved = !this.onCreateRow && this.config!.presets.length > 0;
+    const onSaved = this.currentPresetIndex() >= 0;
+    const spaceLabel = this.onCreateRow ? "Create" : this.onHeaderRow ? "Expand/Collapse" : "Enter Lobby";
     let x = 4;
-    x = this.hotkey(x, null, "SPACE.png", this.onCreateRow ? "Create" : "Enter Lobby");
+    x = this.hotkey(x, null, "SPACE.png", spaceLabel);
     if (onSaved) {
       x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_ABILITY, "E.png", "Edit");
       x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_SHINY, "R.png", "Rename");
       x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_NATURE, "DEL.png", "Delete");
+      x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_GENDER, "G.png", "Folder");
       x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_TERA, "V.png", "Export");
     }
     // Import is reachable everywhere (incl. the empty state - paste in your first team).
@@ -964,26 +1110,51 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
       this.renderEmptyState();
       return;
     }
-    const rows = this.rowCount();
-    for (let vi = 0; vi < VISIBLE_BOXES; vi++) {
-      const row = this.scroll + vi;
-      if (row >= rows) {
+    const rows = this.rowsList();
+    let y = BODY_Y;
+    let lastDrawn = this.scroll - 1;
+    for (let row = this.scroll; row < rows.length; row++) {
+      const r = rows[row];
+      const h = this.rowHeight(r);
+      if (y + h > BODY_Y + LIST_H) {
         break;
       }
-      const y = BODY_Y + vi * BOX_PITCH;
-      if (row === cfg.presets.length) {
-        this.renderCreateBox(y, BOX_H, row === this.teamCursor, false);
+      const focused = row === this.teamCursor;
+      if (r.kind === "create") {
+        this.renderCreateBox(y, BOX_H, focused, false);
+      } else if (r.kind === "header") {
+        this.renderFolderHeader(r, y, focused);
       } else {
-        this.renderPresetBox(cfg.presets[row], y, row === this.teamCursor);
+        this.renderPresetBox(cfg.presets[r.presetIndex ?? 0], y, focused);
       }
+      lastDrawn = row;
+      y += h + BOX_GAP;
     }
     // Scroll affordance arrows when the list overflows.
     if (this.scroll > 0) {
       this.text(LEFT_X + LEFT_W / 2, BODY_Y - 4, "▲", TextStyle.SUMMARY_GRAY, 0.5, FONT_TINY);
     }
-    if (this.scroll + VISIBLE_BOXES < rows) {
+    if (lastDrawn < rows.length - 1) {
       this.text(LEFT_X + LEFT_W / 2, SCREEN_H - 5, "▼", TextStyle.SUMMARY_GRAY, 0.5, FONT_TINY);
     }
+  }
+
+  /** A compact collapsible folder HEADER row: a chevron, the folder name, and the preset count. P3. */
+  private renderFolderHeader(row: TeamMenuRow, y: number, focused: boolean): void {
+    const folder = row.folder ?? "";
+    this.fill(LEFT_X, y, LEFT_W, HEADER_ROW_H, focused ? ACCENT : HEADER_BAND, focused ? 0.95 : 0.9);
+    this.outline(LEFT_X, y, LEFT_W, HEADER_ROW_H, focused ? GOLD : 0x2b3a5c);
+    // Expand/collapse marker ([+] collapsed / [-] expanded) - ASCII so the pixel font always has it.
+    this.text(LEFT_X + 5, y + 2, row.collapsed ? "[+]" : "[-]", TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
+    this.text(
+      LEFT_X + 20,
+      y + 2,
+      this.clip(folder, 19),
+      focused ? TextStyle.SUMMARY_GOLD : TextStyle.WINDOW,
+      0,
+      FONT_TINY,
+    );
+    this.text(LEFT_X + LEFT_W - 6, y + 2, `${row.count ?? 0}`, TextStyle.SUMMARY_GRAY, 1, FONT_TINY);
   }
 
   private renderEmptyState(): void {
@@ -1292,13 +1463,22 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.fill(0, 0, SCREEN_W, SCREEN_H, 0x000000, 0.55);
     this.add(addWindow(bx, by, bw, bh));
     this.fill(bx + 2, by + 2, bw - 4, bh - 4, 0x0d1524, 1);
-    this.text(bx + 8, by + 5, "RENAME TEAM", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    const folderMode = this.renameMode === "folder";
+    this.text(bx + 8, by + 5, folderMode ? "SET FOLDER" : "RENAME TEAM", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
     // The live text field.
     this.fill(bx + 8, by + 16, bw - 16, 12, CELL_DIM, 1);
     this.outline(bx + 8, by + 16, bw - 16, 12, GOLD);
-    const shown = this.renameBuffer.length > 0 ? this.renameBuffer : "Team";
+    const placeholder = folderMode ? "(none)" : "Team";
+    const shown = this.renameBuffer.length > 0 ? this.renameBuffer : placeholder;
     this.text(bx + 12, by + 18, `${this.clip(shown, 30)}_`, TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
-    this.text(bx + 8, by + 30, "Enter: save    Esc: cancel", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    this.text(
+      bx + 8,
+      by + 30,
+      folderMode ? "Enter: save    Esc: cancel    (empty = ungroup)" : "Enter: save    Esc: cancel",
+      TextStyle.SUMMARY_GRAY,
+      0,
+      FONT_TINY,
+    );
   }
 }
 

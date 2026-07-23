@@ -9,8 +9,15 @@ import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
 import { biomeBgmLoopPoints } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
+import {
+  getEncounterSpeciesWeightMultiplier,
+  isToxicTerrainProtected,
+} from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
+import { resolveErBiomeBackground, selectErBiomeBackgroundSetIndex } from "#data/elite-redux/er-biome-backgrounds";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { getErBiomeStartWave } from "#data/elite-redux/er-biome-structure";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
 import { SpeciesFormChangeRevertWeatherFormTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
@@ -183,8 +190,9 @@ export class Arena {
   public playerFaints: number;
 
   private lastTimeOfDay: TimeOfDay;
-  /** Time of day the background variant was last set for (variant biomes only). */
-  private lastBgTimeOfDay: TimeOfDay;
+  /** Stable scene choice for this biome visit. */
+  private backgroundSetIndex = 0;
+  private lastBgTextureKey: string;
 
   private pokemonPool: ArenaPokemonPools;
   private readonly trainerPool: TrainerPools;
@@ -265,14 +273,15 @@ export class Arena {
   // #region Misc Public Methods
 
   public init() {
+    const waveIndex = globalScene.currentBattle?.waveIndex ?? 1;
+    const biomeStartWave = erBiomeRoutingActive() ? getErBiomeStartWave() : Math.floor((waveIndex - 1) / 10) * 10 + 1;
+    this.backgroundSetIndex = selectErBiomeBackgroundSetIndex(this.biomeId, globalScene.seed ?? "", biomeStartWave);
+
     globalScene.arenaPlayer.setBiome(this.biomeId);
     globalScene.arenaPlayerTransition.setBiome(this.biomeId);
     globalScene.arenaEnemy.setBiome(this.biomeId);
     globalScene.arenaNextEnemy.setBiome(this.biomeId);
-    const bgKey = this.getBgTextureKey();
-    globalScene.arenaBg.setTexture(bgKey);
-    globalScene.arenaBgTransition.setTexture(bgKey);
-    this.lastBgTimeOfDay = this.getTimeOfDay();
+    this.applyBgTexture();
 
     // Redo this on initialize because during save/load the current wave isn't always
     // set correctly during construction
@@ -280,36 +289,46 @@ export class Arena {
   }
 
   /**
-   * The background texture key for this arena, honoring per-time-of-day variants.
-   * Variant biomes (see {@linkcode BG_VARIANT_BIOMES}) ship hand-painted
-   * `{biome}_bg_{day|dusk|night}` art; every other biome uses the single
-   * `{biome}_bg` (tinted by the day/night shader). DAWN reuses the day art.
+   * The background texture key for the selected scene and current time of day.
    */
   public getBgTextureKey(): string {
-    const biomeKey = getBiomeKey(this.biomeId);
-    if (biomeHasBgVariants(this.biomeId)) {
-      return `${biomeKey}_bg_${bgVariantSuffixForTime(this.getTimeOfDay())}`;
+    return this.getResolvedBg().textureKey;
+  }
+
+  public getBgIgnoreTimeTint(): boolean {
+    return this.getResolvedBg().ignoreTimeTint;
+  }
+
+  private getResolvedBg() {
+    return (
+      resolveErBiomeBackground(this.biomeId, this.backgroundSetIndex, this.getTimeOfDay()) ?? {
+        textureKey: `${getBiomeKey(this.biomeId)}_bg`,
+        ignoreTimeTint: false,
+      }
+    );
+  }
+
+  private applyBgTexture(): void {
+    const background = this.getResolvedBg();
+    for (const sprite of [globalScene.arenaBg, globalScene.arenaBgTransition]) {
+      sprite.setTexture(background.textureKey);
+      sprite.pipelineData = {
+        ...sprite.pipelineData,
+        ignoreTimeTint: background.ignoreTimeTint,
+      };
     }
-    return `${biomeKey}_bg`;
+    this.lastBgTextureKey = background.textureKey;
   }
 
   /**
-   * Swap the arena background to match the current time of day for biomes that
-   * have day/dusk/night variants. Cheap no-op for single-background biomes and
-   * when the time-of-day bucket has not changed. Called once per wave.
+   * Refresh the selected scene's frame when the arena time bucket changes.
+   * Called once per wave and is a cheap no-op when the texture remains the same.
    */
   public updateBgForTimeOfDay(): void {
-    if (!biomeHasBgVariants(this.biomeId)) {
+    if (this.getBgTextureKey() === this.lastBgTextureKey) {
       return;
     }
-    const timeOfDay = this.getTimeOfDay();
-    if (timeOfDay === this.lastBgTimeOfDay) {
-      return;
-    }
-    this.lastBgTimeOfDay = timeOfDay;
-    const bgKey = this.getBgTextureKey();
-    globalScene.arenaBg.setTexture(bgKey);
-    globalScene.arenaBgTransition.setTexture(bgKey);
+    this.applyBgTexture();
   }
 
   public setIgnoreAbilities(ignoreAbilities: boolean, ignoringEffectSource: BattlerIndex | null = null): void {
@@ -461,6 +480,19 @@ export class Arena {
     }
 
     this.weather = weather ? new Weather(weather, weatherDuration.value, weatherDuration.value) : null;
+
+    if (
+      [WeatherType.HAIL, WeatherType.SNOW].includes(oldWeatherType)
+      && ![WeatherType.HAIL, WeatherType.SNOW].includes(weather)
+    ) {
+      for (const side of [ArenaTagSide.PLAYER, ArenaTagSide.ENEMY]) {
+        const veil = this.getTagOnSide(ArenaTagType.AURORA_VEIL, side);
+        if (veil?.turnCount != null && veil.turnCount <= 0) {
+          this.removeTagOnSide(ArenaTagType.AURORA_VEIL, side);
+        }
+      }
+    }
+
     this.eventTarget.dispatchEvent(
       new WeatherChangedEvent(oldWeatherType, this.weather?.weatherType!, this.weather?.turnsLeft!),
     ); // TODO: this `x?.y!` is dumb, fix this
@@ -583,6 +615,9 @@ export class Arena {
    */
   public trySetTerrain(terrain: TerrainType, ignoreAnim = false, user?: Pokemon, turnsOverride?: number): boolean {
     if (!this.canSetTerrain(terrain)) {
+      return false;
+    }
+    if (this.terrainType === TerrainType.TOXIC && terrain !== TerrainType.TOXIC && isToxicTerrainProtected()) {
       return false;
     }
 
@@ -797,7 +832,17 @@ export class Arena {
     if (tierPool.length === 0) {
       species = globalScene.randomSpecies(waveIndex, level);
     } else {
-      species = getPokemonSpecies(randSeedItem(tierPool));
+      const encounterWeights = tierPool.map(speciesId =>
+        getEncounterSpeciesWeightMultiplier(getPokemonSpecies(speciesId)),
+      );
+      if (encounterWeights.every(weight => weight === 1)) {
+        species = getPokemonSpecies(randSeedItem(tierPool));
+      } else {
+        const weightedIndices = new Map<number, number>(
+          encounterWeights.map((weight, index) => [index, Math.max(1, Math.round(weight * 1000))]),
+        );
+        species = getPokemonSpecies(tierPool[weightedPick(weightedIndices)]);
+      }
     }
 
     // ER biome identity (#439 §3): the ISLAND favors regional variants. When the
@@ -1333,46 +1378,6 @@ export class Arena {
 
 export function getBiomeKey(biomeId: BiomeId): string {
   return enumValueToKey(BiomeId, biomeId).toLowerCase();
-}
-
-/**
- * Biomes that ship hand-painted day/dusk/night battle-background art (ER staging).
- * For these the arena swaps between `{biome}_bg_day` / `_dusk` / `_night` by time
- * of day instead of tinting a single `{biome}_bg`, and the background opts out of
- * the day/night shader tint (its lighting is already painted in). Consumed by the
- * loading-scene variant preload and {@linkcode Arena.getBgTextureKey} /
- * {@linkcode Arena.updateBgForTimeOfDay}, and the `ignoreTimeTint` flag in
- * `BattleScene.newArena`.
- */
-export const BG_VARIANT_BIOMES: ReadonlySet<BiomeId> = new Set<BiomeId>([
-  BiomeId.VOLCANO,
-  BiomeId.WASTELAND,
-  BiomeId.GRAVEYARD,
-  BiomeId.POWER_PLANT,
-  // Abyss getTimeOfDay() is hardcoded to NIGHT, so it always shows abyss_bg_night
-  // (the dark crystal-cavern slice), untinted.
-  BiomeId.ABYSS,
-]);
-
-/** The time-of-day suffixes every variant biome provides (DAWN reuses "day"). */
-export const BG_VARIANT_SUFFIXES = ["day", "dusk", "night"] as const;
-
-/** Whether the biome has per-time-of-day background variants installed. */
-export function biomeHasBgVariants(biomeId: BiomeId): boolean {
-  return BG_VARIANT_BIOMES.has(biomeId);
-}
-
-/** Maps a time of day to the background variant suffix a variant biome provides. */
-export function bgVariantSuffixForTime(timeOfDay: TimeOfDay): (typeof BG_VARIANT_SUFFIXES)[number] {
-  switch (timeOfDay) {
-    case TimeOfDay.NIGHT:
-      return "night";
-    case TimeOfDay.DUSK:
-      return "dusk";
-    default:
-      // DAY and DAWN both use the day-lit art.
-      return "day";
-  }
 }
 
 export function getBiomeHasProps(biomeId: BiomeId): boolean {

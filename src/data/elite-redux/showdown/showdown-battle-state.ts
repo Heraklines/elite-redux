@@ -19,7 +19,7 @@
 
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
-import type { ShowdownSession } from "#data/elite-redux/showdown/showdown-session";
+import type { ShowdownBattleFormat, ShowdownSession } from "#data/elite-redux/showdown/showdown-session";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import type { Starter } from "#types/save-data";
 
@@ -27,6 +27,13 @@ interface ShowdownBattleState {
   ownManifest: ShowdownMonManifest[];
   opponentManifest: ShowdownMonManifest[];
   relay: ShowdownCommandRelay | null;
+  /**
+   * The AGREED field-width format for this match (both clients validated equal in the negotiate
+   * handshake). "singles" for a plain 1v1; "doubles"/"triples" for a tournament match. The HOST's
+   * battle bootstrap (`BattleScene.checkIsDouble`/`resolveBattleFormat`) reads this to build the
+   * field to the negotiated width; the guest adopts the host's format from the launch snapshot.
+   */
+  battleFormat: ShowdownBattleFormat;
   /**
    * Task C7: the OPPONENT's authored ghost-trainer presentation (already sanitized on receipt),
    * or null when the opponent authored none. The host applies it to the enemy trainer; the guest
@@ -176,6 +183,7 @@ export function beginShowdownBattle(
   opponentProfile: GhostTrainerProfile | null = null,
   matchId: string | null = null,
   ranked: ShowdownRankedContext | null = null,
+  battleFormat: ShowdownBattleFormat = "singles",
 ): void {
   // Adopt the pre-battle relay into the live state: clear the pending slot WITHOUT disposing the
   // adopted relay (endShowdownBattle owns its teardown now). Dispose a stale, non-adopted pending relay.
@@ -183,7 +191,7 @@ export function beginShowdownBattle(
     pendingRelay.dispose();
   }
   pendingRelay = null;
-  state = { ownManifest, opponentManifest, relay, opponentProfile, matchId, ranked };
+  state = { ownManifest, opponentManifest, relay, opponentProfile, matchId, ranked, battleFormat };
 }
 
 /** The live match state, or null when no showdown match is active. */
@@ -213,6 +221,15 @@ export function getShowdownOpponentProfile(): GhostTrainerProfile | null {
 /** The enemy-command relay (C4), or null (host-solo bootstrap / no match). */
 export function getShowdownRelay(): ShowdownCommandRelay | null {
   return state?.relay ?? null;
+}
+
+/**
+ * The negotiated field-width format of the active match ("singles"/"doubles"/"triples"), or null when
+ * no showdown match is active. The HOST's battle bootstrap reads this to build the field to the agreed
+ * width; a plain (non-tournament) match is always "singles".
+ */
+export function getShowdownBattleFormat(): ShowdownBattleFormat | null {
+  return state?.battleFormat ?? null;
 }
 
 /** Task D1/D2: the escrow match id for a STAKED match, or null for a friendly (no escrow). */

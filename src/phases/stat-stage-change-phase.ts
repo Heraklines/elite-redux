@@ -4,6 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import type { ArenaTag } from "#data/arena-tag";
 import { OctolockTag } from "#data/battler-tags";
+import { applySuperegoAfterBoost } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementStatStage } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
@@ -269,6 +270,9 @@ export class StatStageChangePhase extends PokemonPhase {
         }
 
         pokemon.setStatStage(s, pokemon.getStatStage(s) + stages.value);
+        if (stages.value > 0) {
+          applySuperegoAfterBoost(pokemon, s, this.canBeCopied);
+        }
         erRecordAchievementStatStage(pokemon, s as Stat);
 
         // Co-op host turn recorder (#633, TRACK-2 Phase B - animation layer): record the NEW absolute

@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { getExperienceGainMultiplier } from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { ExpBoosterModifier } from "#modifiers/modifier";
 import { PlayerPartyMemberPokemonPhase } from "#phases/player-party-member-pokemon-phase";
 import { NumberHolder } from "#utils/common";
@@ -7,7 +8,7 @@ import i18next from "i18next";
 
 export class ExpPhase extends PlayerPartyMemberPokemonPhase {
   public readonly phaseName = "ExpPhase";
-  private expValue: number;
+  private readonly expValue: number;
 
   constructor(partyMemberIndex: number, expValue: number) {
     super(partyMemberIndex);
@@ -21,6 +22,7 @@ export class ExpPhase extends PlayerPartyMemberPokemonPhase {
     const pokemon = this.getPokemon();
     const exp = new NumberHolder(this.expValue);
     globalScene.applyModifiers(ExpBoosterModifier, true, exp);
+    exp.value *= getExperienceGainMultiplier(pokemon);
     exp.value = Math.floor(exp.value);
     // Co-op animations-off FAST-FORWARD (replay pacing): in a co-op run with move animations disabled,
     // collapse the EXP dwell - reveal the gain line INSTANTLY (delay 0, no typewriter) and fill the EXP

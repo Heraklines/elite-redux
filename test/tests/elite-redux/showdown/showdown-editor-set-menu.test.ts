@@ -119,6 +119,71 @@ describe.runIf(RUN)("showdown set editor - Set Menu (export / import / save / lo
   });
 });
 
+// =============================================================================
+// SUGGESTED SETS (P3, the flagship): the editor lists your OWN winning full-sets (applied whole) and
+// COMMUNITY popular item+form hints (overlaid onto the current set, KEEPING your moves). Telemetry only
+// stores fingerprints, so the community half is honestly item+form; the full-set half is your own wins.
+// =============================================================================
+describe.runIf(RUN)("showdown set editor - Suggested sets (P3)", () => {
+  let phaserGame: Phaser.Game;
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+  afterAll(() => phaserGame.destroy(true));
+
+  /** Open the Set Menu and move the cursor onto "Suggested sets" (the 5th option). */
+  const openSuggested = (ed: Internals) => {
+    ed.processInput(Button.STATS);
+    for (let i = 0; i < 4; i++) {
+      ed.processInput(Button.DOWN);
+    }
+    ed.processInput(Button.ACTION);
+  };
+
+  it("lists YOUR winning sets + COMMUNITY popular items, with an honest empty state when neither exists", () => {
+    const game = new GameManager(phaserGame);
+    const emptyEd = buildEditor(game, { demoWinningSets: [], demoCommunitySuggestions: [] });
+    openSuggested(emptyEd);
+    expect(emptyEd.setMenu).toBe("suggested");
+    expect((emptyEd as any).suggestedList.length).toBe(0);
+
+    const ed = buildEditor(game, {
+      demoWinningSets: [exportShowdownSet(pikaProofGarchomp())],
+      demoCommunitySuggestions: [{ speciesId: SpeciesId.GARCHOMP, formIndex: 0, item: "ER_CHOICE_BAND", wins: 7 }],
+    });
+    openSuggested(ed);
+    const list = (ed as any).suggestedList as { source: string }[];
+    expect(list.length).toBe(2);
+    expect(list[0].source).toBe("yours"); // your winning set ranks first
+    expect(list[1].source).toBe("popular");
+  });
+
+  it("applying YOUR winning set applies it WHOLE (item + moves), same path as Load", () => {
+    const game = new GameManager(phaserGame);
+    const ed = buildEditor(game, { demoWinningSets: [exportShowdownSet(pikaProofGarchomp())] });
+    openSuggested(ed);
+    ed.processInput(Button.ACTION); // apply the first (yours) entry
+    expect(ed.setMenu).toBe("closed");
+    expect(ed.config.set.item).toBe("ER_LIFE_ORB"); // the winning set's item
+    expect(ed.config.set.moves[0]).toBe(MoveId.EARTHQUAKE); // and its moveset
+  });
+
+  it("applying a COMMUNITY hint overlays item + stage but KEEPS your current moves (honest partial)", () => {
+    const game = new GameManager(phaserGame);
+    const ed = buildEditor(game, {
+      demoWinningSets: [],
+      demoCommunitySuggestions: [{ speciesId: SpeciesId.GARCHOMP, formIndex: 0, item: "ER_CHOICE_BAND", wins: 5 }],
+    });
+    const movesBefore = [...ed.config.set.moves];
+    openSuggested(ed);
+    ed.processInput(Button.ACTION); // apply the only (community) entry
+    expect(ed.setMenu).toBe("closed");
+    expect(ed.config.set.item).toBe("ER_CHOICE_BAND"); // adopted the popular item
+    expect(ed.config.stage.speciesId).toBe(SpeciesId.GARCHOMP); // fielded the popular stage
+    expect(ed.config.set.moves).toEqual(movesBefore); // YOUR moves are untouched (telemetry has no moves)
+  });
+});
+
 /** A Garchomp-line manifest with a distinctive item, to prove Load actually applied it. */
 function pikaProofGarchomp() {
   return {

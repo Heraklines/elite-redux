@@ -29,6 +29,13 @@ export class CommandUiHandler extends UiHandler {
   private infoHintIcon: Phaser.GameObjects.Sprite;
   private infoHintLabel: Phaser.GameObjects.Text;
 
+  /** Showdown 1v1: a subtle turn-clock countdown shown while the host's 60s command clock ticks. */
+  private showdownClockLabel: Phaser.GameObjects.Text;
+  /** The per-second tick driving {@linkcode showdownClockLabel}; null when the clock is not shown. */
+  private showdownClockTick: Phaser.Time.TimerEvent | null = null;
+  /** Epoch ms the current turn clock expires (for the countdown text); 0 when not armed. */
+  private showdownClockDeadline = 0;
+
   protected fieldIndex = 0;
   /** Remembered cursor per NON-lead field slot (index 1..2; a triple has two - a single shared `cursor2` made slots 2 and 3 clobber each other's memory). Slot 0 keeps the base-class `cursor`. */
   protected cursorsBySlot: number[] = [];
@@ -104,6 +111,52 @@ export class CommandUiHandler extends UiHandler {
       fontSize: "42px",
     }).setName("info-hint-label");
     this.commandsContainer.add([this.infoHintIcon, this.infoHintLabel]);
+
+    // Showdown 1v1 turn clock (right-aligned above the command grid). Hidden until the versus
+    // CommandPhase arms it via startShowdownClock; matches the Info-hint chrome (small, subtle).
+    this.showdownClockLabel = addTextObject(120, -15, "", TextStyle.INSTRUCTIONS_TEXT, { fontSize: "42px" })
+      .setName("showdown-clock")
+      .setOrigin(1, 0)
+      .setVisible(false);
+    this.commandsContainer.add(this.showdownClockLabel);
+  }
+
+  /**
+   * Showdown 1v1: show the turn-clock countdown for `totalMs` (the versus CommandPhase drives it). Ticks
+   * once a second, recoloring red under 10s. Idempotent restart; hidden + stopped by
+   * {@linkcode stopShowdownClock} on pick / phase end. Cosmetic only - the authoritative expiry timer
+   * lives in CommandPhase.
+   */
+  startShowdownClock(totalMs: number): void {
+    this.stopShowdownClock();
+    this.showdownClockDeadline = Date.now() + totalMs;
+    this.showdownClockLabel.setVisible(true);
+    this.refreshShowdownClock();
+    // Tick every second; the harness no-ops timers, so the initial render still shows the full clock.
+    this.showdownClockTick = globalScene.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => this.refreshShowdownClock(),
+    });
+  }
+
+  /** Update the countdown text + color from the remaining time (clamped at 0). */
+  private refreshShowdownClock(): void {
+    const remainingMs = Math.max(0, this.showdownClockDeadline - Date.now());
+    const secs = Math.ceil(remainingMs / 1000);
+    const mm = Math.floor(secs / 60);
+    const ss = secs % 60;
+    this.showdownClockLabel.setText(`${mm}:${ss.toString().padStart(2, "0")}`);
+    // Under 10s: red; otherwise the standard instruction tint.
+    this.showdownClockLabel.setColor(secs <= 10 ? "#e8646a" : "#f8f8f8");
+  }
+
+  /** Hide + stop the turn-clock countdown (no-op when not shown). */
+  stopShowdownClock(): void {
+    this.showdownClockTick?.remove();
+    this.showdownClockTick = null;
+    this.showdownClockDeadline = 0;
+    this.showdownClockLabel?.setVisible(false);
   }
 
   /** Refresh the Info-hint key glyph to match the player's current input method/binding. */
@@ -354,6 +407,7 @@ export class CommandUiHandler extends UiHandler {
   clear(): void {
     super.clear();
     this.battleInfo.close();
+    this.stopShowdownClock();
     this.getUi().getMessageHandler().commandWindow.setVisible(false);
     this.commandsContainer.setVisible(false);
     this.getUi().getMessageHandler().clearText();

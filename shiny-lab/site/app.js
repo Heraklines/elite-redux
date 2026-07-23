@@ -190,6 +190,40 @@ const distFor = ai => {
   }
   return distCache.get(ai);
 };
+// Exotic-effect support (ported from the in-game Shiny Lab, 2026-07-20): a
+// per-frame silhouette-topology bundle (SDF / Voronoi midline / normals /
+// matcap z / pixId), computed lazily only when an exotic surface is active.
+const topoCache = new Map();
+const topoFor = ai => {
+  if (!topoCache.has(ai)) {
+    topoCache.set(ai, computeFxTopology(frameBuf[ai], FW, FH));
+  }
+  return topoCache.get(ai);
+};
+const EXOTIC_SURF = new Set(["gildedbones", "carvedrelief", "innerember", "nestedportrait"]);
+// Union-silhouette centroid across ALL frames of the current animation, in
+// padded-normalized coords: landmark geometry (Warp Well) anchors to this so it
+// does not wobble as the pose hops frame to frame. Falls back to the frame
+// centroid for a single-frame sprite.
+let stableAnchor = null;
+function computeStableAnchor() {
+  let sx = 0;
+  let sy = 0;
+  let cnt = 0;
+  for (let ai = 0; ai < frameBuf.length; ai++) {
+    const buf = frameBuf[ai];
+    for (let y = 0; y < FH; y++) {
+      for (let x = 0; x < FW; x++) {
+        if (buf[(y * FW + x) * 4 + 3] > 0.02) {
+          sx += x + PAD;
+          sy += y + PAD;
+          cnt++;
+        }
+      }
+    }
+  }
+  stableAnchor = cnt > 0 ? { cx: sx / cnt / PW, cy: sy / cnt / PH } : null;
+}
 const makeSampler = buf => (x, y) => {
   const xi = Math.max(0, Math.min(FW - 1, Math.round(x * FW)));
   const yi = Math.max(0, Math.min(FH - 1, Math.round(y * FH)));
@@ -239,6 +273,8 @@ async function loadSpecies(id) {
   frameBuf = [];
   edgeCache.clear();
   distCache.clear();
+  topoCache.clear();
+  stableAnchor = null;
   for (const f of fr) {
     const fb = new Float32Array(FW * FH * 4);
     const sss = f.spriteSourceSize || { x: 0, y: 0 };
@@ -276,6 +312,7 @@ async function loadSpecies(id) {
   }
   denseBuf = dense;
   recomputeCL();
+  computeStableAnchor();
   curSpecies = id;
   resizeCanvases();
   status("");
@@ -319,7 +356,21 @@ function renderLook(slots, buf, ef, dist, t, out, amt, fx) {
       }
     }
   }
-  const ac = { cx: dist.cx, cy: dist.cy, fy: dist.fy, spr: sprPad, main: mainCol };
+  const surf0 = slots.surface || null;
+  // Exotic topology: computed lazily per frame, only when an exotic surface is on.
+  const ai = frameBuf.indexOf(buf);
+  const topo = surf0 && EXOTIC_SURF.has(surf0) && ai >= 0 ? topoFor(ai) : null;
+  const stCx = stableAnchor ? stableAnchor.cx : dist.cx;
+  const stCy = stableAnchor ? stableAnchor.cy : dist.cy;
+  const ac = {
+    cx: dist.cx,
+    cy: dist.cy,
+    fy: dist.fy,
+    stableCx: stCx,
+    stableCy: stCy,
+    spr: sprPad,
+    main: mainCol,
+  };
   const ctx = {
     e: 0,
     sa: rawSa,
@@ -328,6 +379,10 @@ function renderLook(slots, buf, ef, dist, t, out, amt, fx) {
     K: CL ? CL.K : 1,
     clRank: (r, g, b) => (CL ? clusterRank(CL, r, g, b) : 0),
     clColor: i => (CL ? CL.cent[i] : [0.5, 0.5, 0.5]),
+    px: 0,
+    py: 0,
+    topo,
+    anchors: { frameCx: dist.cx, frameCy: dist.cy, frameFy: dist.fy, stableCx: stCx, stableCy: stCy, stableFy: dist.fy },
   };
   const pal = slots.palette && slots.palette !== "base" ? slots.palette : null;
   const surf = slots.surface || null;
@@ -389,6 +444,8 @@ function renderLook(slots, buf, ef, dist, t, out, amt, fx) {
         const x = (sx + 0.5) / FW;
         const y = (sy + 0.5) / FH;
         ctx.e = ef[sy * FW + sx];
+        ctx.px = sx;
+        ctx.py = sy;
         const r = buf[i];
         const g = buf[i + 1];
         const b = buf[i + 2];

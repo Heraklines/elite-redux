@@ -5,6 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { isReleasedCommander } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
@@ -81,6 +82,7 @@ import {
 import { FieldPhase } from "#phases/field-phase";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
+import type { CommandUiHandler } from "#ui/command-ui-handler";
 import { canTerastallize } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
@@ -213,6 +215,7 @@ export class CommandPhase extends FieldPhase {
     const pokemon = this.getPokemon();
     if (
       (globalScene.currentBattle?.getBattlerCount() ?? 0) > 1
+      && !isReleasedCommander(pokemon)
       && pokemon.getAllies().some(ally => ally.getTag(BattlerTagType.COMMANDED)?.sourceId === pokemon.id)
     ) {
       globalScene.currentBattle.turnCommands[this.fieldIndex] = {
@@ -940,28 +943,79 @@ export class CommandPhase extends FieldPhase {
     if (!isVersusSession() || getCoopController()?.role !== "guest") {
       return false;
     }
-    let serialized: SerializedCommand;
     if (command === Command.FIGHT || command === Command.TERA) {
-      const moveId = this.getPokemon().getMoveset()[cursor]?.moveId;
+      const mon = this.getPokemon();
+      const moveId = mon.getMoveset()[cursor]?.moveId;
       if (moveId == null) {
         return false;
       }
-      serialized = buildShowdownFightCommand(cursor, moveId);
-      if (typeof useMode !== "boolean") {
-        serialized.useMode = useMode;
+      const tera = command === Command.TERA;
+      const resolvedUseMode = typeof useMode === "boolean" ? undefined : useMode;
+      // DOUBLES/TRIPLES targeting: a single-target move with MORE THAN ONE legal candidate needs the
+      // human's choice, so run the game's REAL target selector and ship the RESOLVED target. Singles
+      // (one opposing slot) and spread moves (`multiple`) have a deterministic target set the host
+      // re-derives, so they ship immediately with no target UI.
+      const moveTargets = getMoveTargets(mon, moveId);
+      const needsChoice = moveTargets.targets.length > 1 && !moveTargets.multiple;
+      if (needsChoice) {
+        globalScene.ui.setMode(UiMode.TARGET_SELECT, this.fieldIndex, moveId, (targets: BattlerIndex[]) => {
+          globalScene.ui.setMode(UiMode.MESSAGE);
+          if (targets.length === 0) {
+            // Cancelled / restricted: reopen this slot's command menu so the player re-picks.
+            globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
+            return;
+          }
+          this.shipShowdownGuestFight(cursor, moveId, [...targets], resolvedUseMode, tera);
+        });
+        return true;
       }
-      if (command === Command.TERA) {
-        serialized.tera = true;
-      }
-    } else if (command === Command.POKEMON) {
-      serialized = buildShowdownSwitchCommand(cursor);
-      serialized.baton = typeof useMode === "boolean" ? useMode : false;
-    } else {
-      // BALL / RUN / SHIFT have no meaning in a versus trainer 1v1; let them fall through (they are
-      // not selectable in this mode, so this branch is unreachable in practice).
-      return false;
+      this.shipShowdownGuestFight(cursor, moveId, moveTargets.targets, resolvedUseMode, tera);
+      return true;
     }
-    getShowdownRelay()?.sendCommand(globalScene.currentBattle.turn, serialized);
+    if (command === Command.POKEMON) {
+      const serialized = buildShowdownSwitchCommand(cursor);
+      serialized.baton = typeof useMode === "boolean" ? useMode : false;
+      this.finishShowdownGuestShip(serialized);
+      return true;
+    }
+    // BALL / RUN / SHIFT have no meaning in a versus trainer match; let them fall through (they are
+    // not selectable in this mode, so this branch is unreachable in practice).
+    return false;
+  }
+
+  /**
+   * Ship a versus-guest FIGHT with its resolved targets. Builds the STABLE `targetRefs` ({side,
+   * pokemonId}) from the guest's chosen LOCAL battler indices so the host maps them across the
+   * perspective flip by pokemonId; the numeric `targets` ride along for presentation. Then finalizes
+   * the ship (relay + inert skip + waiting notice).
+   */
+  private shipShowdownGuestFight(
+    cursor: number,
+    moveId: number,
+    targets: number[],
+    useMode: MoveUseMode | undefined,
+    tera: boolean,
+  ): void {
+    const targetRefs = targets.map(bi => this.coopTargetRef(bi)).filter((r): r is CoopBattleTargetRef => r != null);
+    const serialized = buildShowdownFightCommand(cursor, moveId, targets, targetRefs);
+    if (useMode != null) {
+      serialized.useMode = useMode;
+    }
+    if (tera) {
+      serialized.tera = true;
+    }
+    this.finishShowdownGuestShip(serialized);
+  }
+
+  /**
+   * Finalize a versus-guest ship: relay the serialized command to the host (keyed by this own field
+   * slot), write an inert skip so the phase queue stays well-formed (TurnStartPhase diverts to
+   * CoopReplayTurnPhase and the guest renders the host's authoritative outcome), show the waiting
+   * notice, and end the phase.
+   */
+  private finishShowdownGuestShip(serialized: SerializedCommand): void {
+    this.clearShowdownTurnClock();
+    getShowdownRelay()?.sendCommand(globalScene.currentBattle.turn, serialized, this.fieldIndex);
     globalScene.currentBattle.turnCommands[this.fieldIndex] = {
       command: Command.FIGHT,
       move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
@@ -976,7 +1030,6 @@ export class CommandPhase extends FieldPhase {
       true,
     );
     this.end();
-    return true;
   }
 
   /** Open THIS client's own-slot command UI (FIGHT for a skip-to-fight ME, else the COMMAND menu). */
@@ -1006,6 +1059,13 @@ export class CommandPhase extends FieldPhase {
       return;
     }
     this.clearShowdownTurnClock();
+    // Cosmetic: show the countdown on the command UI so the player sees their own clock.
+    try {
+      const commandUi = globalScene.ui.handlers[UiMode.COMMAND] as CommandUiHandler | undefined;
+      commandUi?.startShowdownClock(SHOWDOWN_TURN_TIMER_MS);
+    } catch {
+      /* the countdown is cosmetic; a UI hiccup must never block the turn clock */
+    }
     this.showdownTurnClock = window.setTimeout(() => {
       this.showdownTurnClock = null;
       try {
@@ -1026,6 +1086,12 @@ export class CommandPhase extends FieldPhase {
     if (this.showdownTurnClock != null) {
       window.clearTimeout(this.showdownTurnClock);
       this.showdownTurnClock = null;
+    }
+    // Hide the cosmetic countdown alongside the authoritative timer.
+    try {
+      (globalScene.ui.handlers[UiMode.COMMAND] as CommandUiHandler | undefined)?.stopShowdownClock();
+    } catch {
+      /* cosmetic only */
     }
   }
 

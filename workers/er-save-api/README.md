@@ -15,14 +15,16 @@ client already speaks (`src/api/*`). Because the client already does all the log
 
 ## Capacity (how many players this hosts)
 
-The binding limits on Cloudflare's **free** tier are **Workers: 100k requests/day**
-and **D1: 100k writes/day** (reads 5M/day, storage 5 GB). The client syncs with
-debounce (~40 writes/day per active player), so:
+The account is on the **Workers Paid plan**. D1 storage is **10 GB per database**
+(er-saves currently sits at ~4% of that; the old free-tier **500 MB/db** cap no
+longer applies — saves are stored uncompressed), and the paid write/read budgets
+(**50M D1 writes/mo**, **~25B rows read/mo**, **10M Worker req/mo**) are far above
+what the client's debounced sync (~40 writes/day per active player) needs:
 
 | Tier | Daily-active players | Notes |
 |------|----------------------|-------|
-| **Free** | **~1,000–1,500** | Write count is the ceiling; debounced sync keeps 1k players ≈ 40k writes/day. Storage (~1 GB for 1k players) is never the issue. |
-| **Workers Paid ($5/mo)** | **~40,000+** | 50M D1 writes/mo, 10M Worker req/mo included. |
+| **Workers Paid ($5/mo)** — current | **~40,000+** | Write count is the ceiling; debounced sync keeps 1k players ≈ 40k writes/day. Storage (~1 GB per 1k players) is a rounding error against the 10 GB/db ceiling. |
+| Free tier (historical) | ~1,000–1,500 | 100k Worker req/day, 100k D1 writes/day, 5M rows read/day, 500 MB/db storage. |
 
 KV is **not** used — its ~1,000 writes/day cap can't host saves. D1 is the right store.
 

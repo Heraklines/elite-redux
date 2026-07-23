@@ -28,7 +28,13 @@ import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SLOTS_PER_PLAYER } from "#data/elite-redux/coop/coop-session";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import { resetErAchievementRunState } from "#data/elite-redux/er-achievement-run-state";
-import { ER_BLACK_SHINY_TINT } from "#data/elite-redux/er-black-shinies";
+import {
+  countErBlackShinyStarters,
+  ER_BLACK_SHINY_LUCK,
+  ER_BLACK_SHINY_TINT,
+  getErBlackShinySpriteSource,
+  isErBlackShinyStarterSelection,
+} from "#data/elite-redux/er-black-shinies";
 import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#data/elite-redux/er-community-run-state";
 import { resetErCustomTrainerTracking } from "#data/elite-redux/er-custom-trainers";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
@@ -1843,6 +1849,26 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
     }
 
+    // Black is a selected tier layered over the epic (variant 2) shiny. Purge
+    // stale saved flags when the unlock or its underlying shiny is no longer
+    // valid; otherwise a normal/red preview can incorrectly display Luck 5.
+    if (starterAttributes.erBlackShiny) {
+      const selectedShiny = starterAttributes.shiny === true || (starterAttributes.shiny !== false && hasShiny !== 0n);
+      let selectedVariant = starterAttributes.variant;
+      if (selectedVariant === undefined) {
+        if ((caughtAttr & DexAttr.VARIANT_3) !== 0n) {
+          selectedVariant = 2;
+        } else if ((caughtAttr & DexAttr.VARIANT_2) === 0n) {
+          selectedVariant = 0;
+        } else {
+          selectedVariant = 1;
+        }
+      }
+      if (!starterData.erBlackShiny || !selectedShiny || selectedVariant !== 2) {
+        starterAttributes.erBlackShiny = undefined;
+      }
+    }
+
     if (
       starterAttributes.female !== undefined
       && !(starterAttributes.female ? caughtAttr & DexAttr.FEMALE : caughtAttr & DexAttr.MALE)
@@ -3538,9 +3564,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 starterAttributes.erBlackShiny = true;
                 originalStarterAttributes.erBlackShiny = true;
                 globalScene.playSound("se/sparkle");
-                this.pokemonShinyIcon.setFrame(getVariantIcon(2)).setTint(0x0a0a0a).setVisible(true);
-                // ER (#349): preview the black look on the big sprite too.
-                this.pokemonSprite.setTint(ER_BLACK_SHINY_TINT);
+                // Re-run the same detail pipeline as every ordinary shiny tier:
+                // this refreshes the real black atlas, Luck 5, shiny marker, and
+                // an already-selected party entry atomically.
+                this.setSpeciesDetails(this.lastSpecies, { shiny: true, variant: 2 });
                 success = true;
               } else {
                 // If shiny, we update the variant
@@ -3548,7 +3575,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 if (starterAttributes.erBlackShiny) {
                   starterAttributes.erBlackShiny = false;
                   originalStarterAttributes.erBlackShiny = false;
-                  this.pokemonSprite.clearTint();
                 }
                 let newVariant = props.variant;
                 do {
@@ -3889,6 +3915,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       return false;
     }
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, dexAttr);
+    const { dexEntry, starterDataEntry } = this.getSpeciesData(species.speciesId);
+    const isBlackShiny = this.isBlackShinyPick(species.speciesId, starterDataEntry, props.shiny, props.variant);
+    if (isBlackShiny && countErBlackShinyStarters(this.starters) >= 1) {
+      if (!randomSelection) {
+        this.rejectBlackShinyPick();
+      }
+      return false;
+    }
     // Showdown (B7 item 15): the party mini-icon follows the picked Field Stage. The stage is read
     // from `showdownSelections` (keyed by root), which restore-last-team seeds before this add and
     // the interactive stage pick sets, so the icon shows the fielded form the moment it is chosen.
@@ -3903,8 +3937,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       `starter-party-shiny-lab-icon-${this.starterSpecies.length}-${species.speciesId}`,
       false,
     );
-
-    const { dexEntry, starterDataEntry } = this.getSpeciesData(species.speciesId);
 
     // TODO(er-phase-b): `passive: boolean` on the run-start `Starter` is slot-1 only.
     // Phase B will widen `Starter` to carry per-slot enabled state across all 3 slots.
@@ -3924,7 +3956,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       ivs: dexEntry.ivs,
       // ER Black Shinies (#349): t4 selected in the shiny cycle (requires the
       // line's black unlock).
-      erBlackShiny: this.isBlackShinyPick(species.speciesId, starterDataEntry, props.shiny),
+      erBlackShiny: isBlackShiny,
     };
 
     // Showdown: stamp the chosen evolution/mega STAGE + held ITEM onto the starter (the
@@ -3954,8 +3986,20 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * pick of the same species is NOT a black shiny. Single source for the derivation `addToParty`
    * and the showdown field-legality gate both need.
    */
-  private isBlackShinyPick(speciesId: number, starterDataEntry: StarterDataEntry, shiny: boolean): boolean {
-    return !!this.starterPreferences[speciesId]?.erBlackShiny && !!starterDataEntry?.erBlackShiny && shiny;
+  private isBlackShinyPick(
+    speciesId: number,
+    starterDataEntry: StarterDataEntry,
+    shiny: boolean,
+    variant: number,
+  ): boolean {
+    return (
+      !!starterDataEntry?.erBlackShiny
+      && isErBlackShinyStarterSelection({
+        ...this.starterPreferences[speciesId],
+        shiny,
+        variant,
+      })
+    );
   }
 
   /**
@@ -3975,7 +4019,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, dexAttr);
     const { starterDataEntry } = this.getSpeciesData(species.speciesId);
-    const erBlackShiny = this.isBlackShinyPick(species.speciesId, starterDataEntry, props.shiny);
+    const erBlackShiny = this.isBlackShinyPick(species.speciesId, starterDataEntry, props.shiny, props.variant);
     const baseCost = speciesStarterCosts[species.speciesId] ?? 4;
     const partyAlreadyHasHighCost = this.starters.some(s => {
       const c = speciesStarterCosts[s.speciesId] ?? 4;
@@ -3996,6 +4040,22 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.showText(message, undefined, () => this.showText("", 0, () => (this.tutorialActive = false)), undefined, true);
   }
 
+  /** Friendly early rejection for the signature-Pokemon one-Black-Shiny cap. */
+  private rejectBlackShinyPick(): void {
+    this.getUi().playError();
+    this.tryUpdateValue();
+    this.tutorialActive = true;
+    this.showText(
+      i18next.t("starterSelectUiHandler:blackShinyLimit", {
+        defaultValue: "Only one Black Shiny can be selected per team.",
+      }),
+      undefined,
+      () => this.showText("", 0, () => (this.tutorialActive = false)),
+      undefined,
+      true,
+    );
+  }
+
   /**
    * Showdown grid-confirm dispatch (flow wiring). A NEW eligible pick opens the full-screen SET EDITOR
    * to CREATE the slot; an already-in-party line opens a small Edit/Remove party menu (editing re-opens
@@ -4012,7 +4072,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         {
           label: "Edit Set",
           handler: () => {
-            this.openShowdownEditor(removeIndex);
+            // OPTION_SELECT is transient. Dismiss it back to the live grid before opening the editor,
+            // otherwise the editor chains onto this consumed menu and Done returns to an invisible,
+            // input-dead OPTION_SELECT handler.
+            void ui.revertMode().then(() => this.openShowdownEditor(removeIndex));
             return true;
           },
         },
@@ -4020,14 +4083,19 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           label: i18next.t("starterSelectUiHandler:removeFromParty"),
           handler: () => {
             this.popStarter(removeIndex);
-            ui.setMode(UiMode.STARTER_SELECT);
+            void ui.revertMode();
+            return true;
+          },
+        },
+        {
+          label: i18next.t("menu:cancel"),
+          handler: () => {
+            void ui.revertMode();
             return true;
           },
         },
       ];
-      ui.setMode(UiMode.STARTER_SELECT).then(() =>
-        ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options, maxOptions: 8, yOffset: 47 }),
-      );
+      ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 8, yOffset: 47 });
       return;
     }
     // New pick: the field-legality gate fires BEFORE the editor opens (same messages as the validator).
@@ -5675,18 +5743,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           starterColors[species.speciesId] = ["ffffff", "ffffff"];
         }
         const colorScheme = starterColors[species.speciesId];
-
-        // ER (#432): a selected Black Shiny reads its flat Luck 5 (the dex-attr
-        // path only knows the regular 1-3 variant tiers). Display-only here;
-        // the in-run value comes from Pokemon.getLuck()'s matching override.
-        const luck = starterAttributes?.erBlackShiny
-          ? 5
-          : globalScene.gameData.getDexAttrLuck(this.speciesStarterDexEntry.caughtAttr);
-        this.pokemonLuckText
-          .setVisible(!!luck)
-          .setText(luck.toString())
-          .setTint(getVariantTint(Math.min(luck - 1, 2) as Variant));
-        this.pokemonLuckLabelText.setVisible(this.pokemonLuckText.visible);
+        const defaultDexAttr = this.getCurrentDexProps(species.speciesId);
+        const defaultProps = globalScene.gameData.getSpeciesDexAttrProps(species, defaultDexAttr);
+        const isBlackShiny = this.refreshStarterLuck(
+          species,
+          globalScene.gameData.getStarterDataEntry(species.speciesId),
+          defaultProps.shiny,
+          defaultProps.variant,
+          this.speciesStarterDexEntry.caughtAttr,
+        );
 
         //Growth translate
         let growthReadable = toTitleCase(GrowthRate[species.growthRate]);
@@ -5711,10 +5776,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
         this.pokemonHatchedCountText.setText(`${this.speciesStarterDexEntry.hatchedCount}`);
 
-        const defaultDexAttr = this.getCurrentDexProps(species.speciesId);
-        const defaultProps = globalScene.gameData.getSpeciesDexAttrProps(species, defaultDexAttr);
         const variant = defaultProps.variant;
-        const tint = getVariantTint(variant);
+        const tint = isBlackShiny ? 0x0a0a0a : getVariantTint(variant);
         this.pokemonShinyIcon.setFrame(getVariantIcon(variant)).setTint(tint).setVisible(defaultProps.shiny);
         this.pokemonCaughtHatchedContainer.setVisible(true);
         this.pokemonFormText.setVisible(true);
@@ -5824,10 +5887,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         this.setTypeIcons(speciesFormTypes(speciesForm));
 
         this.pokemonSprite.clearTint();
-        // ER Black Shinies (#349): PREVIEW the black tier - obsidian-tint the
-        // preview sprite while the black look is selected for this species
-        // (the real black atlas is a battle asset; the tint is the cue here).
-        if (this.starterPreferences[species.speciesId]?.erBlackShiny && props.shiny && props.variant === 2) {
+        // Generated t4 art is the primary preview. Only lines/forms without a
+        // generated atlas use the documented interim obsidian tint.
+        const previewBlackShiny = this.isBlackShinyPick(
+          species.speciesId,
+          globalScene.gameData.getStarterDataEntry(species.speciesId),
+          props.shiny,
+          props.variant,
+        );
+        if (previewBlackShiny && !getErBlackShinySpriteSource(species, props.female ?? false, props.formIndex)) {
           this.pokemonSprite.setTint(ER_BLACK_SHINY_TINT);
         }
         if (this.pokerusSpecies.includes(species)) {
@@ -6137,6 +6205,51 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
   }
 
+  /** Load a generated Black Shiny atlas under its distinct `-erblack` key. */
+  private loadBlackShinyPreviewAtlas(key: string, atlasPath: string): Promise<void> {
+    if (globalScene.textures.exists(key)) {
+      ensureErSpriteAnim(key);
+      return Promise.resolve();
+    }
+    return new Promise(resolve => {
+      const completeEvent = `filecomplete-atlasjson-${key}`;
+      let settled = false;
+      const safetyTimer = globalScene.time.delayedCall(10000, () => settle());
+      const cleanup = (): void => {
+        globalScene.load.off(completeEvent, onComplete);
+        globalScene.load.off("loaderror", onError);
+        safetyTimer.remove();
+      };
+      const settle = (): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        if (globalScene.textures.exists(key)) {
+          ensureErSpriteAnim(key);
+        }
+        resolve();
+      };
+      const onComplete = (): void => settle();
+      const onError = (file: { key?: string }): void => {
+        if (file.key === key) {
+          settle();
+        }
+      };
+
+      globalScene.load.on(completeEvent, onComplete);
+      globalScene.load.on("loaderror", onError);
+      globalScene.loadPokemonAtlas(key, atlasPath);
+      if (!globalScene.load.isLoading()) {
+        globalScene.load.start();
+      }
+      if (globalScene.textures.exists(key)) {
+        settle();
+      }
+    });
+  }
+
   private refreshPreviewSprite(): void {
     const species = this.lastSpecies;
     if (!species || this.statsMode || !this.starterSelectContainer.visible) {
@@ -6156,15 +6269,25 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const renderStage = this.showdownRenderStage(species.speciesId);
     const renderSpecies = renderStage?.species ?? species;
     const renderFormIndex = renderStage?.formIndex ?? props.formIndex;
+    const isBlackShiny = this.isBlackShinyPick(
+      species.speciesId,
+      globalScene.gameData.getStarterDataEntry(species.speciesId),
+      props.shiny,
+      props.variant,
+    );
+    const blackSource = isBlackShiny ? getErBlackShinySpriteSource(renderSpecies, female, renderFormIndex) : null;
     const labPreview = props.shiny ? this.getStarterShinyLabPreview(species.speciesId) : null;
-    const labPaletteId = props.shiny
-      ? (labPreview?.loadout.palette ?? getErShinyLabPaletteIdForSpecies(species.speciesId))
-      : null;
+    const labPaletteId =
+      props.shiny && !blackSource
+        ? (labPreview?.loadout.palette ?? getErShinyLabPaletteIdForSpecies(species.speciesId))
+        : null;
     const hasExactLabFx = this.hasExactShinyLabFx(labPreview?.loadout);
     const labPaletteVariant: Variant = 0;
     const textureShiny = labPaletteId ? false : props.shiny;
     const textureVariant = labPaletteId ? labPaletteVariant : props.variant;
-    const spriteKey = renderSpecies.getSpriteKey(female, renderFormIndex, textureShiny, textureVariant);
+    const spriteKey =
+      blackSource?.key ?? renderSpecies.getSpriteKey(female, renderFormIndex, textureShiny, textureVariant);
+    this.pokemonSprite.setPipelineData("requestedTextureKey", spriteKey);
     const initialLabCacheKey = labPaletteId
       ? ensureErShinyLabPaletteVariantCache(spriteKey, labPaletteId, labPaletteVariant)
       : null;
@@ -6219,12 +6342,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     this.spriteLoadInFlight = true;
     this.spriteLoadAttempts.set(spriteKey, (this.spriteLoadAttempts.get(spriteKey) ?? 0) + 1);
-    renderSpecies
-      // spriteOnly: ER customs have no cry, and vanilla cries aren't needed in
-      // the preview — skipping audio is what keeps the loader from piling up.
-      // ER-custom species route through ErCustomSpecies.loadAssets here (its
-      // `_shiny`/`_shiny2`/`_shiny3` paths), so all custom sprites still load.
-      .loadAssets(female, renderFormIndex, textureShiny, textureVariant, true, false, true)
+    const loadPromise = blackSource
+      ? this.loadBlackShinyPreviewAtlas(blackSource.key, blackSource.atlasPath)
+      : renderSpecies.loadAssets(female, renderFormIndex, textureShiny, textureVariant, true, false, true);
+    loadPromise
       .catch(() => {})
       .then(() => {
         this.spriteLoadInFlight = false;
@@ -6454,6 +6575,28 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
   }
 
+  /**
+   * Refresh the selected starter's luck and return whether the selected look is
+   * Black Shiny. Black is a tier layered outside the dex-attribute luck table,
+   * so every look-change path must use this helper.
+   */
+  private refreshStarterLuck(
+    species: PokemonSpecies,
+    starterDataEntry: StarterDataEntry,
+    shiny: boolean,
+    variant: number,
+    caughtAttr: bigint,
+  ): boolean {
+    const isBlackShiny = this.isBlackShinyPick(species.speciesId, starterDataEntry, shiny, variant);
+    const luck = isBlackShiny ? ER_BLACK_SHINY_LUCK : globalScene.gameData.getDexAttrLuck(caughtAttr);
+    this.pokemonLuckText
+      .setVisible(!!luck)
+      .setText(luck.toString())
+      .setTint(getVariantTint(Math.min(luck - 1, 2) as Variant));
+    this.pokemonLuckLabelText.setVisible(this.pokemonLuckText.visible);
+    return isBlackShiny;
+  }
+
   setSpeciesDetails(species: PokemonSpecies, options: SpeciesDetails = {}, save = true): void {
     let { shiny, formIndex, female, variant, abilityIndex, natureIndex, teraType } = options;
     const forSeen: boolean = options.forSeen ?? false;
@@ -6581,17 +6724,27 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
       if (forSeen ? this.speciesStarterDexEntry?.seenAttr : this.speciesStarterDexEntry?.caughtAttr) {
         const starterIndex = this.starterSpecies.indexOf(species);
+        const selectedProps = globalScene.gameData.getSpeciesDexAttrProps(species, this.dexAttrCursor);
 
         if (starterIndex > -1) {
           const starter = this.starters[starterIndex];
-          const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.dexAttrCursor);
-          starter.shiny = props.shiny;
-          starter.variant = props.variant;
-          starter.female = props.female;
-          starter.formIndex = props.formIndex;
+          starter.shiny = selectedProps.shiny;
+          starter.variant = selectedProps.variant;
+          starter.female = selectedProps.female;
+          starter.formIndex = selectedProps.formIndex;
           starter.abilityIndex = this.abilityCursor;
           starter.nature = this.natureCursor;
           starter.teraType = this.teraCursor;
+          starter.erBlackShiny = this.isBlackShinyPick(
+            species.speciesId,
+            starterDataEntry,
+            selectedProps.shiny,
+            selectedProps.variant,
+          );
+        }
+
+        if (caughtAttr) {
+          this.refreshStarterLuck(species, starterDataEntry, selectedProps.shiny, selectedProps.variant, caughtAttr);
         }
 
         female ??= false;
@@ -6629,7 +6782,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         const caughtVariants = [DexAttr.DEFAULT_VARIANT, DexAttr.VARIANT_2, DexAttr.VARIANT_3].filter(
           v => caughtAttr & v,
         );
-        this.canCycleShiny = (isNonShinyCaught && isShinyCaught) || (isShinyCaught && caughtVariants.length > 1);
+        const canCycleBlack =
+          !!starterDataEntry.erBlackShiny && isShinyCaught && (caughtAttr & DexAttr.VARIANT_3) !== 0n;
+        this.canCycleShiny =
+          (isNonShinyCaught && isShinyCaught) || (isShinyCaught && caughtVariants.length > 1) || canCycleBlack;
 
         const isMaleCaught = !!(caughtAttr & DexAttr.MALE);
         const isFemaleCaught = !!(caughtAttr & DexAttr.FEMALE);
@@ -7505,6 +7661,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * It checks each pokemon against the challenge - noting that due to monotype challenges it needs to check the pokemon while ignoring their evolutions/form change items
    */
   isPartyValid(): boolean {
+    if (countErBlackShinyStarters(this.starters) > 1) {
+      return false;
+    }
     let canStart = false;
     for (let s = 0; s < this.starterSpecies.length; s++) {
       const species = this.starterSpecies[s];

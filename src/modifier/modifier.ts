@@ -7,9 +7,11 @@ import { erIsHeldItemDisabled } from "#data/battler-tags";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { erIsHeldItemSuppressed } from "#data/elite-redux/abilities/item-suppression";
+import { claimCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import type { GreaterAbilityRandomizerChoiceCache } from "#data/elite-redux/er-greater-ability-randomizer";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { getLevelTotalExp } from "#data/exp";
@@ -1604,6 +1606,7 @@ export class BypassSpeedChanceModifier extends PokemonHeldItemModifier {
       const hasQuickClaw = this.type.is("PokemonHeldItemModifierType") && this.type.id === "QUICK_CLAW";
 
       if (hasQuickClaw) {
+        claimCommandAbilityProvenance(pokemon, "quick-claw:proc");
         globalScene.phaseManager.queueMessage(
           i18next.t("modifier:bypassSpeedChanceApply", {
             pokemonName: getPokemonNameWithAffix(pokemon),
@@ -2778,6 +2781,14 @@ export class ErGreaterAbilityCapsuleModifier extends ConsumablePokemonModifier {
  * screen queues a continuation copy, removed by the phase only once committed.
  */
 export class ErGreaterAbilityRandomizerModifier extends ConsumablePokemonModifier {
+  constructor(
+    type: ModifierType,
+    pokemonId: number,
+    private readonly choiceCache: GreaterAbilityRandomizerChoiceCache = new Map(),
+  ) {
+    super(type, pokemonId);
+  }
+
   override apply(playerPokemon: PlayerPokemon): boolean {
     // Co-op (#633 B9c): thread the shop seq + watcher flag in (see ErAbilityCapsuleModifier).
     const { seq, watcher } = coopAbilityPickerContext();
@@ -2786,6 +2797,7 @@ export class ErGreaterAbilityRandomizerModifier extends ConsumablePokemonModifie
       globalScene.getPlayerParty().indexOf(playerPokemon),
       seq,
       watcher,
+      this.choiceCache,
     );
     return true;
   }

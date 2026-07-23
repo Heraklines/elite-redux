@@ -48,7 +48,7 @@ export class AttemptCapturePhase extends PokemonPhase {
   public readonly phaseName = "AttemptCapturePhase";
   public coopV2ControlOperationId: string | null = null;
   private readonly coopOwningRuntime = getCoopRuntime();
-  private pokeballType: PokeballType;
+  private readonly pokeballType: PokeballType;
   private pokeball: Phaser.GameObjects.Sprite;
   private originalY: number;
 
@@ -88,6 +88,7 @@ export class AttemptCapturePhase extends PokemonPhase {
     }
 
     globalScene.pokeballCounts[this.pokeballType]--;
+    globalScene.currentBattle.recordUsedPokeball(this.pokeballType);
 
     this.originalY = pokemon.y;
 

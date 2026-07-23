@@ -15,11 +15,11 @@
 //   - 911 Greedy — "Uses Thief when it loses an item." (MoveId.THIEF)
 // =============================================================================
 
-import { PostItemLostAbAttr } from "#abilities/ab-attrs";
 import type { AbAttrBaseParams } from "#abilities/ab-attrs";
+import { PostItemLostAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { PokemonMove } from "#data/moves/pokemon-move";
-import { MoveId } from "#enums/move-id";
+import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 
 export interface PostItemLostScriptedMoveOptions {
@@ -28,7 +28,10 @@ export interface PostItemLostScriptedMoveOptions {
 
 export class PostItemLostScriptedMoveAbAttr extends PostItemLostAbAttr {
   constructor(private readonly opts: PostItemLostScriptedMoveOptions) {
-    super(false);
+    // showAbility = true (default): casting a scripted move on item loss is a
+    // discrete, player-visible activation, so the ability banner must flash
+    // (same popup-display defect class as the counter-attack archetype).
+    super();
   }
 
   override canApply(_params: AbAttrBaseParams): boolean {

@@ -18,17 +18,17 @@
 // Auth model: username + password. Passwords are stored only as a PBKDF2-SHA256
 // hash. A successful login returns a stateless HMAC-signed token; the client
 // sends it back verbatim in the `Authorization` header. Verifying the token is a
-// pure HMAC check (no DB read), which keeps us well inside the free-tier request
-// budget.
+// pure HMAC check (no DB read), which keeps request cost low.
 //
 // Storage: D1 (SQLite). One row per account in `users`, one `system_saves` row
 // per user, up to five `session_saves` rows per user. Saves are opaque blobs
 // (the client encrypts them); the server never inspects them.
 //
-// Capacity (free tier): the binding limit is D1 writes (100k/day) and Worker
-// requests (100k/day). With the client's debounced sync (~40 writes/day/active
-// player) that comfortably hosts ~1,000-1,500 daily-active players; the $5/mo
-// Workers Paid plan (50M writes/mo) scales to ~40,000.
+// Capacity: the account is on the Workers Paid plan. D1 storage is 10GB per
+// database (er-saves sits at ~4% of that; the old free-tier 500MB/db cap no longer
+// applies), and the paid write/read budgets (50M D1 writes/mo, ~25B rows read/mo)
+// are far above the client's debounced sync (~40 writes/day/active player) — good
+// for tens of thousands of daily-active players.
 // =============================================================================
 
 import { BiomeId } from "../../../src/enums/biome-id";
@@ -97,6 +97,12 @@ interface Env {
   /** Refuse to publish usage tiers from a too-small 30-day sample. */
   USAGE_TIER_MIN_PLAYERS?: string;
   USAGE_TIER_MIN_RUNS?: string;
+  /**
+   * Shared secret authenticating the er-telemetry tournament worker's server-to-server reward push
+   * (POST /showdown/tournament-grant). SAME value must be set on er-telemetry as SHOWDOWN_GRANT_SECRET.
+   * Set via `wrangler secret put`. Unset = the tournament-grant route is disabled (503).
+   */
+  SHOWDOWN_GRANT_SECRET?: string;
 }
 
 interface UserRow {
@@ -174,29 +180,22 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 /**
- * Save compression (#storage). system_saves blobs are JSON that gzips ~12x, and
- * the DB was hitting the D1 500MB cap. Stored form: "GZ1:" + base64(gzip(save)).
- * A plaintext save starts with "{", so reads detect the format unambiguously and
- * legacy plaintext rows keep working until their next write (or the one-time
- * migration) compresses them. Uses the deadlock-safe stream pattern (begin the
- * read before writing) so large saves don't stall on backpressure.
+ * Save storage format (#storage). system_saves blobs are now stored UNCOMPRESSED
+ * (plaintext JSON) going forward. Save compression was originally added to keep the
+ * DB under the D1 free-tier 500MB cap (gzip ~12x, stored as "GZ1:" + base64(gzip)),
+ * but the account is now on the paid plan (10GB/db; er-saves sits at ~4% of that), so
+ * saves no longer have to be compressed — and compression added a decode/decompress
+ * failure surface on read (a corrupt or truncated "GZ1:" blob is unreadable and
+ * throws, forcing {@linkcode handleSystemGet} to reject the load) plus a
+ * compression-aware clobber guard, which caused issues in practice.
+ *
+ * READ stays backward-compatible: {@linkcode decompressSave} still transparently
+ * inflates any legacy "GZ1:" blob already in the DB (a plaintext save starts with
+ * "{", so the format is detected unambiguously by the prefix). The migration is
+ * LAZY — an existing account's next system-save write re-stores it uncompressed, so
+ * no bulk migration is needed and no existing save is ever broken.
  */
 const SAVE_GZIP_PREFIX = "GZ1:";
-
-async function compressSave(plain: string): Promise<string> {
-  try {
-    const cs = new CompressionStream("gzip");
-    const read = new Response(cs.readable).arrayBuffer();
-    const writer = cs.writable.getWriter();
-    await writer.write(enc.encode(plain));
-    await writer.close();
-    return SAVE_GZIP_PREFIX + toBase64(new Uint8Array(await read));
-  } catch (err) {
-    // A compression failure must never break a save: fall back to plaintext.
-    console.error("compressSave failed, storing plaintext:", err);
-    return plain;
-  }
-}
 
 async function decompressSave(stored: string): Promise<string> {
   if (!stored.startsWith(SAVE_GZIP_PREFIX)) {
@@ -205,9 +204,17 @@ async function decompressSave(stored: string): Promise<string> {
   const ds = new DecompressionStream("gzip");
   const read = new Response(ds.readable).arrayBuffer();
   const writer = ds.writable.getWriter();
-  await writer.write(fromBase64(stored.slice(SAVE_GZIP_PREFIX.length)));
-  await writer.close();
-  return dec.decode(await read);
+  // Feed the compressed bytes. A tampered/truncated "GZ1:" blob makes the gzip
+  // stream error (unexpected EOF); both `read` and the write/close promise then
+  // reject. Await them TOGETHER so BOTH settle and NEITHER leaks an unhandled
+  // rejection — Promise.all attaches a handler to each, so the caller's try/catch
+  // sees exactly one graceful failure and the corrupt bytes are rejected cleanly.
+  const pump = (async () => {
+    await writer.write(fromBase64(stored.slice(SAVE_GZIP_PREFIX.length)));
+    await writer.close();
+  })();
+  const [buf] = await Promise.all([read, pump]);
+  return dec.decode(buf);
 }
 
 // #endregion
@@ -589,9 +596,8 @@ async function ensureBackupTable(env: Env): Promise<void> {
 }
 
 /**
- * Snapshot the about-to-be-overwritten save (stored form is already gzip'd, so the
- * backup is small) and prune to the most recent BACKUP_KEEP per user. Rate-limited
- * per user. Best-effort: never throws into the caller.
+ * Snapshot the about-to-be-overwritten save and prune to the most recent BACKUP_KEEP
+ * per user. Rate-limited per user. Best-effort: never throws into the caller.
  */
 async function maybeBackupSystemSave(env: Env, userId: number, previous: SystemSaveRow): Promise<void> {
   try {
@@ -705,7 +711,9 @@ async function handleSystemUpdate(
   if (guard) {
     return guard;
   }
-  const stored = await compressSave(data);
+  // Store uncompressed (lazy migration): a legacy "GZ1:" row is replaced with
+  // plaintext here on its next write; reads stay back-compat via decompressSave.
+  const stored = data;
   const trainerId = Number.parseInt(url.searchParams.get("trainerId") ?? "", 10);
   const secretId = Number.parseInt(url.searchParams.get("secretId") ?? "", 10);
   await env.DB.prepare(
@@ -1973,7 +1981,8 @@ async function handleUpdateAll(
     if (guard) {
       return guard;
     }
-    storedSystem = await compressSave(sys);
+    // Store uncompressed (lazy migration); reads stay back-compat via decompressSave.
+    storedSystem = sys;
   }
   const slotRaw = String(payload.sessionSlotId ?? "");
   const slot = /^\d+$/u.test(slotRaw) ? Number(slotRaw) : Number.NaN;
@@ -2237,7 +2246,8 @@ async function ensureGhostBattlesTable(env: Env): Promise<void> {
 // ---------------------------------------------------------------------------
 // General per-player notifications (rewards / announcements). The client inbox
 // polls /savedata/notifications since its last-seen ts (like ghost-notifications),
-// so the server can push ANY message to ANY player. `payload` is an optional JSON
+// so the server can push to one player or every player with username '*'.
+// `payload` is an optional JSON
 // blob the client renders (e.g. {species, shiny, variant} for a reward icon).
 // Rows are inserted server-side (reward grants / admin).
 // ---------------------------------------------------------------------------
@@ -2275,7 +2285,7 @@ async function handleNotifications(
   const rows = await env.DB.prepare(
     `SELECT id, kind, title, body, payload, created_at
        FROM notifications
-      WHERE lower(username) = lower(?1) AND created_at > ?2
+      WHERE (username = '*' OR lower(username) = lower(?1)) AND created_at > ?2
       ORDER BY created_at DESC
       LIMIT 50`,
   )
@@ -2350,6 +2360,19 @@ async function ensureRunsGhostIndex(env: Env): Promise<void> {
     await env.DB.prepare(
       "CREATE INDEX IF NOT EXISTS idx_runs_ghost_source ON runs (ghost_source_name, created_at)",
     ).run();
+  } catch {
+    // Index is an optimization only; the query is correct without it.
+  }
+}
+
+/**
+ * Lazily index runs by `wave` so the ghost-sample keyset walk (handleRunSample)
+ * scans only the eligible wave band, not the whole table. The (wave) index carries
+ * rowid implicitly, so `ORDER BY wave, rowid` is served straight from it.
+ */
+async function ensureRunSampleIndex(env: Env): Promise<void> {
+  try {
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_runs_wave ON runs (wave)").run();
   } catch {
     // Index is an optimization only; the query is correct without it.
   }
@@ -2469,6 +2492,63 @@ type RunSampleRow = {
   presentation?: string | null;
 };
 
+/**
+ * Endless contamination guard (CORRECTNESS): a classic/challenge run ends at wave 200
+ * (game-mode.ts isWaveFinal); ENDLESS runs go to 250/500/1000+ with absurd kits. A
+ * hard `wave <= 200` ceiling drops already-stored endless rows that predate the `mode`
+ * tag. No classic run exceeds 200, so this never drops a legitimate team.
+ */
+export const GHOST_SAMPLE_MAX_WAVE = 200;
+/** Modes that must never seed the ghost pool (endless/daily contamination). */
+const NON_GHOST_MODES_SQL = "'endless', 'spliced_endless', 'daily'";
+
+/**
+ * Enumerate the rowid of EVERY ghost-eligible run — the FULL, de-restricted candidate
+ * pool. A run is eligible when it isn't the caller's own (`user_id != uid`), reached at
+ * least `minWave` (its team is only proven viable up to where it died), stayed at/below
+ * the endless ceiling, and isn't an endless/daily contamination row.
+ *
+ * Full breadth, still efficient (NOT one unbounded blob): walk the (wave, rowid) KEYSET
+ * over idx_runs_wave, one bounded page at a time, so only the eligible wave band is
+ * scanned and the result streams page by page. Every eligible run is considered; no wave
+ * band or uploader is unreachable. This replaces the old capped `min(count*2, 40)`
+ * random-rowid seeks + shallow top-up that were optimized for the free-tier rows-read
+ * budget and caused the stale/repetitive-ghost class. The paid plan lifts that budget.
+ */
+export async function enumerateEligibleRunRowids(
+  env: Env,
+  uid: number,
+  minWave: number,
+  pageSize = 2000,
+): Promise<number[]> {
+  const rowids: number[] = [];
+  let cursorWave = minWave - 1;
+  let cursorRowid = 0;
+  for (;;) {
+    const page = await env.DB.prepare(
+      `SELECT rowid AS rid, wave FROM runs
+         WHERE wave >= ?1 AND wave <= ?2 AND user_id != ?3
+           AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+           AND (wave > ?4 OR (wave = ?4 AND rowid > ?5))
+         ORDER BY wave, rowid LIMIT ?6`,
+    )
+      .bind(minWave, GHOST_SAMPLE_MAX_WAVE, uid, cursorWave, cursorRowid, pageSize)
+      .all<{ rid: number; wave: number }>();
+    const rows = page.results ?? [];
+    for (const row of rows) {
+      rowids.push(row.rid);
+      // Rows are ordered (wave, rowid), so the last iteration leaves the cursor on
+      // the last row of the page — the keyset start for the next page.
+      cursorWave = row.wave;
+      cursorRowid = row.rid;
+    }
+    if (rows.length < pageSize) {
+      break;
+    }
+  }
+  return rowids;
+}
+
 /** Sample winning runs (excluding the caller's own) as ghost-team snapshots. */
 async function handleRunSample(
   url: URL,
@@ -2490,67 +2570,45 @@ async function handleRunSample(
   // compat and as a display fallback but no longer restricts the pool.) The wave
   // floor + re-levelling on spawn keep the opponent appropriately strong
   // regardless of its origin tier.
-  // ER (#131): the old `ORDER BY RANDOM() LIMIT ?` had NO usable index for its
-  // `user_id != ? AND wave >= ?` filter, so D1 read the ENTIRE runs table on every
-  // ghost fetch and blew past the rows-read budget; the query errored and the client
-  // SILENTLY fell back to the player's OWN teams ("same ghost over and over").
-  // The first fix replaced it with ONE random-rowid window - a seek + walk forward for
-  // `count` CONSECUTIVE eligible rows. That reads ~count rows (good) but returns a
-  // temporally-adjacent BLOCK (bad): each run's pool was clustered, so the thin
-  // high-wave bands (wave 137/163) were missed ~half the time and the ghost challenge
-  // then fielded a far-deeper team that had to be devolved (the "unevolved ghosts").
-  // Now: many INDEPENDENT random-rowid seeks, each taking the FIRST eligible row at/after
-  // its point (LIMIT 1) via the PK index, run as one batch. Still ~constant rows read,
-  // but a uniform SPREAD across the whole table - diverse uploaders, every wave band
-  // reachable. Dedup by id; top up from the table start only if the eligible set is sparse.
-  // Endless contamination guard: a classic/challenge run ends at wave 200 (game-mode.ts
-  // isWaveFinal), while ENDLESS runs go to 250, 500, 1000+ with absurdly over-levelled,
-  // over-itemed teams. Fielding one as a ghost in a classic run is the reported bug.
-  // Exclude them two ways: (a) `mode` (new uploads tag classic/challenge; endless/daily
-  // never upload now) - `mode IS NULL` keeps legacy rows; (b) a hard `wave <= 200` ceiling,
-  // which catches already-stored endless rows that predate the `mode` tag (their depth is
-  // the only signal). No classic run exceeds 200, so this never drops a legitimate team.
-  const MAX_GHOST_SAMPLE_WAVE = 200;
-  const NON_GHOST_MODES = "'endless', 'spliced_endless', 'daily'";
+  //
+  // DE-RESTRICTION (maintainer, capacity upgrade): the ghost fetch was previously
+  // OPTIMIZED for the free-tier D1 rows-read budget — first `ORDER BY RANDOM()`
+  // (#131: full-table scan, blew the budget, errored → client fell back to the
+  // player's OWN teams), then a bounded set of `min(count*2, 40)` random-rowid
+  // seeks plus a shallow top-up read from the START of the table. That capped the
+  // candidate pool to ~40 biased probes and over-fielded the same old shallow runs
+  // (the "stale / repetitive ghosts" class), and systematically missed eligible
+  // runs beyond the probe window. The account is now on the paid plan (er-saves at
+  // ~4% of the 10GB ceiling, and a full-breadth scan is a rounding error against the
+  // paid rows-read budget), so we no longer restrict ourselves: the candidate pool
+  // is EVERY eligible run.
+  //
+  // Full breadth, still efficient (not one unbounded blob): enumerate the rowid of
+  // every eligible run via KEYSET PAGINATION (enumerateEligibleRunRowids), then
+  // uniformly sample `count` of them and fetch only those `count` full rows. Every
+  // eligible run has an equal chance; no wave band or uploader is unreachable.
   const cols =
     "id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation";
-  const maxRow = await env.DB.prepare("SELECT MAX(rowid) AS m FROM runs").first<{ m: number | null }>();
-  const maxRowId = maxRow?.m ?? 0;
-  const seen = new Set<string>();
-  let results: RunSampleRow[] = [];
-  if (maxRowId > 0) {
-    const seekStmt = (start: number) =>
-      env.DB.prepare(
-        `SELECT ${cols} FROM runs WHERE rowid >= ?1 AND user_id != ?2 AND wave >= ?3 AND wave <= ?4 AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES})) ORDER BY rowid LIMIT 1`,
-      ).bind(start, auth.uid, minWave, MAX_GHOST_SAMPLE_WAVE);
-    const seeks = Math.min(count * 2, 40);
-    const stmts = Array.from({ length: seeks }, () => seekStmt(Math.floor(Math.random() * (maxRowId + 1))));
-    const batched = await env.DB.batch<RunSampleRow>(stmts);
-    for (const r of batched) {
-      for (const row of r.results ?? []) {
-        if (!seen.has(row.id)) {
-          seen.add(row.id);
-          results.push(row);
-        }
-      }
-    }
-    if (results.length < count) {
-      // Sparse eligible set: some seeks landed past the last eligible row. Top up from
-      // the start of the table (a contiguous read of the shallow end) to reach `count`.
-      const fill = await env.DB.prepare(
-        `SELECT ${cols} FROM runs WHERE user_id != ?1 AND wave >= ?2 AND wave <= ?3 AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES})) ORDER BY rowid LIMIT ?4`,
-      )
-        .bind(auth.uid, minWave, MAX_GHOST_SAMPLE_WAVE, count * 2)
-        .all<RunSampleRow>();
-      for (const row of fill.results ?? []) {
-        if (!seen.has(row.id)) {
-          seen.add(row.id);
-          results.push(row);
-        }
-      }
-    }
+  // Index the (wave, rowid) keyset walk. Cheap no-op once created; lazy so an
+  // already-deployed prod DB gains it without a manual migration (mirrors
+  // ensureRunsGhostIndex). schema.sql declares it for a fresh DB.
+  await ensureRunSampleIndex(env);
+  const eligibleRowids = await enumerateEligibleRunRowids(env, auth.uid, minWave);
+  // Uniform random sample of `count` distinct eligible rowids (partial Fisher-Yates).
+  const k = Math.min(count, eligibleRowids.length);
+  for (let i = 0; i < k; i++) {
+    const j = i + Math.floor(Math.random() * (eligibleRowids.length - i));
+    [eligibleRowids[i], eligibleRowids[j]] = [eligibleRowids[j], eligibleRowids[i]];
   }
-  results = results.slice(0, count);
+  const chosen = eligibleRowids.slice(0, k);
+  let results: RunSampleRow[] = [];
+  if (chosen.length > 0) {
+    const placeholders = chosen.map((_, i) => `?${i + 1}`).join(", ");
+    const fetched = await env.DB.prepare(`SELECT ${cols} FROM runs WHERE rowid IN (${placeholders})`)
+      .bind(...chosen)
+      .all<RunSampleRow>();
+    results = fetched.results ?? [];
+  }
   const teams = (results ?? [])
     .map(row => {
       try {
@@ -4481,6 +4539,67 @@ async function handleShowdownPendingAck(request: Request, auth: TokenPayload, en
   return json({ ok: true, acked: res.meta.changes ?? 0 }, 200, cors);
 }
 
+/**
+ * TOURNAMENT reward delivery (server-to-server, called by the er-telemetry tournament worker).
+ * Pushes each winner's reward mutations into the SAME showdown_settlements store the escrow flow
+ * uses, so winners receive them on their next login sweep exactly like a staked payout. Auth is a
+ * shared worker secret (X-Grant-Auth == SHOWDOWN_GRANT_SECRET), NOT a session token — this is not a
+ * player-facing route. Idempotent: rows are keyed by the synthetic match id `tour:<tournamentId>`,
+ * and (like escrow) we only insert when NONE exist yet for that match id, so a retry never
+ * double-grants. Ledger discipline is unchanged: the client applies each row once (row id + ledger).
+ */
+async function handleShowdownTournamentGrant(request: Request, env: Env, cors: Record<string, string>) {
+  const secret = env.SHOWDOWN_GRANT_SECRET;
+  if (!secret) {
+    return json({ error: "tournament grant delivery not configured" }, 503, cors);
+  }
+  const provided = request.headers.get("X-Grant-Auth") ?? "";
+  if (!timingSafeEqual(enc.encode(provided), enc.encode(secret))) {
+    return json({ error: "unauthorized" }, 401, cors);
+  }
+  const body = await readShowdownBody(request);
+  if (body == null) {
+    return json({ error: "invalid body" }, 400, cors);
+  }
+  const tournamentId = typeof body.tournamentId === "string" ? body.tournamentId : "";
+  const grants = Array.isArray(body.grants) ? body.grants : null;
+  if (!tournamentId || !grants) {
+    return json({ error: "missing tournamentId or grants" }, 400, cors);
+  }
+  await ensureShowdownTables(env);
+  const matchId = `tour:${tournamentId}`;
+  const now = Date.now();
+  // Idempotency guard (mirrors finalizeSettlement): only insert when no rows exist for this tournament.
+  const existing = await env.DB.prepare("SELECT COUNT(*) AS c FROM showdown_settlements WHERE match_id = ?1")
+    .bind(matchId)
+    .first<{ c: number }>();
+  if ((existing?.c ?? 0) > 0) {
+    return json({ ok: true, delivered: 0, alreadyDelivered: true }, 200, cors);
+  }
+  const stmts: D1PreparedStatement[] = [];
+  for (const g of grants) {
+    if (!g || typeof g !== "object") {
+      continue;
+    }
+    const uid = typeof g.uid === "string" ? g.uid : "";
+    const mutation = g.mutation;
+    if (!uid || !mutation || typeof mutation !== "object") {
+      continue;
+    }
+    // Stamp the uid INTO the stored mutation json (client mutations carry no uid; escrow rows do).
+    const stored = { uid, ...mutation };
+    stmts.push(
+      env.DB.prepare(
+        "INSERT INTO showdown_settlements (match_id, uid, mutation_json, created_at, applied_at) VALUES (?1, ?2, ?3, ?4, NULL)",
+      ).bind(matchId, uid, JSON.stringify(stored), now),
+    );
+  }
+  if (stmts.length > 0) {
+    await env.DB.batch(stmts);
+  }
+  return json({ ok: true, delivered: stmts.length }, 200, cors);
+}
+
 // #endregion
 // #region showdown ranked ladder
 // -----------------------------------------------------------------------------
@@ -4865,6 +4984,12 @@ export default {
       // client clears its cookie regardless.
       if (pathname === "/account/logout" && method === "GET") {
         return text("", 200, cors);
+      }
+
+      // Tournament reward delivery — server-to-server from er-telemetry, authenticated by the shared
+      // SHOWDOWN_GRANT_SECRET (X-Grant-Auth), NOT a session token. Placed in the unauthenticated block.
+      if (pathname === "/showdown/tournament-grant" && method === "POST") {
+        return await handleShowdownTournamentGrant(request, env, cors);
       }
 
       // ---- authenticated ----

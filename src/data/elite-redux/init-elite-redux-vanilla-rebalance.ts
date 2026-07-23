@@ -57,6 +57,7 @@ import {
   BlockStatusDamageAbAttr,
   BlockWeatherDamageAttr,
   BypassBurnDamageReductionAbAttr,
+  BypassSpeedChanceAbAttr,
   ChangeMovePriorityAbAttr,
   ConditionalCritAbAttr,
   DefensiveStatSubstituteAbAttr,
@@ -95,6 +96,7 @@ import {
   PostWeatherLapseHealAbAttr,
   PreHitResistTypeChangeAbAttr,
   PreserveBaseStatAbilitiesAbAttr,
+  ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
   ReduceBurnDamageAbAttr,
@@ -110,6 +112,21 @@ import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities, allMoves } from "#data/data-lists";
+import {
+  AllyHigherStatMultiplierAbAttr,
+  BallRecoveryAbAttr,
+  BiomeRevealBonusAbAttr,
+  ExperienceGainMultiplierAbAttr,
+  FirstEntryPartyHealAbAttr,
+  HigherStatMultiplierAbAttr,
+  hasCommandAbilityProvenance,
+  MoneyGainMultiplierAbAttr,
+  MoveFlagImmunityAbAttr,
+  PostDefendSuppressFirstInnateAbAttr,
+  PostSummonSnowCloakAuroraVeilAbAttr,
+  PreLeaveFieldRemoveSnowCloakAuroraVeilAbAttr,
+  ProvenanceBypassSpeedChanceAbAttr,
+} from "#data/elite-redux/ability-upgrades/attrs/index";
 import { BerserkOnThresholdAbAttr } from "#data/elite-redux/archetypes/berserk-on-threshold";
 import {
   ChanceBattlerTagOnAttackAbAttr,
@@ -117,7 +134,9 @@ import {
   ChanceStatusOnHitAbAttr,
 } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
+import { CopyMoveByFilterAbAttr } from "#data/elite-redux/archetypes/copy-move-by-filter";
 import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
+import { DamageReductionAbAttr } from "#data/elite-redux/archetypes/damage-reduction-generic";
 import {
   DisableFoeItemsOnEntryAbAttr,
   DisableTargetItemOnContactAbAttr,
@@ -136,6 +155,7 @@ import { PostAttackChangeTargetTypeAbAttr } from "#data/elite-redux/archetypes/p
 import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes/post-defend-change-attacker-type";
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { PostFaintDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-detonate";
+import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
 import { RecoilDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/recoil-damage-multiplier";
 import { SelfHighestStatMultiplierAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-multiplier";
 import {
@@ -165,6 +185,7 @@ import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MoveTarget } from "#enums/move-target";
+import { PokeballType } from "#enums/pokeball";
 import { PokemonType } from "#enums/pokemon-type";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -301,6 +322,75 @@ const PATCHED_MARKER = Symbol.for("er-vanilla-rebalance/patched");
 /** Convenience type for casting an Ability to allow mutation of its `attrs` array. */
 type MutableAbility = Ability & { attrs: AbAttr[]; [PATCHED_MARKER]?: true };
 
+const ABILITY_DESCRIPTION_OVERRIDES: ReadonlyMap<AbilityId, string> = new Map([
+  [AbilityId.INSOMNIA, "Prevents sleep and casts Torment on the opposing Pokemon on entry."],
+  [
+    AbilityId.TELEPATHY,
+    "Protects the team from friendly fire, senses super-effective moves, dodges the first super-effective hit, and reveals one additional biome.",
+  ],
+  [AbilityId.MARVEL_SCALE, "Raises Defense by 1.5x while statused and prevents damage from status conditions."],
+  [AbilityId.WHITE_SMOKE, "Prevents stat reductions and sets Mist on the holder's side for 3 turns on entry."],
+  [AbilityId.OBLIVIOUS, "Prevents infatuation, Taunt, and Intimidate. Contact attacks have a 20% chance to confuse."],
+  [
+    AbilityId.ICE_BODY,
+    "Prevents hail damage, restores HP during hail or snow, and contact attackers have a 10% chance to be frostbitten.",
+  ],
+  [AbilityId.TANGLING_HAIR, "Contact lowers the attacker's Speed and has a 50% chance to trap it."],
+  [AbilityId.WIMP_OUT, "Switches out below half HP and guarantees escape from wild battles."],
+  [AbilityId.RATTLED, "Raises Speed when threatened by certain moves and guarantees escape from wild battles."],
+  [AbilityId.EMERGENCY_EXIT, "Switches out below half HP and guarantees escape from wild battles."],
+  [
+    AbilityId.MUMMY,
+    "Contact replaces the attacker's Ability with Mummy and disables its first innate until it switches. Mummy-family holders are immune.",
+  ],
+  [
+    AbilityId.LINGERING_AROMA,
+    "Contact replaces the attacker's Ability with Lingering Aroma and disables its first innate until it switches. Mummy-family holders are immune.",
+  ],
+  [
+    AbilityId.WANDERING_SPIRIT,
+    "Contact swaps Abilities and disables the attacker's first innate until it switches. Mummy-family holders are immune. Reveals one additional biome.",
+  ],
+  [AbilityId.HEALER, "Always cures the user's and its ally's status conditions at the end of each turn."],
+  [
+    AbilityId.KLUTZ,
+    "The Pokemon cannot use held items. It also prevents opposing Pokemon from consuming Berries or other held items.",
+  ],
+  [
+    AbilityId.SWEET_VEIL,
+    "Prevents the user and allies from falling asleep. The first time it enters battle, restores 10% of the party's maximum HP.",
+  ],
+  [
+    AbilityId.PASTEL_VEIL,
+    "Uses Safeguard on entry. The first time it enters battle, restores 10% of the party's maximum HP.",
+  ],
+  [
+    AbilityId.STEADFAST,
+    "Raises Speed when flinched. Grants paralysis immunity, immunity to self-inflicted stat drops, and halves recoil damage.",
+  ],
+  [AbilityId.HEAVY_METAL, "Doubles weight and halves damage from Ghost, Dark, and sound-based moves."],
+  [AbilityId.PERISH_BODY, "Contact causes both battlers to perish in four turns. Also gains Aftermath."],
+  [AbilityId.DAZZLING, "Protects the user's side from priority moves and boosts accuracy by 1.2x."],
+  [AbilityId.GULP_MISSILE, "Takes 20% less damage from direct attacks."],
+  [AbilityId.DELTA_STREAM, "Summons strong winds on entry and creates Tailwind for 3 turns."],
+  [
+    AbilityId.SCREEN_CLEANER,
+    "On entry, removes Reflect, Light Screen, Aurora Veil, and Smokescreen from the opposing side only.",
+  ],
+  [
+    AbilityId.QUICK_DRAW,
+    "Damaging moves may act first in their priority bracket. A Quick Draw-procced attack deals double damage to another Quick Draw user.",
+  ],
+  [
+    AbilityId.UNBURDEN,
+    "Boosts Speed by 1.2x while active and prevents every Speed-lowering effect, including paralysis and held items.",
+  ],
+  [
+    AbilityId.SNOW_CLOAK,
+    "During hail or snow, creates and maintains Aurora Veil until the weather ends or the holder leaves the field.",
+  ],
+]);
+
 /**
  * Per-ability patcher dispatch table. The key is the pokerogue {@linkcode AbilityId},
  * and the value is the function that mutates the live `Ability` instance in
@@ -427,8 +517,135 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new PostAttackApplyBattlerTagAbAttr(true, () => 50, BattlerTagType.INFATUATED));
     },
   ],
-  // HEALER: 50% → 30% (also extends target to self — minor variant, just the chance for now)
+  // HEALER: always cures both the holder and its ally at turn end.
   [AbilityId.HEALER, ab => patchHealerChance(ab)],
+
+  // Easy additive ability upgrades. Keep every existing effect and append the
+  // requested rider unless the request explicitly corrects an obsolete attr.
+  [AbilityId.WANDERING_SPIRIT, ab => ab.attrs.push(new BiomeRevealBonusAbAttr(1))],
+  [AbilityId.SUPER_LUCK, ab => ab.attrs.push(new ExperienceGainMultiplierAbAttr(1.2))],
+  [AbilityId.GOOD_AS_GOLD, ab => ab.attrs.push(new MoneyGainMultiplierAbAttr(1.2))],
+  [AbilityId.INSOMNIA, ab => ab.attrs.push(new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TORMENT }))],
+  [AbilityId.TELEPATHY, ab => appendAbilityAttrs(ab, allAbilities[AbilityId.ANTICIPATION])],
+  [
+    AbilityId.MARVEL_SCALE,
+    ab => ab.attrs.push(new BlockStatusDamageAbAttr(StatusEffect.POISON, StatusEffect.TOXIC, StatusEffect.BURN)),
+  ],
+  [
+    AbilityId.WHITE_SMOKE,
+    ab => ab.attrs.push(new EntryEffectAbAttr({ kind: "set-screen-or-room", tag: ArenaTagType.MIST, turns: 3 })),
+  ],
+  [AbilityId.WIMP_OUT, ab => appendAbilityAttrs(ab, allAbilities[AbilityId.RUN_AWAY])],
+  [AbilityId.RATTLED, ab => appendAbilityAttrs(ab, allAbilities[AbilityId.RUN_AWAY])],
+  [AbilityId.EMERGENCY_EXIT, ab => appendAbilityAttrs(ab, allAbilities[AbilityId.RUN_AWAY])],
+  [
+    AbilityId.OBLIVIOUS,
+    ab => ab.attrs.push(new PostAttackApplyBattlerTagAbAttr(true, () => 20, BattlerTagType.CONFUSED)),
+  ],
+  [
+    AbilityId.ICE_BODY,
+    ab => {
+      mutateHealFactor(ab, 2);
+      ab.attrs.push(new PostDefendContactApplyTagChanceAbAttr(10, BattlerTagType.ER_FROSTBITE));
+    },
+  ],
+  [AbilityId.TANGLING_HAIR, ab => ab.attrs.push(new PostDefendContactApplyTagChanceAbAttr(50, BattlerTagType.TRAPPED))],
+  [AbilityId.MUMMY, ab => ab.attrs.unshift(new PostDefendSuppressFirstInnateAbAttr())],
+  [AbilityId.LINGERING_AROMA, ab => ab.attrs.unshift(new PostDefendSuppressFirstInnateAbAttr())],
+  [AbilityId.WANDERING_SPIRIT, ab => ab.attrs.unshift(new PostDefendSuppressFirstInnateAbAttr())],
+  [
+    AbilityId.BALL_FETCH,
+    ab => {
+      const interceptedFlags = [MoveFlags.BALLBOMB_MOVE, MoveFlags.THROW_BASED] as const;
+      ab.attrs.length = 0;
+      ab.clearConditions();
+      ab.attrs.push(
+        new MoveFlagImmunityAbAttr(interceptedFlags),
+        new CopyMoveByFilterAbAttr({ anyFlags: interceptedFlags }),
+        new BallRecoveryAbAttr([PokeballType.POKEBALL, PokeballType.GREAT_BALL]),
+      );
+    },
+  ],
+  [AbilityId.KLUTZ, ab => appendAbilityAttrs(ab, allAbilities[AbilityId.UNNERVE])],
+  [
+    AbilityId.SWEET_VEIL,
+    ab => {
+      ab.attrs.push(new FirstEntryPartyHealAbAttr({ key: "sweet-veil", healFraction: 0.1 }));
+    },
+  ],
+  [
+    AbilityId.STEADFAST,
+    ab => {
+      appendAbilityAttrs(ab, allAbilities[AbilityId.LIMBER]);
+    },
+  ],
+  [
+    AbilityId.PERISH_BODY,
+    ab => {
+      appendAbilityAttrs(ab, allAbilities[AbilityId.AFTERMATH]);
+    },
+  ],
+  [
+    AbilityId.DAZZLING,
+    ab => {
+      ab.attrs.push(
+        new StatMultiplierAbAttr(Stat.ACC, 1.2),
+        new AiMovegenMoveStatsAbAttr(({ accMult }) => {
+          accMult.value *= 1.2;
+        }),
+      );
+    },
+  ],
+  [
+    AbilityId.GULP_MISSILE,
+    ab => {
+      ab.attrs.push(
+        new DamageReductionAbAttr({
+          reduction: 0.2,
+          filter: { kind: "all" },
+          affectsFixedDamage: true,
+        }),
+      );
+    },
+  ],
+  [
+    AbilityId.DELTA_STREAM,
+    ab => {
+      ab.attrs.push(new EntryEffectAbAttr({ kind: "set-screen-or-room", tag: ArenaTagType.TAILWIND, turns: 3 }));
+    },
+  ],
+  [
+    AbilityId.QUICK_DRAW,
+    ab => {
+      ab.attrs = ab.attrs.filter(attr => !(attr instanceof BypassSpeedChanceAbAttr));
+      ab.attrs.push(
+        new ProvenanceBypassSpeedChanceAbAttr(30, "quick-draw:proc"),
+        new MovePowerBoostAbAttr(
+          (user, target) =>
+            hasCommandAbilityProvenance(user, "quick-draw:proc") && (target?.hasAbility(AbilityId.QUICK_DRAW) ?? false),
+          2,
+        ),
+      );
+    },
+  ],
+  [
+    AbilityId.UNBURDEN,
+    ab => {
+      ab.attrs.length = 0;
+      ab.attrs.push(
+        new StatMultiplierAbAttr(Stat.SPD, 1.2),
+        new ProtectStatAbAttr(Stat.SPD),
+        new SelfStatDropImmunityAbAttr(Stat.SPD),
+      );
+    },
+  ],
+  [
+    AbilityId.SNOW_CLOAK,
+    ab => {
+      ab.attrs.length = 0;
+      ab.attrs.push(new PostSummonSnowCloakAuroraVeilAbAttr(), new PreLeaveFieldRemoveSnowCloakAuroraVeilAbAttr());
+    },
+  ],
 
   // ===== MINOR — Damage fractions =====
   // BAD_DREAMS: 1/8 → 1/4 foe HP loss.
@@ -504,9 +721,9 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new EntryTailwindClearWeatherAbAttr());
     },
   ],
-  // STENCH (1): ER spec ALLEGEDLY says "Toxic terrain is permanent" but ER
-  // C source (vendor/elite-redux/source/src/battle_util.c:9801) implements
-  // ONLY the 10% flinch — same as vanilla pokerogue. NO PATCH NEEDED.
+  // STENCH (1): the authoritative ER 2.65 dex freezes Toxic Terrain's
+  // countdown while an eligible holder is present. TurnEndPhase owns that
+  // terrain-duration consumer; the vanilla flinch attrs remain unchanged here.
   // DAMP (6): ER spec ALLEGEDLY adds "Makes foe Water-type on contact"
   // but ER C source only implements explosion-block (matches vanilla).
   // NO PATCH NEEDED.
@@ -560,14 +777,26 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new MovePowerBoostAbAttr((_user, _target, move) => move.category === MoveCategory.PHYSICAL, 1.2));
     },
   ],
-  // HEAVY_METAL: ER dex is "takes half damage from Ghost and Dark AND doubles
-  // weight" — the weight-doubling is KEPT (the dex still lists it), only the
-  // Ghost/Dark resist is ADDED on top of vanilla's WeightMultiplierAbAttr(2).
+  // HEAVY_METAL keeps weight doubling and halves Ghost, Dark, or sound damage
+  // once even when a move qualifies through more than one category.
   [
     AbilityId.HEAVY_METAL,
     ab => {
-      ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.GHOST, 0.5));
-      ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.DARK, 0.5));
+      ab.attrs.push(
+        new ReceivedMoveDamageMultiplierAbAttr(
+          (_target, user, move) => {
+            const moveType = user.getMoveType(move);
+            return (
+              moveType === PokemonType.GHOST
+              || moveType === PokemonType.DARK
+              || move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user })
+            );
+          },
+          0.5,
+          false,
+          true,
+        ),
+      );
     },
   ],
   // ROCKY_PAYLOAD: ER dex is "boosts Rock-type AND throwing-based moves by 50%".
@@ -1004,6 +1233,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     AbilityId.RATTLED,
     ab => {
       ab.attrs.push(new FlinchStatStageChangeAbAttr([Stat.SPD], 1));
+      appendAbilityAttrs(ab, allAbilities[AbilityId.RUN_AWAY]);
     },
   ],
   // 138 FLARE_BOOST: ER 2.65 dex — +50% SpAtk when burned (vanilla) AND "Negates
@@ -1102,7 +1332,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [
     AbilityId.ANTICIPATION,
     ab => {
-      ab.attrs.push(new DodgeFirstSuperEffectiveAbAttr());
+      ab.attrs.push(new DodgeFirstSuperEffectiveAbAttr(), new BiomeRevealBonusAbAttr(1));
     },
   ],
   // 209 BIG_PECKS already total.
@@ -1141,7 +1371,6 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
   [AbilityId.SAND_VEIL, ab => mutateStatMultiplier(ab, Stat.EVA, 1.25)],
-  [AbilityId.SNOW_CLOAK, ab => mutateStatMultiplier(ab, Stat.EVA, 1.25)],
   // 96 NORMALIZE: vanilla converts all moves to Normal-type. ER adds a 1.1x
   // boost on Normal-type moves AND makes those moves IGNORE the target's
   // resistances (but not immunities) — the IgnoreResistancesAbAttr marker is
@@ -1341,6 +1570,11 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
           tag: ArenaTagType.ER_SMOKESCREEN,
           turns: 3,
         }),
+        new EntryEffectAbAttr({
+          kind: "set-screen-or-room",
+          tag: ArenaTagType.MIST,
+          turns: 3,
+        }),
       );
     },
   ],
@@ -1378,12 +1612,10 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     ab => {
       ab.attrs = ab.attrs.filter(a => !(a instanceof PostSummonRemoveArenaTagAbAttr));
       ab.attrs.push(
-        new PostSummonRemoveArenaTagAbAttr([
-          ArenaTagType.AURORA_VEIL,
-          ArenaTagType.LIGHT_SCREEN,
-          ArenaTagType.REFLECT,
-          ArenaTagType.ER_SMOKESCREEN,
-        ]),
+        new PostSummonRemoveArenaTagAbAttr(
+          [ArenaTagType.AURORA_VEIL, ArenaTagType.LIGHT_SCREEN, ArenaTagType.REFLECT, ArenaTagType.ER_SMOKESCREEN],
+          "opponent",
+        ),
       );
     },
   ],
@@ -1500,7 +1732,13 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 12 OBLIVIOUS: vanilla immune to infatuation + Intimidate + Taunt.
   // ER says "Immune to infatuation, Scare, Intimidate and Taunt" — adds
   // ER_FEAR (Scare) immunity.
-  [AbilityId.OBLIVIOUS, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
+  [
+    AbilityId.OBLIVIOUS,
+    ab => {
+      extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR);
+      ab.attrs.push(new PostAttackApplyBattlerTagAbAttr(true, () => 20, BattlerTagType.CONFUSED));
+    },
+  ],
   // 20 OWN_TEMPO: vanilla immune to confusion + Intimidate. ER adds Scare.
   [AbilityId.OWN_TEMPO, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
   // 39 INNER_FOCUS: vanilla immune to flinch + Intimidate. ER adds Scare.
@@ -1909,7 +2147,9 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
       // `ability.description` (battle popups, info panels, Battle Info) is correct.
       // Prefer the expanded ROM text; fall back to the short ER summary.
       const erDescription =
-        getErAbilityRomDescription(enAbilityName(mutableAbility)) ?? getErAbilityDescription(pokerogueId as AbilityId);
+        ABILITY_DESCRIPTION_OVERRIDES.get(pokerogueId as AbilityId)
+        ?? getErAbilityRomDescription(enAbilityName(mutableAbility))
+        ?? getErAbilityDescription(pokerogueId as AbilityId);
       if (erDescription) {
         mutableAbility.descriptionOverride = erDescription;
       }
@@ -1926,6 +2166,15 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
       const msg = err instanceof Error ? err.message : String(err);
       result.abilityErrors.push(`Patcher for ability id ${pokerogueId} threw: ${msg}`);
     }
+  }
+
+  // Wandering Spirit is routed through the ER dispatcher instead of the
+  // `archetype === "vanilla"` loop above, but its additive route-reveal marker
+  // still belongs on the live vanilla Ability instance.
+  const wanderingSpirit = abilityById.get(AbilityId.WANDERING_SPIRIT) as MutableAbility | undefined;
+  if (wanderingSpirit && !wanderingSpirit.attrs.some(attr => attr instanceof BiomeRevealBonusAbAttr)) {
+    wanderingSpirit.attrs.push(new BiomeRevealBonusAbAttr(1));
+    result.abilityDeltas++;
   }
 
   // === MOVE MECHANIC PATCHES ===
@@ -2335,23 +2584,32 @@ class ErDefeatistStatMultiplierAbAttr extends StatMultiplierAbAttr {
   }
 }
 
-/**
- * Replace HEALER's conditional 50% chance with 30% (ER convention). Uses the
- * same `conditionalAttr` pattern as vanilla but with the tighter chance.
- *
- * NOTE: The vanilla HEALER uses `randSeedInt(10) < 3` (30%) wait — actually
- * vanilla `init-abilities.ts:910` says `randSeedInt(10) < 3` which is already
- * 30%. The audit doc lists it as "50% → 30%" but vanilla is ALREADY 30% in
- * pokerogue. Skipping the patch — see audit notes. (Defensive: this function
- * is a no-op.)
- */
+function appendAbilityAttrs(target: MutableAbility, source: Ability): void {
+  if (source.conditions.length === 0) {
+    target.attrs.push(...source.attrs);
+    return;
+  }
+
+  const sourceConditions = source.conditions;
+  for (const attr of source.attrs) {
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(attr)), attr) as AbAttr;
+    const existing = clone.getCondition();
+    clone.addCondition(
+      pokemon => sourceConditions.every(condition => condition(pokemon)) && (existing === null || existing(pokemon)),
+    );
+    target.attrs.push(clone);
+  }
+}
+
+/** Make Healer's existing ally cure guaranteed, then add a guaranteed holder cure. */
 function patchHealerChance(ability: MutableAbility): void {
-  // pokerogue's HEALER is already at 30% (`randSeedInt(10) < 3`) for the ALLY
-  // cure. ER 2.65 dex additionally cures the USER's own status with an
-  // INDEPENDENT 30% check ("cures status for both the user AND their ally.
-  // Makes 2 separate checks for each Pokemon."). Add the self-cure branch with
-  // its own roll — the ally branch stays as the vanilla attr.
-  ability.attrs.push(new PostTurnResetStatusAbAttr(false).addCondition(_pokemon => randSeedInt(10) < 3));
+  const allyCure = ability.attrs.find(attr => attr instanceof PostTurnResetStatusAbAttr);
+  if (allyCure) {
+    allyCure.addCondition(() => true);
+  } else {
+    ability.attrs.push(new PostTurnResetStatusAbAttr(true));
+  }
+  ability.attrs.push(new PostTurnResetStatusAbAttr(false));
 }
 
 /**
@@ -2605,7 +2863,10 @@ function patchForewarn(ability: MutableAbility): void {
  */
 function patchPastelVeil(ability: MutableAbility): void {
   ability.attrs.length = 0;
-  ability.attrs.push(new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.SAFEGUARD }));
+  ability.attrs.push(
+    new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.SAFEGUARD }),
+    new FirstEntryPartyHealAbAttr({ key: "pastel-veil", healFraction: 0.1 }),
+  );
 }
 
 /**
@@ -2713,21 +2974,22 @@ function getAttrCtorByName(name: string): (new (...args: unknown[]) => AbAttr) |
 }
 
 /**
- * Patch FLOWER_GIFT: vanilla boosts ATK + SPDEF in sun; ER boosts SPATK + SPDEF.
- * Mutate the `stat` field on the ATK multipliers to SPATK.
+ * Patch FLOWER_GIFT so each recipient's naturally higher offense and defense
+ * receive the sun multiplier.
  */
 function patchFlowerGift(ability: MutableAbility): void {
-  for (const attr of ability.attrs) {
-    if (attr instanceof StatMultiplierAbAttr && attr.stat === Stat.ATK) {
-      (attr as unknown as { stat: Stat }).stat = Stat.SPATK;
-    }
-    if (attr instanceof AllyStatMultiplierAbAttr) {
-      const tagged = attr as unknown as { stat: Stat };
-      if (tagged.stat === Stat.ATK) {
-        tagged.stat = Stat.SPATK;
-      }
-    }
-  }
+  ability.attrs = ability.attrs.filter(
+    attr => !(attr instanceof StatMultiplierAbAttr) && !(attr instanceof AllyStatMultiplierAbAttr),
+  );
+  const inSun = () =>
+    !globalScene.arena.weather?.isEffectSuppressed()
+    && [WeatherType.SUNNY, WeatherType.HARSH_SUN].includes(globalScene.arena.weatherType);
+  ability.attrs.push(
+    new HigherStatMultiplierAbAttr([Stat.ATK, Stat.SPATK], 1.5).addCondition(inSun),
+    new HigherStatMultiplierAbAttr([Stat.DEF, Stat.SPDEF], 1.5).addCondition(inSun),
+    new AllyHigherStatMultiplierAbAttr([Stat.ATK, Stat.SPATK], 1.5).addCondition(inSun),
+    new AllyHigherStatMultiplierAbAttr([Stat.DEF, Stat.SPDEF], 1.5).addCondition(inSun),
+  );
 }
 
 /**

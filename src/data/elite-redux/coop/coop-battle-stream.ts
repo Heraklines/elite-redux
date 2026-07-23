@@ -249,6 +249,8 @@ function isPositiveSafeAddressPart(value: unknown): value is number {
 
 /** Hard bound for the summon/on-entry cosmetic prefix retained beside one wave-start state. */
 const MAX_ENTRY_PRESENTATION_EVENTS = 256;
+/** Defensive ceiling for ER innate plus shared GIFT ability-source indexes. */
+const MAX_ABILITY_SOURCE_SLOT = 31;
 
 function isNumberArray(value: unknown, length?: number): value is number[] {
   return Array.isArray(value) && (length === undefined || value.length === length) && value.every(isFiniteNumber);
@@ -382,7 +384,8 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
         && isValidPartySlot(event.partySlot)
         && isPositiveSafeAddressPart(event.abilityId)
         && typeof event.passive === "boolean"
-        && (event.passiveSlot === 0 || event.passiveSlot === 1 || event.passiveSlot === 2)
+        && isSafeAddressPart(event.passiveSlot)
+        && event.passiveSlot <= MAX_ABILITY_SOURCE_SLOT
       );
     case "weather":
       return (
@@ -2189,8 +2192,9 @@ export class CoopBattleStreamer {
     encounter?: CoopEncounterAuthority,
     entryPresentation?: CoopBattleEvent[],
   ): void {
+    const entryPresentationLength = entryPresentation?.length ?? 0;
     if (entryPresentation !== undefined && !isStrictEntryPresentation(entryPresentation)) {
-      throw new Error(`refusing malformed entry presentation wave=${wave} events=${entryPresentation.length}`);
+      throw new Error(`refusing malformed entry presentation wave=${wave} events=${entryPresentationLength}`);
     }
     if (
       entryPresentation !== undefined
