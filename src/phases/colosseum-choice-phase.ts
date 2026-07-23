@@ -158,10 +158,10 @@ export class ColosseumChoicePhase extends Phase {
     this.resolving = true;
 
     // Co-op (#829): relay the resolved board decision on the dedicated board seq so the partner adopts the
-    // SAME branch - but ONLY when the LOCAL client owns the board (host-owned, or solo where the send is a
-    // hard no-op anyway). On a GUEST-owned board the guest already relayed its pick and the host is APPLYING
+    // SAME branch - but ONLY when a live co-op board is locally owned. On a GUEST-owned board the guest
+    // already relayed its pick and the host is APPLYING
     // it here (open() awaited it), so re-sending would echo a second pick onto the board seq. FIRE-AND-FORGET.
-    if ((!coopColosseumBoardIsCoop() || coopColosseumBoardOwnedLocally()) && !coopColosseumSendDecision(choice)) {
+    if (coopColosseumBoardIsCoop() && coopColosseumBoardOwnedLocally() && !coopColosseumSendDecision(choice)) {
       return;
     }
 

@@ -228,7 +228,7 @@ export function coopColosseumStreamBoard(labels: string[], roundOverride?: numbe
  */
 export function coopColosseumSendDecision(index: number, roundOverride?: number): boolean {
   if (!coopColosseumActiveInMe()) {
-    return false;
+    return true;
   }
   const pinned = coopMeInteractionStartValue();
   const seq = coopColosseumSeq(pinned);
