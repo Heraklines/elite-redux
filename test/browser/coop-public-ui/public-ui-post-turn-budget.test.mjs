@@ -558,6 +558,10 @@ test("sequential command driver submits the first owner before waiting for the p
   const rig = {
     clients: { first, second },
     config: { timeoutMs: 1_000 },
+    assertPresentationLedgerAtSharedCommand: async (_from, expectedAddress) => {
+      assert.equal(expectedAddress, "73:1:2");
+      order.push("presentation-proof");
+    },
   };
 
   const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
@@ -567,7 +571,7 @@ test("sequential command driver submits the first owner before waiting for the p
     "turn-2",
   );
 
-  assert.deepEqual(order, ["first", "second"]);
+  assert.deepEqual(order, ["first", "presentation-proof", "second"]);
   assert.equal(firstEvidence.events.at(-1).kind, "sequential-command-proof");
   assert.equal(secondEvidence.events.at(-1).kind, "sequential-command-proof");
   assert.deepEqual(result.outcomeCursors, {
@@ -665,7 +669,14 @@ test("sequential command driver resolves an animation-delayed target before wait
     },
     press: async () => {},
   };
-  const rig = { clients: { first, second }, config: { timeoutMs: 1_000 } };
+  const rig = {
+    clients: { first, second },
+    config: { timeoutMs: 1_000 },
+    assertPresentationLedgerAtSharedCommand: async (_from, expectedAddress) => {
+      assert.equal(expectedAddress, "73:1:2");
+      order.push("presentation-proof");
+    },
+  };
 
   await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
     rig,
@@ -674,7 +685,7 @@ test("sequential command driver resolves an animation-delayed target before wait
     "targeted-turn",
   );
 
-  assert.deepEqual(order, ["first-command", "first-target:Space", "second-command"]);
+  assert.deepEqual(order, ["first-command", "first-target:Space", "presentation-proof", "second-command"]);
   assert.equal(
     firstEvidence.events.some(event => event.kind === "semantic-target-selection-proof"),
     true,
