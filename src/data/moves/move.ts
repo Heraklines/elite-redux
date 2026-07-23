@@ -42,7 +42,7 @@ import { hasCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/
 import { getMoveHpCostFraction } from "#data/elite-redux/ability-upgrades/attrs/move-hp-cost";
 import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
 // biome-ignore lint/suspicious/noImportCycles: cycle closes through the batch-2 signature battle-chokepoint hooks (move -> mechanics -> scripted-move-util -> move).
-import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
+import { broadcastCoopWaveResolved, isShowdownSyncSession } from "#data/elite-redux/coop/coop-runtime";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   erHasUsablePowerHerb,
@@ -8793,6 +8793,7 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
             switchOutTarget.getFieldIndex(),
             true,
             true,
+            isShowdownSyncSession() && this.selfSwitch,
           );
           return true;
         }
@@ -8879,6 +8880,11 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
             false,
             false,
           );
+        } else if (isShowdownSyncSession() && this.selfSwitch) {
+          // The mirrored enemy is controlled by the remote human. Their local engine opens the
+          // replacement picker; this engine must await and apply that exact pick instead of asking
+          // trainer AI for getNextSummonIndex(), which gives the two simulations different actives.
+          globalScene.phaseManager.queueDeferred("ShowdownEnemyFaintSwitchPhase", switchOutTarget.getFieldIndex());
         } else {
           globalScene.phaseManager.queueDeferred(
             "SwitchSummonPhase",
