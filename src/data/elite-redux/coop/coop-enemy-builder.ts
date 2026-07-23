@@ -48,6 +48,13 @@ export function buildCoopEnemy(
   fallbackLevel: number,
   trainerSlot: TrainerSlot = TrainerSlot.NONE,
 ): EnemyPokemon | null {
+  const serializedTrainerSlot = coopNum(data, "trainerSlot");
+  const authoritativeTrainerSlot =
+    serializedTrainerSlot === TrainerSlot.NONE
+    || serializedTrainerSlot === TrainerSlot.TRAINER
+    || serializedTrainerSlot === TrainerSlot.TRAINER_PARTNER
+      ? serializedTrainerSlot
+      : trainerSlot;
   const speciesId = coopNum(data, "speciesId");
   if (speciesId === undefined) {
     // Fallback: no species in the host blob -> caller rolls its own (divergence risk). Warn so the
@@ -61,7 +68,7 @@ export function buildCoopEnemy(
     return null;
   }
   const level = Math.max(1, Math.floor(coopNum(data, "level") ?? fallbackLevel));
-  const enemy = globalScene.addEnemyPokemon(species, level, trainerSlot, false);
+  const enemy = globalScene.addEnemyPokemon(species, level, authoritativeTrainerSlot, false);
   const id = coopNum(data, "id");
   if (id !== undefined) {
     enemy.id = id >>> 0;
@@ -153,7 +160,7 @@ export function buildCoopEnemy(
     enemy.initBattleInfo();
     coopLog(
       "replay",
-      `guest adopt enemy bi=${trainerSlot} isBoss segments=${bossSegments} index=${enemy.bossSegmentIndex}`,
+      `guest adopt enemy trainerSlot=${authoritativeTrainerSlot} isBoss segments=${bossSegments} index=${enemy.bossSegmentIndex}`,
     );
   } else if (data.isBoss === false || bossSegments === 0) {
     // Modern host manifests state the neutral boss value explicitly.  Re-assert it just as deliberately
@@ -185,7 +192,7 @@ export function buildCoopEnemy(
   // visible. heldItems summarized by count (the full reconcile logs in applyCoopEnemyHeldItems).
   coopLog(
     "enemy",
-    `buildCoopEnemy ADOPT bi=${trainerSlot} species=${speciesId} form=${enemy.formIndex} lv=${enemy.level} abilityIdx=${enemy.abilityIndex} nature=${enemy.nature} gender=${enemy.gender} shiny=${enemy.shiny} tera=${enemy.isTerastallized ? 1 : 0}:${enemy.teraType} hp=${enemy.hp}/${enemy.getMaxHp()} moves=${enemy.moveset.length} heldItems=${Array.isArray(data.heldItems) ? data.heldItems.length : 0}`,
+    `buildCoopEnemy ADOPT trainerSlot=${authoritativeTrainerSlot} species=${speciesId} form=${enemy.formIndex} lv=${enemy.level} abilityIdx=${enemy.abilityIndex} nature=${enemy.nature} gender=${enemy.gender} shiny=${enemy.shiny} tera=${enemy.isTerastallized ? 1 : 0}:${enemy.teraType} hp=${enemy.hp}/${enemy.getMaxHp()} moves=${enemy.moveset.length} heldItems=${Array.isArray(data.heldItems) ? data.heldItems.length : 0}`,
   );
   return enemy;
 }

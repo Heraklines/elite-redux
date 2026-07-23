@@ -1909,3 +1909,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Two focused reward commit fixtures bypassed `SelectModifierPhase.start()` and therefore left `typeOptions`
   undefined. They now install the same valid empty authoritative option image that a started phase owns before
   invoking the private terminal/result seam; this removes fixture crashes without changing production code.
+
+# 2026-07-23 - trainer lanes become immutable authority material
+
+- B8 exposed a real trainer-battle divergence: the guest reconstructed every streamed trainer enemy with
+  `TrainerSlot.TRAINER`, while the authority's partnered lead and reserve correctly used
+  `TrainerSlot.TRAINER_PARTNER`. The enemy manifest and complete battle image now carry the exact live lane;
+  initial reconstruction and later full-state application both restore it before AI or switch selection.
+- The trainer-switch and rapid faint-chain journeys now opt into the harness's existing address-exact next-turn
+  command proof. Previously they asked for turn N+1 while the pure renderer was validly parked at turn N's
+  finalize phase, producing a harness-only `host=11:2, guest=11:1` red before testing the switch itself.

@@ -145,7 +145,9 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
   async function playTurn(rig: DuoRig, hostMove: MoveId, guestMove: MoveId): Promise<void> {
     currentGuestMove = guestMove;
     const turn = rig.hostScene.currentBattle.turn;
-    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, turn);
+    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, turn, {
+      proveGuestCommand: true,
+    });
     await withClient(rig.hostCtx, async () => {
       game.move.select(hostMove, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
@@ -207,7 +209,9 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     await playTurn(rig, KO_MOVE, HOLD_MOVE);
     // The completed TurnEndPhase has already advanced the battle's turn. Use the materialized current
     // boundary instead of manufacturing a second increment that can only describe a phantom turn.
-    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, rig.hostScene.currentBattle.turn);
+    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, rig.hostScene.currentBattle.turn, {
+      proveGuestCommand: true,
+    });
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });

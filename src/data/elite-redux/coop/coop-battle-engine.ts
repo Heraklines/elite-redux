@@ -111,6 +111,7 @@ import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { TrainerSlot } from "#enums/trainer-slot";
 import type { WeatherType } from "#enums/weather-type";
 import { EnemyPokemon, type PlayerPokemon, type Pokemon } from "#field/pokemon";
 // biome-ignore lint/performance/noNamespaceImport: held-item reconstruction resolves the modifier class by serialized name (`Modifier[className]`), exactly like the save-load path in game-data.ts.
@@ -1286,6 +1287,9 @@ export function captureCoopEnemies(): CoopSerializedEnemy[] {
           // live stages here as well so that reconstruction/stat recalculation can never reopen command
           // input with a zeroed local array after an entry ability already changed battle math.
           statStages: [...enemy.getStatStages()],
+          // Trainer lane is live authority state, not derivable from party-index parity after switches.
+          // It gates the AI's reserve pool and determines which trainer sprite owns a send-out.
+          trainerSlot: enemy.trainerSlot,
           hp: enemy.hp,
           // Boss adopt (#633, A/BLOCKING-2): boss state lives ONLY on EnemyPokemon and is hardcoded
           // `false` on the guest's `addEnemyPokemon` reconstruct, so an adopted boss renders normal
@@ -2663,6 +2667,12 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
 
 function pokemonDataForWire(mon: Pokemon): Record<string, unknown> {
   const data = JSON.parse(JSON.stringify(new PokemonData(mon))) as Record<string, unknown>;
+  // PokemonData is save-oriented and derives an enemy's trainer lane from party-index parity on reload.
+  // Live trainer parties can reorder after a switch, so parity is not authority. Carry the exact lane with
+  // every mechanical image; the replica reapplies it before AI/switch selection can inspect the party.
+  if (mon instanceof EnemyPokemon) {
+    data.trainerSlot = mon.trainerSlot;
+  }
   // Save-format PokemonData normally omits derived stats because solo reload recalculates them. An
   // authoritative renderer must not recalculate under its own ER modifier/context, so the live network
   // carrier includes the host's exact array; applyAuthoritativeMonData already gives it precedence.
@@ -2879,12 +2889,23 @@ function parseAuthoritativeParty(rawParty: Record<string, unknown>[] | undefined
   const out: PokemonData[] = [];
   for (const raw of rawParty) {
     try {
-      out.push(new PokemonData(raw));
+      const data = new PokemonData(raw) as PokemonData & { trainerSlot?: TrainerSlot };
+      const trainerSlot = readAuthoritativeTrainerSlot(raw.trainerSlot);
+      if (trainerSlot !== undefined) {
+        data.trainerSlot = trainerSlot;
+      }
+      out.push(data);
     } catch {
       return null;
     }
   }
   return out;
+}
+
+function readAuthoritativeTrainerSlot(value: unknown): TrainerSlot | undefined {
+  return value === TrainerSlot.NONE || value === TrainerSlot.TRAINER || value === TrainerSlot.TRAINER_PARTNER
+    ? value
+    : undefined;
 }
 
 function battleSpriteKey(mon: Pokemon): string {
@@ -2963,6 +2984,12 @@ function applyAuthoritativeMonData(mon: Pokemon, data: PokemonData, authoritativ
     mon.battleData = new PokemonBattleData(data.battleData);
     if (data.coopOwner !== undefined) {
       (mon as PlayerPokemon).coopOwner = data.coopOwner;
+    }
+    if (mon instanceof EnemyPokemon) {
+      const trainerSlot = readAuthoritativeTrainerSlot((data as PokemonData & { trainerSlot?: unknown }).trainerSlot);
+      if (trainerSlot !== undefined) {
+        mon.trainerSlot = trainerSlot;
+      }
     }
     mon.calculateStats();
     if (Array.isArray(data.stats) && data.stats.length > 0) {
