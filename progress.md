@@ -1562,3 +1562,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Permitted local evidence: all touched-file TypeScript filters report zero diagnostics, semantic diffs are
   narrow, and `git diff --check` is clean. Remote S shards plus affected B/C/P shards are required before this
   failure cluster is considered closed.
+
+# 2026-07-23 - post-merge public static gate and move-runtime cycle closure
+
+- Exact-SHA public journey `29971204535` did not launch Chromium. Its build job failed in the owned-file
+  Biome step with seven `noImportCycles` errors, so it is CI/static evidence rather than a co-op runtime
+  regression. All seven reports shared the feat-merge path `field/pokemon -> newcomer signature mechanics ->
+  scripted move util -> move -> coop-runtime`.
+- The only direct move-to-runtime dependency was the forced-wild-flee wave-resolution notification. It now
+  crosses a tiny late-bound bridge installed by `coop-runtime`; the move engine fails loudly in co-op if that
+  production bridge is ever absent instead of silently stranding the guest. The existing #838 two-engine
+  wild-flee regression continues to own the behavioral boundary on hosted runners.
+- The public workflow now typechecks and lints both the bridge and universal move engine explicitly. In a
+  clean LF exact-SHA mirror with `CI=true`, the complete 46-file public static slice is zero-error. The three
+  touched TypeScript files also have zero diagnostics against the repository's documented unrelated baseline.
+- The integration ownership manifest is now version 2 and owns this exact post-`593b6dd2f` correction set;
+  no frozen P33 schema file is modified. Full gate `29971229403` on the parent SHA remains red and supplies
+  the next runtime/fixture triage corpus; a corrected exact-SHA public journey and gate are still required.

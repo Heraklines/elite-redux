@@ -6,9 +6,13 @@
   "baseSha": "593b6dd2f64f7e7e060218ef1409826b50fa9671",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
+    ".github/workflows/coop-public-ui-journey.yml",
     "docs/coop-task-ownership.md",
     "progress.md",
     "scripts/guard-coop-task-ownership.mjs",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/data/elite-redux/coop/coop-wave-resolution-bridge.ts",
+    "src/data/moves/move.ts",
     "test/scripts/guard-coop-task-ownership.test.mjs"
   ],
   "lockedSchemaFiles": []

@@ -41,8 +41,7 @@ import { erRendezvousPowerMultiplier } from "#data/elite-redux/abilities/rendezv
 import { hasCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { getMoveHpCostFraction } from "#data/elite-redux/ability-upgrades/attrs/move-hp-cost";
 import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
-// biome-ignore lint/suspicious/noImportCycles: cycle closes through the batch-2 signature battle-chokepoint hooks (move -> mechanics -> scripted-move-util -> move).
-import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
+import { notifyCoopWaveResolved } from "#data/elite-redux/coop/coop-wave-resolution-bridge";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   erHasUsablePowerHerb,
@@ -8840,7 +8839,10 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
         // on a host waveResolved - would STRAND awaiting a resolution the host never sends. Mirror
         // AttemptRunPhase's broadcast at this shared chokepoint. Hard no-op unless we are the authoritative
         // co-op HOST (guest / solo / lockstep unaffected), so the vanilla flee flow is byte-for-byte intact.
-        broadcastCoopWaveResolved("flee");
+        const waveResolutionBridgeInstalled = notifyCoopWaveResolved("flee");
+        if (globalScene.gameMode.isCoop && !waveResolutionBridgeInstalled) {
+          throw new Error("The co-op forced-flee boundary has no installed wave-resolution broadcaster.");
+        }
         globalScene.phaseManager.pushNew("BattleEndPhase", false);
 
         if (globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()) {

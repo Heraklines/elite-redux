@@ -466,6 +466,7 @@ import {
   setCoopWaveAdvanceOperationRevisionFloor,
   tryApplyCoopWaveAdvanceDataAtBoundary,
 } from "#data/elite-redux/coop/coop-wave-operation";
+import { installCoopWaveResolutionBroadcaster } from "#data/elite-redux/coop/coop-wave-resolution-bridge";
 import { BARGAIN_SIN_ORDER } from "#data/elite-redux/er-bargain-sins";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
 import {
@@ -8335,6 +8336,11 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
   }
   sendCoopWaveResolvedCompatibility(wave, outcome, captureParty, presentation, transition);
 }
+
+// Keep the universal move engine independent from this orchestration module. In any co-op session the
+// runtime is loaded before battle input can begin, so forced-flee mechanics reach this exact host-authority
+// boundary without introducing move -> runtime -> field -> ability -> move dependency cycles.
+installCoopWaveResolutionBroadcaster(broadcastCoopWaveResolved);
 
 function sendCoopWaveResolvedCompatibility(
   wave: number,
