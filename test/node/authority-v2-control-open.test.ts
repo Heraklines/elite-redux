@@ -9,8 +9,8 @@ import {
   buildInteractionOpenEntry,
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
+  commandOpenControlAddressesClaim,
   commandOpenMaterialDigest,
-  commandOpenMaterialMustWaitForPresentation,
   decodeCommandOpenEntry,
   decodeInteractionOpenEntry,
   interactionOpenMaterialDigest,
@@ -116,13 +116,52 @@ function interactionMaterial(overrides: Partial<CoopInteractionOpenMaterialV2> =
 }
 
 describe("authority-v2 explicit command-open boundary", () => {
-  it("retains command material while an encounter presentation owns the route to CommandPhase", () => {
-    expect(commandOpenMaterialMustWaitForPresentation("EncounterPhase")).toBe(true);
-    expect(commandOpenMaterialMustWaitForPresentation("NewBiomeEncounterPhase")).toBe(true);
-    expect(commandOpenMaterialMustWaitForPresentation("NextEncounterPhase")).toBe(true);
-    expect(commandOpenMaterialMustWaitForPresentation("CoopFinalizeTurnPhase")).toBe(false);
-    expect(commandOpenMaterialMustWaitForPresentation("CommandPhase")).toBe(false);
-    expect(commandOpenMaterialMustWaitForPresentation(null)).toBe(false);
+  it("addresses only the exact parked command consumer without naming presentation phases", () => {
+    const frontier = command({
+      wave: 12,
+      turn: 4,
+      commands: [
+        { ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 },
+        { ownerSeatId: 1, pokemonId: 202, fieldIndex: 1 },
+      ],
+    });
+    expect(
+      commandOpenControlAddressesClaim(frontier, {
+        epoch: 3,
+        wave: 12,
+        turn: 4,
+        fieldIndex: 1,
+        pokemonId: 202,
+      }),
+    ).toBe(true);
+    expect(
+      commandOpenControlAddressesClaim(frontier, {
+        epoch: 3,
+        wave: 12,
+        turn: 3,
+        fieldIndex: 1,
+        pokemonId: 202,
+      }),
+    ).toBe(false);
+    expect(
+      commandOpenControlAddressesClaim(frontier, {
+        epoch: 3,
+        wave: 12,
+        turn: 4,
+        fieldIndex: 0,
+        pokemonId: 999,
+      }),
+    ).toBe(false);
+    expect(
+      commandOpenControlAddressesClaim(frontier, {
+        epoch: 3,
+        wave: 12,
+        turn: 4,
+        fieldIndex: 0,
+        pokemonId: 999,
+        authorityTarget: { ownerSeatId: 1, pokemonId: 202, fieldIndex: 1 },
+      }),
+    ).toBe(true);
   });
 
   it("carries and fingerprints the complete post-entry-effects state", () => {

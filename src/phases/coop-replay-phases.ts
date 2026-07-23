@@ -1080,6 +1080,14 @@ export class CoopCaptureReplayPhase extends Phase {
  * runs ONLY here, and this phase is always LAST on its tree level - so it can never leaveField a mon whose
  * faint has not yet animated.
  */
+export interface CoopV2ControlSuccessorClaim {
+  readonly sessionEpoch: number;
+  readonly revision: number;
+  readonly kind: CoopAuthorityEntryKind;
+  readonly operationId: string;
+  readonly nextControl: CoopNextControl;
+}
+
 export class CoopFinalizeTurnPhase extends Phase {
   public readonly phaseName = "CoopFinalizeTurnPhase";
 
@@ -1098,13 +1106,7 @@ export class CoopFinalizeTurnPhase extends Phase {
    * presentation receipt. Retain that exact authenticated edge until finishTurn reaches the park decision;
    * otherwise a fast replica loses the release merely because the log retry beat the finalizer by one stack.
    */
-  private authoritySuccessorReady: {
-    sessionEpoch: number;
-    revision: number;
-    kind: CoopAuthorityEntryKind;
-    operationId: string;
-    nextControl: CoopNextControl;
-  } | null = null;
+  private authoritySuccessorReady: CoopV2ControlSuccessorClaim | null = null;
   private authoritySuccessorMachineWaitEnd: (() => void) | null = null;
   private supersedingCheckpoint: CoopCheckpointEnvelope | null | undefined;
   private turnCommitSupersededBy: CoopCheckpointEnvelope | undefined;
@@ -1253,13 +1255,7 @@ export class CoopFinalizeTurnPhase extends Phase {
    * revision is legal only when this TURN stated AWAIT_SUCCESSOR. The wake can arrive before finishTurn
    * decides to park, so the exact edge is latched and consumed at that decision rather than being lost.
    */
-  public releaseForCoopV2Control(successor: {
-    sessionEpoch: number;
-    revision: number;
-    kind: CoopAuthorityEntryKind;
-    operationId: string;
-    nextControl: CoopNextControl;
-  }): boolean {
+  private acceptsCoopV2ControlSuccessor(successor: CoopV2ControlSuccessorClaim): boolean {
     if (this.ended || successor.sessionEpoch !== this.epoch || this.authorityRevision == null) {
       return false;
     }
@@ -1288,16 +1284,23 @@ export class CoopFinalizeTurnPhase extends Phase {
       && statedControl?.kind === "REPLACEMENT"
       && successor.kind === "REPLACEMENT_COMMIT"
       && successor.operationId === statedControl.operationId;
-    if (!sameEntryReplacement && !orderedSuccessor && !orderedReplacementResult) {
-      return false;
-    }
+    const addressAccepted = sameEntryReplacement || orderedSuccessor || orderedReplacementResult;
     const prior = this.authoritySuccessorReady;
-    if (
+    const conflictsWithLatchedSuccessor =
       prior != null
       && (prior.revision !== successor.revision
         || prior.operationId !== successor.operationId
-        || controlIdOf(prior.nextControl) !== controlIdOf(successor.nextControl))
-    ) {
+        || controlIdOf(prior.nextControl) !== controlIdOf(successor.nextControl));
+    return addressAccepted && !conflictsWithLatchedSuccessor;
+  }
+
+  /** Non-mutating proof used before an immutable successor applies its material state. */
+  public canReleaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
+    return this.acceptsCoopV2ControlSuccessor(successor);
+  }
+
+  public releaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
+    if (!this.acceptsCoopV2ControlSuccessor(successor)) {
       return false;
     }
     this.authoritySuccessorReady ??= successor;

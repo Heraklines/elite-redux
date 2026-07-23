@@ -48,6 +48,10 @@ const pushReplacementCheckpointPhase = readFileSync(
 );
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
 const replayTurnPhase = readFileSync(new URL("src/phases/coop-replay-turn-phase.ts", root), "utf8");
+const controlOpenAdapter = readFileSync(
+  new URL("src/data/elite-redux/coop/authority-v2/adapters/control-open.ts", root),
+  "utf8",
+);
 const replayMePhase = readFileSync(new URL("src/phases/coop-replay-me-phase.ts", root), "utf8");
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
@@ -608,6 +612,34 @@ test("biome-market readiness proves the exact actionable owner or fully armed wa
   assert.ok(interactionReady > surfaceProof, "V2 cannot retire before the concrete market surface is proven");
 });
 
+test("command material waits for an address-exact engine consumer, never a phase-name allowlist", () => {
+  const consumerStart = coopRuntime.indexOf("function hasCoopV2CommandOpenMaterialConsumer(");
+  const consumerEnd = coopRuntime.indexOf("\n/**\n * Release the real turn finalizer", consumerStart);
+  assert.notEqual(consumerStart, -1, "runtime exposes one command material consumer proof");
+  assert.ok(consumerEnd > consumerStart, "the command material proof has a bounded source block");
+  const consumer = coopRuntime.slice(consumerStart, consumerEnd);
+  assert.match(consumer, /v2DeferredCommandStarts/u);
+  assert.match(consumer, /commandOpenControlAddressesClaim\(control, claim\)/u);
+  assert.match(consumer, /canReleaseForCoopV2Control/u);
+  assert.doesNotMatch(consumer, /phaseName|EncounterPhase|SwitchBiomePhase/u);
+
+  const applyStart = coopRuntime.indexOf(
+    'if (material.kind === "command-open" && !hasCoopV2CommandOpenMaterialConsumer',
+  );
+  assert.notEqual(applyStart, -1, "command material is fail-closed behind the exact consumer proof");
+
+  const addressStart = controlOpenAdapter.indexOf("export function commandOpenControlAddressesClaim(");
+  const addressEnd = controlOpenAdapter.indexOf("\n}\n", addressStart) + 2;
+  assert.notEqual(addressStart, -1, "the adapter exposes one shared command address matcher");
+  assert.ok(addressEnd > addressStart, "the command address matcher has a bounded source block");
+  const address = controlOpenAdapter.slice(addressStart, addressEnd);
+  assert.match(address, /control\.epoch === claim\.epoch/u);
+  assert.match(address, /control\.wave === claim\.wave/u);
+  assert.match(address, /control\.turn === claim\.turn/u);
+  assert.match(address, /command\.fieldIndex/u);
+  assert.match(address, /command\.pokemonId/u);
+});
+
 test("a committed replacement wake cannot be stranded behind its own turn finalizer", () => {
   const markStart = coopRuntime.indexOf("function markCoopV2ControlMaterialApplied(");
   const markEnd = coopRuntime.indexOf("\n}\n", markStart) + 2;
@@ -622,19 +654,33 @@ test("a committed replacement wake cannot be stranded behind its own turn finali
     "the parked turn is released only after its exact replacement wake is queued",
   );
 
-  const releaseStart = replayPhases.indexOf("public releaseForCoopV2Control(");
-  const releaseEnd = replayPhases.indexOf("\n  private completeCoopV2ControlRelease(", releaseStart);
-  assert.notEqual(releaseStart, -1, "the real finalizer exposes one authenticated release edge");
-  assert.ok(releaseEnd > releaseStart, "the finalizer release edge has a bounded source block");
-  const release = replayPhases.slice(releaseStart, releaseEnd);
-  assert.match(release, /successor\.revision === this\.authorityRevision/u);
-  assert.match(release, /statedControl\?\.kind === "REPLACEMENT"/u);
-  assert.match(release, /controlIdOf\(successor\.nextControl\) === controlIdOf\(statedControl\)/u);
+  const acceptsStart = replayPhases.indexOf("private acceptsCoopV2ControlSuccessor(");
+  const acceptsEnd = replayPhases.indexOf("\n  /** Non-mutating proof", acceptsStart);
+  assert.notEqual(acceptsStart, -1, "the real finalizer exposes one exact successor predicate");
+  assert.ok(acceptsEnd > acceptsStart, "the successor predicate has a bounded source block");
+  const accepts = replayPhases.slice(acceptsStart, acceptsEnd);
+  assert.match(accepts, /successor\.revision === this\.authorityRevision/u);
+  assert.match(accepts, /statedControl\?\.kind === "REPLACEMENT"/u);
+  assert.match(accepts, /controlIdOf\(successor\.nextControl\) === controlIdOf\(statedControl\)/u);
   assert.match(
-    release,
+    accepts,
     /successor\.revision === this\.authorityRevision \+ 1[\s\S]*statedControl\?\.kind === "REPLACEMENT"[\s\S]*successor\.kind === "REPLACEMENT_COMMIT"[\s\S]*successor\.operationId === statedControl\.operationId/u,
     "the executable replacement control releases only through its exact globally-next immutable result",
   );
+
+  const proofStart = replayPhases.indexOf("public canReleaseForCoopV2Control(");
+  const proofEnd = replayPhases.indexOf("\n  public releaseForCoopV2Control(", proofStart);
+  assert.notEqual(proofStart, -1, "the finalizer exposes a non-mutating pre-apply proof");
+  assert.ok(proofEnd > proofStart, "the pre-apply proof has a bounded source block");
+  const proof = replayPhases.slice(proofStart, proofEnd);
+  assert.match(proof, /return this\.acceptsCoopV2ControlSuccessor\(successor\)/u);
+  assert.doesNotMatch(proof, /authoritySuccessorReady|completeCoopV2ControlRelease/u);
+
+  const releaseStart = proofEnd + 1;
+  const releaseEnd = replayPhases.indexOf("\n  private completeCoopV2ControlRelease(", releaseStart);
+  assert.ok(releaseEnd > releaseStart, "the finalizer release edge has a bounded source block");
+  const release = replayPhases.slice(releaseStart, releaseEnd);
+  assert.match(release, /this\.acceptsCoopV2ControlSuccessor\(successor\)/u);
   assert.match(release, /this\.authoritySuccessorReady \?\?= successor/u);
 
   const parkStart = replayPhases.indexOf("} else if (v2NoImmediateCommand) {");

@@ -23,7 +23,7 @@ import type { Phase } from "#app/phase";
 import {
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
-  commandOpenMaterialMustWaitForPresentation,
+  commandOpenControlAddressesClaim,
   decodeControlOpenEntry,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import {
@@ -4716,6 +4716,48 @@ function isCoopV2RecoveryCommandBootstrapInstalled(
   return firstTargetId == null || runtime.v2InstalledCommandTargets.has(firstTargetId);
 }
 
+interface CoopV2ControlSuccessorClaim {
+  readonly sessionEpoch: number;
+  readonly revision: number;
+  readonly kind: CoopAuthorityEntry["kind"];
+  readonly operationId: string;
+  readonly nextControl: CoopNextControl;
+}
+
+function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSuccessorClaim {
+  return {
+    sessionEpoch: entry.context.sessionEpoch,
+    revision: entry.revision,
+    kind: entry.kind,
+    operationId: entry.operationId,
+    nextControl: entry.nextControl,
+  };
+}
+
+/**
+ * A command-open state may mutate the engine only when an exact engine consumer exists.
+ *
+ * A real CommandPhase registers its complete address in `v2DeferredCommandStarts`; a
+ * settled turn finalizer exposes a non-mutating successor proof. Every other phase or
+ * future screen is deferred by default, so a legacy transition carrier cannot rebuild
+ * older objects after a newer V2 state was applied ahead of its structural route.
+ */
+function hasCoopV2CommandOpenMaterialConsumer(runtime: CoopRuntime, entry: CoopAuthorityEntry): boolean {
+  const control = entry.nextControl;
+  if (control.kind !== "COMMAND_FRONTIER") {
+    return false;
+  }
+  if ([...runtime.v2DeferredCommandStarts.values()].some(claim => commandOpenControlAddressesClaim(control, claim))) {
+    return true;
+  }
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        canReleaseForCoopV2Control?: (successor: CoopV2ControlSuccessorClaim) => boolean;
+      }
+    | undefined;
+  return phase?.canReleaseForCoopV2Control?.(coopV2ControlSuccessorClaim(entry)) === true;
+}
+
 /**
  * Release the real turn finalizer parked by a null-successor TURN_COMMIT. The successor's live adapter must
  * call this only after installing its own phase wake or stream carrier, so Phaser can never fall through an
@@ -4727,24 +4769,10 @@ function releaseCoopV2ParkedTurnBoundary(runtime: CoopRuntime, entry: CoopAuthor
   }
   const phase = globalScene.phaseManager?.getCurrentPhase() as
     | {
-        releaseForCoopV2Control?: (successor: {
-          sessionEpoch: number;
-          revision: number;
-          kind: CoopAuthorityEntry["kind"];
-          operationId: string;
-          nextControl: CoopNextControl;
-        }) => boolean;
+        releaseForCoopV2Control?: (successor: CoopV2ControlSuccessorClaim) => boolean;
       }
     | undefined;
-  return (
-    phase?.releaseForCoopV2Control?.({
-      sessionEpoch: entry.context.sessionEpoch,
-      revision: entry.revision,
-      kind: entry.kind,
-      operationId: entry.operationId,
-      nextControl: entry.nextControl,
-    }) === true
-  );
+  return phase?.releaseForCoopV2Control?.(coopV2ControlSuccessorClaim(entry)) === true;
 }
 
 /**
@@ -5731,16 +5759,14 @@ function buildCoopV2LiveSeams(
           if (receiverScene != null && receiverScene !== globalScene) {
             return "deferred";
           }
-          if (
-            material.kind === "command-open"
-            && commandOpenMaterialMustWaitForPresentation(globalScene.phaseManager?.getCurrentPhase()?.phaseName)
-          ) {
-            // Do not let the absolute command-state projector kill an encounter tween whose onComplete
-            // callback is the only structural route to the real CommandPhase. The immutable entry stays
-            // admitted and is retried from that CommandPhase's boundary below.
+          if (material.kind === "command-open" && !hasCoopV2CommandOpenMaterialConsumer(runtime, entry)) {
+            // The immutable entry remains admitted and is retried by the real address-exact CommandPhase
+            // claim (or the exact settled-turn finalizer). No transition screen is allowed to opt itself
+            // into mechanical command authority merely by having a known phase name.
             coopLog(
               "v2-control",
-              `deferred command-open rev=${entry.revision} until encounter presentation reaches CommandPhase`,
+              `deferred command-open rev=${entry.revision} until an exact engine consumer is registered `
+                + `phase=${globalScene.phaseManager?.getCurrentPhase()?.phaseName ?? "none"}`,
             );
             return "deferred";
           }
@@ -7315,17 +7341,7 @@ function releaseCoopV2DeferredCommandStarts(
   control: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }>,
 ): void {
   for (const [key, pending] of [...runtime.v2DeferredCommandStarts]) {
-    const expected = pending.authorityTarget;
-    const addressed = control.commands.some(
-      command =>
-        command.fieldIndex === (expected?.fieldIndex ?? pending.fieldIndex)
-        && command.pokemonId === (expected?.pokemonId ?? pending.pokemonId)
-        && (expected == null || command.ownerSeatId === expected.ownerSeatId)
-        && control.epoch === pending.epoch
-        && control.wave === pending.wave
-        && control.turn === pending.turn,
-    );
-    if (!addressed) {
+    if (!commandOpenControlAddressesClaim(control, pending)) {
       continue;
     }
     runtime.v2DeferredCommandStarts.delete(key);

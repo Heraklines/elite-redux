@@ -75,19 +75,42 @@ export interface CoopInteractionOpenMaterialV2 {
 export type CoopControlOpenMaterialV2 = CoopCommandOpenMaterialV2 | CoopInteractionOpenMaterialV2;
 
 /**
- * Presentation phases whose completion callback is itself the structural path to CommandPhase.
- *
- * A faster authority can publish command-open while a slower replica is still sliding the next encounter
- * onto the field. Applying the command image at that instant runs the absolute field projector, which
- * deliberately kills battler tweens; Phaser then also drops the encounter tween's completion callback and
- * the replica can never create the real CommandPhase needed to prove the control. Keep the DATA entry
- * retained until that local presentation reaches its own command boundary. This is ordering, not a timeout
- * or local successor guess: the same immutable entry is retried there.
+ * Address claimed by one real local CommandPhase while it is parked behind the
+ * immutable command-open entry. Showdown supplies `authorityTarget` because its
+ * locally reflected field coordinates differ from the authority's coordinates;
+ * classic co-op uses the local coordinates directly.
  */
-const COMMAND_OPEN_PRESENTATION_BARRIERS = new Set(["EncounterPhase", "NewBiomeEncounterPhase", "NextEncounterPhase"]);
+export interface CoopDeferredCommandControlClaim {
+  readonly epoch: number;
+  readonly wave: number;
+  readonly turn: number;
+  readonly fieldIndex: number;
+  readonly pokemonId: number;
+  readonly authorityTarget?: CoopCommandControlTarget;
+}
 
-export function commandOpenMaterialMustWaitForPresentation(phaseName: string | null | undefined): boolean {
-  return phaseName != null && COMMAND_OPEN_PRESENTATION_BARRIERS.has(phaseName);
+/**
+ * Prove that a complete command frontier addresses a real parked local command
+ * consumer. This replaces the former phase-name denylist: new transition screens,
+ * minigames, and presentation phases are deferred by default because they have not
+ * registered an address-exact command claim.
+ */
+export function commandOpenControlAddressesClaim(
+  control: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }>,
+  claim: CoopDeferredCommandControlClaim,
+): boolean {
+  const expected = claim.authorityTarget;
+  return (
+    control.epoch === claim.epoch
+    && control.wave === claim.wave
+    && control.turn === claim.turn
+    && control.commands.some(
+      command =>
+        command.fieldIndex === (expected?.fieldIndex ?? claim.fieldIndex)
+        && command.pokemonId === (expected?.pokemonId ?? claim.pokemonId)
+        && (expected == null || command.ownerSeatId === expected.ownerSeatId),
+    )
+  );
 }
 
 export interface BuildCommandOpenEntryInput {
