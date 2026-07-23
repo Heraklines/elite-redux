@@ -716,11 +716,54 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
       ],
     };
 
-    guestSync.broadcastLocalCommand(1, 8, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [-1] }, "guest");
+    let rejections = 0;
+    const off = guest.onMessage(message => {
+      if (message.t === "commandRejected") {
+        rejections++;
+      }
+    });
+    // This is the exact fast-UI race: the move auto-submits before the request/offer arrives and the local
+    // renderer has no numeric target. The later single-set offer makes the missing geometry unambiguous.
+    guestSync.broadcastLocalCommand(1, 8, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [] }, "guest");
     await new Promise(resolve => setTimeout(resolve, 0));
     const command = await hostSync.requestPartnerCommand(1, 8, [1], "guest", soleTargetOffer);
 
     expect(command).toMatchObject({ moveId: 55, targets: [2] });
+    expect(rejections, "the legal implicit target is normalized before validation, not rejected/defaulted").toBe(0);
+    off();
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("repairs the same implicit target when the authority waiter already exists", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    const soleTargetOffer: CoopBattleCommandOffer = {
+      ...legalOffer,
+      moves: [
+        {
+          slot: 1,
+          moveId: 55,
+          targetSets: [[2]],
+          targetRefSets: [[{ side: "enemy", pokemonId: 200 }]],
+          canTera: false,
+        },
+      ],
+    };
+    let rejections = 0;
+    const off = guest.onMessage(message => {
+      if (message.t === "commandRejected") {
+        rejections++;
+      }
+    });
+
+    const command = hostSync.requestPartnerCommand(1, 9, [1], "guest", soleTargetOffer);
+    guestSync.broadcastLocalCommand(1, 9, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [] }, "guest");
+
+    await expect(command).resolves.toMatchObject({ moveId: 55, targets: [2] });
+    expect(rejections, "the live waiter also accepts the sole offered target without a rejection round-trip").toBe(0);
+    off();
     hostSync.dispose();
     guestSync.dispose();
   });

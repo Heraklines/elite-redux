@@ -1856,3 +1856,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   that the guest has applied it before command control opens.
 - The remaining optional-target command fixture now accepts both valid production paths: an explicit target
   picker when multiple targets exist, and the direct replay commit when only one legal target exists.
+
+# 2026-07-23 - early-command implicit-target race
+
+- P2's real public command driver exposed a product failure hidden behind its biome label: the guest could
+  submit its move before receiving the authority's legal offer. When its renderer omitted the only implicit
+  numeric target, the authority validated the raw `targets=[]` command before its existing unambiguous-target
+  repair, rejected it, and waited forever after both players had already chosen.
+- Validation now repairs only FIGHT geometry before checking the authority offer; non-FIGHT commands stay raw
+  through validation so malformed extra fields cannot be normalized away. Both the pre-wait buffered race and
+  the already-live waiter have failure-first regression coverage which also proves no rejection/default path ran.

@@ -210,6 +210,27 @@ function normalizeLocalCommand(
   };
 }
 
+/**
+ * Validate a real local command after repairing only authority-unambiguous FIGHT geometry.
+ *
+ * A fast player can broadcast before the authority's offer reaches their browser. In that race the local
+ * renderer may have no numeric target even though the later offer contains exactly one legal target set.
+ * Validating the raw early command first made the repair below unreachable and left the authority waiting
+ * forever after rejecting a choice the UI had already closed. Non-FIGHT commands remain raw until after
+ * validation so normalization can never hide forbidden extra fields on switch/run/ball messages.
+ */
+function validateAndNormalizeLocalCommand(
+  command: SerializedCommand,
+  offer: CoopBattleCommandOffer,
+): { command: SerializedCommand; validation: ReturnType<typeof validateCoopBattleCommand> } {
+  const candidate = command.command === Command.FIGHT ? normalizeLocalCommand(command, offer) : command;
+  const validation = validateCoopBattleCommand(candidate, offer);
+  return {
+    command: validation.valid ? normalizeLocalCommand(candidate, offer) : candidate,
+    validation,
+  };
+}
+
 function sameNumberSet(left: readonly number[], right: readonly number[]): boolean {
   if (left.length !== right.length) {
     return false;
@@ -574,7 +595,8 @@ export class CoopBattleSync {
     const buffered = this.inbox.get(key);
     if (buffered !== undefined) {
       this.inbox.delete(key);
-      const validation = offer == null ? { valid: true } : validateCoopBattleCommand(buffered.command, offer);
+      const normalized = offer == null ? null : validateAndNormalizeLocalCommand(buffered.command, offer);
+      const validation = normalized?.validation ?? { valid: true };
       if (validation.valid) {
         this.settled.add(key);
         if (isCoopDebug()) {
@@ -584,7 +606,7 @@ export class CoopBattleSync {
           );
         }
         traceCommand("applied", fieldIndex, turn, owner, address, "buffered-intent");
-        return Promise.resolve(offer == null ? buffered.command : normalizeLocalCommand(buffered.command, offer));
+        return Promise.resolve(normalized?.command ?? buffered.command);
       }
       traceCommand("rejected", fieldIndex, turn, owner, address, validation.reason ?? "invalid-buffered-intent");
       coopWarn(
@@ -1072,7 +1094,8 @@ export class CoopBattleSync {
       }
       if (request) {
         if (request.offer != null) {
-          const validation = validateCoopBattleCommand(msg.command, request.offer);
+          const normalized = validateAndNormalizeLocalCommand(msg.command, request.offer);
+          const validation = normalized.validation;
           if (!validation.valid) {
             traceCommand("rejected", msg.fieldIndex, msg.turn, msg.owner, address, validation.reason ?? "invalid");
             coopWarn(
@@ -1099,6 +1122,15 @@ export class CoopBattleSync {
             request.finish(authoritativeDefault);
             return;
           }
+          if (isCoopDebug()) {
+            coopLog(
+              "relay",
+              `recv command fieldIndex=${msg.fieldIndex} turn=${msg.turn} command=${msg.command.command} -> resolved awaiting request`,
+            );
+          }
+          traceCommand("applied", msg.fieldIndex, msg.turn, msg.owner, address, `command=${msg.command.command}`);
+          request.finish(normalized.command);
+          return;
         }
         if (isCoopDebug()) {
           coopLog(
@@ -1107,7 +1139,7 @@ export class CoopBattleSync {
           );
         }
         traceCommand("applied", msg.fieldIndex, msg.turn, msg.owner, address, `command=${msg.command.command}`);
-        request.finish(request.offer == null ? msg.command : normalizeLocalCommand(msg.command, request.offer));
+        request.finish(msg.command);
       } else {
         if (isCoopDebug()) {
           coopLog(
