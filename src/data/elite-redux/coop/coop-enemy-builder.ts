@@ -284,12 +284,17 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       if (activeFieldIndex >= 0) {
         built.setFieldPosition(fieldPositionForSlot(entry.fieldIndex, battle.arrangement.enemyCapacity));
         // Pokemon construction does not put the container on Phaser's display list. SummonPhase always
-        // calls add.existing before seating it; structural replay must do the same or Container.addAt can
-        // leave a logically active rebuilt party identity detached from the rendered field.
+        // calls add.existing before seating it; structural replay must do the same.
         globalScene.add.existing(built);
-        // Preserve the old object's display-list depth as well as its mechanical field membership. A
-        // plain add would make commands legal again but could render the rebuilt enemy over trainers/UI.
-        globalScene.field.addAt(built, Math.min(activeFieldIndex, globalScene.field.length));
+        // Use the exact proven SummonPhase `field.add` path first, then restore the displaced child's depth.
+        // Phaser's Container.addAt path silently left newly created Pokemon detached in the three retained-
+        // adoption shapes covered by B7; add + moveTo makes membership observable before reordering it.
+        globalScene.field.add(built);
+        const seatedIndex = globalScene.field.getIndex(built);
+        if (seatedIndex < 0) {
+          throw new Error(`structural enemy adopt could not seat id=${built.id} in the field container`);
+        }
+        globalScene.field.moveTo(built, Math.min(activeFieldIndex, Math.max(0, globalScene.field.length - 1)));
         built.setVisible(true);
         built.getSprite().setVisible(true);
       }

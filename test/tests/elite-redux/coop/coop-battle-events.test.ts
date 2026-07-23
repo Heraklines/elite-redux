@@ -265,6 +265,31 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
   });
 
+  it("an animations-disabled engine lane does not require a display actor or claim rendered pixels", async () => {
+    const field = await startCoopGuest();
+    const token = createCoopPresentationOutcomeToken();
+    const pokemon = field[0];
+    globalScene.moveAnimations = false;
+    const phase = new CoopMoveAnimReplayPhase(
+      pokemon.getBattlerIndex(),
+      MoveId.SPLASH,
+      [],
+      { side: "player", pokemonId: Number.MAX_SAFE_INTEGER },
+      undefined,
+      token,
+    );
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(coopPresentationOutcome(token)).toEqual({
+      kind: "intentionally-skipped",
+      reason: "animations-disabled",
+      actorFingerprint: `player:bi${pokemon.getBattlerIndex()}:p${Number.MAX_SAFE_INTEGER}`,
+    });
+    expect(endSpy).toHaveBeenCalledTimes(1);
+  });
+
   /** Start a co-op authoritative double as the HOST and tag field ownership. */
   const startCoopHost = async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);

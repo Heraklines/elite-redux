@@ -513,6 +513,26 @@ export class CoopTeraReplayPhase extends Phase {
     const inferredSide = presentationSideFromBi(this.bi);
     const exactActor =
       this.actor ?? (inferredSide == null ? undefined : { side: inferredSide, pokemonId: this.pokemonId });
+    const actorSide = exactActor?.side ?? inferredSide ?? "enemy";
+    const actorFingerprint = `${actorSide}:bi${this.bi}:slot${this.partySlot}:p${this.pokemonId}`;
+    let ended = false;
+    let watchdog: CoopReplayWatchdog | undefined;
+    const finish = (outcome: CoopPresentationOutcome) => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      settleCoopPresentationOutcome(this.outcomeToken, outcome);
+      this.end();
+    };
+    // An animations-disabled engine lane explicitly declines visible-presentation proof. Do not require
+    // a materialized Phaser actor in that contract: the following immutable V2 checkpoint owns the Tera
+    // state, while the real-browser path below remains exact-identity and fail-closed.
+    if (!globalScene.moveAnimations) {
+      finish({ kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint });
+      return;
+    }
     const partyMatches =
       exactActor == null
         ? [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()].filter(
@@ -524,8 +544,6 @@ export class CoopTeraReplayPhase extends Phase {
         ? getActuallyFieldedCoopPokemon().filter(candidate => candidate.id === this.pokemonId)
         : getActuallyFieldedCoopPokemon(exactActor.side).filter(candidate => candidate.id === this.pokemonId);
     const pokemon = fieldMatches.length === 1 ? fieldMatches[0] : null;
-    const playerSide = exactActor?.side === "player" || (exactActor == null && (pokemon?.isPlayer() ?? false));
-    const actorFingerprint = `${playerSide ? "player" : "enemy"}:bi${this.bi}:slot${this.partySlot}:p${this.pokemonId}`;
     if (partyMatches.length !== 1 || pokemon == null) {
       coopWarn(
         "replay",
@@ -540,22 +558,7 @@ export class CoopTeraReplayPhase extends Phase {
       return;
     }
 
-    let ended = false;
-    let watchdog: CoopReplayWatchdog | undefined;
-    const finish = (outcome: CoopPresentationOutcome) => {
-      if (ended) {
-        return;
-      }
-      ended = true;
-      watchdog?.remove();
-      settleCoopPresentationOutcome(this.outcomeToken, outcome);
-      this.end();
-    };
     try {
-      if (!globalScene.moveAnimations) {
-        finish({ kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint });
-        return;
-      }
       watchdog = armCoopReplayProgressWatchdog(() =>
         finish({ kind: "failed", reason: "tera-watchdog-expired", actorFingerprint }),
       );
@@ -610,6 +613,13 @@ export class CoopMoveAnimReplayPhase extends Phase {
       this.end();
     };
     try {
+      // This phase is presentation-only. Engine/headless fixtures that explicitly disable animations
+      // prove the V2 checkpoint and sequencing contract, not pixels; resolving exact display actors there
+      // both over-claims coverage and falsely terminalizes after the checkpoint has already removed one.
+      if (!globalScene.moveAnimations) {
+        finish({ kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint });
+        return;
+      }
       const user = fieldMon(this.bi, this.actor);
       const targetBi = currentBattlerIndexForActor(this.targetActors?.[0], this.targets[0] ?? this.bi);
       if (user == null) {
@@ -624,10 +634,6 @@ export class CoopMoveAnimReplayPhase extends Phase {
       }
       if (this.targetActors?.[0] != null && fieldMon(targetBi, this.targetActors[0]) == null) {
         finish({ kind: "failed", reason: "move-target-not-displayed", actorFingerprint });
-        return;
-      }
-      if (!globalScene.moveAnimations) {
-        finish({ kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint });
         return;
       }
       watchdog = armCoopReplayProgressWatchdog(() =>
@@ -691,8 +697,9 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
           coopLog("replay", `present hp bi=${this.battlerIndex} NO-OP end (mon absent)`);
         }
         settleCoopPresentationOutcome(this.outcomeToken, {
-          kind: "failed",
-          reason: "hp-actor-not-displayed",
+          ...(globalScene.moveAnimations
+            ? { kind: "failed" as const, reason: "hp-actor-not-displayed" }
+            : { kind: "intentionally-skipped" as const, reason: "animations-disabled" }),
           actorFingerprint,
         });
         this.end();
@@ -902,7 +909,11 @@ export class CoopStatStageReplayPhase extends PokemonPhase {
         if (isCoopDebug()) {
           coopLog("replay", `present statStage bi=${this.battlerIndex} stat=${this.stat} NO-OP end (mon absent)`);
         }
-        finish({ kind: "failed", reason: "stat-actor-not-displayed", actorFingerprint });
+        finish(
+          globalScene.moveAnimations
+            ? { kind: "failed", reason: "stat-actor-not-displayed", actorFingerprint }
+            : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
+        );
         return;
       }
       const prevStage = pokemon.getStatStage(this.stat);
@@ -1272,7 +1283,11 @@ export class CoopStatusReplayPhase extends PokemonPhase {
             `present status bi=${this.battlerIndex} status=${this.status} NO-OP end (mon=${pokemon != null} none/faint=${effect === StatusEffect.NONE || effect === StatusEffect.FAINT})`,
           );
         }
-        finish({ kind: "failed", reason: "status-actor-not-displayed", actorFingerprint });
+        finish(
+          globalScene.moveAnimations
+            ? { kind: "failed", reason: "status-actor-not-displayed", actorFingerprint }
+            : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
+        );
         return;
       }
       // Cure / FAINT (the faint event handles that) deliberately has no animation.
@@ -1566,6 +1581,12 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       if (pokemon == null || globalScene.field.getIndex(pokemon) < 0) {
         if (isCoopDebug()) {
           coopLog("replay", `present faint bi=${this.battlerIndex} NO-OP end (already removed/off-field)`);
+        }
+        if (!globalScene.moveAnimations) {
+          // `finish` also preserves the address-exact replacement-picker relay. A direct `end()` here
+          // made animation-free engine campaigns skip that control boundary and wait forever upstream.
+          finish({ kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint });
+          return;
         }
         settleCoopPresentationOutcome(
           this.outcomeToken,

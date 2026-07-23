@@ -5133,6 +5133,9 @@ export async function buildShowdownDuo(
   toShowdownGameMode: (scene: BattleScene) => void,
 ): Promise<ShowdownDuoRig> {
   const hostScene = hostGame.scene;
+  // Like buildDuo, this two-engine fixture proves mechanics/V2 sequencing without claiming visible
+  // animation coverage. The public two-browser campaign is the sole visible-presentation oracle.
+  hostScene.moveAnimations = false;
   neutralizeCoopCandyBar(hostScene);
   const hostRuntime = assembleCoopRuntime(pair.host, {
     username: "Host",
@@ -5190,6 +5193,7 @@ export async function buildShowdownDuo(
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
   const guestScene = buildGuestScene(hostGame);
+  guestScene.moveAnimations = false;
   installHeadlessCoopSemanticProjectionOracle(guestScene);
   const guestCtx: ClientCtx = {
     label: "guest",

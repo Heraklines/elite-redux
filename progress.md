@@ -2282,3 +2282,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A failure-first engine regression proves one advancing frame renews the presentation observation while a
   subsequent no-progress interval releases the phase as failed. This preserves softlock protection without
   encoding the CI software renderer's frame rate into production correctness.
+
+# 2026-07-24 - Engine presentation contracts are explicit and structural adoption uses proven seating
+
+- Full exact-SHA gate `30053022023` kept static checks, public/V2 contracts, all mutation shards, native
+  WebRTC, and twenty matrix shards green. Its twenty-four red matrix shards retained the same precise roots
+  exposed by the earlier selected artifacts: animation-disabled two-engine fixtures still resolved exact
+  display actors before recording their intentional skip, while B7's three direct retained-adoption proofs
+  showed `Container.addAt` had not seated the rebuilt Pokemon at all.
+- Presentation-only move and Tera replay now short-circuit the explicit animations-disabled contract before
+  querying Phaser display actors. HP, stat, status, and faint treat an absent actor as an intentional skip only
+  in that contract; animations-enabled browsers remain exact-identity and fail-closed. Faint's skip uses its
+  normal finalizer so the address-exact replacement picker/relay is not accidentally bypassed.
+- The independent Showdown two-engine rig now selects the same animations-disabled engine contract as the
+  ordinary duo rig. Its real V2 mechanics and replay dispatch remain exercised, while rendered animation is
+  claimed only by the sealed two-browser campaign.
+- Structural enemy adoption now follows SummonPhase's proven `field.add` membership path, verifies membership,
+  then restores the old display depth with `moveTo`. This replaces the failing direct `addAt` insertion without
+  weakening the three existing B7 failure-first identity/same-species/retained-state regressions.
