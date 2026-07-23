@@ -24,7 +24,6 @@ import {
   getPokeballTintColor,
 } from "#data/pokeball";
 import { getStatusEffectCatchRateMultiplier } from "#data/status-effect";
-import { BattlerIndex } from "#enums/battler-index";
 import { ChallengeType } from "#enums/challenge-type";
 import type { PokeballType } from "#enums/pokeball";
 import { StatusEffect } from "#enums/status-effect";
@@ -43,20 +42,24 @@ import i18next from "i18next";
 // TODO: Refactor and split up to allow for overriding capture chance
 export class AttemptCapturePhase extends PokemonPhase {
   public readonly phaseName = "AttemptCapturePhase";
+  private readonly targetPokemon: EnemyPokemon;
   private readonly pokeballType: PokeballType;
   private pokeball: Phaser.GameObjects.Sprite;
   private originalY: number;
 
   /** Co-op (#800): the BALL-THROWER's role, pinned for attribution while this capture resolves. */
-  private throwerRole: CoopRole | undefined;
+  private readonly throwerRole: CoopRole | undefined;
 
-  constructor(targetIndex: number, pokeballType: PokeballType, throwerRole?: CoopRole) {
-    // Multi-format: targetIndex is the caught enemy's position; map it to the flat index via
-    // the enemy side's base offset (== BattlerIndex.ENEMY in binary, shifted in triple).
-    super((globalScene.currentBattle?.arrangement.enemyOffset ?? BattlerIndex.ENEMY) + targetIndex);
+  constructor(targetPokemon: EnemyPokemon, pokeballType: PokeballType, throwerRole?: CoopRole) {
+    super(targetPokemon.getBattlerIndex());
 
+    this.targetPokemon = targetPokemon;
     this.pokeballType = pokeballType;
     this.throwerRole = throwerRole;
+  }
+
+  public override getPokemon(): EnemyPokemon {
+    return this.targetPokemon;
   }
 
   public override end(): void {
@@ -71,9 +74,11 @@ export class AttemptCapturePhase extends PokemonPhase {
     setCoopCatchThrowerHint(this.throwerRole ?? null);
     super.start();
 
-    const pokemon = this.getPokemon() as EnemyPokemon;
+    const pokemon = this.getPokemon();
 
-    if (!pokemon?.hp) {
+    // A BALL command may be relayed or sit queued while field occupancy changes. It must
+    // never fall back to a same-numbered player slot when its enemy target is stale.
+    if (!pokemon.hp || !globalScene.getEnemyField(true).includes(pokemon)) {
       return this.end();
     }
 
@@ -268,7 +273,7 @@ export class AttemptCapturePhase extends PokemonPhase {
   }
 
   catch() {
-    const pokemon = this.getPokemon() as EnemyPokemon;
+    const pokemon = this.getPokemon();
 
     // ER relic (#439): Collector's Album - record this catch against the run's
     // unique-species tally and, on every Nth new species, grant a candy trickle

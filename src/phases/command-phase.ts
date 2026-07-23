@@ -1347,10 +1347,8 @@ export class CommandPhase extends FieldPhase {
    * @returns Whether the command was successfully initiated
    */
   private handleBallCommand(cursor: number): boolean {
-    const targets = globalScene
-      .getEnemyField()
-      .filter(p => p.isActive(true))
-      .map(p => p.getBattlerIndex());
+    const targetPokemon = globalScene.getEnemyField().filter(p => p.isActive(true));
+    const targets = targetPokemon.map(p => p.getBattlerIndex());
 
     if (!this.checkCanUseBall()) {
       return false;
@@ -1361,17 +1359,21 @@ export class CommandPhase extends FieldPhase {
       return false;
     }
 
+    if (targets.length === 0) {
+      return false;
+    }
+
     const isChallengeActive = globalScene.gameMode.hasAnyChallenges();
     const isFinalBoss = globalScene.gameMode.isBattleClassicFinalBoss(globalScene.currentBattle.waveIndex);
     const isCatchableDailyBoss = isDailyFinalBoss() && (getDailyEventSeedBoss()?.catchable ?? false);
 
     const numBallTypes = 5;
     if (cursor < numBallTypes) {
-      const targetPokemon = globalScene.getEnemyPokemon(false);
+      const target = targetPokemon[0];
       if (
-        targetPokemon?.isBoss()
-        && targetPokemon?.bossSegmentIndex >= 1 // TODO: Decouple this hardcoded exception for wonder guard and just check the target...
-        && !targetPokemon?.hasAbility(AbilityId.WONDER_GUARD, false, true)
+        target.isBoss()
+        && target.bossSegmentIndex >= 1 // TODO: Decouple this hardcoded exception for wonder guard and just check the target...
+        && !target.hasAbility(AbilityId.WONDER_GUARD, false, true)
       ) {
         // When facing the final boss, it must be weakened unless a Master Ball is used AND no challenges are active.
         // The message is customized for the final boss.

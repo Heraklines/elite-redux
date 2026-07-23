@@ -37,6 +37,7 @@ import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
+import type { AttemptCapturePhase } from "#phases/attempt-capture-phase";
 import type { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -436,6 +437,22 @@ describe.skipIf(!RUN)("repro: triple-battle bugs (staging report)", () => {
       expect(p.isOnField(), `triple lead ${slot} remains on the field`).toBe(true);
       expect(p.visible, `triple lead ${slot}'s back sprite is shown`).toBe(true);
     }
+    expect(
+      oldLeads.map(p => [p.fieldPosition, p.x, p.y]),
+      "all retained player sprites settle on the canonical triple lanes",
+    ).toEqual([
+      [FieldPosition.LEFT, 48, 144],
+      [FieldPosition.CENTER, 106, 140],
+      [FieldPosition.RIGHT, 164, 152],
+    ]);
+    expect(
+      globalScene.getEnemyField().map(p => [p.fieldPosition, p.x, p.y]),
+      "all new enemy sprites settle on the canonical triple lanes",
+    ).toEqual([
+      [FieldPosition.LEFT, 178, 86],
+      [FieldPosition.CENTER, 236, 76],
+      [FieldPosition.RIGHT, 294, 94],
+    ]);
   }, 120_000);
 
   // ---------------------------------------------------------------------------
@@ -461,8 +478,9 @@ describe.skipIf(!RUN)("repro: triple-battle bugs (staging report)", () => {
     // A ball is only throwable at a SINGLE live foe (the `noPokeballMulti` guard), so faint two
     // of the three foes; then throwing from the LAST slot walks past the earlier slots' commands.
     const foes = globalScene.getEnemyField();
+    foes[0].hp = 0;
     foes[1].hp = 0;
-    foes[2].hp = 0;
+    const survivor = foes[2];
     expect(globalScene.getEnemyField(true).length, "one live foe remains (ball is throwable)").toBe(1);
 
     // Slots 0 + 1 commit a harmless Growl (writes turnCommands[0], [1]); slot 2 throws the ball.
@@ -490,14 +508,18 @@ describe.skipIf(!RUN)("repro: triple-battle bugs (staging report)", () => {
         result.threw = e;
       }
     });
-    // Advancing fires slot 2's command-phase prompt; downstream capture resolution is irrelevant here.
-    await game.phaseInterceptor.to("TurnStartPhase", false).catch(() => {});
+    // The rightmost foe has flat battler index 5 in triples. Carrying it as a side-local
+    // number previously risked resolving the same-numbered object from the player's party.
+    await game.phaseInterceptor.to("AttemptCapturePhase", false);
+    const capturePhase = globalScene.phaseManager.getCurrentPhase() as AttemptCapturePhase;
 
     console.log(
       `#3 crash: threw=${result.threw == null ? "no" : String(result.threw)} accepted=${result.accepted} skippedEarlierSlot=${result.skipped1}`,
     );
     expect(result.threw, "throwing a ball past an empty triple slot must not crash").toBeNull();
     expect(result.accepted, "the ball throw is accepted at a single live foe").toBe(true);
+    expect(capturePhase.getPokemon(), "the phase keeps the exact surviving enemy object").toBe(survivor);
+    expect(capturePhase.getPokemon().isEnemy(), "a ball can never target one of the player's own Pokemon").toBe(true);
     expect(result.skipped1, "an earlier committed slot's command is skipped (null-safe over ALL earlier slots)").toBe(
       true,
     );

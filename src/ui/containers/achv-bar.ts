@@ -4,6 +4,10 @@ import { TextStyle } from "#enums/text-style";
 import { Achv, getAchievementDescription, RewardAchv } from "#system/achv";
 import { Voucher } from "#system/voucher";
 import { addTextObject } from "#ui/text";
+import { fixedInt } from "#utils/common";
+
+export const ACHV_TRANSITION_DURATION = fixedInt(500);
+export const ACHV_DISPLAY_DURATION = fixedInt(10000);
 
 export class AchvBar extends Phaser.GameObjects.Container {
   private defaultWidth: number;
@@ -104,11 +108,11 @@ export class AchvBar extends Phaser.GameObjects.Container {
     globalScene.tweens.add({
       targets: this,
       x: globalScene.scaledCanvas.width - this.bg.width / 2,
-      duration: 500,
+      duration: ACHV_TRANSITION_DURATION,
       ease: "Sine.easeOut",
     });
 
-    globalScene.time.delayedCall(10000, () => this.hide(this.playerGender));
+    globalScene.time.delayedCall(ACHV_DISPLAY_DURATION, () => this.hide(this.playerGender));
 
     this.setVisible(true);
     this.shown = true;
@@ -122,7 +126,7 @@ export class AchvBar extends Phaser.GameObjects.Container {
     globalScene.tweens.add({
       targets: this,
       x: globalScene.scaledCanvas.width,
-      duration: 500,
+      duration: ACHV_TRANSITION_DURATION,
       ease: "Sine.easeIn",
       onComplete: () => {
         this.shown = false;

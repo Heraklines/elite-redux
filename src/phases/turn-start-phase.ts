@@ -393,16 +393,20 @@ export class TurnStartPhase extends FieldPhase {
         this.handleFightCommand(turnCommand, pokemon);
         break;
       case Command.BALL:
-        // Multi-format: AttemptCapturePhase takes the target enemy's POSITION within its side
-        // (== flat target - enemyOffset, which is `% 2` only in binary).
-        globalScene.phaseManager.unshiftNew(
-          "AttemptCapturePhase",
-          globalScene.currentBattle.arrangement.locate(turnCommand.targets![0]).position,
-          turnCommand.cursor!,
-          // Co-op (#800): the commanding mon's owner IS the ball-thrower - the catch is
-          // attributed to them (their half permitting) instead of pure half-balancing.
-          (pokemon as { coopOwner?: "host" | "guest" }).coopOwner,
-        );
+        {
+          const targetIndex = turnCommand.targets?.[0];
+          const targetPokemon = globalScene.getEnemyField(true).find(enemy => enemy.getBattlerIndex() === targetIndex);
+          if (targetPokemon) {
+            globalScene.phaseManager.unshiftNew(
+              "AttemptCapturePhase",
+              targetPokemon,
+              turnCommand.cursor!,
+              // Co-op (#800): the commanding mon's owner IS the ball-thrower - the catch is
+              // attributed to them (their half permitting) instead of pure half-balancing.
+              (pokemon as { coopOwner?: "host" | "guest" }).coopOwner,
+            );
+          }
+        }
         break;
       case Command.POKEMON:
         globalScene.phaseManager.unshiftNew(
