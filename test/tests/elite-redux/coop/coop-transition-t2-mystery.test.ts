@@ -41,7 +41,7 @@ import {
   type ClientCtx,
   type DuoRig,
   drainLoopback,
-  driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveRewardShopOwnerLeaveViaUi,
@@ -245,36 +245,11 @@ async function pressPublicButton(ctx: ClientCtx, button: Button, label: string):
   });
 }
 
-async function driveGuestCommandUi(rig: DuoRig): Promise<void> {
-  const guestCommand = await driveQueuedPhaseWithPublicDialogue(rig.guestCtx, "guest-owned CommandPhase", {
-    matches: phase =>
-      phase.phaseName === "CommandPhase"
-      && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
-  });
-  await withClient(rig.guestCtx, async () => {
-    guestCommand.start();
-    await drainLoopback();
-  });
-  await withClient(rig.hostCtx, async () => {
-    await drainLoopback();
-    // Wave 11's host CommandPhase opened before the live runtime existed. Re-enter that same public phase
-    // once so its reciprocal rendezvous participates in this real two-client command boundary.
-    rig.hostScene.phaseManager.getCurrentPhase().start();
-    await drainLoopback();
-  });
-  await withClient(rig.guestCtx, async () => {
-    await drainLoopback();
-    expect(rig.guestScene.ui.getMode(), "ordinary wave guest command surface opened").toBe(UiMode.COMMAND);
-    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest opens Fight through public COMMAND UI").toBe(true);
-    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest picks Tackle through public FIGHT UI").toBe(true);
-    const target = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
-    target.start();
-    await drainLoopback();
-    expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest targets enemy slot 2").toBe(true);
-    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms target through public UI").toBe(true);
-    await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
-  });
-  await withClient(rig.hostCtx, () => drainLoopback());
+async function driveGuestCommandUi(game: GameManager, rig: DuoRig): Promise<void> {
+  // Use the shared production-keyboard driver so one-target battles follow the real direct-submit branch
+  // while two-target battles still cross the real target picker. Keeping a private copy here let this T2
+  // lane keep demanding a target screen after the engine had already submitted the guest command.
+  await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
 }
 
 async function driveOrdinaryRewardBoundary(game: GameManager, rig: DuoRig): Promise<void> {
@@ -509,7 +484,7 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
     pair.setAutomaticDelivery(false);
     const resync = installCoopResyncProbe(rig.guestRuntime);
     try {
-      await driveGuestCommandUi(rig);
+      await driveGuestCommandUi(game, rig);
       const ordinaryTurn = rig.hostScene.currentBattle.turn;
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);

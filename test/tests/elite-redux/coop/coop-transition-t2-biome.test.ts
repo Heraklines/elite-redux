@@ -86,6 +86,7 @@ import {
   type DuoRig,
   drainLoopback,
   driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
@@ -295,34 +296,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
   }
 
   async function driveGuestCommandUi(rig: DuoRig): Promise<void> {
-    const guestCommand = await withClient(rig.guestCtx, () =>
-      driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
-        matches: phase =>
-          phase.phaseName === "CommandPhase"
-          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
-      }),
-    );
-    await withClient(rig.guestCtx, async () => {
-      guestCommand.start();
-      await drainLoopback();
-    });
-    await withClient(rig.hostCtx, async () => {
-      // The launch CommandPhase pre-dates the runtime; re-enter the same phase so both real rendezvous arms fire.
-      rig.hostScene.phaseManager.getCurrentPhase().start();
-      await drainLoopback();
-    });
-    await withClient(rig.guestCtx, async () => {
-      await drainLoopback();
-      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest opens Fight through public COMMAND UI").toBe(true);
-      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest picks Tackle through public FIGHT UI").toBe(true);
-      const target = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
-      target.start();
-      await drainLoopback();
-      expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest targets enemy slot 2").toBe(true);
-      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms target through public UI").toBe(true);
-      await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
-    });
-    await withClient(rig.hostCtx, () => drainLoopback());
+    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
   }
 
   async function driveRealBiomeMarketLeave(rig: DuoRig): Promise<void> {
