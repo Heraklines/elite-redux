@@ -401,6 +401,16 @@ test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must
   const projector = coopRuntime.slice(projectionStart, projectionEnd);
   assert.match(projector, /plan\.kind !== "mystery"/u);
   assert.match(projector, /materializeCoopV2InteractionProjection\(runtime, control, plan\)/u);
+  assert.match(
+    projector,
+    /plan\.kind === "learn-move" \|\| plan\.kind === "learn-move-batch" \|\| plan\.kind === "revival"/u,
+    "ordinary delivery reconstructs mid-turn modal interactions from the same immutable plan as recovery",
+  );
+  assert.match(
+    projector,
+    /phaseManager\.overridePhase\(phase\)/u,
+    "a suppressed legacy prompt cannot be required to open an authoritative modal",
+  );
   assert.match(projector, /phaseManager\.replaceWithCoopAuthoritativePhase\(current, phase\)/u);
   assert.doesNotMatch(
     projector,

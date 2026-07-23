@@ -2756,6 +2756,7 @@ export async function buildDuo(
  * It never mutates log internals and never grants a successor directly from COMMAND.
  */
 export async function retireDuoInitialCommandForBoundaryTest(rig: DuoRig): Promise<void> {
+  let retiredTurn = -1;
   await withClient(rig.hostCtx, () => {
     const recording = endCoopRecording();
     const battle = rig.hostScene.currentBattle;
@@ -2770,6 +2771,7 @@ export async function retireDuoInitialCommandForBoundaryTest(rig: DuoRig): Promi
     }
     const epoch = rig.hostRuntime.controller.sessionEpoch;
     const wave = carrier.authoritativeState.wave;
+    retiredTurn = recording.turn;
     const operationId = `TURN/e${epoch}/w${wave}/t${recording.turn}`;
     const capture = {
       turnResolution: recording.events,
@@ -2802,11 +2804,23 @@ export async function retireDuoInitialCommandForBoundaryTest(rig: DuoRig): Promi
     }
   });
   await pumpDuoDestinations(rig, 4);
+  await withClient(rig.guestCtx, () =>
+    driveGuestReplayTurn(rig.guestScene, retiredTurn, {
+      sealRetainedWaveBoundary: false,
+    }),
+  );
+  await pumpDuoDestinations(rig, 4);
   const hostControl = getCoopV2Shadow(rig.hostRuntime)?.authorityFrontier()?.nextControl;
   const guestControl = rig.guestRuntime.v2ControlLedger.latestControl;
-  if (hostControl?.kind !== "AWAIT_SUCCESSOR" || guestControl?.kind !== "AWAIT_SUCCESSOR") {
+  const guestActiveControl = rig.guestRuntime.v2ControlLedger.activeControl;
+  if (
+    hostControl?.kind !== "AWAIT_SUCCESSOR"
+    || guestControl?.kind !== "AWAIT_SUCCESSOR"
+    || guestActiveControl?.kind !== "AWAIT_SUCCESSOR"
+  ) {
     throw new Error(
-      `boundary fixture turn predecessor did not converge: host=${hostControl?.kind ?? "none"} guest=${guestControl?.kind ?? "none"}`,
+      `boundary fixture turn predecessor did not converge: host=${hostControl?.kind ?? "none"} `
+        + `guest=${guestControl?.kind ?? "none"} active=${guestActiveControl?.kind ?? "none"}`,
     );
   }
 }

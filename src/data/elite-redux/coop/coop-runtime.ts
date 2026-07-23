@@ -6199,11 +6199,7 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
   control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
   plan: CoopV2InteractionProjectionPlan,
 ): boolean {
-  if (
-    plan.kind !== "mystery"
-    || runtime.controller.authorityRole === "authority"
-    || runtime.controller.role !== "guest"
-  ) {
+  if (runtime.controller.authorityRole === "authority" || runtime.controller.role !== "guest") {
     return false;
   }
   const controlId = controlIdOf(control);
@@ -6223,11 +6219,26 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
     typeof (current as { coopV2ControlOperationId?: unknown }).coopV2ControlOperationId === "string"
       ? (current as unknown as { coopV2ControlOperationId: string }).coopV2ControlOperationId
       : null;
-  if (current.is("CoopReplayMePhase") && currentOperationId === control.operationId) {
+  if (currentOperationId === control.operationId) {
     runtime.v2ProjectedInteractionControlId = controlId;
     return true;
   }
-  if (!current.is("NextEncounterPhase") && !current.is("MysteryEncounterPhase")) {
+
+  // Mid-turn modal interactions have no replica-local causal phase tree. Their immutable presentation
+  // entry is therefore the only event that can create the guest surface. Recovery has always rebuilt these
+  // exact phases from the same closed projection plan; use that constructor during ordinary delivery too so
+  // Revival and Move Learn cannot depend on a suppressed legacy prompt winning a listener race.
+  if (plan.kind === "learn-move" || plan.kind === "learn-move-batch" || plan.kind === "revival") {
+    const phase = materializeCoopV2InteractionProjection(runtime, control, plan);
+    if (phase == null || !phaseManager.overridePhase(phase)) {
+      return false;
+    }
+    runtime.v2ProjectedInteractionControlId = controlId;
+    coopLog("v2-interaction", `projected exact ${plan.kind} modal for ${controlId} from ${current.phaseName}`);
+    return true;
+  }
+
+  if (plan.kind !== "mystery" || (!current.is("NextEncounterPhase") && !current.is("MysteryEncounterPhase"))) {
     return false;
   }
   const phase = materializeCoopV2InteractionProjection(runtime, control, plan);

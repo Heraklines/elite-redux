@@ -2017,6 +2017,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   leg now drops one `authorityEntry` and requires its retained redelivery, instead of expecting a raw
   `biomePick` result carrier that the cutover correctly suppresses.
 
+# 2026-07-23 - Ordinary V2 interaction projection closes modal presentation gaps
+
+- Ordinary replica delivery now reconstructs Revival and both Move Learn surfaces directly from the same
+  immutable projection capsule recovery uses. Those mid-turn modals no longer depend on a suppressed raw
+  prompt or process-global listener timing before they can become actionable and publish `controlInstalled`.
+- The isolated-boundary helper now drives the replica through the committed synthetic turn and requires the
+  ordered `AWAIT_SUCCESSOR` to be active, not merely admitted. This prevents later fixture entries from
+  appearing as revision gaps while the prior turn is still waiting for its real replay/finalize proof.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real
