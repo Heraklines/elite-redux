@@ -1968,3 +1968,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - `startGuestMeShopOwner` now derives the registered authority context and services that peer between guest
   drains by default. This models the two independent browser event loops and closes the documented pumpPeer
   tail without requiring every caller to remember bespoke wiring.
+
+# 2026-07-23 - public post-turn contract migration
+
+- Full gate `30034310659` found one remaining fake-browser fixture which followed a current MESSAGE surface
+  with only the retired `CommandPhase -> LOCAL UI` console string. Production intentionally refuses to
+  resurrect an older command while a newer semantic surface is visible, so that fixture could never prove the
+  next public frontier.
+- The fixture now publishes the same current, owned, address-bearing `command:command` semantic observation as
+  a real browser after each narration confirm. The fast gate therefore validates the production ownership rule
+  instead of relying on its legacy console fallback.

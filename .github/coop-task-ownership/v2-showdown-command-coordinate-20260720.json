@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "81976736b0ada19dda83c38bf21cea88fc86d44d",
+  "baseSha": "be6b0c3e2d9f2cc3616d0d998d497f2a2c520efb",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -57,6 +57,7 @@
     "src/system/game-data.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
     "test/browser/coop-public-ui/browser-workflow-fanout.test.mjs",
+    "test/browser/coop-public-ui/campaign-exp-phase.test.mjs",
     "test/browser/coop-public-ui/evidence.mjs",
     "test/browser/coop-public-ui/fatal-console-evidence.test.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",

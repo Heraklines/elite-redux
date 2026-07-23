@@ -82,6 +82,26 @@ class FakeEvidence {
     });
   }
 
+  pushOwnedCommandSurface(localSeat, address = { epoch: 7, wave: 1, turn: 1 }) {
+    this.events.push({
+      index: this.events.length,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "command:command",
+        operationClass: "command",
+        coop: true,
+        phase: "CommandPhase",
+        phaseInstance: 2,
+        uiMode: "COMMAND",
+        ownerModel: "seat",
+        localSeat,
+        seatsWithInput: [localSeat],
+        ready: { handlerActive: true, inputBlocked: false },
+        address,
+      },
+    });
+  }
+
   pushBattleReadiness(
     surfaceId,
     phase,
@@ -862,12 +882,14 @@ test("the short public journey advances readiness-proven narration before pollin
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
   const clients = { authority, renderer };
+  const seats = { authority: 0, renderer: 1 };
   for (const client of Object.values(clients)) {
+    client.publicSeat = seats[client.label];
     client.evidence.pushCommandSurface();
     client.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 1);
     client.press = async function press(key, purpose) {
       this.presses.push({ key, purpose });
-      this.evidence.pushConsole("CommandPhase regression -> LOCAL UI");
+      this.evidence.pushOwnedCommandSurface(this.publicSeat);
     };
   }
   const rig = {
