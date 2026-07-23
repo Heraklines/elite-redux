@@ -58,7 +58,8 @@ export type ShowdownCommandResponder = (req: ShowdownCommandRequest) => Serializ
 export interface ShowdownCommandRelayOptions {
   /**
    * Per-request TURN TIMER before {@linkcode ShowdownCommandRelay.requestEnemyCommand} resolves
-   * null (the host then falls back to the AI picker). Default 60s - the showdown turn timer.
+   * null (the host then falls back to the AI picker). The default includes bounded renderer grace
+   * before the peer's own 60s command clock can even open; an explicit override remains exact.
    */
   timeoutMs?: number;
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
@@ -67,6 +68,15 @@ export interface ShowdownCommandRelayOptions {
 
 /** The showdown TURN TIMER: wait 60s for the remote player's enemy command, then AI-fallback. */
 export const SHOWDOWN_TURN_TIMER_MS = 60_000;
+
+/**
+ * A renderer must finish the authority's presentation stream before its own command UI can open.
+ * Keep the host's relay alive through that bounded, non-interactive interval, then through the peer's
+ * ordinary 60s player clock. Browser run 30030175748 needed ~115s solely for entry presentation at
+ * ~3fps; timing out after 60s replaced a real pending human choice with AI before input was possible.
+ */
+export const SHOWDOWN_REMOTE_PRESENTATION_GRACE_MS = 180_000;
+export const SHOWDOWN_COMMAND_RELAY_TIMEOUT_MS = SHOWDOWN_REMOTE_PRESENTATION_GRACE_MS + SHOWDOWN_TURN_TIMER_MS;
 
 /** The composite pending/inbox key for a (turn, fieldIndex) command slot. */
 function slotKey(turn: number, fieldIndex: number): string {
@@ -110,7 +120,7 @@ export class ShowdownCommandRelay {
 
   constructor(transport: CoopTransport, opts: ShowdownCommandRelayOptions = {}) {
     this.transport = transport;
-    this.timeoutMs = opts.timeoutMs ?? SHOWDOWN_TURN_TIMER_MS;
+    this.timeoutMs = opts.timeoutMs ?? SHOWDOWN_COMMAND_RELAY_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
   }

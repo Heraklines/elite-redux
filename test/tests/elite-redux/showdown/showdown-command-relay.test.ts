@@ -9,7 +9,10 @@
 // fallback signal); dispose cancels an in-flight request. Mirrors the co-op relay tests.
 
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
+import {
+  SHOWDOWN_COMMAND_RELAY_TIMEOUT_MS,
+  ShowdownCommandRelay,
+} from "#data/elite-redux/showdown/showdown-command-relay";
 import { describe, expect, it } from "vitest";
 
 /** LoopbackTransport delivers on a microtask; flush before asserting. */
@@ -81,6 +84,22 @@ describe("Showdown enemy-command relay (C4)", () => {
     expect(cmd).toBeNull();
 
     hostRelay.dispose();
+  });
+
+  it("keeps the remote relay alive through renderer grace plus the player's own turn clock", async () => {
+    const { host } = createLoopbackPair();
+    let scheduledMs: number | null = null;
+    const hostRelay = new ShowdownCommandRelay(host, {
+      schedule: (_cb, ms) => {
+        scheduledMs = ms;
+        return () => {};
+      },
+    });
+
+    const pending = hostRelay.requestEnemyCommand(1);
+    expect(scheduledMs).toBe(SHOWDOWN_COMMAND_RELAY_TIMEOUT_MS);
+    hostRelay.dispose();
+    expect(await pending).toBeNull();
   });
 
   it("dispose cancels an in-flight request (resolves null so the host AI-falls-back)", async () => {

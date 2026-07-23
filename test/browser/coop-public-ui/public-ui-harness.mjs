@@ -252,7 +252,13 @@ export function createPublicBattleProgressBudget(
 }
 
 function findOwnedCommandOrTerminal(client, from) {
+  const terminal =
+    client.evidence.find(SHARED_SESSION_TERMINAL, from) ?? client.evidence.find(LAUNCH_SNAPSHOT_ABORT, from);
+  if (terminal != null) {
+    return terminal;
+  }
   const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
+  const latestSemantic = client.evidence.findLastSemanticSurface(from);
   const observation = semantic?.observation;
   const semanticOwner =
     observation != null
@@ -260,18 +266,22 @@ function findOwnedCommandOrTerminal(client, from) {
       ? observation.ownerModel === "local" && observation.localSeat == null && observation.seatsWithInput?.includes(0)
       : observation.localSeat === client.publicSeat && observation.seatsWithInput?.includes(client.publicSeat));
   const ownedSemantic =
-    observation?.ready?.handlerActive === true
+    semantic?.index === latestSemantic?.index
+    && observation?.surfaceId === "command:command"
+    && observation?.ready?.handlerActive === true
     && observation.phase === "CommandPhase"
     && observation.uiMode === "COMMAND"
     && semanticOwner
       ? semantic
       : null;
-  return (
-    ownedSemantic
-    ?? client.evidence.find(LOCAL_COMMAND, from)
-    ?? client.evidence.find(SHARED_SESSION_TERMINAL, from)
-    ?? client.evidence.find(LAUNCH_SNAPSHOT_ABORT, from)
-  );
+  // Semantic surfaces are an append-only observation log, but only the latest one represents the
+  // UI a human can currently control. Never resurrect an old CommandPhase after EnemyCommandPhase,
+  // narration, a picker, or turn replay has replaced it (Showdown run 30030175748 otherwise spent
+  // switch-navigation keys in MoveEffectPhase after the 60s clock had already closed the menu).
+  if (latestSemantic != null) {
+    return ownedSemantic;
+  }
+  return client.evidence.find(LOCAL_COMMAND, from) ?? null;
 }
 
 function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
@@ -1755,6 +1765,27 @@ export class DuoPublicUiRig {
     }
   }
 
+  /** Reach the first currently actionable owner command without waiting out the other seat's presentation. */
+  async waitForFirstLocalCommandDrivingBattlePrompts(from, purpose) {
+    const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
+    const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, purpose, {
+      requireSharedCommandAddress: false,
+    });
+    while (Date.now() < progressBudget.observe()) {
+      const owner = Object.values(this.clients).find(
+        client => findOwnedCommandOrTerminal(client, from[client.label] ?? 0)?.kind === "browser-surface2",
+      );
+      if (owner != null) {
+        return findOwnedCommandOrTerminal(owner, from[owner.label] ?? 0);
+      }
+      if (await advanceBattlePrompt()) {
+        continue;
+      }
+      await delay(100);
+    }
+    throw new Error(`${purpose}: timed out waiting for the first actionable command owner`);
+  }
+
   /**
    * Advance only readiness-proven public battle prompts until both clients publish the same
    * Commander boundary. Unlike the ordinary command-frontier driver, this must not require an
@@ -2440,7 +2471,21 @@ export class DuoPublicUiRig {
         }),
       ),
     );
-    await this.waitForAllLocalCommandsDrivingBattlePrompts(battleCursors, "showdown-wave-1-intro");
+    // The two clients render the retained entry presentation sequentially on throttled browsers. Waiting
+    // for both command surfaces here can consume the first player's entire 60s turn clock before the test
+    // is allowed to act. A real player chooses as soon as THEIR menu opens. The sequential round below does
+    // the same, then proves the exact renderer ledger before admitting the second player's command.
+    const firstCommand = await this.waitForFirstLocalCommandDrivingBattlePrompts(
+      battleCursors,
+      "showdown-wave-1-intro",
+    );
+    this.activeBattleWave = firstCommand.observation.address.wave;
+    this.showdownCommandCursors = battleCursors;
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-wave-1-first-command")));
+  }
+
+  /** Prove the entry ability/environment visuals against each seat's own turn-1 command frontier. */
+  async assertShowdownEntryPresentation(battleCursors, expectedAddress) {
     const presentationPrefix = "[coop-browser:presentation] ";
     const [hostAbility, guestAbility, hostEnvironment, guestEnvironment] = await Promise.all([
       this.host.evidence.waitFor(/\[coop-browser:presentation\] \{.*"kind":"ability".*"phase":"ShowAbilityPhase"/u, {
@@ -2494,13 +2539,11 @@ export class DuoPublicUiRig {
         `Showdown environment presentation diverged: host=${JSON.stringify(hostEnvironmentView)} guest=${JSON.stringify(guestEnvironmentView)}`,
       );
     }
-    const commandMatch = findSharedCommandFrontierMatch(
-      this.host,
-      this.guest,
-      battleCursors,
-      this.lastSharedSurfaceAddress.get("command"),
-      { allowAddressRepeat: true, expectedWave: 1 },
-    );
+    const commandMatch = findSharedCommandFrontierMatch(this.host, this.guest, battleCursors, null, {
+      allowAddressRepeat: true,
+      expectedWave: 1,
+      expectedAddress,
+    });
     if (
       commandMatch == null
       || hostAbility.index >= commandMatch.hostProjection.event.index
@@ -2522,12 +2565,6 @@ export class DuoPublicUiRig {
         presentation: presentation(event),
       });
     }
-    const boundary = await this.assertSharedCommandFrontier(battleCursors, "showdown-wave-1-command", {
-      expectedWave: 1,
-    });
-    this.activeBattleWave = boundary.wave;
-    this.showdownCommandCursors = battleCursors;
-    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-wave-1-command")));
   }
 
   /**
@@ -2572,6 +2609,7 @@ export class DuoPublicUiRig {
       await this.driveSequentialCommandRound(commandCursors, this.config.keys.battle, switchLabel, {
         driveCommand: (client, purpose, event) => this.driveShowdownVoluntarySwitch(client, purpose, event),
       });
+    await this.assertShowdownEntryPresentation(commandCursors, switchCommandAddress);
     const switchOutcome = await this.waitForPostTurnOutcome(switchOutcomeCursors, {
       expectedCommandAddress: switchCommandAddress,
     });

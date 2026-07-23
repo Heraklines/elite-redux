@@ -581,6 +581,60 @@ test("sequential command driver submits the first owner before waiting for the p
   assert.equal(result.expectedCommandAddress, "73:1:2");
 });
 
+test("sequential command driver never resurrects a command surface superseded by presentation", async () => {
+  const order = [];
+  const firstEvidence = new FakeEvidence("first");
+  const secondEvidence = new FakeEvidence("second");
+  firstEvidence.push(ownedCommand(0));
+  firstEvidence.push({
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "battle-progress",
+      surfaceId: "battle:message",
+      phase: "MoveEffectPhase",
+      uiMode: "MESSAGE",
+      address: { epoch: 73, wave: 1, turn: 2 },
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true, awaitingActionInput: false },
+    },
+  });
+  secondEvidence.push(ownedCommand(1));
+  const first = {
+    label: "first",
+    publicSeat: 0,
+    evidence: firstEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("first");
+    },
+  };
+  const second = {
+    label: "second",
+    publicSeat: 1,
+    evidence: secondEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("second");
+      firstEvidence.push(ownedCommand(0));
+    },
+  };
+  const rig = {
+    clients: { first, second },
+    config: { timeoutMs: 1_000 },
+    assertPresentationLedgerAtSharedCommand: async () => order.push("presentation-proof"),
+  };
+
+  await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { first: 0, second: 0 },
+    ["Space"],
+    "showdown-switch",
+  );
+
+  assert.deepEqual(order, ["second", "presentation-proof", "first"]);
+});
+
 test("target selection is admitted only while the exact owned picker is the current semantic surface", () => {
   const evidence = new FakeEvidence("owner");
   const client = { label: "owner", publicSeat: 1, evidence };

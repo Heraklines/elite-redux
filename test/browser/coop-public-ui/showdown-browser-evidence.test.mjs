@@ -122,7 +122,7 @@ test("two public clients must prove one positive gameplay epoch before locking t
 
   const start = harness.slice(
     harness.indexOf("async startShowdownBattle()"),
-    harness.indexOf("\n  /** Drive successive reciprocal", harness.indexOf("async startShowdownBattle()")),
+    harness.indexOf("\n  /** Prove the entry ability", harness.indexOf("async startShowdownBattle()")),
   );
   assert.ok(
     start.indexOf("const wagerCursors = this.pairRoleCursors") < start.indexOf("completePairingBinding()"),
@@ -134,7 +134,8 @@ test("two public clients must prove one positive gameplay epoch before locking t
     "battle evidence receives a fresh cursor only after the one-shot wager was observed",
   );
   assert.match(start, /targetId: "showdown-wager:friendly"/u);
-  assert.match(start, /assertSharedCommandFrontier\(battleCursors, "showdown-wave-1-command"/u);
+  assert.match(start, /waitForFirstLocalCommandDrivingBattlePrompts/u);
+  assert.doesNotMatch(start, /waitForAllLocalCommandsDrivingBattlePrompts/u);
 });
 
 test("the journey executes a reciprocal switch plus two attacks and requires every retained frontier", () => {
@@ -168,8 +169,8 @@ test("the real-browser oracle requires streamed ability and environment presenta
     /phaseName === "CommonAnimPhase"[\s\S]*environmentPresentation\?\.source === "environment"[\s\S]*Number\.isSafeInteger\(anim\)/u,
   );
   const start = harness.slice(
-    harness.indexOf("async startShowdownBattle()"),
-    harness.indexOf("\n  /** Drive successive reciprocal", harness.indexOf("async startShowdownBattle()")),
+    harness.indexOf("async assertShowdownEntryPresentation("),
+    harness.indexOf("\n  /** Submit a voluntary switch", harness.indexOf("async assertShowdownEntryPresentation(")),
   );
   assert.match(start, /authority Showdown ability flyout/u);
   assert.match(start, /renderer Showdown ability flyout/u);
@@ -182,6 +183,7 @@ test("the real-browser oracle requires streamed ability and environment presenta
   assert.match(start, /Showdown ability presentation diverged/u);
   assert.match(start, /Showdown presentation did not complete on both clients before the shared command frontier/u);
   assert.match(start, /showdown-presentation-proof/u);
+  assert.match(harness, /driveShowdownTurn\(\)[\s\S]*assertShowdownEntryPresentation/u);
   assert.match(
     replay,
     /entryPresentationOnly[\s\S]*awaitEntryPresentation[\s\S]*retained entry presentation installed/u,

@@ -1919,3 +1919,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The trainer-switch and rapid faint-chain journeys now opt into the harness's existing address-exact next-turn
   command proof. Previously they asked for turn N+1 while the pure renderer was validly parked at turn N's
   finalize phase, producing a harness-only `host=11:2, guest=11:1` red before testing the switch itself.
+
+# 2026-07-23 - Showdown clocks no longer outrun mandatory presentation
+
+- Exact two-browser run `30030175748` proved the authority and renderer produced the same entry weather,
+  ability, and message ledger, but its oracle waited for both command surfaces while the first seat's real 60s
+  clock was already running. At ~3 fps both seats auto-picked before the driver attempted its voluntary switch.
+- The public driver now acts on the first CURRENT owned command surface immediately and requires the complete
+  ordered renderer ledger before admitting the reciprocal choice. Historical command surfaces superseded by
+  presentation are fail-closed, with a failure-first source regression for the exact stale-surface sequence.
+- The remote-command relay now has three minutes of bounded renderer grace in addition to the player's 60s
+  input clock. A peer cannot be replaced by AI while mandatory authoritative presentation prevents its menu
+  from opening, while disconnect and the combined four-minute ceiling still guarantee liveness.
