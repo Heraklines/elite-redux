@@ -95,7 +95,7 @@ test("two public clients must prove one positive gameplay epoch before locking t
 
   const start = harness.slice(
     harness.indexOf("async startShowdownBattle()"),
-    harness.indexOf("\n  /**\n   * Drive one reciprocal", harness.indexOf("async startShowdownBattle()")),
+    harness.indexOf("\n  /** Drive successive reciprocal", harness.indexOf("async startShowdownBattle()")),
   );
   assert.ok(
     start.indexOf("const wagerCursors = this.pairRoleCursors") < start.indexOf("completePairingBinding()"),
@@ -110,17 +110,18 @@ test("two public clients must prove one positive gameplay epoch before locking t
   assert.match(start, /assertSharedCommandFrontier\(battleCursors, "showdown-wave-1-command"/u);
 });
 
-test("the journey executes a reciprocal turn and requires the next retained frontier", () => {
+test("the journey executes two reciprocal turns and requires every retained frontier", () => {
   const turn = harness.slice(
     harness.indexOf("async driveShowdownTurn()"),
     harness.indexOf("\n  async assertSharedSurface(", harness.indexOf("async driveShowdownTurn()")),
   );
   assert.match(turn, /driveSequentialCommandRound\(/u);
+  assert.match(turn, /for \(let round = 1; round <= 2; round\+\+\)/u);
   assert.match(turn, /waitForPostTurnOutcome\(/u);
   assert.match(turn, /outcome\.kind !== "command"/u);
-  assert.match(turn, /assertSharedCommandFrontier\(outcomeCursors, "showdown-turn-1-next-command"/u);
-  assert.match(turn, /assertRetainedContinuation\(outcomeCursors, "showdown-turn-1-next-command"/u);
-  assert.match(turn, /showdown-turn-1-synchronized/u);
+  assert.match(turn, /assertSharedCommandFrontier\(outcomeCursors, `\$\{label\}-next-command`/u);
+  assert.match(turn, /assertRetainedContinuation\(outcomeCursors, `\$\{label\}-next-command`/u);
+  assert.match(turn, /showdown-turn-2-synchronized/u);
 });
 
 test("the real-browser oracle requires streamed ability and environment presentation on both clients", () => {
@@ -132,7 +133,7 @@ test("the real-browser oracle requires streamed ability and environment presenta
   );
   const start = harness.slice(
     harness.indexOf("async startShowdownBattle()"),
-    harness.indexOf("\n  /**\n   * Drive one reciprocal", harness.indexOf("async startShowdownBattle()")),
+    harness.indexOf("\n  /** Drive successive reciprocal", harness.indexOf("async startShowdownBattle()")),
   );
   assert.match(start, /authority Showdown ability flyout/u);
   assert.match(start, /renderer Showdown ability flyout/u);

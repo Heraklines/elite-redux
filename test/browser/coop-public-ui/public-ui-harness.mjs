@@ -2441,25 +2441,36 @@ export class DuoPublicUiRig {
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-wave-1-command")));
   }
 
-  /** Drive one reciprocal real-player turn and prove both browsers install the next exact frontier. */
+  /** Drive successive reciprocal turns and prove both browsers install every exact next frontier. */
   async driveShowdownTurn() {
     if (this.showdownCommandCursors == null) {
       throw new Error("driveShowdownTurn requires startShowdownBattle()");
     }
-    const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
-      this.showdownCommandCursors,
-      this.config.keys.battle,
-      "showdown-turn-1",
-    );
-    const outcome = await this.waitForPostTurnOutcome(outcomeCursors, { expectedCommandAddress });
-    if (outcome.kind !== "command") {
-      throw new Error(`Showdown turn 1 reached ${outcome.kind} instead of the next synchronized command frontier`);
+    let commandCursors = this.showdownCommandCursors;
+    // One round proves launch. A second round proves that the first retained turn retired cleanly and did
+    // not poison the next command address. The symmetric level-100 Pelipper fixture cannot faint within
+    // these two ordinary Air Cutter rounds, so both iterations must end at an executable command frontier.
+    for (let round = 1; round <= 2; round++) {
+      const label = `showdown-turn-${round}`;
+      const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
+        commandCursors,
+        this.config.keys.battle,
+        label,
+      );
+      const outcome = await this.waitForPostTurnOutcome(outcomeCursors, { expectedCommandAddress });
+      if (outcome.kind !== "command") {
+        throw new Error(
+          `Showdown turn ${round} reached ${outcome.kind} instead of the next synchronized command frontier`,
+        );
+      }
+      await this.assertSharedCommandFrontier(outcomeCursors, `${label}-next-command`, {
+        expectedWave: 1,
+      });
+      await this.assertRetainedContinuation(outcomeCursors, `${label}-next-command`);
+      commandCursors = outcomeCursors;
     }
-    await this.assertSharedCommandFrontier(outcomeCursors, "showdown-turn-1-next-command", {
-      expectedWave: 1,
-    });
-    await this.assertRetainedContinuation(outcomeCursors, "showdown-turn-1-next-command");
-    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-turn-1-synchronized")));
+    this.showdownCommandCursors = commandCursors;
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-turn-2-synchronized")));
   }
 
   async assertSharedSurface(surface, cursors, proofName, { allowAddressRepeat = false, expectedWave = null } = {}) {
