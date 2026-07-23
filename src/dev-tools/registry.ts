@@ -125,8 +125,8 @@ export function isCoopBrowserShowdownFixtureBuild(): boolean {
  * It does not persist or auto-select anything: each browser still opens the normal team menu,
  * confirms the visible preset, pairs, chooses its wager, and commands the battle through public
  * keyboard input. Pelipper's ordinary Drizzle lead deterministically exercises both an ability flyout
- * and weather animation before command input. Gyarados supplies a legal voluntary-switch target whose
- * Intimidate entry exercises switch, ability, and stat-stage presentation before the next command frontier;
+ * and weather animation before command input. Arcanine supplies a legal voluntary-switch target whose
+ * active Intimidate exercises switch, ability, and stat-stage presentation before the next command frontier;
  * the fixture bundle supplies that legal preset independently of the ephemeral test account's unlocks.
  */
 export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null {
@@ -154,20 +154,22 @@ export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null
     baseCost: speciesStarterCosts[SpeciesId.PELIPPER],
   };
   const intimidateSwitch: ShowdownMonManifest = {
-    speciesId: SpeciesId.GYARADOS,
+    speciesId: SpeciesId.ARCANINE,
     formIndex: 0,
     level: 100,
     shiny: false,
     variant: 0,
-    // Elite Redux Gyarados slot 0 is Intimidate. The two-browser journey switches both players into
-    // this slot and requires the resulting ability + stat-stage entries to complete on the renderer.
+    // Elite Redux Arcanine active slot 0 is Intimidate. Gyarados's Intimidate is instead a candy-gated
+    // innate on the player side, so using it made the same manifest asymmetric between the authority's
+    // player and opponent parties. The journey needs two deterministic active triggers, independent of
+    // either ephemeral test account's unlocks.
     abilityIndex: 0,
     ivs: new Array(6).fill(15),
     moveset: [MoveId.TACKLE],
     item: SHOWDOWN_ITEM_POOL[0],
-    rootSpeciesId: SpeciesId.GYARADOS,
+    rootSpeciesId: SpeciesId.ARCANINE,
     erBlackShiny: false,
-    baseCost: speciesStarterCosts[SpeciesId.GYARADOS],
+    baseCost: speciesStarterCosts[SpeciesId.ARCANINE],
   };
   return makeShowdownTeamPreset("Browser Showdown", [drizzleLead, intimidateSwitch]);
 }

@@ -2037,6 +2037,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the later outcome cursors remain reserved for finding the next frontier. The deterministic dual-Intimidate
   requirement remains strict; the corrected run must expose any real missing ability instead of hiding it.
 
+# 2026-07-23 - Showdown presentation fixture uses symmetric active abilities
+
+- The prior switch fixture described Gyarados slot 0 as Intimidate, but Elite Redux places Intimidate in
+  Gyarados's first innate slot. Player innates are account-unlock gated while opponent innates are active,
+  so an identical versus manifest produced only the opponent flyout/stat drop and could never satisfy the
+  intended two-sided presentation proof.
+- The guarded browser-only preset now switches both seats to active-slot-0 Intimidate Arcanine. Both ability
+  flyouts and both stat-stage animations are therefore required without depending on either disposable CI
+  account's candy unlocks; the oracle remains strict instead of treating missing combat presentation as noise.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real

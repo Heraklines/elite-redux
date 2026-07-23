@@ -2670,7 +2670,7 @@ export class DuoPublicUiRig {
     await this.assertRetainedContinuation(switchOutcomeCursors, `${switchLabel}-next-command`);
     commandCursors = switchOutcomeCursors;
 
-    // Two ordinary Gyarados rounds prove the switch frontier retired cleanly, move/damage presentation
+    // Two ordinary Arcanine rounds prove the switch frontier retired cleanly, move/damage presentation
     // remained exact, and the second retained turn did not poison the following command address.
     for (let round = 1; round <= 2; round++) {
       const label = `showdown-turn-${round + 1}-attack`;

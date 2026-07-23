@@ -68,8 +68,9 @@ test("the preset fixture requires both immutable build identity and exact page U
   );
   assert.match(
     registry,
-    /speciesId: SpeciesId\.GYARADOS[\s\S]*level: 100[\s\S]*abilityIndex: 0[\s\S]*moveset: \[MoveId\.TACKLE\][\s\S]*item: SHOWDOWN_ITEM_POOL\[0\]/u,
+    /speciesId: SpeciesId\.ARCANINE[\s\S]*level: 100[\s\S]*abilityIndex: 0[\s\S]*moveset: \[MoveId\.TACKLE\][\s\S]*item: SHOWDOWN_ITEM_POOL\[0\]/u,
   );
+  assert.match(registry, /Gyarados's Intimidate is instead a candy-gated[\s\S]*ephemeral test account's unlocks/u);
   assert.match(registry, /makeShowdownTeamPreset\("Browser Showdown", \[drizzleLead, intimidateSwitch\]\)/u);
   assert.match(title, /getCoopBrowserShowdownFixturePreset\(\)/u);
   assert.match(
