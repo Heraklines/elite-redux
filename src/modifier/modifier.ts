@@ -600,15 +600,16 @@ export class TempCritBoosterModifier extends LapsingPersistentModifier {
   }
 }
 
+/** Base Map plus the three World Map route-reveal upgrades. */
+export const ER_MAP_MAX_UPGRADE_TIER = 3;
+export const ER_MAP_MAX_STACK_COUNT = 1 + ER_MAP_MAX_UPGRADE_TIER;
+
 export class MapModifier extends PersistentModifier {
   clone(): MapModifier {
     return new MapModifier(this.type, this.stackCount);
   }
 
-  // Singleton key item (max stack 1). Without a match() override the base
-  // Modifier.match() returns false, so a second grant (ER shops / mystery
-  // encounters can hand it out outside the reward-pool ownership gate) would
-  // push a duplicate icon instead of merging - see the Mega Bracelet report.
+  // All map upgrades merge into the run's base Map so they stay one HUD item.
   match(modifier: Modifier): boolean {
     return modifier instanceof MapModifier;
   }
@@ -618,7 +619,7 @@ export class MapModifier extends PersistentModifier {
   }
 
   getMaxStackCount(): number {
-    return 1;
+    return ER_MAP_MAX_STACK_COUNT;
   }
 }
 

@@ -1,6 +1,13 @@
 import { modifierTypes } from "#data/data-lists";
+import { erMapUpgradeTier } from "#data/elite-redux/er-biome-routing";
 import { SpeciesId } from "#enums/species-id";
-import { GigantamaxAccessModifier, MegaEvolutionAccessModifier, TerastallizeAccessModifier } from "#modifiers/modifier";
+import {
+  ER_MAP_MAX_STACK_COUNT,
+  GigantamaxAccessModifier,
+  MapModifier,
+  MegaEvolutionAccessModifier,
+  TerastallizeAccessModifier,
+} from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -55,5 +62,29 @@ describe("ER singleton key-item dedup (#mega-bracelet)", () => {
 
     expect(game.scene.getModifiers(GigantamaxAccessModifier)).toHaveLength(1);
     expect(game.scene.getModifiers(TerastallizeAccessModifier)).toHaveLength(1);
+  });
+
+  it("merges three Upgraded Maps into the base Map before rejecting another", async () => {
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+    const grantMapUpgrade = () =>
+      game.scene.addModifier(
+        modifierTypes.ER_UPGRADED_MAP().withIdFromFunc(modifierTypes.ER_UPGRADED_MAP).newModifier(),
+      );
+
+    expect(game.scene.getModifiers(MapModifier)).toHaveLength(1);
+    expect(erMapUpgradeTier()).toBe(0);
+
+    for (let i = 0; i < 3; i++) {
+      await grantMapUpgrade();
+    }
+
+    const maps = game.scene.getModifiers(MapModifier);
+    expect(maps).toHaveLength(1);
+    expect(maps[0].getStackCount()).toBe(ER_MAP_MAX_STACK_COUNT);
+    expect(erMapUpgradeTier()).toBe(3);
+
+    await grantMapUpgrade();
+    expect(game.scene.getModifiers(MapModifier)[0].getStackCount()).toBe(ER_MAP_MAX_STACK_COUNT);
+    expect(erMapUpgradeTier()).toBe(3);
   });
 });

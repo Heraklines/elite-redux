@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { TRIPLE_FORMAT } from "#data/battle-format";
 import {
   applyErCustomTrainerDisplayName,
   applyErCustomTrainerPresentation,
@@ -13,6 +14,7 @@ import {
   setErCustomTrainerBstBypass,
 } from "#data/elite-redux/er-custom-trainers";
 import { BattleType } from "#enums/battle-type";
+import { Challenges } from "#enums/challenges";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
@@ -136,7 +138,15 @@ export function installErCustomTrainerForCurrentWave(): void {
     battle.trainer = trainer;
     battle.battleType = BattleType.TRAINER;
     battle.enemyParty = [];
-    battle.setDouble(resolved.isDouble);
+    // Authored encounter width must not clobber a run-wide format challenge.
+    // This was the wave-boundary "Triples Only became 1v1" regression (and the
+    // equivalent Doubles Only report): the battle resolver created the forced
+    // format, then this installer overwrote it from the trainer's own metadata.
+    if (globalScene.gameMode.hasChallenge(Challenges.TRIPLES_ONLY)) {
+      battle.setFormat(TRIPLE_FORMAT);
+    } else {
+      battle.setDouble(resolved.isDouble || globalScene.gameMode.hasChallenge(Challenges.DOUBLES_ONLY));
+    }
 
     // Resolve the FINAL fielded party for this run (seed-deterministic): per
     // authored slot roll slot-fill (slot 1 always fills), and for a filled slot

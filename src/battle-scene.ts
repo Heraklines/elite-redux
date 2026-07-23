@@ -2249,12 +2249,17 @@ export class BattleScene extends SceneBase {
       }
     }
 
-    // Triples Only / dev override: any battle that reached the force point (double === true, set in
-    // checkIsDouble) becomes a triple. The single edges (finale / endless boss / ME) return
-    // double === false there, so they correctly stay single - never upgraded.
+    // Triples Only is a direct format invariant for regular battles. Do not make it
+    // depend on the intermediate legacy `double` flag: later encounter adapters can
+    // legitimately recompute that boolean, and coupling the challenge to it caused a
+    // wave-transition triple to collapse to 1v1. Explicit dev overrides remain authoritative.
     if (
       Overrides.BATTLE_STYLE_OVERRIDE === "triple"
-      || (double && this.gameMode.hasChallenge(Challenges.TRIPLES_ONLY))
+      || (Overrides.BATTLE_STYLE_OVERRIDE == null
+        && this.gameMode.hasChallenge(Challenges.TRIPLES_ONLY)
+        && (props.battleType === BattleType.WILD || props.battleType === BattleType.TRAINER)
+        && !this.gameMode.isWaveFinal(props.waveIndex)
+        && !this.gameMode.isEndlessBoss(props.waveIndex))
     ) {
       return TRIPLE_FORMAT;
     }
