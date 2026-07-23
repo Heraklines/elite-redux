@@ -43,6 +43,9 @@ async function openViewer(page) {
       });
     });
   }
+  await page.locator(".er-rich-notification-content").evaluate(node => {
+    node.scrollTop = 0;
+  });
 }
 
 async function inspect(page) {
@@ -101,7 +104,6 @@ try {
 
   const mobile = await browser.newPage({
     hasTouch: true,
-    isMobile: true,
     viewport: { width: 390, height: 844 },
   });
   await openViewer(mobile);
@@ -110,6 +112,7 @@ try {
   assert.equal(mobileState.imagesLoaded, 6, "Not every mobile patch-note image loaded");
   assert.ok(mobileState.contentScrollHeight > mobileState.contentClientHeight, "Mobile notes are not scrollable");
   assert.ok(mobileState.contentWidthFits, "Mobile content overflows horizontally");
+  assert.deepEqual(mobileState.viewport, { height: 844, width: 390 });
   assert.ok(mobileState.dialog.left >= 0 && mobileState.dialog.right <= mobileState.viewport.width);
   assert.ok(mobileState.dialog.top >= 0 && mobileState.dialog.bottom <= mobileState.viewport.height);
   await mobile.screenshot({ path: `${outputDir}/mobile.png` });
