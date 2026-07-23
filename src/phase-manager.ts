@@ -710,7 +710,7 @@ export class PhaseManager {
    *
    * @deprecated Only used for switches and should be phased out eventually.
    */
-  public queueDeferred<const T extends "SwitchPhase" | "SwitchSummonPhase">(
+  public queueDeferred<const T extends "ShowdownEnemyFaintSwitchPhase" | "SwitchPhase" | "SwitchSummonPhase">(
     phase: T,
     ...args: ConstructorParameters<PhaseConstructorMap[T]>
   ): void {

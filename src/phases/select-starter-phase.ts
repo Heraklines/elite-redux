@@ -776,6 +776,12 @@ export class SelectStarterPhase extends Phase {
       if (starter.passive) {
         starterPokemon.passive = true;
       }
+      // Showdown teams are competitive manifests, not progression-gated starters. The mirrored trainer
+      // representation always runs every ER innate, so unlock all three slots on the local player copy as
+      // well; otherwise dual-simulation clients resolve different abilities from the same team.
+      if (globalScene.gameMode.isShowdown) {
+        starterPokemon.customPokemonData.erRunUnlockedAbilitySlots = [1, 2, 3];
+      }
       starterPokemon.luck = globalScene.gameData.getDexAttrLuck(
         globalScene.gameData.dexData[species.speciesId].caughtAttr,
       );

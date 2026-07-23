@@ -994,7 +994,8 @@ export function mirrorHostBattleToGuest(
   }
   // Versus flip: the guest's local PLAYER party is the host's ENEMY party (its own team). Co-op: the
   // host's own player party (the shared team).
-  for (const hostMon of preservePlayer ? [] : flip ? hostScene.getEnemyParty() : hostScene.getPlayerParty()) {
+  const playerSources = preservePlayer ? [] : flip ? hostScene.getEnemyParty() : hostScene.getPlayerParty();
+  for (const [sourceIndex, hostMon] of playerSources.entries()) {
     const data = new PokemonData(hostMon);
     const mon = new PlayerPokemon(
       getPokemonSpecies(hostMon.species.speciesId),
@@ -1010,7 +1011,19 @@ export function mirrorHostBattleToGuest(
     );
     // coopOwner is a runtime tag (typed on PlayerPokemon; the versus-flip source may be an EnemyPokemon).
     mon.coopOwner = (hostMon as PlayerPokemon).coopOwner ?? "host";
+    if (flip && guestScene.gameMode.isShowdown) {
+      mon.customPokemonData.erRunUnlockedAbilitySlots = [1, 2, 3];
+    }
     mon.calculateStats();
+    // Flipping an EnemyPokemon into a PlayerPokemon changes which constructor/stat modifiers run. Carry
+    // the source battler's exact live scalar state so both simulations resolve damage from identical stats.
+    const sourceScalar = (flip ? hostEnemyScalars : hostPlayerScalars)[sourceIndex];
+    if (sourceScalar?.stats.length === 6) {
+      mon.stats = [...sourceScalar.stats];
+    }
+    const maxHp = sourceScalar?.maxHp ?? mon.getMaxHp();
+    mon.setStat(Stat.HP, maxHp);
+    mon.hp = Math.max(0, Math.min(sourceScalar?.hp ?? hostMon.hp, maxHp));
     guestSceneInternal.party.push(mon);
   }
 
@@ -1100,7 +1113,13 @@ export function mirrorHostBattleToGuest(
   for (const mon of [...guestScene.getPlayerField(), ...guestScene.getEnemyField()]) {
     guestScene.field.add(mon);
   }
-  applyCoopAuthoritativeBattleState(waveBoundaryState ?? undefined, true);
+  // A flipped versus mirror is already reconstructed from PokemonData in the guest's local orientation.
+  // The captured boundary is in the host's orientation, so applying it verbatim would undo the flip and
+  // turn the Sync proof back into an authoritative-host renderer. Production performs the equivalent side
+  // swap at launch ingress; the direct harness mirror must leave the reconstructed local parties intact.
+  if (!flip) {
+    applyCoopAuthoritativeBattleState(waveBoundaryState ?? undefined, true);
+  }
   // setFormat/applyCoopAuthoritativeBattleState may recalculate enemy stats after construction. Re-assert
   // the production carrier's authoritative max-HP rule at the completed mirror boundary.
   if (!flip) {
@@ -3998,6 +4017,13 @@ export async function buildShowdownDuo(
   setCoopRuntimeFn(guestRuntime);
   guestRuntime.controller.connect();
   await drainLoopback();
+
+  // Building the synthetic flipped scene constructs a second set of battlers in this one process and
+  // advances only its saved RNG cursor. Real Sync clients both begin battle resolution from the negotiated
+  // seed boundary, so align the harness cursors after construction before either engine resolves a turn.
+  if (netcodeMode === "lockstep") {
+    guestCtx.rndState = hostCtx.rndState;
+  }
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
   // Showdown rigs own the same two independently assembled runtimes as ordinary co-op rigs. Register

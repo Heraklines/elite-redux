@@ -14,12 +14,12 @@ import { applyShowdownSyncCommand } from "#data/elite-redux/showdown/showdown-sy
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
-import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { SpeciesId } from "#enums/species-id";
+import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
@@ -32,8 +32,9 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { generateStarters } from "#test/utils/game-manager-utils";
+import { PartyOption } from "#ui/handlers/party-ui-handler";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -63,6 +64,25 @@ function installTurnStart(scene: BattleScene): void {
   const phase = manager.create("TurnStartPhase");
   (manager as unknown as { currentPhase: Phase }).currentPhase = phase;
   phase.start();
+}
+
+function startWithHeadlessPartyPick(scene: BattleScene, phase: Phase, slotIndex: number): () => void {
+  const ui = scene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+  const realSetMode = ui.setMode.bind(ui);
+  ui.setMode = (...args: unknown[]): unknown => {
+    if (args[0] === UiMode.PARTY) {
+      (args[3] as (slot: number, option: PartyOption) => void)(slotIndex, PartyOption.SEND_OUT);
+      return Promise.resolve();
+    }
+    if (args[0] === UiMode.MESSAGE) {
+      return Promise.resolve();
+    }
+    return realSetMode(...args);
+  };
+  phase.start();
+  return () => {
+    ui.setMode = realSetMode;
+  };
 }
 
 describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation", () => {
@@ -209,17 +229,11 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
     initGlobalScene(rig.hostScene);
     setCoopRuntime(rig.hostRuntime);
     withClientSync(rig.hostCtx, () => hostPhase.start());
-    withClientSync(rig.guestCtx, () => {
-      guestPhase.start();
-      const handler = rig.guestScene.ui.handlers[UiMode.PARTY] as unknown as {
-        setCursor(cursor: number): boolean;
-        processInput(button: Button): boolean;
-      };
-      expect(handler.setCursor(1)).toBe(true);
-      expect(handler.processInput(Button.ACTION)).toBe(true);
-      expect(handler.processInput(Button.ACTION)).toBe(true);
-    });
+    const restoreGuestUi = withClientSync(rig.guestCtx, () =>
+      startWithHeadlessPartyPick(rig.guestScene, guestPhase, 1),
+    );
     await drainLoopback();
+    restoreGuestUi();
 
     await withClient(rig.hostCtx, () => driveClientPhaseQueueTo(rig.hostScene, "TurnInitPhase"));
     await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "TurnInitPhase"));
@@ -228,6 +242,78 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
     expect(rig.guestScene.getPlayerParty()[0].species.speciesId).toBe(guestReplacementSpecies);
     expect(rig.hostScene.getEnemyField()[0].id).toBe(hostReplacementId);
     expect(rig.guestScene.getPlayerField()[0].species.speciesId).toBe(guestReplacementSpecies);
+    logs.flush();
+  }, 300_000);
+
+  it("relays a Teleport replacement instead of letting the mirrored trainer AI choose", async () => {
+    await game.runToTitle();
+    game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+      toShowdown(game.scene);
+      beginShowdownBattle([magikarp()], [magikarp(), magikarp(), magikarp()]);
+      const starters = generateStarters(game.scene, [SpeciesId.PIKACHU]);
+      game.scene.phaseManager.pushNew("EncounterPhase", false);
+      new SelectStarterPhase().initBattle(starters);
+    });
+    await game.phaseInterceptor.to("CommandPhase");
+
+    const pair = createLoopbackPair();
+    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown, { netcodeMode: "lockstep" });
+    const chosenPartyIndex = 2;
+    const chosenId = rig.guestScene.getPlayerParty()[chosenPartyIndex].id;
+    expect(rig.hostScene.getEnemyParty()[chosenPartyIndex].id).toBe(chosenId);
+
+    const installEnemyWaiter = (scene: BattleScene): Phase => {
+      scene.phaseManager.clearAllPhases();
+      const phase = scene.phaseManager.create("ShowdownEnemyFaintSwitchPhase", 0);
+      (scene.phaseManager as unknown as { currentPhase: Phase }).currentPhase = phase;
+      return phase;
+    };
+    const installTeleportPicker = (scene: BattleScene): Phase => {
+      scene.phaseManager.clearAllPhases();
+      const phase = scene.phaseManager.create("SwitchPhase", SwitchType.SWITCH, 0, true, true, true);
+      (scene.phaseManager as unknown as { currentPhase: Phase }).currentPhase = phase;
+      return phase;
+    };
+    const enemyWaiter = withClientSync(rig.hostCtx, () => installEnemyWaiter(rig.hostScene));
+    const teleportPicker = withClientSync(rig.guestCtx, () => installTeleportPicker(rig.guestScene));
+
+    initGlobalScene(rig.hostScene);
+    setCoopRuntime(rig.hostRuntime);
+    withClientSync(rig.hostCtx, () => enemyWaiter.start());
+    const restoreGuestUi = withClientSync(rig.guestCtx, () =>
+      startWithHeadlessPartyPick(rig.guestScene, teleportPicker, chosenPartyIndex),
+    );
+    await drainLoopback();
+    restoreGuestUi();
+
+    await withClient(rig.hostCtx, () => driveClientPhaseQueueTo(rig.hostScene, "TurnInitPhase"));
+    await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "TurnInitPhase"));
+
+    expect(rig.hostScene.getEnemyParty()[0].id).toBe(chosenId);
+    expect(rig.guestScene.getPlayerParty()[0].id).toBe(chosenId);
+    expect(rig.hostScene.getEnemyField()[0].id).toBe(chosenId);
+    expect(rig.guestScene.getPlayerField()[0].id).toBe(chosenId);
+
+    const { allMoves } = await import("#data/data-lists");
+    const teleport = allMoves[MoveId.TELEPORT];
+    const forceSwitch = teleport.attrs.find(attr => attr.constructor.name === "ForceSwitchOutAttr");
+    expect(forceSwitch).toBeDefined();
+
+    const hostQueue = vi.spyOn(rig.hostScene.phaseManager, "queueDeferred").mockImplementation(() => undefined);
+    withClientSync(rig.hostCtx, () => {
+      const enemy = rig.hostScene.getEnemyField()[0];
+      expect(forceSwitch!.apply(enemy, enemy, teleport, [])).toBe(true);
+    });
+    expect(hostQueue).toHaveBeenCalledWith("ShowdownEnemyFaintSwitchPhase", 0);
+    hostQueue.mockRestore();
+
+    const guestQueue = vi.spyOn(rig.guestScene.phaseManager, "queueDeferred").mockImplementation(() => undefined);
+    withClientSync(rig.guestCtx, () => {
+      const player = rig.guestScene.getPlayerField()[0];
+      expect(forceSwitch!.apply(player, player, teleport, [])).toBe(true);
+    });
+    expect(guestQueue).toHaveBeenCalledWith("SwitchPhase", SwitchType.SWITCH, 0, true, true, true);
+    guestQueue.mockRestore();
     logs.flush();
   }, 300_000);
 });

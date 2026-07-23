@@ -40,6 +40,7 @@ export class SwitchPhase extends BattlePhase {
   private readonly switchType: SwitchType;
   private readonly isModal: boolean;
   private readonly doReturn: boolean;
+  private readonly showdownSyncMoveReplacement: boolean;
 
   /**
    * Creates a new SwitchPhase
@@ -51,13 +52,20 @@ export class SwitchPhase extends BattlePhase {
    * recalled to ball or has already left the field. Passed to {@linkcode SwitchSummonPhase},
    * and is (ostensibly) only set to `false` from `FaintPhase`.
    */
-  constructor(switchType: SwitchType, fieldIndex: number, isModal: boolean, doReturn: boolean) {
+  constructor(
+    switchType: SwitchType,
+    fieldIndex: number,
+    isModal: boolean,
+    doReturn: boolean,
+    showdownSyncMoveReplacement = false,
+  ) {
     super();
 
     this.switchType = switchType;
     this.fieldIndex = fieldIndex;
     this.isModal = isModal;
     this.doReturn = doReturn;
+    this.showdownSyncMoveReplacement = showdownSyncMoveReplacement;
   }
 
   start() {
@@ -102,7 +110,7 @@ export class SwitchPhase extends BattlePhase {
         ? this.fieldIndex
         : 0;
 
-    if (this.tryShowdownSyncPlayerFaintSwitch(fieldIndex)) {
+    if (this.tryShowdownSyncPlayerReplacement(fieldIndex)) {
       return;
     }
 
@@ -354,9 +362,10 @@ export class SwitchPhase extends BattlePhase {
     }
   }
 
-  /** In Sync, each client chooses and relays replacements for its own local player party. */
-  private tryShowdownSyncPlayerFaintSwitch(fieldIndex: number): boolean {
-    if (!isShowdownSyncSession() || !this.isModal || this.doReturn) {
+  /** In Sync, each client chooses and relays faint or move-triggered replacements for its own party. */
+  private tryShowdownSyncPlayerReplacement(fieldIndex: number): boolean {
+    const relayedReplacement = !this.doReturn || this.showdownSyncMoveReplacement;
+    if (!isShowdownSyncSession() || !this.isModal || !relayedReplacement) {
       return false;
     }
     const relay = getCoopInteractionRelay();
@@ -365,10 +374,10 @@ export class SwitchPhase extends BattlePhase {
     }
     const scene = globalScene;
     const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
-    const finish = (slotIndex: number): void => {
+    const finish = (slotIndex: number, switchType: SwitchType): void => {
       const picked = scene.getPlayerParty()[slotIndex];
       if (picked != null && !picked.isFainted() && !picked.isOnField()) {
-        scene.phaseManager.unshiftNew("SwitchSummonPhase", this.switchType, fieldIndex, slotIndex, this.doReturn);
+        scene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
       }
       const close = (): void => {
         if (scene.phaseManager.getCurrentPhase() === this) {
@@ -382,13 +391,19 @@ export class SwitchPhase extends BattlePhase {
       UiMode.PARTY,
       PartyUiMode.FAINT_SWITCH,
       fieldIndex,
-      (slotIndex: number) => {
+      (slotIndex: number, option: PartyOption) => {
         if (scene.phaseManager.getCurrentPhase() !== this) {
           return;
         }
         const picked = scene.getPlayerParty()[slotIndex];
-        relay.sendInteractionChoice(faintSeq, "switch", slotIndex, [0, picked?.species?.speciesId ?? 0]);
-        finish(slotIndex);
+        const switchType = option === PartyOption.PASS_BATON ? SwitchType.BATON_PASS : this.switchType;
+        relay.sendInteractionChoice(faintSeq, "switch", slotIndex, [
+          switchType === SwitchType.BATON_PASS ? 1 : 0,
+          picked?.species?.speciesId ?? 0,
+          picked?.id ?? 0,
+          switchType,
+        ]);
+        finish(slotIndex, switchType);
       },
       PartyUiHandler.FilterNonFainted,
     );
