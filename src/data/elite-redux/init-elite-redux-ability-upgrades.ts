@@ -56,7 +56,7 @@ import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-a
 import { CritDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/crit-mod";
 import { DamageReductionAbAttr } from "#data/elite-redux/archetypes/damage-reduction-generic";
 import { FirstTurnStatMultiplierAbAttr } from "#data/elite-redux/archetypes/first-turn-stat-multiplier";
-import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
+import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
 import { PassiveRecoveryAbAttr } from "#data/elite-redux/archetypes/passive-recovery";
 import { PostAttackScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-attack-scripted-move";
 import { PostSummonQuashFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-quash-foes";
@@ -107,7 +107,7 @@ const CUSTOM_DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
   [650, "Physical moves deal 20% more damage, may burn or poison on contact, and apply Grip Pincer's binding."],
   [652, "Food-based Pokemon deal half damage to the holder and take 1.5x damage from it."],
   [893, "Creates a Sea of Fire on entry. Pokemon caught in it cannot switch until it ends."],
-  [358, "While enraged, damaging moves strike again at 25% power."],
+  [358, "Moves hit twice (2nd hit 25% power); a third 25% hit while enraged."],
   [278, "Ice, Flying, and Water-type moves get a 1.3x power boost."],
   [478, "Fairy- and Dark-type moves gain STAB. Moonlight restores 75% HP. Takes half damage from Water-type moves."],
   [485, "Cures party status on entry. The holder and each adjacent ally recover 1/16 of their maximum HP each turn."],
@@ -574,19 +574,39 @@ export function initEliteReduxAbilityUpgrades(): AbilityUpgradeResult {
     ),
   );
 
+  // Hyper Aggressive (358) and its composites - Raging Goddess (721), Balloon
+  // Blitz (755), Frenzied Phantom (790), Witch Broom (961), Ghost Frenzy (999) -
+  // all carry the Hyper Aggressive kit: "Moves hit twice, 2nd hit at 25% power",
+  // an always-on extra strike wired by the multi-hit-override archetype. The 2.65
+  // dex adds an ENRAGE rider on top: "While enraged, performs an additional attack
+  // at 25% power" - a THIRD strike, also 25%. So a normal use is 2 hits
+  // (100% + 25%) and an enraged use is 3 hits (100% + 25% + 25%).
+  //
+  // The base extra strike stays UNCONDITIONAL; we append a SECOND, enrage-gated
+  // extra-strike layer (another `HitMultiplierAbAttr({ extraStrikes: 1 })` that
+  // fires only while the ER_ENRAGE tag is present). The two strike-count attrs
+  // stack: not enraged = base +1 (2 hits); enraged = base +1 +1 (3 hits). The
+  // existing unconditional `HitMultiplierPowerAbAttr({ multiplier: 0.25,
+  // extraStrikesOnly: true })` already scales EVERY strike past the first to 25%,
+  // so the 3rd hit inherits 25% power with no additional power attr, and the
+  // flinch-only-on-first-strike guard in FlinchAttr covers all extra strikes.
   for (const draftId of [358, 721, 755, 790, 961, 999]) {
     patch(draftId, ability => {
-      let changed = 0;
-      for (const attr of ability.attrs) {
-        if (
-          (attr instanceof HitMultiplierAbAttr && attr.getExtraStrikes() === 1)
-          || (attr instanceof HitMultiplierPowerAbAttr && attr.isExtraStrikesOnly() && attr.getMultiplier() === 0.25)
-        ) {
-          attr.addCondition(pokemon => pokemon.getTag(BattlerTagType.ER_ENRAGE) != null);
-          changed++;
-        }
+      const hasBaseStrike = ability.attrs.some(
+        attr => attr instanceof HitMultiplierAbAttr && attr.getExtraStrikes() === 1,
+      );
+      if (!hasBaseStrike) {
+        return 0;
       }
-      return changed;
+      return Number(
+        appendAbilityAttrsOnce(ability, "upgrade:hyper-aggressive:enrage-extra-strike", [
+          () => {
+            const enrageStrike = new HitMultiplierAbAttr({ extraStrikes: 1 });
+            enrageStrike.addCondition(pokemon => pokemon.getTag(BattlerTagType.ER_ENRAGE) != null);
+            return enrageStrike;
+          },
+        ]),
+      );
     });
   }
 

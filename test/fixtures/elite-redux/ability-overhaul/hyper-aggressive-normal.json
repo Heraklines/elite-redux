@@ -1,18 +1,18 @@
 {
   "v": 1,
-  "name": "Hyper Aggressive hits a third time while enraged",
+  "name": "Hyper Aggressive hits twice when not enraged",
   "run": {
     "wave": 146,
     "level": 100,
     "difficulty": "ace",
-    "seed": "hyper-aggressive-enrage"
+    "seed": "hyper-aggressive-normal"
   },
   "party": [
     {
       "species": "BLASTOISE",
       "ability": 5096,
       "passiveAbility": "NO_GUARD",
-      "moves": ["TAIL_WHIP", "TACKLE"]
+      "moves": ["TACKLE", "TAIL_WHIP"]
     }
   ],
   "enemy": {
@@ -22,16 +22,16 @@
         "species": "SNORLAX",
         "level": 100,
         "ability": "BALL_FETCH",
-        "moves": ["SWAGGER", "SWORDS_DANCE"]
+        "moves": ["SWORDS_DANCE", "DEFENSE_CURL"]
       }
     ]
   },
   "start": { "enemyStages": [0, 6, 0, 6, 0, 0, 0] },
-  "script": [{ "move": "TAIL_WHIP", "enemyMove": "SWAGGER" }, { "move": "TACKLE", "enemyMove": "SWORDS_DANCE" }],
+  "script": [{ "move": "TACKLE", "enemyMove": "SWORDS_DANCE" }],
   "expect": {
     "outcome": "max-turns-reached",
-    "maxHits": 3,
-    "playerTags": ["ER_ENRAGE"],
+    "maxHits": 2,
+    "playerTagsAbsent": ["ER_ENRAGE"],
     "enemyDamaged": true
   }
 }

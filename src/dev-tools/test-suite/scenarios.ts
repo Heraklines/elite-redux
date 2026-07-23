@@ -3038,6 +3038,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Ability — Hyper Aggressive: 2 hits normally, 3 when enraged
+  // ===========================================================================
+  {
+    label: "Hyper Aggressive: 2 hits, 3 when enraged",
+    description:
+      "ER Hyper Aggressive (ability 358). Damaging moves always hit TWICE (the 2nd\n"
+      + "hit does 25% power). While the holder is ENRAGED, the move strikes a THIRD\n"
+      + "time, also at 25%. Your Snorlax has Hyper Aggressive forced as its active\n"
+      + "ability. DO: first attack the foe with Body Slam - you should see it hit\n"
+      + "TWICE. Then let the foe use Swagger on you (it may miss - retry until it\n"
+      + "lands and you become enraged, your Attack rises). Attack again with Body\n"
+      + "Slam - now it hits THREE times. EXPECT: 2 hits before enrage, 3 hits while\n"
+      + "enraged (each extra hit at 25% power). (Headless-verified + unit test\n"
+      + "test/tests/elite-redux/er-ability-overhaul-requested-batch.test.ts.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.HYPER_AGGRESSIVE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX, // bulky enough to survive the multi-hits
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SWAGGER, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.TACKLE, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Multi-format — TRIPLE leads keep their slots across a wave (no vanishing lead)
   // ===========================================================================
   {
