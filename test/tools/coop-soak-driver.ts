@@ -56,6 +56,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import type { Phase } from "#app/phase";
+import { decodeCoopV2InteractionEnvelope } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   applyCoopAuthoritativeBattleState,
   applyCoopCaptureParty,
@@ -1258,10 +1259,11 @@ export function prepareCoopSoakContent(game: GameManager, seed: number, pinSeed?
  * Install the coverage taps (test-side seam wraps, ZERO production change):
  *   - CARRIER tap on BOTH runtimes: every interactionChoice/interactionOutcome frame records its `kind`
  *     (hits.kinds) + the seq BAND it rides (bandForSeq -> hits.bands). The two ME carriers already cut over
- *     to retained P33 envelopes are projected from the exact outgoing operation id onto their legacy semantic
- *     coverage edges (`ME_PRESENT` -> `mePresent`, `ME_TERMINAL` -> `meResync`). ONE tap therefore covers
- *     every raw kind plus the durable replacements, including async ME tails that can escape the relay-instance
- *     wrapper. A carrier that never actually leaves a runtime stays cold and is caught by completeness.
+ *     to Authority V2 entries (or retained P33 envelopes in explicit legacy fixtures) are projected from the
+ *     exact outgoing operation id onto their semantic coverage edges (`ME_PRESENT` -> `mePresent`,
+ *     `ME_TERMINAL` -> `meResync`). ONE tap therefore covers every raw kind plus the durable replacements,
+ *     including async ME tails that can escape the relay-instance wrapper. A carrier that never actually leaves
+ *     a runtime stays cold and is caught by completeness.
  *   - PERMANENT guest ui.setMode recorder: every guest setMode targeting a co-op-MIRRORED UiMode records
  *     hits.modes. The guest is the renderer, so it opens the mirrored screens the headless host bypass
  *     never shows. The one-shot faint wrapper (driveGuestReplayTurnWithFaint) saves + calls THIS recorder
@@ -1271,16 +1273,18 @@ const ME_OPERATION_WIRE_SEQ_STRIDE = 8_000;
 const ME_OPERATION_KIND_SEQ_STRIDE = 1_000;
 
 /**
- * Recover the real relay-address root encoded in an outgoing durable ME operation. This is deliberately an
- * observer of the final wire envelope: it does not sample the journal ledger, infer success from scene state,
- * or call an apply seam. Full address validation prevents a malformed/unrelated envelope from manufacturing a
- * coverage hit.
+ * Recover the real relay-address root encoded in an outgoing durable ME operation. This deliberately observes
+ * the final wire carrier: the Authority V2 entry in cutover mode, or the retained P33 envelope in an explicit
+ * legacy fixture. It does not sample either ledger, infer success from scene state, or call an apply seam. Full
+ * entry and address validation prevents a malformed/unrelated frame from manufacturing a coverage hit.
  */
 function durableMeCoverageCarrier(message: CoopMessage): { seq: number; kind: "mePresent" | "meResync" } | null {
-  if (message.t !== "envelope") {
-    return null;
-  }
-  const operation = message.envelope.pendingOperation;
+  const operation =
+    message.t === "envelope"
+      ? message.envelope.pendingOperation
+      : message.t === "authorityEntry"
+        ? decodeCoopV2InteractionEnvelope({ context: message.ctx, ...message.body })?.envelope.pendingOperation
+        : null;
   if (operation == null || operation.status !== "applied") {
     return null;
   }
