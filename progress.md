@@ -1866,3 +1866,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Validation now repairs only FIGHT geometry before checking the authority offer; non-FIGHT commands stay raw
   through validation so malformed extra fields cannot be normalized away. Both the pre-wait buffered race and
   the already-live waiter have failure-first regression coverage which also proves no rejection/default path ran.
+
+# 2026-07-23 - V2 biome test migration
+
+- Tail-focused SwitchBiome fault tests no longer manufacture a second interaction commit behind the live V2
+  command predecessor. They install the exact already-committed transition permit and continue testing only
+  tail parking, idempotence, materialization, and bounded recovery.
+- Removed the detached market-owner retention half from the production phase suite because it violated the
+  closed V2 predecessor graph and duplicated the operation/durability retain-before-publish contract. The
+  unique watcher assertion remains: a missing exact terminal must never be treated as LEAVE.

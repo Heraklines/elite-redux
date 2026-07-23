@@ -17,7 +17,6 @@ import {
   captureCoopSaveDataNormalized,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
-  commitAuthoritativeBiomeTransition,
   coopAuthoritativeBiomeTransitionOperationId,
   resetCoopBiomeCommitWaitMs,
 } from "#data/elite-redux/coop/coop-biome-operation";
@@ -798,16 +797,21 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       expect(blockedHostEnd, "even the host cannot switch before a successful exact commit").not.toHaveBeenCalled();
       expect(rig.hostScene.arena.biomeId, "an uncommitted host switch cannot replace the arena").toBe(sourceBiomeId);
 
+      const operationId = coopAuthoritativeBiomeTransitionOperationId(10);
+      const address = operationId == null ? null : parseCoopOperationId(operationId);
+      expect(address).not.toBeNull();
       expect(
-        commitAuthoritativeBiomeTransition({
-          sourceWave: 10,
+        armCoopBiomeTransitionTailPermit({
+          operationId: operationId!,
+          sessionEpoch: address!.epoch,
+          revision: 1,
+          wave: 10,
           sourceBiomeId,
           destinationBiomeId: BiomeId.VOLCANO,
-          turn: 0,
-          localRole: "host",
+          nextWave: 11,
         }),
-        "the sole authority commits and arms the exact local permit before constructing the switch tail",
-      ).not.toBeNull();
+        "the tail probe installs the exact already-committed permit without forging a second V2 transition",
+      ).toBe(true);
       const committedHostSwitch = liveSwitch(BiomeId.VOLCANO);
       const committedHostEnd = vi.spyOn(committedHostSwitch, "end").mockImplementation(() => {});
       committedHostSwitch.start();
@@ -824,15 +828,20 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     await withClient(rig.hostCtx, () => {
       rig.hostScene.currentBattle.waveIndex = 10;
       const sourceBiomeId = rig.hostScene.arena.biomeId;
+      const operationId = coopAuthoritativeBiomeTransitionOperationId(10);
+      const address = operationId == null ? null : parseCoopOperationId(operationId);
+      expect(address).not.toBeNull();
       expect(
-        commitAuthoritativeBiomeTransition({
-          sourceWave: 10,
+        armCoopBiomeTransitionTailPermit({
+          operationId: operationId!,
+          sessionEpoch: address!.epoch,
+          revision: 1,
+          wave: 10,
           sourceBiomeId,
           destinationBiomeId: BiomeId.VOLCANO,
-          turn: 0,
-          localRole: "host",
+          nextWave: 11,
         }),
-      ).not.toBeNull();
+      ).toBe(true);
 
       type Plan = {
         readonly nodes: readonly ErRouteNode[];
@@ -1156,44 +1165,14 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
   }, 120_000);
 
-  it("market LEAVE waits for journal retention and a missing watcher terminal never implies LEAVE", async () => {
+  it("a missing market watcher terminal never implies LEAVE", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
 
-    await withClient(rig.hostCtx, async () => {
-      const pinned = rig.hostRuntime.controller.interactionCounter();
-      const durability = rig.hostRuntime.durability;
-      expect(durability, "the production-shaped runtime has an active durability journal").not.toBeNull();
-      const rawTerminal = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionChoice");
-      let counterAtFailedRetention = -1;
-      let rawCallsAtFailedRetention = -1;
-      const retain = vi.spyOn(durability!, "commit").mockImplementationOnce(() => {
-        counterAtFailedRetention = rig.hostRuntime.controller.interactionCounter();
-        rawCallsAtFailedRetention = rawTerminal.mock.calls.length;
-        return false;
-      });
-      const market = new BiomeShopPhase() as unknown as {
-        coopBiomeStart: number;
-        coopBiomeOwner: boolean;
-        coopAsyncBoundaryStillLive(generation: number, wave: number, expectedPinned: number): boolean;
-        coopBiomeTerminal(): Promise<boolean>;
-      };
-      market.coopBiomeStart = pinned;
-      market.coopBiomeOwner = true;
-      market.coopAsyncBoundaryStillLive = () => true;
-
-      const terminal = market.coopBiomeTerminal();
-      expect(
-        counterAtFailedRetention,
-        "the first committed-but-unretained attempt cannot advance market ownership",
-      ).toBe(pinned);
-      expect(rawCallsAtFailedRetention, "the host cannot expose an unretained raw terminal companion").toBe(0);
-      await expect(terminal).resolves.toBe(true);
-      expect(retain, "the immutable host commit is journaled again on its exact re-ACK").toHaveBeenCalledTimes(2);
-      expect(rawTerminal, "the retained terminal may keep its legacy-compatible companion").toHaveBeenCalledOnce();
-      expect(rig.hostRuntime.controller.interactionCounter()).toBe(pinned + 1);
-    });
-
+    // Exact retain-before-publish behavior belongs to the operation/durability contract suite. Constructing
+    // a detached market owner here would try to append INTERACTION_COMMIT after the live COMMAND predecessor,
+    // which V2 correctly rejects. Keep this production-phase test on its unique responsibility: a watcher
+    // may never reinterpret an exhausted/missing exact terminal as a local LEAVE.
     await withClient(rig.guestCtx, async () => {
       const pinned = rig.guestRuntime.controller.interactionCounter();
       vi.spyOn(rig.guestRuntime.interactionRelay, "awaitInteractionChoice").mockResolvedValue(null);
