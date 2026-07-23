@@ -44,6 +44,17 @@ describe("ER Doubles Only challenge - forces doubles in all regular battles", ()
     expect(globalScene.getEnemyField()).toHaveLength(2);
   });
 
+  it("remains a 2v2 after reloading the active battle", async () => {
+    await game.challengeMode.startBattle(SpeciesId.MAGIKARP, SpeciesId.FEEBAS);
+    await game.reload.reloadSession();
+
+    expect(globalScene.currentBattle.double).toBe(true);
+    expect(globalScene.currentBattle.arrangement.playerCapacity).toBe(2);
+    expect(globalScene.currentBattle.arrangement.enemyCapacity).toBe(2);
+    expect(globalScene.getPlayerField().filter(p => p.isOnField())).toHaveLength(2);
+    expect(globalScene.getEnemyField().filter(p => p.isOnField())).toHaveLength(2);
+  });
+
   it("strips lures from the reward pool (every battle is already double)", async () => {
     await game.challengeMode.startBattle(SpeciesId.MAGIKARP, SpeciesId.FEEBAS);
 

@@ -263,14 +263,17 @@ export function fieldPositionForSlot(slot: number, capacity: number): FieldPosit
 /**
  * Per-slot SPRITE pixel offset from a side's centre, by {@linkcode FieldPosition} and the
  * side's capacity. Binary keeps the legacy tight spacing (center 0, wings +/-32). A 3-wide
- * side spreads the wings out and staggers depth. Player wings sit slightly higher than enemy
- * wings so the larger back sprites do not sink into the command bar.
+ * side spreads the wings out and staggers depth. The left lane sits above the right lane,
+ * and player lanes sit above their enemy equivalents so back sprites clear the command bar.
  */
 export function fieldSpriteOffset(position: FieldPosition, capacity: number, playerSide = false): [number, number] {
   if (capacity >= 3) {
     switch (position) {
       case FieldPosition.LEFT:
-        return [-58, playerSide ? 4 : 10];
+        // The left lane is closest to the lower UI edge on a phone. Lift it one
+        // logical tile above the right wing so short/wide sprites do not sink
+        // into the command box; preserve the existing X spread and other lanes.
+        return [-58, playerSide ? -4 : 2];
       case FieldPosition.RIGHT:
         return [58, playerSide ? 4 : 10];
       default:

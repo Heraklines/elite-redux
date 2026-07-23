@@ -16,20 +16,15 @@ export class ToggleDoublePositionPhase extends BattlePhase {
   start() {
     super.start();
 
-    // Triple+ battles (playerCapacity >= 3): the binary single/double logic below only
-    // repositions the FIRST active mon and swaps party[0]/[1] when it sits at field index 1.
-    // That scrambles a 3-mon party and leaves the other leads stacked - e.g. after a lead
-    // faints the RIGHT lead can stay pinned on CENTER, hidden behind the middle mon (reads
-    // in-game as "a lead's sprite vanished"). Instead reposition EVERY on-field lead to the
-    // slot its field index maps to (LEFT / CENTER / RIGHT ...), with no party reorder.
-    // Idempotent: setFieldPosition no-ops when a mon is already in place.
+    // Reconcile EVERY occupied slot whenever at least two leads are already present. This
+    // is required for triple -> double transitions: slot 1 used to retain triple's CENTER
+    // lane because the binary path only touched slot 0, leaving the next 2v2 visually
+    // stacked and its battle-info bar in triple scale/offset. Triple -> triple needs the
+    // same all-slot repair after faint/replacement churn. The one-lead path below remains
+    // responsible for party compaction while a second lead is still being summoned.
     const capacity = globalScene.currentBattle?.arrangement.playerCapacity ?? 1;
-    if (this.double && capacity >= 3) {
-      const onField = globalScene.getPlayerField().filter(p => p.isActive(true));
-      if (onField.length === 0) {
-        this.end();
-        return;
-      }
+    const onField = globalScene.getPlayerField().filter(p => p.isActive(true));
+    if (this.double && capacity > 1 && onField.length > 1) {
       Promise.all(onField.map(p => p.setFieldPosition(fieldPositionForSlot(p.getFieldIndex(), capacity), 500))).then(
         () => this.end(),
       );
