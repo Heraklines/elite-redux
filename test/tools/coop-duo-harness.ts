@@ -2628,6 +2628,11 @@ export async function buildDuo(
   toCoopGameMode: (scene: BattleScene) => void,
 ): Promise<DuoRig> {
   const hostScene = hostGame.scene;
+  // This fixture runs two real engines but Phaser.HEADLESS cannot execute production tweens. Declare the
+  // supported animations-disabled path for both clients so the mechanical/V2 lanes prove exact material
+  // and liveness without falsely claiming visible presentation. The sealed two-real-browser journeys keep
+  // animations enabled and are the only release oracle for rendered presentation receipts.
+  hostScene.moveAnimations = false;
   // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
   // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
   neutralizeCoopCandyBar(hostScene);
@@ -2668,6 +2673,7 @@ export async function buildDuo(
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
   const guestScene = buildGuestScene(hostGame);
+  guestScene.moveAnimations = false;
   installHeadlessCoopSemanticProjectionOracle(guestScene);
   // BattleScene construction resets process-global ER module state. Production clients are separate
   // processes, so creating the guest must not clobber the already-running host's authoritative state.

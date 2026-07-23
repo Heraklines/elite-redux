@@ -283,6 +283,10 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       battle.enemyParty[entry.fieldIndex] = built;
       if (activeFieldIndex >= 0) {
         built.setFieldPosition(fieldPositionForSlot(entry.fieldIndex, battle.arrangement.enemyCapacity));
+        // Pokemon construction does not put the container on Phaser's display list. SummonPhase always
+        // calls add.existing before seating it; structural replay must do the same or Container.addAt can
+        // leave a logically active rebuilt party identity detached from the rendered field.
+        globalScene.add.existing(built);
         // Preserve the old object's display-list depth as well as its mechanical field membership. A
         // plain add would make commands legal again but could render the rebuilt enemy over trainers/UI.
         globalScene.field.addAt(built, Math.min(activeFieldIndex, globalScene.field.length));

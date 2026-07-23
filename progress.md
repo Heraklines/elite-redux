@@ -2249,3 +2249,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   browser. Static verification is clean (`Biome`, `git diff --check`, and zero TypeScript diagnostics in
   changed files against the branch's 222-error baseline); co-op engine/browser qualification remains
   remote-only per `AGENTS.md` and is the next exact-SHA step.
+
+# 2026-07-24 - Headless presentation migration and rebuilt field-container ownership
+
+- Exact-SHA mutation qualification `30050966176` is fully green on `be00c5a59`. Full gate `30050984912`
+  then proved the presentation ledger was fail-closed: Phaser.HEADLESS cannot execute production tweens, so
+  legacy two-engine fixtures with animations implicitly enabled terminalized with `hp-watchdog-expired`
+  instead of continuing behind unobserved presentation. The shared DUO engine fixture now explicitly selects
+  the supported animations-disabled contract on both seats. It continues to prove real replay dispatch,
+  immutable material, exact intentional-skip receipts, and V2 liveness; only the sealed two-real-browser
+  journey is allowed to claim rendered-animation evidence, and it keeps production animations enabled.
+- The same gate exposed a second, independent product/harness identity defect left by the structural adoption
+  repair: a newly constructed Pokemon is not registered with Phaser's display list. Structural replay now
+  follows SummonPhase's `add.existing` ownership step before seating the rebuilt identity at the preserved
+  field depth. This closes the observed party/display split where public commands saw no legal rendered enemy.
+- Faint replay now tests actual field-container membership instead of `Pokemon.isOnField()`. An interrupted
+  switch can leave the exact visible actor with `switchOutStatus=true`; the authoritative faint must still
+  animate and remove that displayed identity rather than silently reporting an off-field no-op.

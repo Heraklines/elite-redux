@@ -1495,7 +1495,7 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       // animation path did (cry threw mid-summon, tween failed, watchdog fired), the fainted mon
       // must never remain standing. Idempotent: a completed animation already removed it.
       try {
-        if (victim != null && victim.isOnField()) {
+        if (victim != null && globalScene.field.getIndex(victim) >= 0) {
           victim.hp = 0;
           victim.doSetStatus(StatusEffect.FAINT);
           victim.leaveField(true, true, false);
@@ -1516,7 +1516,9 @@ export class CoopFaintReplayPhase extends PokemonPhase {
     try {
       const pokemon = victim;
       // Already removed (defensive: a duplicate faint, or a mon off-field) - nothing to animate.
-      if (pokemon == null || !pokemon.isOnField()) {
+      // Use actual container membership, not Pokemon.isOnField(): an interrupted switch can leave the exact
+      // visible actor carrying switchOutStatus=true even though it still needs the authoritative faint cue.
+      if (pokemon == null || globalScene.field.getIndex(pokemon) < 0) {
         if (isCoopDebug()) {
           coopLog("replay", `present faint bi=${this.battlerIndex} NO-OP end (already removed/off-field)`);
         }
