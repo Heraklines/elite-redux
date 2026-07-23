@@ -179,12 +179,15 @@ test("the real-browser oracle compares every authority event to a completed cano
   assert.match(recorder, /stage:\s*"renderer-completed"/u);
   assert.match(evidence, /presentationEventView\(text\)/u);
   assert.match(evidence, /sink\.record\("browser-presentation-event"/u);
-  assert.match(harness, /assertPresentationLedger\(cursors, commandMatch, proofName\)/u);
+  assert.match(harness, /assertPresentationLedger\(cursors, commandMatch, proofName,/u);
   assert.match(harness, /entry\.stage !== "authority-recorded"/u);
   assert.match(harness, /entry\.stage !== "renderer-completed"/u);
   assert.match(harness, /ordered presentation ledger diverged/u);
   assert.match(harness, /showdown-entry-presentation-ledger/u);
   assert.match(harness, /`\$\{label\}-presentation-ledger`/u);
+  assert.match(harness, /assertPresentationLedgerAtSharedCommand/u);
+  assert.match(harness, /pending\.size === 1 && submittedCommandAddress != null/u);
+  assert.match(harness, /presentation-before-final-command/u);
 });
 
 test("presentation receipts reject malformed or unknown event identities", () => {

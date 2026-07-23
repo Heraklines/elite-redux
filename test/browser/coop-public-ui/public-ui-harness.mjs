@@ -2321,19 +2321,19 @@ export class DuoPublicUiRig {
    * the shared command frontier. This compares canonical wire events, not localized text or Showdown's
    * guest-side battler-index reflection.
    */
-  assertPresentationLedger(cursors, commandMatch, proofName) {
+  assertPresentationLedger(cursors, commandMatch, proofName, { allowEmpty = false } = {}) {
     const before = new Map([
       [this.host, commandMatch.hostProjection.event.index],
       [this.guest, commandMatch.guestProjection.event.index],
     ]);
     const ledger = client =>
       client.evidence.events
-        .slice(cursors[client.label])
+        .slice(cursors[client.label] ?? 0)
         .filter(event => event.index < before.get(client) && event.kind === "browser-presentation-event")
         .map(event => event.observation);
     const hostLedger = ledger(this.host);
     const guestLedger = ledger(this.guest);
-    if (hostLedger.length === 0 || guestLedger.length === 0) {
+    if (!allowEmpty && (hostLedger.length === 0 || guestLedger.length === 0)) {
       throw new Error(
         `${proofName}: presentation ledger was empty before command frontier (host=${hostLedger.length} guest=${guestLedger.length})`,
       );
@@ -2360,13 +2360,43 @@ export class DuoPublicUiRig {
       );
     }
     for (const client of [this.host, this.guest]) {
-      client.evidence.record("showdown-presentation-ledger-proof", {
+      client.evidence.record("presentation-ledger-proof", {
         proofName,
         eventCount: authority.length,
         first: authority[0],
         last: authority.at(-1),
       });
     }
+  }
+
+  /**
+   * Campaign counterpart of the Showdown proof. The reciprocal command UI opens sequentially, so the
+   * last player's still-unsubmitted command is the only safe point where both browsers expose one
+   * addressed frontier and the authority cannot have started recording the next turn yet.
+   */
+  async assertPresentationLedgerAtSharedCommand(cursors, expectedAddress, proofName) {
+    const host = this.host;
+    const guest = this.guest;
+    if (!host || !guest) {
+      throw new Error(`${proofName}: paired host/guest presentation observations were unavailable`);
+    }
+    const deadline = Date.now() + this.config.timeoutMs;
+    let match = null;
+    while (Date.now() < deadline && match == null) {
+      match = findSharedCommandFrontierMatch(host, guest, cursors, null, {
+        allowAddressRepeat: true,
+        expectedAddress,
+      });
+      if (match == null) {
+        await delay(100);
+      }
+    }
+    if (match == null) {
+      throw new Error(`${proofName}: no shared command frontier opened before the final public command`);
+    }
+    // A legal turn can contain zero visible events (for example, both actions are structurally skipped).
+    // Empty/empty is therefore valid here; any non-empty loss, duplicate, reorder, or payload drift fails.
+    this.assertPresentationLedger(cursors, match, proofName, { allowEmpty: true });
   }
 
   /**
@@ -3461,6 +3491,13 @@ export class DuoPublicUiRig {
         }
         if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
           throw new Error(`${client.label}: shared session terminated before ${purpose}: ${event.text}`);
+        }
+        if (pending.size === 1 && submittedCommandAddress != null) {
+          await this.assertPresentationLedgerAtSharedCommand(
+            from,
+            `${submittedCommandAddress.epoch}:${submittedCommandAddress.wave}:${submittedCommandAddress.turn}`,
+            `${purpose}-presentation-before-final-command`,
+          );
         }
         commandEvents[client.label] = event;
         outcomeCursors[client.label] = client.evidence.cursor();
