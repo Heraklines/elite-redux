@@ -284,15 +284,16 @@ function inspectCoopPokemonPresentationReadiness(pokemon: Pokemon): CoopPokemonP
       readiness.onField
       && readiness.pokemonVisible
       && readiness.pokemonAlpha > 0
-      && readiness.spritePresent
-      && (readiness.spriteVisible || readiness.fxOverlayVisible)
-      && ((readiness.spriteAlpha ?? 0) > 0 || readiness.fxOverlayVisible)
+      && (readiness.fxOverlayVisible
+        || (readiness.spritePresent
+          && readiness.spriteVisible
+          && (readiness.spriteAlpha ?? 0) > 0
+          && readiness.exactLiveKey
+          && readiness.textureCached
+          && readiness.animationCached))
       && readiness.infoPresent
       && readiness.infoVisible
-      && (readiness.infoAlpha ?? 0) > 0
-      && (readiness.fxOverlayVisible || readiness.exactLiveKey)
-      && readiness.textureCached
-      && readiness.animationCached,
+      && (readiness.infoAlpha ?? 0) > 0,
   };
 }
 

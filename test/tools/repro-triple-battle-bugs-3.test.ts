@@ -177,9 +177,11 @@ describe.skipIf(!RUN)("repro: triple-battle bugs round 3 (2026-07-07 report)", (
 
     // The CENTRE quakes (hits all adjacent); the two WING foes sit at 1 HP and faint in
     // the SAME MoveEffectPhase. My Pidgeot wings are airborne (Earthquake immune) and
-    // just Harden. The centre foe keeps enough HP to survive.
+    // just Harden. Keep the center foe Ground-immune so later damage-table changes cannot
+    // turn this two-KO replacement regression into an unrelated full-field wipe.
     field[0].hp = 1;
     field[2].hp = 1;
+    game.field.mockAbility(field[1], AbilityId.LEVITATE);
     game.move.select(MoveId.HARDEN, 0);
     game.move.select(MoveId.EARTHQUAKE, 1);
     game.move.select(MoveId.HARDEN, 2);
