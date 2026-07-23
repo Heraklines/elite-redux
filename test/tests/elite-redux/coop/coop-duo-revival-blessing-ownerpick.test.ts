@@ -26,7 +26,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import type { Phase } from "#app/phase";
 import { checksumState } from "#data/elite-redux/coop/coop-battle-checksum";
 import { captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
@@ -61,14 +60,6 @@ const OWNER_PICK_SLOT = 3; // BLASTOISE - the guest owner's actual pick
 
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
-}
-
-/** Test seam for the runtime-queued guest picker. */
-interface PhaseQueueSeam {
-  phaseManager: {
-    phaseQueue: { find(name: string): Phase | undefined };
-    tryRemovePhase(name: "CoopGuestRevivalPhase", filter: (phase: Phase) => boolean): boolean;
-  };
 }
 
 /** The minimal guest UI seam whose setMode we stub to drive the REVIVAL_BLESSING picker headlessly. */
@@ -178,47 +169,36 @@ describe.skipIf(!RUN)(
         hostRbp.start();
       });
 
-      // ===== (C) GUEST: drain so the queued `revivalPrompt` is delivered while the GUEST runtime is live ->
-      // onRevivalPrompt unshifts a real CoopGuestRevivalPhase onto the guest queue (the wiring under test). =====
+      // ===== (C) GUEST: the raw revivalPrompt is intentionally suppressed after the Authority V2 cutover.
+      // Install the headless input hook BEFORE delivery: the immutable REVIVAL prompt projects the real
+      // CoopGuestRevivalPhase as the current override and starts it immediately, exactly like the browser.
+      // The owner selects slot 3 through that phase's ordinary PARTY callback. =====
+      const projectedGuestPickers: Array<{ phaseName: string; coopV2ControlOperationId?: string | null }> = [];
       await withClient(rig.guestCtx, async () => {
-        await drainLoopback();
-      });
-      const guestPicker = withClientSync(rig.guestCtx, () =>
-        (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.phaseQueue.find("CoopGuestRevivalPhase"),
-      );
-      expect(
-        guestPicker,
-        "the host's revivalPrompt queued a CoopGuestRevivalPhase on the guest (runtime wiring)",
-      ).toBeDefined();
-
-      // ===== (D) GUEST (SYNC, no microtask flush): run the real picker phase. Stub the guest UI's PARTY open
-      // to auto-pick slot 3 (the OWNER'S choice); the phase relays the pick under the revival seq band. The
-      // MESSAGE setMode returns a never-resolving promise so the phase's own end() cannot fire later under
-      // the wrong shared-process client context. After the pick is sent, retire this queued UI-driver phase
-      // explicitly—the production picker does the same via end()—so it cannot sit ahead of turn finalize. =====
-      withClientSync(rig.guestCtx, () => {
         const ui = rig.guestScene.ui as unknown as StubbableUi;
         const realSetMode = ui.setMode.bind(ui);
         ui.setMode = (...args: unknown[]): unknown => {
-          const mode = args[0];
-          if (mode === UiMode.PARTY) {
-            ui.setMode = realSetMode; // one-shot: restore before invoking the picker callback
+          if (args[0] === UiMode.PARTY) {
+            projectedGuestPickers.push(rig.guestScene.phaseManager.getCurrentPhase());
+            ui.setMode = realSetMode;
             // setMode(PARTY, PartyUiMode.REVIVAL_BLESSING, fieldIndex, callback, filter)
             (args[3] as (slotIndex: number) => void)(OWNER_PICK_SLOT);
             return Promise.resolve();
           }
-          if (mode === UiMode.MESSAGE) {
-            return new Promise(() => {}); // never resolves -> phase.end() (shiftPhase) never fires cross-ctx
-          }
           return realSetMode(...args);
         };
-        (guestPicker as Phase).start();
-        const removed = (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.tryRemovePhase(
-          "CoopGuestRevivalPhase",
-          phase => phase === guestPicker,
-        );
-        expect(removed, "completed guest revival picker retired before replay finalize").toBe(true);
+        await drainLoopback();
+        await Promise.resolve();
+        await Promise.resolve();
       });
+      const projectedGuestPicker = projectedGuestPickers.at(-1);
+      expect(projectedGuestPicker?.phaseName, "the V2 prompt projected the real guest revival picker").toBe(
+        "CoopGuestRevivalPhase",
+      );
+      expect(
+        projectedGuestPicker?.coopV2ControlOperationId,
+        "the projected picker is bound to the immutable V2 operation",
+      ).toMatch(/^\d+:\d+:REVIVAL:/u);
 
       // ===== (E) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the host's
       // awaitInteractionChoice resolves UNDER the host ctx -> applyRevive on the HOST scene + end(). Then run

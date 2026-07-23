@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "17b9642f047f92f7045f2fafe56c8000289b944b",
+  "baseSha": "a343af82d21782729172cd8f124a16b0990f349f",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -80,7 +80,9 @@
     "test/tests/elite-redux/coop/coop-duo-enemy-faint-chain.test.ts",
     "test/tests/elite-redux/coop/coop-duo-fault.test.ts",
     "test/tests/elite-redux/coop/coop-duo-launch-terrain.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-learn-move.test.ts",
     "test/tests/elite-redux/coop/coop-duo-resync-live-shop.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-revival-blessing-ownerpick.test.ts",
     "test/tests/elite-redux/coop/coop-duo-reward-reroll.test.ts",
     "test/tests/elite-redux/coop/coop-duo-seating.test.ts",
     "test/tests/elite-redux/coop/coop-duo-trainer-mirror.test.ts",

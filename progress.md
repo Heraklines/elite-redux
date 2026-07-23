@@ -1999,6 +1999,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   failure-first regression publishes both the authority `EnemyCommandPhase` and renderer presentation before
   the delayed peer command, and proves presentation is checked before the real second command is submitted.
 
+# 2026-07-23 - Learn-move and Revival fixtures follow V2 control
+
+- The isolated batch learn-move tests now retire their real boot `COMMAND_FRONTIER` through a complete
+  `TURN_COMMIT -> AWAIT_SUCCESSOR` before opening the interaction. They no longer ask the V2 log to accept an
+  impossible direct `COMMAND -> LEARN_MOVE_BATCH` edge.
+- The Revival Blessing journey now installs its input hook before the immutable prompt arrives and drives the
+  current, operation-addressed `CoopGuestRevivalPhase` projected by V2. It no longer searches or manually
+  starts the retired legacy queued phase after the real public picker has already opened.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real

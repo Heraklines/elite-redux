@@ -44,6 +44,7 @@ import {
   type DuoRig,
   drainLoopback,
   installDuoLogCapture,
+  retireDuoInitialCommandForBoundaryTest,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -148,6 +149,7 @@ describe.skipIf(!RUN)(
       expect(hostMon.coopOwner, "slot 1 is guest-owned on the host").toBe("guest");
       expect(hostMon.getMoveset(true).length, "the mon has a FULL moveset (pick/replace fires)").toBe(4);
       const forgottenMove = hostMon.moveset[0]!.moveId;
+      await retireDuoInitialCommandForBoundaryTest(rig);
 
       // HOST (sole engine): the level-up learn, forced via the real batch phase. withClientSync = SEND-ONLY:
       // it streams the present (queued, NOT yet delivered) + opens the host's read-only WATCHER panel; the
@@ -209,6 +211,7 @@ describe.skipIf(!RUN)(
       expect(hostMon.coopOwner, "slot 0 is host-owned").toBe("host");
       expect(hostMon.getMoveset(true).length, "the mon has a FULL moveset").toBe(4);
       const forgottenMove = hostMon.moveset[0]!.moveId;
+      await retireDuoInitialCommandForBoundaryTest(rig);
 
       // HOST owns + DRIVES: withClientSync = SEND-ONLY. The batch phase opens the real OWNER panel on the host
       // (synchronous) + streams the present (queued, not yet delivered).
