@@ -2047,6 +2047,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   flyouts and both stat-stage animations are therefore required without depending on either disposable CI
   account's candy unlocks; the oracle remains strict instead of treating missing combat presentation as noise.
 
+# 2026-07-23 - Authority V2 modals replace stale renderer overrides
+
+- Full gate `30039243371` showed learn-move and Revival commits applying their immutable DATA but remaining
+  `controlDeferred`: the renderer already occupied PhaseManager's single generic standby slot, so both the
+  legacy inline opener and the new ordinary V2 projector silently failed to install the real modal.
+- PhaseManager now has a narrow authenticated-modal replacement primitive. It discards the superseded local
+  standby, preserves the exact current ordered predecessor as the modal return target, and starts the V2 phase.
+  Ordinary Move Learn and Revival projection uses this path, so an unrelated renderer override can no longer
+  suppress a committed combat UI or resurrect an old CommandPhase when that modal closes.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real

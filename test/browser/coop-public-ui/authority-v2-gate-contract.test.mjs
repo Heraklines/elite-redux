@@ -408,9 +408,10 @@ test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must
   );
   assert.match(
     projector,
-    /phaseManager\.overridePhase\(phase\)/u,
-    "a suppressed legacy prompt cannot be required to open an authoritative modal",
+    /phaseManager\.replaceWithCoopAuthoritativeModal\(current, phase\)/u,
+    "a suppressed legacy prompt or occupied generic override slot cannot block an authoritative modal",
   );
+  assert.doesNotMatch(projector, /phaseManager\.overridePhase\(phase\)/u);
   assert.match(projector, /phaseManager\.replaceWithCoopAuthoritativePhase\(current, phase\)/u);
   assert.doesNotMatch(
     projector,
@@ -422,6 +423,17 @@ test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must
     /projected exact mystery generation/u,
     "the authenticated successor replaces a stuck local predecessor",
   );
+
+  const modalStart = phaseManager.indexOf("public replaceWithCoopAuthoritativeModal(");
+  const modalEnd = phaseManager.indexOf("\n  /**\n   * Determine the next phase", modalStart);
+  assert.ok(modalStart >= 0 && modalEnd > modalStart, "PhaseManager exposes a bounded V2 modal replacement");
+  const modal = phaseManager.slice(modalStart, modalEnd);
+  assert.match(modal, /this\.currentPhase !== predecessor/u);
+  assert.ok(
+    modal.indexOf("this.standbyPhase = predecessor") < modal.indexOf("this.currentPhase = successor"),
+    "the old renderer standby is replaced by the exact ordered predecessor before the modal starts",
+  );
+  assert.doesNotMatch(modal, /clearAllPhases/u, "the parked V2 predecessor remains the modal's return target");
 });
 
 test("Mystery publishes the real actionability edge after its click-through guard expires", () => {

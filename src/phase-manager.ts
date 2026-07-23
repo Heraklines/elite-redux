@@ -534,6 +534,29 @@ export class PhaseManager {
   }
 
   /**
+   * Install an authenticated Authority V2 modal over its exact live predecessor.
+   *
+   * Replica battle replay can already occupy the generic one-level override slot while its
+   * ordered finalizer is current. A later interaction commit must not be refused merely because
+   * that slot still contains an obsolete local CommandPhase. Replace that stale standby with the
+   * exact current predecessor, then run the committed modal. When the modal ends it returns to the
+   * same parked V2 boundary; it can never resurrect the superseded local phase tree.
+   */
+  public replaceWithCoopAuthoritativeModal(predecessor: Phase, successor: Phase): boolean {
+    if (
+      this.currentPhase !== predecessor
+      || this.coopTerminalProgressionFrozen
+      || this.coopRecoveryProgressionFrozen()
+    ) {
+      return false;
+    }
+    this.standbyPhase = predecessor;
+    this.currentPhase = successor;
+    this.startCurrentPhase();
+    return true;
+  }
+
+  /**
    * Determine the next phase to run and start it.
    * @privateRemarks
    * This is called by {@linkcode Phase.end} by default, and should not be called by other methods.

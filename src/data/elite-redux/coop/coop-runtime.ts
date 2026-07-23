@@ -6227,10 +6227,12 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
   // Mid-turn modal interactions have no replica-local causal phase tree. Their immutable presentation
   // entry is therefore the only event that can create the guest surface. Recovery has always rebuilt these
   // exact phases from the same closed projection plan; use that constructor during ordinary delivery too so
-  // Revival and Move Learn cannot depend on a suppressed legacy prompt winning a listener race.
+  // Revival and Move Learn cannot depend on a suppressed legacy prompt winning a listener race. The replica
+  // may already have consumed the generic override slot while replay parked its ordered finalizer, so replace
+  // that obsolete standby with the current V2 predecessor rather than allowing overridePhase to refuse.
   if (plan.kind === "learn-move" || plan.kind === "learn-move-batch" || plan.kind === "revival") {
     const phase = materializeCoopV2InteractionProjection(runtime, control, plan);
-    if (phase == null || !phaseManager.overridePhase(phase)) {
+    if (phase == null || !phaseManager.replaceWithCoopAuthoritativeModal(current, phase)) {
       return false;
     }
     runtime.v2ProjectedInteractionControlId = controlId;
