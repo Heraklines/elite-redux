@@ -1899,3 +1899,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The CI observer now gives the command grid locale-independent semantic identities, including conditional Tera
   and dev-only Reset entries, without mutating the game. The switch round requires two completed `switch`,
   `showAbility`, and `statStage` entries in the exact authority-versus-renderer ledger before command can reopen.
+
+# 2026-07-23 - B8 reward fixtures migrated to Authority V2 evidence
+
+- The live-shop resync journey still drives the real owner surface through public `CANCEL -> CONFIRM`, but no
+  longer expects the intentionally retired legacy `op:global` UI trace. It now proves that exact input chain
+  advances the host's one mechanical Authority V2 log by exactly one entry, then retains its waiter,
+  interaction-counter, and full checksum convergence assertions.
+- Two focused reward commit fixtures bypassed `SelectModifierPhase.start()` and therefore left `typeOptions`
+  undefined. They now install the same valid empty authoritative option image that a started phase owns before
+  invoking the private terminal/result seam; this removes fixture crashes without changing production code.

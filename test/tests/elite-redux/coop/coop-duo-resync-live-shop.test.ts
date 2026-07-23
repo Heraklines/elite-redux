@@ -33,9 +33,8 @@ import { initGlobalScene } from "#app/global-scene";
 import { checksumState } from "#data/elite-redux/coop/coop-battle-checksum";
 import { captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
@@ -87,7 +86,6 @@ describe.skipIf(!RUN)(
 
     beforeEach(() => {
       setCoopWaveBarrierMs(50);
-      resetCoopUiRelayTrace();
       game = new GameManager(phaserGame);
       logs = installDuoLogCapture(`resync-live-shop-${Date.now()}`);
       game.override
@@ -103,7 +101,6 @@ describe.skipIf(!RUN)(
 
     afterEach(() => {
       setCoopWaveBarrierMs(60_000);
-      resetCoopUiRelayTrace();
       logs.dispose();
       clearCoopRuntime();
       // #710 harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).
@@ -232,6 +229,10 @@ describe.skipIf(!RUN)(
       // ===== The pick STILL relays: drive the already-open owner surface through CANCEL -> CONFIRM. This
       // public path mints and retains the terminal before continuation; the surviving watcher applies that
       // retained result, so both engines advance the interaction in lockstep. =====
+      const v2CommittedBefore = withClientSync(
+        rig.hostCtx,
+        () => getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed ?? 0,
+      );
       await withClient(rig.hostCtx, async () => {
         expect(rig.hostScene.ui.getMode(), "host still owns the open reward UI").toBe(UiMode.MODIFIER_SELECT);
         const handler = rig.hostScene.ui.getHandler() as unknown as { unblockInput?: () => void };
@@ -255,13 +256,9 @@ describe.skipIf(!RUN)(
       // Close that destination-scoped round trip before asserting the authority-side terminal release.
       await pumpDuoDestinations(rig, 4);
       expect(
-        // Carrier edges can be attributed to MESSAGE in HEADLESS when the skip narration callback performs
-        // the confirm during the same public input chain. The trace only records inside Ui.processInput, so
-        // the operation carrier itself is the strict UI-to-retained-operation proof; a private seam cannot
-        // manufacture it regardless of which transient chrome mode owned that input scope.
-        getCoopUiRelayEdges().some(edge => edge.carrier === "operation"),
-        "the live shop terminal crossed the public UI-to-retained-operation edge",
-      ).toBe(true);
+        withClientSync(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed ?? 0),
+        "the public CANCEL -> CONFIRM chain committed exactly one mechanical Authority V2 entry",
+      ).toBe(v2CommittedBefore + 1);
 
       // ----- ASSERTIONS -----
 

@@ -354,6 +354,10 @@ describe.skipIf(!RUN)("co-op reward-shop money sync (#698) - watcher threading +
     const phase = new SelectModifierPhase();
     const seam = phase as unknown as WatcherSeam;
     seam.coopInteractionStart = 0;
+    // start() always installs the authoritative option image before this terminal seam. This focused
+    // fixture invokes the private seam directly, so provide the same valid (empty) image instead of
+    // asking result serialization to encode an uninitialized phase.
+    seam.typeOptions = [];
     const before = runtime!.durability!.unackedCount();
 
     expect(seam.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip")).toBe(false);
@@ -380,6 +384,8 @@ describe.skipIf(!RUN)("co-op reward-shop money sync (#698) - watcher threading +
     const phase = new SelectModifierPhase();
     const seam = phase as unknown as WatcherSeam;
     seam.coopInteractionStart = 0;
+    // Mirror SelectModifierPhase.start(): an empty option image is still complete authoritative material.
+    seam.typeOptions = [];
     const before = runtime!.durability!.unackedCount();
 
     expect(seam.coopRelaySend(0, [COOP_ACT_REWARD], "reward")).toBe(false);
