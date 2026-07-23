@@ -2264,15 +2264,27 @@ export async function driveDuoGuestTackleThroughPublicUi(
       expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
       expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
 
-      // The direct guest scene uses a manual phase manager. The Fight click queues the production target
-      // phase, so start that real queued phase before sending the target inputs.
-      const targetPhase = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
-      targetPhase.start();
-      await drainLoopback();
-      expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
-      expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest moves to the second enemy target").toBe(true);
-      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
-      await drainLoopback();
+      // The production command handler skips TARGET_SELECT when the selected move has only one legal
+      // target (for example the one-enemy direct-mirror fixtures). Older harness code always waited for a
+      // target picker and therefore reported a ten-second hang after the genuine guest command had already
+      // been sent and the renderer was correctly parked on CoopReplayTurnPhase. Follow the same public-UI
+      // branch a browser sees: drive the picker only when it exists, otherwise accept the already-submitted
+      // command frontier. This remains fail-closed for every other phase.
+      const postMovePhase = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase or replay", {
+        matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "CoopReplayTurnPhase",
+      });
+      if (postMovePhase.phaseName === "SelectTargetPhase") {
+        postMovePhase.start();
+        await drainLoopback();
+        expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
+        expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest moves to the second enemy target").toBe(true);
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
+        await drainLoopback();
+      } else {
+        expect(rig.guestScene.ui.getMode(), "single-target command closes into the authoritative replay wait").toBe(
+          UiMode.MESSAGE,
+        );
+      }
       await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
     });
     await withClient(rig.hostCtx, () => drainLoopback());
