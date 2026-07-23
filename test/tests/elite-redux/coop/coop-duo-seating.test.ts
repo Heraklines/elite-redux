@@ -202,8 +202,16 @@ describe.skipIf(!RUN)("co-op DUO field seating: strict same-owner switch/replace
       ui.setMode = (...args: unknown[]): unknown => {
         if (args[0] === UiMode.PARTY) {
           ui.setMode = realSetMode; // one-shot
-          (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
-          return;
+          const opened = realSetMode(...args);
+          // The Authority V2 lease belongs to the real, active PARTY handler. Select only after Phaser's
+          // transition promise has installed that handler and the phase's own readiness continuation has
+          // had a microtask to publish controlInstalled; invoking the callback synchronously manufactures
+          // an impossible pre-surface pick and correctly leaves the retained TURN_COMMIT unacknowledged.
+          // biome-ignore lint/complexity/noVoid: test driver deliberately schedules after the real UI promise.
+          void Promise.resolve(opened).then(() =>
+            queueMicrotask(() => (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0)),
+          );
+          return opened;
         }
         if (args[0] === UiMode.MESSAGE) {
           return; // the picker's close transition - a no-op headlessly
