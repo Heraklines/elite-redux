@@ -1978,3 +1978,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The fixture now publishes the same current, owned, address-bearing `command:command` semantic observation as
   a real browser after each narration confirm. The fast gate therefore validates the production ownership rule
   instead of relying on its legacy console fallback.
+
+# 2026-07-23 - Showdown renderer presentation cannot close command collection
+
+- Exact two-browser run `30033867894` showed the authority submitting its real voluntary switch while the
+  renderer was still consuming entry weather, message, and ability events. The driver's generic same-address
+  `MessagePhase` test incorrectly declared command collection closed and skipped the renderer 52 seconds before
+  its real command menu opened; both production clients were still healthy and converging.
+- Battle-progress collection-close proof is now authority-only (structural rewards remain role-independent).
+  A failure-first delayed-renderer regression proves an ordinary guest `MessagePhase` cannot skip that player,
+  the complete presentation ledger is checked, and the renderer's eventual public command is submitted.

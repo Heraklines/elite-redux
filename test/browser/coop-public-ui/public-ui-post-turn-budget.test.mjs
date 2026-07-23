@@ -794,6 +794,7 @@ test("sequential command driver accepts an exact-address collection close when t
   firstEvidence.push(ownedCommand(0, address));
   const first = {
     label: "first",
+    publicRole: "host",
     publicSeat: 0,
     evidence: firstEvidence,
     checkpoint: async () => {},
@@ -805,6 +806,7 @@ test("sequential command driver accepts an exact-address collection close when t
           operationClass: "battle-progress",
           surfaceId: "battle:message",
           phase: "MovePhase",
+          localRole: "host",
           address,
         },
       });
@@ -838,6 +840,61 @@ test("sequential command driver accepts an exact-address collection close when t
   assert.equal(secondProof.skippedAfterCollectionClosed, true);
   assert.equal(secondProof.collectionClosedObservedBy, "first");
   assert.equal(result.expectedCommandAddress, "73:1:2");
+});
+
+test("renderer presentation cannot close command collection before its delayed Showdown command", async () => {
+  const order = [];
+  const address = { epoch: 73, wave: 1, turn: 2 };
+  const authorityEvidence = new FakeEvidence("authority");
+  const rendererEvidence = new FakeEvidence("renderer");
+  authorityEvidence.push(ownedCommand(0, address));
+  const authority = {
+    label: "authority",
+    publicRole: "host",
+    publicSeat: 0,
+    evidence: authorityEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("authority-command");
+      rendererEvidence.push({
+        kind: "browser-surface2",
+        observation: {
+          operationClass: "battle-progress",
+          surfaceId: "battle:message",
+          phase: "MessagePhase",
+          localRole: "guest",
+          address,
+        },
+      });
+      setTimeout(() => rendererEvidence.push(ownedCommand(1, address)), 10);
+    },
+  };
+  const renderer = {
+    label: "renderer",
+    publicRole: "guest",
+    publicSeat: 1,
+    evidence: rendererEvidence,
+    checkpoint: async () => {},
+    sequence: async () => order.push("renderer-command"),
+  };
+  const rig = {
+    clients: { authority, renderer },
+    host: authority,
+    guest: renderer,
+    config: { timeoutMs: 1_000 },
+    assertPresentationLedgerAtSharedCommand: async () => order.push("presentation-proof"),
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { authority: 0, renderer: 0 },
+    ["Space"],
+    "showdown-entry",
+  );
+
+  assert.deepEqual(order, ["authority-command", "presentation-proof", "renderer-command"]);
+  assert.equal(result.commandEvents.renderer?.observation.surfaceId, "command:command");
+  assert.equal(rendererEvidence.events.at(-1).skippedAfterCollectionClosed, false);
 });
 
 test("exact-address reward closure skips a phantom owner without hiding the one-shot outcome", async () => {

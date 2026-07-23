@@ -287,8 +287,11 @@ function findOwnedCommandOrTerminal(client, from) {
 function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
   return client.evidence.events.slice(from).find(event => {
     const observation = event.kind === "browser-surface2" ? event.observation : null;
+    const authorityAdvanced =
+      observation?.localRole === "host" || (observation?.localRole == null && client.publicRole === "host");
     return (
-      (observation?.operationClass === "battle-progress" || observation?.operationClass === "reward")
+      (observation?.operationClass === "reward"
+        || (observation?.operationClass === "battle-progress" && authorityAdvanced))
       && observation.phase !== "CommandPhase"
       && sameAddress(observation.address, expectedAddress)
     );
@@ -3669,9 +3672,11 @@ export class DuoPublicUiRig {
             }))
             .find(candidate => candidate.event != null) ?? null;
         if (commandCollectionClosed != null) {
-          // A non-command phase at the exact submitted address is the public state machine's proof
-          // that no reciprocal command owner exists for this round (for example, that battler is
-          // fainted or structurally hidden). Never invent a second owner after collection has closed.
+          // Only an AUTHORITY non-command phase (or a structural reward) at the exact submitted address
+          // proves that no reciprocal command owner exists for this round. The renderer can still expose
+          // MessagePhase/CommonAnimPhase while draining the immutable presentation stream before its real
+          // command opens; treating that ordinary replay as collection-close skipped a live Showdown owner
+          // in run 30033867894. Never invent a second owner after authoritative collection has closed.
           for (const label of pending) {
             // Preserve the pre-round cursor: a one-shot reward/terminal surface may itself be the exact
             // collection-close event and must remain visible to the following outcome scan.
