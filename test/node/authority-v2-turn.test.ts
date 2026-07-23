@@ -221,6 +221,52 @@ describe("buildTurnCommitEntry - shape + digest", () => {
     });
     expect(entry.nextControl).toEqual(replacement);
   });
+
+  it("states the exact turn-N to Mystery-terminal turn-0 edge without weakening other interactions", () => {
+    const mysteryTerminalWait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "turn-op-1",
+      epoch: 1,
+      wave: 3,
+      turn: 5,
+      allowedKinds: ["INTERACTION_COMMIT" as const],
+      allowedInteractionAddresses: [
+        { surfaceClass: "op:me" as const, operationKind: "ME_TERMINAL" as const, wave: 3, turn: 0 },
+      ],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    const entry = buildCommitted({
+      capture: CAPTURE_WITH_COMPANIONS,
+      nextCommandFrontier: null,
+      nextSuccessorWait: mysteryTerminalWait,
+    });
+    expect(entry.nextControl).toEqual(mysteryTerminalWait);
+  });
+
+  it("rejects conflicting or mis-addressed explicit turn successors", () => {
+    const wait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "turn-op-1",
+      epoch: 1,
+      wave: 3,
+      turn: 5,
+      allowedKinds: ["INTERACTION_COMMIT" as const],
+      allowedInteractionAddresses: [
+        { surfaceClass: "op:me" as const, operationKind: "ME_TERMINAL" as const, wave: 3, turn: 0 },
+      ],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    expect(() => buildCommitted({ nextSuccessorWait: wait })).toThrow("exactly one successor");
+    expect(() =>
+      buildCommitted({
+        capture: CAPTURE_WITH_COMPANIONS,
+        nextCommandFrontier: null,
+        nextSuccessorWait: { ...wait, turn: 4 },
+      }),
+    ).toThrow("not bound to the resolved turn");
+  });
 });
 
 // ---------------------------------------------------------------------------

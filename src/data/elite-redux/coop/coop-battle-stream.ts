@@ -115,6 +115,12 @@ export interface CoopTurnResolution {
   authorityRevision?: number;
 }
 
+/** Authority-observed battle classification needed to state the final turn's closed V2 successor. */
+export interface CoopTurnBoundaryIdentity {
+  /** True only for a battle spawned inside a retained Mystery encounter transaction. */
+  readonly mysteryBattle: boolean;
+}
+
 /** Complete pre-command cosmetic prefix paired with the post-summon state image that authored it. */
 export interface CoopEntryPresentationPrefix {
   readonly events: readonly CoopBattleEvent[];
@@ -2491,6 +2497,7 @@ export class CoopBattleStreamer {
     preimage: string,
     fullField: CoopFullMonSnapshot[],
     authoritativeState: CoopAuthoritativeBattleStateV1,
+    boundary: CoopTurnBoundaryIdentity = { mysteryBattle: false },
   ): boolean {
     const revision = authoritativeState.tick;
     const invalidEventIndex = events.findIndex(event => !isStrictBattleEvent(event));
@@ -2537,6 +2544,7 @@ export class CoopBattleStreamer {
         preimage,
         fullField,
         authoritativeState,
+        boundary,
       );
       if (!v2Committed) {
         const reason = `Authority V2 could not commit turn ${wave}:${turn}; refusing legacy turn authority.`;
@@ -2575,6 +2583,7 @@ export class CoopBattleStreamer {
       preimage,
       fullField,
       authoritativeState,
+      boundary,
     );
     return true;
   }
@@ -2597,6 +2606,7 @@ export class CoopBattleStreamer {
     preimage: string,
     fullField: CoopFullMonSnapshot[],
     authoritativeState: CoopAuthoritativeBattleStateV1,
+    boundary: CoopTurnBoundaryIdentity,
   ): boolean {
     const cutoverActive = isCoopV2TurnCutoverActive();
     if (!cutoverActive && !isCoopV2ShadowActive()) {
@@ -2639,8 +2649,31 @@ export class CoopBattleStreamer {
     const replacementControl = hasImmediateCommand
       ? null
       : resolveCoopV2ReplacementControl(epoch, authoritativeState, events);
+    const operationId = `TURN/e${epoch}/w${wave}/t${turn}`;
+    // A Mystery-spawned battle terminates through the retained ME transaction, not WAVE_ADVANCE. That
+    // transaction deliberately lives at the encounter's wave/turn-0 address even though the battle may end
+    // on turn N. State the inverse edge exactly here; a generic turn-N wait correctly rejects turn 0 and used
+    // to terminate an otherwise checksum-converged run at the post-battle reward handoff (gate C1 wave 32).
+    const nextSuccessorWait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null =
+      !hasImmediateCommand
+      && replacementControl == null
+      && boundary.mysteryBattle
+      && authoritativePartyIsDefeated(authoritativeState.enemyParty)
+      && !authoritativePartyIsDefeated(authoritativeState.playerParty)
+        ? {
+            kind: "AWAIT_SUCCESSOR",
+            afterOperationId: operationId,
+            epoch,
+            wave,
+            turn,
+            allowedKinds: ["INTERACTION_COMMIT"],
+            allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave, turn: 0 }],
+            allowNextWaveStart: false,
+            expectedOperationId: null,
+          }
+        : null;
     const input: CoopV2ShadowTurnTap = {
-      operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
+      operationId,
       capture,
       nextCommandFrontier:
         completeCommands.length === 0
@@ -2652,6 +2685,7 @@ export class CoopBattleStreamer {
               commands: completeCommands,
             },
       nextReplacementControl: replacementControl,
+      nextSuccessorWait,
       // Deliverable 1: fingerprint the LEGACY turn image (the resolution + checkpoint + companions legacy just
       // committed) through the SAME turn digest so parity compares like-for-like (v2 entry digest vs
       // v2-digest-of-legacy-image); the full-state checksum stays as the raw legacy token for the log.

@@ -108,6 +108,7 @@ export class CoopTurnCommitPhase extends Phase {
         carrier.preimage,
         carrier.fullField,
         carrier.authoritativeState,
+        { mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true },
       );
       if (!retained) {
         fatal(`Host could not retain complete turn authority for wave ${wave}, turn ${recording.turn}.`);

@@ -1635,3 +1635,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   production's strict validator remains unchanged.
 - No local co-op/browser Vitest run. YAML/static/ownership verification only; exact remote qualification is
   required after the active public journey releases the branch push lock.
+
+# 2026-07-23 - exact final Mystery-turn terminal successor
+
+- Full-gate C1 on `ff838fee8` remained checksum-converged through wave 32 and successfully crossed the newly
+  exact `ME_TERMINAL -> command-open` edge. Its inverse edge then failed: the final embedded-battle
+  `TURN_COMMIT` parked on a generic turn-N wait, while the retained Mystery settlement is deliberately
+  addressed as `ME_TERMINAL` at the same wave/turn 0. Authority V2 correctly rejected that unstated edge and
+  terminated the session before the reward tail.
+- The turn adapter now accepts only a bound, typed `AWAIT_SUCCESSOR` override in addition to command or
+  replacement control, rejects conflicting/mis-addressed successor inputs, and preserves the exact closed
+  Mystery terminal address. The authority engine explicitly supplies the Mystery-battle identity at the turn
+  capture boundary; the engine-free streamer no longer infers it from ambient phase state.
+- Process note: an accidental local node-pure invocation completed 80/80 before the current no-local-co-op
+  rule in `AGENTS.md` was re-read; it exited normally and was not repeated. Scoped Biome has no new errors,
+  and repository TypeScript reports only the unrelated feat integration baseline with no touched-path
+  diagnostic. All valid C1/contract/full-gate proof remains remote-only after the active public journey
+  releases the branch push lock.

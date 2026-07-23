@@ -327,6 +327,8 @@ export interface CoopV2ShadowTurnTap {
   readonly capture: TurnResolutionImage;
   readonly nextCommandFrontier: TurnCommandFrontier | null;
   readonly nextReplacementControl?: Extract<CoopNextControl, { kind: "REPLACEMENT" }> | null;
+  /** Exact closed-address wait for a known non-command boundary (for example final ME turn -> ME_TERMINAL). */
+  readonly nextSuccessorWait?: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null;
   /** The raw legacy comparand token (the host full-state checksum) - a DIFFERENT scheme, kept for the log. */
   readonly legacyDigest: string;
   /**
@@ -690,6 +692,7 @@ export class CoopAuthorityV2Shadow {
         capture: input.capture,
         nextCommandFrontier: input.nextCommandFrontier,
         ...(input.nextReplacementControl === undefined ? {} : { nextReplacementControl: input.nextReplacementControl }),
+        ...(input.nextSuccessorWait === undefined ? {} : { nextSuccessorWait: input.nextSuccessorWait }),
         barrier,
         ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
       });
