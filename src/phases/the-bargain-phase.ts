@@ -359,7 +359,7 @@ export class TheBargainPhase extends Phase {
     void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
       this.end();
       if (adoption.accepted && adoption.operationId != null) {
-        settleCoopV2InteractionOperation(adoption.operationId);
+        settleCoopV2InteractionOperation(adoption.operationId, this.coopOwningRuntime);
       }
       if (
         adoption.requiresAuthorityCommit
@@ -424,7 +424,7 @@ export class TheBargainPhase extends Phase {
     if (sins.length === 0) {
       this.coopBargainTerminal();
       if (this.coopV2ControlOperationId != null) {
-        settleCoopV2InteractionOperation(this.coopV2ControlOperationId);
+        settleCoopV2InteractionOperation(this.coopV2ControlOperationId, this.coopOwningRuntime);
       }
       this.closeCoopBargainOwnerTerminal();
       return;

@@ -440,7 +440,7 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
     this.end();
     if (adoption?.accepted === true) {
       settleCoopAbilityOperation(adoption.operationId, this.coopOperationBinding);
-      settleCoopV2InteractionOperation(adoption.operationId);
+      settleCoopV2InteractionOperation(adoption.operationId, this.coopOwningRuntime);
     }
     if (
       adoption?.accepted === true

@@ -296,7 +296,11 @@ export class SelectModifierPhase extends BattlePhase {
       return;
     }
     this.coopV2ControlOperationId = operationId;
-    settleCoopV2InteractionOperation(operationId);
+    // The handler terminal often resumes from a UI promise. In the two-engine harness another client can
+    // own the process-global runtime by then; production also benefits from making this proof explicitly
+    // phase-owned. Publishing it through ambient `active` can settle the replica while the authority's
+    // local ledger refuses the exact result as unproved.
+    settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
   }
 
   /**

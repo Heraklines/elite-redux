@@ -237,6 +237,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
             : 0;
   let terminalOperationId: string | null = null;
   if (controller.role === "host" && isCoopMeOperationEnabled()) {
+    const owningRuntime = getCoopRuntime();
     if (outcome == null) {
       coopWarn("me", "coopEndMePump HOLD: leave terminal has no retained authoritative outcome");
       return false;
@@ -266,11 +267,11 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
       localRole: "host",
       wave,
       turn: COOP_ME_AUTHORITY_TURN,
-      beforeAuthorityCommit: operationId => settleCoopV2InteractionOperation(operationId, getCoopRuntime()),
+      beforeAuthorityCommit: operationId => settleCoopV2InteractionOperation(operationId, owningRuntime),
     });
     if (terminalOperationId == null) {
       coopWarn("me", "coopEndMePump HOLD: exact authoritative leave did not commit");
-      getCoopRuntime()?.durability?.reconnect();
+      owningRuntime?.durability?.reconnect();
       return false;
     }
     if (terminalOperationId != null) {
