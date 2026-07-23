@@ -134,7 +134,10 @@ describe.skipIf(!RUN)("Showdown versus DOUBLES / TRIPLES - two-engine multi-slot
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       new SelectStarterPhase().initBattle(starters);
     });
-    await game.phaseInterceptor.to("CommandPhase");
+    // Stop before CommandPhase starts. Mandatory versus authority is installed by buildShowdownDuo below;
+    // letting this orphan host CommandPhase run first correctly terminalizes the shared battle and clears
+    // its field, which made this grouped shard observe zero host battlers (and a null battle on the next case).
+    await game.phaseInterceptor.to("CommandPhase", false);
     // Bake the moves onto BOTH the base moveset (what the mirror serializes to the guest) AND
     // summonData.moveset (what getMoveset() actually returns once a mon is summoned - a bare
     // `.moveset =` is shadowed by summonData.moveset, which made the host use its default damaging

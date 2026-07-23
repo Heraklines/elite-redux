@@ -1579,3 +1579,27 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The integration ownership manifest is now version 2 and owns this exact post-`593b6dd2f` correction set;
   no frozen P33 schema file is modified. Full gate `29971229403` on the parent SHA remains red and supplies
   the next runtime/fixture triage corpus; a corrected exact-SHA public journey and gate are still required.
+
+# 2026-07-23 - exact successor whitelists and focused-gate classification
+
+- Parent full gate `29971229403` exposed a node-pure defect in the newly added Mystery battle successor:
+  an exact wrong-turn `command-open` missed `allowedControlAddresses` and then fell through to the generic
+  N+1 command rule. Exact interaction/control alternatives are now closed whitelists for their entry class,
+  so a stated same-turn Mystery command cannot accidentally authorize the generic next-turn command.
+- The focused run on `9849815d8` found all six cross-lane representatives and intentionally refused to omit
+  one behind its five-shard cap. Root `AGENTS.md` reserves focused branches for 1-5 shards and requires an
+  integration-sized cross-lane batch to escalate to the complete gate; the planner red is therefore policy
+  evidence, not a product or harness failure. The cap remains unchanged.
+- Permitted local evidence is green: repository TypeScript completes with zero diagnostics, scoped Biome
+  lint has zero errors, and `git diff --check` is clean. Co-op Vitest/browser proof remains remote-only. Public journey
+  `29972091501` on parent `9849815d8` was still active during this batch, so no push occurred while it owned
+  the shared browser-journey concurrency slot.
+- Lane T3's only parent-gate failure was a fixture false red, not a triple refill defect. The spread attack
+  produced the intended two wing KOs and both reserves reported `onField=true`; a randomly generated Stunky's
+  ER Aftermath then forced Explosion, creating an unintended third KO with no third reserve. The focused #5c
+  setup now pins the enemy passive to inert Ball Fetch, so it measures exactly two simultaneous vacancies.
+- Lane S8's three multi-slot Showdown failures shared another fixture boundary: its bootstrap let the first
+  host `CommandPhase` run before `buildShowdownDuo` installed mandatory versus authority. Production correctly
+  terminalized that orphan command; the test then saw zero host fields or a null battle. The fixture now stops
+  before CommandPhase, matching the already-correct Showdown duo/faint/summon harnesses, and lets the paired
+  builder install both runtimes before opening input.

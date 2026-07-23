@@ -163,7 +163,11 @@ describe.skipIf(!RUN)("repro: triple-battle bugs round 3 (2026-07-07 report)", (
       .enemyMoveset(MoveId.HARDEN)
       .moveset([MoveId.EARTHQUAKE, MoveId.HARDEN])
       .ability(AbilityId.SHADOW_TAG)
-      .enemyAbility(AbilityId.BALL_FETCH);
+      .enemyAbility(AbilityId.BALL_FETCH)
+      // This test owns two simultaneous vacancies, not random ER passive follow-ups. A generated Stunky
+      // previously used Aftermath/Explosion and created a third KO; both reserves were correctly on field,
+      // but the fixture then demanded three living battlers from only two available reserves.
+      .enemyPassiveAbility(AbilityId.BALL_FETCH);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIDGEOT, SpeciesId.PIDGEOT);
 
     const field = globalScene.getEnemyField();

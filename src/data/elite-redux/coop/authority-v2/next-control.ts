@@ -163,30 +163,34 @@ export function successorWaitAllows(
   if (
     nextKind === "INTERACTION_COMMIT"
     && interactionOperationKind != null
-    && wait.allowedInteractionAddresses?.some(
+    && wait.allowedInteractionAddresses != null
+  ) {
+    // Once the predecessor states exact interaction alternatives, they are a closed whitelist. A
+    // right-kind/wrong-address entry must not fall through into the broad wave/turn compatibility rules.
+    return wait.allowedInteractionAddresses.some(
       allowed =>
         allowed.wave === wait.wave
         && allowed.surfaceClass === interactionMaterial?.surfaceClass
         && allowed.operationKind === interactionOperationKind
         && allowed.wave === address.wave
         && allowed.turn === address.turn,
-    )
-  ) {
-    return true;
+    );
   }
   const controlMaterial = objectRecord(nextMaterial);
   if (
     nextKind === "CONTROL_COMMIT"
     && (controlMaterial?.kind === "command-open" || controlMaterial?.kind === "interaction-open")
-    && wait.allowedControlAddresses?.some(
+    && wait.allowedControlAddresses != null
+  ) {
+    // Exact control alternatives are likewise exhaustive. Falling through after a mismatch admitted the
+    // ordinary N+1 command edge even when an ME_TERMINAL explicitly authorized only its same-turn command.
+    return wait.allowedControlAddresses.some(
       allowed =>
         allowed.materialKind === controlMaterial.kind
         && allowed.wave === address.wave
         && allowed.turn === address.turn
         && (allowed.operationId == null || allowed.operationId === nextOperationId),
-    )
-  ) {
-    return true;
+    );
   }
   // A turn result parks at turn N before the engine finishes its post-effects settlement. A surviving
   // battle authors CONTROL_COMMIT for turn N+1. Victory/GameOver can likewise capture its complete

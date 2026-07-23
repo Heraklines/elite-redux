@@ -3,17 +3,13 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "593b6dd2f64f7e7e060218ef1409826b50fa9671",
+  "baseSha": "9849815d8373b73a9f7ea361626ff40e25429312",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
-    ".github/workflows/coop-public-ui-journey.yml",
-    "docs/coop-task-ownership.md",
     "progress.md",
-    "scripts/guard-coop-task-ownership.mjs",
-    "src/data/elite-redux/coop/coop-runtime.ts",
-    "src/data/elite-redux/coop/coop-wave-resolution-bridge.ts",
-    "src/data/moves/move.ts",
-    "test/scripts/guard-coop-task-ownership.test.mjs"
+    "src/data/elite-redux/coop/authority-v2/next-control.ts",
+    "test/tests/elite-redux/showdown/showdown-versus-doubles.test.ts",
+    "test/tools/repro-triple-battle-bugs-3.test.ts"
   ],
   "lockedSchemaFiles": []
 }
