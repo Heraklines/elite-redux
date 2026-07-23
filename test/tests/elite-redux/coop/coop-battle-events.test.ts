@@ -185,6 +185,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     "CoopStatusReplayPhase",
     "CoopShowAbilityReplayPhase",
     "CoopFaintReplayPhase",
+    "CoopSwitchReplayPhase",
     "CoopFinalizeTurnPhase",
   ] as const;
 
@@ -317,6 +318,21 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       expect(statStage.value, "the recorded stage is the NEW ABSOLUTE value").toBe(1);
       expect(hostMon.getStatStage(Stat.ATK), "the host actually applied the change").toBe(1);
     }
+  });
+
+  it("(A) records status acquisition and cure as absolute presentation events", async () => {
+    const field = await startCoopHost();
+    const hostMon = field[COOP_HOST_FIELD_INDEX];
+
+    beginCoopRecording(globalScene.currentBattle.turn);
+    hostMon.doSetStatus(StatusEffect.BURN);
+    hostMon.clearStatus(false, false);
+    const recording = endCoopRecording();
+
+    expect(recording.events.filter(event => event.k === "status")).toEqual([
+      { k: "status", bi: hostMon.getBattlerIndex(), status: StatusEffect.BURN },
+      { k: "status", bi: hostMon.getBattlerIndex(), status: StatusEffect.NONE },
+    ]);
   });
 
   it("(A) records an immutable ability flyout plus weather/terrain presentation material", async () => {

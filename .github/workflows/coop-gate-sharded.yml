@@ -316,27 +316,21 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          # The static gate compares this exact candidate with its push base (or first parent for a
+          # manual run). Keeping the parent locally removes the slow/stale "last green gate" lookup.
+          fetch-depth: 2
           submodules: recursive
 
       - uses: ./.github/actions/setup-deps
 
-      - name: Resolve and explicitly fetch the last successful full-gate base
+      - name: Resolve the exact candidate delta base
         env:
-          GH_TOKEN: ${{ github.token }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
         shell: bash
         run: |
-          base="$(
-            gh api \
-              "repos/${GITHUB_REPOSITORY}/actions/workflows/coop-gate-sharded.yml/runs?branch=feat%2Felite-redux-port&status=success&per_page=10" \
-              --jq "first(.workflow_runs[] | select(.head_sha != \"${GITHUB_SHA}\") | .head_sha) // empty"
-          )"
+          base="$PUSH_BASE_SHA"
           if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
-            base="${{ github.event.before }}"
-          fi
-          if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
-            git fetch --no-tags --depth=1 origin feat/elite-redux-port
-            base="$(git rev-parse FETCH_HEAD)"
+            base="$(git rev-parse "${GITHUB_SHA}^")"
           else
             git fetch --no-tags --depth=1 origin "$base"
           fi

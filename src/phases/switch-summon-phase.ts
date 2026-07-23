@@ -10,6 +10,8 @@ import {
   markGenuineVoluntaryEntry,
 } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { getSaltCircleEscapeSource } from "#data/elite-redux/ability-upgrades/requested-field-effects";
+import { getActiveCoopV2ReplacementCutover } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
@@ -71,6 +73,37 @@ export class SwitchSummonPhase extends SummonPhase {
         this.showEnemyTrainer(trainerSlot);
         globalScene.pbTrayEnemy.showPbTray(globalScene.getEnemyParty());
       }
+    }
+
+    const incoming = (this.player ? this.getParty() : globalScene.getEnemyParty())[this.slotIndex];
+    const outgoing = this.getPokemon();
+    // Host-authored switch presentation belongs to the same ordered turn stream as the effects around it.
+    // A staged post-faint V2 replacement carries its summon in REPLACEMENT_COMMIT instead, so it cannot be
+    // rendered twice when that out-of-band entry races the eventual turn batch.
+    const replacementOwnsPresentation =
+      outgoing?.isFainted() === true && (getActiveCoopV2ReplacementCutover()?.pendingCount ?? 0) > 0;
+    const incomingSpeciesId = incoming?.species?.speciesId;
+    if (
+      incoming != null
+      && outgoing != null
+      && Number.isSafeInteger(incoming.id)
+      && incoming.id > 0
+      && Number.isSafeInteger(incomingSpeciesId)
+      && (incomingSpeciesId as number) > 0
+      && !replacementOwnsPresentation
+    ) {
+      const bi = this.player
+        ? this.fieldIndex
+        : (globalScene.currentBattle.arrangement?.enemyOffset ?? 2) + this.fieldIndex;
+      recordCoopEvent({
+        k: "switch",
+        bi,
+        partySlot: this.slotIndex,
+        pokemonId: incoming.id,
+        speciesId: incomingSpeciesId as number,
+        switchType: this.switchType,
+        doReturn: this.doReturn,
+      });
     }
 
     if (

@@ -72,16 +72,16 @@ describe("co-op session controller (#633, P1)", () => {
     });
 
     it("rejects an older peer that cannot decode the complete battle presentation stream", async () => {
-      // er-coop-44: a 43 peer rejects the new embedded Showdown presentation event kind,
-      // so pairing must fail closed instead of accepting a mixed recovery graph.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-44");
+      // er-coop-45: a 44 peer cannot replay the identity-bearing switch/replacement presentation,
+      // so pairing must fail closed instead of accepting different visual authority graphs.
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-45");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,
       });
       controller.connect();
-      guest.send({ t: "hello", version: "er-coop-42", username: "Cached", role: "guest", epoch: 0 });
+      guest.send({ t: "hello", version: "er-coop-44", username: "Cached", role: "guest", epoch: 0 });
       await flush();
 
       expect(controller.versionMismatch).toBe(true);

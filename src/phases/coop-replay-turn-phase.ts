@@ -413,8 +413,30 @@ export class CoopReplayTurnPhase extends Phase {
             }
             coopLog(
               "checkpoint",
-              `guest apply OUT-OF-BAND checkpoint mid-park reason=${envelope.reason} turn=${this.turn}`,
+              `guest prepare OUT-OF-BAND checkpoint mid-park reason=${envelope.reason} turn=${this.turn}`,
             );
+            if (envelope.replacementPresentation != null && !streamer.hasRenderedReplacementPresentation(envelope)) {
+              const localPresentation = isShowdownGuestFlipGated()
+                ? (swapBattleEvent({ k: "switch", ...envelope.replacementPresentation }) as Extract<
+                    CoopBattleEvent,
+                    { k: "switch" }
+                  >)
+                : { k: "switch" as const, ...envelope.replacementPresentation };
+              globalScene.phaseManager.unshiftNew("CoopSwitchReplayPhase", localPresentation, envelope);
+              globalScene.phaseManager.unshiftNew(
+                "CoopReplayTurnPhase",
+                this.turn,
+                this.rendered,
+                [...this.fromHpByBi.entries()],
+                this.sourceWave,
+              );
+              coopLog(
+                "replay",
+                `guest replacement rev=${envelope.authorityRevision ?? "?"} queued pre-checkpoint switch presentation`,
+              );
+              this.end();
+              return;
+            }
             if (!this.applyReplacementTransaction(envelope)) {
               this.parkForReplacementRetry(streamer, envelope);
               return;
@@ -1221,9 +1243,11 @@ export class CoopReplayTurnPhase extends Phase {
               occurrence: this.rendered + eventOffset,
             });
             break;
+          case "switch":
+            pm.unshiftNew("CoopSwitchReplayPhase", event);
+            break;
           default:
-            // Switch placement rides the authoritative checkpoint; every declared cosmetic event above
-            // is rendered without running mechanics.
+            // Keep a fail-soft default for future additive presentation kinds.
             break;
         }
       } catch {

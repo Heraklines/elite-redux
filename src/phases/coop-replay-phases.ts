@@ -53,6 +53,8 @@ import {
   coopAppliedStateTick,
   drainCoopApplyFailures,
   reapplyAcceptedCoopAuthoritativeBattleState,
+  summonCoopEnemyField,
+  summonCoopPlayerField,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import type {
   CoopAuthorityFailure,
@@ -107,13 +109,14 @@ import type {
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
+  CoopSwitchPresentation,
 } from "#data/elite-redux/coop/coop-transport";
 import {
   adoptWaveAdvanceWatcherChoice,
   coopWaveAdvanceSanctionedTails,
   isCoopWaveAdvanceOperationEnabled,
 } from "#data/elite-redux/coop/coop-wave-operation";
-import { doPokeballBounceAnim, getPokeballAtlasKey } from "#data/pokeball";
+import { doPokeballBounceAnim, getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { HitResult } from "#enums/hit-result";
@@ -122,6 +125,8 @@ import type { MoveId } from "#enums/move-id";
 import type { PokeballType } from "#enums/pokeball";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { SwitchType } from "#enums/switch-type";
+import { TrainerSlot } from "#enums/trainer-slot";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { PokemonPhase } from "#phases/pokemon-phase";
@@ -568,12 +573,242 @@ export class CoopStatStageReplayPhase extends PokemonPhase {
 }
 
 /**
+ * GUEST: replay one immutable host switch without entering SwitchSummonPhase. The phase performs only the
+ * recall/ball/sprite presentation and the same side-effect-free party placement used by checkpoint
+ * reconciliation; hazards, abilities, switch effects, RNG, and turn commands remain authority-only.
+ *
+ * A replacement envelope is optional. When present, completion advances the streamer's exact V2
+ * presentation watermark before the replay pump may install the post-summon checkpoint. That makes
+ * redelivery idempotent and prevents `presentationReady` from meaning merely "the final sprite exists".
+ */
+export class CoopSwitchReplayPhase extends Phase {
+  public readonly phaseName = "CoopSwitchReplayPhase";
+
+  constructor(
+    private readonly presentation: CoopSwitchPresentation,
+    private readonly replacementEnvelope?: CoopCheckpointEnvelope,
+  ) {
+    super();
+  }
+
+  public override start(): void {
+    super.start();
+    let ended = false;
+    let watchdog: Phaser.Time.TimerEvent | undefined;
+    let incoming: Pokemon | undefined;
+    const finish = (): void => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      try {
+        if (incoming != null) {
+          incoming.setVisible(true);
+          incoming.getSprite()?.setVisible(true);
+          incoming.getSprite()?.clearTint();
+          incoming.showInfo();
+          void incoming.updateInfo();
+        }
+      } catch {
+        // The following authoritative projection retries the exact atlas/info-bar proof.
+      }
+      if (this.replacementEnvelope != null) {
+        getCoopBattleStreamer()?.noteRenderedReplacementPresentation(this.replacementEnvelope);
+      }
+      this.end();
+    };
+
+    try {
+      const arrangement = globalScene.currentBattle?.arrangement;
+      const located = arrangement?.locate(this.presentation.bi);
+      const side = arrangement?.ownerOf(this.presentation.bi);
+      const player = side === SideKind.PLAYER;
+      if (located == null || located.position < 0 || (!player && side !== SideKind.ENEMY)) {
+        coopWarn("replay", `switch presentation rejected unmapped bi=${this.presentation.bi}`);
+        finish();
+        return;
+      }
+      const party = player ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+      const exactSlot = party.findIndex(mon => mon?.id === this.presentation.pokemonId);
+      const speciesSlot = party.findIndex(
+        mon => mon?.species?.speciesId === this.presentation.speciesId && !mon.isOnField(),
+      );
+      const partySlot =
+        exactSlot >= 0
+          ? exactSlot
+          : party[this.presentation.partySlot]?.species?.speciesId === this.presentation.speciesId
+            ? this.presentation.partySlot
+            : speciesSlot;
+      if (partySlot < 0 || partySlot === located.position) {
+        coopWarn(
+          "replay",
+          `switch presentation could not resolve incoming id=${this.presentation.pokemonId} `
+            + `species=${this.presentation.speciesId} slot=${this.presentation.partySlot}`,
+        );
+        finish();
+        return;
+      }
+      const outgoing = party[located.position];
+      const projectIncoming = (): void => {
+        try {
+          if (player) {
+            summonCoopPlayerField(located.position, partySlot);
+          } else {
+            summonCoopEnemyField(located.position, partySlot);
+          }
+          incoming = party[located.position];
+          if (
+            incoming == null
+            || (incoming.id !== this.presentation.pokemonId
+              && incoming.species?.speciesId !== this.presentation.speciesId)
+          ) {
+            coopWarn("replay", `switch presentation projected a different actor at bi=${this.presentation.bi}`);
+            finish();
+            return;
+          }
+          const sendOutText =
+            this.presentation.switchType === SwitchType.FORCE_SWITCH
+              ? i18next.t("battle:pokemonDraggedOut", { pokemonName: getPokemonNameWithAffix(incoming) })
+              : player
+                ? i18next.t("battle:playerGo", { pokemonName: getPokemonNameWithAffix(incoming) })
+                : i18next.t("battle:trainerGo", {
+                    trainerName: globalScene.currentBattle.trainer?.getName(
+                      globalScene.currentBattle.double
+                        && globalScene.currentBattle.trainer?.isDouble()
+                        && located.position > 0
+                        ? TrainerSlot.TRAINER_PARTNER
+                        : TrainerSlot.TRAINER,
+                    ),
+                    pokemonName: incoming.getNameToRender(),
+                  });
+          globalScene.ui.showText(sendOutText);
+          if (!globalScene.moveAnimations) {
+            finish();
+            return;
+          }
+
+          // The placement helper is synchronous. Hide the actor in the same frame, then reveal it only at
+          // the immutable ball-open cue; no snap can render between these statements.
+          incoming.hideInfo();
+          incoming.setVisible(false);
+          incoming.getSprite()?.setVisible(false);
+          const fpOffset = incoming.getFieldPositionOffset();
+          const pokeball = globalScene.addFieldSprite(
+            player ? 36 : 248,
+            player ? 80 : 44,
+            "pb",
+            getPokeballAtlasKey(incoming.getPokeball(true)),
+          );
+          pokeball.setOrigin(0.5, 0.625).setVisible(true);
+          globalScene.field.add(pokeball);
+          globalScene.tweens.add({
+            targets: pokeball,
+            duration: 650,
+            x: (player ? 100 : 236) + fpOffset[0],
+          });
+          globalScene.tweens.add({
+            targets: pokeball,
+            duration: 150,
+            ease: "Cubic.easeOut",
+            y: (player ? 70 : 34) + fpOffset[1],
+            onComplete: () => {
+              try {
+                globalScene.tweens.add({
+                  targets: pokeball,
+                  duration: 500,
+                  ease: "Cubic.easeIn",
+                  angle: 1440,
+                  y: (player ? 132 : 86) + fpOffset[1],
+                  onComplete: () => {
+                    try {
+                      globalScene.playSound("se/pb_rel");
+                      pokeball.destroy();
+                      globalScene.animations.addPokeballOpenParticles(
+                        incoming!.x,
+                        incoming!.y - 16,
+                        incoming!.getPokeball(true),
+                      );
+                      incoming!.showInfo();
+                      incoming!.playAnim();
+                      incoming!.setVisible(true);
+                      incoming!.getSprite()?.setVisible(true);
+                      incoming!.setScale(0.5);
+                      incoming!.tint(getPokeballTintColor(incoming!.getPokeball(true)));
+                      incoming!.untint(250, "Sine.easeIn");
+                      globalScene.tweens.add({
+                        targets: incoming,
+                        duration: 250,
+                        ease: "Sine.easeIn",
+                        scale: incoming!.getSpriteScale(),
+                        onComplete: () => {
+                          try {
+                            incoming!.cry(incoming!.getHpRatio() > 0.25 ? undefined : { rate: 0.85 });
+                          } finally {
+                            finish();
+                          }
+                        },
+                      });
+                    } catch {
+                      finish();
+                    }
+                  },
+                });
+              } catch {
+                finish();
+              }
+            },
+          });
+        } catch {
+          finish();
+        }
+      };
+
+      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS + 2_000, finish);
+      if (this.presentation.doReturn && outgoing?.isOnField()) {
+        globalScene.ui.showText(
+          player
+            ? i18next.t("battle:playerComeBack", { pokemonName: getPokemonNameWithAffix(outgoing) })
+            : i18next.t("battle:trainerComeBack", {
+                trainerName: globalScene.currentBattle.trainer?.getName(
+                  globalScene.currentBattle.double
+                    && globalScene.currentBattle.trainer?.isDouble()
+                    && located.position > 0
+                    ? TrainerSlot.TRAINER_PARTNER
+                    : TrainerSlot.TRAINER,
+                ),
+                pokemonName: outgoing.getNameToRender(),
+              }),
+        );
+        if (!globalScene.moveAnimations) {
+          projectIncoming();
+          return;
+        }
+        globalScene.playSound("se/pb_rel");
+        outgoing.hideInfo();
+        outgoing.tint(getPokeballTintColor(outgoing.getPokeball(true)), 1, 250, "Sine.easeIn");
+        globalScene.tweens.add({
+          targets: outgoing,
+          duration: 250,
+          ease: "Sine.easeIn",
+          scale: 0.5,
+          onComplete: projectIncoming,
+        });
+        return;
+      }
+      projectIncoming();
+    } catch {
+      finish();
+    }
+  }
+}
+
+/**
  * GUEST: render a status change for a `status` event (#633): play the RNG-free status common-anim
- * + narrate the obtain text. The host does NOT emit `status` events in the animation layer (the
- * status message already rides the `message` tap and the actual status state rides the checkpoint),
- * so this phase is dormant in normal play; it is implemented for completeness + future use and never
- * mutates state the checkpoint owns (it does not call doSetStatus - the checkpoint sets status). A
- * status value of 0 / NONE is treated as a cure (no anim). Hardened to always reach `end()`.
+ * + narrate the obtain text. The host emits the absolute status at Pokemon.doSetStatus/clearStatus while
+ * the status message independently rides the `message` tap and the actual state rides the checkpoint.
+ * This phase never mutates state the checkpoint owns (it does not call doSetStatus). A status value of
+ * 0 / NONE is treated as a cure (no anim). Hardened to always reach `end()`.
  */
 export class CoopStatusReplayPhase extends PokemonPhase {
   public readonly phaseName = "CoopStatusReplayPhase";

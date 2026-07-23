@@ -141,7 +141,10 @@ export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null
     level: 100,
     shiny: false,
     variant: 0,
-    abilityIndex: 1,
+    // Elite Redux Pelipper is [DRIZZLE, RETRIEVER, ...]. Slot 0 is the deterministic entry trigger
+    // this fixture promises; slot 1 silently selected Retriever and made the browser oracle wait for
+    // an ability/weather presentation the production battle could never emit.
+    abilityIndex: 0,
     ivs: new Array(6).fill(15),
     moveset: [MoveId.AIR_CUTTER],
     item: SHOWDOWN_ITEM_POOL[0],

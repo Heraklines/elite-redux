@@ -136,10 +136,24 @@ describe("co-op replacement continuation releases from the command-barrier park 
       commands: [{ ownerSeatId: 1, pokemonId: 1, fieldIndex: 0 }],
     };
 
-    guestStream.ingestAuthoritativeV2Replacement(message, nextControl, 41);
+    const presentation = {
+      bi: 0,
+      partySlot: 2,
+      pokemonId: 101,
+      speciesId: 25,
+      switchType: 1,
+      doReturn: false,
+    } as const;
+    guestStream.ingestAuthoritativeV2Replacement(message, nextControl, 41, presentation);
     const delivered = guestStream.consumeCheckpoint();
     expect(delivered?.authorityNextControl).toEqual(nextControl);
     expect(delivered?.authorityRevision).toBe(41);
+    expect(delivered?.replacementPresentation).toEqual(presentation);
+    expect(delivered == null ? false : guestStream.hasRenderedReplacementPresentation(delivered)).toBe(false);
+    if (delivered != null) {
+      guestStream.noteRenderedReplacementPresentation(delivered);
+      expect(guestStream.hasRenderedReplacementPresentation(delivered)).toBe(true);
+    }
     expect(guestStream.acknowledgeReplacement(delivered!, "materialApplied")).toBe(true);
     expect(
       guestStream.hasFinalizedAuthoritativeV2Replacement(message),

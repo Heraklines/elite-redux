@@ -94,6 +94,8 @@ type StagedReplacementTap = Omit<CoopV2ShadowReplacementTap, "authorityCarrier" 
 
 export interface CoopV2ReplacementCommitBatch {
   readonly authorityCarrier: ReplacementAuthorityCarrier;
+  /** Canonical host field seat occupied by the resolved replacement after the summon. */
+  readonly presentationSeat: { readonly bi: number; readonly pokemonId: number } | null;
   /** Exact currently-executable replacement head authored by the preceding mechanical entry. */
   readonly activeControl: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
   /** Exact mechanical successor command frontier after the final same-boundary faint is materialized. */
@@ -248,14 +250,41 @@ export class CoopV2ReplacementCutover {
     if (!successorResult.ok) {
       return { kind: "failed-clean" };
     }
+    const selected = current.proposal.selected;
+    if (
+      selected != null
+      && (batch.presentationSeat == null
+        || !Number.isSafeInteger(batch.presentationSeat.bi)
+        || batch.presentationSeat.bi < 0
+        || !Number.isSafeInteger(batch.presentationSeat.pokemonId)
+        || batch.presentationSeat.pokemonId <= 0)
+    ) {
+      return { kind: "failed-clean" };
+    }
+    const authorityCarrier: ReplacementAuthorityCarrier = {
+      ...batch.authorityCarrier,
+      presentation:
+        selected == null || batch.presentationSeat == null
+          ? null
+          : {
+              bi: batch.presentationSeat.bi,
+              partySlot: selected.partySlot,
+              pokemonId: batch.presentationSeat.pokemonId,
+              speciesId: selected.speciesId,
+              // Every staged V2 transaction here is a post-faint replacement. The outgoing Pokemon has
+              // already fainted, so presentation sends the committed replacement without a recall.
+              switchType: 1,
+              doReturn: false,
+            },
+    };
     const entry = this.harness.tapReplacementCommit({
       ...current,
-      authorityCarrier: batch.authorityCarrier,
+      authorityCarrier,
       successor: successorResult.successor,
       legacyImage: {
         proposal: current.proposal,
         resolution: current.resolution,
-        authorityCarrier: batch.authorityCarrier,
+        authorityCarrier,
       },
     });
     if (entry == null) {

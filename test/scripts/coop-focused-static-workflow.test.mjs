@@ -15,6 +15,10 @@ const workflow = readFileSync(resolve(root, ".github/workflows/coop-focused-bran
   "\r\n",
   "\n",
 );
+const fullWorkflow = readFileSync(resolve(root, ".github/workflows/coop-gate-sharded.yml"), "utf8").replaceAll(
+  "\r\n",
+  "\n",
+);
 const staticGate = readFileSync(resolve(root, "scripts/run-coop-static-gate.mjs"), "utf8").replaceAll("\r\n", "\n");
 const planner = readFileSync(resolve(root, "scripts/run-coop-gate.mjs"), "utf8").replaceAll("\r\n", "\n");
 const soakDriver = readFileSync(resolve(root, "test/tools/coop-soak-driver.ts"), "utf8").replaceAll("\r\n", "\n");
@@ -61,6 +65,20 @@ test("focused static accepts ignored-only metadata after the non-vacuous type ra
   assert.match(staticGate, /"biome",\s+"check",\s+"--no-errors-on-unmatched"/u);
   assert.match(staticGate, /"--diagnostic-level=error"/u);
   assert.match(staticGate, /"--max-diagnostics=none"/u);
+});
+
+test("full static checks only the exact candidate delta, never every change since the last all-green gate", () => {
+  const start = fullWorkflow.indexOf("\n  static:\n");
+  const end = fullWorkflow.indexOf("\n  public-ui-contracts:", start + 1);
+  assert.notEqual(start, -1, "full static job must exist");
+  assert.notEqual(end, -1, "public UI contract job must follow full static");
+  const staticJob = fullWorkflow.slice(start, end);
+
+  assert.match(staticJob, /fetch-depth: 2/u);
+  assert.match(staticJob, /PUSH_BASE_SHA: \$\{\{ github\.event\.before \}\}/u);
+  assert.match(staticJob, /git rev-parse "\$\{GITHUB_SHA\}\^"/u);
+  assert.doesNotMatch(staticJob, /last successful full-gate base|gh api/u);
+  assert.match(staticJob, /COOP_BASE_SHA=\$base/u);
 });
 
 test("focused aggregate requires static and isolated shard evidence", () => {

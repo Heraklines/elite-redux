@@ -7307,6 +7307,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     this.status = new Status(effect, 0, sleepTurnsRemaining);
+    if (effect !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
+      recordCoopEvent({ k: "status", bi: this.getBattlerIndex(), status: effect });
+    }
     erRecordAchievementStatusSet(this, effect);
   }
 
@@ -7359,6 +7362,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public clearStatus(confusion: boolean, reloadAssets: boolean) {
     const lastStatus = this.status?.effect;
     this.status = null;
+    if (lastStatus != null && lastStatus !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
+      recordCoopEvent({ k: "status", bi: this.getBattlerIndex(), status: StatusEffect.NONE });
+    }
     this.setFrameRate(10);
     if (lastStatus === StatusEffect.SLEEP && this.getTag(BattlerTagType.NIGHTMARE)) {
       this.lapseTag(BattlerTagType.NIGHTMARE);

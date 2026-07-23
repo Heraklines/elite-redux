@@ -1793,3 +1793,27 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Permitted local evidence: 15/15 public/workflow source contracts green, touched-path TypeScript filter empty,
   scoped Biome has no errors (repository-baseline complexity infos only), and `git diff --check` clean. Co-op
   engine and browser qualification remain GitHub-hosted per `AGENTS.md`.
+
+# 2026-07-23 - switch, replacement, and status presentation become host-authored
+
+- The presentation audit found that `switch` and `status` were declared wire events with no production
+  producer, the guest predicted its own voluntary switch from local command state, and a V2 replacement
+  could acknowledge `presentationReady` after only snapping the final sprite. Switch/roar/pivot paths could
+  therefore be mechanically converged while visibly incomplete or positionally wrong.
+- Every resolved `SwitchSummonPhase` now records an immutable identity-bearing switch event. The guest uses a
+  presentation-only replay phase that performs the recall/ball/summon visuals and side-effect-free party
+  placement without hazards, abilities, RNG, or local turn resolution. The guest-side predictive self-switch
+  path is removed. Status acquisition and cure now produce absolute presentation events at the state mutation.
+- Post-faint replacements carry their exact summon result inside `REPLACEMENT_COMMIT`; missing presentation
+  material fails entry construction/decoding. The renderer drains that exact event before applying the
+  replacement checkpoint and watermarks the global V2 revision so redelivery re-proves material without
+  replaying the animation. Protocol `er-coop-45` rejects older renderers that would silently snap this boundary.
+- Showdown run `30007414806` reached a real reciprocal battle but correctly found no Drizzle presentation:
+  the dedicated fixture selected Pelipper ability slot 1 (Elite Redux Retriever) while claiming it selected
+  Drizzle. The fixture now selects slot 0, so its ability/environment oracle measures production presentation
+  instead of waiting for an impossible event.
+- Full gate `30007412687` proved public/V2 contracts, build, native WebRTC, mutation, and all gameplay shards
+  green; its sole upstream red was the static job comparing against the last all-green full gate and therefore
+  classifying months of unrelated branch changes as this candidate's delta. Full static now uses the exact push
+  base, or the checked-out first parent for manual dispatch, while retaining the full-repository diagnostic
+  ratchet and global co-op-scope enforcement.

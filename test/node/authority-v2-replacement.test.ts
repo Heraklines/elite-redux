@@ -82,6 +82,14 @@ const AUTHORITY_CARRIER: ReplacementAuthorityCarrier = {
   epoch: 1,
   wave: 3,
   turn: 3,
+  presentation: {
+    bi: 0,
+    partySlot: 2,
+    pokemonId: 4242,
+    speciesId: 279,
+    switchType: 1,
+    doReturn: false,
+  },
 };
 
 function address(over: Partial<ReplacementSourceAddress> = {}): ReplacementSourceAddress {
@@ -199,6 +207,32 @@ describe("validateReplacementProposal", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildReplacementCommitEntry", () => {
+  it("refuses live replacement material without an explicit presentation result", () => {
+    const { presentation: _presentation, ...incomplete } = AUTHORITY_CARRIER;
+    expect(() =>
+      buildReplacementCommitEntry({
+        context: FRAME,
+        proposal: proposal(),
+        resolution: "owner-pick",
+        authorityCarrier: incomplete,
+        successor: { kind: "terminal" },
+      }),
+    ).toThrow(/invalid replacement presentation/u);
+
+    expect(() =>
+      buildReplacementCommitEntry({
+        context: FRAME,
+        proposal: proposal(),
+        resolution: "owner-pick",
+        authorityCarrier: {
+          ...AUTHORITY_CARRIER,
+          presentation: { ...AUTHORITY_CARRIER.presentation!, bi: -1 },
+        },
+        successor: { kind: "terminal" },
+      }),
+    ).toThrow(/invalid replacement presentation/u);
+  });
+
   it("builds a REPLACEMENT_COMMIT entry the foundation validator accepts", () => {
     const built = buildReplacementCommitEntry({
       context: FRAME,

@@ -71,6 +71,7 @@ import type {
   CoopRecoveryTicketV1,
   CoopSerializedEnemy,
   CoopStateSyncUnavailableReason,
+  CoopSwitchPresentation,
   CoopTransport,
   CoopWaveOutcome,
 } from "#data/elite-redux/coop/coop-transport";
@@ -154,6 +155,8 @@ export interface CoopCheckpointEnvelope {
   authorityNextControl?: CoopNextControl;
   /** Global V2 revision paired with {@link authorityNextControl}. */
   authorityRevision?: number;
+  /** Local-only immutable V2 summon event; excluded from legacy carrier identity/ACK canonicalization. */
+  replacementPresentation?: CoopSwitchPresentation | null;
 }
 
 /**
@@ -415,7 +418,14 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
         && (event.anim === undefined || isSafeAddressPart(event.anim))
       );
     case "switch":
-      return isValidBattlerIndex(event.bi) && isValidPartySlot(event.partySlot);
+      return (
+        isValidBattlerIndex(event.bi)
+        && isValidPartySlot(event.partySlot)
+        && isPositiveSafeAddressPart(event.pokemonId)
+        && isPositiveSafeAddressPart(event.speciesId)
+        && isSafeAddressPart(event.switchType)
+        && typeof event.doReturn === "boolean"
+      );
     default:
       return false;
   }
@@ -1114,6 +1124,8 @@ export class CoopBattleStreamer {
    * so a legitimate post-resync/checkpoint-reapply re-render of a fresh turn address always starts at zero.
    */
   private readonly renderedThrough = new Map<string, number>();
+  /** Exact V2 replacement revisions whose switch/summon phase drained before checkpoint installation. */
+  private readonly renderedReplacementPresentations = new Set<string>();
   /**
    * Exact addressed waits cancelled because the renderer opened the same numeric
    * turn in a newer wave/epoch. The replay pump distinguishes this benign stale
@@ -1893,6 +1905,7 @@ export class CoopBattleStreamer {
     this.pendingSince.clear();
     this.liveEvents.clear();
     this.renderedThrough.clear();
+    this.renderedReplacementPresentations.clear();
     this.pendingCheckpoints.clear();
     this.appliedOutOfBandCheckpoints.clear();
     this.highestSeenTurnAuthority.clear();
@@ -4379,8 +4392,31 @@ export class CoopBattleStreamer {
     msg: Extract<CoopMessage, { t: "battleCheckpoint" }>,
     nextControl: CoopNextControl,
     authorityRevision: number,
+    presentation: CoopSwitchPresentation | null,
   ): void {
-    this.handle(msg, "authority-v2", nextControl, authorityRevision);
+    this.handle(msg, "authority-v2", nextControl, authorityRevision, presentation);
+  }
+
+  /** Whether this exact V2 replacement has already drained its pre-checkpoint visual event. */
+  hasRenderedReplacementPresentation(envelope: CoopCheckpointEnvelope): boolean {
+    return this.renderedReplacementPresentations.has(this.replacementPresentationKey(envelope));
+  }
+
+  /** Exactly-once presentation watermark. Redelivery can re-prove material without replaying the summon. */
+  noteRenderedReplacementPresentation(envelope: CoopCheckpointEnvelope): void {
+    const key = this.replacementPresentationKey(envelope);
+    this.renderedReplacementPresentations.add(key);
+    while (this.renderedReplacementPresentations.size > 512) {
+      const oldest = this.renderedReplacementPresentations.values().next().value as string | undefined;
+      if (oldest === undefined || oldest === key) {
+        break;
+      }
+      this.renderedReplacementPresentations.delete(oldest);
+    }
+  }
+
+  private replacementPresentationKey(envelope: CoopCheckpointEnvelope): string {
+    return `${authorityKey(envelope)}:v2r${envelope.authorityRevision ?? 0}`;
   }
 
   /**
@@ -4775,6 +4811,7 @@ export class CoopBattleStreamer {
     this.inbox.clear();
     this.liveEvents.clear();
     this.renderedThrough.clear();
+    this.renderedReplacementPresentations.clear();
     this.supersededTurnWaits.clear();
     this.finalizedMarks.clear();
     this.finalizedTurnAuthorities.clear();
@@ -4839,6 +4876,7 @@ export class CoopBattleStreamer {
     source: "transport" | "authority-v2" = "transport",
     authorityNextControl?: CoopNextControl,
     authorityRevision?: number,
+    replacementPresentation: CoopSwitchPresentation | null = null,
   ): void {
     switch (msg.t) {
       case "enemyPartySync": {
@@ -5352,7 +5390,7 @@ export class CoopBattleStreamer {
             const retained = copyAdmittedAuthority(admission.seen);
             const delivered =
               source === "authority-v2" && authorityNextControl !== undefined && authorityRevision !== undefined
-                ? { ...retained, authorityNextControl, authorityRevision }
+                ? { ...retained, authorityNextControl, authorityRevision, replacementPresentation }
                 : retained;
             coopLog(
               "checkpoint",
@@ -5377,7 +5415,7 @@ export class CoopBattleStreamer {
         const key = bufferedAuthorityKey("replacement", envelope);
         const deliveredEnvelope =
           source === "authority-v2" && authorityNextControl !== undefined && authorityRevision !== undefined
-            ? { ...envelope, authorityNextControl, authorityRevision }
+            ? { ...envelope, authorityNextControl, authorityRevision, replacementPresentation }
             : envelope;
         // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
         // carrying the host's checksum so the guest can verify convergence after applying.

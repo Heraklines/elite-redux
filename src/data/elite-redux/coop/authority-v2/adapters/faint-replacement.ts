@@ -56,6 +56,7 @@ import {
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { ApplyMaterialFn } from "#data/elite-redux/coop/authority-v2/replica";
+import type { CoopSwitchPresentation } from "#data/elite-redux/coop/coop-transport";
 
 // ---------------------------------------------------------------------------
 // Identity - the typed proposal (no positional arrays, no hole-able payloads)
@@ -173,6 +174,8 @@ export interface ReplacementAuthorityCarrier {
   readonly epoch: unknown;
   readonly wave: unknown;
   readonly turn: unknown;
+  /** Exact summon animation authored by this replacement, or explicit null for a sealed empty slot. */
+  readonly presentation?: CoopSwitchPresentation | null;
 }
 
 /**
@@ -364,7 +367,7 @@ export function toReplacementCommitImage(
   if (!check.ok) {
     throw new Error(`[authority-v2/faint-replacement] invalid proposal: ${check.reason}`);
   }
-  return {
+  const baseImage = {
     sourceAddress: {
       epoch: proposal.sourceAddress.epoch,
       wave: proposal.sourceAddress.wave,
@@ -378,20 +381,27 @@ export function toReplacementCommitImage(
       proposal.selected == null
         ? null
         : { partySlot: proposal.selected.partySlot, speciesId: proposal.selected.speciesId },
-    ...(authorityCarrier === undefined
-      ? {}
-      : {
-          authorityCarrier: {
-            checkpoint: authorityCarrier.checkpoint,
-            checksum: authorityCarrier.checksum,
-            preimage: authorityCarrier.preimage,
-            fullField: authorityCarrier.fullField,
-            authoritativeState: authorityCarrier.authoritativeState,
-            epoch: authorityCarrier.epoch,
-            wave: authorityCarrier.wave,
-            turn: authorityCarrier.turn,
-          },
-        }),
+  };
+  if (authorityCarrier === undefined) {
+    return baseImage;
+  }
+  const presentation = decodeReplacementPresentation(authorityCarrier.presentation);
+  if (presentation === undefined) {
+    throw new Error("[authority-v2/faint-replacement] live authority carrier has invalid replacement presentation");
+  }
+  return {
+    ...baseImage,
+    authorityCarrier: {
+      checkpoint: authorityCarrier.checkpoint,
+      checksum: authorityCarrier.checksum,
+      preimage: authorityCarrier.preimage,
+      fullField: authorityCarrier.fullField,
+      authoritativeState: authorityCarrier.authoritativeState,
+      epoch: authorityCarrier.epoch,
+      wave: authorityCarrier.wave,
+      turn: authorityCarrier.turn,
+      presentation,
+    },
   };
 }
 
@@ -722,8 +732,13 @@ function decodeReplacementAuthorityCarrier(value: unknown): ReplacementAuthority
     "epoch",
     "wave",
     "turn",
+    "presentation",
   ] as const;
   if (required.some(field => !(field in value))) {
+    return null;
+  }
+  const presentation = decodeReplacementPresentation(value.presentation);
+  if (presentation === undefined) {
     return null;
   }
   return {
@@ -735,6 +750,35 @@ function decodeReplacementAuthorityCarrier(value: unknown): ReplacementAuthority
     epoch: value.epoch,
     wave: value.wave,
     turn: value.turn,
+    presentation,
+  };
+}
+
+/** `undefined` means malformed/missing; `null` is the explicit no-summon presentation. */
+function decodeReplacementPresentation(value: unknown): CoopSwitchPresentation | null | undefined {
+  if (value === null) {
+    return null;
+  }
+  if (!isPlainObject(value)) {
+    return;
+  }
+  if (
+    !isNonNegativeInt(value.bi)
+    || !isNonNegativeInt(value.partySlot)
+    || !isPositiveInt(value.pokemonId)
+    || !isPositiveInt(value.speciesId)
+    || !isNonNegativeInt(value.switchType)
+    || typeof value.doReturn !== "boolean"
+  ) {
+    return;
+  }
+  return {
+    bi: value.bi,
+    partySlot: value.partySlot,
+    pokemonId: value.pokemonId,
+    speciesId: value.speciesId,
+    switchType: value.switchType,
+    doReturn: value.doReturn,
   };
 }
 

@@ -56,7 +56,7 @@ test("the preset fixture requires both immutable build identity and exact page U
   );
   assert.match(
     registry,
-    /speciesId: SpeciesId\.PELIPPER[\s\S]*level: 100[\s\S]*abilityIndex: 1[\s\S]*moveset: \[MoveId\.AIR_CUTTER\][\s\S]*item: SHOWDOWN_ITEM_POOL\[0\]/u,
+    /speciesId: SpeciesId\.PELIPPER[\s\S]*level: 100[\s\S]*abilityIndex: 0[\s\S]*moveset: \[MoveId\.AIR_CUTTER\][\s\S]*item: SHOWDOWN_ITEM_POOL\[0\]/u,
   );
   assert.match(title, /getCoopBrowserShowdownFixturePreset\(\)/u);
   assert.match(

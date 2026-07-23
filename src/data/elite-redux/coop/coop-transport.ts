@@ -126,7 +126,10 @@ export type CoopRole = "host" | "guest";
 // er-coop-44 adds the immutable ability-flyout identity and environment-animation cue to the ordered
 // battle presentation stream. An older strict renderer rejects the new embedded event kind, so mixed
 // builds must refuse pairing instead of dropping switch-in presentation or the complete turn carrier.
-export const COOP_PROTOCOL_VERSION = "er-coop-44";
+// er-coop-45 makes switch presentation an immutable identity-bearing event and attaches the exact
+// replacement summon to REPLACEMENT_COMMIT. A protocol-44 renderer only snaps the post-switch checkpoint
+// and can falsely call that presentation-ready, so mixed builds must refuse pairing.
+export const COOP_PROTOCOL_VERSION = "er-coop-45";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1044,6 +1047,25 @@ export interface CoopAuthoritativeBattleStateV1 {
  * `message` (narration) and relies on the checkpoint for outcomes; the richer kinds
  * drive per-move animation fidelity in a later pass.
  */
+/**
+ * Immutable, presentation-only description of one completed host switch. The renderer may use these
+ * fields to recall/summon the exact actors, but it never runs SwitchSummonPhase or derives mechanics.
+ */
+export interface CoopSwitchPresentation {
+  /** Canonical host-orientation battler index of the vacated field slot. */
+  readonly bi: number;
+  /** Pre-switch party slot containing the incoming Pokemon. */
+  readonly partySlot: number;
+  /** Host-stable Pokemon identity; preferred over party order during replay. */
+  readonly pokemonId: number;
+  /** Species identity fallback when a pre-presentation party order has drifted. */
+  readonly speciesId: number;
+  /** Already-resolved SwitchType enum value. Presentation only; never re-executed. */
+  readonly switchType: number;
+  /** Whether the host showed the recall animation/text before sending the incoming Pokemon. */
+  readonly doReturn: boolean;
+}
+
 export type CoopBattleEvent =
   /** A battle-log line, ALREADY localized by the host (the guest shows it verbatim). */
   | { k: "message"; text: string }
@@ -1080,8 +1102,8 @@ export type CoopBattleEvent =
   | { k: "weather"; weather: number; turnsLeft: number; anim?: number }
   /** Terrain changed (`TerrainType` enum); `anim` is omitted when the authority suppressed it. */
   | { k: "terrain"; terrain: number; turnsLeft: number; anim?: number }
-  /** A mon switched out for the party member at `partySlot`. */
-  | { k: "switch"; bi: number; partySlot: number };
+  /** A mon switched out; every identity needed for deterministic presentation is explicit. */
+  | ({ k: "switch" } & CoopSwitchPresentation);
 
 // =============================================================================
 // Host-authoritative INTERACTION OUTCOME (#633, TRACK-2 Phase C). Today the owner

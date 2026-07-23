@@ -436,6 +436,7 @@ import type {
   CoopSessionKind,
   CoopSharedTerminalBoundary,
   CoopSharedTerminalReasonCode,
+  CoopSwitchPresentation,
   CoopWaveOutcome,
 } from "#data/elite-redux/coop/coop-transport";
 import {
@@ -4548,9 +4549,10 @@ function reconstructCoopV2TurnResolution(
 }
 
 /** Rebuild the compatibility envelope consumed by the real replacement replay transaction. */
-function reconstructCoopV2ReplacementCheckpoint(
-  entry: CoopAuthorityEntry,
-): Extract<CoopMessage, { t: "battleCheckpoint" }> | null {
+function reconstructCoopV2ReplacementCheckpoint(entry: CoopAuthorityEntry): {
+  readonly checkpoint: Extract<CoopMessage, { t: "battleCheckpoint" }>;
+  readonly presentation: CoopSwitchPresentation | null;
+} | null {
   const image = decodeReplacementCommitMaterial(entry);
   const carrier = image?.authorityCarrier;
   if (
@@ -4568,6 +4570,7 @@ function reconstructCoopV2ReplacementCheckpoint(
     || typeof carrier.epoch !== "number"
     || typeof carrier.wave !== "number"
     || typeof carrier.turn !== "number"
+    || carrier.presentation === undefined
   ) {
     return null;
   }
@@ -4587,18 +4590,21 @@ function reconstructCoopV2ReplacementCheckpoint(
     return null;
   }
   return {
-    t: "battleCheckpoint",
-    reason: "replacement",
-    epoch: carrier.epoch,
-    wave: carrier.wave,
-    turn: carrier.turn,
-    // Keep the exact compatibility identity used by sendCheckpoint. The Authority V2 log revision remains
-    // the retained ordering identity; the replay transaction's immutable carrier revision is the state tick.
-    revision: state.tick,
-    checkpoint: carrier.checkpoint as CoopBattleCheckpoint,
-    checksum: carrier.checksum,
-    fullField: carrier.fullField as CoopFullMonSnapshot[],
-    authoritativeState: state,
+    checkpoint: {
+      t: "battleCheckpoint",
+      reason: "replacement",
+      epoch: carrier.epoch,
+      wave: carrier.wave,
+      turn: carrier.turn,
+      // Keep the exact compatibility identity used by sendCheckpoint. The Authority V2 log revision remains
+      // the retained ordering identity; the replay transaction's immutable carrier revision is the state tick.
+      revision: state.tick,
+      checkpoint: carrier.checkpoint as CoopBattleCheckpoint,
+      checksum: carrier.checksum,
+      fullField: carrier.fullField as CoopFullMonSnapshot[],
+      authoritativeState: state,
+    },
+    presentation: carrier.presentation,
   };
 }
 
@@ -5827,14 +5833,19 @@ function buildCoopV2LiveSeams(
           if (!materializeCoopV2ReplacementPickerTerminal(image, runtime.controller.localSeatId, runtime.opState)) {
             return "deferred";
           }
-          const checkpoint = reconstructCoopV2ReplacementCheckpoint(entry);
-          if (checkpoint == null) {
+          const replacement = reconstructCoopV2ReplacementCheckpoint(entry);
+          if (replacement == null) {
             return false;
           }
-          if (runtime.battleStream.hasFinalizedAuthoritativeV2Replacement(checkpoint)) {
+          if (runtime.battleStream.hasFinalizedAuthoritativeV2Replacement(replacement.checkpoint)) {
             return markCoopV2ControlMaterialApplied(runtime, entry);
           }
-          runtime.battleStream.ingestAuthoritativeV2Replacement(checkpoint, entry.nextControl, entry.revision);
+          runtime.battleStream.ingestAuthoritativeV2Replacement(
+            replacement.checkpoint,
+            entry.nextControl,
+            entry.revision,
+            replacement.presentation,
+          );
           // The checkpoint is now retained in the correct replica stream. Release a preceding
           // null-successor turn only after that carrier exists, allowing the normal TurnInit/replay path
           // to consume it without opening a phantom command first.
@@ -6820,8 +6831,19 @@ export function commitCoopV2ReplacementAuthority(
           expectedOperationId: null,
         }
       : null;
+  const replacementSide =
+    runtime.controller.isVersusSession() && activeControl.ownerSeatId !== runtime.controller.authoritySeatId
+      ? "enemy"
+      : "player";
+  const replacementBi =
+    replacementSide === "player"
+      ? activeControl.fieldIndex
+      : (globalScene.currentBattle?.arrangement?.enemyOffset ?? 2) + activeControl.fieldIndex;
+  const replacementSeat =
+    state.field.find(seat => seat.side === replacementSide && seat.bi === replacementBi && seat.presented) ?? null;
   return cutover.commitStagedHostReplacements({
     authorityCarrier,
+    presentationSeat: replacementSeat == null ? null : { bi: replacementSeat.bi, pokemonId: replacementSeat.pokemonId },
     activeControl,
     commands: commandFrontier.commands,
     nextSuccessorWait,

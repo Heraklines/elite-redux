@@ -178,7 +178,15 @@ describe("showdown-side-swap: battle events", () => {
       passive: true,
       passiveSlot: 2,
     },
-    { k: "switch", bi: BattlerIndex.PLAYER, partySlot: 3 },
+    {
+      k: "switch",
+      bi: BattlerIndex.PLAYER,
+      partySlot: 3,
+      pokemonId: 91,
+      speciesId: 25,
+      switchType: 1,
+      doReturn: true,
+    },
     { k: "weather", weather: 2, turnsLeft: 5 },
     { k: "terrain", terrain: 1, turnsLeft: 3 },
   ];
