@@ -49,6 +49,7 @@ function tournament(rewardPool: TournamentRecord["rewardPool"]): TournamentRecor
     bracket: completeBracket(),
     battleFormat: "singles",
     seriesFormat: "single",
+    community: false,
     rewardPool,
     closeAt: null,
     rewardsGranted: false,

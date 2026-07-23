@@ -140,6 +140,7 @@ function completeTournament(rewardPool: TournamentRecord["rewardPool"]): Tournam
     bracket,
     battleFormat: "singles",
     seriesFormat: "single",
+    community: false,
     rewardPool,
     closeAt: null,
     rewardsGranted: false,

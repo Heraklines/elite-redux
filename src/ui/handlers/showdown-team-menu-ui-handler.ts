@@ -657,7 +657,8 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
       const preset = this.config!.presets[idx];
       if (preset != null) {
         // The VIEW is ephemeral (never hashed/persisted); the SAVE path omits the key via setPresetFolder.
-        preset.folder = folder ? folder : undefined;
+        const { folder: _previousFolder, ...ungrouped } = preset;
+        this.config!.presets[idx] = folder ? { ...ungrouped, folder } : ungrouped;
       }
       // Keep the cursor on the moved team so the preview does not jump.
       const rows = this.rowsList();

@@ -286,7 +286,7 @@ describe("tournament routes — editor-password auth (team credential)", () => {
   });
 
   it("editor password does nothing when the secret is unset on the worker", async () => {
-    env.EDITOR_PASSWORD = undefined;
+    delete env.EDITOR_PASSWORD;
     const res = await call("/tournament/create", "POST", null, { name: "Cup" }, EDITOR_HDR);
     expect(res.status).toBe(401);
   });
