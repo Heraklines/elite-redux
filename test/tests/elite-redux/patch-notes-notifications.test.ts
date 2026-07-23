@@ -20,7 +20,7 @@ describe("patch-notes notifications", () => {
           body: "Plain-text fallback",
           payload: {
             markdown: "# Full notes\n\n![Logo](https://example.com/logo.png)",
-            actionLabel: "Join Discord",
+            actionLabel: "Join PokeRogue Redux Discord",
             actionUrl: "https://discord.gg/q8d2jq5dE",
           },
         }),
@@ -28,7 +28,7 @@ describe("patch-notes notifications", () => {
     ).toEqual({
       title: "v0.0.6.0",
       markdown: "# Full notes\n\n![Logo](https://example.com/logo.png)",
-      actionLabel: "Join Discord",
+      actionLabel: "Join PokeRogue Redux Discord",
       actionUrl: "https://discord.gg/q8d2jq5dE",
     });
   });

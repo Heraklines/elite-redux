@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 
 const baseUrl = process.env.QA_BASE_URL ?? "http://127.0.0.1:4182";
 const outputDir = "test-results/rich-notification";
+const markdown = await readFile(new URL("../../docs/patch-notes/0.0.6.0.md", import.meta.url), "utf8");
 await mkdir(outputDir, { recursive: true });
 
 const browser = await chromium.launch({ channel: "chrome", headless: true });
@@ -12,23 +13,36 @@ async function openViewer(page) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   // The app may perform one development-mode reload while initializing assets.
   await page.waitForTimeout(3_000);
-  await page.evaluate(async () => {
+  await page.evaluate(async markdown => {
     const { RichNotificationViewer } = await import("/src/ui/rich-notification-viewer.ts");
-    const markdown = await fetch("/docs/patch-notes/0.0.6.0.md").then(response => response.text());
     window.__richNotificationQaClosed = 0;
     window.__richNotificationQaViewer = new RichNotificationViewer(
       {
         title: "PokeRogue Redux v0.0.6.0",
         markdown,
-        actionLabel: "Join Discord",
+        actionLabel: "Join PokeRogue Redux Discord",
         actionUrl: "https://discord.gg/q8d2jq5dE",
       },
       () => {
         window.__richNotificationQaClosed += 1;
       },
     );
-  });
-  await page.locator(".er-rich-notification-content img").waitFor({ state: "visible" });
+  }, markdown);
+  const images = page.locator(".er-rich-notification-content img");
+  await images.first().waitFor({ state: "visible" });
+  for (let index = 0; index < (await images.count()); index++) {
+    const image = images.nth(index);
+    await image.scrollIntoViewIfNeeded();
+    await image.evaluate(element => {
+      if (element.complete && element.naturalWidth > 0) {
+        return;
+      }
+      return new Promise((resolve, reject) => {
+        element.addEventListener("load", resolve, { once: true });
+        element.addEventListener("error", reject, { once: true });
+      });
+    });
+  }
 }
 
 async function inspect(page) {
@@ -49,6 +63,8 @@ async function inspect(page) {
       discordTarget: discord?.getAttribute("target"),
       headings: content?.querySelectorAll("h1, h2, h3").length ?? 0,
       imageLoaded: (image?.naturalWidth ?? 0) > 0,
+      images: content?.querySelectorAll("img").length ?? 0,
+      imagesLoaded: [...(content?.querySelectorAll("img") ?? [])].filter(image => image.naturalWidth > 0).length,
       viewport: { height: innerHeight, width: innerWidth },
     };
   });
@@ -58,8 +74,10 @@ try {
   const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await openViewer(desktop);
   const desktopState = await inspect(desktop);
-  assert.equal(desktopState.actionLabel, "Join Discord");
+  assert.equal(desktopState.actionLabel, "Join PokeRogue Redux Discord");
   assert.ok(desktopState.headings >= 6, "Markdown headings did not render");
+  assert.equal(desktopState.images, 6, "Not every patch-note image rendered");
+  assert.equal(desktopState.imagesLoaded, 6, "Not every patch-note image loaded");
   assert.ok(desktopState.imageLoaded, "Patch-note image did not load");
   assert.ok(desktopState.contentScrollHeight > desktopState.contentClientHeight, "Long notes are not scrollable");
   assert.ok(desktopState.contentWidthFits, "Desktop content overflows horizontally");
@@ -73,6 +91,10 @@ try {
   await desktop.waitForTimeout(200);
   assert.ok((await desktop.locator(".er-rich-notification-content").evaluate(node => node.scrollTop)) > 0);
   await desktop.screenshot({ path: `${outputDir}/desktop.png` });
+  await desktop
+    .getByRole("img", { name: "The Showdown set editor with stage, ability, item, nature, and move controls" })
+    .scrollIntoViewIfNeeded();
+  await desktop.screenshot({ path: `${outputDir}/desktop-image.png` });
   await desktop.getByRole("button", { name: "Close patch notes" }).click();
   assert.equal(await desktop.locator(".er-rich-notification-backdrop").count(), 0);
   assert.equal(await desktop.evaluate(() => window.__richNotificationQaClosed), 1);
@@ -84,11 +106,15 @@ try {
   });
   await openViewer(mobile);
   const mobileState = await inspect(mobile);
+  assert.equal(mobileState.images, 6, "Not every mobile patch-note image rendered");
+  assert.equal(mobileState.imagesLoaded, 6, "Not every mobile patch-note image loaded");
   assert.ok(mobileState.contentScrollHeight > mobileState.contentClientHeight, "Mobile notes are not scrollable");
   assert.ok(mobileState.contentWidthFits, "Mobile content overflows horizontally");
   assert.ok(mobileState.dialog.left >= 0 && mobileState.dialog.right <= mobileState.viewport.width);
   assert.ok(mobileState.dialog.top >= 0 && mobileState.dialog.bottom <= mobileState.viewport.height);
   await mobile.screenshot({ path: `${outputDir}/mobile.png` });
+  await mobile.getByRole("img", { name: "A 64-player World Grand Prix tournament bracket" }).scrollIntoViewIfNeeded();
+  await mobile.screenshot({ path: `${outputDir}/mobile-image.png` });
   await mobile.keyboard.press("Escape");
   assert.equal(await mobile.locator(".er-rich-notification-backdrop").count(), 0);
 
