@@ -39,3 +39,17 @@ test("live replacement material cannot omit the immutable presentation result", 
   assert.match(adapter, /"presentation"/u);
   assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-45"/u);
 });
+
+test("every co-op renderer boundary triggers the production two-browser journey", () => {
+  const workflow = read(".github/workflows/coop-public-ui-journey.yml");
+  for (const path of [
+    "src/data/elite-redux/coop/**",
+    "src/data/elite-redux/showdown/**",
+    "src/field/**",
+    "src/phase-manager.ts",
+    "src/phases/**",
+    "src/ui/**",
+  ]) {
+    assert.match(workflow, new RegExp(`- "${path.replaceAll("*", "\\*")}"`, "u"));
+  }
+});

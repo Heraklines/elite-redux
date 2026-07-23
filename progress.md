@@ -1821,3 +1821,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   allowlist. That would have replaced it with `CoopInertPhase` and left a replacement presentation watermark
   unopened. The phase is now present in the production allowlist, the empirical observed-phase contract, and
   the two-engine replay driver; the fast source contract also requires that wiring for every future edit.
+- The public-browser push trigger was also too narrow: changes to the battle stream, transport, renderer gate,
+  field event producers, phase manager, or a new UI could skip the real-browser journey. On `ci/coop/**` it now
+  covers the whole co-op and Showdown cores plus field, phases, and UI; a source contract pins that breadth.

@@ -8,17 +8,19 @@ on:
       - ".github/workflows/coop-public-ui-journey.yml"
       - "scripts/coop-browser-entry.ts"
       - "scripts/prepare-coop-browser-artifact.mjs"
-      - "src/data/elite-redux/coop/authority-v2/**"
-      - "src/data/elite-redux/coop/coop-runtime.ts"
-      - "src/data/elite-redux/coop/coop-webrtc-transport.ts"
+      # The production renderer is spread across transport, stream, runtime, V2 adapters, recovery,
+      # and the default-deny phase gate. A narrow file list previously let an allowlist omission skip
+      # the only test that constructs the phase through a real production browser.
+      - "src/data/elite-redux/coop/**"
       - "src/data/elite-redux/showdown/**"
       - "src/dev-tools/registry.ts"
       # Co-op control boundaries are distributed across ordinary gameplay phases.
       # Keep this broad so a new or migrated phase cannot bypass the two-browser
       # production journey merely because it was not added to this list yet.
+      - "src/field/**"
+      - "src/phase-manager.ts"
       - "src/phases/**"
-      - "src/ui/handlers/showdown-*.ts"
-      - "src/ui/handlers/starter-select-ui-handler.ts"
+      - "src/ui/**"
       - "test/browser/coop-public-ui/**"
       - "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"
       - "test/tests/elite-redux/coop/coop-guest-renderer.test.ts"
