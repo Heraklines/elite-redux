@@ -27,7 +27,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -166,6 +166,9 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     // ===== (1) WAVE-START checksum parity: the mirror rebuilt the guest byte-identical to the host. =====
     const hostChk0 = await withClient(rig.hostCtx, () => captureCoopChecksum());
     const guestChk0 = await withClient(rig.guestCtx, () => captureCoopChecksum());
+    const hostState0 = await withClient(rig.hostCtx, () => captureCoopChecksumState());
+    const guestState0 = await withClient(rig.guestCtx, () => captureCoopChecksumState());
+    expect(guestState0, "wave-start: every canonical trainer checksum component matches host").toEqual(hostState0);
     expect(guestChk0, "wave-start: guest checksum matches host (trainer wave mirrored faithfully)").toBe(hostChk0);
 
     // ===== (2) TRAINER-AWARE mirror fidelity: identity + FULL bench + per-slot trainerSlot. =====

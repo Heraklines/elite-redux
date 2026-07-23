@@ -26,7 +26,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -150,6 +150,9 @@ describe.skipIf(!RUN)(
 
       const hostChk0 = await withClient(rig.hostCtx, () => captureCoopChecksum());
       const guestChk0 = await withClient(rig.guestCtx, () => captureCoopChecksum());
+      const hostState0 = await withClient(rig.hostCtx, () => captureCoopChecksumState());
+      const guestState0 = await withClient(rig.guestCtx, () => captureCoopChecksumState());
+      expect(guestState0, "wave-start: every canonical checksum component matches host").toEqual(hostState0);
       expect(guestChk0, "wave-start: guest checksum matches host").toBe(hostChk0);
 
       // Rapid faint chain: KO the ENEMY-slot lead every turn; the trainer sends its next reserve at the
