@@ -1,0 +1,344 @@
+url:      https://showdown-sync.elite-redux-staging.pages.dev/
+build:    local:mrxw3mkb:170ae8d91c13a59b
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@24402ms -> title-shown@47294ms
+lastSess: crashed after boot-start
+mode:     7  wave:1
+seed:     showdown-sync:e8e9576b53ecbef6:7e4d524f2f72f1e3
+party:    Vulnona(L100 287hp f0), Arkani(L100 321hp f1)
+enemy:    Lapras(L100), Stahlos(L100), Simsala(L100)
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"local:mrxw3mkb:170ae8d91c13a59b","source":"local","sha":null,"workflow":null,"deployment":null}
+
+----- CO-OP REPORT CORRELATION (JSON) -----
+{"version":1,"pairKey":"coop-v1|session=-|run=8fe24591-c6b8-414d-8761-aef1376d24c0|epoch=1827670602828884|seed=showdown-sync%3Ae8e9576b53ecbef6%3A7e4d524f2f72f1e3","runId":"8fe24591-c6b8-414d-8761-aef1376d24c0","epoch":1827670602828884,"seed":"showdown-sync:e8e9576b53ecbef6:7e4d524f2f72f1e3","binding":null,"membership":{"revision":1,"connectionGeneration":0},"local":{"role":"host","seat":0},"partner":{"role":"guest","seat":1},"build":{"version":1,"id":"local:mrxw3mkb:170ae8d91c13a59b","source":"local","sha":null,"workflow":null,"deployment":null}}
+
+----- CO-OP CONTROL PLANE -----
+session:  role=host seat=0 gen=0g epoch=1827670602828884 run=8fe24591-c6b8-414d-8761-aef1376d24c0 binding=- sessionId=- netcode=lockstep
+members:  rev=1 state=active connectionGen=0 present=[0:host=true, 1:guest=true]
+phase:    running=CommandPhase queue=[EnemyCommandPhase, TurnStartPhase]
+interact: counter=0 awaiting=none
+commands: pending=[]
+rendez:   awaiting=[] localArrived=[showdown-ready, showdown-wager-commit] partnerArrived=[showdown-ready, showdown-wager-commit]
+transport(local): state=connected generation=0 lastRx=2s
+causal:   8/8 most-recent edges
+  #1 recovery:local-arrival id=rendezvous:e1827670602828884:showdown-ready role=host @e1827670602828884
+  #2 recovery:wait-open id=rendezvous:e1827670602828884:showdown-ready role=host @e1827670602828884
+  #3 recovery:peer-arrival id=rendezvous:e1827670602828884:showdown-ready role=host @e1827670602828884
+  #4 recovery:release id=rendezvous:e1827670602828884:showdown-ready role=host @e1827670602828884 outcome=exact
+  #5 recovery:peer-arrival id=rendezvous:e1827670602828884:showdown-wager-commit role=host @e1827670602828884
+  #6 recovery:local-arrival id=rendezvous:e1827670602828884:showdown-wager-commit role=host @e1827670602828884
+  #7 recovery:wait-open id=rendezvous:e1827670602828884:showdown-wager-commit role=host @e1827670602828884
+  #8 recovery:release id=rendezvous:e1827670602828884:showdown-wager-commit role=host @e1827670602828884 outcome=exact
+uiRelay:  none
+
+----- CONSOLE -----
+[19:21:55.928] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:21:56.538] LOG: [ER] build {"version":1,"id":"local:mrxw3mkb:170ae8d91c13a59b","source":"local","sha":null,"workflow":null,"deployment":null}
+[19:21:56.607] LOG: [dev-tools] loaded — 725 scenarios + Send Logs button
+[19:22:00.274] WARN: [asset-retry] load error key=grass_bg_rocky_dusk - retry 1/2 with cache-buster
+[19:22:00.316] WARN: [asset-retry] load error key=town_bg_courtyard_night - retry 1/2 with cache-buster
+[19:22:00.350] WARN: [asset-retry] load error key=grass_bg_rocky_day - retry 1/2 with cache-buster
+[19:22:00.377] WARN: [asset-retry] load error key=metropolis_bg_west_night - retry 1/2 with cache-buster
+[19:22:00.396] WARN: [asset-retry] load error key=metropolis_bg_park_night - retry 1/2 with cache-buster
+[19:22:00.417] WARN: [asset-retry] load error key=metropolis_bg_east_day - retry 1/2 with cache-buster
+[19:22:00.422] WARN: [asset-retry] load error key=metropolis_bg_mart - retry 1/2 with cache-buster
+[19:22:00.502] WARN: [asset-retry] load error key=forest_bg_path_day - retry 1/2 with cache-buster
+[19:22:00.502] WARN: [asset-retry] load error key=tall_grass_bg_field_day - retry 1/2 with cache-buster
+[19:22:00.512] WARN: [asset-retry] load error key=metropolis_bg_east_dusk - retry 1/2 with cache-buster
+[19:22:00.519] WARN: [asset-retry] load error key=swamp_bg_wetlands - retry 1/2 with cache-buster
+[19:22:00.548] WARN: [asset-retry] load error key=forest_bg_path_night - retry 1/2 with cache-buster
+[19:22:00.646] WARN: [asset-retry] load error key=swamp_bg_path - retry 1/2 with cache-buster
+[19:22:00.651] WARN: [asset-retry] load error key=swamp_bg_shadowmoon - retry 1/2 with cache-buster
+[19:22:00.661] WARN: [asset-retry] load error key=sea_bg_open_day - retry 1/2 with cache-buster
+[19:22:00.673] WARN: [asset-retry] load error key=forest_bg_shadowmoon - retry 1/2 with cache-buster
+[19:22:00.701] WARN: [asset-retry] load error key=beach_bg_shore_night - retry 1/2 with cache-buster
+[19:22:00.720] WARN: [asset-retry] load error key=town_bg_courtyard_day - retry 1/2 with cache-buster
+[19:22:00.783] WARN: [asset-retry] load error key=lake_bg_forest_day - retry 1/2 with cache-buster
+[19:22:00.784] WARN: [asset-retry] load error key=beach_bg_shore_dusk - retry 1/2 with cache-buster
+[19:22:00.787] WARN: [asset-retry] load error key=lake_bg_orion_day - retry 1/2 with cache-buster
+[19:22:00.834] WARN: [asset-retry] load error key=lake_bg_orion_dusk - retry 1/2 with cache-buster
+[19:22:00.925] WARN: [asset-retry] load error key=seabed_bg_coral - retry 1/2 with cache-buster
+[19:22:00.925] WARN: [asset-retry] load error key=seabed_bg_dirty - retry 1/2 with cache-buster
+[19:22:01.038] WARN: [asset-retry] load error key=mountain_bg_canyon_night - retry 1/2 with cache-buster
+[19:22:01.042] WARN: [asset-retry] load error key=town_bg_courtyard_dusk - retry 1/2 with cache-buster
+[19:22:01.042] WARN: [asset-retry] load error key=mountain_bg_canyon_dusk - retry 1/2 with cache-buster
+[19:22:01.155] WARN: [asset-retry] load error key=badlands_bg_scrub_path - retry 1/2 with cache-buster
+[19:22:01.219] WARN: [asset-retry] load error key=cave_bg_rock_night - retry 1/2 with cache-buster
+[19:22:01.223] WARN: [asset-retry] load error key=cave_bg_crystal_day - retry 1/2 with cache-buster
+[19:22:01.236] WARN: [asset-retry] load error key=cave_bg_rock_day - retry 1/2 with cache-buster
+[19:22:01.258] WARN: [asset-retry] load error key=cave_bg_crystal_night - retry 1/2 with cache-buster
+[19:22:01.512] WARN: [asset-retry] load error key=desert_bg_dunes - retry 1/2 with cache-buster
+[19:22:01.555] WARN: [asset-retry] load error key=metropolis_bg_west_day - retry 1/2 with cache-buster
+[19:22:01.606] WARN: [asset-retry] load error key=lake_bg_orion_night - retry 1/2 with cache-buster
+[19:22:01.755] WARN: [asset-retry] load error key=metropolis_bg_park_dusk - retry 1/2 with cache-buster
+[19:22:01.829] WARN: [asset-retry] load error key=ice_cave_bg_glacier - retry 1/2 with cache-buster
+[19:22:01.876] WARN: [asset-retry] load error key=metropolis_bg_night - retry 1/2 with cache-buster
+[19:22:01.876] WARN: [asset-retry] load error key=metropolis_bg_west_dusk - retry 1/2 with cache-buster
+[19:22:01.925] WARN: [asset-retry] load error key=dojo_bg_stadium_day - retry 1/2 with cache-buster
+[19:22:01.925] WARN: [asset-retry] load error key=dojo_bg_interior - retry 1/2 with cache-buster
+[19:22:01.988] WARN: [asset-retry] load error key=dojo_bg_stadium_night - retry 1/2 with cache-buster
+[19:22:01.988] WARN: [asset-retry] load error key=dojo_bg_stadium_dusk - retry 1/2 with cache-buster
+[19:22:02.000] WARN: [asset-retry] load error key=metropolis_bg_east_night - retry 1/2 with cache-buster
+[19:22:02.083] WARN: [asset-retry] load error key=grass_bg_rocky_night - retry 1/2 with cache-buster
+[19:22:02.084] WARN: [asset-retry] load error key=lake_bg_forest_night - retry 1/2 with cache-buster
+[19:22:02.110] WARN: [asset-retry] load error key=beach_bg_shore_day - retry 1/2 with cache-buster
+[19:22:02.110] WARN: [asset-retry] load error key=mountain_bg_canyon_day - retry 1/2 with cache-buster
+[19:22:02.111] WARN: [asset-retry] load error key=sea_bg_open_night - retry 1/2 with cache-buster
+[19:22:02.111] WARN: [asset-retry] load error key=metropolis_bg_dusk - retry 1/2 with cache-buster
+[19:22:02.359] WARN: [asset-retry] load error key=construction_site_bg_night - retry 1/2 with cache-buster
+[19:22:02.360] WARN: [asset-retry] load error key=construction_site_bg_dusk - retry 1/2 with cache-buster
+[19:22:02.467] WARN: [asset-retry] load error key=fairy_cave_bg_crystal_water_night - retry 1/2 with cache-buster
+[19:22:02.594] WARN: [asset-retry] load error key=snowy_forest_bg_plain_night - retry 1/2 with cache-buster
+[19:22:02.595] WARN: [asset-retry] load error key=snowy_forest_bg_plain_day - retry 1/2 with cache-buster
+[19:22:02.630] WARN: [asset-retry] load error key=laboratory_bg_science_night - retry 1/2 with cache-buster
+[19:22:02.635] WARN: [asset-retry] load error key=tall_grass_bg_field_night - retry 1/2 with cache-buster
+[19:22:02.655] WARN: [asset-retry] load error key=metropolis_bg_park_day - retry 1/2 with cache-buster
+[19:22:03.165] WARN: [asset-retry] load error key=cave_bg_stream - retry 1/2 with cache-buster
+[19:22:03.415] WARN: [asset-retry] load error key=laboratory_bg_destroyed - retry 1/2 with cache-buster
+[19:22:03.823] WARN: [asset-retry] load error key=fairy_cave_bg_crystal_water_day - retry 1/2 with cache-buster
+[19:22:16.236] WARN: [asset-retry] load error key=er_icon__forbiddron - retry 1/2 with cache-buster
+[19:22:16.239] WARN: [asset-retry] load error key=er_icon__nimbeon - retry 1/2 with cache-buster
+[19:22:16.241] WARN: [asset-retry] load error key=er_icon__dustnoir - retry 1/2 with cache-buster
+[19:22:16.276] WARN: [asset-retry] load error key=er_icon__ryuveon - retry 1/2 with cache-buster
+[19:22:16.276] WARN: [asset-retry] load error key=er_icon__twinkletuff - retry 1/2 with cache-buster
+[19:22:16.314] WARN: [asset-retry] load error key=er_icon__webbed_bruiser - retry 1/2 with cache-buster
+[19:22:16.315] WARN: [asset-retry] load error key=er_icon__idolfin - retry 1/2 with cache-buster
+[19:22:16.585] WARN: [asset-retry] load error key=grass_bg_rocky_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.597] WARN: [asset-retry] load error key=town_bg_courtyard_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.610] WARN: [asset-retry] load error key=metropolis_bg_west_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.615] WARN: [asset-retry] load error key=grass_bg_rocky_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.623] WARN: [asset-retry] load error key=metropolis_bg_park_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.629] WARN: [asset-retry] load error key=metropolis_bg_mart - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.634] WARN: [asset-retry] load error key=forest_bg_path_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.640] WARN: [asset-retry] load error key=metropolis_bg_east_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.652] WARN: [asset-retry] load error key=tall_grass_bg_field_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.656] WARN: [asset-retry] load error key=metropolis_bg_east_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.660] WARN: [asset-retry] load error key=swamp_bg_wetlands - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.665] WARN: [asset-retry] load error key=forest_bg_path_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.670] WARN: [asset-retry] load error key=swamp_bg_shadowmoon - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.675] WARN: [asset-retry] load error key=sea_bg_open_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.680] WARN: [asset-retry] load error key=swamp_bg_path - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.739] WARN: [asset-retry] load error key=beach_bg_shore_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.744] WARN: [asset-retry] load error key=forest_bg_shadowmoon - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.750] WARN: [asset-retry] load error key=town_bg_courtyard_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.760] WARN: [asset-retry] load error key=lake_bg_orion_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.768] WARN: [asset-retry] load error key=beach_bg_shore_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.776] WARN: [asset-retry] load error key=lake_bg_forest_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.796] WARN: [asset-retry] load error key=er_icon__titaneon - retry 1/2 with cache-buster
+[19:22:16.833] WARN: [asset-retry] load error key=lake_bg_orion_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.840] WARN: [asset-retry] load error key=seabed_bg_dirty - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.848] WARN: [asset-retry] load error key=mountain_bg_canyon_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.862] WARN: [asset-retry] load error key=seabed_bg_coral - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.886] WARN: [asset-retry] load error key=town_bg_courtyard_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.904] WARN: [asset-retry] load error key=mountain_bg_canyon_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.912] WARN: [asset-retry] load error key=cave_bg_crystal_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.918] WARN: [asset-retry] load error key=cave_bg_rock_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.924] WARN: [asset-retry] load error key=cave_bg_rock_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.929] WARN: [asset-retry] load error key=badlands_bg_scrub_path - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.940] WARN: [asset-retry] load error key=desert_bg_dunes - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.944] WARN: [asset-retry] load error key=lake_bg_orion_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.950] WARN: [asset-retry] load error key=metropolis_bg_park_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.955] WARN: [asset-retry] load error key=metropolis_bg_west_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:16.961] WARN: [asset-retry] load error key=cave_bg_crystal_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.014] WARN: [asset-retry] load error key=metropolis_bg_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.034] WARN: [asset-retry] load error key=ice_cave_bg_glacier - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.043] WARN: [asset-retry] load error key=metropolis_bg_west_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.077] WARN: [asset-retry] load error key=dojo_bg_stadium_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.082] WARN: [asset-retry] load error key=dojo_bg_stadium_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.085] WARN: [asset-retry] load error key=dojo_bg_interior - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.091] WARN: [asset-retry] load error key=metropolis_bg_east_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.097] WARN: [asset-retry] load error key=dojo_bg_stadium_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.108] WARN: [asset-retry] load error key=grass_bg_rocky_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.113] WARN: [asset-retry] load error key=beach_bg_shore_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.117] WARN: [asset-retry] load error key=lake_bg_forest_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.124] WARN: [asset-retry] load error key=mountain_bg_canyon_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.156] WARN: [asset-retry] load error key=er_icon__egoelk - retry 1/2 with cache-buster
+[19:22:17.157] WARN: [asset-retry] load error key=sea_bg_open_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.163] WARN: [asset-retry] load error key=metropolis_bg_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.171] WARN: [asset-retry] load error key=construction_site_bg_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.177] WARN: [asset-retry] load error key=construction_site_bg_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.182] WARN: [asset-retry] load error key=fairy_cave_bg_crystal_water_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.190] WARN: [asset-retry] load error key=snowy_forest_bg_plain_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.228] WARN: [asset-retry] load error key=laboratory_bg_science_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.236] WARN: [asset-retry] load error key=tall_grass_bg_field_night - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.241] WARN: [asset-retry] load error key=cave_bg_stream - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.248] WARN: [asset-retry] load error key=metropolis_bg_park_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.252] WARN: [asset-retry] load error key=snowy_forest_bg_plain_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.258] WARN: [asset-retry] load error key=laboratory_bg_destroyed - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.272] WARN: [asset-retry] load error key=fairy_cave_bg_crystal_water_day - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.278] WARN: [asset-retry] load error key=er_icon__forbiddron - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.316] WARN: [asset-retry] load error key=er_icon__nimbeon - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.367] WARN: [asset-retry] load error key=er_icon__idolfin - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.375] WARN: [asset-retry] load error key=er_icon__webbed_bruiser - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.386] WARN: [asset-retry] load error key=er_icon__ryuveon - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.395] WARN: [asset-retry] load error key=er_icon__twinkletuff - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.405] WARN: [asset-retry] load error key=er_icon__dustnoir - retry 2/2 via fastly mirror + cache-buster
+[19:22:17.560] WARN: [asset-retry] load error key=er_icon__drawclops - retry 1/2 with cache-buster
+[19:22:17.617] WARN: [asset-retry] load error key=er_icon__titaneon - retry 2/2 via fastly mirror + cache-buster
+[19:22:18.320] WARN: [asset-retry] load error key=er_icon__egoelk - retry 2/2 via fastly mirror + cache-buster
+[19:22:18.427] WARN: [asset-retry] load error key=er_icon__drawclops - retry 2/2 via fastly mirror + cache-buster
+[19:22:18.738] DEBUG: Destroying loading scene
+[19:22:18.738] DEBUG: Destroyed loading scene
+[19:22:18.868] LOG: Seed: Ugwwu0yRiwaS07cZkHphgUoF
+[19:22:18.869] LOG: Wave Seed: Ugwwu0yRiwaS07cZkHphgUoF 0
+[19:22:40.634] LOG: %cStart Phase LoginPhase color:green;
+[19:22:40.959] LOG: Client Session: 7YsGrs2gVNdj2Zk8dIL696m4x2ceSDVN
+[19:22:41.616] LOG: %cStart Phase TitlePhase color:green;
+[19:22:41.617] LOG: Getting Session Slot id: %d 0
+[19:22:41.634] LOG: use seasonal splash messages true
+[19:22:45.423] LOG: [coop:lobby] start announce name=Heraklines1 protocol=p33
+[19:22:46.916] LOG: [coop:lobby] poll players=1
+[19:22:47.335] LOG: [coop:lobby] request target=p33_qWOLiPStUVmMtAViiNTuUkzoObv9dkaF (self=p33_7QAhfBIwZmaHlnLoFtvVeP7T-aujyjPb)
+[19:22:47.885] LOG: [coop:lobby] poll players=1
+[19:22:49.721] LOG: [coop:lobby] poll players=1
+[19:22:51.593] LOG: [coop:lobby] poll matched code=S3MK7A transportRole=answerer -> connect
+[19:22:51.913] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[19:22:52.949] LOG: [coop:launch] data channel already open
+[19:22:52.949] LOG: [coop:webrtc] peer connection state role=host state=connecting channel=open
+[19:22:52.949] LOG: [coop:webrtc] ICE connection state role=host state=connected channel=open
+[19:22:52.949] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[19:22:52.952] LOG: [coop:webrtc] channel OPEN role=host gen=0
+[19:22:52.953] LOG: [coop:webrtc] peer connection state role=host state=connected channel=open
+[19:22:53.074] LOG: [coop:launch] connectCoopSession role=host state=connected username=Heraklines1 netcode=authoritative
+[19:22:53.076] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[19:22:53.078] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[19:22:53.079] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[19:22:53.079] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[19:22:53.079] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[19:22:53.079] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[19:22:53.079] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[19:22:53.079] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[19:22:53.081] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[19:22:53.081] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[19:22:53.081] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=Heraklines1 version=er-coop-37 tiebreak=0.5463504584183188
+[19:22:53.087] LOG: [coop:webrtc] raw tx QUEUE role=host t=hello bytes=543
+[19:22:53.141] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=d934626e515c046f(1108) movesName=12be97f97ecdc120(1108) movesets=3cd1aab08a835678(1932) abilitiesData=750d7c1a57ed5701(1148) abilitiesName=92447639a283b339(1148)
+[19:22:53.144] LOG: [coop:webrtc] raw tx QUEUE role=host t=dataFingerprint bytes=329
+[19:22:53.151] LOG: %cStart Phase SelectStarterPhase color:green;
+[19:22:53.155] LOG: [coop:webrtc] raw tx QUEUE role=host t=showdownTeam bytes=793
+[19:22:53.155] LOG: [coop:webrtc] raw tx QUEUE role=host t=showdownReady bytes=51
+[19:22:53.223] LOG: [coop:webrtc] raw rx role=host t=hello bytes=530 handlers=13
+[19:22:53.226] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[19:22:53.226] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:22:53.227] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:22:53.288] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=13
+[19:22:53.289] LOG: [coop:checksum] MATCH - data tables identical across clients
+[19:22:53.289] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:22:53.289] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:22:53.309] LOG: [coop:webrtc] raw rx role=host t=showdownTeam bytes=745 handlers=13
+[19:22:53.309] LOG: [coop:webrtc] raw rx role=host t=showdownReady bytes=51 handlers=13
+[19:22:53.309] LOG: [coop:webrtc] raw tx QUEUE role=host t=showdownTeam bytes=793
+[19:22:53.309] LOG: [coop:webrtc] raw tx QUEUE role=host t=showdownReady bytes=51
+[19:22:53.310] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=host
+[19:22:53.310] LOG: [coop:webrtc] raw tx QUEUE role=host t=rendezvous bytes=43
+[19:22:53.310] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=host
+[19:22:53.311] LOG: [coop:webrtc] raw rx role=host t=showdownTeam bytes=745 handlers=13
+[19:22:53.311] LOG: [coop:webrtc] raw rx role=host t=showdownReady bytes=51 handlers=13
+[19:22:53.312] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=43 handlers=13
+[19:22:53.312] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=host
+[19:22:53.312] LOG: [coop:webrtc] raw tx QUEUE role=host t=rendezvous bytes=43
+[19:22:53.313] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=host
+[19:22:53.354] LOG: [coop:webrtc] raw tx QUEUE role=host t=showdownStakeOffer bytes=106
+[19:22:53.377] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=43 handlers=13
+[19:22:53.377] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> DUPLICATE (already seen) role=host
+[19:22:53.378] LOG: [coop:webrtc] raw rx role=host t=showdownStakeOffer bytes=106 handlers=13
+[19:22:54.376] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=50 handlers=13
+[19:22:54.376] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> BUFFER (no waiter yet) role=host
+[19:22:55.905] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=host
+[19:22:55.905] LOG: [coop:webrtc] raw tx QUEUE role=host t=rendezvous bytes=50
+[19:22:55.905] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit -> partner already arrived (buffer-hit) role=host
+[19:22:55.935] LOG: Wave Seed: showdown-sync:e8e9576b53ecbef6:7e4d524f2f72f1e3 0
+[19:22:55.966] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=50 handlers=12
+[19:22:55.966] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> DUPLICATE (already seen) role=host
+[19:22:56.601] LOG: Wave Seed: tipxepxo.tzod;f9f:687c64fdcfg7;8f5e635g3g83g2f4 1
+[19:22:56.608] LOG: %cStart Phase EncounterPhase color:green;
+[19:22:56.651] LOG: Pokemon: Mega-Simsala (Gegner) | Species ID: 65 | Level: 100 | Nature: Robust (-)
+[19:22:56.651] LOG: Stats (IVs): HP: 251 (31), Atk: 136 (31), Def: 166 (31), Spatk: 386 (31), Spdef: 246 (31), Spd: 336 (31)
+[19:22:56.651] LOG: Ability: Mystic Power | Passive Ability: Psychic Mind 
+[19:22:56.651] LOG: Moveset: ["Teleport","Psykraft","Telekinese","Seitentausch"]
+[19:22:56.682] LOG: Pokemon: Stahlos (Gegner) | Species ID: 208 | Level: 100 | Nature: Robust (-)
+[19:22:56.682] LOG: Stats (IVs): HP: 291 (31), Atk: 246 (31), Def: 436 (31), Spatk: 146 (31), Spdef: 186 (31), Spd: 76 (31)
+[19:22:56.682] LOG: Ability: Aftershock | Passive Ability: Lead Coat 
+[19:22:56.682] LOG: Moveset: ["Body Press","Einrollen","Tectonic Fangs","Sandsammler"]
+[19:22:56.702] LOG: Pokemon: Lapras (Gegner) | Species ID: 131 | Level: 100 | Nature: Robust (-)
+[19:22:56.702] LOG: Stats (IVs): HP: 401 (31), Atk: 206 (31), Def: 196 (31), Spatk: 226 (31), Spdef: 226 (31), Spd: 156 (31)
+[19:22:56.702] LOG: Ability: Anpassung | Passive Ability: Edelmut 
+[19:22:56.702] LOG: Moveset: ["Genesung","Gefriertrockner","Gesang","Siedewasser"]
+[19:22:57.560] LOG: Generated AI funcs
+[19:22:57.570] LOG: Wave Seed: tipxepxo.tzod;f9f:687c64fdcfg7;8f5e635g3g83g2f4 1
+[19:22:58.087] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[19:22:58.088] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=0s transport=connected journal=0/0 queue=0
+[19:22:58.247] LOG: Veteran test4
+[19:23:03.483] LOG: Dialogue saved as seen: dialogue:veteran.encounter.1
+[19:23:03.578] LOG: Veteran test4
+[19:23:04.414] LOG: %cStart Phase SummonPhase color:green;
+[19:23:04.416] LOG: test4
+[19:23:05.278] LOG: %cStart Phase SummonPhase color:green;
+[19:23:05.849] WARN: cry/38 not found
+[19:23:06.184] LOG: %cStart Phase ShinySparklePhase color:green;
+[19:23:06.522] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:23:06.523] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:23:06.526] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:06.526] LOG: Ran PSP for: Mega-Simsala
+[19:23:06.530] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:06.536] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:23:07.047] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:23:08.098] LOG: %cStart Phase MessagePhase color:green;
+[19:23:08.837] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:23:08.910] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:08.910] LOG: Ran PSP for: Vulnona
+[19:23:08.911] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:08.914] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:23:09.424] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:23:09.933] LOG: %cStart Phase MessagePhase color:green;
+[19:23:10.655] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:23:10.731] LOG: %cStart Phase TurnInitPhase color:green;
+[19:23:10.732] LOG: %cStart Phase CommandPhase color:green;
+[19:23:12.122] LOG: Move: TAIL_GLOW Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Vulnona
+[19:23:12.123] LOG: [coop:relay] showdown peer sendCommand turn=1 slot=0 command=0 cursor=0
+[19:23:12.123] LOG: [coop:webrtc] raw tx QUEUE role=host t=showdownCommand bytes=106
+[19:23:12.126] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:23:12.126] LOG: [coop:relay] showdown host requestEnemyCommand SEND turn=1 slot=0 (awaiting peer)
+[19:23:17.481] LOG: [coop:webrtc] raw rx role=host t=showdownCommand bytes=106 handlers=12
+[19:23:17.481] LOG: [coop:relay] showdown recv command turn=1 slot=0 command=0 -> resolved awaiting request
+[19:23:17.481] LOG: %cStart Phase TurnStartPhase color:green;
+[19:23:17.486] LOG: %cStart Phase MovePhase color:green;
+[19:23:17.486] LOG: %cUser: Vulnona
+Move: TAIL_GLOW
+Use Mode: NORMAL color:orchid
+[19:23:17.492] LOG: %cStart Phase MessagePhase color:green;
+[19:23:17.878] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:23:19.101] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:23:19.704] LOG: %cStart Phase MessagePhase color:green;
+[19:23:20.467] LOG: %cStart Phase MoveEndPhase color:green;
+[19:23:20.467] LOG: %cStart Phase MovePhase color:green;
+[19:23:20.468] LOG: %cUser: Mega-Simsala
+Move: TELEPORT
+Use Mode: NORMAL color:orchid
+[19:23:20.473] LOG: %cStart Phase MessagePhase color:green;
+[19:23:20.937] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:23:21.464] LOG: %cStart Phase MoveEndPhase color:green;
+[19:23:21.464] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:23:22.226] LOG: test4
+[19:23:22.886] LOG: %cStart Phase ShinySparklePhase color:green;
+[19:23:23.224] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:23.224] LOG: Ran PSP for: Lapras
+[19:23:23.224] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:23:23.224] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:23:23.918] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:23:23.918] LOG: %cStart Phase BerryPhase color:green;
+[19:23:23.920] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:23:23.921] LOG: %cStart Phase TurnEndPhase color:green;
+[19:23:23.925] LOG: %cStart Phase TurnInitPhase color:green;
+[19:23:23.926] LOG: %cStart Phase CommandPhase color:green;
+[19:23:33.081] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[19:23:33.081] LOG: [coop:health] tick=0g turn=2 wave=1 counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=1s transport=connected journal=0/0 queue=0
+[19:23:39.791] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"showdown-sync:e8e9576b53ecbef6:7e4d524f2f72f1e3","gameModeId":7,"difficulty":"youngster","challenges":[],"roster":[{"id":2731181490,"player":true,"species":38,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":100,"exp":1000000,"levelExp":0,"gender":0,"hp":287,"stats":[287,169,186,240,236,236],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":294,"ppUsed":0,"ppUp":0},{"moveId":595,"ppUsed":0,"ppUp":0},{"moveId":585,"ppUsed":0,"ppUp":0},{"moveId":844,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":100,"metBiome":-1,"metSpecies":38,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,3,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":294,"targets":[0],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":924376070,"player":true,"species":59,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":100,"exp":1081250,"levelExp":0,"gender":0,"hp":321,"stats":[321,316,256,256,256,316],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":43,"ppUsed":0,"ppUp":0},{"moveId":52,"ppUsed":0,"ppUp":0},{"moveId":221,"ppUsed":0,"ppUp":0},{"moveId":24,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":100,"metBiome":-1,"metSpecies":59,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":1,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":0}},{"type":"command","wave":1,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0,"target":2}}],"checkpoint":{"wave":1,"seed":"showdown-sync:e8e9576b53ecbef6:7e4d524f2f72f1e3","party":[{"id":2731181490,"player":true,"species":38,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":100,"exp":1000000,"levelExp":0,"gender":0,"hp":287,"stats":[287,169,186,240,236,236],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":294,"ppUsed":0,"ppUp":0},{"moveId":595,"ppUsed":0,"ppUp":0},{"moveId":585,"ppUsed":0,"ppUp":0},{"moveId":844,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":100,"metBiome":-1,"metSpecies":38,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,3,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":294,"targets":[0],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":924376070,"player":true,"species":59,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":100,"exp":1081250,"levelExp":0,"gender":0,"hp":321,"stats":[321,316,256,256,256,316],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":43,"ppUsed":0,"ppUp":0},{"moveId":52,"ppUsed":0,"ppUp":0},{"moveId":221,"ppUsed":0,"ppUp":0},{"moveId":24,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":100,"metBiome":-1,"metSpecies":59,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"LEFTOVERS","args":[2731181490],"stackCount":1,"className":"TurnHealModifier"},{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":0,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
