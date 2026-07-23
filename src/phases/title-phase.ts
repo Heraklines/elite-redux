@@ -77,18 +77,40 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
 const NO_SAVE_SLOT = -1;
-export const SHOWDOWN_MODES_ENABLED = false;
+export const SHOWDOWN_1V1_ENABLED = true;
+export const SHOWDOWN_TOURNAMENTS_ENABLED = false;
 const SHOWDOWN_MODE_OVERRIDE_PARAM = "enableShowdown";
+const SHOWDOWN_1V1_OVERRIDE_PARAM = "enableShowdown1v1";
+const SHOWDOWN_TOURNAMENTS_OVERRIDE_PARAM = "enableShowdownTournaments";
 
-export function areShowdownModesEnabled(search = typeof window === "undefined" ? "" : window.location.search): boolean {
-  const override = new URLSearchParams(search).get(SHOWDOWN_MODE_OVERRIDE_PARAM);
+function readShowdownOverride(params: URLSearchParams, key: string): boolean | undefined {
+  const override = params.get(key);
   if (override === "1") {
     return true;
   }
   if (override === "0") {
     return false;
   }
-  return SHOWDOWN_MODES_ENABLED;
+  return;
+}
+
+function isShowdownFeatureEnabled(search: string, featureParam: string, defaultEnabled: boolean): boolean {
+  const params = new URLSearchParams(search);
+  return (
+    readShowdownOverride(params, featureParam)
+    ?? readShowdownOverride(params, SHOWDOWN_MODE_OVERRIDE_PARAM)
+    ?? defaultEnabled
+  );
+}
+
+export function isShowdown1v1Enabled(search = typeof window === "undefined" ? "" : window.location.search): boolean {
+  return isShowdownFeatureEnabled(search, SHOWDOWN_1V1_OVERRIDE_PARAM, SHOWDOWN_1V1_ENABLED);
+}
+
+export function areShowdownTournamentsEnabled(
+  search = typeof window === "undefined" ? "" : window.location.search,
+): boolean {
+  return isShowdownFeatureEnabled(search, SHOWDOWN_TOURNAMENTS_OVERRIDE_PARAM, SHOWDOWN_TOURNAMENTS_ENABLED);
 }
 
 export class TitlePhase extends Phase {
@@ -195,7 +217,7 @@ export class TitlePhase extends Phase {
     // Register the tournament deep-link opener while at the title (cleared on teardown). A
     // challenge notification in the inbox uses this to jump straight to the board on its match.
     setTournamentFlowOpener(
-      areShowdownModesEnabled()
+      areShowdownTournamentsEnabled()
         ? (target: TournamentDeepLink) => this.openShowdownTournaments(gm => this.launchGameMode(gm), target)
         : null,
     );
@@ -274,31 +296,21 @@ export class TitlePhase extends Phase {
             semanticId: "showdown",
             label: GameMode.getModeName(GameModes.SHOWDOWN),
             handler: () => {
-              if (!areShowdownModesEnabled()) {
+              if (!isShowdown1v1Enabled()) {
                 showTemporarilyDisabled();
                 return true;
               }
-              this.openShowdownTeamMenu(setModeAndEnd, "authoritative");
+              this.openShowdownTeamMenu(setModeAndEnd, "lockstep");
               return true;
             },
           });
-          if (isDev || isBeta || devToolsEnabled) {
-            options.push({
-              semanticId: "showdown-sync",
-              label: "Showdown Sync",
-              handler: () => {
-                this.openShowdownTeamMenu(setModeAndEnd, "lockstep");
-                return true;
-              },
-            });
-          }
           // Showdown TOURNAMENTS (beside the Team Menu path): async single-elim brackets. Opens the
           // tournament LIST (worker-backed); register / view bracket / play a bracket match from there.
           options.push({
             semanticId: "showdown-tournaments",
             label: "Showdown Tournaments",
             handler: () => {
-              if (!areShowdownModesEnabled()) {
+              if (!areShowdownTournamentsEnabled()) {
                 showTemporarilyDisabled();
                 return true;
               }
@@ -537,7 +549,7 @@ export class TitlePhase extends Phase {
    */
   private openShowdownTeamMenu(
     setModeAndEnd: (gameMode: GameModes) => void,
-    netcodeMode: CoopNetcodeMode = "authoritative",
+    netcodeMode: CoopNetcodeMode = "lockstep",
   ): void {
     const { gameData } = globalScene;
     const showMenu = (): void => {
@@ -1108,8 +1120,9 @@ export class TitlePhase extends Phase {
         const isCurrentSession = (): boolean =>
           !lobbyTerminated && !lobbyCompleted && this.isExactCoopSession(runtime, controller, sessionGeneration);
         // Versus launches no longer broadcast a runConfig, so BOTH clients must pin the mode selected
-        // by their title route before entering the battle flow. Standard Showdown passes authoritative;
-        // the staging-only Showdown Sync route passes lockstep. Co-op's host remains the config authority.
+        // by their title route before entering the battle flow. Showdown 1v1 runs the dual-engine
+        // lockstep path; tournaments retain their existing authoritative route. Co-op's host remains
+        // the config authority.
         if (sessionKind === "versus" || runtime.controller.role === "host") {
           runtime.controller.setNetcodeMode(netcodeMode);
         }
