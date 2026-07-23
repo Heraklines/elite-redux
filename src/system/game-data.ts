@@ -2843,6 +2843,28 @@ export class GameData {
     );
   }
 
+  private async combinedCloudSaveReadbackMatches(
+    accountIdentity: string | null,
+    slot: number,
+    expectedSystem: string,
+    expectedSession: string | null,
+  ): Promise<boolean> {
+    if (!this.persistenceAccountIsCurrent(accountIdentity)) {
+      return false;
+    }
+    const [systemRead, sessionRead] = await Promise.all([
+      pokerogueApi.savedata.system.get({ clientSessionId }),
+      expectedSession == null
+        ? Promise.resolve(null)
+        : pokerogueApi.savedata.session.getCoopCas({ slot, clientSessionId }),
+    ]);
+    return (
+      this.persistenceAccountIsCurrent(accountIdentity)
+      && systemRead === expectedSystem
+      && (expectedSession == null || (sessionRead?.ok === true && sessionRead.rawSavedata === expectedSession))
+    );
+  }
+
   private async classifyCoopReplica(slot: number, raw: string): Promise<CoopClassifiedReplica> {
     const structural = classifySessionProtection(raw);
     if (structural === "unknown") {
@@ -5579,15 +5601,10 @@ export class GameData {
       clientSessionId,
     };
 
-    const systemSaved = trySetLocalStorageItem(
-      systemStorageKey,
-      encrypt(
-        JSON.stringify(systemData, (_k: any, v: any) =>
-          typeof v === "bigint" ? (v <= maxIntAttrValue ? Number(v) : v.toString()) : v,
-        ),
-        bypassLogin,
-      ),
+    const systemJson = JSON.stringify(systemData, (_k: any, v: any) =>
+      typeof v === "bigint" ? (v <= maxIntAttrValue ? Number(v) : v.toString()) : v,
     );
+    const systemSaved = trySetLocalStorageItem(systemStorageKey, encrypt(systemJson, bypassLogin));
 
     const encryptedSession = encrypt(sessionJson, bypassLogin);
     let sessionSaved = false;
@@ -6028,9 +6045,21 @@ export class GameData {
     if (overwriteCloudSyncApplies && this.pendingOverwriteCloudSync === pendingOverwriteCloudSync) {
       this.pendingOverwriteCloudSync = null;
     }
+    const readbackEligible = saveError === "Unknown error" || saveError === "Combined cloud save timed out.";
+    const readbackProvedCommit =
+      readbackEligible
+      && (await this.combinedCloudSaveReadbackMatches(
+        saveAccountIdentity,
+        globalScene.sessionSlotId,
+        systemJson,
+        cloudRequest.session == null ? null : sessionJson,
+      ));
     globalScene.ui.savingIcon.hide();
 
-    if (!saveError) {
+    if (!saveError || readbackProvedCommit) {
+      if (readbackProvedCommit) {
+        console.warn(`Combined cloud save returned "${saveError}", but exact readback proved it committed.`);
+      }
       if (authorityCloudDebt) {
         return true;
       }

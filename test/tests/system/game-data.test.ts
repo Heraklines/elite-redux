@@ -82,6 +82,7 @@ describe("System - Game Data", () => {
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
       vi.spyOn(pokerogueApi.account, "getInfo").mockResolvedValue([
         {
+          accountId: "1",
           username: "cloud",
           lastSessionSlot: -1,
           discordId: "",
@@ -142,6 +143,7 @@ describe("System - Game Data", () => {
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
       vi.spyOn(pokerogueApi.account, "getInfo").mockResolvedValue([
         {
+          accountId: "1",
           username: "cloud",
           lastSessionSlot: -1,
           discordId: "",
@@ -165,13 +167,52 @@ describe("System - Game Data", () => {
       expect(verifySpy).not.toHaveBeenCalled();
       expect(updateAllSpy).not.toHaveBeenCalled();
     });
+
+    it("accepts a timed-out combined save only when exact cloud readback proves the commit", async () => {
+      // GameManager's reload helper stubs saveAll; this test exercises the real persistence path.
+      vi.mocked(game.scene.gameData.saveAll).mockRestore();
+      const sessionData = { timestamp: Date.now(), gameMode: 0 } as SessionSaveData;
+      const systemData = { timestamp: Date.now() } as SystemSaveData;
+      vi.mocked(game.scene.gameData.getSessionSaveData).mockReturnValue(sessionData);
+      vi.mocked(game.scene.gameData.getSystemSaveData).mockReturnValue(systemData);
+      vi.spyOn(pokerogueApi.savedata, "updateAll").mockResolvedValue("Combined cloud save timed out.");
+      vi.spyOn(pokerogueApi.savedata.system, "get").mockResolvedValue(JSON.stringify(systemData));
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue({
+        ok: true,
+        status: 200,
+        rawSavedata: JSON.stringify(sessionData),
+      });
+
+      const success = await game.scene.gameData.saveAll(true, true, false, false, true);
+
+      expect(success).toBe(true);
+      expect(game.scene.gameData.lastCloudSyncFailed).toBe(false);
+      expect(pokerogueApi.savedata.system.get).toHaveBeenCalledOnce();
+      expect(pokerogueApi.savedata.session.getCoopCas).toHaveBeenCalledOnce();
+    });
+
+    it("keeps the cloud warning when a timed-out save does not match cloud readback", async () => {
+      vi.mocked(game.scene.gameData.saveAll).mockRestore();
+      vi.spyOn(pokerogueApi.savedata, "updateAll").mockResolvedValue("Combined cloud save timed out.");
+      vi.spyOn(pokerogueApi.savedata.system, "get").mockResolvedValue(JSON.stringify({ timestamp: 1 }));
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue({
+        ok: true,
+        status: 200,
+        rawSavedata: JSON.stringify({ timestamp: 1 }),
+      });
+
+      const success = await game.scene.gameData.saveAll(true, true, false, false, true);
+
+      expect(success).toBe(true);
+      expect(game.scene.gameData.lastCloudSyncFailed).toBe(true);
+    });
   });
 
   describe("initSystem - local session preservation (save-loss fix)", () => {
     beforeEach(async () => {
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
       vi.spyOn(pokerogueApi.account, "getInfo").mockResolvedValue([
-        { username: "cloud", lastSessionSlot: -1, discordId: "", googleId: "", hasAdminRole: false },
+        { accountId: "1", username: "cloud", lastSessionSlot: -1, discordId: "", googleId: "", hasAdminRole: false },
         200,
       ]);
       await account.updateUserInfo();

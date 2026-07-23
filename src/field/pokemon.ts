@@ -1787,39 +1787,54 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       // Triple+: thin the stacked bars and shift them off the sprites (player down, enemy up).
       this.battleInfo.applyTripleThin(sideCapacity, this.isPlayer());
 
-      if (fieldPosition === this.fieldPosition) {
+      this.fieldPosition = fieldPosition;
+
+      const newOffset = this.getFieldPositionOffset();
+      const subTag = this.getTag(SubstituteTag);
+      const substituteOffset = this.isOffsetBySubstitute() ? this.getSubstituteOffset() : ([0, 0] as const);
+      const anchor = this.isPlayer() ? ([106, 148] as const) : ([236, 84] as const);
+      const targetX = anchor[0] + newOffset[0] + substituteOffset[0];
+      const targetY = anchor[1] + newOffset[1] + substituteOffset[1];
+      const relX = targetX - this.x;
+      const relY = targetY - this.y;
+
+      // A format transition can preserve the same lane (for example triple LEFT -> double LEFT)
+      // while changing that lane's offset. Always normalize the actual coordinates; comparing only
+      // the FieldPosition enum leaves the prior format's offset behind and compounds drift each wave.
+      if (relX === 0 && relY === 0) {
         resolve();
         return;
       }
 
-      const initialOffset = this.getFieldPositionOffset();
-
-      this.fieldPosition = fieldPosition;
-
-      const newOffset = this.getFieldPositionOffset();
-
-      const relX = newOffset[0] - initialOffset[0];
-      const relY = newOffset[1] - initialOffset[1];
-
-      const subTag = this.getTag(SubstituteTag);
-
       if (duration) {
-        // TODO: can this use stricter typing?
-        const targets: any[] = [this];
-        if (subTag?.sprite) {
-          targets.push(subTag.sprite);
+        const substituteTarget = subTag?.sprite
+          ? { sprite: subTag.sprite, x: subTag.sprite.x + relX, y: subTag.sprite.y + relY }
+          : null;
+        if (substituteTarget) {
+          globalScene.tweens.add({
+            targets: substituteTarget.sprite,
+            x: substituteTarget.x,
+            y: substituteTarget.y,
+            duration,
+            ease: "Sine.easeOut",
+          });
         }
         globalScene.tweens.add({
-          targets,
-          x: (_target, _key, value: number) => value + relX,
-          y: (_target, _key, value: number) => value + relY,
+          targets: this,
+          x: targetX,
+          y: targetY,
           duration,
           ease: "Sine.easeOut",
-          onComplete: () => resolve(),
+          onComplete: () => {
+            // Phaser's headless tween shim and interrupted browser frames can complete without
+            // applying the final interpolated value. Settle the canonical coordinates explicitly.
+            this.setPosition(targetX, targetY);
+            substituteTarget?.sprite.setPosition(substituteTarget.x, substituteTarget.y);
+            resolve();
+          },
         });
       } else {
-        this.x += relX;
-        this.y += relY;
+        this.setPosition(targetX, targetY);
         if (subTag?.sprite) {
           subTag.sprite.x += relX;
           subTag.sprite.y += relY;

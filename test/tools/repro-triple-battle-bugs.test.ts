@@ -304,6 +304,7 @@ describe.skipIf(!RUN)("repro: triple-battle bugs (staging report)", () => {
     // Slot 0 remains (the single lead); slots 1 and 2 must be fully recalled.
     expect(oldLeads[0].isOnField(), "the single lead (old slot 0) stays on the field").toBe(true);
     expect(oldLeads[0].fieldPosition, "the retained lead returns to the single CENTER lane").toBe(FieldPosition.CENTER);
+    expect([oldLeads[0].x, oldLeads[0].y], "the retained lead returns to the single field anchor").toEqual([106, 148]);
     expect(infoScale(oldLeads[0]), "the retained lead's info bar returns to binary scale").toBe(1);
     for (const slot of [1, 2]) {
       const p = oldLeads[slot];
@@ -347,6 +348,10 @@ describe.skipIf(!RUN)("repro: triple-battle bugs (staging report)", () => {
     expect(oldLeads[2].isOnField(), "old triple slot 2 was recalled").toBe(false);
     expect(oldLeads[0].fieldPosition).toBe(FieldPosition.LEFT);
     expect(oldLeads[1].fieldPosition, "old triple CENTER becomes the double RIGHT lane").toBe(FieldPosition.RIGHT);
+    expect([oldLeads[0].x, oldLeads[0].y], "the retained LEFT lane drops the stale triple offset").toEqual([74, 140]);
+    expect([oldLeads[1].x, oldLeads[1].y], "the retained second lead reaches the binary RIGHT lane").toEqual([
+      138, 148,
+    ]);
     expect(infoScale(oldLeads[0])).toBe(1);
     expect(infoScale(oldLeads[1])).toBe(1);
   }, 120_000);
