@@ -1670,3 +1670,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   repository TypeScript emitted no diagnostic, `git diff --check` is clean, and the ownership manifest
   validates. Co-op node/browser tests were not run locally; the new adapter/cutover negative contracts and
   exact two-browser journey require hosted qualification.
+
+# 2026-07-23 - no-reward Mystery terminal chain and current feat integration
+
+- Reconciled the stale `a4ce1a3e6` audit against the current line. Its Mystery same-turn command edge,
+  exact faint-proposal retry retirement, recovery pending-control frontier, and protocol-compatibility
+  findings were valid for that snapshot but are all closed by isolated production fixes and failure-first
+  contracts; the wire protocol is now `er-coop-44`.
+- Full-gate C1 evidence on `d69346fea` found a later real product edge at wave 39. `ER_CLEANSING_FONT`
+  committed `ME_TERMINAL reward-settled` with no reward operations, then immediately authored the final
+  transaction `leave`; the settled image waited at engine turn 1 while the terminal transaction remained
+  addressed at turn 0, so the generic interaction rule rejected the legitimate step-1 entry.
+- A settled Mystery terminal with an empty reward surface now states only the exact next terminal operation:
+  `op:me`, `ME_TERMINAL`, same wave, turn 0, and the predictable pinned sequence plus one. Negative contracts
+  reject the wrong operation id, kind, or turn. Other reward and multi-surface paths retain their existing
+  predecessor graph. Runtime proof remains hosted-only.
+- The same `d69346fea` qualification proved the separate P33 mutation job, native browser WebRTC/hot-rejoin,
+  public UI plus all Authority V2 contracts, lane A, all triple/topology lanes, and Showdown S1/S2/S4-S7.
+  Its remaining gate reds are mixed: many still construct retired raw carriers, while each unresolved engine
+  mechanism must remain individually triaged rather than waived by shard.
+- Merged current `heraklines/feat/elite-redux-port` (`e325c2b46`) into the local integration candidate. This
+  adds the confirmed divergent-save overwrite repair, bounded/restored triple layouts and summon behavior,
+  forced-format/map fixes, and their regressions without changing Authority V2 ownership. No push occurs
+  until public journey `29975873789` releases the shared browser accounts.
