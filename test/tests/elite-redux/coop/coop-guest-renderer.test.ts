@@ -248,6 +248,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     "CoopStatStageReplayPhase",
     "CoopStatusReplayPhase",
     "CoopFaintReplayPhase",
+    "CoopSwitchReplayPhase",
     "CoopFinalizeTurnPhase",
   ];
 
@@ -1374,17 +1375,11 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(globalScene.modifiers.length, "host authority is the only source of shared modifiers").toBe(before);
   });
 
-  // (G) SELF-SWITCH MIRROR (#633, coop-me-authoritative): the headline regression. The guest's
-  // TurnStartPhase diverts the WHOLE turn to CoopReplayTurnPhase BEFORE the handleTurnCommand loop -
-  // the ONLY place a SwitchSummonPhase is ever queued - so the guest's OWN voluntary switch
-  // (`turnCommands[guestSlot] = {command: POKEMON, cursor}`) was silently discarded: its on-field
-  // composition kept the OLD lead while the host swapped in the new mon. The positional getPlayerField
-  // serialization shifted by one and the per-turn checksum mismatched EVERY turn (the live "desync after
-  // switching"). The fix mirrors the guest's own switch with the side-effect-free summonCoopPlayerField
-  // (the SAME party swap the host's SwitchSummonPhase does, NO RNG / NO resolution pipeline) inside the
-  // divert. This asserts: after the divert, (1) the guest's on-field composition + party order MATCH the
-  // host's post-switch state, and (2) the per-turn checksum MATCHES (no desync) - a switch no longer desyncs.
-  it("SELF-SWITCH MIRROR (#633): the guest mirrors its OWN switch on divert; composition + party order + checksum match the host", async () => {
+  // (G) AUTHORITATIVE SELF-SWITCH (#633): the guest must not eagerly mutate its own field from a local
+  // command. The immutable host event performs the presentation-only placement, then the checkpoint proves
+  // the exact resulting state. This is the production call chain that covers voluntary switches, Roar,
+  // pivots, and trainer replacements without a second local source of switch truth.
+  it("AUTHORITATIVE SELF-SWITCH (#633): local intent stays inert until the host switch event projects it", async () => {
     const field = await startCoopGuest();
     const hostMon = field[COOP_HOST_FIELD_INDEX];
     const guestLead = field[COOP_GUEST_FIELD_INDEX];
@@ -1401,11 +1396,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const benchSpecies = bench.species.speciesId;
     expect(benchSpecies, "the bench mon is a different species from the guest's lead").not.toBe(oldLeadSpecies);
 
-    // --- HOST authoritative truth AFTER the guest's switch: the host simulates with the guest's relayed
-    // command and runs a real SwitchSummonPhase for the guest's slot, so its party[1] is now the bench mon.
-    // Model it with the SAME side-effect-free swap (its own inverse), capture the post-switch checksum +
-    // composition, then revert so the guest still starts PRE-switch (the divert must re-derive this state).
+    // Capture the immutable post-switch authority, then restore the renderer to its pre-switch state.
     coopEngine.summonCoopPlayerField(COOP_GUEST_FIELD_INDEX, benchSlot);
+    const turn = globalScene.currentBattle.turn;
+    const hostCarrier = completeTurnCarrier(turn);
     const hostChecksum = coopEngine.captureCoopChecksum();
     const hostParty = globalScene.getPlayerParty().map(p => p.species.speciesId);
     const hostFieldByBi = globalScene
@@ -1423,9 +1417,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       hostChecksum,
     );
 
-    // --- GUEST turn: it queued a voluntary switch for its OWN slot (what command-phase tryLeaveField writes),
-    // plus inert commands for the others. Driving TurnStartPhase diverts to CoopReplayTurnPhase AND mirrors
-    // the switch first.
+    // The guest records only its intent. TurnStart diverts to the renderer but does not predict the switch.
     const inert = {
       command: Command.FIGHT,
       move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
@@ -1449,14 +1441,41 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     ).toBe(true);
     expect(
       pushNewSpy.mock.calls.some(([name]) => name === "SwitchSummonPhase"),
-      "the mirror queues NO real SwitchSummonPhase (no RNG / hazard re-fire)",
+      "the renderer queues NO real SwitchSummonPhase (no RNG / hazard re-fire)",
     ).toBe(false);
     expect(
       pushNewSpy.mock.calls.some(([name]) => name === "MovePhase"),
       "no MovePhase resolution on the guest",
     ).toBe(false);
 
-    // (1) The guest's on-field composition + party order now MATCH the host's post-switch state.
+    expect(
+      globalScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].species.speciesId,
+      "local intent cannot mutate the field before host authority arrives",
+    ).toBe(oldLeadSpecies);
+
+    // Remove the replay object queued by the detached TurnStart fixture, then inject and drive the exact
+    // production turn carrier. The switch event must render before the post-switch checkpoint installs.
+    game.scene.phaseManager.clearPhaseQueue();
+    getCoopRuntime()!.partnerTransport!.send({
+      t: "turnResolution",
+      turn,
+      ...hostCarrier,
+      events: [
+        {
+          k: "switch",
+          bi: COOP_GUEST_FIELD_INDEX,
+          partySlot: benchSlot,
+          pokemonId: bench.id,
+          speciesId: benchSpecies,
+          switchType: SwitchType.SWITCH,
+          doReturn: true,
+        },
+      ],
+    });
+    await new Promise(r => setTimeout(r, 0));
+    await driveReplayTurn(turn);
+
+    // The streamed result now matches the host's post-switch state.
     expect(
       globalScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].species.speciesId,
       "the bench mon is now on the guest's slot",
@@ -1475,8 +1494,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       .map(m => [m.getBattlerIndex(), m.species.speciesId] as const);
     expect(guestFieldByBi, "on-field composition (bi -> species) matches the host").toEqual(hostFieldByBi);
 
-    // (2) The per-turn checksum now MATCHES the host's: a switch no longer desyncs.
-    expect(coopEngine.captureCoopChecksum(), "checksum converges with the host after the self-switch mirror").toBe(
+    expect(coopEngine.captureCoopChecksum(), "checkpoint converges after the authoritative switch event").toBe(
       hostChecksum,
     );
   });
