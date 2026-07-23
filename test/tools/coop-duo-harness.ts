@@ -909,7 +909,7 @@ function adoptCoopHostRunConfig(hostScene: BattleScene, guestScene: BattleScene)
 export function mirrorHostBattleToGuest(
   hostScene: BattleScene,
   guestScene: BattleScene,
-  opts?: { preserveGuestPlayerParty?: boolean },
+  opts?: { preserveGuestPlayerParty?: boolean; forceGuestPerspective?: boolean },
 ): void {
   // Production's enemyPartySync now pairs the new enemy manifest with a complete authoritative boundary
   // state. Capture it under the host scene before reconstructing the guest, then apply it after the streamed
@@ -938,7 +938,7 @@ export function mirrorHostBattleToGuest(
   // production launch-snapshot ingress swap (swapSessionData) produces, so the egress un-swap in
   // captureVersusGuestChecksumState maps back to the host's authoritative orientation and the wave-start
   // checksums converge. FALSE for co-op / solo (byte-identical mirror as before).
-  const flip = isShowdownGuestFlipGated();
+  const flip = opts?.forceGuestPerspective === true || isShowdownGuestFlipGated();
   // 1. Same game mode + arena/biome as the host.
   guestScene.gameMode = hostScene.gameMode;
   guestScene.newArena(hostScene.arena.biomeId);
@@ -3961,16 +3961,15 @@ export async function buildShowdownDuo(
     toShowdownGameMode(guestScene);
     // The mirror reconstructs the guest's world in its LOCAL (flipped) orientation (Task F1): its OWN
     // team is its local PLAYER party (bottom) and the opponent (host team) its local ENEMY party (top).
-    mirrorHostBattleToGuest(hostScene, guestScene);
-    // Reconstruct the guest's persistent-modifier stacks in the mode's world orientation. Authoritative
-    // Showdown flips the guest (guest PLAYER <- host ENEMY); Sync deliberately preserves the canonical
-    // host world (guest PLAYER <- host PLAYER) so side-sensitive ER mechanics execute identically.
+    mirrorHostBattleToGuest(hostScene, guestScene, { forceGuestPerspective: netcodeMode === "lockstep" });
+    // Reconstruct the guest's persistent-modifier stacks in local perspective for both transports:
+    // guest PLAYER <- host ENEMY, guest ENEMY <- host PLAYER.
     const guestPlayerModifiers = (guestScene as unknown as { modifiers: PersistentModifier[] }).modifiers;
     const guestEnemyModifiers = (guestScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers;
     guestPlayerModifiers.length = 0;
     guestEnemyModifiers.length = 0;
-    const playerModifiers = netcodeMode === "lockstep" ? clonedHostPlayerModifiers : clonedHostEnemyModifiers;
-    const enemyModifiers = netcodeMode === "lockstep" ? clonedHostEnemyModifiers : clonedHostPlayerModifiers;
+    const playerModifiers = clonedHostEnemyModifiers;
+    const enemyModifiers = clonedHostPlayerModifiers;
     for (const m of playerModifiers) {
       guestPlayerModifiers.push(m);
     }

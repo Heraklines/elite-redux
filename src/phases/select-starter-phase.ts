@@ -40,7 +40,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
-import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
+import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   beginShowdownBattle,
@@ -52,7 +52,6 @@ import {
   getShowdownOwnManifest,
   setPendingShowdownRelay,
   setPendingShowdownSession,
-  setShowdownFieldOpponent,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
 import { buildShowdownHeldItem } from "#data/elite-redux/showdown/showdown-enemy-build";
@@ -565,7 +564,7 @@ export class SelectStarterPhase extends Phase {
           hostTeam: manifests,
           guestTeam: result.opponentManifest,
         });
-        void this.launchShowdownBattle(starters, role, matchId, manifests, result.opponentManifest, ownProfile);
+        void this.launchShowdownBattle(starters, role, matchId, manifests, result.opponentManifest);
       },
     };
     // Await so no later UI transition can silently displace the wager screen; both players must
@@ -575,7 +574,7 @@ export class SelectStarterPhase extends Phase {
 
   /**
    * Launch the negotiated match. Authoritative Showdown keeps the host-built snapshot boot. Sync
-   * instead builds the same host-oriented field locally on both clients from the negotiated manifests.
+   * instead builds each client's own player side locally from the negotiated manifests.
    */
   private async launchShowdownBattle(
     starters: Starter[],
@@ -583,7 +582,6 @@ export class SelectStarterPhase extends Phase {
     matchId: string | null,
     ownManifests?: ShowdownMonManifest[],
     opponentManifests?: ShowdownMonManifest[],
-    ownProfile: GhostTrainerProfile | null = null,
   ): Promise<void> {
     // B7 item 11: the run launch is DEFERRED to here (post wager-commit), so it can't race the wager
     // screen the way item-4's team-confirm `startRun` did. Pin the neutral run difficulty ("ace", the
@@ -627,7 +625,6 @@ export class SelectStarterPhase extends Phase {
       const canonicalSeed = showdownSyncBattleSeed(role, logicalOwn, logicalOpponent);
       syncSeed = canonicalSeed;
       if (role === "guest") {
-        setShowdownFieldOpponent(sides.enemyManifest, ownProfile, getCoopController()?.localName() ?? null);
         globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
         void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
           globalScene.setSeed(canonicalSeed);

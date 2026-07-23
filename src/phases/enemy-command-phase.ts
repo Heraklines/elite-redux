@@ -11,7 +11,7 @@ import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from 
 import { isReplayRecording, recordReplayCommand } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
-import { applyShowdownSyncCommand, hasShowdownSyncCommand } from "#data/elite-redux/showdown/showdown-sync-command";
+import { applyShowdownSyncCommand } from "#data/elite-redux/showdown/showdown-sync-command";
 import { getMoveTargets } from "#data/moves/move-utils";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -70,21 +70,9 @@ export class EnemyCommandPhase extends FieldPhase {
       return this.end();
     }
 
-    // The Sync guest selected and applied its own canonical enemy-side command while its preceding
-    // CommandPhase awaited the host's player-side command. Do not overwrite that human choice with AI.
-    if (
-      isShowdownSyncSession()
-      && getCoopController()?.role === "guest"
-      && hasShowdownSyncCommand("enemy", this.fieldIndex)
-    ) {
-      return this.end();
-    }
-
-    // Showdown 1v1 (C4): the HOST awaits the REMOTE player's command for this enemy slot instead
-    // of rolling the AI (the enemy side is a real human). On a timeout/null (disconnect) it falls
-    // back to the AI so the turn never hangs. The guest short-circuit above already handled the
-    // guest; solo / co-op never take this branch (isVersusSession is false).
-    if (isVersusSession() && getCoopController()?.role === "host") {
+    // Authoritative Showdown resolves remote commands only on the host. Sync runs both engines in
+    // local perspective, so both peers await the opponent and apply that choice to their enemy side.
+    if (isShowdownSyncSession() || (isVersusSession() && getCoopController()?.role === "host")) {
       void this.resolveVersusEnemyCommand();
       return;
     }
