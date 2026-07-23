@@ -147,7 +147,6 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
   /** Drive ONE host wave to a win; the partner slot was supplied by the guest's real public UI intent. */
   async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
@@ -186,7 +185,10 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
 
     const WAVES = 3;
     for (let w = 1; w <= WAVES; w++) {
-      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: w === 1 });
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        submitHostTackle: true,
+      });
       // ===== Host plays this wave to a win (emits turnResolution + checkpoint + waveResolved). =====
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);

@@ -22,8 +22,6 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { BattlerIndex } from "#enums/battler-index";
 import { BerryType } from "#enums/berry-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -94,7 +92,6 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
   /** Drive ONE host wave to a win; the partner slot came through the guest's real public command UI. */
   async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
@@ -158,7 +155,10 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
 
     // ===== WAVE 1 (host-owned, even counter): a party-target HELD ITEM. =====
     {
-      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        submitHostTackle: true,
+      });
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);
       await withClient(rig.guestCtx, async () => {
@@ -191,7 +191,7 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
       }),
     );
     expect(rig.guestScene.currentBattle.waveIndex, "guest consumed the real wave-2 carrier").toBe(2);
-    await driveDuoGuestTackleThroughPublicUi(game, rig);
+    await driveDuoGuestTackleThroughPublicUi(game, rig, { submitHostTackle: true });
 
     // ===== WAVE 2 (guest-owned, odd counter): a party-target RARE_CANDY (the live desync). =====
     {
@@ -237,7 +237,10 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
     await withClient(rig.hostCtx, () => rig.hostRuntime.controller.advanceInteraction());
     await withClient(rig.guestCtx, () => rig.guestRuntime.controller.advanceInteraction());
 
-    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+    });
     const turn = rig.hostScene.currentBattle.turn;
     await hostPlayWave(rig);
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));

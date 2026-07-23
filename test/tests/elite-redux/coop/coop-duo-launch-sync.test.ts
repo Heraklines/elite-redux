@@ -38,8 +38,6 @@ import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -129,7 +127,6 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
   /** Drive ONE host wave to a win after the guest submitted its own command through public UI. */
   async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
@@ -216,7 +213,10 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
       );
 
       // Host plays the wave to a win; the guest replays + applies the checkpoint.
-      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: w === 1 });
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        submitHostTackle: true,
+      });
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);
       await withClient(rig.guestCtx, async () => {

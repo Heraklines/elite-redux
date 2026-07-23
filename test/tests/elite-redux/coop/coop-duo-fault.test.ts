@@ -35,9 +35,7 @@ import {
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -172,10 +170,10 @@ describe.skipIf(!RUN)(
         await withClient(rig.guestCtx, () => materializeMirroredGuestInputTurn(rig.guestScene));
       }
       await driveDuoGuestTackleThroughPublicUi(game, rig, {
-        restartAlreadyOpenHost: preRuntimeInitialCommand,
+        restartAlreadyOpenHost: false,
+        submitHostTackle: true,
       });
       await withClient(rig.hostCtx, async () => {
-        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
         await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
     }
