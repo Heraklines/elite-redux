@@ -34,7 +34,11 @@ test("the exact-SHA workflow exposes and seals a dedicated Showdown battle journ
     /- "src\/phases\/\*\*"/u,
     "Showdown and shared-control phase edits all trigger the exact two-browser journey",
   );
-  assert.match(workflow, /- "src\/ui\/handlers\/showdown-\*\.ts"/u);
+  assert.match(
+    workflow,
+    /- "src\/ui\/\*\*"/u,
+    "every Showdown and shared-control UI edit triggers the exact two-browser journey",
+  );
   assert.match(workflow, /src\/phases\/title-phase\|src\/system\/game-data/u);
   assert.match(workflow, /src\/phases\/title-phase\.ts \\/u);
   assert.match(config, /"showdown-battle"/u);
