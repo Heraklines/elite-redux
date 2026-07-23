@@ -141,7 +141,7 @@ describe("ER save-integrity: solo overwrite over a diverged local/cloud slot (P0
     expect(nonExplicit.error).toBe("Local/cloud checkpoint bytes differ; refusing ambiguous delete.");
   });
 
-  it("keeps an OPAQUE cloud side protected even on an explicit delete (frozen co-op scope)", async () => {
+  it("uses the exact-digest endpoint when a confirmed overwrite finds an opaque cloud row", async () => {
     const localRaw = encrypt(soloJson({ timestamp: 111 }), false);
     const cloudRaw = "not-parseable-json {{{"; // opaque cloud checkpoint
 
@@ -150,11 +150,60 @@ describe("ER save-integrity: solo overwrite over a diverged local/cloud slot (P0
       status: 200,
       rawSavedata: cloudRaw,
     });
+    const deleteSpy = vi.spyOn(pokerogueApi.savedata.session, "deleteOpaqueExact").mockResolvedValue({
+      ok: true,
+      status: 200,
+      error: "",
+      failureKind: null,
+    });
 
     const gd = game.scene.gameData as unknown as PrivateCloudDelete;
     const explicit = await gd.deleteSessionCloudSafely(0, localRaw, "cloud", true);
 
-    expect(explicit.error).toBe("Local/cloud checkpoint bytes differ; refusing ambiguous delete.");
+    expect(explicit.error).toBeNull();
+    expect(deleteSpy).toHaveBeenCalledWith(expect.objectContaining({ slot: 0, exactDigest: expect.any(String) }));
+  });
+
+  it("still protects a divergent opaque row from an automatic/background delete", async () => {
+    const localRaw = encrypt(soloJson({ timestamp: 111 }), false);
+    const cloudRaw = "not-parseable-json {{{";
+
+    vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue({
+      ok: true,
+      status: 200,
+      rawSavedata: cloudRaw,
+    });
+    const deleteSpy = vi.spyOn(pokerogueApi.savedata.session, "deleteOpaqueExact");
+
+    const gd = game.scene.gameData as unknown as PrivateCloudDelete;
+    const automatic = await gd.deleteSessionCloudSafely(0, localRaw, "cloud", false);
+
+    expect(automatic.error).toBe("Local/cloud checkpoint bytes differ; refusing ambiguous delete.");
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it("starts the replacement after exact deletion of a divergent legacy co-op cloud row", async () => {
+    const localRaw = encrypt(soloJson({ timestamp: 111 }), false);
+    const cloudRaw = JSON.stringify({ gameMode: 6, waveIndex: 12, timestamp: 222 });
+    localStorage.setItem("sessionData_cloud", localRaw);
+
+    vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue({
+      ok: true,
+      status: 200,
+      rawSavedata: cloudRaw,
+    });
+    const deleteSpy = vi.spyOn(pokerogueApi.savedata.session, "deleteLegacyCoopExact").mockResolvedValue({
+      ok: true,
+      status: 200,
+      error: "",
+      failureKind: null,
+    });
+
+    const result = await game.scene.gameData.deleteSession(0, true);
+
+    expect(result).toBe(true);
+    expect(deleteSpy).toHaveBeenCalledWith(expect.objectContaining({ slot: 0, exactDigest: expect.any(String) }));
+    expect(localStorage.getItem("sessionData_cloud")).toBeNull();
   });
 
   it("sanity: a brand-new GameData with no local bytes and a missing cloud row deletes cleanly", async () => {

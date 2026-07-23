@@ -20,6 +20,8 @@ import {
   legacyFormat,
   SINGLE_FORMAT,
   SideKind,
+  TRIPLE_BATTLE_GHOST_RARITY,
+  TRIPLE_BATTLE_RARITY,
   TRIPLE_FORMAT,
 } from "#data/battle-format";
 import { BattlerIndex } from "#enums/battler-index";
@@ -140,14 +142,19 @@ describe("battle-format: lookups", () => {
     expect(formatById("quad")).toBeNull();
     expect(formatById(null)).toBeNull();
   });
+
+  it("pins natural triples to 20% of ghosts and 5% of wild/trainer battles", () => {
+    expect(1 / TRIPLE_BATTLE_GHOST_RARITY).toBe(0.2);
+    expect(1 / TRIPLE_BATTLE_RARITY).toBe(0.05);
+  });
 });
 
 describe("battle-format sprite offsets", () => {
-  it("raises only the player-side triple wings", () => {
-    expect(fieldSpriteOffset(FieldPosition.LEFT, 3, true)).toEqual([-58, 4]);
+  it("raises the left triple lane without moving the right or center lanes", () => {
+    expect(fieldSpriteOffset(FieldPosition.LEFT, 3, true)).toEqual([-58, -4]);
     expect(fieldSpriteOffset(FieldPosition.RIGHT, 3, true)).toEqual([58, 4]);
 
-    expect(fieldSpriteOffset(FieldPosition.LEFT, 3, false)).toEqual([-58, 10]);
+    expect(fieldSpriteOffset(FieldPosition.LEFT, 3, false)).toEqual([-58, 2]);
     expect(fieldSpriteOffset(FieldPosition.RIGHT, 3, false)).toEqual([58, 10]);
     expect(fieldSpriteOffset(FieldPosition.CENTER, 3, true)).toEqual([0, -8]);
     expect(fieldSpriteOffset(FieldPosition.CENTER, 3, false)).toEqual([0, -8]);

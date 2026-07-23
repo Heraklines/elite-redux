@@ -3,8 +3,10 @@ import { mkdir, readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 
 const baseUrl = process.env.QA_BASE_URL ?? "http://127.0.0.1:4182";
+const assetOrigin = process.env.QA_ASSET_ORIGIN?.replace(/\/$/u, "");
 const outputDir = "test-results/rich-notification";
-const markdown = await readFile(new URL("../../docs/patch-notes/0.0.6.0.md", import.meta.url), "utf8");
+const markdownSource = await readFile(new URL("../../docs/patch-notes/0.0.6.0.md", import.meta.url), "utf8");
+const markdown = assetOrigin ? markdownSource.replaceAll("](/images/", `](${assetOrigin}/images/`) : markdownSource;
 await mkdir(outputDir, { recursive: true });
 
 const browser = await chromium.launch({ channel: "chrome", headless: true });
@@ -34,8 +36,11 @@ async function openViewer(page) {
     const image = images.nth(index);
     await image.scrollIntoViewIfNeeded();
     await image.evaluate(element => {
-      if (element.complete && element.naturalWidth > 0) {
-        return;
+      if (element.complete) {
+        if (element.naturalWidth > 0) {
+          return;
+        }
+        throw new Error(`Image failed to load: ${element.currentSrc || element.src}`);
       }
       return new Promise((resolve, reject) => {
         element.addEventListener("load", resolve, { once: true });

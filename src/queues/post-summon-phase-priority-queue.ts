@@ -32,6 +32,15 @@ export class PostSummonPhasePriorityQueue extends PokemonPhasePriorityQueue<Post
     const phasePokemon = phase.getPokemon();
 
     for (const source of phasePokemon.getActiveAbilitySources()) {
+      // Most active/innate abilities have no switch-in behavior. Scheduling a dynamic
+      // phase for every one was pure overhead (up to 24 empty phases for a 3v3), which
+      // is especially visible on mobile during a triple intro. A source can only do
+      // work here through a PostSummonAbAttr, so omit empty phases before sorting and
+      // dispatch. Sources with a gated attr still need a phase because canApply depends
+      // on the fully assembled field at execution time.
+      if (!source.ability.hasAttr("PostSummonAbAttr")) {
+        continue;
+      }
       const activateAbilityPhase = new PostSummonActivateAbilityPhase(
         phasePokemon.getBattlerIndex(),
         source.ability.postSummonPriority,

@@ -4907,21 +4907,15 @@ export class GameData {
     if (!this.persistenceAccountIsCurrent(accountIdentity)) {
       return { error: "Delete account changed while cloud checkpoint was classified." };
     }
-    if (localCommitment != null) {
-      if (cloudCommitment == null || cloudCommitment.runId !== localCommitment.runId) {
-        return { error: "Local/cloud checkpoint conflict must be reconciled before delete." };
-      }
-    } else if (localRaw != null && localJson !== observed) {
-      // Local and cloud plaintext have DIVERGED. For an automatic/background delete this is
-      // ambiguous, so we refuse - never silently destroy the newer of two diverged copies. But
-      // when the user has EXPLICITLY confirmed destroying this slot (overwrite to start a new run,
-      // or the delete-run action) AND both sides are plain solo checkpoints, the divergence no
-      // longer matters: both copies are being discarded on purpose, so proceed and clear both
-      // instead of dead-ending to the title. Stay strict when the cloud side is anything other
-      // than a plain solo checkpoint (co-op / legacy / opaque) - that is frozen co-op territory
-      // and must not be clobbered by a solo-local explicit delete.
-      const cloudIsPlainSolo = cloudCommitment == null && cloudKind === "solo";
-      if (!(explicitUserDeletion && cloudIsPlainSolo)) {
+    if (!explicitUserDeletion) {
+      if (localCommitment != null) {
+        if (cloudCommitment == null || cloudCommitment.runId !== localCommitment.runId) {
+          return { error: "Local/cloud checkpoint conflict must be reconciled before delete." };
+        }
+      } else if (localRaw != null && localJson !== observed) {
+        // Background cleanup must never choose between divergent replicas. A confirmed destructive
+        // action may continue because every protected cloud class below is deleted conditionally
+        // against the exact row just observed (commitment CAS or content digest).
         return { error: "Local/cloud checkpoint bytes differ; refusing ambiguous delete." };
       }
     }
@@ -4943,7 +4937,7 @@ export class GameData {
       const mutation = await this.deleteOpaqueExactBounded({ slot, clientSessionId, exactDigest });
       return mutation.ok ? { error: null } : { error: mutation.error };
     }
-    if (localKind === "legacy-coop" || localKind === "opaque") {
+    if (!explicitUserDeletion && (localKind === "legacy-coop" || localKind === "opaque")) {
       return { error: "Local/cloud checkpoint classification conflict must be resolved before delete." };
     }
     return { error: await this.deleteSessionBounded({ slot, clientSessionId }) };

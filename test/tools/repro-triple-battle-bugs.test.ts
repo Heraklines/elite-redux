@@ -31,6 +31,7 @@ import { globalScene } from "#app/global-scene";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import { Command } from "#enums/command";
+import { FieldPosition } from "#enums/field-position";
 import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
@@ -51,6 +52,10 @@ const RUN = process.env.ER_SCENARIO === "1";
  */
 function infoVisible(mon: object): boolean | undefined {
   return (mon as unknown as { battleInfo?: { visible: boolean } | null }).battleInfo?.visible;
+}
+
+function infoScale(mon: object): number | undefined {
+  return (mon as unknown as { battleInfo?: { scaleX: number } | null }).battleInfo?.scaleX;
 }
 
 describe.skipIf(!RUN)("repro: triple-battle bugs (staging report)", () => {
@@ -298,12 +303,52 @@ describe.skipIf(!RUN)("repro: triple-battle bugs (staging report)", () => {
     );
     // Slot 0 remains (the single lead); slots 1 and 2 must be fully recalled.
     expect(oldLeads[0].isOnField(), "the single lead (old slot 0) stays on the field").toBe(true);
+    expect(oldLeads[0].fieldPosition, "the retained lead returns to the single CENTER lane").toBe(FieldPosition.CENTER);
+    expect(infoScale(oldLeads[0]), "the retained lead's info bar returns to binary scale").toBe(1);
     for (const slot of [1, 2]) {
       const p = oldLeads[slot];
       expect(p.isOnField(), `old triple slot ${slot} must have left the field`).toBe(false);
       expect(p.visible, `old triple slot ${slot}'s back sprite must be hidden`).toBe(false);
       expect(infoVisible(p), `old triple slot ${slot}'s info bar must be hidden`).toBe(false);
     }
+  }, 120_000);
+
+  it("#2 player: triple -> DOUBLE next wave restores LEFT/RIGHT lanes and binary bars", async () => {
+    game.override.startingWave(3);
+    game.override
+      .battleStyle("triple")
+      .battleType(BattleType.WILD)
+      .disableTrainerWaves()
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .criticalHits(false)
+      .startingLevel(200)
+      .enemyLevel(5)
+      .enemyMoveset(MoveId.HARDEN)
+      .moveset([MoveId.TACKLE])
+      .ability(AbilityId.BALL_FETCH)
+      .enemyAbility(AbilityId.BALL_FETCH);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.SNORLAX, SpeciesId.SNORLAX);
+    const oldLeads = globalScene.getPlayerField().slice();
+    const foes = globalScene.getEnemyField();
+    globalScene.currentBattle.enemyParty.length = foes.length;
+    for (const foe of foes) {
+      foe.hp = 1;
+    }
+    const enemyIdx = foes.map(e => e.getBattlerIndex());
+    game.move.select(MoveId.TACKLE, 0, enemyIdx[0]);
+    game.move.select(MoveId.TACKLE, 1, enemyIdx[1]);
+    game.move.select(MoveId.TACKLE, 2, enemyIdx[2]);
+    game.override.battleStyle("double");
+    await game.toNextWave();
+
+    expect(globalScene.currentBattle.arrangement.playerCapacity, "wave 2 is a double").toBe(2);
+    expect(oldLeads[0].isOnField()).toBe(true);
+    expect(oldLeads[1].isOnField()).toBe(true);
+    expect(oldLeads[2].isOnField(), "old triple slot 2 was recalled").toBe(false);
+    expect(oldLeads[0].fieldPosition).toBe(FieldPosition.LEFT);
+    expect(oldLeads[1].fieldPosition, "old triple CENTER becomes the double RIGHT lane").toBe(FieldPosition.RIGHT);
+    expect(infoScale(oldLeads[0])).toBe(1);
+    expect(infoScale(oldLeads[1])).toBe(1);
   }, 120_000);
 
   it("#2 player: triple WILD -> SINGLE next wave (non-reset) also recalls the leftover slots", async () => {

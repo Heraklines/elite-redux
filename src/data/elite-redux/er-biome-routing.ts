@@ -30,7 +30,7 @@ import { allBiomes } from "#data/data-lists";
 import { getBiomeRevealBonus } from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { erCartographersLensExtraNodes } from "#data/elite-redux/er-relics";
 import { BiomeId } from "#enums/biome-id";
-import { MapModifier } from "#modifiers/modifier";
+import { ER_MAP_MAX_UPGRADE_TIER, MapModifier } from "#modifiers/modifier";
 import { randSeedInt } from "#utils/common";
 
 /** Percent chance each candidate "unexpected" biome appears as an extra node. */
@@ -231,11 +231,12 @@ export function restoreErRouting(value: number | undefined): void {
   prevBiome = value == null ? null : (value as BiomeId);
 }
 
-/** Total Map Upgrade tier = summed stacks of the (renamed) Map item held. */
+/** The base Map is tier 0; each additional merged stack is one route-reveal upgrade. */
 export function erMapUpgradeTier(): number {
-  return globalScene
+  const totalMapStacks = globalScene
     .findModifiers(m => m instanceof MapModifier)
     .reduce((sum, m) => sum + m.getStackCount(), 0);
+  return Math.min(ER_MAP_MAX_UPGRADE_TIER, Math.max(0, totalMapStacks - 1));
 }
 
 function getErVisibleNodeCount(): number {
