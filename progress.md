@@ -2153,3 +2153,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   assertions instead of requiring the suppressed legacy envelope carrier.
 - The biome-choice static assertion now compares the committed receipt to the global authority frontier's
   operation identity. `CoopV2AuthorityFrontier` intentionally exposes no duplicate entry-kind field.
+
+# 2026-07-23 - Headless mirrors install the real active field
+
+- Focused run `30044901272` proved the migrated public Mystery and launch journeys reached real Command/Fight
+  input, but the guest Gengar computed zero legal Tackle targets. Its early empty command was then correctly
+  rejected against the authority's two-target offer, leaving the host on its partner CommandPhase.
+- The mirror had queried `getEnemyField()` before attaching cloned enemies to `scene.field`. Since enemy
+  activity is defined by that attachment, the query was circular and always omitted the guest enemy leads.
+  It now captures the host's exact live player/enemy Pokemon identities before cloning and installs those
+  identities, in field order, on the guest (with the Showdown perspective swap preserved).
+- The shared public command driver now asserts that the mirrored handler sees at least one live enemy before
+  accepting keyboard input. The canonical empty command slot is also asserted as `null`, matching Battle's
+  initialized command substrate rather than the obsolete pre-initialization `undefined` fixture.

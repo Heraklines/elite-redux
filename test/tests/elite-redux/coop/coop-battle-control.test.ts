@@ -256,7 +256,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     // capability-mismatch test. Observe the production-opened surface instead.
     expect(game.scene.phaseManager.getCurrentPhase().phaseName).toBe("CommandPhase");
     expect(globalScene.ui.getMode()).toBe(UiMode.COMMAND);
-    expect(globalScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]).toBeUndefined();
+    expect(globalScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]).toBeNull();
   });
 
   it("the AI partner picker resolves a LEGAL fight command (move in moveset, concrete targets)", async () => {

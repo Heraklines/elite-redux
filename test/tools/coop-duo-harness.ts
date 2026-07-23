@@ -999,6 +999,14 @@ export function mirrorHostBattleToGuest(
   const hostPlayerScalars = hostScene
     .getPlayerParty()
     .map(player => ({ stats: [...player.stats], maxHp: player.getMaxHp(), hp: player.hp }));
+  // Capture the actual live field while the host is still the active scene. Reconstructing party members
+  // below does not make them active: EnemyPokemon in particular becomes discoverable through
+  // getEnemyField() only after it has been attached to `scene.field`. Asking the new guest scene which
+  // cloned enemies are active before that attachment is therefore circular and used to return an empty
+  // enemy field. The public Command/Fight handler then saw zero legal targets and emitted an empty command,
+  // which the authority correctly rejected against its non-empty offer (P1 run 30044901272).
+  const hostPlayerFieldIds = hostScene.getPlayerField().map(player => player.id);
+  const hostEnemyFieldIds = hostScene.getEnemyField().map(enemy => enemy.id);
   initGlobalScene(previousScene);
   // 0. Adopt the host's SEED + run-config-derived scene state (#658 seed-pin). See adoptCoopHostRunConfig:
   //    this is the launch-handshake step the plain mirror skipped, and WHY a benign per-wave checksum
@@ -1170,8 +1178,19 @@ export function mirrorHostBattleToGuest(
   for (const mon of [...guestSceneInternal.party, ...enemyParty]) {
     stubBattleInfo(mon);
   }
-  for (const mon of [...guestScene.getPlayerField(), ...guestScene.getEnemyField()]) {
-    guestScene.field.add(mon);
+  const localPlayerFieldIds = flip ? hostEnemyFieldIds : hostPlayerFieldIds;
+  const localEnemyFieldIds = flip ? hostPlayerFieldIds : hostEnemyFieldIds;
+  const clonedById = new Map<number, PlayerPokemon | EnemyPokemon>(
+    [...guestSceneInternal.party, ...enemyParty].map(mon => [mon.id, mon]),
+  );
+  for (const id of [...localPlayerFieldIds, ...localEnemyFieldIds]) {
+    const mon = clonedById.get(id);
+    if (mon == null) {
+      throw new Error(`headless mirror could not install active host field Pokemon ${id}`);
+    }
+    if (guestScene.field.getIndex(mon) < 0) {
+      guestScene.field.add(mon);
+    }
   }
   applyCoopAuthoritativeBattleState(waveBoundaryState ?? undefined, true);
   // setFormat/applyCoopAuthoritativeBattleState may recalculate enemy stats after construction. Re-assert
@@ -2270,6 +2289,10 @@ export async function driveDuoGuestTackleThroughPublicUi(
     await withClient(rig.guestCtx, async () => {
       await drainLoopback();
       expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);
+      expect(
+        rig.guestScene.getEnemyField().filter(mon => mon.isActive(true)).length,
+        "the mirrored public command surface has the authority's live enemy targets",
+      ).toBeGreaterThan(0);
       expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
       expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
       expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
