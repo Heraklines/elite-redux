@@ -111,12 +111,15 @@ export function validateOwnershipManifest(raw, manifestPath) {
     fail(`${manifestPath} must contain one JSON object`);
   }
   const keys = Object.keys(raw).sort();
-  const expectedKeys = ["allowedFiles", "baseSha", "branch", "taskId", "trainRef", "version"];
+  const expectedKeys =
+    raw.version === 2
+      ? ["allowedFiles", "baseSha", "branch", "lockedSchemaFiles", "taskId", "trainRef", "version"]
+      : ["allowedFiles", "baseSha", "branch", "taskId", "trainRef", "version"];
   if (keys.length !== expectedKeys.length || keys.some((key, index) => key !== expectedKeys[index])) {
     fail(`${manifestPath} keys must be exactly: ${expectedKeys.join(", ")}`);
   }
-  if (raw.version !== 1) {
-    fail(`${manifestPath} version must be 1`);
+  if (raw.version !== 1 && raw.version !== 2) {
+    fail(`${manifestPath} version must be 1 or 2`);
   }
   if (typeof raw.taskId !== "string" || !TASK_PATTERN.test(raw.taskId)) {
     fail(`${manifestPath} taskId must match ${TASK_PATTERN}`);
@@ -135,13 +138,33 @@ export function validateOwnershipManifest(raw, manifestPath) {
   if (!pathIsAllowed(normalizedManifestPath, allowedFiles)) {
     fail(`${manifestPath} must own itself in allowedFiles`);
   }
+  if (raw.version === 2 && !Array.isArray(raw.lockedSchemaFiles)) {
+    fail(`${manifestPath} lockedSchemaFiles must be an array`);
+  }
+  const lockedSchemaFiles =
+    raw.version === 2
+      ? raw.lockedSchemaFiles.map((value, index) => normalizedRepoPath(value, `lockedSchemaFiles[${index}]`))
+      : [];
+  sortedUnique(lockedSchemaFiles, `${manifestPath} lockedSchemaFiles`);
+  const unknownLocked = lockedSchemaFiles.filter(file => !LOCKED_P33_SCHEMA_FILES.includes(file));
+  if (unknownLocked.length > 0) {
+    fail(`${manifestPath} lockedSchemaFiles contains non-schema paths: ${unknownLocked.join(", ")}`);
+  }
+  const unownedLocked = lockedSchemaFiles.filter(file => !pathIsAllowed(file, allowedFiles));
+  if (unownedLocked.length > 0) {
+    fail(`${manifestPath} must also own declared lockedSchemaFiles: ${unownedLocked.join(", ")}`);
+  }
+  if (lockedSchemaFiles.length > 0 && branch !== trainRef) {
+    fail(`${manifestPath} only an integration train may declare lockedSchemaFiles`);
+  }
   return Object.freeze({
-    version: 1,
+    version: raw.version,
     taskId: raw.taskId,
     branch,
     trainRef,
     baseSha: raw.baseSha,
     allowedFiles: Object.freeze(allowedFiles),
+    lockedSchemaFiles: Object.freeze(lockedSchemaFiles),
     manifestPath: normalizedManifestPath,
   });
 }
@@ -217,8 +240,14 @@ export function evaluateOwnership({ manifest, branch, expectedBase, headSha, cha
     ...new Set(changedFiles.map((file, index) => normalizedRepoPath(file, `changedFiles[${index}]`))),
   ].sort(lexicalCompare);
   const locked = normalizedChanges.filter(file => LOCKED_P33_SCHEMA_FILES.includes(file));
-  if (locked.length > 0) {
-    fail(`locked P33 schema files changed: ${locked.join(", ")}`);
+  const approvedLocked = manifest.lockedSchemaFiles ?? [];
+  const undeclaredLocked = locked.filter(file => !approvedLocked.includes(file));
+  if (undeclaredLocked.length > 0) {
+    fail(`locked P33 schema files changed without exact integration declaration: ${undeclaredLocked.join(", ")}`);
+  }
+  const staleLocked = approvedLocked.filter(file => !locked.includes(file));
+  if (staleLocked.length > 0) {
+    fail(`declared locked P33 schema files were unchanged in this integration batch: ${staleLocked.join(", ")}`);
   }
   const outside = normalizedChanges.filter(file => !pathIsAllowed(file, manifest.allowedFiles));
   if (outside.length > 0) {
@@ -242,12 +271,14 @@ export function evaluateOwnership({ manifest, branch, expectedBase, headSha, cha
           trainRef: manifest.trainRef,
           baseSha: manifest.baseSha,
           allowedFiles: manifest.allowedFiles,
+          ...(manifest.version === 2 ? { lockedSchemaFiles: approvedLocked } : {}),
         }),
       )
       .digest("hex"),
     allowedFiles: [...manifest.allowedFiles],
     changedFiles: normalizedChanges,
     lockedSchemaFiles: [...LOCKED_P33_SCHEMA_FILES],
+    approvedLockedSchemaFiles: [...approvedLocked],
   };
 }
 

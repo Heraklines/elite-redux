@@ -162,6 +162,76 @@ test("frozen schema changes fail even when a broad prefix claims them", () => {
   );
 });
 
+test("only the integration train may declare the exact locked schema files changed by one batch", () => {
+  const baseSha = "1".repeat(40);
+  const schemaFile = LOCKED_P33_SCHEMA_FILES[0];
+  assert.throws(
+    () =>
+      validateOwnershipManifest(
+        {
+          version: 2,
+          taskId: "p33-example",
+          branch: BRANCH,
+          trainRef: TRAIN,
+          baseSha,
+          allowedFiles: [MANIFEST_PATH, schemaFile],
+          lockedSchemaFiles: [schemaFile],
+        },
+        MANIFEST_PATH,
+      ),
+    /only an integration train may declare lockedSchemaFiles/u,
+  );
+
+  const integration = validateOwnershipManifest(
+    {
+      version: 2,
+      taskId: "p33-example",
+      branch: BRANCH,
+      trainRef: BRANCH,
+      baseSha,
+      allowedFiles: [MANIFEST_PATH, schemaFile],
+      lockedSchemaFiles: [schemaFile],
+    },
+    MANIFEST_PATH,
+  );
+  const evidence = evaluateOwnership({
+    manifest: integration,
+    branch: BRANCH,
+    expectedBase: baseSha,
+    headSha: "2".repeat(40),
+    changedFiles: [schemaFile],
+  });
+  assert.deepEqual(evidence.approvedLockedSchemaFiles, [schemaFile]);
+});
+
+test("an integration schema declaration is exact and single-batch, never a reusable waiver", () => {
+  const baseSha = "1".repeat(40);
+  const schemaFile = LOCKED_P33_SCHEMA_FILES[0];
+  const integration = validateOwnershipManifest(
+    {
+      version: 2,
+      taskId: "p33-example",
+      branch: BRANCH,
+      trainRef: BRANCH,
+      baseSha,
+      allowedFiles: [MANIFEST_PATH, schemaFile],
+      lockedSchemaFiles: [schemaFile],
+    },
+    MANIFEST_PATH,
+  );
+  assert.throws(
+    () =>
+      evaluateOwnership({
+        manifest: integration,
+        branch: BRANCH,
+        expectedBase: baseSha,
+        headSha: "2".repeat(40),
+        changedFiles: [MANIFEST_PATH],
+      }),
+    /declared locked P33 schema files were unchanged/u,
+  );
+});
+
 test("resolved train base must exactly equal the declared base", () => {
   const baseSha = "3".repeat(40);
   assert.throws(

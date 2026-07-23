@@ -37,9 +37,32 @@ The integration train is a special case only in how its expected base is resolve
 must update that branch's manifest for each intentional merge batch. This keeps the integration diff reviewable
 without comparing it to the stale release branch.
 
+An integration-only manifest may use version 2 to approve an intentional frozen-schema change in that one
+batch. `lockedSchemaFiles` must be a sorted, exact subset of the guard's frozen schema list, every path must
+also be owned by `allowedFiles`, and `branch` must equal `trainRef`. The declaration must match the files that
+actually changed: an undeclared locked file fails, and a declared-but-unchanged file also fails. This makes the
+approval a reviewed per-push schema freeze, not a durable wildcard waiver.
+
+```json
+{
+  "version": 2,
+  "taskId": "p33-integration",
+  "branch": "ci/coop/p33-integration",
+  "trainRef": "ci/coop/p33-integration",
+  "baseSha": "0123456789abcdef0123456789abcdef01234567",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-integration.json",
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ],
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ]
+}
+```
+
 The guard writes `coop-task-ownership-resolution.json` and `coop-task-ownership-evidence.json`. These records are
 uploaded with the focused plan so every selected shard is tied to the exact train base and allowed-file contract.
 
 The frozen schema list lives in `scripts/guard-coop-task-ownership.mjs`. A deliberate wire-schema change must not
-be smuggled through a surface task; it requires the integration owner's separate schema-freeze workflow and
-compatibility fixtures.
+be smuggled through a surface task; it requires the integration owner's version-2 exact batch declaration plus
+the relevant compatibility fixtures.
