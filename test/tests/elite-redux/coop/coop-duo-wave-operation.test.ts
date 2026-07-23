@@ -449,7 +449,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       expect(
         pushNewSpy.mock.calls.find(call => call[0] === "VictoryPhase")?.slice(2),
         "the retained materializer queues the ordinary wave-11 Victory tail",
-      ).toEqual([false, 11]);
+      ).toEqual([false, 11, 1]);
 
       // PhaseInterceptor disables automatic starts. Shift into the manager-created Victory and start it
       // exactly once; its normal end() shifts to the sanctioned, source-addressed BattleEnd boundary.
@@ -468,11 +468,14 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   }, 300_000);
 
   it("FINAL VICTORY: retains Victory -> BattleEnd -> GameOver and suppresses the later duplicate terminal echo", async () => {
-    const rig = await bootDuo({ startingWave: 200 });
+    // Use an ordinary playable command frontier and make it final through the same game-mode predicate
+    // consumed by the boundary. Booting the test harness directly at wave 200 starts its synthetic guest
+    // on LoginPhase, so it cannot prove the required COMMAND -> TURN_COMMIT predecessor at all.
+    const rig = await bootDuo({ startingWave: 7 });
     vi.spyOn(rig.hostScene.gameMode, "isWaveFinal").mockReturnValue(true);
-    const payload = await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 200 });
+    const payload = await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 7 });
 
-    expect(payload?.nextWave, "a final victory cannot invent wave 201").toBe(200);
+    expect(payload?.nextWave, "a final victory cannot invent a following wave").toBe(7);
     expect(payload?.biomeChange).toBe(false);
     expect(payload?.eggLapse).toBe(false);
     expect(waveOp.coopWaveAdvanceSanctionedTails(payload!)).toEqual([
@@ -524,7 +527,9 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     await withClient(rig.guestCtx, async () => {
       rig.guestScene.currentBattle.waveIndex = 7;
       rig.guestScene.currentBattle.turn = 1;
-      const replay = new CoopReplayTurnPhase(1);
+      // Turn 1 was already consumed into the ordered successor wait above. The adversarial local replay is
+      // therefore the genuinely phantom NEXT turn; reopening turn 1 would correctly be rejected as stale.
+      const replay = new CoopReplayTurnPhase(2);
       rig.guestScene.phaseManager.clearPhaseQueue();
       rig.guestScene.phaseManager.unshiftPhase(replay);
       rig.guestScene.phaseManager.shiftPhase();

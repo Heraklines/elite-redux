@@ -2057,6 +2057,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Ordinary Move Learn and Revival projection uses this path, so an unrelated renderer override can no longer
   suppress a committed combat UI or resurrect an old CommandPhase when that modal closes.
 
+# 2026-07-23 - Wave and biome suites use legal V2 predecessors
+
+- The wave matrix no longer boots its synthetic renderer at final wave 200/LoginPhase and then asks an
+  uninstalled command to retire. It boots a playable addressed command and exercises finality through the
+  production `isWaveFinal` predicate; its adversarial replay is now turn 2 rather than reopening consumed turn 1.
+- Biome/Crossroads interaction cases now boot at their tested source wave and retire the real initial command
+  into `AWAIT_SUCCESSOR` before opening a picker. They no longer mutate a wave-1 authority address after the
+  fact. Raw `biomePick` emission and legacy durability are no longer treated as correctness: the public map
+  probe requires an `INTERACTION_COMMIT`, and retained checks read the global V2 log.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real

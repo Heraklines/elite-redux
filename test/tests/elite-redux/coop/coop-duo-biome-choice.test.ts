@@ -34,6 +34,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { getCoopV2Shadow } from "#data/elite-redux/coop/authority-v2/shadow";
 import { applyCoopFullSnapshot, captureCoopFullSnapshot } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   coopBiomeOperationId,
@@ -88,6 +89,7 @@ import {
   drainLoopback,
   installDuoLogCapture,
   pumpDuoDestinations,
+  retireDuoInitialCommandForBoundaryTest,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -287,6 +289,15 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   function setPendingNodesForBoth(rig: DuoRig, nodes: readonly ErRouteNode[]): void {
     withClientSync(rig.hostCtx, () => setErPendingNodes(nodes.map(node => ({ ...node }))));
     withClientSync(rig.guestCtx, () => setErPendingNodes(nodes.map(node => ({ ...node }))));
+  }
+
+  /** Boot the tested biome address and retire its real command into an ordered V2 successor wait. */
+  async function bootBoundaryAtWave(wave: number): Promise<DuoRig> {
+    game.override.startingWave(wave);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    await retireDuoInitialCommandForBoundaryTest(rig);
+    return rig;
   }
 
   interface CrossroadsSeam {
@@ -561,10 +572,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   }
 
   it("retains one Crossroads source when the guest renderer already exposes the next battle", async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
     const sourceWave = 5;
-    rig.hostScene.currentBattle.waveIndex = sourceWave;
+    const rig = await bootBoundaryAtWave(sourceWave);
     // Victory passes the completed source explicitly even if the renderer's ambient next battle won the race.
     rig.guestScene.currentBattle.waveIndex = sourceWave + 1;
     const hostPhase = withClientSync(rig.hostCtx, () => liveCrossroads(sourceWave));
@@ -634,12 +643,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // SCENARIO 1: CROSSROADS STAY - both continue the same biome, overstay armed, one advance.
   // =====================================================================================
   it("CROSSROADS STAY: owner picks Stay -> both stay in the same biome, counter advances once on both", async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-
     // Drive a deep wave so the crossroads is PAST the notoriety-free window (Stay arms the overstay anchor).
-    rig.hostScene.currentBattle.waveIndex = 26;
-    rig.guestScene.currentBattle.waveIndex = 26;
+    const rig = await bootBoundaryAtWave(26);
 
     const beginSpy = vi.spyOn(CoopUiMirror.prototype, "beginSession");
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
@@ -688,12 +693,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // SCENARIO 2 + 3: CROSSROADS LEAVE -> WORLD-MAP PICK (one interaction), then ALTERNATION.
   // =====================================================================================
   it("CROSSROADS LEAVE + WORLD-MAP PICK: one interaction, both land in the owner's NON-DEFAULT biome; alternation flips", async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-
     // A mid-run wave (not a finale); both engines share it.
-    rig.hostScene.currentBattle.waveIndex = 11;
-    rig.guestScene.currentBattle.waveIndex = 11;
+    const rig = await bootBoundaryAtWave(11);
 
     // Two REVEALED onward nodes (shared er-map state). The owner will pick the SECOND (non-default).
     const nodes: ErRouteNode[] = [
@@ -889,11 +890,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // down to MESSAGE, and parks for the missing exact commit without choosing a biome locally.
   // =====================================================================================
   it("ORPHAN (#863): owner advances with NO exact commit -> watcher leaves the map and parks without mutation", async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-
-    rig.hostScene.currentBattle.waveIndex = 11;
-    rig.guestScene.currentBattle.waveIndex = 11;
+    const rig = await bootBoundaryAtWave(11);
 
     setPendingNodesForBoth(rig, [
       { biome: BiomeId.FOREST, revealed: true },
@@ -971,15 +968,11 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // pump - the untested gap. The other scenarios call the captured onSelect DIRECTLY (mocking
   // setMode), so they never exercise the real handler input -> confirmPick -> onSelect funnel NOR
   // the real ui.processInput owner-drive/relay pump. This one does. Assert the owner emits the
-  // biomePick relay + advances the counter.
+  // immutable V2 biome commit + advances the counter.
   // =====================================================================================
-  it("PROBE: owner drives the REAL ER_MAP handler via real input -> emits biomePick relay + advances", async () => {
+  it("PROBE: owner drives the REAL ER_MAP handler via real input -> commits Authority V2 + advances", async () => {
     const { Button } = await import("#enums/buttons");
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-
-    rig.hostScene.currentBattle.waveIndex = 11;
-    rig.guestScene.currentBattle.waveIndex = 11;
+    const rig = await bootBoundaryAtWave(11);
 
     setPendingNodesForBoth(rig, [
       { biome: BiomeId.FOREST, revealed: true },
@@ -1018,7 +1011,14 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     console.log(
       `[PROBE #864] sendInteractionChoice calls=${JSON.stringify(sendSpy.mock.calls.map(c => ({ seq: c[0], kind: c[1], choice: c[2], data: c[3] })))} counterBefore=${counterBefore} counterAfter=${rig.hostRuntime.controller.interactionCounter()}`,
     );
-    expect(biomePickSends.length, "the owner emitted a biomePick relay via the REAL handler input path").toBe(1);
+    expect(biomePickSends.length, "the cut-over owner does not emit a raw biomePick correctness carrier").toBe(0);
+    expect(
+      withClientSync(rig.hostCtx, () =>
+        getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore }),
+      ),
+      "the public handler committed the addressed V2 biome operation",
+    ).not.toBeNull();
+    expect(getCoopV2Shadow(rig.hostRuntime)?.authorityFrontier()?.kind).toBe("INTERACTION_COMMIT");
     logs.flush();
   }, 300_000);
 
@@ -1041,10 +1041,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // it verbatim -> both engines land in the SAME biome.
   // =====================================================================================
   it("SCENARIO 6: a chained deterministic terminal uses an exact host BIOME_PICK, not a phantom interaction relay", async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    rig.hostScene.currentBattle.waveIndex = 11;
-    rig.guestScene.currentBattle.waveIndex = 11;
+    const rig = await bootBoundaryAtWave(11);
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const destination = BiomeId.VOLCANO;
     const sendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
@@ -1060,8 +1057,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       await drainLoopback();
     });
     expect(
-      rig.hostRuntime.durability?.unackedCount(),
-      "the deterministic boundary terminal remains retained until the renderer continuation opens",
+      getCoopV2Shadow(rig.hostRuntime)?.diagnostics().retained,
+      "the deterministic V2 terminal remains retained until the renderer continuation opens",
     ).toBeGreaterThan(0);
     await withClient(rig.guestCtx, async () => {
       setErPendingNodes([{ biome: destination, revealed: true }]);
@@ -1103,12 +1100,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // terminal, and never lands on the host's biome. PASSES-AFTER: the guest adopts the host's single node.
   // =====================================================================================
   it("SCENARIO 7 (#865): divergent map state -> guest adopts host's pending nodes via resync -> NATURAL single-node terminal converges", async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-
     // A mid-run wave, NOT a boundary/finale and NOT chained from a crossroads (the NATURAL terminal).
-    rig.hostScene.currentBattle.waveIndex = 13;
-    rig.guestScene.currentBattle.waveIndex = 13;
+    const rig = await bootBoundaryAtWave(13);
 
     const hostBiome = BiomeId.VOLCANO;
     const seedMap = (nodes: ErRouteNode[]): void => {
@@ -1174,8 +1167,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       // terminal was pre-delivered; a host-context drain only services the host inbox.
       await withClient(rig.guestCtx, () => drainLoopback());
       expect(
-        rig.hostRuntime.durability?.unackedCount(),
-        "the natural single-node terminal remains retained before renderer projection",
+        getCoopV2Shadow(rig.hostRuntime)?.diagnostics().retained,
+        "the natural single-node V2 terminal remains retained before renderer projection",
       ).toBeGreaterThan(0);
       expect(
         hostSwitch.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1],
@@ -1233,12 +1226,9 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   }, 300_000);
 
   it("retains the map's source-wave address when the renderer ambient battle has already advanced", async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
     const sourceWave = 15;
+    const rig = await bootBoundaryAtWave(sourceWave);
     const destination = BiomeId.VOLCANO;
-    rig.hostScene.currentBattle.waveIndex = sourceWave;
-    rig.guestScene.currentBattle.waveIndex = sourceWave;
     const hostSwitch = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
     const guestSwitch = vi.spyOn(rig.guestScene.phaseManager, "unshiftNew");
 
@@ -1314,11 +1304,9 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   }, 300_000);
 
   it("captures a non-wave map source at construction when no retained wave candidate exists", async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const rig = await bootBoundaryAtWave(21);
 
     const captured = withClientSync(rig.guestCtx, () => {
-      rig.guestScene.currentBattle.waveIndex = 21;
       const phase = new SelectBiomePhase() as unknown as { requireCoopSourceWave(): number };
       // Crossroads/move/ability map entries can resume after an await. They have no unresolved WAVE_ADVANCE,
       // so the construction-time source—not a speculative next Battle—must address their biome operation.
