@@ -768,18 +768,26 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         });
         earlyPicker.start();
         await drainLoopback();
-        const picker = earlyPicker;
+        let picker = earlyPicker as Phase & { coopV2ControlOperationId?: string | null };
         if (V2_REPLACEMENT_CUTOVER) {
-          // The replay driver has already run CoopFinalizeTurnPhase before it returns this current phase.
-          // Its TURN_COMMIT's typed REPLACEMENT successor is therefore material-applied and projected; this
-          // first real picker is the ordered control, not a speculative pre-commit generation that should be
-          // destroyed and recreated. Requiring a second picker made the completed V2 path fail precisely
-          // because it now opens one address-exact surface without flicker.
+          // Faint presentation precedes the settled TURN_COMMIT by design. The first structural picker must
+          // therefore register its exact RC address and retire without exposing PARTY; keeping it current in
+          // front of CoopFinalizeTurnPhase would deadlock the very entry that authorizes input. Drive the real
+          // finalizer, then accept only the one address-exact picker reconstructed by that immutable control.
+          expect(pickerOpens, "the pre-commit picker never exposes speculative input").toBe(0);
+          const operationId = picker.coopV2ControlOperationId;
+          expect(operationId, "the retired structural picker registered its replacement address").toMatch(/^RC\//u);
+          picker = (await driveClientPhaseQueueTo(rig.guestScene, "Showdown ordered idle guest picker", {
+            matches: phase => phase.phaseName === "CoopGuestFaintSwitchPhase",
+            perPhaseTimeoutMs: 5_000,
+          })) as Phase & { coopV2ControlOperationId?: string | null };
+          picker.start();
+          await drainLoopback();
           expect(pickerOpens, "the ordered V2 replacement picker opened without a speculative duplicate").toBe(1);
           expect(
-            (picker as Phase & { coopV2ControlOperationId?: string | null }).coopV2ControlOperationId,
+            picker.coopV2ControlOperationId,
             "the public picker is bound to its immutable replacement operation",
-          ).toMatch(/^RC\//u);
+          ).toBe(operationId);
         }
         await vi.waitUntil(() => pickerOpens === 1 && rig.guestScene.ui.getMode() === UiMode.PARTY, {
           timeout: 5_000,
