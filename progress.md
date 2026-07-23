@@ -2223,3 +2223,29 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - B13's sole red also modeled an impossible ability bar: `isVisible=true` before phase entry exercised the
   hide-and-requeue path while expecting the new flyout synchronously. It now models closed-before-show and
   visible-after-show, preserving the throttled-tween regression without a false signal.
+
+# 2026-07-24 - Cold-resume entry carrier and exact combat-presentation proof
+
+- Public two-browser run `30047074787` proved fresh co-op through wave 2, then reproduced the live cold-resume
+  abort before its first resumed command. Both seats loaded the same wave-2 snapshot, but
+  `EncounterPhase(loaded=true)` suppressed the authority's retained enemy/entry carrier. The guest correctly
+  waited for that carrier while the host eventually terminalized with "could not publish its complete entry
+  presentation." Loaded authority encounters now publish through the same idempotent carrier seam; the method
+  remains a hard no-op for solo and replica seats. A failure-first wiring assertion protects the exact seam,
+  while the repeated public fresh/resume browser journey is the behavioral proof.
+- Every combat event whose battler coordinate can become stale now carries an additive stable
+  `{ side, pokemonId }` actor identity; move targets carry an aligned exact identity list. Producers cover
+  move use, HP/healing, faint, stat stage, status, ability, Tera, and switch. Strict transport validation
+  checks the new addresses, and Showdown's side projector flips both source and target identities.
+- Replay resolves new entries by exact side-local identity and fails closed when that actor is not displayed;
+  it only retains battler-index/species fallback for already-retained older entries. HP chains are keyed by
+  stable actor identity, avoiding visual state reuse when a switch or faint reassigns a field coordinate.
+- Move, HP, stat, status, faint, weather, and terrain replay now contribute presentation outcome tokens just
+  like ability, Tera, and switch. Render callbacks settle success, disabled animations settle an explicit
+  intentional skip, and missing actors, throws, rejected redraws, or watchdog expiry settle failure. The V2
+  finalizer therefore cannot report `controlInstalled` after silently losing a mechanical presentation.
+- Engine fixtures now execute the real replay phase implementations with animations disabled instead of
+  mocking `start()` into a synthetic `end()`, so they exercise the same presentation-proof contract as the
+  browser. Static verification is clean (`Biome`, `git diff --check`, and zero TypeScript diagnostics in
+  changed files against the branch's 222-error baseline); co-op engine/browser qualification remains
+  remote-only per `AGENTS.md` and is the next exact-SHA step.

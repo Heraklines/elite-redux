@@ -93,6 +93,7 @@ export class ShowAbilityPhase extends PokemonPhase {
         k: "showAbility",
         bi: this.battlerIndex,
         pokemonId: this.pokemonId,
+        actor: { side: pokemon.isPlayer() ? "player" : "enemy", pokemonId: this.pokemonId },
         partySlot: this.partySlot,
         abilityId: this.abilityId,
         passive: this.passive,

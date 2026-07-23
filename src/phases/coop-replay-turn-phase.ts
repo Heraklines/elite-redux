@@ -22,6 +22,7 @@ import {
 import type { CoopAuthorityFailure, CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { hasPendingCoopFaintSwitchReplacementIntent } from "#data/elite-redux/coop/coop-faint-switch-operation";
+import { getActuallyFieldedCoopPokemon } from "#data/elite-redux/coop/coop-field-presentation";
 import { beginCoopAuthoritativeProjectionSettlement } from "#data/elite-redux/coop/coop-presentation";
 import {
   type CoopPresentationOutcomeToken,
@@ -40,7 +41,7 @@ import {
   isCoopAuthoritativeGuest,
   registerCoopActiveReplayTurnAborter,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
+import type { CoopBattleEvent, CoopPresentationActorRef } from "#data/elite-redux/coop/coop-transport";
 import {
   hasCoopPresentationObserver,
   observeCoopPresentationOutcome,
@@ -84,6 +85,14 @@ let activeCoopReplayTurnPhase: CoopReplayTurnPhase | null = null;
 const REPLACEMENT_RETRY_LIMIT = 3;
 const REPLACEMENT_RETRY_TIMEOUT_MS = 2_000;
 const REPLACEMENT_PRESENTATION_TIMEOUT_MS = 15_000;
+
+function fieldMonHp(bi: number, actor?: CoopPresentationActorRef): number | undefined {
+  if (actor == null) {
+    return globalScene.getField()[bi]?.hp;
+  }
+  const matches = getActuallyFieldedCoopPokemon(actor.side).filter(candidate => candidate.id === actor.pokemonId);
+  return matches.length === 1 ? matches[0].hp : undefined;
+}
 
 export function abortActiveCoopReplayTurnPhase(reason: string): boolean {
   return activeCoopReplayTurnPhase?.abortPhantom(reason) ?? false;
@@ -141,7 +150,7 @@ export class CoopReplayTurnPhase extends Phase {
   /** #782 live pump: how many event POSITIONS (seq 0..rendered-1) this turn has already presented. */
   private readonly rendered: number;
   /** #782 live pump: the per-mon hp chain carried ACROSS pump continuations (multi-hit drains). */
-  private readonly fromHpByBi: Map<number, number>;
+  private readonly fromHpByBi: Map<string, number>;
   /** #859: set by {@linkcode abortPhantom} - the pump ends WITHOUT finalize/turn-advance. */
   private aborted = false;
   /** One-shot wake while a failed replacement stays buffered awaiting a retransmission/newer frame. */
@@ -163,7 +172,7 @@ export class CoopReplayTurnPhase extends Phase {
   constructor(
     turn: number,
     rendered = 0,
-    hpChain?: [number, number][],
+    hpChain?: [string, number][],
     sourceWave?: number,
     entryPresentationOnly = false,
     presentationOutcomeTokens?: readonly CoopPresentationOutcomeToken[],
@@ -1253,14 +1262,27 @@ export class CoopReplayTurnPhase extends Phase {
             // the move-anim phase. The host suppressed streaming its own (host-language) useMove message,
             // so this queueMessage is the sole source of the line. The regenerated line lands at the
             // moveUsed position (one slot after the original message position - adjacent, cosmetic).
-            coopNarrateMoveUsed(event.bi, event.moveId);
-            pm.unshiftNew("CoopMoveAnimReplayPhase", event.bi, event.moveId, [...event.targets]);
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            coopNarrateMoveUsed(event.bi, event.moveId, event.actor);
+            pm.unshiftNew(
+              "CoopMoveAnimReplayPhase",
+              event.bi,
+              event.moveId,
+              [...event.targets],
+              event.actor,
+              event.targetActors == null ? undefined : [...event.targetActors],
+              outcomeToken,
+            );
             break;
           case "hp": {
-            const seeded = fromHpByBi.has(event.bi)
-              ? (fromHpByBi.get(event.bi) ?? event.hp)
-              : (globalScene.getField()[event.bi]?.hp ?? event.hp);
-            fromHpByBi.set(event.bi, event.hp);
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            const hpActorKey = event.actor == null ? `bi:${event.bi}` : `${event.actor.side}:p${event.actor.pokemonId}`;
+            const seeded = fromHpByBi.has(hpActorKey)
+              ? (fromHpByBi.get(hpActorKey) ?? event.hp)
+              : (fieldMonHp(event.bi, event.actor) ?? event.hp);
+            fromHpByBi.set(hpActorKey, event.hp);
             pm.unshiftNew(
               "CoopHpDrainReplayPhase",
               event.bi,
@@ -1270,14 +1292,20 @@ export class CoopReplayTurnPhase extends Phase {
               event.sp,
               event.result,
               event.critical,
+              event.actor,
+              outcomeToken,
             );
             break;
           }
           case "statStage":
-            pm.unshiftNew("CoopStatStageReplayPhase", event.bi, event.stat, event.value);
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew("CoopStatStageReplayPhase", event.bi, event.stat, event.value, event.actor, outcomeToken);
             break;
           case "status":
-            pm.unshiftNew("CoopStatusReplayPhase", event.bi, event.status);
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew("CoopStatusReplayPhase", event.bi, event.status, event.actor, outcomeToken);
             break;
           case "showAbility":
             outcomeToken = createCoopPresentationOutcomeToken();
@@ -1291,6 +1319,7 @@ export class CoopReplayTurnPhase extends Phase {
               event.passive,
               event.passiveSlot,
               outcomeToken,
+              event.actor,
             );
             break;
           case "tera":
@@ -1303,29 +1332,49 @@ export class CoopReplayTurnPhase extends Phase {
               event.partySlot,
               event.teraType,
               outcomeToken,
+              event.actor,
             );
             break;
           case "weather":
           case "terrain":
             if (event.anim !== undefined) {
-              pm.unshiftNew("CommonAnimPhase", undefined, undefined, event.anim as CommonAnim, {
-                source: "environment",
-                kind: event.k,
-                value: event.k === "weather" ? event.weather : event.terrain,
-              });
+              outcomeToken = createCoopPresentationOutcomeToken();
+              this.presentationOutcomeTokens.push(outcomeToken);
+              pm.unshiftNew(
+                "CommonAnimPhase",
+                undefined,
+                undefined,
+                event.anim as CommonAnim,
+                {
+                  source: "environment",
+                  kind: event.k,
+                  value: event.k === "weather" ? event.weather : event.terrain,
+                },
+                outcomeToken,
+              );
             }
             break;
           case "faint":
             // #691 (host-language leak): pass the `narrate` flag so the faint phase regenerates the
             // "X fainted!" line in the GUEST'S language ONLY for KOs the host actually narrated (a real
             // FaintPhase ran, i.e. `!ignoreFaintPhase`). Older host (no `narrate`) -> falsy -> no line.
-            pm.unshiftNew("CoopFaintReplayPhase", event.bi, event.narrate === true, event.sp, {
-              wave: this.sourceWave,
-              turn: this.turn,
-              // The existing stream seq is identical to the event's turn-resolution batch index.
-              // `this.rendered` is this continuation's exact starting watermark.
-              occurrence: this.rendered + eventOffset,
-            });
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew(
+              "CoopFaintReplayPhase",
+              event.bi,
+              event.narrate === true,
+              event.sp,
+              {
+                wave: this.sourceWave,
+                turn: this.turn,
+                // The existing stream seq is identical to the event's turn-resolution batch index.
+                // `this.rendered` is this continuation's exact starting watermark.
+                occurrence: this.rendered + eventOffset,
+              },
+              event.actor,
+              outcomeToken,
+            );
             break;
           case "switch":
             outcomeToken = createCoopPresentationOutcomeToken();

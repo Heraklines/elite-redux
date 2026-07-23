@@ -944,9 +944,13 @@ export class EncounterPhase extends BattlePhase {
     if (this.coopAdoptedEnemyParty && this.coopEnemyAuthority != null) {
       applyCoopEnemies(this.coopEnemyAuthority);
     }
-    if (!this.loaded) {
-      this.broadcastCoopEnemyParty();
-    }
+    // A cold co-op resume constructs EncounterPhase(loaded=true) from the shared snapshot. The snapshot
+    // supplies initial material, but it does not replace this wave's retained enemy/entry carrier: the
+    // replica's turn-1 replay deliberately waits for that carrier before exposing command input, and the
+    // post-summon authority refresh requires its sent-state cache. Publish for loaded authority encounters
+    // too; the method is already a hard no-op for solo and replicas. Skipping this used to let both clients
+    // render the resumed intro, then terminalize at the first command with no publishable entry prefix.
+    this.broadcastCoopEnemyParty();
   }
 
   /** Finalize the shared authority, then dispatch the subtype-specific presentation. */

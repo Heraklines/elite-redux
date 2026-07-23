@@ -7,6 +7,7 @@ import { PokemonPhase } from "#app/phases/pokemon-phase";
 import { CenterOfAttentionTag, type EncoreTag } from "#data/battler-tags";
 import { erLibraryRecordFoeMove } from "#data/elite-redux/abilities/library";
 import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
+import type { CoopPresentationActorRef } from "#data/elite-redux/coop/coop-transport";
 import {
   isCoopRecording,
   recordCoopEvent,
@@ -764,14 +765,25 @@ export class MovePhase extends PokemonPhase {
     // event in the recording), so the guest narrates the text then plays the anim. Inert unless a recording
     // is open (only the host, mid-turn, in a live co-op run) - solo / non-host is byte-for-byte unaffected.
     if (isCoopRecording()) {
+      const targets = this.targets.filter(target => Number.isSafeInteger(target) && target >= 0 && target <= 11);
+      const targetActors: Array<CoopPresentationActorRef | null> = targets.map(target => {
+        const targetPokemon = globalScene.getField()[target];
+        return targetPokemon == null
+          ? null
+          : { side: targetPokemon.isPlayer() ? ("player" as const) : ("enemy" as const), pokemonId: targetPokemon.id };
+      });
       recordCoopEvent({
         k: "moveUsed",
         bi: pokemon.getBattlerIndex(),
+        actor: { side: pokemon.isPlayer() ? "player" : "enemy", pokemonId: pokemon.id },
         moveId,
         // A later action in the same turn can still carry an engine target sentinel after an earlier
         // action fainted that target. Sentinels have no replayable field entity; omit them from the
         // presentation cue (the replay phase safely falls back to the user for a targetless animation).
-        targets: this.targets.filter(target => Number.isSafeInteger(target) && target >= 0 && target <= 11),
+        targets,
+        ...(targetActors.every(target => target != null)
+          ? { targetActors: targetActors as CoopPresentationActorRef[] }
+          : {}),
       });
     }
 

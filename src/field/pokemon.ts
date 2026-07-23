@@ -5979,6 +5979,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       recordCoopEvent({
         k: "hp",
         bi: this.getBattlerIndex(),
+        actor: { side: this.isPlayer() ? "player" : "enemy", pokemonId: this.id },
         hp: this.hp,
         maxHp: this.getMaxHp(),
         sp: this.species?.speciesId ?? 0,
@@ -5996,7 +5997,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         // onFaintTarget) and thus a shown message, so `narrate` is TRUE for a recorded faint. The flag is
         // kept on the wire (not hardcoded on the guest) so the GATING semantics + forward-compat hold (an
         // event may carry narrate=false and the guest suppresses the line).
-        recordCoopEvent({ k: "faint", bi: this.getBattlerIndex(), narrate: true, sp: this.species?.speciesId ?? 0 });
+        recordCoopEvent({
+          k: "faint",
+          bi: this.getBattlerIndex(),
+          actor: { side: this.isPlayer() ? "player" : "enemy", pokemonId: this.id },
+          narrate: true,
+          sp: this.species?.speciesId ?? 0,
+        });
       }
     }
     if (this.isFainted() && !ignoreFaintPhase) {
@@ -6113,6 +6120,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       recordCoopEvent({
         k: "hp",
         bi: this.getBattlerIndex(),
+        actor: { side: this.isPlayer() ? "player" : "enemy", pokemonId: this.id },
         hp: this.hp,
         maxHp: this.getMaxHp(),
         sp: this.species?.speciesId ?? 0,
@@ -7329,7 +7337,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     this.status = new Status(effect, 0, sleepTurnsRemaining);
     if (effect !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
-      recordCoopEvent({ k: "status", bi: this.getBattlerIndex(), status: effect });
+      recordCoopEvent({
+        k: "status",
+        bi: this.getBattlerIndex(),
+        actor: { side: this.isPlayer() ? "player" : "enemy", pokemonId: this.id },
+        status: effect,
+      });
     }
     erRecordAchievementStatusSet(this, effect);
   }
@@ -7384,7 +7397,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const lastStatus = this.status?.effect;
     this.status = null;
     if (lastStatus != null && lastStatus !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
-      recordCoopEvent({ k: "status", bi: this.getBattlerIndex(), status: StatusEffect.NONE });
+      recordCoopEvent({
+        k: "status",
+        bi: this.getBattlerIndex(),
+        actor: { side: this.isPlayer() ? "player" : "enemy", pokemonId: this.id },
+        status: StatusEffect.NONE,
+      });
     }
     this.setFrameRate(10);
     if (lastStatus === StatusEffect.SLEEP && this.getTag(BattlerTagType.NIGHTMARE)) {

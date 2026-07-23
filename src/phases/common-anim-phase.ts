@@ -1,5 +1,10 @@
 import { globalScene } from "#app/global-scene";
 import { CommonBattleAnim } from "#data/battle-anims";
+import {
+  type CoopPresentationOutcome,
+  type CoopPresentationOutcomeToken,
+  settleCoopPresentationOutcome,
+} from "#data/elite-redux/coop/coop-presentation-outcome";
 import type { BattlerIndex } from "#enums/battler-index";
 import type { CommonAnim } from "#enums/move-anims-common";
 import { PokemonPhase } from "#phases/pokemon-phase";
@@ -25,6 +30,7 @@ export class CommonAnimPhase extends PokemonPhase {
     targetIndex?: BattlerIndex,
     anim: CommonAnim | null = null,
     coopPresentation?: CommonAnimPresentationTag,
+    private readonly coopPresentationOutcomeToken?: CoopPresentationOutcomeToken,
   ) {
     super(battlerIndex);
 
@@ -61,20 +67,31 @@ export class CommonAnimPhase extends PokemonPhase {
     // `ended` guards against the watchdog and the real callback both firing.
     let ended = false;
     let watchdog: Phaser.Time.TimerEvent | undefined;
-    const finish = () => {
+    const actorFingerprint =
+      this.coopPresentation == null
+        ? `environment:unknown:anim${this.anim ?? "none"}`
+        : `${this.coopPresentation.kind}:${this.coopPresentation.value}:anim${this.anim ?? "none"}`;
+    const finish = (outcome: CoopPresentationOutcome) => {
       if (ended) {
         return;
       }
       ended = true;
       watchdog?.remove();
+      if (this.coopPresentationOutcomeToken != null) {
+        settleCoopPresentationOutcome(this.coopPresentationOutcomeToken, outcome);
+      }
       this.end();
     };
-    watchdog = globalScene.time.delayedCall(5000, finish);
+    watchdog = globalScene.time.delayedCall(5000, () =>
+      finish({ kind: "failed", reason: "environment-watchdog-expired", actorFingerprint }),
+    );
     try {
-      new CommonBattleAnim(this.anim, this.getPokemon(), target).play(false, finish);
+      new CommonBattleAnim(this.anim, this.getPokemon(), target).play(false, () =>
+        finish({ kind: "rendered", actorFingerprint }),
+      );
     } catch (err) {
       console.error(`[ER] CommonAnimPhase: anim ${this.anim} failed to play; ending phase to avoid a freeze`, err);
-      finish();
+      finish({ kind: "failed", reason: "environment-presentation-threw", actorFingerprint });
     }
   }
 }

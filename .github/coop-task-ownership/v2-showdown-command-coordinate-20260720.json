@@ -42,12 +42,17 @@
     "src/modifier/modifier.ts",
     "src/phase-manager.ts",
     "src/phases/command-phase.ts",
+    "src/phases/common-anim-phase.ts",
     "src/phases/coop-push-replacement-checkpoint-phase.ts",
     "src/phases/coop-replay-phases.ts",
     "src/phases/coop-replay-turn-phase.ts",
     "src/phases/coop-turn-commit-phase.ts",
+    "src/phases/encounter-phase.ts",
     "src/phases/er-custom-trainer-install.ts",
     "src/phases/init-encounter-phase.ts",
+    "src/phases/move-phase.ts",
+    "src/phases/show-ability-phase.ts",
+    "src/phases/stat-stage-change-phase.ts",
     "src/phases/summon-phase.ts",
     "src/phases/switch-summon-phase.ts",
     "src/phases/tera-phase.ts",
@@ -117,5 +122,5 @@
     "test/tools/repro-triple-battle-bugs.test.ts",
     "test/visual/rich-notification-qa.mjs"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": ["src/data/elite-redux/coop/coop-transport.ts"]
 }

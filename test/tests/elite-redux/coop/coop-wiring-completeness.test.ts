@@ -218,6 +218,24 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     ).not.toContain("enemies = await streamer.awaitEnemyParty(");
   });
 
+  it("FAILURE-FIRST: a loaded cold-resume encounter republishes the retained entry carrier", () => {
+    const encounterSource = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "src", "phases", "encounter-phase.ts"),
+      "utf8",
+    );
+    const start = encounterSource.indexOf("private finalizeCoopEncounterAuthority(): void");
+    const end = encounterSource.indexOf("private enterEncounterPresentation(): void", start);
+    expect(start, "the final encounter authority seam exists").toBeGreaterThanOrEqual(0);
+    expect(end, "the seam has a bounded source section").toBeGreaterThan(start);
+    const finalize = encounterSource.slice(start, end);
+    expect(finalize, "loaded authority encounters publish the same retained wave carrier").toContain(
+      "this.broadcastCoopEnemyParty();",
+    );
+    expect(finalize, "cold resume must not suppress the carrier required by entry presentation").not.toContain(
+      "if (!this.loaded)",
+    );
+  });
+
   it("keeps an authoritative guest behind the atomic encounter carrier before Mystery materialization", () => {
     const root = join(__dirname, "..", "..", "..", "..", "src");
     const encounterSource = readFileSync(join(root, "phases", "encounter-phase.ts"), "utf8");

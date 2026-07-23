@@ -361,6 +361,18 @@ function isStrictCheckpoint(value: unknown): value is CoopBattleCheckpoint {
   });
 }
 
+function isPresentationActorRef(value: unknown): value is { side: "player" | "enemy"; pokemonId: number } {
+  if (value == null || typeof value !== "object") {
+    return false;
+  }
+  const actor = value as Record<string, unknown>;
+  return (actor.side === "player" || actor.side === "enemy") && isPositiveSafeAddressPart(actor.pokemonId);
+}
+
+function isOptionalPresentationActorRef(value: unknown): boolean {
+  return value === undefined || isPresentationActorRef(value);
+}
+
 function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
   if (value == null || typeof value !== "object") {
     return false;
@@ -375,6 +387,11 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
         && isSafeAddressPart(event.moveId, false)
         && Array.isArray(event.targets)
         && event.targets.every(isValidBattlerIndex)
+        && isOptionalPresentationActorRef(event.actor)
+        && (event.targetActors === undefined
+          || (Array.isArray(event.targetActors)
+            && event.targetActors.length === event.targets.length
+            && event.targetActors.every(isPresentationActorRef)))
       );
     case "hp":
       return (
@@ -387,17 +404,26 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
         && (event.result === undefined || [1, 2, 3, 4, 10, 12, 13].includes(event.result as number))
         && (event.critical === undefined || typeof event.critical === "boolean")
         && (event.result === undefined) === (event.critical === undefined)
+        && isOptionalPresentationActorRef(event.actor)
       );
     case "faint":
       return (
         isValidBattlerIndex(event.bi)
         && (event.narrate === undefined || typeof event.narrate === "boolean")
         && (event.sp === undefined || isFiniteNumber(event.sp))
+        && isOptionalPresentationActorRef(event.actor)
       );
     case "statStage":
-      return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.stat) && isFiniteNumber(event.value);
+      return (
+        isValidBattlerIndex(event.bi)
+        && isSafeAddressPart(event.stat)
+        && isFiniteNumber(event.value)
+        && isOptionalPresentationActorRef(event.actor)
+      );
     case "status":
-      return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.status);
+      return (
+        isValidBattlerIndex(event.bi) && isSafeAddressPart(event.status) && isOptionalPresentationActorRef(event.actor)
+      );
     case "showAbility":
       return (
         isValidBattlerIndex(event.bi)
@@ -407,6 +433,8 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
         && typeof event.passive === "boolean"
         && isSafeAddressPart(event.passiveSlot)
         && event.passiveSlot <= MAX_ABILITY_SOURCE_SLOT
+        && (event.actor === undefined
+          || (isPresentationActorRef(event.actor) && event.actor.pokemonId === event.pokemonId))
       );
     case "tera":
       return (
@@ -414,6 +442,8 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
         && isPositiveSafeAddressPart(event.pokemonId)
         && isValidPartySlot(event.partySlot)
         && isSafeAddressPart(event.teraType)
+        && (event.actor === undefined
+          || (isPresentationActorRef(event.actor) && event.actor.pokemonId === event.pokemonId))
       );
     case "weather":
       return (
@@ -435,6 +465,8 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
         && isPositiveSafeAddressPart(event.speciesId)
         && isSafeAddressPart(event.switchType)
         && typeof event.doReturn === "boolean"
+        && (event.actor === undefined
+          || (isPresentationActorRef(event.actor) && event.actor.pokemonId === event.pokemonId))
       );
     default:
       return false;

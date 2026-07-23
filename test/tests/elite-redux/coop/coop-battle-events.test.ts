@@ -212,6 +212,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   it("an exact ability identity survives a stale post-reorder battler index", async () => {
     const field = await startCoopGuest();
     const pokemon = field[0];
+    const collidingEnemy = globalScene.getEnemyParty()[0];
+    collidingEnemy.id = pokemon.id;
     const partySlot = globalScene.getPlayerParty().indexOf(pokemon);
     const token = createCoopPresentationOutcomeToken();
     const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility").mockResolvedValue();
@@ -226,6 +228,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       false,
       0,
       token,
+      { side: "player", pokemonId: pokemon.id },
     );
     phase.start();
     await Promise.resolve();
@@ -235,6 +238,31 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       "the immutable Pokemon id, not a stale party-derived bi, selects the flyout actor",
     ).toHaveBeenCalled();
     expect(coopPresentationOutcome(token)?.kind).toBe("rendered");
+  });
+
+  it("an exact combat event cannot report presentation success for a missing actor", async () => {
+    const field = await startCoopGuest();
+    const token = createCoopPresentationOutcomeToken();
+    const pokemon = field[0];
+    const phase = new CoopHpDrainReplayPhase(
+      pokemon.getBattlerIndex(),
+      pokemon.hp,
+      pokemon.hp - 1,
+      pokemon.getMaxHp(),
+      pokemon.species.speciesId,
+      undefined,
+      false,
+      { side: "player", pokemonId: Number.MAX_SAFE_INTEGER },
+      token,
+    );
+    vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(coopPresentationOutcome(token)).toMatchObject({
+      kind: "failed",
+      reason: "hp-actor-not-displayed",
+    });
   });
 
   /** Start a co-op authoritative double as the HOST and tag field ownership. */
@@ -466,8 +494,18 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const recording = endCoopRecording();
 
     expect(recording.events.filter(event => event.k === "status")).toEqual([
-      { k: "status", bi: hostMon.getBattlerIndex(), status: StatusEffect.BURN },
-      { k: "status", bi: hostMon.getBattlerIndex(), status: StatusEffect.NONE },
+      {
+        k: "status",
+        bi: hostMon.getBattlerIndex(),
+        actor: { side: "player", pokemonId: hostMon.id },
+        status: StatusEffect.BURN,
+      },
+      {
+        k: "status",
+        bi: hostMon.getBattlerIndex(),
+        actor: { side: "player", pokemonId: hostMon.id },
+        status: StatusEffect.NONE,
+      },
     ]);
   });
 
@@ -492,6 +530,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       k: "showAbility",
       bi: hostMon.getBattlerIndex(),
       pokemonId: hostMon.id,
+      actor: { side: "player", pokemonId: hostMon.id },
       partySlot: globalScene.getPlayerParty().indexOf(hostMon),
       abilityId: hostMon.getAbility().id,
       passive: false,
@@ -682,22 +721,26 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const hostChecksum = carrier.checksum;
     expect(enemy0.isOnField(), "enemy0 is alive on the guest's pre-turn field").toBe(true);
 
-    // Record the ORDER the replay phases run + whether the FAINT phase saw the mon PRESENT (not snapped
-    // away on an empty field). Anim/drain phases short-circuit to end() (no headless tweens); the faint
-    // phase PERFORMS the real removal (so the field matches the host); the finalize phase runs for real.
+    // Record the ORDER while still running the real replay implementations. Presentation outcome tokens
+    // are part of the production continuation proof; replacing start() with a synthetic end() would create
+    // a false test-only pending outcome and no longer model the real queue.
     const order: string[] = [];
     let faintSawMonPresent: boolean | null = null;
+    globalScene.moveAnimations = false;
+    const moveStart = CoopMoveAnimReplayPhase.prototype.start;
+    const hpStart = CoopHpDrainReplayPhase.prototype.start;
+    const faintStart = CoopFaintReplayPhase.prototype.start;
     const moveSpy = vi.spyOn(CoopMoveAnimReplayPhase.prototype, "start").mockImplementation(function (
       this: CoopMoveAnimReplayPhase,
     ) {
       order.push("MoveAnim");
-      this.end();
+      moveStart.call(this);
     });
     const hpSpy = vi.spyOn(CoopHpDrainReplayPhase.prototype, "start").mockImplementation(function (
       this: CoopHpDrainReplayPhase,
     ) {
       order.push("HpDrain");
-      this.end();
+      hpStart.call(this);
     });
     const faintSpy = vi.spyOn(CoopFaintReplayPhase.prototype, "start").mockImplementation(function (
       this: CoopFaintReplayPhase,
@@ -705,12 +748,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       order.push("Faint");
       // The faint phase runs BEFORE the checkpoint, so the KOd mon MUST still be on-field here.
       faintSawMonPresent = enemy0.isOnField();
-      // Perform the same side-effect-free removal the real faint phase does (so the field matches
-      // the host's end-of-turn composition before the finalize checkpoint reconciles it).
-      enemy0.hp = 0;
-      enemy0.doSetStatus(StatusEffect.FAINT);
-      enemy0.leaveField(true, true, false);
-      this.end();
+      faintStart.call(this);
     });
     const finalizeSpy = vi.spyOn(CoopFinalizeTurnPhase.prototype, "start");
 
@@ -830,6 +868,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(recording.events, "healing is no longer left to a silent checkpoint snap").toContainEqual({
       k: "hp",
       bi: pokemon.getBattlerIndex(),
+      actor: { side: "player", pokemonId: pokemon.id },
       hp: maxHp - 3,
       maxHp,
       sp: pokemon.species.speciesId,
@@ -848,6 +887,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(recording.events).toContainEqual({
       k: "hp",
       bi: pokemon.getBattlerIndex(),
+      actor: { side: "player", pokemonId: pokemon.id },
       hp: fromHp - 7,
       maxHp: pokemon.getMaxHp(),
       sp: pokemon.species.speciesId,
@@ -869,6 +909,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       k: "tera",
       bi: pokemon.getBattlerIndex(),
       pokemonId: pokemon.id,
+      actor: { side: "player", pokemonId: pokemon.id },
       partySlot: globalScene.getPlayerParty().indexOf(pokemon),
       teraType: pokemon.getTeraType(),
     });
@@ -940,7 +981,16 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(globalScene.field.getIndex(detachedParty)).toBe(-1);
     globalScene.moveAnimations = false;
     vi.spyOn(displayed, "updateInfo").mockResolvedValue(undefined);
-    const phase = new CoopHpDrainReplayPhase(battlerIndex, fromHp, toHp, maxHp, displayed.species.speciesId);
+    const phase = new CoopHpDrainReplayPhase(
+      battlerIndex,
+      fromHp,
+      toHp,
+      maxHp,
+      displayed.species.speciesId,
+      undefined,
+      false,
+      { side: "enemy", pokemonId: displayed.id },
+    );
     const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
 
     phase.start();

@@ -100,6 +100,7 @@ export class SwitchSummonPhase extends SummonPhase {
         bi,
         partySlot: this.slotIndex,
         pokemonId: incoming.id,
+        actor: { side: this.player ? "player" : "enemy", pokemonId: incoming.id },
         speciesId: incomingSpeciesId as number,
         switchType: this.switchType,
         doReturn: this.doReturn,

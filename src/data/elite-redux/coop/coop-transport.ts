@@ -1067,15 +1067,46 @@ export interface CoopSwitchPresentation {
   readonly switchType: number;
   /** Whether the host showed the recall animation/text before sending the incoming Pokemon. */
   readonly doReturn: boolean;
+  /** Stable side-local identity of the incoming actor. Additive for retained pre-identity entries. */
+  readonly actor?: CoopPresentationActorRef;
+}
+
+/**
+ * Stable presentation identity. Battler indices are transient field coordinates: an actor that has
+ * switched, fainted, or been reordered can legitimately report ATTACKER/invalid by the time an async
+ * presentation phase records it. Side + Pokemon id remains exact across that transition and is flipped
+ * with the rest of the event for a Showdown guest.
+ */
+export interface CoopPresentationActorRef {
+  readonly side: "player" | "enemy";
+  readonly pokemonId: number;
 }
 
 export type CoopBattleEvent =
   /** A battle-log line, ALREADY localized by the host (the guest shows it verbatim). */
   | { k: "message"; text: string }
   /** A mon used a move (cue the "X used Y!" + move animation). */
-  | { k: "moveUsed"; bi: number; moveId: number; targets: number[] }
+  | {
+      k: "moveUsed";
+      bi: number;
+      moveId: number;
+      targets: number[];
+      /** Exact actor identity; optional only for retained entries written by an older build. */
+      actor?: CoopPresentationActorRef;
+      /** Exact identities aligned one-for-one with `targets`, when every target was materialized. */
+      targetActors?: CoopPresentationActorRef[];
+    }
   /** Set + tween a mon's hp to this value using the authority-resolved damage presentation, when present. */
-  | { k: "hp"; bi: number; hp: number; maxHp: number; sp?: number; result?: number; critical?: boolean }
+  | {
+      k: "hp";
+      bi: number;
+      hp: number;
+      maxHp: number;
+      sp?: number;
+      result?: number;
+      critical?: boolean;
+      actor?: CoopPresentationActorRef;
+    }
   /**
    * A mon fainted. `narrate` (#691, additive optional) is true IFF the host shows an "X fainted!" message
    * for this KO (a FaintPhase runs - either inline at the damage chokepoint or deferred via the move's
@@ -1085,11 +1116,11 @@ export type CoopBattleEvent =
    * an older host -> the guest treats it as falsy and does not narrate (today's silent behavior); the flag
    * stays on the wire (not hardcoded on the guest) so the gating + forward-compat semantics hold.
    */
-  | { k: "faint"; bi: number; narrate?: boolean; sp?: number }
+  | { k: "faint"; bi: number; narrate?: boolean; sp?: number; actor?: CoopPresentationActorRef }
   /** A mon's stat stage changed to this absolute value (`Stat` enum). */
-  | { k: "statStage"; bi: number; stat: number; value: number }
+  | { k: "statStage"; bi: number; stat: number; value: number; actor?: CoopPresentationActorRef }
   /** A mon's status changed (`StatusEffect` enum, 0 = cured). */
-  | { k: "status"; bi: number; status: number }
+  | { k: "status"; bi: number; status: number; actor?: CoopPresentationActorRef }
   /** Show one exact ability activation without asking the renderer to derive which ability fired. */
   | {
       k: "showAbility";
@@ -1100,9 +1131,17 @@ export type CoopBattleEvent =
       passive: boolean;
       /** ER innate or shared GIFT source index, resolved by the authority. */
       passiveSlot: number;
+      actor?: CoopPresentationActorRef;
     }
   /** Show the exact authority-selected Terastallization without running its mechanics on the renderer. */
-  | { k: "tera"; bi: number; pokemonId: number; partySlot: number; teraType: number }
+  | {
+      k: "tera";
+      bi: number;
+      pokemonId: number;
+      partySlot: number;
+      teraType: number;
+      actor?: CoopPresentationActorRef;
+    }
   /** Weather changed (`WeatherType` enum); `anim` is the already-resolved presentation cue. */
   | { k: "weather"; weather: number; turnsLeft: number; anim?: number }
   /** Terrain changed (`TerrainType` enum); `anim` is omitted when the authority suppressed it. */

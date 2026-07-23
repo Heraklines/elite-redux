@@ -284,6 +284,7 @@ export class StatStageChangePhase extends PokemonPhase {
           recordCoopEvent({
             k: "statStage",
             bi: this.battlerIndex,
+            actor: { side: pokemon.isPlayer() ? "player" : "enemy", pokemonId: pokemon.id },
             stat: s,
             value: pokemon.getStatStage(s),
           });

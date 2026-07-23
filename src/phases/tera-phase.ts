@@ -33,6 +33,7 @@ export class TeraPhase extends BattlePhase {
         k: "tera",
         bi: this.pokemon.getBattlerIndex(),
         pokemonId: this.pokemon.id,
+        actor: { side: this.pokemon.isPlayer() ? "player" : "enemy", pokemonId: this.pokemon.id },
         partySlot,
         teraType: this.pokemon.getTeraType(),
       });
