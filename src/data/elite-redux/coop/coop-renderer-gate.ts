@@ -118,6 +118,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "CoopStatStageReplayPhase", // stat tween replay (renders the denied StatStageChangePhase)
   "CoopStatusReplayPhase", // status-change replay
   "CoopShowAbilityReplayPhase", // exact host-authored ability flyout; presentation only
+  "CoopTeraReplayPhase", // exact host-authored Terastallization; presentation only
   "CoopSwitchReplayPhase", // exact host-authored recall/summon; no hazards, abilities, or RNG
   "CoopPresentationReceiptPhase", // CI-only read-only proof after one presentation subtree drains
   "CoopFaintReplayPhase", // faint replay (renders the denied FaintPhase)

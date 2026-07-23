@@ -305,6 +305,19 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         state,
       ),
     ).toThrow("malformed turn event index=0");
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
+        [{ k: "tera", bi: 0, pokemonId: 7, partySlot: -1, teraType: 2 } as never],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
     expect(stream.retainedAuthorityDiagnostics().turnCommits).toBe(0);
     expect(() =>
       stream.emitTurn(

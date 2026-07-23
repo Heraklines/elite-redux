@@ -749,6 +749,25 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
   });
 
+  it("records the exact Terastallization identity instead of leaving a silent state snap", async () => {
+    const field = await startCoopHost();
+    const pokemon = field[COOP_HOST_FIELD_INDEX];
+    const animSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation(() => {});
+
+    beginCoopRecording(globalScene.currentBattle.turn, "tera-presentation");
+    game.scene.phaseManager.create("TeraPhase", pokemon).start();
+    const recording = endCoopRecording();
+
+    expect(recording.events).toContainEqual({
+      k: "tera",
+      bi: pokemon.getBattlerIndex(),
+      pokemonId: pokemon.id,
+      partySlot: globalScene.getPlayerParty().indexOf(pokemon),
+      teraType: pokemon.getTeraType(),
+    });
+    animSpy.mockRestore();
+  });
+
   it("replays the authority-resolved strong critical cue instead of a generic hit", async () => {
     const field = await startCoopGuest();
     const pokemon = field[COOP_HOST_FIELD_INDEX];

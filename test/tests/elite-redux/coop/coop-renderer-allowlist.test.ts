@@ -62,6 +62,7 @@ const COOP_GUEST_OBSERVED_PHASES: readonly string[] = [
   "CoopReplayTurnPhase",
   "CoopStatStageReplayPhase",
   "CoopSwitchReplayPhase",
+  "CoopTeraReplayPhase",
   "CoopVictorySealPhase",
   "EggLapsePhase",
   "ErQuizPhase",

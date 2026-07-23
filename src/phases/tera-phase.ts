@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { CommonBattleAnim } from "#data/battle-anims";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { SpeciesFormChangeTeraTrigger } from "#data/form-change-triggers";
 import { CommonAnim } from "#enums/move-anims-common";
 import { PokemonType } from "#enums/pokemon-type";
@@ -22,6 +23,20 @@ export class TeraPhase extends BattlePhase {
 
   start() {
     super.start();
+
+    const party: readonly Pokemon[] = this.pokemon.isPlayer()
+      ? globalScene.getPlayerParty()
+      : globalScene.getEnemyParty();
+    const partySlot = party.indexOf(this.pokemon);
+    if (partySlot >= 0) {
+      recordCoopEvent({
+        k: "tera",
+        bi: this.pokemon.getBattlerIndex(),
+        pokemonId: this.pokemon.id,
+        partySlot,
+        teraType: this.pokemon.getTeraType(),
+      });
+    }
 
     globalScene.phaseManager.queueMessage(
       i18next.t("battle:pokemonTerastallized", {

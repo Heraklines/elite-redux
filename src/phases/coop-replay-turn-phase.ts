@@ -1257,6 +1257,9 @@ export class CoopReplayTurnPhase extends Phase {
               event.passiveSlot,
             );
             break;
+          case "tera":
+            pm.unshiftNew("CoopTeraReplayPhase", event.bi, event.pokemonId, event.partySlot, event.teraType);
+            break;
           case "weather":
           case "terrain":
             if (event.anim !== undefined) {

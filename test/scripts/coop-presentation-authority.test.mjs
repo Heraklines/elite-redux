@@ -61,6 +61,19 @@ test("damage effectiveness and critical presentation are authority-authored end 
   assert.match(replay, /repeat:\s*5[\s\S]+setVisible/u);
 });
 
+test("Terastallization is authority-authored and replayed without renderer mechanics", () => {
+  const producer = read("src/phases/tera-phase.ts");
+  const transport = read("src/data/elite-redux/coop/coop-transport.ts");
+  const replay = read("src/phases/coop-replay-phases.ts");
+  const replayPump = read("src/phases/coop-replay-turn-phase.ts");
+
+  assert.match(producer, /recordCoopEvent\(\{[\s\S]+k: "tera"[\s\S]+teraType: this\.pokemon\.getTeraType\(\)/u);
+  assert.match(transport, /\| \{ k: "tera"; bi: number; pokemonId: number; partySlot: number; teraType: number \}/u);
+  assert.match(replay, /class CoopTeraReplayPhase[\s\S]+CommonAnim\.TERASTALLIZE/u);
+  assert.doesNotMatch(replay, /class CoopTeraReplayPhase[\s\S]+isTerastallized = true/u);
+  assert.match(replayPump, /case "tera":[\s\S]+"CoopTeraReplayPhase"/u);
+});
+
 test("ordinary co-op and Showdown both replay retained entry presentation before command input", () => {
   const summon = read("src/phases/summon-phase.ts");
   const initEncounter = read("src/phases/init-encounter-phase.ts");

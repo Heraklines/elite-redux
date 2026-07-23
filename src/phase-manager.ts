@@ -50,6 +50,7 @@ import {
   CoopStatStageReplayPhase,
   CoopStatusReplayPhase,
   CoopSwitchReplayPhase,
+  CoopTeraReplayPhase,
 } from "#phases/coop-replay-phases";
 import { CoopPresentationReceiptPhase, CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
@@ -223,6 +224,7 @@ const PHASES = Object.freeze({
   CoopStatStageReplayPhase,
   CoopStatusReplayPhase,
   CoopSwitchReplayPhase,
+  CoopTeraReplayPhase,
   CoopVictorySealPhase,
   CommonAnimPhase,
   DamageAnimPhase,

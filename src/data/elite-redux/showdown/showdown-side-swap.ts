@@ -161,6 +161,7 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
     case "statStage":
     case "status":
     case "showAbility":
+    case "tera":
     case "switch":
       return { ...event, bi: swapBi(event.bi, enemyBase) };
     default:

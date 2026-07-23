@@ -326,6 +326,73 @@ export class CoopShowAbilityReplayPhase extends Phase {
 }
 
 /**
+ * GUEST: play one authority-selected Terastallization animation. The following authoritative state image
+ * owns `isTerastallized`, typing, form, counters, and every mechanical consequence; this phase only renders
+ * CommonAnim.TERASTALLIZE against the side/party identity carried by the event.
+ */
+export class CoopTeraReplayPhase extends Phase {
+  public readonly phaseName = "CoopTeraReplayPhase";
+
+  constructor(
+    private readonly bi: number,
+    private readonly pokemonId: number,
+    private readonly partySlot: number,
+    private readonly teraType: number,
+  ) {
+    super();
+  }
+
+  /** Read-only exact presentation identity used by the sealed two-browser oracle. */
+  public getCoopPresentationIdentity() {
+    return {
+      source: "tera" as const,
+      pokemonId: this.pokemonId,
+      partySlot: this.partySlot,
+      teraType: this.teraType,
+    };
+  }
+
+  public override start(): void {
+    super.start();
+
+    const playerSide = globalScene.currentBattle.arrangement.ownerOf(this.bi) === SideKind.PLAYER;
+    const party: readonly Pokemon[] = playerSide ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+    const pokemonAtSlot = party[this.partySlot];
+    const pokemon = pokemonAtSlot ?? party.find(candidate => candidate.id === this.pokemonId);
+    if (pokemon == null) {
+      coopWarn(
+        "replay",
+        `present tera bi=${this.bi} pokemonId=${this.pokemonId} partySlot=${this.partySlot} missing material (skipped)`,
+      );
+      this.end();
+      return;
+    }
+
+    let ended = false;
+    let watchdog: Phaser.Time.TimerEvent | undefined;
+    const finish = () => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      this.end();
+    };
+    try {
+      if (!globalScene.moveAnimations) {
+        finish();
+        return;
+      }
+      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
+      new CommonBattleAnim(CommonAnim.TERASTALLIZE, pokemon).play(false, finish);
+    } catch {
+      coopWarn("replay", `present tera bi=${this.bi} pokemonId=${this.pokemonId} threw (handled)`);
+      finish();
+    }
+  }
+}
+
+/**
  * GUEST: play the RNG-free move animation for a host `moveUsed` event (#633). Uses the
  * `MoveAnim` path (which draws NO RNG - it just renders the pre-built anim sequence), NOT a
  * MovePhase / MoveEffectPhase (those recompute outcomes + draw RNG). The "X used Y!" line

@@ -408,6 +408,13 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
         && isSafeAddressPart(event.passiveSlot)
         && event.passiveSlot <= MAX_ABILITY_SOURCE_SLOT
       );
+    case "tera":
+      return (
+        isValidBattlerIndex(event.bi)
+        && isPositiveSafeAddressPart(event.pokemonId)
+        && isValidPartySlot(event.partySlot)
+        && isSafeAddressPart(event.teraType)
+      );
     case "weather":
       return (
         isSafeAddressPart(event.weather)

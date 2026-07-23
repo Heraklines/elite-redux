@@ -129,9 +129,9 @@ export type CoopRole = "host" | "guest";
 // er-coop-45 makes switch presentation an immutable identity-bearing event and attaches the exact
 // replacement summon to REPLACEMENT_COMMIT. A protocol-44 renderer only snaps the post-switch checkpoint
 // and can falsely call that presentation-ready, so mixed builds must refuse pairing.
-// er-coop-46 carries the authority-resolved damage result and critical flag on HP presentation events.
-// A protocol-45 renderer would turn strong/weak/critical/OHKO/indirect hits into the generic hit cue, so
-// mixed builds must refuse pairing instead of silently presenting a different battle.
+// er-coop-46 carries authority-resolved damage result/critical cues and Terastallization presentation.
+// A protocol-45 renderer would turn strong/weak/critical/OHKO/indirect hits into the generic hit cue and
+// silently omit Tera, so mixed builds must refuse pairing instead of presenting a different battle.
 export const COOP_PROTOCOL_VERSION = "er-coop-46";
 
 /**
@@ -1101,6 +1101,8 @@ export type CoopBattleEvent =
       /** ER innate or shared GIFT source index, resolved by the authority. */
       passiveSlot: number;
     }
+  /** Show the exact authority-selected Terastallization without running its mechanics on the renderer. */
+  | { k: "tera"; bi: number; pokemonId: number; partySlot: number; teraType: number }
   /** Weather changed (`WeatherType` enum); `anim` is the already-resolved presentation cue. */
   | { k: "weather"; weather: number; turnsLeft: number; anim?: number }
   /** Terrain changed (`TerrainType` enum); `anim` is omitted when the authority suppressed it. */
