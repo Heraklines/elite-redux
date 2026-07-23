@@ -1279,12 +1279,16 @@ const ME_OPERATION_KIND_SEQ_STRIDE = 1_000;
  * entry and address validation prevents a malformed/unrelated frame from manufacturing a coverage hit.
  */
 function durableMeCoverageCarrier(message: CoopMessage): { seq: number; kind: "mePresent" | "meResync" } | null {
-  const operation =
+  const envelope =
     message.t === "envelope"
-      ? message.envelope.pendingOperation
+      ? message.envelope
       : message.t === "authorityEntry"
-        ? decodeCoopV2InteractionEnvelope({ context: message.ctx, ...message.body })?.envelope.pendingOperation
+        ? decodeCoopV2InteractionEnvelope({ context: message.ctx, ...message.body })?.envelope
         : null;
+  if (envelope == null) {
+    return null;
+  }
+  const operation = envelope.pendingOperation;
   if (operation == null || operation.status !== "applied") {
     return null;
   }
@@ -1307,7 +1311,7 @@ function durableMeCoverageCarrier(message: CoopMessage): { seq: number; kind: "m
   const parsed = parseCoopOperationId(operation.id);
   if (
     parsed == null
-    || parsed.epoch !== message.envelope.sessionEpoch
+    || parsed.epoch !== envelope.sessionEpoch
     || parsed.owner !== operation.owner
     || parsed.kind !== operation.kind
   ) {
