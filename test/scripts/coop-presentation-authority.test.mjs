@@ -63,6 +63,7 @@ test("damage effectiveness and critical presentation are authority-authored end 
 
 test("ordinary co-op and Showdown both replay retained entry presentation before command input", () => {
   const summon = read("src/phases/summon-phase.ts");
+  const initEncounter = read("src/phases/init-encounter-phase.ts");
   const command = read("src/phases/command-phase.ts");
   const turnInit = read("src/phases/turn-init-phase.ts");
 
@@ -71,6 +72,10 @@ test("ordinary co-op and Showdown both replay retained entry presentation before
     /if \(isAuthoritativeBattleSession\(\) && controller\?\.role === "host"\)[\s\S]+beginCoopRecording/u,
   );
   assert.doesNotMatch(summon, /isVersusSession\(\).*beginCoopRecording/u);
+  assert.match(
+    initEncounter,
+    /isAuthoritativeBattleSession\(\) && controller\?\.role === "host"[\s\S]+beginCoopRecording/u,
+  );
   assert.match(
     command,
     /const entryPresentation = sealCoopEntryPresentation\(\);[\s\S]+rebroadcastCoopWaveStartAuthorityAfterEntryEffects\(entryPresentation\)/u,

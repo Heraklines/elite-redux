@@ -41,6 +41,7 @@
     "src/phases/coop-replay-turn-phase.ts",
     "src/phases/coop-turn-commit-phase.ts",
     "src/phases/er-custom-trainer-install.ts",
+    "src/phases/init-encounter-phase.ts",
     "src/phases/summon-phase.ts",
     "src/phases/switch-summon-phase.ts",
     "src/phases/toggle-double-position-phase.ts",
