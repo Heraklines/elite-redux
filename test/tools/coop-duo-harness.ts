@@ -3447,6 +3447,7 @@ export async function driveRetainedTeachMoveRewardWatch(
     unshiftPhase(phase: { phaseName?: string }): void;
     tryRemovePhase(name: string): boolean;
   };
+  const peerCtx = peerContextByScene.get(globalScene);
   const queued: string[] = [];
   const removed: string[] = [];
   const originalUnshift = pm.unshiftPhase.bind(pm);
@@ -3465,6 +3466,13 @@ export async function driveRetainedTeachMoveRewardWatch(
     await driveOwner();
     for (let i = 0; i < 32; i++) {
       await drainLoopback();
+      // A retained successor can arrive while the presentation entry is still waiting for this watcher's
+      // exact public surface. Once that surface installs, the replica requests the blocked tail from the
+      // authority. Two browsers service that request concurrently; the shared-process harness must pump
+      // the authority context too or the request remains artificially parked in its inbound queue.
+      if (peerCtx != null) {
+        await withClient(peerCtx, () => drainLoopback());
+      }
       if (queued.includes("LearnMovePhase")) {
         break;
       }
