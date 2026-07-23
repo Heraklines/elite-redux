@@ -9,13 +9,17 @@
 // showed wave-20 boss teams fielding Kyogre/Suicune/Manaphy at lvl 11. Elite
 // trainer mons over the wave's BST ceiling (or legend-like before wave 80) are
 // now DEVOLVED stage by stage, or SWAPPED for a wave-appropriate factory pick
-// when no prevolution fits. Hell exempt. Gated behind ER_SCENARIO=1.
+// when no prevolution fits. Hell uses its own steeper ladder. Gated behind
+// ER_SCENARIO=1.
 // =============================================================================
 
+import { allSpecies } from "#data/data-lists";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
+import { SpeciesFormKey } from "#enums/species-form-key";
 import { SpeciesId } from "#enums/species-id";
 import type { EnemyPokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
@@ -57,6 +61,21 @@ describe.skipIf(!RUN)("ER Elite BST curve enforcement (#419)", () => {
     return enemy;
   };
 
+  const findEarlyMegaCandidate = () => {
+    const megaKeys = new Set([SpeciesFormKey.MEGA, SpeciesFormKey.MEGA_X, SpeciesFormKey.MEGA_Y]);
+    for (const species of allSpecies) {
+      const baseBst = (species.forms?.[0] ?? species).getBaseStatTotal();
+      const formIndex =
+        species.forms?.findIndex(
+          (form, index) => index > 0 && megaKeys.has(form.formKey as SpeciesFormKey) && form.getBaseStatTotal() > 460,
+        ) ?? -1;
+      if (baseBst <= 460 && formIndex > 0) {
+        return { species, formIndex, baseBst };
+      }
+    }
+    throw new Error("Expected an ER mega with a wave-5-legal base species");
+  };
+
   it("wave-20 Kyogre (the report case) is swapped for a non-legend under the boss cap", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     setErDifficulty("elite");
@@ -75,16 +94,44 @@ describe.skipIf(!RUN)("ER Elite BST curve enforcement (#419)", () => {
     expect(enemy.species.speciesId).toBe(SpeciesId.GABITE);
   });
 
-  it("no cap past wave 100, and Hell is exempt entirely", async () => {
+  it("caps early Hell spawns but removes the cap past wave 100", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
-    setErDifficulty("elite");
+    setErDifficulty("hell");
+    const early = retarget(SpeciesId.KYOGRE, 20);
+    enforceErEliteBstCurve(early);
+    expect(early.species.speciesId).not.toBe(SpeciesId.KYOGRE);
+    expect(early.getSpeciesForm().getBaseStatTotal()).toBeLessThanOrEqual(500); // 460 + 40 boss headroom
+
     const late = retarget(SpeciesId.KYOGRE, 120);
     enforceErEliteBstCurve(late);
     expect(late.species.speciesId).toBe(SpeciesId.KYOGRE);
+  });
 
+  it("evaluates the active form and reverts an over-cap mega to its legal base form", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     setErDifficulty("hell");
-    const hell = retarget(SpeciesId.KYOGRE, 20);
-    enforceErEliteBstCurve(hell);
-    expect(hell.species.speciesId).toBe(SpeciesId.KYOGRE);
+    const candidate = findEarlyMegaCandidate();
+    const enemy = retarget(candidate.species.speciesId as SpeciesId, 5);
+    enemy.formIndex = candidate.formIndex;
+    expect(enemy.getSpeciesForm().getBaseStatTotal()).toBeGreaterThan(460);
+
+    enforceErEliteBstCurve(enemy);
+
+    expect(enemy.species.speciesId).toBe(candidate.species.speciesId);
+    expect(enemy.formIndex).toBe(0);
+    expect(enemy.getSpeciesForm().getBaseStatTotal()).toBe(candidate.baseBst);
+  });
+
+  it("clamps standalone ER mega species such as Mega Typhlosion", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    setErDifficulty("hell");
+    const megaTyphlosionId = ER_ID_MAP.species[2137] as SpeciesId;
+    const enemy = retarget(megaTyphlosionId, 5);
+    expect(enemy.getSpeciesForm().getBaseStatTotal()).toBeGreaterThan(460);
+
+    enforceErEliteBstCurve(enemy);
+
+    expect(enemy.species.speciesId).not.toBe(megaTyphlosionId);
+    expect(enemy.getSpeciesForm().getBaseStatTotal()).toBeLessThanOrEqual(460);
   });
 });

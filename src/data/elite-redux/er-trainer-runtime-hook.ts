@@ -88,7 +88,7 @@ function hashErSelectionSeed(s: string): number {
   return h >>> 0;
 }
 import { TrainerVariant } from "#enums/trainer-variant";
-import type { PokemonSpecies } from "#data/pokemon-species";
+import type { PokemonSpecies, PokemonSpeciesForm } from "#data/pokemon-species";
 import type { EnemyPokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -827,8 +827,8 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
   // which would otherwise show a mega at wave < 50. Hell is exempt.
   for (const enemy of party) {
     revertEarlyMega(enemy);
-    // ER (#419): ELITE early-game BST curve - devolve/swap trainer mons that
-    // violate the wave ceiling (Kyogre at wave 20 lvl 11 etc.). Hell exempt.
+    // ER (#419): apply the receiving difficulty's BST curve after every trainer
+    // roster/form override (including cross-player ghosts).
     enforceErEliteBstCurve(enemy);
     // ER (#357): per-mon resist-berry roll (5% Ace / 10% Elite / 20% Hell) — a
     // trainer mon may hold ONE berry matching one of its weaknesses. These are
@@ -1136,15 +1136,13 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     // Staff-authored custom trainers (er-custom-trainers.json) are curated
     // content fielded EXACTLY as authored - the wave-ladder cap must never
     // devolve/swap their mons (maintainer directive: staff intent wins).
-    // ER (#419 follow-up): a cross-player GHOST battle fields the uploader's roster
-    // VERBATIM - its fairness is the +40-wave eligibility window at selection, not
-    // species mutation. Exempt the whole ghost battle so the cap never devolves/swaps
-    // its stored mons (the "ghost became a different species / wrong moves" report).
+    // Cross-player ghosts are intentionally NOT exempt. Their selection window
+    // cannot prevent an early saved legendary/mega from overshooting the receiving
+    // player's curve, so every fielded ghost member must pass this same gate.
     if (
       globalScene.gameMode?.isDaily ||
       globalScene.gameMode?.isShowdown ||
       erColosseumBattleActive ||
-      globalScene.currentBattle?.trainer?.erIsGhost ||
       isErCustomTrainerBstBypassActive() ||
       (globalScene.currentBattle?.isBattleMysteryEncounter?.() ?? false)
     ) {
@@ -1164,14 +1162,33 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     // Hell keeps its early legendary spikes (BST cap still trims most of them);
     // only the vanilla-facing ladders ban legend-likes before the legend wave.
     const legendBanned = !isHell && wave < ER_ELITE_LEGEND_FROM_WAVE();
-    const violates = (sp: PokemonSpecies): boolean =>
-      sp.getBaseStatTotal() > cap || (legendBanned && (sp.legendary || sp.subLegendary || sp.mythical));
-    if (!violates(enemy.species)) {
+    const isLegendLike = (sp: PokemonSpecies): boolean => sp.legendary || sp.subLegendary || sp.mythical;
+    const defaultForm = (sp: PokemonSpecies): PokemonSpeciesForm => sp.forms?.[0] ?? sp;
+    const violatesSpecies = (sp: PokemonSpecies): boolean =>
+      defaultForm(sp).getBaseStatTotal() > cap || (legendBanned && isLegendLike(sp));
+
+    // Measure the form that will actually be fielded. Checking only `enemy.species`
+    // misses stored mega/alternate forms because their base species may fit the cap.
+    const originalSpecies = enemy.species;
+    const originalFormIndex = enemy.formIndex;
+    const originalBst = enemy.getSpeciesForm(true).getBaseStatTotal();
+    if (originalBst <= cap && !(legendBanned && isLegendLike(originalSpecies))) {
       return;
     }
-    // 1. Devolve stage by stage while it still violates.
-    let current = enemy.species;
+
+    // A direct ER mega is represented as its own species. Prefer its mapped base
+    // before walking the normal prevolution chain or falling back to a factory pick.
+    let current = originalSpecies;
+    const directMegaBaseId = megaSpeciesToBase().get(current.speciesId);
+    if (directMegaBaseId !== undefined) {
+      current = getPokemonSpecies(directMegaBaseId) ?? current;
+    }
+
+    // 1. Devolve stage by stage while the default form still violates.
     for (let g = 0; g < 3; g++) {
+      if (!violatesSpecies(current)) {
+        break;
+      }
       const prevId = pokemonPrevolutions[current.speciesId];
       if (prevId === undefined) {
         break;
@@ -1181,16 +1198,13 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
         break;
       }
       current = prev;
-      if (!violates(current)) {
-        break;
-      }
     }
     // 2. Still violating (legendary / heavy single-stager): swap for a
     //    wave-appropriate factory-pool pick under the cap, closest to it.
-    if (violates(current)) {
+    if (violatesSpecies(current)) {
       const pool = resolvedFactorySets().filter(s => {
         const sp = getPokemonSpecies(s.speciesId);
-        return sp && !violates(sp);
+        return sp && !violatesSpecies(sp);
       });
       if (pool.length === 0) {
         return; // nothing safe to swap to - leave it rather than break generation
@@ -1199,11 +1213,15 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
       const idx = windowStart + (hashErSelectionSeed(`${globalScene.seed}:bstcap:${wave}:${enemy.id}`) % (pool.length - windowStart));
       current = getPokemonSpecies(pool[idx].speciesId);
     }
-    if (current === enemy.species) {
+    const formChanged = current === originalSpecies && originalFormIndex !== 0;
+    if (current === originalSpecies && !formChanged) {
       return;
     }
+    const targetBst = defaultForm(current).getBaseStatTotal();
+    const originalLabel =
+      originalFormIndex > 0 ? `${originalSpecies.name} form ${originalFormIndex}` : originalSpecies.name;
     console.log(
-      `ER #419: elite BST cap (${cap} @ w${wave}) - replacing ${enemy.species.name} (${enemy.species.getBaseStatTotal()}) with ${current.name} (${current.getBaseStatTotal()})`,
+      `ER #419: BST cap (${cap} @ w${wave}) - replacing ${originalLabel} (${originalBst}) with ${current.name} (${targetBst})`,
     );
     enemy.species = current;
     enemy.formIndex = 0;

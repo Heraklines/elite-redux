@@ -19912,18 +19912,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) Ghost teams: identity survives reload; verbatim roster; no repeats; difficulty-gated",
+    label: "(note) Ghost teams: identity survives reload; wave-capped roster; no repeats; difficulty-gated",
     description:
       "GHOST-POOL fixes (pool/serialization, not a single forcible battle) - verify via the Ghost\n"
       + "Trainers challenge and a mid-battle save/reload:\n"
       + "1. IDENTITY (#ghost-identity): save + reload DURING a ghost battle - the trainer KEEPS its\n"
       + "   uploader name, piano BGM, and authored dialogue (was reverting to a plain NPC).\n"
-      + "2. VERBATIM (#419): a fielded ghost shows the uploader's EXACT species (no BST-cap devolve/\n"
-      + "   swap to the wave ceiling - e.g. a Snorlax stays Snorlax at an early ghost wave).\n"
+      + "2. BST CAP (#419): legal ghost members keep their exact species/moves, while over-cap species\n"
+      + "   and forms devolve/revert/swap to the receiving wave's ceiling.\n"
       + "3. NO-REPEAT (#ghost-repeat): consecutive ghost waves do NOT field the same player 3x+ in a row.\n"
       + "4. DIFFICULTY (#345): a Youngster/Ace run NEVER meets a Hell-scaled ghost team (challenge pool is\n"
       + "   capped at the run's tier and easier).\n"
-      + "Unit-tested: er-ghost-identity-reload / er-ghost-species-verbatim / er-ghost-repeat-suppression /\n"
+      + "Unit-tested: er-ghost-identity-reload / er-ghost-bst-cap / er-ghost-repeat-suppression /\n"
       + "er-ghost-difficulty-pool.test.ts.",
     setup: () => {
       resetDevOverrides();

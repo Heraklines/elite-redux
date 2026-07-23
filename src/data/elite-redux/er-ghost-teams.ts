@@ -1300,12 +1300,6 @@ export function buildGhostDialogueCtx(): GhostDialogueContext {
 /** Flag a freshly-built Trainer as a ghost, and size its party to the snapshot. */
 export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot): void {
   GHOST_BY_TRAINER.set(trainer, snapshot);
-  // ER (#419 follow-up): mark the whole battle as a ghost so the universal BST power
-  // gate (enforceErEliteBstCurve) exempts every member of the fielded roster - the
-  // ghost is shown VERBATIM (fairness is the +40-wave eligibility window, not species
-  // mutation). A plain boolean read there needs no cross-module import (avoids the
-  // circular-init hazard this module guards against).
-  trainer.erIsGhost = true;
   const size = Math.min(snapshot.party.length, MAX_PARTY);
   // Shadow the instance method so getPartyLevels / genParty field exactly the
   // ghost's team size (the shared trainer config is left untouched).
@@ -1470,21 +1464,13 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     }
     const level = battle?.enemyLevels?.[index] ?? member.level;
     const trainerSlot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
-    // ER (#419 follow-up): a ghost is fielded VERBATIM (the uploader's exact roster).
-    // Its eligibility is already gated by the +40-wave fairness window at SELECTION, so
-    // the universal BST cap must NOT additionally devolve/SWAP the stored species to the
-    // wave ceiling (e.g. a wave-63 hell ghost's Skarmory -> Clamperl) - that swap was the
-    // reported "ghost mons became a different species / wrong moves" bug. The whole ghost
-    // battle is exempt from enforceErEliteBstCurve via the trainer's `erIsGhost` marker
-    // (set in markTrainerAsGhost), which covers EVERY construction pass (party-gen AND
-    // the send-out rebuild). Our own fairness devolve above (below ER_GHOST_NO_DEVOLVE_WAVE
-    // only) is the intended depth-gate and still ran.
+    // addEnemyPokemon runs the universal BST gate. Ghost selection's +40-wave
+    // window is not sufficient on its own: the uploader may already own a
+    // legendary or mega. Over-cap members are therefore devolved/replaced here.
     const enemy = globalScene.addEnemyPokemon(species, level, trainerSlot);
-    // With the BST cap suppressed the final species now equals the stored member, so the
-    // stored loadout (form + ability slot + exact moveset) is restored below. The match
-    // check is kept as defense-in-depth: our fairness devolve (early challenge waves)
-    // legitimately changes the species, and in that case the level-appropriate moveset
-    // addEnemyPokemon generated for the devolved species is kept instead.
+    // Restore the stored loadout only when the species survived the gate. A second
+    // gate pass after party construction validates the restored form itself, so a
+    // stored mega cannot bypass the cap through a legal base species.
     const speciesMatchesStored = enemy.species.speciesId === member.speciesId;
     if (member.formIndex >= 0 && speciesMatchesStored && member.formIndex < (enemy.species.forms?.length ?? 0)) {
       enemy.formIndex = member.formIndex;
