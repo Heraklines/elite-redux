@@ -458,8 +458,7 @@ const FOCUSED_IMPACT_RULES = [
     lanes: ["C", "P"],
   },
   {
-    matches: file =>
-      file.startsWith("src/") || file.startsWith("test/tests/elite-redux/coop/") || file.startsWith("test/tools/coop-"),
+    matches: file => file.startsWith("src/") || file.startsWith("test/tools/coop-"),
     lanes: ["A", "B", "P"],
   },
   {
@@ -477,6 +476,13 @@ const FOCUSED_LANE_PRIORITY = Object.freeze({ A: 0, B: 1, C: 2, S: 3, T: 4, P: 5
 export function impactLanes(changedFiles) {
   const lanes = new Set();
   for (const file of changedFiles) {
+    // Integration tests already have one exact assignment in createCiMatrix().
+    // Adding semantic representatives for their filenames double-counts a test
+    // (for example a B test plus A/P representatives) and can exceed the focused
+    // safety cap before the directly changed test gets a runner.
+    if (file.startsWith("test/tests/elite-redux/coop/")) {
+      continue;
+    }
     for (const rule of FOCUSED_IMPACT_RULES) {
       if (rule.matches(file)) {
         for (const lane of rule.lanes) {
@@ -484,9 +490,6 @@ export function impactLanes(changedFiles) {
         }
       }
     }
-  }
-  if (lanes.size === 0) {
-    lanes.add("B");
   }
   return lanes;
 }

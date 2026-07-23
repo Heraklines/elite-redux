@@ -150,6 +150,24 @@ test("ownership metadata does not manufacture a six-lane runtime impact", () => 
   );
 });
 
+test("a directly assigned co-op integration test does not manufacture cross-lane representatives", () => {
+  assert.deepEqual(
+    [...impactLanes(["test/tests/elite-redux/coop/coop-duo-fault.test.ts"])].sort(),
+    [],
+    "the exact B shard already covers a directly changed B test",
+  );
+  assert.deepEqual(
+    [...impactLanes(["test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts"])].sort(),
+    [],
+    "a production-fidelity test keeps its explicit P assignment",
+  );
+  assert.deepEqual(
+    [...impactLanes(["test/tests/elite-redux/coop/coop-soak-me.test.ts"])].sort(),
+    [],
+    "a soak test keeps its explicit C assignment",
+  );
+});
+
 test("representative soak never manufactures a command rendezvous and scopes the spectator to final-boss stage one", () => {
   assert.doesNotMatch(soakDriver, /rendezvous\.reannounce\(point\)/u);
   assert.match(soakDriver, /currentBattle\.isClassicFinalBoss[\s\S]*playerCapacity === 1[\s\S]*enemyCapacity === 1/u);
