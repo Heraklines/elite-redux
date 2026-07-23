@@ -1,0 +1,377 @@
+url:      https://showdown-sync.elite-redux-staging.pages.dev/
+build:    local:mrxw3mkb:170ae8d91c13a59b
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@45573ms -> title-shown@65734ms
+lastSess: ok (reached title)
+mode:     7  wave:1
+seed:     showdown-sync:e8e9576b53ecbef6:7e4d524f2f72f1e3
+party:    Stahlos(L100 291hp f0), Simsala(L100 251hp f1), Lapras(L100 401hp f0)
+enemy:    Vulnona(L100), Arkani(L100)
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"local:mrxw3mkb:170ae8d91c13a59b","source":"local","sha":null,"workflow":null,"deployment":null}
+
+----- CO-OP REPORT CORRELATION (JSON) -----
+{"version":1,"pairKey":"coop-v1|session=-|run=-|epoch=0|seed=showdown-sync%3Ae8e9576b53ecbef6%3A7e4d524f2f72f1e3","runId":null,"epoch":0,"seed":"showdown-sync:e8e9576b53ecbef6:7e4d524f2f72f1e3","binding":null,"membership":{"revision":1,"connectionGeneration":0},"local":{"role":"guest","seat":1},"partner":{"role":"host","seat":0},"build":{"version":1,"id":"local:mrxw3mkb:170ae8d91c13a59b","source":"local","sha":null,"workflow":null,"deployment":null}}
+
+----- CO-OP CONTROL PLANE -----
+session:  role=guest seat=1 gen=0g epoch=0 run=- binding=- sessionId=- netcode=lockstep
+members:  rev=1 state=active connectionGen=0 present=[0:host=true, 1:guest=true]
+phase:    running=CommandPhase queue=[EnemyCommandPhase, TurnStartPhase]
+interact: counter=0 awaiting=none
+commands: pending=[]
+rendez:   awaiting=[] localArrived=[showdown-ready, showdown-wager-commit] partnerArrived=[showdown-ready, showdown-wager-commit]
+transport(local): state=connected generation=0 lastRx=9s
+causal:   8/8 most-recent edges
+  #1 recovery:local-arrival id=rendezvous:e0:showdown-ready role=guest @e0
+  #2 recovery:wait-open id=rendezvous:e0:showdown-ready role=guest @e0
+  #3 recovery:peer-arrival id=rendezvous:e0:showdown-ready role=guest @e0
+  #4 recovery:release id=rendezvous:e0:showdown-ready role=guest @e0 outcome=exact
+  #5 recovery:local-arrival id=rendezvous:e0:showdown-wager-commit role=guest @e0
+  #6 recovery:wait-open id=rendezvous:e0:showdown-wager-commit role=guest @e0
+  #7 recovery:peer-arrival id=rendezvous:e0:showdown-wager-commit role=guest @e0
+  #8 recovery:release id=rendezvous:e0:showdown-wager-commit role=guest @e0 outcome=exact
+uiRelay:  none
+
+----- CONSOLE -----
+[19:20:34.358] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:20:35.654] LOG: [ER] build {"version":1,"id":"local:mrxw3mkb:170ae8d91c13a59b","source":"local","sha":null,"workflow":null,"deployment":null}
+[19:20:36.218] LOG: [dev-tools] loaded — 725 scenarios + Send Logs button
+[19:20:41.590] WARN: [asset-retry] load error key=town_bg_courtyard_night - retry 1/2 with cache-buster
+[19:20:41.596] WARN: [asset-retry] load error key=town_bg_courtyard_day - retry 1/2 with cache-buster
+[19:20:41.597] WARN: [asset-retry] load error key=town_bg_courtyard_dusk - retry 1/2 with cache-buster
+[19:20:41.727] WARN: [asset-retry] load error key=grass_bg_rocky_dusk - retry 1/2 with cache-buster
+[19:20:41.729] WARN: [asset-retry] load error key=grass_bg_rocky_day - retry 1/2 with cache-buster
+[19:20:41.730] WARN: [asset-retry] load error key=grass_bg_rocky_night - retry 1/2 with cache-buster
+[19:20:41.860] WARN: [asset-retry] load error key=tall_grass_bg_field_day - retry 1/2 with cache-buster
+[19:20:41.875] WARN: [asset-retry] load error key=tall_grass_bg_field_night - retry 1/2 with cache-buster
+[19:20:41.901] WARN: [asset-retry] load error key=metropolis_bg_dusk - retry 1/2 with cache-buster
+[19:20:41.902] WARN: [asset-retry] load error key=metropolis_bg_east_day - retry 1/2 with cache-buster
+[19:20:41.902] WARN: [asset-retry] load error key=metropolis_bg_night - retry 1/2 with cache-buster
+[19:20:41.902] WARN: [asset-retry] load error key=metropolis_bg_east_dusk - retry 1/2 with cache-buster
+[19:20:41.903] WARN: [asset-retry] load error key=metropolis_bg_east_night - retry 1/2 with cache-buster
+[19:20:41.925] WARN: [asset-retry] load error key=metropolis_bg_west_dusk - retry 1/2 with cache-buster
+[19:20:41.927] WARN: [asset-retry] load error key=metropolis_bg_mart - retry 1/2 with cache-buster
+[19:20:41.928] WARN: [asset-retry] load error key=metropolis_bg_park_day - retry 1/2 with cache-buster
+[19:20:41.929] WARN: [asset-retry] load error key=metropolis_bg_west_day - retry 1/2 with cache-buster
+[19:20:41.930] WARN: [asset-retry] load error key=metropolis_bg_park_dusk - retry 1/2 with cache-buster
+[19:20:41.931] WARN: [asset-retry] load error key=metropolis_bg_west_night - retry 1/2 with cache-buster
+[19:20:41.932] WARN: [asset-retry] load error key=metropolis_bg_park_night - retry 1/2 with cache-buster
+[19:20:42.017] WARN: [asset-retry] load error key=forest_bg_path_night - retry 1/2 with cache-buster
+[19:20:42.018] WARN: [asset-retry] load error key=forest_bg_shadowmoon - retry 1/2 with cache-buster
+[19:20:42.056] WARN: [asset-retry] load error key=forest_bg_path_day - retry 1/2 with cache-buster
+[19:20:42.093] WARN: [asset-retry] load error key=sea_bg_open_night - retry 1/2 with cache-buster
+[19:20:42.096] WARN: [asset-retry] load error key=sea_bg_open_day - retry 1/2 with cache-buster
+[19:20:42.163] WARN: [asset-retry] load error key=swamp_bg_wetlands - retry 1/2 with cache-buster
+[19:20:42.172] WARN: [asset-retry] load error key=swamp_bg_path - retry 1/2 with cache-buster
+[19:20:42.218] WARN: [asset-retry] load error key=swamp_bg_shadowmoon - retry 1/2 with cache-buster
+[19:20:42.221] WARN: [asset-retry] load error key=beach_bg_shore_day - retry 1/2 with cache-buster
+[19:20:42.266] WARN: [asset-retry] load error key=beach_bg_shore_night - retry 1/2 with cache-buster
+[19:20:42.267] WARN: [asset-retry] load error key=beach_bg_shore_dusk - retry 1/2 with cache-buster
+[19:20:42.381] WARN: [asset-retry] load error key=lake_bg_forest_day - retry 1/2 with cache-buster
+[19:20:42.402] WARN: [asset-retry] load error key=lake_bg_forest_night - retry 1/2 with cache-buster
+[19:20:42.403] WARN: [asset-retry] load error key=lake_bg_orion_day - retry 1/2 with cache-buster
+[19:20:42.403] WARN: [asset-retry] load error key=lake_bg_orion_dusk - retry 1/2 with cache-buster
+[19:20:42.404] WARN: [asset-retry] load error key=lake_bg_orion_night - retry 1/2 with cache-buster
+[19:20:42.416] WARN: [asset-retry] load error key=seabed_bg_dirty - retry 1/2 with cache-buster
+[19:20:42.587] WARN: [asset-retry] load error key=seabed_bg_coral - retry 1/2 with cache-buster
+[19:20:42.894] WARN: [asset-retry] load error key=mountain_bg_canyon_night - retry 1/2 with cache-buster
+[19:20:42.895] WARN: [asset-retry] load error key=mountain_bg_canyon_dusk - retry 1/2 with cache-buster
+[19:20:42.896] WARN: [asset-retry] load error key=mountain_bg_canyon_day - retry 1/2 with cache-buster
+[19:20:42.970] WARN: [asset-retry] load error key=badlands_bg_scrub_path - retry 1/2 with cache-buster
+[19:20:43.132] WARN: [asset-retry] load error key=cave_bg_crystal_day - retry 1/2 with cache-buster
+[19:20:43.142] WARN: [asset-retry] load error key=cave_bg_rock_day - retry 1/2 with cache-buster
+[19:20:43.142] WARN: [asset-retry] load error key=cave_bg_crystal_night - retry 1/2 with cache-buster
+[19:20:43.143] WARN: [asset-retry] load error key=cave_bg_rock_night - retry 1/2 with cache-buster
+[19:20:43.154] WARN: [asset-retry] load error key=cave_bg_stream - retry 1/2 with cache-buster
+[19:20:43.333] WARN: [asset-retry] load error key=desert_bg_dunes - retry 1/2 with cache-buster
+[19:20:43.535] WARN: [asset-retry] load error key=ice_cave_bg_glacier - retry 1/2 with cache-buster
+[19:20:44.040] WARN: [asset-retry] load error key=dojo_bg_stadium_day - retry 1/2 with cache-buster
+[19:20:44.049] WARN: [asset-retry] load error key=dojo_bg_interior - retry 1/2 with cache-buster
+[19:20:44.051] WARN: [asset-retry] load error key=dojo_bg_stadium_dusk - retry 1/2 with cache-buster
+[19:20:44.062] WARN: [asset-retry] load error key=dojo_bg_stadium_night - retry 1/2 with cache-buster
+[19:20:44.551] WARN: [asset-retry] load error key=construction_site_bg_dusk - retry 1/2 with cache-buster
+[19:20:44.552] WARN: [asset-retry] load error key=construction_site_bg_night - retry 1/2 with cache-buster
+[19:20:44.738] WARN: [asset-retry] load error key=fairy_cave_bg_crystal_water_day - retry 1/2 with cache-buster
+[19:20:44.738] WARN: [asset-retry] load error key=fairy_cave_bg_crystal_water_night - retry 1/2 with cache-buster
+[19:20:44.986] WARN: [asset-retry] load error key=snowy_forest_bg_plain_day - retry 1/2 with cache-buster
+[19:20:45.045] WARN: [asset-retry] load error key=snowy_forest_bg_plain_night - retry 1/2 with cache-buster
+[19:20:45.127] WARN: [asset-retry] load error key=laboratory_bg_destroyed - retry 1/2 with cache-buster
+[19:20:45.127] WARN: [asset-retry] load error key=laboratory_bg_science_night - retry 1/2 with cache-buster
+[19:21:09.602] WARN: [asset-retry] load error key=er_icon__drawclops - retry 1/2 with cache-buster
+[19:21:09.603] WARN: [asset-retry] load error key=er_icon__dustnoir - retry 1/2 with cache-buster
+[19:21:09.648] WARN: [asset-retry] load error key=er_icon__nimbeon - retry 1/2 with cache-buster
+[19:21:09.671] WARN: [asset-retry] load error key=er_icon__ryuveon - retry 1/2 with cache-buster
+[19:21:09.693] WARN: [asset-retry] load error key=er_icon__titaneon - retry 1/2 with cache-buster
+[19:21:09.800] WARN: [asset-retry] load error key=er_icon__twinkletuff - retry 1/2 with cache-buster
+[19:21:09.804] WARN: [asset-retry] load error key=er_icon__egoelk - retry 1/2 with cache-buster
+[19:21:09.823] WARN: [asset-retry] load error key=er_icon__forbiddron - retry 1/2 with cache-buster
+[19:21:09.825] WARN: [asset-retry] load error key=er_icon__idolfin - retry 1/2 with cache-buster
+[19:21:09.829] WARN: [asset-retry] load error key=er_icon__webbed_bruiser - retry 1/2 with cache-buster
+[19:21:11.485] WARN: [asset-retry] load error key=town_bg_courtyard_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.499] WARN: [asset-retry] load error key=town_bg_courtyard_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.506] WARN: [asset-retry] load error key=grass_bg_rocky_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.513] WARN: [asset-retry] load error key=grass_bg_rocky_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.520] WARN: [asset-retry] load error key=town_bg_courtyard_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.530] WARN: [asset-retry] load error key=metropolis_bg_east_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.536] WARN: [asset-retry] load error key=tall_grass_bg_field_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.538] WARN: [asset-retry] load error key=tall_grass_bg_field_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.545] WARN: [asset-retry] load error key=grass_bg_rocky_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.553] WARN: [asset-retry] load error key=metropolis_bg_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.569] WARN: [asset-retry] load error key=metropolis_bg_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.574] WARN: [asset-retry] load error key=metropolis_bg_east_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.580] WARN: [asset-retry] load error key=metropolis_bg_east_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.588] WARN: [asset-retry] load error key=metropolis_bg_west_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.597] WARN: [asset-retry] load error key=metropolis_bg_mart - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.603] WARN: [asset-retry] load error key=metropolis_bg_park_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.605] WARN: [asset-retry] load error key=metropolis_bg_west_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.614] WARN: [asset-retry] load error key=metropolis_bg_park_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.662] WARN: [asset-retry] load error key=metropolis_bg_west_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.715] WARN: [asset-retry] load error key=metropolis_bg_park_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.719] WARN: [asset-retry] load error key=forest_bg_path_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.729] WARN: [asset-retry] load error key=forest_bg_path_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.735] WARN: [asset-retry] load error key=forest_bg_shadowmoon - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.804] WARN: [asset-retry] load error key=swamp_bg_path - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.807] WARN: [asset-retry] load error key=swamp_bg_shadowmoon - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.812] WARN: [asset-retry] load error key=lake_bg_forest_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.817] WARN: [asset-retry] load error key=beach_bg_shore_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.820] WARN: [asset-retry] load error key=lake_bg_orion_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.821] WARN: [asset-retry] load error key=sea_bg_open_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.826] WARN: [asset-retry] load error key=beach_bg_shore_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.827] WARN: [asset-retry] load error key=beach_bg_shore_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.829] WARN: [asset-retry] load error key=sea_bg_open_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.833] WARN: [asset-retry] load error key=lake_bg_forest_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.836] WARN: [asset-retry] load error key=swamp_bg_wetlands - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.845] WARN: [asset-retry] load error key=lake_bg_orion_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.852] WARN: [asset-retry] load error key=lake_bg_orion_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.856] WARN: [asset-retry] load error key=seabed_bg_dirty - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.909] WARN: [asset-retry] load error key=seabed_bg_coral - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.944] WARN: [asset-retry] load error key=cave_bg_rock_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.948] WARN: [asset-retry] load error key=desert_bg_dunes - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.953] WARN: [asset-retry] load error key=cave_bg_rock_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.964] WARN: [asset-retry] load error key=cave_bg_stream - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.969] WARN: [asset-retry] load error key=mountain_bg_canyon_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.978] WARN: [asset-retry] load error key=badlands_bg_scrub_path - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.984] WARN: [asset-retry] load error key=mountain_bg_canyon_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.988] WARN: [asset-retry] load error key=mountain_bg_canyon_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.992] WARN: [asset-retry] load error key=cave_bg_crystal_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.994] WARN: [asset-retry] load error key=cave_bg_crystal_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:11.997] WARN: [asset-retry] load error key=dojo_bg_stadium_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.001] WARN: [asset-retry] load error key=dojo_bg_interior - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.005] WARN: [asset-retry] load error key=dojo_bg_stadium_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.009] WARN: [asset-retry] load error key=ice_cave_bg_glacier - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.016] WARN: [asset-retry] load error key=dojo_bg_stadium_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.024] WARN: [asset-retry] load error key=construction_site_bg_dusk - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.088] WARN: [asset-retry] load error key=er_icon__drawclops - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.099] WARN: [asset-retry] load error key=er_icon__titaneon - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.112] WARN: [asset-retry] load error key=er_icon__twinkletuff - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.123] WARN: [asset-retry] load error key=er_icon__forbiddron - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.131] WARN: [asset-retry] load error key=er_icon__egoelk - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.139] WARN: [asset-retry] load error key=er_icon__idolfin - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.145] WARN: [asset-retry] load error key=er_icon__dustnoir - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.154] WARN: [asset-retry] load error key=er_icon__nimbeon - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.161] WARN: [asset-retry] load error key=er_icon__ryuveon - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.168] WARN: [asset-retry] load error key=snowy_forest_bg_plain_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.180] WARN: [asset-retry] load error key=er_icon__webbed_bruiser - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.215] WARN: [asset-retry] load error key=fairy_cave_bg_crystal_water_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.224] WARN: [asset-retry] load error key=laboratory_bg_destroyed - retry 2/2 via fastly mirror + cache-buster
+[19:21:12.283] WARN: [asset-retry] load error key=fairy_cave_bg_crystal_water_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:13.145] WARN: [asset-retry] load error key=laboratory_bg_science_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:13.995] WARN: [asset-retry] load error key=snowy_forest_bg_plain_day - retry 2/2 via fastly mirror + cache-buster
+[19:21:14.547] WARN: [asset-retry] load error key=construction_site_bg_night - retry 2/2 via fastly mirror + cache-buster
+[19:21:14.702] DEBUG: Destroying loading scene
+[19:21:14.702] DEBUG: Destroyed loading scene
+[19:21:14.897] LOG: Seed: 8ln0YVXOghWBlnXg6hVgJNVh
+[19:21:14.897] LOG: Wave Seed: 8ln0YVXOghWBlnXg6hVgJNVh 0
+[19:21:33.529] LOG: %cStart Phase LoginPhase color:green;
+[19:21:33.898] LOG: Client Session: hKZaM0dzwto64bX7V8MZ3NE8IcO7Hz2c
+[19:21:34.829] LOG: %cStart Phase TitlePhase color:green;
+[19:21:34.831] LOG: Getting Session Slot id: %d 2
+[19:21:34.852] LOG: use seasonal splash messages true
+[19:21:40.488] LOG: [coop:lobby] start announce name=test4 protocol=p33
+[19:21:41.964] LOG: [coop:lobby] poll players=0
+[19:21:43.768] LOG: [coop:lobby] poll players=0
+[19:21:45.567] LOG: [coop:lobby] poll players=0
+[19:21:47.368] LOG: [coop:lobby] poll players=0
+[19:21:49.232] LOG: [coop:lobby] poll players=0
+[19:21:51.159] LOG: [coop:lobby] poll players=0
+[19:21:52.992] LOG: [coop:lobby] poll players=0
+[19:21:54.785] LOG: [coop:lobby] poll players=0
+[19:21:56.597] LOG: [coop:lobby] poll players=0
+[19:21:58.398] LOG: [coop:lobby] poll players=0
+[19:22:00.227] LOG: [coop:lobby] poll players=0
+[19:22:02.041] LOG: [coop:lobby] poll players=0
+[19:22:03.893] LOG: [coop:lobby] poll players=0
+[19:22:05.777] LOG: [coop:lobby] poll players=0
+[19:22:07.587] LOG: [coop:lobby] poll players=0
+[19:22:09.464] LOG: [coop:lobby] poll players=0
+[19:22:11.380] LOG: [coop:lobby] poll players=0
+[19:22:13.195] LOG: [coop:lobby] poll players=0
+[19:22:15.556] LOG: [coop:lobby] poll players=0
+[19:22:17.360] LOG: [coop:lobby] poll players=0
+[19:22:19.160] LOG: [coop:lobby] poll players=0
+[19:22:20.963] LOG: [coop:lobby] poll players=0
+[19:22:22.753] LOG: [coop:lobby] poll players=0
+[19:22:24.566] LOG: [coop:lobby] poll players=0
+[19:22:26.354] LOG: [coop:lobby] poll players=0
+[19:22:28.153] LOG: [coop:lobby] poll players=0
+[19:22:29.995] LOG: [coop:lobby] poll players=0
+[19:22:31.841] LOG: [coop:lobby] poll players=0
+[19:22:33.631] LOG: [coop:lobby] poll players=0
+[19:22:35.412] LOG: [coop:lobby] poll players=0
+[19:22:37.253] LOG: [coop:lobby] poll players=0
+[19:22:39.040] LOG: [coop:lobby] poll players=0
+[19:22:40.844] LOG: [coop:lobby] poll players=0
+[19:22:42.673] LOG: [coop:lobby] poll players=0
+[19:22:44.441] LOG: [coop:lobby] poll players=0
+[19:22:46.241] LOG: [coop:lobby] poll players=0
+[19:22:48.080] LOG: [coop:lobby] poll: incoming request from=p33_7QAhfBIwZmaHlnLoFtvVeP7T-aujyjPb name=Heraklines1
+[19:22:48.088] LOG: [coop:lobby] poll players=1
+[19:22:49.897] LOG: [coop:lobby] respond accept=true from=p33_7QAhfBIwZmaHlnLoFtvVeP7T-aujyjPb (self=p33_qWOLiPStUVmMtAViiNTuUkzoObv9dkaF)
+[19:22:49.927] LOG: [coop:lobby] poll: incoming request from=p33_7QAhfBIwZmaHlnLoFtvVeP7T-aujyjPb name=Heraklines1
+[19:22:49.928] LOG: [coop:lobby] poll players=1
+[19:22:50.505] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[19:22:52.880] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[19:22:52.915] LOG: [coop:launch] data channel OPEN
+[19:22:52.915] LOG: [coop:webrtc] peer connection state role=guest state=connected channel=open
+[19:22:52.915] LOG: [coop:webrtc] ICE connection state role=guest state=connected channel=open
+[19:22:52.915] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[19:22:53.091] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=543 handlers=0
+[19:22:53.091] LOG: [coop:webrtc] raw rx BUFFERED (no handlers yet) role=guest t=hello queued=1
+[19:22:53.147] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=0
+[19:22:53.147] LOG: [coop:webrtc] raw rx BUFFERED (no handlers yet) role=guest t=dataFingerprint queued=2
+[19:22:53.157] LOG: [coop:webrtc] raw rx role=guest t=showdownTeam bytes=793 handlers=0
+[19:22:53.157] LOG: [coop:webrtc] raw rx BUFFERED (no handlers yet) role=guest t=showdownTeam queued=3
+[19:22:53.157] LOG: [coop:webrtc] raw rx role=guest t=showdownReady bytes=51 handlers=0
+[19:22:53.157] LOG: [coop:webrtc] raw rx BUFFERED (no handlers yet) role=guest t=showdownReady queued=4
+[19:22:53.212] LOG: [coop:launch] connectCoopSession role=guest state=connected username=test4 netcode=authoritative
+[19:22:53.214] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[19:22:53.216] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[19:22:53.216] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[19:22:53.216] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[19:22:53.217] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[19:22:53.217] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[19:22:53.217] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[19:22:53.217] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[19:22:53.219] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[19:22:53.219] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[19:22:53.219] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=test4 version=er-coop-37 tiebreak=0.525063526979288
+[19:22:53.220] LOG: [coop:webrtc] raw tx QUEUE role=guest t=hello bytes=530
+[19:22:53.286] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=d934626e515c046f(1108) movesName=12be97f97ecdc120(1108) movesets=3cd1aab08a835678(1932) abilitiesData=750d7c1a57ed5701(1148) abilitiesName=92447639a283b339(1148)
+[19:22:53.288] LOG: [coop:webrtc] raw tx QUEUE role=guest t=dataFingerprint bytes=329
+[19:22:53.290] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[19:22:53.290] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:22:53.291] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:22:53.293] LOG: [coop:checksum] MATCH - data tables identical across clients
+[19:22:53.293] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:22:53.293] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:22:53.293] LOG: [coop:webrtc] early-rx drain role=guest n=4 dropped=0
+[19:22:53.299] LOG: %cStart Phase SelectStarterPhase color:green;
+[19:22:53.302] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownTeam bytes=745
+[19:22:53.303] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownReady bytes=51
+[19:22:53.310] LOG: [coop:webrtc] raw rx role=guest t=showdownTeam bytes=793 handlers=13
+[19:22:53.311] LOG: [coop:webrtc] raw rx role=guest t=showdownReady bytes=51 handlers=13
+[19:22:53.311] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownTeam bytes=745
+[19:22:53.311] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownReady bytes=51
+[19:22:53.312] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=guest
+[19:22:53.312] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=43
+[19:22:53.313] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=guest
+[19:22:53.313] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=43 handlers=13
+[19:22:53.313] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=guest
+[19:22:53.313] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=43
+[19:22:53.313] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=guest
+[19:22:53.339] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownStakeOffer bytes=106
+[19:22:53.369] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=43 handlers=13
+[19:22:53.369] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> DUPLICATE (already seen) role=guest
+[19:22:53.369] LOG: [coop:webrtc] raw rx role=guest t=showdownStakeOffer bytes=106 handlers=13
+[19:22:54.376] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=guest
+[19:22:54.376] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=50
+[19:22:54.376] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit timeoutMs=600000 -> network-wait role=guest
+[19:22:55.906] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=50 handlers=13
+[19:22:55.906] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> deliver-to-waiter role=guest
+[19:22:55.906] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=50
+[19:22:55.906] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit RESOLVE both-arrived role=guest
+[19:22:55.948] LOG: Wave Seed: showdown-sync:e8e9576b53ecbef6:7e4d524f2f72f1e3 0
+[19:22:57.917] LOG: Wave Seed: tipxepxo.tzod;f9f:687c64fdcfg7;8f5e635g3g83g2f4 1
+[19:22:57.922] LOG: %cStart Phase EncounterPhase color:green;
+[19:22:57.957] LOG: Pokemon: Vulnona (Gegner) | Species ID: 38 | Level: 100 | Nature: Mäßig (+SpAng/-Ang)
+[19:22:57.957] LOG: Stats (IVs): HP: 287 (31), Atk: 169 (31), Def: 186 (31), Spatk: 240 (31), Spdef: 236 (31), Spd: 236 (31)
+[19:22:57.957] LOG: Ability: Dürre | Passive Ability: Pyromancy 
+[19:22:57.957] LOG: Moveset: ["Schweifglanz","Magieflamme","Mondgewalt","Phantomparade"]
+[19:22:57.977] LOG: Pokemon: Arkani (Gegner) | Species ID: 59 | Level: 100 | Nature: Robust (-)
+[19:22:57.977] LOG: Stats (IVs): HP: 321 (31), Atk: 316 (31), Def: 256 (31), Spatk: 256 (31), Spdef: 256 (31), Spd: 316 (31)
+[19:22:57.977] LOG: Ability: Krallenwucht | Passive Ability: Steinhaupt 
+[19:22:57.977] LOG: Moveset: ["Silberblick","Glut","Läuterfeuer","Doppelkick"]
+[19:22:58.222] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[19:22:58.223] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=0s transport=connected journal=0/0 queue=0
+[19:22:58.935] LOG: Generated AI funcs
+[19:22:58.941] LOG: Wave Seed: tipxepxo.tzod;f9f:687c64fdcfg7;8f5e635g3g83g2f4 1
+[19:22:59.612] LOG: Tänzer Heraklines1
+[19:23:00.193] LOG: Tänzer Heraklines1
+[19:23:01.138] LOG: %cStart Phase SummonPhase color:green;
+[19:23:01.139] LOG: Heraklines1
+[19:23:01.995] LOG: %cStart Phase ShinySparklePhase color:green;
+[19:23:02.327] LOG: %cStart Phase ShinySparklePhase color:green;
+[19:23:02.662] LOG: %cStart Phase SummonPhase color:green;
+[19:23:03.570] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:23:03.574] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:23:03.581] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:03.581] LOG: Ran PSP for: Mega-Simsala
+[19:23:03.585] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:03.595] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:23:04.117] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:23:05.172] LOG: %cStart Phase MessagePhase color:green;
+[19:23:05.907] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:23:05.977] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:05.977] LOG: Ran PSP for: Vulnona
+[19:23:05.977] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:05.982] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:23:06.494] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:23:07.004] LOG: %cStart Phase MessagePhase color:green;
+[19:23:07.725] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:23:07.793] LOG: %cStart Phase TurnInitPhase color:green;
+[19:23:07.794] LOG: %cStart Phase CommandPhase color:green;
+[19:23:12.125] LOG: [coop:webrtc] raw rx role=guest t=showdownCommand bytes=106 handlers=12
+[19:23:12.126] LOG: [coop:relay] showdown recv command turn=1 slot=0 command=0 -> BUFFERED (no awaiter yet)
+[19:23:17.478] LOG: Move: TELEPORT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Mega-Simsala
+[19:23:17.478] LOG: [coop:relay] showdown peer sendCommand turn=1 slot=0 command=0 cursor=0
+[19:23:17.479] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=106
+[19:23:17.481] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:23:17.481] LOG: [coop:relay] showdown host requestEnemyCommand turn=1 slot=0 -> consumed BUFFERED command=0
+[19:23:17.482] LOG: %cStart Phase TurnStartPhase color:green;
+[19:23:17.486] LOG: %cStart Phase MovePhase color:green;
+[19:23:17.487] LOG: %cUser: Vulnona
+Move: TAIL_GLOW
+Use Mode: NORMAL color:orchid
+[19:23:17.495] LOG: %cStart Phase MessagePhase color:green;
+[19:23:17.944] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:23:19.163] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:23:19.743] LOG: %cStart Phase MessagePhase color:green;
+[19:23:20.579] LOG: %cStart Phase MoveEndPhase color:green;
+[19:23:20.580] LOG: %cStart Phase MovePhase color:green;
+[19:23:20.580] LOG: %cUser: Mega-Simsala
+Move: TELEPORT
+Use Mode: NORMAL color:orchid
+[19:23:20.584] LOG: %cStart Phase MessagePhase color:green;
+[19:23:20.986] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:23:21.511] LOG: %cStart Phase MoveEndPhase color:green;
+[19:23:21.511] LOG: %cStart Phase SwitchPhase color:green;
+[19:23:24.727] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:23:25.725] LOG: %cStart Phase ShinySparklePhase color:green;
+[19:23:26.058] LOG: %cStart Phase PostSummonPhase color:green;
+[19:23:26.058] LOG: Ran PSP for: Stahlos
+[19:23:26.059] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:23:26.059] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:23:26.764] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:23:26.764] LOG: %cStart Phase BerryPhase color:green;
+[19:23:26.766] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:23:26.767] LOG: %cStart Phase TurnEndPhase color:green;
+[19:23:26.774] LOG: %cStart Phase TurnInitPhase color:green;
+[19:23:26.774] LOG: %cStart Phase CommandPhase color:green;
+[19:23:36.898] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+
+----- REPLAY TRACE (JSON) -----
+(none)
