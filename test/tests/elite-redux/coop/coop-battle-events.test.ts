@@ -244,6 +244,9 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const field = await startCoopGuest();
     const token = createCoopPresentationOutcomeToken();
     const pokemon = field[0];
+    // This contract exercises a visible browser-equivalent lane. The shared headless fixture disables
+    // animation presentation by default, where the correct outcome is intentionally-skipped.
+    globalScene.moveAnimations = true;
     const phase = new CoopHpDrainReplayPhase(
       pokemon.getBattlerIndex(),
       pokemon.hp,

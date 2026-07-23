@@ -2300,3 +2300,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Structural enemy adoption now follows SummonPhase's proven `field.add` membership path, verifies membership,
   then restores the old display depth with `moveTo`. This replaces the failing direct `addAt` insertion without
   weakening the three existing B7 failure-first identity/same-species/retained-state regressions.
+
+# 2026-07-24 - Exact field identity/depth and V2 fixture predecessor correction
+
+- Exact-SHA gate `30053818956` moved every Showdown shard green and eliminated the broad missing-actor failure
+  cluster. The remaining matrix failures are now dominated by legacy fixtures that mutate or commit after the
+  immutable initial COMMAND entry, rather than a hidden presentation-success fallback.
+- Exact presentation actor lookup now reads the real Phaser field container by immutable id and side without an
+  `instanceof` realm dependency. Animations-enabled lanes still fail closed on missing/duplicate identities;
+  the explicit animations-disabled engine contract remains an intentional skip rather than rendered evidence.
+- Structural enemy adoption restores the displaced child's depth against a stable relative anchor and verifies
+  the exact postcondition. This replaces an unverified numeric `moveTo` that left rebuilt battlers appended in
+  all three retained-state identity regressions.
+- The boundary-fixture retirement helper now recognizes `AWAIT_SUCCESSOR` as the active ordered permit the V2
+  ledger deliberately installs. Requiring `activeControl=null` contradicted the production ledger and made
+  already-converged interaction/wave fixtures fail before reaching their tested successor.
+- The Commander regression now installs its entry-effect relationship before the initial immutable COMMAND
+  entry is published. Its prior shape rewrote state after `buildDuo` had already admitted that control, which a
+  closed authority graph must reject rather than rebroadcast as a compatibility mutation.

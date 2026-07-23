@@ -2857,7 +2857,8 @@ export async function retireDuoInitialCommandForBoundaryTest(rig: DuoRig): Promi
     committedWaitOperationId == null
     || guestControl?.kind !== "AWAIT_SUCCESSOR"
     || guestControl.afterOperationId !== committedWaitOperationId
-    || guestActiveControl != null
+    || guestActiveControl?.kind !== "AWAIT_SUCCESSOR"
+    || guestActiveControl.afterOperationId !== committedWaitOperationId
   ) {
     throw new Error(
       `boundary fixture turn predecessor did not converge: committed=${committedWaitOperationId ?? "none"} `

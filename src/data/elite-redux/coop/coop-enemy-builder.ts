@@ -282,19 +282,33 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       }
       battle.enemyParty[entry.fieldIndex] = built;
       if (activeFieldIndex >= 0) {
+        // The stale child has already been removed, so the object now occupying its former index is a
+        // stable relative depth anchor. Anchoring against that child is more reliable than an unverified
+        // numeric move: Phaser's headless container has accepted moveTo() without changing the order in
+        // this reconstruction path, leaving the battler appended above unrelated field presentation.
+        const restoreIndex = Math.min(activeFieldIndex, globalScene.field.length);
+        const depthAnchor = restoreIndex < globalScene.field.length ? globalScene.field.getAt(restoreIndex) : null;
         built.setFieldPosition(fieldPositionForSlot(entry.fieldIndex, battle.arrangement.enemyCapacity));
         // Pokemon construction does not put the container on Phaser's display list. SummonPhase always
         // calls add.existing before seating it; structural replay must do the same.
         globalScene.add.existing(built);
         // Use the exact proven SummonPhase `field.add` path first, then restore the displaced child's depth.
         // Phaser's Container.addAt path silently left newly created Pokemon detached in the three retained-
-        // adoption shapes covered by B7; add + moveTo makes membership observable before reordering it.
+        // adoption shapes covered by B7; membership is therefore established before relative reordering.
         globalScene.field.add(built);
         const seatedIndex = globalScene.field.getIndex(built);
         if (seatedIndex < 0) {
           throw new Error(`structural enemy adopt could not seat id=${built.id} in the field container`);
         }
-        globalScene.field.moveTo(built, Math.min(activeFieldIndex, Math.max(0, globalScene.field.length - 1)));
+        if (depthAnchor != null) {
+          globalScene.field.moveBelow(built, depthAnchor);
+        }
+        const restoredIndex = globalScene.field.getIndex(built);
+        if (restoredIndex !== restoreIndex) {
+          throw new Error(
+            `structural enemy adopt depth mismatch id=${built.id} expected=${restoreIndex} actual=${restoredIndex}`,
+          );
+        }
         built.setVisible(true);
         built.getSprite().setVisible(true);
       }

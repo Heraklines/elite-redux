@@ -219,7 +219,21 @@ function exactPartyActor(actor: CoopPresentationActorRef): Pokemon | null {
 }
 
 function exactDisplayedActor(actor: CoopPresentationActorRef): Pokemon | null {
-  const matches = getActuallyFieldedCoopPokemon(actor.side).filter(candidate => candidate.id === actor.pokemonId);
+  // Read Phaser's actual container directly and identify Pokemon structurally. `instanceof Pokemon` is
+  // not a safe wire/presentation boundary: the two-engine harness can load scene objects through a
+  // different module realm, making a genuinely displayed battler fail the class check even though its
+  // immutable identity and side are exact. The method/identity checks still fail closed for every
+  // non-Pokemon field child and duplicate identity.
+  const matches = globalScene.field.list.filter((candidate): candidate is Pokemon => {
+    const pokemon = candidate as Pokemon;
+    return (
+      typeof pokemon.id === "number"
+      && typeof pokemon.isPlayer === "function"
+      && typeof pokemon.isEnemy === "function"
+      && pokemon.id === actor.pokemonId
+      && (actor.side === "player" ? pokemon.isPlayer() : pokemon.isEnemy())
+    );
+  });
   return matches.length === 1 ? matches[0] : null;
 }
 

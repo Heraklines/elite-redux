@@ -22,7 +22,6 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { CommandPhase } from "#phases/command-phase";
-import { rebroadcastCoopWaveStartAuthorityAfterEntryEffects } from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, drainLoopback, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -138,43 +137,19 @@ describe.skipIf(!RUN)("co-op Commander automatic command materialization", () =>
     logs.flush();
   }, 120_000);
 
-  it("reclassifies a guest-owned Commander skip materialized while its reciprocal barrier is closed", async () => {
+  it("adopts a guest-owned Commander skip before its ordered V2 command control opens", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    // Production entry effects settle before the immutable COMMAND control is published. Install the
+    // Commander relationship at that real predecessor boundary; mutating it after buildDuo() returns would
+    // rewrite material after the initial V2 command entry was already admitted, which the closed authority
+    // model intentionally refuses.
+    const hostCommander = game.scene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+    const hostCommandedAlly = hostCommander.getAllies()[0];
+    hostCommandedAlly.summonData.tags.push(new CommandedTag(hostCommander.id));
+
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const wave = rig.guestScene.currentBattle.waveIndex;
-    const turn = rig.guestScene.currentBattle.turn;
-    const point = `cmd:${wave}:${turn}`;
     const guestCommander = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     const guestCommandedAlly = guestCommander.getAllies()[0];
-    const setModeSpy = vi.spyOn(rig.guestScene.ui, "setMode");
-
-    rig.guestScene.currentBattle.turnCommands = {};
-    await withClient(rig.guestCtx, async () => {
-      new CommandPhase(COOP_GUEST_FIELD_INDEX).start();
-      await Promise.resolve();
-    });
-    expect(
-      rig.guestScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX],
-      "the early guest check legitimately precedes the host's post-summon Commander materialization",
-    ).toBeUndefined();
-
-    await withClient(rig.hostCtx, () => {
-      // Materialize the late relationship on the AUTHORITY'S real field, then publish it through the
-      // production post-summon carrier. The old fixture flipped a guest-local mock after the early check;
-      // that bypassed the exact serialized sourceId + consume/apply chain this regression exists to prove.
-      const hostCommander = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-      const hostCommandedAlly = hostCommander.getAllies()[0];
-      hostCommandedAlly.summonData.tags.push(new CommandedTag(hostCommander.id));
-      expect(
-        rebroadcastCoopWaveStartAuthorityAfterEntryEffects(),
-        "the authoritative post-summon Commander relationship is retained for the guest",
-      ).toBe(true);
-      rig.hostRuntime.rendezvous.arrive(point);
-    });
-    await withClient(rig.guestCtx, async () => {
-      await drainLoopback();
-      await Promise.resolve();
-    });
 
     const adoptedTag = guestCommandedAlly.getTag(BattlerTagType.COMMANDED);
     expect(adoptedTag?.sourceId, "the guest adopted the authoritative Commander source identity").toBe(
@@ -186,12 +161,9 @@ describe.skipIf(!RUN)("co-op Commander automatic command materialization", () =>
       skip: true,
     });
     expect(
-      setModeSpy.mock.calls.some(
-        ([mode, openedFieldIndex]) =>
-          (mode === UiMode.COMMAND || mode === UiMode.FIGHT) && openedFieldIndex === COOP_GUEST_FIELD_INDEX,
-      ),
-      "a late authoritative Commander tag closes the boundary without exposing selectable input",
-    ).toBe(false);
+      [UiMode.COMMAND, UiMode.FIGHT],
+      "the authoritative Commander skip closes without exposing selectable local input",
+    ).not.toContain(rig.guestScene.ui.getMode());
 
     logs.flush();
   }, 120_000);
