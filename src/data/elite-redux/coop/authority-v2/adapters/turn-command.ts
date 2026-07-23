@@ -333,16 +333,21 @@ export function buildTurnCommitEntry(input: BuildTurnCommitInput): BuildTurnComm
     return { kind: "barred", pendingTokens };
   }
 
-  const sourceWave = input.capture.wave;
-  const sourceTurn = input.capture.turn;
+  // A fully enriched live capture carries its own exact address.  The adapter also
+  // intentionally supports the digest-only/shadow image, whose byte contract omits
+  // the companion address fields; in that case the authority-stated frontier is the
+  // only source of the settled N address.  Validate the resulting successor against
+  // that address below either way, so an enriched capture can never be contradicted
+  // by a different frontier while the compact image remains backwards-compatible.
+  const sourceWave = input.capture.wave ?? input.nextCommandFrontier?.wave;
+  const sourceTurn = input.capture.turn ?? input.nextCommandFrontier?.resolvedTurn;
   if (
-    input.nextCommandFrontier == null
-    && (!Number.isSafeInteger(sourceWave)
-      || (sourceWave as number) <= 0
-      || !Number.isSafeInteger(sourceTurn)
-      || (sourceTurn as number) <= 0)
+    !Number.isSafeInteger(sourceWave)
+    || (sourceWave as number) <= 0
+    || !Number.isSafeInteger(sourceTurn)
+    || (sourceTurn as number) <= 0
   ) {
-    throw new Error("[authority-v2/turn-command] a non-command successor requires exact source wave/turn");
+    throw new Error("[authority-v2/turn-command] a successor requires exact source wave/turn");
   }
   const nextControl = resolveTurnNextControl(input, sourceWave, sourceTurn);
   if (

@@ -732,17 +732,30 @@ export class CoopReplayTurnPhase extends Phase {
       // tick already landed through EncounterPhase) before displaying the cues it authored. This prevents
       // a renderer from showing rain/terrain/ability material over an older mechanical battlefield.
       const entryState = streamer.consumeEnemyPartyState(this.sourceWave);
-      if (
-        entryState !== undefined
-        && !applyCoopAuthoritativeBattleState(entryState, true)
-        && !reapplyAcceptedCoopAuthoritativeBattleState(entryState, true)
-      ) {
-        this.failAuthority(
-          streamer,
-          "turnResolution",
-          `Showdown entry state for wave ${this.sourceWave} could not be installed before presentation.`,
-        );
-        return;
+      if (entryState !== undefined) {
+        const appliedBeforePresentation = coopAppliedStateTick();
+        if (entryState.tick < appliedBeforePresentation) {
+          // Authority V2 command-open can install a later post-summon/checkpoint image before this retained
+          // presentation prefix is consumed. The older entry carrier is cosmetic after cutover: replay its
+          // cues only when the already-accepted state also satisfies the prefix watermark below. Treating
+          // this legitimate supersession as an authority failure lets a delayed legacy carrier tear down an
+          // otherwise converged session (observed in direct doubles/triples and possible under network delay).
+          coopLog(
+            "replay",
+            `guest replay turn=${this.turn}: entry state tick=${entryState.tick} superseded by `
+              + `accepted tick=${appliedBeforePresentation}; retaining presentation only`,
+          );
+        } else if (
+          !applyCoopAuthoritativeBattleState(entryState, true)
+          && !reapplyAcceptedCoopAuthoritativeBattleState(entryState, true)
+        ) {
+          this.failAuthority(
+            streamer,
+            "turnResolution",
+            `Showdown entry state for wave ${this.sourceWave} could not be installed before presentation.`,
+          );
+          return;
+        }
       }
       if (coopAppliedStateTick() < prefix.stateTick) {
         this.failAuthority(

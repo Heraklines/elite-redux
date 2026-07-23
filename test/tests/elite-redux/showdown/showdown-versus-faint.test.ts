@@ -25,6 +25,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
+import type { Phase } from "#app/phase";
 import type { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import {
   beginCoopFaintSwitchWindow,

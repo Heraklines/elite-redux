@@ -516,6 +516,7 @@ describe("replica pipeline - redelivery equivalence", () => {
 describe("buildTurnCommitEntry - stated successor COMMAND", () => {
   it("states the COMMAND for the NEXT turn (N+1) with the authority-stated owner seat", () => {
     const entry = buildCommitted({
+      context: { ...FRAME, sessionEpoch: 2 },
       nextCommandFrontier: {
         epoch: 2,
         wave: 4,
@@ -545,6 +546,20 @@ describe("buildTurnCommitEntry - stated successor COMMAND", () => {
     if (entry.nextControl?.kind === "COMMAND_FRONTIER") {
       expect(entry.nextControl.turn).toBe(13);
     }
+  });
+
+  it("rejects a command frontier that contradicts an enriched capture's settled address", () => {
+    expect(() =>
+      buildCommitted({
+        capture: CAPTURE_WITH_COMPANIONS,
+        nextCommandFrontier: {
+          epoch: 1,
+          wave: 4,
+          resolvedTurn: 5,
+          commands: [{ ownerSeatId: 1, pokemonId: 42, fieldIndex: 1 }],
+        },
+      }),
+    ).toThrow("not bound to the settled turn");
   });
 });
 
