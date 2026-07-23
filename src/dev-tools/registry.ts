@@ -125,8 +125,9 @@ export function isCoopBrowserShowdownFixtureBuild(): boolean {
  * It does not persist or auto-select anything: each browser still opens the normal team menu,
  * confirms the visible preset, pairs, chooses its wager, and commands the battle through public
  * keyboard input. Pelipper's ordinary Drizzle lead deterministically exercises both an ability flyout
- * and weather animation before command input; the fixture bundle supplies that legal preset independently
- * of the ephemeral test account's collection unlocks.
+ * and weather animation before command input. Gyarados supplies a legal voluntary-switch target whose
+ * Intimidate entry exercises switch, ability, and stat-stage presentation before the next command frontier;
+ * the fixture bundle supplies that legal preset independently of the ephemeral test account's unlocks.
  */
 export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null {
   if (!isCoopBrowserShowdownFixtureBuild() || typeof location === "undefined") {
@@ -135,7 +136,7 @@ export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null
   if (new URLSearchParams(location.search).get("coopfixture") !== "showdown-battle") {
     return null;
   }
-  const mon: ShowdownMonManifest = {
+  const drizzleLead: ShowdownMonManifest = {
     speciesId: SpeciesId.PELIPPER,
     formIndex: 0,
     level: 100,
@@ -152,7 +153,23 @@ export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null
     erBlackShiny: false,
     baseCost: speciesStarterCosts[SpeciesId.PELIPPER],
   };
-  return makeShowdownTeamPreset("Browser Showdown", [mon]);
+  const intimidateSwitch: ShowdownMonManifest = {
+    speciesId: SpeciesId.GYARADOS,
+    formIndex: 0,
+    level: 100,
+    shiny: false,
+    variant: 0,
+    // Elite Redux Gyarados slot 0 is Intimidate. The two-browser journey switches both players into
+    // this slot and requires the resulting ability + stat-stage entries to complete on the renderer.
+    abilityIndex: 0,
+    ivs: new Array(6).fill(15),
+    moveset: [MoveId.TACKLE],
+    item: SHOWDOWN_ITEM_POOL[0],
+    rootSpeciesId: SpeciesId.GYARADOS,
+    erBlackShiny: false,
+    baseCost: speciesStarterCosts[SpeciesId.GYARADOS],
+  };
+  return makeShowdownTeamPreset("Browser Showdown", [drizzleLead, intimidateSwitch]);
 }
 
 /**

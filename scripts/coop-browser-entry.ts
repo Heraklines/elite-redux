@@ -802,6 +802,31 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       optionCount: optionIds?.length ?? null,
     };
   }
+  if (uiMode === "COMMAND") {
+    const commandHandler = handler as unknown as {
+      teraButton?: { visible?: boolean };
+      resetEnabled?: boolean;
+    };
+    const optionByCommand = new Map<number, string>([
+      [Command.FIGHT, "command:fight"],
+      [Command.BALL, "command:ball"],
+      [Command.POKEMON, "command:pokemon"],
+      [Command.RUN, "command:run"],
+    ]);
+    if (commandHandler.teraButton?.visible === true) {
+      optionByCommand.set(Command.TERA, "command:tera");
+    }
+    if (commandHandler.resetEnabled === true) {
+      optionByCommand.set(Command.RESET, "command:reset");
+    }
+    const optionIds = [...optionByCommand.values()];
+    return {
+      selectedOptionId:
+        selectedIndex == null ? null : (optionByCommand.get(selectedIndex) ?? `cursor:${selectedIndex}`),
+      optionIds,
+      optionCount: optionIds.length,
+    };
+  }
   if (uiMode === "FIGHT") {
     const moveSlots = readFightMoveSlots(uiMode);
     if (moveSlots != null) {

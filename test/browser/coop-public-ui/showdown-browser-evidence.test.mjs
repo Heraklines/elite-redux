@@ -66,6 +66,11 @@ test("the preset fixture requires both immutable build identity and exact page U
     registry,
     /speciesId: SpeciesId\.PELIPPER[\s\S]*level: 100[\s\S]*abilityIndex: 0[\s\S]*moveset: \[MoveId\.AIR_CUTTER\][\s\S]*item: SHOWDOWN_ITEM_POOL\[0\]/u,
   );
+  assert.match(
+    registry,
+    /speciesId: SpeciesId\.GYARADOS[\s\S]*level: 100[\s\S]*abilityIndex: 0[\s\S]*moveset: \[MoveId\.TACKLE\][\s\S]*item: SHOWDOWN_ITEM_POOL\[0\]/u,
+  );
+  assert.match(registry, /makeShowdownTeamPreset\("Browser Showdown", \[drizzleLead, intimidateSwitch\]\)/u);
   assert.match(title, /getCoopBrowserShowdownFixturePreset\(\)/u);
   assert.match(
     title,
@@ -79,6 +84,10 @@ test("Showdown setup exposes locale-independent semantic options with reciprocal
   assert.match(observer, /case "SHOWDOWN_WAGER":[\s\S]*surfaceId: "wager"[\s\S]*ownerModel: "local"/u);
   assert.match(observer, /showdown-preset:\$\{index\}/u);
   assert.match(observer, /showdown-wager:friendly/u);
+  assert.match(
+    observer,
+    /uiMode === "COMMAND"[\s\S]*Command\.FIGHT, "command:fight"[\s\S]*Command\.POKEMON, "command:pokemon"/u,
+  );
 });
 
 test("two public clients must prove one positive gameplay epoch before locking the wager", () => {
@@ -128,18 +137,27 @@ test("two public clients must prove one positive gameplay epoch before locking t
   assert.match(start, /assertSharedCommandFrontier\(battleCursors, "showdown-wave-1-command"/u);
 });
 
-test("the journey executes two reciprocal turns and requires every retained frontier", () => {
+test("the journey executes a reciprocal switch plus two attacks and requires every retained frontier", () => {
+  const switchDrive = harness.slice(
+    harness.indexOf("async driveShowdownVoluntarySwitch("),
+    harness.indexOf("\n  /** Drive a reciprocal switch", harness.indexOf("async driveShowdownVoluntarySwitch(")),
+  );
   const turn = harness.slice(
     harness.indexOf("async driveShowdownTurn()"),
     harness.indexOf("\n  async assertSharedSurface(", harness.indexOf("async driveShowdownTurn()")),
   );
+  assert.match(switchDrive, /targetId: "command:pokemon"/u);
+  assert.match(switchDrive, /party-slot:1/u);
+  assert.match(switchDrive, /party-option:send-out/u);
   assert.match(turn, /driveSequentialCommandRound\(/u);
+  assert.match(turn, /driveShowdownVoluntarySwitch/u);
+  assert.match(turn, /\["switch", "showAbility", "statStage"\]/u);
   assert.match(turn, /for \(let round = 1; round <= 2; round\+\+\)/u);
   assert.match(turn, /waitForPostTurnOutcome\(/u);
   assert.match(turn, /outcome\.kind !== "command"/u);
   assert.match(turn, /assertSharedCommandFrontier\(outcomeCursors, `\$\{label\}-next-command`/u);
   assert.match(turn, /assertRetainedContinuation\(outcomeCursors, `\$\{label\}-next-command`/u);
-  assert.match(turn, /showdown-turn-2-synchronized/u);
+  assert.match(turn, /showdown-turn-3-synchronized/u);
 });
 
 test("the real-browser oracle requires streamed ability and environment presentation on both clients", () => {

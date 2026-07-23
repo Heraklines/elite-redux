@@ -2367,6 +2367,7 @@ export class DuoPublicUiRig {
         last: authority.at(-1),
       });
     }
+    return authority;
   }
 
   /**
@@ -2529,17 +2530,86 @@ export class DuoPublicUiRig {
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-wave-1-command")));
   }
 
-  /** Drive successive reciprocal turns and prove both browsers install every exact next frontier. */
+  /**
+   * Submit a voluntary switch through the same command grid, party list, and SEND OUT submenu a real
+   * player uses. The semantic mirror only identifies visible options; every mutation remains an ordinary
+   * arrow/Space key handled by the production UI.
+   */
+  async driveShowdownVoluntarySwitch(client, purpose, commandEvent) {
+    const fromCursor = commandEvent.index;
+    await selectOptionById(client, {
+      surfaceId: "command:command",
+      targetId: "command:pokemon",
+      navKeys: ["ArrowDown", "ArrowUp"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor,
+    });
+    await selectOptionById(client, {
+      surfaceId: "party",
+      targetId: "party-slot:1",
+      navKeys: ["ArrowDown", "ArrowUp"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor,
+    });
+    await selectOptionById(client, {
+      surfaceId: "party",
+      targetId: "party-option:send-out",
+      navKeys: ["ArrowDown", "ArrowUp"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor,
+    });
+    client.evidence.record("showdown-voluntary-switch-command", { purpose, partySlot: 1 });
+  }
+
+  /** Drive a reciprocal switch and two attacks, proving every retained frontier and presentation receipt. */
   async driveShowdownTurn() {
     if (this.showdownCommandCursors == null) {
       throw new Error("driveShowdownTurn requires startShowdownBattle()");
     }
     let commandCursors = this.showdownCommandCursors;
-    // One round proves launch. A second round proves that the first retained turn retired cleanly and did
-    // not poison the next command address. The symmetric level-100 Pelipper fixture cannot faint within
-    // these two ordinary Air Cutter rounds, so both iterations must end at an executable command frontier.
+    const switchLabel = "showdown-turn-1-switch";
+    const { outcomeCursors: switchOutcomeCursors, expectedCommandAddress: switchCommandAddress } =
+      await this.driveSequentialCommandRound(commandCursors, this.config.keys.battle, switchLabel, {
+        driveCommand: (client, purpose, event) => this.driveShowdownVoluntarySwitch(client, purpose, event),
+      });
+    const switchOutcome = await this.waitForPostTurnOutcome(switchOutcomeCursors, {
+      expectedCommandAddress: switchCommandAddress,
+    });
+    if (switchOutcome.kind !== "command") {
+      throw new Error(`Showdown voluntary switch reached ${switchOutcome.kind} instead of the next command frontier`);
+    }
+    await this.assertSharedCommandFrontier(switchOutcomeCursors, `${switchLabel}-next-command`, { expectedWave: 1 });
+    const switchMatch = findSharedCommandFrontierMatch(this.host, this.guest, switchOutcomeCursors, null, {
+      allowAddressRepeat: true,
+      expectedWave: 1,
+    });
+    if (switchMatch == null) {
+      throw new Error(`${switchLabel}: could not recover the matched command boundary for presentation proof`);
+    }
+    const switchLedger = this.assertPresentationLedger(
+      switchOutcomeCursors,
+      switchMatch,
+      `${switchLabel}-presentation-ledger`,
+    );
+    const switchKindCounts = switchLedger.reduce((counts, entry) => {
+      const kind = entry.event.k;
+      counts[kind] = (counts[kind] ?? 0) + 1;
+      return counts;
+    }, {});
+    for (const kind of ["switch", "showAbility", "statStage"]) {
+      if ((switchKindCounts[kind] ?? 0) < 2) {
+        throw new Error(
+          `${switchLabel}: expected both battlers to present ${kind}; ledger=${JSON.stringify(switchLedger)}`,
+        );
+      }
+    }
+    await this.assertRetainedContinuation(switchOutcomeCursors, `${switchLabel}-next-command`);
+    commandCursors = switchOutcomeCursors;
+
+    // Two ordinary Gyarados rounds prove the switch frontier retired cleanly, move/damage presentation
+    // remained exact, and the second retained turn did not poison the following command address.
     for (let round = 1; round <= 2; round++) {
-      const label = `showdown-turn-${round}`;
+      const label = `showdown-turn-${round + 1}-attack`;
       const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
         commandCursors,
         this.config.keys.battle,
@@ -2548,7 +2618,7 @@ export class DuoPublicUiRig {
       const outcome = await this.waitForPostTurnOutcome(outcomeCursors, { expectedCommandAddress });
       if (outcome.kind !== "command") {
         throw new Error(
-          `Showdown turn ${round} reached ${outcome.kind} instead of the next synchronized command frontier`,
+          `Showdown turn ${round + 1} reached ${outcome.kind} instead of the next synchronized command frontier`,
         );
       }
       await this.assertSharedCommandFrontier(outcomeCursors, `${label}-next-command`, {
@@ -2566,7 +2636,7 @@ export class DuoPublicUiRig {
       commandCursors = outcomeCursors;
     }
     this.showdownCommandCursors = commandCursors;
-    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-turn-2-synchronized")));
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-turn-3-synchronized")));
   }
 
   async assertSharedSurface(surface, cursors, proofName, { allowAddressRepeat = false, expectedWave = null } = {}) {

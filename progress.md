@@ -1890,3 +1890,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Journey and Mystery soaks no longer use a 50 ms command-rendezvous ceiling. The failing seed showed the guest
   actively draining 22 immutable entry ability/stat events while seven 50 ms retries exhausted on the host.
   A two-second test ceiling remains bounded but represents the production ordering guarantee.
+
+# 2026-07-23 - Showdown voluntary-switch presentation oracle
+
+- The real two-browser Showdown journey no longer stops at a one-mon, attack-only happy path. Its sealed fixture
+  now carries a legal Gyarados bench on both clients; both players navigate the ordinary command grid, party list,
+  and SEND OUT submenu exclusively with public keys before two further attack rounds.
+- The CI observer now gives the command grid locale-independent semantic identities, including conditional Tera
+  and dev-only Reset entries, without mutating the game. The switch round requires two completed `switch`,
+  `showAbility`, and `statStage` entries in the exact authority-versus-renderer ledger before command can reopen.
