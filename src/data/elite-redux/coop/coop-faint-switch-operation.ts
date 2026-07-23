@@ -303,7 +303,20 @@ function retryKey(
   // This identifies the owner's one proposal WINDOW, not its proposed result. Authority may legally
   // remap the slot by species identity or commit a different fallback; either terminal must still
   // close the original proposal retry without touching another turn's same-field window.
-  return `${s.epoch}:${coopSeatOfRole("guest")}:${Math.trunc(wave)}:${Math.trunc(turn)}:${Math.trunc(occurrence)}:${Math.trunc(payload.fieldIndex)}:FAINT_SWITCH_PROPOSAL`;
+  return retryKeyForAddress(s.epoch, coopSeatOfRole("guest"), {
+    wave,
+    turn,
+    occurrence,
+    fieldIndex: payload.fieldIndex,
+  });
+}
+
+function retryKeyForAddress(
+  epoch: number,
+  ownerSeatId: number,
+  address: Pick<ReplacementCommitImage["sourceAddress"], "wave" | "turn" | "occurrence" | "fieldIndex">,
+): string {
+  return `${Math.trunc(epoch)}:${Math.trunc(ownerSeatId)}:${Math.trunc(address.wave)}:${Math.trunc(address.turn)}:${Math.trunc(address.occurrence)}:${Math.trunc(address.fieldIndex)}:FAINT_SWITCH_PROPOSAL`;
 }
 
 function cancelRetry(s: FaintSwitchOpState, retryWindow: string, operationId: string): void {
@@ -316,6 +329,27 @@ function cancelRetry(s: FaintSwitchOpState, retryWindow: string, operationId: st
       `faint-switch authority APPLIED op=${operationId} window=${retryWindow} -> cancelled exact intent retry`,
     );
   }
+}
+
+/**
+ * Retire only the proposal window proven by one materially-installed V2 replacement result. This is
+ * deliberately address-based rather than result-slot-based: authority may remap a proposed party slot,
+ * choose a timeout fallback, or commit an explicit no-replacement terminal, and all three outcomes settle
+ * the same immutable owner+faint window.
+ */
+function settleCoopV2FaintSwitchProposalRetry(
+  s: FaintSwitchOpState,
+  image: ReplacementCommitImage,
+  localSeatId: number,
+): void {
+  if (image.ownerSeatId !== localSeatId || image.sourceAddress.epoch !== s.epoch) {
+    return;
+  }
+  cancelRetry(
+    s,
+    retryKeyForAddress(image.sourceAddress.epoch, image.ownerSeatId, image.sourceAddress),
+    replacementOperationId(image.sourceAddress, image.ownerSeatId),
+  );
 }
 
 /**
@@ -826,6 +860,7 @@ export function materializeCoopV2ReplacementPickerTerminal(
   const address = image.sourceAddress;
   const key = pickerKey(address.wave, address.turn, address.occurrence, address.fieldIndex);
   if (s.settledPickers.has(key)) {
+    settleCoopV2FaintSwitchProposalRetry(s, image, localSeatId);
     return true;
   }
   const terminal = s.pickerTerminals.get(address.fieldIndex);
@@ -835,6 +870,7 @@ export function materializeCoopV2ReplacementPickerTerminal(
     // not a reason to retain this entry forever.
     if (image.selected === null) {
       rememberSettledPicker(s, key);
+      settleCoopV2FaintSwitchProposalRetry(s, image, localSeatId);
       return true;
     }
     return false;
@@ -861,6 +897,7 @@ export function materializeCoopV2ReplacementPickerTerminal(
   }
   s.pickerTerminals.delete(address.fieldIndex);
   rememberSettledPicker(s, key);
+  settleCoopV2FaintSwitchProposalRetry(s, image, localSeatId);
   return true;
 }
 

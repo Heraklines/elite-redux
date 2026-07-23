@@ -167,6 +167,80 @@ describe("co-op faint-switch operation migration", () => {
     ).toBe(false);
   });
 
+  it("V2 retires only the materially settled owner proposal window for every terminal resolution", () => {
+    setCoopFaintSwitchRetryMs(60_000);
+    const guestState = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(guestState);
+    const binding = captureCoopFaintSwitchOperationBinding("guest");
+    const payload = { fieldIndex: COOP_GUEST_FIELD_INDEX, partySlot: 3, data: [0, 6] };
+
+    for (const occurrence of [11, 12, 13]) {
+      armCoopFaintSwitchIntentResend(
+        {
+          payload,
+          localRole: "guest",
+          wave: 8,
+          turn: 2,
+          occurrence,
+          resend: () => {},
+        },
+        binding,
+      );
+    }
+    expect(hasPendingCoopFaintSwitchReplacementIntent(8, 2, binding)).toBe(true);
+
+    const image = (
+      occurrence: number,
+      selected: { partySlot: number; speciesId: number } | null,
+      resolution: "owner-pick" | "fallback-auto" = "owner-pick",
+    ) => ({
+      sourceAddress: {
+        epoch: 1,
+        wave: 8,
+        turn: 2,
+        occurrence,
+        fieldIndex: COOP_GUEST_FIELD_INDEX,
+      },
+      ownerSeatId: 1,
+      resolution,
+      selected,
+    });
+
+    markCoopFaintSwitchPickerSettled(8, 2, COOP_GUEST_FIELD_INDEX, binding, 11);
+    expect(materializeCoopV2ReplacementPickerTerminal(image(11, { partySlot: 3, speciesId: 6 }), 1, guestState)).toBe(
+      true,
+    );
+    expect(
+      hasPendingCoopFaintSwitchReplacementIntent(8, 2, binding),
+      "the neighboring fallback and no-replacement windows must remain armed",
+    ).toBe(true);
+
+    registerCoopFaintSwitchPickerTerminal(
+      {
+        wave: 8,
+        turn: 2,
+        occurrence: 12,
+        fieldIndex: COOP_GUEST_FIELD_INDEX,
+        consume: () => true,
+      },
+      binding,
+    );
+    expect(
+      materializeCoopV2ReplacementPickerTerminal(
+        image(12, { partySlot: 4, speciesId: 25 }, "fallback-auto"),
+        1,
+        guestState,
+      ),
+    ).toBe(true);
+    expect(hasPendingCoopFaintSwitchReplacementIntent(8, 2, binding)).toBe(true);
+
+    expect(materializeCoopV2ReplacementPickerTerminal(image(13, null, "fallback-auto"), 1, guestState)).toBe(true);
+    expect(
+      hasPendingCoopFaintSwitchReplacementIntent(8, 2, binding),
+      "owner-pick, fallback/remap, and no-replacement all retire their exact retries",
+    ).toBe(false);
+  });
+
   it("materializes only the exact old-address picker before acknowledging a timeout fallback", () => {
     const guestState = createCoopRuntimeOpState("guest");
     setActiveCoopRuntimeOpState(guestState);
