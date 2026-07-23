@@ -724,11 +724,16 @@ export class CoopSwitchReplayPhase extends Phase {
                     try {
                       globalScene.playSound("se/pb_rel");
                       pokeball.destroy();
-                      globalScene.animations.addPokeballOpenParticles(
-                        incoming!.x,
-                        incoming!.y - 16,
-                        incoming!.getPokeball(true),
-                      );
+                      // HEADLESS has no pixels to present, while this particle helper owns an independent
+                      // repeating timer that can outlive the phase/test scene. Do not create an orphaned
+                      // callback there; real Canvas/WebGL clients retain the complete ball-open effect.
+                      if (globalScene.game.config.renderType !== Phaser.HEADLESS) {
+                        globalScene.animations.addPokeballOpenParticles(
+                          incoming!.x,
+                          incoming!.y - 16,
+                          incoming!.getPokeball(true),
+                        );
+                      }
                       incoming!.showInfo();
                       incoming!.playAnim();
                       incoming!.setVisible(true);

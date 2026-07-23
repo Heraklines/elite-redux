@@ -12,6 +12,7 @@ const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), "ut
 test("switch presentation is host-authored and the renderer never predicts its own switch", () => {
   const producer = read("src/phases/switch-summon-phase.ts");
   const replay = read("src/phases/coop-replay-turn-phase.ts");
+  const replayPhases = read("src/phases/coop-replay-phases.ts");
   const rendererGate = read("src/data/elite-redux/coop/coop-renderer-gate.ts");
   const guestTurn = read("src/phases/turn-start-phase.ts");
 
@@ -20,6 +21,11 @@ test("switch presentation is host-authored and the renderer never predicts its o
   assert.match(producer, /speciesId:\s*incomingSpeciesId/u);
   assert.match(replay, /case\s+"switch":\s*pm\.unshiftNew\("CoopSwitchReplayPhase",\s*event\)/u);
   assert.match(rendererGate, /"CoopSwitchReplayPhase"/u);
+  assert.match(
+    replayPhases,
+    /renderType\s*!==\s*Phaser\.HEADLESS[\s\S]+addPokeballOpenParticles/u,
+    "headless presentation cannot leave an orphaned particle timer after scene teardown",
+  );
   assert.doesNotMatch(guestTurn, /mirrorGuestOwnSwitch|summonCoopPlayerField/u);
 });
 
