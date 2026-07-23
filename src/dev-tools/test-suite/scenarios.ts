@@ -2475,6 +2475,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Custom trainers preserve doubles / triples battle format",
+    description:
+      "FORMAT fix - a custom trainer authored as a single battle could overwrite the format that the\n"
+      + "run had already resolved, recalling the second/third player Pokemon and turning a 2v2 or 3v3\n"
+      + "fight into 1v1. Custom-trainer metadata may still upgrade a single wave to doubles, but can no\n"
+      + "longer downgrade an existing multi battle.\n"
+      + "DO (this is a CUSTOM-TRAINERS-PICKER check, ignore the throwaway battle you spawn into): from\n"
+      + "the title, choose a Doubles Only or Triples Only run/ghost, then Dev Scenarios -> Custom\n"
+      + "Trainers -> pick a staff trainer authored as SINGLE -> Fight with random ghost team.\n"
+      + "EXPECT: the custom trainer fight stays 2v2 or 3v3. No player partner is recalled and the enemy\n"
+      + "fields the same number of active slots. Headless wave-transition coverage lives in\n"
+      + "test/tests/elite-redux/er-custom-trainer-format-challenge.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.SURF, MoveId.GRASS_KNOT, MoveId.NASTY_PLOT],
+        }),
+        makeStarter(SpeciesId.EEVEE, {
+          moveset: [MoveId.BODY_SLAM, MoveId.BITE, MoveId.QUICK_ATTACK, MoveId.WISH],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Held-item icons align in the summary items row (vanilla + ER)",
     description:
       "UI ALIGNMENT fix (not a battle behavior) - the ER-custom held items (tactical / reactive /\n"
