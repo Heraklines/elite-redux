@@ -1,0 +1,96 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:267db4cb08955016e4d1c15579b50aa44d7b0c08:run-29967773977.1
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36
+platform: Linux armv81
+screen:   883x412 @2.625x  devmem:8 GB
+boot:     boot-start@0ms -> loading-complete@85482ms -> title-shown@92954ms
+lastSess: ok (reached title)
+mode:     0  wave:?
+seed:     MBxJa1gg33sCMVTVzBMW7NpP
+party:    
+enemy:    
+
+----- COMMENT -----
+Run wont start glitch happening again, On Mobile if that helps
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:267db4cb08955016e4d1c15579b50aa44d7b0c08:run-29967773977.1","source":"github","sha":"267db4cb08955016e4d1c15579b50aa44d7b0c08","workflow":{"provider":"github-actions","runId":"29967773977","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[00:06:29.835] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[00:06:31.268] LOG: [ER] build {"version":1,"id":"github:267db4cb08955016e4d1c15579b50aa44d7b0c08:run-29967773977.1","source":"github","sha":"267db4cb08955016e4d1c15579b50aa44d7b0c08","workflow":{"provider":"github-actions","runId":"29967773977","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[00:06:32.814] LOG: [dev-tools] loaded — 724 scenarios + Send Logs button
+[00:07:49.663] DEBUG: Destroying loading scene
+[00:07:49.664] DEBUG: Destroyed loading scene
+[00:07:49.810] LOG: Seed: 5nBFJklPPruAKQuYLQIEbbfk
+[00:07:49.810] LOG: Wave Seed: 5nBFJklPPruAKQuYLQIEbbfk 0
+[00:07:55.237] LOG: %cStart Phase LoginPhase color:green;
+[00:07:56.198] LOG: Client Session: RyNtSdyzG5gvGXeId9aMhCNbo7pLkaGt
+[00:07:57.113] LOG: %cStart Phase TitlePhase color:green;
+[00:07:57.117] LOG: Getting Session Slot id: %d 1
+[00:07:57.184] LOG: use seasonal splash messages true
+[00:08:26.230] LOG: Getting Session Slot id: %d 0
+[00:08:26.270] LOG: Getting Session Slot id: %d 1
+[00:08:26.291] LOG: Getting Session Slot id: %d 2
+[00:08:26.314] LOG: Getting Session Slot id: %d 3
+[00:08:26.330] LOG: Getting Session Slot id: %d 4
+[00:08:31.402] WARN: Attempted to load save slot of -1 through load game menu!
+[00:08:31.434] LOG: use seasonal splash messages true
+[00:08:34.568] LOG: %cStart Phase TitlePhase color:green;
+[00:08:34.570] LOG: Getting Session Slot id: %d 1
+[00:08:34.601] LOG: use seasonal splash messages true
+[00:08:37.039] LOG: %cStart Phase TitlePhase color:green;
+[00:08:37.041] LOG: Getting Session Slot id: %d 1
+[00:08:37.069] LOG: use seasonal splash messages true
+[00:08:45.545] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:09:01.109] LOG: %cStart Phase TitlePhase color:green;
+[00:09:01.112] LOG: Getting Session Slot id: %d 1
+[00:09:01.136] LOG: use seasonal splash messages true
+[00:09:28.323] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:09:36.442] WARN: cry/10686 not found
+[00:09:36.460] WARN: cry/10779 not found
+[00:09:40.202] LOG: %cStart Phase TitlePhase color:green;
+[00:09:40.203] LOG: Getting Session Slot id: %d 1
+[00:09:40.236] LOG: use seasonal splash messages true
+[00:09:44.000] LOG: %cStart Phase SelectChallengePhase color:green;
+[00:09:50.635] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:10:18.553] LOG: %cSaving starter preferences color: blue
+[00:10:18.971] LOG: %cSaving starter preferences color: blue
+[00:10:22.285] LOG: %cSaving starter preferences color: blue
+[00:10:22.496] LOG: %cSaving starter preferences color: blue
+[00:10:29.474] WARN: cry/10686 not found
+[00:10:39.133] LOG: %cSaving starter preferences color: blue
+[00:10:39.998] LOG: %cSaving starter preferences color: blue
+[00:10:54.864] WARN: cry/622 not found
+[00:11:00.925] WARN: cry/623-mega not found
+[00:11:28.086] WARN: cry/688 not found
+[00:11:37.362] WARN: cry/307 not found
+[00:12:26.857] WARN: cry/931 not found
+[00:12:33.162] WARN: cry/931 not found
+[00:12:40.555] WARN: cry/10791 not found
+[00:12:51.526] WARN: cry/527 not found
+[00:13:03.885] WARN: cry/527 not found
+[00:13:19.398] WARN: cry/931 not found
+[00:13:49.034] WARN: cry/535 not found
+[00:14:17.728] WARN: cry/688 not found
+[00:14:26.239] LOG: Getting Session Slot id: %d 0
+[00:14:26.248] LOG: Getting Session Slot id: %d 1
+[00:14:26.255] LOG: Getting Session Slot id: %d 2
+[00:14:26.262] LOG: Getting Session Slot id: %d 3
+[00:14:26.266] LOG: Getting Session Slot id: %d 4
+[00:14:32.100] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[00:14:32.101] LOG: Seed: fJaj6uhVVxTLoWgRyCheIyKM
+[00:14:32.102] LOG: Wave Seed: fJaj6uhVVxTLoWgRyCheIyKM 0
+[00:14:32.709] WARN: AnimationManager key already exists: prompt
+[00:14:32.710] WARN: AnimationManager key already exists: tera_sparkle
+[00:14:32.710] LOG: Seed: MBxJa1gg33sCMVTVzBMW7NpP
+[00:14:32.710] LOG: Wave Seed: MBxJa1gg33sCMVTVzBMW7NpP 0
+[00:14:37.210] LOG: %cStart Phase LoginPhase color:green;
+[00:14:37.821] LOG: Client Session: RyNtSdyzG5gvGXeId9aMhCNbo7pLkaGt
+[00:14:39.223] DEBUG: Using cached system data
+[00:14:39.404] LOG: %cStart Phase TitlePhase color:green;
+[00:14:39.406] LOG: Getting Session Slot id: %d 1
+[00:14:39.433] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
