@@ -250,18 +250,12 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
   it("the HOST CommandPhase opens the interactive command menu (human-driven)", async () => {
     await startCoopDouble();
 
-    const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
-    globalScene.currentBattle.turnCommands = {};
-
-    const hostPhase = game.scene.phaseManager.create("CommandPhase", COOP_HOST_FIELD_INDEX) as CommandPhase;
-    hostPhase.start();
-
-    // The host's own slot is NOT auto-resolved - it opens UiMode.COMMAND for slot 0
-    // and leaves the turn command empty until the human picks.
-    const openedCommandForHost = setModeSpy.mock.calls.some(
-      ([mode, fieldIndex]) => mode === UiMode.COMMAND && fieldIndex === COOP_HOST_FIELD_INDEX,
-    );
-    expect(openedCommandForHost).toBe(true);
+    // `startBattle()` already stopped at the real host CommandPhase. Starting a
+    // second synthetic phase here used to create a fresh V2 entry against the
+    // deliberately legacy spoof peer, turning this UI assertion into an invalid
+    // capability-mismatch test. Observe the production-opened surface instead.
+    expect(game.scene.phaseManager.getCurrentPhase().phaseName).toBe("CommandPhase");
+    expect(globalScene.ui.getMode()).toBe(UiMode.COMMAND);
     expect(globalScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]).toBeUndefined();
   });
 
@@ -627,10 +621,10 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
           fieldIndex === COOP_GUEST_FIELD_INDEX
           && sentTurn === turn
           && command.command === Command.FIGHT
-          && command.targets?.length === 1
-          && command.targets[0] === BattlerIndex.ENEMY_2,
+          && (command.targets?.length === 0
+            || (command.targets?.length === 1 && command.targets[0] === BattlerIndex.ENEMY_2)),
       ),
-      "RIGHT + confirm emitted the exact guest-owned FIGHT intent for the second 1-HP enemy",
+      "RIGHT + confirm emitted the guest-owned FIGHT intent; the sole target may be implicit until authority validation",
     ).toBe(true);
     await withClient(rig.hostCtx, async () => {
       expect(rig.hostScene.ui.getMode(), "the host starts on its real command surface").toBe(UiMode.COMMAND);
@@ -654,6 +648,10 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
         rig.hostScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.targets,
         "the host selected the first 1-HP enemy",
       ).toEqual([BattlerIndex.ENEMY]);
+      expect(
+        rig.hostScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX]?.targets,
+        "the authority normalized the guest's implicit sole target before committing the turn",
+      ).toEqual([BattlerIndex.ENEMY_2]);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
       expect(
         rig.hostScene.currentBattle.enemyParty.every(enemy => enemy.isFainted()),

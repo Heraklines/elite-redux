@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "302c39f05a52eef6b45f9bdc97b12ee9f5c088fe",
+  "baseSha": "f26e7216d7574d734c4d79d886bad0e2e274b9ac",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -85,6 +85,9 @@
     "test/tests/elite-redux/coop/coop-p33-mutation-victims.test.ts",
     "test/tests/elite-redux/coop/coop-renderer-allowlist.test.ts",
     "test/tests/elite-redux/coop/coop-session-controller.test.ts",
+    "test/tests/elite-redux/coop/coop-soak-journey.test.ts",
+    "test/tests/elite-redux/coop/coop-soak-me.test.ts",
+    "test/tests/elite-redux/coop/coop-soak.test.ts",
     "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts",
     "test/tests/elite-redux/coop/coop-transition-t2-mystery.test.ts",
     "test/tests/elite-redux/er-doubles-only-all-battles.test.ts",

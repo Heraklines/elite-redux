@@ -51,7 +51,9 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
   beforeEach(() => {
     // Force-hit (a determinism knob, NOT content narrowing) so the god party's max-clamped moves connect.
     accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
-    setCoopWaveBarrierMs(50);
+    // Mystery campaigns still traverse ordinary entry presentations. Do not let the test-only rendezvous
+    // ceiling expire while the renderer is visibly replaying an ability-heavy wave opening.
+    setCoopWaveBarrierMs(2_000);
     setCoopFaintSwitchWaitMs(4000);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`soak-me-${Date.now()}`);

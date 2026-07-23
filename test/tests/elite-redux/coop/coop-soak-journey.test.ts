@@ -75,7 +75,10 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
 
   beforeEach(() => {
     accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
-    setCoopWaveBarrierMs(50);
+    // Entry presentation can legitimately contain many ordered ability/stat phases before the renderer
+    // reaches its command rendezvous. A 50 ms ceiling terminated the authority while that healthy replay
+    // was still draining; keep a bounded test timeout while allowing the real presentation path to finish.
+    setCoopWaveBarrierMs(2_000);
     setCoopFaintSwitchWaitMs(4_000);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`soak-journey-${Date.now()}`);

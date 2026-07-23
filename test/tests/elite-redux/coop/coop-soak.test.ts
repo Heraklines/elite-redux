@@ -92,7 +92,9 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
     // #788 v2 partner-sync gate: tiny wait so the harness's manually-driven shop flows proceed fast via
     // the gate's own timeout fallback instead of sitting through the 60s live default.
-    setCoopWaveBarrierMs(50);
+    // Production waits 60 seconds. Two seconds remains aggressively bounded for CI while allowing the
+    // renderer to drain a large immutable entry-presentation ledger before it reaches COMMAND.
+    setCoopWaveBarrierMs(2_000);
     // #786 faint replacement: bound the host's wait for the guest's relayed replacement pick so a
     // guest-owned faint resolves fast via the harness's auto-picker instead of the 60s live default.
     setCoopFaintSwitchWaitMs(4000);

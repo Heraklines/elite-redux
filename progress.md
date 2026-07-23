@@ -1875,3 +1875,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Removed the detached market-owner retention half from the production phase suite because it violated the
   closed V2 predecessor graph and duplicated the operation/durability retain-before-publish contract. The
   unique watcher assertion remains: a missing exact terminal must never be treated as LEAVE.
+
+# 2026-07-23 - battle-control fixture migration
+
+- Full gate `30028133952` showed two remaining battle-control assumptions rather than a production regression.
+  The host-menu test was starting a second synthetic V2 command entry against a deliberately legacy spoof peer;
+  it now observes the real command surface which `startBattle()` already opened.
+- The two-engine EXP journey now distinguishes the public renderer's valid targetless sole-target intent from
+  the authority's normalized committed command. It accepts either raw UI shape at the transport edge but still
+  requires the host's committed guest command to contain exactly `ENEMY_2` before the turn can execute.
+- The full soak's wave-20 Tera red was a harness omission: `CoopTeraReplayPhase` was allowlisted in production
+  but absent from the shared replay drain set, so the driver declared a strand while the animation child was
+  validly ahead of `CoopFinalizeTurnPhase`. The shared pump now drains it.
+- Journey and Mystery soaks no longer use a 50 ms command-rendezvous ceiling. The failing seed showed the guest
+  actively draining 22 immutable entry ability/stat events while seven 50 ms retries exhausted on the host.
+  A two-second test ceiling remains bounded but represents the production ordering guarantee.
