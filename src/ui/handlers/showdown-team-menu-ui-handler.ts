@@ -76,7 +76,7 @@ export interface ShowdownTeamMenuPresetView {
   name: string;
   mons: ShowdownMonManifest[];
   /** OPTIONAL folder (P3): groups the preset under a collapsible header in the menu. */
-  folder?: string;
+  folder?: string | undefined;
   /**
    * Non-null when the preset is currently INVALID against the live collection / format rules
    * (mon released, unlock changed, rule broken). The menu shows an invalid marker + this reason,
@@ -657,7 +657,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
       const preset = this.config!.presets[idx];
       if (preset != null) {
         // The VIEW is ephemeral (never hashed/persisted); the SAVE path omits the key via setPresetFolder.
-        preset.folder = folder ? folder : undefined;
+        preset.folder = folder || undefined;
       }
       // Keep the cursor on the moved team so the preview does not jump.
       const rows = this.rowsList();

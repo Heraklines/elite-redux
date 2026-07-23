@@ -52,6 +52,7 @@ function tournament(rewardPool: TournamentRecord["rewardPool"]): TournamentRecor
     rewardPool,
     closeAt: null,
     rewardsGranted: false,
+    community: false,
   };
 }
 

@@ -571,7 +571,10 @@ describe("co-op lobby self-healing handshake (#868)", () => {
   // one-shot lock-in recovers it by asking the guest to re-broadcast.
   // -------------------------------------------------------------------------
   it("requestRoster recovers a rosterSync the host missed (one-shot re-answered)", async () => {
-    const { host, guest } = createLoopbackPair();
+    // Use the explicit loss-injection transport here. Loopback intentionally buffers frames sent
+    // before the first subscription, matching WebRTC early-rx behavior, so it cannot model a truly
+    // missed one-shot frame anymore.
+    const { host, guest } = makeFlapPair();
     const g = new CoopSessionController(guest, { username: "Guest" });
     // The guest announces + locks in BEFORE the host controller exists, so the host misses
     // the one-shot rosterSync entirely (it is delivered to no handler).

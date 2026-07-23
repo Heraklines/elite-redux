@@ -13,6 +13,7 @@ import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
+import { HitResult } from "#enums/move-result";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { PokeballType } from "#enums/pokeball";
 import { PokemonType } from "#enums/pokemon-type";
@@ -494,14 +495,14 @@ describe("follow-up move recursion guards", () => {
 
     const pokemon = {
       turnData: { hitsLeft: 1 },
-      getLastXMoves: () => [{ useMode: MoveUseMode.NORMAL }],
+      getLastXMoves: () => [{ move: MoveId.TACKLE, targets: [], useMode: MoveUseMode.NORMAL }],
     } as unknown as Pokemon;
     expect(canTrigger(pokemon)).toBe(true);
 
-    pokemon.getLastXMoves = () => [{ useMode: MoveUseMode.INDIRECT }];
+    pokemon.getLastXMoves = () => [{ move: MoveId.TACKLE, targets: [], useMode: MoveUseMode.INDIRECT }];
     expect(canTrigger(pokemon)).toBe(false);
 
-    pokemon.getLastXMoves = () => [{ useMode: MoveUseMode.NORMAL }];
+    pokemon.getLastXMoves = () => [{ move: MoveId.TACKLE, targets: [], useMode: MoveUseMode.NORMAL }];
     pokemon.turnData.hitsLeft = 2;
     expect(canTrigger(pokemon)).toBe(false);
   });
@@ -529,7 +530,7 @@ describe("source-aware offensive binding", () => {
     const opponent = { addTag: vi.fn() } as unknown as Pokemon;
     const move = { id: MoveId.BIND } as Move;
 
-    attr.apply({ pokemon, opponent, move, simulated: false });
+    attr.apply({ pokemon, opponent, move, simulated: false, damage: 0, hitResult: HitResult.EFFECTIVE });
 
     expect(opponent.addTag).toHaveBeenCalledWith(BattlerTagType.BIND, 0, MoveId.BIND, 41);
   });

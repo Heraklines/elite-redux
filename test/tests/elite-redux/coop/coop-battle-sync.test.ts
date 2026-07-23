@@ -315,6 +315,10 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
   it("keeps an exact retained intent after a stale actor-address rejection", async () => {
     const pair = createLoopbackPair();
     const guestSync = new CoopBattleSync(pair.guest);
+    // Mark the host endpoint as already subscribed so this setup broadcast is consumed instead of
+    // entering the transport's production-parity pre-subscription buffer. The assertion below is
+    // specifically about replies to rejection/request traffic, not the original broadcast.
+    const consumeInitial = pair.host.onMessage(() => {});
     const currentAddress = { epoch: 37, wave: 4, pokemonId: 700 };
     guestSync.broadcastLocalCommand(
       1,
@@ -324,6 +328,7 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
       currentAddress,
     );
     await new Promise(resolve => setTimeout(resolve, 0));
+    consumeInitial();
 
     const replies: Extract<Parameters<typeof pair.host.send>[0], { t: "command" }>[] = [];
     const off = pair.host.onMessage(message => {

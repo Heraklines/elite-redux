@@ -79,7 +79,7 @@ export interface TournamentEnv {
    * uid allowlist — so any teammate using the editor page's existing password can administer
    * tournaments without a personal admin-uid entry. Unset = editor-password auth disabled.
    */
-  EDITOR_PASSWORD?: string;
+  EDITOR_PASSWORD?: string | undefined;
   /** er-editor-api base URL - the delegated editor-password verifier (zero-setup team admin). */
   EDITOR_API_URL?: string;
   /** Base URL of the er-save-api worker (settlement store) for server-to-server reward delivery. */

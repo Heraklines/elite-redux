@@ -143,6 +143,7 @@ function completeTournament(rewardPool: TournamentRecord["rewardPool"]): Tournam
     rewardPool,
     closeAt: null,
     rewardsGranted: false,
+    community: false,
   };
 }
 

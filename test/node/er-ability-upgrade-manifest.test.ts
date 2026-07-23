@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { REQUESTED_ABILITY_UPGRADES } from "#data/elite-redux/ability-upgrades/requested-ability-manifest";
+import {
+  REQUESTED_ABILITY_UPGRADES,
+  type RequestedAbilityUpgrade,
+} from "#data/elite-redux/ability-upgrades/requested-ability-manifest";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
@@ -21,6 +24,8 @@ function normalizeName(name: string): string {
     .replace(/[^a-z0-9]/gi, "")
     .toLowerCase();
 }
+
+const REQUESTED_ROWS: readonly RequestedAbilityUpgrade[] = REQUESTED_ABILITY_UPGRADES;
 
 const EXPECTED_REQUESTED_NAMES = [
   "Insomnia",
@@ -162,16 +167,16 @@ const EXPECTED_REQUESTED_NAMES = [
 
 describe("requested Elite Redux ability-overhaul manifest", () => {
   it("contains every requested ability exactly once", () => {
-    const names = REQUESTED_ABILITY_UPGRADES.map(row => row.name);
+    const names = REQUESTED_ROWS.map(row => row.name);
     expect(new Set(names).size).toBe(names.length);
     expect([...names].sort()).toEqual([...EXPECTED_REQUESTED_NAMES].sort());
-    expect(REQUESTED_ABILITY_UPGRADES.every(row => row.requestedEffect.trim().length > 0)).toBe(true);
+    expect(REQUESTED_ROWS.every(row => row.requestedEffect.trim().length > 0)).toBe(true);
   });
 
   it("matches each ER draft id to the requested ability name", () => {
     const draftsById = new Map(ER_ABILITIES.map(ability => [ability.id, ability]));
 
-    for (const row of REQUESTED_ABILITY_UPGRADES) {
+    for (const row of REQUESTED_ROWS) {
       if (row.erDraftId == null) {
         continue;
       }
@@ -183,7 +188,7 @@ describe("requested Elite Redux ability-overhaul manifest", () => {
   });
 
   it("resolves every row to a live vanilla or ER runtime ability id", () => {
-    for (const row of REQUESTED_ABILITY_UPGRADES) {
+    for (const row of REQUESTED_ROWS) {
       const vanilla = row.vanillaKey ? vanillaId(row.vanillaKey) : undefined;
       const erRuntime = row.erDraftId == null ? undefined : ER_ID_MAP.abilities[row.erDraftId];
 
@@ -201,7 +206,7 @@ describe("requested Elite Redux ability-overhaul manifest", () => {
   });
 
   it("keeps replacements, nerfs, and the rename explicitly classified", () => {
-    const byName = new Map(REQUESTED_ABILITY_UPGRADES.map(row => [row.name, row]));
+    const byName = new Map(REQUESTED_ROWS.map(row => [row.name, row]));
     for (const name of [
       "Snow Cloak",
       "Ball Fetch",

@@ -65,7 +65,7 @@ export class ActivateOncePerBattleEntryWindowAbAttr extends PostSummonAbAttr {
 
 export class TimeLimitedEffectivenessFloorAbAttr extends FullHpResistTypeAbAttr {
   private readonly turns: number;
-  private readonly activeWindowKey?: string;
+  private readonly activeWindowKey: string | undefined;
 
   constructor(options: TimeLimitedEffectivenessFloorOptions) {
     super();

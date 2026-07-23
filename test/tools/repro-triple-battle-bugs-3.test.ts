@@ -163,7 +163,8 @@ describe.skipIf(!RUN)("repro: triple-battle bugs round 3 (2026-07-07 report)", (
       .enemyMoveset(MoveId.HARDEN)
       .moveset([MoveId.EARTHQUAKE, MoveId.HARDEN])
       .ability(AbilityId.SHADOW_TAG)
-      .enemyAbility(AbilityId.BALL_FETCH);
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyHasPassiveAbility(false);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIDGEOT, SpeciesId.PIDGEOT);
 
     const field = globalScene.getEnemyField();
