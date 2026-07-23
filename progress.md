@@ -1652,3 +1652,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   and repository TypeScript reports only the unrelated feat integration baseline with no touched-path
   diagnostic. All valid C1/contract/full-gate proof remains remote-only after the active public journey
   releases the branch push lock.
+
+# 2026-07-23 - replacement-owned Mystery terminal edge and exact staging-noise classification
+
+- The same final Mystery victory can cross through `REPLACEMENT_COMMIT` instead of `TURN_COMMIT` when a
+  surviving player faints on the winning turn. Replacement now supports an operation-bound ordered wait;
+  the runtime emits the exact `op:me / ME_TERMINAL / same wave / turn 0` successor only when the phase is an
+  actual Mystery battle, the retained handoff names that wave, the immutable enemy image is defeated, and a
+  player remains alive. Ordinary replacement, wave victory, and GameOver successors are unchanged.
+- Public journey `29973852644` on `ff838fee8` completed the product path through fresh registration, lobby
+  pairing, two live turns, reward, wave-2 checkpoint, full reload, re-pair, resume admission, and resumed
+  wave-2 command control in both real browsers. Its final 3+3 fatal events were the exact optional
+  `/tournament/list` 404 emitted because that service is not mounted on the staging save Worker. Evidence now
+  excuses only that status/path on the exact staging hostname; production, other paths/statuses, and browser
+  exceptions remain fatal.
+- Local verification stayed within the current policy: scoped Biome formatting/checking has no new error,
+  repository TypeScript emitted no diagnostic, `git diff --check` is clean, and the ownership manifest
+  validates. Co-op node/browser tests were not run locally; the new adapter/cutover negative contracts and
+  exact two-browser journey require hosted qualification.

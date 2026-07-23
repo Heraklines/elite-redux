@@ -14,6 +14,7 @@ import {
   fatalCoopConsoleReason,
   isExpectedLocaleFallbackError,
   isExpectedMissingSystemSaveError,
+  isExpectedUnavailableStagingTournamentError,
 } from "./evidence.mjs";
 
 const fatalLines = [
@@ -156,6 +157,33 @@ test("fresh/dirty account exempts ONLY the two exact missing save/session reads,
     false,
   );
   assert.equal(isExpectedMissingSystemSaveError("warning", notFound, `${api}/savedata/system/get`, true), false);
+});
+
+test("only the unavailable staging tournament poll is non-fatal", () => {
+  const notFound = "Failed to load resource: the server responded with a status of 404 ()";
+  const staging = "https://er-save-api-staging.heraklines.workers.dev";
+  assert.equal(isExpectedUnavailableStagingTournamentError("error", notFound, `${staging}/tournament/list`), true);
+  assert.equal(
+    isExpectedUnavailableStagingTournamentError(
+      "error",
+      notFound,
+      "https://er-save-api.heraklines.workers.dev/tournament/list",
+    ),
+    false,
+  );
+  assert.equal(
+    isExpectedUnavailableStagingTournamentError("error", notFound, `${staging}/savedata/session/get`),
+    false,
+  );
+  assert.equal(
+    isExpectedUnavailableStagingTournamentError(
+      "error",
+      "Failed to load resource: the server responded with a status of 500 ()",
+      `${staging}/tournament/list`,
+    ),
+    false,
+  );
+  assert.equal(isExpectedUnavailableStagingTournamentError("warning", notFound, `${staging}/tournament/list`), false);
 });
 
 test("EvidenceSink exempts the two fresh-account save 404s but keeps every other 404/pageerror fatal", async () => {

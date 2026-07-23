@@ -436,6 +436,20 @@ export function isExpectedMissingSystemSaveError(type, text, source, freshAccoun
 }
 
 /**
+ * The staging save Worker deliberately has no tournament service mounted. The title screen polls the
+ * optional endpoint anyway, so Chromium emits a 404 console error even though account, save, lobby, and
+ * gameplay continue normally. Excuse only that exact GET-resource symptom on the exact staging host; a
+ * production failure, another path/status, or an application exception remains fatal.
+ */
+export function isExpectedUnavailableStagingTournamentError(type, text, source) {
+  if (type !== "error" || !/Failed to load resource:.*status of 404/iu.test(text)) {
+    return false;
+  }
+  const url = parsedUrl(source);
+  return url?.hostname === "er-save-api-staging.heraklines.workers.dev" && url.pathname === "/tournament/list";
+}
+
+/**
  * i18next deliberately falls back to the bundled English namespace when a selected locale has
  * not translated that JSON resource. Chromium reports that ordinary fallback probe as a console
  * error. Keep the 404 response in the evidence, but do not misclassify a successful non-English
@@ -1401,14 +1415,17 @@ export class EvidenceSink {
         this.expectedMissingSystemSaveErrors || this.freshAccountMissingSaves,
       );
       const expectedLocaleFallback = isExpectedLocaleFallbackError(message.type(), text, source);
-      if (expectedMissingSystemSave || expectedLocaleFallback) {
+      const expectedUnavailableTournament = isExpectedUnavailableStagingTournamentError(message.type(), text, source);
+      if (expectedMissingSystemSave || expectedLocaleFallback || expectedUnavailableTournament) {
         // A register-mode flag, not a countdown: a fresh account reads several missing saves
         // (system + session) before its first persist, so all such reads are expected.
         this.record("console-error-expected", {
           source,
           reason: expectedLocaleFallback
             ? "selected locale falls back to the bundled English namespace"
-            : "fresh account has no persisted save yet",
+            : expectedUnavailableTournament
+              ? "optional tournament service is not mounted on the staging save Worker"
+              : "fresh account has no persisted save yet",
         });
       } else if (
         fatalCoopReason == null
