@@ -40,7 +40,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
-import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
+import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   beginShowdownBattle,
@@ -48,20 +48,27 @@ import {
   disposePendingShowdownRelay,
   disposePendingShowdownSession,
   endShowdownBattle,
+  getShowdownOpponentManifest,
   getShowdownOwnManifest,
   setPendingShowdownRelay,
   setPendingShowdownSession,
+  setShowdownFieldOpponent,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
 import { buildShowdownHeldItem } from "#data/elite-redux/showdown/showdown-enemy-build";
 import { reportShowdownBattleEntered } from "#data/elite-redux/showdown/showdown-escrow-client";
-import { starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
+import { manifestToStarter, starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
 import {
   ShowdownNegotiationError,
   type ShowdownNegotiationResult,
   ShowdownSession,
 } from "#data/elite-redux/showdown/showdown-session";
 import { buildShowdownStakePool } from "#data/elite-redux/showdown/showdown-stake-pool";
+import {
+  shouldAwaitShowdownLaunchSnapshot,
+  showdownLaunchSides,
+  showdownSyncBattleSeed,
+} from "#data/elite-redux/showdown/showdown-sync-launch";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { beginShowdownTelemetry } from "#data/elite-redux/showdown/showdown-telemetry";
 import {
@@ -558,7 +565,7 @@ export class SelectStarterPhase extends Phase {
           hostTeam: manifests,
           guestTeam: result.opponentManifest,
         });
-        void this.launchShowdownBattle(starters, role, matchId, manifests);
+        void this.launchShowdownBattle(starters, role, matchId, manifests, result.opponentManifest, ownProfile);
       },
     };
     // Await so no later UI transition can silently displace the wager screen; both players must
@@ -567,16 +574,16 @@ export class SelectStarterPhase extends Phase {
   }
 
   /**
-   * Showdown 1v1 (D0): launch the negotiated match. The HOST fields its OWN team as the player side
-   * (the enemy trainer is built from the stashed opponent manifest in `newBattle`); the GUEST boots
-   * from the host's authoritative launch snapshot (its player side IS the host's team) - there is no
-   * correct local fallback for the guest, so a missed snapshot aborts cleanly.
+   * Launch the negotiated match. Authoritative Showdown keeps the host-built snapshot boot. Sync
+   * instead builds the same host-oriented field locally on both clients from the negotiated manifests.
    */
   private async launchShowdownBattle(
     starters: Starter[],
     role: CoopRole,
     matchId: string | null,
     ownManifests?: ShowdownMonManifest[],
+    opponentManifests?: ShowdownMonManifest[],
+    ownProfile: GhostTrainerProfile | null = null,
   ): Promise<void> {
     // B7 item 11: the run launch is DEFERRED to here (post wager-commit), so it can't race the wager
     // screen the way item-4's team-confirm `startRun` did. Pin the neutral run difficulty ("ace", the
@@ -593,7 +600,8 @@ export class SelectStarterPhase extends Phase {
     if (matchId != null) {
       void reportShowdownBattleEntered(matchId).catch(() => {});
     }
-    if (role === "guest") {
+    const netcodeMode = getCoopNetcodeMode();
+    if (shouldAwaitShowdownLaunchSnapshot(role, netcodeMode)) {
       globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
       void globalScene.ui.setMode(UiMode.MESSAGE).then(async () => {
         if (await this.tryCoopGuestSnapshotBoot()) {
@@ -602,6 +610,32 @@ export class SelectStarterPhase extends Phase {
         this.abortShowdown("Did not receive the match from the host.");
       });
       return;
+    }
+    let launchStarters = starters;
+    let launchManifests = ownManifests;
+    let syncSeed: string | null = null;
+    if (netcodeMode === "lockstep") {
+      const logicalOwn = ownManifests ?? getShowdownOwnManifest();
+      const logicalOpponent = opponentManifests ?? getShowdownOpponentManifest();
+      if (logicalOwn == null || logicalOpponent == null) {
+        this.abortShowdown("The synchronized match teams were not available.");
+        return;
+      }
+      const sides = showdownLaunchSides(role, netcodeMode, logicalOwn, logicalOpponent);
+      launchStarters = sides.playerManifest.map(manifestToStarter);
+      launchManifests = sides.playerManifest;
+      const canonicalSeed = showdownSyncBattleSeed(role, logicalOwn, logicalOpponent);
+      syncSeed = canonicalSeed;
+      if (role === "guest") {
+        setShowdownFieldOpponent(sides.enemyManifest, ownProfile, getCoopController()?.localName() ?? null);
+        globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
+        void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+          globalScene.setSeed(canonicalSeed);
+          globalScene.resetSeed();
+          this.initBattle(launchStarters, true, undefined, launchManifests);
+        });
+        return;
+      }
     }
     // HOST: pick a SAFE save slot (first empty; never overwrite an existing run). Showdown never
     // persists (the result phase never saves), but newBattle still needs a valid slot id.
@@ -612,7 +646,15 @@ export class SelectStarterPhase extends Phase {
     globalScene.sessionSlotId = slot;
     // ignoreMovesetValidation: the showdown team was assembled with explicit movesets - keep them
     // verbatim (the legality pass would strip them and desync the relayed enemy commands).
-    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(starters, true, undefined, ownManifests));
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+      if (syncSeed != null) {
+        // This is the final synchronous boundary before party construction. Seeding any earlier lets
+        // save-slot or UI work consume a different amount of RNG on the two clients.
+        globalScene.setSeed(syncSeed);
+        globalScene.resetSeed();
+      }
+      this.initBattle(launchStarters, true, undefined, launchManifests);
+    });
   }
 
   /** Showdown 1v1 (D0): tear the versus session down and return to the title with a message. */
@@ -823,11 +865,10 @@ export class SelectStarterPhase extends Phase {
     // Showdown 1v1 (B7 item 6): attach each OWN mon's manifest held item to the PLAYER party -
     // the SAME mapping (buildShowdownHeldItem) the opponent's client fields for you, so both
     // sides field a byte-equal held-item set. MEGA_STONE / unset -> no runtime modifier. The
-    // host is the only client that runs initBattle for showdown (the guest boots from the host's
-    // launch snapshot, which carries these modifiers; the authoritative turn stream then relays
-    // them each turn), and the party is built in the same order as the stashed own manifest.
+    // Authoritative guests receive these modifiers in the host snapshot. Sync clients both run
+    // initBattle against the same host-oriented player manifest, so they attach an identical set.
     if (globalScene.gameMode.isShowdown) {
-      const ownManifest = getShowdownOwnManifest();
+      const ownManifest = ownManifests ?? getShowdownOwnManifest();
       if (ownManifest != null) {
         party.forEach((pokemon, i) => {
           const heldMon = ownManifest[i];

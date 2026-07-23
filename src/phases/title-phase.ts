@@ -21,6 +21,7 @@ import {
   clearCoopRuntime,
   coopSessionGeneration,
   getCoopController,
+  getCoopNetcodeMode,
   getCoopRuntime,
   isVersusSession,
   startLocalCoopSession,
@@ -42,6 +43,7 @@ import {
   manifestToStarter,
   starterToManifest,
 } from "#data/elite-redux/showdown/showdown-manifest";
+import { shouldAwaitShowdownLaunchSnapshot } from "#data/elite-redux/showdown/showdown-sync-launch";
 import { validateShowdownTeam } from "#data/elite-redux/showdown/showdown-team";
 import { buildTeamMenuPresetViews, runShowdownPresetBuild } from "#data/elite-redux/showdown/showdown-team-menu-flow";
 import {
@@ -1866,9 +1868,13 @@ export class TitlePhase extends Phase {
     // The standard new-run EncounterPhase queued here ran FIRST as an UNLOADED encounter -
     // adopting the UNSWAPPED coop enemy payload and generating a second world on top of the
     // swapped snapshot (the log-confirmed double-launch: two EncounterPhases, three summons,
-    // dangling queue entries). The HOST keeps this phase - its initBattle feeds it.
-    const isVersusGuestLaunch = this.gameMode === GameModes.SHOWDOWN && getCoopController()?.role === "guest";
-    if (!isVersusGuestLaunch) {
+    // dangling queue entries). Sync guests build locally, so they keep this phase with the host.
+    const controller = getCoopController();
+    const isAuthoritativeVersusGuestLaunch =
+      this.gameMode === GameModes.SHOWDOWN
+      && controller != null
+      && shouldAwaitShowdownLaunchSnapshot(controller.role, getCoopNetcodeMode());
+    if (!isAuthoritativeVersusGuestLaunch) {
       globalScene.phaseManager.pushNew("EncounterPhase", this.loaded);
     }
 

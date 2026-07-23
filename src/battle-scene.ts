@@ -99,8 +99,9 @@ import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-re
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import {
   getShowdownBattleFormat,
-  getShowdownOpponentManifest,
-  getShowdownOpponentProfile,
+  getShowdownFieldOpponentManifest,
+  getShowdownFieldOpponentName,
+  getShowdownFieldOpponentProfile,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import { markTrainerAsShowdown } from "#data/elite-redux/showdown/showdown-enemy-build";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
@@ -1865,8 +1866,8 @@ export class BattleScene extends SceneBase {
     // stream, so the rebuilt trainer is purely cosmetic (sprite/name/title/dialogue/FX). No profile ->
     // a plain Veteran, identical to before.
     if (resolved.trainer != null && this.gameMode.isShowdown && isShowdownGuestFlip()) {
-      const teamSize = getShowdownOpponentManifest()?.length ?? resolved.trainer.getPartyTemplate().size;
-      resolved.trainer = this.buildShowdownTrainer(getShowdownOpponentProfile(), teamSize);
+      const teamSize = getShowdownFieldOpponentManifest()?.length ?? resolved.trainer.getPartyTemplate().size;
+      resolved.trainer = this.buildShowdownTrainer(getShowdownFieldOpponentProfile(), teamSize);
     }
     if (resolved.trainer) {
       this.field.add(resolved.trainer);
@@ -1877,10 +1878,9 @@ export class BattleScene extends SceneBase {
    * Task C7: build the showdown OPPONENT trainer from the opponent's authored ghost-trainer `profile`.
    * Sprite/class + gender are chosen at CONSTRUCTION (mirroring {@linkcode createGhostTrainer}); the
    * name/title/dialogue/FX are applied via the SHARED ghost helper {@linkcode applyGhostTrainerPresentation}
-   * so ghost + showdown presentation stay byte-identical. Used by BOTH clients: the HOST fields the guest's
-   * team behind the guest's profile; the GUEST re-skins its flipped-top trainer with the host's profile.
-   * `teamSize` sizes the party (the party itself is adopted from the stream on the guest). A null profile
-   * yields a plain Veteran.
+   * so ghost + showdown presentation stay byte-identical. The field-facing profile accounts for both
+   * the authoritative guest's flipped snapshot and Sync's host-oriented local simulation. `teamSize`
+   * sizes the party. A null profile yields a plain Veteran.
    */
   private buildShowdownTrainer(profile: GhostTrainerProfile | null, teamSize: number): Trainer {
     const authoredType =
@@ -1895,9 +1895,9 @@ export class BattleScene extends SceneBase {
     // profile (or one with no displayName) must still face you under their real ACCOUNT NAME -
     // not the trainer class's random NPC name. An authored displayName, when present, wins.
     if (!profile?.displayName) {
-      const partnerName = getCoopController()?.partnerName;
-      if (partnerName) {
-        trainer.name = partnerName;
+      const fallbackName = getShowdownFieldOpponentName() ?? getCoopController()?.partnerName;
+      if (fallbackName) {
+        trainer.name = fallbackName;
       }
     }
     return trainer;
@@ -1912,15 +1912,15 @@ export class BattleScene extends SceneBase {
     // Showdown 1v1 (C3): the opponent's negotiated team is fielded as a TRAINER (6-mon party,
     // switching, no catch, win-on-wipe - the 1v1 shape), built VERBATIM from the manifest via
     // the genPartyMember showdown hook (markTrainerAsShowdown). Wins over every wild/trainer/
-    // ghost roll. Only fires for a live showdown match on the HOST; the guest renders the host's
-    // streamed party. Showdown-only, so co-op / solo are byte-for-byte unaffected.
-    const showdownManifest = this.gameMode.isShowdown ? getShowdownOpponentManifest() : null;
+    // ghost roll. It runs on the host in authoritative Showdown and on both local engines in Sync.
+    // Showdown-only, so co-op / solo are byte-for-byte unaffected.
+    const showdownManifest = this.gameMode.isShowdown ? getShowdownFieldOpponentManifest() : null;
     if (showdownManifest != null && showdownManifest.length > 0) {
       resolved.battleType = BattleType.TRAINER;
       // Task C7: field the opponent behind their authored ghost-trainer profile (sprite/class/name/
-      // title/dialogue/FX) - the SAME presentation ghost battles use. Profile is null when the
-      // opponent authored none (plain Veteran).
-      const opponent = this.buildShowdownTrainer(getShowdownOpponentProfile(), showdownManifest.length);
+      // title/dialogue/FX) - the SAME presentation ghost battles use. On a Sync guest the
+      // field-facing opponent is the guest's own account. A null profile yields a plain Veteran.
+      const opponent = this.buildShowdownTrainer(getShowdownFieldOpponentProfile(), showdownManifest.length);
       this.field.add(opponent);
       resolved.trainer = opponent;
       return;
