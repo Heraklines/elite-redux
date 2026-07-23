@@ -7,7 +7,9 @@
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     "progress.md",
+    "scripts/run-coop-gate.mjs",
     "src/data/elite-redux/coop/authority-v2/next-control.ts",
+    "test/scripts/coop-focused-static-workflow.test.mjs",
     "test/tests/elite-redux/showdown/showdown-versus-doubles.test.ts",
     "test/tools/repro-triple-battle-bugs-3.test.ts"
   ],

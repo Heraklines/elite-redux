@@ -104,6 +104,23 @@ test("focused planner fails closed when more than five affected shards require c
   assert.doesNotMatch(planner, /\.slice\(0, maxShards\)/u);
 });
 
+test("ownership metadata does not manufacture a six-lane runtime impact", () => {
+  const impacted = [
+    ...impactLanes([
+      ".github/coop-task-ownership/v2-example.json",
+      "src/data/elite-redux/coop/authority-v2/next-control.ts",
+      "test/tests/elite-redux/showdown/showdown-versus-doubles.test.ts",
+      "test/tools/repro-triple-battle-bugs-3.test.ts",
+    ]),
+  ].sort();
+  assert.deepEqual(impacted, ["A", "B", "P", "S", "T"]);
+  assert.deepEqual(
+    [...impactLanes([".github/workflows/coop-focused-branch.yml"])].sort(),
+    ["A", "B", "C", "P", "S", "T"],
+    "executable GitHub workflow changes still require every representative lane",
+  );
+});
+
 test("representative soak never manufactures a command rendezvous and scopes the spectator to final-boss stage one", () => {
   assert.doesNotMatch(soakDriver, /rendezvous\.reannounce\(point\)/u);
   assert.match(soakDriver, /currentBattle\.isClassicFinalBoss[\s\S]*playerCapacity === 1[\s\S]*enemyCapacity === 1/u);

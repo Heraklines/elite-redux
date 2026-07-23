@@ -463,7 +463,12 @@ const FOCUSED_IMPACT_RULES = [
     lanes: ["A", "B", "P"],
   },
   {
-    matches: file => /^(?:\.github|scripts|package\.json|pnpm-lock\.yaml|vite|vitest|tsconfig)/.test(file),
+    // Ownership manifests are declarative planner input, not executable CI/runtime code. Every valid task
+    // push must update one; treating that JSON as generic `.github` infrastructure made every focused push
+    // select all six lanes and fail its five-shard cap before the owned product files could be tested.
+    matches: file =>
+      (!file.startsWith(".github/coop-task-ownership/") && file.startsWith(".github/"))
+      || /^(?:scripts|package\.json|pnpm-lock\.yaml|vite|vitest|tsconfig)/.test(file),
     lanes: Object.keys(COOP_CI_TARGET_SHARDS),
   },
 ];

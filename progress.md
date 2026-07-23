@@ -1603,3 +1603,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   terminalized that orphan command; the test then saw zero host fields or a null battle. The fixture now stops
   before CommandPhase, matching the already-correct Showdown duo/faint/summon harnesses, and lets the paired
   builder install both runtimes before opening input.
+- Focused planning had a separate structural noise source: the required declarative ownership JSON matched
+  the generic `.github` infrastructure rule, so every otherwise narrow task update manufactured a six-lane
+  impact and tripped the five-shard cap. Ownership metadata is now excluded from runtime impact only; actual
+  workflows/actions still select all lanes. A node-pure contract proves this batch's product paths resolve to
+  A/B/P/S/T while a workflow edit continues to require A/B/C/P/S/T.
