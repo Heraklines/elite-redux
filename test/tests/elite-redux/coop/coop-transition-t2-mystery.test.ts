@@ -22,12 +22,11 @@ import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-re
 import { isCompleteCoopMeTerminalPayload } from "#data/elite-redux/coop/coop-me-operation";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, isCoopSharedTerminalFrozen, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { resetErBiomeStructure, restoreErBiomeStructure } from "#data/elite-redux/er-biome-structure";
 import { BattleType } from "#enums/battle-type";
-import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -249,7 +248,10 @@ async function driveGuestCommandUi(game: GameManager, rig: DuoRig): Promise<void
   // Use the shared production-keyboard driver so one-target battles follow the real direct-submit branch
   // while two-target battles still cross the real target picker. Keeping a private copy here let this T2
   // lane keep demanding a target screen after the engine had already submitted the guest command.
-  await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+  await driveDuoGuestTackleThroughPublicUi(game, rig, {
+    restartAlreadyOpenHost: true,
+    submitHostTackle: true,
+  });
 }
 
 async function driveOrdinaryRewardBoundary(game: GameManager, rig: DuoRig): Promise<void> {
@@ -486,10 +488,7 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
     try {
       await driveGuestCommandUi(game, rig);
       const ordinaryTurn = rig.hostScene.currentBattle.turn;
-      await withClient(rig.hostCtx, async () => {
-        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-        await game.phaseInterceptor.to("CoopTurnCommitPhase");
-      });
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CoopTurnCommitPhase"));
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, ordinaryTurn));
       expect(rig.guestScene.currentBattle.enemyParty.every(enemy => enemy.isFainted())).toBe(true);
 

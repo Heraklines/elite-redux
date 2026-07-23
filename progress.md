@@ -1951,3 +1951,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The voluntary-switch oracle now waits for a post-submit party observation whose actual option set contains
   SEND OUT, then navigates from that exact surface. This is an observer pacing fix; the screenshot and semantic
   trace prove production had already opened the correct public menu.
+
+# 2026-07-23 - Mystery transition command migration
+
+- Focused P1 on `41c5c4948` exposed the same mixed-input seam as the biome journey: the guest chose through
+  production UI, then a private host `move.select` bypassed the reciprocal command surface and left the host
+  parked at MESSAGE. Both Mystery journey variants now submit both seats through the shared public UI driver.
+- The source migration contract now covers both long production-transition suites, preventing a future helper
+  refactor from silently restoring private battle input to either biome or Mystery coverage.

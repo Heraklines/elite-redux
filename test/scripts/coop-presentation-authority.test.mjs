@@ -159,6 +159,7 @@ test("every co-op renderer boundary triggers the production two-browser journey"
 test("production-transition fixtures use public commands and terminal teardown cannot resurrect a dead client", () => {
   const harness = read("test/tools/coop-duo-harness.ts");
   const biomeJourney = read("test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts");
+  const mysteryJourney = read("test/tests/elite-redux/coop/coop-transition-t2-mystery.test.ts");
 
   assert.match(harness, /options\.submitHostTackle[\s\S]+host selects Fight through COMMAND UI/u);
   assert.match(harness, /prev\.runtime\.localTransport\.state !== "closed"/u);
@@ -168,4 +169,6 @@ test("production-transition fixtures use public commands and terminal teardown c
   );
   assert.match(biomeJourney, /submitHostTackle:\s*true/u);
   assert.doesNotMatch(biomeJourney, /game\.move\.select\(/u);
+  assert.match(mysteryJourney, /submitHostTackle:\s*true/u);
+  assert.doesNotMatch(mysteryJourney, /game\.move\.select\(/u);
 });
