@@ -183,6 +183,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     "CoopHpDrainReplayPhase",
     "CoopStatStageReplayPhase",
     "CoopStatusReplayPhase",
+    "CoopShowAbilityReplayPhase",
     "CoopFaintReplayPhase",
     "CoopFinalizeTurnPhase",
   ] as const;

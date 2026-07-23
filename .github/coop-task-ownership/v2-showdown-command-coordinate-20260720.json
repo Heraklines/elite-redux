@@ -46,6 +46,7 @@
     "test/node/authority-v2-replacement.test.ts",
     "test/node/authority-v2-turn.test.ts",
     "test/scripts/coop-focused-static-workflow.test.mjs",
+    "test/tests/elite-redux/coop/coop-battle-events.test.ts",
     "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
     "test/tests/elite-redux/coop/coop-p33-mutation-victims.test.ts",
     "test/tests/elite-redux/er-doubles-only-all-battles.test.ts",
