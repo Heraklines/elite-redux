@@ -2067,6 +2067,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   fact. Raw `biomePick` emission and legacy durability are no longer treated as correctness: the public map
   probe requires an `INTERACTION_COMMIT`, and retained checks read the global V2 log.
 
+# 2026-07-23 - Co-op test migration owns the complete integration directory
+
+- Focused run `30040452427` stopped in planning because the ownership manifest enumerated individual co-op
+  suites and did not yet include the newly migrated biome-choice suite. No test or product assertion ran.
+- This task is explicitly migrating the complete co-op suite to Authority V2, so the manifest now owns the
+  co-op integration-test directory. Subsequent migration batches can fan out immediately while production
+  ownership and the frozen protocol-schema guard remain unchanged.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real
