@@ -2121,3 +2121,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   informational findings and `git diff --check` is clean.
 - Next: dispatch the exact two-browser `showdown-battle` journey on the fixed SHA and visually inspect both
   post-switch screenshots. Co-op Vitest and browsers remain remote-only under `AGENTS.md`.
+
+# 2026-07-23 - Presentation completion is outcome-driven for identity events
+
+- The fresh source audit correctly found that queue drainage was being reported as successful rendering even
+  when an ability, Tera, switch, or replacement presentation resolved the wrong actor, threw, or expired its
+  watchdog. Replacement presentation watermarks could therefore advance after a failed visual operation.
+- Identity-bearing replay phases now settle a first-writer-wins outcome token. Ability and Tera require the
+  exact side, battler, party slot, and Pokemon id; switch additionally requires the exact species. Failed or
+  pending outcomes prevent a modern turn from publishing presentation-ready, and replacement watermarks only
+  advance after rendered or explicit animations-disabled outcomes.
+- Exact-browser receipts now carry rendered, intentionally-skipped, or failed outcomes (including reason and
+  actor fingerprint) instead of inferring success from queue position. Static contracts reject malformed
+  failure evidence and a focused engine regression proves a late animation callback cannot overwrite a
+  watchdog failure. Remaining non-identity events will adopt the same outcome contract in the next slice.

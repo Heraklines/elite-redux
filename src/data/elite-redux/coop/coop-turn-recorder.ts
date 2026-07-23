@@ -26,6 +26,7 @@
 // =============================================================================
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import type { CoopPresentationOutcome } from "#data/elite-redux/coop/coop-presentation-outcome";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 
 /** The open recording: the turn number stamped at start + the ordered events + the per-turn live seq. */
@@ -84,11 +85,13 @@ let liveEmitter: CoopLiveEmitter | null = null;
 
 export interface CoopPresentationObservation {
   /** The authority assigned the immutable event, or the renderer finished its presentation subtree. */
-  readonly stage: "authority-recorded" | "renderer-completed";
+  readonly stage: "authority-recorded" | "renderer-completed" | "renderer-skipped" | "renderer-failed";
   readonly turn: number;
   readonly seq: number;
   /** Always the authority's canonical event, before any Showdown guest-side battler-index reflection. */
   readonly event: CoopBattleEvent;
+  readonly reason?: string;
+  readonly actorFingerprint?: string;
 }
 
 type CoopPresentationObserver = (observation: CoopPresentationObservation) => void;
@@ -116,6 +119,36 @@ export function observeCoopRenderedPresentation(turn: number, seq: number, event
     presentationObserver({ stage: "renderer-completed", turn, seq, event });
   } catch {
     // CI telemetry must never become a production progression dependency.
+    coopWarn("turn", `presentation observer threw at renderer turn=${turn} seq=${seq} k=${event.k}`);
+  }
+}
+
+/** Outcome-driven renderer evidence; a drained-but-failed phase can never report completion. */
+export function observeCoopPresentationOutcome(
+  turn: number,
+  seq: number,
+  event: CoopBattleEvent,
+  outcome: CoopPresentationOutcome,
+): void {
+  if (presentationObserver == null) {
+    return;
+  }
+  const stage =
+    outcome.kind === "rendered"
+      ? "renderer-completed"
+      : outcome.kind === "intentionally-skipped"
+        ? "renderer-skipped"
+        : "renderer-failed";
+  try {
+    presentationObserver({
+      stage,
+      turn,
+      seq,
+      event,
+      ...(outcome.kind === "rendered" ? {} : { reason: outcome.reason }),
+      ...(outcome.actorFingerprint == null ? {} : { actorFingerprint: outcome.actorFingerprint }),
+    });
+  } catch {
     coopWarn("turn", `presentation observer threw at renderer turn=${turn} seq=${seq} k=${event.k}`);
   }
 }

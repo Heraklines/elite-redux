@@ -26,6 +26,8 @@ const [
   stream,
   transport,
   sprite,
+  presentationOutcome,
+  replayPhases,
 ] = await Promise.all([
   read(".github/workflows/coop-public-ui-journey.yml"),
   read("test/browser/coop-public-ui/config.mjs"),
@@ -40,6 +42,8 @@ const [
   read("src/data/elite-redux/coop/coop-battle-stream.ts"),
   read("src/data/elite-redux/coop/coop-transport.ts"),
   read("src/pipelines/sprite.ts"),
+  read("src/data/elite-redux/coop/coop-presentation-outcome.ts"),
+  read("src/phases/coop-replay-phases.ts"),
 ]);
 
 test("the exact-SHA workflow exposes and seals a dedicated Showdown battle journey", () => {
@@ -231,6 +235,15 @@ test("the real-browser oracle compares every authority event to a completed cano
   assert.match(harness, /pending\.size === 1 && submittedCommandAddress != null/u);
   assert.match(harness, /presentation-before-final-command/u);
   assert.match(harness, /presentationCursors \?\?= beforeSubmissionCursors/u);
+  assert.match(replay, /observeCoopPresentationOutcome/u);
+  assert.match(replay, /presentation-phase-ended-without-outcome/u);
+  assert.match(presentationOutcome, /First terminal result wins/u);
+  assert.match(presentationOutcome, /outcome\.kind === "failed"/u);
+  assert.match(replayPhases, /ability-actor-identity-mismatch/u);
+  assert.match(replayPhases, /tera-actor-identity-mismatch/u);
+  assert.match(replayPhases, /switch-watchdog-expired/u);
+  assert.match(replayPhases, /inspectCoopPresentationOutcomes\(this\.presentationOutcomeTokens\)/u);
+  assert.match(replayPhases, /coopPresentationOutcomeAllowsProgress\(coopPresentationOutcome\(this\.outcomeToken\)\)/u);
 });
 
 test("a switch sprite detached during a WebGL batch cannot crash either battle renderer", () => {
@@ -259,6 +272,16 @@ test("presentation receipts reject malformed or unknown event identities", () =>
   );
   assert.throws(
     () => presentationEventView(`${prefix}${JSON.stringify({ ...valid, stage: "renderer-queued" })}`),
+    /invalid presentation-event observation/u,
+  );
+  assert.deepEqual(
+    presentationEventView(
+      `${prefix}${JSON.stringify({ ...valid, stage: "renderer-failed", reason: "ability-watchdog-expired" })}`,
+    )?.reason,
+    "ability-watchdog-expired",
+  );
+  assert.throws(
+    () => presentationEventView(`${prefix}${JSON.stringify({ ...valid, stage: "renderer-failed" })}`),
     /invalid presentation-event observation/u,
   );
 });

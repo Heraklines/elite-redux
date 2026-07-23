@@ -805,7 +805,7 @@ export function presentationEventView(text) {
     !value
     || typeof value !== "object"
     || value.version !== 1
-    || (value.stage !== "authority-recorded" && value.stage !== "renderer-completed")
+    || !["authority-recorded", "renderer-completed", "renderer-skipped", "renderer-failed"].includes(value.stage)
     || (value.role !== "host" && value.role !== "guest")
     || !Number.isSafeInteger(value.epoch)
     || value.epoch <= 0
@@ -818,6 +818,10 @@ export function presentationEventView(text) {
     || !value.event
     || typeof value.event !== "object"
     || !PRESENTATION_EVENT_KINDS.has(value.event.k)
+    || ((value.stage === "renderer-skipped" || value.stage === "renderer-failed")
+      && (typeof value.reason !== "string" || value.reason.length === 0))
+    || (value.actorFingerprint !== undefined
+      && (typeof value.actorFingerprint !== "string" || value.actorFingerprint.length === 0))
   ) {
     throw new Error("built browser emitted an invalid presentation-event observation");
   }

@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "cfb8aff8089c6513ace6ba46d546ab1ce5efce69",
+  "baseSha": "f786ad08470c31f3440d9af26ed1868d1ca57c07",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -28,6 +28,7 @@
     "src/data/elite-redux/coop/coop-battle-stream.ts",
     "src/data/elite-redux/coop/coop-battle-sync.ts",
     "src/data/elite-redux/coop/coop-enemy-builder.ts",
+    "src/data/elite-redux/coop/coop-presentation-outcome.ts",
     "src/data/elite-redux/coop/coop-renderer-gate.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
     "src/data/elite-redux/coop/coop-transport.ts",

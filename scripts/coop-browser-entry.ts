@@ -93,6 +93,8 @@ setCoopPresentationObserver(observation => {
       turn: observation.turn,
       seq: observation.seq,
       event: observation.event,
+      ...(observation.reason == null ? {} : { reason: observation.reason }),
+      ...(observation.actorFingerprint == null ? {} : { actorFingerprint: observation.actorFingerprint }),
     })}`,
   );
 });

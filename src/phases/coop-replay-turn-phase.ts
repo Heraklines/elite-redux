@@ -24,6 +24,11 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import { hasPendingCoopFaintSwitchReplacementIntent } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { beginCoopAuthoritativeProjectionSettlement } from "#data/elite-redux/coop/coop-presentation";
 import {
+  type CoopPresentationOutcomeToken,
+  coopPresentationOutcome,
+  createCoopPresentationOutcomeToken,
+} from "#data/elite-redux/coop/coop-presentation-outcome";
+import {
   coopHasPendingWaveAdvance,
   coopLocalOwnedPlayerFieldSlot,
   coopRetainedGameOverSupersedesReplay,
@@ -38,6 +43,7 @@ import {
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import {
   hasCoopPresentationObserver,
+  observeCoopPresentationOutcome,
   observeCoopRenderedPresentation,
 } from "#data/elite-redux/coop/coop-turn-recorder";
 import { swapBattleEvent } from "#data/elite-redux/showdown/showdown-side-swap";
@@ -97,12 +103,25 @@ export class CoopPresentationReceiptPhase extends Phase {
     private readonly turn: number,
     private readonly seq: number,
     private readonly canonicalEvent: CoopBattleEvent,
+    private readonly outcomeToken?: CoopPresentationOutcomeToken,
   ) {
     super();
   }
 
   override start(): void {
-    observeCoopRenderedPresentation(this.turn, this.seq, this.canonicalEvent);
+    if (this.outcomeToken == null) {
+      observeCoopRenderedPresentation(this.turn, this.seq, this.canonicalEvent);
+    } else {
+      observeCoopPresentationOutcome(
+        this.turn,
+        this.seq,
+        this.canonicalEvent,
+        coopPresentationOutcome(this.outcomeToken) ?? {
+          kind: "failed",
+          reason: "presentation-phase-ended-without-outcome",
+        },
+      );
+    }
     this.end();
   }
 }
@@ -138,6 +157,8 @@ export class CoopReplayTurnPhase extends Phase {
   private readonly sourceWave: number;
   /** Turn-1 prefix consumer: replay the retained authoritative post-summon carrier before command input. */
   private readonly entryPresentationOnly: boolean;
+  /** Outcome proofs accumulated across live-event pump continuations for this exact turn. */
+  private readonly presentationOutcomeTokens: CoopPresentationOutcomeToken[];
 
   constructor(
     turn: number,
@@ -145,6 +166,7 @@ export class CoopReplayTurnPhase extends Phase {
     hpChain?: [number, number][],
     sourceWave?: number,
     entryPresentationOnly = false,
+    presentationOutcomeTokens?: readonly CoopPresentationOutcomeToken[],
   ) {
     super();
     this.turn = turn;
@@ -152,6 +174,7 @@ export class CoopReplayTurnPhase extends Phase {
     this.fromHpByBi = new Map(hpChain ?? []);
     this.sourceWave = sourceWave ?? globalScene.currentBattle?.waveIndex ?? 0;
     this.entryPresentationOnly = entryPresentationOnly;
+    this.presentationOutcomeTokens = [...(presentationOutcomeTokens ?? [])];
   }
 
   /** Bind this async phase to the exact phase tree that created it. */
@@ -324,6 +347,8 @@ export class CoopReplayTurnPhase extends Phase {
             sharedRendered,
             [...this.fromHpByBi.entries()],
             this.sourceWave,
+            this.entryPresentationOnly,
+            this.presentationOutcomeTokens,
           );
           this.end();
           return;
@@ -341,6 +366,8 @@ export class CoopReplayTurnPhase extends Phase {
             this.rendered + increment.length,
             [...this.fromHpByBi.entries()],
             this.sourceWave,
+            this.entryPresentationOnly,
+            this.presentationOutcomeTokens,
           );
           this.end();
           return;
@@ -457,6 +484,8 @@ export class CoopReplayTurnPhase extends Phase {
                 this.rendered,
                 [...this.fromHpByBi.entries()],
                 this.sourceWave,
+                this.entryPresentationOnly,
+                this.presentationOutcomeTokens,
               );
               coopLog(
                 "replay",
@@ -647,6 +676,8 @@ export class CoopReplayTurnPhase extends Phase {
                 this.rendered,
                 [...this.fromHpByBi.entries()],
                 this.sourceWave,
+                this.entryPresentationOnly,
+                this.presentationOutcomeTokens,
               );
               this.end();
               return;
@@ -751,6 +782,7 @@ export class CoopReplayTurnPhase extends Phase {
           raced.res.revision,
           raced.res.authorityNextControl,
           raced.res.authorityRevision,
+          this.presentationOutcomeTokens,
         );
         this.end();
         return;
@@ -1205,6 +1237,7 @@ export class CoopReplayTurnPhase extends Phase {
     // replay-phase sequence it ran for this turn (move/hp/stat/status/faint/message counts).
     const tally: Record<string, number> = {};
     for (const [eventOffset, event] of localEvents.entries()) {
+      let outcomeToken: CoopPresentationOutcomeToken | undefined;
       tally[event.k] = (tally[event.k] ?? 0) + 1;
       try {
         // HOT LOOP (per battle event): build the per-event trace only when debug is on.
@@ -1247,6 +1280,8 @@ export class CoopReplayTurnPhase extends Phase {
             pm.unshiftNew("CoopStatusReplayPhase", event.bi, event.status);
             break;
           case "showAbility":
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
             pm.unshiftNew(
               "CoopShowAbilityReplayPhase",
               event.bi,
@@ -1255,10 +1290,20 @@ export class CoopReplayTurnPhase extends Phase {
               event.abilityId,
               event.passive,
               event.passiveSlot,
+              outcomeToken,
             );
             break;
           case "tera":
-            pm.unshiftNew("CoopTeraReplayPhase", event.bi, event.pokemonId, event.partySlot, event.teraType);
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew(
+              "CoopTeraReplayPhase",
+              event.bi,
+              event.pokemonId,
+              event.partySlot,
+              event.teraType,
+              outcomeToken,
+            );
             break;
           case "weather":
           case "terrain":
@@ -1283,7 +1328,9 @@ export class CoopReplayTurnPhase extends Phase {
             });
             break;
           case "switch":
-            pm.unshiftNew("CoopSwitchReplayPhase", event);
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew("CoopSwitchReplayPhase", event, undefined, outcomeToken);
             break;
           default: {
             // Keep the renderer closed over the wire union. Adding a new authority event without a
@@ -1302,6 +1349,7 @@ export class CoopReplayTurnPhase extends Phase {
             this.turn,
             this.rendered + eventOffset,
             canonicalEvents[eventOffset],
+            outcomeToken,
           );
         }
       } catch {

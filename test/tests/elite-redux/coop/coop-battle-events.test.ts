@@ -33,6 +33,11 @@ import { globalScene } from "#app/global-scene";
 import { CommonBattleAnim } from "#data/battle-anims";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import {
+  coopPresentationOutcome,
+  createCoopPresentationOutcomeToken,
+  settleCoopPresentationOutcome,
+} from "#data/elite-redux/coop/coop-presentation-outcome";
+import {
   clearCoopRuntime,
   getCoopController,
   getCoopRuntime,
@@ -127,6 +132,48 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(observations).toEqual([
       { stage: "authority-recorded", turn: 3, seq: 0, event },
       { stage: "renderer-completed", turn: 3, seq: 0, event },
+    ]);
+  });
+
+  it("a drained presentation cannot overwrite failure with a successful browser receipt", () => {
+    const event: CoopBattleEvent = {
+      k: "showAbility",
+      bi: 0,
+      pokemonId: 17,
+      partySlot: 0,
+      abilityId: 2,
+      passive: false,
+      passiveSlot: 0,
+    };
+    const observations: unknown[] = [];
+    const token = createCoopPresentationOutcomeToken();
+    setCoopPresentationObserver(observation => observations.push(observation));
+    expect(
+      settleCoopPresentationOutcome(token, {
+        kind: "failed",
+        reason: "ability-watchdog-expired",
+        actorFingerprint: "player:bi0:slot0:p17",
+      }),
+    ).toBe(true);
+    expect(
+      settleCoopPresentationOutcome(token, { kind: "rendered", actorFingerprint: "player:bi0:slot0:p17" }),
+      "a late animation callback cannot rewrite the watchdog result",
+    ).toBe(false);
+
+    const receipt = new CoopPresentationReceiptPhase(3, 1, event, token);
+    vi.spyOn(receipt, "end").mockImplementation(() => {});
+    receipt.start();
+
+    expect(coopPresentationOutcome(token)?.kind).toBe("failed");
+    expect(observations).toEqual([
+      {
+        stage: "renderer-failed",
+        turn: 3,
+        seq: 1,
+        event,
+        reason: "ability-watchdog-expired",
+        actorFingerprint: "player:bi0:slot0:p17",
+      },
     ]);
   });
 
