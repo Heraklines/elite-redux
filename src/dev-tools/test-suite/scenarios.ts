@@ -20015,6 +20015,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Scenario Builder lists newcomer species and forms",
+    description:
+      "DEV-TOOLS UI fix - the Scenario Builder species autocomplete now rebuilds from the live species\n"
+      + "registry every time it opens and includes named entries for every form instead of requiring staff\n"
+      + "to guess a numeric form index.\n"
+      + "DO: return to Dev Scenarios, open Scenario Builder, then search the player/enemy species field.\n"
+      + "EXPECT: standalone newcomers such as Drawclops, Dustnoir, and Webbed Bruiser are available.\n"
+      + "Search for Yveltal (Mega Z) or Metagross (Battle Bond), select it, and verify the Form field is\n"
+      + "filled automatically. Launch or copy/import the scenario; the selected form must be preserved.\n"
+      + "Headless regression: test/tests/elite-redux/er-scenario-builder-newcomers.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });
+      return [
+        makeStarter(SpeciesId.BULBASAUR, {
+          moveset: [MoveId.TACKLE, MoveId.VINE_WHIP, MoveId.GROWL, MoveId.GROWTH],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // Ability overhaul - deferred meta consumers
   // ===========================================================================

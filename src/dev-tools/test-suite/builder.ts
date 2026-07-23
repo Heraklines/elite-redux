@@ -52,24 +52,72 @@ const PANEL_ID = "er-dev-scenario-builder";
 // --- name <-> id catalogs (built lazily from the live tables) -----------------
 
 let catalogs: {
-  speciesByName: Map<string, number>;
+  speciesByName: Map<string, ScenarioSpeciesOption>;
   speciesNameById: Map<number, string>;
+  speciesLabelByKey: Map<string, string>;
+  speciesLabels: string[];
   moveByName: Map<string, number>;
   moveNameById: Map<number, string>;
 } | null = null;
+
+export interface ScenarioSpeciesOption {
+  label: string;
+  species: number;
+  formIndex: number;
+}
+
+function speciesFormKey(species: number, formIndex: number): string {
+  return `${species}:${formIndex}`;
+}
+
+function formLabel(formName: string, formKey: string): string {
+  const explicit = formName.trim();
+  if (explicit) {
+    return explicit;
+  }
+  return formKey
+    .split("-")
+    .filter(Boolean)
+    .map(part => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+/** Build the staff picker from the fully initialized live registry, including every form. */
+export function buildScenarioSpeciesOptions(): ScenarioSpeciesOption[] {
+  const options: ScenarioSpeciesOption[] = [];
+  for (const species of allSpecies) {
+    if (!species?.name) {
+      continue;
+    }
+    options.push({ label: species.name, species: species.speciesId, formIndex: 0 });
+    species.forms?.forEach((form, formIndex) => {
+      if (!form?.formKey) {
+        return;
+      }
+      const suffix = formLabel(form.formName, form.formKey);
+      if (suffix) {
+        options.push({ label: `${species.name} (${suffix})`, species: species.speciesId, formIndex });
+      }
+    });
+  }
+  return options;
+}
 
 function getCatalogs() {
   if (catalogs) {
     return catalogs;
   }
-  const speciesByName = new Map<string, number>();
+  const speciesByName = new Map<string, ScenarioSpeciesOption>();
   const speciesNameById = new Map<number, string>();
-  for (const s of allSpecies) {
-    if (s?.name) {
-      speciesNameById.set(s.speciesId, s.name);
-      if (!speciesByName.has(s.name.toLowerCase())) {
-        speciesByName.set(s.name.toLowerCase(), s.speciesId);
-      }
+  const speciesLabelByKey = new Map<string, string>();
+  const speciesOptions = buildScenarioSpeciesOptions();
+  for (const option of speciesOptions) {
+    if (option.formIndex === 0 && !speciesNameById.has(option.species)) {
+      speciesNameById.set(option.species, option.label);
+    }
+    speciesLabelByKey.set(speciesFormKey(option.species, option.formIndex), option.label);
+    if (!speciesByName.has(option.label.toLowerCase())) {
+      speciesByName.set(option.label.toLowerCase(), option);
     }
   }
   const moveByName = new Map<string, number>();
@@ -82,7 +130,14 @@ function getCatalogs() {
       }
     }
   });
-  catalogs = { speciesByName, speciesNameById, moveByName, moveNameById };
+  catalogs = {
+    speciesByName,
+    speciesNameById,
+    speciesLabelByKey,
+    speciesLabels: speciesOptions.map(option => option.label),
+    moveByName,
+    moveNameById,
+  };
   return catalogs;
 }
 
@@ -100,11 +155,12 @@ function enumOptions(enumObj: Record<string, unknown>, noneLabel?: string): { la
 }
 
 function ensureDatalist(id: string, names: Iterable<string>): void {
-  if (document.getElementById(id)) {
-    return;
+  const existing = document.getElementById(id);
+  const dl = existing?.tagName === "DATALIST" ? (existing as HTMLDataListElement) : document.createElement("datalist");
+  dl.replaceChildren();
+  if (dl !== existing) {
+    dl.id = id;
   }
-  const dl = document.createElement("datalist");
-  dl.id = id;
   const frag = document.createDocumentFragment();
   for (const name of names) {
     const opt = document.createElement("option");
@@ -112,7 +168,11 @@ function ensureDatalist(id: string, names: Iterable<string>): void {
     frag.appendChild(opt);
   }
   dl.appendChild(frag);
-  document.body.appendChild(dl);
+  if (existing && dl !== existing) {
+    existing.replaceWith(dl);
+  } else if (!existing) {
+    document.body.appendChild(dl);
+  }
 }
 
 // --- tiny DOM helpers ----------------------------------------------------------
@@ -221,7 +281,7 @@ interface MonRow {
 }
 
 function monRow(index: number, withLevel: boolean): MonRow {
-  const { speciesNameById } = getCatalogs();
+  const { speciesLabelByKey, speciesNameById } = getCatalogs();
   const root = el("div", {
     display: "flex",
     flexWrap: "wrap",
@@ -230,8 +290,15 @@ function monRow(index: number, withLevel: boolean): MonRow {
     padding: "3px 0",
     borderBottom: "1px dashed #333",
   });
-  const species = textInput("130px", `mon ${index + 1} species`, "er-builder-species");
+  const species = textInput("180px", `mon ${index + 1} species or form`, "er-builder-species");
   const form = numInput("44px", "form");
+  species.addEventListener("change", () => {
+    const selected = getCatalogs().speciesByName.get(species.value.trim().toLowerCase());
+    if (selected) {
+      form.value = selected.formIndex > 0 ? String(selected.formIndex) : "";
+      species.style.borderColor = "#555";
+    }
+  });
   const ability = selectInput(
     [
       { label: "Ability 1", value: 0 },
@@ -266,9 +333,9 @@ function monRow(index: number, withLevel: boolean): MonRow {
       return null;
     }
     const { speciesByName, moveByName } = getCatalogs();
-    const id = speciesByName.get(name.toLowerCase());
-    species.style.borderColor = id === undefined ? "#c0392b" : "#555";
-    if (id === undefined) {
+    const selected = speciesByName.get(name.toLowerCase());
+    species.style.borderColor = selected === undefined ? "#c0392b" : "#555";
+    if (selected === undefined) {
       return null;
     }
     const moveIds: number[] = [];
@@ -287,8 +354,8 @@ function monRow(index: number, withLevel: boolean): MonRow {
     const shinyTier = Number(shiny.value);
     return {
       speciesName: name,
-      species: id,
-      formIndex: Number(form.value) || 0,
+      species: selected.species,
+      formIndex: form.value.trim() === "" ? selected.formIndex : Number(form.value) || 0,
       abilitySlot: Number(ability.value) || 0,
       nature: Number(nature.value) || 0,
       moves: moveIds.length > 0 ? moveIds : undefined,
@@ -299,7 +366,13 @@ function monRow(index: number, withLevel: boolean): MonRow {
     };
   };
   const fill = (mon: Partial<SpecEnemyMon>) => {
-    species.value = mon.species === undefined ? "" : (speciesNameById.get(mon.species) ?? String(mon.species));
+    const formIndex = mon.formIndex ?? 0;
+    species.value =
+      mon.species === undefined
+        ? ""
+        : (speciesLabelByKey.get(speciesFormKey(mon.species, formIndex))
+          ?? speciesNameById.get(mon.species)
+          ?? String(mon.species));
     form.value = mon.formIndex ? String(mon.formIndex) : "";
     ability.value = String(mon.abilitySlot ?? 0);
     nature.value = String(mon.nature ?? 0);
@@ -322,8 +395,11 @@ export function openScenarioBuilder(deps: BuilderDeps): void {
     return;
   }
   document.getElementById(PANEL_ID)?.remove();
-  const { speciesNameById, moveNameById } = getCatalogs();
-  ensureDatalist("er-builder-species", speciesNameById.values());
+  // Custom species and injected forms are registered during ER initialization.
+  // Rebuild on every open so an early/stale builder visit cannot permanently hide them.
+  catalogs = null;
+  const { speciesLabels, moveNameById } = getCatalogs();
+  ensureDatalist("er-builder-species", speciesLabels);
   ensureDatalist("er-builder-moves", moveNameById.values());
   ensureDatalist("er-builder-items", Object.keys(modifierTypes));
 
