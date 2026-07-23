@@ -1499,9 +1499,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     );
   });
 
-  // (H) SELF-SWITCH MIRROR is gated to the GUEST only: a BALL/RUN command on the guest's own slot is NOT a
-  // field-composition change, so the divert must NOT swap the party for it (those ride the host's outcome).
-  it("SELF-SWITCH MIRROR (#633): a non-POKEMON command on the guest's slot does NOT swap the party", async () => {
+  // (H) LOCAL COMMANDS ARE INTENT-ONLY: BALL/RUN cannot mutate the renderer before host authority arrives.
+  it("AUTHORITATIVE RENDERER (#633): a non-POKEMON command cannot mutate the guest field", async () => {
     const field = await startCoopGuest();
     const leadSpecies = field[COOP_GUEST_FIELD_INDEX].species.speciesId;
     const bench = globalScene.addPlayerPokemon(getPokemonSpecies(SpeciesId.PIKACHU), 5);

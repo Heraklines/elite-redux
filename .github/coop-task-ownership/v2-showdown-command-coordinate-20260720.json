@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "1b9abfa022e0690e2c2529bef733d959cecec27e",
+  "baseSha": "5ea4b0e9b69404055c998d9d4dd79622471cf375",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -63,6 +63,7 @@
     "test/tests/elite-redux/coop/coop-duo-fault.test.ts",
     "test/tests/elite-redux/coop/coop-duo-reward-reroll.test.ts",
     "test/tests/elite-redux/coop/coop-duo-seating.test.ts",
+    "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
     "test/tests/elite-redux/coop/coop-p33-mutation-victims.test.ts",
     "test/tests/elite-redux/coop/coop-renderer-allowlist.test.ts",
     "test/tests/elite-redux/coop/coop-session-controller.test.ts",
