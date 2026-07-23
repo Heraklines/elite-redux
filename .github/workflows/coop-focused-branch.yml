@@ -461,6 +461,13 @@ jobs:
         env:
           COOP_GATE_MANIFEST: coop-focused-assignment.json
           NODE_OPTIONS: --max-old-space-size=8192
+          # Focused shards qualify the same complete Authority V2 graph as the aggregate gate. Omitting
+          # these variables silently exercises legacy progression and turns V2 assertions into false reds.
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
         shell: bash
         run: |
           set +e

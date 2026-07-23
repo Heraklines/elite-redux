@@ -960,6 +960,10 @@ export class PublicUiClient {
       entryUrl.searchParams.set("coopfixture", "game-over");
     } else if (this.config.journey === "showdown-battle") {
       entryUrl.searchParams.set("coopfixture", "showdown-battle");
+      // Showdown remains deliberately disabled for ordinary players while the mode is under
+      // qualification. The dedicated exact-SHA journey must opt into the same public title path instead
+      // of timing out on the intentional "Temporarily disabled" message.
+      entryUrl.searchParams.set("enableShowdown", "1");
     }
     this.evidence.record("navigate", { url: entryUrl.origin });
     await this.page.goto(entryUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });

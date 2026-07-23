@@ -1777,3 +1777,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   planning before any test ran (`declared base d69346f... does not match resolved train base ff57332...`). The
   next exact batch is re-anchored to the current remote tip `8d7cedd34`; this preserves fail-closed ownership
   while allowing the planner to qualify only the new seven-file delta.
+
+# 2026-07-23 - exact qualification context repairs after the presentation audit
+
+- Full-gate `30005118269` on `e0cce81bd` exposed two non-product blockers: the focused shards had run without
+  any `COOP_AUTHORITY_V2_*` process flags, and `coop-duo-fault.test.ts` returned a numeric watcher token from
+  callbacks whose contract is `Promise<void>`. The focused engine job now enables turn, replacement, wave,
+  interaction, and recovery exactly like the aggregate gate; a source contract pins all five flags. The
+  watcher callbacks now await the token internally without leaking it through their return type.
+- Showdown journey `30005117992` never exercised Showdown. Both final screenshots showed the intentional
+  title message `Temporarily disabled. It will be back soon.` because the exact-SHA driver supplied its sealed
+  fixture but omitted the existing public `enableShowdown=1` override. Only the dedicated Showdown journey now
+  appends that query parameter; ordinary players remain disabled. A source contract scopes the override to the
+  exact journey before navigation.
+- Permitted local evidence: 15/15 public/workflow source contracts green, touched-path TypeScript filter empty,
+  scoped Biome has no errors (repository-baseline complexity infos only), and `git diff --check` clean. Co-op
+  engine and browser qualification remain GitHub-hosted per `AGENTS.md`.

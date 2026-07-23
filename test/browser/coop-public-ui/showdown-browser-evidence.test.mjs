@@ -74,6 +74,16 @@ test("Showdown setup exposes locale-independent semantic options with reciprocal
 });
 
 test("two public clients must prove one positive gameplay epoch before locking the wager", () => {
+  const open = harness.slice(
+    harness.indexOf("async open()"),
+    harness.indexOf("\n  async reopen()", harness.indexOf("async open()")),
+  );
+  assert.match(
+    open,
+    /this\.config\.journey === "showdown-battle"[\s\S]*entryUrl\.searchParams\.set\("coopfixture", "showdown-battle"\)[\s\S]*entryUrl\.searchParams\.set\("enableShowdown", "1"\)/u,
+    "the exact-SHA Showdown journey must opt into the intentionally disabled public mode before navigation",
+  );
+
   const enter = harness.slice(
     harness.indexOf("async enterShowdownLobby()"),
     harness.indexOf("\n  async waitForLobbyPlayer(", harness.indexOf("async enterShowdownLobby()")),

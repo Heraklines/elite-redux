@@ -80,6 +80,17 @@ test("focused aggregate requires static and isolated shard evidence", () => {
   assert.match(requiredJob, /test "\$BROWSER_RESULT" = success/u);
 });
 
+test("focused engine shards qualify the complete Authority V2 graph", () => {
+  const gateJob = job("gate", "focused-required");
+  for (const surface of ["TURN", "REPLACEMENT", "WAVE", "INTERACTION", "RECOVERY"]) {
+    assert.match(
+      gateJob,
+      new RegExp(`COOP_AUTHORITY_V2_${surface}: "on"`, "u"),
+      `focused shards must enable Authority V2 ${surface.toLowerCase()}`,
+    );
+  }
+});
+
 test("focused planner fails closed when more than five affected shards require coverage", () => {
   const impacted = [...impactLanes(["scripts/run-coop-gate.mjs"])].sort();
   assert.deepEqual(impacted, ["A", "B", "C", "P", "S", "T"]);
