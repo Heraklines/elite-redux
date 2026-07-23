@@ -1492,4 +1492,32 @@ describe("authority-v2 log", () => {
     expect(log.retained()[0].operationId).toBe("op-1");
     expect(delivered(sent)[0].operationId).toBe("op-1");
   });
+
+  it("retention immutability: nested successor addresses never alias or freeze caller-owned input", () => {
+    const log = makeLog(scheduler, sent);
+    const address = { materialKind: "command-open" as const, wave: 1, turn: 1, operationId: null };
+    const allowedControlAddresses = [address];
+    const nextControl: CoopNextControl = {
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: "op-nested-control",
+      epoch: 1,
+      wave: 1,
+      turn: 1,
+      allowedKinds: ["CONTROL_COMMIT"],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+      allowedControlAddresses,
+    };
+
+    log.commit(entryInput("op-nested-control", { nextControl }));
+
+    expect(Object.isFrozen(allowedControlAddresses)).toBe(false);
+    expect(Object.isFrozen(address)).toBe(false);
+    address.turn = 2;
+    const retainedControl = log.retained()[0].nextControl;
+    expect(retainedControl?.kind).toBe("AWAIT_SUCCESSOR");
+    if (retainedControl?.kind === "AWAIT_SUCCESSOR") {
+      expect(retainedControl.allowedControlAddresses?.[0]?.turn).toBe(1);
+    }
+  });
 });

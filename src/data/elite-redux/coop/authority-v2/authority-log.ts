@@ -1148,7 +1148,9 @@ function cloneEntry(entry: CoopAuthorityEntry): CoopAuthorityEntry {
     operationId: entry.operationId,
     kind: entry.kind,
     material: { digest: entry.material.digest, payload: clonePayload(entry.material.payload) },
-    nextControl: { ...entry.nextControl },
+    // Successor controls now contain nested address arrays. Clone the complete JSON value before
+    // deep-freezing retention so committing an entry neither freezes nor aliases caller-owned input.
+    nextControl: structuredClone(entry.nextControl),
     subsumes: [...entry.subsumes],
   };
 }
