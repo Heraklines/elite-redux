@@ -37,6 +37,7 @@ import {
   type CoopRecoveryTransactionDeps,
   createRecoveryTransaction,
 } from "#data/elite-redux/coop/authority-v2/recovery";
+import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import type {
   CoopRecoveryAppliedProofV2,
   CoopRecoveryBundle,
@@ -91,12 +92,16 @@ interface FakeLog extends CoopAuthorityLog {
 }
 
 function makeLog(frontier: number): FakeLog {
-  let current = frontier;
+  let received = frontier;
+  let applied = frontier;
+  let control = frontier;
   const adopted: number[] = [];
   return {
     commit(pending) {
-      current += 1;
-      return { ...pending, revision: current };
+      received += 1;
+      applied = received;
+      control = received;
+      return { ...pending, revision: received };
     },
     acceptReceipt() {
       return false;
@@ -107,27 +112,50 @@ function makeLog(frontier: number): FakeLog {
     admit() {
       return { kind: "admitted" };
     },
-    recordReplicaStage() {
+    recordReplicaStage(candidate, stage) {
+      if (
+        stage !== "controlInstalled"
+        || candidate.revision !== received
+        || applied !== received
+        || control !== received - 1
+      ) {
+        return false;
+      }
+      control = received;
       return true;
     },
     receivedThrough() {
-      return current;
+      return received;
     },
     appliedThrough() {
-      return current;
+      return applied;
     },
     controlInstalledThrough() {
-      return current;
+      return control;
     },
     adoptFrontier(revision) {
       adopted.push(revision);
-      current = revision;
+      received = revision;
+      applied = revision;
+      control = revision;
+    },
+    stageRecoveredFrontier(candidate) {
+      if (candidate.revision < control) {
+        return false;
+      }
+      adopted.push(candidate.revision);
+      received = candidate.revision;
+      applied = candidate.revision;
+      control = candidate.revision - 1;
+      return true;
     },
     dispose() {
       /* no-op */
     },
     setFrontier(revision) {
-      current = revision;
+      received = revision;
+      applied = revision;
+      control = revision;
     },
     adopted,
   };
@@ -200,7 +228,10 @@ function makeCtx(scheduler: CoopScheduler, cancellation: AbortSignal): CoopRunti
   };
 }
 
-const INSTALLED: CoopControlInstallResult = { kind: "installed", controlId: "ctrl-1" };
+const INSTALLED: CoopControlInstallResult = {
+  kind: "installed",
+  controlId: controlIdOf(COMMAND_CONTROL),
+};
 
 interface Harness {
   deps: CoopRecoveryTransactionDeps;
@@ -361,7 +392,7 @@ describe("authority-v2 recovery transaction", () => {
       requestId: "recovery-1",
       frontier: 12,
       materialDigest: "material-digest",
-      controlId: "ctrl-1",
+      controlId: controlIdOf(COMMAND_CONTROL),
     });
   });
 
@@ -415,7 +446,7 @@ describe("authority-v2 recovery transaction", () => {
     const h = makeHarness(async () => makeBundle(), {
       project: () =>
         actionable
-          ? { kind: "installed", controlId: "ctrl-1" }
+          ? { kind: "installed", controlId: controlIdOf(COMMAND_CONTROL) }
           : { kind: "deferred", reason: "real CommandPhase handler not started" },
     });
     const txn = createRecoveryTransaction(h.ctx, h.deps);
@@ -426,6 +457,9 @@ describe("authority-v2 recovery transaction", () => {
     }
     expect(h.project).toHaveBeenCalledTimes(1);
     expect(h.acknowledge).not.toHaveBeenCalled();
+    expect(h.log.receivedThrough(), "snapshot material is installed while its successor remains pending").toBe(12);
+    expect(h.log.appliedThrough()).toBe(12);
+    expect(h.log.controlInstalledThrough(), "a queued phase cannot advance the mechanical frontier").toBe(11);
     expect(h.deps.fence.state).toBe("held");
     expect(h.deps.fence.isCommandAdmissionFrozen()).toBe(true);
     expect(h.deps.fence.isControlSurfaceStartFrozen()).toBe(false);
@@ -435,7 +469,20 @@ describe("authority-v2 recovery transaction", () => {
     expect(await running).toBe("recovered");
     expect(h.project).toHaveBeenCalledTimes(2);
     expect(h.acknowledge).toHaveBeenCalledTimes(1);
+    expect(h.log.controlInstalledThrough()).toBe(12);
     expect(h.deps.fence.state).toBe("open");
+  });
+
+  it("terminalizes when the projector claims a different control identity", async () => {
+    const h = makeHarness(async () => makeBundle(), {
+      projectResult: { kind: "installed", controlId: "wrong-control" },
+    });
+    const txn = createRecoveryTransaction(h.ctx, h.deps);
+
+    expect(await txn.run()).toBe("terminalized");
+    expect(h.deps.fence.terminalReason).toContain("expected");
+    expect(h.log.controlInstalledThrough()).toBe(11);
+    expect(h.acknowledge).not.toHaveBeenCalled();
   });
 
   it("terminalizes (never applies) when the frontier advances elsewhere mid-request", async () => {

@@ -955,6 +955,41 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
   }
 
+  /**
+   * Recovery replica seam: the snapshot proved canonical material through this exact immutable entry, but
+   * recovery replaced the phase generation, so its successor is not yet installed. Keep the final revision
+   * in the ordinary pending-entry slot and leave control one behind until recordReplicaStage proves it.
+   */
+  stageRecoveredFrontier(entry: CoopAuthorityEntry): boolean {
+    if (this.disposed || !isValidAuthorityEntry(entry) || !isSameSessionIdentity(entry.context, this.localContext)) {
+      return false;
+    }
+    const authorityPeer = this.peerBindings.find(peer => peer.seatId === entry.context.authoritySeatId);
+    if (
+      entry.context.sessionEpoch !== this.localContext.sessionEpoch
+      || entry.context.membershipRevision !== this.localContext.membershipRevision
+      || entry.context.authoritySeatId !== this.localContext.authoritySeatId
+      || entry.context.senderSeatId !== entry.context.authoritySeatId
+      || this.localContext.senderSeatId === this.localContext.authoritySeatId
+      || authorityPeer == null
+      || entry.context.connectionGeneration !== authorityPeer.connectionGeneration
+      || !this.ledger.adoptRecoveryMaterialFrontier(entry.revision)
+    ) {
+      return false;
+    }
+    this.pendingReplicaEntry = freezeAuthorityEntry(cloneEntry(entry));
+    this.pendingReplicaSuccessorControl = null;
+    this.latestCommittedOperationId = entry.operationId;
+    this.latestNextControl = structuredClone(entry.nextControl);
+    if (this.pendingTailRequestFrom != null && entry.revision >= this.pendingTailRequestFrom) {
+      this.pendingTailRequestFrom = null;
+    }
+    if (entry.revision > this.headRevision) {
+      this.headRevision = entry.revision;
+    }
+    return true;
+  }
+
   /** Dispose every timer/lease this log owns (teardown): zero orphan timers, zero leases. */
   dispose(_reason: string): void {
     if (this.disposed) {

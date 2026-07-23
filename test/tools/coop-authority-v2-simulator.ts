@@ -484,6 +484,14 @@ export class RefAuthorityLog implements CoopAuthorityLog {
     }
   }
 
+  stageRecoveredFrontier(entry: CoopAuthorityEntry): boolean {
+    if (entry.revision < this.frontier) {
+      return false;
+    }
+    this.frontier = entry.revision;
+    return true;
+  }
+
   dispose(_reason: string): void {
     this.disposed = true;
     this.committed.length = 0;

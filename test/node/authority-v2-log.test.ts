@@ -1357,6 +1357,28 @@ describe("authority-v2 log", () => {
     expect(log.admit(fullEntry(8, "op-wave", { kind: "WAVE_ADVANCE" }))).toEqual({ kind: "admitted" });
   });
 
+  it("keeps a recovered frontier control-pending until the exact ordinary stage proof", () => {
+    const log = makeReplicaLog(scheduler, sent);
+    const recovered = fullEntry(7, "op-recovered", {
+      nextControl: successorWait("op-recovered", ["WAVE_ADVANCE"]),
+    });
+
+    // Even an equal frontier must reopen control: recovery destroyed the old phase generation.
+    log.adoptFrontier(7, { operationId: recovered.operationId, nextControl: recovered.nextControl });
+    expect(log.stageRecoveredFrontier(recovered)).toBe(true);
+    expect(log.receivedThrough()).toBe(7);
+    expect(log.appliedThrough()).toBe(7);
+    expect(log.controlInstalledThrough()).toBe(6);
+    expect(log.admit(fullEntry(8, "op-too-early", { kind: "WAVE_ADVANCE" }))).toEqual({
+      kind: "gap",
+      missingFrom: 7,
+    });
+
+    expect(log.recordReplicaStage(recovered, "controlInstalled")).toBe(true);
+    expect(log.controlInstalledThrough()).toBe(7);
+    expect(log.admit(fullEntry(8, "op-wave", { kind: "WAVE_ADVANCE" }))).toEqual({ kind: "admitted" });
+  });
+
   it("refuses a recovery slice with an impossible hole or a frontier ahead of authority", () => {
     const log = makeLog(scheduler, sent);
     const first = log.commit(entryInput("op-recovery-hole-1"));

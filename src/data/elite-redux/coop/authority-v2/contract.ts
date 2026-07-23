@@ -216,6 +216,12 @@ export interface CoopAuthorityLog {
     revision: number,
     terminal?: { readonly operationId: string; readonly nextControl: CoopNextControl },
   ): void;
+  /**
+   * REPLICA recovery: install the exact reconstructed frontier as material-applied but control-pending.
+   * The caller must use recordReplicaStage(entry, "controlInstalled") only after the ordinary projector
+   * proves that entry's successor is actionable.
+   */
+  stageRecoveredFrontier(entry: CoopAuthorityEntry): boolean;
   /** BOTH: dispose every timer/lease this log owns. */
   dispose(reason: string): void;
 }

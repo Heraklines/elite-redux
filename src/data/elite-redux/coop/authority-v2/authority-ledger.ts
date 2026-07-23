@@ -140,6 +140,23 @@ export class AuthorityLedger {
       this.controlCursor = revision;
     }
   }
+
+  /**
+   * Recovery-only adoption after a canonical snapshot has applied but before its reconstructed successor is
+   * actionable. Receipt and material truth move to `revision`; control deliberately remains one revision
+   * behind until the ordinary projector proves the exact final entry's successor. This may reopen the
+   * already-complete current frontier because recovery destroys that old phase generation and must prove
+   * the replacement generation, not inherit a stale control claim.
+   */
+  adoptRecoveryMaterialFrontier(revision: number): boolean {
+    if (!Number.isSafeInteger(revision) || revision <= 0 || revision < this.controlCursor) {
+      return false;
+    }
+    this.receivedCursor = revision;
+    this.materialCursor = revision;
+    this.controlCursor = revision - 1;
+    return true;
+  }
 }
 
 /**

@@ -11,7 +11,8 @@
 //
 //   acquire fence -> capture frontier -> request (AbortSignal-aware, scheduler-
 //   timed on the "recovery" time class) -> validate -> apply material ->
-//   adoptFrontier -> project nextControl -> ACK -> release.
+//   stage the material frontier with control pending -> project and prove the
+//   exact nextControl -> advance the ordinary control frontier -> ACK -> release.
 //
 // The fence is acquired BEFORE the request (the v1 defect was fencing AFTER the
 // network result, letting local progression stale the snapshot the protocol
@@ -43,6 +44,7 @@ import type {
   CoopRuntimeContext,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import type {
   CoopRecoveryAppliedProofV2,
   CoopRecoveryBundle,
@@ -302,11 +304,19 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
       if (frontierOperationId != null && frontierControl == null) {
         return this.terminalize("non-empty recovery frontier has no successor control");
       }
-      const terminal =
-        frontierOperationId == null || frontierControl == null
-          ? undefined
-          : { operationId: frontierOperationId, nextControl: frontierControl };
-      this.deps.log.adoptFrontier(bundle.frontier, terminal);
+      if (frontierOperationId != null && frontierControl != null) {
+        const frontierEntry = bundle.requiredTail.at(-1);
+        if (
+          frontierEntry == null
+          || frontierEntry.revision !== bundle.frontier
+          || frontierEntry.operationId !== frontierOperationId
+          || !this.deps.log.stageRecoveredFrontier(frontierEntry)
+        ) {
+          return this.terminalize("ordinary authority log refused the material-applied recovery frontier");
+        }
+      } else {
+        this.deps.log.adoptFrontier(bundle.frontier);
+      }
     } catch (error) {
       return this.terminalize(`adoptFrontier threw: ${describeError(error)}`);
     }
@@ -327,6 +337,10 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
       return this.terminalize(control.reason);
     }
     if (bundle.nextControl != null) {
+      const frontierEntry = bundle.requiredTail.at(-1);
+      if (frontierEntry == null || !this.deps.log.recordReplicaStage(frontierEntry, "controlInstalled")) {
+        return this.terminalize("ordinary authority log refused the recovered control proof");
+      }
       this.enter("control-installed");
     }
 
@@ -403,6 +417,17 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
         return { ok: false, reason: `control projection threw: ${describeError(error)}` };
       }
       if (result.kind === "installed" || result.kind === "already-installed") {
+        const operationId = bundle.frontierOperationId;
+        if (operationId == null) {
+          return { ok: false, reason: "control projection installed without a frontier operation" };
+        }
+        const expectedControlId = controlIdOf(bundle.nextControl);
+        if (result.controlId !== expectedControlId) {
+          return {
+            ok: false,
+            reason: `control projection proved ${result.controlId}, expected ${expectedControlId}`,
+          };
+        }
         return { ok: true, controlId: result.controlId };
       }
       if (result.kind === "rejected") {
