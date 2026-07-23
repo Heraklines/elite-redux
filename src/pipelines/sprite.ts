@@ -58,12 +58,15 @@ export class SpritePipeline extends FieldSpritePipeline {
       position[0] += field.x / field.scale;
       position[1] += field.y / field.scale;
     }
-    position[0] +=
-      -(sprite.width - sprite.frame.width) / 2 + sprite.frame.x + (ignoreFieldPos ? 0 : sprite.x - field.x);
+    // Switch animations can detach a sprite from its field container between the
+    // display-list update and the WebGL batch.  Rendering that one frame must not
+    // tear down the whole battle renderer; a detached sprite is already expressed
+    // in its own coordinates, so there is no field-relative offset to apply.
+    const fieldRelativeX = ignoreFieldPos || field == null ? 0 : sprite.x - field.x;
+    const fieldRelativeY = ignoreFieldPos || field == null ? 0 : sprite.y - field.y;
+    position[0] += -(sprite.width - sprite.frame.width) / 2 + sprite.frame.x + fieldRelativeX;
     if (sprite.originY === 0.5) {
-      position[1] +=
-        (sprite.height / 2) * ((isEntityObj ? sprite.parentContainer : sprite).scale - 1)
-        + (ignoreFieldPos ? 0 : sprite.y - field.y);
+      position[1] += (sprite.height / 2) * ((isEntityObj ? sprite.parentContainer : sprite).scale - 1) + fieldRelativeY;
     }
     this.set1f("teraTime", (this.game.getTime() % 500000) / 500000)
       .set3fv(

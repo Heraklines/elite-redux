@@ -12,21 +12,35 @@ import { presentationEventView } from "./evidence.mjs";
 const root = resolve(import.meta.dirname, "../../..");
 const read = path => readFile(resolve(root, path), "utf8");
 
-const [workflow, config, journeys, harness, observer, evidence, recorder, registry, title, replay, stream, transport] =
-  await Promise.all([
-    read(".github/workflows/coop-public-ui-journey.yml"),
-    read("test/browser/coop-public-ui/config.mjs"),
-    read("test/browser/coop-public-ui/journeys.mjs"),
-    read("test/browser/coop-public-ui/public-ui-harness.mjs"),
-    read("scripts/coop-browser-entry.ts"),
-    read("test/browser/coop-public-ui/evidence.mjs"),
-    read("src/data/elite-redux/coop/coop-turn-recorder.ts"),
-    read("src/dev-tools/registry.ts"),
-    read("src/phases/title-phase.ts"),
-    read("src/phases/coop-replay-turn-phase.ts"),
-    read("src/data/elite-redux/coop/coop-battle-stream.ts"),
-    read("src/data/elite-redux/coop/coop-transport.ts"),
-  ]);
+const [
+  workflow,
+  config,
+  journeys,
+  harness,
+  observer,
+  evidence,
+  recorder,
+  registry,
+  title,
+  replay,
+  stream,
+  transport,
+  sprite,
+] = await Promise.all([
+  read(".github/workflows/coop-public-ui-journey.yml"),
+  read("test/browser/coop-public-ui/config.mjs"),
+  read("test/browser/coop-public-ui/journeys.mjs"),
+  read("test/browser/coop-public-ui/public-ui-harness.mjs"),
+  read("scripts/coop-browser-entry.ts"),
+  read("test/browser/coop-public-ui/evidence.mjs"),
+  read("src/data/elite-redux/coop/coop-turn-recorder.ts"),
+  read("src/dev-tools/registry.ts"),
+  read("src/phases/title-phase.ts"),
+  read("src/phases/coop-replay-turn-phase.ts"),
+  read("src/data/elite-redux/coop/coop-battle-stream.ts"),
+  read("src/data/elite-redux/coop/coop-transport.ts"),
+  read("src/pipelines/sprite.ts"),
+]);
 
 test("the exact-SHA workflow exposes and seals a dedicated Showdown battle journey", () => {
   assert.match(workflow, /options:[\s\S]*- showdown-battle/u);
@@ -217,6 +231,12 @@ test("the real-browser oracle compares every authority event to a completed cano
   assert.match(harness, /pending\.size === 1 && submittedCommandAddress != null/u);
   assert.match(harness, /presentation-before-final-command/u);
   assert.match(harness, /presentationCursors \?\?= beforeSubmissionCursors/u);
+});
+
+test("a switch sprite detached during a WebGL batch cannot crash either battle renderer", () => {
+  assert.match(sprite, /const fieldRelativeX = ignoreFieldPos \|\| field == null \? 0 : sprite\.x - field\.x/u);
+  assert.match(sprite, /const fieldRelativeY = ignoreFieldPos \|\| field == null \? 0 : sprite\.y - field\.y/u);
+  assert.doesNotMatch(sprite, /ignoreFieldPos \? 0 : sprite\.[xy] - field\.[xy]/u);
 });
 
 test("presentation receipts reject malformed or unknown event identities", () => {

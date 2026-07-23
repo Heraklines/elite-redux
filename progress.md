@@ -2106,3 +2106,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The public duo command helper's legacy `restartAlreadyOpenHost` option is now idempotent. `buildDuo` already
   adopts and re-enters the pre-pair host command; starting that live menu again after guest arrival reset it to
   MESSAGE and manufactured the shared P1/P2/reward/multiwave “stuck at CommandPhase” signature.
+
+# 2026-07-23 - Showdown reciprocal-switch renderer lifetime closure
+
+- Exact two-browser Showdown run `30039682544` at `52fa909b3` proved the authoritative presentation stream
+  delivered the complete ordered sequence on the replica: weather, message, ability, switch, ability,
+  message, stat-stage, switch (seq 0-7). The authority then raised `Cannot read properties of null (reading
+  'x')` in `SpritePipeline.onBind` while its second `SwitchSummonPhase` temporarily detached a sprite from
+  the field container. The host screenshot had lost the local battler/HUD while the guest showed both
+  Arcanine and the Intimidate message.
+- `SpritePipeline` now treats a temporarily detached sprite as already expressed in its own coordinates and
+  applies no field-relative offset for that batch. A fast Showdown source contract forbids reintroducing an
+  unconditional `field.x`/`field.y` dereference. The contract is 10/10 green; scoped Biome has only existing
+  informational findings and `git diff --check` is clean.
+- Next: dispatch the exact two-browser `showdown-battle` journey on the fixed SHA and visually inspect both
+  post-switch screenshots. Co-op Vitest and browsers remain remote-only under `AGENTS.md`.

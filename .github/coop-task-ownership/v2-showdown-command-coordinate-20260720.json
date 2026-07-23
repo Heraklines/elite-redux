@@ -53,6 +53,7 @@
     "src/phases/toggle-double-position-phase.ts",
     "src/phases/turn-init-phase.ts",
     "src/phases/turn-start-phase.ts",
+    "src/pipelines/sprite.ts",
     "src/queues/post-summon-phase-priority-queue.ts",
     "src/system/game-data.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
