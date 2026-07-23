@@ -1959,3 +1959,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   parked at MESSAGE. Both Mystery journey variants now submit both seats through the shared public UI driver.
 - The source migration contract now covers both long production-transition suites, preventing a future helper
   refactor from silently restoring private battle input to either biome or Mystery coverage.
+
+# 2026-07-23 - Mystery reward-handoff peer pump
+
+- B9's first Mystery failure showed the replica had correctly installed ME_PRESENT, buffered later revisions,
+  and sent a tail request while its replay waited for the embedded reward successor. The one-process helper
+  pumped only the guest, so the queued request never reached the host and it declared the replay stranded.
+- `startGuestMeShopOwner` now derives the registered authority context and services that peer between guest
+  drains by default. This models the two independent browser event loops and closes the documented pumpPeer
+  tail without requiring every caller to remember bespoke wiring.

@@ -163,6 +163,10 @@ test("production-transition fixtures use public commands and terminal teardown c
 
   assert.match(harness, /options\.submitHostTackle[\s\S]+host selects Fight through COMMAND UI/u);
   assert.match(harness, /prev\.runtime\.localTransport\.state !== "closed"/u);
+  assert.match(
+    harness,
+    /startGuestMeShopOwner[\s\S]+peerContextByScene\.get\(guestScene\)[\s\S]+withClient\(peerCtx, \(\) => drainLoopback\(\)\)/u,
+  );
   assert.doesNotMatch(
     harness,
     /for \(const runtime of \[rig\.guestRuntime, rig\.hostRuntime\]\) \{\s*if \(runtime\.localTransport\.state === "closed"\)/u,

@@ -4445,6 +4445,8 @@ export async function startGuestMeShopOwner(
   guestScene: BattleScene,
   options: { pumpPeer?: () => Promise<void> } = {},
 ): Promise<ShopPhaseSeam> {
+  const peerCtx = peerContextByScene.get(guestScene);
+  const pumpPeer = options.pumpPeer ?? (peerCtx == null ? undefined : () => withClient(peerCtx, () => drainLoopback()));
   // The already-running replay owns its asynchronous handoff. Drain it without re-entering start() until
   // it yields to a production-queued successor; then let the cooperative scheduler execute every real
   // wrapper/interstitial on the way to the shop. Run 29673971204 proved MysteryEncounterRewardsPhase may
@@ -4459,7 +4461,7 @@ export async function startGuestMeShopOwner(
     // browser and cannot be consumed by another guest-only pump. Give the caller the exact reciprocal
     // scheduler edge, then return to the guest on the next iteration to admit the re-delivered ME terminal.
     // Two real browsers execute these event loops concurrently; the one-process fixture must alternate them.
-    await options.pumpPeer?.();
+    await pumpPeer?.();
   }
 
   const current = guestScene.phaseManager.getCurrentPhase();
