@@ -45,8 +45,20 @@ test("healing is an authority-authored presentation and every event kind is exha
     /public heal\([\s\S]+healAmount > 0 && isCoopRecording\(\)[\s\S]+recordCoopEvent\(\{\s*k: "hp"/u,
   );
   assert.match(replayPhases, /const healing = toHp > fromHp[\s\S]+CommonBattleAnim\(CommonAnim\.HEALTH_UP, mon\)/u);
-  assert.match(replayPhases, /healing \? HitResult\.HEAL : HitResult\.EFFECTIVE/u);
+  assert.match(replayPhases, /damageNumberHandler\.add\(mon, amount, HitResult\.HEAL, false\)/u);
   assert.match(replay, /const unhandledEvent: never = event/u);
+});
+
+test("damage effectiveness and critical presentation are authority-authored end to end", () => {
+  const pokemon = read("src/field/pokemon.ts");
+  const transport = read("src/data/elite-redux/coop/coop-transport.ts");
+  const replay = read("src/phases/coop-replay-phases.ts");
+
+  assert.match(pokemon, /presentationResult[\s\S]+result: presentationResult, critical: presentationCritical/u);
+  assert.match(transport, /result\?: number; critical\?: boolean/u);
+  assert.match(replay, /damageNumberHandler\.add\(mon, amount, damageResult, this\.critical\)/u);
+  assert.match(replay, /HitResult\.SUPER_EFFECTIVE[\s\S]+playSound\("se\/hit_strong"\)/u);
+  assert.match(replay, /repeat:\s*5[\s\S]+setVisible/u);
 });
 
 test("ordinary co-op and Showdown both replay retained entry presentation before command input", () => {
@@ -109,7 +121,7 @@ test("live replacement material cannot omit the immutable presentation result", 
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-45"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-46"/u);
 });
 
 test("every co-op renderer boundary triggers the production two-browser journey", () => {

@@ -130,6 +130,7 @@ import { TrainerSlot } from "#enums/trainer-slot";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { PokemonPhase } from "#phases/pokemon-phase";
+import type { DamageResult } from "#types/damage-result";
 import { fixedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
@@ -385,8 +386,8 @@ export class CoopMoveAnimReplayPhase extends Phase {
 /**
  * GUEST: animate the HP bar to the host's authoritative post-mutation value for an `hp` event (#633).
  * The same immutable event represents damage (`toHp < fromHp`) and healing (`toHp > fromHp`). Damage
- * renders the standard hit cue; healing renders HEALTH_UP followed by the green amount, matching the
- * host's PokemonHealPhase ordering. The guest never computes an amount or result from mechanics. It
+ * renders the authority-resolved hit cue; healing renders HEALTH_UP followed by the green amount,
+ * matching the host's PokemonHealPhase ordering. The guest never computes an amount or result from mechanics. It
  * ENDS at the host's hp, identical to the checkpoint, so the next turn's checksum is unaffected. The
  * pre-mutation hp is baked in at replay time (before the checkpoint snaps) so the change is visible.
  */
@@ -399,6 +400,8 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
     private readonly toHp: number,
     private readonly maxHp: number,
     private readonly sp?: number,
+    private readonly result?: number,
+    private readonly critical = false,
   ) {
     super(battlerIndex);
   }
@@ -432,12 +435,21 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
       let ended = false;
       let settling = false;
       let watchdog: Phaser.Time.TimerEvent | undefined;
+      let flashTimer: Phaser.Time.TimerEvent | undefined;
+      let invertTimer: Phaser.Time.TimerEvent | undefined;
+      let inverted = false;
       const finish = () => {
         if (ended) {
           return;
         }
         ended = true;
         watchdog?.remove();
+        flashTimer?.remove();
+        invertTimer?.remove();
+        if (inverted) {
+          inverted = false;
+          globalScene.toggleInvert(false);
+        }
         this.end();
       };
       const finishAtAuthority = (instant = false) => {
@@ -454,6 +466,7 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
         }
         mon.hp = toHp;
         try {
+          mon.getSprite().setVisible(true);
           // Best-effort redraw only: a hung/rejected UI promise must not defeat the phase watchdog.
           void mon.updateInfo(true);
         } finally {
@@ -473,12 +486,12 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
       mon.hp = fromHp;
       watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, forceFinishAtAuthority);
 
-      const renderAuthoritativeAmount = () => {
+      const renderHealing = () => {
         if (ended || settling) {
           return;
         }
         if (amount > 0) {
-          globalScene.damageNumberHandler.add(mon, amount, healing ? HitResult.HEAL : HitResult.EFFECTIVE, false);
+          globalScene.damageNumberHandler.add(mon, amount, HitResult.HEAL, false);
         }
         finishAtAuthority();
       };
@@ -486,13 +499,65 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
       if (healing) {
         // PokemonHealPhase plays HEALTH_UP first, then mutates HP and shows the green number. Reproduce
         // that presentation only; the amount and final HP remain authority-authored values.
-        new CommonBattleAnim(CommonAnim.HEALTH_UP, mon).play(false, renderAuthoritativeAmount);
+        new CommonBattleAnim(CommonAnim.HEALTH_UP, mon).play(false, renderHealing);
         return;
       }
-      if (amount > 0) {
-        globalScene.playSound("se/hit");
+
+      const damageResult = (this.result ?? HitResult.EFFECTIVE) as DamageResult;
+      const renderDamage = () => {
+        if (ended || settling) {
+          return;
+        }
+        switch (damageResult) {
+          case HitResult.EFFECTIVE:
+          case HitResult.CONFUSION:
+            globalScene.playSound("se/hit");
+            break;
+          case HitResult.SUPER_EFFECTIVE:
+          case HitResult.INDIRECT_KO:
+          case HitResult.ONE_HIT_KO:
+            globalScene.playSound("se/hit_strong");
+            break;
+          case HitResult.NOT_VERY_EFFECTIVE:
+            globalScene.playSound("se/hit_weak");
+            break;
+        }
+        if (amount > 0) {
+          globalScene.damageNumberHandler.add(mon, amount, damageResult, this.critical);
+        }
+        mon.hp = toHp;
+        if (damageResult === HitResult.INDIRECT || amount === 0) {
+          finishAtAuthority();
+          return;
+        }
+        flashTimer = globalScene.time.addEvent({
+          delay: 100,
+          repeat: 5,
+          startAt: 200,
+          callback: () => {
+            const repeatCount = flashTimer?.repeatCount ?? 0;
+            mon.getSprite().setVisible(repeatCount % 2 === 0);
+            if (!repeatCount) {
+              finishAtAuthority();
+            }
+          },
+        });
+      };
+
+      if (damageResult === HitResult.ONE_HIT_KO || damageResult === HitResult.INDIRECT_KO) {
+        inverted = true;
+        globalScene.toggleInvert(true);
+        invertTimer = globalScene.time.delayedCall(fixedInt(1000), () => {
+          if (ended) {
+            return;
+          }
+          inverted = false;
+          globalScene.toggleInvert(false);
+          renderDamage();
+        });
+        return;
       }
-      renderAuthoritativeAmount();
+      renderDamage();
     } catch {
       // A bad hp value / missing sprite must never strand the queue. The deferred checkpoint still
       // installs the authoritative state after this presentation phase ends.

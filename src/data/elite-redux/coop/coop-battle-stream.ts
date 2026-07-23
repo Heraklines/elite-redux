@@ -384,6 +384,9 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
         && isFiniteNumber(event.maxHp)
         && event.maxHp > 0
         && (event.sp === undefined || isFiniteNumber(event.sp))
+        && (event.result === undefined || [1, 2, 3, 4, 10, 12, 13].includes(event.result as number))
+        && (event.critical === undefined || typeof event.critical === "boolean")
+        && (event.result === undefined) === (event.critical === undefined)
       );
     case "faint":
       return (

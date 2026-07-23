@@ -729,6 +729,73 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
   });
 
+  it("records the authority-resolved effectiveness and critical presentation on direct damage", async () => {
+    const field = await startCoopHost();
+    const pokemon = field[COOP_HOST_FIELD_INDEX];
+    const fromHp = pokemon.hp;
+
+    beginCoopRecording(globalScene.currentBattle.turn, "damage-presentation");
+    pokemon.damageAndUpdate(7, { result: HitResult.SUPER_EFFECTIVE, isCritical: true });
+    const recording = endCoopRecording();
+
+    expect(recording.events).toContainEqual({
+      k: "hp",
+      bi: pokemon.getBattlerIndex(),
+      hp: fromHp - 7,
+      maxHp: pokemon.getMaxHp(),
+      sp: pokemon.species.speciesId,
+      result: HitResult.SUPER_EFFECTIVE,
+      critical: true,
+    });
+  });
+
+  it("replays the authority-resolved strong critical cue instead of a generic hit", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[COOP_HOST_FIELD_INDEX];
+    const maxHp = pokemon.getMaxHp();
+    const fromHp = maxHp;
+    const toHp = maxHp - 7;
+    pokemon.hp = fromHp;
+    globalScene.moveAnimations = true;
+
+    const soundSpy = vi.spyOn(globalScene, "playSound").mockImplementation(() => null as never);
+    const numberSpy = vi.spyOn(globalScene.damageNumberHandler, "add").mockImplementation(() => {});
+    const updateSpy = vi.spyOn(pokemon, "updateInfo").mockResolvedValue(undefined);
+    let flashCallback: (() => void) | undefined;
+    const flashTimer = { repeatCount: 5, remove: vi.fn() };
+    const addEventSpy = vi.spyOn(globalScene.time, "addEvent").mockImplementation(config => {
+      flashCallback = config.callback as () => void;
+      return flashTimer as never;
+    });
+    const phase = new CoopHpDrainReplayPhase(
+      pokemon.getBattlerIndex(),
+      fromHp,
+      toHp,
+      maxHp,
+      pokemon.species.speciesId,
+      HitResult.SUPER_EFFECTIVE,
+      true,
+    );
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+    expect(soundSpy).toHaveBeenCalledWith("se/hit_strong");
+    expect(numberSpy).toHaveBeenCalledWith(pokemon, 7, HitResult.SUPER_EFFECTIVE, true);
+    expect(endSpy, "the host-equivalent hit flash still owns presentation completion").not.toHaveBeenCalled();
+    flashTimer.repeatCount = 0;
+    flashCallback?.();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(pokemon.hp).toBe(toHp);
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(endSpy).toHaveBeenCalledTimes(1);
+
+    soundSpy.mockRestore();
+    numberSpy.mockRestore();
+    updateSpy.mockRestore();
+    addEventSpy.mockRestore();
+    endSpy.mockRestore();
+  });
+
   it("(Step 2) an upward HP event plays HEALTH_UP, shows a green amount, and finishes at authority HP", async () => {
     const field = await startCoopGuest();
     const pokemon = field[COOP_HOST_FIELD_INDEX];

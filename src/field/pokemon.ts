@@ -5903,7 +5903,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   // TODO: Rework this to use an object for the optional parameters
   // TODO: Remove uses of this outside of the `Pokemon` class and subclasses and change to `protected`
   // Known violators: Pain Split, Status effect code
-  damage(damage: number, _ignoreSegments = false, preventEndure = false, ignoreFaintPhase = false): number {
+  damage(
+    damage: number,
+    _ignoreSegments = false,
+    preventEndure = false,
+    ignoreFaintPhase = false,
+    presentationResult?: DamageResult,
+    presentationCritical = false,
+  ): number {
     if (this.isFainted()) {
       return 0;
     }
@@ -5975,6 +5982,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         hp: this.hp,
         maxHp: this.getMaxHp(),
         sp: this.species?.speciesId ?? 0,
+        ...(presentationResult === undefined ? {} : { result: presentationResult, critical: presentationCritical }),
       });
       if (this.isFainted()) {
         // #691 (host-language leak): carry `narrate` = whether the host shows an "X fainted!" message for
@@ -6075,7 +6083,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!isIndirectDamage && source && damage > 0 && this.hp - damage <= 0 && tryCrackedVessel(this, source)) {
       damage = this.hp - 1;
     }
-    damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase);
+    damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase, result, isCritical);
     erRecordAchievementDamageAndUpdate(this, damage, source, isIndirectDamage ? "indirect" : "direct");
     // Damage amount may have changed, but needed to be queued before calling damage function
     damagePhase.updateAmount(damage);
@@ -9751,7 +9759,14 @@ export class EnemyPokemon extends Pokemon {
    * @inheritdoc
    * @param ignoreSegments - Whether to ignore boss segments when applying damage
    */
-  public damage(damage: number, ignoreSegments = false, preventEndure = false, ignoreFaintPhase = false): number {
+  public damage(
+    damage: number,
+    ignoreSegments = false,
+    preventEndure = false,
+    ignoreFaintPhase = false,
+    presentationResult?: DamageResult,
+    presentationCritical = false,
+  ): number {
     if (this.isFainted()) {
       return 0;
     }
@@ -9791,7 +9806,14 @@ export class EnemyPokemon extends Pokemon {
       damage = Math.min(damage, this.hp - 1);
     }
 
-    const ret = super.damage(damage, ignoreSegments, preventEndure, ignoreFaintPhase);
+    const ret = super.damage(
+      damage,
+      ignoreSegments,
+      preventEndure,
+      ignoreFaintPhase,
+      presentationResult,
+      presentationCritical,
+    );
 
     if (this.isBoss()) {
       if (ignoreSegments) {

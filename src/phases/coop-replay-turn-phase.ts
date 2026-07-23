@@ -1228,7 +1228,16 @@ export class CoopReplayTurnPhase extends Phase {
               ? (fromHpByBi.get(event.bi) ?? event.hp)
               : (globalScene.getField()[event.bi]?.hp ?? event.hp);
             fromHpByBi.set(event.bi, event.hp);
-            pm.unshiftNew("CoopHpDrainReplayPhase", event.bi, seeded, event.hp, event.maxHp, event.sp);
+            pm.unshiftNew(
+              "CoopHpDrainReplayPhase",
+              event.bi,
+              seeded,
+              event.hp,
+              event.maxHp,
+              event.sp,
+              event.result,
+              event.critical,
+            );
             break;
           }
           case "statStage":

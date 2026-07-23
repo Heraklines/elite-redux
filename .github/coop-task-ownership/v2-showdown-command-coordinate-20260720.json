@@ -90,5 +90,7 @@
     "test/tools/repro-triple-battle-bugs.test.ts",
     "test/visual/rich-notification-qa.mjs"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ]
 }

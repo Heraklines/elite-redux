@@ -129,7 +129,10 @@ export type CoopRole = "host" | "guest";
 // er-coop-45 makes switch presentation an immutable identity-bearing event and attaches the exact
 // replacement summon to REPLACEMENT_COMMIT. A protocol-44 renderer only snaps the post-switch checkpoint
 // and can falsely call that presentation-ready, so mixed builds must refuse pairing.
-export const COOP_PROTOCOL_VERSION = "er-coop-45";
+// er-coop-46 carries the authority-resolved damage result and critical flag on HP presentation events.
+// A protocol-45 renderer would turn strong/weak/critical/OHKO/indirect hits into the generic hit cue, so
+// mixed builds must refuse pairing instead of silently presenting a different battle.
+export const COOP_PROTOCOL_VERSION = "er-coop-46";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1071,8 +1074,8 @@ export type CoopBattleEvent =
   | { k: "message"; text: string }
   /** A mon used a move (cue the "X used Y!" + move animation). */
   | { k: "moveUsed"; bi: number; moveId: number; targets: number[] }
-  /** Set + tween a mon's hp to this value. */
-  | { k: "hp"; bi: number; hp: number; maxHp: number; sp?: number }
+  /** Set + tween a mon's hp to this value using the authority-resolved damage presentation, when present. */
+  | { k: "hp"; bi: number; hp: number; maxHp: number; sp?: number; result?: number; critical?: boolean }
   /**
    * A mon fainted. `narrate` (#691, additive optional) is true IFF the host shows an "X fainted!" message
    * for this KO (a FaintPhase runs - either inline at the damage chokepoint or deferred via the move's
