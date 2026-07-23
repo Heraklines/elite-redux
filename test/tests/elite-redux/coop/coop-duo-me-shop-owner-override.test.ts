@@ -32,6 +32,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { decodeCoopV2InteractionEnvelope } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
@@ -77,16 +78,20 @@ function committedMeTerminals(calls: readonly (readonly CoopMessage[])[]): {
   const byId = new Map<string, { id: string; payload: CoopMeTerminalPayload }>();
   for (const call of calls) {
     const message = call[0];
-    if (message?.t !== "envelope") {
-      continue;
-    }
-    const operation = message.envelope.pendingOperation;
+    const operation = message == null ? null : committedInteractionOperation(message);
     if (operation?.status !== "applied" || operation.kind !== "ME_TERMINAL") {
       continue;
     }
     byId.set(operation.id, { id: operation.id, payload: operation.payload as CoopMeTerminalPayload });
   }
   return [...byId.values()];
+}
+
+function committedInteractionOperation(message: CoopMessage) {
+  if (message.t !== "authorityEntry") {
+    return null;
+  }
+  return decodeCoopV2InteractionEnvelope({ ...message.body, context: message.ctx })?.envelope.pendingOperation ?? null;
 }
 
 describe.skipIf(!RUN)(
@@ -220,13 +225,10 @@ describe.skipIf(!RUN)(
         "host applied the guest's relayed option via handleOptionSelect",
       ).toHaveBeenCalled();
       expect(
-        hostSend.mock.calls.some(
-          ([message]) =>
-            message.t === "envelope"
-            && message.envelope.pendingOperation?.kind === "ME_PICK"
-            && message.envelope.pendingOperation.status === "applied"
-            && message.envelope.pendingOperation.owner === 1,
-        ),
+        hostSend.mock.calls.some(([message]) => {
+          const operation = committedInteractionOperation(message);
+          return operation?.kind === "ME_PICK" && operation.status === "applied" && operation.owner === 1;
+        }),
         "the host validated the public guest proposal and retained the typed ME_PICK operation",
       ).toBe(true);
       // MAJOR-3: the embedded ME reward shop suppresses its own advance mid-ME - still at the ME counter.
@@ -307,13 +309,10 @@ describe.skipIf(!RUN)(
         await game.phaseInterceptor.to("PostMysteryEncounterPhase");
       });
       expect(
-        hostSend.mock.calls.some(
-          ([message]) =>
-            message.t === "envelope"
-            && message.envelope.pendingOperation?.kind === "REWARD"
-            && message.envelope.pendingOperation.status === "applied"
-            && message.envelope.pendingOperation.owner === 1,
-        ),
+        hostSend.mock.calls.some(([message]) => {
+          const operation = committedInteractionOperation(message);
+          return operation?.kind === "REWARD" && operation.status === "applied" && operation.owner === 1;
+        }),
         "the host validated the public guest reward proposal and retained the typed REWARD result",
       ).toBe(true);
 

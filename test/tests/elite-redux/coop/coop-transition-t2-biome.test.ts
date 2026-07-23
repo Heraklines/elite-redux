@@ -295,7 +295,9 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
 
   async function driveGuestCommandUi(rig: DuoRig): Promise<void> {
     await driveDuoGuestTackleThroughPublicUi(game, rig, {
-      restartAlreadyOpenHost: true,
+      // buildDuo has already adopted and started the live host command. Restarting that same phase
+      // rewinds its UI to MESSAGE and prevents the selected command from reaching CoopTurnCommitPhase.
+      restartAlreadyOpenHost: false,
       submitHostTackle: true,
     });
   }

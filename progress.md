@@ -2144,3 +2144,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Every Showdown round now derives the exact numeric successor from the submitted public command address and
   requires both browsers to converge there before slicing its presentation ledger. Same-wave or same-address
   command observations can no longer produce an early false red or a false next-turn proof.
+
+# 2026-07-23 - Transition and ME-shop fixtures consume public V2 authority
+
+- The remaining T2 biome and Mystery transition drivers no longer restart `buildDuo`'s already-live host
+  CommandPhase; both submit the real host and guest commands through the shared public command helper.
+- The ME owner-override fixture now decodes retained `authorityEntry` commits for ME, reward, and terminal
+  assertions instead of requiring the suppressed legacy envelope carrier.
+- The biome-choice static assertion now compares the committed receipt to the global authority frontier's
+  operation identity. `CoopV2AuthorityFrontier` intentionally exposes no duplicate entry-kind field.

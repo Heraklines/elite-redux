@@ -249,7 +249,7 @@ async function driveGuestCommandUi(game: GameManager, rig: DuoRig): Promise<void
   // while two-target battles still cross the real target picker. Keeping a private copy here let this T2
   // lane keep demanding a target screen after the engine had already submitted the guest command.
   await driveDuoGuestTackleThroughPublicUi(game, rig, {
-    restartAlreadyOpenHost: true,
+    restartAlreadyOpenHost: false,
     submitHostTackle: true,
   });
 }

@@ -970,7 +970,6 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // immutable V2 biome commit + advances the counter.
   // =====================================================================================
   it("PROBE: owner drives the REAL ER_MAP handler via real input -> commits Authority V2 + advances", async () => {
-    const { Button } = await import("#enums/buttons");
     const rig = await bootBoundaryAtWave(11);
 
     setPendingNodesForBoth(rig, [
@@ -1011,13 +1010,11 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       `[PROBE #864] sendInteractionChoice calls=${JSON.stringify(sendSpy.mock.calls.map(c => ({ seq: c[0], kind: c[1], choice: c[2], data: c[3] })))} counterBefore=${counterBefore} counterAfter=${rig.hostRuntime.controller.interactionCounter()}`,
     );
     expect(biomePickSends.length, "the cut-over owner does not emit a raw biomePick correctness carrier").toBe(0);
-    expect(
-      withClientSync(rig.hostCtx, () =>
-        getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore }),
-      ),
-      "the public handler committed the addressed V2 biome operation",
-    ).not.toBeNull();
-    expect(getCoopV2Shadow(rig.hostRuntime)?.authorityFrontier()?.kind).toBe("INTERACTION_COMMIT");
+    const receipt = withClientSync(rig.hostCtx, () =>
+      getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore }),
+    );
+    expect(receipt, "the public handler committed the addressed V2 biome operation").not.toBeNull();
+    expect(getCoopV2Shadow(rig.hostRuntime)?.authorityFrontier()?.operationId).toBe(receipt?.operationId);
     logs.flush();
   }, 300_000);
 
