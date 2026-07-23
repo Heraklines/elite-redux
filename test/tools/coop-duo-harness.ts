@@ -76,11 +76,12 @@ import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritat
 import {
   applyCoopAuthoritativeBattleState,
   captureCoopAuthoritativeBattleState,
+  captureCoopEnemies,
   captureCoopPlayerModifiers,
   reconcileArenaTags,
   reconcileCoopPlayerModifiers,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import type { CoopStateSyncOutcome } from "#data/elite-redux/coop/coop-battle-stream";
+import { COOP_WAVE_NO_ME, type CoopStateSyncOutcome } from "#data/elite-redux/coop/coop-battle-stream";
 import {
   clearCoopBiomeInteractionStart,
   coopBiomeInteractionInProgress,
@@ -132,6 +133,7 @@ import {
   createLoopbackPair,
   type SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
+import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { isCoopWaveAdvanceOperationEnabled } from "#data/elite-redux/coop/coop-wave-operation";
 import {
   type ErAchievementRunSaveData,
@@ -214,6 +216,7 @@ import {
   setActiveCoopReplayMePhaseForHarness,
   setCoopMeHostPresentation,
 } from "#phases/coop-replay-me-phase";
+import { captureCoopEncounterAuthority } from "#phases/encounter-phase";
 import { coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { ModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
@@ -4967,10 +4970,30 @@ export async function buildShowdownDuo(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  // Production installs both versus runtimes before either CommandPhase accepts input. Showdown fixtures
-  // deliberately stop at the pre-command boundary so the orphan-runtime guard remains meaningful;
-  // open the host command surface only after the authoritative pair has connected.
-  await withClient(hostCtx, () => hostGame.phaseInterceptor.to("CommandPhase"));
+  // Production installs both versus runtimes before Encounter/Summon. These older direct-mirror fixtures
+  // deliberately stop the solo host at CommandPhase first, so pairing otherwise omits TWO required edges:
+  // Encounter's retained wave-start carrier and Summon's recorder window. Recreate those exact boundaries
+  // from the already-settled immutable host state before re-entering the parked CommandPhase. The prefix is
+  // intentionally empty: summon presentation happened before pairing and must not be guessed after the fact;
+  // real ability/weather/terrain event identity is covered by the public two-browser launch journey.
+  await withClient(hostCtx, async () => {
+    const battle = hostScene.currentBattle;
+    const authoritativeState = captureCoopAuthoritativeBattleState(battle.turn);
+    if (authoritativeState == null) {
+      throw new Error("direct-mirror Showdown fixture could not capture its pre-command authoritative state");
+    }
+    hostRuntime.battleStream.sendEnemyParty(
+      battle.waveIndex,
+      captureCoopEnemies(),
+      battle.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+      battle.battleType,
+      authoritativeState,
+      captureCoopEncounterAuthority(battle),
+    );
+    beginCoopRecording(battle.turn, `${hostRuntime.controller.sessionEpoch}:${battle.waveIndex}`);
+    await drainLoopback();
+    await hostGame.phaseInterceptor.to("CommandPhase");
+  });
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
   // The direct mirror omitted the guest browser's real Encounter -> TurnInit path. Materialize only that
