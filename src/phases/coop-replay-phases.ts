@@ -338,12 +338,23 @@ export class CoopShowAbilityReplayPhase extends Phase {
       watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, () =>
         finish({ kind: "failed", reason: "ability-watchdog-expired", actorFingerprint }),
       );
-      globalScene.abilityBar
-        .showAbility(getPokemonNameWithAffix(pokemon), ability.name, this.passive, pokemon.isPlayer())
-        .then(
-          () => finish({ kind: "rendered", actorFingerprint }),
-          () => finish({ kind: "failed", reason: "ability-presentation-rejected", actorFingerprint }),
-        );
+      const presentation = globalScene.abilityBar.showAbility(
+        getPokemonNameWithAffix(pokemon),
+        ability.name,
+        this.passive,
+        pokemon.isPlayer(),
+      );
+      // AbilityBar installs the localized text and makes the exact bar visible synchronously before its
+      // tween promise waits for animation time. A throttled/background renderer can visibly present that
+      // canonical flyout yet leave the tween unresolved until our bounded watchdog (exact browser run
+      // 30044520244). Record the real visual boundary now; the promise/watchdog still owns queue liveness.
+      if (globalScene.abilityBar.isVisible()) {
+        settleCoopPresentationOutcome(this.outcomeToken, { kind: "rendered", actorFingerprint });
+      }
+      presentation.then(
+        () => finish({ kind: "rendered", actorFingerprint }),
+        () => finish({ kind: "failed", reason: "ability-presentation-rejected", actorFingerprint }),
+      );
     } catch {
       coopWarn(
         "replay",

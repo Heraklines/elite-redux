@@ -238,6 +238,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     resetObservedCoopGuestPhases();
     setCoopWaveTailSanction(null);
     game = new GameManager(phaserGame);
+    // resetScene can synchronously drain callbacks owned by the reused guest scene. Fence any runtime they
+    // restored, then pin the freshly reset host scene before this test's first battle phase is constructed.
+    initGlobalScene(game.scene);
+    clearCoopRuntime();
     // GameManager deliberately defaults legacy co-op tests to skipping the x0 market. This journey
     // owns the real queued market/UI boundary, so opt back in only after that constructor default runs.
     setCoopBiomeMarketTestSkip(false);

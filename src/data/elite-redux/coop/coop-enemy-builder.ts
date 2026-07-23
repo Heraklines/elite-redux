@@ -27,7 +27,7 @@ import type { BiomeId } from "#enums/biome-id";
 import type { Nature } from "#enums/nature";
 import { Stat } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
-import type { EnemyPokemon } from "#field/pokemon";
+import { EnemyPokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
@@ -234,9 +234,17 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       const existing = battle.enemyParty[entry.fieldIndex];
       // A retained state image can make the locally rolled enemy active before the final turn-one
       // enemyParty carrier replaces it with the host's immutable identity. Remember that exact live
-      // occupancy before leaveField removes the old object. Pre-summon ME/colosseum adoption has no
-      // active object, so it deliberately stays inactive and still follows its ordinary SummonPhase.
-      const activeFieldIndex = existing == null ? -1 : globalScene.field.getIndex(existing);
+      // occupancy before leaveField removes the old object. Encounter-authority application can already
+      // have replaced battle.enemyParty while leaving the accepted state image's old identity displayed,
+      // so search both the party slot and the actual field by the host's immutable Pokemon id.
+      const authoritativeId = coopNum(entry.data, "id");
+      const displayedIdentity = globalScene.field.list.find(
+        child => child instanceof EnemyPokemon && authoritativeId !== undefined && child.id === authoritativeId >>> 0,
+      );
+      const activeEnemy = existing != null && globalScene.field.getIndex(existing) >= 0 ? existing : displayedIdentity;
+      // Pre-summon ME/colosseum adoption has no active object, so it deliberately stays inactive and still
+      // follows its ordinary SummonPhase.
+      const activeFieldIndex = activeEnemy == null ? -1 : globalScene.field.getIndex(activeEnemy);
       const wantSpecies = coopNum(entry.data, "speciesId");
       if (existing != null && (wantSpecies === undefined || existing.species.speciesId === wantSpecies)) {
         continue; // same mon - the corrector pass below converges its state
@@ -248,6 +256,9 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       }
       try {
         existing?.leaveField(true, true, true);
+        if (activeEnemy != null && activeEnemy !== existing) {
+          activeEnemy.leaveField(true, true, true);
+        }
       } catch {
         /* stale sprite teardown must not block the adopt */
       }

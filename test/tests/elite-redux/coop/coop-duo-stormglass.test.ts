@@ -101,6 +101,9 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
       expect(globalScene.phaseManager.overridePhase(phase), "the ordered Stormglass successor became current").toBe(
         true,
       );
+      // PhaseInterceptor suppresses PhaseManager.startCurrentPhase in engine tests. Production starts the
+      // override itself; explicitly cross that intercepted start edge here before exercising public input.
+      phase.start();
       await Promise.resolve();
       await drainLoopback();
       expect(options?.map(option => option.label)).toEqual(["Sun", "Rain", "Sandstorm", "Hail", "Fog"]);

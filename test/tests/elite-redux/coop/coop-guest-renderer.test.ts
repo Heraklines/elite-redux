@@ -482,6 +482,37 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     ).toBe(true);
   });
 
+  it("turn-one structural adoption replaces a retained-state field identity after its party slot changed", async () => {
+    await startCoopGuest();
+    const battle = globalScene.currentBattle;
+    const displayed = battle.enemyParty[0];
+    const displayedFieldIndex = globalScene.field.getIndex(displayed);
+    const authoritativeId = displayed.id;
+    game.override.enemySpecies(null);
+
+    // Model encounter-authority material replacing the party reference before the retained enemy manifest
+    // lands. The old authoritative identity is still on the display field, but it is no longer discoverable
+    // through battle.enemyParty[0]—the exact ordering seen in focused run 30046428284.
+    const detachedLocal = globalScene.addEnemyPokemon(displayed.species, displayed.level, displayed.trainerSlot, false);
+    battle.enemyParty[0] = detachedLocal;
+    expect(globalScene.field.getIndex(detachedLocal)).toBe(-1);
+    expect(globalScene.field.getIndex(displayed)).toBe(displayedFieldIndex);
+    vi.spyOn(EnemyPokemon.prototype, "loadAssets").mockResolvedValue(undefined);
+
+    adoptCoopEnemiesStructural([
+      { fieldIndex: 0, data: { id: authoritativeId, speciesId: SpeciesId.PIKACHU, level: 5 } },
+      { fieldIndex: 1, data: { speciesId: battle.enemyParty[1].species.speciesId, level: 5 } },
+    ]);
+
+    const rebuilt = battle.enemyParty[0];
+    expect(rebuilt.id, "the rebuilt party member adopted the retained field identity").toBe(authoritativeId);
+    expect(rebuilt.species.speciesId).toBe(SpeciesId.PIKACHU);
+    expect(globalScene.field.getIndex(rebuilt), "the rebuilt identity inherited the stale display slot").toBe(
+      displayedFieldIndex,
+    );
+    expect(globalScene.field.getIndex(displayed), "the superseded display object was removed").toBe(-1);
+  });
+
   it("ENEMY-FIELD RECONCILE (#633): a host-KOd enemy the guest still has ALIVE is removed + the checksum converges", async () => {
     await startCoopGuest();
     // The two enemies on the double field. enemy0 = bi2, enemy1 = bi3.

@@ -2182,3 +2182,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   null owning runtime and correctly failed its durable terminal. The T2 suite also clears a retired shared
   runtime before booting the next Phaser-reused test scene, preventing a fresh solo bootstrap from entering
   the previous replica's replay wait.
+
+# 2026-07-23 - Showdown ability receipts and retained enemy identities follow observable production state
+
+- Exact two-browser Showdown run `30044520244` reached converged public command control without a desync or
+  softlock, but rejected its presentation ledger because the exact guest ability flyout was visibly present
+  while its throttled tween promise remained unresolved until the watchdog. Ability replay now records the
+  rendered outcome at AbilityBar's synchronous visible/text installation boundary; its promise/watchdog still
+  bounds phase liveness, so a slow tween cannot produce either a false failed receipt or a queue softlock.
+- Focused run `30046428284` showed that encounter material can replace `battle.enemyParty[index]` before the
+  retained state field object is replaced. Structural adoption now locates that displayed object by the
+  host's immutable Pokemon id, removes it, and installs the rebuilt party member at the same depth. A focused
+  regression models the distinct party-reference/display-identity race rather than only the simple same-object
+  case.
+- The Stormglass fixture explicitly starts the installed override because PhaseInterceptor suppresses the
+  production PhaseManager auto-start in engine tests. The T2 suite also clears any runtime restored while its
+  reused Phaser scene resets, closing the remaining cross-test replica bootstrap leak.

@@ -68,6 +68,7 @@ import {
   CoopFinalizeTurnPhase,
   CoopHpDrainReplayPhase,
   CoopMoveAnimReplayPhase,
+  CoopShowAbilityReplayPhase,
 } from "#phases/coop-replay-phases";
 import { CoopPresentationReceiptPhase } from "#phases/coop-replay-turn-phase";
 import { GameManager } from "#test/framework/game-manager";
@@ -175,6 +176,37 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
         actorFingerprint: "player:bi0:slot0:p17",
       },
     ]);
+  });
+
+  it("a visible exact ability flyout is rendered even when its cosmetic tween remains throttled", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[0];
+    const partySlot = globalScene.getPlayerParty().indexOf(pokemon);
+    const token = createCoopPresentationOutcomeToken();
+    let finishTween!: () => void;
+    const throttledTween = new Promise<void>(resolve => {
+      finishTween = resolve;
+    });
+    vi.spyOn(globalScene.abilityBar, "showAbility").mockReturnValue(throttledTween);
+    vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(true);
+
+    const phase = new CoopShowAbilityReplayPhase(
+      pokemon.getBattlerIndex(),
+      pokemon.id,
+      partySlot,
+      pokemon.getAbility().id,
+      false,
+      0,
+      token,
+    );
+    phase.start();
+
+    expect(coopPresentationOutcome(token)).toEqual({
+      kind: "rendered",
+      actorFingerprint: `player:bi${pokemon.getBattlerIndex()}:slot${partySlot}:p${pokemon.id}`,
+    });
+    finishTween();
+    await Promise.resolve();
   });
 
   /** Start a co-op authoritative double as the HOST and tag field ownership. */
