@@ -2266,3 +2266,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Faint replay now tests actual field-container membership instead of `Pokemon.isOnField()`. An interrupted
   switch can leave the exact visible actor with `switchOutStatus=true`; the authoritative faint must still
   animate and remove that displayed identity rather than silently reporting an off-field no-op.
+
+# 2026-07-24 - Presentation watchdogs measure renderer progress, not assumed GPU speed
+
+- Real two-browser run `30050966246` reached exact shared command control and streamed the complete first
+  turn, then failed presentation proof on valid Growl/stat animations. The trace showed both renderers
+  visible, focused, input-healthy, and advancing, but SwiftShader produced roughly 0.5 game-loop frames per
+  wall second. The fixed five-second Phaser watchdog therefore expired after only a handful of actual
+  animation frames; it was a false terminal, not a mechanical desync or missing event.
+- Outcome-gated Tera, move, HP, stat, switch, status, and faint replay now use a progress-aware bounded
+  watchdog. Each observation renews only after a newer renderer frame, the real animation completion
+  callback remains the sole `rendered` receipt, a no-progress interval still fails closed, and a 120-second
+  wall ceiling prevents an advancing-but-broken callback from becoming an indefinite hold. Ability keeps
+  its synchronous visible-bar receipt and capture retains its independent hardened completion fallback.
+- A failure-first engine regression proves one advancing frame renews the presentation observation while a
+  subsequent no-progress interval releases the phase as failed. This preserves softlock protection without
+  encoding the CI software renderer's frame rate into production correctness.

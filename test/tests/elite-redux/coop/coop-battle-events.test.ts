@@ -1078,6 +1078,50 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     endSpy.mockRestore();
   });
 
+  it("(Step 2) a slow but advancing renderer renews the presentation watchdog before the hard bound", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[COOP_HOST_FIELD_INDEX];
+    const maxHp = pokemon.getMaxHp();
+    const fromHp = maxHp - 10;
+    const toHp = maxHp - 3;
+    pokemon.hp = fromHp;
+    globalScene.moveAnimations = true;
+
+    const animSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation(() => {});
+    const updateSpy = vi.spyOn(pokemon, "updateInfo").mockReturnValue(new Promise(() => {}));
+    const watchdogCallbacks: Array<() => void> = [];
+    const timers = Array.from({ length: 2 }, () => ({ remove: vi.fn() }));
+    const timerSpy = vi.spyOn(globalScene.time, "delayedCall").mockImplementation((_delay, callback) => {
+      const index = watchdogCallbacks.length;
+      watchdogCallbacks.push(() => callback());
+      return timers[index] as never;
+    });
+    const phase = new CoopHpDrainReplayPhase(pokemon.getBattlerIndex(), fromHp, toHp, maxHp, pokemon.species.speciesId);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+    const loop = globalScene.game.loop as unknown as { frame: number };
+    const originalFrame = loop.frame;
+
+    try {
+      phase.start();
+      expect(watchdogCallbacks, "the presentation arms its first progress observation").toHaveLength(1);
+
+      loop.frame = originalFrame + 1;
+      watchdogCallbacks[0]();
+      expect(endSpy, "a newly rendered frame is progress, not a presentation failure").not.toHaveBeenCalled();
+      expect(watchdogCallbacks, "progress renews one bounded observation").toHaveLength(2);
+
+      watchdogCallbacks[1]();
+      expect(endSpy, "no progress in the renewed interval still fails closed").toHaveBeenCalledTimes(1);
+      expect(timers[1].remove, "completion retires the active renewed watchdog").toHaveBeenCalledTimes(1);
+    } finally {
+      loop.frame = originalFrame;
+      animSpy.mockRestore();
+      updateSpy.mockRestore();
+      timerSpy.mockRestore();
+      endSpy.mockRestore();
+    }
+  });
+
   it("(Step 2) the guest ANIMATES a poison-KO faint stream (hp drain + faint) without throwing", async () => {
     const field = await startCoopGuest();
     const turn = globalScene.currentBattle.turn;
