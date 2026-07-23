@@ -698,17 +698,13 @@ export class CommandPhase extends FieldPhase {
       // the post-summon re-capture so the guest adopts those on-entry effects at its OWN turn-1 belt-and-
       // suspenders above, BEFORE it commands, instead of at the turn-1 END checkpoint. Gated to field slot 0
       // so it evaluates once per wave; a hard no-op unless an entry effect actually changed state (self-latching).
-      if (isVersusSession()) {
-        // Summon-time flyouts/environment cues are part of turn 1's ordered event stream, but the
-        // renderer must finish that prefix before it exposes command input. Seal it only after the
-        // host's complete PostSummon chain and post-entry authority recapture have settled.
-        const entryPresentation = sealCoopEntryPresentation();
-        if (entryPresentation == null || !rebroadcastCoopWaveStartAuthorityAfterEntryEffects(entryPresentation)) {
-          failCoopSharedSession(`Wave ${waveIndex} could not publish its complete Showdown entry presentation.`);
-          return false;
-        }
-      } else {
-        rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
+      // Summon-time flyouts/environment cues are part of turn 1's ordered event stream in every
+      // authoritative battle. The renderer must finish that retained prefix before it exposes command
+      // input. Seal it only after the complete PostSummon chain and post-entry state recapture settled.
+      const entryPresentation = sealCoopEntryPresentation();
+      if (entryPresentation == null || !rebroadcastCoopWaveStartAuthorityAfterEntryEffects(entryPresentation)) {
+        failCoopSharedSession(`Wave ${waveIndex} could not publish its complete entry presentation.`);
+        return false;
       }
     }
     return true;

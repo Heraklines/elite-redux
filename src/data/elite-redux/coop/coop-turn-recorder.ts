@@ -228,7 +228,7 @@ export function recordCoopEvent(event: CoopBattleEvent): number | null {
 }
 
 /**
- * HOST Showdown: freeze the complete summon/on-entry presentation prefix exactly once. The retained
+ * HOST authority: freeze the complete summon/on-entry presentation prefix exactly once. The retained
  * wave-start carrier delivers this immutable copy before turn-1 command input; the ordinary turn batch
  * still contains the same positions and the renderer's shared watermark prevents duplicate display.
  */

@@ -136,7 +136,7 @@ export class CoopReplayTurnPhase extends Phase {
   private awaitingAuthority = false;
   /** Immutable source wave for every event presented by this turn pump and its continuations. */
   private readonly sourceWave: number;
-  /** Showdown turn-1 prefix consumer: replay the retained post-summon carrier before command input. */
+  /** Turn-1 prefix consumer: replay the retained authoritative post-summon carrier before command input. */
   private readonly entryPresentationOnly: boolean;
 
   constructor(
@@ -761,7 +761,7 @@ export class CoopReplayTurnPhase extends Phase {
     }
   }
 
-  /** Render the complete, re-requestable Showdown entry prefix before either command surface opens. */
+  /** Render the complete, re-requestable authoritative entry prefix before either command surface opens. */
   private async pumpEntryPresentation(streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>): Promise<void> {
     try {
       this.awaitingAuthority = true;
@@ -774,7 +774,7 @@ export class CoopReplayTurnPhase extends Phase {
         this.failAuthority(
           streamer,
           "turnResolution",
-          `Showdown entry presentation for wave ${this.sourceWave} was unavailable.`,
+          `Authoritative entry presentation for wave ${this.sourceWave} was unavailable.`,
         );
         return;
       }

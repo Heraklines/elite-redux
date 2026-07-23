@@ -3,7 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { erApplyPendingRevives } from "#data/elite-redux/archetypes/post-faint-deferred-revive";
-import { getCoopController, isAuthoritativeBattleSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, isAuthoritativeBattleSession } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erApplyPendingSwitchInBoost } from "#data/elite-redux/empower-switch-in";
 import { erApplyPendingSafePassage } from "#data/elite-redux/safe-passage";
@@ -32,12 +32,12 @@ export class SummonPhase extends PartyMemberPokemonPhase {
   start() {
     super.start();
 
-    // SHOWDOWN presentation authority: switch-in/lead abilities and environment changes fire in the
-    // summon chain, before TurnStart previously opened the recorder. Open the host's ordered stream
-    // here; TurnStart's same-turn begin is idempotent and preserves this prefix. Classic co-op keeps its
-    // existing initial lockstep summon presentation, avoiding duplicate lead flyouts there.
+    // AUTHORITATIVE presentation: switch-in/lead abilities and environment changes fire in the summon
+    // chain, before TurnStart previously opened the recorder. Open the host's ordered stream here for
+    // both shared co-op and Showdown; TurnStart's same-turn begin is idempotent and preserves this prefix.
+    // The renderer consumes the retained prefix before command input instead of deriving entry visuals.
     const controller = getCoopController();
-    if (isAuthoritativeBattleSession() && isVersusSession() && controller?.role === "host") {
+    if (isAuthoritativeBattleSession() && controller?.role === "host") {
       beginCoopRecording(
         globalScene.currentBattle.turn,
         `${controller.sessionEpoch}:${globalScene.currentBattle.waveIndex}`,

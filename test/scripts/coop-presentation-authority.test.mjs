@@ -49,6 +49,27 @@ test("healing is an authority-authored presentation and every event kind is exha
   assert.match(replay, /const unhandledEvent: never = event/u);
 });
 
+test("ordinary co-op and Showdown both replay retained entry presentation before command input", () => {
+  const summon = read("src/phases/summon-phase.ts");
+  const command = read("src/phases/command-phase.ts");
+  const turnInit = read("src/phases/turn-init-phase.ts");
+
+  assert.match(
+    summon,
+    /if \(isAuthoritativeBattleSession\(\) && controller\?\.role === "host"\)[\s\S]+beginCoopRecording/u,
+  );
+  assert.doesNotMatch(summon, /isVersusSession\(\).*beginCoopRecording/u);
+  assert.match(
+    command,
+    /const entryPresentation = sealCoopEntryPresentation\(\);[\s\S]+rebroadcastCoopWaveStartAuthorityAfterEntryEffects\(entryPresentation\)/u,
+  );
+  assert.match(
+    turnInit,
+    /if \(globalScene\.currentBattle\.turn === 1\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+globalScene\.currentBattle\.waveIndex,[\s\S]+true,/u,
+  );
+  assert.doesNotMatch(turnInit, /isShowdownGuestFlipGated\(\) && globalScene\.currentBattle\.turn === 1/u);
+});
+
 test("every authority event receives an ordered renderer-completion receipt in the exact-browser build", () => {
   const recorder = read("src/data/elite-redux/coop/coop-turn-recorder.ts");
   const replay = read("src/phases/coop-replay-turn-phase.ts");

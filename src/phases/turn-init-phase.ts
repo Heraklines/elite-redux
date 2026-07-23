@@ -102,10 +102,10 @@ export class TurnInitPhase extends FieldPhase {
       return true;
     }
     const deferCommand = this.shouldDeferVersusGuestCommandForEnemyReplacement();
-    if (isShowdownGuestFlipGated() && globalScene.currentBattle.turn === 1) {
-      // Showdown abilities/environment cues are host-authored during Summon/PostSummon. Consume their
-      // complete retained post-summon prefix before either real command opens; the shared event watermark
-      // prevents best-effort live copies and the ordinary post-command batch from showing them twice.
+    if (globalScene.currentBattle.turn === 1) {
+      // Entry abilities/environment cues are host-authored during Summon/PostSummon in both shared co-op
+      // and Showdown. Consume their complete retained prefix before either real command opens; the shared
+      // event watermark prevents best-effort live copies and the ordinary turn batch from showing twice.
       globalScene.phaseManager.pushNew(
         "CoopReplayTurnPhase",
         globalScene.currentBattle.turn,

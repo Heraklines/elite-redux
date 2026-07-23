@@ -2375,7 +2375,7 @@ export class CoopBattleStreamer {
     };
   }
 
-  /** Consume a retained, complete Showdown entry-presentation prefix once. */
+  /** Consume a retained, complete authoritative entry-presentation prefix once. */
   consumeEntryPresentation(wave: number): CoopEntryPresentationPrefix | null {
     const prefix = this.entryPresentationByWave.get(wave) ?? null;
     this.entryPresentationByWave.delete(wave);
