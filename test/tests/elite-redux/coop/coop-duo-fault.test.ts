@@ -44,6 +44,7 @@ import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
@@ -205,11 +206,23 @@ describe.skipIf(!RUN)(
       const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       expect(hostShop.phaseName, `wave ${w}: host reached SelectModifierPhase`).toBe("SelectModifierPhase");
       if (hostOwns) {
-        await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
-        await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+        await withClient(rig.hostCtx, () =>
+          driveHostRewardShopOwner(hostShop, {
+            takeReward: false,
+            partnerReady: () => withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop)),
+            partnerSettle: () =>
+              withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true })),
+          }),
+        );
       } else {
-        await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
-        await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+        await withClient(rig.guestCtx, () =>
+          driveHostRewardShopOwner(guestShop, {
+            takeReward: false,
+            partnerReady: () => withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop)),
+            partnerSettle: () =>
+              withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true })),
+          }),
+        );
       }
       await pumpDuoDestinations(rig);
       expect(

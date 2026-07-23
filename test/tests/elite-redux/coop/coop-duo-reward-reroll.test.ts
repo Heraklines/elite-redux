@@ -35,11 +35,13 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
+  driveHostRewardShopOwner,
   installDuoLogCapture,
   reachQueuedRewardShop,
   type ShopPhaseSeam,
@@ -162,9 +164,13 @@ describe.skipIf(!RUN)(
       // phase never owns the guest's public surface, so the retained transition is correct to reject it.
       const guestShop0 = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
-      // ===== OWNER SIDE (host): start round 0, capture its options, REROLL, then start + leave round 1. =====
+      // ===== ROUND 0: both public surfaces exist before the owner can press REROLL. =====
+      // The V2 shop rendezvous deliberately keeps input closed until the reciprocal watcher arrives. The old
+      // fixture drove both owner rounds first and only started the watcher afterwards, an ordering a human
+      // cannot produce; V2 correctly refused to consume an uninstalled REWARD_PRESENT control.
       let hostOptionIds1: number[] = [];
       let hostMoneyAfterReroll = -1;
+      await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop0));
       await withClient(rig.hostCtx, async () => {
         hostShop0.start(); // streams round-0 options + opens the owner screen (pins counter 0)
         await drainLoopback();
@@ -178,31 +184,16 @@ describe.skipIf(!RUN)(
         }
         hostMoneyAfterReroll = rig.hostScene.money;
         expect(hostMoneyAfterReroll, "owner: the reroll deducted a positive cost").toBeLessThan(SHOP_MONEY);
-
-        // The reroll ended round 0 and made the fresh round-1 SelectModifierPhase CURRENT (unstarted: the
-        // test framework stubs startCurrentPhase). Retrieve + start it (streams the REROLLED options), then leave.
-        const hostShop1 = rig.hostScene.phaseManager.getCurrentPhase() as unknown as RerollShopSeam;
-        expect(hostShop1.phaseName, "the reroll made a fresh round-1 SelectModifierPhase current").toBe(
-          "SelectModifierPhase",
-        );
-        hostShop1.start();
-        await drainLoopback();
-        expect(hostShop1.rerollCount, "round 1 has rerollCount 1").toBe(1);
-        hostOptionIds1 = optionIds(hostShop1);
-
-        // LEAVE round 1 (the terminal that advances the alternating-interaction counter; the watcher mirrors it).
-        hostShop1.coopEndMirror();
-        hostShop1.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
-        hostShop1.end();
-        hostShop1.coopAdvanceInteraction();
-        await drainLoopback();
       });
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop0, { alreadyStarted: true }));
 
-      // ===== WATCHER SIDE (guest): round-0 watch consumes the buffered REROLL (rerolls its pool + sets the
-      // relayed money), then the round-1 watch adopts the rerolled options + consumes the buffered LEAVE. =====
-      await withClient(rig.guestCtx, async () => {
-        await driveGuestRewardWatch(guestShop0); // adopt round-0 -> REROLL -> rerolls -> returns
-      });
+      // ===== ROUND 1: start the newly-authorized owner and watcher generations together, then leave. =====
+      const hostShop1 = withClientSync(rig.hostCtx, () =>
+        rig.hostScene.phaseManager.getCurrentPhase(),
+      ) as unknown as RerollShopSeam;
+      expect(hostShop1.phaseName, "the reroll made a fresh round-1 SelectModifierPhase current").toBe(
+        "SelectModifierPhase",
+      );
       // The watcher reroll ended round 0 and made the fresh round-1 SelectModifierPhase current (unstarted).
       const guestShop1 = withClientSync(rig.guestCtx, () =>
         rig.guestScene.phaseManager.getCurrentPhase(),
@@ -211,9 +202,23 @@ describe.skipIf(!RUN)(
         "SelectModifierPhase",
       );
       let guestOptionIds1: number[] = [];
-      await withClient(rig.guestCtx, async () => {
-        await driveGuestRewardWatch(guestShop1); // adopt round-1 (rerolled) options -> LEAVE
-        guestOptionIds1 = optionIds(guestShop1);
+      await withClient(rig.hostCtx, async () => {
+        hostShop1.start();
+        await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop1));
+        for (let i = 0; i < 4; i++) {
+          await drainLoopback();
+        }
+        expect(hostShop1.rerollCount, "round 1 has rerollCount 1").toBe(1);
+        hostOptionIds1 = optionIds(hostShop1);
+        await driveHostRewardShopOwner(hostShop1, {
+          takeReward: false,
+          alreadyStarted: true,
+          partnerSettle: () =>
+            withClient(rig.guestCtx, async () => {
+              await driveGuestRewardWatch(guestShop1, { alreadyStarted: true });
+              guestOptionIds1 = optionIds(guestShop1);
+            }),
+        });
       });
 
       // ----- ASSERTIONS -----
