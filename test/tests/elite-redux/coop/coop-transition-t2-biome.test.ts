@@ -224,6 +224,11 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
   });
 
   beforeEach(() => {
+    // GameManager reuses the suite's Phaser game. A previous two-engine fixture can therefore leave its
+    // process-global replica installed even though its scene is no longer the next test's scene. Clear that
+    // stale realm before startBattle constructs any phases; otherwise the fresh solo bootstrap is correctly
+    // diverted into CoopReplayTurnPhase and waits forever for a peer that belonged to the retired test.
+    clearCoopRuntime();
     setCoopHarnessModuleLetIsolation(true);
     setCoopBiomePickerDrivenByTest();
     setCoopWaveBarrierMs(10_000);

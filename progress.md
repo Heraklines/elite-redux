@@ -2166,3 +2166,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The shared public command driver now asserts that the mirrored handler sees at least one live enemy before
   accepting keyboard input. The canonical empty command slot is also asserted as `null`, matching Battle's
   initialized command substrate rather than the obsolete pre-initialization `undefined` fixture.
+
+# 2026-07-23 - Turn-one enemy adoption preserves live targets and fixtures use V2 semantics
+
+- Focused run `30045700301` proved the direct mirror now installs the initial field, then exposed the later
+  production seam: a retained state could make local enemies active before `enemyPartySync` structurally
+  replaced them. Replacement removed the active local object but never fielded its host-authored successor,
+  so a valid public Command/Fight surface had zero legal targets. Structural adoption now preserves the exact
+  active field slot and display depth; pre-summon mystery/colosseum adoption remains intentionally inactive.
+- The mystery-shop owner probe no longer demands that `ME_PICK` consume a mechanical Authority V2 revision.
+  It proves the public proposal relay and host application, while the immutable `ME_TERMINAL` results remain
+  the ordered mechanical entries. This matches the cutover's closed telemetry/mechanical distinction.
+- The Stormglass probe now constructs its picker after the live runtime exists, following the real
+  `COMMAND -> TURN_COMMIT -> AWAIT_SUCCESSOR -> STORMGLASS_PRESENT` graph. The old pre-pair phase captured a
+  null owning runtime and correctly failed its durable terminal. The T2 suite also clears a retired shared
+  runtime before booting the next Phaser-reused test scene, preventing a fresh solo bootstrap from entering
+  the previous replica's replay wait.

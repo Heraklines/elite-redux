@@ -225,12 +225,15 @@ describe.skipIf(!RUN)(
         "host applied the guest's relayed option via handleOptionSelect",
       ).toHaveBeenCalled();
       expect(
-        hostSend.mock.calls.some(([message]) => {
+        hostSend.mock.calls.every(([message]) => {
           const operation = committedInteractionOperation(message);
-          return operation?.kind === "ME_PICK" && operation.status === "applied" && operation.owner === 1;
+          return operation?.kind !== "ME_PICK";
         }),
-        "the host validated the public guest proposal and retained the typed ME_PICK operation",
+        "the guest ME_PICK proposal stays telemetry and consumes no mechanical Authority V2 revision",
       ).toBe(true);
+      // The immutable mechanical results are the ordered ME_TERMINAL images asserted below. Letting the
+      // proposal itself enter the global log would create a second ordering authority and shift every
+      // successor revision; the public relay edge plus host application above are its complete proof.
       // MAJOR-3: the embedded ME reward shop suppresses its own advance mid-ME - still at the ME counter.
       expect(
         rig.hostRuntime.controller.interactionCounter(),

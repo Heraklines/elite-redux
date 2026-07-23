@@ -18,7 +18,13 @@ import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import { ErRelicModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
-import { buildDuo, drainLoopback, withClient, withClientSync } from "#test/tools/coop-duo-harness";
+import {
+  buildDuo,
+  drainLoopback,
+  retireDuoInitialCommandForBoundaryTest,
+  withClient,
+  withClientSync,
+} from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import Phaser from "phaser";
@@ -59,21 +65,16 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
 
   it("suppresses the raw choice while both real engines apply the committed Sandstorm", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    // This operation test used to start a detached picker after buildDuo had already installed an
-    // actionable COMMAND_FRONTIER. Authority V2 correctly rejects that impossible
-    // COMMAND -> STORMGLASS_PRESENT edge. Make the picker the real current phase before pairing, as
-    // EncounterPhase does when a held unconfigured Stormglass opens at a battle boundary. buildDuo
-    // therefore does not manufacture an unrelated initial command control, and V2 projects this
-    // first retained interaction into the replica's real phase manager.
-    game.scene.phaseManager.clearPhaseQueue();
-    game.scene.phaseManager.unshiftNew("ErStormglassPickerPhase");
-    game.scene.phaseManager.shiftPhase();
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       { drop: 1, reorder: 0, delay: 0, faultable: msg => msg.t === "interactionChoice" && msg.kind === "stormglass" },
       { seed: 0x57026a56 },
     );
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    // Isolated boundary fixture: retire the real initial command into an ordered successor wait. Construct
+    // the picker only after the host runtime exists, matching EncounterPhase in production. The former
+    // pre-pair phase captured a null owning runtime, so its otherwise-correct terminal proof failed closed.
+    await retireDuoInitialCommandForBoundaryTest(rig);
 
     for (const ctx of [rig.hostCtx, rig.guestCtx]) {
       await withClient(ctx, async () => {
@@ -96,9 +97,10 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
         // actionable OPTION_SELECT handler before the host is allowed to commit the decision successor.
         return setMode(mode, config);
       });
-      const phase = globalScene.phaseManager.getCurrentPhase();
-      expect(phase.phaseName).toBe("ErStormglassPickerPhase");
-      phase.start();
+      const phase = globalScene.phaseManager.create("ErStormglassPickerPhase");
+      expect(globalScene.phaseManager.overridePhase(phase), "the ordered Stormglass successor became current").toBe(
+        true,
+      );
       await Promise.resolve();
       await drainLoopback();
       expect(options?.map(option => option.label)).toEqual(["Sun", "Rain", "Sandstorm", "Hail", "Fog"]);

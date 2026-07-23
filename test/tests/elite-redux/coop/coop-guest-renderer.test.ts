@@ -449,6 +449,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(battle.enemyParty[0].species.speciesId, "guest starts on its own MAGIKARP roll").toBe(SpeciesId.MAGIKARP);
     game.override.enemySpecies(null);
     const originalSlot0 = battle.enemyParty[0];
+    const originalFieldIndex = globalScene.field.getIndex(originalSlot0);
+    expect(originalFieldIndex, "the mismatched local roll is active before the turn-one adopt").toBeGreaterThanOrEqual(
+      0,
+    );
 
     // Spy + neutralize the real asset I/O (headless has no atlas); we only assert the load was REQUESTED.
     const loadAssetsSpy = vi.spyOn(EnemyPokemon.prototype, "loadAssets").mockResolvedValue(undefined);
@@ -465,6 +469,11 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const rebuilt = battle.enemyParty[0];
     expect(rebuilt, "the mismatched slot was replaced by a freshly built mon").not.toBe(originalSlot0);
     expect(rebuilt.species.speciesId, "the mismatched slot was rebuilt to the host's species").toBe(SpeciesId.PIKACHU);
+    expect(
+      globalScene.field.getIndex(rebuilt),
+      "an active mismatched enemy is replaced in the same live field slot (public commands keep legal targets)",
+    ).toBe(originalFieldIndex);
+    expect(globalScene.field.getIndex(originalSlot0), "the stale local enemy left the field").toBe(-1);
     // ...and its REAL sprite assets were requested on THIS rebuilt mon (the placeholder-doll swap is
     // wired), so it can never sit on the substitute placeholder for the whole fight.
     expect(

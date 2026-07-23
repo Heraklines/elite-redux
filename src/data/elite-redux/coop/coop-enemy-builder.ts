@@ -17,6 +17,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { fieldPositionForSlot } from "#data/battle-format";
 import { applyCoopEnemies, applyCoopEnemyHeldItems } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopSerializedEnemy, CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
@@ -231,6 +232,11 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
     let rebuilt = 0;
     for (const entry of enemies) {
       const existing = battle.enemyParty[entry.fieldIndex];
+      // A retained state image can make the locally rolled enemy active before the final turn-one
+      // enemyParty carrier replaces it with the host's immutable identity. Remember that exact live
+      // occupancy before leaveField removes the old object. Pre-summon ME/colosseum adoption has no
+      // active object, so it deliberately stays inactive and still follows its ordinary SummonPhase.
+      const activeFieldIndex = existing == null ? -1 : globalScene.field.getIndex(existing);
       const wantSpecies = coopNum(entry.data, "speciesId");
       if (existing != null && (wantSpecies === undefined || existing.species.speciesId === wantSpecies)) {
         continue; // same mon - the corrector pass below converges its state
@@ -246,6 +252,14 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
         /* stale sprite teardown must not block the adopt */
       }
       battle.enemyParty[entry.fieldIndex] = built;
+      if (activeFieldIndex >= 0) {
+        built.setFieldPosition(fieldPositionForSlot(entry.fieldIndex, battle.arrangement.enemyCapacity));
+        // Preserve the old object's display-list depth as well as its mechanical field membership. A
+        // plain add would make commands legal again but could render the rebuilt enemy over trainers/UI.
+        globalScene.field.addAt(built, Math.min(activeFieldIndex, globalScene.field.length));
+        built.setVisible(true);
+        built.getSprite().setVisible(true);
+      }
       // #836 SPRITE: a REBUILT slot is a brand-new EnemyPokemon that never went through the
       // encounter-phase asset load (buildCoopEnemy deliberately leaves loadAssets to "the
       // encounter loop", but the structural adopt paths - the ME-battle boot in
