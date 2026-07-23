@@ -232,6 +232,7 @@ describe("ordered-wait exact control addresses", () => {
 
   it("admits only the explicitly stated same-turn Mystery battle command-open", () => {
     const wait = successorWait({
+      afterOperationId: "me-terminal",
       wave: 32,
       turn: 1,
       allowedKinds: ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
@@ -256,6 +257,7 @@ describe("ordered-wait exact control addresses", () => {
     );
 
     const exact = successorWait({
+      afterOperationId: "me-terminal",
       wave: 32,
       turn: 1,
       allowedControlAddresses: [{ materialKind: "command-open", wave: 32, turn: 1, operationId: "expected-command" }],
