@@ -153,6 +153,15 @@ describe("showdown-side-swap: battle events", () => {
     { k: "faint", bi: BattlerIndex.ENEMY_2, narrate: true },
     { k: "statStage", bi: BattlerIndex.PLAYER_2, stat: 1, value: -1 },
     { k: "status", bi: BattlerIndex.ENEMY, status: 4 },
+    {
+      k: "showAbility",
+      bi: BattlerIndex.PLAYER_2,
+      pokemonId: 91,
+      partySlot: 4,
+      abilityId: 22,
+      passive: true,
+      passiveSlot: 2,
+    },
     { k: "switch", bi: BattlerIndex.PLAYER, partySlot: 3 },
     { k: "weather", weather: 2, turnsLeft: 5 },
     { k: "terrain", terrain: 1, turnsLeft: 3 },
@@ -166,13 +175,16 @@ describe("showdown-side-swap: battle events", () => {
     expect((swapBattleEvent(events[3]) as Extract<CoopBattleEvent, { k: "faint" }>).bi).toBe(BattlerIndex.PLAYER_2);
     expect((swapBattleEvent(events[4]) as Extract<CoopBattleEvent, { k: "statStage" }>).bi).toBe(BattlerIndex.ENEMY_2);
     expect((swapBattleEvent(events[5]) as Extract<CoopBattleEvent, { k: "status" }>).bi).toBe(BattlerIndex.PLAYER);
-    expect((swapBattleEvent(events[6]) as Extract<CoopBattleEvent, { k: "switch" }>).bi).toBe(BattlerIndex.ENEMY);
+    expect((swapBattleEvent(events[6]) as Extract<CoopBattleEvent, { k: "showAbility" }>).bi).toBe(
+      BattlerIndex.ENEMY_2,
+    );
+    expect((swapBattleEvent(events[7]) as Extract<CoopBattleEvent, { k: "switch" }>).bi).toBe(BattlerIndex.ENEMY);
   });
 
   it("leaves side-free members (message / weather / terrain) untouched", () => {
     expect(swapBattleEvent(events[0])).toEqual(events[0]);
-    expect(swapBattleEvent(events[7])).toEqual(events[7]);
     expect(swapBattleEvent(events[8])).toEqual(events[8]);
+    expect(swapBattleEvent(events[9])).toEqual(events[9]);
   });
 
   it("swap∘swap = identity for every event kind", () => {

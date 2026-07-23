@@ -37,6 +37,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { swapBattleEvent } from "#data/elite-redux/showdown/showdown-side-swap";
+import type { CommonAnim } from "#enums/move-anims-common";
 import { coopNarrateMoveUsed } from "#phases/coop-replay-phases";
 
 /**
@@ -107,13 +108,22 @@ export class CoopReplayTurnPhase extends Phase {
   private awaitingAuthority = false;
   /** Immutable source wave for every event presented by this turn pump and its continuations. */
   private readonly sourceWave: number;
+  /** Showdown turn-1 prefix consumer: replay the retained post-summon carrier before command input. */
+  private readonly entryPresentationOnly: boolean;
 
-  constructor(turn: number, rendered = 0, hpChain?: [number, number][], sourceWave?: number) {
+  constructor(
+    turn: number,
+    rendered = 0,
+    hpChain?: [number, number][],
+    sourceWave?: number,
+    entryPresentationOnly = false,
+  ) {
     super();
     this.turn = turn;
     this.rendered = rendered;
     this.fromHpByBi = new Map(hpChain ?? []);
     this.sourceWave = sourceWave ?? globalScene.currentBattle?.waveIndex ?? 0;
+    this.entryPresentationOnly = entryPresentationOnly;
   }
 
   /** Bind this async phase to the exact phase tree that created it. */
@@ -202,6 +212,11 @@ export class CoopReplayTurnPhase extends Phase {
       this.handleAuthorityFailure(streamer, bufferedFailure);
       return;
     }
+    if (this.entryPresentationOnly) {
+      coopLog("replay", `guest replay turn=${this.turn}: awaiting retained entry presentation`);
+      void this.pumpEntryPresentation(streamer);
+      return;
+    }
     // #790 (live post-resync strand): a DUPLICATE replay phase for an already-finalized turn
     // (a leftover pump continuation that a resync raced past) must never park - the host will
     // never resend that turn's resolution, and the legit instance already advanced the run.
@@ -238,7 +253,10 @@ export class CoopReplayTurnPhase extends Phase {
       }
     }
     if (this.rendered === 0) {
-      coopLog("replay", `guest replay turn=${this.turn}: live pump start (awaiting host events/resolution)`);
+      coopLog(
+        "replay",
+        `guest replay turn=${this.turn}: live pump start mode=${this.entryPresentationOnly ? "entry-presentation" : "turn"}`,
+      );
     }
     void this.pump(streamer);
   }
@@ -266,6 +284,22 @@ export class CoopReplayTurnPhase extends Phase {
         }
         // 1) Present any contiguous live events buffered right now, then continue via a
         //    continuation phase so the presentations actually play before the next drain.
+        const sharedRendered = streamer.renderedThroughForTurn(this.turn, this.sourceWave);
+        if (sharedRendered > this.rendered) {
+          coopLog(
+            "replay",
+            `guest replay turn=${this.turn}: advance local watermark ${this.rendered}->${sharedRendered}`,
+          );
+          globalScene.phaseManager.unshiftNew(
+            "CoopReplayTurnPhase",
+            this.turn,
+            sharedRendered,
+            [...this.fromHpByBi.entries()],
+            this.sourceWave,
+          );
+          this.end();
+          return;
+        }
         const increment = streamer.consumeLiveEventsFrom(this.turn, this.rendered, this.sourceWave);
         if (increment.length > 0) {
           coopLog(
@@ -677,6 +711,66 @@ export class CoopReplayTurnPhase extends Phase {
     }
   }
 
+  /** Render the complete, re-requestable Showdown entry prefix before either command surface opens. */
+  private async pumpEntryPresentation(streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>): Promise<void> {
+    try {
+      this.awaitingAuthority = true;
+      const prefix = await streamer.awaitEntryPresentation(this.sourceWave);
+      this.awaitingAuthority = false;
+      if (this.aborted || this.ended || getCoopBattleStreamer() !== streamer) {
+        return;
+      }
+      if (prefix == null) {
+        this.failAuthority(
+          streamer,
+          "turnResolution",
+          `Showdown entry presentation for wave ${this.sourceWave} was unavailable.`,
+        );
+        return;
+      }
+      // The prefix and post-summon state share one retained carrier. Apply that state (or prove its exact
+      // tick already landed through EncounterPhase) before displaying the cues it authored. This prevents
+      // a renderer from showing rain/terrain/ability material over an older mechanical battlefield.
+      const entryState = streamer.consumeEnemyPartyState(this.sourceWave);
+      if (
+        entryState !== undefined
+        && !applyCoopAuthoritativeBattleState(entryState, true)
+        && !reapplyAcceptedCoopAuthoritativeBattleState(entryState, true)
+      ) {
+        this.failAuthority(
+          streamer,
+          "turnResolution",
+          `Showdown entry state for wave ${this.sourceWave} could not be installed before presentation.`,
+        );
+        return;
+      }
+      if (coopAppliedStateTick() < prefix.stateTick) {
+        this.failAuthority(
+          streamer,
+          "turnResolution",
+          `Showdown entry presentation requires state tick ${prefix.stateTick}, applied ${coopAppliedStateTick()}.`,
+        );
+        return;
+      }
+      const events = [...prefix.events];
+      this.renderEvents(events);
+      streamer.noteRenderedThrough(this.turn, events.length, this.sourceWave);
+      coopLog(
+        "replay",
+        `guest replay turn=${this.turn}: retained entry presentation installed stateTick=${prefix.stateTick} `
+          + `events=${events.length}`,
+      );
+      this.end();
+    } catch {
+      this.awaitingAuthority = false;
+      this.failAuthority(
+        streamer,
+        "turnResolution",
+        `Showdown entry presentation for wave ${this.sourceWave} could not be replayed.`,
+      );
+    }
+  }
+
   /** Retire an obsolete async continuation without shifting an unrelated newer queue. */
   private retireSupersededWait(): void {
     if (globalScene.phaseManager.getCurrentPhase() === this) {
@@ -987,6 +1081,13 @@ export class CoopReplayTurnPhase extends Phase {
     for (const { seq, event } of live) {
       liveBySeq.set(seq, event);
     }
+    // A retained entry prefix can advance the shared watermark before the best-effort live copies are
+    // consumed. Those lower positions are already rendered and are not "extra" events after the batch.
+    for (const seq of liveBySeq.keys()) {
+      if (seq < fromIndex) {
+        liveBySeq.delete(seq);
+      }
+    }
     const merged: CoopBattleEvent[] = [];
     // Render every REMAINING batch POSITION exactly once, preferring the live-channel copy for that
     // seq/index. Positions < fromIndex were already presented live by the pump (#782) - skip them.
@@ -1074,6 +1175,27 @@ export class CoopReplayTurnPhase extends Phase {
           case "status":
             pm.unshiftNew("CoopStatusReplayPhase", event.bi, event.status);
             break;
+          case "showAbility":
+            pm.unshiftNew(
+              "CoopShowAbilityReplayPhase",
+              event.bi,
+              event.pokemonId,
+              event.partySlot,
+              event.abilityId,
+              event.passive,
+              event.passiveSlot,
+            );
+            break;
+          case "weather":
+          case "terrain":
+            if (event.anim !== undefined) {
+              pm.unshiftNew("CommonAnimPhase", undefined, undefined, event.anim as CommonAnim, {
+                source: "environment",
+                kind: event.k,
+                value: event.k === "weather" ? event.weather : event.terrain,
+              });
+            }
+            break;
           case "faint":
             // #691 (host-language leak): pass the `narrate` flag so the faint phase regenerates the
             // "X fainted!" line in the GUEST'S language ONLY for KOs the host actually narrated (a real
@@ -1087,7 +1209,8 @@ export class CoopReplayTurnPhase extends Phase {
             });
             break;
           default:
-            // weather / terrain / switch ride the authoritative checkpoint, not the animation pump.
+            // Switch placement rides the authoritative checkpoint; every declared cosmetic event above
+            // is rendered without running mechanics.
             break;
         }
       } catch {

@@ -4,24 +4,42 @@ import type { BattlerIndex } from "#enums/battler-index";
 import type { CommonAnim } from "#enums/move-anims-common";
 import { PokemonPhase } from "#phases/pokemon-phase";
 
+export interface CommonAnimPresentationTag {
+  readonly source: "environment";
+  readonly kind: "weather" | "terrain";
+  readonly value: number;
+}
+
 export class CommonAnimPhase extends PokemonPhase {
   // PokemonHealPhase extends CommonAnimPhase, and to make typescript happy,
   // we need to allow phaseName to be a union of the two
   public readonly phaseName: "CommonAnimPhase" | "PokemonHealPhase" | "WeatherEffectPhase" = "CommonAnimPhase";
   private anim: CommonAnim | null;
-  private targetIndex?: BattlerIndex | undefined;
+  private readonly targetIndex: BattlerIndex | undefined;
+  public readonly coopPresentation: CommonAnimPresentationTag | undefined;
 
   // TODO: Why can common anim be null?
   // TODO: Pass in pokemon directly instead of operating with unsafe indices
-  constructor(battlerIndex?: BattlerIndex, targetIndex?: BattlerIndex, anim: CommonAnim | null = null) {
+  constructor(
+    battlerIndex?: BattlerIndex,
+    targetIndex?: BattlerIndex,
+    anim: CommonAnim | null = null,
+    coopPresentation?: CommonAnimPresentationTag,
+  ) {
     super(battlerIndex);
 
     this.anim = anim;
     this.targetIndex = targetIndex;
+    this.coopPresentation = coopPresentation;
   }
 
   setAnimation(anim: CommonAnim) {
     this.anim = anim;
+  }
+
+  /** Read-only presentation identity used by the sealed two-browser oracle. */
+  public getAnimationId(): CommonAnim | null {
+    return this.anim;
   }
 
   start() {

@@ -1,20 +1,25 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import type { BattlerIndex } from "#enums/battler-index";
+import type { Pokemon } from "#field/pokemon";
 import { PokemonPhase } from "#phases/pokemon-phase";
 
 export class ShowAbilityPhase extends PokemonPhase {
   public readonly phaseName = "ShowAbilityPhase";
-  private passive: boolean;
+  private readonly passive: boolean;
   /**
    * ER 3-passive: which passive slot (0/1/2) this display refers to.
    * Only meaningful when {@linkcode passive} is `true`; ignored otherwise.
    * Defaults to slot 0 for legacy single-passive callers.
    */
-  private passiveSlot: 0 | 1 | 2;
-  private pokemonName: string;
-  private abilityName: string;
-  private pokemonOnField: boolean;
+  private readonly passiveSlot: 0 | 1 | 2;
+  private readonly pokemonName: string;
+  private readonly abilityName: string;
+  private readonly abilityId: number;
+  private readonly pokemonId: number;
+  private readonly partySlot: number;
+  private readonly pokemonOnField: boolean;
 
   constructor(battlerIndex: BattlerIndex, passive = false, passiveSlot: 0 | 1 | 2 = 0) {
     super(battlerIndex);
@@ -34,10 +39,31 @@ export class ShowAbilityPhase extends PokemonPhase {
       // If the slot is empty (null), there's nothing to display. We still mark
       // the pokemon as on-field so start() runs end() through the early-return.
       this.abilityName = ability?.name ?? "";
+      this.abilityId = ability?.id ?? 0;
+      this.pokemonId = pokemon.id;
+      const party: readonly Pokemon[] = pokemon.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+      this.partySlot = party.indexOf(pokemon);
       this.pokemonOnField = true;
     } else {
+      this.pokemonName = "";
+      this.abilityName = "";
+      this.abilityId = 0;
+      this.pokemonId = 0;
+      this.partySlot = -1;
       this.pokemonOnField = false;
     }
+  }
+
+  /** Read-only exact presentation identity used by the sealed two-browser oracle. */
+  public getCoopPresentationIdentity() {
+    return {
+      source: "ability" as const,
+      pokemonId: this.pokemonId,
+      partySlot: this.partySlot,
+      abilityId: this.abilityId,
+      passive: this.passive,
+      passiveSlot: this.passiveSlot,
+    };
   }
 
   start() {
@@ -60,6 +86,20 @@ export class ShowAbilityPhase extends PokemonPhase {
     }
 
     const pokemon = this.getPokemon();
+    // Record at the actual flyout boundary (after the visible-bar requeue guard) so one host display
+    // produces exactly one ordered event. IDs plus side-local party order, never localized labels, let
+    // every renderer identify the same switch-in before the following authoritative checkpoint.
+    if (this.partySlot >= 0) {
+      recordCoopEvent({
+        k: "showAbility",
+        bi: this.battlerIndex,
+        pokemonId: this.pokemonId,
+        partySlot: this.partySlot,
+        abilityId: this.abilityId,
+        passive: this.passive,
+        passiveSlot: this.passiveSlot,
+      });
+    }
 
     if (pokemon.isPlayer()) {
       globalScene.currentBattle.lastPlayerInvolved = globalScene.currentBattle.arrangement.locate(

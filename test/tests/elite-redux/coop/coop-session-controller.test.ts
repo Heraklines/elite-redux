@@ -71,10 +71,10 @@ describe("co-op session controller (#633, P1)", () => {
       clearNegotiatedCoopCapabilities();
     });
 
-    it("rejects an older peer without authenticated V2 quiz presentation carriers", async () => {
-      // er-coop-43: a 42 peer cannot reconstruct the complete immutable interaction projection,
+    it("rejects an older peer that cannot decode the complete battle presentation stream", async () => {
+      // er-coop-44: a 43 peer rejects the new embedded Showdown presentation event kind,
       // so pairing must fail closed instead of accepting a mixed recovery graph.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-43");
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-44");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",

@@ -40,6 +40,7 @@ import {
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import { TerrainType } from "#data/terrain";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { GameModes } from "#enums/game-modes";
@@ -47,6 +48,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import {
   CoopFaintReplayPhase,
@@ -316,6 +318,53 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     }
   });
 
+  it("(A) records an immutable ability flyout plus weather/terrain presentation material", async () => {
+    const field = await startCoopHost();
+    const hostMon = field[COOP_HOST_FIELD_INDEX];
+    globalScene.arena.weather = null;
+    globalScene.arena.terrain = null;
+
+    const visibleSpy = vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(false);
+    const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility").mockResolvedValue();
+
+    beginCoopRecording(globalScene.currentBattle.turn);
+    const phase = game.scene.phaseManager.create("ShowAbilityPhase", hostMon.getBattlerIndex(), false, 0);
+    phase.start();
+    await new Promise(r => setTimeout(r, 0));
+    expect(globalScene.arena.trySetWeather(WeatherType.RAIN, hostMon)).toBe(true);
+    expect(globalScene.arena.trySetTerrain(TerrainType.GRASSY, false, hostMon)).toBe(true);
+    const recording = endCoopRecording();
+
+    expect(recording.events.find(event => event.k === "showAbility")).toEqual({
+      k: "showAbility",
+      bi: hostMon.getBattlerIndex(),
+      pokemonId: hostMon.id,
+      partySlot: globalScene.getPlayerParty().indexOf(hostMon),
+      abilityId: hostMon.getAbility().id,
+      passive: false,
+      passiveSlot: 0,
+    });
+    expect(recording.events.find(event => event.k === "weather")).toMatchObject({
+      k: "weather",
+      weather: WeatherType.RAIN,
+      turnsLeft: 5,
+    });
+    expect(recording.events.find(event => event.k === "terrain")).toMatchObject({
+      k: "terrain",
+      terrain: TerrainType.GRASSY,
+      turnsLeft: 5,
+    });
+    expect((recording.events.find(event => event.k === "weather") as { anim?: number } | undefined)?.anim).toEqual(
+      expect.any(Number),
+    );
+    expect((recording.events.find(event => event.k === "terrain") as { anim?: number } | undefined)?.anim).toEqual(
+      expect.any(Number),
+    );
+
+    visibleSpy.mockRestore();
+    showSpy.mockRestore();
+  });
+
   it("(A) the recorder seams are INERT outside a recording (no event leaks, solo unaffected)", async () => {
     const field = await startCoopHost();
     // No beginCoopRecording -> isCoopRecording() is false, so the seams record nothing.
@@ -337,6 +386,9 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const field = await startCoopGuest();
     const turn = globalScene.currentBattle.turn;
     const enemy0 = globalScene.getEnemyField(false)[0];
+    const hostMon = field[COOP_HOST_FIELD_INDEX];
+    const visibleSpy = vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(false);
+    const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility").mockResolvedValue();
 
     // A rich event stream: a move animation, an HP drain on the host's mon, a stat change, a status anim,
     // and a faint on an enemy. Every kind the host can emit. The checkpoint snaps every mon to hp=9.
@@ -352,6 +404,15 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
         { k: "hp", bi: enemy0.getBattlerIndex(), hp: 9, maxHp: enemy0.getMaxHp() },
         { k: "statStage", bi: BattlerIndex.PLAYER, stat: Stat.ATK, value: 2 },
         { k: "status", bi: enemy0.getBattlerIndex(), status: 0 },
+        {
+          k: "showAbility",
+          bi: hostMon.getBattlerIndex(),
+          pokemonId: hostMon.id,
+          partySlot: globalScene.getPlayerParty().indexOf(hostMon),
+          abilityId: hostMon.getAbility().id,
+          passive: false,
+          passiveSlot: 0,
+        },
         { k: "faint", bi: enemy0.getBattlerIndex() },
       ],
     });
@@ -366,6 +427,9 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     for (const mon of field) {
       expect(mon.hp, "guest field snaps to the host's streamed checkpoint hp").toBe(9);
     }
+    expect(showSpy, "the renderer displays the exact streamed ability material").toHaveBeenCalledTimes(1);
+    visibleSpy.mockRestore();
+    showSpy.mockRestore();
   });
 
   it("(B) CONVERGENCE: after the guest pump + checkpoint, the post-render CHECKSUM matches the host's", async () => {

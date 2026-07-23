@@ -32,6 +32,8 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
+import { SideKind } from "#data/battle-format";
+import { allAbilities } from "#data/data-lists";
 import type { CoopAuthorityEntryKind, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2WaveCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
@@ -119,6 +121,7 @@ import type { MoveId } from "#enums/move-id";
 import type { PokeballType } from "#enums/pokeball";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { PokemonPhase } from "#phases/pokemon-phase";
 import { fixedInt } from "#utils/common";
@@ -203,6 +206,115 @@ export function coopNarrateFaint(bi: number): void {
   } catch {
     // A bad bi must never throw into the replay pump - skip the cosmetic line.
     coopWarn("replay", `narrate faint bi=${bi} threw (handled, line skipped)`);
+  }
+}
+
+/**
+ * GUEST: replay one host-resolved ability flyout without running an ability or deriving which ability
+ * fired. The immutable event identifies the Pokemon and ability directly, so this also works for a
+ * switch-in that is still off-field on the renderer until the following authoritative checkpoint.
+ * Names are resolved from local data at display time, preserving each player's selected language.
+ */
+export class CoopShowAbilityReplayPhase extends Phase {
+  public readonly phaseName = "CoopShowAbilityReplayPhase";
+
+  private readonly bi: number;
+  private readonly pokemonId: number;
+  private readonly partySlot: number;
+  private readonly abilityId: number;
+  private readonly passive: boolean;
+  private readonly passiveSlot: 0 | 1 | 2;
+
+  constructor(
+    bi: number,
+    pokemonId: number,
+    partySlot: number,
+    abilityId: number,
+    passive: boolean,
+    passiveSlot: 0 | 1 | 2,
+  ) {
+    super();
+    this.bi = bi;
+    this.pokemonId = pokemonId;
+    this.partySlot = partySlot;
+    this.abilityId = abilityId;
+    this.passive = passive;
+    this.passiveSlot = passiveSlot;
+  }
+
+  /** Read-only exact presentation identity used by the sealed two-browser oracle. */
+  public getCoopPresentationIdentity() {
+    return {
+      source: "ability" as const,
+      pokemonId: this.pokemonId,
+      partySlot: this.partySlot,
+      abilityId: this.abilityId,
+      passive: this.passive,
+      passiveSlot: this.passiveSlot,
+    };
+  }
+
+  public override start(): void {
+    super.start();
+
+    // Pokemon ids are unique only within one side, and the two Showdown clients can briefly hold
+    // different local ids before the next authoritative state image lands. Resolve through the
+    // side-swapped battler address plus stable party order first; use the id only inside that side.
+    const playerSide = globalScene.currentBattle.arrangement.ownerOf(this.bi) === SideKind.PLAYER;
+    const party: readonly Pokemon[] = playerSide ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+    const pokemonAtSlot = party[this.partySlot];
+    const pokemon = pokemonAtSlot ?? party.find(candidate => candidate.id === this.pokemonId);
+    const ability = allAbilities[this.abilityId];
+    if (pokemon == null || ability == null || !ability.name) {
+      coopWarn(
+        "replay",
+        `present ability bi=${this.bi} pokemonId=${this.pokemonId} abilityId=${this.abilityId} missing material (skipped)`,
+      );
+      this.end();
+      return;
+    }
+
+    // Match the ordinary ShowAbilityPhase queue discipline. Requeueing happens before the flyout and
+    // does not re-run mechanics; the event has already selected the exact immutable presentation.
+    if (globalScene.abilityBar.isVisible()) {
+      globalScene.phaseManager.unshiftNew("HideAbilityPhase");
+      globalScene.phaseManager.unshiftNew(
+        "CoopShowAbilityReplayPhase",
+        this.bi,
+        this.pokemonId,
+        this.partySlot,
+        this.abilityId,
+        this.passive,
+        this.passiveSlot,
+      );
+      this.end();
+      return;
+    }
+
+    let ended = false;
+    let watchdog: Phaser.Time.TimerEvent | undefined;
+    const finish = () => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      pokemon.revealAbility();
+      this.end();
+    };
+
+    try {
+      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
+      globalScene.abilityBar
+        .showAbility(getPokemonNameWithAffix(pokemon), ability.name, this.passive, pokemon.isPlayer())
+        .then(finish, finish);
+    } catch {
+      coopWarn(
+        "replay",
+        `present ability bi=${this.bi} pokemonId=${this.pokemonId} abilityId=${this.abilityId} threw (handled)`,
+      );
+      finish();
+    }
   }
 }
 

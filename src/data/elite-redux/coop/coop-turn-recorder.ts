@@ -31,6 +31,10 @@ import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 /** The open recording: the turn number stamped at start + the ordered events + the per-turn live seq. */
 interface CoopRecording {
   turn: number;
+  /** Explicit session+wave boundary that permits same-turn summon/TurnStart prefix preservation. */
+  scope: string | undefined;
+  /** Event count frozen at the Showdown pre-command boundary. */
+  entryPresentationLength: number | undefined;
   events: CoopBattleEvent[];
   /** Per-turn monotonic index stamped on each event as it is recorded (the LIVE emit ordering). */
   seq: number;
@@ -88,23 +92,32 @@ export function setCoopLiveEmitter(emitter: CoopLiveEmitter | null): void {
 }
 
 /**
- * HOST: open a recording for `turn` (stamped now, at TurnStart). A recording already
- * open is replaced (defensive - a turn never overlaps another). No-op semantics are the
- * caller's job (only the host, in a live co-op run, begins recording). The per-turn live
- * `seq` resets to 0 so each turn's events number from the start.
+ * HOST: open a recording for `turn`. Showdown opens this at summon so entry presentation
+ * is not lost before TurnStart; TurnStart calls this again for the same turn. That repeated
+ * call is deliberately idempotent only when both callers provide the same explicit session+wave
+ * `scope`, preserving the already-recorded prefix without conflating repeated turn numbers across
+ * waves or sessions.
+ * A different open turn is still replaced defensively. The per-turn live `seq` resets to 0
+ * only for a genuinely new recording.
  */
-export function beginCoopRecording(turn: number): void {
+export function beginCoopRecording(turn: number, scope?: string): void {
   if (recording == null) {
-    coopLog("turn", `host recorder: begin turn=${turn} (no prior open recording)`);
+    coopLog("turn", `host recorder: begin turn=${turn} scope=${scope ?? "none"} (no prior open recording)`);
+  } else if (scope != null && recording.scope === scope && recording.turn === turn) {
+    coopLog(
+      "turn",
+      `host recorder: preserve recording scope=${scope} turn=${turn} events=${recording.events.length} seq=${recording.seq}`,
+    );
+    return;
   } else {
     // A turn should never overlap another; an open recording at begin means the prior turn never
     // finalized (endCoopRecording was missed) - its buffered events are discarded by the replace.
     coopWarn(
       "turn",
-      `host recorder: begin turn=${turn} REPLACES open recording turn=${recording.turn} events=${recording.events.length} (prior turn never finalized)`,
+      `host recorder: begin scope=${scope ?? "none"} turn=${turn} REPLACES open scope=${recording.scope ?? "none"} turn=${recording.turn} events=${recording.events.length} (prior turn never finalized)`,
     );
   }
-  recording = { turn, events: [], seq: 0, faintOccurrences: new Map() };
+  recording = { turn, scope, entryPresentationLength: undefined, events: [], seq: 0, faintOccurrences: new Map() };
 }
 
 /** Whether a recording is currently open (the queueMessage tap checks this - inert otherwise). */
@@ -169,6 +182,19 @@ export function recordCoopEvent(event: CoopBattleEvent): number | null {
 }
 
 /**
+ * HOST Showdown: freeze the complete summon/on-entry presentation prefix exactly once. The retained
+ * wave-start carrier delivers this immutable copy before turn-1 command input; the ordinary turn batch
+ * still contains the same positions and the renderer's shared watermark prevents duplicate display.
+ */
+export function sealCoopEntryPresentation(): CoopBattleEvent[] | null {
+  if (recording == null) {
+    return null;
+  }
+  recording.entryPresentationLength ??= recording.events.length;
+  return recording.events.slice(0, recording.entryPresentationLength);
+}
+
+/**
  * Bind the next recorded faint occurrence for one battler to its real host FaintPhase. A missing
  * occurrence is normal outside authoritative recording and falls back to zero at the caller.
  */
@@ -189,7 +215,14 @@ export function consumeCoopRecordedFaintOccurrence(battlerIndex: number): number
  * (empty + turn -1 when nothing was recorded, so the caller can decide whether to emit).
  */
 export function endCoopRecording(): CoopRecording {
-  const done = recording ?? { turn: -1, events: [], seq: 0, faintOccurrences: new Map() };
+  const done = recording ?? {
+    turn: -1,
+    scope: undefined,
+    entryPresentationLength: undefined,
+    events: [],
+    seq: 0,
+    faintOccurrences: new Map(),
+  };
   if (recording == null) {
     coopWarn("turn", "host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)");
   } else {

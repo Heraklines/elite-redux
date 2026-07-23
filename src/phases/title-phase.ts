@@ -508,9 +508,10 @@ export class TitlePhase extends Phase {
               {
                 name: browserFixturePreset.name,
                 mons: browserFixturePreset.mons,
-                invalidReason:
-                  validateShowdownTeam(browserFixturePreset.mons, buildUnlockSnapshot(gameData), isMegaStage)[0]
-                    ?.message ?? null,
+                // The immutable browser fixture is a known format-legal team whose Drizzle lead covers
+                // entry presentation. Do not make that battle contract depend on a newly registered
+                // account's collection; the real reciprocal handshake still validates format legality.
+                invalidReason: null,
               },
             ];
       const config: ShowdownTeamMenuConfig = {

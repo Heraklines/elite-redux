@@ -70,6 +70,7 @@ const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
+const PRESENTATION_PREFIX = "[coop-browser:presentation] ";
 
 // =============================================================================
 // Optimization brief R4: digest-cost SLA. Detection latency is FIXED (1s parked
@@ -1487,10 +1488,75 @@ function observeSemanticSurface(): void {
   }
 }
 
+// Showdown presentation is intentionally not part of the mechanical digest: two locales render different
+// text while sharing one state. The dedicated browser journey must nevertheless prove that both real
+// clients displayed the stream, rather than accepting silent checkpoint convergence. Observe each concrete
+// long-lived presentation phase once; this is read-only and supplies no phase/scene mutation capability.
+const observedPresentationPhases = new WeakSet<object>();
+function observeShowdownPresentation(): void {
+  try {
+    const runtime = getCoopRuntime();
+    if (runtime?.controller.isVersusSession() !== true) {
+      return;
+    }
+    const phase = globalScene?.phaseManager?.getCurrentPhase();
+    if (phase == null || observedPresentationPhases.has(phase)) {
+      return;
+    }
+    const phaseName = phase.phaseName;
+    const abilityVisible = globalScene.abilityBar?.isVisible() === true;
+    const environment = {
+      weather: globalScene.arena?.weather?.weatherType ?? 0,
+      terrain: globalScene.arena?.terrain?.terrainType ?? 0,
+    };
+    const isAbility =
+      abilityVisible && (phaseName === "ShowAbilityPhase" || phaseName === "CoopShowAbilityReplayPhase");
+    const abilityPresentation = (
+      phase as unknown as { getCoopPresentationIdentity?: () => Record<string, unknown> }
+    ).getCoopPresentationIdentity?.();
+    const environmentPresentation = (
+      phase as unknown as {
+        coopPresentation?: { source?: unknown; kind?: unknown; value?: unknown };
+        getAnimationId?: () => unknown;
+      }
+    ).coopPresentation;
+    const anim = (phase as unknown as { getAnimationId?: () => unknown }).getAnimationId?.();
+    const isEnvironment =
+      phaseName === "CommonAnimPhase"
+      && environmentPresentation?.source === "environment"
+      && (environmentPresentation.kind === "weather" || environmentPresentation.kind === "terrain")
+      && Number.isSafeInteger(environmentPresentation.value)
+      && Number.isSafeInteger(anim);
+    if (!isAbility && !isEnvironment) {
+      return;
+    }
+    observedPresentationPhases.add(phase);
+    console.info(
+      `${PRESENTATION_PREFIX}${JSON.stringify({
+        version: 1,
+        kind: isAbility ? "ability" : "environment",
+        role: runtime.controller.role,
+        epoch: runtime.controller.sessionEpoch,
+        wave: globalScene.currentBattle.waveIndex,
+        turn: globalScene.currentBattle.turn,
+        phase: phaseName,
+        abilityVisible,
+        abilityPresentation: isAbility ? abilityPresentation : null,
+        anim: Number.isSafeInteger(anim) ? anim : null,
+        environmentPresentation: isEnvironment ? environmentPresentation : null,
+        ...environment,
+      })}`,
+    );
+  } catch {
+    // The scene may be between battles. Ordinary page/observer diagnostics still own real failures.
+  }
+}
+
 setInterval(() => {
   observeBoundSession();
   observeContinuationSurface();
   observeSemanticSurface();
+  observeShowdownPresentation();
   observeRenderProfile();
   observeBiomeMarket();
   observeCommanderBoundary();

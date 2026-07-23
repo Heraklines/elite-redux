@@ -3,6 +3,8 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { erApplyPendingRevives } from "#data/elite-redux/archetypes/post-faint-deferred-revive";
+import { getCoopController, isAuthoritativeBattleSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
+import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erApplyPendingSwitchInBoost } from "#data/elite-redux/empower-switch-in";
 import { erApplyPendingSafePassage } from "#data/elite-redux/safe-passage";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
@@ -29,6 +31,18 @@ export class SummonPhase extends PartyMemberPokemonPhase {
 
   start() {
     super.start();
+
+    // SHOWDOWN presentation authority: switch-in/lead abilities and environment changes fire in the
+    // summon chain, before TurnStart previously opened the recorder. Open the host's ordered stream
+    // here; TurnStart's same-turn begin is idempotent and preserves this prefix. Classic co-op keeps its
+    // existing initial lockstep summon presentation, avoiding duplicate lead flyouts there.
+    const controller = getCoopController();
+    if (isAuthoritativeBattleSession() && isVersusSession() && controller?.role === "host") {
+      beginCoopRecording(
+        globalScene.currentBattle.turn,
+        `${controller.sessionEpoch}:${globalScene.currentBattle.waveIndex}`,
+      );
+    }
 
     applyAbAttrs("PreSummonAbAttr", { pokemon: this.getPokemon() });
     this.preSummon();

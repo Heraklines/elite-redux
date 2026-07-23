@@ -100,7 +100,8 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
       { k: "hp", bi: 2, hp: 3, maxHp: 14 },
       { k: "faint", bi: 2 },
       { k: "statStage", bi: 1, stat: 1, value: -1 },
-      { k: "weather", weather: 3, turnsLeft: 5 },
+      { k: "showAbility", bi: 1, pokemonId: 991, partySlot: 3, abilityId: 22, passive: true, passiveSlot: 2 },
+      { k: "weather", weather: 3, turnsLeft: 5, anim: 7 },
     ];
     const checkpoint: CoopBattleCheckpoint = {
       tick: 1,
@@ -149,11 +150,21 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
       throw new Error("discriminant lost over the wire");
     }
     expect(msg.turn).toBe(1);
-    expect(msg.events).toHaveLength(6);
+    expect(msg.events).toHaveLength(7);
     // Ordered + discriminated events survive.
     expect(msg.events[0]).toEqual({ k: "message", text: "Bulbasaur used Vine Whip!" });
     const faint = msg.events.find(e => e.k === "faint");
     expect(faint).toEqual({ k: "faint", bi: 2 });
+    const ability = msg.events.find(e => e.k === "showAbility");
+    expect(ability).toEqual({
+      k: "showAbility",
+      bi: 1,
+      pokemonId: 991,
+      partySlot: 3,
+      abilityId: 22,
+      passive: true,
+      passiveSlot: 2,
+    });
     // The authoritative checkpoint is intact: the enemy is at 0 hp + fainted.
     const enemyState = msg.checkpoint.field.find(f => f.bi === 2);
     expect(enemyState?.hp).toBe(0);

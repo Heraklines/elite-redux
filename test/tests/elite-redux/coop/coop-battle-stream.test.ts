@@ -281,6 +281,30 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         7,
         1,
         1,
+        [
+          {
+            k: "showAbility",
+            bi: 0,
+            pokemonId: 7,
+            partySlot: 0,
+            abilityId: 1,
+            passive: true,
+            passiveSlot: 3,
+          } as never,
+        ],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
+    expect(stream.retainedAuthorityDiagnostics().turnCommits).toBe(0);
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
         [{ k: "moveUsed", bi: 0, moveId: 1, targets: [] }],
         emptyCheckpoint(),
         "deadbeefdeadbeef",
@@ -392,6 +416,102 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.consumeEnemyParty(9),
       "a delayed lower tick cannot repopulate the party half of the same carrier",
     ).toBeNull();
+  });
+
+  it("delivers a retained Showdown entry prefix exactly once across duplicate carriers", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+    const state = emptyAuthoritativeState(9);
+    const entryPresentation = [
+      {
+        k: "showAbility" as const,
+        bi: 2,
+        pokemonId: 77,
+        partySlot: 0,
+        abilityId: 22,
+        passive: false,
+        passiveSlot: 0 as const,
+      },
+      { k: "terrain" as const, terrain: 1, turnsLeft: 5, anim: 7 },
+    ];
+
+    hostStream.sendEnemyParty(
+      9,
+      [{ fieldIndex: 2, data: { speciesId: 77 } }],
+      -1,
+      0,
+      state,
+      undefined,
+      entryPresentation,
+    );
+    hostStream.sendEnemyParty(
+      9,
+      [{ fieldIndex: 2, data: { speciesId: 999 } }],
+      -1,
+      0,
+      { ...state, tick: state.tick + 1 },
+      undefined,
+      entryPresentation,
+    );
+    await flushWire();
+    await expect(guestStream.awaitEntryPresentation(9)).resolves.toEqual({
+      events: entryPresentation,
+      stateTick: state.tick,
+    });
+
+    hostStream.sendEnemyParty(
+      9,
+      [{ fieldIndex: 2, data: { speciesId: 77 } }],
+      -1,
+      0,
+      state,
+      undefined,
+      entryPresentation,
+    );
+    await flushWire();
+    expect(guestStream.consumeEntryPresentation(9), "a duplicate retained carrier cannot replay the prefix").toBeNull();
+    await expect(
+      guestStream.awaitEntryPresentation(9, { timeoutMs: 5 }),
+      "a reconstructed turn-1 phase completes immediately after the exact prefix was already consumed",
+    ).resolves.toEqual({ events: [], stateTick: 0 });
+  });
+
+  it("rejects malformed or unbounded Showdown entry presentation before retaining it", () => {
+    const { host } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const state = emptyAuthoritativeState(9);
+    const enemies = [{ fieldIndex: 2, data: { speciesId: 77 } }];
+
+    expect(() =>
+      hostStream.sendEnemyParty(9, enemies, -1, 0, state, undefined, [
+        {
+          k: "showAbility",
+          bi: 2,
+          pokemonId: 77,
+          partySlot: 0,
+          abilityId: 0,
+          passive: false,
+          passiveSlot: 0,
+        },
+      ]),
+    ).toThrow("malformed entry presentation");
+    expect(() =>
+      hostStream.sendEnemyParty(
+        9,
+        enemies,
+        -1,
+        0,
+        state,
+        undefined,
+        Array.from({ length: 257 }, () => ({ k: "terrain" as const, terrain: 1, turnsLeft: 5, anim: 7 })),
+      ),
+    ).toThrow("events=257");
+    expect(() =>
+      hostStream.sendEnemyParty(9, enemies, -1, 0, undefined, undefined, [
+        { k: "terrain", terrain: 1, turnsLeft: 5, anim: 7 },
+      ]),
+    ).toThrow("without its exact wave-start state");
   });
 
   it("retires a mystery selector carrier without blocking a newer same-wave battle carrier", async () => {

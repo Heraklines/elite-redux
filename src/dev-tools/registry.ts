@@ -124,8 +124,9 @@ export function isCoopBrowserShowdownFixtureBuild(): boolean {
  * This fixture is inert unless both the immutable build identity and the exact page URL agree.
  * It does not persist or auto-select anything: each browser still opens the normal team menu,
  * confirms the visible preset, pairs, chooses its wager, and commands the battle through public
- * keyboard input. An omitted nature deliberately avoids depending on account-specific nature
- * unlocks while the fresh-account default Bulbasaur/ability and Tackle remain production-legal.
+ * keyboard input. Pelipper's ordinary Drizzle lead deterministically exercises both an ability flyout
+ * and weather animation before command input; the fixture bundle supplies that legal preset independently
+ * of the ephemeral test account's collection unlocks.
  */
 export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null {
   if (!isCoopBrowserShowdownFixtureBuild() || typeof location === "undefined") {
@@ -135,18 +136,18 @@ export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null
     return null;
   }
   const mon: ShowdownMonManifest = {
-    speciesId: SpeciesId.BULBASAUR,
+    speciesId: SpeciesId.PELIPPER,
     formIndex: 0,
     level: 100,
     shiny: false,
     variant: 0,
-    abilityIndex: 0,
+    abilityIndex: 1,
     ivs: new Array(6).fill(15),
-    moveset: [MoveId.TACKLE],
+    moveset: [MoveId.AIR_CUTTER],
     item: SHOWDOWN_ITEM_POOL[0],
-    rootSpeciesId: SpeciesId.BULBASAUR,
+    rootSpeciesId: SpeciesId.PELIPPER,
     erBlackShiny: false,
-    baseCost: speciesStarterCosts[SpeciesId.BULBASAUR],
+    baseCost: speciesStarterCosts[SpeciesId.PELIPPER],
   };
   return makeShowdownTeamPreset("Browser Showdown", [mon]);
 }

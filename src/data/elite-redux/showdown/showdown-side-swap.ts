@@ -131,6 +131,7 @@ export function swapBattleEvent(event: CoopBattleEvent): CoopBattleEvent {
     case "faint":
     case "statStage":
     case "status":
+    case "showAbility":
     case "switch":
       return { ...event, bi: swapBi(event.bi) };
     default:

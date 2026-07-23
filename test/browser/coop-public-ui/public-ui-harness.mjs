@@ -2353,6 +2353,86 @@ export class DuoPublicUiRig {
       ),
     );
     await this.waitForAllLocalCommandsDrivingBattlePrompts(battleCursors, "showdown-wave-1-intro");
+    const presentationPrefix = "[coop-browser:presentation] ";
+    const [hostAbility, guestAbility, hostEnvironment, guestEnvironment] = await Promise.all([
+      this.host.evidence.waitFor(/\[coop-browser:presentation\] \{.*"kind":"ability".*"phase":"ShowAbilityPhase"/u, {
+        from: battleCursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "authority Showdown ability flyout",
+      }),
+      this.guest.evidence.waitFor(
+        /\[coop-browser:presentation\] \{.*"kind":"ability".*"phase":"CoopShowAbilityReplayPhase"/u,
+        {
+          from: battleCursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: "renderer Showdown ability flyout",
+        },
+      ),
+      this.host.evidence.waitFor(/\[coop-browser:presentation\] \{.*"kind":"environment"/u, {
+        from: battleCursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "authority Showdown environment animation",
+      }),
+      this.guest.evidence.waitFor(/\[coop-browser:presentation\] \{.*"kind":"environment"/u, {
+        from: battleCursors[this.guest.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "renderer Showdown environment animation",
+      }),
+    ]);
+    const presentation = event => JSON.parse(event.text.slice(presentationPrefix.length));
+    const hostAbilityView = presentation(hostAbility);
+    const guestAbilityView = presentation(guestAbility);
+    const hostEnvironmentView = presentation(hostEnvironment);
+    const guestEnvironmentView = presentation(guestEnvironment);
+    const comparableAbility = view => ({
+      partySlot: view.abilityPresentation?.partySlot,
+      abilityId: view.abilityPresentation?.abilityId,
+      passive: view.abilityPresentation?.passive,
+      passiveSlot: view.abilityPresentation?.passiveSlot,
+    });
+    if (JSON.stringify(comparableAbility(hostAbilityView)) !== JSON.stringify(comparableAbility(guestAbilityView))) {
+      throw new Error(
+        `Showdown ability presentation diverged: host=${JSON.stringify(hostAbilityView)} guest=${JSON.stringify(guestAbilityView)}`,
+      );
+    }
+    if (
+      hostEnvironmentView.anim !== guestEnvironmentView.anim
+      || hostEnvironmentView.environmentPresentation?.kind !== guestEnvironmentView.environmentPresentation?.kind
+      || hostEnvironmentView.environmentPresentation?.value !== guestEnvironmentView.environmentPresentation?.value
+      || hostEnvironmentView.weather !== guestEnvironmentView.weather
+      || hostEnvironmentView.terrain !== guestEnvironmentView.terrain
+    ) {
+      throw new Error(
+        `Showdown environment presentation diverged: host=${JSON.stringify(hostEnvironmentView)} guest=${JSON.stringify(guestEnvironmentView)}`,
+      );
+    }
+    const commandMatch = findSharedCommandFrontierMatch(
+      this.host,
+      this.guest,
+      battleCursors,
+      this.lastSharedSurfaceAddress.get("command"),
+      { allowAddressRepeat: true, expectedWave: 1 },
+    );
+    if (
+      commandMatch == null
+      || hostAbility.index >= commandMatch.hostProjection.event.index
+      || hostEnvironment.index >= commandMatch.hostProjection.event.index
+      || guestAbility.index >= commandMatch.guestProjection.event.index
+      || guestEnvironment.index >= commandMatch.guestProjection.event.index
+    ) {
+      throw new Error("Showdown presentation did not complete on both clients before the shared command frontier");
+    }
+    for (const [client, event] of [
+      [this.host, hostAbility],
+      [this.guest, guestAbility],
+      [this.host, hostEnvironment],
+      [this.guest, guestEnvironment],
+    ]) {
+      client.evidence.record("showdown-presentation-proof", {
+        sourceEventIndex: event.index,
+        presentation: presentation(event),
+      });
+    }
     const boundary = await this.assertSharedCommandFrontier(battleCursors, "showdown-wave-1-command", {
       expectedWave: 1,
     });

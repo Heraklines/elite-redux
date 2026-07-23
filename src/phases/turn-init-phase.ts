@@ -102,6 +102,19 @@ export class TurnInitPhase extends FieldPhase {
       return true;
     }
     const deferCommand = this.shouldDeferVersusGuestCommandForEnemyReplacement();
+    if (isShowdownGuestFlipGated() && globalScene.currentBattle.turn === 1) {
+      // Showdown abilities/environment cues are host-authored during Summon/PostSummon. Consume their
+      // complete retained post-summon prefix before either real command opens; the shared event watermark
+      // prevents best-effort live copies and the ordinary post-command batch from showing them twice.
+      globalScene.phaseManager.pushNew(
+        "CoopReplayTurnPhase",
+        globalScene.currentBattle.turn,
+        0,
+        undefined,
+        globalScene.currentBattle.waveIndex,
+        true,
+      );
+    }
     globalScene.getField().forEach((pokemon, fieldIndex) => {
       if (pokemon?.isPlayer() && pokemon.isActive()) {
         // Clear prior-turn input ephemera so the local command UI cannot inherit a stale queued/skip state.

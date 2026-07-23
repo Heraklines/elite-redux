@@ -11,7 +11,7 @@ import test from "node:test";
 const root = resolve(import.meta.dirname, "../../..");
 const read = path => readFile(resolve(root, path), "utf8");
 
-const [workflow, config, journeys, harness, observer, registry, title] = await Promise.all([
+const [workflow, config, journeys, harness, observer, registry, title, replay, stream, transport] = await Promise.all([
   read(".github/workflows/coop-public-ui-journey.yml"),
   read("test/browser/coop-public-ui/config.mjs"),
   read("test/browser/coop-public-ui/journeys.mjs"),
@@ -19,6 +19,9 @@ const [workflow, config, journeys, harness, observer, registry, title] = await P
   read("scripts/coop-browser-entry.ts"),
   read("src/dev-tools/registry.ts"),
   read("src/phases/title-phase.ts"),
+  read("src/phases/coop-replay-turn-phase.ts"),
+  read("src/data/elite-redux/coop/coop-battle-stream.ts"),
+  read("src/data/elite-redux/coop/coop-transport.ts"),
 ]);
 
 test("the exact-SHA workflow exposes and seals a dedicated Showdown battle journey", () => {
@@ -49,7 +52,7 @@ test("the preset fixture requires both immutable build identity and exact page U
   );
   assert.match(
     registry,
-    /speciesId: SpeciesId\.BULBASAUR[\s\S]*level: 100[\s\S]*moveset: \[MoveId\.TACKLE\][\s\S]*item: SHOWDOWN_ITEM_POOL\[0\]/u,
+    /speciesId: SpeciesId\.PELIPPER[\s\S]*level: 100[\s\S]*abilityIndex: 1[\s\S]*moveset: \[MoveId\.AIR_CUTTER\][\s\S]*item: SHOWDOWN_ITEM_POOL\[0\]/u,
   );
   assert.match(title, /getCoopBrowserShowdownFixturePreset\(\)/u);
   assert.match(
@@ -114,6 +117,36 @@ test("the journey executes a reciprocal turn and requires the next retained fron
   assert.match(turn, /assertSharedCommandFrontier\(outcomeCursors, "showdown-turn-1-next-command"/u);
   assert.match(turn, /assertRetainedContinuation\(outcomeCursors, "showdown-turn-1-next-command"/u);
   assert.match(turn, /showdown-turn-1-synchronized/u);
+});
+
+test("the real-browser oracle requires streamed ability and environment presentation on both clients", () => {
+  assert.match(observer, /const PRESENTATION_PREFIX = "\[coop-browser:presentation\] "/u);
+  assert.match(observer, /phaseName === "ShowAbilityPhase" \|\| phaseName === "CoopShowAbilityReplayPhase"/u);
+  assert.match(
+    observer,
+    /phaseName === "CommonAnimPhase"[\s\S]*environmentPresentation\?\.source === "environment"[\s\S]*Number\.isSafeInteger\(anim\)/u,
+  );
+  const start = harness.slice(
+    harness.indexOf("async startShowdownBattle()"),
+    harness.indexOf("\n  /**\n   * Drive one reciprocal", harness.indexOf("async startShowdownBattle()")),
+  );
+  assert.match(start, /authority Showdown ability flyout/u);
+  assert.match(start, /renderer Showdown ability flyout/u);
+  assert.match(start, /authority Showdown environment animation/u);
+  assert.match(start, /renderer Showdown environment animation/u);
+  assert.match(start, /hostEnvironmentView\.anim !== guestEnvironmentView\.anim/u);
+  assert.match(start, /hostEnvironmentView\.environmentPresentation\?\.value/u);
+  assert.match(start, /hostEnvironmentView\.weather !== guestEnvironmentView\.weather/u);
+  assert.match(start, /hostEnvironmentView\.terrain !== guestEnvironmentView\.terrain/u);
+  assert.match(start, /Showdown ability presentation diverged/u);
+  assert.match(start, /Showdown presentation did not complete on both clients before the shared command frontier/u);
+  assert.match(start, /showdown-presentation-proof/u);
+  assert.match(
+    replay,
+    /entryPresentationOnly[\s\S]*awaitEntryPresentation[\s\S]*retained entry presentation installed/u,
+  );
+  assert.match(stream, /awaitEntryPresentation[\s\S]*requestEnemyParty/u);
+  assert.match(transport, /enemyPartySync[\s\S]*entryPresentation\?: CoopBattleEvent\[\]/u);
 });
 
 test("Showdown command convergence excludes account-local state and canonicalizes both battle perspectives by seat", () => {

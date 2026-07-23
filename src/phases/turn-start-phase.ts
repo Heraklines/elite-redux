@@ -224,7 +224,8 @@ export class TurnStartPhase extends FieldPhase {
     // / non-co-op play is byte-for-byte unchanged. Showdown-versus (C3) rides the SAME divert
     // via isAuthoritativeBattleSession() (co-op OR showdown, authoritative).
     if (isAuthoritativeBattleSession()) {
-      const role = getCoopController()?.role;
+      const controller = getCoopController();
+      const role = controller?.role;
       // DIAGNOSTIC (#633 trainer-victory deadlock): log the authoritative guest-diversion guard so a
       // live capture shows the mode+role at the divert decision - a silent "lockstep" fallback here is
       // exactly the failure where the guest runs its OWN engine instead of CoopReplayTurnPhase.
@@ -250,8 +251,11 @@ export class TurnStartPhase extends FieldPhase {
         this.end();
         return;
       }
-      if (role === "host") {
-        beginCoopRecording(globalScene.currentBattle.turn);
+      if (controller?.role === "host") {
+        beginCoopRecording(
+          globalScene.currentBattle.turn,
+          `${controller.sessionEpoch}:${globalScene.currentBattle.waveIndex}`,
+        );
       }
     }
 

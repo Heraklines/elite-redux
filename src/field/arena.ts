@@ -9,6 +9,7 @@ import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
 import { biomeBgmLoopPoints } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
@@ -464,9 +465,20 @@ export class Arena {
       new WeatherChangedEvent(oldWeatherType, this.weather?.weatherType!, this.weather?.turnsLeft!),
     ); // TODO: this `x?.y!` is dumb, fix this
 
+    recordCoopEvent({
+      k: "weather",
+      weather,
+      turnsLeft: this.weather?.turnsLeft ?? 0,
+      ...(this.weather ? { anim: weatherCommonAnim(weather) } : {}),
+    });
+
     if (this.weather) {
       const anim = weatherCommonAnim(weather);
-      globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, anim);
+      globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, anim, {
+        source: "environment",
+        kind: "weather",
+        value: weather,
+      });
       globalScene.phaseManager.queueMessage(getWeatherStartMessage(weather)!); // TODO: is this bang correct?
     } else {
       globalScene.phaseManager.queueMessage(getWeatherClearMessage(oldWeatherType)!); // TODO: is this bang correct?
@@ -593,9 +605,20 @@ export class Arena {
       new TerrainChangedEvent(oldTerrainType, this.terrain?.terrainType!, this.terrain?.turnsLeft!),
     ); // TODO: are those bangs correct?
 
+    recordCoopEvent({
+      k: "terrain",
+      terrain,
+      turnsLeft: this.terrain?.turnsLeft ?? 0,
+      ...(this.terrain && !ignoreAnim ? { anim: terrainCommonAnim(terrain) } : {}),
+    });
+
     if (this.terrain) {
       if (!ignoreAnim) {
-        globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, terrainCommonAnim(terrain));
+        globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, terrainCommonAnim(terrain), {
+          source: "environment",
+          kind: "terrain",
+          value: terrain,
+        });
       }
       globalScene.phaseManager.queueMessage(getTerrainStartMessage(terrain));
     } else {

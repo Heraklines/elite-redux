@@ -48,6 +48,7 @@ import type {
   CoopBattleTargetRef,
   SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
+import { sealCoopEntryPresentation } from "#data/elite-redux/coop/coop-turn-recorder";
 import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
 import { recordSinglePlayerCommand } from "#data/elite-redux/replay-single-recording";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -679,7 +680,18 @@ export class CommandPhase extends FieldPhase {
       // the post-summon re-capture so the guest adopts those on-entry effects at its OWN turn-1 belt-and-
       // suspenders above, BEFORE it commands, instead of at the turn-1 END checkpoint. Gated to field slot 0
       // so it evaluates once per wave; a hard no-op unless an entry effect actually changed state (self-latching).
-      rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
+      if (isVersusSession()) {
+        // Summon-time flyouts/environment cues are part of turn 1's ordered event stream, but the
+        // renderer must finish that prefix before it exposes command input. Seal it only after the
+        // host's complete PostSummon chain and post-entry authority recapture have settled.
+        const entryPresentation = sealCoopEntryPresentation();
+        if (entryPresentation == null || !rebroadcastCoopWaveStartAuthorityAfterEntryEffects(entryPresentation)) {
+          failCoopSharedSession(`Wave ${waveIndex} could not publish its complete Showdown entry presentation.`);
+          return false;
+        }
+      } else {
+        rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
+      }
     }
     return true;
   }

@@ -42,6 +42,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { captureCoopTrainerVictoryBoundary } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
 import type {
+  CoopBattleEvent,
   CoopEncounterAuthority,
   CoopSerializedEnemy,
   CoopSerializedTrainer,
@@ -308,35 +309,37 @@ export function captureCoopEncounterAuthority(battle: Battle): CoopEncounterAuth
  * the interaction counter (plain `transport.send`), so it cannot re-introduce the wave-1 -> wave-2 command
  * rendezvous deadlock the sole-publication comment in {@linkcode broadcastCoopEnemyParty} warns against.
  */
-export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(): void {
+export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(entryPresentation?: CoopBattleEvent[]): boolean {
+  const presentationRequired = entryPresentation !== undefined;
   if (!isAuthoritativeBattleSession()) {
-    return;
+    return !presentationRequired;
   }
   const controller = getCoopController();
   const streamer = getCoopBattleStreamer();
   if (controller == null || streamer == null || controller.role !== "host") {
-    return;
+    return !presentationRequired;
   }
   try {
     const battle = globalScene.currentBattle;
     if (battle == null) {
-      return;
+      return !presentationRequired;
     }
     const wave = battle.waveIndex;
     const sentState = streamer.peekSentEnemyPartyAuthoritativeState(wave);
     if (sentState === undefined) {
       // No wave-start authoritative state was published for this wave; there is nothing to refresh.
-      return;
+      return !presentationRequired;
     }
     const liveSignature = coopWaveStartEntryEffectSignature();
-    if (liveSignature === "" || liveSignature === coopWaveStartEntryEffectSignature(sentState)) {
+    const entryStateChanged = liveSignature !== "" && liveSignature !== coopWaveStartEntryEffectSignature(sentState);
+    if (!entryStateChanged && entryPresentation === undefined) {
       // No on-entry effect mutated arena/forms after the pre-summon capture: a true no-op.
-      return;
+      return true;
     }
     const enemies = captureCoopEnemies();
     const authoritativeState = captureCoopAuthoritativeBattleState(battle.turn);
     if (authoritativeState == null) {
-      return;
+      return !presentationRequired;
     }
     const encounter = captureCoopEncounterAuthority(battle);
     // Re-publish the SAME carrier with the post-summon re-capture. The encounter descriptor is re-sent so
@@ -349,15 +352,20 @@ export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(): void {
       battle.battleType,
       authoritativeState,
       encounter,
+      entryPresentation,
     );
     coopLog(
       "replay",
-      `host RE-BROADCAST wave-start authority wave=${wave} after post-summon entry effects settled (#920)`,
+      `host RE-BROADCAST wave-start authority wave=${wave} after post-summon boundary `
+        + `stateChanged=${entryStateChanged} presentation=${entryPresentation?.length ?? "none"} (#920)`,
     );
+    return true;
   } catch (error) {
-    // A re-broadcast failure must never break the host's turn; the guest still heals at the turn-1 END
-    // checkpoint (its prior, slower behavior), so this is strictly best-effort.
+    // Classic's state refresh remains best-effort because the turn-1 checkpoint heals it. Showdown's
+    // retained presentation prefix is a pre-command prerequisite; report false so CommandPhase terminates
+    // both seats instead of opening host input while the renderer waits for a carrier that cannot exist.
     coopWarn("stream", "host failed to re-broadcast post-summon wave-start authority", error);
+    return !presentationRequired;
   }
 }
 

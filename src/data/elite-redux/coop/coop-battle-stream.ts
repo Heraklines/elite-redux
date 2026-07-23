@@ -115,6 +115,12 @@ export interface CoopTurnResolution {
   authorityRevision?: number;
 }
 
+/** Complete pre-command cosmetic prefix paired with the post-summon state image that authored it. */
+export interface CoopEntryPresentationPrefix {
+  readonly events: readonly CoopBattleEvent[];
+  readonly stateTick: number;
+}
+
 /** An out-of-turn authoritative checkpoint + the host's matching full-state checksum. */
 export interface CoopCheckpointEnvelope {
   reason: string;
@@ -232,6 +238,17 @@ function isValidBattlerIndex(value: unknown): value is number {
   // A future topology protocol replaces this conservative ceiling with the negotiated manifest.
   return isSafeAddressPart(value) && value <= 11;
 }
+
+function isValidPartySlot(value: unknown): value is number {
+  return isSafeAddressPart(value) && value <= 5;
+}
+
+function isPositiveSafeAddressPart(value: unknown): value is number {
+  return isSafeAddressPart(value) && value > 0;
+}
+
+/** Hard bound for the summon/on-entry cosmetic prefix retained beside one wave-start state. */
+const MAX_ENTRY_PRESENTATION_EVENTS = 256;
 
 function isNumberArray(value: unknown, length?: number): value is number[] {
   return Array.isArray(value) && (length === undefined || value.length === length) && value.every(isFiniteNumber);
@@ -358,15 +375,36 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
       return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.stat) && isFiniteNumber(event.value);
     case "status":
       return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.status);
+    case "showAbility":
+      return (
+        isValidBattlerIndex(event.bi)
+        && isPositiveSafeAddressPart(event.pokemonId)
+        && isValidPartySlot(event.partySlot)
+        && isPositiveSafeAddressPart(event.abilityId)
+        && typeof event.passive === "boolean"
+        && (event.passiveSlot === 0 || event.passiveSlot === 1 || event.passiveSlot === 2)
+      );
     case "weather":
-      return isSafeAddressPart(event.weather) && isSafeAddressPart(event.turnsLeft);
+      return (
+        isSafeAddressPart(event.weather)
+        && isSafeAddressPart(event.turnsLeft)
+        && (event.anim === undefined || isSafeAddressPart(event.anim))
+      );
     case "terrain":
-      return isSafeAddressPart(event.terrain) && isSafeAddressPart(event.turnsLeft);
+      return (
+        isSafeAddressPart(event.terrain)
+        && isSafeAddressPart(event.turnsLeft)
+        && (event.anim === undefined || isSafeAddressPart(event.anim))
+      );
     case "switch":
-      return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.partySlot);
+      return isValidBattlerIndex(event.bi) && isValidPartySlot(event.partySlot);
     default:
       return false;
   }
+}
+
+function isStrictEntryPresentation(value: unknown): value is CoopBattleEvent[] {
+  return Array.isArray(value) && value.length <= MAX_ENTRY_PRESENTATION_EVENTS && value.every(isStrictBattleEvent);
 }
 
 function isStrictAuthoritativeState(
@@ -1197,6 +1235,11 @@ export class CoopBattleStreamer {
   private readonly checkpointEnvelopeHandlers = new Set<(envelope: CoopCheckpointEnvelope) => void>();
   /** wave -> resolver for an in-flight {@linkcode awaitEnemyParty}. */
   private readonly enemyPartyWaiters = new Map<number, (res: CoopSerializedEnemy[] | null) => void>();
+  /** Showdown pre-command presentation, delivered by the retained post-summon wave carrier. */
+  private readonly entryPresentationByWave = new Map<number, CoopEntryPresentationPrefix>();
+  private readonly entryPresentationWaiters = new Map<number, (prefix: CoopEntryPresentationPrefix | null) => void>();
+  /** Monotonic run-local exact-once watermark; avoids an unbounded per-wave tombstone set. */
+  private consumedEntryPresentationThroughWave = 0;
   /** ME-battle key -> resolver for an in-flight {@linkcode awaitMeBattleEnemyParty} (#633 ME handoff). */
   private readonly meBattlePartyWaiters = new Map<string, (res: CoopSerializedEnemy[] | null) => void>();
   /** ME-battle key -> a party that arrived before its waiter (race buffer, #633 ME handoff). */
@@ -1398,6 +1441,10 @@ export class CoopBattleStreamer {
       }
       for (const wave of this.enemyPartyWaiters.keys()) {
         coopLog("stream", `guest RE-SEND requestEnemyParty wave=${wave} after reconnect`);
+        this.transport.send({ t: "requestEnemyParty", wave });
+      }
+      for (const wave of this.entryPresentationWaiters.keys()) {
+        coopLog("stream", `guest RE-SEND requestEnemyParty wave=${wave} for entry presentation after reconnect`);
         this.transport.send({ t: "requestEnemyParty", wave });
       }
       for (const key of this.meBattlePartyWaiters.keys()) {
@@ -1812,6 +1859,9 @@ export class CoopBattleStreamer {
     for (const finish of [...this.enemyPartyWaiters.values()]) {
       finish(null);
     }
+    for (const finish of [...this.entryPresentationWaiters.values()]) {
+      finish(null);
+    }
     for (const finish of [...this.meBattlePartyWaiters.values()]) {
       finish(null);
     }
@@ -1824,6 +1874,7 @@ export class CoopBattleStreamer {
     this.pending.clear();
     this.pendingSince.clear();
     this.enemyPartyWaiters.clear();
+    this.entryPresentationWaiters.clear();
     this.meBattlePartyWaiters.clear();
     this.launchSnapshotWaiters.clear();
     this.stateSyncWaiters.clear();
@@ -2136,7 +2187,17 @@ export class CoopBattleStreamer {
     battleType?: number,
     authoritativeState?: CoopAuthoritativeBattleStateV1,
     encounter?: CoopEncounterAuthority,
+    entryPresentation?: CoopBattleEvent[],
   ): void {
+    if (entryPresentation !== undefined && !isStrictEntryPresentation(entryPresentation)) {
+      throw new Error(`refusing malformed entry presentation wave=${wave} events=${entryPresentation.length}`);
+    }
+    if (
+      entryPresentation !== undefined
+      && (authoritativeState == null || authoritativeState.wave !== wave || !isSafeAddressPart(authoritativeState.tick))
+    ) {
+      throw new Error(`refusing entry presentation without its exact wave-start state wave=${wave}`);
+    }
     const retained = this.sentEnemyParties.get(wave);
     if (retained?.encounter !== undefined && encounter === undefined) {
       // A complete encounter carrier is monotonic authority. A later legacy/turn-boundary sender must
@@ -2154,6 +2215,22 @@ export class CoopBattleStreamer {
     }
     const resolvedMeType = encounter?.mysteryEncounterType ?? meType;
     const resolvedBattleType = encounter?.battleType ?? battleType;
+    if (retained?.entryPresentation !== undefined) {
+      if (
+        entryPresentation !== undefined
+        && canonicalize(retained.entryPresentation) !== canonicalize(entryPresentation)
+      ) {
+        coopWarn("stream", `host preserved immutable entry presentation after conflicting re-send wave=${wave}`);
+      }
+      // Once the post-summon prefix is sealed, its party, encounter, and state tick are one immutable
+      // pre-command carrier. A later same-wave sender may re-publish it but may not pair those cosmetics
+      // with a different mechanical image.
+      this.transport.send(retained);
+      return;
+    }
+    // Clone before retention: the recording array is caller-owned and continues to grow through turn 1.
+    // Retained redelivery must remain the exact prefix sealed at CommandPhase, not alias later mutations.
+    const resolvedEntryPresentation = entryPresentation === undefined ? undefined : structuredClone(entryPresentation);
     const message: Extract<CoopMessage, { t: "enemyPartySync" }> = {
       t: "enemyPartySync",
       wave,
@@ -2162,6 +2239,7 @@ export class CoopBattleStreamer {
       ...(resolvedBattleType === undefined ? {} : { battleType: resolvedBattleType }),
       ...(encounter === undefined ? {} : { encounter }),
       ...(authoritativeState === undefined ? {} : { authoritativeState }),
+      ...(resolvedEntryPresentation === undefined ? {} : { entryPresentation: resolvedEntryPresentation }),
     };
     this.sentEnemyParties.delete(wave);
     this.sentEnemyParties.set(wave, message);
@@ -2174,7 +2252,8 @@ export class CoopBattleStreamer {
     }
     coopLog(
       "replay",
-      `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${resolvedMeType ?? "-"} battleType=${resolvedBattleType ?? "-"}`,
+      `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${resolvedMeType ?? "-"} `
+        + `battleType=${resolvedBattleType ?? "-"} entryPresentation=${resolvedEntryPresentation?.length ?? "-"}`,
     );
     this.transport.send(message);
   }
@@ -2224,6 +2303,87 @@ export class CoopBattleStreamer {
       encounter: this.consumeEnemyPartyEncounter(wave),
       state: this.consumeEnemyPartyState(wave),
     };
+  }
+
+  /** Consume a retained, complete Showdown entry-presentation prefix once. */
+  consumeEntryPresentation(wave: number): CoopEntryPresentationPrefix | null {
+    const prefix = this.entryPresentationByWave.get(wave) ?? null;
+    this.entryPresentationByWave.delete(wave);
+    if (prefix != null) {
+      this.consumedEntryPresentationThroughWave = Math.max(this.consumedEntryPresentationThroughWave, wave);
+    }
+    return prefix;
+  }
+
+  /**
+   * Await the retained post-summon carrier and re-request it on a bounded cadence. Unlike best-effort
+   * live battleEvent packets, this complete prefix survives a drop/reconnect and cannot strand command input.
+   */
+  awaitEntryPresentation(
+    wave: number,
+    opts: { timeoutMs?: number; retryIntervalMs?: number; maxRetries?: number } = {},
+  ): Promise<CoopEntryPresentationPrefix | null> {
+    const buffered = this.consumeEntryPresentation(wave);
+    if (buffered != null) {
+      return Promise.resolve(buffered);
+    }
+    if (wave <= this.consumedEntryPresentationThroughWave) {
+      // A reconstructed/re-entered turn-1 phase must not wait forever for a prefix this session already
+      // rendered. Returning an empty exact-once prefix advances no event watermark and opens no duplicate UI.
+      return Promise.resolve({ events: [], stateTick: 0 });
+    }
+    const stale = this.entryPresentationWaiters.get(wave);
+    stale?.(null);
+    const timeoutMs = opts.timeoutMs ?? this.timeoutMs;
+    const retryIntervalMs = opts.retryIntervalMs ?? 5_000;
+    const maxRetries = opts.maxRetries ?? 6;
+    return new Promise(resolve => {
+      let settled = false;
+      let attempts = 0;
+      let cancelTimeout: () => void = () => {};
+      let cancelRetry: () => void = () => {};
+      const finish = (prefix: CoopEntryPresentationPrefix | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelTimeout();
+        cancelRetry();
+        if (this.entryPresentationWaiters.get(wave) === finish) {
+          this.entryPresentationWaiters.delete(wave);
+        }
+        if (prefix != null) {
+          this.entryPresentationByWave.delete(wave);
+          this.consumedEntryPresentationThroughWave = Math.max(this.consumedEntryPresentationThroughWave, wave);
+        }
+        resolve(prefix);
+      };
+      const request = () => {
+        try {
+          this.transport.send({ t: "requestEnemyParty", wave });
+        } catch {
+          // The retained host carrier or a later retry remains authoritative.
+        }
+      };
+      const scheduleRetry = () => {
+        if (settled || attempts >= maxRetries || retryIntervalMs <= 0) {
+          return;
+        }
+        cancelRetry = this.schedule(() => {
+          if (settled) {
+            return;
+          }
+          attempts++;
+          coopWarn("stream", `guest awaitEntryPresentation wave=${wave} RE-REQUEST attempt ${attempts}/${maxRetries}`);
+          request();
+          scheduleRetry();
+        }, retryIntervalMs);
+      };
+      this.entryPresentationWaiters.set(wave, finish);
+      cancelTimeout = this.schedule(() => finish(null), timeoutMs);
+      request();
+      scheduleRetry();
+    });
   }
 
   /**
@@ -4392,6 +4552,7 @@ export class CoopBattleStreamer {
       + this.pendingCheckpoints.size
       + this.appliedOutOfBandCheckpoints.size
       + this.meBattlePartyInbox.size
+      + this.entryPresentationByWave.size
       + this.enemyPartyStateByWave.size
       + this.enemyPartyEncounterByWave.size
       + this.enemyPartyAuthorityFloorByWave.size
@@ -4418,6 +4579,8 @@ export class CoopBattleStreamer {
     this.finalizedTurnAuthorities.clear();
     this.finalizedReplacementAuthorities.clear();
     this.lastEnemyParty = null;
+    this.entryPresentationByWave.clear();
+    this.consumedEntryPresentationThroughWave = 0;
     this.enemyPartyStateByWave.clear();
     this.enemyPartyEncounterByWave.clear();
     this.enemyPartyAuthorityFloorByWave.clear();
@@ -4456,6 +4619,9 @@ export class CoopBattleStreamer {
     for (const finish of [...this.enemyPartyWaiters.values()]) {
       finish(null);
     }
+    for (const finish of [...this.entryPresentationWaiters.values()]) {
+      finish(null);
+    }
     for (const finish of [...this.meBattlePartyWaiters.values()]) {
       finish(null);
     }
@@ -4488,6 +4654,7 @@ export class CoopBattleStreamer {
     this.highestSeenTurnAuthority.clear();
     this.seenTurnAuthority.clear();
     this.enemyPartyWaiters.clear();
+    this.entryPresentationWaiters.clear();
     this.meBattlePartyWaiters.clear();
     this.launchSnapshotWaiters.clear();
     this.meBattlePartyInbox.clear();
@@ -4528,6 +4695,8 @@ export class CoopBattleStreamer {
     }
     this.appliedOutOfBandCheckpoints.clear();
     this.lastEnemyParty = null;
+    this.entryPresentationByWave.clear();
+    this.consumedEntryPresentationThroughWave = 0;
     this.sentEnemyParties.clear();
     this.enemyPartyStateByWave.clear();
     this.enemyPartyEncounterByWave.clear();
@@ -4561,6 +4730,17 @@ export class CoopBattleStreamer {
   ): void {
     switch (msg.t) {
       case "enemyPartySync": {
+        const entryPresentation = msg.entryPresentation;
+        if (
+          entryPresentation !== undefined
+          && (!isStrictEntryPresentation(entryPresentation)
+            || msg.authoritativeState == null
+            || msg.authoritativeState.wave !== msg.wave
+            || !isSafeAddressPart(msg.authoritativeState.tick))
+        ) {
+          coopWarn("stream", `guest rejected malformed entry presentation wave=${msg.wave}`);
+          return;
+        }
         const floor = this.enemyPartyAuthorityFloorByWave.get(msg.wave);
         if (floor != null && (msg.authoritativeState === undefined || msg.authoritativeState.tick <= floor)) {
           coopLog(
@@ -4626,6 +4806,45 @@ export class CoopBattleStreamer {
           this.enemyPartyEncounterByWave.set(msg.wave, msg.encounter);
           this.meTypeByWave.set(msg.wave, msg.encounter.mysteryEncounterType);
           this.battleTypeByWave.set(msg.wave, msg.encounter.battleType);
+        }
+        // Admit presentation only after the carrier's floor/address/tick checks above. A retired or
+        // regressed wave-start state must never reintroduce obsolete cosmetics into a newer frontier.
+        if (entryPresentation !== undefined) {
+          const presentationState = msg.authoritativeState;
+          if (presentationState == null) {
+            // The strict carrier check above already rejects this branch; keep the local proof explicit so
+            // later refactors cannot accidentally detach the prefix from its state image.
+            return;
+          }
+          if (msg.wave <= this.consumedEntryPresentationThroughWave) {
+            coopLog("replay", `guest IGNORE duplicate consumed entry presentation wave=${msg.wave}`);
+          } else {
+            const immutableEntryPresentation: CoopEntryPresentationPrefix = {
+              events: structuredClone(entryPresentation),
+              stateTick: presentationState.tick,
+            };
+            const prior = this.entryPresentationByWave.get(msg.wave);
+            if (prior != null && canonicalize(prior.events) !== canonicalize(entryPresentation)) {
+              coopWarn("stream", `guest rejected conflicting entry presentation wave=${msg.wave}`);
+              return;
+            }
+            const entryWaiter = this.entryPresentationWaiters.get(msg.wave);
+            if (entryWaiter == null) {
+              this.entryPresentationByWave.set(msg.wave, immutableEntryPresentation);
+            } else {
+              entryWaiter(immutableEntryPresentation);
+            }
+            while (this.entryPresentationByWave.size > 4) {
+              const oldestWave = Math.min(...this.entryPresentationByWave.keys());
+              this.entryPresentationByWave.delete(oldestWave);
+            }
+            coopLog(
+              "replay",
+              `guest RECV entry presentation wave=${msg.wave} stateTick=${immutableEntryPresentation.stateTick} `
+                + `events=${entryPresentation.length} `
+                + `${entryWaiter == null ? "buffered" : "delivered"}`,
+            );
+          }
         }
         // Hand it straight to a parked awaitEnemyParty (consumed), else buffer for the
         // next consume/await. Either way fire any live handler.

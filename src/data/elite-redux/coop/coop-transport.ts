@@ -123,7 +123,10 @@ export type CoopRole = "host" | "guest";
 // identity. Older builds drop host-owned quiz answers after V2 suppresses the raw legacy authority stream.
 // er-coop-43 makes the exact market subclass and stock vector part of every authoritative option
 // presentation/continuation. Older builds rebuild curated shops as generic 99-stock markets after recovery.
-export const COOP_PROTOCOL_VERSION = "er-coop-43";
+// er-coop-44 adds the immutable ability-flyout identity and environment-animation cue to the ordered
+// battle presentation stream. An older strict renderer rejects the new embedded event kind, so mixed
+// builds must refuse pairing instead of dropping switch-in presentation or the complete turn carrier.
+export const COOP_PROTOCOL_VERSION = "er-coop-44";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1062,10 +1065,20 @@ export type CoopBattleEvent =
   | { k: "statStage"; bi: number; stat: number; value: number }
   /** A mon's status changed (`StatusEffect` enum, 0 = cured). */
   | { k: "status"; bi: number; status: number }
-  /** Weather changed (`WeatherType` enum). */
-  | { k: "weather"; weather: number; turnsLeft: number }
-  /** Terrain changed (`TerrainType` enum). */
-  | { k: "terrain"; terrain: number; turnsLeft: number }
+  /** Show one exact ability activation without asking the renderer to derive which ability fired. */
+  | {
+      k: "showAbility";
+      bi: number;
+      pokemonId: number;
+      partySlot: number;
+      abilityId: number;
+      passive: boolean;
+      passiveSlot: 0 | 1 | 2;
+    }
+  /** Weather changed (`WeatherType` enum); `anim` is the already-resolved presentation cue. */
+  | { k: "weather"; weather: number; turnsLeft: number; anim?: number }
+  /** Terrain changed (`TerrainType` enum); `anim` is omitted when the authority suppressed it. */
+  | { k: "terrain"; terrain: number; turnsLeft: number; anim?: number }
   /** A mon switched out for the party member at `partySlot`. */
   | { k: "switch"; bi: number; partySlot: number };
 
@@ -1544,6 +1557,8 @@ export type CoopMessage =
       encounter?: CoopEncounterAuthority;
       /** Complete host state at the new-wave encounter boundary; additive for older peers. */
       authoritativeState?: CoopAuthoritativeBattleStateV1;
+      /** Complete immutable pre-command presentation prefix, sealed after PostSummon on the authority. */
+      entryPresentation?: CoopBattleEvent[];
     }
   /**
    * Guest -> host (#633/#698, enemy-party handoff robustness): "(re)send me the enemy party
