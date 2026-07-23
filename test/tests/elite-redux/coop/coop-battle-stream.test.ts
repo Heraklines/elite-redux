@@ -289,7 +289,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
             partySlot: 0,
             abilityId: 1,
             passive: true,
-            passiveSlot: 3,
+            passiveSlot: 32,
           } as never,
         ],
         emptyCheckpoint(),

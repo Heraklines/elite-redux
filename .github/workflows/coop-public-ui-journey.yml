@@ -294,7 +294,10 @@ jobs:
     name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
     needs: browser-build
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || (inputs.journey == 'save-mutations' || inputs.journey == 'resume-scan-isolation') && 50 || inputs.journey == 'commander-skip' && 45 || 35 }}
+    # The fresh+resume journey deliberately runs two complete launches. Its adaptive progress budget can
+    # remain healthy for roughly 48 minutes on the constrained ~3-fps runner; a 35-minute outer job ceiling
+    # previously cancelled it mid-ShowAbilityPhase while both peers were connected and assertion-clean.
+    timeout-minutes: ${{ (inputs.journey || 'fresh-resume') == 'market-wide-lens' && 55 || (inputs.journey || 'fresh-resume') == 'fresh-resume' && 55 || ((inputs.journey || 'fresh-resume') == 'save-mutations' || (inputs.journey || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
       matrix:

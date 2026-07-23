@@ -1622,3 +1622,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   foe an explicit high HP reserve so it deterministically owns exactly two vacancies and two reserves.
 - No local Showdown/triples/co-op Vitest run (repository policy). Static/ownership checks only; remote S8/T3
   requalification required after the active public journey releases the branch push lock.
+# 2026-07-23 - public fresh/resume timeout contract and stale malformed-event fixture
+
+- Public journey `29972091501` did not deadlock: at GitHub cancellation both browsers were connected,
+  assertion-clean, and advancing wave-2 entry phases. The driver's adaptive progress deadline had extended
+  to ~48 minutes, but the outer fresh/resume job still killed it at 35 minutes.
+- The fresh/resume job ceiling is now 55 minutes, matching the driver's bounded hard ceiling plus artifact
+  cleanup. This removes a deterministic infrastructure false red; it does not waive a driver assertion or
+  production terminal.
+- Full-gate A1's sole red was stale validation debt: passive ability source slots now intentionally support
+  up to 31, while the malformed-event test still used slot 3 as invalid. The negative fixture now uses 32;
+  production's strict validator remains unchanged.
+- No local co-op/browser Vitest run. YAML/static/ownership verification only; exact remote qualification is
+  required after the active public journey releases the branch push lock.
