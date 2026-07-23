@@ -97,7 +97,7 @@ describe("title mode selection", () => {
       openShowdownTeamMenu: ReturnType<typeof vi.fn>;
       openShowdownTournaments: ReturnType<typeof vi.fn>;
     };
-    const teamMenuSpy = vi.spyOn(testablePhase, "openShowdownTeamMenu");
+    const teamMenuSpy = vi.spyOn(testablePhase, "openShowdownTeamMenu").mockImplementation(() => {});
     const tournamentSpy = vi.spyOn(testablePhase, "openShowdownTournaments");
     await testablePhase.showOptions(-1);
     titleOptions.find(option => option.semanticId === "new-game")?.handler();
@@ -119,6 +119,41 @@ describe("title mode selection", () => {
     ).toBeDefined();
     expect(teamMenuSpy).not.toHaveBeenCalled();
     expect(tournamentSpy).not.toHaveBeenCalled();
+  });
+
+  it("exposes Showdown Sync only in staging/dev and routes it to lockstep", async () => {
+    vi.stubEnv("VITE_DEV_TOOLS", "1");
+    let titleOptions: OptionSelectItem[] = [];
+    let modeOptions: OptionSelectItem[] = [];
+    const scene = {
+      gameData: { isUnlocked: vi.fn().mockReturnValue(true) },
+      ui: {
+        setMode: vi.fn((_mode, config?: OptionSelectConfig) => {
+          if (config != null) {
+            titleOptions = config.options;
+          }
+        }),
+        showText: vi.fn((_message, _delay, callback?: () => void) => callback?.()),
+        setOverlayMode: vi.fn((_mode, config: OptionSelectConfig) => {
+          modeOptions = config.options;
+        }),
+      },
+    } as unknown as BattleScene;
+    initGlobalScene(scene);
+
+    const phase = new TitlePhase();
+    const testablePhase = phase as unknown as {
+      showOptions(lastSessionSlot: number): Promise<void>;
+      openShowdownTeamMenu: ReturnType<typeof vi.fn>;
+    };
+    const teamMenuSpy = vi.spyOn(testablePhase, "openShowdownTeamMenu").mockImplementation(() => {});
+    await testablePhase.showOptions(-1);
+    titleOptions.find(option => option.semanticId === "new-game")?.handler();
+
+    const syncOption = modeOptions.find(option => option.semanticId === "showdown-sync");
+    expect(syncOption?.label).toBe("Showdown Sync");
+    syncOption?.handler();
+    expect(teamMenuSpy).toHaveBeenCalledWith(expect.any(Function), "lockstep");
   });
 
   it("supports explicit URL overrides for testing and emergency shutdown", () => {

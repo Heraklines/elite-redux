@@ -276,10 +276,20 @@ export class TitlePhase extends Phase {
                 showTemporarilyDisabled();
                 return true;
               }
-              this.openShowdownTeamMenu(setModeAndEnd);
+              this.openShowdownTeamMenu(setModeAndEnd, "authoritative");
               return true;
             },
           });
+          if (isDev || isBeta || devToolsEnabled) {
+            options.push({
+              semanticId: "showdown-sync",
+              label: "Showdown Sync",
+              handler: () => {
+                this.openShowdownTeamMenu(setModeAndEnd, "lockstep");
+                return true;
+              },
+            });
+          }
           // Showdown TOURNAMENTS (beside the Team Menu path): async single-elim brackets. Opens the
           // tournament LIST (worker-backed); register / view bracket / play a bracket match from there.
           options.push({
@@ -523,7 +533,10 @@ export class TitlePhase extends Phase {
    * Opened via the DEFERRED pattern (setMode(MESSAGE)+resetModeChain()+showText callback) so returning
    * true from the option handler cannot clobber the setMode - mirrors {@linkcode openProfileHub}.
    */
-  private openShowdownTeamMenu(setModeAndEnd: (gameMode: GameModes) => void): void {
+  private openShowdownTeamMenu(
+    setModeAndEnd: (gameMode: GameModes) => void,
+    netcodeMode: CoopNetcodeMode = "authoritative",
+  ): void {
     const { gameData } = globalScene;
     const showMenu = (): void => {
       const config: ShowdownTeamMenuConfig = {
@@ -555,7 +568,7 @@ export class TitlePhase extends Phase {
           // Reconstruct the engine starters from the saved wire manifests and stash them; the versus
           // launch (SelectStarterPhase.startShowdownSelect) consumes them + skips the grid teambuild.
           setPendingShowdownPresetStarters(preset.mons.map(manifestToStarter));
-          this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
+          this.openCoopLobby(setModeAndEnd, netcodeMode, "versus", GameModes.SHOWDOWN);
         },
       };
       // Inject the mobile/desktop native-keyboard bridge for the rename overlay (single-line) AND the
@@ -1092,9 +1105,10 @@ export class TitlePhase extends Phase {
         flowGeneration = sessionGeneration;
         const isCurrentSession = (): boolean =>
           !lobbyTerminated && !lobbyCompleted && this.isExactCoopSession(runtime, controller, sessionGeneration);
-        // Co-op is authoritative-only (#633 M6c); pinning the mode here is a no-op
-        // kept for the wire config's back-compat field.
-        if (runtime.controller.role === "host") {
+        // Versus launches no longer broadcast a runConfig, so BOTH clients must pin the mode selected
+        // by their title route before entering the battle flow. Standard Showdown passes authoritative;
+        // the staging-only Showdown Sync route passes lockstep. Co-op's host remains the config authority.
+        if (sessionKind === "versus" || runtime.controller.role === "host") {
           runtime.controller.setNetcodeMode(netcodeMode);
         }
         // Showdown 1v1 (staging fix 2026-07-07): pin the session kind on BOTH roles. Both clients

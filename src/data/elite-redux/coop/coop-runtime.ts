@@ -1885,6 +1885,11 @@ function wireShowdownResult(transport: CoopTransport, runtime: CoopRuntime): voi
     if (msg.t !== "showdownResult" && msg.t !== "showdownVoid") {
       return;
     }
+    // In Sync, both engines settle their own canonical simulation. Accepting the peer terminal as an
+    // authoritative interrupt would race the local Victory/GameOver phase and can tear down mid-turn.
+    if (runtime.controller.netcodeMode === "lockstep") {
+      return;
+    }
     // First terminal wins. Duplicates are idempotent; a conflicting late terminal cannot overwrite the
     // destination already chosen by the first accepted outcome.
     if (!pendingShowdownResults.has(runtime)) {
@@ -3365,16 +3370,13 @@ export function applyCoopControlPlaneSaveData(data: unknown): boolean {
 }
 
 /**
- * The active co-op netcode (#633, M6c: authoritative-ONLY), or `"lockstep"` when there is no
- * live session. Co-op has exactly one netcode since M3: a LIVE session is ALWAYS authoritative
- * (the guest renders, the host resolves), unconditionally - the old selectable toggle, the
- * controller's netcodeMode consultation, and the transient-read LATCH are all retired. The
- * "lockstep" return survives ONLY as the no-session sentinel every solo gate keys off
- * (`=== "authoritative"` is false -> solo is byte-for-byte unaffected). Deliberately does NOT
- * touch globalScene - it is a pure runtime read so the engine-free unit tests can call it.
+ * The active session's explicitly negotiated netcode, or `"lockstep"` when there is no session.
+ * Normal co-op and Showdown still start as `"authoritative"`; the controller read exists so the
+ * staging-only Showdown Sync route can opt into the retained dual-engine protocol without changing
+ * either production default. Deliberately does not touch globalScene.
  */
 export function getCoopNetcodeMode(): CoopNetcodeMode {
-  return active == null ? "lockstep" : "authoritative";
+  return active?.controller.netcodeMode ?? "lockstep";
 }
 
 /**
@@ -3406,6 +3408,11 @@ export function getCoopSessionKind(): CoopSessionKind {
  */
 export function isVersusSession(): boolean {
   return active != null && active.controller.isVersusSession();
+}
+
+/** Whether the staging-only dual-engine Showdown compatibility mode is active. */
+export function isShowdownSyncSession(): boolean {
+  return isVersusSession() && getCoopNetcodeMode() === "lockstep";
 }
 
 /**
@@ -3458,7 +3465,10 @@ export function isShowdownGuestFlip(): boolean {
   // gates the DATA mappers (ingress side swap + egress checksum un-swap) plus the one legitimate
   // guest-only presentation choice left - the C7 opponent-trainer re-skin. HARD `false` for solo /
   // co-op / host (narrower than isCoopAuthoritativeGuest, which is true for co-op guests too).
-  return isVersusSession() && getCoopController()?.role === "guest";
+  // Showdown Sync keeps both engines in the host-oriented canonical world. That is required for
+  // deterministic dual simulation because ER has mechanics whose activation depends on player/enemy
+  // ownership. The authoritative renderer keeps today's data-level guest flip unchanged.
+  return isVersusSession() && getCoopNetcodeMode() === "authoritative" && getCoopController()?.role === "guest";
 }
 
 /** Convenience: the live battle-command relay, or null when not in a co-op run. */

@@ -221,6 +221,10 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // constrained lobby afterward.
   [UiMode.TOURNAMENT_LIST]: "local-only",
   [UiMode.TOURNAMENT_BRACKET]: "local-only",
+
+  // Showdown Sync guest command surface: versus-only and driven locally by the guest; only the
+  // serialized command crosses the Showdown relay. It is never part of a shared co-op interaction.
+  [UiMode.SHOWDOWN_SYNC_COMMAND]: "local-only",
 };
 
 /**

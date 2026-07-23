@@ -121,6 +121,19 @@ export class ShowdownCommandRelay {
    * timer (caller -> AI fallback). A second request for the same slot supersedes the first (resolves it null).
    */
   requestEnemyCommand(turn: number, fieldIndex = 0): Promise<SerializedCommand | null> {
+    return this.waitForCommand(turn, fieldIndex, true);
+  }
+
+  /**
+   * SYNC: await the peer's independently selected command without sending an authority-style request.
+   * Both engines ship their local command unprompted, so emitting requests in both directions would only
+   * accumulate stale responder work. The timeout and early-command inbox behavior match the existing relay.
+   */
+  awaitCommand(turn: number, fieldIndex = 0): Promise<SerializedCommand | null> {
+    return this.waitForCommand(turn, fieldIndex, false);
+  }
+
+  private waitForCommand(turn: number, fieldIndex: number, sendRequest: boolean): Promise<SerializedCommand | null> {
     const key = slotKey(turn, fieldIndex);
     // Supersede any stale in-flight request on this slot.
     const stale = this.pending.get(key);
@@ -164,7 +177,9 @@ export class ShowdownCommandRelay {
       if (isCoopDebug()) {
         coopLog("relay", `showdown host requestEnemyCommand SEND turn=${turn} slot=${fieldIndex} (awaiting peer)`);
       }
-      this.transport.send({ t: "showdownCommandRequest", turn, ...(fieldIndex === 0 ? {} : { fieldIndex }) });
+      if (sendRequest) {
+        this.transport.send({ t: "showdownCommandRequest", turn, ...(fieldIndex === 0 ? {} : { fieldIndex }) });
+      }
     });
   }
 

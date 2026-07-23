@@ -30,6 +30,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   isCoopSharedTerminalFrozen,
+  isShowdownSyncSession,
   isVersusSession,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
@@ -47,6 +48,11 @@ import {
   buildShowdownFightCommand,
   buildShowdownSwitchCommand,
 } from "#data/elite-redux/showdown/showdown-guest-command";
+import {
+  applyShowdownSyncCommand,
+  applyShowdownSyncFallback,
+  broadcastShowdownSyncPlayerCommand,
+} from "#data/elite-redux/showdown/showdown-sync-command";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -669,6 +675,10 @@ export class CommandPhase extends FieldPhase {
 
     this.checkCommander();
 
+    if (this.tryShowdownSyncGuestCommand()) {
+      return;
+    }
+
     const hasGeneratedSkip = globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip === true;
 
     const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
@@ -775,7 +785,7 @@ export class CommandPhase extends FieldPhase {
    * Targets are a presentation default (the host re-derives them). Returns true when it shipped.
    */
   private tryShipShowdownGuestCommand(command: Command, cursor: number, useMode: boolean | MoveUseMode): boolean {
-    if (!isVersusSession() || getCoopController()?.role !== "guest") {
+    if (!isVersusSession() || getCoopNetcodeMode() !== "authoritative" || getCoopController()?.role !== "guest") {
       return false;
     }
     if (command === Command.FIGHT || command === Command.TERA) {
@@ -865,6 +875,55 @@ export class CommandPhase extends FieldPhase {
       true,
     );
     this.end();
+  }
+
+  /**
+   * Sync guest command boundary. Both engines retain the host-oriented world, so this client selects
+   * its own canonical enemy-side command, applies it locally, sends it to the host, then awaits and
+   * applies the host's player-side command before allowing the shared turn to resolve.
+   */
+  private tryShowdownSyncGuestCommand(): boolean {
+    if (!isShowdownSyncSession() || getCoopController()?.role !== "guest") {
+      return false;
+    }
+    const relay = getShowdownRelay();
+    const turn = globalScene.currentBattle.turn;
+    const scene = globalScene;
+    if (relay == null) {
+      return false;
+    }
+    scene.ui.setMode(UiMode.SHOWDOWN_SYNC_COMMAND, {
+      turn,
+      fieldIndex: this.fieldIndex,
+      onCommand: (_turn: number, ownCommand: SerializedCommand) => {
+        if (scene.phaseManager.getCurrentPhase() !== this) {
+          return;
+        }
+        if (!applyShowdownSyncCommand("enemy", this.fieldIndex, ownCommand)) {
+          scene.ui.showText("That command is no longer legal. Choose again.", null, () => {
+            if (scene.phaseManager.getCurrentPhase() === this) {
+              this.tryShowdownSyncGuestCommand();
+            }
+          });
+          return;
+        }
+        relay.sendCommand(turn, ownCommand, this.fieldIndex);
+        void relay.awaitCommand(turn, this.fieldIndex).then(remoteCommand => {
+          if (scene.phaseManager.getCurrentPhase() !== this) {
+            return;
+          }
+          if (
+            (remoteCommand == null || !applyShowdownSyncCommand("player", this.fieldIndex, remoteCommand))
+            && !applyShowdownSyncFallback("player", this.fieldIndex)
+          ) {
+            scene.ui.showText("The opponent command could not be resolved.", null);
+            return;
+          }
+          this.end();
+        });
+      },
+    });
+    return true;
   }
 
   /** Open THIS client's own-slot command UI (FIGHT for a skip-to-fight ME, else the COMMAND menu). */
@@ -1174,6 +1233,14 @@ export class CommandPhase extends FieldPhase {
       // teras the partner's mon too. Without it the broadcast hardcoded FIGHT and the
       // partner never terastallized -> the two engines diverged (type/STAB/stat changes).
       this.broadcastLocalCoopCommand(turnCommand, moveId, moveTargets.targets, useMode, command === Command.TERA);
+      broadcastShowdownSyncPlayerCommand(this.fieldIndex, {
+        command: Command.FIGHT,
+        cursor: turnCommand.cursor ?? cursor,
+        moveId,
+        targets: turnCommand.move?.targets ?? moveTargets.targets,
+        useMode,
+        ...(command === Command.TERA ? { tera: true } : {}),
+      });
     }
 
     return true;
@@ -1645,6 +1712,9 @@ export class CommandPhase extends FieldPhase {
         // live wave-4 "he switched and we desynced" report). `cursor` is the party slot
         // (the merged party is identical on both clients), and the Baton flag rides along.
         this.broadcastLocalCoopActionCommand(command, cursor, typeof useMode === "boolean" ? useMode : false);
+        const syncSwitch = buildShowdownSwitchCommand(cursor);
+        syncSwitch.baton = typeof useMode === "boolean" ? useMode : false;
+        broadcastShowdownSyncPlayerCommand(this.fieldIndex, syncSwitch);
       }
       // #record-replay (single-player): capture this committed player command (move/switch/ball/run).
       // Fires AFTER the co-op broadcast above (behavior-preserving) and is a hard no-op in co-op (the

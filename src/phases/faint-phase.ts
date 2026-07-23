@@ -4,7 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erHeartbreakOnAllyFaint } from "#data/elite-redux/abilities/heartbreak";
-import { getCoopController, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, isShowdownSyncSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import { isCoopRecording, withCoopMessageRecordingSuppressed } from "#data/elite-redux/coop/coop-turn-recorder";
 import {
   erRecordAchievementEnemyFaint,
@@ -260,7 +260,7 @@ export class FaintPhase extends PokemonPhase {
           // choice). The dedicated phase awaits that pick, validates it, summons it, and AI-falls-back on
           // a timeout/illegal pick so the duel never stalls. A co-op host (its enemy is AI) or any
           // non-versus trainer keeps the vanilla inline auto-pick below.
-          if (isVersusSession() && getCoopController()?.role === "host") {
+          if (isVersusSession() && (getCoopController()?.role === "host" || isShowdownSyncSession())) {
             globalScene.phaseManager.pushNew("ShowdownEnemyFaintSwitchPhase", this.fieldIndex);
           } else {
             globalScene.phaseManager.pushNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, -1, false, false);

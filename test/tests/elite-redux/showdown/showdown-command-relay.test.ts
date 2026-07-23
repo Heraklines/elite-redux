@@ -52,6 +52,26 @@ describe("Showdown enemy-command relay (C4)", () => {
     hostRelay.dispose();
   });
 
+  it("Sync waits symmetrically without emitting an authority request", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostRelay = new ShowdownCommandRelay(host, { schedule: noTimer });
+    const peerRelay = new ShowdownCommandRelay(guest, { schedule: noTimer });
+    const receivedByPeer: string[] = [];
+    const off = guest.onMessage(message => receivedByPeer.push(message.t));
+
+    const pending = hostRelay.awaitCommand(8, 1);
+    await flush();
+    expect(receivedByPeer).not.toContain("showdownCommandRequest");
+
+    peerRelay.sendCommand(8, { command: 0, cursor: 2, moveId: 99 }, 1);
+    await flush();
+    expect(await pending).toMatchObject({ cursor: 2, moveId: 99 });
+
+    off();
+    hostRelay.dispose();
+    peerRelay.dispose();
+  });
+
   it("keeps per-turn buffers distinct (a later turn does not clobber an unconsumed earlier one)", async () => {
     const { host, guest } = createLoopbackPair();
     const hostRelay = new ShowdownCommandRelay(host, { schedule: noTimer });
