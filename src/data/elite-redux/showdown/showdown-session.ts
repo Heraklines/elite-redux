@@ -243,6 +243,11 @@ export class ShowdownSession {
   private receivedVoid: string | null = null;
   /** Guards the one-shot barrier arrival so a re-entrant gate can't arrive twice. */
   private crossingBarrier = false;
+  /**
+   * The first peer ready frame echoes our handshake once. This heals a peer whose Showdown listener
+   * registered after the transport's generic early-frame drain without creating a resend loop.
+   */
+  private handshakeEchoed = false;
   /** Idempotency guard for {@linkcode dispose} (B7 item 8: disposed via both the pending slot and the flow). */
   private disposed = false;
 
@@ -394,10 +399,16 @@ export class ShowdownSession {
         this.opponentProfile = sanitizeGhostProfile(msg.presentation);
         this.tryGate();
         break;
-      case "showdownReady":
+      case "showdownReady": {
+        const firstReady = this.opponentTeamHash == null;
         this.opponentTeamHash = msg.teamHash;
+        if (firstReady && !this.handshakeEchoed && this.settle != null) {
+          this.handshakeEchoed = true;
+          this.resendHandshake();
+        }
         this.tryGate();
         break;
+      }
       case "showdownVoid":
         this.receivedVoid = msg.reason;
         this.tryGate();
