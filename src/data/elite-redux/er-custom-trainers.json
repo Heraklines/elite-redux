@@ -4004,5 +4004,32 @@
     "trainerClass": "BLACK_BELT",
     "victoryDialogue": "Back to training.",
     "weight": 100
+  },
+  "TRAINER_70022": {
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70022,
+    "maxWave": 10,
+    "minWave": 5,
+    "name": "Jordan",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "HEADBUTT"
+        ],
+        "species": 263
+      }
+    ],
+    "trainerClass": "ACE_TRAINER",
+    "trainerSprite": "model_1",
+    "weight": 1
   }
 }
