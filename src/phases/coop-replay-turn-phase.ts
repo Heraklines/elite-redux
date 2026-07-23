@@ -1273,10 +1273,16 @@ export class CoopReplayTurnPhase extends Phase {
           case "switch":
             pm.unshiftNew("CoopSwitchReplayPhase", event);
             break;
-          default:
+          default: {
+            // Keep the renderer closed over the wire union. Adding a new authority event without a
+            // concrete replay phase is a compile failure, while malformed runtime input still skips
+            // fail-soft and receives no browser completion receipt.
+            const unhandledEvent: never = event;
+            coopWarn("replay", `unsupported authority presentation event=${String(unhandledEvent)} skipped`);
             // Future additive kinds deliberately receive no completion receipt. The exact-browser
             // ledger will fail host-vs-renderer equality until their concrete presentation is wired.
             continue;
+          }
         }
         if (hasCoopPresentationObserver()) {
           pm.unshiftNew(

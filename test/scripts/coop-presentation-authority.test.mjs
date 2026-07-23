@@ -29,10 +29,24 @@ test("switch presentation is host-authored and the renderer never predicts its o
   );
   assert.match(
     animations,
-    /addPokeballOpenParticles[\s\S]+renderType\s*===\s*Phaser\.HEADLESS[\s\S]+return/u,
-    "the shared animation boundary contains headless particle timers for every switch/capture caller",
+    /doDefaultPbOpenParticles[\s\S]+const scene = globalScene[\s\S]+const particleTimer = scene\.time\.addEvent[\s\S]+scene\.add == null[\s\S]+particleTimer\.remove\(\)/u,
+    "the shared animation boundary binds its timer to one scene and retires callbacks after teardown",
   );
   assert.doesNotMatch(guestTurn, /mirrorGuestOwnSwitch|summonCoopPlayerField/u);
+});
+
+test("healing is an authority-authored presentation and every event kind is exhaustively rendered", () => {
+  const pokemon = read("src/field/pokemon.ts");
+  const replay = read("src/phases/coop-replay-turn-phase.ts");
+  const replayPhases = read("src/phases/coop-replay-phases.ts");
+
+  assert.match(
+    pokemon,
+    /public heal\([\s\S]+healAmount > 0 && isCoopRecording\(\)[\s\S]+recordCoopEvent\(\{\s*k: "hp"/u,
+  );
+  assert.match(replayPhases, /const healing = toHp > fromHp[\s\S]+CommonBattleAnim\(CommonAnim\.HEALTH_UP, mon\)/u);
+  assert.match(replayPhases, /healing \? HitResult\.HEAL : HitResult\.EFFECTIVE/u);
+  assert.match(replay, /const unhandledEvent: never = event/u);
 });
 
 test("every authority event receives an ordered renderer-completion receipt in the exact-browser build", () => {

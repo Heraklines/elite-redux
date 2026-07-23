@@ -6097,6 +6097,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public heal(amount: number): number {
     const healAmount = Math.min(amount, this.getMaxHp() - this.hp);
     this.hp += healAmount;
+    // Healing is an HP presentation boundary just like damage. Record the authoritative post-heal
+    // value at the universal mutation seam so moves, berries, terrain, abilities, drain effects, and
+    // linked-heal mechanics cannot silently jump only on the guest's end-of-turn checkpoint. Emit before
+    // Soulmate recursively copies the heal so the immutable event order matches the host's mutation order.
+    if (healAmount > 0 && isCoopRecording()) {
+      recordCoopEvent({
+        k: "hp",
+        bi: this.getBattlerIndex(),
+        hp: this.hp,
+        maxHp: this.getMaxHp(),
+        sp: this.species?.speciesId ?? 0,
+      });
+    }
     // ER Soulmate (ability 5918): 50% of the direct healing a Soulmate holder
     // receives is copied to its linked ally (guarded against recursion).
     erApplySoulmateHealCopy(this, healAmount);

@@ -30,6 +30,7 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { CommonBattleAnim } from "#data/battle-anims";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import {
   clearCoopRuntime,
@@ -49,6 +50,8 @@ import { TerrainType } from "#data/terrain";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { GameModes } from "#enums/game-modes";
+import { HitResult } from "#enums/hit-result";
+import { CommonAnim } from "#enums/move-anims-common";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
@@ -705,6 +708,102 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(faintEvent, "the poison KO recorded a faint event (no longer a silent vanish)").toBeDefined();
     // Exactly ONE faint for this mon (damage() no-ops once fainted, so no duplicate).
     expect(recording.events.filter(e => e.k === "faint" && e.bi === koBi).length, "exactly one faint event").toBe(1);
+  });
+
+  it("(Step 2) healing records the authoritative post-heal HP at the universal mutation seam", async () => {
+    const field = await startCoopHost();
+    const pokemon = field[COOP_HOST_FIELD_INDEX];
+    const maxHp = pokemon.getMaxHp();
+    pokemon.hp = maxHp - 10;
+
+    beginCoopRecording(globalScene.currentBattle.turn, "heal-recording");
+    expect(pokemon.heal(7), "the host applies the requested in-range heal").toBe(7);
+    const recording = endCoopRecording();
+
+    expect(recording.events, "healing is no longer left to a silent checkpoint snap").toContainEqual({
+      k: "hp",
+      bi: pokemon.getBattlerIndex(),
+      hp: maxHp - 3,
+      maxHp,
+      sp: pokemon.species.speciesId,
+    });
+  });
+
+  it("(Step 2) an upward HP event plays HEALTH_UP, shows a green amount, and finishes at authority HP", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[COOP_HOST_FIELD_INDEX];
+    const maxHp = pokemon.getMaxHp();
+    const fromHp = maxHp - 10;
+    const toHp = maxHp - 3;
+    pokemon.hp = fromHp;
+    globalScene.moveAnimations = true;
+
+    const played: Array<CommonAnim | null> = [];
+    const animSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation(function (
+      this: CommonBattleAnim,
+      _onSubstitute?: boolean,
+      callback?: () => void,
+    ) {
+      played.push(this.commonAnim);
+      callback?.();
+    });
+    const numberSpy = vi.spyOn(globalScene.damageNumberHandler, "add").mockImplementation(() => {});
+    const updateSpy = vi.spyOn(pokemon, "updateInfo").mockResolvedValue(undefined);
+    const phase = new CoopHpDrainReplayPhase(pokemon.getBattlerIndex(), fromHp, toHp, maxHp, pokemon.species.speciesId);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(played, "the guest uses the same healing animation class as the host").toEqual([CommonAnim.HEALTH_UP]);
+    expect(numberSpy, "the guest shows the exact authority-authored heal amount in green").toHaveBeenCalledWith(
+      pokemon,
+      7,
+      HitResult.HEAL,
+      false,
+    );
+    expect(pokemon.hp, "the replay cannot leave a guessed HP value behind").toBe(toHp);
+    expect(updateSpy, "the authoritative bar target is redrawn").toHaveBeenCalledTimes(1);
+    expect(endSpy, "the healing presentation always releases the replay queue").toHaveBeenCalledTimes(1);
+
+    animSpy.mockRestore();
+    numberSpy.mockRestore();
+    updateSpy.mockRestore();
+    endSpy.mockRestore();
+  });
+
+  it("(Step 2) an HP animation or redraw that never settles cannot strand the replay queue", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[COOP_HOST_FIELD_INDEX];
+    const maxHp = pokemon.getMaxHp();
+    const fromHp = maxHp - 10;
+    const toHp = maxHp - 3;
+    pokemon.hp = fromHp;
+    globalScene.moveAnimations = true;
+
+    const animSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation(() => {});
+    const updateSpy = vi.spyOn(pokemon, "updateInfo").mockReturnValue(new Promise(() => {}));
+    let watchdogCallback: (() => void) | undefined;
+    const timer = { remove: vi.fn() };
+    const timerSpy = vi.spyOn(globalScene.time, "delayedCall").mockImplementation((_delay, callback) => {
+      watchdogCallback = () => callback();
+      return timer as never;
+    });
+    const phase = new CoopHpDrainReplayPhase(pokemon.getBattlerIndex(), fromHp, toHp, maxHp, pokemon.species.speciesId);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+    expect(endSpy, "the phase is genuinely waiting on the missing animation callback").not.toHaveBeenCalled();
+    watchdogCallback?.();
+
+    expect(pokemon.hp, "the timeout still installs the immutable authority HP").toBe(toHp);
+    expect(endSpy, "the timeout releases even when updateInfo never settles").toHaveBeenCalledTimes(1);
+    expect(timer.remove, "release retires the watchdog exactly once").toHaveBeenCalledTimes(1);
+
+    animSpy.mockRestore();
+    updateSpy.mockRestore();
+    timerSpy.mockRestore();
+    endSpy.mockRestore();
   });
 
   it("(Step 2) the guest ANIMATES a poison-KO faint stream (hp drain + faint) without throwing", async () => {

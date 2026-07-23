@@ -383,12 +383,12 @@ export class CoopMoveAnimReplayPhase extends Phase {
 }
 
 /**
- * GUEST: drain the HP bar to the host's authoritative post-hit value for an `hp` event (#633).
- * The host pre-computed the value (no RNG); this phase sets `mon.hp` to it then renders the
- * standard hit flash + damage number + info-bar redraw (modeled on `DamageAnimPhase`, but with
- * its own `end()` so the final-boss-phase-two override can never fire on the guest). It ENDS at
- * the host's hp, identical to the checkpoint, so the next turn's checksum is unaffected. The
- * pre-hit hp is baked in at replay time (before the checkpoint snaps) so the drain is visible.
+ * GUEST: animate the HP bar to the host's authoritative post-mutation value for an `hp` event (#633).
+ * The same immutable event represents damage (`toHp < fromHp`) and healing (`toHp > fromHp`). Damage
+ * renders the standard hit cue; healing renders HEALTH_UP followed by the green amount, matching the
+ * host's PokemonHealPhase ordering. The guest never computes an amount or result from mechanics. It
+ * ENDS at the host's hp, identical to the checkpoint, so the next turn's checksum is unaffected. The
+ * pre-mutation hp is baked in at replay time (before the checkpoint snaps) so the change is visible.
  */
 export class CoopHpDrainReplayPhase extends PokemonPhase {
   public readonly phaseName = "CoopHpDrainReplayPhase";
@@ -423,29 +423,79 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
         this.end();
         return;
       }
-      // Co-op animations-off FAST-FORWARD (replay pacing): collapse the HP drain to an INSTANT set.
-      // The drain phase already knows its authoritative target (`toHp`), so when move animations are
-      // disabled we skip the hit sound + floating damage number + the pre-hit restore and snap the
-      // bar straight to the host's value with `updateInfo(true)` (tween duration 0). The END STATE is
-      // byte-identical to the animated path (`mon.hp === toHp`, idempotent with the finalize
-      // checkpoint), so the per-turn checksum is unchanged - only the human-pace drain WAIT is gone.
+      const authoritativeMaxHp = Math.trunc(this.maxHp) || mon.getMaxHp();
+      const fromHp = Math.max(0, Math.min(Math.trunc(this.fromHp), authoritativeMaxHp));
+      const toHp = Math.max(0, Math.min(Math.trunc(this.toHp), authoritativeMaxHp));
+      const healing = toHp > fromHp;
+      const amount = Math.abs(toHp - fromHp);
+
+      let ended = false;
+      let settling = false;
+      let watchdog: Phaser.Time.TimerEvent | undefined;
+      const finish = () => {
+        if (ended) {
+          return;
+        }
+        ended = true;
+        watchdog?.remove();
+        this.end();
+      };
+      const finishAtAuthority = (instant = false) => {
+        if (ended || settling) {
+          return;
+        }
+        settling = true;
+        mon.hp = toHp;
+        void mon.updateInfo(instant).then(finish, finish);
+      };
+      const forceFinishAtAuthority = () => {
+        if (ended) {
+          return;
+        }
+        mon.hp = toHp;
+        try {
+          // Best-effort redraw only: a hung/rejected UI promise must not defeat the phase watchdog.
+          void mon.updateInfo(true);
+        } finally {
+          finish();
+        }
+      };
+
+      // Co-op animations-off FAST-FORWARD (replay pacing): collapse either direction to an INSTANT set.
+      // The phase already knows its authoritative target (`toHp`), so the END STATE is byte-identical to
+      // the animated path and idempotent with the finalize checkpoint.
       if (!globalScene.moveAnimations) {
-        mon.hp = Math.max(0, Math.min(Math.trunc(this.toHp), Math.trunc(this.maxHp) || mon.getMaxHp()));
-        void mon.updateInfo(true).then(() => this.end());
+        finishAtAuthority(true);
         return;
       }
-      const amount = Math.max(0, Math.trunc(this.fromHp) - Math.trunc(this.toHp));
-      // Restore the pre-hit value so the bar visibly drains from it to the host's hp.
-      mon.hp = Math.max(0, Math.min(Math.trunc(this.fromHp), Math.trunc(this.maxHp) || mon.getMaxHp()));
+
+      // Restore the pre-mutation value so the bar visibly moves in the same direction as the host.
+      mon.hp = fromHp;
+      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, forceFinishAtAuthority);
+
+      const renderAuthoritativeAmount = () => {
+        if (ended || settling) {
+          return;
+        }
+        if (amount > 0) {
+          globalScene.damageNumberHandler.add(mon, amount, healing ? HitResult.HEAL : HitResult.EFFECTIVE, false);
+        }
+        finishAtAuthority();
+      };
+
+      if (healing) {
+        // PokemonHealPhase plays HEALTH_UP first, then mutates HP and shows the green number. Reproduce
+        // that presentation only; the amount and final HP remain authority-authored values.
+        new CommonBattleAnim(CommonAnim.HEALTH_UP, mon).play(false, renderAuthoritativeAmount);
+        return;
+      }
       if (amount > 0) {
         globalScene.playSound("se/hit");
-        globalScene.damageNumberHandler.add(mon, amount, HitResult.EFFECTIVE, false);
       }
-      // Snap to the host's authoritative hp (idempotent with the checkpoint) and redraw.
-      mon.hp = Math.max(0, Math.min(Math.trunc(this.toHp), Math.trunc(this.maxHp) || mon.getMaxHp()));
-      void mon.updateInfo().then(() => this.end());
+      renderAuthoritativeAmount();
     } catch {
-      // A bad hp value / missing sprite must never strand the queue.
+      // A bad hp value / missing sprite must never strand the queue. The deferred checkpoint still
+      // installs the authoritative state after this presentation phase ends.
       coopWarn("replay", `present hp bi=${this.battlerIndex} threw -> end (handled)`);
       this.end();
     }

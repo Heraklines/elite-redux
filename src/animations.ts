@@ -283,13 +283,18 @@ export class Animation {
   // #region Private Methods
 
   private doDefaultPbOpenParticles(x: number, y: number, radius: number): void {
-    const pbOpenParticlesFrameNames = globalScene.anims.generateFrameNames("pb_particles", {
+    // Bind the complete cosmetic effect to the scene that created it. `globalScene` can point at a
+    // replacement scene before this repeating timer drains (especially during a session restart), and
+    // a torn-down scene deliberately clears its display factories. A late particle must therefore
+    // retire its own timer instead of touching either a dead scene or an unrelated successor scene.
+    const scene = globalScene;
+    const pbOpenParticlesFrameNames = scene.anims.generateFrameNames("pb_particles", {
       start: 0,
       end: 3,
       suffix: ".png",
     });
-    if (!globalScene.anims.exists("pb_open_particle")) {
-      globalScene.anims.create({
+    if (!scene.anims.exists("pb_open_particle")) {
+      scene.anims.create({
         key: "pb_open_particle",
         frames: pbOpenParticlesFrameNames,
         frameRate: 16,
@@ -298,11 +303,11 @@ export class Animation {
     }
 
     const addParticle = (index: number) => {
-      const particle = globalScene.add.sprite(x, y, "pb_open_particle");
-      globalScene.field.add(particle);
+      const particle = scene.add.sprite(x, y, "pb_open_particle");
+      scene.field.add(particle);
       const angle = index * 45;
       const [xCoord, yCoord] = [radius * Math.cos((angle * Math.PI) / 180), radius * Math.sin((angle * Math.PI) / 180)];
-      globalScene.tweens.add({
+      scene.tweens.add({
         targets: particle,
         x: x + xCoord,
         y: y + yCoord,
@@ -311,9 +316,9 @@ export class Animation {
       particle.play({
         key: "pb_open_particle",
         startFrame: (index + 3) % 4,
-        frameRate: Math.floor(16 * globalScene.gameSpeed),
+        frameRate: Math.floor(16 * scene.gameSpeed),
       });
-      globalScene.tweens.add({
+      scene.tweens.add({
         targets: particle,
         delay: 500,
         duration: 75,
@@ -324,10 +329,19 @@ export class Animation {
     };
 
     let particleCount = 0;
-    globalScene.time.addEvent({
+    const particleTimer = scene.time.addEvent({
       delay: 20,
       repeat: 16,
-      callback: () => addParticle(++particleCount),
+      callback: () => {
+        // Phaser destroys these managers during scene teardown. The timer implementation used by the
+        // headless harness can deliver one already-scheduled callback afterwards; production scene
+        // restarts have the same lifecycle race. Stop at the boundary instead of throwing asynchronously.
+        if (scene.add == null || scene.field == null || scene.tweens == null) {
+          particleTimer.remove();
+          return;
+        }
+        addParticle(++particleCount);
+      },
     });
   }
 
