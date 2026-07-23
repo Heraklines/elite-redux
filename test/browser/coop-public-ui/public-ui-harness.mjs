@@ -2628,10 +2628,13 @@ export class DuoPublicUiRig {
     }
     let commandCursors = this.showdownCommandCursors;
     const switchLabel = "showdown-turn-1-switch";
-    const { outcomeCursors: switchOutcomeCursors, expectedCommandAddress: switchCommandAddress } =
-      await this.driveSequentialCommandRound(commandCursors, this.config.keys.battle, switchLabel, {
-        driveCommand: (client, purpose, event) => this.driveShowdownVoluntarySwitch(client, purpose, event),
-      });
+    const {
+      outcomeCursors: switchOutcomeCursors,
+      presentationCursors: switchPresentationCursors,
+      expectedCommandAddress: switchCommandAddress,
+    } = await this.driveSequentialCommandRound(commandCursors, this.config.keys.battle, switchLabel, {
+      driveCommand: (client, purpose, event) => this.driveShowdownVoluntarySwitch(client, purpose, event),
+    });
     await this.assertShowdownEntryPresentation(commandCursors, switchCommandAddress);
     const switchOutcome = await this.waitForPostTurnOutcome(switchOutcomeCursors, {
       expectedCommandAddress: switchCommandAddress,
@@ -2648,7 +2651,7 @@ export class DuoPublicUiRig {
       throw new Error(`${switchLabel}: could not recover the matched command boundary for presentation proof`);
     }
     const switchLedger = this.assertPresentationLedger(
-      switchOutcomeCursors,
+      switchPresentationCursors,
       switchMatch,
       `${switchLabel}-presentation-ledger`,
     );
@@ -2671,7 +2674,7 @@ export class DuoPublicUiRig {
     // remained exact, and the second retained turn did not poison the following command address.
     for (let round = 1; round <= 2; round++) {
       const label = `showdown-turn-${round + 1}-attack`;
-      const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
+      const { outcomeCursors, presentationCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
         commandCursors,
         this.config.keys.battle,
         label,
@@ -2692,7 +2695,7 @@ export class DuoPublicUiRig {
       if (commandMatch == null) {
         throw new Error(`${label}: could not recover the matched command boundary for presentation proof`);
       }
-      this.assertPresentationLedger(outcomeCursors, commandMatch, `${label}-presentation-ledger`);
+      this.assertPresentationLedger(presentationCursors, commandMatch, `${label}-presentation-ledger`);
       await this.assertRetainedContinuation(outcomeCursors, `${label}-next-command`);
       commandCursors = outcomeCursors;
     }
@@ -3495,6 +3498,7 @@ export class DuoPublicUiRig {
     let postSubmissionCursors = null;
     let commandCollectionClosed = null;
     let supersedingOutcome = null;
+    let presentationCursors = null;
     const consumedTargetInstances = new Set();
 
     while (pending.size > 0 && Date.now() < progressBudget.observe()) {
@@ -3636,6 +3640,11 @@ export class DuoPublicUiRig {
         const beforeSubmissionCursors = Object.fromEntries(
           clients.map(value => [value.label, value.evidence.cursor()]),
         );
+        // Presentation may begin synchronously as soon as the first real player submits.
+        // Preserve the evidence tail immediately before that first submission; the
+        // post-command outcome cursors intentionally exclude the just-consumed command
+        // surfaces and are therefore too late to prove the resulting animation stream.
+        presentationCursors ??= beforeSubmissionCursors;
         if (driveCommand == null) {
           await client.sequence(keys, `${purpose}-${client.label}`);
         } else {
@@ -3724,7 +3733,13 @@ export class DuoPublicUiRig {
       submittedCommandAddress == null
         ? null
         : `${submittedCommandAddress.epoch}:${submittedCommandAddress.wave}:${submittedCommandAddress.turn}`;
-    return { commandEvents, outcomeCursors, expectedCommandAddress };
+    return {
+      commandEvents,
+      outcomeCursors,
+      presentationCursors:
+        presentationCursors ?? Object.fromEntries(clients.map(client => [client.label, from[client.label] ?? 0])),
+      expectedCommandAddress,
+    };
   }
 
   async waitForPostTurnOutcome(from, { expectedCommandAddress = null, progressBudgetOptions = {} } = {}) {

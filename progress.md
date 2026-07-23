@@ -2026,6 +2026,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   ordered `AWAIT_SUCCESSOR` to be active, not merely admitted. This prevents later fixture entries from
   appearing as revision gaps while the prior turn is still waiting for its real replay/finalize proof.
 
+# 2026-07-23 - Showdown presentation evidence starts before command execution
+
+- Exact two-browser run `30037468361` reached the synchronized second-turn command and recorded identical
+  authority/renderer switch, ability, message, and stat-stage entries on both browsers. Its post-turn oracle
+  nevertheless sliced from cursors captured after command submission, so every causal presentation entry was
+  outside the evidence window and the healthy ledger was reported as empty.
+- Each sequential real-player round now preserves a dedicated evidence cursor immediately before its first
+  public command is submitted. Switch and attack presentation are compared from that causal boundary while
+  the later outcome cursors remain reserved for finding the next frontier. The deterministic dual-Intimidate
+  requirement remains strict; the corrected run must expose any real missing ability instead of hiding it.
+
 # 2026-07-23 - Authority V2 boundary-fixture predecessor migration
 
 - The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real

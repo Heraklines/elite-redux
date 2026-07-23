@@ -154,6 +154,11 @@ test("the journey executes a reciprocal switch plus two attacks and requires eve
   assert.match(switchDrive, /party-option:send-out/u);
   assert.match(turn, /driveSequentialCommandRound\(/u);
   assert.match(turn, /driveShowdownVoluntarySwitch/u);
+  assert.match(turn, /presentationCursors: switchPresentationCursors/u);
+  assert.match(turn, /assertPresentationLedger\(\s*switchPresentationCursors/u);
+  assert.match(turn, /assertPresentationLedger\(presentationCursors, commandMatch/u);
+  assert.doesNotMatch(turn, /assertPresentationLedger\(\s*switchOutcomeCursors/u);
+  assert.doesNotMatch(turn, /assertPresentationLedger\(outcomeCursors, commandMatch/u);
   assert.match(turn, /\["switch", "showAbility", "statStage"\]/u);
   assert.match(turn, /for \(let round = 1; round <= 2; round\+\+\)/u);
   assert.match(turn, /waitForPostTurnOutcome\(/u);
@@ -210,6 +215,7 @@ test("the real-browser oracle compares every authority event to a completed cano
   assert.match(harness, /assertPresentationLedgerAtSharedCommand/u);
   assert.match(harness, /pending\.size === 1 && submittedCommandAddress != null/u);
   assert.match(harness, /presentation-before-final-command/u);
+  assert.match(harness, /presentationCursors \?\?= beforeSubmissionCursors/u);
 });
 
 test("presentation receipts reject malformed or unknown event identities", () => {
