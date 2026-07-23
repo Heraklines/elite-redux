@@ -25,7 +25,11 @@
 // duo harness swaps it whenever it swaps runtimes.
 // =============================================================================
 
-import type { ReplacementAuthorityCarrier } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
+import type {
+  ReplacementAuthorityCarrier,
+  ReplacementSourceAddress,
+  ReplacementSuccessor,
+} from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import {
   replacementImageDigest,
   replacementOperationId,
@@ -94,12 +98,54 @@ export interface CoopV2ReplacementCommitBatch {
   readonly activeControl: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
   /** Exact mechanical successor command frontier after the final same-boundary faint is materialized. */
   readonly commands: readonly CoopCommandControlTarget[];
+  /** Exact non-command successor when the final replacement closes a known differently-addressed boundary. */
+  readonly nextSuccessorWait?: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null;
 }
 
 export type CoopV2ReplacementBatchResult =
   | { readonly kind: "no-pending" }
   | { readonly kind: "committed"; readonly entries: readonly CoopAuthorityEntry[] }
   | { readonly kind: "failed-clean" };
+
+function resolveReplacementSuccessor(
+  batch: CoopV2ReplacementCommitBatch,
+  source: ReplacementSourceAddress,
+  carrierEpoch: number,
+  carrierWave: number,
+): { readonly ok: true; readonly successor: ReplacementSuccessor } | { readonly ok: false } {
+  const [next, ...remaining] = batch.activeControl.remaining;
+  if (batch.nextSuccessorWait != null && (next != null || batch.commands.length > 0)) {
+    return { ok: false };
+  }
+  if (next != null) {
+    return {
+      ok: true,
+      successor: {
+        kind: "next-replacement",
+        control: { kind: "REPLACEMENT", ...next, remaining },
+      },
+    };
+  }
+  if (batch.commands.length > 0) {
+    return {
+      ok: true,
+      successor: {
+        kind: "resume-command-frontier",
+        epoch: carrierEpoch,
+        wave: carrierWave,
+        turn: source.turn + 1,
+        commands: batch.commands,
+      },
+    };
+  }
+  return {
+    ok: true,
+    successor:
+      batch.nextSuccessorWait == null
+        ? { kind: "terminal" }
+        : { kind: "ordered-wait", control: batch.nextSuccessorWait },
+  };
+}
 
 export class CoopV2ReplacementCutover {
   private readonly harness: CoopAuthorityV2Shadow;
@@ -198,30 +244,14 @@ export class CoopV2ReplacementCutover {
     ) {
       return { kind: "failed-clean" };
     }
-    const [next, ...remaining] = active.remaining;
-    const successor =
-      next == null
-        ? batch.commands.length === 0
-          ? ({ kind: "terminal" } as const)
-          : ({
-              kind: "resume-command-frontier",
-              epoch: carrierEpoch,
-              wave: carrierWave,
-              turn: source.turn + 1,
-              commands: batch.commands,
-            } as const)
-        : ({
-            kind: "next-replacement",
-            control: {
-              kind: "REPLACEMENT",
-              ...next,
-              remaining,
-            },
-          } as const);
+    const successorResult = resolveReplacementSuccessor(batch, source, carrierEpoch, carrierWave);
+    if (!successorResult.ok) {
+      return { kind: "failed-clean" };
+    }
     const entry = this.harness.tapReplacementCommit({
       ...current,
       authorityCarrier: batch.authorityCarrier,
-      successor,
+      successor: successorResult.successor,
       legacyImage: {
         proposal: current.proposal,
         resolution: current.resolution,

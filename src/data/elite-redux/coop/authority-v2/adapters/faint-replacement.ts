@@ -130,6 +130,9 @@ export type ReplacementResolutionMode = "owner-pick" | "fallback-auto";
  *   - "next-replacement" - another faint remains in the SAME turn; the current
  *                          post-summon result installs the next exact executable
  *                          picker plus the immutable remainder of the chain.
+ *   - "ordered-wait"     - the replacement is the final material result, but the
+ *                          next authority lives at a deliberately different typed
+ *                          address (for example Mystery battle -> ME_TERMINAL t0).
  *   - "terminal"         - no executable control follows the replacement; the
  *                          entry waits explicitly for interaction/wave/terminal authority.
  */
@@ -145,6 +148,10 @@ export type ReplacementSuccessor =
   | {
       readonly kind: "next-replacement";
       readonly control: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
+    }
+  | {
+      readonly kind: "ordered-wait";
+      readonly control: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>;
     }
   | { readonly kind: "terminal" };
 
@@ -409,6 +416,16 @@ export function successorControl(
         commands: successor.commands,
       };
     case "next-replacement":
+      return successor.control;
+    case "ordered-wait":
+      if (
+        successor.control.afterOperationId !== sourceOperationId
+        || successor.control.epoch !== address.epoch
+        || successor.control.wave !== address.wave
+        || successor.control.turn !== address.turn
+      ) {
+        throw new Error("[authority-v2/faint-replacement] ordered successor wait is not bound to the replacement");
+      }
       return successor.control;
     case "terminal":
       return {

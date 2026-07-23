@@ -328,6 +328,70 @@ describe("authority-v2 replacement staged transaction", () => {
     duo.dispose();
   });
 
+  it("states the exact Mystery terminal edge when replacement is the final victory material", () => {
+    const duo = buildDuo();
+    const cutover = new CoopV2ReplacementCutover(duo.host);
+    const pick = proposal();
+    const activeControl = replacementControl(pick);
+    expect(stage(cutover, pick)).toBe(true);
+    const nextSuccessorWait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: activeControl.operationId,
+      epoch: SESSION.epoch,
+      wave: 8,
+      turn: 4,
+      allowedKinds: ["INTERACTION_COMMIT" as const],
+      allowedInteractionAddresses: [
+        { surfaceClass: "op:me" as const, operationKind: "ME_TERMINAL" as const, wave: 8, turn: 0 },
+      ],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+
+    const result = cutover.commitStagedHostReplacements({
+      authorityCarrier: carrier(),
+      activeControl,
+      commands: [],
+      nextSuccessorWait,
+    });
+    expect(result.kind).toBe("committed");
+    if (result.kind !== "committed") {
+      throw new Error("expected committed replacement batch");
+    }
+    expect(result.entries[0].nextControl).toEqual(nextSuccessorWait);
+    cutover.dispose();
+    duo.dispose();
+  });
+
+  it("fails cleanly when an ordered wait conflicts with command or replacement control", () => {
+    const duo = buildDuo();
+    const cutover = new CoopV2ReplacementCutover(duo.host);
+    const pick = proposal();
+    const activeControl = replacementControl(pick);
+    expect(stage(cutover, pick)).toBe(true);
+    const wait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: activeControl.operationId,
+      epoch: SESSION.epoch,
+      wave: 8,
+      turn: 4,
+      allowedKinds: ["INTERACTION_COMMIT" as const],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    expect(
+      cutover.commitStagedHostReplacements({
+        authorityCarrier: carrier(),
+        activeControl,
+        commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
+        nextSuccessorWait: wait,
+      }).kind,
+    ).toBe("failed-clean");
+    expect(cutover.pendingCount).toBe(1);
+    cutover.dispose();
+    duo.dispose();
+  });
+
   it("commits only the active same-boundary faint and installs the next exact picker", () => {
     const duo = buildDuo();
     const cutover = new CoopV2ReplacementCutover(duo.host);

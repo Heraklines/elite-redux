@@ -286,6 +286,43 @@ describe("buildReplacementCommitEntry", () => {
     expect(decodeReplacementCommitMaterial({ ...built, revision: 6 })?.authorityCarrier).toEqual(AUTHORITY_CARRIER);
   });
 
+  it("preserves an exact differently-addressed successor wait and rejects a foreign binding", () => {
+    const operationId = replacementOperationId(address(), 1);
+    const wait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: operationId,
+      epoch: 1,
+      wave: 3,
+      turn: 2,
+      allowedKinds: ["INTERACTION_COMMIT" as const],
+      allowedInteractionAddresses: [
+        { surfaceClass: "op:me" as const, operationKind: "ME_TERMINAL" as const, wave: 3, turn: 0 },
+      ],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    const built = buildReplacementCommitEntry({
+      context: FRAME,
+      proposal: proposal(),
+      resolution: "owner-pick",
+      successor: { kind: "ordered-wait", control: wait },
+    });
+    expect(built.nextControl).toEqual(wait);
+    expect(isValidAuthorityEntry({ ...built, revision: 5 })).toBe(true);
+
+    expect(() =>
+      buildReplacementCommitEntry({
+        context: FRAME,
+        proposal: proposal(),
+        resolution: "owner-pick",
+        successor: {
+          kind: "ordered-wait",
+          control: { ...wait, afterOperationId: "RC/e1/w3/t2/o0/f0/s0" },
+        },
+      }),
+    ).toThrow(/not bound to the replacement/u);
+  });
+
   it("throws on a successor that would encode an invalid control", () => {
     expect(() =>
       buildReplacementCommitEntry({

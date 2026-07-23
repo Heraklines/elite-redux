@@ -80,16 +80,19 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
           fatal(`Host could not capture replacement authority for wave ${wave}, turn ${turn}.`);
           return;
         }
-        const v2 = commitCoopV2ReplacementAuthority({
-          checkpoint: carrier.checkpoint,
-          checksum: carrier.checksum,
-          preimage: carrier.preimage,
-          fullField: carrier.fullField,
-          authoritativeState: carrier.authoritativeState,
-          epoch: controller.sessionEpoch,
-          wave: carrier.authoritativeState.wave,
-          turn: carrier.authoritativeState.turn,
-        });
+        const v2 = commitCoopV2ReplacementAuthority(
+          {
+            checkpoint: carrier.checkpoint,
+            checksum: carrier.checksum,
+            preimage: carrier.preimage,
+            fullField: carrier.fullField,
+            authoritativeState: carrier.authoritativeState,
+            epoch: controller.sessionEpoch,
+            wave: carrier.authoritativeState.wave,
+            turn: carrier.authoritativeState.turn,
+          },
+          { mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true },
+        );
         if (v2?.kind === "committed") {
           coopLog(
             "v2-replacement",

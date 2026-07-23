@@ -6724,6 +6724,7 @@ export function retainCoopV2InteractionProposal(
  */
 export function commitCoopV2ReplacementAuthority(
   authorityCarrier: ReplacementAuthorityCarrier,
+  boundary: { readonly mysteryBattle: boolean } = { mysteryBattle: false },
 ): CoopV2ReplacementBatchResult | null {
   const runtime = active;
   if (runtime == null || runtime.controller.authorityRole !== "authority") {
@@ -6759,10 +6760,45 @@ export function commitCoopV2ReplacementAuthority(
     );
     return { kind: "failed-clean" };
   }
+  const mysteryControl = captureCoopActiveMysteryControl();
+  const enemyDefeated =
+    state.enemyParty.length === 0
+    || state.enemyParty.every(mon => typeof mon.hp === "number" && Number.isFinite(mon.hp) && mon.hp <= 0);
+  const playerSurvived = state.playerParty.some(
+    mon => typeof mon.hp === "number" && Number.isFinite(mon.hp) && mon.hp > 0,
+  );
+  // A simultaneous player faint can make the final mechanical result REPLACEMENT_COMMIT instead of the
+  // TURN_COMMIT that normally owns this edge. Mystery settlement is nevertheless authored at turn 0, so a
+  // generic source-turn replacement wait would correctly reject it. Require all three independent facts:
+  // the phase identifies an actual Mystery battle, the retained ME transaction identifies this handoff wave,
+  // and the immutable post-summon image proves victory rather than game-over. Nothing else receives the t0 edge.
+  const nextSuccessorWait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null =
+    activeControl.remaining.length === 0
+    && !hasImmediateCommand
+    && boundary.mysteryBattle
+    && mysteryControl?.terminal === "battle"
+    && mysteryControl.handoffWave === state.wave
+    && enemyDefeated
+    && playerSurvived
+      ? {
+          kind: "AWAIT_SUCCESSOR",
+          afterOperationId: activeControl.operationId,
+          epoch: activeControl.epoch,
+          wave: activeControl.wave,
+          turn: activeControl.turn,
+          allowedKinds: ["INTERACTION_COMMIT"],
+          allowedInteractionAddresses: [
+            { surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: activeControl.wave, turn: 0 },
+          ],
+          allowNextWaveStart: false,
+          expectedOperationId: null,
+        }
+      : null;
   return cutover.commitStagedHostReplacements({
     authorityCarrier,
     activeControl,
     commands: commandFrontier.commands,
+    nextSuccessorWait,
   });
 }
 
