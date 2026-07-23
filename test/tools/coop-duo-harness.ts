@@ -76,6 +76,7 @@ import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritat
 import {
   applyCoopAuthoritativeBattleState,
   captureCoopAuthoritativeBattleState,
+  captureCoopAuthoritativeCarrier,
   captureCoopEnemies,
   captureCoopPlayerModifiers,
   reconcileArenaTags,
@@ -115,6 +116,7 @@ import {
   getCoopInteractionRelay,
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
+  getCoopV2Shadow,
   installCoopRuntimeGhostHooks,
   installCoopRuntimeLiveEmitter,
   isCoopV2InteractionHumanInputFrozen,
@@ -133,7 +135,7 @@ import {
   createLoopbackPair,
   type SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
-import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { isCoopWaveAdvanceOperationEnabled } from "#data/elite-redux/coop/coop-wave-operation";
 import {
   type ErAchievementRunSaveData,
@@ -2736,6 +2738,72 @@ export async function buildDuo(
   installDuoCtxOwnershipPins(rig, hostGame);
   liveDuoRigs.add(rig);
   return rig;
+}
+
+/**
+ * Retire buildDuo's real initial COMMAND frontier for an isolated successor-boundary fixture.
+ *
+ * This is deliberately NOT a journey driver: tests which claim UI-to-relay coverage must submit the
+ * ordinary Command/Fight/Target handlers through {@linkcode driveDuoGuestTackleThroughPublicUi}. Small
+ * adapter/boundary suites instead need a legal predecessor without replaying an unrelated battle. They may
+ * use this helper to capture the same complete immutable turn material as `CoopTurnCommitPhase`, commit it
+ * through the real Authority V2 log, and install an exact ordered wait before exercising their target entry.
+ * It never mutates log internals and never grants a successor directly from COMMAND.
+ */
+export async function retireDuoInitialCommandForBoundaryTest(rig: DuoRig): Promise<void> {
+  await withClient(rig.hostCtx, () => {
+    const recording = endCoopRecording();
+    const battle = rig.hostScene.currentBattle;
+    if (recording.turn !== battle.turn || recording.turn <= 0) {
+      throw new Error(
+        `boundary fixture could not retire command: recorder turn=${recording.turn} battle turn=${battle.turn}`,
+      );
+    }
+    const carrier = captureCoopAuthoritativeCarrier(recording.turn, "turnResolution");
+    if (carrier == null) {
+      throw new Error("boundary fixture could not capture complete turn authority");
+    }
+    const epoch = rig.hostRuntime.controller.sessionEpoch;
+    const wave = carrier.authoritativeState.wave;
+    const operationId = `TURN/e${epoch}/w${wave}/t${recording.turn}`;
+    const capture = {
+      turnResolution: recording.events,
+      ...carrier,
+      epoch,
+      wave,
+      turn: recording.turn,
+      revision: carrier.authoritativeState.tick,
+    };
+    const committed = getCoopV2Shadow(rig.hostRuntime)?.tapTurnCommit({
+      operationId,
+      capture,
+      nextCommandFrontier: null,
+      nextSuccessorWait: {
+        kind: "AWAIT_SUCCESSOR",
+        afterOperationId: operationId,
+        epoch,
+        wave,
+        turn: recording.turn,
+        allowedKinds: ["CONTROL_COMMIT", "REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+        allowNextWaveStart: false,
+        expectedOperationId: null,
+      },
+      legacyImage: capture,
+      legacyDigest: carrier.checksum,
+      successorSeatSource: "none-non-command-boundary",
+    });
+    if (committed == null) {
+      throw new Error("boundary fixture could not commit its complete Authority V2 TURN_COMMIT predecessor");
+    }
+  });
+  await pumpDuoDestinations(rig, 4);
+  const hostControl = getCoopV2Shadow(rig.hostRuntime)?.authorityFrontier()?.nextControl;
+  const guestControl = rig.guestRuntime.v2ControlLedger.latestControl;
+  if (hostControl?.kind !== "AWAIT_SUCCESSOR" || guestControl?.kind !== "AWAIT_SUCCESSOR") {
+    throw new Error(
+      `boundary fixture turn predecessor did not converge: host=${hostControl?.kind ?? "none"} guest=${guestControl?.kind ?? "none"}`,
+    );
+  }
 }
 
 /**

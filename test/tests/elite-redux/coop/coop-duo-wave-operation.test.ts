@@ -48,7 +48,6 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import * as waveOp from "#data/elite-redux/coop/coop-wave-operation";
 import {
   markCoopWaveAdvanceContinuationReady,
@@ -66,7 +65,14 @@ import { CoopFinalizeTurnPhase, CoopWaveAdvanceBoundaryPhase } from "#phases/coo
 import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { GameOverPhase } from "#phases/game-over-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { buildDuo, type DuoRig, drainLoopback, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
+import {
+  buildDuo,
+  type DuoRig,
+  drainLoopback,
+  installDuoLogCapture,
+  retireDuoInitialCommandForBoundaryTest,
+  withClient,
+} from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -123,9 +129,22 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   });
 
   /** Boot the host into a live battle + stand up the duo rig. */
-  async function bootDuo(options: { preserveProductionWaveSink?: boolean } = {}): Promise<DuoRig> {
+  async function bootDuo(
+    options: { preserveProductionWaveSink?: boolean; startingWave?: number } = {},
+  ): Promise<DuoRig> {
+    if (options.startingWave != null) {
+      game.override.startingWave(options.startingWave);
+    }
     await game.classicMode.startBattle(SpeciesId.MAGIKARP, SpeciesId.MAGIKARP);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    if (options.startingWave != null) {
+      expect(rig.hostScene.currentBattle.waveIndex, "the initial V2 command belongs to the tested wave").toBe(
+        options.startingWave,
+      );
+      expect(rig.guestScene.currentBattle.waveIndex, "the guest mirrored the tested command address").toBe(
+        options.startingWave,
+      );
+    }
     expect(rig.hostRuntime.waveOperationBinding.opState).toBe(rig.hostRuntime.opState);
     expect(rig.hostRuntime.waveOperationBinding.durability).toBe(rig.hostRuntime.durability);
     expect(Object.isFrozen(rig.hostRuntime.waveOperationBinding)).toBe(true);
@@ -163,17 +182,33 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
         rig.hostScene.currentBattle.battleType = ctx.battleType;
       }
       if (ctx.waveIndex !== undefined) {
-        rig.hostScene.currentBattle.waveIndex = ctx.waveIndex;
+        expect(
+          rig.hostScene.currentBattle.waveIndex,
+          "the wave boundary must follow the exact command/turn address that booted the fixture",
+        ).toBe(ctx.waveIndex);
       }
-      broadcastCoopWaveResolved(outcome);
+      // Normal wave outcomes are first staged while the final turn is still recording. Authority V2
+      // correctly refuses a WAVE_ADVANCE directly behind COMMAND, so retire that real command below before
+      // BattleEnd seals the transition. GameOver has no BattleEnd and is opened only after the turn wait.
       if (outcome !== "gameOver") {
+        broadcastCoopWaveResolved(outcome);
+      }
+    });
+    await retireDuoInitialCommandForBoundaryTest(rig);
+    await withClient(rig.hostCtx, () => {
+      if (outcome === "gameOver") {
+        broadcastCoopWaveResolved(outcome);
+      } else {
+        if (outcome === "win") {
+          expect(flushCoopWaveResolvedAfterTurnCommit(rig.hostScene.currentBattle.waveIndex)).toBe(true);
+        }
         broadcastCoopWaveEndState(outcome === "win" || outcome === "capture");
       }
     });
     expect(
       getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed,
-      "the host committed exactly one ordered V2 boundary",
-    ).toBe(committedBefore + 1);
+      "the host committed TURN_COMMIT then exactly one ordered wave/terminal boundary",
+    ).toBe(committedBefore + 2);
     // Pump delivery under the GUEST ctx so the decoded entry is admitted by that replica, never by
     // whichever process-global scene happened to commit it.
     return withClient(rig.guestCtx, () => {
@@ -194,7 +229,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   }
 
   it("still commits and routes the complete transaction when both raw wave carriers are dropped", async () => {
-    const rig = await bootDuo();
+    const rig = await bootDuo({ startingWave: 2 });
     vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved").mockImplementation(() => {
       throw new Error("drop raw waveResolved");
     });
@@ -213,15 +248,15 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   }, 300_000);
 
   it("withholds the raw victory hint until the material final-turn commit boundary", async () => {
-    const rig = await bootDuo();
+    const rig = await bootDuo({ startingWave: 3 });
     const raw = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
 
     await withClient(rig.hostCtx, () => {
-      rig.hostScene.currentBattle.waveIndex = 3;
-      beginCoopRecording(rig.hostScene.currentBattle.turn);
       broadcastCoopWaveResolved("win");
       expect(raw, "Victory may stage its transition but cannot publish ahead of turn authority").not.toHaveBeenCalled();
-      endCoopRecording();
+    });
+    await retireDuoInitialCommandForBoundaryTest(rig);
+    await withClient(rig.hostCtx, () => {
       expect(flushCoopWaveResolvedAfterTurnCommit(3)).toBe(true);
     });
 
@@ -233,7 +268,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   // CLASS 1 - WILD WIN: VictoryPhase tail, NO trainer, next phase WAVE_VICTORY.
   // ===========================================================================================
   it("WILD win: the committed WAVE_ADVANCE states outcome=win victoryKind=wild next=WAVE_VICTORY, adopted by the guest", async () => {
-    const rig = await bootDuo();
+    const rig = await bootDuo({ startingWave: 3 });
     const payload = await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 3 });
 
     expect(payload, "the host committed a WAVE_ADVANCE op").toBeDefined();
@@ -257,7 +292,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   // CLASS 2 - TRAINER VICTORY: VictoryPhase cascade PLUS TrainerVictoryPhase, next phase WAVE_VICTORY.
   // ===========================================================================================
   it("TRAINER victory: the committed WAVE_ADVANCE states victoryKind=trainer, sanctioning TrainerVictoryPhase", async () => {
-    const rig = await bootDuo();
+    const rig = await bootDuo({ startingWave: 5 });
     const payload = await commitAndDeliver(rig, "win", { battleType: BattleType.TRAINER, waveIndex: 5 });
 
     expect(payload!.outcome).toBe("win");
@@ -275,7 +310,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   // CLASS 3 - BIOME BOUNDARY @ wave 10: the transition crosses a biome boundary; biomeChange is host-stated.
   // ===========================================================================================
   it("BIOME boundary @10: the committed WAVE_ADVANCE states biomeChange faithfully, and the guest receives the SAME verdict", async () => {
-    const rig = await bootDuo();
+    const rig = await bootDuo({ startingWave: 10 });
     vi.spyOn(rig.hostScene, "isNewBiome").mockReturnValue(true);
     const guestDerive = vi.spyOn(rig.guestScene, "isNewBiome").mockReturnValue(false);
     const payload = await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 10 });
@@ -306,7 +341,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   // (§8.7 residual) - so WAVE_ADVANCE must NEVER claim an ME boundary for an ordinary wave.
   // ===========================================================================================
   it("ME boundary: a standard wave-advance states meBoundary='none' (ME-battle victory stays on the Wave-2c op)", async () => {
-    const rig = await bootDuo();
+    const rig = await bootDuo({ startingWave: 12 });
     const payload = await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 12 });
 
     expect(payload!.meBoundary, "a standard wave-advance never claims an ME boundary (that is the ME op's job)").toBe(
@@ -352,7 +387,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   }, 300_000);
 
   it("retained ordinary BattleEnd ignores a speculative next-wave Mystery battle and skips local settlement", async () => {
-    const rig = await bootDuo();
+    const rig = await bootDuo({ startingWave: 11 });
     // Keep DATA unresolved until the real BattleEnd boundary. This mirrors production and ensures the
     // phase constructor captures the exact wave-11 transaction instead of mutable ambient battle state.
     registerCoopOperationLiveSink("op:wave", envelope => {
@@ -389,11 +424,10 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   }, 300_000);
 
   it("retained ordinary Victory ignores speculative Mystery classification with no encounter payload", async () => {
-    const rig = await bootDuo({ preserveProductionWaveSink: true });
+    const rig = await bootDuo({ preserveProductionWaveSink: true, startingWave: 11 });
     // The retained journal's production sink bootstraps only at its addressed source wave. Mirror that exact
     // pre-delivery boundary first, then let the renderer speculate to wave 12 after the immutable operation
     // has landed. Starting this fixture at the boot wave (1) would correctly reject a wave-11 transaction.
-    rig.guestScene.currentBattle.waveIndex = 11;
     await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 11 });
 
     await withClient(rig.guestCtx, () => {
@@ -434,7 +468,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   }, 300_000);
 
   it("FINAL VICTORY: retains Victory -> BattleEnd -> GameOver and suppresses the later duplicate terminal echo", async () => {
-    const rig = await bootDuo();
+    const rig = await bootDuo({ startingWave: 200 });
     vi.spyOn(rig.hostScene.gameMode, "isWaveFinal").mockReturnValue(true);
     const payload = await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 200 });
 
@@ -462,7 +496,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   // CLASS 5 - GAME OVER: the run ended; next phase GAME_OVER, next wave == wave (no advance), only GameOverPhase.
   // ===========================================================================================
   it("GAME OVER: the committed WAVE_ADVANCE states outcome=gameOver next=GAME_OVER, sanctioning only GameOverPhase", async () => {
-    const rig = await bootDuo();
+    const rig = await bootDuo({ startingWave: 7 });
     const payload = await commitAndDeliver(rig, "gameOver", { battleType: BattleType.WILD, waveIndex: 7 });
 
     expect(payload!.outcome).toBe("gameOver");
@@ -478,7 +512,8 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   }, 300_000);
 
   it("GAME OVER: a retained terminal dissolves a phantom next-turn replay and both peers reach GameOver", async () => {
-    const rig = await bootDuo({ preserveProductionWaveSink: true });
+    const rig = await bootDuo({ preserveProductionWaveSink: true, startingWave: 7 });
+    await retireDuoInitialCommandForBoundaryTest(rig);
     const hostTerminal = new GameOverPhase(false);
     const hostTerminalHandler = vi.spyOn(hostTerminal, "handleGameOver").mockImplementation(() => {});
     const retainedBefore = getCoopV2Shadow(rig.hostRuntime)?.diagnostics().retained ?? 0;

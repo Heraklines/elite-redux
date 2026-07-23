@@ -1988,3 +1988,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Battle-progress collection-close proof is now authority-only (structural rewards remain role-independent).
   A failure-first delayed-renderer regression proves an ordinary guest `MessagePhase` cannot skip that player,
   the complete presentation ledger is checked, and the renderer's eventual public command is submitted.
+
+# 2026-07-23 - Authority V2 boundary-fixture predecessor migration
+
+- The full sharded gate exposed a shared legacy-fixture seam: isolated wave/interaction suites booted a real
+  V2 `COMMAND_FRONTIER`, then attempted to commit their target boundary directly. The global log correctly
+  rejects that impossible edge; mutating `waveIndex` after command-open also changes no ordered address.
+- The duo harness now has one narrow non-journey helper which captures complete turn authority and commits a
+  real `TURN_COMMIT` into an exact `AWAIT_SUCCESSOR`. The wave-operation matrix boots at each tested wave and
+  follows `COMMAND -> TURN_COMMIT -> WAVE_ADVANCE/TERMINAL_COMMIT`; UI journey suites remain public-input only.
