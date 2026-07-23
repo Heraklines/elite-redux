@@ -7,22 +7,26 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
+import { presentationEventView } from "./evidence.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const read = path => readFile(resolve(root, path), "utf8");
 
-const [workflow, config, journeys, harness, observer, registry, title, replay, stream, transport] = await Promise.all([
-  read(".github/workflows/coop-public-ui-journey.yml"),
-  read("test/browser/coop-public-ui/config.mjs"),
-  read("test/browser/coop-public-ui/journeys.mjs"),
-  read("test/browser/coop-public-ui/public-ui-harness.mjs"),
-  read("scripts/coop-browser-entry.ts"),
-  read("src/dev-tools/registry.ts"),
-  read("src/phases/title-phase.ts"),
-  read("src/phases/coop-replay-turn-phase.ts"),
-  read("src/data/elite-redux/coop/coop-battle-stream.ts"),
-  read("src/data/elite-redux/coop/coop-transport.ts"),
-]);
+const [workflow, config, journeys, harness, observer, evidence, recorder, registry, title, replay, stream, transport] =
+  await Promise.all([
+    read(".github/workflows/coop-public-ui-journey.yml"),
+    read("test/browser/coop-public-ui/config.mjs"),
+    read("test/browser/coop-public-ui/journeys.mjs"),
+    read("test/browser/coop-public-ui/public-ui-harness.mjs"),
+    read("scripts/coop-browser-entry.ts"),
+    read("test/browser/coop-public-ui/evidence.mjs"),
+    read("src/data/elite-redux/coop/coop-turn-recorder.ts"),
+    read("src/dev-tools/registry.ts"),
+    read("src/phases/title-phase.ts"),
+    read("src/phases/coop-replay-turn-phase.ts"),
+    read("src/data/elite-redux/coop/coop-battle-stream.ts"),
+    read("src/data/elite-redux/coop/coop-transport.ts"),
+  ]);
 
 test("the exact-SHA workflow exposes and seals a dedicated Showdown battle journey", () => {
   assert.match(workflow, /options:[\s\S]*- showdown-battle/u);
@@ -166,6 +170,45 @@ test("the real-browser oracle requires streamed ability and environment presenta
   );
   assert.match(stream, /awaitEntryPresentation[\s\S]*requestEnemyParty/u);
   assert.match(transport, /enemyPartySync[\s\S]*entryPresentation\?: CoopBattleEvent\[\]/u);
+});
+
+test("the real-browser oracle compares every authority event to a completed canonical renderer receipt", () => {
+  assert.match(observer, /const PRESENTATION_EVENT_PREFIX = "\[coop-browser:presentation-event\] "/u);
+  assert.match(observer, /setCoopPresentationObserver\(observation =>/u);
+  assert.match(recorder, /stage:\s*"authority-recorded"/u);
+  assert.match(recorder, /stage:\s*"renderer-completed"/u);
+  assert.match(evidence, /presentationEventView\(text\)/u);
+  assert.match(evidence, /sink\.record\("browser-presentation-event"/u);
+  assert.match(harness, /assertPresentationLedger\(cursors, commandMatch, proofName\)/u);
+  assert.match(harness, /entry\.stage !== "authority-recorded"/u);
+  assert.match(harness, /entry\.stage !== "renderer-completed"/u);
+  assert.match(harness, /ordered presentation ledger diverged/u);
+  assert.match(harness, /showdown-entry-presentation-ledger/u);
+  assert.match(harness, /`\$\{label\}-presentation-ledger`/u);
+});
+
+test("presentation receipts reject malformed or unknown event identities", () => {
+  const prefix = "[coop-browser:presentation-event] ";
+  const valid = {
+    version: 1,
+    stage: "authority-recorded",
+    role: "host",
+    epoch: 9,
+    wave: 1,
+    turn: 1,
+    seq: 0,
+    event: { k: "showAbility", bi: 0, pokemonId: 1, partySlot: 0, abilityId: 2, passive: false },
+  };
+  assert.deepEqual(presentationEventView(`${prefix}${JSON.stringify(valid)}`), valid);
+  assert.equal(presentationEventView("ordinary log"), null);
+  assert.throws(
+    () => presentationEventView(`${prefix}${JSON.stringify({ ...valid, event: { k: "future-unwired-kind" } })}`),
+    /invalid presentation-event observation/u,
+  );
+  assert.throws(
+    () => presentationEventView(`${prefix}${JSON.stringify({ ...valid, stage: "renderer-queued" })}`),
+    /invalid presentation-event observation/u,
+  );
 });
 
 test("Showdown command convergence excludes account-local state and canonicalizes both battle perspectives by seat", () => {

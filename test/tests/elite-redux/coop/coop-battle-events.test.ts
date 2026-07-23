@@ -39,7 +39,12 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
-import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import {
+  beginCoopRecording,
+  endCoopRecording,
+  recordCoopEvent,
+  setCoopPresentationObserver,
+} from "#data/elite-redux/coop/coop-turn-recorder";
 import { TerrainType } from "#data/terrain";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -56,6 +61,7 @@ import {
   CoopHpDrainReplayPhase,
   CoopMoveAnimReplayPhase,
 } from "#phases/coop-replay-phases";
+import { CoopPresentationReceiptPhase } from "#phases/coop-replay-turn-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import Phaser from "phaser";
@@ -98,7 +104,27 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   });
 
   afterEach(() => {
+    setCoopPresentationObserver(null);
     clearCoopRuntime();
+  });
+
+  it("the exact-browser observer pairs one authority event with its completed canonical renderer receipt", () => {
+    const event: CoopBattleEvent = { k: "message", text: "canonical authority event" };
+    const observations: unknown[] = [];
+    setCoopPresentationObserver(observation => observations.push(observation));
+
+    beginCoopRecording(3, "observer-contract");
+    expect(recordCoopEvent(event)).toBe(0);
+    endCoopRecording();
+
+    const receipt = new CoopPresentationReceiptPhase(3, 0, event);
+    vi.spyOn(receipt, "end").mockImplementation(() => {});
+    receipt.start();
+
+    expect(observations).toEqual([
+      { stage: "authority-recorded", turn: 3, seq: 0, event },
+      { stage: "renderer-completed", turn: 3, seq: 0, event },
+    ]);
   });
 
   /** Start a co-op authoritative double as the HOST and tag field ownership. */

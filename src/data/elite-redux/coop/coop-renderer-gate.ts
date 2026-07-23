@@ -119,6 +119,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "CoopStatusReplayPhase", // status-change replay
   "CoopShowAbilityReplayPhase", // exact host-authored ability flyout; presentation only
   "CoopSwitchReplayPhase", // exact host-authored recall/summon; no hazards, abilities, or RNG
+  "CoopPresentationReceiptPhase", // CI-only read-only proof after one presentation subtree drains
   "CoopFaintReplayPhase", // faint replay (renders the denied FaintPhase)
   "CoopCaptureReplayPhase", // guest ball-throw replay (renders the denied AttemptCapturePhase)
   "CoopApplyResyncPhase", // applies a host resync snapshot at a safe boundary

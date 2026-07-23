@@ -36,6 +36,10 @@ import {
   registerCoopActiveReplayTurnAborter,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
+import {
+  hasCoopPresentationObserver,
+  observeCoopRenderedPresentation,
+} from "#data/elite-redux/coop/coop-turn-recorder";
 import { swapBattleEvent } from "#data/elite-redux/showdown/showdown-side-swap";
 import type { CommonAnim } from "#enums/move-anims-common";
 import { coopNarrateMoveUsed } from "#phases/coop-replay-phases";
@@ -77,6 +81,30 @@ const REPLACEMENT_PRESENTATION_TIMEOUT_MS = 15_000;
 
 export function abortActiveCoopReplayTurnPhase(reason: string): boolean {
   return activeCoopReplayTurnPhase?.abortPhantom(reason) ?? false;
+}
+
+/**
+ * CI-observer receipt queued immediately after one concrete presentation phase. Because unshifted
+ * siblings drain FIFO and a phase's child subtree drains before its next sibling, reaching this phase
+ * proves the corresponding visual/narration phase completed rather than merely being constructed.
+ * It is created only while the exact-SHA browser observer is installed; staged/production play pays no
+ * queue or logging cost.
+ */
+export class CoopPresentationReceiptPhase extends Phase {
+  public readonly phaseName = "CoopPresentationReceiptPhase";
+
+  constructor(
+    private readonly turn: number,
+    private readonly seq: number,
+    private readonly canonicalEvent: CoopBattleEvent,
+  ) {
+    super();
+  }
+
+  override start(): void {
+    observeCoopRenderedPresentation(this.turn, this.seq, this.canonicalEvent);
+    this.end();
+  }
 }
 
 export class CoopReplayTurnPhase extends Phase {
@@ -1155,18 +1183,17 @@ export class CoopReplayTurnPhase extends Phase {
    * same instant - BEFORE any of these presentation phases play. Each phase ENDS at the host's value
    * (idempotent with the checkpoint), so the animations can never leave drift for the next turn's
    * checksum. Presentation phases NEVER recompute / draw RNG and NEVER run a real
-   * MovePhase/MoveEffectPhase/FaintPhase/StatStageChangePhase. weather / terrain / switch ride the
-   * checkpoint, so they are not animated here. Each unshift is guarded so one garbled event can never
-   * hang the turn - the checkpoint still corrects its state.
+   * MovePhase/MoveEffectPhase/FaintPhase/StatStageChangePhase. Weather, terrain, and switch presentation
+   * are replayed from immutable authority events too. Each unshift is guarded so one garbled event can
+   * never hang the turn - the checkpoint still corrects its state.
    */
   private renderEvents(events: CoopBattleEvent[]): void {
     // SHOWDOWN (Task F1): reflect every bi-bearing event into the versus guest's LOCAL orientation so the
     // replay phases animate the correct sprites (a missed bi = a move/hp/faint on the wrong side). Swapped
     // at RENDER time (the guest's own context), covering both the live per-event and batched paths that
     // merge into here. No-op off the versus-guest path.
-    if (isShowdownGuestFlipGated()) {
-      events = events.map(swapBattleEvent);
-    }
+    const canonicalEvents = events;
+    const localEvents = isShowdownGuestFlipGated() ? canonicalEvents.map(swapBattleEvent) : canonicalEvents;
     coopLog("replay", `guest replay turn=${this.turn}: rendering ${events.length} event(s)`);
     // Running per-mon hp so multi-hit drains chain (hit1: cur->hp1, hit2: hp1->hp2, ...). Seeded
     // lazily from the live (pre-checkpoint) hp the first time a mon is seen. INSTANCE state (#782):
@@ -1177,7 +1204,7 @@ export class CoopReplayTurnPhase extends Phase {
     // Per-turn tally of the presentation phases unshifted, so the guest's log shows the exact
     // replay-phase sequence it ran for this turn (move/hp/stat/status/faint/message counts).
     const tally: Record<string, number> = {};
-    for (const [eventOffset, event] of events.entries()) {
+    for (const [eventOffset, event] of localEvents.entries()) {
       tally[event.k] = (tally[event.k] ?? 0) + 1;
       try {
         // HOT LOOP (per battle event): build the per-event trace only when debug is on.
@@ -1247,8 +1274,17 @@ export class CoopReplayTurnPhase extends Phase {
             pm.unshiftNew("CoopSwitchReplayPhase", event);
             break;
           default:
-            // Keep a fail-soft default for future additive presentation kinds.
-            break;
+            // Future additive kinds deliberately receive no completion receipt. The exact-browser
+            // ledger will fail host-vs-renderer equality until their concrete presentation is wired.
+            continue;
+        }
+        if (hasCoopPresentationObserver()) {
+          pm.unshiftNew(
+            "CoopPresentationReceiptPhase",
+            this.turn,
+            this.rendered + eventOffset,
+            canonicalEvents[eventOffset],
+          );
         }
       } catch {
         // A garbled event must never hang the guest's turn; the checkpoint still corrects its state.

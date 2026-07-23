@@ -2317,6 +2317,59 @@ export class DuoPublicUiRig {
   }
 
   /**
+   * Prove the authority's complete ordered event prefix reached completed renderer phase subtrees before
+   * the shared command frontier. This compares canonical wire events, not localized text or Showdown's
+   * guest-side battler-index reflection.
+   */
+  assertPresentationLedger(cursors, commandMatch, proofName) {
+    const before = new Map([
+      [this.host, commandMatch.hostProjection.event.index],
+      [this.guest, commandMatch.guestProjection.event.index],
+    ]);
+    const ledger = client =>
+      client.evidence.events
+        .slice(cursors[client.label])
+        .filter(event => event.index < before.get(client) && event.kind === "browser-presentation-event")
+        .map(event => event.observation);
+    const hostLedger = ledger(this.host);
+    const guestLedger = ledger(this.guest);
+    if (hostLedger.length === 0 || guestLedger.length === 0) {
+      throw new Error(
+        `${proofName}: presentation ledger was empty before command frontier (host=${hostLedger.length} guest=${guestLedger.length})`,
+      );
+    }
+    if (hostLedger.some(entry => entry.stage !== "authority-recorded" || entry.role !== "host")) {
+      throw new Error(`${proofName}: authority presentation ledger contains a non-authority receipt`);
+    }
+    if (guestLedger.some(entry => entry.stage !== "renderer-completed" || entry.role !== "guest")) {
+      throw new Error(`${proofName}: renderer presentation ledger contains a non-renderer receipt`);
+    }
+    const comparable = entries =>
+      entries.map(entry => ({
+        epoch: entry.epoch,
+        wave: entry.wave,
+        turn: entry.turn,
+        seq: entry.seq,
+        event: entry.event,
+      }));
+    const authority = comparable(hostLedger);
+    const renderer = comparable(guestLedger);
+    if (JSON.stringify(authority) !== JSON.stringify(renderer)) {
+      throw new Error(
+        `${proofName}: ordered presentation ledger diverged; authority=${JSON.stringify(authority)} renderer=${JSON.stringify(renderer)}`,
+      );
+    }
+    for (const client of [this.host, this.guest]) {
+      client.evidence.record("showdown-presentation-ledger-proof", {
+        proofName,
+        eventCount: authority.length,
+        first: authority[0],
+        last: authority.at(-1),
+      });
+    }
+  }
+
+  /**
    * Cross the real Showdown pre-battle pipeline after public lobby pairing. Unlike ordinary co-op,
    * Showdown has no save prompt or host launch button: the title flow commits a fresh shared identity
    * automatically, both players independently lock the Friendly wager, and the ordinary battle opens.
@@ -2426,6 +2479,7 @@ export class DuoPublicUiRig {
     ) {
       throw new Error("Showdown presentation did not complete on both clients before the shared command frontier");
     }
+    this.assertPresentationLedger(battleCursors, commandMatch, "showdown-entry-presentation-ledger");
     for (const [client, event] of [
       [this.host, hostAbility],
       [this.guest, guestAbility],
@@ -2470,6 +2524,14 @@ export class DuoPublicUiRig {
       await this.assertSharedCommandFrontier(outcomeCursors, `${label}-next-command`, {
         expectedWave: 1,
       });
+      const commandMatch = findSharedCommandFrontierMatch(this.host, this.guest, outcomeCursors, null, {
+        allowAddressRepeat: true,
+        expectedWave: 1,
+      });
+      if (commandMatch == null) {
+        throw new Error(`${label}: could not recover the matched command boundary for presentation proof`);
+      }
+      this.assertPresentationLedger(outcomeCursors, commandMatch, `${label}-presentation-ledger`);
       await this.assertRetainedContinuation(outcomeCursors, `${label}-next-command`);
       commandCursors = outcomeCursors;
     }

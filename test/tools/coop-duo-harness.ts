@@ -2842,6 +2842,7 @@ export const REPLAY_DRAIN_PHASES = new Set([
   // the harness can call a replayed turn complete (the real renderer gate permits the same phase).
   "CoopShowAbilityReplayPhase",
   "CoopSwitchReplayPhase",
+  "CoopPresentationReceiptPhase",
   "CoopFaintReplayPhase",
   "CoopGuestFaintSwitchPhase",
   // The renderer gate replaces a forbidden local resolution phase (commonly MovePhase) with this

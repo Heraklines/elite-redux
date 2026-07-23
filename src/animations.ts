@@ -3,6 +3,7 @@ import type { BattleAnim } from "#data/battle-anims";
 import { PokeballType } from "#enums/pokeball";
 import type { Variant } from "#sprites/variant";
 import { type BooleanHolder, getFrameMs, randGauss, randInt } from "#utils/common";
+import Phaser from "phaser";
 
 /**
  * Class for handling general animations such as particle effects.
@@ -173,6 +174,14 @@ export class Animation {
   }
 
   public addPokeballOpenParticles(x: number, y: number, pokeballType: PokeballType): void {
+    // Headless scenes have no pixels to present. More importantly, the default Poké Ball effect owns
+    // an independent repeating timer; creating it in a test scene lets the callback outlive scene
+    // teardown and manufacture a late unhandled exception. Contain the cosmetic timer at the shared
+    // animation boundary so ordinary host switches, authoritative replay switches, and capture replay
+    // all receive the same protection. Canvas/WebGL clients retain the complete effect.
+    if (globalScene.game.config.renderType === Phaser.HEADLESS) {
+      return;
+    }
     switch (pokeballType) {
       case PokeballType.POKEBALL:
         this.doDefaultPbOpenParticles(x, y, 48);

@@ -48,7 +48,20 @@ const BINDING_PREFIX = "[coop-browser:binding] ";
 const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
 const MARKET_PREFIX = "[coop-browser:market] ";
 const COMMANDER_PREFIX = "[coop-browser:commander] ";
+const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
+const PRESENTATION_EVENT_KINDS = new Set([
+  "message",
+  "moveUsed",
+  "hp",
+  "faint",
+  "statStage",
+  "status",
+  "showAbility",
+  "weather",
+  "terrain",
+  "switch",
+]);
 const CHECKSUM_SENTINEL = "0000000000000000";
 /** The client's own fail-closed handling of a post-terminal signaling beat (see assertClean). */
 const HEARTBEAT_OWNERSHIP_LOSS = /P33 heartbeat lost authenticated ownership status=(?:401|403)/u;
@@ -777,7 +790,45 @@ export function commanderObservationView(text) {
 const INPUT_ECHO_PREFIX = "[coop-browser:input-echo] ";
 const INPUT_HEALTH_PREFIX = "[coop-browser:input-health] ";
 
+/** Parse the exact host-recorded/guest-completed presentation receipt contract. */
+export function presentationEventView(text) {
+  if (!text.startsWith(PRESENTATION_EVENT_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(PRESENTATION_EVENT_PREFIX.length));
+  } catch (error) {
+    throw new Error("built browser emitted malformed presentation-event JSON", { cause: error });
+  }
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 1
+    || (value.stage !== "authority-recorded" && value.stage !== "renderer-completed")
+    || (value.role !== "host" && value.role !== "guest")
+    || !Number.isSafeInteger(value.epoch)
+    || value.epoch <= 0
+    || !Number.isSafeInteger(value.wave)
+    || value.wave <= 0
+    || !Number.isSafeInteger(value.turn)
+    || value.turn <= 0
+    || !Number.isSafeInteger(value.seq)
+    || value.seq < 0
+    || !value.event
+    || typeof value.event !== "object"
+    || !PRESENTATION_EVENT_KINDS.has(value.event.k)
+  ) {
+    throw new Error("built browser emitted an invalid presentation-event observation");
+  }
+  return Object.freeze({ ...value, event: Object.freeze({ ...value.event }) });
+}
+
 function recordBrowserObservations(sink, text) {
+  const presentationEvent = presentationEventView(text);
+  if (presentationEvent != null) {
+    sink.record("browser-presentation-event", { observation: presentationEvent });
+  }
   // Optimization brief R1c: the game's own input acknowledgment (uiMode/cursor/phase
   // change). Pacing signal only - never a proof surface.
   if (text.startsWith(INPUT_ECHO_PREFIX)) {

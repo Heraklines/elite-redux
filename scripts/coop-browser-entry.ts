@@ -18,6 +18,7 @@ const [
   { captureCoopSaveDataDigest },
   { canonicalize, fnv1a64 },
   { getCoopRuntime, isCoopV2InteractionHumanInputFrozen },
+  { setCoopPresentationObserver },
   { BattlerTagType },
   { BattleType },
   { Command },
@@ -33,6 +34,7 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-engine"),
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
+  import("../src/data/elite-redux/coop/coop-turn-recorder"),
   import("../src/enums/battler-tag-type"),
   import("../src/enums/battle-type"),
   import("../src/enums/command"),
@@ -71,6 +73,29 @@ const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const PRESENTATION_PREFIX = "[coop-browser:presentation] ";
+const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
+
+// Exact ordered presentation ledger. The authority callback runs synchronously after assigning the
+// event's immutable per-turn sequence; the renderer callback runs only when the matching presentation
+// phase subtree has drained. The normal application never imports this entry or registers the observer.
+setCoopPresentationObserver(observation => {
+  const runtime = getCoopRuntime();
+  if (runtime == null) {
+    return;
+  }
+  console.info(
+    `${PRESENTATION_EVENT_PREFIX}${JSON.stringify({
+      version: 1,
+      stage: observation.stage,
+      role: runtime.controller.role,
+      epoch: runtime.controller.sessionEpoch,
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      turn: observation.turn,
+      seq: observation.seq,
+      event: observation.event,
+    })}`,
+  );
+});
 
 // =============================================================================
 // Optimization brief R4: digest-cost SLA. Detection latency is FIXED (1s parked

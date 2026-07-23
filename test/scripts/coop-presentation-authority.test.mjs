@@ -13,6 +13,7 @@ test("switch presentation is host-authored and the renderer never predicts its o
   const producer = read("src/phases/switch-summon-phase.ts");
   const replay = read("src/phases/coop-replay-turn-phase.ts");
   const replayPhases = read("src/phases/coop-replay-phases.ts");
+  const animations = read("src/animations.ts");
   const rendererGate = read("src/data/elite-redux/coop/coop-renderer-gate.ts");
   const guestTurn = read("src/phases/turn-start-phase.ts");
 
@@ -26,7 +27,29 @@ test("switch presentation is host-authored and the renderer never predicts its o
     /renderType\s*!==\s*Phaser\.HEADLESS[\s\S]+addPokeballOpenParticles/u,
     "headless presentation cannot leave an orphaned particle timer after scene teardown",
   );
+  assert.match(
+    animations,
+    /addPokeballOpenParticles[\s\S]+renderType\s*===\s*Phaser\.HEADLESS[\s\S]+return/u,
+    "the shared animation boundary contains headless particle timers for every switch/capture caller",
+  );
   assert.doesNotMatch(guestTurn, /mirrorGuestOwnSwitch|summonCoopPlayerField/u);
+});
+
+test("every authority event receives an ordered renderer-completion receipt in the exact-browser build", () => {
+  const recorder = read("src/data/elite-redux/coop/coop-turn-recorder.ts");
+  const replay = read("src/phases/coop-replay-turn-phase.ts");
+  const browser = read("scripts/coop-browser-entry.ts");
+  const harness = read("test/browser/coop-public-ui/public-ui-harness.mjs");
+
+  assert.match(recorder, /stage:\s*"authority-recorded"/u);
+  assert.match(recorder, /stage:\s*"renderer-completed"/u);
+  assert.match(replay, /class CoopPresentationReceiptPhase[\s\S]+observeCoopRenderedPresentation/u);
+  assert.match(replay, /const canonicalEvents = events[\s\S]+canonicalEvents\[eventOffset\]/u);
+  assert.match(replay, /if \(hasCoopPresentationObserver\(\)\)[\s\S]+CoopPresentationReceiptPhase/u);
+  assert.match(browser, /\[coop-browser:presentation-event\]/u);
+  assert.match(harness, /assertPresentationLedger\(battleCursors, commandMatch/u);
+  assert.match(harness, /assertPresentationLedger\(outcomeCursors, commandMatch/u);
+  assert.match(harness, /ordered presentation ledger diverged/u);
 });
 
 test("V2 replacement animation drains before its checkpoint can install", () => {

@@ -82,6 +82,44 @@ export function withCoopMessageRecordingSuppressed<T>(fn: () => T): T {
 type CoopLiveEmitter = (turn: number, seq: number, event: CoopBattleEvent) => void;
 let liveEmitter: CoopLiveEmitter | null = null;
 
+export interface CoopPresentationObservation {
+  /** The authority assigned the immutable event, or the renderer finished its presentation subtree. */
+  readonly stage: "authority-recorded" | "renderer-completed";
+  readonly turn: number;
+  readonly seq: number;
+  /** Always the authority's canonical event, before any Showdown guest-side battler-index reflection. */
+  readonly event: CoopBattleEvent;
+}
+
+type CoopPresentationObserver = (observation: CoopPresentationObservation) => void;
+let presentationObserver: CoopPresentationObserver | null = null;
+
+/**
+ * Install a read-only presentation observer. The normal application never registers one; the exact-SHA
+ * browser build uses it to prove that every authority-recorded event reaches a completed renderer phase.
+ */
+export function setCoopPresentationObserver(observer: CoopPresentationObserver | null): void {
+  presentationObserver = observer;
+}
+
+/** Whether replay should queue completion receipts. False in staged/production builds. */
+export function hasCoopPresentationObserver(): boolean {
+  return presentationObserver != null;
+}
+
+/** Renderer receipt seam, called only after the event's presentation phase subtree has drained. */
+export function observeCoopRenderedPresentation(turn: number, seq: number, event: CoopBattleEvent): void {
+  if (presentationObserver == null) {
+    return;
+  }
+  try {
+    presentationObserver({ stage: "renderer-completed", turn, seq, event });
+  } catch {
+    // CI telemetry must never become a production progression dependency.
+    coopWarn("turn", `presentation observer threw at renderer turn=${turn} seq=${seq} k=${event.k}`);
+  }
+}
+
 /** HOST: register (or clear with null) the live-event emitter the runtime wires to the battle stream. */
 export function setCoopLiveEmitter(emitter: CoopLiveEmitter | null): void {
   coopLog(
@@ -160,6 +198,14 @@ export function recordCoopEvent(event: CoopBattleEvent): number | null {
     recording.faintOccurrences.set(event.bi, occurrences);
   }
   recording.events.push(event);
+  if (presentationObserver != null) {
+    try {
+      presentationObserver({ stage: "authority-recorded", turn: recording.turn, seq, event });
+    } catch {
+      // The observer is diagnostic only. The authority event and its durable batch remain valid.
+      coopWarn("turn", `presentation observer threw at authority turn=${recording.turn} seq=${seq} k=${event.k}`);
+    }
+  }
   // HOT PATH (per recorded battle event): build the trace string only when debug is on.
   if (isCoopDebug()) {
     coopLog(
