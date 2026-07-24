@@ -120,6 +120,23 @@ export function pingTournamentPresence(id: string): Promise<ClientResult<unknown
   return request("POST", "/tournament/ping", { id });
 }
 
+/** Mark or clear readiness for one exact server-authoritative bracket pairing. */
+export function setTournamentMatchReady(
+  tournamentId: string,
+  matchId: string,
+  ready: boolean,
+): Promise<ClientResult<{ tournament: TournamentView; opponentReady: boolean }>> {
+  return request("POST", "/tournament/ready", { tournamentId, matchId, ready });
+}
+
+/**
+ * Leave a tournament at any stage. Before play this removes the entrant; once play has begun the
+ * worker records a walkover so the bracket cannot retain a dead pairing.
+ */
+export function dropOutOfTournament(id: string): Promise<ClientResult<{ tournament: TournamentView }>> {
+  return request("POST", "/tournament/drop-out", { id });
+}
+
 /**
  * Report a finished authoritative tournament match result (winner is a username).
  * The worker enforces attestation: the reporter is the authenticated account and

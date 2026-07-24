@@ -208,7 +208,8 @@ async function ensureTournamentTables(env: TournamentEnv): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS tournament_entrants (
        tournament_id TEXT NOT NULL, participant TEXT NOT NULL, name TEXT NOT NULL, preset_name TEXT NOT NULL,
-       seed INTEGER, registered_at INTEGER NOT NULL, ghost_json TEXT, last_seen INTEGER, waitlisted INTEGER,
+       seed INTEGER, registered_at INTEGER NOT NULL, ghost_json TEXT, last_seen INTEGER,
+       ready_match_id TEXT, ready_opponent TEXT, ready_at INTEGER, waitlisted INTEGER,
        PRIMARY KEY (tournament_id, participant) )`,
   ).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_entrant_tour ON tournament_entrants (tournament_id)").run();
@@ -217,6 +218,9 @@ async function ensureTournamentTables(env: TournamentEnv): Promise<void> {
   // "duplicate column name" error once the column is already present.
   await addColumnIfMissing(env, "tournament_entrants", "ghost_json", "TEXT");
   await addColumnIfMissing(env, "tournament_entrants", "last_seen", "INTEGER");
+  await addColumnIfMissing(env, "tournament_entrants", "ready_match_id", "TEXT");
+  await addColumnIfMissing(env, "tournament_entrants", "ready_opponent", "TEXT");
+  await addColumnIfMissing(env, "tournament_entrants", "ready_at", "INTEGER");
   await addColumnIfMissing(env, "tournament_entrants", "waitlisted", "INTEGER");
   await addColumnIfMissing(env, "tournaments", "battle_format", "TEXT");
   await addColumnIfMissing(env, "tournaments", "series_format", "TEXT");
@@ -306,7 +310,7 @@ function parseGhost(raw: string | null | undefined): GhostIconSummary | null {
 /** Load ALL rows (active + waitlisted), ordered by registration time. */
 async function loadAllEntrants(env: TournamentEnv, id: string): Promise<EntrantRecord[]> {
   const res = await env.DB.prepare(
-    "SELECT participant, name, preset_name, seed, registered_at, ghost_json, last_seen, waitlisted FROM tournament_entrants WHERE tournament_id = ? ORDER BY registered_at",
+    "SELECT participant, name, preset_name, seed, registered_at, ghost_json, last_seen, ready_match_id, ready_opponent, ready_at, waitlisted FROM tournament_entrants WHERE tournament_id = ? ORDER BY registered_at",
   )
     .bind(id)
     .all<{
@@ -317,6 +321,9 @@ async function loadAllEntrants(env: TournamentEnv, id: string): Promise<EntrantR
       registered_at: number;
       ghost_json?: string | null;
       last_seen?: number | null;
+      ready_match_id?: string | null;
+      ready_opponent?: string | null;
+      ready_at?: number | null;
       waitlisted?: number | null;
     }>();
   return (res.results ?? []).map(r => ({
@@ -328,6 +335,9 @@ async function loadAllEntrants(env: TournamentEnv, id: string): Promise<EntrantR
     registeredAt: r.registered_at,
     ghost: parseGhost(r.ghost_json),
     lastSeen: r.last_seen ?? null,
+    readyMatchId: r.ready_match_id ?? null,
+    readyOpponent: r.ready_opponent ?? null,
+    readyAt: r.ready_at ?? null,
     waitlisted: r.waitlisted === 1,
   }));
 }
@@ -413,6 +423,8 @@ function tournamentView(t: TournamentRecord, entrants: EntrantRecord[], waitlist
     closeAt: t.closeAt,
     rewardsGranted: t.rewardsGranted,
     community: t.community,
+    // Kept in the light list view so a walked-over entrant is not still labelled registered.
+    kicked: t.bracket?.kicked ?? [],
     entrantCount: entrants.length,
     entrants: entrants.map(e => ({
       participant: e.participant,
@@ -420,6 +432,9 @@ function tournamentView(t: TournamentRecord, entrants: EntrantRecord[], waitlist
       seed: e.seed,
       ghost: e.ghost ?? null,
       lastSeen: e.lastSeen ?? null,
+      readyMatchId: e.readyMatchId ?? null,
+      readyOpponent: e.readyOpponent ?? null,
+      readyAt: e.readyAt ?? null,
       presetName: e.presetName,
     })),
     // P3: the waitlist (admin surface) — queued beyond cap, in promotion order.
@@ -739,6 +754,76 @@ async function handlePing(body: any, caller: Caller, env: TournamentEnv, cors: C
   return json({ ok: true }, 200, cors);
 }
 
+/**
+ * Mark readiness for one exact pairing. Both the match id and opponent are persisted so a reseed or
+ * admin opponent swap cannot accidentally carry readiness into a different pairing at the same slot.
+ */
+function activePairing(
+  t: TournamentRecord,
+  participant: string,
+  matchId: string,
+): { matchId: string; opponent: string } | null {
+  if (t.state !== "in_progress" || t.bracket === null) {
+    return null;
+  }
+  const match = findMatch(t.bracket, matchId);
+  const opponent = match?.a === participant ? match.b : match?.b === participant ? match.a : null;
+  return match?.winner === null && match.a !== null && match.b !== null && opponent !== null
+    ? { matchId: match.id, opponent }
+    : null;
+}
+
+async function readyResponse(
+  t: TournamentRecord,
+  caller: string,
+  matchId: string,
+  env: TournamentEnv,
+  cors: Cors,
+): Promise<Response> {
+  const entrants = await loadEntrants(env, t.id);
+  const waitlist = await loadWaitlist(env, t.id);
+  const pairing = activePairing(t, caller, matchId);
+  const opponentEntrant = entrants.find(e => e.participant === pairing?.opponent);
+  const opponentReady =
+    pairing !== null && opponentEntrant?.readyMatchId === pairing.matchId && opponentEntrant.readyOpponent === caller;
+  return json({ ok: true, opponentReady, tournament: tournamentView(t, entrants, waitlist) }, 200, cors);
+}
+
+async function handleReady(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
+  const loaded = await loadTournament(env, String(body?.id ?? body?.tournamentId));
+  if (!loaded) {
+    return json({ error: "tournament not found" }, 404, cors);
+  }
+  const t = await refreshTournament(env, loaded, Date.now());
+  const allEntrants = await loadAllEntrants(env, t.id);
+  const ownEntrant = allEntrants.find(e => e.participant === caller.u && !e.waitlisted);
+  if (!ownEntrant) {
+    return json({ error: "not an active entrant" }, 422, cors);
+  }
+
+  const matchId = String(body?.matchId ?? "");
+  if (body?.ready !== true) {
+    await env.DB.prepare(
+      "UPDATE tournament_entrants SET ready_match_id=NULL, ready_opponent=NULL, ready_at=NULL WHERE tournament_id=?1 AND participant=?2",
+    )
+      .bind(t.id, caller.u)
+      .run();
+    return readyResponse(t, caller.u, matchId, env, cors);
+  }
+
+  const pairing = activePairing(t, caller.u, matchId);
+  if (pairing === null) {
+    return json({ error: "that pairing is no longer active" }, 409, cors);
+  }
+  const now = Date.now();
+  await env.DB.prepare(
+    "UPDATE tournament_entrants SET ready_match_id=?3, ready_opponent=?4, ready_at=?5, last_seen=?5 WHERE tournament_id=?1 AND participant=?2",
+  )
+    .bind(t.id, caller.u, pairing.matchId, pairing.opponent, now)
+    .run();
+  return readyResponse(t, caller.u, pairing.matchId, env, cors);
+}
+
 async function handleList(env: TournamentEnv, cors: Cors): Promise<Response> {
   await ensureTournamentTables(env);
   const res = await env.DB.prepare(
@@ -877,8 +962,11 @@ async function handleKick(body: any, caller: Caller, env: TournamentEnv, cors: C
   if (gate instanceof Response) {
     return gate;
   }
-  const t = gate.t;
-  const target = String(body?.participant ?? "");
+  return removeEntrant(gate.t, String(body?.participant ?? ""), env, cors);
+}
+
+/** Shared persistence for an admin kick and an entrant's own explicit dropout. */
+async function removeEntrant(t: TournamentRecord, target: string, env: TournamentEnv, cors: Cors): Promise<Response> {
   const entrants = await loadEntrants(env, t.id);
   const waitlist = await loadWaitlist(env, t.id);
   const now = Date.now();
@@ -894,11 +982,9 @@ async function handleKick(body: any, caller: Caller, env: TournamentEnv, cors: C
     await maybeAutoGrantRewards(env, res.tournament);
   } else {
     // registration / reopen: remove the kicked field row, promote the first waitlisted member.
-    if (!res.keepEntrantRow) {
-      await env.DB.prepare("DELETE FROM tournament_entrants WHERE tournament_id=?1 AND participant=?2")
-        .bind(t.id, res.removed)
-        .run();
-    }
+    await env.DB.prepare("DELETE FROM tournament_entrants WHERE tournament_id=?1 AND participant=?2")
+      .bind(t.id, res.removed)
+      .run();
     if (res.kind === "reopen") {
       // Undo the generation: revert to registration + clear every seed.
       await updateTournament(env, res.tournament);
@@ -933,6 +1019,19 @@ async function handleKick(body: any, caller: Caller, env: TournamentEnv, cors: C
     200,
     cors,
   );
+}
+
+/**
+ * Entrant-controlled dropout. This intentionally uses the same domain operation as an admin kick:
+ * registration removes the row, a pre-play auto-close reopens/reseeds, and a live bracket advances
+ * the opponent by walkover instead of leaving an impossible pairing behind.
+ */
+async function handleDropOut(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
+  const t = await loadTournament(env, String(body?.id ?? body?.tournamentId));
+  if (!t) {
+    return json({ error: "tournament not found" }, 404, cors);
+  }
+  return removeEntrant(t, caller.u, env, cors);
 }
 
 /** P3 EDIT (scenario 5): rewards / cap / window / close-time / name / (still-unlocked) format while in registration. */
@@ -1147,6 +1246,10 @@ export async function handleTournamentRoute(
       return handleWithdraw(body, caller, env, cors);
     case "/tournament/ping":
       return handlePing(body, caller, env, cors);
+    case "/tournament/ready":
+      return handleReady(body, caller, env, cors);
+    case "/tournament/drop-out":
+      return handleDropOut(body, caller, env, cors);
     case "/tournament/result":
       return handleResult(body, caller, env, cors);
     case "/tournament/resolve":

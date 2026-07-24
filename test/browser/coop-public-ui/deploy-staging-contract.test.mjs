@@ -23,6 +23,7 @@ test("staging promotes one verified browser/Worker contract without cancellable 
   const contract = requiredOffset("- name: Verify staging promotion contract");
   const resolveCoopD1 = requiredOffset("- name: Resolve isolated co-op D1 and seal staging Worker config");
   const worker = requiredOffset("- name: Deploy cloud-save API (staging)");
+  const telemetryWorker = requiredOffset("- name: Deploy tournament telemetry API (staging)");
   const coopWorker = requiredOffset("- name: Deploy co-op signaling API (staging)");
   const coopHealth = requiredOffset("- name: Verify staging P33 signaling contract");
   const pages = requiredOffset("- name: Deploy to Cloudflare Pages (staging)");
@@ -32,20 +33,24 @@ test("staging promotes one verified browser/Worker contract without cancellable 
   assert.ok(verify < contract, "the assembled bundle must verify before the promotion contract runs");
   assert.ok(contract < resolveCoopD1, "all local verification must finish before staging bindings are resolved");
   assert.ok(resolveCoopD1 < worker, "D1 isolation must be proven before any Worker mutates");
-  assert.ok(worker < coopWorker, "the save identity contract must be live before signaling is published");
+  assert.ok(worker < telemetryWorker, "the save identity contract must be live before telemetry is published");
+  assert.ok(telemetryWorker < coopWorker, "all authenticated staging APIs must be live before signaling is published");
   assert.ok(coopWorker < coopHealth, "the co-op Worker must be deployed before it is attested");
   assert.ok(coopHealth < pages, "P33 must be healthy at the exact SHA before the browser is published");
 });
 
 test("staging browser and signaling deployment are pinned to P33 without production bindings", () => {
   assert.match(workflow, /echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"/u);
+  assert.match(workflow, /echo "VITE_SERVER_URL_TELEMETRY=https:\/\/er-telemetry-staging\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_COOP_SERVER_URL=https:\/\/er-coop-api-staging\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_COOP_SIGNALING_PROTOCOL=p33"/u);
   assert.match(workflow, /node scripts\/materialize-coop-staging-config\.mjs/u);
   assert.match(workflow, /command: deploy --config workers\/er-coop-api\/wrangler\.generated\.staging\.toml/u);
+  assert.match(workflow, /command: deploy --config workers\/er-telemetry\/wrangler\.staging\.toml/u);
   assert.match(workflow, /\.sourceSha == \$sha/u);
   assert.match(workflow, /for attempt in \$\(seq 1 24\); do/u);
   assert.match(workflow, /Cache-Control: no-cache/u);
   assert.match(workflow, /source_sha=\$\{PROMOTED_SHA\}&attempt=\$\{attempt\}/u);
   assert.doesNotMatch(workflow, /command: deploy --config workers\/er-coop-api\/wrangler\.toml/u);
+  assert.doesNotMatch(workflow, /VITE_SERVER_URL_TELEMETRY=https:\/\/er-telemetry\.heraklines\.workers\.dev/u);
 });

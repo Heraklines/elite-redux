@@ -47,15 +47,26 @@ import { shouldAwaitShowdownLaunchSnapshot } from "#data/elite-redux/showdown/sh
 import { validateShowdownTeam } from "#data/elite-redux/showdown/showdown-team";
 import { buildTeamMenuPresetViews, runShowdownPresetBuild } from "#data/elite-redux/showdown/showdown-team-menu-flow";
 import {
+  dropOutOfTournament,
   getTournamentBracket,
   listTournaments,
   pingTournamentPresence,
   registerForTournament,
+  setTournamentMatchReady,
 } from "#data/elite-redux/showdown/tournament-client";
 import { buildOwnGhostIconSummary } from "#data/elite-redux/showdown/tournament-ghost-icon";
-import { setTournamentMatchContext } from "#data/elite-redux/showdown/tournament-match-context";
+import {
+  clearTournamentMatchContext,
+  setTournamentMatchContext,
+} from "#data/elite-redux/showdown/tournament-match-context";
 import { setTournamentFlowOpener, type TournamentDeepLink } from "#data/elite-redux/showdown/tournament-notifications";
-import type { BattleFormat, SeriesFormat } from "#data/elite-redux/showdown/tournament-types";
+import {
+  isEntrantReadyForMatch,
+  isTournamentPairingCurrent,
+  nextMatchFor,
+  opponentOf,
+  type TournamentView,
+} from "#data/elite-redux/showdown/tournament-types";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -127,6 +138,13 @@ export function showdownTournamentLaunchConfig(): {
   launchMode: GameModes;
 } {
   return { netcodeMode: SHOWDOWN_NETCODE_MODE, sessionKind: "versus", launchMode: GameModes.SHOWDOWN };
+}
+
+interface TournamentLobbyConstraint {
+  expectedOpponent: string;
+  /** true = still paired, false = changed, null = worker temporarily unavailable. */
+  validate: () => Promise<boolean | null>;
+  onLeave: () => void;
 }
 
 export class TitlePhase extends Phase {
@@ -648,35 +666,107 @@ export class TitlePhase extends Phase {
       })();
     };
 
-    const enterMatch = (
-      tournamentId: string,
-      matchId: string,
-      opponent: string,
-      battleFormat?: BattleFormat,
-      seriesFormat?: SeriesFormat,
-    ): void => {
-      const presets = gameData.listShowdownTeamPresets();
-      if (presets.length === 0) {
-        // A saved team preset is REQUIRED - route to the Team Menu to build one.
-        notice("You need a saved team preset first. Build one in the Showdown menu.", () => backToTitle());
-        return;
+    const enterMatch = (tournamentId: string, matchId: string, opponent: string): void => {
+      void (async () => {
+        // Re-fetch at the last possible moment. A reseed, dropout, or organizer correction may have
+        // changed this slot since the board's previous poll; never create a transport for stale peers.
+        const latest = await getTournamentBracket(tournamentId);
+        const t = latest.ok ? latest.data.tournament : null;
+        const match = t?.bracket == null ? null : nextMatchFor(t.bracket, ownName);
+        const currentOpponent = match == null ? null : opponentOf(match, ownName);
+        const ownEntrant = t?.entrants.find(e => e.participant === ownName);
+        const opponentEntrant = t?.entrants.find(e => e.participant === currentOpponent);
+        const bothReady =
+          match != null
+          && currentOpponent != null
+          && isEntrantReadyForMatch(ownEntrant, match.id, currentOpponent)
+          && isEntrantReadyForMatch(opponentEntrant, match.id, ownName);
+        const pairingCurrent = t != null && isTournamentPairingCurrent(t, ownName, matchId, opponent);
+        if (!latest.ok || t == null || !pairingCurrent || !bothReady) {
+          clearTournamentMatchContext();
+          clearCoopRuntime();
+          notice(
+            latest.ok ? "That pairing changed or is no longer ready. The bracket has been refreshed." : latest.error,
+            () => void openBracket(tournamentId),
+          );
+          return;
+        }
+
+        const presets = gameData.listShowdownTeamPresets();
+        if (presets.length === 0) {
+          notice("You need a saved team preset first. Build one in the Showdown menu.", () => backToTitle());
+          return;
+        }
+        setPendingShowdownPresetStarters(presets[0].mons.map(manifestToStarter));
+
+        // Tournament lobbies are ephemeral. Clear a failed prior versus transport before creating
+        // this exact pairing, then carry the freshly validated server format into the match.
+        clearTournamentMatchContext();
+        clearCoopRuntime();
+        setTournamentMatchContext({
+          tournamentId,
+          matchId,
+          expectedOpponent: opponent,
+          ...(t.battleFormat && t.battleFormat !== "singles" ? { battleFormat: t.battleFormat } : {}),
+          ...(t.seriesFormat && t.seriesFormat !== "single" ? { seriesFormat: t.seriesFormat, gameIndex: 0 } : {}),
+        });
+        const launch = showdownTournamentLaunchConfig();
+        this.openCoopLobby(setModeAndEnd, launch.netcodeMode, launch.sessionKind, launch.launchMode, {
+          expectedOpponent: opponent,
+          validate: async () => {
+            const current = await getTournamentBracket(tournamentId);
+            if (!current.ok) {
+              return null;
+            }
+            return isTournamentPairingCurrent(current.data.tournament, ownName, matchId, opponent);
+          },
+          onLeave: () => void openBracket(tournamentId),
+        });
+      })();
+    };
+
+    const browseForMatch = (tournament: TournamentView, matchId: string) => {
+      for (let round = 0; round < (tournament.bracket?.rounds.length ?? 0); round++) {
+        const slot = tournament.bracket?.rounds[round].findIndex(match => match.id === matchId) ?? -1;
+        if (slot >= 0) {
+          return { round, slot };
+        }
       }
-      // P1: field the first saved preset (P2 adds a per-match preset picker). The registered team is not
-      // locked - the player may re-pick presets per match.
-      setPendingShowdownPresetStarters(presets[0].mons.map(manifestToStarter));
-      // Carry the tournament's field width + series wrapper into the match context. Both clients read
-      // the SAME server-authoritative tournament record, so the format is agreed by construction; the
-      // negotiate handshake cross-checks it (a stale client refuses to pair rather than desync). The
-      // series starts at game 0.
-      setTournamentMatchContext({
-        tournamentId,
-        matchId,
-        expectedOpponent: opponent,
-        ...(battleFormat && battleFormat !== "singles" ? { battleFormat } : {}),
-        ...(seriesFormat && seriesFormat !== "single" ? { seriesFormat, gameIndex: 0 } : {}),
+      return;
+    };
+
+    const changeReady = (tournamentId: string, matchId: string, ready: boolean): void => {
+      void setTournamentMatchReady(tournamentId, matchId, ready).then(res => {
+        if (!res.ok) {
+          notice(res.error, () => void openBracket(tournamentId));
+          return;
+        }
+        void openBracket(tournamentId, browseForMatch(res.data.tournament, matchId));
       });
-      const launch = showdownTournamentLaunchConfig();
-      this.openCoopLobby(setModeAndEnd, launch.netcodeMode, launch.sessionKind, launch.launchMode);
+    };
+
+    const requestDropOut = (tournamentId: string): void => {
+      notice("Drop out of this tournament? This may give your opponent a walkover.", () => {
+        globalScene.ui.setOverlayMode(
+          UiMode.CONFIRM,
+          () => {
+            void globalScene.ui.revertMode().then(() => {
+              void dropOutOfTournament(tournamentId).then(res => {
+                if (!res.ok) {
+                  notice(res.error, () => void openBracket(tournamentId));
+                  return;
+                }
+                clearTournamentMatchContext();
+                clearCoopRuntime();
+                notice("You dropped out of the tournament.", () => void showList());
+              });
+            });
+          },
+          () => {
+            void globalScene.ui.revertMode().then(() => void openBracket(tournamentId));
+          },
+        );
+      });
     };
 
     const openBracket = async (id: string, initialBrowse?: { round: number; slot: number }): Promise<void> => {
@@ -690,8 +780,9 @@ export class TitlePhase extends Phase {
         tournament: t,
         ownParticipant: ownName,
         now: Date.now(),
-        onPlayMatch: (matchId: string, opponent: string) =>
-          enterMatch(t.id, matchId, opponent, t.battleFormat, t.seriesFormat),
+        onPlayMatch: (matchId: string, opponent: string) => enterMatch(t.id, matchId, opponent),
+        onReadyChange: (matchId: string, ready: boolean) => changeReady(t.id, matchId, ready),
+        onDropOut: () => requestDropOut(t.id),
         onBack: () => void showList(),
         // P1.5 live board: poll the worker for the advancing bracket + ping presence while open.
         onPoll: async () => {
@@ -861,8 +952,10 @@ export class TitlePhase extends Phase {
     netcodeMode: CoopNetcodeMode,
     sessionKind: CoopSessionKind = "coop",
     launchMode: GameModes = GameModes.COOP,
+    tournamentConstraint?: TournamentLobbyConstraint,
   ): void {
     const username = loggedInUser?.username ?? "Player";
+    const expectedOpponent = tournamentConstraint?.expectedOpponent ?? null;
     // #810 barrier: how long the GUEST waits for the host's Resume/New Game decision before
     // an anti-hang fallback to NEW GAME. Comfortably longer than the host's own 60s resume
     // offer timeout, so a slow-but-alive human host never trips it; only a dead peer does.
@@ -889,6 +982,15 @@ export class TitlePhase extends Phase {
     // selected an action from the new generation.
     let lobbyActionRequiresReselection = false;
     let panelGeneration = 0;
+    let constraintPollTimer: ReturnType<typeof setInterval> | null = null;
+    let constraintPollPending = false;
+
+    const stopConstraintPolling = () => {
+      if (constraintPollTimer != null) {
+        clearInterval(constraintPollTimer);
+        constraintPollTimer = null;
+      }
+    };
 
     const isCurrentFlow = (): boolean =>
       !lobbyTerminated
@@ -908,6 +1010,7 @@ export class TitlePhase extends Phase {
         return;
       }
       lobbyTerminated = true;
+      stopConstraintPolling();
       stage.destroy();
       controller?.cancel();
       if (flowRuntime != null && flowController != null && flowGeneration != null) {
@@ -915,8 +1018,13 @@ export class TitlePhase extends Phase {
       }
     };
 
-    const backToTitle = () => {
+    const leaveLobby = () => {
       terminateLobby();
+      if (tournamentConstraint != null) {
+        clearTournamentMatchContext();
+        tournamentConstraint.onLeave();
+        return;
+      }
       globalScene.phaseManager.toTitleScreen();
       super.end();
     };
@@ -928,7 +1036,7 @@ export class TitlePhase extends Phase {
       terminateLobby();
       globalScene.ui.setMode(UiMode.MESSAGE);
       globalScene.ui.resetModeChain();
-      globalScene.ui.showText(message, null, backToTitle, null, true);
+      globalScene.ui.showText(message, null, leaveLobby, null, true);
     };
 
     // Render (or re-render) the current INPUT panel as a blue OPTION_SELECT.
@@ -958,7 +1066,11 @@ export class TitlePhase extends Phase {
             handler: () => {
               incoming = null;
               stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
-              stage.setStatus("Looking for other players...");
+              stage.setStatus(
+                expectedOpponent == null
+                  ? "Looking for other players..."
+                  : `Waiting for ${expectedOpponent} to join this match lobby...`,
+              );
               void controller?.respond(false);
               renderPanel();
               return true;
@@ -1009,36 +1121,38 @@ export class TitlePhase extends Phase {
             },
           });
         }
-        if (!lobbyActionRequiresReselection && selectedLobbyOptionId === "cpu") {
-          initialCursor = opts.length;
+        if (tournamentConstraint == null) {
+          if (!lobbyActionRequiresReselection && selectedLobbyOptionId === "cpu") {
+            initialCursor = opts.length;
+          }
+          opts.push({
+            label: "Play vs CPU",
+            onHover: () => {
+              lobbyActionRequiresReselection = false;
+              selectedLobbyOptionId = "cpu";
+            },
+            handler: () => {
+              stage.destroy();
+              controller?.cancel();
+              startLocalCoopSession({ username, netcodeMode, kind: sessionKind });
+              setModeAndEnd(launchMode);
+              return true;
+            },
+          });
         }
-        opts.push({
-          label: "Play vs CPU",
-          onHover: () => {
-            lobbyActionRequiresReselection = false;
-            selectedLobbyOptionId = "cpu";
-          },
-          handler: () => {
-            stage.destroy();
-            controller?.cancel();
-            startLocalCoopSession({ username, netcodeMode, kind: sessionKind });
-            setModeAndEnd(launchMode);
-            return true;
-          },
-        });
       }
       if (!lobbyActionRequiresReselection && selectedLobbyOptionId === "cancel") {
         initialCursor = opts.length;
       }
       opts.push({
         semanticId: "cancel",
-        label: i18next.t("menu:cancel"),
+        label: tournamentConstraint == null ? i18next.t("menu:cancel") : "Leave match lobby",
         onHover: () => {
           lobbyActionRequiresReselection = false;
           selectedLobbyOptionId = "cancel";
         },
         handler: () => {
-          backToTitle();
+          leaveLobby();
           return true;
         },
       });
@@ -1069,17 +1183,23 @@ export class TitlePhase extends Phase {
 
     controller = new CoopLobbyController(username, {
       onPlayers: players => {
-        lastPlayers = players;
+        const visiblePlayers =
+          expectedOpponent == null ? players : players.filter(player => player.name === expectedOpponent);
+        lastPlayers = visiblePlayers;
         stage.setStatus(
           incoming
-            ? `${incoming.name} wants to join your run!`
+            ? `${incoming.name} wants to ${expectedOpponent == null ? "join your run" : "start the match"}!`
             : controller?.isRequestPending()
               ? "Waiting for their answer..."
-              : players.length > 0
-                ? "Pick a player below to send a request."
-                : "Looking for other players...",
+              : visiblePlayers.length > 0
+                ? expectedOpponent == null
+                  ? "Pick a player below to send a request."
+                  : `${expectedOpponent} is ready. Send the match request.`
+                : expectedOpponent == null
+                  ? "Looking for other players..."
+                  : `Waiting for ${expectedOpponent} to join this match lobby...`,
         );
-        const sig = players.map(p => p.id).join(",") + (incoming ? `|req:${incoming.id}` : "");
+        const sig = visiblePlayers.map(p => p.id).join(",") + (incoming ? `|req:${incoming.id}` : "");
         if (sig !== listSig) {
           listSig = sig;
           if (!incoming) {
@@ -1089,17 +1209,29 @@ export class TitlePhase extends Phase {
       },
       // Lobby v2: someone asked to join US - take over the panel with Accept/Decline.
       onRequest: from => {
+        if (expectedOpponent != null && from.name !== expectedOpponent) {
+          void controller?.respond(false);
+          return;
+        }
         lobbyActionRequiresReselection = false;
         incoming = { id: from.id, name: from.name };
-        stage.setSeat(1, { name: from.name, detail: "Wants to join!", dot: "red" });
-        stage.setStatus(`${from.name} wants to join your run!`);
+        stage.setSeat(1, {
+          name: from.name,
+          detail: expectedOpponent == null ? "Wants to join!" : "Ready to battle!",
+          dot: "red",
+        });
+        stage.setStatus(`${from.name} wants to ${expectedOpponent == null ? "join your run" : "start the match"}!`);
         renderPanel();
       },
       onRequestGone: () => {
         incoming = null;
         lobbyActionRequiresReselection = true;
         stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
-        stage.setStatus("They withdrew. Looking for other players...");
+        stage.setStatus(
+          expectedOpponent == null
+            ? "They withdrew. Looking for other players..."
+            : `They withdrew. Waiting for ${expectedOpponent}...`,
+        );
         renderPanel();
       },
       onRequestPending: targetName => {
@@ -1108,7 +1240,9 @@ export class TitlePhase extends Phase {
       },
       onDeclined: name => {
         stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
-        stage.setStatus(`${name} declined. Pick another player.`);
+        stage.setStatus(
+          expectedOpponent == null ? `${name} declined. Pick another player.` : `${name} declined. You can try again.`,
+        );
         renderPanel();
       },
       onTransientError: message => {
@@ -1120,10 +1254,10 @@ export class TitlePhase extends Phase {
       },
       onConnecting: () => {
         stage.setSeat(1, { name: null, detail: "Connecting...", dot: "amber" });
-        stage.setStatus("Connecting to your partner...");
+        stage.setStatus(`Connecting to your ${expectedOpponent == null ? "partner" : "opponent"}...`);
         globalScene.ui.setMode(UiMode.MESSAGE);
         globalScene.ui.resetModeChain();
-        globalScene.ui.showText("Connecting to your partner...", null);
+        globalScene.ui.showText(`Connecting to your ${expectedOpponent == null ? "partner" : "opponent"}...`, null);
       },
       onConnected: runtime => {
         if (lobbyTerminated || getCoopRuntime() !== runtime) {
@@ -1154,27 +1288,58 @@ export class TitlePhase extends Phase {
         // still be in flight. Resume discovery is pair-keyed and then deserializes a full save,
         // so hold both clients until the complete compatibility contract has settled.
         stage.setSeat(1, { name: null, detail: "Verifying...", dot: "amber" });
-        stage.setStatus("Connected! Verifying your partner...");
+        stage.setStatus(
+          expectedOpponent == null ? "Connected! Verifying your partner..." : "Connected! Verifying your opponent...",
+        );
         globalScene.ui.setMode(UiMode.MESSAGE);
         globalScene.ui.resetModeChain();
-        globalScene.ui.showText("Connected! Verifying your partner and co-op saves...", null);
+        globalScene.ui.showText(
+          expectedOpponent == null
+            ? "Connected! Verifying your partner and co-op saves..."
+            : "Connected! Verifying your tournament opponent...",
+          null,
+        );
         const startNewRun = () => {
           if (!isCurrentSession()) {
             return;
           }
           lobbyCompleted = true;
+          stopConstraintPolling();
           stage.destroy();
           setModeAndEnd(launchMode);
         };
 
-        // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it never saves, never resumes,
-        // and never picks a save slot. The co-op RESUME / NEW-GAME barrier below (readCoopResumeMarker,
-        // the guest resume-decision wait, loadSaveSlot) is a co-op-only feature; running it for versus
-        // surfaced an unselectable "wait for the partner to resume or start a new game?" prompt that
-        // HARD SOFT-LOCKED both clients post-pairing. Skip the entire barrier for versus on BOTH roles
-        // and go straight into the versus teambuild (the negotiate step is the real sync point).
+        // A versus match is ephemeral and never enters the co-op resume path. Plain Showdown can
+        // launch immediately; tournament Showdown first resolves the transport's authenticated peer
+        // identity and requires the freshly validated bracket opponent on both clients.
         if (sessionKind === "versus") {
-          startNewRun();
+          if (expectedOpponent == null) {
+            startNewRun();
+            return;
+          }
+          void controller
+            .awaitPartnerCompatibility()
+            .then(identity => {
+              if (!isCurrentSession()) {
+                return;
+              }
+              if (identity?.partnerName !== expectedOpponent) {
+                terminalFailure(
+                  `This tournament pairing changed. Only ${expectedOpponent} can join this match. Returning to the bracket.`,
+                );
+                return;
+              }
+              stage.setSeat(1, { name: expectedOpponent, detail: "Connected", dot: "green" });
+              stage.setStatus(`Connected to ${expectedOpponent}. Starting the match...`);
+              startNewRun();
+            })
+            .catch(error => {
+              if (!isCurrentSession()) {
+                return;
+              }
+              console.error("[tournament-lobby] opponent verification failed", error);
+              terminalFailure("Could not verify your tournament opponent. Returning to the bracket.");
+            });
           return;
         }
 
@@ -1492,7 +1657,7 @@ export class TitlePhase extends Phase {
       },
       onError: e => {
         if (flowRuntime == null || isCurrentFlow()) {
-          terminalFailure(`Co-op error:\n${e}`);
+          terminalFailure(`${tournamentConstraint == null ? "Co-op" : "Tournament lobby"} error:\n${e}`);
         }
       },
     });
@@ -1500,7 +1665,28 @@ export class TitlePhase extends Phase {
     // Enter the lobby: clear the mode menu and show the stage while we announce.
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.resetModeChain();
-    globalScene.ui.showText("Finding co-op players...", null);
+    globalScene.ui.showText(
+      expectedOpponent == null
+        ? sessionKind === "versus"
+          ? "Finding Showdown players..."
+          : "Finding co-op players..."
+        : `Opening your match lobby with ${expectedOpponent}...`,
+      null,
+    );
+    if (tournamentConstraint != null) {
+      const validateConstraint = async () => {
+        if (constraintPollPending || lobbyTerminated || lobbyCompleted) {
+          return;
+        }
+        constraintPollPending = true;
+        const valid = await tournamentConstraint.validate().catch(() => null);
+        constraintPollPending = false;
+        if (valid === false && !lobbyTerminated && !lobbyCompleted) {
+          terminalFailure("Your tournament pairing changed. Returning to the updated bracket.");
+        }
+      };
+      constraintPollTimer = setInterval(() => void validateConstraint(), 6000);
+    }
     void controller.start();
   }
 

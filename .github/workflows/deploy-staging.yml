@@ -206,9 +206,9 @@ jobs:
             echo "VITE_SERVER_URL=${{ vars.STAGING_SERVER_URL }}"
             echo "VITE_COOP_SERVER_URL=https://er-coop-api-staging.heraklines.workers.dev"
             echo "VITE_COOP_SIGNALING_PROTOCOL=p33"
-            # Showdown battle telemetry (D5): dedicated worker + er-telemetry D1.
+            # Showdown/tournament state: isolated staging worker + staging D1.
             # Without this the client falls back to VITE_SERVER_URL (404 no-op).
-            echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry.heraklines.workers.dev"
+            echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry-staging.heraklines.workers.dev"
             echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"
             # Enable the in-game dev TEST SUITE on STAGING only (Dev Scenarios menu,
             # Pass/Fail, Send Logs). Production's Cloudflare Pages build does NOT set
@@ -319,6 +319,13 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config workers/er-save-api/wrangler.staging.toml
+
+      - name: Deploy tournament telemetry API (staging)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config workers/er-telemetry/wrangler.staging.toml
 
       - name: Deploy co-op signaling API (staging)
         uses: cloudflare/wrangler-action@v3

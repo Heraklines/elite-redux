@@ -28,6 +28,7 @@ import type {
   TournamentRewardMutation,
   TournamentView,
 } from "#data/elite-redux/showdown/tournament-types";
+import { isKickedParticipant } from "#data/elite-redux/showdown/tournament-types";
 import { Button } from "#enums/buttons";
 import { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
@@ -450,7 +451,10 @@ export class TournamentListUiHandler extends UiHandler {
     for (let i = this.scrollTop; i < end; i++) {
       const t = list[i];
       const y = ROW_Y0 + (i - this.scrollTop) * ROW_HEIGHT;
-      const registered = t.entrants.some(e => e.participant === cfg.ownParticipant);
+      const droppedOut =
+        t.kicked?.includes(cfg.ownParticipant)
+        ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant);
+      const registered = !droppedOut && t.entrants.some(e => e.participant === cfg.ownParticipant);
       const chip = stateChip(t);
 
       // state chip (left)
@@ -483,7 +487,7 @@ export class TournamentListUiHandler extends UiHandler {
 
       // second line: window + your-status
       const windowHrs = Math.round(t.roundWindowMs / 3_600_000);
-      const sub = registered ? "You are registered" : `${windowHrs}h rounds`;
+      const sub = droppedOut ? "Dropped out" : registered ? "You are registered" : `${windowHrs}h rounds`;
       const subText = addTextObject(46, y + 10, sub, TextStyle.PARTY, { fontSize: "26px" });
       subText.setOrigin(0, 0);
       subText.setTint(registered ? OPEN_GREEN : TODO);
@@ -502,7 +506,10 @@ export class TournamentListUiHandler extends UiHandler {
       return;
     }
     const t = cfg.tournaments[this.cursor];
-    const registered = t.entrants.some(e => e.participant === cfg.ownParticipant);
+    const droppedOut =
+      t.kicked?.includes(cfg.ownParticipant)
+      ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant);
+    const registered = !droppedOut && t.entrants.some(e => e.participant === cfg.ownParticipant);
     if (t.state === "registration" && !registered) {
       this.hint.setText("A: Register    B: Back");
     } else if (t.state === "registration") {
@@ -565,7 +572,10 @@ export class TournamentListUiHandler extends UiHandler {
           return false;
         }
         const t = cfg.tournaments[this.cursor];
-        const registered = t.entrants.some(e => e.participant === cfg.ownParticipant);
+        const droppedOut =
+          t.kicked?.includes(cfg.ownParticipant)
+          ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant);
+        const registered = !droppedOut && t.entrants.some(e => e.participant === cfg.ownParticipant);
         globalScene.ui.playSelect();
         if (t.state === "registration" && !registered) {
           cfg.onRegister(t.id);

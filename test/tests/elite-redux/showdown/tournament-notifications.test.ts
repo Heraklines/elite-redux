@@ -19,6 +19,7 @@ import {
   tournamentDeepLinkOf,
 } from "#data/elite-redux/showdown/tournament-notifications";
 import type { TournamentView } from "#data/elite-redux/showdown/tournament-types";
+import { isTournamentPairingCurrent } from "#data/elite-redux/showdown/tournament-types";
 import { type ErNotification, notificationManager } from "#system/notifications/notification-manager";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -96,22 +97,29 @@ describe("tournament challenge notifications - derivation", () => {
     setTournamentFlowOpener(null);
   });
 
-  it("emits a READY notification when the pairing is set + undecided", () => {
+  it("does not notify merely because a pairing exists", () => {
     const out = actionableTournamentNotifications(view(), "Carla", NOW);
-    expect(out).toHaveLength(1);
-    expect(out[0].type).toBe(TOURNAMENT_NOTIF_TYPE);
-    expect((out[0].data as any).kind).toBe("ready");
-    expect((out[0].data as any).opponent).toBe("AshK");
-    // deep-link points at Carla's live match (round 0, slot 0).
-    const link = tournamentDeepLinkOf(out[0]);
-    expect(link).toEqual({ tournamentId: "cup", round: 0, slot: 0 });
+    expect(out).toHaveLength(0);
   });
 
-  it("ADDS a PRESENT notification when the opponent is in the lobby now", () => {
+  it("invalidates a lobby binding when the same bracket slot gets a different opponent", () => {
     const t = view();
-    t.entrants[1].lastSeen = NOW - 10_000; // AshK pinged 10s ago -> present
+    expect(isTournamentPairingCurrent(t, "Carla", "r0m0", "AshK")).toBe(true);
+    t.bracket!.rounds[0][0].b = "MistyW";
+    expect(isTournamentPairingCurrent(t, "Carla", "r0m0", "AshK")).toBe(false);
+  });
+
+  it("notifies and deep-links when the exact opponent explicitly readies", () => {
+    const t = view();
+    t.entrants[1].readyMatchId = "r0m0";
+    t.entrants[1].readyOpponent = "Carla";
+    t.entrants[1].readyAt = NOW - 10_000;
     const out = actionableTournamentNotifications(t, "Carla", NOW);
-    expect(out.map(n => (n.data as any).kind).sort()).toEqual(["present", "ready"]);
+    expect(out).toHaveLength(1);
+    expect(out[0].type).toBe(TOURNAMENT_NOTIF_TYPE);
+    expect((out[0].data as any).kind).toBe("opponent-ready");
+    expect((out[0].data as any).opponent).toBe("AshK");
+    expect(tournamentDeepLinkOf(out[0])).toEqual({ tournamentId: "cup", round: 0, slot: 0 });
   });
 
   it("red-proof: nothing for a non-entrant / registration / decided / bye", () => {
@@ -129,11 +137,12 @@ describe("tournament challenge notifications - derivation", () => {
     expect(actionableTournamentNotifications(bye, "Carla", NOW)).toHaveLength(0);
   });
 
-  it("does not surface an opponent's presence stale beyond the freshness window", () => {
+  it("does not treat online presence or stale-pair readiness as matchmaking intent", () => {
     const t = view();
-    t.entrants[1].lastSeen = NOW - 10 * 60_000; // 10 min ago -> stale
-    const out = actionableTournamentNotifications(t, "Carla", NOW);
-    expect(out.map(n => (n.data as any).kind)).toEqual(["ready"]);
+    t.entrants[1].lastSeen = NOW - 10_000;
+    t.entrants[1].readyMatchId = "r0m0";
+    t.entrants[1].readyOpponent = "SomebodyElse";
+    expect(actionableTournamentNotifications(t, "Carla", NOW)).toHaveLength(0);
   });
 
   it("P2: emits an ADVANCED notification when you moved on without playing (activity win)", () => {
@@ -178,8 +187,12 @@ describe("tournament challenge notifications - derivation", () => {
   });
 
   it("DEDUPES to once per state change (stable ids across polls)", () => {
-    const first = actionableTournamentNotifications(view(), "Carla", NOW);
-    const second = actionableTournamentNotifications(view(), "Carla", NOW + 60_000);
+    const ready = view();
+    ready.entrants[1].readyMatchId = "r0m0";
+    ready.entrants[1].readyOpponent = "Carla";
+    ready.entrants[1].readyAt = NOW - 1_000;
+    const first = actionableTournamentNotifications(ready, "Carla", NOW);
+    const second = actionableTournamentNotifications(ready, "Carla", NOW + 60_000);
     // ids are identical across the two polls
     expect(second[0].id).toBe(first[0].id);
     // pushing both polls into the manager yields ONE stored notification.
