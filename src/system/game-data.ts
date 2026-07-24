@@ -65,6 +65,7 @@ import {
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
+import { getErGhostRepeatLedger, restoreErGhostRepeatLedger } from "#data/elite-redux/er-ghost-teams";
 import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
@@ -1865,6 +1866,7 @@ export class GameData {
       // adjacent waves from the same spawn window.
       erUsedCustomTrainerKeys: getErUsedCustomTrainerKeys(),
       erUsedCustomTrainerWindows: getErUsedCustomTrainerWindows(),
+      erGhostRepeatLedger: getErGhostRepeatLedger(),
       // ER (#348): persist per-mon faint-free money streaks across save/load.
       erMoneyStreaks: getErMoneyStreakEntries(),
       // ER achievement-expansion catalog-v2 (#900): persist run-local achievement state
@@ -4876,6 +4878,7 @@ export class GameData {
     setErDifficulty(fromSession.erDifficulty ?? "ace");
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
     restoreErCustomTrainerTracking(fromSession.erUsedCustomTrainerKeys, fromSession.erUsedCustomTrainerWindows);
+    restoreErGhostRepeatLedger(fromSession.erGhostRepeatLedger);
     restoreErMoneyStreaks(fromSession.erMoneyStreaks);
     // ER achievement-expansion catalog-v2 (#900): restore run-local achievement state so a
     // mid-run reload keeps an in-progress feat (bargain flags, black-market credit, etc.).

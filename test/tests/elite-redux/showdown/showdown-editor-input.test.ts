@@ -172,6 +172,22 @@ describe.skipIf(!RUN)("Showdown Set Editor type-to-search input model", () => {
     expect(cancels(), "MENU leaves the editor via onCancel").toBe(1);
   });
 
+  it("controller Start (MENU) commits the set because generic pads have no SUBMIT binding", () => {
+    const game = new GameManager(phaserGame);
+    const registered = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR] as ShowdownSetEditorUiHandler;
+    const handler = new (registered.constructor as new () => ShowdownSetEditorUiHandler)();
+    handler.setup();
+    const done = vi.fn();
+    handler.show([buildShowdownEditorDemoConfig({ initialField: EditorField.ABILITY, onDone: done })]);
+    game.scene.inputController.lastSource = "gamepad";
+    try {
+      expect((handler as unknown as EditorInternals).processInput(Button.MENU)).toBe(true);
+      expect(done).toHaveBeenCalledOnce();
+    } finally {
+      game.scene.inputController.lastSource = "keyboard";
+    }
+  });
+
   it("Escape (MENU) from an OPEN move dropdown only CLOSES the dropdown (browse), it does NOT leave", () => {
     const game = new GameManager(phaserGame);
     const { internals, cancels } = buildEditorWithCancel(game, EditorField.MOVE0);

@@ -526,6 +526,12 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         handled = true;
         break;
       case Button.MENU:
+        // Generic/Xbox/Switch controllers do not expose a SUBMIT binding: their Start button emits
+        // MENU. Treat Start as Done for controller input while preserving keyboard Escape as Leave.
+        if (globalScene.inputController?.lastSource === "gamepad") {
+          handled = this.tryCommit();
+          break;
+        }
         // Escape: leave the editor to the grid. Consumed HERE so it can never bubble to the exposed
         // StarterSelect (where MENU maps to Start -> an empty versus battle - the reported softlock).
         this.config!.onCancel?.();

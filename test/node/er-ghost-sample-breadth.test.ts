@@ -247,6 +247,19 @@ describe("er-save-api — ghost sample considers ALL eligible runs (de-restricti
     return data.teams.map(t => t.id);
   }
 
+  async function callBandedSample(
+    count: number,
+    maxWave: number,
+  ): Promise<{ id: string; sourceUserId: string; waveReached: number }[]> {
+    const request = new Request(
+      `https://save.test/savedata/run/sample?difficulty=hell&count=${count}&minWave=${MIN_WAVE}&maxWave=${maxWave}`,
+      { method: "GET", headers: { Authorization: authorization, Accept: "application/json" } },
+    );
+    const res = await saveWorker.fetch(request, { DB: database, SESSION_SECRET: secret } as never);
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { teams: { id: string; sourceUserId: string; waveReached: number }[] }).teams;
+  }
+
   function rowidsToIds(rowids: number[]): string[] {
     return rowids.map(r => (sqlite.prepare("SELECT id FROM runs WHERE rowid = ?").get(r) as { id: string }).id);
   }
@@ -280,6 +293,17 @@ describe("er-save-api — ghost sample considers ALL eligible runs (de-restricti
       expect(wave).toBeGreaterThanOrEqual(floor);
       expect(wave).toBeLessThanOrEqual(GHOST_SAMPLE_MAX_WAVE);
       expect(ineligibleIds.has(id)).toBe(false);
+    }
+  });
+
+  it("honors an explicit maxWave ceiling and maximises distinct uploaders", async () => {
+    vi.spyOn(Math, "random").mockImplementation(mulberry32(0xbad5eed));
+    const teams = await callBandedSample(3, 120);
+    expect(teams).toHaveLength(3);
+    expect(new Set(teams.map(team => team.sourceUserId)).size).toBe(3);
+    for (const team of teams) {
+      expect(team.waveReached).toBeGreaterThanOrEqual(MIN_WAVE);
+      expect(team.waveReached).toBeLessThanOrEqual(120);
     }
   });
 

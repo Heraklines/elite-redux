@@ -17,7 +17,9 @@
 
 import {
   type GhostTeamSnapshot,
+  getErGhostRepeatLedger,
   resetErGhostRunState,
+  restoreErGhostRepeatLedger,
   setPrefetchedGhostTeamsForTests,
   takeGhostForWave,
 } from "#data/elite-redux/er-ghost-teams";
@@ -41,30 +43,25 @@ const member = (speciesId: number) => ({
   shiny: false,
   variant: 0,
   passive: false,
-  moves: [],
+  moves: [] as number[],
 });
 
-/** A pool of several uploaders, some with multiple teams (mirrors the live per-uploader cap of 3). */
+/** Enough distinct uploaders and semantic teams to cover every trainer wave. */
 const makePool = (): GhostTeamSnapshot[] => {
-  const uploaders: [string, number][] = [
-    ["Arctic Flame", 3],
-    ["Veteran Lance", 2],
-    ["Dusk Walker", 2],
-    ["Iron Sage", 1],
-  ];
   const pool: GhostTeamSnapshot[] = [];
-  for (const [name, count] of uploaders) {
-    for (let i = 0; i < count; i++) {
-      pool.push({
-        id: `${name}-${i}`,
-        trainerName: name,
-        difficulty: "hell",
-        waveReached: 45, // eligible across waves 10..30 in the primary +40 window
-        isVictory: true,
-        timestamp: 1,
-        party: [member(SpeciesId.GARCHOMP)],
-      });
-    }
+  for (let i = 0; i < 24; i++) {
+    const ghostMember = member(SpeciesId.GARCHOMP);
+    ghostMember.moves = [i + 1];
+    pool.push({
+      id: `ghost-${i}`,
+      sourceUserId: String(10_000 + i),
+      trainerName: `Uploader ${i}`,
+      difficulty: "hell",
+      waveReached: 45,
+      isVictory: true,
+      timestamp: 1,
+      party: [ghostMember],
+    });
   }
   return pool;
 };
@@ -112,6 +109,8 @@ describe.skipIf(!RUN)("ER ghost teams - recent-pick suppression (no same ghost s
     for (let i = 1; i < ids.length; i++) {
       expect(ids[i], `same team ${ids[i]} fielded on consecutive waves ${9 + i}/${10 + i}`).not.toBe(ids[i - 1]);
     }
+    expect(new Set(ids).size, "no snapshot is recycled during the run").toBe(ids.length);
+    expect(new Set(uploaders).size, "no source uploader is recycled during the run").toBe(uploaders.length);
 
     // No uploader appears 3+ times in an unbroken streak (the "same ghost N in a row" report).
     let streak = 1;
@@ -121,5 +120,35 @@ describe.skipIf(!RUN)("ER ghost teams - recent-pick suppression (no same ghost s
       maxStreak = Math.max(maxStreak, streak);
     }
     expect(maxStreak, `longest same-uploader streak was ${maxStreak}: ${uploaders.join(", ")}`).toBeLessThan(3);
+  });
+
+  it("keeps semantic duplicate suppression across a save-ledger restore", async () => {
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.MAGIKARP);
+    resetErGhostRunState();
+
+    const original = makePool()[0];
+    setPrefetchedGhostTeamsForTests([original]);
+    expect(takeGhostForWave(10, true)?.id).toBe(original.id);
+    const ledger = getErGhostRepeatLedger();
+
+    const duplicate: GhostTeamSnapshot = {
+      ...original,
+      id: "duplicate-upload",
+      sourceUserId: "different-account",
+      trainerName: "Different Uploader",
+    };
+    const different: GhostTeamSnapshot = {
+      ...original,
+      id: "different-team",
+      sourceUserId: "another-account",
+      trainerName: "Another Uploader",
+      party: [{ ...original.party[0], moves: [999] }],
+    };
+
+    resetErGhostRunState();
+    restoreErGhostRepeatLedger(ledger);
+    setPrefetchedGhostTeamsForTests([duplicate, different]);
+    expect(takeGhostForWave(11, true)?.id).toBe(different.id);
   });
 });
