@@ -117,6 +117,7 @@ import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopBattleCheckpoint,
+  CoopBattleEvent,
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,

@@ -233,14 +233,18 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       const turnBefore = rig.guestScene.currentBattle.turn;
       const victory = await driveClientPhaseQueueTo(rig.guestScene, "VictoryPhase");
       victory.start();
+      const currentAfterVictory = rig.guestScene.phaseManager.getCurrentPhase();
       const queuedAfterVictory = rig.guestScene.phaseManager.getQueuedPhaseNames();
-      expect(queuedAfterVictory, "Victory constructed its real retained BattleEnd").toContain("BattleEndPhase");
-      const restored = rig.guestScene.phaseManager.getCurrentPhase();
-      restored.end();
-      expect(rig.guestScene.phaseManager.getCurrentPhase()?.phaseName, "guest parks on exact ME BattleEnd").toBe(
-        "BattleEndPhase",
-      );
-      const guestBattleEnd = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(
+        [currentAfterVictory?.phaseName, ...queuedAfterVictory],
+        "Victory constructed and entered its real retained BattleEnd",
+      ).toContain("BattleEndPhase");
+      expect(currentAfterVictory?.phaseName, "guest parks on exact ME BattleEnd").toBe("BattleEndPhase");
+      const guestBattleEnd = currentAfterVictory!;
+      expect(
+        rig.guestScene.phaseManager.getCurrentPhase(),
+        "the exact BattleEnd remains current before settlement",
+      ).toBe(guestBattleEnd);
       const heldEnd = vi.spyOn(guestBattleEnd, "end");
       const scoreBeforeHold = rig.guestScene.score;
       guestBattleEnd.start();

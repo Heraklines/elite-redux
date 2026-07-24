@@ -3137,3 +3137,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   halfway.
 - The focused ownership train was rebased to exact qualified predecessor `99b2fe918` so the next external run
   covers both B9's embedded-battle command boundary and B10's repaired replay fixtures.
+
+# 2026-07-24 - Command-open presentation types remain explicit at phase boundaries
+
+- Focused run `30106371311` reached its intended B9/B10 shards, but its independent static job found two
+  missing type-only `CoopBattleEvent` imports introduced when the sealed prefix was threaded through
+  CommandPhase and the replay successor claim. Both phase modules now import that wire type explicitly;
+  no runtime behavior changed.
+
+# 2026-07-24 - Exact-SHA B9 proves V2 entry presentation and exposes the next finite seams
+
+- Focused run `30106371311` proved the production embedded-Mystery path: after applying command-open
+  revision 3 and state tick 8, the guest rendered and proved all 15 ordered entry events—including ability,
+  narration, stat-stage, and move-used events—before exposing the real CommandPhase.
+- The broad red fan-out shared one harness cause: the post-pair direct-mirror bridge still constructed a
+  turn-one command frontier without the newly mandatory entry prefix. It now seals the deliberately empty
+  observed prefix through the same recorder API as production instead of bypassing the material invariant.
+- The same run exposed a real non-battle Mystery seam: an entry-only replay waiter aborted by ME_TERMINAL was
+  not registered in the legacy streamer's pending waits, so it remained current ahead of the ordered reward
+  successor. Entry-only V2 consumers now retire themselves directly whether their prefix is waiting or
+  already buffered; the detached async continuation sees `aborted`/`ended` and cannot shift a newer phase.
+- The ME victory fixture now observes VictoryPhase's synchronous transition correctly: the retained
+  BattleEnd is already current, not still queued. This changes only the assertion/driver, not production.

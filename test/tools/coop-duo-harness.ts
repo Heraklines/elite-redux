@@ -135,7 +135,11 @@ import {
   type CoopTransport,
   createLoopbackPair,
 } from "#data/elite-redux/coop/coop-transport";
-import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import {
+  beginCoopRecording,
+  endCoopRecording,
+  sealCoopEntryPresentation,
+} from "#data/elite-redux/coop/coop-turn-recorder";
 import { isCoopWaveAdvanceOperationEnabled } from "#data/elite-redux/coop/coop-wave-operation";
 import {
   type ErAchievementRunSaveData,
@@ -1758,7 +1762,14 @@ function adoptAlreadyOpenHostCommandBoundary(scene: BattleScene): boolean {
   if (pokemon == null) {
     throw new Error(`cannot adopt pre-pair CommandPhase for missing field ${fieldIndex}`);
   }
-  const frontier = establishCoopV2CommandControlFrontier();
+  // buildDuo opened the recorder immediately before this adoption. Seal its deliberately empty observed
+  // prefix through the same production function CommandPhase uses; a turn-one CONTROL_COMMIT without an
+  // explicit prefix is now invalid by construction, even when the legacy fixture paired after Summon.
+  const entryPresentation = sealCoopEntryPresentation();
+  if (entryPresentation == null) {
+    throw new Error("cannot adopt pre-pair Authority V2 command frontier without its sealed entry presentation");
+  }
+  const frontier = establishCoopV2CommandControlFrontier(entryPresentation);
   if (frontier !== "ready") {
     throw new Error(`cannot establish pre-pair Authority V2 command frontier: ${frontier}`);
   }

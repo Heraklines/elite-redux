@@ -213,9 +213,21 @@ export class CoopReplayTurnPhase extends Phase {
       return true;
     }
     this.aborted = true;
+    // Entry-only phases are speculative V2 consumers even when the commit arrived just before start() and
+    // is still buffered. In either state they are outside battleStream.pending and must retire directly.
+    const retiringV2EntryWait = this.entryPresentationOnly;
     this.v2EntryPresentationResolver?.(null);
     this.v2EntryPresentationResolver = null;
+    this.v2EntryPresentationBuffered = null;
     coopWarn("replay", `guest replay turn=${this.turn}: ABORT phantom turn (${reason}) - dissolving parked pump`);
+    // A V2 entry-only wait does not live in battleStream.pending, so abortTurnWait cannot retire it. Shift
+    // this exact phase now; the resolved async pump observes aborted/ended and becomes a no-op. This is the
+    // non-battle Mystery path: its ordered ME_TERMINAL has already queued the reward/leave successor behind
+    // the speculative TurnInit replay, and leaving the aborted object current would softlock that surface.
+    if (retiringV2EntryWait) {
+      this.retireSupersededWait();
+      return true;
+    }
     if (this.replacementRetryUnsubscribe != null) {
       this.clearReplacementRetryWake();
       this.end();

@@ -48,6 +48,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import type {
   CoopBattleCommandOffer,
+  CoopBattleEvent,
   CoopBattleTargetRef,
   SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
