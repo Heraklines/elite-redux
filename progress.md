@@ -2699,3 +2699,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   wave, and turn remain mandatory; the change does not loosen the fail-closed material boundary. In two
   actual browsers this is a no-op, while the duo harness can no longer terminate a valid guest picker merely
   because the host was ambient when the shared JavaScript microtask ran.
+
+# 2026-07-24 - Exact B1 evidence closes the internal transition-predicate schedule
+
+- Exact-SHA gate `30081518757` showed both residual B1 failures reached their intended public surfaces, but
+  the market's real 350ms Phaser transition had not completed within the attempted 25ms owner hold and the
+  replacement UI's internal bounded predicate still consulted the peer-ambient runtime before its fenced
+  promise tail could reactivate the guest.
+- The market fixture now holds each owner across the already-proven 650ms transition budget before staging
+  the peer. The replacement transition separately distinguishes captured-scene material presence from the
+  runtime identity required to mutate: generation, exact phase token, wave, and turn fence the UI promise;
+  its continuation then re-enters and requires the captured runtime before settlement or phase shift.
+- No authority, successor, timeout, or failure policy was relaxed. This is the same schedule as two isolated
+  browser realms, expressed explicitly in the single-realm engine harness.

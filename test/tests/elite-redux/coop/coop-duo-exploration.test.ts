@@ -365,9 +365,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         haltQueueAfterCurrent();
         phase.start();
         await drainLoopback();
-        // Keep the owner installed while the mock Phaser timer and its promise continuation publish the
-        // address-exact input proof. Staging the other browser first creates an impossible ambient schedule.
-        await new Promise<void>(resolve => setTimeout(resolve, 25));
+        // Keep the owner installed across the real 250ms fade + 100ms delayed hand-off and its promise
+        // continuation. Staging the other browser first creates an impossible ambient schedule.
+        await new Promise<void>(resolve => setTimeout(resolve, 650));
       });
 
       await withClient(rig.guestCtx, async () => {
@@ -381,7 +381,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         haltQueueAfterCurrent();
         phase.start();
         await drainLoopback();
-        await new Promise<void>(resolve => setTimeout(resolve, 25));
+        await new Promise<void>(resolve => setTimeout(resolve, 650));
       });
 
       // Wait for the actual BIOME_SHOP handler. The retired fixture invoked the callback captured from

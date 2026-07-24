@@ -146,12 +146,12 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       return;
     }
     this.opened = true;
-    const boundaryStillLive = (): boolean =>
+    const materialBoundaryStillPresent = (): boolean =>
       coopSessionGeneration() === sourceGeneration
-      && getCoopRuntime() === runtime
       && scene.phaseManager.getCurrentPhase() === this
       && (scene.currentBattle?.waveIndex ?? -1) === phaseBoundary.wave
       && (scene.currentBattle?.turn ?? -1) === phaseBoundary.turn;
+    const boundaryStillLive = (): boolean => getCoopRuntime() === runtime && materialBoundaryStillPresent();
     coopLog("replay", `guest own-faint picker OPEN slot=${this.fieldIndex} seq=${seq} (choose your replacement)`);
     // Suppress the stall watchdog while THIS human's replacement picker is open: the guest's replay is
     // parked in a network wait for the host's next turn (which legitimately can't arrive until this pick),
@@ -184,7 +184,11 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       // Judge the terminal and mutate the queue only after this picker's captured runtime is active again.
       // Real browsers are permanently bound to their own runtime, so this is a no-op there; it preserves
       // the same strict generation/runtime/phase/wave/turn fence in both schedules.
-      scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result =>
+      // The UI transition owns this captured scene. Its internal async predicate must not classify the
+      // boundary as superseded merely because the peer runtime is momentarily ambient in the one-realm
+      // duo harness. Generation + phase token + wave + turn still fence the transition itself; the promise
+      // tail reactivates this runtime and then requires the full runtime identity before mutating anything.
+      scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, materialBoundaryStillPresent).then(result =>
         runWhenCoopRuntimeActive(runtime, () => {
           if (coopSessionGeneration() !== sourceGeneration) {
             return;
