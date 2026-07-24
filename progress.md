@@ -2756,3 +2756,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   stale wait had left the completed PARTY surface mounted and caused the later shared-process fixture cascade.
 - The focused-gate manifest now advances its integration-batch base on every push as required by
   `docs/coop-task-ownership.md`; run `30083562237` proves the previously noisy self-train ownership gate green.
+
+# 2026-07-24 - Public Showdown installs lockstep before capability negotiation
+
+- Real-browser Showdown run `30083388351` reached wave 1 but stranded the guest after the host's first
+  voluntary switch. Its trace showed the public title route selected Showdown while `connectCoopSession`
+  still logged `netcode=authoritative`, negotiated the full Authority V2 capability set, and deferred the
+  guest's command-open commit because no V2 engine consumer exists in Showdown's dual-engine flow.
+- The route constant was already correctly `lockstep`; the bug was ordering. The P33 and legacy connectors
+  constructed and connected the runtime (sending the opening hello) before `TitlePhase.onConnected` mutated
+  the controller. Netcode and session kind now travel through the lobby and connector into runtime assembly,
+  before capability advertisement or any transport frame. The late mutation is deleted and replaced by a
+  fail-closed route/runtime assertion.
+- Legacy and authenticated P33 lobby contracts both prove that `lockstep` plus `versus` reaches the connector
+  in its construction options. The fix changes launch wiring only; no Authority V2 mechanical rule is
+  weakened and ordinary co-op continues to construct as `authoritative` plus `coop`.

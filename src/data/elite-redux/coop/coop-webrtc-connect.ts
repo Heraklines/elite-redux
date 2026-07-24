@@ -39,6 +39,7 @@ import {
   rejoinP33Run,
 } from "#data/elite-redux/coop/coop-p33-client";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopNetcodeMode, CoopSessionKind } from "#data/elite-redux/coop/coop-transport";
 
 // Optimization brief R6: the game-coupled session attach is loaded LAZILY so the
 // TRANSPORT half of this module (signaling, SDP exchange, fingerprint binding,
@@ -251,6 +252,10 @@ function waitForChannelOpen(channel: RTCDataChannel, timeoutMs = 30_000): Promis
 export interface CoopConnectOptions {
   /** Local account name, shown to the partner. */
   username?: string | undefined;
+  /** Install the gameplay authority model before the opening hello/capability offer is sent. */
+  netcodeMode?: CoopNetcodeMode | undefined;
+  /** Install co-op versus Showdown semantics before the opening hello is sent. */
+  kind?: CoopSessionKind | undefined;
   /** ICE override; defaults to {@linkcode coopIceConfigFromEnv}. */
   ice?: CoopIceConfig;
   /** Injectable authenticated-client dependencies for focused browser tests. */
@@ -476,6 +481,8 @@ export async function connectCoopP33Pairing(
   const transport = webRtcTransportFromChannel(gameplayRole, channel, pc, activePairing.connectionGeneration);
   const runtime = await connectCoopSession(transport, {
     username: activePairing.account.displayName,
+    netcodeMode: opts.netcodeMode,
+    kind: opts.kind,
     p33: context,
   });
 
@@ -633,7 +640,11 @@ export async function connectCoopWithCode(
 ): Promise<CoopRuntime> {
   coopLog("launch", `connectCoopWithCode code=${code} role=${role} username=${opts.username ?? "(default)"}`);
   const { transport, rejoin } = await establishCoopTransportWithCode(code, role, opts);
-  const runtime = await connectCoopSession(transport, { username: opts.username });
+  const runtime = await connectCoopSession(transport, {
+    username: opts.username,
+    netcodeMode: opts.netcodeMode,
+    kind: opts.kind,
+  });
   runtime.rejoinDriver = rejoin;
   return runtime;
 }
@@ -661,7 +672,11 @@ export async function connectCoopAsHost(
 
   const { channel, pc } = await exchangeAndOpenChannel(code, "host", opts.ice);
   const transport = webRtcTransportFromChannel("host", channel, pc);
-  const runtime = await connectCoopSession(transport, { username: opts.username });
+  const runtime = await connectCoopSession(transport, {
+    username: opts.username,
+    netcodeMode: opts.netcodeMode,
+    kind: opts.kind,
+  });
   runtime.rejoinDriver = makeCoopRejoinDriver(code, "host", transport, opts.ice);
   coopLog("launch", `host session live code=${code}`);
   return { code, runtime };
@@ -681,7 +696,11 @@ export async function connectCoopAsGuest(code: string, opts: CoopConnectOptions 
   await postJson("/coop/join", { code, guest: opts.username ?? "Player 2" });
   const { channel, pc } = await exchangeAndOpenChannel(code, "guest", opts.ice);
   const transport = webRtcTransportFromChannel("guest", channel, pc);
-  const runtime = await connectCoopSession(transport, { username: opts.username });
+  const runtime = await connectCoopSession(transport, {
+    username: opts.username,
+    netcodeMode: opts.netcodeMode,
+    kind: opts.kind,
+  });
   runtime.rejoinDriver = makeCoopRejoinDriver(code, "guest", transport, opts.ice);
   return runtime;
 }

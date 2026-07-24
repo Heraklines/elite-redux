@@ -34,6 +34,7 @@ import {
   respondToP33Request,
 } from "#data/elite-redux/coop/coop-p33-client";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopNetcodeMode, CoopSessionKind } from "#data/elite-redux/coop/coop-transport";
 import { connectCoopP33Pairing, connectCoopWithCode, coopServerBase } from "#data/elite-redux/coop/coop-webrtc-connect";
 
 /** A player currently waiting in the lobby (as seen by someone else). */
@@ -217,11 +218,20 @@ export interface CoopLobbyCallbacks {
 }
 
 /** The WebRTC connect signature - injectable so tests can stub the browser leg. */
-export type CoopConnectFn = (code: string, role: "host" | "guest", opts: { username: string }) => Promise<CoopRuntime>;
+interface CoopLobbySessionOptions {
+  netcodeMode?: CoopNetcodeMode | undefined;
+  kind?: CoopSessionKind | undefined;
+}
+
+export type CoopConnectFn = (
+  code: string,
+  role: "host" | "guest",
+  opts: { username: string } & CoopLobbySessionOptions,
+) => Promise<CoopRuntime>;
 export type CoopP33ConnectFn = (
   credential: CoopP33LobbyCredentialV1,
   pairing: CoopP33PairingV1,
-  opts: { p33Dependencies?: CoopP33ClientDependencies },
+  opts: { p33Dependencies?: CoopP33ClientDependencies } & CoopLobbySessionOptions,
 ) => Promise<CoopRuntime>;
 
 /** Extra controller options (mainly a connect override for headless tests). */
@@ -232,6 +242,10 @@ export interface CoopLobbyOptions {
   protocol?: CoopLobbyProtocol;
   connectP33?: CoopP33ConnectFn;
   p33Dependencies?: CoopP33ClientDependencies;
+  /** Gameplay authority model that must exist before the connector sends its opening hello. */
+  netcodeMode?: CoopNetcodeMode | undefined;
+  /** Session semantics that must exist before capability negotiation begins. */
+  sessionKind?: CoopSessionKind | undefined;
 }
 
 /** Staging selects P33 explicitly; legacy remains isolated until the Worker promotion is complete. */
@@ -276,6 +290,7 @@ export class CoopLobbyController {
   private readonly connectP33Fn: CoopP33ConnectFn;
   private readonly protocol: CoopLobbyProtocol;
   private readonly p33Dependencies: CoopP33ClientDependencies;
+  private readonly sessionOptions: CoopLobbySessionOptions;
   private p33Credential: CoopP33LobbyCredentialV1 | null = null;
   /** Lobby v2: the presence id of the player currently asking to join ME (dedupe onRequest). */
   private incomingRequestId: string | null = null;
@@ -292,6 +307,10 @@ export class CoopLobbyController {
     this.protocol = options.protocol ?? coopLobbyProtocolFromEnv();
     const room = coopLobbyRoomFromEnv();
     this.p33Dependencies = options.p33Dependencies ?? (room == null ? {} : { room });
+    this.sessionOptions = {
+      ...(options.netcodeMode == null ? {} : { netcodeMode: options.netcodeMode }),
+      ...(options.sessionKind == null ? {} : { kind: options.sessionKind }),
+    };
   }
 
   /** Announce presence and begin polling. Connects immediately if already paired. */
@@ -564,7 +583,10 @@ export class CoopLobbyController {
     this.clearTimer();
     this.callbacks.onConnecting();
     try {
-      const runtime = await this.connectFn(pairing.code, pairing.role, { username: this.name });
+      const runtime = await this.connectFn(pairing.code, pairing.role, {
+        username: this.name,
+        ...this.sessionOptions,
+      });
       if (this.stopped) {
         coopLog("launch", `lobby connect: runtime ready but stopped -> discard code=${pairing.code}`);
         return;
@@ -587,6 +609,7 @@ export class CoopLobbyController {
     try {
       const runtime = await this.connectP33Fn(this.p33Credential, pairing, {
         p33Dependencies: this.p33Dependencies,
+        ...this.sessionOptions,
       });
       if (this.stopped) {
         runtime.localTransport.close();

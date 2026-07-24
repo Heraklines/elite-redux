@@ -123,6 +123,29 @@ describe("CoopLobbyController state machine (#633)", () => {
     c.cancel();
   });
 
+  it("installs Showdown lockstep axes before the connector creates its runtime", async () => {
+    responder = () => ({ body: { id: "me", pairing: { code: "VERSUS", role: "host" } } });
+    connectMock.mockResolvedValue({ runtime: true });
+
+    const c = new CoopLobbyController(
+      "Alice",
+      { onPlayers: vi.fn(), onConnecting: vi.fn(), onConnected: vi.fn(), onError: vi.fn() },
+      {
+        connect: connectMock,
+        netcodeMode: "lockstep",
+        sessionKind: "versus",
+      },
+    );
+    await c.start();
+
+    expect(connectMock).toHaveBeenCalledWith("VERSUS", "host", {
+      username: "Alice",
+      netcodeMode: "lockstep",
+      kind: "versus",
+    });
+    c.cancel();
+  });
+
   it("renders players when announce has no pairing, then connects on a polled pairing", async () => {
     vi.useFakeTimers();
     let phase = 0;

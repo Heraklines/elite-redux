@@ -1195,6 +1195,7 @@ export class TitlePhase extends Phase {
       });
     };
 
+    // biome-ignore format: keep the long callback table readable while passing pre-connect session axes.
     controller = new CoopLobbyController(username, {
       onPlayers: players => {
         const visiblePlayers =
@@ -1284,20 +1285,12 @@ export class TitlePhase extends Phase {
         flowGeneration = sessionGeneration;
         const isCurrentSession = (): boolean =>
           !lobbyTerminated && !lobbyCompleted && this.isExactCoopSession(runtime, controller, sessionGeneration);
-        // Versus launches no longer broadcast a runConfig, so BOTH clients must pin the mode selected
-        // by their title route before entering the battle flow. All Showdown matches, including
-        // scheduled tournament matches, run the same dual-engine lockstep path. Co-op's host remains
-        // the config authority for co-op sessions.
-        if (sessionKind === "versus" || runtime.controller.role === "host") {
-          runtime.controller.setNetcodeMode(netcodeMode);
+        // These axes shape the opening capability offer, so setting them after onConnected is too late:
+        // the hello has already been sent. Fail closed if a connector ever constructs the wrong runtime.
+        if (controller.netcodeMode !== netcodeMode || controller.sessionKind !== sessionKind) {
+          terminalFailure("The paired session opened with the wrong gameplay mode. Reconnect and try again.");
+          return;
         }
-        // Showdown 1v1 (staging fix 2026-07-07): pin the session kind on BOTH roles. Both clients
-        // entered this lobby through the same menu entry, so the kind is local knowledge. The old
-        // host-only pin relied on broadcastRunConfig to carry it to the guest - that broadcast was
-        // removed with the deferred run launch (B7 item 11), which silently left the GUEST on
-        // "coop" and disabled every versus gate (perspective flip, showdown command menu, pure-
-        // renderer divert): the guest then ran a full live engine on the host's snapshot.
-        runtime.controller.setSessionKind(sessionKind);
         // The data channel is open, but peer identity and the functional-build fingerprint may
         // still be in flight. Resume discovery is pair-keyed and then deserializes a full save,
         // so hold both clients until the complete compatibility contract has settled.
@@ -1767,7 +1760,7 @@ export class TitlePhase extends Phase {
           terminalFailure(`${tournamentConstraint == null ? "Co-op" : "Tournament lobby"} error:\n${e}`);
         }
       },
-    });
+    }, { netcodeMode, sessionKind });
 
     // Enter the lobby: clear the mode menu and show the stage while we announce.
     globalScene.ui.setMode(UiMode.MESSAGE);

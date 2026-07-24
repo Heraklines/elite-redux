@@ -585,6 +585,44 @@ describe("authenticated P33 browser client", () => {
     expect(urls.some(url => /\/coop\/lobby(?!\/announce)/u.test(url))).toBe(false);
   });
 
+  it("carries Showdown lockstep axes through the authenticated P33 connector seam", async () => {
+    const dependencies = baseDependencies(async () =>
+      response({
+        presenceId: credential.presenceId,
+        pairingToken: credential.pairingToken,
+        identity,
+        pairing: pairing(),
+      }),
+    );
+    const connectP33 = vi.fn().mockResolvedValue({});
+    const onConnected = vi.fn();
+    const controller = new CoopLobbyController(
+      identity.displayName,
+      { onPlayers: vi.fn(), onConnecting: vi.fn(), onConnected, onError: vi.fn() },
+      {
+        protocol: "p33",
+        p33Dependencies: dependencies,
+        connectP33,
+        netcodeMode: "lockstep",
+        sessionKind: "versus",
+      },
+    );
+
+    await controller.start();
+
+    expect(connectP33).toHaveBeenCalledWith(
+      expect.objectContaining({ presenceId: credential.presenceId, pairingToken: credential.pairingToken }),
+      expect.objectContaining({ pairingId: "PAIR33", transportRole: "answerer" }),
+      {
+        p33Dependencies: dependencies,
+        netcodeMode: "lockstep",
+        kind: "versus",
+      },
+    );
+    expect(onConnected).toHaveBeenCalledTimes(1);
+    controller.cancel();
+  });
+
   it("keeps polling after a stale P33 Accept race instead of treating 409 as credential loss", async () => {
     vi.useFakeTimers();
     let polls = 0;
