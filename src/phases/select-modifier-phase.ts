@@ -171,6 +171,8 @@ function coopCheckOpName(op: number): string {
  *  (which would land the watcher in the next wave while the owner is still shopping = desync). */
 const COOP_REWARD_WAIT_MS = 1_200_000;
 
+type CoopRewardWaitDisposition = "continue" | "end";
+
 /**
  * Co-op (#633 / #828): inside an AUTHORITATIVE mystery encounter the embedded reward shop's two
  * authorities SPLIT (they coincide for every normal wave shop, so this is null outside an ME):
@@ -1811,23 +1813,25 @@ export class SelectModifierPhase extends BattlePhase {
       : durability!.waitForOperationMaterialApplied(operationId);
     void peerMaterialApplied
       .then(applied => {
-        if (!applied) {
-          this.coopAwaitingMaterialResults.delete(operationId);
-          if (coopSessionGeneration() === generation && getCoopRuntime() === runtime) {
-            failCoopSharedSession(`Reward terminal ${operationId} exhausted before peer material apply`);
+        runWhenCoopRuntimeActive(runtime, () => {
+          if (!applied) {
+            this.coopAwaitingMaterialResults.delete(operationId);
+            if (coopSessionGeneration() === generation && getCoopRuntime() === runtime) {
+              failCoopSharedSession(`Reward terminal ${operationId} exhausted before peer material apply`);
+            }
+            return;
           }
-          return;
-        }
-        runWhenCoopRuntimeActive(runtime, () =>
-          this.coopFinishTerminalAfterMaterialApplied(operationId, runtime, generation),
-        );
+          this.coopFinishTerminalAfterMaterialApplied(operationId, runtime, generation);
+        });
       })
       .catch(error => {
-        this.coopAwaitingMaterialResults.delete(operationId);
-        coopWarn("reward", `Reward terminal ${operationId} material barrier rejected`, error);
-        if (coopSessionGeneration() === generation && getCoopRuntime() === runtime) {
-          failCoopSharedSession(`Reward terminal ${operationId} material barrier failed`);
-        }
+        runWhenCoopRuntimeActive(runtime, () => {
+          this.coopAwaitingMaterialResults.delete(operationId);
+          coopWarn("reward", `Reward terminal ${operationId} material barrier rejected`, error);
+          if (coopSessionGeneration() === generation && getCoopRuntime() === runtime) {
+            failCoopSharedSession(`Reward terminal ${operationId} material barrier failed`);
+          }
+        });
       });
   }
 
@@ -1857,6 +1861,48 @@ export class SelectModifierPhase extends BattlePhase {
     this.coopAdvanceInteraction();
   }
 
+  /** Apply one guest-owned authoritative result only after its phase runtime has been restored. */
+  private coopApplyGuestAuthoritativeResult(
+    operationId: string,
+    action: CoopInteractionChoice | null,
+  ): CoopRewardWaitDisposition {
+    if (!this.coopShopSceneAlive("guest result apply")) {
+      return "end";
+    }
+    if (action == null) {
+      getCoopRuntime()?.durability?.reconnect();
+      failCoopSharedSession(`Reward result ${operationId} was not recovered`);
+      return "end";
+    }
+    const terminal = isCoopRewardActionTerminal("reward", action.kind, action.choice, action.data);
+    const decision = adoptRewardWatcherChoice(
+      {
+        surface: "reward",
+        rewardSurface: this.coopRewardSurface,
+        pinned: this.coopInteractionStart,
+        action: {
+          choice: action.choice,
+          data: action.data,
+          operationId: action.operationId,
+          rewardSurface: action.rewardSurface,
+        },
+        terminal,
+        localRole: "guest",
+        wave: this.coopRewardWave(),
+        turn: this.coopRewardTurn(),
+      },
+      this.coopRewardOperationBinding,
+    );
+    if (!decision.adopt && decision.reason === "reward-surface-mismatch") {
+      failCoopSharedSession(`Reward result ${operationId} targeted a different ordered surface`);
+      return "end";
+    }
+    if (!decision.adopt || decision.operationId !== operationId || decision.authoritativeProjection !== true) {
+      return "continue";
+    }
+    return this.applyRelayedRewardAction(action, decision) ? "end" : "continue";
+  }
+
   /** GUEST intent owner: remain parked until the retained host result has applied, then project its UI tail. */
   private coopAwaitAuthoritativeResult(operationId: string): void {
     if (this.coopAwaitingAuthorityResults.has(operationId)) {
@@ -1880,38 +1926,10 @@ export class SelectModifierPhase extends BattlePhase {
             COOP_REWARD_CHOICE_KINDS,
             this.coopRewardSurface ?? null,
           );
-          if (action == null) {
-            getCoopRuntime()?.durability?.reconnect();
-            failCoopSharedSession(`Reward result ${operationId} was not recovered`);
-            return;
-          }
-          const terminal = isCoopRewardActionTerminal("reward", action.kind, action.choice, action.data);
-          const decision = adoptRewardWatcherChoice(
-            {
-              surface: "reward",
-              rewardSurface: this.coopRewardSurface,
-              pinned: this.coopInteractionStart,
-              action: {
-                choice: action.choice,
-                data: action.data,
-                operationId: action.operationId,
-                rewardSurface: action.rewardSurface,
-              },
-              terminal,
-              localRole: "guest",
-              wave: this.coopRewardWave(),
-              turn: this.coopRewardTurn(),
-            },
-            this.coopRewardOperationBinding,
+          const disposition = await this.coopResumeOnOwningRuntimeAsync(() =>
+            this.coopApplyGuestAuthoritativeResult(operationId, action),
           );
-          if (!decision.adopt && decision.reason === "reward-surface-mismatch") {
-            failCoopSharedSession(`Reward result ${operationId} targeted a different ordered surface`);
-            return;
-          }
-          if (!decision.adopt || decision.operationId !== operationId || decision.authoritativeProjection !== true) {
-            continue;
-          }
-          if (this.applyRelayedRewardAction(action, decision)) {
+          if (disposition !== "continue") {
             return;
           }
         }
@@ -1980,37 +1998,45 @@ export class SelectModifierPhase extends BattlePhase {
         COOP_REWARD_WAIT_MS,
         this.coopRewardSurface,
       );
-      if (serialized == null) {
-        coopWarn(
-          "reward",
-          `WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=${this.typeOptions.length})`,
+      const adopted = await this.coopResumeOnOwningRuntimeAsync(() => {
+        if (!this.coopShopSceneAlive("authoritative options apply")) {
+          return false;
+        }
+        if (serialized == null) {
+          coopWarn(
+            "reward",
+            `WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=${this.typeOptions.length})`,
+          );
+          this.coopShowAuthoritativeOptionsUnavailable();
+          return false;
+        }
+        const rebuilt = reconstructRewardOptions(serialized, globalScene.getPlayerParty());
+        if (rebuilt == null) {
+          coopWarn("reward", "WATCHER could not reconstruct owner's options -> FAIL CLOSED; local roll suppressed");
+          this.coopShowAuthoritativeOptionsUnavailable();
+          return false;
+        }
+        const operationId = relay.consumeCommittedRewardOptionsOperationId(
+          this.coopInteractionStart,
+          this.rerollCount,
+          this.coopRewardSurface,
         );
-        this.coopShowAuthoritativeOptionsUnavailable();
-        return false;
-      }
-      const rebuilt = reconstructRewardOptions(serialized, globalScene.getPlayerParty());
-      if (rebuilt == null) {
-        coopWarn("reward", "WATCHER could not reconstruct owner's options -> FAIL CLOSED; local roll suppressed");
-        this.coopShowAuthoritativeOptionsUnavailable();
-        return false;
-      }
-      const operationId = relay.consumeCommittedRewardOptionsOperationId(
-        this.coopInteractionStart,
-        this.rerollCount,
-        this.coopRewardSurface,
-      );
-      if (operationId != null) {
-        this.coopV2ControlOperationId = operationId;
-      }
-      coopLog(
-        "reward",
-        `WATCHER ADOPTED owner reward options (was=${this.typeOptions.length} now=${rebuilt.length} ids=[${serialized.map(o => o.id).join(",")}])`,
-      );
-      this.typeOptions = rebuilt;
-      return true;
+        if (operationId != null) {
+          this.coopV2ControlOperationId = operationId;
+        }
+        coopLog(
+          "reward",
+          `WATCHER ADOPTED owner reward options (was=${this.typeOptions.length} now=${rebuilt.length} ids=[${serialized.map(o => o.id).join(",")}])`,
+        );
+        this.typeOptions = rebuilt;
+        return true;
+      });
+      return adopted === true;
     } catch (e) {
-      coopWarn("reward", "WATCHER authoritative option adoption threw -> FAIL CLOSED", e);
-      this.coopShowAuthoritativeOptionsUnavailable();
+      await this.coopResumeOnOwningRuntimeAsync(() => {
+        coopWarn("reward", "WATCHER authoritative option adoption threw -> FAIL CLOSED", e);
+        this.coopShowAuthoritativeOptionsUnavailable();
+      });
       return false;
     }
   }
@@ -2169,6 +2195,28 @@ export class SelectModifierPhase extends BattlePhase {
     });
   }
 
+  /** Awaitable form for post-network continuations that return a loop disposition under the owning runtime. */
+  private coopResumeOnOwningRuntimeAsync<T>(callback: () => T | PromiseLike<T>): Promise<T | null> {
+    const runtime = this.coopOwningRuntime;
+    if (runtime == null) {
+      return Promise.resolve().then(callback);
+    }
+    return new Promise<T | null>((resolve, reject) => {
+      runWhenCoopRuntimeActive(runtime, () => {
+        if (globalScene !== this.coopOwningScene) {
+          coopWarn("reward", "stale shop continuation DROPPED: owning runtime was rebound to another scene");
+          resolve(null);
+          return;
+        }
+        try {
+          Promise.resolve(callback()).then(resolve, reject);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+  }
+
   /**
    * #872/P33: is this exact shop phase still entitled to touch its owning screen after an async wait?
    * A parked continuation can resolve after teardown OR after a later battle replaced it. Inspect the
@@ -2324,13 +2372,66 @@ export class SelectModifierPhase extends BattlePhase {
     if (!(await this.coopAdoptOwnerRewardOptions())) {
       return;
     }
-    // #872: the adopt wait can also outlive the scene (see coopShopSceneAlive).
-    if (!this.coopShopSceneAlive("owner adopt-options open")) {
-      return;
+    await this.coopResumeOnOwningRuntimeAsync(() => {
+      // #872: the adopt wait can also outlive the scene (see coopShopSceneAlive).
+      if (!this.coopShopSceneAlive("owner adopt-options open")) {
+        return;
+      }
+      this.resetModifierSelect(modifierSelectCallback);
+      // Co-op (#633): relay our cursor so the partner (the pick watcher) mirrors it live.
+      this.coopBeginMirror("owner");
+    });
+  }
+
+  /** Apply one watcher relay only after restoring the exact phase-owned runtime and scene. */
+  private coopApplyWatcherAction(
+    seq: number,
+    localRole: "host" | "guest",
+    action: CoopInteractionChoice | null,
+  ): CoopRewardWaitDisposition {
+    if (!this.coopShopSceneAlive("watcher result apply")) {
+      return "end";
     }
-    this.resetModifierSelect(modifierSelectCallback);
-    // Co-op (#633): relay our cursor so the partner (the pick watcher) mirrors it live.
-    this.coopBeginMirror("owner");
+    if (action == null) {
+      coopLog("reward", "WATCHER timed out waiting for partner -> leaving reward screen");
+      this.coopEndMirror();
+      void globalScene.ui.setMode(UiMode.MESSAGE);
+      super.end();
+      this.coopAdvanceInteraction();
+      return "end";
+    }
+    // Wave-2d: gate adoption through the authoritative operation primitive (idempotent by operationId,
+    // stale-/late-rejecting a pick from an earlier interaction or after this one left - the #861 shape).
+    const decision = adoptRewardWatcherChoice(
+      {
+        surface: "reward",
+        rewardSurface: this.coopRewardSurface,
+        pinned: this.coopInteractionStart,
+        action: {
+          choice: action.choice,
+          data: action.data,
+          operationId: action.operationId,
+          rewardSurface: action.rewardSurface,
+        },
+        terminal: isCoopRewardActionTerminal("reward", action.kind, action.choice, action.data),
+        localRole,
+        wave: this.coopRewardWave(),
+        turn: this.coopRewardTurn(),
+      },
+      this.coopRewardOperationBinding,
+    );
+    if (!decision.adopt) {
+      if (decision.reason === "reward-surface-mismatch") {
+        failCoopSharedSession(`Reward interaction ${seq} targeted a different ordered surface`);
+        return "end";
+      }
+      coopWarn(
+        "reward",
+        `WATCHER op-gate rejected relayed action (${decision.reason}) seq=${seq} choice=${action.choice} - keep awaiting terminal (Wave-2d)`,
+      );
+      return "continue";
+    }
+    return this.applyRelayedRewardAction(action, decision) ? "end" : "continue";
   }
 
   /** WATCHER: open the SAME reward screen the owner drives (read-only, cursor-mirrored) and
@@ -2368,16 +2469,35 @@ export class SelectModifierPhase extends BattlePhase {
     // AUTHORITATIVE outcome is the relayed action loop below. The watcher's apply path never
     // touches this handler (all `!coopWatcher` guarded), so the open screen is purely a
     // cosmetic, cursor-mirrored projection.
-    await globalScene.ui.setMode(
-      UiMode.MODIFIER_SELECT,
-      this.isPlayer(),
-      this.typeOptions,
-      () => false,
-      this.getRerollCost(globalScene.lockModifierTiers),
-    );
-    // Watchers open the same real surface through a separate async path from resetModifierSelect.
-    this.notifyCoopContinuationSurfaceReady();
-    this.coopBeginMirror("watcher");
+    const opened = await this.coopResumeOnOwningRuntimeAsync(() => {
+      if (!this.coopShopSceneAlive("watcher screen open")) {
+        return false;
+      }
+      return globalScene.ui
+        .setMode(
+          UiMode.MODIFIER_SELECT,
+          this.isPlayer(),
+          this.typeOptions,
+          () => false,
+          this.getRerollCost(globalScene.lockModifierTiers),
+        )
+        .then(() => true);
+    });
+    if (opened !== true) {
+      return;
+    }
+    const ready = await this.coopResumeOnOwningRuntimeAsync(() => {
+      if (!this.coopShopSceneAlive("watcher screen ready")) {
+        return false;
+      }
+      // Watchers open the same real surface through a separate async path from resetModifierSelect.
+      this.notifyCoopContinuationSurfaceReady();
+      this.coopBeginMirror("watcher");
+      return true;
+    });
+    if (ready !== true) {
+      return;
+    }
     // Await on the PINNED interaction counter (#633), matching the owner's pinned send seq.
     // Reading the live counter here would let an inbound reconcile broadcast (which can bump
     // it mid-interaction) move our await seq off the owner's send seq -> we'd stop receiving
@@ -2391,47 +2511,10 @@ export class SelectModifierPhase extends BattlePhase {
         COOP_REWARD_CHOICE_KINDS,
         this.coopRewardSurface ?? null,
       );
-      if (action == null) {
-        coopLog("reward", "WATCHER timed out waiting for partner -> leaving reward screen");
-        this.coopEndMirror();
-        globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
-        this.coopAdvanceInteraction();
-        return;
-      }
-      // Wave-2d: gate adoption through the authoritative operation primitive (idempotent by operationId,
-      // stale-/late-rejecting a pick from an earlier interaction or after this one left - the #861 shape).
-      // When the flag is OFF this passes through verbatim (legacy). A reject IGNORES the action + keeps
-      // awaiting the authoritative terminal, exactly like the existing #854 out-of-range guard.
-      const decision = adoptRewardWatcherChoice(
-        {
-          surface: "reward",
-          rewardSurface: this.coopRewardSurface,
-          pinned: this.coopInteractionStart,
-          action: {
-            choice: action.choice,
-            data: action.data,
-            operationId: action.operationId,
-            rewardSurface: action.rewardSurface,
-          },
-          terminal: isCoopRewardActionTerminal("reward", action.kind, action.choice, action.data),
-          localRole: controller.role,
-          wave: this.coopRewardWave(),
-          turn: this.coopRewardTurn(),
-        },
-        this.coopRewardOperationBinding,
+      const disposition = await this.coopResumeOnOwningRuntimeAsync(() =>
+        this.coopApplyWatcherAction(seq, controller.role, action),
       );
-      if (!decision.adopt) {
-        if (decision.reason === "reward-surface-mismatch") {
-          failCoopSharedSession(`Reward interaction ${seq} targeted a different ordered surface`);
-          return;
-        }
-        coopWarn(
-          "reward",
-          `WATCHER op-gate rejected relayed action (${decision.reason}) seq=${seq} choice=${action.choice} - keep awaiting terminal (Wave-2d)`,
-        );
-        continue;
-      }
-      if (this.applyRelayedRewardAction(action, decision)) {
+      if (disposition !== "continue") {
         return;
       }
     }

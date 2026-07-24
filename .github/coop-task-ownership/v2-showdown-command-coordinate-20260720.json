@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "3291c3a24c7f8d9827008ad411e459f4155f50b0",
+  "baseSha": "d5349198e072651317365eb5fe54477404034625",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -52,6 +52,7 @@
     "src/phases/er-custom-trainer-install.ts",
     "src/phases/init-encounter-phase.ts",
     "src/phases/move-phase.ts",
+    "src/phases/select-modifier-phase.ts",
     "src/phases/show-ability-phase.ts",
     "src/phases/stat-stage-change-phase.ts",
     "src/phases/summon-phase.ts",

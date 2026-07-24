@@ -2432,3 +2432,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   controls instead of calling captured callbacks or asserting suppressed legacy echoes. The two LEG2 Mystery
   variants likewise submit through the retained public helper rather than manually constructing raw relay
   traffic. Local Biome and diff checks are clean; the branch-focused remote matrix owns runtime verification.
+
+# 2026-07-24 - Reward results resume under their phase-owned runtime
+
+- Audit and B3 fault evidence identified a product ownership race after a guest-owned reward proposal: the
+  host watcher decoded the terminal action after an asynchronous relay wait, but ambient runtime state could
+  belong to the guest when it decided whether to commit. Proposal retention/deduplication then worked while
+  the one authoritative result was silently never created.
+- Reward option adoption, owner-screen reopening, watcher result application, guest result projection, and
+  both material-barrier outcomes now re-enter the runtime and scene captured by the exact reward phase. A
+  rebound scene or replaced phase is dropped explicitly; no post-network continuation may rediscover its
+  authority from the other in-process client or a replacement session.
+- Exact-SHA focused run `30058835013` on the preceding tip kept static, A1, and its selected Showdown shard
+  green. It reduced B1 to five independently classified migration failures; B5 now names six Mystery fixture
+  failures plus four reward sub-picker terminals, and P1 isolates one legacy transition driver parked in
+  `CoopReplayTurnPhase`. These remain red and are not being treated as release evidence.
