@@ -1516,11 +1516,11 @@ export class InverseRoomTag extends RoomArenaTag {
   }
 
   protected override get onAddMessageKey(): string {
-    return ""; // no locale message — cosmetic text omitted, effect is faithful
+    return "arenaTag:inverseRoomOnAdd";
   }
 
   protected override get onRemoveMessageKey(): string {
-    return "";
+    return "arenaTag:inverseRoomOnRemove";
   }
 }
 

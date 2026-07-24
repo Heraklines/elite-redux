@@ -11211,6 +11211,29 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Xatu Inversion clarity",
+    description:
+      "Xatu can have Inversion, which sets Inverse Room on entry for 3 turns.\n"
+      + "Use Knock Off. Dark is normally super-effective against Xatu, but Inverse\n"
+      + "Room reverses the matchup, so the hit is not very effective.\n"
+      + "EXPECT: explicit text says type matchups were reversed; after 3 turns, text\n"
+      + "says they returned to normal. This is Xatu's intended ability, not a type bug.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.XATU,
+        ENEMY_ABILITY_OVERRIDE: erAbility(ErAbilityId.INVERSION),
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.WEAVILE, {
+          moveset: [MoveId.KNOCK_OFF, MoveId.SPLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Restraining Order / Gooschase (#452)",
     description:
       "#452 - Restraining Order (Gooschase line): 'Forces the ATTACKER out when hit,\n"

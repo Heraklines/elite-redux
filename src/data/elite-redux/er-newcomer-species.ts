@@ -48,6 +48,7 @@
 // =============================================================================
 
 import { speciesEggTiers } from "#balance/species-egg-tiers";
+import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import {
   EvoCondKey,
@@ -1101,7 +1102,26 @@ export function applyErNewcomerSpeciesLearnsets(): number {
     wired++;
   }
 
+  // Webbed Bruiser is the standalone past-paradox counterpart to Ariados. It
+  // intentionally has no evolution edge to inherit data through, so copy the
+  // finalized Ariados level-up table explicitly.
+  table[ER_WEBBED_BRUISER_SPECIES_ID] = cloneLearnset(SpeciesId.ARIADOS);
+  wired++;
+
   return wired;
+}
+
+/**
+ * Give Webbed Bruiser the Spinarak family's finalized ER egg moves. This must
+ * run after `initEliteReduxEggMoves()`, which replaces Spinarak's vanilla list.
+ */
+export function applyErNewcomerSpeciesEggMoves(): number {
+  const source = speciesEggMoves[SpeciesId.SPINARAK] ?? [];
+  if (source.length === 0) {
+    return 0;
+  }
+  (speciesEggMoves as Record<number, MoveId[]>)[ER_WEBBED_BRUISER_SPECIES_ID] = [...source];
+  return 1;
 }
 
 /**
@@ -1229,6 +1249,11 @@ export function applyErNewcomerSpeciesTmCompatibility(): number {
   for (const mv of REGITUBE_TM_MOVES) {
     addTm(ER_REGITUBE_SPECIES_ID, mv);
   }
+  wired++;
+
+  // Like its level-up table, Webbed Bruiser's TM compatibility follows
+  // Ariados. Standalone species do not inherit this automatically.
+  inheritFrom(ER_WEBBED_BRUISER_SPECIES_ID, SpeciesId.ARIADOS);
   wired++;
 
   // Seed each partner evolution from its corresponding vanilla evolution before

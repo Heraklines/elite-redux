@@ -1338,6 +1338,12 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             this.blockInput = true;
 
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
+              if (this.levelMoves.length === 0) {
+                ui.showText(i18next.t("pokedexUiHandler:noLevelMoves"));
+                this.blockInput = false;
+                return true;
+              }
+
               ui.showText(i18next.t("pokedexUiHandler:showLevelMoves"), null, () => {
                 this.moveInfoOverlay.show(allMoves[this.levelMoves[0][1]]);
 

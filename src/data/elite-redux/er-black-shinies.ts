@@ -165,6 +165,11 @@ function drawDistinctFromPool(count: number, exclude: ReadonlySet<number> = new 
  * Idempotent.
  */
 export function applyErBlackShinyKit(pokemon: Pokemon): void {
+  // The gift flag and the visual shiny state are one invariant. Keeping this
+  // here prevents later pipelines (notably challenge starter modification)
+  // from leaving a Black-gift mon rendered as an ordinary/red shiny.
+  pokemon.shiny = true;
+  pokemon.variant = 2;
   const data = pokemon.customPokemonData;
   if (data.erBlackShiny) {
     return;

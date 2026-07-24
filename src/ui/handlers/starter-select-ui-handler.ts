@@ -1908,13 +1908,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
 
     if (starterAttributes.tera !== undefined) {
+      const teraForm = getPokemonSpeciesForm(species.speciesId, starterAttributes.form ?? 0);
+      const legalTeraTypes = speciesFormTypes(teraForm);
       // If somehow we have an illegal tera type, it is reset here
-      if (!(starterAttributes.tera === species.type1 || starterAttributes.tera === species?.type2)) {
-        starterAttributes.tera = species.type1;
+      if (!legalTeraTypes.includes(starterAttributes.tera)) {
+        starterAttributes.tera = teraForm.type1;
       }
       // In fresh start challenge, the tera type is always reset to the first one
       if (globalScene.gameMode.hasChallenge(Challenges.FRESH_START) && !ignoreChallenge) {
-        starterAttributes.tera = species.type1;
+        starterAttributes.tera = teraForm.type1;
       }
     }
 
@@ -3702,19 +3704,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           case Button.CYCLE_TERA:
             if (this.canCycleTera) {
               const speciesForm = getPokemonSpeciesForm(this.lastSpecies.speciesId, starterAttributes.form ?? 0);
-              if (speciesForm.type1 === this.teraCursor && speciesForm.type2 != null) {
-                starterAttributes.tera = speciesForm.type2;
-                originalStarterAttributes.tera = starterAttributes.tera;
-                this.setSpeciesDetails(this.lastSpecies, {
-                  teraType: speciesForm.type2,
-                });
-              } else {
-                starterAttributes.tera = speciesForm.type1;
-                originalStarterAttributes.tera = starterAttributes.tera;
-                this.setSpeciesDetails(this.lastSpecies, {
-                  teraType: speciesForm.type1,
-                });
-              }
+              const teraTypes = speciesFormTypes(speciesForm);
+              const currentIndex = teraTypes.indexOf(this.teraCursor);
+              const nextType = teraTypes[(currentIndex + 1) % teraTypes.length] ?? speciesForm.type1;
+              starterAttributes.tera = nextType;
+              originalStarterAttributes.tera = nextType;
+              this.setSpeciesDetails(this.lastSpecies, { teraType: nextType });
               success = true;
             }
             break;
@@ -6808,7 +6803,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         this.canCycleTera =
           !this.statsMode
           && this.allowTera
-          && getPokemonSpeciesForm(species.speciesId, formIndex ?? 0).type2 != null
+          && speciesFormTypes(getPokemonSpeciesForm(species.speciesId, formIndex ?? 0)).length > 1
           && !globalScene.gameMode.hasChallenge(Challenges.FRESH_START);
       }
 
@@ -7761,7 +7756,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.canCycleTera =
         !this.statsMode
         && this.allowTera
-        && getPokemonSpeciesForm(this.lastSpecies.speciesId, formIndex ?? 0).type2 != null
+        && speciesFormTypes(getPokemonSpeciesForm(this.lastSpecies.speciesId, formIndex ?? 0)).length > 1
         && !globalScene.gameMode.hasChallenge(Challenges.FRESH_START);
       this.updateInstructions();
       this.pokemonSprite.setPipelineData("previewStateKey", "");

@@ -124,5 +124,7 @@
   "grassWaterPledgeOnRemoveEnemy": "The swamp around the opposing team disappeared!",
   "fairyLockOnAdd": "No one will be able to run away during the next turn!",
   "neutralizingGasOnAdd": "{{pokemonNameWithAffix}}’s Neutralizing Gas filled the area!",
-  "neutralizingGasOnRemove": "The effects of the neutralizing gas wore off!"
+  "neutralizingGasOnRemove": "The effects of the neutralizing gas wore off!",
+  "inverseRoomOnAdd": "Inverse Room reversed\ntype matchups!",
+  "inverseRoomOnRemove": "Inverse Room wore off!\nType matchups returned to normal."
 }

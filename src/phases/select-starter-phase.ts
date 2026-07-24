@@ -851,6 +851,13 @@ export class SelectStarterPhase extends Phase {
         }
       }
       const chalApplied = applyChallenges(ChallengeType.STARTER_MODIFY, starterPokemon);
+      // Challenge modifiers run after the initial Black kit application. Full
+      // Reset deliberately clears ordinary shiny state, but a selected Black
+      // starter must remain a coherent t4 instance in every mode.
+      if (starter.erBlackShiny) {
+        applyErBlackShinyKit(starterPokemon);
+        starterPokemon.luck = ER_BLACK_SHINY_LUCK;
+      }
       party.push(starterPokemon);
       if (chalApplied) {
         // If any challenges modified the starter, it should update

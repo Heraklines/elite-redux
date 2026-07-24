@@ -9,6 +9,7 @@ import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/comp
 import { registerErFinalBossFormChange } from "#data/elite-redux/er-final-boss";
 import { applyNewcomerLearnsetAdditions, injectNewcomerForms } from "#data/elite-redux/er-newcomer-forms";
 import {
+  applyErNewcomerSpeciesEggMoves,
   applyErNewcomerSpeciesLearnsets,
   applyErNewcomerSpeciesTmCompatibility,
   injectErNewcomerSpecies,
@@ -389,6 +390,8 @@ function initPhaseErTiersFinal(): void {
   console.info(
     `[er-egg-moves] applied egg-move table: ${eggMoveResult.added} new + ${eggMoveResult.alreadyPresent} overridden species (skipped ${eggMoveResult.skippedUnmapped} unmapped)`,
   );
+  const newcomerEggMoves = applyErNewcomerSpeciesEggMoves();
+  console.info(`[er-newcomer-species] wired egg moves for ${newcomerEggMoves} standalone newcomer species`);
 
   // Elite Redux: editor-created custom mons (er-custom-mons.json). Runs after
   // the egg-move pass so every balance table it writes exists; invalid entries
