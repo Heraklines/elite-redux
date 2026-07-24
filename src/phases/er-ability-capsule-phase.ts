@@ -142,8 +142,15 @@ export class ErAbilityCapsulePhase extends Phase {
         "ability",
         `capsule WATCHER-APPLIES-RELAYED seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name} (no local picker)`,
       );
-      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
-      void this.coopApplyRelayedOutcome(mon);
+      // The watcher inherits the reward screen that queued this phase. That old MODIFIER_SELECT handler is
+      // not proof of the ABILITY_PRESENT control, and announcing readiness against it leaves the immutable
+      // result parked behind an uninstalled presentation forever. Install the passive MESSAGE surface first,
+      // then retry the exact V2 claim against this phase/handler generation. The result waiter may arm in
+      // parallel: committed outcomes are buffered until this proof edge is crossed.
+      Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() =>
+        notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime),
+      );
+      this.coopApplyRelayedOutcome(mon);
       return;
     }
     if (this.coopSeq >= 0) {

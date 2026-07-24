@@ -1,0 +1,13 @@
+{
+  "taskId": "v2-passive-interaction-surfaces-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-passive-interaction-surfaces-20260724",
+  "trainRef": "ci/coop/v2-passive-interaction-surfaces-20260724",
+  "baseSha": "1ec7731d6052dbe4866466714e3c54c8c6aa7e7b",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-passive-interaction-surfaces-20260724.json",
+    "src/phases/er-ability-capsule-phase.ts",
+    "test/tests/elite-redux/coop/coop-duo-stormglass.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
