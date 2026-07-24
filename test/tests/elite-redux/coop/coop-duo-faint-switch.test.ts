@@ -294,7 +294,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     const materialBarrierSpy = vi.spyOn(hostDurability, "waitForOperationMaterialApplied");
     const unshiftSpy = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
     const v2CommittedBefore = hostTransportSendSpy.mock.calls.filter(
-      ([message]) => message.t === "authorityEntry" && message.entry.kind === "REPLACEMENT_COMMIT",
+      ([message]) => message.t === "authorityEntry" && message.body.kind === "REPLACEMENT_COMMIT",
     ).length;
     let hostAdvance: Promise<void> | undefined;
 
@@ -448,7 +448,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       if (V2_REPLACEMENT_CUTOVER) {
         expect(
           hostTransportSendSpy.mock.calls.filter(
-            ([message]) => message.t === "authorityEntry" && message.entry.kind === "REPLACEMENT_COMMIT",
+            ([message]) => message.t === "authorityEntry" && message.body.kind === "REPLACEMENT_COMMIT",
           ).length,
           "the host committed the staged fallback only after the post-summon carrier phase executed",
         ).toBeGreaterThan(v2CommittedBefore);

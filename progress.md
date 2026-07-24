@@ -3051,3 +3051,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   prove is executable. The graph is now `TURN -> REPLACEMENT`; after the final summon, the replacement
   adapter's existing terminal wait admits the retained WAVE_ADVANCE (or TERMINAL_COMMIT) at N/N+1. Surviving
   battles still receive their command frontier, and a won wave cannot open a phantom next-turn command.
+
+# 2026-07-24 - Faint evidence reads the canonical V2 wire body
+
+- Exact full-gate run `30100787579` found two compile-only failures in the migrated faint journey: its
+  replacement assertions inspected a nonexistent `entry` property on an `authorityEntry` envelope.
+- Both assertions now inspect the canonical `body.kind`. This changes no runtime behavior; it restores typed
+  evidence that the real post-summon carrier emitted a `REPLACEMENT_COMMIT` at the public replacement edge.
