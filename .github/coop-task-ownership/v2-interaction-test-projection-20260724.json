@@ -1,0 +1,13 @@
+{
+  "taskId": "v2-interaction-test-projection-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-interaction-test-projection-20260724",
+  "trainRef": "ci/coop/v2-interaction-test-projection-20260724",
+  "baseSha": "7dc81dbb18775b6a62d9308db7a386df54c44177",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-interaction-test-projection-20260724.json",
+    "test/tests/elite-redux/coop/coop-duo-exploration.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-stormglass.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}

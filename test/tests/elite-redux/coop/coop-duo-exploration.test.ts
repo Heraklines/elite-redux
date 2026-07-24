@@ -46,7 +46,6 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
-import { ErAbilityCapsulePhase } from "#phases/er-ability-capsule-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   beginRewardShopWatch,
@@ -302,24 +301,21 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         stubBattleInfo(mon);
       }
     });
-    // The REAL unshifted guest capsule phase mis-detects itself as OWNER here: production's
-    // coopAbilityPickerContext() reads the LIVE current SelectModifierPhase, but the harness's
-    // watcher shop is hand-constructed (never pm-current), so the context lookup misses and the
-    // phase opens the OWNER picker - whose invalid-pick path reopens forever under a scripted
-    // picker (the OOM this probe originally hit; harmless live, a human breaks the loop).
-    // Drive the WATCHER variant explicitly with the correct seq instead - the exact object
-    // production builds when the context lookup succeeds; the buffered relay outcome applies.
+    // Drive the exact Authority V2-projected watcher generation. The retired fixture removed that current
+    // phase and started a detached replacement object, so its handler could never prove the V2 control and
+    // the already-committed result remained a gap. Production starts the projected phase automatically;
+    // PhaseInterceptor deliberately suppresses that edge, so cross it once here and keep both inboxes live.
     const watcherDrove = await withClient(rig.guestCtx, async () => {
-      globalScene.phaseManager.tryRemovePhase("ErAbilityCapsulePhase");
-      const phase = new ErAbilityCapsulePhase(PARTNER_SLOT, guestShop.coopInteractionStart, true);
-      haltQueueAfterCurrent();
-      phase.start();
-      for (let i = 0; i < 12; i++) {
-        await drainLoopback();
-      }
-      return true;
+      const projected = await driveClientPhaseQueueTo(rig.guestScene, "projected Ability Capsule watcher", {
+        matches: phase => phase.phaseName === "ErAbilityCapsulePhase",
+        pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+      });
+      projected.start();
+      return projected.phaseName === "ErAbilityCapsulePhase";
     });
-    await pumpDuoDestinations(rig);
+    for (let i = 0; i < 80 && !guestTarget.customPokemonData.erRunUnlockedAbilitySlots.includes(unlockSlot); i++) {
+      await pumpDuoDestinations(rig, 1);
+    }
     expect(watcherDrove, "the watcher capsule phase ran (directly or via fallback)").toBe(true);
     expect(
       guestTarget.customPokemonData.erRunUnlockedAbilitySlots,
@@ -1083,6 +1079,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         realEndO();
       };
       expect(rig.hostScene.phaseManager.overridePhase(phase), "the owner Bargain is the real current phase").toBe(true);
+      // PhaseInterceptor suppresses PhaseManager's automatic start in engine tests. Start the exact current
+      // phase once; without this edge no BARGAIN_PRESENT exists and the guest correctly waits forever.
+      phase.start();
       await drainLoopback();
     });
     await withClient(rig.guestCtx, async () => {

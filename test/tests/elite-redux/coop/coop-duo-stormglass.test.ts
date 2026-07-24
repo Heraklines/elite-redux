@@ -21,6 +21,8 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   drainLoopback,
+  driveClientPhaseQueueTo,
+  pumpDuoDestinations,
   retireDuoInitialCommandForBoundaryTest,
   withClient,
   withClientSync,
@@ -127,7 +129,23 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
     await withClient(rig.guestCtx, async () => {
       vi.spyOn(globalScene.ui, "showText").mockImplementation(() => undefined);
       vi.spyOn(globalScene.ui, "setMode").mockResolvedValue(true as never);
-      await drainLoopback();
+      const projected = await driveClientPhaseQueueTo(rig.guestScene, "projected Stormglass watcher", {
+        matches: phase => phase.phaseName === "ErStormglassPickerPhase",
+        pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+      });
+      // Production starts the authoritative override synchronously. PhaseInterceptor suppresses that start
+      // in engine tests, so cross the same edge once instead of asserting before the watcher can sign control.
+      projected.start();
+    });
+    for (let i = 0; i < 80; i++) {
+      await pumpDuoDestinations(rig, 1);
+      const applied = withClientSync(rig.guestCtx, () => getStormglassWeather() === WeatherType.SANDSTORM);
+      if (applied) {
+        break;
+      }
+    }
+
+    await withClient(rig.guestCtx, async () => {
       expect(getStormglassWeather()).toBe(WeatherType.SANDSTORM);
       expect(globalScene.arena.weather?.weatherType).toBe(WeatherType.SANDSTORM);
       expect(globalScene.arena.weather?.turnsLeft).toBe(5);
