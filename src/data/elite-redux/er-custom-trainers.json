@@ -4156,7 +4156,7 @@
     "trainerEffect": "holyrays",
     "trainerSprite": "volo",
     "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70023": {
     "battleBgm": "battle_sinnoh_champion",
@@ -4323,6 +4323,6 @@
     "trainerEffect": "holyrays",
     "trainerSprite": "volo",
     "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
-    "weight": 100
+    "weight": 10
   }
 }
