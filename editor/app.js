@@ -1259,6 +1259,13 @@ function openCtrSpeciesDrop(input) {
     })
     .join("");
   drop.classList.toggle("open", matches.length > 0);
+  if (matches.length > 0) {
+    const inputRect = input.getBoundingClientRect();
+    const menuHeight = Math.min(280, drop.scrollHeight);
+    drop.classList.toggle("above", inputRect.bottom + menuHeight > window.innerHeight && inputRect.top > menuHeight);
+  } else {
+    drop.classList.remove("above");
+  }
 }
 
 function closeCtrSpeciesDrops() {
