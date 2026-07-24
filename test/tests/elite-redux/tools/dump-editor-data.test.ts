@@ -247,7 +247,8 @@ describe("tools — dump editor SPA data", () => {
       return {
         const: `${baseConst}__FORM_${def.formKey.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`,
         baseConst,
-        name: `${base.name} (${def.formName})`,
+        name: `${def.formName} ${base.name}`,
+        aliases: [`${base.name} ${def.formName}`, `${base.name} (${def.formName})`],
         slug: def.slug,
         id: def.baseSpecies,
         formIndex,
@@ -270,6 +271,10 @@ describe("tools — dump editor SPA data", () => {
       speciesForms.filter(form => !form.slug),
       "every newcomer form must expose its bespoke sprite slug",
     ).toEqual([]);
+    expect(speciesForms.find(form => form.slug === "jumpluff_mega")).toMatchObject({
+      name: "Mega Jumpluff",
+      aliases: ["Jumpluff Mega", "Jumpluff (Mega)"],
+    });
 
     // ---- items.json ---------------------------------------------------------
     const tierNames: ReadonlyArray<readonly [ModifierTier, string]> = [
