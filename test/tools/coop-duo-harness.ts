@@ -5265,9 +5265,10 @@ export async function replayCoopTrace(
 
   // ===== Flip to co-op + stand up the guest engine over one loopback pair (host owns EVEN interaction
   // counters, guest owns ODD - the production parity rule buildDuo wires). =====
-  const pair = opts.pairFactory?.() ?? createLoopbackPair();
+  const providedPair = opts.pairFactory?.();
+  const pair = providedPair ?? createLoopbackPair();
   const rig = await buildDuo(game as unknown as Parameters<typeof buildDuo>[0], pair, setCoopRuntime, replayToCoop);
-  pair.setAutomaticDelivery?.(false);
+  providedPair?.setAutomaticDelivery?.(false);
   if (checkpoint != null) {
     // `buildDuo` constructs a second scene while test overrides are live. Reassert the checkpoint on the
     // host afterward, then mirror that exact post-checkpoint state into the guest before any event replays.
@@ -5336,7 +5337,10 @@ export async function replayCoopTrace(
         await withClient(rig.hostCtx, () =>
           driveHostRewardShopOwner(hostShop, {
             takeReward,
-            partnerReady: () => withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop)),
+            partnerReady: () =>
+              withClient(rig.guestCtx, async () => {
+                await beginRewardShopWatch(guestShop);
+              }),
             partnerSettle: () =>
               withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true })),
           }),
@@ -5345,7 +5349,10 @@ export async function replayCoopTrace(
         await withClient(rig.guestCtx, () =>
           driveHostRewardShopOwner(guestShop, {
             takeReward,
-            partnerReady: () => withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop)),
+            partnerReady: () =>
+              withClient(rig.hostCtx, async () => {
+                await beginRewardShopWatch(hostShop);
+              }),
             partnerSettle: () =>
               withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true })),
           }),

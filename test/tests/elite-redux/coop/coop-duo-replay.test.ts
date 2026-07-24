@@ -370,7 +370,10 @@ describe.skipIf(!RUN)(
           await withClient(rig.hostCtx, () =>
             driveHostRewardShopOwner(hostShop, {
               takeReward,
-              partnerReady: () => withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop)),
+              partnerReady: () =>
+                withClient(rig.guestCtx, async () => {
+                  await beginRewardShopWatch(guestShop);
+                }),
               partnerSettle: () =>
                 withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true })),
             }),
@@ -379,7 +382,10 @@ describe.skipIf(!RUN)(
           await withClient(rig.guestCtx, () =>
             driveHostRewardShopOwner(guestShop, {
               takeReward: false,
-              partnerReady: () => withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop)),
+              partnerReady: () =>
+                withClient(rig.hostCtx, async () => {
+                  await beginRewardShopWatch(hostShop);
+                }),
               partnerSettle: () =>
                 withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true })),
             }),
