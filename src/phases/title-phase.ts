@@ -43,6 +43,13 @@ import {
   manifestToStarter,
   starterToManifest,
 } from "#data/elite-redux/showdown/showdown-manifest";
+import {
+  consumeQueuedShowdownReturnSlot,
+  getShowdownQueueStatus,
+  queueShowdownTeam,
+  restoreShowdownMatchmaking,
+  setShowdownMatchLaunchHandler,
+} from "#data/elite-redux/showdown/showdown-matchmaking";
 import { shouldAwaitShowdownLaunchSnapshot } from "#data/elite-redux/showdown/showdown-sync-launch";
 import { validateShowdownTeam } from "#data/elite-redux/showdown/showdown-team";
 import { buildTeamMenuPresetViews, runShowdownPresetBuild } from "#data/elite-redux/showdown/showdown-team-menu-flow";
@@ -139,6 +146,9 @@ export function showdownTournamentLaunchConfig(): {
 
 interface TournamentLobbyConstraint {
   expectedOpponent: string;
+  /** Accepted tournament offers pair automatically in a match-specific room, with no lobby UI. */
+  automatic?: boolean;
+  room?: string;
   /** true = still paired, false = changed, null = worker temporarily unavailable. */
   validate: () => Promise<boolean | null>;
   onLeave: () => void;
@@ -199,6 +209,23 @@ export class TitlePhase extends Phase {
     // and it never blocks the title. Only when logged in (the pending queue is per-account).
     if (loggedInUser != null) {
       void syncShowdownPendingSettlements(globalScene.gameData).catch(() => {});
+    }
+
+    restoreShowdownMatchmaking();
+    const launchQueuedMatch = setShowdownMatchLaunchHandler(launch => {
+      if (getCoopRuntime() !== launch.runtime) {
+        return;
+      }
+      setPendingShowdownPresetStarters(launch.mons.map(manifestToStarter));
+      this.launchGameMode(GameModes.SHOWDOWN);
+    });
+    const queuedReturnSlot = consumeQueuedShowdownReturnSlot();
+    if (queuedReturnSlot != null) {
+      await this.loadSaveSlot(queuedReturnSlot);
+      return;
+    }
+    if (launchQueuedMatch) {
+      return;
     }
 
     const lastSlot = await this.checkLastSaveSlot();
@@ -352,7 +379,7 @@ export class TitlePhase extends Phase {
                 showTemporarilyDisabled();
                 return true;
               }
-              this.openShowdownTeamMenu(setModeAndEnd, SHOWDOWN_NETCODE_MODE);
+              this.openShowdownTeamMenu();
               return true;
             },
           });
@@ -584,29 +611,26 @@ export class TitlePhase extends Phase {
   //     onLockIn opens the COMMUNITY_CHALLENGE_TEXT name modal (setOverlayMode, noTransition); its
   //     revertMode returns to the grid; settle()->showMenu()->setMode(SHOWDOWN_TEAM_MENU) clears the grid
   //     (getHandler()==grid) and shows the menu. Name-cancel takes the same terminal without saving.
-  //  TEAM MENU --("Enter lobby")--> versus pairing (leaves the offline graph); --(Exit)--> title
+  //  TEAM MENU --("Queue")--> background versus matchmaking; --(Exit)--> title
   //     (revertModes()+toTitleScreen()). Menu-internal overlays (rename text, delete/enter CONFIRM) all
   //     revert instantly back to the menu (lastMode noTransition).
   // ===========================================================================================
   /**
    * Showdown 1v1 (Team Menu, addendum): open the TEAM PRESET MENU - the new pre-pairing entry screen.
-   * Teams are built + selected here, BEFORE the lobby. The menu's callbacks:
-   *   - onEnterLobby: reconstruct the chosen preset's starters and stash them, then open the EXISTING
-   *     pairing lobby carrying the versus session (the pre-built team skips the in-lobby teambuild).
+   * Teams are built and selected before matchmaking. The menu queues the chosen preset and then
+   * returns to the title/run flow while the signaling controller searches in the background.
    *   - onCreate / onEdit: run the OFFLINE build (starter-select + editor, no session), then save.
    *   - onRename / onDelete: persist to the account save (the handler updates its own view live).
    *   - onExit: unwind back to the title.
    * Opened via the DEFERRED pattern (setMode(MESSAGE)+resetModeChain()+showText callback) so returning
    * true from the option handler cannot clobber the setMode - mirrors {@linkcode openProfileHub}.
    */
-  private openShowdownTeamMenu(
-    setModeAndEnd: (gameMode: GameModes) => void,
-    netcodeMode: CoopNetcodeMode = SHOWDOWN_NETCODE_MODE,
-  ): void {
+  private openShowdownTeamMenu(): void {
     const { gameData } = globalScene;
     const showMenu = (): void => {
       const config: ShowdownTeamMenuConfig = {
         presets: buildTeamMenuPresetViews(gameData),
+        queueStatus: getShowdownQueueStatus(),
         onExit: () => {
           void globalScene.ui.revertModes().then(() => {
             globalScene.phaseManager.toTitleScreen();
@@ -625,16 +649,21 @@ export class TitlePhase extends Phase {
         validateTeam: mons => validateShowdownTeam(mons, buildUnlockSnapshot(gameData), isMegaStage),
         // IMPORT save: persist the imported team as a new account-save preset (the handler appends its view).
         onImportSave: (name, mons) => gameData.saveShowdownTeamPreset(name, mons),
-        onEnterLobby: idx => {
+        onQueue: idx => {
           const preset = gameData.listShowdownTeamPresets()[idx];
           if (preset == null) {
             showMenu();
             return;
           }
-          // Reconstruct the engine starters from the saved wire manifests and stash them; the versus
-          // launch (SelectStarterPhase.startShowdownSelect) consumes them + skips the grid teambuild.
-          setPendingShowdownPresetStarters(preset.mons.map(manifestToStarter));
-          this.openCoopLobby(setModeAndEnd, netcodeMode, "versus", GameModes.SHOWDOWN);
+          if (!queueShowdownTeam(preset.name, preset.mons)) {
+            globalScene.ui.playError();
+            showMenu();
+            return;
+          }
+          void globalScene.ui.revertModes().then(() => {
+            globalScene.phaseManager.toTitleScreen();
+            super.end();
+          });
         },
       };
       // Inject the mobile/desktop native-keyboard bridge for the rename overlay (single-line) AND the
@@ -722,6 +751,8 @@ export class TitlePhase extends Phase {
         const launch = showdownTournamentLaunchConfig();
         this.openCoopLobby(setModeAndEnd, launch.netcodeMode, launch.sessionKind, launch.launchMode, {
           expectedOpponent: opponent,
+          automatic: true,
+          room: `tournament-${tournamentId}-${matchId}`.replace(/[^A-Za-z0-9_-]/gu, "_").slice(0, 64),
           validate: async () => {
             const current = await getTournamentBracket(tournamentId);
             if (!current.ok) {
@@ -959,6 +990,7 @@ export class TitlePhase extends Phase {
   ): void {
     const username = loggedInUser?.username ?? "Player";
     const expectedOpponent = tournamentConstraint?.expectedOpponent ?? null;
+    const automaticPairing = tournamentConstraint?.automatic === true;
     // #810 barrier: how long the GUEST waits for the host's Resume/New Game decision before
     // an anti-hang fallback to NEW GAME. Comfortably longer than the host's own 60s resume
     // offer timeout, so a slow-but-alive human host never trips it; only a dead peer does.
@@ -970,7 +1002,9 @@ export class TitlePhase extends Phase {
     let incoming: { id: string; name: string } | null = null;
     // The aesthetic stage (backdrop + two seat cards + status strip); the option
     // panel below is the INPUT. Torn down on every exit path.
-    const stage = new CoopLobbyStage(username, sessionKind === "versus" ? "showdown" : "coop");
+    const stage = automaticPairing
+      ? null
+      : new CoopLobbyStage(username, sessionKind === "versus" ? "showdown" : "coop");
     let lobbyTerminated = false;
     let lobbyCompleted = false;
     let flowRuntime: CoopRuntime | null = null;
@@ -1014,7 +1048,7 @@ export class TitlePhase extends Phase {
       }
       lobbyTerminated = true;
       stopConstraintPolling();
-      stage.destroy();
+      stage?.destroy();
       controller?.cancel();
       if (flowRuntime != null && flowController != null && flowGeneration != null) {
         this.clearExactCoopSession(flowRuntime, flowController, flowGeneration);
@@ -1047,6 +1081,9 @@ export class TitlePhase extends Phase {
     // state change REPLACES the panel rather than stacking a new one. An incoming
     // join request takes over the panel (Accept / Decline) until it is answered.
     const renderPanel = () => {
+      if (automaticPairing) {
+        return;
+      }
       const generation = ++panelGeneration;
       const opts: OptionSelectItem[] = [];
       let initialCursor = 0;
@@ -1068,8 +1105,8 @@ export class TitlePhase extends Phase {
             label: "Decline",
             handler: () => {
               incoming = null;
-              stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
-              stage.setStatus(
+              stage?.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
+              stage?.setStatus(
                 expectedOpponent == null
                   ? "Looking for other players..."
                   : `Waiting for ${expectedOpponent} to join this match lobby...`,
@@ -1135,7 +1172,7 @@ export class TitlePhase extends Phase {
               selectedLobbyOptionId = "cpu";
             },
             handler: () => {
-              stage.destroy();
+              stage?.destroy();
               controller?.cancel();
               startLocalCoopSession({ username, netcodeMode, kind: sessionKind });
               setModeAndEnd(launchMode);
@@ -1184,15 +1221,30 @@ export class TitlePhase extends Phase {
       });
     };
 
-    controller = new CoopLobbyController(username, {
-      onPlayers: players => {
-        const visiblePlayers =
-          expectedOpponent == null ? players : players.filter(player => player.name === expectedOpponent);
-        lastPlayers = visiblePlayers;
-        stage.setStatus(
-          incoming
-            ? `${incoming.name} wants to ${expectedOpponent == null ? "join your run" : "start the match"}!`
-            : controller?.isRequestPending()
+    controller = new CoopLobbyController(
+      username,
+      {
+        onPlayers: players => {
+          const visiblePlayers =
+            expectedOpponent == null ? players : players.filter(player => player.name === expectedOpponent);
+          lastPlayers = visiblePlayers;
+          if (automaticPairing) {
+            const target = visiblePlayers[0];
+            const self = controller?.ownPresenceId();
+            if (
+              target != null
+              && self != null
+              && self.localeCompare(target.id) < 0
+              && !controller?.isRequestPending()
+            ) {
+              void controller?.request(target.id, target.name);
+            }
+            return;
+          }
+          stage?.setStatus(
+            incoming
+              ? `${incoming.name} wants to ${expectedOpponent == null ? "join your run" : "start the match"}!`
+              : controller?.isRequestPending()
               ? "Waiting for their answer..."
               : visiblePlayers.length > 0
                 ? expectedOpponent == null
@@ -1213,54 +1265,60 @@ export class TitlePhase extends Phase {
       // Lobby v2: someone asked to join US - take over the panel with Accept/Decline.
       onRequest: from => {
         if (expectedOpponent != null && from.name !== expectedOpponent) {
-          void controller?.respond(false);
-          return;
-        }
-        lobbyActionRequiresReselection = false;
-        incoming = { id: from.id, name: from.name };
-        stage.setSeat(1, {
-          name: from.name,
-          detail: expectedOpponent == null ? "Wants to join!" : "Ready to battle!",
-          dot: "red",
-        });
-        stage.setStatus(`${from.name} wants to ${expectedOpponent == null ? "join your run" : "start the match"}!`);
-        renderPanel();
-      },
-      onRequestGone: () => {
-        incoming = null;
-        lobbyActionRequiresReselection = true;
-        stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
-        stage.setStatus(
-          expectedOpponent == null
-            ? "They withdrew. Looking for other players..."
-            : `They withdrew. Waiting for ${expectedOpponent}...`,
+            void controller?.respond(false);
+            return;
+          }
+          if (automaticPairing) {
+            void controller?.respond(true);
+            return;
+          }
+          lobbyActionRequiresReselection = false;
+          incoming = { id: from.id, name: from.name };
+          stage?.setSeat(1, {
+            name: from.name,
+            detail: expectedOpponent == null ? "Wants to join!" : "Ready to battle!",
+            dot: "red",
+          });
+          stage?.setStatus(`${from.name} wants to ${expectedOpponent == null ? "join your run" : "start the match"}!`);
+          renderPanel();
+        },
+        onRequestGone: () => {
+          incoming = null;
+          lobbyActionRequiresReselection = true;
+          stage?.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
+          stage?.setStatus(
+            expectedOpponent == null
+              ? "They withdrew. Looking for other players..."
+              : `They withdrew. Waiting for ${expectedOpponent}...`,
         );
-        renderPanel();
-      },
-      onRequestPending: targetName => {
-        stage.setSeat(1, { name: targetName, detail: "Asked to join", dot: "amber" });
-        stage.setStatus(`Request sent to ${targetName}. Waiting for their answer...`);
-      },
-      onDeclined: name => {
-        stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
-        stage.setStatus(
-          expectedOpponent == null ? `${name} declined. Pick another player.` : `${name} declined. You can try again.`,
-        );
-        renderPanel();
-      },
-      onTransientError: message => {
-        incoming = null;
-        lobbyActionRequiresReselection = true;
-        stage.setSeat(1, { name: null, detail: "Lobby changed", dot: "amber" });
-        stage.setStatus(`${message} Choose a player again.`);
-        renderPanel();
-      },
-      onConnecting: () => {
-        stage.setSeat(1, { name: null, detail: "Connecting...", dot: "amber" });
-        stage.setStatus(`Connecting to your ${expectedOpponent == null ? "partner" : "opponent"}...`);
-        globalScene.ui.setMode(UiMode.MESSAGE);
-        globalScene.ui.resetModeChain();
-        globalScene.ui.showText(`Connecting to your ${expectedOpponent == null ? "partner" : "opponent"}...`, null);
+          renderPanel();
+        },
+        onRequestPending: targetName => {
+          stage?.setSeat(1, { name: targetName, detail: "Asked to join", dot: "amber" });
+          stage?.setStatus(`Request sent to ${targetName}. Waiting for their answer...`);
+        },
+        onDeclined: name => {
+          stage?.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
+          stage?.setStatus(
+            expectedOpponent == null
+              ? `${name} declined. Pick another player.`
+              : `${name} declined. You can try again.`,
+          );
+          renderPanel();
+        },
+        onTransientError: message => {
+          incoming = null;
+          lobbyActionRequiresReselection = true;
+          stage?.setSeat(1, { name: null, detail: "Lobby changed", dot: "amber" });
+          stage?.setStatus(`${message} Choose a player again.`);
+          renderPanel();
+        },
+        onConnecting: () => {
+          stage?.setSeat(1, { name: null, detail: "Connecting...", dot: "amber" });
+          stage?.setStatus(`Connecting to your ${expectedOpponent == null ? "partner" : "opponent"}...`);
+          globalScene.ui.setMode(UiMode.MESSAGE);
+          globalScene.ui.resetModeChain();
+          globalScene.ui.showText(`Connecting to your ${expectedOpponent == null ? "partner" : "opponent"}...`, null);
       },
       onConnected: runtime => {
         if (lobbyTerminated || getCoopRuntime() !== runtime) {
@@ -1287,14 +1345,14 @@ export class TitlePhase extends Phase {
         // "coop" and disabled every versus gate (perspective flip, showdown command menu, pure-
         // renderer divert): the guest then ran a full live engine on the host's snapshot.
         runtime.controller.setSessionKind(sessionKind);
-        // The data channel is open, but peer identity and the functional-build fingerprint may
-        // still be in flight. Resume discovery is pair-keyed and then deserializes a full save,
-        // so hold both clients until the complete compatibility contract has settled.
-        stage.setSeat(1, { name: null, detail: "Verifying...", dot: "amber" });
-        stage.setStatus(
-          expectedOpponent == null ? "Connected! Verifying your partner..." : "Connected! Verifying your opponent...",
-        );
-        globalScene.ui.setMode(UiMode.MESSAGE);
+          // The data channel is open, but peer identity and the functional-build fingerprint may
+          // still be in flight. Resume discovery is pair-keyed and then deserializes a full save,
+          // so hold both clients until the complete compatibility contract has settled.
+          stage?.setSeat(1, { name: null, detail: "Verifying...", dot: "amber" });
+          stage?.setStatus(
+            expectedOpponent == null ? "Connected! Verifying your partner..." : "Connected! Verifying your opponent...",
+          );
+          globalScene.ui.setMode(UiMode.MESSAGE);
         globalScene.ui.resetModeChain();
         globalScene.ui.showText(
           expectedOpponent == null
@@ -1305,12 +1363,12 @@ export class TitlePhase extends Phase {
         const startNewRun = () => {
           if (!isCurrentSession()) {
             return;
-          }
-          lobbyCompleted = true;
-          stopConstraintPolling();
-          stage.destroy();
-          setModeAndEnd(launchMode);
-        };
+            }
+            lobbyCompleted = true;
+            stopConstraintPolling();
+            stage?.destroy();
+            setModeAndEnd(launchMode);
+          };
 
         // A versus match is ephemeral and never enters the co-op resume path. Plain Showdown can
         // launch immediately; tournament Showdown first resolves the transport's authenticated peer
@@ -1329,14 +1387,14 @@ export class TitlePhase extends Phase {
               if (identity?.partnerName !== expectedOpponent) {
                 terminalFailure(
                   `This tournament pairing changed. Only ${expectedOpponent} can join this match. Returning to the bracket.`,
-                );
-                return;
-              }
-              stage.setSeat(1, { name: expectedOpponent, detail: "Connected", dot: "green" });
-              stage.setStatus(`Connected to ${expectedOpponent}. Starting the match...`);
-              startNewRun();
-            })
-            .catch(error => {
+                  );
+                  return;
+                }
+                stage?.setSeat(1, { name: expectedOpponent, detail: "Connected", dot: "green" });
+                stage?.setStatus(`Connected to ${expectedOpponent}. Starting the match...`);
+                startNewRun();
+              })
+              .catch(error => {
               if (!isCurrentSession()) {
                 return;
               }
@@ -1353,22 +1411,22 @@ export class TitlePhase extends Phase {
               return;
             }
             if (identity == null || identity.partnerName == null) {
-              console.warn(
-                "[coop-resume] peer compatibility barrier failed; keeping lobby closed (no unilateral start)",
-              );
-              stage.setSeat(1, { name: null, detail: "Reconnect needed", dot: "red" });
-              stage.setStatus("Could not verify a compatible partner build. Reconnect and try again.");
-              terminalFailure(
-                "Could not verify your co-op partner's build. Both players should refresh, reconnect, and try again.",
-              );
-              return;
-            }
-            const partner = identity.partnerName;
-            stage.setSeat(1, { name: partner, detail: "Connected", dot: "green" });
-            stage.setStatus("Connected! Checking for a co-op save...");
-            if (identity.localRole === "guest") {
-              globalScene.gameData.armCoopResumeCheckpointPersistence();
-            }
+                console.warn(
+                  "[coop-resume] peer compatibility barrier failed; keeping lobby closed (no unilateral start)",
+                );
+                stage?.setSeat(1, { name: null, detail: "Reconnect needed", dot: "red" });
+                stage?.setStatus("Could not verify a compatible partner build. Reconnect and try again.");
+                terminalFailure(
+                  "Could not verify your co-op partner's build. Both players should refresh, reconnect, and try again.",
+                );
+                return;
+              }
+              const partner = identity.partnerName;
+              stage?.setSeat(1, { name: partner, detail: "Connected", dot: "green" });
+              stage?.setStatus("Connected! Checking for a co-op save...");
+              if (identity.localRole === "guest") {
+                globalScene.gameData.armCoopResumeCheckpointPersistence();
+              }
 
             // #810 RESUME FLOW (maintainer directive): after the ACCEPT handshake, decide RESUME
             // vs NEW GAME BEFORE anyone advances into starter-select. The HOST owns the decision
@@ -1379,13 +1437,13 @@ export class TitlePhase extends Phase {
             if (identity.localRole === "guest") {
               // GUEST: block on the host's decision. Show a mirrored "waiting" state - NO "press to
               // start" (that was the barrier hole: the guest could start a new run while the host
-              // was still deciding to resume). Release on EITHER the resume OFFER or the START-NEW
-              // signal. If the host goes silent, fail closed to reconnect instead of authorizing a
-              // unilateral new run that would split the clients across different states.
-              stage.setStatus(`Connected! Waiting for ${partner}...`);
-              globalScene.ui.setMode(UiMode.MESSAGE);
-              globalScene.ui.resetModeChain();
-              globalScene.ui.showText(`Connected! Waiting for ${partner} to choose Resume or New Game...`, null);
+                // was still deciding to resume). Release on EITHER the resume OFFER or the START-NEW
+                // signal. If the host goes silent, fail closed to reconnect instead of authorizing a
+                // unilateral new run that would split the clients across different states.
+                stage?.setStatus(`Connected! Waiting for ${partner}...`);
+                globalScene.ui.setMode(UiMode.MESSAGE);
+                globalScene.ui.resetModeChain();
+                globalScene.ui.showText(`Connected! Waiting for ${partner} to choose Resume or New Game...`, null);
 
               let settled = false;
               /** Claim the single decision; returns true only for the first caller. */
@@ -1398,13 +1456,13 @@ export class TitlePhase extends Phase {
               };
               const guestWaitTimer = setTimeout(() => {
                 if (isCurrentSession() && claim()) {
-                  console.warn(
-                    `[coop-resume] guest: no Resume/New Game from ${partner} in ${COOP_RESUME_GUEST_WAIT_MS}ms -> reconnect (fail-closed)`,
-                  );
-                  stage.setStatus("Partner decision timed out. Reconnect and try again.");
-                  terminalFailure(
-                    "Your partner did not finish the co-op save decision. Please reconnect and try again.",
-                  );
+                    console.warn(
+                      `[coop-resume] guest: no Resume/New Game from ${partner} in ${COOP_RESUME_GUEST_WAIT_MS}ms -> reconnect (fail-closed)`,
+                    );
+                    stage?.setStatus("Partner decision timed out. Reconnect and try again.");
+                    terminalFailure(
+                      "Your partner did not finish the co-op save decision. Please reconnect and try again.",
+                    );
                 }
               }, COOP_RESUME_GUEST_WAIT_MS);
 
@@ -1442,13 +1500,15 @@ export class TitlePhase extends Phase {
                     { version: 1, players: commitment.participants, seats: commitment.seats },
                     controller.localName(),
                     partner,
-                    controller.role,
-                  )
-                ) {
-                  terminalFailure("The co-op resume offer did not match this exact session. Reconnect and try again.");
-                  return;
-                }
-                globalScene.ui.showText(
+                      controller.role,
+                    )
+                  ) {
+                    terminalFailure(
+                      "The co-op resume offer did not match this exact session. Reconnect and try again.",
+                    );
+                    return;
+                  }
+                  globalScene.ui.showText(
                   `${partner} wants to resume your saved co-op run (wave ${commitment.wave}). Accept?`,
                   null,
                   () => {
@@ -1465,17 +1525,19 @@ export class TitlePhase extends Phase {
                             .replyResume(true)
                             .then(committed => {
                               if (!isCurrentSession()) {
-                                return;
-                              }
-                              if (!committed) {
-                                terminalFailure("The resume decision could not be committed. Reconnect and try again.");
-                                return;
-                              }
-                              lobbyCompleted = true;
-                              stage.destroy();
-                              void this.coopGuestResumeBoot(
-                                commitment,
-                                runtime,
+                                  return;
+                                }
+                                if (!committed) {
+                                  terminalFailure(
+                                    "The resume decision could not be committed. Reconnect and try again.",
+                                  );
+                                  return;
+                                }
+                                lobbyCompleted = true;
+                                stage?.destroy();
+                                void this.coopGuestResumeBoot(
+                                  commitment,
+                                  runtime,
                                 controller,
                                 sessionGeneration,
                                 terminalFailure,
@@ -1562,13 +1624,13 @@ export class TitlePhase extends Phase {
             if (blockedMessage != null && discovery.kind !== "candidate" && discovery.kind !== "no-save") {
               if (discovery.kind !== "replica-unavailable") {
                 // A fresh run is safe even when an old slot is quarantined: SelectStarterPhase
-                // independently proves a different slot empty in both local and cloud storage,
-                // fences it across the launch, and wins the backend empty-slot CAS before release.
-                // Require an explicit press so an ambiguous/legacy save is never silently ignored.
-                stage.setStatus("A save conflict was isolated. Start a separate run?");
-                globalScene.ui.setMode(UiMode.MESSAGE);
-                globalScene.ui.showText(
-                  `${blockedMessage}\n\nPress to start a separate co-op run. Existing saves will not be overwritten.`,
+                  // independently proves a different slot empty in both local and cloud storage,
+                  // fences it across the launch, and wins the backend empty-slot CAS before release.
+                  // Require an explicit press so an ambiguous/legacy save is never silently ignored.
+                  stage?.setStatus("A save conflict was isolated. Start a separate run?");
+                  globalScene.ui.setMode(UiMode.MESSAGE);
+                  globalScene.ui.showText(
+                    `${blockedMessage}\n\nPress to start a separate co-op run. Existing saves will not be overwritten.`,
                   null,
                   hostStartNew,
                   null,
@@ -1623,14 +1685,20 @@ export class TitlePhase extends Phase {
                       .then(accepted => {
                         if (!isCurrentSession()) {
                           return;
-                        }
-                        if (accepted) {
-                          lobbyCompleted = true;
-                          stage.destroy();
-                          void this.loadCoopResumeSlot(marker, runtime, controller, sessionGeneration, terminalFailure);
-                        } else {
-                          // The guest remains behind the barrier after declining; this single durable
-                          // release moves both clients into team select together.
+                          }
+                          if (accepted) {
+                            lobbyCompleted = true;
+                            stage?.destroy();
+                            void this.loadCoopResumeSlot(
+                              marker,
+                              runtime,
+                              controller,
+                              sessionGeneration,
+                              terminalFailure,
+                            );
+                          } else {
+                            // The guest remains behind the barrier after declining; this single durable
+                            // release moves both clients into team select together.
                           hostStartNew();
                         }
                       })
@@ -1660,10 +1728,14 @@ export class TitlePhase extends Phase {
       },
       onError: e => {
         if (flowRuntime == null || isCurrentFlow()) {
-          terminalFailure(`${tournamentConstraint == null ? "Co-op" : "Tournament lobby"} error:\n${e}`);
-        }
+            terminalFailure(`${tournamentConstraint == null ? "Co-op" : "Tournament lobby"} error:\n${e}`);
+          }
+        },
       },
-    });
+      tournamentConstraint?.room == null
+        ? {}
+        : { protocol: "p33", p33Dependencies: { room: tournamentConstraint.room } },
+    );
 
     // Enter the lobby: clear the mode menu and show the stage while we announce.
     globalScene.ui.setMode(UiMode.MESSAGE);
@@ -1673,7 +1745,9 @@ export class TitlePhase extends Phase {
         ? sessionKind === "versus"
           ? "Finding Showdown players..."
           : "Finding co-op players..."
-        : `Opening your match lobby with ${expectedOpponent}...`,
+        : automaticPairing
+          ? `Waiting for ${expectedOpponent} to accept the match...`
+          : `Opening your match lobby with ${expectedOpponent}...`,
       null,
     );
     if (tournamentConstraint != null) {

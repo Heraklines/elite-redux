@@ -21,6 +21,10 @@ import {
   syncShowdownPendingSettlements,
 } from "#data/elite-redux/showdown/showdown-escrow-client";
 import {
+  completeQueuedShowdownMatch,
+  isQueuedShowdownMatchInProgress,
+} from "#data/elite-redux/showdown/showdown-matchmaking";
+import {
   type ShowdownResultReason,
   type ShowdownVoidReason,
   selectShowdownResultLine,
@@ -185,6 +189,17 @@ export class ShowdownResultPhase extends BattlePhase {
       reason: this.reason,
       voided: this.voided,
     });
+
+    // A lobbyless queue match returns to waiting after every result. End the authenticated
+    // signaling run before clearing the runtime so the account can announce a fresh queue presence.
+    if (isQueuedShowdownMatchInProgress()) {
+      try {
+        void runtime?.p33Signaling?.end().catch(() => {});
+      } catch {
+        // The next queue announce also reconciles a stale terminal run.
+      }
+      completeQueuedShowdownMatch();
+    }
 
     // Ephemeral match: drop the showdown + co-op runtime state. NEVER persisted (no saveAll).
     endShowdownBattle();

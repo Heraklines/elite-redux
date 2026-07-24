@@ -554,6 +554,11 @@ export class CoopLobbyController {
     return this.outgoingPending;
   }
 
+  /** Authenticated presence id used for deterministic headless matchmaking. */
+  ownPresenceId(): string | null {
+    return this.id;
+  }
+
   private async connect(pairing: LobbyPairing): Promise<void> {
     if (this.connecting) {
       coopLog("lobby", `connect IGNORED code=${pairing.code} (already connecting)`);

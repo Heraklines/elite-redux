@@ -90,13 +90,15 @@ export interface ShowdownTeamMenuPresetView {
 export interface ShowdownTeamMenuConfig {
   /** The saved presets (may be empty - the empty-state affordance renders then). */
   presets: ShowdownTeamMenuPresetView[];
+  /** Persisted lobbyless matchmaking state for the selected preset. */
+  queueStatus?: { presetName: string; active: boolean } | null;
   /** Deterministic initial team cursor (for recipes / restore). */
   initialTeam?: number;
   /** Deterministic initial mon cursor within the hovered team (for recipes). */
   initialMon?: number;
   /** Deterministic initial rename-overlay state (for the rename-prompt render recipe). */
   initialRenaming?: boolean;
-  /** Deterministic initial confirm-question banner text (for the enter-lobby / delete prompt render recipe). */
+  /** Deterministic initial confirm-question banner text for the queue/delete prompt render recipe. */
   initialPromptText?: string;
   /** Deterministic initial IMPORT paste-modal state (for the import-modal render recipe). */
   initialImporting?: boolean;
@@ -117,8 +119,8 @@ export interface ShowdownTeamMenuConfig {
   onCreate?: () => void;
   /** Edit (E) a saved preset: re-enter the build flow seeded with it (Phase C). */
   onEdit?: (index: number) => void;
-  /** CONFIRM on a valid saved preset: enter the pairing lobby carrying it (Phase D). */
-  onEnterLobby?: (index: number) => void;
+  /** CONFIRM on a valid saved preset: queue for lobbyless matchmaking with it. */
+  onQueue?: (index: number) => void;
   /** Rename (R) a saved preset - the flow persists it. The handler updates its own view live. */
   onRename?: (index: number, newName: string) => void;
   /** Delete (N) a saved preset - the flow persists it. The handler updates its own view live. */
@@ -204,7 +206,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   /** A transient explain/notice banner (e.g. confirming an invalid team) - cleared on next input. */
   private notice: string | null = null;
   /**
-   * The QUESTION shown while a Yes/No CONFIRM overlay is up (enter-lobby / delete). The CONFIRM handler
+   * The QUESTION shown while a Yes/No CONFIRM overlay is up (queue / delete). The CONFIRM handler
    * only draws the bare Yes/No buttons; a plain `ui.showText` routes to the battle message box that this
    * full-screen menu paints OVER, so the question was invisible ("it just says yes or no" - maintainer).
    * We render it as our OWN banner BEFORE opening the overlay (the menu container stays visible beneath a
@@ -476,7 +478,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     return true;
   }
 
-  /** CONFIRM: create (create box) / explain (invalid team) / enter-lobby prompt (valid team). */
+  /** CONFIRM: create (create box) / explain (invalid team) / queue prompt (valid team). */
   private confirmRow(): boolean {
     const cfg = this.config!;
     // A folder HEADER row toggles its collapse (P3).
@@ -504,7 +506,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
       return true;
     }
     const idx = this.currentPresetIndex();
-    this.prompt("Enter the lobby with this team?", () => cfg.onEnterLobby?.(idx));
+    this.prompt("Queue for a Showdown match with this team?", () => cfg.onQueue?.(idx));
     return true;
   }
 
@@ -1018,7 +1020,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.text(bx + 8, by + bh - 9, footer, savable > 0 ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
   }
 
-  /** The question banner shown beneath the Yes/No CONFIRM overlay (enter-lobby / delete), so the player
+  /** The question banner shown beneath the Yes/No CONFIRM overlay (queue / delete), so the player
    *  sees WHAT they are confirming. Neutral gold-accented styling (the notice banner is red for errors). */
   private renderPromptBanner(): void {
     const bh = 20;
@@ -1057,7 +1059,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.fill(0, HOTKEY_Y, SCREEN_W, HOTKEY_H, BAR_BG, 1);
     this.fill(0, HOTKEY_Y, SCREEN_W, 1, 0x1a2740, 1);
     const onSaved = this.currentPresetIndex() >= 0;
-    const spaceLabel = this.onCreateRow ? "Create" : this.onHeaderRow ? "Expand/Collapse" : "Enter Lobby";
+    const spaceLabel = this.onCreateRow ? "Create" : this.onHeaderRow ? "Expand/Collapse" : "Queue";
     let x = 4;
     x = this.hotkey(x, null, "SPACE.png", spaceLabel);
     if (onSaved) {
@@ -1173,7 +1175,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.text(
       LEFT_X + LEFT_W / 2,
       y + 48,
-      "Build a 1v1 squad, then head to the lobby.",
+      "Build a 1v1 squad, then queue for a match.",
       TextStyle.SUMMARY_GRAY,
       0.5,
       FONT_TINY,
@@ -1196,7 +1198,8 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
       0,
       FONT_NAME,
     );
-    this.renderValidityMarker(LEFT_X + LEFT_W - 8, y + 5, invalid);
+    const queued = this.config?.queueStatus?.presetName === preset.name ? this.config.queueStatus : null;
+    this.renderValidityMarker(LEFT_X + LEFT_W - 8, y + 5, invalid, queued?.active ?? null);
 
     // Six mini icons, gold-ringed on the hovered mon of the hovered team.
     const iconY = y + 16;
@@ -1232,14 +1235,22 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     );
   }
 
-  private renderValidityMarker(rightX: number, y: number, invalid: boolean): void {
-    const label = invalid ? "INVALID" : "READY";
+  private renderValidityMarker(rightX: number, y: number, invalid: boolean, queued: boolean | null): void {
+    const label = invalid ? "INVALID" : queued === true ? "QUEUED" : queued === false ? "PAUSED" : "READY";
     const w = label.length * 3.0 + 12;
     const x = rightX - w;
     this.fill(x, y, w, 9, HEADER_BAND, 1);
-    this.outline(x, y, w, 9, invalid ? RED_EDGE : GREEN_EDGE);
-    this.fill(x + 3, y + 3, 3, 3, invalid ? 0xe86464 : 0x4bd08a, 1);
-    this.text(x + 8, y + 1, label, invalid ? TextStyle.SUMMARY_RED : TextStyle.SUMMARY_GREEN, 0, FONT_TINY);
+    const paused = !invalid && queued === false;
+    this.outline(x, y, w, 9, invalid ? RED_EDGE : paused ? 0x9b792f : GREEN_EDGE);
+    this.fill(x + 3, y + 3, 3, 3, invalid ? 0xe86464 : paused ? 0xf0b94d : 0x4bd08a, 1);
+    this.text(
+      x + 8,
+      y + 1,
+      label,
+      invalid ? TextStyle.SUMMARY_RED : paused ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY_GREEN,
+      0,
+      FONT_TINY,
+    );
   }
 
   private renderMiniIcon(mon: ShowdownMonManifest, cx: number, y: number): void {

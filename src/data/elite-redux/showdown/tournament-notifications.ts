@@ -19,6 +19,7 @@
 import { loggedInUser } from "#app/account";
 import { SESSION_ID_COOKIE_NAME } from "#app/constants";
 import {
+  dropOutOfTournament,
   getTournamentBracket,
   listTournaments,
   pingTournamentPresence,
@@ -246,12 +247,18 @@ let presencePollTimer: ReturnType<typeof setInterval> | null = null;
 let presencePollPending = false;
 let activeToast: HTMLDivElement | null = null;
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
+let toastCountdownTimer: ReturnType<typeof setInterval> | null = null;
+const MATCH_ACCEPT_MS = 60_000;
 const announcedOnlineMatches = new Set<string>();
 
 function dismissTournamentToast(): void {
   if (toastTimer != null) {
     clearTimeout(toastTimer);
     toastTimer = null;
+  }
+  if (toastCountdownTimer != null) {
+    clearInterval(toastCountdownTimer);
+    toastCountdownTimer = null;
   }
   activeToast?.remove();
   activeToast = null;
@@ -277,7 +284,12 @@ export function showTournamentMatchToast(notification: ErNotification): boolean 
   const open = document.createElement("button");
   open.type = "button";
   open.className = "er-tournament-match-toast-open";
-  open.textContent = "Open match";
+  const deadline = Date.now() + MATCH_ACCEPT_MS;
+  const updateCountdown = () => {
+    const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1_000));
+    open.textContent = `Accept (${seconds}s)`;
+  };
+  updateCountdown();
   open.addEventListener("click", () => {
     const target = tournamentDeepLinkOf(notification);
     if (target != null && openTournamentDeepLink(target)) {
@@ -288,14 +300,44 @@ export function showTournamentMatchToast(notification: ErNotification): boolean 
   const close = document.createElement("button");
   close.type = "button";
   close.className = "er-tournament-match-toast-close";
-  close.setAttribute("aria-label", "Dismiss tournament match notification");
+  close.setAttribute("aria-label", "Forfeit tournament match");
   close.textContent = "X";
-  close.addEventListener("click", dismissTournamentToast);
+  const forfeit = (message: string, expired = false) => {
+    open.disabled = true;
+    close.disabled = true;
+    body.textContent = message;
+    dropOutOfTournament(data.tournamentId)
+      .then(result => {
+        if (result.ok) {
+          dismissTournamentToast();
+          return;
+        }
+        open.disabled = expired;
+        close.disabled = false;
+        body.textContent = `Could not forfeit: ${result.error}`;
+      })
+      .catch(() => {
+        open.disabled = expired;
+        close.disabled = false;
+        body.textContent = "Could not reach the tournament server. Try again.";
+      });
+  };
+  close.addEventListener("click", () => {
+    const confirmed =
+      typeof globalThis.confirm === "function" && globalThis.confirm("Are you sure you want to forfeit the match?");
+    if (!confirmed) {
+      return;
+    }
+    forfeit("Forfeiting this tournament match...");
+  });
 
   toast.append(copy, open, close);
   document.body.append(toast);
   activeToast = toast;
-  toastTimer = setTimeout(dismissTournamentToast, 30_000);
+  toastCountdownTimer = setInterval(updateCountdown, 1_000);
+  toastTimer = setTimeout(() => {
+    forfeit("Match acceptance expired. Forfeiting...", true);
+  }, MATCH_ACCEPT_MS);
   return true;
 }
 
