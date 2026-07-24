@@ -520,7 +520,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
   // and emit its controlInstalled receipt before any reward shop opens. This LEG proves that ordered V2
   // crossing reaches the terminal and next command without falling back to the retired continuation journal.
   // =====================================================================================
-  it("LEG 2b (guest-owned, narration-bearing): the committed ME_PICK continuation releases from the post-pick surface, no Title (Track R)", async () => {
+  it("LEG 2b (guest-owned, narration-bearing): the shadow pick leads to one ordered terminal successor, no Title", async () => {
     await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
     const hostScene = game.scene;
 
@@ -537,8 +537,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     expect(counterBefore, "the ME opens on interaction counter 1 (guest owns odd)").toBe(1);
 
-    // Observe the real V2 wire proof. The retired operation-continuation journal is deliberately absent
-    // from correctness: the replica may proceed only after it signs controlInstalled for the exact ME_PICK.
+    // Observe the real V2 wire proof. ME_PICK is proposal/shadow telemetry and deliberately consumes no
+    // mechanical revision. The replica may proceed only after it signs controlInstalled for the complete
+    // immutable ME_TERMINAL that resolves that pick and states the next ordered control.
     const guestV2SendSpy = vi.spyOn(pair.guest, "send");
 
     // STEP A (host): reach MysteryEncounterPhase; the host parks awaiting the guest's relayed index.
@@ -569,9 +570,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       await drainLoopback();
     });
 
-    // STEP C1 (guest): pump the guest so it APPLIES the broadcast ME_PICK envelope. The Track R
-    // material-apply hook fires here and installs the entry's exact typed successor before any reward shop.
-    // Snapshot the wire count first so the assertion isolates this ME_PICK apply window.
+    // STEP C1 (guest): pump the guest so it applies the ordered terminal resulting from the shadow pick.
+    // The choice itself must not enter the mechanical log; the complete terminal installs its exact typed
+    // successor before any reward shop can become authoritative.
     await withClient(rig.guestCtx, async () => {
       for (let i = 0; i < 8; i++) {
         await drainLoopback();
@@ -583,9 +584,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         message =>
           message.t === "authorityReceipt"
           && message.body.stage === "controlInstalled"
-          && message.body.operationId.includes(":ME_PICK:"),
+          && message.body.operationId.includes(":ME_TERMINAL:"),
       ),
-      "the guest proved the committed ME_PICK successor installed before any shop opened (Authority V2)",
+      "the guest proved the immutable ME terminal successor installed before any shop opened (Authority V2)",
     ).toBe(true);
 
     // STEP C2 (guest): the guest OWNS the reward pick (#828) - open its shop as owner, relay LEAVE sync.
