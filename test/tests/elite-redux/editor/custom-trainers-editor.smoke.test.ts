@@ -61,6 +61,9 @@ interface EditorHarness {
   spByConst: Map<string, unknown>;
   spById: Map<number, unknown>;
   spByBattleIdentity: Map<string, unknown>;
+  spBySearchKey: Map<string, unknown>;
+  registerSpeciesSearchEntry(species: Record<string, unknown>): void;
+  speciesDatalistOptionsHtml(species: Record<string, unknown>[]): string;
   pokemonAtlasCache: Map<string, unknown>;
   renderPokemonFrame(slug: string, el: HTMLElement, targetSize: number): void;
   trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
@@ -110,6 +113,7 @@ function addSpecies(constKey: string, id: number, name: string): void {
   ct.spByConst.set(constKey, entry);
   ct.spById.set(id, entry);
   ct.spByBattleIdentity.set(`${id}:0`, entry);
+  ct.registerSpeciesSearchEntry(entry);
 }
 
 /** Create + select a fresh trainer via the real "＋ New trainer" click; returns its key. */
@@ -141,7 +145,7 @@ beforeAll(() => {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
       ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, ctrConfig, spByConst, spById, spByBattleIdentity, pokemonAtlasCache, renderPokemonFrame, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, abilById, abilIdByNormalizedName, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, ctrConfig, spByConst, spById, spByBattleIdentity, spBySearchKey, registerSpeciesSearchEntry, speciesDatalistOptionsHtml, pokemonAtlasCache, renderPokemonFrame, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, abilById, abilIdByNormalizedName, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
@@ -178,6 +182,7 @@ beforeEach(() => {
   ct.spByConst.clear();
   ct.spById.clear();
   ct.spByBattleIdentity.clear();
+  ct.spBySearchKey.clear();
   ct.pokemonAtlasCache.clear();
   ct.MOVE_SET.clear();
   addSpecies("SPECIES_PIKACHU", 25, "Pikachu");
@@ -261,7 +266,8 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     const mega = {
       const: "SPECIES_JUMPLUFF__FORM_MEGA",
       baseConst: "SPECIES_JUMPLUFF",
-      name: "Jumpluff (Mega)",
+      name: "Mega Jumpluff",
+      aliases: ["Jumpluff Mega", "Jumpluff (Mega)"],
       slug: "jumpluff_mega",
       id: 189,
       formIndex: 1,
@@ -270,9 +276,13 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     };
     ct.spByConst.set(mega.const, mega);
     ct.spByBattleIdentity.set("189:1", mega);
+    ct.registerSpeciesSearchEntry(mega);
+    const datalist = ct.speciesDatalistOptionsHtml([mega]);
+    expect(datalist).toContain('value="Mega Jumpluff"');
+    expect(datalist).toContain('value="Jumpluff Mega"');
 
     const key = newTrainer();
-    setSpecies(0, mega.const);
+    setSpecies(0, "Mega Jumpluff");
     const member = ct.ctr.current[key].team[0];
     expect(member.species).toBe(mega.const);
     expect(member.formIndex).toBe(1);

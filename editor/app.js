@@ -1156,6 +1156,7 @@ async function saveMon() {
 const spByConst = new Map();
 const spById = new Map();
 const spByBattleIdentity = new Map(); // `${speciesId}:${formIndex}` -> base/form picker entry
+const spBySearchKey = new Map(); // normalized display name/alias/CONST -> picker entry
 
 function battleIdentityKey(speciesId, formIndex) {
   return `${speciesId}:${Number.isInteger(formIndex) ? formIndex : 0}`;
@@ -1163,6 +1164,52 @@ function battleIdentityKey(speciesId, formIndex) {
 
 function ctrSpeciesEntryForIdentity(speciesId, formIndex) {
   return spByBattleIdentity.get(battleIdentityKey(speciesId, formIndex)) || spById.get(speciesId) || null;
+}
+
+function speciesSearchKey(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function speciesSearchValues(species) {
+  const values = [species?.name, ...(Array.isArray(species?.aliases) ? species.aliases : []), species?.const].filter(
+    Boolean,
+  );
+  const parenthetical = String(species?.name || "").match(/^(.+?) \((.+)\)$/);
+  if (parenthetical) {
+    values.push(`${parenthetical[2]} ${parenthetical[1]}`, `${parenthetical[1]} ${parenthetical[2]}`);
+  }
+  return [...new Set(values)];
+}
+
+function registerSpeciesSearchEntry(species) {
+  for (const value of speciesSearchValues(species)) {
+    spBySearchKey.set(speciesSearchKey(value), species);
+  }
+}
+
+function resolveSpeciesInput(value) {
+  const direct = spByConst.get(
+    String(value || "")
+      .trim()
+      .toUpperCase(),
+  );
+  return direct || spBySearchKey.get(speciesSearchKey(value)) || null;
+}
+
+function speciesDatalistOptionsHtml(speciesEntries) {
+  return speciesEntries
+    .flatMap(species =>
+      speciesSearchValues(species).map(
+        value =>
+          `<option value="${esc(value)}" label="${esc(value === species.const ? species.name : species.const)}"></option>`,
+      ),
+    )
+    .join("");
 }
 
 /** The Pokedex tabs' species list: ALL species, filtered by the header search, sorted. */
@@ -3403,9 +3450,9 @@ function onCustomTrainerInput(el) {
     ctrEnsureSlot(m);
     m.variants[m.cur].weight = clampCtrWeight(Number(el.value));
   } else if (el.classList.contains("ctr-species") && m) {
-    m.species = el.value.trim().toUpperCase();
+    const selected = resolveSpeciesInput(el.value);
+    m.species = selected?.const || el.value.trim().toUpperCase();
     el.value = m.species;
-    const selected = spByConst.get(m.species);
     if (selected) {
       m.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
     }
@@ -3457,9 +3504,9 @@ function onCustomTrainerInput(el) {
     m.shiny = ctrNormShiny(m.shiny);
     m.shiny.name = el.value;
   } else if (el.classList.contains("ctr-fusion-species") && m && m.fusion) {
-    m.fusion.species = el.value.trim().toUpperCase();
+    const selected = resolveSpeciesInput(el.value);
+    m.fusion.species = selected?.const || el.value.trim().toUpperCase();
     el.value = m.fusion.species;
-    const selected = spByConst.get(m.fusion.species);
     if (selected) {
       m.fusion.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
     }
@@ -5703,10 +5750,12 @@ async function init() {
     spByConst.clear();
     spById.clear();
     spByBattleIdentity.clear();
+    spBySearchKey.clear();
     for (const s of POKEDEX_SPECIES) {
       spByConst.set(s.const, s);
       spById.set(s.id, s);
       spByBattleIdentity.set(battleIdentityKey(s.id, 0), s);
+      registerSpeciesSearchEntry(s);
       const base = (lsData[s.id] || []).map(([lvl, mv]) => [lvl, mv]);
       learn.current[s.const] = Array.isArray(lsLive[s.const]) ? lsLive[s.const].map(([lvl, mv]) => [lvl, mv]) : base;
       const tmBase = (tmData[s.id] || []).slice();
@@ -5732,6 +5781,7 @@ async function init() {
       }
       spByConst.set(form.const, form);
       spByBattleIdentity.set(battleIdentityKey(form.id, form.formIndex), form);
+      registerSpeciesSearchEntry(form);
     }
     learn.baseline = JSON.parse(JSON.stringify(learn.current));
     tms.baseline = JSON.parse(JSON.stringify(tms.current));
@@ -5908,10 +5958,9 @@ async function init() {
     // Custom Trainers: species picker (full universe), trainer-class + held-item pickers.
     const sdl = document.createElement("datalist");
     sdl.id = "species-list";
-    sdl.innerHTML = [...POKEDEX_SPECIES, ...TRAINER_SPECIES_FORMS]
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(s => `<option value="${s.const}">${esc(s.name)}</option>`)
-      .join("");
+    sdl.innerHTML = speciesDatalistOptionsHtml(
+      [...POKEDEX_SPECIES, ...TRAINER_SPECIES_FORMS].sort((a, b) => a.name.localeCompare(b.name)),
+    );
     document.body.appendChild(sdl);
     const tcdl = document.createElement("datalist");
     tcdl.id = "trainerclass-list";
