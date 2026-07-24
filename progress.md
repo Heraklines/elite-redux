@@ -2318,3 +2318,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The Commander regression now installs its entry-effect relationship before the initial immutable COMMAND
   entry is published. Its prior shape rewrote state after `buildDuo` had already admitted that control, which a
   closed authority graph must reject rather than rebroadcast as a compatibility mutation.
+
+# 2026-07-24 - Environment presentation joins the renderer-progress contract
+
+- Public two-browser run `30053005380` is green on `09eaad657`: two independent Chromium clients paired,
+  completed wave 1 with rendered combat, reached wave 2, persisted the run, re-paired, resumed, and both
+  returned to the same actionable wave-2 command surface in 27 minutes without a desync or softlock.
+- Weather and terrain replay no longer use a fixed five-second wall-clock timeout. They share the same
+  frame-progress-aware, 120-second hard-bounded watchdog as move/HP/stat/status/faint/switch/Tera replay, so
+  healthy software-rendered environment animations cannot false-terminal a session at sub-1-FPS rates.
+- Animations-disabled two-engine lanes now settle environment events as explicit `intentionally-skipped`
+  outcomes before resolving a source actor or starting `CommonBattleAnim`. A direct regression proves those
+  mechanical lanes never claim rendered pixels; animations-enabled browser lanes remain callback-proven and
+  fail closed on stalls or throws.

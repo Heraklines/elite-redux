@@ -63,6 +63,7 @@ import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
+import { CommonAnimPhase } from "#phases/common-anim-phase";
 import {
   CoopFaintReplayPhase,
   CoopFinalizeTurnPhase,
@@ -290,6 +291,31 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       reason: "animations-disabled",
       actorFingerprint: `player:bi${pokemon.getBattlerIndex()}:p${Number.MAX_SAFE_INTEGER}`,
     });
+    expect(endSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("an animations-disabled engine lane intentionally skips environment pixels before resolving an actor", async () => {
+    await startCoopGuest();
+    globalScene.moveAnimations = false;
+    const token = createCoopPresentationOutcomeToken();
+    const playSpy = vi.spyOn(CommonBattleAnim.prototype, "play");
+    const phase = new CommonAnimPhase(
+      undefined,
+      undefined,
+      CommonAnim.RAIN,
+      { source: "environment", kind: "weather", value: WeatherType.RAIN },
+      token,
+    );
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(coopPresentationOutcome(token)).toEqual({
+      kind: "intentionally-skipped",
+      reason: "animations-disabled",
+      actorFingerprint: `weather:${WeatherType.RAIN}:anim${CommonAnim.RAIN}`,
+    });
+    expect(playSpy, "the mechanical engine lane never claims an environment animation ran").not.toHaveBeenCalled();
     expect(endSpy).toHaveBeenCalledTimes(1);
   });
 

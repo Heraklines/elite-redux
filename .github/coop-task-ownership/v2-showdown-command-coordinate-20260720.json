@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "326d399dbb4679a4a4280f9a774128ef09783e9e",
+  "baseSha": "d1c89fe670dda24a3ea1749c5e3585c65ecd044c",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -43,6 +43,7 @@
     "src/phase-manager.ts",
     "src/phases/command-phase.ts",
     "src/phases/common-anim-phase.ts",
+    "src/phases/coop-presentation-watchdog.ts",
     "src/phases/coop-push-replacement-checkpoint-phase.ts",
     "src/phases/coop-replay-phases.ts",
     "src/phases/coop-replay-turn-phase.ts",

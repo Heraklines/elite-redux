@@ -140,6 +140,11 @@ import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
+import {
+  armCoopPresentationProgressWatchdog,
+  COOP_PRESENTATION_STALL_MS,
+  type CoopPresentationProgressWatchdog,
+} from "#phases/coop-presentation-watchdog";
 import { PokemonPhase } from "#phases/pokemon-phase";
 import type { DamageResult } from "#types/damage-result";
 import { fixedInt } from "#utils/common";
@@ -147,54 +152,8 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 import { decompressFromBase64 } from "lz-string";
 
-/** A renderer that makes no frame progress for this long has stalled its current presentation. */
-const COOP_REPLAY_WATCHDOG_MS = 5000;
-/** Advancing frames may be slow, but a broken animation callback still cannot hold control forever. */
-const COOP_REPLAY_HARD_WATCHDOG_MS = 120_000;
 /** Asset/UI projection must either prove ready or enter the shared terminal; it can never park forever. */
 const COOP_AUTHORITY_PRESENTATION_DEADLINE_MS = 15_000;
-
-interface CoopReplayWatchdog {
-  remove(): void;
-}
-
-/**
- * Bound a presentation by renderer progress instead of assuming a GPU frame rate. The sealed Chromium
- * oracle uses software WebGL and can advance below one frame per second while still faithfully drawing
- * every animation frame. A fixed Phaser-time deadline therefore aborted healthy animations mid-stream.
- *
- * This watchdog renews only after observing a newer game-loop frame. The real animation completion
- * callback remains the sole rendered receipt; no progress fails on the first interval, and the absolute
- * wall ceiling catches a callback/tween that advances frames forever without ever completing.
- */
-function armCoopReplayProgressWatchdog(onExpired: () => void, stallMs = COOP_REPLAY_WATCHDOG_MS): CoopReplayWatchdog {
-  const startedAt = Date.now();
-  let lastFrame = globalScene.game.loop.frame;
-  let removed = false;
-  let timer: Phaser.Time.TimerEvent | undefined;
-  const check = () => {
-    if (removed) {
-      return;
-    }
-    const frame = globalScene.game.loop.frame;
-    if (frame > lastFrame && Date.now() - startedAt < COOP_REPLAY_HARD_WATCHDOG_MS) {
-      lastFrame = frame;
-      timer = globalScene.time.delayedCall(stallMs, check);
-      return;
-    }
-    onExpired();
-  };
-  timer = globalScene.time.delayedCall(stallMs, check);
-  return {
-    remove: () => {
-      if (removed) {
-        return;
-      }
-      removed = true;
-      timer?.remove();
-    },
-  };
-}
 
 /**
  * Resolve the live field mon for a streamed battler index, or null if absent (a mon the
@@ -447,7 +406,7 @@ export class CoopShowAbilityReplayPhase extends Phase {
     }
 
     let ended = false;
-    let watchdog: CoopReplayWatchdog | undefined;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
     const finish = (outcome: CoopPresentationOutcome) => {
       if (ended) {
         return;
@@ -460,7 +419,7 @@ export class CoopShowAbilityReplayPhase extends Phase {
     };
 
     try {
-      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, () =>
+      watchdog = globalScene.time.delayedCall(COOP_PRESENTATION_STALL_MS, () =>
         finish({ kind: "failed", reason: "ability-watchdog-expired", actorFingerprint }),
       );
       const presentation = globalScene.abilityBar.showAbility(
@@ -530,7 +489,7 @@ export class CoopTeraReplayPhase extends Phase {
     const actorSide = exactActor?.side ?? inferredSide ?? "enemy";
     const actorFingerprint = `${actorSide}:bi${this.bi}:slot${this.partySlot}:p${this.pokemonId}`;
     let ended = false;
-    let watchdog: CoopReplayWatchdog | undefined;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
     const finish = (outcome: CoopPresentationOutcome) => {
       if (ended) {
         return;
@@ -573,7 +532,7 @@ export class CoopTeraReplayPhase extends Phase {
     }
 
     try {
-      watchdog = armCoopReplayProgressWatchdog(() =>
+      watchdog = armCoopPresentationProgressWatchdog(() =>
         finish({ kind: "failed", reason: "tera-watchdog-expired", actorFingerprint }),
       );
       new CommonBattleAnim(CommonAnim.TERASTALLIZE, pokemon).play(false, () =>
@@ -614,7 +573,7 @@ export class CoopMoveAnimReplayPhase extends Phase {
       coopLog("replay", `present move bi=${this.bi} moveId=${this.moveId} targets=${this.targets.length}`);
     }
     let ended = false;
-    let watchdog: CoopReplayWatchdog | undefined;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
     const actorFingerprint =
       this.actor == null ? `bi${this.bi}` : `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}`;
     const finish = (outcome: CoopPresentationOutcome) => {
@@ -650,7 +609,7 @@ export class CoopMoveAnimReplayPhase extends Phase {
         finish({ kind: "failed", reason: "move-target-not-displayed", actorFingerprint });
         return;
       }
-      watchdog = armCoopReplayProgressWatchdog(() =>
+      watchdog = armCoopPresentationProgressWatchdog(() =>
         finish({ kind: "failed", reason: "move-watchdog-expired", actorFingerprint }),
       );
       new MoveAnim(this.moveId as MoveId, user, targetBi as BattlerIndex).play(false, () =>
@@ -727,7 +686,7 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
 
       let ended = false;
       let settling = false;
-      let watchdog: CoopReplayWatchdog | undefined;
+      let watchdog: CoopPresentationProgressWatchdog | undefined;
       let flashTimer: Phaser.Time.TimerEvent | undefined;
       let invertTimer: Phaser.Time.TimerEvent | undefined;
       let inverted = false;
@@ -784,7 +743,7 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
 
       // Restore the pre-mutation value so the bar visibly moves in the same direction as the host.
       mon.hp = fromHp;
-      watchdog = armCoopReplayProgressWatchdog(forceFinishAtAuthority);
+      watchdog = armCoopPresentationProgressWatchdog(forceFinishAtAuthority);
 
       const renderHealing = () => {
         if (ended || settling) {
@@ -903,7 +862,7 @@ export class CoopStatStageReplayPhase extends PokemonPhase {
       coopLog("replay", `present statStage bi=${this.battlerIndex} stat=${this.stat} -> ${this.value}`);
     }
     let ended = false;
-    let watchdog: CoopReplayWatchdog | undefined;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
     const actorFingerprint =
       this.actor == null
         ? `bi${this.battlerIndex}`
@@ -940,7 +899,7 @@ export class CoopStatStageReplayPhase extends PokemonPhase {
       void pokemon.updateInfo();
       // Visual tween (the red/blue stat sprite), gated like the real phase on moveAnimations.
       if (delta !== 0 && globalScene.moveAnimations) {
-        watchdog = armCoopReplayProgressWatchdog(() =>
+        watchdog = armCoopPresentationProgressWatchdog(() =>
           finish({ kind: "failed", reason: "stat-watchdog-expired", actorFingerprint }),
         );
         this.playStatTween(pokemon, delta, () => finish({ kind: "rendered", actorFingerprint }));
@@ -1034,7 +993,7 @@ export class CoopSwitchReplayPhase extends Phase {
   public override start(): void {
     super.start();
     let ended = false;
-    let watchdog: CoopReplayWatchdog | undefined;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
     let incoming: Pokemon | undefined;
     const actorFingerprint = `bi${this.presentation.bi}:slot${this.presentation.partySlot}:p${this.presentation.pokemonId}:sp${this.presentation.speciesId}`;
     const finish = (outcome: CoopPresentationOutcome): void => {
@@ -1206,9 +1165,9 @@ export class CoopSwitchReplayPhase extends Phase {
         }
       };
 
-      watchdog = armCoopReplayProgressWatchdog(
+      watchdog = armCoopPresentationProgressWatchdog(
         () => finish({ kind: "failed", reason: "switch-watchdog-expired", actorFingerprint }),
-        COOP_REPLAY_WATCHDOG_MS + 2_000,
+        COOP_PRESENTATION_STALL_MS + 2_000,
       );
       if (this.presentation.doReturn && outgoing?.isOnField()) {
         globalScene.ui.showText(
@@ -1273,7 +1232,7 @@ export class CoopStatusReplayPhase extends PokemonPhase {
       coopLog("replay", `present status bi=${this.battlerIndex} status=${this.status}`);
     }
     let ended = false;
-    let watchdog: CoopReplayWatchdog | undefined;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
     const actorFingerprint =
       this.actor == null
         ? `bi${this.battlerIndex}`
@@ -1319,7 +1278,7 @@ export class CoopStatusReplayPhase extends PokemonPhase {
       }
       // The obtain TEXT already rides as a `message` event (the host's status message rides the
       // queueMessage tap), so this phase plays the status common-anim only - no duplicate line.
-      watchdog = armCoopReplayProgressWatchdog(() =>
+      watchdog = armCoopPresentationProgressWatchdog(() =>
         finish({ kind: "failed", reason: "status-watchdog-expired", actorFingerprint }),
       );
       // CommonAnim.POISON + (effect - 1) is the established status-anim mapping (obtain-status-effect-phase.ts).
@@ -1552,7 +1511,7 @@ export class CoopFaintReplayPhase extends PokemonPhase {
   public override start(): void {
     super.start();
     let ended = false;
-    let watchdog: CoopReplayWatchdog | undefined;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
     const victim = fieldMonByIdentity(this.battlerIndex, this.sp, this.actor);
     const resolvedFieldIndex = currentBattlerIndexForActor(this.actor, victim?.getBattlerIndex() ?? this.battlerIndex);
     const actorFingerprint =
@@ -1627,7 +1586,7 @@ export class CoopFaintReplayPhase extends PokemonPhase {
         finish({ kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint });
         return;
       }
-      watchdog = armCoopReplayProgressWatchdog(() =>
+      watchdog = armCoopPresentationProgressWatchdog(() =>
         finish({ kind: "failed", reason: "faint-watchdog-expired", actorFingerprint }),
       );
       pokemon.faintCry(() => {
@@ -1759,7 +1718,7 @@ export class CoopCaptureReplayPhase extends Phase {
       pokeball.setOrigin(0.5, 0.625);
       globalScene.field.add(pokeball);
 
-      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
+      watchdog = globalScene.time.delayedCall(COOP_PRESENTATION_STALL_MS, finish);
       globalScene.playSound("se/pb_throw");
 
       globalScene.tweens.add({

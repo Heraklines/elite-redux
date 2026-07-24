@@ -7,6 +7,10 @@ import {
 } from "#data/elite-redux/coop/coop-presentation-outcome";
 import type { BattlerIndex } from "#enums/battler-index";
 import type { CommonAnim } from "#enums/move-anims-common";
+import {
+  armCoopPresentationProgressWatchdog,
+  type CoopPresentationProgressWatchdog,
+} from "#phases/coop-presentation-watchdog";
 import { PokemonPhase } from "#phases/pokemon-phase";
 
 export interface CommonAnimPresentationTag {
@@ -49,11 +53,6 @@ export class CommonAnimPhase extends PokemonPhase {
   }
 
   start() {
-    const target =
-      this.targetIndex === undefined
-        ? this.getPokemon()
-        : (this.player ? globalScene.getEnemyField() : globalScene.getPlayerField())[this.targetIndex];
-
     // Elite Redux — a common/weather animation must NEVER be able to hang the
     // phase queue, which freezes the whole game. Two failure modes are guarded:
     //   1. play() throws synchronously while starting the anim — e.g. an ER
@@ -66,7 +65,7 @@ export class CommonAnimPhase extends PokemonPhase {
     //      trips on a genuine hang — it never cuts a legitimate animation short.
     // `ended` guards against the watchdog and the real callback both firing.
     let ended = false;
-    let watchdog: Phaser.Time.TimerEvent | undefined;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
     const actorFingerprint =
       this.coopPresentation == null
         ? `environment:unknown:anim${this.anim ?? "none"}`
@@ -82,13 +81,20 @@ export class CommonAnimPhase extends PokemonPhase {
       }
       this.end();
     };
-    watchdog = globalScene.time.delayedCall(5000, () =>
-      finish({ kind: "failed", reason: "environment-watchdog-expired", actorFingerprint }),
-    );
+    if (this.coopPresentationOutcomeToken != null && !globalScene.moveAnimations) {
+      finish({ kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint });
+      return;
+    }
     try {
-      new CommonBattleAnim(this.anim, this.getPokemon(), target).play(false, () =>
-        finish({ kind: "rendered", actorFingerprint }),
+      const source = this.getPokemon();
+      const target =
+        this.targetIndex === undefined
+          ? source
+          : (this.player ? globalScene.getEnemyField() : globalScene.getPlayerField())[this.targetIndex];
+      watchdog = armCoopPresentationProgressWatchdog(() =>
+        finish({ kind: "failed", reason: "environment-watchdog-expired", actorFingerprint }),
       );
+      new CommonBattleAnim(this.anim, source, target).play(false, () => finish({ kind: "rendered", actorFingerprint }));
     } catch (err) {
       console.error(`[ER] CommonAnimPhase: anim ${this.anim} failed to play; ending phase to avoid a freeze`, err);
       finish({ kind: "failed", reason: "environment-presentation-threw", actorFingerprint });
