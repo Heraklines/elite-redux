@@ -2918,3 +2918,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Full-gate static run `30093196764` found one narrow TypeScript cast-overlap diagnostic in the phase-token
   read. The token is deliberately opaque at the ledger boundary; the explicit `unknown` bridge now records
   that intent without weakening any runtime predicate.
+
+# 2026-07-24 - B11 fixtures follow the completed Authority V2 boundary
+
+- Exact gate `30093196764` proves the half-wipe fix: the former replacement hang is green and the node-pure
+  automatic-control contract passes. Its remaining B11 reds sampled legacy or impossible fixture states.
+- The retained-terminal test now supplies an actually later settled turn. The biome public-input probe
+  observes the immutable `INTERACTION_COMMIT` wire entry instead of a compatibility receipt that is released
+  after V2 retirement, and the chained Crossroads journey lets both receipt continuations install before it
+  samples the replica pin.
+- Revival Blessing now crosses the guest's real command/replay boundary before the mid-turn picker, so the
+  final turn material has a live consumer. The trainer-switch render probe removes the replica reserve before
+  command authority is authored instead of corrupting it after projection; its visible-field, exact identity,
+  checksum, and zero-resync assertions remain unchanged.

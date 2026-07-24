@@ -44,6 +44,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type CoopResyncProbe,
   drainLoopback,
@@ -146,6 +147,14 @@ describe.skipIf(!RUN)(
       resyncProbe = installCoopResyncProbe(rig.guestRuntime);
 
       const turn = rig.hostScene.currentBattle.turn;
+
+      // Cross the guest's real public command boundary before the authority begins the turn. The former
+      // fixture answered requestPartnerCommand directly while leaving the replica's CONTROL_COMMIT parked
+      // at its predecessor, so the later REVIVAL projection temporarily worked but the final TURN_COMMIT
+      // had no live replay consumer and its checksum was sampled before material application.
+      await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, turn, {
+        proveGuestCommand: true,
+      });
 
       // ===== (A) HOST: select moves + advance until the RevivalBlessingPhase is CURRENT (not yet run). =====
       // The guest lead's Revival Blessing (a triage move) unshifts RevivalBlessingPhase; we stop BEFORE it

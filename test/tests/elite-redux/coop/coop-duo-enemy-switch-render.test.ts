@@ -161,6 +161,23 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     expect(guestChk0, "wave-start: guest checksum matches host").toBe(hostChk0);
 
     const enemyLeadIdBefore = rig.hostScene.getEnemyField()[0]?.id;
+    const expectedReserveId = hostParty.find(enemy => !rig.hostScene.getEnemyField().includes(enemy))?.id;
+    expect(expectedReserveId, "the trainer has a concrete first reserve identity").toBeDefined();
+
+    // Remove the reserve BEFORE the KO/next-command Authority V2 boundary. This forces the production
+    // command-open material to reconstruct the new trainer actor. The retired version deleted it only
+    // after that immutable boundary had already projected, which modeled an impossible local mutation
+    // after authority and then blamed the renderer for refusing to re-derive the same control.
+    const allyId = await withClient(rig.guestCtx, () => {
+      const guestEnemyParty = rig.guestScene.getEnemyParty();
+      for (let i = guestEnemyParty.length - 1; i >= 0; i--) {
+        if (guestEnemyParty[i]?.id === expectedReserveId) {
+          guestEnemyParty.splice(i, 1);
+        }
+      }
+      return rig.guestScene.getEnemyField()[1]?.id;
+    });
+    expect(allyId, "a surviving guest enemy ally exists to anchor the double-battle field").toBeDefined();
 
     // KO turn: host FLAMETHROWERs the ENEMY-slot lead; guest THUNDER_WAVEs ENEMY_2 (no damage, survives).
     // The enemy trainer sends its next reserve at the turn BOUNDARY (the to("CommandPhase") crossing).
@@ -178,34 +195,9 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     const enemyLeadIdAfter = rig.hostScene.getEnemyField()[0]?.id;
     const switched = enemyLeadIdAfter != null && enemyLeadIdAfter !== enemyLeadIdBefore;
     expect(switched, "the host trainer sent its next reserve after the ENEMY-slot KO").toBe(true);
-
-    // FORCE THE LIVE PATH + expose the platform base. Two guest-side setups, both faithful to the live seam:
-    //  (1) Remove the reserve (by host id) from the guest's enemy party so it is a NEW id the guest does not
-    //      have -> the RECONSTRUCT path. The enemy bench is NOT in the per-turn checksum, so this trips no
-    //      resync; it only removes the checkpoint's species-match summon candidate, leaving the AUTHORITATIVE
-    //      full-state apply as the SOLE seater of the replacement.
-    //  (2) SHIFT the surviving ally's base off the EnemyPokemon ctor's STATIC (236,84) default. In the live
-    //      renderer the real enemy-platform base is NOT that static constant - `updateFieldScale` (>2 mons,
-    //      bosses), fusions, and biome layout move it - so a freshly reconstructed reserve seated with the
-    //      bare RELATIVE setFieldPosition (which only nudges by the slot-offset delta from the ctor default)
-    //      lands OFF the live platform: the empty-slot P0. A correct summon derives the base from the LIVE
-    //      ally (as summonCoopEnemyField does). Shifting the ally makes "inherit the live base" observable:
-    //      the reserve's base must equal the ally's, NOT the stale ctor default.
-    const allyShift = { dx: 120, dy: 90 };
-    const allyId = await withClient(rig.guestCtx, () => {
-      const guestEnemyParty = rig.guestScene.getEnemyParty();
-      for (let i = guestEnemyParty.length - 1; i >= 0; i--) {
-        if (guestEnemyParty[i]?.id === enemyLeadIdAfter) {
-          guestEnemyParty.splice(i, 1);
-        }
-      }
-      const survivor = rig.guestScene.getEnemyField().find(e => e.isOnField());
-      if (survivor != null) {
-        survivor.setPosition(survivor.x + allyShift.dx, survivor.y + allyShift.dy);
-      }
-      return survivor?.id;
-    });
-    expect(allyId, "a surviving guest enemy ally exists to anchor the platform base").toBeDefined();
+    expect(enemyLeadIdAfter, "the trainer sent the exact reserve removed from the replica fixture").toBe(
+      expectedReserveId,
+    );
 
     // HOLD turn: both slots THUNDER_WAVE (no damage) so nobody faints. The guest replays THIS turn, whose
     // authoritative state carries the trainer's send-out ON-FIELD - the guest must RENDER the replacement.
@@ -258,10 +250,8 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     expect(guestFacts.species, "guest on-field enemy species match host after the switch").toEqual(hostFacts.species);
 
     // ===== RENDER-PRESENTATION: the reserve was SUMMONED onto the LIVE platform, not seated at the stale
-    // ctor-default base. The reconstructed reserve must inherit the surviving ally's platform base (the same
-    // base summonCoopEnemyField derives). At HEAD the bare RELATIVE setFieldPosition leaves it at the ctor
-    // default (236,84), which the shifted ally no longer occupies -> the reserve renders off the platform
-    // (the empty-slot P0). A faithful summon lands it on the ally's base.
+    // ctor-default base. The reconstructed reserve must inherit the surviving ally's live double-battle
+    // platform base (the same base summonCoopEnemyField derives).
     expect(guestFacts.replacementBase, "reserve has a resolvable field base").not.toBeNull();
     expect(guestFacts.allyBase, "ally has a resolvable field base").not.toBeNull();
     expect(

@@ -538,7 +538,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       await new Promise(resolve => setTimeout(resolve, 5));
       expect(replay.isAwaitingAuthority(), "the guest has opened the phantom next-turn waiter").toBe(true);
       expect(
-        replay.abortIfRetainedTerminalSuperseded(2, "a future terminal must not abort an earlier replay (test)"),
+        replay.abortIfRetainedTerminalSuperseded(3, "a future terminal must not abort an earlier replay (test)"),
         "a terminal from a later settled turn cannot truncate this replay",
       ).toBe(false);
       expect(replay.isAwaitingAuthority()).toBe(true);

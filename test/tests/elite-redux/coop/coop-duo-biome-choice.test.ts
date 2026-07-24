@@ -63,7 +63,7 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_SEQ_BASE, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { type ErRouteNode, getErPendingNodes, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
@@ -752,14 +752,14 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     expect(biomeArg(hostSwitch)).toBeUndefined(); // no SwitchBiomePhase yet - the map pick is still pending
 
     // ===== Step B: the WORLD-MAP PICK (same owner drives; owner picks the NON-DEFAULT biome). =====
-    // The crossroads deferred its terminal by pinning the biome interaction (shared module state here;
-    // one per-process pin in production). Snapshot it so the WATCHER engine sees its OWN pin too (the
-    // owner engine clears the shared global at its terminal - production-faithful restore).
+    // The crossroads deferred its terminal by pinning the biome interaction. The owner's receipt callback
+    // can finish before the replica's callback in this single-process scheduler, so first let both ordered
+    // continuations install their SelectBiomePhase; only then inspect each browser-scoped pin.
     const ownerPinAfterLeave = withClientSync(ownerCtx, () => coopBiomeInteractionStartValue());
-    const watcherPinAfterLeave = withClientSync(watcherCtx, () => coopBiomeInteractionStartValue());
     expect(ownerPinAfterLeave, "the crossroads Leave pinned the owner biome interaction").toBe(counterBefore);
-    expect(watcherPinAfterLeave, "the crossroads Leave pinned the watcher biome interaction").toBe(counterBefore);
     const biomePhases = await startQueuedBiomePair(rig);
+    const watcherPinAfterLeave = withClientSync(watcherCtx, () => coopBiomeInteractionStartValue());
+    expect(watcherPinAfterLeave, "the crossroads Leave pinned the watcher biome interaction").toBe(counterBefore);
     const ownerBiomePhase = ownerCtx === rig.hostCtx ? biomePhases.host : biomePhases.guest;
     const watcherBiomePhase = watcherCtx === rig.hostCtx ? biomePhases.host : biomePhases.guest;
     await waitForProjectedPublicSurface(rig, ownerCtx, watcherCtx, ownerBiomePhase, watcherBiomePhase, UiMode.ER_MAP);
@@ -1007,11 +1007,21 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     );
     expect(biomePickRelayCalls.length, "the public handler still reaches the compatibility suppression seam").toBe(1);
     expect(rawBiomePickFrames.length, "the cut-over owner does not emit a raw biomePick correctness carrier").toBe(0);
-    const receipt = withClientSync(rig.hostCtx, () =>
-      getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore }),
+    const v2BiomeCommits = transportSendSpy.mock.calls
+      .map(call => call[0] as CoopMessage)
+      .filter(
+        message =>
+          message.t === "authorityEntry"
+          && message.body.kind === "INTERACTION_COMMIT"
+          && message.body.operationId.includes(`:BIOME_PICK:${COOP_BIOME_PICK_SEQ_BASE + counterBefore}`),
+      );
+    expect(v2BiomeCommits.length, "the public handler emitted the addressed V2 biome operation").toBeGreaterThan(0);
+    const committedOperationId =
+      v2BiomeCommits[0]?.t === "authorityEntry" ? v2BiomeCommits[0].body.operationId : undefined;
+    expect(committedOperationId, "the V2 biome commit has an immutable operation identity").toMatch(/:BIOME_PICK:/u);
+    expect(rig.hostRuntime.controller.interactionCounter(), "the V2 biome commit advanced ownership once").toBe(
+      counterBefore + 1,
     );
-    expect(receipt, "the public handler committed the addressed V2 biome operation").not.toBeNull();
-    expect(getCoopV2Shadow(rig.hostRuntime)?.authorityFrontier()?.operationId).toBe(receipt?.operationId);
     logs.flush();
   }, 300_000);
 
