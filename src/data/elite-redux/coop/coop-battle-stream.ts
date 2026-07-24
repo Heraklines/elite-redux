@@ -260,6 +260,16 @@ function isValidBattlerIndex(value: unknown): value is number {
   return isSafeAddressPart(value) && value <= 11;
 }
 
+/**
+ * Presentation phases address actors by stable side + Pokemon id. `-1` is the engine's ATTACKER sentinel
+ * and is legitimate when an asynchronous effect finishes after its actor left the field, or when an effect
+ * such as Revival Blessing mutates a benched target that never had a field coordinate. No other negative or
+ * out-of-range coordinate is accepted.
+ */
+function isActorAddressableBattlerIndex(value: unknown): value is number {
+  return value === -1 || isValidBattlerIndex(value);
+}
+
 function isValidPartySlot(value: unknown): value is number {
   return isSafeAddressPart(value) && value <= 5;
 }
@@ -393,7 +403,7 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
       );
     case "hp":
       return (
-        isValidBattlerIndex(event.bi)
+        isActorAddressableBattlerIndex(event.bi)
         && isFiniteNumber(event.hp)
         && event.hp >= 0
         && isFiniteNumber(event.maxHp)
@@ -406,23 +416,27 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
       );
     case "faint":
       return (
-        isValidBattlerIndex(event.bi)
+        isActorAddressableBattlerIndex(event.bi)
         && (event.narrate === undefined || typeof event.narrate === "boolean")
         && (event.sp === undefined || isFiniteNumber(event.sp))
         && isPresentationActorRef(event.actor)
       );
     case "statStage":
       return (
-        isValidBattlerIndex(event.bi)
+        isActorAddressableBattlerIndex(event.bi)
         && isSafeAddressPart(event.stat)
         && isFiniteNumber(event.value)
         && isPresentationActorRef(event.actor)
       );
     case "status":
-      return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.status) && isPresentationActorRef(event.actor);
+      return (
+        isActorAddressableBattlerIndex(event.bi)
+        && isSafeAddressPart(event.status)
+        && isPresentationActorRef(event.actor)
+      );
     case "showAbility":
       return (
-        isValidBattlerIndex(event.bi)
+        isActorAddressableBattlerIndex(event.bi)
         && isPositiveSafeAddressPart(event.pokemonId)
         && isValidPartySlot(event.partySlot)
         && isPositiveSafeAddressPart(event.abilityId)
@@ -434,7 +448,7 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
       );
     case "tera":
       return (
-        isValidBattlerIndex(event.bi)
+        isActorAddressableBattlerIndex(event.bi)
         && isPositiveSafeAddressPart(event.pokemonId)
         && isValidPartySlot(event.partySlot)
         && isSafeAddressPart(event.teraType)

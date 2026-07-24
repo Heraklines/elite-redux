@@ -287,6 +287,58 @@ function acknowledgeReplacementThroughContinuation(stream: CoopBattleStreamer, e
 }
 
 describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
+  it("retains an identity-addressed HP event for an off-field party member", () => {
+    const state = { ...emptyAuthoritativeState(1, 1, 20), playerParty: [{ id: 1 }, { id: 3 }] };
+    const validStream = new CoopBattleStreamer(createLoopbackPair().host);
+    expect(() =>
+      validStream.emitTurn(
+        7,
+        1,
+        1,
+        [
+          {
+            k: "hp",
+            bi: -1,
+            hp: 9,
+            maxHp: 20,
+            sp: 143,
+            actor: { side: "player", pokemonId: 3 },
+          },
+        ],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).not.toThrow();
+    expect(validStream.retainedAuthorityDiagnostics().turnCommits).toBe(1);
+
+    const malformedStream = new CoopBattleStreamer(createLoopbackPair().host);
+    expect(() =>
+      malformedStream.emitTurn(
+        7,
+        1,
+        1,
+        [
+          {
+            k: "hp",
+            bi: -2,
+            hp: 9,
+            maxHp: 20,
+            actor: { side: "player", pokemonId: 3 },
+          },
+        ],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
+    expect(malformedStream.retainedAuthorityDiagnostics().turnCommits).toBe(0);
+  });
+
   it("withholds malformed host events before authority retention", () => {
     const { host } = createLoopbackPair();
     const stream = new CoopBattleStreamer(host);

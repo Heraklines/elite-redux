@@ -1,0 +1,13 @@
+{
+  "taskId": "v2-presentation-off-field-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-presentation-off-field-20260724",
+  "trainRef": "ci/coop/v2-presentation-off-field-20260724",
+  "baseSha": "e4e0e27d9dd9082dbda7b56377d21da682cdb23d",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-presentation-off-field-20260724.json",
+    "src/data/elite-redux/coop/coop-battle-stream.ts",
+    "test/tests/elite-redux/coop/coop-battle-stream.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
