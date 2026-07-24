@@ -19,6 +19,7 @@
     "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
     "test/tests/elite-redux/coop/coop-duo-exploration.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-me-operation.test.ts",
     "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
     "test/tests/elite-redux/coop/coop-lobby.test.ts",
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",

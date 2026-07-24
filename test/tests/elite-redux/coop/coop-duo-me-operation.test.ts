@@ -36,6 +36,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
+import { decodeCoopV2InteractionEnvelope } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import * as meOp from "#data/elite-redux/coop/coop-me-operation";
 import {
@@ -51,6 +52,7 @@ import {
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { clearCoopRuntime, coopHostStreamMeMessage, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { Button } from "#enums/buttons";
@@ -60,13 +62,16 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  advanceCoopActiveTime,
   awaitRewardShopPhaseExit,
   buildDuoForMe,
+  clearCoopSchedulerActiveTimeClock,
   drainGuestMeReplayToSettle,
   drainLoopback,
   driveClientPhaseQueueTo,
   driveGuestMeReplay,
   driveHostMeRewardShopWithGuestReplay,
+  installCoopSchedulerActiveTimeClock,
   installDuoLogCapture,
   relayGuestMeOptionIndexOnly,
   relayGuestMeShopLeaveSync,
@@ -91,6 +96,17 @@ const ME_WAVE = 12;
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+function committedInteractionOperation(message: CoopMessage) {
+  if (message.t !== "authorityEntry") {
+    return null;
+  }
+  return decodeCoopV2InteractionEnvelope({ ...message.body, context: message.ctx })?.envelope.pendingOperation ?? null;
+}
+
+function isCommittedMeOperation(message: CoopMessage, kind: string): boolean {
+  return committedInteractionOperation(message)?.kind === kind;
 }
 
 describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (Wave-2c)", () => {
@@ -121,6 +137,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
   });
 
   afterEach(() => {
+    clearCoopSchedulerActiveTimeClock();
     resetCoopMeOperationFlag();
     resetCoopMeOperationState();
     logs.dispose();
@@ -197,12 +214,26 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
   it("DURABILITY: dropping the first retained leave transaction redelivers and executes it exactly once", async () => {
     await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
     const hostScene = game.scene;
+    installCoopSchedulerActiveTimeClock();
+    let leaveCommitSends = 0;
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       {
-        drop: 0,
+        drop: 1,
         reorder: 0,
         delay: 0,
+        faultable: (message: CoopMessage): boolean => {
+          const operation = committedInteractionOperation(message);
+          if (
+            operation?.kind !== "ME_TERMINAL"
+            || !meOp.isCompleteCoopMeTerminalPayload(operation.payload)
+            || operation.payload.terminal !== "leave"
+          ) {
+            return false;
+          }
+          leaveCommitSends += 1;
+          return leaveCommitSends === 1;
+        },
       },
       { seed: 0x6d3e },
     );
@@ -216,23 +247,20 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       await game.phaseInterceptor.to("SelectModifierPhase", false);
       const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       guestReplayPhase = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
-      // Lose exactly the first retained terminal frame. A permanent `drop: 1` profile would discard every
-      // retransmission too and therefore model an unrecoverable partition, not the one-frame loss named by
-      // this test. The journal must heal this one-shot loss from the same immutable transaction.
-      pair.armNextDrop("envelope", "host");
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
-    expect(pair.faultsInjected(), "the first retained ME terminal delivery must actually be dropped").toBeGreaterThan(
+    expect(pair.faultsInjected(), "the first V2 ME terminal entry delivery must actually be dropped").toBeGreaterThan(
       0,
     );
+    expect(leaveCommitSends, "only the immediate immutable leave entry has been sent so far").toBe(1);
 
-    const guestReplay = await withClient(rig.guestCtx, async () => {
-      // The guest replay is already live so starting it no longer supplies the old implicit reconnect.
-      // Reannounce the receiver's journal cursor exactly as a transport recovery does; the host must replay
-      // the one dropped immutable terminal and the guest must materialize it once.
-      rig.guestRuntime.durability?.reconnect();
-      return drainGuestMeReplayToSettle(guestReplayPhase);
+    await withClient(rig.hostCtx, async () => {
+      advanceCoopActiveTime(300);
+      await drainLoopback();
     });
+    expect(leaveCommitSends, "the Authority V2 log redelivered the retained leave entry").toBeGreaterThanOrEqual(2);
+
+    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
     expect(guestReplay.settled, "the durable ME_TERMINAL must settle the real guest replay phase").toBe(true);
     expect(
       applyOutcomeSpy,
@@ -242,12 +270,37 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     logs.flush();
   }, 300_000);
 
-  it("STOPSHIP: a committed terminal whose first journal retention fails re-ACKs the exact first meResync", async () => {
+  it("STOPSHIP: losing the V2 control-installed receipt redelivers one immutable terminal without reapply", async () => {
     await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
     const hostScene = game.scene;
-    const pair = createLoopbackPair();
+    installCoopSchedulerActiveTimeClock();
+    let armReceiptDrop = false;
+    let terminalReceiptAttempts = 0;
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: (message: CoopMessage): boolean => {
+          if (
+            !armReceiptDrop
+            || message.t !== "authorityReceipt"
+            || message.body.stage !== "controlInstalled"
+            || !message.body.operationId.includes(":ME_TERMINAL:")
+          ) {
+            return false;
+          }
+          terminalReceiptAttempts += 1;
+          return terminalReceiptAttempts === 1;
+        },
+      },
+      { seed: 0x6d3e_2 },
+    );
     const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const applyOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
+    const hostSendSpy = vi.spyOn(pair.host, "send");
 
     let guestReplayPhase!: Phase;
     await withClient(rig.hostCtx, async () => {
@@ -257,108 +310,69 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       guestReplayPhase = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
       await game.phaseInterceptor.to("PostMysteryEncounterPhase", false);
     });
-
-    const durability = rig.hostRuntime.durability;
-    expect(durability, "the production host runtime has an active durability journal").not.toBeNull();
-    const originalJournalCommit = durability!.commit.bind(durability);
-    let injected = false;
-    const journalSpy = vi.spyOn(durability!, "commit").mockImplementation((cls, seq, msg) => {
-      if (!injected && msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "ME_TERMINAL") {
-        injected = true;
-        return false;
-      }
-      return originalJournalCommit(cls, seq, msg);
-    });
-    const submitSpy = vi.spyOn(CoopOperationHost.prototype, "submit");
-    const captureSpy = vi.spyOn(coopEngine, "captureCoopMeOutcome");
-    const releaseSpy = vi.spyOn(meOp, "releaseCoopMeRetainedTerminal");
-    const advanceSpy = vi.spyOn(rig.hostRuntime.controller, "advanceInteraction");
+    armReceiptDrop = true;
+    await withClient(rig.hostCtx, () => hostScene.phaseManager.getCurrentPhase()!.start());
+    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
+    expect(guestReplay.settled, "the first terminal delivery settles the production guest replay").toBe(true);
+    expect(pair.faultsInjected(), "the first V2 controlInstalled receipt was actually dropped").toBeGreaterThan(0);
+    expect(terminalReceiptAttempts, "the replica emitted the dropped terminal receipt").toBe(1);
 
     await withClient(rig.hostCtx, async () => {
-      hostScene.phaseManager.getCurrentPhase()!.start();
-      expect(injected, "the committed terminal hit the injected journal-retention failure").toBe(true);
-      expect(
-        rig.hostRuntime.controller.interactionCounter(),
-        "the host cannot queue/advance past a terminal that is committed but not retained",
-      ).toBe(counterBefore);
-      expect(
-        rig.guestRuntime.controller.interactionCounter(),
-        "the guest remains on the same exact Mystery boundary",
-      ).toBe(counterBefore);
-      expect(hostScene.phaseManager.getCurrentPhase()?.phaseName).toBe("PostMysteryEncounterPhase");
-      expect(captureSpy, "the first attempt captured one authoritative terminal image").toHaveBeenCalledTimes(1);
-      expect(advanceSpy, "journal failure occurs before the local close/advance transaction").not.toHaveBeenCalled();
-      expect(
-        releaseSpy,
-        "the exact terminal image stays retained while the shared boundary is held",
-      ).not.toHaveBeenCalled();
-
-      await new Promise(resolve => setTimeout(resolve, 350));
+      advanceCoopActiveTime(300);
+      await drainLoopback();
     });
+    await withClient(rig.guestCtx, () => drainLoopback());
+    await withClient(rig.hostCtx, () => drainLoopback());
 
-    const terminalSubmits = submitSpy.mock.calls
-      .map((call, index) => ({ intent: call[0], result: submitSpy.mock.results[index] }))
-      .filter(({ intent }) => intent.kind === "ME_TERMINAL");
-    expect(terminalSubmits, "one committed attempt plus one exact deterministic re-ACK").toHaveLength(2);
+    const terminalEntries = hostSendSpy.mock.calls
+      .map(call => call[0])
+      .filter(message => {
+        const operation = committedInteractionOperation(message);
+        return (
+          operation?.kind === "ME_TERMINAL"
+          && meOp.isCompleteCoopMeTerminalPayload(operation.payload)
+          && operation.payload.terminal === "leave"
+        );
+      });
+    expect(terminalEntries.length, "the authority redelivered the unretired terminal entry").toBeGreaterThanOrEqual(2);
     expect(
-      new Set(terminalSubmits.map(({ intent }) => intent.id)).size,
-      "the retry reuses the identical terminal operation address",
+      new Set(terminalEntries.map(message => (message.t === "authorityEntry" ? message.body.operationId : null))).size,
+      "every retry preserves one immutable operation identity",
     ).toBe(1);
     expect(
-      terminalSubmits.map(({ result }) => (result.type === "return" ? result.value.kind : result.type)),
-      "the operation commits once, then the journal-only retry is an idempotent re-ACK",
-    ).toEqual(["committed", "reack"]);
-    expect(
-      JSON.stringify(terminalSubmits[1].intent.payload),
-      "the retry submits the byte-identical first-captured meResync payload",
-    ).toBe(JSON.stringify(terminalSubmits[0].intent.payload));
-    expect(captureSpy, "PostMysteryEncounterPhase must not recapture producer state on retry").toHaveBeenCalledTimes(1);
-
-    const terminalJournalAttempts = journalSpy.mock.calls.filter(
-      ([, , msg]) => msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "ME_TERMINAL",
+      new Set(terminalEntries.map(message => (message.t === "authorityEntry" ? message.body.revision : null))).size,
+      "every retry preserves one global V2 revision",
+    ).toBe(1);
+    expect(applyOutcomeSpy, "duplicate V2 delivery never reapplies either ordered ME terminal").toHaveBeenCalledTimes(
+      2,
     );
-    expect(terminalJournalAttempts, "the re-ACK retries the exact failed journal handoff").toHaveLength(2);
-    expect(terminalJournalAttempts[1][1], "the journal retry retains the same committed envelope revision").toBe(
-      terminalJournalAttempts[0][1],
-    );
-    expect(JSON.stringify(terminalJournalAttempts[1][2])).toBe(JSON.stringify(terminalJournalAttempts[0][2]));
-    expect(rig.hostRuntime.controller.interactionCounter(), "the successful retry advances the host exactly once").toBe(
-      counterBefore + 1,
-    );
-    expect(advanceSpy, "the successful retained terminal closes/advances exactly once").toHaveBeenCalledTimes(1);
-    expect(releaseSpy, "the terminal image releases exactly once after close/advance succeeds").toHaveBeenCalledTimes(
-      1,
-    );
-    expect(releaseSpy.mock.invocationCallOrder[0]).toBeGreaterThan(advanceSpy.mock.invocationCallOrder[0]);
-    expect(
-      rig.guestRuntime.controller.interactionCounter(),
-      "delivery alone cannot mutate the inactive guest engine context",
-    ).toBe(counterBefore);
-
-    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
-    expect(guestReplay.settled, "the retried committed terminal settles the production guest replay").toBe(true);
-    expect(rig.guestRuntime.controller.interactionCounter(), "the guest advances exactly once from that terminal").toBe(
-      counterBefore + 1,
-    );
+    expect(rig.hostRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
+    expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
     logs.flush();
   }, 300_000);
 
   it("DURABILITY: dropping the top-level mePresent still materializes the host presentation", async () => {
     await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
     const hostScene = game.scene;
+    installCoopSchedulerActiveTimeClock();
+    let presentationCommitSends = 0;
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       {
-        drop: 0,
+        drop: 1,
         reorder: 0,
         delay: 0,
+        faultable: (message: CoopMessage): boolean => {
+          if (!isCommittedMeOperation(message, "ME_PRESENT")) {
+            return false;
+          }
+          presentationCommitSends += 1;
+          return presentationCommitSends === 1;
+        },
       },
       { seed: 0x6d3f },
     );
     const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
-    // The first host envelope on ME entry is the retained ME_PRESENT. Drop it once, while leaving every
-    // resync replay deliverable, so this is a recovery proof rather than an endless partition.
-    pair.armNextDrop("envelope", "host");
     const hostEncounter = hostScene.currentBattle.mysteryEncounter!;
     const populateHostTokens = hostEncounter.populateDialogueTokensFromRequirements.bind(hostEncounter);
     vi.spyOn(hostEncounter, "populateDialogueTokensFromRequirements").mockImplementation(() => {
@@ -370,14 +384,19 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     let guestReplayPhase!: Phase;
     await withClient(rig.hostCtx, async () => {
       await runMysteryEncounterToEnd(game, 1);
+      expect(
+        pair.faultsInjected(),
+        "the first retained top-level presentation must actually be dropped",
+      ).toBeGreaterThan(0);
+      expect(presentationCommitSends, "the first V2 ME_PRESENT delivery was the dropped frame").toBe(1);
+      advanceCoopActiveTime(300);
+      await drainLoopback();
+      expect(presentationCommitSends, "the Authority V2 log redelivered ME_PRESENT").toBeGreaterThanOrEqual(2);
       await game.phaseInterceptor.to("SelectModifierPhase", false);
       const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       guestReplayPhase = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
-    expect(pair.faultsInjected(), "the first retained top-level presentation must actually be dropped").toBeGreaterThan(
-      0,
-    );
 
     const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
     expect(guestReplay.settled, "the guest replay still reaches its terminal").toBe(true);
@@ -507,16 +526,10 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
 
   // =====================================================================================
   // LEG 2b - TRACK R (run 29640634363 mystery lane): GUEST-OWNED NARRATION-BEARING ME. The guest owner
-  // picks; the HOST commits the ME_PICK and RETAINS it awaiting the guest's continuation surface. The
-  // guest then shows post-pick NARRATION in UiMode.MESSAGE, whose continuation surface is null by design
-  // (coop-ui-registry.ts:311) - so WITHOUT the fix the committed ME_PICK's authority-continuation deadline
-  // exhausts (`operation continuation EXHAUSTED key=...ME_PICK`, ~3min) -> shared session terminal -> both
-  // to Title, and the ME terminal (gated behind the unreleased pick) can never substitute. The fix
-  // (CoopReplayMePhase.releaseAppliedPickContinuationSurface, driven from the guest-owned ME_PICK
-  // material-apply hook in applyJournaledMeEnvelope) emits ONE phase-owned `sharedInput` continuation for
-  // the applied pick at its exact op-derived address. This LEG proves that release fires from the phase -
-  // BEFORE any reward-shop surface opens - so the pick continuation drains, the guest reaches the terminal
-  // without Title, and both engines converge in lockstep.
+  // picks; the HOST commits the ME_PICK and RETAINS it until the guest proves the typed successor installed.
+  // Post-pick narration is not executable control, so Authority V2 must project the exact next interaction
+  // and emit its controlInstalled receipt before any reward shop opens. This LEG proves that ordered V2
+  // crossing reaches the terminal and next command without falling back to the retired continuation journal.
   // =====================================================================================
   it("LEG 2b (guest-owned, narration-bearing): the committed ME_PICK continuation releases from the post-pick surface, no Title (Track R)", async () => {
     await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
@@ -535,14 +548,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     expect(counterBefore, "the ME opens on interaction counter 1 (guest owns odd)").toBe(1);
 
-    const guestDurability = rig.guestRuntime.durability;
-    if (guestDurability == null) {
-      throw new Error("guest-owned narration ME test lost its durability journal");
-    }
-    // The exact seam the fix relies on: the phase's post-pick sharedInput continuation emit routes through
-    // the ACTIVE durability (the guest's, under guestCtx). Capturing it proves the phase - not a later
-    // shop surface - retired the retained pick.
-    const releaseSpy = vi.spyOn(guestDurability, "notifyOperationContinuationSurface");
+    // Observe the real V2 wire proof. The retired operation-continuation journal is deliberately absent
+    // from correctness: the replica may proceed only after it signs controlInstalled for the exact ME_PICK.
+    const guestV2SendSpy = vi.spyOn(pair.guest, "send");
 
     // STEP A (host): reach MysteryEncounterPhase; the host parks awaiting the guest's relayed index.
     await withClient(rig.hostCtx, async () => {
@@ -573,26 +581,24 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     });
 
     // STEP C1 (guest): pump the guest so it APPLIES the broadcast ME_PICK envelope. The Track R
-    // material-apply hook fires here and releases the pick's continuation from the phase - BEFORE the guest
-    // opens any reward-shop (sharedInput) surface. Snapshot the emit count first so the assertion isolates
-    // THIS pick-apply window (the earlier ME_PRESENT selector surface emit is excluded).
-    const emitsBeforePickApply = releaseSpy.mock.calls.length;
-    const pickApplyEmits = await withClient(rig.guestCtx, async () => {
+    // material-apply hook fires here and installs the entry's exact typed successor before any reward shop.
+    // Snapshot the wire count first so the assertion isolates this ME_PICK apply window.
+    const sendsBeforePickApply = guestV2SendSpy.mock.calls.length;
+    const pickApplySends = await withClient(rig.guestCtx, async () => {
       for (let i = 0; i < 8; i++) {
         await drainLoopback();
       }
-      return releaseSpy.mock.calls.slice(emitsBeforePickApply);
+      return guestV2SendSpy.mock.calls.slice(sendsBeforePickApply).map(call => call[0]);
     });
     expect(
-      pickApplyEmits.some(
-        ([surface, address]) => surface === "sharedInput" && address.wave === ME_WAVE && address.turn === 0,
+      pickApplySends.some(
+        message =>
+          message.t === "authorityReceipt"
+          && message.body.stage === "controlInstalled"
+          && message.body.operationId.includes(":ME_PICK:"),
       ),
-      "the guest released its committed ME_PICK continuation from the phase at the pick apply, before any shop opened (Track R)",
+      "the guest proved the committed ME_PICK successor installed before any shop opened (Authority V2)",
     ).toBe(true);
-    expect(
-      guestDurability.operationContinuationDiagnostics().pending,
-      "the guest owner's ME_PICK drained; only the already-applied pre-reward terminal awaits its public tail",
-    ).toBe(1);
 
     // STEP C2 (guest): the guest OWNS the reward pick (#828) - open its shop as owner, relay LEAVE sync.
     const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
@@ -731,11 +737,6 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     expect(rig.guestRuntime.controller.interactionCounter(), "guest counter is 2 after the ME (lockstep)").toBe(
       counterBefore + 1,
     );
-    expect(
-      guestDurability.operationContinuationDiagnostics().pending,
-      "the guest holds no stranded op:me continuation after the ME",
-    ).toBe(0);
-
     logs.flush();
   }, 300_000);
 
@@ -764,8 +765,22 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       );
     });
 
-    // Drive the guest: the terminal race resolves the 9M battle-handoff; the guest finishes WITHOUT leaving.
-    const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+    // Drive the guest while both destination event loops stay alive. ME_PRESENT's controlInstalled receipt
+    // makes the authority publish ME_PICK, whose receipt then publishes the ordered ME_TERMINAL. A fixed
+    // guest-only drain loop executes the host receipt callback under the wrong shared-process scene and
+    // manufactures a gap that cannot occur in two browsers.
+    rig.pair.setDestinationContextDelivery?.(true);
+    const guestReplay = await (async () => {
+      try {
+        const guestReplayPending = withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+        return await settleDuoPromise(rig, guestReplayPending, "battle-handoff Mystery replay", {
+          timeoutMs: 10_000,
+          intervalMs: 5,
+        });
+      } finally {
+        rig.pair.setDestinationContextDelivery?.(false);
+      }
+    })();
     expect(guestReplay.settled, "guest CoopReplayMePhase settled at the battle-handoff").toBe(true);
 
     const terminal = submitSpy.mock.calls.map(call => call[0]).find(intent => intent.kind === "ME_TERMINAL")?.payload;

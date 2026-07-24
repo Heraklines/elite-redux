@@ -2792,3 +2792,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   retains its exact payload, presentation-ledger, and before-command ordering comparisons.
 - The branch-wide typecheck still reports the repository's known unrelated baseline. It reports no error in
   any file changed by this batch; owned-file formatting and `git diff --check` remain clean.
+
+# 2026-07-24 - B5 Mystery durability migrates from the retired journal to Authority V2
+
+- Exact full gate `30086274421` left five B5 failures in `coop-duo-me-operation`. Four asserted mechanisms
+  intentionally removed by the V2 cutover: dropping a legacy `envelope`, failing the independent durability
+  journal, and releasing progression through `notifyOperationContinuationSurface`. The fixtures now fault
+  the exact `INTERACTION_COMMIT` authority entry or `controlInstalled` receipt, advance the deterministic V2
+  lease clock, and require immutable revision/operation redelivery plus exactly-once material application.
+- The guest-owned narration proof now observes the exact ME_PICK `controlInstalled` receipt instead of a
+  legacy `sharedInput` continuation. Its remaining end-to-end assertions still require both real engines to
+  reach the next public command surface with lockstep counters.
+- The battle-handoff red was a one-process scheduling artifact with direct evidence: revision 2 arrived while
+  revision 1's receipt callback was executing under the guest's ambient scene, then the guest-only drain loop
+  never let the host publish the successor. The test now uses the existing destination-context scheduler and
+  pumps both real client contexts until the retained ME_PRESENT -> ME_PICK -> ME_TERMINAL chain settles.
