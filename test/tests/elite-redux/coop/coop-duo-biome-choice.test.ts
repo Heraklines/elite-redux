@@ -777,8 +777,12 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       getCoopUiRelayEdges().some(edge => edge.mode === UiMode.ER_MAP && edge.carrier === "interactionChoice"),
       "the public World-Map input reached the production biome relay",
     ).toBe(true);
-    for (let attempt = 0; attempt < 80 && biomeArg(guestSwitch) === undefined; attempt++) {
+    for (let attempt = 0; attempt < 200 && biomeArg(guestSwitch) === undefined; attempt++) {
       await pumpDuoDestinations(rig, 1);
+      // The watcher closes ER_MAP through an asynchronous setMode(MESSAGE) continuation before it projects
+      // SwitchBiomePhase. Transport-only spins can exhaust their bound without ever yielding the watcher's
+      // browser timer queue, even though its immutable BIOME_PICK is already admitted and material-ready.
+      await withClient(watcherCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
     }
 
     // BOTH engines switch to the owner's CHOSEN (non-default) biome - the core mechanic, restored.

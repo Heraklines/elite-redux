@@ -3001,7 +3001,13 @@ export async function arriveGuestCommandBoundary(
   const behind = (scene: BattleScene): boolean =>
     scene.currentBattle.waveIndex < wave
     || (opts.proveGuestCommand === true && scene.currentBattle.waveIndex === wave && scene.currentBattle.turn < turn);
-  if (behind(rig.hostScene) || behind(rig.guestScene)) {
+  const needsAddressDrive = behind(rig.hostScene) || behind(rig.guestScene);
+  const currentGuest = rig.guestScene.phaseManager.getCurrentPhase();
+  const guestAlreadyAtProofBoundary =
+    currentGuest?.phaseName === "CoopReplayTurnPhase"
+    || (currentGuest?.phaseName === "CommandPhase"
+      && (currentGuest as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX);
+  if (needsAddressDrive || (opts.proveGuestCommand === true && !guestAlreadyAtProofBoundary)) {
     await withClient(rig.hostCtx, () =>
       driveClientPhaseQueueTo(rig.hostScene, `host wave ${wave} CommandPhase`, {
         matches: phase =>
@@ -3020,17 +3026,28 @@ export async function arriveGuestCommandBoundary(
             || (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX),
       }),
     );
-    if (opts.proveGuestCommand === true) {
-      // Present (start) the guest-owned CommandPhase so its address-exact frontier proof is recorded. Once
-      // the proof is submitted the pure-renderer guest advances through its own TurnStart into a parked
-      // CoopReplayTurnPhase (awaiting the host resolution) - the exact production tail. Drive to that phase
-      // and record the crossed boundary directly (the guest is no longer AT a CommandPhase, so the
-      // CommandPhase-guarded markRealGuestCommandBoundary cannot be used): this keeps remirrorWave from
-      // re-clobbering the proven guest and lets driveGuestReplayTurn reuse the already-current replay object.
-      await withClient(rig.guestCtx, async () => {
-        const guestCommand = rig.guestScene.phaseManager.getCurrentPhase();
+  }
+  if (opts.proveGuestCommand === true) {
+    // Present (start) the guest-owned CommandPhase so its address-exact frontier proof is recorded. This
+    // must also run for an initial wave whose mirrored currentBattle already equals the requested address;
+    // equality alone never proved that the public handler existed, and the former `behind`-only branch let
+    // interaction overrides consume the command phase while the later TURN_COMMIT had no live replay.
+    await withClient(rig.guestCtx, async () => {
+      let guestCommand = rig.guestScene.phaseManager.getCurrentPhase();
+      if (guestCommand.phaseName !== "CoopReplayTurnPhase") {
+        if (
+          guestCommand.phaseName !== "CommandPhase"
+          || (guestCommand as Phase & { getFieldIndex(): number }).getFieldIndex() !== COOP_GUEST_FIELD_INDEX
+        ) {
+          guestCommand = await driveClientPhaseQueueTo(rig.guestScene, `guest ${wave}:${turn} command proof`, {
+            matches: phase =>
+              phase.phaseName === "CommandPhase"
+              && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+            pumpPeer: () => drainLoopback(),
+          });
+        }
         const mode = rig.guestScene.ui.getMode();
-        if (guestCommand.phaseName === "CommandPhase" && mode !== UiMode.COMMAND && mode !== UiMode.FIGHT) {
+        if (mode !== UiMode.COMMAND && mode !== UiMode.FIGHT) {
           guestCommand.start();
         }
         await drainLoopback();
@@ -3039,11 +3056,13 @@ export async function arriveGuestCommandBoundary(
           // still-unstarted wave CommandPhase (hostPlayWave owns starting it) with a drain-only peer pump.
           await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase", { pumpPeer: () => drainLoopback() });
         }
-      });
-      realGuestCommandBoundaries.set(rig.guestScene, { wave, turn });
-    } else {
-      markRealGuestCommandBoundary(rig.guestScene, wave, turn);
-    }
+      }
+    });
+    realGuestCommandBoundaries.set(rig.guestScene, { wave, turn });
+  } else if (needsAddressDrive) {
+    // Preserve the pre-drive fact: after materialization `behind()` is necessarily false, but ordinary
+    // arrival-only callers still need the exact boundary recorded without starting its UI.
+    markRealGuestCommandBoundary(rig.guestScene, wave, turn);
   }
 
   if (

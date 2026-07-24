@@ -19,28 +19,25 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
-import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  buildDuo,
   buildGuestScene,
   buildRuntime,
-  type ClientCtx,
   drainLoopback,
   driveClientPhaseQueueTo,
-  emptyGhostSnapshot,
+  driveDuoGuestTackleThroughPublicUi,
+  driveGuestReplayTurn as driveHarnessGuestReplayTurn,
   installDuoLogCapture,
-  installHeadlessPlayerAtlasCompletionModel,
-  mirrorHostBattleToGuest,
   reachInterceptedRewardShop,
   shiftQueuedGuestBootTail,
   withClient,
@@ -199,83 +196,38 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
   }, 120_000);
 
   it("DUO: host plays a turn, the REAL guest engine RECVs+RESOLVEs+applies the checkpoint over loopback", async () => {
-    // ===== HOST engine =====
+    // Build the same paired two-engine boundary as the maintained journeys. The original feasibility
+    // spike assembled runtimes by hand and injected both commands into the host engine, so it never
+    // established the V2 CONTROL_COMMIT predecessor that now authorizes TURN_COMMIT.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const hostScene = game.scene;
     const pair = createLoopbackPair();
-    // Assemble BOTH runtimes over the ONE loopback pair (assembleCoopRuntime does NOT clear/close,
-    // so building the guest does not disconnect the host - the inventory's "assemble once" rule).
-    const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
-    const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
-    hostRuntime.controller.role = "host";
-    guestRuntime.controller.role = "guest";
-
-    hostScene.gameMode = getGameMode(GameModes.COOP);
-    const hostField = hostScene.getPlayerField();
-    hostField[COOP_HOST_FIELD_INDEX].coopOwner = "host";
-    hostField[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
-    const hostCtx: ClientCtx = {
-      label: "host",
-      scene: hostScene,
-      runtime: hostRuntime,
-      rndState: Phaser.Math.RND.state(),
-      ghost: emptyGhostSnapshot(),
-    };
-
-    // ===== GUEST engine (a 2nd real BattleScene) =====
-    const guestScene = buildGuestScene(game);
-    const guestCtx: ClientCtx = {
-      label: "guest",
-      scene: guestScene,
-      runtime: guestRuntime,
-      rndState: Phaser.Math.RND.state(),
-      ghost: emptyGhostSnapshot(),
-    };
-    await withClient(guestCtx, () => {
-      mirrorHostBattleToGuest(hostScene, guestScene);
-      // This older hand-assembled spike bypasses buildDuo, so wire the same HEADLESS-only Phaser cache/live
-      // key completion model explicitly. The production projection path below remains otherwise unchanged.
-      installHeadlessPlayerAtlasCompletionModel(guestScene);
-      const gf = guestScene.getPlayerField();
-      gf[COOP_HOST_FIELD_INDEX].coopOwner = "host";
-      gf[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
+    const rig = await buildDuo(game, pair, setCoopRuntime, scene => {
+      scene.gameMode = getGameMode(GameModes.COOP);
     });
-
-    // Connect both controllers (exchange hello / dataFingerprint over the live loopback).
-    setCoopRuntime(hostRuntime);
-    hostRuntime.controller.connect();
-    setCoopRuntime(guestRuntime);
-    guestRuntime.controller.connect();
-    await drainLoopback();
-
-    // The REAL guest engine answers the host's commandRequest for ITS OWN slot via the
-    // production CoopBattleSync relay (the guest's transport endpoint), picking move 0. This is
-    // the genuine guest-side command channel - not a hand-authored turnResolution.
-    guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
 
     // Track the exact carrier the guest received. Legacy applies the numeric checkpoint directly; Authority
     // V2 intentionally bypasses that function and proves the immutable carrier reached its material boundary.
     const applyCheckpointSpy = vi.spyOn(coopEngine, "applyCoopCheckpoint");
     let guestTurnResolution: Extract<CoopMessage, { t: "turnResolution" }> | null = null;
-    const guestV2AppliedBefore = getCoopV2Shadow(guestRuntime)?.diagnostics().applied ?? 0;
+    const guestV2AppliedBefore = getCoopV2Shadow(rig.guestRuntime)?.diagnostics().applied ?? 0;
     pair.guest.onMessage(msg => {
       if (msg.t === "turnResolution") {
         guestTurnResolution = msg;
       }
     });
 
-    // ===== Drive ONE host turn to completion (both player slots FIGHT). =====
-    await withClient(hostCtx, async () => {
-      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+    // Drive both seats exclusively through their real COMMAND/FIGHT/TARGET handlers. This proves the
+    // guest relay and installs the exact V2 command control before the host authors the turn.
+    const turn = rig.hostScene.currentBattle.turn;
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+      guestTarget: BattlerIndex.ENEMY_2,
+    });
+    await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
-    await drainLoopback();
+    await withClient(rig.guestCtx, () => drainLoopback());
 
     // V2 owns the mechanical carrier, so its legacy turnResolution twin must be absent. A legacy fallback
     // keeps the original assertion. The real material proof happens after the guest replay below.
@@ -285,26 +237,25 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       expect(guestTurnResolution, "the legacy guest received the host's turnResolution").not.toBeNull();
     }
 
-    // The spike predates buildDuo's sequential-boundary bridge. Finish the real host BattleEnd seam and its
-    // retained automatic-victory seal now so the COMPLETE post-victory WAVE_ADVANCE transaction exists
+    // Finish the real host BattleEnd seam and its retained automatic-victory seal so the COMPLETE
+    // post-victory WAVE_ADVANCE transaction exists
     // before the winning guest replay consumes it. Stopping at BattleEnd alone is intentionally insufficient:
     // trainer money, automatic modifiers, and biome/x0 state settle between BattleEnd and the seal.
-    await withClient(hostCtx, async () => {
+    await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CoopVictorySealPhase");
     });
-    await withClient(guestCtx, () => drainLoopback());
+    await withClient(rig.guestCtx, () => drainLoopback());
 
     // ===== Pump the GUEST: run its REAL CoopReplayTurnPhase for the host's turn. The host won the
     // wave (it broadcast waveResolved "win"), so the guest's ordered WAVE_ADVANCE entry owns the
     // VictoryPhase tail - the guest's path to the SAME post-battle reward shop the host reaches.
     // We assert the real phase queue reaches that tail (no infinite TurnInit loop).
     let guestVictoryPhase = "";
-    await withClient(guestCtx, async () => {
-      const turn = guestScene.currentBattle.turn;
-      await driveGuestReplayTurn(guestScene, turn);
+    await withClient(rig.guestCtx, async () => {
+      await driveHarnessGuestReplayTurn(rig.guestScene, turn);
       // A null TURN successor deliberately cannot manufacture this tail. The following ordered
       // WAVE_ADVANCE entry owns it, first through CoopWaveAdvanceBoundaryPhase and then VictoryPhase.
-      const victory = await driveClientPhaseQueueTo(guestScene, "VictoryPhase");
+      const victory = await driveClientPhaseQueueTo(rig.guestScene, "VictoryPhase");
       guestVictoryPhase = victory.phaseName;
     });
 
@@ -312,7 +263,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // assertion follows the negotiated implementation instead of demanding an obsolete legacy helper call.
     if (V2_TURN_CUTOVER) {
       expect(
-        getCoopV2Shadow(guestRuntime)?.diagnostics().applied ?? 0,
+        getCoopV2Shadow(rig.guestRuntime)?.diagnostics().applied ?? 0,
         "the Authority V2 entry completed the guest's live material/finalize boundary",
       ).toBeGreaterThan(guestV2AppliedBefore);
     } else {
@@ -320,7 +271,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     }
     // The guest engine's enemies converged to the host's KO'd state (the frail Magikarps fainted) -
     // the guest computed nothing, it rendered the host's authoritative outcome.
-    const guestEnemiesFainted = guestScene.currentBattle.enemyParty.every(e => e.isFainted());
+    const guestEnemiesFainted = rig.guestScene.currentBattle.enemyParty.every(e => e.isFainted());
     expect(guestEnemiesFainted, "the guest's enemies converged to the host-KOd state").toBe(true);
     // PHASE PROGRESS / no hang: the guest's finalize queued its OWN turn-end (the run loops) AND the
     // VictoryPhase tail (the wave advances toward the post-battle reward shop). This is the exact path
@@ -332,71 +283,12 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // ===== HOST reaches the post-battle REWARD SHOP. Continue driving the host past VictoryPhase to
     // its SelectModifierPhase (the reward shop) - proving the won battle traverses to the shop on the
     // sole authoritative engine, which is where the guest (replaying the host's stream) follows. =====
-    await withClient(hostCtx, () => reachInterceptedRewardShop(game, hostScene));
+    await withClient(rig.hostCtx, () => reachInterceptedRewardShop(game, rig.hostScene));
     expect(
-      hostScene.phaseManager.getCurrentPhase().is("SelectModifierPhase"),
+      rig.hostScene.phaseManager.getCurrentPhase().is("SelectModifierPhase"),
       "the host reached the post-battle reward shop (SelectModifierPhase)",
     ).toBe(true);
 
     logs.flush();
   }, 180_000);
 });
-
-/**
- * Pump a guest scene's phase queue to completion (it has no PhaseInterceptor; the harness made
- * startCurrentPhase inert). Runs each current phase, drains loopback between, until the queue is
- * empty or a no-progress hang is detected (which FAILS the spike with both logs already captured).
- */
-/**
- * The presentation phases {@linkcode CoopReplayTurnPhase} unshifts (anim pump + deferred finalize),
- * plus the MessagePhase a `message` event queues. The checkpoint + wave-advance run in the deferred
- * {@linkcode CoopFinalizeTurnPhase} (LAST on the tree level), so we drain these to observe the
- * checkpoint applied. (Mirrors the single-engine guest test's REPLAY_DRAIN_PHASES.)
- */
-const REPLAY_DRAIN_PHASES = new Set([
-  "MessagePhase",
-  "CoopMoveAnimReplayPhase",
-  "CoopHpDrainReplayPhase",
-  "CoopStatStageReplayPhase",
-  "CoopStatusReplayPhase",
-  "CoopFaintReplayPhase",
-  "CoopFinalizeTurnPhase",
-]);
-
-/**
- * Start a guest {@linkcode CoopReplayTurnPhase} for `turn` and drain the presentation phases it
- * unshifts PLUS the deferred {@linkcode CoopFinalizeTurnPhase} (which applies the host's checkpoint,
- * verifies the checksum, queues turn-end + the wave-advance tail). Throws on a no-progress hang so
- * the spike FAILS loudly (with both clients' logs already captured). The drain runs each phase to
- * completion; the anim/tween work is force-ended headlessly.
- */
-async function driveGuestReplayTurn(
-  guestScene: { phaseManager: { create: (n: "CoopReplayTurnPhase", t: number) => Phase; getCurrentPhase(): Phase } },
-  turn: number,
-): Promise<void> {
-  const replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
-  replay.start();
-  await drainLoopback();
-  let lastName = "";
-  let stall = 0;
-  for (let i = 0; i < 64; i++) {
-    const cur = guestScene.phaseManager.getCurrentPhase();
-    if (cur == null || !REPLAY_DRAIN_PHASES.has(cur.phaseName)) {
-      return;
-    }
-    if (cur.phaseName === lastName) {
-      if (++stall > 16) {
-        throw new Error(`guest replay HANG: stuck on ${cur.phaseName} - see dev-logs/coop-duo/`);
-      }
-    } else {
-      stall = 0;
-    }
-    lastName = cur.phaseName;
-    const wasFinalize = cur.phaseName === "CoopFinalizeTurnPhase";
-    cur.start();
-    await drainLoopback();
-    if (wasFinalize) {
-      return;
-    }
-  }
-}

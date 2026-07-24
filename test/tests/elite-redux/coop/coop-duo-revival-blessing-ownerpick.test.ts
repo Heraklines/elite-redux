@@ -34,7 +34,6 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
@@ -47,14 +46,15 @@ import {
   arriveGuestCommandBoundary,
   buildDuo,
   type CoopResyncProbe,
-  drainLoopback,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
   pumpDuoDestinations,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -116,8 +116,9 @@ describe.skipIf(!RUN)(
         SpeciesId.CHARIZARD, // 2 guest bench (FAINTED - the host fallback target)
         SpeciesId.BLASTOISE, // 3 guest bench (FAINTED - the OWNER'S pick)
       );
-      const pair = createLoopbackPair();
+      const pair = createScheduledCoopPair({ automatic: true });
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+      pair.setAutomaticDelivery(false);
 
       // Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay). This is the
       // ONLY driver for the guest slot (field 1) - the host resolves it via requestPartnerCommand, NOT the
@@ -238,15 +239,31 @@ describe.skipIf(!RUN)(
         );
       });
 
+      // PARTY confirmation closes through the projected phase's asynchronous MESSAGE-mode tail. Keep the
+      // destination browser alive until that exact phase has ended; beginning host turn resolution while
+      // the guest override is merely committed-but-current can make the later TURN_COMMIT material wait
+      // behind a UI that a real independent browser would already have retired.
+      for (
+        let attempt = 0;
+        attempt < 200 && rig.guestScene.phaseManager.getCurrentPhase() === projectedGuestPicker;
+        attempt++
+      ) {
+        await pumpDuoDestinations(rig, 1);
+        await withClient(rig.guestCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
+      }
+      expect(
+        rig.guestScene.phaseManager.getCurrentPhase(),
+        "the projected revival picker closed under the guest browser context",
+      ).not.toBe(projectedGuestPicker);
+
       // ===== (E) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the host's
       // awaitInteractionChoice resolves UNDER the host ctx -> applyRevive on the HOST scene + end(). Then run
       // the rest of the turn to TurnEndPhase (host lead's tackle, enemy moves, checkpoint emit). =====
-      await withClient(rig.hostCtx, async () => {
-        for (let i = 0; i < 8; i++) {
-          await drainLoopback();
-        }
-        await game.phaseInterceptor.to("CoopTurnCommitPhase");
+      let hostAdvance!: Promise<void>;
+      await withClient(rig.hostCtx, () => {
+        hostAdvance = game.phaseInterceptor.to("CoopTurnCommitPhase") as Promise<void>;
       });
+      await settleDuoPromise(rig, hostAdvance, "revival owner-pick host turn crossing");
 
       // ===== (F) GUEST: replay the turn. The ordinary authoritative checkpoint must carry the mutated
       // bench HP/status directly; requiring a checksum mismatch + heavy stateSync here would expose a visible

@@ -39,36 +39,34 @@ import { initGlobalScene } from "#app/global-scene";
 import { adoptCoopHostPlayerPartyOrder, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import {
-  broadcastCoopWaveEndState,
-  broadcastCoopWaveResolved,
-  clearCoopRuntime,
-  getCoopWaveBoundaryStatus,
-  setCoopRuntime,
-} from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { clearCoopRuntime, getCoopWaveBoundaryStatus, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { Move } from "#moves/move";
-import { BattleEndPhase } from "#phases/battle-end-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
+  drainLoopback,
   driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
+  haltQueueAfterCurrent,
   installCoopResyncProbe,
   installDuoLogCapture,
-  pumpDuoDestinations,
   setCoopHarnessLiveEvents,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
-import { hostOwnedFaintPending, registerHostFaintAutoPick } from "#test/tools/coop-soak-driver";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
@@ -152,9 +150,11 @@ describe.skipIf(!RUN)(
         SpeciesId.LAPRAS, // 4 host  (bench - alive)
         SpeciesId.VENUSAUR, // 5 guest (bench - alive)
       );
-      const pair = createLoopbackPair();
+      const pair = createScheduledCoopPair({ automatic: true });
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-      wireGuestCommand(rig);
+      // Automatic microtask delivery is boot-only. Gameplay frames are pumped under the destination
+      // browser's complete context so the fixture cannot apply a guest entry against the host scene.
+      pair.setAutomaticDelivery(false);
 
       // Host EVEN / guest ODD ownership (the soak's 3-per-player rule) on both engines.
       for (const scene of [rig.hostScene, rig.guestScene]) {
@@ -177,9 +177,14 @@ describe.skipIf(!RUN)(
         withClientSync(rig.guestCtx, () => order(rig.guestScene)),
       );
 
-      // TURN 1 on the HOST: the host lead SPLASHes (harmless); the foe's ROCK_SLIDE KOs the 1-HP host lead.
+      // TURN 1: both seats choose their harmless first move through the real public handlers; the foe's
+      // ROCK_SLIDE KOs the 1-HP host lead. This installs the exact V2 command predecessor instead of
+      // answering a synthetic commandRequest callback.
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        submitHostTackle: true,
+      });
       await withClient(rig.hostCtx, async () => {
-        game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
         await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       expect(rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX]?.isFainted() ?? true, "the host lead fainted").toBe(
@@ -194,12 +199,44 @@ describe.skipIf(!RUN)(
       // HOST: cross past its own SwitchPhase - it auto-picks FENNEKIN (slot 2), whose SwitchSummonPhase SWAPS
       // the array to [FENNEKIN@0, SNORLAX@1, CHIKORITA@2, ...], then pushes the out-of-band replacement
       // checkpoint (the SOURCE fix).
-      await withClient(rig.hostCtx, async () => {
-        if (hostOwnedFaintPending(rig)) {
-          registerHostFaintAutoPick(game, rig);
+      const publicReplacementPicks: Promise<void>[] = [];
+      const hostUi = rig.hostScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+      const realHostSetMode = hostUi.setMode.bind(rig.hostScene.ui);
+      hostUi.setMode = (...args: unknown[]): unknown => {
+        if (args[0] === UiMode.PARTY) {
+          hostUi.setMode = realHostSetMode;
+          const opened = realHostSetMode(...args);
+          publicReplacementPicks.push(
+            Promise.resolve(opened).then(
+              () =>
+                new Promise<void>(resolve => {
+                  setTimeout(() => {
+                    withClientSync(rig.hostCtx, () => {
+                      expect(rig.hostScene.ui.processInput(Button.DOWN)).toBe(true);
+                      expect(rig.hostScene.ui.processInput(Button.DOWN)).toBe(true);
+                      expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
+                      expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
+                    });
+                    resolve();
+                  }, 0);
+                }),
+            ),
+          );
+          return opened;
         }
-        await game.phaseInterceptor.to("CommandPhase", false);
-      });
+        return realHostSetMode(...args);
+      };
+      let hostAdvance: Promise<void> | undefined;
+      try {
+        await withClient(rig.hostCtx, async () => {
+          hostAdvance = game.phaseInterceptor.to("CommandPhase", false) as Promise<void>;
+        });
+        expect(hostAdvance, "the host replacement crossing started").toBeDefined();
+        await settleDuoPromise(rig, hostAdvance!, "party-transposition host replacement crossing");
+        await Promise.all(publicReplacementPicks);
+      } finally {
+        hostUi.setMode = realHostSetMode;
+      }
       const hostOrderAfter = order(rig.hostScene);
       expect(hostOrderAfter[0], "host swapped FENNEKIN into the front (field) slot").toBe(SpeciesId.FENNEKIN);
       expect(hostOrderAfter[2], "host moved the fainted CHIKORITA to the vacated bench slot").toBe(SpeciesId.CHIKORITA);
@@ -221,47 +258,58 @@ describe.skipIf(!RUN)(
         "guest party order matches the host",
       ).toEqual(hostOrderAfter);
 
-      // Start both real turn-N+1 command surfaces. This is the mechanical proof that retires the ordered
-      // replacement entry; merely constructing/replaying up to CommandPhase is intentionally insufficient.
-      const guestCommand = await withClient(rig.guestCtx, () =>
-        driveClientPhaseQueueTo(rig.guestScene, "post-replacement guest CommandPhase", {
-          matches: phase =>
-            phase.phaseName === "CommandPhase"
-            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
-        }),
-      );
-      await withClient(rig.guestCtx, () => {
-        guestCommand.start();
-      });
-      await withClient(rig.hostCtx, () => {
-        const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
-        expect(hostCommand.phaseName, "the host retained its prepared post-replacement command").toBe("CommandPhase");
-        hostCommand.start();
-      });
-      await pumpDuoDestinations(rig, 4);
-
-      // The bench mon that took the field (FENNEKIN, host slot 0) fights on + levels up: settle it on the host,
-      // then commit the host's complete settled image into an ordered V2 WAVE_ADVANCE and apply it at the
-      // guest's retained BattleEnd boundary.
+      // The bench mon that took the field (FENNEKIN, host slot 0) fights on + levels up. Make the next
+      // real turn a deterministic win so WAVE_ADVANCE is authored from its legal TURN predecessor rather
+      // than from the replacement control (the obsolete fixture's direct broadcast was correctly refused).
       rig.hostScene.getPlayerParty()[0].level = 55;
       rig.hostScene.getPlayerParty()[0].exp += 5000;
       rig.hostScene.getPlayerParty()[0].calculateStats();
-      await withClient(rig.hostCtx, () => {
-        broadcastCoopWaveResolved("win");
-        broadcastCoopWaveEndState();
+      for (const enemy of rig.hostScene.getEnemyField()) {
+        enemy.hp = 1;
+      }
+      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: false });
+      const settledTurn = rig.hostScene.currentBattle.turn;
+      await withClient(rig.hostCtx, async () => {
+        expect(rig.hostScene.ui.getMode(), "host post-replacement COMMAND is actionable").toBe(UiMode.COMMAND);
+        expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
+        expect(rig.hostScene.ui.getMode()).toBe(UiMode.FIGHT);
+        expect(rig.hostScene.ui.processInput(Button.RIGHT), "host selects Earthquake").toBe(true);
+        expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
+        const postMovePhase = await driveClientPhaseQueueTo(rig.hostScene, "Earthquake target or turn commit", {
+          matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "CoopTurnCommitPhase",
+        });
+        if (postMovePhase.phaseName === "SelectTargetPhase") {
+          postMovePhase.start();
+          expect(rig.hostScene.ui.getMode()).toBe(UiMode.TARGET_SELECT);
+          expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms Earthquake's legal target").toBe(true);
+        }
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
+        await game.phaseInterceptor.to("CoopVictorySealPhase");
       });
-      await pumpDuoDestinations(rig, 4);
+      await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, settledTurn));
+
+      // Apply the ordered wave image at the real queued BattleEnd boundary. A current-but-unstarted phase
+      // is not release proof, so pump until its actual end() advances the queue.
+      const boundary = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "retained V2 BattleEnd boundary", {
+          matches: phase => phase.phaseName === "BattleEndPhase",
+          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+        }),
+      );
       let released = 0;
-      await withClient(rig.guestCtx, () => {
-        const boundary = new BattleEndPhase(true);
-        rig.guestScene.phaseManager.clearPhaseQueue();
-        rig.guestScene.phaseManager.unshiftPhase(boundary);
-        rig.guestScene.phaseManager.shiftPhase();
-        expect(rig.guestScene.phaseManager.getCurrentPhase(), "the V2 BattleEnd boundary is current").toBe(boundary);
+      await withClient(rig.guestCtx, async () => {
+        haltQueueAfterCurrent();
+        const realEnd = boundary.end.bind(boundary);
         vi.spyOn(boundary, "end").mockImplementation(() => {
           released += 1;
+          realEnd();
         });
         boundary.start();
+        for (let i = 0; i < 100 && released === 0; i++) {
+          await drainLoopback();
+          await withClient(rig.hostCtx, () => drainLoopback());
+          await new Promise<void>(resolve => setTimeout(resolve, 0));
+        }
       });
       expect(released, "the V2 boundary releases only after the settled image applies").toBe(1);
       expect(

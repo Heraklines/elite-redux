@@ -2931,3 +2931,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   final turn material has a live consumer. The trainer-switch render probe removes the replica reserve before
   command authority is authored instead of corrupting it after projection; its visible-field, exact identity,
   checksum, and zero-resync assertions remain unchanged.
+
+# 2026-07-24 - B10/B11 journeys retain real browser event-loop and public-control semantics
+
+- Focused B11 run `30094170734` reduced the shard to two evidence-bearing failures. The World Map watcher
+  had admitted its immutable BIOME_PICK but the fixture spun only transport microtasks while the real
+  setMode/timer continuation remained pending. The journey now keeps the watcher browser's timer queue alive
+  until its exact SwitchBiome projection appears; the chosen-biome and single-terminal assertions are unchanged.
+- Revival Blessing admitted and applied the guest owner's REVIVAL result, then left its projected PARTY phase
+  current while the fixture advanced only the host. The test now uses the destination-scheduled transport,
+  proves the initial guest command even when both mirrored battle addresses already match, waits for the real
+  picker to close, and settles host resolution while pumping both browser contexts.
+- The B10 feasibility, heavy-faint seating, and party-transposition fixtures no longer inject synthetic guest
+  command authority or author an impossible WAVE successor directly from REPLACEMENT. They drive public
+  COMMAND/FIGHT/PARTY/TARGET handlers, use the real ordered replacement and battle-end boundaries, and keep
+  automatic scheduled delivery boot-only so no guest callback can execute against the host's global scene.
