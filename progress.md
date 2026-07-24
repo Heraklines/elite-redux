@@ -2889,3 +2889,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The enemy-switch renderer fixture now proves the guest's real next command boundary before asking the host
   to cross the trainer send-out. Its render/checksum assertions are unchanged; the edit removes a synthetic
   one-process scheduling assumption already absent from the stronger trainer-mirror fixture.
+
+# 2026-07-24 - Biome receipt continuations resume on their bound two-engine runtime
+
+- Exact B11 evidence showed the Crossroads result was admitted, materialized, and published into the guest's
+  live biome journal, yet the guest counter never advanced and the V2 result stayed `materialDeferred`.
+  The receipt promise had resumed while the host was the process-global active engine, so the guest phase read
+  the host scene and silently rejected its own still-live boundary.
+- Crossroads and World Map receipt consumers now schedule every post-await boundary check and terminal apply
+  back onto the runtime captured by the phase. The map teardown continuations use the same fence before they
+  install the selected biome or release the retained receipt. Single-browser production remains synchronous;
+  the change removes only shared-process scheduler order as a source of false liveness decisions.
+- The existing real two-engine biome-choice scenarios remain the failure-first coverage. No legacy relay,
+  timeout, authority bypass, or synthetic result was added.

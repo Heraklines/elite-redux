@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "1791c7fab0a87cb9eaf7eed26baeb07f40ae7239",
+  "baseSha": "2a12941b72969e71144ce8ad221e2b917c1ab648",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -16,7 +16,9 @@
     "src/data/elite-redux/coop/coop-webrtc-connect.ts",
     "src/phases/coop-guest-faint-switch-phase.ts",
     "src/phases/coop-replay-phases.ts",
+    "src/phases/er-crossroads-phase.ts",
     "src/phases/mystery-encounter-phases.ts",
+    "src/phases/select-biome-phase.ts",
     "src/phases/the-bargain-phase.ts",
     "src/phases/title-phase.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",

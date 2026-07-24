@@ -732,20 +732,22 @@ export class ErCrossroadsPhase extends Phase {
     const generation = coopSessionGeneration();
     const wave = this.requireCoopSourceWave();
     const receipt = await awaitCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
-    if (!this.boundaryStillLive(generation, wave)) {
-      return;
-    }
-    const choice = this.committedCrossroadsChoice(receipt, operationId);
-    if (choice == null) {
-      this.parkCrossroadsCommitRecovery(() => {
-        this.finishCommittedCrossroadsWatcher(operationId, pinned).catch(e =>
-          coopWarn("reward", "crossroads WATCHER receipt retry threw - remaining closed", e),
-        );
-      });
-      return;
-    }
-    getCoopUiMirror()?.endSession();
-    this.applyCrossroadsWatcherDecision(pinned, operationId, "guest", { choice }, true);
+    this.resumeInOwningRuntime(() => {
+      if (!this.boundaryStillLive(generation, wave)) {
+        return;
+      }
+      const choice = this.committedCrossroadsChoice(receipt, operationId);
+      if (choice == null) {
+        this.parkCrossroadsCommitRecovery(() => {
+          this.finishCommittedCrossroadsWatcher(operationId, pinned).catch(e =>
+            coopWarn("reward", "crossroads WATCHER receipt retry threw - remaining closed", e),
+          );
+        });
+        return;
+      }
+      getCoopUiMirror()?.endSession();
+      this.applyCrossroadsWatcherDecision(pinned, operationId, "guest", { choice }, true);
+    });
   }
 
   private applyCrossroadsWatcherDecision(
@@ -829,23 +831,25 @@ export class ErCrossroadsPhase extends Phase {
     const generation = coopSessionGeneration();
     const wave = this.requireCoopSourceWave();
     const receipt = await awaitCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
-    if (!this.boundaryStillLive(generation, wave)) {
-      return;
-    }
-    if (this.committedCrossroadsChoice(receipt, operationId) !== (moveOn ? 1 : 0)) {
+    this.resumeInOwningRuntime(() => {
+      if (!this.boundaryStillLive(generation, wave)) {
+        return;
+      }
+      if (this.committedCrossroadsChoice(receipt, operationId) !== (moveOn ? 1 : 0)) {
+        this.coopCommitPending = false;
+        this.parkCrossroadsCommitRecovery(() => {
+          this.coopCommitPending = true;
+          this.finishGuestOwnedCrossroadsAfterCommit(operationId, pinned, moveOn).catch(e =>
+            coopWarn("reward", "crossroads OWNER receipt retry threw - remaining closed", e),
+          );
+        });
+        return;
+      }
       this.coopCommitPending = false;
-      this.parkCrossroadsCommitRecovery(() => {
-        this.coopCommitPending = true;
-        this.finishGuestOwnedCrossroadsAfterCommit(operationId, pinned, moveOn).catch(e =>
-          coopWarn("reward", "crossroads OWNER receipt retry threw - remaining closed", e),
-        );
-      });
-      return;
-    }
-    this.coopCommitPending = false;
-    if (this.coopApply(pinned, moveOn, operationId, false, true)) {
-      releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
-    }
+      if (this.coopApply(pinned, moveOn, operationId, false, true)) {
+        releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
+      }
+    });
   }
 
   private parkCrossroadsCommitRecovery(retry: () => void): void {
@@ -992,6 +996,19 @@ export class ErCrossroadsPhase extends Phase {
       && this.coopSourceWave === wave
       && globalScene.phaseManager.getCurrentPhase() === this
     );
+  }
+
+  /**
+   * Promise continuations are process-global in the two-engine harness, while gameplay state is runtime-local.
+   * Resume receipt consumers only when this phase's bound runtime is active so a peer pump cannot make a live
+   * boundary look stale. A real browser has one runtime, so this remains synchronous there.
+   */
+  private resumeInOwningRuntime(callback: () => void): void {
+    if (this.coopOwningRuntime == null) {
+      callback();
+      return;
+    }
+    runWhenCoopRuntimeActive(this.coopOwningRuntime, callback);
   }
 
   /**

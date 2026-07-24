@@ -793,46 +793,48 @@ export class SelectBiomePhase extends BattlePhase {
     const receipt =
       getCoopBiomeTransitionCommitReceipt(address, this.requireCoopBiomeOperationBinding())
       ?? (await awaitCoopBiomeTransitionCommitReceipt(address, this.requireCoopBiomeOperationBinding()));
-    if (!this.boundaryStillLive(generation, wave)) {
-      return;
-    }
-    const deterministicOperationId = coopAuthoritativeBiomeTransitionOperationId(
-      wave,
-      this.requireCoopBiomeOperationBinding(),
-    );
-    const exactOperationId = receipt?.operationId ?? "";
-    const payload = this.committedBiomePayload(receipt, exactOperationId);
-    const interactive = exactOperationId === operationId && payload?.nodeIndex !== -1;
-    const deterministic = exactOperationId === deterministicOperationId && payload?.nodeIndex === -1;
-    if (payload == null || (!interactive && !deterministic)) {
-      this.parkBiomeCommitRecovery(() => {
-        this.finishCommittedBiomeWatcher(revealed, operationId, pinned).catch(e =>
-          coopWarn("reward", "biome pick WATCHER receipt retry threw - remaining closed", e),
-        );
-      });
-      return;
-    }
-    getCoopUiMirror()?.endSession();
-    if (deterministic && receipt != null) {
-      await this.applyDeterministicBiomeWatcherReceipt(
-        receipt,
-        payload,
-        generation,
+    this.resumeInOwningRuntime(() => {
+      if (!this.boundaryStillLive(generation, wave)) {
+        return;
+      }
+      const deterministicOperationId = coopAuthoritativeBiomeTransitionOperationId(
         wave,
+        this.requireCoopBiomeOperationBinding(),
+      );
+      const exactOperationId = receipt?.operationId ?? "";
+      const payload = this.committedBiomePayload(receipt, exactOperationId);
+      const interactive = exactOperationId === operationId && payload?.nodeIndex !== -1;
+      const deterministic = exactOperationId === deterministicOperationId && payload?.nodeIndex === -1;
+      if (payload == null || (!interactive && !deterministic)) {
+        this.parkBiomeCommitRecovery(() => {
+          this.finishCommittedBiomeWatcher(revealed, operationId, pinned).catch(e =>
+            coopWarn("reward", "biome pick WATCHER receipt retry threw - remaining closed", e),
+          );
+        });
+        return;
+      }
+      getCoopUiMirror()?.endSession();
+      if (deterministic && receipt != null) {
+        this.applyDeterministicBiomeWatcherReceipt(
+          receipt,
+          payload,
+          generation,
+          wave,
+          revealed,
+          operationId,
+          pinned,
+        ).catch(error => coopWarn("reward", "deterministic biome watcher apply threw - remaining closed", error));
+        return;
+      }
+      this.applyBiomeWatcherDecision(
         revealed,
         operationId,
         pinned,
-      );
-      return;
-    }
-    await this.applyBiomeWatcherDecision(
-      revealed,
-      operationId,
-      pinned,
-      "guest",
-      { choice: payload.nodeIndex, data: [payload.biomeId] },
-      true,
-    );
+        "guest",
+        { choice: payload.nodeIndex, data: [payload.biomeId] },
+        true,
+      ).catch(error => coopWarn("reward", "biome pick WATCHER apply threw - remaining closed", error));
+    });
   }
 
   /**
@@ -854,28 +856,44 @@ export class SelectBiomePhase extends BattlePhase {
       const mode = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, () =>
         this.boundaryStillLive(generation, wave),
       );
-      if (!this.boundaryStillLive(generation, wave)) {
-        return;
-      }
-      if (mode === "superseded") {
-        this.parkBiomeCommitRecovery(() => {
-          this.finishCommittedBiomeWatcher(revealed, interactiveOperationId, pinned).catch(error =>
-            coopWarn("reward", "deterministic biome watcher teardown retry threw - remaining closed", error),
-          );
-        });
-        return;
-      }
+      this.resumeInOwningRuntime(() => {
+        if (!this.boundaryStillLive(generation, wave)) {
+          return;
+        }
+        if (mode === "superseded") {
+          this.parkBiomeCommitRecovery(() => {
+            this.finishCommittedBiomeWatcher(revealed, interactiveOperationId, pinned).catch(error =>
+              coopWarn("reward", "deterministic biome watcher teardown retry threw - remaining closed", error),
+            );
+          });
+          return;
+        }
+        this.coopDeterministicDestination = payload.biomeId as BiomeId;
+        if (
+          this.applyNextBiomeAndEnd(payload.biomeId as BiomeId, {
+            operationId: receipt.operationId,
+            authoritativeProjection: true,
+          })
+        ) {
+          releaseCoopBiomeCommitReceipt(receipt.operationId, this.requireCoopBiomeOperationBinding());
+        }
+      });
     } catch (error) {
       coopWarn("reward", "deterministic biome watcher map teardown failed (continuing exact commit)", error);
-    }
-    this.coopDeterministicDestination = payload.biomeId as BiomeId;
-    if (
-      this.applyNextBiomeAndEnd(payload.biomeId as BiomeId, {
-        operationId: receipt.operationId,
-        authoritativeProjection: true,
-      })
-    ) {
-      releaseCoopBiomeCommitReceipt(receipt.operationId, this.requireCoopBiomeOperationBinding());
+      this.resumeInOwningRuntime(() => {
+        if (!this.boundaryStillLive(generation, wave)) {
+          return;
+        }
+        this.coopDeterministicDestination = payload.biomeId as BiomeId;
+        if (
+          this.applyNextBiomeAndEnd(payload.biomeId as BiomeId, {
+            operationId: receipt.operationId,
+            authoritativeProjection: true,
+          })
+        ) {
+          releaseCoopBiomeCommitReceipt(receipt.operationId, this.requireCoopBiomeOperationBinding());
+        }
+      });
     }
   }
 
@@ -960,32 +978,52 @@ export class SelectBiomePhase extends BattlePhase {
       const mode = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, () =>
         this.boundaryStillLive(generation, boundaryWave),
       );
-      if (!this.boundaryStillLive(generation, boundaryWave)) {
-        return;
-      }
-      if (mode === "superseded") {
-        this.parkBiomeCommitRecovery(() => {
-          this.applyBiomeWatcherDecision(revealed, operationId, pinned, role, committedRes, committed).catch(error =>
-            coopWarn("reward", "biome pick teardown retry threw - remaining closed", error),
-          );
-        });
-        return;
-      }
+      this.resumeInOwningRuntime(() => {
+        if (!this.boundaryStillLive(generation, boundaryWave)) {
+          return;
+        }
+        if (mode === "superseded") {
+          this.parkBiomeCommitRecovery(() => {
+            this.applyBiomeWatcherDecision(revealed, operationId, pinned, role, committedRes, committed).catch(error =>
+              coopWarn("reward", "biome pick teardown retry threw - remaining closed", error),
+            );
+          });
+          return;
+        }
+        const applied = this.setNextBiomeAndEnd(
+          biome,
+          decision.adopt
+            ? {
+                operationId: decision.operationId ?? operationId,
+                authorityCommit: decision.requiresAuthorityCommit === true,
+                authoritativeProjection: decision.authoritativeProjection === true,
+              }
+            : undefined,
+        );
+        if (committed && applied) {
+          releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
+        }
+      });
     } catch (e) {
       coopWarn("reward", "biome pick WATCHER map teardown failed (continuing committed transition)", e);
-    }
-    const applied = this.setNextBiomeAndEnd(
-      biome,
-      decision.adopt
-        ? {
-            operationId: decision.operationId ?? operationId,
-            authorityCommit: decision.requiresAuthorityCommit === true,
-            authoritativeProjection: decision.authoritativeProjection === true,
-          }
-        : undefined,
-    );
-    if (committed && applied) {
-      releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
+      this.resumeInOwningRuntime(() => {
+        if (!this.boundaryStillLive(generation, boundaryWave)) {
+          return;
+        }
+        const applied = this.setNextBiomeAndEnd(
+          biome,
+          decision.adopt
+            ? {
+                operationId: decision.operationId ?? operationId,
+                authorityCommit: decision.requiresAuthorityCommit === true,
+                authoritativeProjection: decision.authoritativeProjection === true,
+              }
+            : undefined,
+        );
+        if (committed && applied) {
+          releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
+        }
+      });
     }
   }
 
@@ -1039,6 +1077,15 @@ export class SelectBiomePhase extends BattlePhase {
       && this.coopSourceWave === wave
       && globalScene.phaseManager.getCurrentPhase() === this
     );
+  }
+
+  /** Keep post-await UI and receipt continuations bound to the scene/runtime that created this phase. */
+  private resumeInOwningRuntime(callback: () => void): void {
+    if (this.coopOwningRuntime == null) {
+      callback();
+      return;
+    }
+    runWhenCoopRuntimeActive(this.coopOwningRuntime, callback);
   }
 
   /** Renderer routes come only from the carrier. Poll finitely, then expose a fenced recovery action. */
@@ -1303,32 +1350,34 @@ export class SelectBiomePhase extends BattlePhase {
     const generation = coopSessionGeneration();
     const wave = this.requireCoopSourceWave();
     const receipt = await awaitCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
-    if (!this.boundaryStillLive(generation, wave)) {
-      return;
-    }
-    if (this.committedBiomePayload(receipt, operationId, nextBiome) == null) {
-      coopWarn(
-        "reward",
-        `biome pick OWNER committed identity mismatch id=${operationId} wave=${wave} source=${globalScene.arena.biomeId} destination=${nextBiome} - remaining closed`,
-      );
-      this.coopCommitPending = false;
-      this.parkBiomeCommitRecovery(() => {
-        this.coopCommitPending = true;
-        this.finishGuestOwnedBiomeAfterCommit(operationId, nextBiome).catch(e =>
-          coopWarn("reward", "biome pick OWNER receipt retry threw - remaining closed", e),
+    this.resumeInOwningRuntime(() => {
+      if (!this.boundaryStillLive(generation, wave)) {
+        return;
+      }
+      if (this.committedBiomePayload(receipt, operationId, nextBiome) == null) {
+        coopWarn(
+          "reward",
+          `biome pick OWNER committed identity mismatch id=${operationId} wave=${wave} source=${globalScene.arena.biomeId} destination=${nextBiome} - remaining closed`,
         );
-      });
-      return;
-    }
-    this.coopCommitPending = false;
-    if (
-      this.applyNextBiomeAndEnd(nextBiome, {
-        operationId,
-        authoritativeProjection: true,
-      })
-    ) {
-      releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
-    }
+        this.coopCommitPending = false;
+        this.parkBiomeCommitRecovery(() => {
+          this.coopCommitPending = true;
+          this.finishGuestOwnedBiomeAfterCommit(operationId, nextBiome).catch(e =>
+            coopWarn("reward", "biome pick OWNER receipt retry threw - remaining closed", e),
+          );
+        });
+        return;
+      }
+      this.coopCommitPending = false;
+      if (
+        this.applyNextBiomeAndEnd(nextBiome, {
+          operationId,
+          authoritativeProjection: true,
+        })
+      ) {
+        releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
+      }
+    });
   }
 
   private parkBiomeCommitRecovery(retry: () => void): void {
