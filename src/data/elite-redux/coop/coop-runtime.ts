@@ -6275,7 +6275,12 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
   // Revival and Move Learn cannot depend on a suppressed legacy prompt winning a listener race. The replica
   // may already have consumed the generic override slot while replay parked its ordered finalizer, so replace
   // that obsolete standby with the current V2 predecessor rather than allowing overridePhase to refuse.
-  if (plan.kind === "learn-move" || plan.kind === "learn-move-batch" || plan.kind === "revival") {
+  if (
+    plan.kind === "learn-move"
+    || plan.kind === "learn-move-batch"
+    || plan.kind === "revival"
+    || plan.kind === "stormglass"
+  ) {
     const phase = materializeCoopV2InteractionProjection(runtime, control, plan);
     if (phase == null || !phaseManager.replaceWithCoopAuthoritativeModal(current, phase)) {
       return false;

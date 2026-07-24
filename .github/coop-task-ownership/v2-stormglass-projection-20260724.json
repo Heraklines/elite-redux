@@ -1,0 +1,12 @@
+{
+  "taskId": "v2-stormglass-projection-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-stormglass-projection-20260724",
+  "trainRef": "ci/coop/v2-stormglass-projection-20260724",
+  "baseSha": "eb6775baf90145feee58ba246c5ef12e2558f985",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-stormglass-projection-20260724.json",
+    "src/data/elite-redux/coop/coop-runtime.ts"
+  ],
+  "lockedSchemaFiles": []
+}
