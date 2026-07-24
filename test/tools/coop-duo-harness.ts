@@ -2527,14 +2527,23 @@ export function disposeDuoRig(rig: DuoRig): void {
 }
 
 /**
+ * Dispose every rig still registered by this process before a reused Phaser scene starts another test.
+ * Suite hooks that toggle process-global isolation need this explicit ordering: `clearCoopRuntime()` alone
+ * can see only the ambient destination and disabling isolation first can make the peer realm unreachable.
+ */
+export function disposeAllDuoRigsForTest(): void {
+  for (const rig of [...liveDuoRigs]) {
+    disposeDuoRig(rig);
+  }
+}
+
+/**
  * A duo test owns two runtimes even though production's global accessor exposes only one. Register this
  * file-local hook once so every importing suite gets strict two-process-equivalent teardown, including a
  * failed test that never reaches its own cleanup statements.
  */
 afterEach(() => {
-  for (const rig of [...liveDuoRigs]) {
-    disposeDuoRig(rig);
-  }
+  disposeAllDuoRigsForTest();
 });
 
 interface RetainedWaveBoundaryBridge {

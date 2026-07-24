@@ -2594,3 +2594,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Two harness assertions were also corrected without weakening coverage: destination-addressed orphan
   delivery pumps the receiving client, and the raw-carrier probe observes actual transport frames rather
   than treating invocation of the production suppression seam as a network send.
+
+# 2026-07-24 - Reused Phaser suites retire both destination runtimes
+
+- P2 run `30066807301` failed only tests 2, 7, and 12 before those tests constructed their own duo. Each
+  inherited a peerless `CoopReplayTurnPhase` from the preceding fixture because `clearCoopRuntime()` can
+  dispose only the ambient destination; toggling module-let isolation could leave its partner registered.
+- The duo harness now exposes one idempotent all-rig teardown, and the long biome-transition suite invokes
+  it before each reused-scene bootstrap and before disabling destination isolation. This preserves the same
+  production two-process lifetime while preventing a completed test's runtime from manufacturing a softlock
+  in the next case.

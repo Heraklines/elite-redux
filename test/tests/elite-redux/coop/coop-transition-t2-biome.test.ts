@@ -82,6 +82,7 @@ import {
   buildDuo,
   type ClientCtx,
   type DuoRig,
+  disposeAllDuoRigsForTest,
   drainLoopback,
   driveClientPhaseQueueTo,
   driveDuoGuestTackleThroughPublicUi,
@@ -228,6 +229,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     // process-global replica installed even though its scene is no longer the next test's scene. Clear that
     // stale realm before startBattle constructs any phases; otherwise the fresh solo bootstrap is correctly
     // diverted into CoopReplayTurnPhase and waits forever for a peer that belonged to the retired test.
+    disposeAllDuoRigsForTest();
     clearCoopRuntime();
     setCoopHarnessModuleLetIsolation(true);
     setCoopBiomePickerDrivenByTest();
@@ -264,6 +266,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       boundary.live = false;
     }
     syntheticBoundaries.clear();
+    disposeAllDuoRigsForTest();
     setCoopBiomeMarketTestSkip(true);
     resetCoopBiomePickerDrivenByTest();
     setCoopWaveBarrierMs(60_000);
