@@ -5264,11 +5264,17 @@ function projectCoopV2InteractionControl(
 
   const contract = coopV2InteractionProofContract(control);
   const observation = observeCoopV2InteractionSurface(contract);
-  const messageShopWatcherReady =
-    control.kind === "REPLACEMENT"
-    || observation?.uiMode !== UiMode.MESSAGE
-    || ((control.operationKind === "SHOP_PRESENT" || control.operationKind === "SHOP_BUY")
-      && runtime.controller.localSeatId !== control.ownerSeatId
+  const isShopControl =
+    control.kind === "SHARED_INTERACTION"
+    && (control.operationKind === "SHOP_PRESENT" || control.operationKind === "SHOP_BUY");
+  // MESSAGE is a valid passive watcher surface for several registered interactions (Stormglass included).
+  // Only shops need the additional continuation-ready bit because their phase may enter MESSAGE during
+  // unrelated confirmation/sub-picker transitions. Applying that shop-only fence to every MESSAGE watcher
+  // strands the retained presentation revision and prevents its result entry from ever leaving the gap queue.
+  const messageSurfaceReady =
+    observation?.uiMode !== UiMode.MESSAGE
+    || !isShopControl
+    || (runtime.controller.localSeatId !== control.ownerSeatId
       && (observation.phaseToken as { coopBiomeWatcherContinuationReady?: boolean }).coopBiomeWatcherContinuationReady
         === true);
   const publicSurface =
@@ -5277,7 +5283,7 @@ function projectCoopV2InteractionControl(
       && observation != null
       && (contract.phaseNames as readonly string[]).includes(observation.phaseName)
       && (contract.uiModes as readonly number[]).includes(observation.uiMode)
-      && messageShopWatcherReady);
+      && messageSurfaceReady);
   if (!publicSurface || (control.kind !== "REPLACEMENT" && observation == null)) {
     return {
       kind: "deferred",

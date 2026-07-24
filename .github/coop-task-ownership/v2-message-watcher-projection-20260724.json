@@ -1,0 +1,12 @@
+{
+  "taskId": "v2-message-watcher-projection-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-message-watcher-projection-20260724",
+  "trainRef": "ci/coop/v2-message-watcher-projection-20260724",
+  "baseSha": "eaabfe5c711a86032744f24157f7e12ed437118b",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-message-watcher-projection-20260724.json",
+    "src/data/elite-redux/coop/coop-runtime.ts"
+  ],
+  "lockedSchemaFiles": []
+}
