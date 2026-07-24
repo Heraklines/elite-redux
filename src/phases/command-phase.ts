@@ -779,6 +779,28 @@ export class CommandPhase extends FieldPhase {
     return true;
   }
 
+  /**
+   * Replace this command with an already-materialized ordered REPLACEMENT successor.
+   *
+   * The destructive step is permitted only while this exact field/pokemon still owns a deferred V2
+   * command-start claim. That claim is the proof that no actionable command UI was installed. Retracting
+   * it before projection also prevents a later command frontier from resuming this ended phase.
+   */
+  public dissolveForCoopV2ReplacementProjection(projectReplacement: () => void): boolean {
+    const pokemon = globalScene.getPlayerField()[this.fieldIndex];
+    if (pokemon == null || !cancelCoopV2DeferredCommandStart(this.fieldIndex, pokemon.id)) {
+      return false;
+    }
+    this.clearParkedReplacementWake();
+    projectReplacement();
+    coopLog(
+      "v2-replacement",
+      `guest parked command dissolved into ordered replacement at wave=${globalScene.currentBattle.waveIndex}`,
+    );
+    this.end();
+    return true;
+  }
+
   private clearParkedReplacementWake(): void {
     this.parkedReplacementUnsub?.();
     this.parkedReplacementUnsub = null;

@@ -6185,14 +6185,36 @@ function prepareCoopV2OrdinaryReplacementControlSurface(
   }
   const projectsBehindTurnFinalizer = current.is("CoopFinalizeTurnPhase");
   const projectsBehindReplacementReplay = current.is("CoopReplayTurnPhase");
-  if (!projectsBehindTurnFinalizer && !projectsBehindReplacementReplay) {
+  const parkedCommand =
+    current.is("CommandPhase")
+    && typeof (current as { dissolveForCoopV2ReplacementProjection?: unknown }).dissolveForCoopV2ReplacementProjection
+      === "function"
+      ? (current as unknown as {
+          dissolveForCoopV2ReplacementProjection: (project: () => void) => boolean;
+        })
+      : null;
+  if (!projectsBehindTurnFinalizer && !projectsBehindReplacementReplay && parkedCommand == null) {
     return false;
   }
-  phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", control.fieldIndex, {
-    wave: control.wave,
-    turn: control.turn,
-    occurrence: control.occurrence,
-  });
+  const projectReplacement = (): void => {
+    phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", control.fieldIndex, {
+      wave: control.wave,
+      turn: control.turn,
+      occurrence: control.occurrence,
+    });
+  };
+  if (parkedCommand == null) {
+    projectReplacement();
+  } else if (
+    // A chained replacement can be materially applied a few milliseconds after the replay that carried
+    // its predecessor ends. The local phase manager may fill that gap with the next CommandPhase. Only
+    // CommandPhase can prove that it is still parked on an exact V2 deferred-start claim; let it retract
+    // that dead claim, install this ordered successor, and dissolve in one operation. An actionable command
+    // has no deferred claim, so it cannot be superseded here.
+    !parkedCommand.dissolveForCoopV2ReplacementProjection(projectReplacement)
+  ) {
+    return false;
+  }
   runtime.v2ProjectedReplacementControlId = controlId;
   // TURN_COMMIT successors park in CoopFinalizeTurnPhase and must be released through its exact claim.
   // A chained REPLACEMENT_COMMIT is applied by the already-idle CoopReplayTurnPhase that consumed the
@@ -7458,16 +7480,19 @@ export function pendingCoopAuthoritativeReplacementReplayTurn(): number | null {
  * leaving the entry lets a later same-address command-open re-enter a dead phase and open a phantom second
  * command surface. Idempotent - a no-op when nothing is parked for the slot.
  */
-export function cancelCoopV2DeferredCommandStart(fieldIndex: number, pokemonId: number): void {
+export function cancelCoopV2DeferredCommandStart(fieldIndex: number, pokemonId: number): boolean {
   const runtime = active;
   if (runtime == null) {
-    return;
+    return false;
   }
+  let cancelled = false;
   for (const [key, pending] of [...runtime.v2DeferredCommandStarts]) {
     if (pending.fieldIndex === fieldIndex && pending.pokemonId === pokemonId) {
       runtime.v2DeferredCommandStarts.delete(key);
+      cancelled = true;
     }
   }
+  return cancelled;
 }
 
 /** Resume one real authority CommandPhase only after its same-address ordered successor wait is installed. */

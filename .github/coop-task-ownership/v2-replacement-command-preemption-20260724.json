@@ -1,0 +1,13 @@
+{
+  "taskId": "v2-replacement-command-preemption-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-replacement-command-preemption-20260724",
+  "trainRef": "ci/coop/v2-replacement-command-preemption-20260724",
+  "baseSha": "284151addaaf413cf42d5312de4e28e4f5fc7445",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-replacement-command-preemption-20260724.json",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/phases/command-phase.ts"
+  ],
+  "lockedSchemaFiles": []
+}
