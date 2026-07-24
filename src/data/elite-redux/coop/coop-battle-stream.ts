@@ -46,6 +46,10 @@ import {
   tapCoopV2ShadowTurnCommit,
 } from "#data/elite-redux/coop/authority-v2/shadow";
 import { COOP_CHECKSUM_SENTINEL, canonicalize, fnv1a64 } from "#data/elite-redux/coop/coop-battle-checksum";
+import {
+  isStrictCoopBattleEvent,
+  isStrictCoopEntryPresentation,
+} from "#data/elite-redux/coop/coop-battle-event-validator";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopAuthoritativeEnvelopeV1,
@@ -260,29 +264,6 @@ function isValidBattlerIndex(value: unknown): value is number {
   return isSafeAddressPart(value) && value <= 11;
 }
 
-/**
- * Presentation phases address actors by stable side + Pokemon id. `-1` is the engine's ATTACKER sentinel
- * and is legitimate when an asynchronous effect finishes after its actor left the field, or when an effect
- * such as Revival Blessing mutates a benched target that never had a field coordinate. No other negative or
- * out-of-range coordinate is accepted.
- */
-function isActorAddressableBattlerIndex(value: unknown): value is number {
-  return value === -1 || isValidBattlerIndex(value);
-}
-
-function isValidPartySlot(value: unknown): value is number {
-  return isSafeAddressPart(value) && value <= 5;
-}
-
-function isPositiveSafeAddressPart(value: unknown): value is number {
-  return isSafeAddressPart(value) && value > 0;
-}
-
-/** Hard bound for the summon/on-entry cosmetic prefix retained beside one wave-start state. */
-const MAX_ENTRY_PRESENTATION_EVENTS = 256;
-/** Defensive ceiling for ER innate plus shared GIFT ability-source indexes. */
-const MAX_ABILITY_SOURCE_SLOT = 31;
-
 function isNumberArray(value: unknown, length?: number): value is number[] {
   return Array.isArray(value) && (length === undefined || value.length === length) && value.every(isFiniteNumber);
 }
@@ -372,119 +353,6 @@ function isStrictCheckpoint(value: unknown): value is CoopBattleCheckpoint {
     }
     return valid;
   });
-}
-
-function isPresentationActorRef(value: unknown): value is { side: "player" | "enemy"; pokemonId: number } {
-  if (value == null || typeof value !== "object") {
-    return false;
-  }
-  const actor = value as Record<string, unknown>;
-  return (actor.side === "player" || actor.side === "enemy") && isPositiveSafeAddressPart(actor.pokemonId);
-}
-
-function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
-  if (value == null || typeof value !== "object") {
-    return false;
-  }
-  const event = value as Record<string, unknown>;
-  switch (event.k) {
-    case "message":
-      return typeof event.text === "string";
-    case "moveUsed":
-      return (
-        isValidBattlerIndex(event.bi)
-        && isSafeAddressPart(event.moveId, false)
-        && Array.isArray(event.targets)
-        && event.targets.every(isValidBattlerIndex)
-        && isPresentationActorRef(event.actor)
-        && Array.isArray(event.targetActors)
-        && event.targetActors.length === event.targets.length
-        && event.targetActors.every(isPresentationActorRef)
-      );
-    case "hp":
-      return (
-        isActorAddressableBattlerIndex(event.bi)
-        && isFiniteNumber(event.hp)
-        && event.hp >= 0
-        && isFiniteNumber(event.maxHp)
-        && event.maxHp > 0
-        && (event.sp === undefined || isFiniteNumber(event.sp))
-        && (event.result === undefined || [1, 2, 3, 4, 10, 12, 13].includes(event.result as number))
-        && (event.critical === undefined || typeof event.critical === "boolean")
-        && (event.result === undefined) === (event.critical === undefined)
-        && isPresentationActorRef(event.actor)
-      );
-    case "faint":
-      return (
-        isActorAddressableBattlerIndex(event.bi)
-        && (event.narrate === undefined || typeof event.narrate === "boolean")
-        && (event.sp === undefined || isFiniteNumber(event.sp))
-        && isPresentationActorRef(event.actor)
-      );
-    case "statStage":
-      return (
-        isActorAddressableBattlerIndex(event.bi)
-        && isSafeAddressPart(event.stat)
-        && isFiniteNumber(event.value)
-        && isPresentationActorRef(event.actor)
-      );
-    case "status":
-      return (
-        isActorAddressableBattlerIndex(event.bi)
-        && isSafeAddressPart(event.status)
-        && isPresentationActorRef(event.actor)
-      );
-    case "showAbility":
-      return (
-        isActorAddressableBattlerIndex(event.bi)
-        && isPositiveSafeAddressPart(event.pokemonId)
-        && isValidPartySlot(event.partySlot)
-        && isPositiveSafeAddressPart(event.abilityId)
-        && typeof event.passive === "boolean"
-        && isSafeAddressPart(event.passiveSlot)
-        && event.passiveSlot <= MAX_ABILITY_SOURCE_SLOT
-        && isPresentationActorRef(event.actor)
-        && event.actor.pokemonId === event.pokemonId
-      );
-    case "tera":
-      return (
-        isActorAddressableBattlerIndex(event.bi)
-        && isPositiveSafeAddressPart(event.pokemonId)
-        && isValidPartySlot(event.partySlot)
-        && isSafeAddressPart(event.teraType)
-        && isPresentationActorRef(event.actor)
-        && event.actor.pokemonId === event.pokemonId
-      );
-    case "weather":
-      return (
-        isSafeAddressPart(event.weather)
-        && isSafeAddressPart(event.turnsLeft)
-        && (event.anim === undefined || isSafeAddressPart(event.anim))
-      );
-    case "terrain":
-      return (
-        isSafeAddressPart(event.terrain)
-        && isSafeAddressPart(event.turnsLeft)
-        && (event.anim === undefined || isSafeAddressPart(event.anim))
-      );
-    case "switch":
-      return (
-        isValidBattlerIndex(event.bi)
-        && isValidPartySlot(event.partySlot)
-        && isPositiveSafeAddressPart(event.pokemonId)
-        && isPositiveSafeAddressPart(event.speciesId)
-        && isSafeAddressPart(event.switchType)
-        && typeof event.doReturn === "boolean"
-        && isPresentationActorRef(event.actor)
-        && event.actor.pokemonId === event.pokemonId
-      );
-    default:
-      return false;
-  }
-}
-
-function isStrictEntryPresentation(value: unknown): value is CoopBattleEvent[] {
-  return Array.isArray(value) && value.length <= MAX_ENTRY_PRESENTATION_EVENTS && value.every(isStrictBattleEvent);
 }
 
 function isStrictAuthoritativeState(
@@ -2452,7 +2320,7 @@ export class CoopBattleStreamer {
     entryPresentation?: CoopBattleEvent[],
   ): void {
     const entryPresentationLength = entryPresentation?.length ?? 0;
-    if (entryPresentation !== undefined && !isStrictEntryPresentation(entryPresentation)) {
+    if (entryPresentation !== undefined && !isStrictCoopEntryPresentation(entryPresentation)) {
       throw new Error(`refusing malformed entry presentation wave=${wave} events=${entryPresentationLength}`);
     }
     if (
@@ -2576,6 +2444,18 @@ export class CoopBattleStreamer {
       this.consumedEntryPresentationThroughWave = Math.max(this.consumedEntryPresentationThroughWave, wave);
     }
     return prefix;
+  }
+
+  /**
+   * Authority V2 carries the prefix on the exact command-open entry. Retire the wave-keyed compatibility
+   * copy so a delayed legacy carrier cannot collide with a later embedded battle in the same wave.
+   */
+  retireEntryPresentationThroughWave(wave: number): void {
+    if (!Number.isSafeInteger(wave) || wave < 0) {
+      return;
+    }
+    this.entryPresentationByWave.delete(wave);
+    this.consumedEntryPresentationThroughWave = Math.max(this.consumedEntryPresentationThroughWave, wave);
   }
 
   /**
@@ -2753,7 +2633,7 @@ export class CoopBattleStreamer {
     boundary: CoopTurnBoundaryIdentity = { mysteryBattle: false },
   ): boolean {
     const revision = authoritativeState.tick;
-    const invalidEventIndex = events.findIndex(event => !isStrictBattleEvent(event));
+    const invalidEventIndex = events.findIndex(event => !isStrictCoopBattleEvent(event));
     if (invalidEventIndex >= 0) {
       throw new Error(
         `refusing malformed turn event index=${invalidEventIndex} e=${epoch} wave=${wave} turn=${turn} `
@@ -3006,7 +2886,7 @@ export class CoopBattleStreamer {
     if (this.authorityTerminalStarted) {
       return;
     }
-    if (!isStrictBattleEvent(event)) {
+    if (!isStrictCoopBattleEvent(event)) {
       coopWarn(
         "replay",
         `host WITHHOLD malformed live battleEvent e=${epoch} wave=${wave} turn=${turn} seq=${seq} `
@@ -5153,7 +5033,7 @@ export class CoopBattleStreamer {
         const entryPresentation = msg.entryPresentation;
         if (
           entryPresentation !== undefined
-          && (!isStrictEntryPresentation(entryPresentation)
+          && (!isStrictCoopEntryPresentation(entryPresentation)
             || msg.authoritativeState == null
             || msg.authoritativeState.wave !== msg.wave
             || !isSafeAddressPart(msg.authoritativeState.tick))
@@ -5371,7 +5251,7 @@ export class CoopBattleStreamer {
           return;
         }
         const invalidEventIndex = Array.isArray(msg.events)
-          ? msg.events.findIndex(event => !isStrictBattleEvent(event))
+          ? msg.events.findIndex(event => !isStrictCoopBattleEvent(event))
           : -1;
         const structurallyComplete =
           typeof msg.preimage === "string"
@@ -5568,7 +5448,7 @@ export class CoopBattleStreamer {
           || !isSafeAddressPart(msg.wave, false)
           || !isSafeAddressPart(msg.turn, false)
           || !isSafeAddressPart(msg.seq)
-          || !isStrictBattleEvent(msg.event)
+          || !isStrictCoopBattleEvent(msg.event)
           || !this.acceptsCurrentAddress(msg)
         ) {
           coopWarn(

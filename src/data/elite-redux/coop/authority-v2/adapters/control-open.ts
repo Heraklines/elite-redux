@@ -22,7 +22,8 @@ import type {
   CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import { controlsEqual, validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
-import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
+import { isStrictCoopEntryPresentation } from "#data/elite-redux/coop/coop-battle-event-validator";
+import type { CoopAuthoritativeBattleStateV1, CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 
 export interface CoopCommandOpenMaterialV2 {
   readonly kind: "command-open";
@@ -30,6 +31,13 @@ export interface CoopCommandOpenMaterialV2 {
   readonly turn: number;
   /** Complete authoritative image after encounter/entry effects and before human input. */
   readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+  /**
+   * Complete ordered presentation produced before this command frontier. Turn one carries the sealed
+   * Summon/PostSummon prefix; later turns carry an empty array. Keeping it inside the globally ordered entry
+   * avoids a second wave-keyed presentation authority and gives embedded Mystery battles a collision-free
+   * pre-command boundary.
+   */
+  readonly entryPresentation: readonly CoopBattleEvent[];
 }
 
 /**
@@ -176,6 +184,7 @@ export function isCompleteCommandOpenMaterial(value: unknown): value is CoopComm
     && isPositiveSafeInt(value.wave)
     && isPositiveSafeInt(value.turn)
     && isCompleteCommandOpenState(value.authoritativeState, value.wave, value.turn)
+    && isStrictCoopEntryPresentation(value.entryPresentation)
   );
 }
 

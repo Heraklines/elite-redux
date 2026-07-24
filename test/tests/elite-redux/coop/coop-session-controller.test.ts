@@ -72,16 +72,16 @@ describe("co-op session controller (#633, P1)", () => {
     });
 
     it("rejects an older peer that cannot decode the complete battle presentation stream", async () => {
-      // er-coop-47: a 46 peer can fall back to transient battler indices because stable presentation
-      // actor identities were optional, so pairing must fail closed instead of accepting different visuals.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-47");
+      // er-coop-48: a 47 peer cannot decode the globally ordered pre-command presentation prefix, so pairing
+      // must fail closed instead of letting an embedded battle open different first-turn visuals/control.
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-48");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,
       });
       controller.connect();
-      guest.send({ t: "hello", version: "er-coop-46", username: "Cached", role: "guest", epoch: 0 });
+      guest.send({ t: "hello", version: "er-coop-47", username: "Cached", role: "guest", epoch: 0 });
       await flush();
 
       expect(controller.versionMismatch).toBe(true);

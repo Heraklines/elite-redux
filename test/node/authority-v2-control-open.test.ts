@@ -79,6 +79,7 @@ function material(overrides: Partial<CoopCommandOpenMaterialV2> = {}): CoopComma
     wave: 4,
     turn: 1,
     authoritativeState: state(),
+    entryPresentation: [],
     ...overrides,
   };
 }
@@ -179,6 +180,33 @@ describe("authority-v2 explicit command-open boundary", () => {
     expect(decodeCommandOpenEntry(committed)).toEqual(material());
   });
 
+  it("binds the complete entry presentation into the immutable command-open digest", () => {
+    const presentation = [
+      {
+        k: "showAbility" as const,
+        bi: 2,
+        pokemonId: 42,
+        partySlot: 0,
+        abilityId: 7,
+        passive: false,
+        passiveSlot: 0,
+        actor: { side: "enemy" as const, pokemonId: 42 },
+      },
+    ];
+    const built = buildCommandOpenEntry({
+      context,
+      operationId: "control-open-entry-presentation",
+      material: material({ entryPresentation: presentation }),
+      command: command(),
+    });
+    const committed = { ...built, revision: 5 } satisfies CoopAuthorityEntry;
+    expect(decodeCommandOpenEntry(committed)?.entryPresentation).toEqual(presentation);
+
+    const tampered = structuredClone(committed);
+    (tampered.material.payload as { entryPresentation: unknown[] }).entryPresentation = [];
+    expect(decodeCommandOpenEntry(tampered)).toBeNull();
+  });
+
   it("rejects tick-zero placeholders and incomplete state arrays", () => {
     expect(() =>
       buildCommandOpenEntry({
@@ -195,6 +223,14 @@ describe("authority-v2 explicit command-open boundary", () => {
         material: material({
           authoritativeState: { ...state(), field: undefined } as unknown as CoopAuthoritativeBattleStateV1,
         }),
+        command: command(),
+      }),
+    ).toThrow(/complete post-entry-effects/u);
+    expect(() =>
+      buildCommandOpenEntry({
+        context,
+        operationId: "missing-presentation",
+        material: { ...material(), entryPresentation: undefined } as unknown as CoopCommandOpenMaterialV2,
         command: command(),
       }),
     ).toThrow(/complete post-entry-effects/u);

@@ -4747,15 +4747,32 @@ interface CoopV2ControlSuccessorClaim {
   readonly kind: CoopAuthorityEntry["kind"];
   readonly operationId: string;
   readonly nextControl: CoopNextControl;
+  readonly commandOpenMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+    readonly entryPresentation: readonly CoopBattleEvent[];
+  };
 }
 
 function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSuccessorClaim {
+  const commandOpen = decodeControlOpenEntry(entry);
   return {
     sessionEpoch: entry.context.sessionEpoch,
     revision: entry.revision,
     kind: entry.kind,
     operationId: entry.operationId,
     nextControl: entry.nextControl,
+    ...(commandOpen?.kind === "command-open"
+      ? {
+          commandOpenMaterial: {
+            wave: commandOpen.wave,
+            turn: commandOpen.turn,
+            stateTick: commandOpen.authoritativeState.tick,
+            entryPresentation: commandOpen.entryPresentation,
+          },
+        }
+      : {}),
   };
 }
 
@@ -7291,7 +7308,9 @@ function commandStartKey(wave: number, turn: number, fieldIndex: number, pokemon
  * Replacement/turn/wave entries may already state this exact frontier; in that case no new revision is
  * minted. Replicas do not author controls and wait for ordered delivery at their CommandPhase gate.
  */
-export function establishCoopV2CommandControlFrontier(): CoopV2CommandBoundaryVerdict {
+export function establishCoopV2CommandControlFrontier(
+  entryPresentation?: readonly CoopBattleEvent[],
+): CoopV2CommandBoundaryVerdict {
   const runtime = active;
   const battle = globalScene.currentBattle;
   if (runtime == null || battle == null || !coopV2ControlCutovers.has(runtime)) {
@@ -7345,11 +7364,19 @@ export function establishCoopV2CommandControlFrontier(): CoopV2CommandBoundaryVe
     );
     return "failed";
   }
+  if (state.turn === 1 && entryPresentation == null) {
+    coopWarn(
+      "v2-control",
+      `command-open refused turn-one frontier without its sealed entry presentation wave=${state.wave}`,
+    );
+    return "failed";
+  }
   const material: CoopCommandOpenMaterialV2 = {
     kind: "command-open",
     wave: state.wave,
     turn: state.turn,
     authoritativeState: state,
+    entryPresentation: [...(entryPresentation ?? [])],
   };
   const operationId = `V2/CONTROL/COMMAND/e${runtime.controller.sessionEpoch}/w${state.wave}/t${state.turn}/tick${state.tick}`;
   return cutover.commitHostCommandOpen({ operationId, material, command }) == null ? "failed" : "ready";
@@ -7442,6 +7469,7 @@ export function enterCoopV2CommandControlBoundary(
   fieldIndex: number,
   pokemonId: number,
   resume: () => void,
+  entryPresentation?: readonly CoopBattleEvent[],
 ): CoopV2CommandBoundaryVerdict {
   const runtime = active;
   const battle = globalScene.currentBattle;
@@ -7483,7 +7511,7 @@ export function enterCoopV2CommandControlBoundary(
       );
       return "deferred";
     }
-    return establishCoopV2CommandControlFrontier();
+    return establishCoopV2CommandControlFrontier(entryPresentation);
   }
 
   const current = runtime.v2ControlLedger.latestControl;
@@ -7544,6 +7572,11 @@ export function enterCoopV2CommandControlBoundary(
   // transport resend would make local CPU speed part of correctness and needlessly add several seconds.
   scheduleCoopV2CommandProofRetry(runtime);
   return "deferred";
+}
+
+/** Whether the complete V2 graph can carry the sealed pre-command presentation on CONTROL_COMMIT. */
+export function isCoopV2CommandEntryPresentationActive(runtime: CoopRuntime | null = active): boolean {
+  return runtime != null && coopV2ControlCutovers.has(runtime);
 }
 
 /** Release only CommandPhase starts addressed by the applied immutable command frontier. */

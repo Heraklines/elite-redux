@@ -3107,3 +3107,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Command/Fight/Target handlers, records the real turn commit, replays its immutable faint checkpoint, and
   reaches the renderer and authority Victory/BattleEnd phases through their ordinary schedulers. The test
   still proves the guest parks at the exact BattleEnd until the post-preparation settlement arrives.
+
+# 2026-07-24 - Entry presentation belongs to the ordered command-open boundary
+
+- Focused B9 run `30104106099` proved the embedded Mystery battle reached the real guest TurnInit, then
+  parked forever awaiting the legacy wave-keyed entry-presentation carrier. Embedded battles correctly do
+  not publish an ordinary `enemyPartySync` wave-start transaction, so the missing ability/summon replay was
+  a production Authority V2 ownership gap rather than a campaign-driver problem.
+- Turn-one `CONTROL_COMMIT(command-open)` now carries the complete sealed Summon/PostSummon presentation
+  prefix beside its post-entry authoritative state. The prefix is strict-union validated, bounded, and
+  covered by the same immutable material digest and global revision; later turns carry an explicit empty
+  prefix.
+- A guest entry-only `CoopReplayTurnPhase` is now the address-exact consumer for that CONTROL entry. It can
+  make the entry materially admissible, receives the prefix only after the state image is applied, renders
+  it before command input, and retires the old wave-keyed copy as compatibility data. Ordinary waves and
+  embedded Mystery battles therefore share one collision-free command boundary without synthesizing fake
+  wave transitions or allowing local phase order to choose progression.
+- The co-op wire protocol is now `er-coop-48`; mixed builds fail negotiation instead of accepting a command
+  material shape whose presentation contract they cannot understand.

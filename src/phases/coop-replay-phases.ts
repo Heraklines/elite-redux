@@ -1831,6 +1831,12 @@ export interface CoopV2ControlSuccessorClaim {
   readonly kind: CoopAuthorityEntryKind;
   readonly operationId: string;
   readonly nextControl: CoopNextControl;
+  readonly commandOpenMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+    readonly entryPresentation: readonly CoopBattleEvent[];
+  };
 }
 
 /**

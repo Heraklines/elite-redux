@@ -19,7 +19,11 @@ import {
   drainCoopApplyFailures,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import type { CoopAuthorityFailure, CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
+import type {
+  CoopAuthorityFailure,
+  CoopCheckpointEnvelope,
+  CoopEntryPresentationPrefix,
+} from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { hasPendingCoopFaintSwitchReplacementIntent } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { getActuallyFieldedCoopPokemon } from "#data/elite-redux/coop/coop-field-presentation";
@@ -39,6 +43,7 @@ import {
   getCoopBattleStreamer,
   getCoopController,
   isCoopAuthoritativeGuest,
+  isCoopV2CommandEntryPresentationActive,
   registerCoopActiveReplayTurnAborter,
   retryCoopV2PendingAuthorityAtSafeBoundary,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -50,7 +55,7 @@ import {
 } from "#data/elite-redux/coop/coop-turn-recorder";
 import { swapBattleEvent } from "#data/elite-redux/showdown/showdown-side-swap";
 import type { CommonAnim } from "#enums/move-anims-common";
-import { coopNarrateMoveUsed } from "#phases/coop-replay-phases";
+import { type CoopV2ControlSuccessorClaim, coopNarrateMoveUsed } from "#phases/coop-replay-phases";
 
 /**
  * Co-op GUEST turn REPLAY (#633, TRACK-2 Phase B). The guest is a pure renderer: it
@@ -169,6 +174,9 @@ export class CoopReplayTurnPhase extends Phase {
   private readonly entryPresentationOnly: boolean;
   /** Outcome proofs accumulated across live-event pump continuations for this exact turn. */
   private readonly presentationOutcomeTokens: CoopPresentationOutcomeToken[];
+  /** Exact V2 command-open delivery for the turn-one prefix; never keyed by wave alone. */
+  private v2EntryPresentationResolver: ((prefix: CoopEntryPresentationPrefix | null) => void) | null = null;
+  private v2EntryPresentationBuffered: CoopEntryPresentationPrefix | null = null;
 
   constructor(
     turn: number,
@@ -205,6 +213,8 @@ export class CoopReplayTurnPhase extends Phase {
       return true;
     }
     this.aborted = true;
+    this.v2EntryPresentationResolver?.(null);
+    this.v2EntryPresentationResolver = null;
     coopWarn("replay", `guest replay turn=${this.turn}: ABORT phantom turn (${reason}) - dissolving parked pump`);
     if (this.replacementRetryUnsubscribe != null) {
       this.clearReplacementRetryWake();
@@ -212,6 +222,43 @@ export class CoopReplayTurnPhase extends Phase {
       return true;
     }
     getCoopBattleStreamer()?.abortTurnWait(this.turn, this.sourceWave);
+    return true;
+  }
+
+  /** The turn-one replay phase is an exact pre-command material consumer for CONTROL_COMMIT. */
+  public canReleaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
+    const material = successor.commandOpenMaterial;
+    return (
+      this.entryPresentationOnly
+      && !this.aborted
+      && !this.ended
+      && successor.kind === "CONTROL_COMMIT"
+      && successor.nextControl.kind === "COMMAND_FRONTIER"
+      && material != null
+      && material.wave === this.sourceWave
+      && material.turn === this.turn
+      && successor.nextControl.wave === this.sourceWave
+      && successor.nextControl.turn === this.turn
+    );
+  }
+
+  /** Deliver the immutable prefix only after its CONTROL_COMMIT state image has been applied. */
+  public releaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
+    if (!this.canReleaseForCoopV2Control(successor)) {
+      return false;
+    }
+    const material = successor.commandOpenMaterial!;
+    const prefix: CoopEntryPresentationPrefix = {
+      events: structuredClone(material.entryPresentation),
+      stateTick: material.stateTick,
+    };
+    const resolve = this.v2EntryPresentationResolver;
+    if (resolve == null) {
+      this.v2EntryPresentationBuffered = prefix;
+    } else {
+      this.v2EntryPresentationResolver = null;
+      resolve(prefix);
+    }
     return true;
   }
 
@@ -836,7 +883,9 @@ export class CoopReplayTurnPhase extends Phase {
   private async pumpEntryPresentation(streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>): Promise<void> {
     try {
       this.awaitingAuthority = true;
-      const prefix = await streamer.awaitEntryPresentation(this.sourceWave);
+      const prefix = isCoopV2CommandEntryPresentationActive()
+        ? await this.awaitV2EntryPresentation(streamer)
+        : await streamer.awaitEntryPresentation(this.sourceWave);
       this.awaitingAuthority = false;
       if (this.aborted || this.ended || getCoopBattleStreamer() !== streamer) {
         return;
@@ -913,6 +962,22 @@ export class CoopReplayTurnPhase extends Phase {
         `Showdown entry presentation for wave ${this.sourceWave} could not be replayed.`,
       );
     }
+  }
+
+  /** Wait on the exact global-log command entry, retiring only the legacy compatibility copy. */
+  private awaitV2EntryPresentation(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+  ): Promise<CoopEntryPresentationPrefix | null> {
+    streamer.retireEntryPresentationThroughWave(this.sourceWave);
+    const buffered = this.v2EntryPresentationBuffered;
+    if (buffered != null) {
+      this.v2EntryPresentationBuffered = null;
+      return Promise.resolve(buffered);
+    }
+    return new Promise(resolve => {
+      this.v2EntryPresentationResolver = resolve;
+      retryCoopV2PendingAuthorityAtSafeBoundary();
+    });
   }
 
   /** Retire an obsolete async continuation without shifting an unrelated newer queue. */
