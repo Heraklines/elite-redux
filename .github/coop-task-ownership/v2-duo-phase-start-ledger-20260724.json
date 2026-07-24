@@ -1,0 +1,12 @@
+{
+  "taskId": "v2-duo-phase-start-ledger-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-duo-phase-start-ledger-20260724",
+  "trainRef": "ci/coop/v2-duo-phase-start-ledger-20260724",
+  "baseSha": "942ef13a549eb05da09a9b79687f95bdac901be8",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-duo-phase-start-ledger-20260724.json",
+    "test/tools/coop-duo-harness.ts"
+  ],
+  "lockedSchemaFiles": []
+}

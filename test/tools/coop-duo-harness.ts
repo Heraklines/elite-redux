@@ -1882,6 +1882,17 @@ async function pumpHostVictoryTail(hostCtx: ClientCtx, started: WeakSet<Phase>):
  * installed. A phase is started exactly once; failure to change phase within `perPhaseTimeoutMs` throws with
  * the current queue shape instead of turning a missing carrier or unexpected UI prompt into a CI timeout.
  */
+/**
+ * Phase identities already started by one of the manual duo drivers.
+ *
+ * A real PhaseManager starts a phase once and then leaves that same invocation current while an async
+ * authority boundary is pending. The headless drivers are invoked in several smaller calls (replay one
+ * turn, then advance to the next command), so a per-call `startedPhase` variable is insufficient: the next
+ * driver call would re-enter the still-current parked finalizer. Retain only object identity in a WeakSet;
+ * completed phases remain collectible and a newly-created phase with the same name is still started.
+ */
+const manuallyStartedDuoPhases = new WeakSet<Phase>();
+
 export async function driveClientPhaseQueueTo(
   scene: BattleScene,
   target: string,
@@ -1928,8 +1939,9 @@ export async function driveClientPhaseQueueTo(
     // installation, so refresh the completion model at each real phase boundary before that phase can
     // exercise the exact launch-ready gate. This wraps only newly seen Pokemon and remains idempotent.
     installHeadlessPlayerAtlasCompletionModel(scene);
-    if (!options.startedPhases?.has(phase)) {
+    if (!options.startedPhases?.has(phase) && !manuallyStartedDuoPhases.has(phase)) {
       options.startedPhases?.add(phase);
+      manuallyStartedDuoPhases.add(phase);
       phase.start();
     }
     const deadline = Date.now() + perPhaseTimeoutMs;
@@ -3196,6 +3208,7 @@ export async function driveGuestReplayTurn(
     }
   }
   if (!replayStarted) {
+    manuallyStartedDuoPhases.add(replay);
     replay.start();
   }
   await drainLoopback();
@@ -3244,6 +3257,7 @@ export async function driveGuestReplayTurn(
     const wasFinalize = cur.phaseName === "CoopFinalizeTurnPhase";
     if (cur !== startedPhase) {
       startedPhase = cur;
+      manuallyStartedDuoPhases.add(cur);
       cur.start();
     }
     await drainLoopback();
