@@ -10655,8 +10655,15 @@ export function connectCoopSession(
  * value. Both peers advertise -> the enforce/journal features become negotiable (the enforce FLIP still
  * gates separately on isCoopCapabilityNegotiated).
  */
-function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityKey[] {
+function buildLocalCoopCapabilities(durabilityEnabled: boolean, netcodeMode: CoopNetcodeMode): CoopCapabilityKey[] {
   const caps: CoopCapabilityKey[] = [];
+  // Authority V2 is the single-simulation authoritative protocol. Showdown Sync deliberately runs two
+  // complete engines in lockstep, so advertising any V2 capability there would let the common capability
+  // handshake install a second control owner inside the lockstep battle. Keep the ordinary operation and
+  // transport capabilities negotiable, but make the V2 family absent from the advertised set unless this
+  // runtime was assembled for authoritative netcode. The peer computes the same intersection, so even a
+  // mismatched pre-runConfig default fails closed to non-V2 behavior rather than partially cutting over.
+  const authorityV2Netcode = netcodeMode === "authoritative";
   if (isCoopAbilityOperationEnabled()) {
     caps.push(COOP_CAP_OP_ABILITY);
   }
@@ -10707,7 +10714,7 @@ function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityK
   // with it off drops it from the intersection and BOTH sides stay off - the harness never builds, no v2
   // frame is ever sent. Default-off keeps a co-op session BYTE-IDENTICAL to the pre-shadow build. The
   // harness authorizes NOTHING (legacy owns all mechanics), so a parity failure never affects progression.
-  if (isCoopV2ShadowEnabled()) {
+  if (authorityV2Netcode && isCoopV2ShadowEnabled()) {
     caps.push(COOP_CAP_AUTHORITY_V2_SHADOW);
   }
   // authority-v2 TURN/COMMAND CUTOVER (surface 1): advertise the cutover capability, gated by the build flag
@@ -10716,16 +10723,16 @@ function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityK
   // authority. Default-off keeps a co-op session BYTE-IDENTICAL to the pre-cutover build. The cutover reuses
   // the shadow harness's log + frame channel, so it is only effective alongside the harness (which builds when
   // either capability is negotiated).
-  if (isCoopV2TurnEnabled()) {
+  if (authorityV2Netcode && isCoopV2TurnEnabled()) {
     caps.push(COOP_CAP_AUTHORITY_V2_TURN);
   }
   // Replacement reuses the turn surface's aggregate COMMAND projector, so advertise it only when this
   // build can advertise both. Negotiation still intersects each key independently and the runtime requires
   // both, making a mixed build fail closed to the complete legacy replacement path.
-  if (isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
+  if (authorityV2Netcode && isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
     caps.push(COOP_CAP_AUTHORITY_V2_REPLACEMENT);
   }
-  if (isCoopV2WaveEnabled() && isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
+  if (authorityV2Netcode && isCoopV2WaveEnabled() && isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
     caps.push(COOP_CAP_AUTHORITY_V2_WAVE);
   }
   const completeInteractionCoverage =
@@ -10745,7 +10752,8 @@ function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityK
   // Interaction cutover is one capability, never a collection of partially migrated screens. Do not even
   // advertise it unless this build has every registered complete-result surface plus its durability binding.
   if (
-    completeInteractionCoverage
+    authorityV2Netcode
+    && completeInteractionCoverage
     && isCoopV2InteractionEnabled()
     && isCoopV2WaveEnabled()
     && isCoopV2ReplacementEnabled()
@@ -10754,7 +10762,8 @@ function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityK
     caps.push(COOP_CAP_AUTHORITY_V2_INTERACTION);
   }
   if (
-    completeInteractionCoverage
+    authorityV2Netcode
+    && completeInteractionCoverage
     && isCoopV2RecoveryEnabled()
     && isCoopV2InteractionEnabled()
     && isCoopV2WaveEnabled()
@@ -10851,7 +10860,7 @@ export function assembleCoopRuntime(
     version: COOP_PROTOCOL_VERSION,
     // #896 W2e-R2: advertise what THIS build supports+enables; the controller negotiates the effective
     // session set (intersection with the peer's) and stores it, and the surface adapters gate on it.
-    localCapabilities: buildLocalCoopCapabilities(durabilityEnabled),
+    localCapabilities: buildLocalCoopCapabilities(durabilityEnabled, opts.netcodeMode ?? "authoritative"),
     // Protocol 31 removes every broad biome-tail escape hatch. Launching without these exact control and
     // delivery capabilities would strand SelectBiome by construction, so compatibility must fail closed.
     requiredCapabilities: [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME, COOP_CAP_DURABILITY_JOURNAL],
