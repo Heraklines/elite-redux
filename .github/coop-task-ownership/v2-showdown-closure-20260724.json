@@ -1,0 +1,18 @@
+{
+  "taskId": "v2-showdown-closure-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-showdown-closure-20260724",
+  "trainRef": "ci/coop/v2-showdown-closure-20260724",
+  "baseSha": "56b8f1cd7a2620d4d4cd568767548a080271cfec",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-showdown-closure-20260724.json",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/phases/coop-replay-turn-phase.ts",
+    "test/tests/elite-redux/coop/coop-soak-journey.test.ts",
+    "test/tests/elite-redux/showdown/showdown-sync-duo.test.ts",
+    "test/tests/elite-redux/showdown/tournament-reward-delivery.test.ts",
+    "test/tests/elite-redux/showdown/tournament-rewards.test.ts",
+    "test/tools/coop-duo-harness.ts"
+  ],
+  "lockedSchemaFiles": []
+}
