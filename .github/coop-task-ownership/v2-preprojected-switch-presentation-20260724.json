@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "1656f7aef251e0f27b9f73e640b60f8350d94828",
+  "baseSha": "4c9d160b0579716171dec394ccd55cc3669bcbe3",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -43,6 +43,7 @@
     "test/tests/elite-redux/coop/coop-duo-replay.test.ts",
     "test/tests/elite-redux/coop/coop-duo-revival-blessing-ownerpick.test.ts",
     "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-wild-flee.test.ts",
     "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
     "test/tests/elite-redux/coop/coop-lobby.test.ts",
     "test/tests/elite-redux/coop/coop-message-localization.test.ts",

@@ -156,8 +156,8 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
     });
     expect(
       stagedBeforeCommand?.continuationReady,
-      "a merely-current CommandPhase is not public continuation evidence",
-    ).toBe(false);
+      "the real BattleEnd release completes the ordered wave transaction before next-command control",
+    ).toBe(true);
 
     // Start both prepared command phases through the established two-engine public-UI driver. Its COMMAND
     // click is accepted only after the reciprocal rendezvous opens the real active handler, which is the
@@ -168,7 +168,7 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
     expect(stagedAfterCommand).toMatchObject({ authority: "v2", dataApplied: true });
     expect(
       stagedAfterCommand?.continuationReady,
-      "the real wave-2 COMMAND handler completes retained flee continuation readiness",
+      "opening the separate wave-2 COMMAND control cannot regress the completed flee transaction",
     ).toBe(true);
     expect(
       rig.guestRuntime.battleStream.retainedAuthorityDiagnostics().waiters,

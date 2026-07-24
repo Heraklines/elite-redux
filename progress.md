@@ -2947,6 +2947,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   COMMAND/FIGHT/PARTY/TARGET handlers, use the real ordered replacement and battle-end boundaries, and keep
   automatic scheduled delivery boot-only so no guest callback can execute against the host's global scene.
 
+# 2026-07-24 - B10 replay and replacement fixtures use real ordered controls
+
+- Full-gate run `30096737312` proved the Roar/flee production fix end-to-end: the guest admitted and applied
+  the exact WAVE_ADVANCE, released its real BattleEnd boundary, and reached wave 2. Its remaining red was an
+  obsolete assertion that expected the already-completed wave transaction to remain unready until the separate
+  next COMMAND control opened; the test now asserts that COMMAND cannot regress completed readiness.
+- The party-transposition fixture no longer increments the guest turn or creates a replay waiter for a host
+  result that does not exist. It follows the projected replacement's ordinary TurnInit -> guest CommandPhase
+  successor, preserving the exact V2 graph under test.
+- Trace replay no longer answers the guest relay directly or calls `game.move.select`. Both captured moves are
+  navigated through the real COMMAND/FIGHT/TARGET handlers, including nonzero move slots and either enemy target.
+  Unsupported Phase-1 command kinds fail loudly instead of silently substituting a move.
+- A window checkpoint is now installed before the real SummonPhase runs. Its reconstructed Pokemon are therefore
+  actually seated in `scene.field` when the first V2 frontier is captured; the old post-Command party splice
+  produced zero presented actors and was correctly rejected by Authority V2.
+
 # 2026-07-24 - Staged flee/capture turns and destination-scene continuations stay in the V2 graph
 
 - Focused run `30095336690` made the remaining mechanisms exact: B10 reached 50/57 with the full heavy-faint

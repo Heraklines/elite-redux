@@ -134,7 +134,6 @@ import {
   type CoopRole,
   type CoopTransport,
   createLoopbackPair,
-  type SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
 import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { isCoopWaveAdvanceOperationEnabled } from "#data/elite-redux/coop/coop-wave-operation";
@@ -177,7 +176,7 @@ import {
   getErRelicBattleState,
   restoreErRelicBattleState,
 } from "#data/elite-redux/er-relic-battle-state";
-import type { ReplayCommandEvent, ReplayTrace } from "#data/elite-redux/replay-trace";
+import type { ReplayTrace } from "#data/elite-redux/replay-trace";
 import { isReplayCommandEvent, isReplayInteractionEvent, validateReplayTrace } from "#data/elite-redux/replay-trace";
 import {
   beginShowdownBattle,
@@ -2258,8 +2257,42 @@ export async function materializeGuestInputAfterReplacement(scene: BattleScene):
   materializeMirroredGuestInputTurn(scene);
 }
 
+function selectFightMoveThroughPublicUi(scene: BattleScene, moveIndex: number, label: string): void {
+  const moveCount = scene.phaseManager.getCurrentPhase()?.is("CommandPhase")
+    ? (scene.phaseManager.getCurrentPhase() as Phase & { getPokemon(): Pokemon }).getPokemon().getMoveset().length
+    : 0;
+  if (!Number.isSafeInteger(moveIndex) || moveIndex < 0 || moveIndex >= moveCount) {
+    throw new Error(`${label}: invalid move index ${moveIndex} for ${moveCount} public move(s)`);
+  }
+  const handler = scene.ui.getHandler() as { getCursor?: () => number };
+  for (let steps = 0; steps < 8; steps++) {
+    const cursor = handler.getCursor?.();
+    if (cursor === moveIndex) {
+      expect(scene.ui.processInput(Button.ACTION), `${label} selects move slot ${moveIndex} through FIGHT UI`).toBe(
+        true,
+      );
+      return;
+    }
+    if (!Number.isSafeInteger(cursor)) {
+      throw new Error(`${label}: FIGHT handler did not expose its public cursor`);
+    }
+    const cursorRow = Math.floor((cursor as number) / 2);
+    const targetRow = Math.floor(moveIndex / 2);
+    const button =
+      cursorRow < targetRow
+        ? Button.DOWN
+        : cursorRow > targetRow
+          ? Button.UP
+          : (cursor as number) % 2 < moveIndex % 2
+            ? Button.RIGHT
+            : Button.LEFT;
+    expect(scene.ui.processInput(button), `${label} navigates toward move slot ${moveIndex}`).toBe(true);
+  }
+  throw new Error(`${label}: FIGHT cursor did not reach move slot ${moveIndex}`);
+}
+
 /**
- * Bring both real clients to the reciprocal command boundary and submit Tackle for the guest-owned
+ * Bring both real clients to the reciprocal command boundary and submit one move for each requested
  * battler exclusively through the production Command/Fight/TargetSelect UI handlers.
  *
  * Scheduled duo tests call this while automatic transport delivery is disabled. Every addressed packet
@@ -2272,6 +2305,9 @@ export async function driveDuoGuestTackleThroughPublicUi(
   options: {
     restartAlreadyOpenHost?: boolean;
     submitHostTackle?: boolean;
+    hostMoveIndex?: number;
+    guestMoveIndex?: number;
+    hostTarget?: BattlerIndex;
     guestTarget?: BattlerIndex;
   } = {},
 ): Promise<void> {
@@ -2332,7 +2368,7 @@ export async function driveDuoGuestTackleThroughPublicUi(
       ).toBeGreaterThan(0);
       expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
       expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
-      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
+      selectFightMoveThroughPublicUi(rig.guestScene, options.guestMoveIndex ?? 0, "guest");
 
       // The production command handler skips TARGET_SELECT when the selected move has only one legal
       // target (for example the one-enemy direct-mirror fixtures). Older harness code always waited for a
@@ -2376,7 +2412,7 @@ export async function driveDuoGuestTackleThroughPublicUi(
         );
         expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Fight through COMMAND UI").toBe(true);
         expect(rig.hostScene.ui.getMode(), "host reaches the move picker").toBe(UiMode.FIGHT);
-        expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Tackle through FIGHT UI").toBe(true);
+        selectFightMoveThroughPublicUi(rig.hostScene, options.hostMoveIndex ?? 0, "host");
 
         const postMovePhase = await driveClientPhaseQueueTo(rig.hostScene, "SelectTargetPhase or turn commit", {
           matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "CoopTurnCommitPhase",
@@ -2385,7 +2421,12 @@ export async function driveDuoGuestTackleThroughPublicUi(
           postMovePhase.start();
           await drainLoopback();
           expect(rig.hostScene.ui.getMode(), "host reaches the real target picker").toBe(UiMode.TARGET_SELECT);
-          expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms the first enemy target").toBe(true);
+          if (options.hostTarget === BattlerIndex.ENEMY_2) {
+            expect(rig.hostScene.ui.processInput(Button.RIGHT), "host navigates to the requested second enemy").toBe(
+              true,
+            );
+          }
+          expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms the selected enemy target").toBe(true);
           await drainLoopback();
         } else {
           expect(
@@ -5067,80 +5108,6 @@ function replayToCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
 
-/** Resolve a captured move SLOT to the live mon's `MoveId` at that slot (the loader stays slot-based). */
-function resolveMoveIdForSlot(mon: Pokemon, moveIndex: number): number {
-  const moveset = mon.getMoveset();
-  const pm = moveset[moveIndex];
-  if (pm == null) {
-    throw new Error(
-      `replay: move slot ${moveIndex} out of range for ${mon.name} (moveset has ${moveset.length} moves)`,
-    );
-  }
-  return pm.moveId;
-}
-
-/**
- * Build the {@linkcode CoopBattleSync} responder for the GUEST slot from this wave's captured guest
- * command. The host AWAITS the guest slot's command over the relay; here we answer it with the trace's
- * decision (resolving the captured move slot to the live guest mon's MoveId). A non-move command on the
- * guest slot is uncommon in the wave loop; we answer FIGHT with the first legal slot as a safe default
- * (and record a divergence) so the turn never hangs.
- */
-function guestCommandResponder(
-  rig: DuoRig,
-  cmd: ReplayCommandEvent | undefined,
-  divergences: ReplayDivergence[],
-): SerializedCommand {
-  const guestMon = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-  if (cmd != null && cmd.command.kind === "move") {
-    const moveId = resolveMoveIdForSlot(guestMon, cmd.command.moveIndex);
-    return {
-      command: Command.FIGHT,
-      cursor: cmd.command.moveIndex,
-      moveId,
-      targets: [cmd.command.target ?? BattlerIndex.ENEMY_2],
-    };
-  }
-  // No captured move for the guest slot this wave (or a non-move command the wave loop can't drive):
-  // answer FIGHT with the first move so the host's request resolves; record it so a test can see it.
-  divergences.push({
-    wave: rig.hostScene.currentBattle.waveIndex,
-    detail: `guest slot had no replayable move command (kind=${cmd?.command.kind ?? "none"}); used first move`,
-  });
-  const moveset = guestMon.getMoveset();
-  return {
-    command: Command.FIGHT,
-    cursor: 0,
-    moveId: moveset.length > 0 ? moveset[0].moveId : 0,
-    targets: [BattlerIndex.ENEMY_2],
-  };
-}
-
-/**
- * Feed one field slot's captured FIGHT move into the host (under `withClient(hostCtx)`). Resolves the
- * captured move SLOT to the live mon's MoveId and selects it at the captured (or default) target. A
- * missing/non-move command falls back to the slot's first move so the host's double commits both slots
- * (the wave never hangs); the caller records a divergence for the missing capture.
- */
-function feedHostFightMove(
-  game: ReplayGameManager,
-  rig: DuoRig,
-  fieldIndex: number,
-  cmd: ReplayCommandEvent | undefined,
-): void {
-  const mon = rig.hostScene.getPlayerField()[fieldIndex];
-  const defaultTarget = fieldIndex === COOP_HOST_FIELD_INDEX ? BattlerIndex.ENEMY : BattlerIndex.ENEMY_2;
-  if (cmd != null && cmd.command.kind === "move") {
-    const moveId = resolveMoveIdForSlot(mon, cmd.command.moveIndex);
-    game.move.select(moveId, fieldIndex, cmd.command.target ?? defaultTarget);
-    return;
-  }
-  const firstMoveId = mon.getMoveset()[0]?.moveId;
-  if (firstMoveId != null) {
-    game.move.select(firstMoveId, fieldIndex, defaultTarget);
-  }
-}
-
 /** Restore the window-start session state after the test launcher has built the checkpoint wave. */
 function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable<ReplayTrace["checkpoint"]>): void {
   const party = scene.getPlayerParty();
@@ -5254,14 +5221,15 @@ export async function replayCoopTrace(
   // with the test framework's default seed, producing a superficially valid but non-representative replay.
   await game.classicMode.runToSummon(...rosterSpecies.slice(0, 2));
   game.scene.setSeed(bootSeed);
-  await game.phaseInterceptor.to("CommandPhase");
   if (checkpoint != null) {
-    // The test launcher may use a global player-moveset override to make the throwaway bootstrap battle
-    // deterministic. Pokemon.getMoveset() reapplies that override on every read (and mutates the stored
-    // moves), so it must end before the authoritative checkpoint party is installed.
+    // Install the checkpoint while the real SummonPhase is still current. The normal summon chain then
+    // seats these exact reconstructed identities and opens CommandPhase for them. Replacing the party only
+    // after CommandPhase left the new Pokemon outside `scene.field`, so V2 correctly found zero presented
+    // command actors and refused the frontier.
     game.override.moveset([]);
     restoreCoopReplayCheckpoint(game.scene, checkpoint);
   }
+  await game.phaseInterceptor.to("CommandPhase");
 
   // ===== Flip to co-op + stand up the guest engine over one loopback pair (host owns EVEN interaction
   // counters, guest owns ODD - the production parity rule buildDuo wires). =====
@@ -5269,12 +5237,6 @@ export async function replayCoopTrace(
   const pair = providedPair ?? createLoopbackPair();
   const rig = await buildDuo(game as unknown as Parameters<typeof buildDuo>[0], pair, setCoopRuntime, replayToCoop);
   providedPair?.setAutomaticDelivery?.(false);
-  if (checkpoint != null) {
-    // `buildDuo` constructs a second scene while test overrides are live. Reassert the checkpoint on the
-    // host afterward, then mirror that exact post-checkpoint state into the guest before any event replays.
-    await withClient(rig.hostCtx, () => restoreCoopReplayCheckpoint(rig.hostScene, checkpoint));
-    await remirrorWave(rig);
-  }
 
   // The captured waves, in order (a Set keeps them unique + sorted).
   const waves = [...new Set(commandEvents.map(c => c.wave))].sort((a, b) => a - b);
@@ -5292,25 +5254,33 @@ export async function replayCoopTrace(
     const hostCmd = waveCommands.find(c => c.slotFieldIndex === COOP_HOST_FIELD_INDEX);
     const guestCmd = waveCommands.find(c => c.slotFieldIndex === COOP_GUEST_FIELD_INDEX);
 
-    // Wire the GUEST slot's command (answered over the CoopBattleSync relay when the host requests it).
-    rig.guestRuntime.battleSync.onCommandRequest(() => guestCommandResponder(rig, guestCmd, divergences));
-
-    // ===== Host plays this wave: feed BOTH slots' captured FIGHT moves (the host commits both in a
-    // co-op double; the guest slot's command is ALSO answered over the relay by the responder above).
-    // For Phase 1 this is the FIGHT class (the wave-loop drivers); a non-move host command records a
-    // divergence (the existing drivers don't cover switch/ball/run yet). =====
+    // Phase-1 traces currently admit FIGHT moves against one of the two enemy slots. Drive those choices through the
+    // actual COMMAND/FIGHT/TARGET handlers on both engines; a direct battleSync responder or game.move.select
+    // bypasses the very UI -> relay -> V2 chain this replay harness exists to verify.
+    if (
+      hostCmd?.command.kind !== "move"
+      || guestCmd?.command.kind !== "move"
+      || !Number.isSafeInteger(hostCmd.command.moveIndex)
+      || !Number.isSafeInteger(guestCmd.command.moveIndex)
+      || ![BattlerIndex.ENEMY, BattlerIndex.ENEMY_2].includes(hostCmd.command.target ?? BattlerIndex.ENEMY)
+      || ![BattlerIndex.ENEMY, BattlerIndex.ENEMY_2].includes(guestCmd.command.target ?? BattlerIndex.ENEMY_2)
+    ) {
+      throw new Error(
+        `replayCoopTrace: wave ${wave} is outside the public Phase-1 command driver `
+          + `(host=${JSON.stringify(hostCmd?.command)} guest=${JSON.stringify(guestCmd?.command)})`,
+      );
+    }
     const turn = rig.hostScene.currentBattle.turn;
+    await driveDuoGuestTackleThroughPublicUi(game as unknown as GameManager, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+      hostMoveIndex: hostCmd.command.moveIndex,
+      guestMoveIndex: guestCmd.command.moveIndex,
+      hostTarget: hostCmd.command.target ?? BattlerIndex.ENEMY,
+      guestTarget: guestCmd.command.target ?? BattlerIndex.ENEMY_2,
+    });
+    commandsFed += waveCommands.length;
     await withClient(rig.hostCtx, async () => {
-      if (hostCmd != null && hostCmd.command.kind === "move") {
-        feedHostFightMove(game, rig, COOP_HOST_FIELD_INDEX, hostCmd);
-        feedHostFightMove(game, rig, COOP_GUEST_FIELD_INDEX, guestCmd);
-        commandsFed += waveCommands.length;
-      } else {
-        divergences.push({
-          wave,
-          detail: `host slot command kind=${hostCmd?.command.kind ?? "none"} not replayable by the wave-loop drivers (FIGHT only)`,
-        });
-      }
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 

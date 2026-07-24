@@ -40,7 +40,7 @@ import { adoptCoopHostPlayerPartyOrder, captureCoopChecksumState } from "#data/e
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, getCoopWaveBoundaryStatus, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
@@ -245,12 +245,17 @@ describe.skipIf(!RUN)(
       // GUEST consumes the ordered Authority V2 REPLACEMENT_COMMIT through the real replay/finalize
       // ingress. It must materialize FENNEKIN and the same array swap without a compatibility checkpoint.
       await withClient(rig.guestCtx, async () => {
-        // The focused rig has already drained turn N and is parked on its synthetic boot TitlePhase.
-        // Production reaches the retained replacement through turn N+1's real replay wait, so drive that
-        // same public replay ingress instead of waiting for a finalize phase that cannot exist until the
-        // V2 carrier is consumed.
-        rig.guestScene.currentBattle.turn = turn + 1;
-        await driveGuestReplayTurn(rig.guestScene, turn + 1);
+        // The replacement entry itself projects the ordinary TurnInit -> Command successor. Do not invent
+        // turn N+1 or construct a replay waiter for a host resolution that does not exist yet: advance the
+        // actual queued phases until the guest-owned public command surface is installed.
+        await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after host replacement", {
+          matches: phase =>
+            phase.phaseName === "CommandPhase"
+            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
+            && rig.guestScene.currentBattle.turn === turn + 1,
+          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+          perPhaseTimeoutMs: 5_000,
+        });
       });
 
       // LAYER 1 ASSERTION: the guest's party ARRAY order is byte-identical to the host - NO transposition.
