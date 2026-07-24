@@ -2353,3 +2353,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   displayed identity, matching HP/faint's material/presentation separation without introducing a slot or
   same-species fallback. A direct regression replaces the party reference while retaining the visible enemy
   and proves the authority-selected ability flyout still renders for that object.
+
+# 2026-07-24 - The headless Phaser container now models real ordering and index zero
+
+- B7 on exact SHA `f8addf531` replaced the earlier `NaN` diagnostic with valid expected indices but still
+  left every rebuild appended. The production code was correct to expect Phaser reordering; the shared
+  `MockContainer` implemented `moveTo`, `moveAbove`, and `moveBelow` as no-ops and returned `-1` for a real
+  child at index zero (`index || -1`). This was a harness-fidelity defect that manufactured field ghosts and
+  drove production toward unnecessary compatibility paths.
+- The mock now implements Phaser's uniqueness, ordered movement, top/back movement, and exact `getIndex`
+  semantics. Structural adoption uses the real `Container.addAt` primitive with the real child count and
+  retains its exact postcondition, so the same code path is exercised in headless gates and browsers.

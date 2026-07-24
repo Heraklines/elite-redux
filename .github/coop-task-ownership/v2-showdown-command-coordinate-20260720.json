@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "f8addf53123847933738f11b7dc103f619e0a696",
+  "baseSha": "719425ba1058b3efa1e42f2d50e28b2f3f226623",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -71,6 +71,7 @@
     "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs",
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
+    "test/mocks/mocks-container/mock-container.ts",
     "test/data/battle-format.test.ts",
     "test/node/authority-v2-control-open.test.ts",
     "test/node/authority-v2-cutover-interaction.test.ts",

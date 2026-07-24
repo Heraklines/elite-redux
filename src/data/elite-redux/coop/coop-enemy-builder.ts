@@ -282,31 +282,24 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       }
       battle.enemyParty[entry.fieldIndex] = built;
       if (activeFieldIndex >= 0) {
-        // The stale child has already been removed, so the object now occupying its former index is a
-        // stable relative depth anchor. Anchoring against that child is more reliable than an unverified
-        // numeric move: Phaser's headless container has accepted moveTo() without changing the order in
-        // this reconstruction path, leaving the battler appended above unrelated field presentation.
         // Phaser.Container is not array-like: its public child count is not exposed as `.length`.
         // The headless renderer therefore produced `Math.min(activeFieldIndex, undefined) === NaN`,
         // making every retained-adoption postcondition fail and enter the compatibility corrector.
         // Snapshot the actual child list after removing the stale identity, before adding the rebuild.
         const fieldLength = globalScene.field.getAll().length;
         const restoreIndex = Math.min(activeFieldIndex, fieldLength);
-        const depthAnchor = restoreIndex < fieldLength ? globalScene.field.getAt(restoreIndex) : null;
         built.setFieldPosition(fieldPositionForSlot(entry.fieldIndex, battle.arrangement.enemyCapacity));
         // Pokemon construction does not put the container on Phaser's display list. SummonPhase always
         // calls add.existing before seating it; structural replay must do the same.
         globalScene.add.existing(built);
-        // Use the exact proven SummonPhase `field.add` path first, then restore the displaced child's depth.
-        // Phaser's Container.addAt path silently left newly created Pokemon detached in the three retained-
-        // adoption shapes covered by B7; membership is therefore established before relative reordering.
-        globalScene.field.add(built);
+        // Phaser's real Container.addAt both establishes membership and preserves this exact renderer
+        // position. The test double used to coerce the old NaN index to zero and then report index zero as
+        // absent; with its API contract repaired, use the production primitive directly instead of a
+        // headless-only add-then-reorder workaround.
+        globalScene.field.addAt(built, restoreIndex);
         const seatedIndex = globalScene.field.getIndex(built);
         if (seatedIndex < 0) {
           throw new Error(`structural enemy adopt could not seat id=${built.id} in the field container`);
-        }
-        if (depthAnchor != null) {
-          globalScene.field.moveBelow(built, depthAnchor);
         }
         const restoredIndex = globalScene.field.getIndex(built);
         if (restoredIndex !== restoreIndex) {

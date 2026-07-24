@@ -190,23 +190,56 @@ export class MockContainer implements MockGameObject {
     return this;
   }
 
-  sendToBack(): this {
-    // Sends this Game Object to the back of its parent's display list.\
+  sendToBack(obj: MockGameObject): this {
+    const index = this.list.indexOf(obj);
+    if (index > 0) {
+      this.list.splice(index, 1);
+      this.list.unshift(obj);
+    }
     return this;
   }
 
-  moveTo(_obj): this {
-    // Moves this Game Object to the given index in the list.\
+  moveTo(obj: MockGameObject, index: number): this {
+    const currentIndex = this.list.indexOf(obj);
+    if (currentIndex < 0 || index < 0 || index >= this.list.length) {
+      throw new Error("Supplied index out of bounds");
+    }
+    if (currentIndex !== index) {
+      this.list.splice(currentIndex, 1);
+      this.list.splice(index, 0, obj);
+    }
     return this;
   }
 
-  moveAbove(_obj): this {
-    // Moves this Game Object to be above the given Game Object in the display list.
+  moveAbove(obj: MockGameObject, base: MockGameObject): this {
+    if (obj === base) {
+      return this;
+    }
+    const currentIndex = this.list.indexOf(obj);
+    const baseIndex = this.list.indexOf(base);
+    if (currentIndex < 0 || baseIndex < 0) {
+      throw new Error("Supplied items must be elements of the same array");
+    }
+    if (currentIndex < baseIndex) {
+      this.list.splice(currentIndex, 1);
+      this.list.splice(this.list.indexOf(base) + 1, 0, obj);
+    }
     return this;
   }
 
-  moveBelow(_obj): this {
-    // Moves this Game Object to be below the given Game Object in the display list.
+  moveBelow(obj: MockGameObject, base: MockGameObject): this {
+    if (obj === base) {
+      return this;
+    }
+    const currentIndex = this.list.indexOf(obj);
+    const baseIndex = this.list.indexOf(base);
+    if (currentIndex < 0 || baseIndex < 0) {
+      throw new Error("Supplied items must be elements of the same array");
+    }
+    if (currentIndex > baseIndex) {
+      this.list.splice(currentIndex, 1);
+      this.list.splice(baseIndex, 0, obj);
+    }
     return this;
   }
 
@@ -215,8 +248,12 @@ export class MockContainer implements MockGameObject {
     return this;
   }
 
-  bringToTop(_obj): this {
-    // Brings this Game Object to the top of its parents display list.
+  bringToTop(obj: MockGameObject): this {
+    const index = this.list.indexOf(obj);
+    if (index >= 0 && index < this.list.length - 1) {
+      this.list.splice(index, 1);
+      this.list.push(obj);
+    }
     return this;
   }
 
@@ -225,7 +262,11 @@ export class MockContainer implements MockGameObject {
   }
 
   add(obj: MockGameObject | MockGameObject[]): this {
-    this.list.push(...coerceArray(obj));
+    for (const item of coerceArray(obj)) {
+      if (!this.list.includes(item)) {
+        this.list.push(item);
+      }
+    }
     return this;
   }
 
@@ -236,8 +277,8 @@ export class MockContainer implements MockGameObject {
   }
 
   addAt(obj: MockGameObject | MockGameObject[], index = 0): this {
-    // Adds a Game Object to this Container at the given index.
-    this.list.splice(index, 0, ...coerceArray(obj));
+    const additions = coerceArray(obj).filter(item => !this.list.includes(item));
+    this.list.splice(index, 0, ...additions);
     return this;
   }
 
@@ -256,7 +297,7 @@ export class MockContainer implements MockGameObject {
 
   getIndex(obj) {
     const index = this.list.indexOf(obj);
-    return index || -1;
+    return index;
   }
 
   getAt(index) {
