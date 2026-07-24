@@ -2307,6 +2307,8 @@ export async function driveDuoGuestTackleThroughPublicUi(
     submitHostTackle?: boolean;
     hostMoveIndex?: number;
     guestMoveIndex?: number;
+    hostMoveId?: MoveId;
+    guestMoveId?: MoveId;
     hostTarget?: BattlerIndex;
     guestTarget?: BattlerIndex;
   } = {},
@@ -2368,7 +2370,14 @@ export async function driveDuoGuestTackleThroughPublicUi(
       ).toBeGreaterThan(0);
       expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
       expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
-      selectFightMoveThroughPublicUi(rig.guestScene, options.guestMoveIndex ?? 0, "guest");
+      const guestMoveIndex =
+        options.guestMoveId == null
+          ? (options.guestMoveIndex ?? 0)
+          : (rig.guestScene.phaseManager.getCurrentPhase() as Phase & { getPokemon(): Pokemon })
+              .getPokemon()
+              .getMoveset()
+              .findIndex(move => move.moveId === options.guestMoveId);
+      selectFightMoveThroughPublicUi(rig.guestScene, guestMoveIndex, "guest");
 
       // The production command handler skips TARGET_SELECT when the selected move has only one legal
       // target (for example the one-enemy direct-mirror fixtures). Older harness code always waited for a
@@ -2412,7 +2421,14 @@ export async function driveDuoGuestTackleThroughPublicUi(
         );
         expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Fight through COMMAND UI").toBe(true);
         expect(rig.hostScene.ui.getMode(), "host reaches the move picker").toBe(UiMode.FIGHT);
-        selectFightMoveThroughPublicUi(rig.hostScene, options.hostMoveIndex ?? 0, "host");
+        const hostMoveIndex =
+          options.hostMoveId == null
+            ? (options.hostMoveIndex ?? 0)
+            : (rig.hostScene.phaseManager.getCurrentPhase() as Phase & { getPokemon(): Pokemon })
+                .getPokemon()
+                .getMoveset()
+                .findIndex(move => move.moveId === options.hostMoveId);
+        selectFightMoveThroughPublicUi(rig.hostScene, hostMoveIndex, "host");
 
         const postMovePhase = await driveClientPhaseQueueTo(rig.hostScene, "SelectTargetPhase or turn commit", {
           matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "CoopTurnCommitPhase",

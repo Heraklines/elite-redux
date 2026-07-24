@@ -29,11 +29,9 @@ import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -42,10 +40,10 @@ import { TrainerVariant } from "#enums/trainer-variant";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
@@ -111,28 +109,18 @@ describe.skipIf(!RUN)(
       // best-effort
     });
 
-    /** Wire the guest's OWN-slot command answer: the harmless HOLD move against ENEMY_2 (never KOs). */
-    function wireGuestCommand(rig: DuoRig): void {
-      rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => {
-        const moveset = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX]?.getMoveset() ?? [];
-        const slot = moveset.findIndex(m => m?.moveId === HOLD_MOVE);
-        return {
-          command: Command.FIGHT,
-          cursor: slot >= 0 && moveSlots.includes(slot) ? slot : (moveSlots[0] ?? 0),
-          moveId: HOLD_MOVE,
-          targets: [BattlerIndex.ENEMY_2],
-        };
-      });
-    }
-
-    /** Play ONE host turn: the HOST slot KOs the ENEMY-slot lead; the GUEST slot rides the relay (HOLD, ENEMY_2). */
+    /** Play one turn through both clients' public COMMAND/FIGHT/TARGET handlers. */
     async function playTurn(rig: DuoRig): Promise<void> {
       const turn = rig.hostScene.currentBattle.turn;
-      await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, turn, {
-        proveGuestCommand: true,
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        submitHostTackle: true,
+        hostMoveId: KO_MOVE,
+        guestMoveId: HOLD_MOVE,
+        hostTarget: BattlerIndex.ENEMY,
+        guestTarget: BattlerIndex.ENEMY_2,
       });
       await withClient(rig.hostCtx, async () => {
-        game.move.select(KO_MOVE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
         await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
@@ -144,7 +132,6 @@ describe.skipIf(!RUN)(
 
       const pair = createLoopbackPair();
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-      wireGuestCommand(rig);
       resyncProbe = installCoopResyncProbe(rig.guestRuntime);
 
       const hostParty = rig.hostScene.getEnemyParty();

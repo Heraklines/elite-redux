@@ -2947,6 +2947,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   COMMAND/FIGHT/PARTY/TARGET handlers, use the real ordered replacement and battle-end boundaries, and keep
   automatic scheduled delivery boot-only so no guest callback can execute against the host's global scene.
 
+# 2026-07-24 - Trainer-switch fixtures cross public command controls
+
+- The B8 trainer mirror and rapid enemy faint-chain tests no longer wire a synthetic guest command responder
+  or inject host moves through `game.move.select`. Each turn now drives both engines' real COMMAND/FIGHT/TARGET
+  handlers, preserving the asymmetric KO/hold targets while exercising the same relay and V2 frontier as players.
+- The shared public driver accepts captured move slots or MoveIds and navigates the real two-column fight menu
+  with directional input. Existing Tackle callers remain unchanged; replay and trainer tests can cover arbitrary
+  move positions without reinstating a direct engine shortcut.
+
 # 2026-07-24 - B10 replay and replacement fixtures use real ordered controls
 
 - Full-gate run `30096737312` proved the Roar/flee production fix end-to-end: the guest admitted and applied

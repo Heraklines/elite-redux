@@ -30,11 +30,9 @@ import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -44,9 +42,9 @@ import { TrainerVariant } from "#enums/trainer-variant";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   installDuoLogCapture,
   withClient,
@@ -119,37 +117,18 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     // best-effort
   });
 
-  // The guest OWN-slot command is answered from this mutable per-turn move (the production relay path reads
-  // it each request). The host auto-cross-targets each player at the OPPOSITE enemy (bi0->ENEMY, bi1->
-  // ENEMY_2), so we KO only ONE enemy by giving the HOST slot the KO move (ENEMY) and the GUEST slot the
-  // no-damage HOLD move (ENEMY_2 survives) - a clean SINGLE enemy switch, no full-field-wipe / dup-species churn.
-  let currentGuestMove: MoveId = KO_MOVE;
-
-  /** Wire the guest's OWN-slot command answer from the current per-turn move (the relayed production path). */
-  function wireGuestCommand(rig: DuoRig): void {
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => {
-      const moveset = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX]?.getMoveset() ?? [];
-      const slot = moveset.findIndex(m => m?.moveId === currentGuestMove);
-      return {
-        command: Command.FIGHT,
-        cursor: slot >= 0 && moveSlots.includes(slot) ? slot : (moveSlots[0] ?? 0),
-        moveId: currentGuestMove,
-        targets: [BattlerIndex.ENEMY_2],
-      };
-    });
-  }
-
-  /** Play ONE host turn: the HOST-owned slot uses `hostMove` (auto-targets ENEMY), the GUEST slot rides the
-   * relay with `guestMove` (auto-targets ENEMY_2); guest replays the turn. Selecting ONLY the host slot is
-   * the co-op faithful pattern (the soak driver's rule): double-selecting the partner slot leaks handlers. */
+  /** Play one turn through both clients' public COMMAND/FIGHT/TARGET handlers. */
   async function playTurn(rig: DuoRig, hostMove: MoveId, guestMove: MoveId): Promise<void> {
-    currentGuestMove = guestMove;
     const turn = rig.hostScene.currentBattle.turn;
-    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, turn, {
-      proveGuestCommand: true,
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+      hostMoveId: hostMove,
+      guestMoveId: guestMove,
+      hostTarget: BattlerIndex.ENEMY,
+      guestTarget: BattlerIndex.ENEMY_2,
     });
     await withClient(rig.hostCtx, async () => {
-      game.move.select(hostMove, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
@@ -163,7 +142,6 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
 
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
 
     // ===== (1) WAVE-START checksum parity: the mirror rebuilt the guest byte-identical to the host. =====
     const hostChk0 = await withClient(rig.hostCtx, () => captureCoopChecksum());
@@ -205,23 +183,15 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     const enemyLeadIdBefore = rig.hostScene.getEnemyField()[0]?.id;
 
     // KO turn: host FLAMETHROWERs the ENEMY-slot lead; guest GROWLs ENEMY_2 (no damage, ENEMY_2 survives).
-    // Only the ENEMY slot faints -> a clean SINGLE trainer send-out. Cross so the trainer summons its next.
+    // Only the ENEMY slot faints -> a clean SINGLE trainer send-out.
     await playTurn(rig, KO_MOVE, HOLD_MOVE);
-    // The completed TurnEndPhase has already advanced the battle's turn. Use the materialized current
-    // boundary instead of manufacturing a second increment that can only describe a phantom turn.
-    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, rig.hostScene.currentBattle.turn, {
-      proveGuestCommand: true,
-    });
-    await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase");
-    });
+
+    // HOLD turn: both slots GROWL (no damage) so nobody faints - the field is stable [switched-in mon,
+    // ENEMY_2]. Entering its real command boundary summons the reserve; its checkpoint carries that send-out.
+    await playTurn(rig, HOLD_MOVE, HOLD_MOVE);
     const enemyLeadIdAfter = rig.hostScene.getEnemyField()[0]?.id;
     const switched = enemyLeadIdAfter != null && enemyLeadIdAfter !== enemyLeadIdBefore;
     expect(switched, "the host trainer sent its next benched mon after the ENEMY-slot KO (an enemy switch)").toBe(true);
-
-    // HOLD turn: both slots GROWL (no damage) so nobody faints - the field is stable [switched-in mon,
-    // ENEMY_2]. The guest replays THIS turn's checkpoint, whose enemy field carries the trainer's send-out.
-    await playTurn(rig, HOLD_MOVE, HOLD_MOVE);
 
     // The guest must render the SAME post-switch on-field enemies as the host (species-identical field).
     const hostFieldSpecies = rig.hostScene.getEnemyField().map(e => e.species.speciesId);
