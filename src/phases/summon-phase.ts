@@ -112,6 +112,10 @@ export class SummonPhase extends PartyMemberPokemonPhase {
         pokemonName,
       });
 
+      // A healthy player Pokemon can persist from the previous wave, leaving no
+      // player SummonPhase to close its trainer-intro tray. Enemy send-out is
+      // the point where both intro trays have finished serving their purpose.
+      globalScene.pbTray.hide();
       globalScene.pbTrayEnemy.hide();
       globalScene.ui.showText(message, null, () => this.summon());
     } else if (globalScene.currentBattle.isBattleMysteryEncounter()) {

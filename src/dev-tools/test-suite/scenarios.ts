@@ -20667,4 +20667,41 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Gimmighoul/Gholdengo shared progression",
+    description:
+      "Gholdengo shares Gimmighoul's single candy bucket and all three innate\n"
+      + "unlock slots. CHECK: give Gimmighoul candy and unlock each innate, then\n"
+      + "evolve it or inspect Gholdengo in the Pokedex. EXPECT: the candy count is\n"
+      + "unchanged and all three corresponding Gholdengo innates are unlocked and\n"
+      + "active. A pre-fix save with progress stored directly on Gholdengo is merged\n"
+      + "back into Gimmighoul on load without losing candy or unlocks. Headless\n"
+      + "coverage: er-gimmighoul-family-unlocks.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.GIMMIGHOUL, {
+          moveset: [MoveId.ASTONISH, MoveId.TACKLE, MoveId.PROTECT, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Trainer intro closes both party trays",
+    description:
+      "The player's party-indicator tray no longer remains over the HUD when a\n"
+      + "healthy Pokemon persists from a wild wave into the next trainer battle.\n"
+      + "CHECK: finish a wild wave without switching or fainting, then enter a\n"
+      + "trainer wave. EXPECT: when the trainer sends out the first foe, both the\n"
+      + "player and enemy party trays slide away and stay hidden. Headless coverage:\n"
+      + "er-trainer-intro-trays.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.MUDKIP, {
+          moveset: [MoveId.TACKLE, MoveId.WATER_GUN, MoveId.PROTECT, MoveId.REST],
+        }),
+      ];
+    },
+  },
 ];
