@@ -479,6 +479,36 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(endSpy, "the guest correctly leaves turn authorship to the host").toHaveBeenCalledTimes(1);
   });
 
+  it("an authoritative host cannot capture while a runtime mutation token is still active", async () => {
+    await startCoopHost();
+    const runtime = getCoopRuntime()!;
+    beginCoopRecording(globalScene.currentBattle.turn, "mutation-ledger-regression");
+    const mutation = runtime.mutationLedger.begin("callback:late-form-settle");
+    const emitSpy = vi.spyOn(runtime.battleStream, "emitTurn");
+    const failureSpy = vi
+      .spyOn(runtime.battleStream, "broadcastAuthorityFailure")
+      .mockReturnValue(new Promise(() => {}));
+    const phase = new CoopTurnCommitPhase();
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(failureSpy, "the active mutation becomes a correlated shared terminal").toHaveBeenCalledWith(
+      expect.objectContaining({
+        wave: globalScene.currentBattle.waveIndex,
+        turn: globalScene.currentBattle.turn,
+        boundary: "turnResolution",
+        reason: expect.stringContaining("callback:late-form-settle"),
+      }),
+    );
+    expect(emitSpy, "no partial legacy or V2 turn image may cross the wire").not.toHaveBeenCalled();
+    expect(
+      endSpy,
+      "the host cannot open locally-derived progression after refusing the capture",
+    ).not.toHaveBeenCalled();
+    expect(mutation.settle()).toBe(true);
+  });
+
   /** Capture the same complete P32 carrier production emits, then put this one-engine guest fixture back. */
   const carrierWithFieldHp = (turn: number, hp: number) => {
     const mons = globalScene.getField(true).filter((m): m is Pokemon => m != null);

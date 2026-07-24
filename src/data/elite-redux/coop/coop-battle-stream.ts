@@ -129,6 +129,8 @@ export interface CoopTurnBoundaryIdentity {
    * the real WAVE_ADVANCE. Only the runtime that owns the staged transition may set this marker.
    */
   readonly deferredWaveOutcome?: "win";
+  /** Runtime mutation-barrier depth at capture; V2 refuses a non-zero value even after outer checks. */
+  readonly pendingMutationTokens?: number;
 }
 
 /** Complete pre-command cosmetic prefix paired with the post-summon state image that authored it. */
@@ -2798,6 +2800,7 @@ export class CoopBattleStreamer {
       legacyDigest: checksum,
       successorSeatSource:
         replacementControl != null || completeCommands.length === 0 ? "none-non-command-boundary" : "owner-field",
+      pendingTokens: boundary.pendingMutationTokens ?? 0,
     };
     if (cutoverActive) {
       // CUTOVER: commit the v2 TURN_COMMIT as the sole authority. A non-null entry commits; null is a fatal

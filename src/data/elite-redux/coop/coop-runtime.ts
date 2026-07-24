@@ -286,6 +286,7 @@ import {
 import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { isCompleteCoopMeResyncOutcome } from "#data/elite-redux/coop/coop-me-terminal-validator";
 import { CoopMembershipController } from "#data/elite-redux/coop/coop-membership";
+import { CoopMutationLedger, setActiveCoopMutationLedger } from "#data/elite-redux/coop/coop-mutation-ledger";
 import type {
   CoopAbilityPickPayload,
   CoopAbilityPresentationPayload,
@@ -4138,6 +4139,8 @@ export interface CoopRuntime {
   controller: CoopSessionController;
   /** Revisioned two-seat membership and connection-generation state. */
   membership: CoopMembershipController;
+  /** Runtime-owned fully-settled-turn barrier; never shared across peers or replacement sessions. */
+  mutationLedger: CoopMutationLedger;
   /** Relays the partner's in-battle command over the transport (#633, LIVE-C). */
   battleSync: CoopBattleSync;
   /** Host-authoritative battle stream: host->guest enemy party + per-turn checkpoints (#633, LIVE-D). */
@@ -7626,6 +7629,7 @@ export function coopSessionGeneration(): number {
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
+  setActiveCoopMutationLedger(runtime.mutationLedger);
   activateCoopV2Runtime(runtime);
   runtimeSceneBindings.set(runtime, globalScene);
   globalScene?.phaseManager?.setCoopRecoveryProgressionFence?.(
@@ -11046,6 +11050,7 @@ export function assembleCoopRuntime(
   runtime = {
     controller,
     membership,
+    mutationLedger: new CoopMutationLedger(),
     battleSync,
     battleStream,
     interactionRelay,
@@ -11304,6 +11309,7 @@ export function clearCoopRuntime(): void {
   // every production start/connect path clears first, so a fresh pairing must never inherit prior-run edges.
   resetCoopUiRelayTrace();
   if (active == null) {
+    setActiveCoopMutationLedger(null);
     // A prior terminal path may have already nulled the runtime before the ordinary title teardown arrives.
     // Cycle-free predicates are process-global, so clear them even on that idempotent second teardown; a
     // later solo run must never inherit Showdown side ownership or renderer gating from the dead session.
@@ -11364,6 +11370,8 @@ export function clearCoopRuntime(): void {
   resetCoopOperationJournalLog();
   active.spoof?.dispose();
   active.showdownSpoof?.dispose();
+  active.mutationLedger.reset();
+  setActiveCoopMutationLedger(null);
   // Drop the persistent move-learn forward listener + its in-flight slot set (#633 BUG3+5) so a
   // subsequent solo / lockstep run has no listener and spawns no CoopReplayLearnMovePhase.
   offLearnMoveForward?.();

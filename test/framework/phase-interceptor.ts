@@ -227,6 +227,10 @@ export class PhaseInterceptor {
       this.state = "running";
       this.interruptedPhase = null;
       this.logPhase(currentPhase.phaseName);
+      // The interceptor replaces PhaseManager.startCurrentPhase, but it must not bypass the production
+      // Authority V2 mutation boundary that lives immediately before phase.start(). A phase token remains
+      // held across this async wait and any public UI interruption until PhaseManager.shiftPhase retires it.
+      this.scene.phaseManager.prepareCurrentPhaseForStart();
       currentPhase.start();
       await vi.waitUntil(() => this.state !== "running", { interval: 50, timeout: TEST_TIMEOUT });
     } catch (error) {

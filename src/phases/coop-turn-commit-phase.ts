@@ -21,13 +21,11 @@ import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { StatusEffect } from "#enums/status-effect";
 
 /**
- * Phases that materially mutate the authoritative battle snapshot and therefore may not
- * remain queued behind the immutable per-turn commit. TurnEndPhase queues this sentinel
- * as its last child; normally every earlier child (including children spawned by those
- * children) has drained before this phase starts. This list is a fail-closed tripwire for
- * a future phase that incorrectly defers material work outside that settled subtree.
+ * Diagnostic names for historically delayed material phases. Correctness is owned by the runtime mutation
+ * ledger, which tracks every started phase across its entire async lifetime. This list remains only to make
+ * a malformed phase tree explain itself when a known mutator is queued behind the immutable commit.
  */
-const UNSETTLED_TURN_MUTATORS = new Set([
+const KNOWN_TURN_MUTATOR_DIAGNOSTICS = new Set([
   "FormChangePhase",
   "ObtainStatusEffectPhase",
   "PokemonHealPhase",
@@ -45,7 +43,7 @@ function unsettledTurnReason(): string | null {
   }
   const queuedMutator = globalScene.phaseManager
     .getQueuedPhaseNames()
-    .find(phaseName => UNSETTLED_TURN_MUTATORS.has(phaseName));
+    .find(phaseName => KNOWN_TURN_MUTATOR_DIAGNOSTICS.has(phaseName));
   return queuedMutator == null ? null : `material mutator ${queuedMutator} remains queued after TurnEnd`;
 }
 
@@ -111,6 +109,19 @@ export class CoopTurnCommitPhase extends Phase {
       return;
     }
     try {
+      const mutationBefore = runtime.mutationLedger.snapshot();
+      if (mutationBefore.pendingTokens > 0) {
+        const labels = mutationBefore.activeLabels.join(", ");
+        coopWarn(
+          "checkpoint",
+          `host refused mutation-busy turnResolution turn=${recording.turn}: ${labels || "unlabelled mutation"}`,
+        );
+        fatal(
+          `Host reached turn commit for wave ${wave}, turn ${recording.turn} with `
+            + `${mutationBefore.pendingTokens} authoritative mutation(s) still active: ${labels || "unlabelled"}.`,
+        );
+        return;
+      }
       const unsettled = unsettledTurnReason();
       if (unsettled != null) {
         coopWarn("checkpoint", `host refused unsettled turnResolution turn=${recording.turn}: ${unsettled}`);
@@ -121,6 +132,21 @@ export class CoopTurnCommitPhase extends Phase {
       if (carrier == null) {
         coopWarn("checkpoint", `host could not capture complete turnResolution turn=${recording.turn}`);
         fatal(`Host could not capture complete turn authority for wave ${wave}, turn ${recording.turn}.`);
+        return;
+      }
+      const mutationAfter = runtime.mutationLedger.snapshot();
+      if (mutationAfter.pendingTokens > 0 || mutationAfter.generation !== mutationBefore.generation) {
+        const labels = mutationAfter.activeLabels.join(", ");
+        coopWarn(
+          "checkpoint",
+          `host refused raced turnResolution turn=${recording.turn}: mutation generation `
+            + `${mutationBefore.generation}->${mutationAfter.generation} pending=${mutationAfter.pendingTokens} `
+            + `labels=${labels || "none"}`,
+        );
+        fatal(
+          `Authoritative mutation state changed while capturing wave ${wave}, turn ${recording.turn} `
+            + `(generation ${mutationBefore.generation}->${mutationAfter.generation}).`,
+        );
         return;
       }
       const deferredWaveOutcome = captureCoopDeferredWaveOutcomeForTurnCommit(carrier.authoritativeState.wave);
@@ -137,6 +163,7 @@ export class CoopTurnCommitPhase extends Phase {
         {
           mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true,
           ...(deferredWaveOutcome == null ? {} : { deferredWaveOutcome }),
+          pendingMutationTokens: mutationAfter.pendingTokens,
         },
       );
       if (!retained) {

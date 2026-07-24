@@ -12,6 +12,7 @@ import { DynamicQueueManager } from "#app/dynamic-queue-manager";
 import { globalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { PhaseTree } from "#app/phase-tree";
+import { beginActiveCoopMutation, type CoopMutationToken } from "#data/elite-redux/coop/coop-mutation-ledger";
 import { coopRendererGateNeutralizes } from "#data/elite-redux/coop/coop-renderer-gate";
 import { isCoopRecording, recordCoopMessage } from "#data/elite-redux/coop/coop-turn-recorder";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
@@ -354,6 +355,12 @@ export class PhaseManager {
   /** The phase put on standby if {@linkcode overridePhase} is called */
   private standbyPhase: Phase | null = null;
   /**
+   * Runtime-owned authoritative-mutation leases, keyed by the exact phase object that acquired them.
+   * A phase remains live across awaits, UI interruption, and modal overrides, so its token is released only
+   * when that object actually leaves the scheduler (never merely because its synchronous start head returned).
+   */
+  private readonly coopMutationTokens = new WeakMap<Phase, CoopMutationToken>();
+  /**
    * Terminal fence for a co-op runtime that is retaining its peer-ACKed shutdown transaction. The current
    * phase may receive late async completions while that handshake runs; blocking `shiftPhase` prevents
    * those completions from rebuilding a turn after the gameplay queues were drained.
@@ -457,6 +464,9 @@ export class PhaseManager {
   public clearAllPhases(): void {
     this.clearPhaseQueue();
     this.dynamicQueueManager.clearQueues();
+    if (this.standbyPhase != null) {
+      this.settleCoopMutationPhase(this.standbyPhase);
+    }
     this.standbyPhase = null;
   }
 
@@ -508,6 +518,7 @@ export class PhaseManager {
     if (!phase.is("CoopApplyResyncPhase") || !this.coopRecoveryProgressionFrozen()) {
       return false;
     }
+    this.settleCoopMutationPhase(this.currentPhase);
     this.clearAllPhases();
     this.currentPhase = phase;
     this.startCurrentPhase();
@@ -529,6 +540,7 @@ export class PhaseManager {
     ) {
       return false;
     }
+    this.settleCoopMutationPhase(predecessor);
     this.clearAllPhases();
     this.currentPhase = successor;
     this.startCurrentPhase();
@@ -573,6 +585,7 @@ export class PhaseManager {
       }
       this.coopRecoveryControlShiftPermitted = false;
     }
+    this.settleCoopMutationPhase(this.currentPhase);
     if (this.standbyPhase) {
       this.currentPhase = this.standbyPhase;
       this.standbyPhase = null;
@@ -603,7 +616,39 @@ export class PhaseManager {
    */
   private startCurrentPhase(): void {
     console.log(`%cStart Phase ${this.currentPhase.phaseName}`, `color:${PHASE_START_COLOR};`);
+    this.prepareCurrentPhaseForStart();
     this.currentPhase.start();
+  }
+
+  /**
+   * Acquire the exact current phase's mutation lease immediately before its first start.
+   *
+   * Public only because the headless PhaseInterceptor deliberately replaces {@linkcode startCurrentPhase}
+   * and must cross the same production boundary before invoking `phase.start()`. Duplicate starts of one
+   * object keep one lease. The commit sentinel is the reader of this barrier and therefore never acquires a
+   * token for itself.
+   */
+  public prepareCurrentPhaseForStart(): void {
+    const phase = this.currentPhase;
+    if (phase == null || phase.is("CoopTurnCommitPhase") || this.coopMutationTokens.has(phase)) {
+      return;
+    }
+    const token = beginActiveCoopMutation(`phase:${phase.phaseName}`);
+    if (token != null) {
+      this.coopMutationTokens.set(phase, token);
+    }
+  }
+
+  private settleCoopMutationPhase(phase: Phase | null | undefined): void {
+    if (phase == null) {
+      return;
+    }
+    const token = this.coopMutationTokens.get(phase);
+    if (token == null) {
+      return;
+    }
+    this.coopMutationTokens.delete(phase);
+    token.settle();
   }
 
   /**

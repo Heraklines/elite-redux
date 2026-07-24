@@ -2621,3 +2621,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   derived state.
 - Engine regressions cover both invariants: no `leaveField` call for an extra display child, and immediate
   terminal fencing for an authority blob without a reconstructable species identity.
+
+# 2026-07-24 - Turn capture uses a runtime-owned mutation ledger
+
+- Each assembled co-op runtime now owns an independent mutation ledger. PhaseManager acquires one labelled
+  token immediately before every real phase start and releases it only when that exact phase leaves the
+  scheduler, including async/UI-interrupted phases and modal predecessors. The headless PhaseInterceptor
+  crosses the same production hook instead of bypassing it.
+- `CoopTurnCommitPhase` requires zero active tokens and an unchanged ledger generation across complete
+  carrier serialization. The historical six-phase scan remains diagnostic only; it no longer owns the
+  fully-settled invariant. The V2 adapter also receives the real pending-token count as defense in depth.
+- Node-pure ledger coverage proves idempotent settlement, destination-runtime ownership, and teardown
+  invalidation. Engine failure-first coverage proves an active callback token produces a correlated shared
+  terminal and emits no partial turn image. Hosted co-op shards remain the required runtime qualification.

@@ -171,6 +171,24 @@ test("an authoritative host turn commit cannot silently release without its immu
   );
 });
 
+test("the production turn boundary is owned by a runtime mutation ledger, not a phase-name blacklist", () => {
+  const manager = read("src/phase-manager.ts");
+  const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
+  const ledger = read("src/data/elite-redux/coop/coop-mutation-ledger.ts");
+  const commit = read("src/phases/coop-turn-commit-phase.ts");
+
+  assert.match(manager, /prepareCurrentPhaseForStart\(\)[\s\S]+beginActiveCoopMutation/u);
+  assert.match(manager, /shiftPhase\(\)[\s\S]+settleCoopMutationPhase\(this\.currentPhase\)/u);
+  assert.match(runtime, /mutationLedger:\s*new CoopMutationLedger\(\)/u);
+  assert.match(ledger, /begin\(label: string\)[\s\S]+activeTokens\.set/u);
+  assert.match(ledger, /settle:[\s\S]+activeTokens\.delete/u);
+  assert.match(commit, /const mutationBefore = runtime\.mutationLedger\.snapshot\(\)/u);
+  assert.match(commit, /const carrier = captureCoopAuthoritativeCarrier/u);
+  assert.match(commit, /const mutationAfter = runtime\.mutationLedger\.snapshot\(\)/u);
+  assert.match(commit, /mutationAfter\.generation !== mutationBefore\.generation/u);
+  assert.doesNotMatch(commit, /const UNSETTLED_TURN_MUTATORS/u);
+});
+
 test("V2 replacement animation drains before its checkpoint can install", () => {
   const replay = read("src/phases/coop-replay-turn-phase.ts");
   const presentationGate = replay.indexOf("hasRenderedReplacementPresentation(envelope)");
