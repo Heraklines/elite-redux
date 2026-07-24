@@ -394,7 +394,7 @@ test("the real command proof edge eagerly completes V2 and the duo fixture creat
   );
 });
 
-test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must create", () => {
+test("interaction DATA cannot wait on a successor phase that ordinary V2 projection must create", () => {
   const materialStart = coopRuntime.indexOf("function materializeCoopMeOperationFromOp(");
   const materialEnd = coopRuntime.indexOf("\ntype CoopV2InteractionLiveMaterializer", materialStart);
   assert.notEqual(materialStart, -1, "runtime exposes the registered Mystery materializer");
@@ -420,13 +420,27 @@ test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must
   assert.notEqual(projectionStart, -1, "runtime exposes the ordinary immutable interaction projector");
   assert.ok(projectionEnd > projectionStart, "ordinary interaction projector has a bounded source block");
   const projector = coopRuntime.slice(projectionStart, projectionEnd);
-  assert.match(projector, /plan\.kind !== "mystery"/u);
   assert.match(projector, /materializeCoopV2InteractionProjection\(runtime, control, plan\)/u);
-  for (const kind of ["learn-move", "learn-move-batch", "revival", "stormglass"]) {
+  for (const kind of [
+    "ability",
+    "catch-full",
+    "colosseum",
+    "learn-move",
+    "learn-move-batch",
+    "revival",
+    "stormglass",
+  ]) {
     assert.match(
       projector,
       new RegExp(`plan\\.kind === "${kind}"`, "u"),
       `ordinary delivery reconstructs the ${kind} modal from the same immutable plan as recovery`,
+    );
+  }
+  for (const kind of ["bargain", "biome", "crossroads", "mystery", "reward", "market"]) {
+    assert.match(
+      projector,
+      new RegExp(`plan\\.kind !== "${kind}"`, "u"),
+      `ordinary delivery closes the ${kind} sequential successor over obsolete local progression`,
     );
   }
   assert.match(
@@ -443,8 +457,8 @@ test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must
   );
   assert.match(
     projector,
-    /projected exact mystery generation/u,
-    "the authenticated successor replaces a stuck local predecessor",
+    /`projected exact \$\{plan\.kind\} generation/u,
+    "every authenticated sequential successor reports its destructive projection",
   );
 
   const modalStart = phaseManager.indexOf("public replaceWithCoopAuthoritativeModal(");

@@ -3303,3 +3303,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The remaining biome material deferral now reports the guest browser's active exact transition permit in
   its failure assertion. Its fail-closed semantics are unchanged; the next isolated B11 artifact will
   distinguish a leaked browser context from a real same-session transition conflict.
+
+# 2026-07-24 - Exact qualification closes the ordinary interaction projector
+
+- Exact full-gate run `30116210471` at `60c74d7c` made B4/B13 green and reduced co-op reds to B9, B10, and
+  B11. Exact public-UI journey `30116066293` completed its full two-real-browser fresh/resume route green.
+  T4 is a non-co-op topology lane and remains outside this branch's scope.
+- B9's quiz trace exposed a production Authority V2 gap: after ME_TERMINAL, REWARD_PRESENT material applied
+  while the replica's speculative CommandPhase remained current. Ordinary delivery now projects every
+  registered interaction from its immutable plan. Ability, catch-full, colosseum, learn-move, revival, and
+  stormglass use exact modal replacement; bargain, biome, crossroads, Mystery, reward, and market
+  destructively replace obsolete local progression. Recovery and ordinary delivery therefore share the same
+  constructors, and no registered surface depends on a local phase tree to decide what opens next.
+- B9's other reds were representative-fixture defects: destination pumping now yields one receiver-owned
+  event-loop turn under each exact client context; command opening waits for that reciprocal crossing; replay
+  pacing waits for causal phase changes instead of re-entering animation-enabled phases; idle replacement
+  accepts an already-installed typed Command successor; and the ME reward regression no longer treats the
+  retired cross-point rendezvous escape hatch as a V2 correctness contract.
+- B10's transposition enemy override now updates the active summon moveset that EnemyCommandPhase reads.
+  B11's Revival fixture uses harmless Protect instead of Elite Redux's damaging Splash, and chained biome
+  phases rebind their owning runtime at the address-exact start boundary instead of retaining a peer runtime
+  captured by an asynchronous predecessor.
+- Local static interaction contracts are 45/45 green and `git diff --check` is clean. Co-op behavioral
+  verification remains external-only; the next exact-SHA aggregate gate must qualify this finite batch.

@@ -11,18 +11,15 @@
 // the host NEVER streams a wave-advance for the ME battle. The guest (a pure renderer that never runs
 // its own FaintPhase/VictoryPhase) then had NO signal to stop looping the won battle: it finalized the
 // winning turn with no pending wave-advance and opened a PHANTOM turn N+1 command for a battle the host
-// already left for the reward shop. Each client then waited at a DIFFERENT rendezvous point (host at
-// `shop:W:C`, guest at `cmd:W:C+1`) and both ate the full 60s anti-hang -> the frozen "neither player
-// can pick the rewards" report.
+// already left for the reward shop. Authority V2 now orders the reward presentation directly after the
+// committed battle result, so an obsolete local command frontier cannot become a correctness owner.
 //
-// TWO fixes, both asserted here across two REAL engines over the loopback:
-//   (1) CROSS-POINT rendezvous release: while awaiting P, the partner's arrival for a DIFFERENT point Q
-//       (that we have not reached) cross-releases P immediately (INFO, not the timeout WARN) - so the
-//       cross-barrier wait can never eat the 60s anti-hang.
-//   (2) PHANTOM-TURN suppression: the guest detects the ME-battle WIN directly
+// This regression asserts across two REAL engines over the loopback that the guest detects the ME-battle
+// WIN directly
 //       (`coopMeHandoffBattleWon`: spawned ME battle + all enemies fainted per the host's authoritative
 //       checkpoint) and runs the ME victory tail (`queueCoopMeBattleVictoryTail` -> VictoryPhase ->
-//       reward shop) INSTEAD of opening a phantom next command.
+//       reward shop) INSTEAD of opening a phantom next command. The retired cross-point-rendezvous section
+//       described a legacy escape hatch and is intentionally not part of the V2 correctness contract.
 //
 // HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-me-battle-reward.test.ts
@@ -41,7 +38,6 @@ import {
   clearCoopRuntime,
   coopMeHandoffBattleWon,
   coopMeInProgress,
-  getCoopRendezvous,
   setCoopMeBattleInteractionCounter,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -61,7 +57,6 @@ import {
   driveGuestReplayTurn,
   installDuoLogCapture,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { runSelectMysteryEncounterOption } from "#test/utils/encounter-test-utils";
 import Phaser from "phaser";
@@ -117,10 +112,7 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     initGlobalScene(game.scene);
   });
 
-  it("FAILS-BEFORE / PASSES-AFTER: guest suppresses the phantom turn (ME victory tail) + the cross-barrier wait releases with NO timeout", async () => {
-    // A warn spy so we can assert the anti-hang RENDEZVOUS TIMEOUT WARN never fires (the deadlock's tell).
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
+  it("FAILS-BEFORE / PASSES-AFTER: the committed ME victory tail suppresses a phantom next turn", async () => {
     // ===== REACH: park the HOST on a real FIGHT_OR_FLIGHT ME wave (option 1 SPAWNS a battle), then stand
     // up the two-engine rig. Host owns the ME at counter 0 (even). Same reach as coop-duo-mystery IT #3. =====
     await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
@@ -320,43 +312,6 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       ).toEqual([]);
     });
 
-    // ===== DEFECT (1) CROSS-BARRIER RELEASE over the REAL runtime rendezvous: reproduce the exact deadlock
-    // shape - the host (reward owner) parks at `shop:W:C` while the guest diverged to a phantom `cmd:W:C+1`.
-    // The host's shop await must CROSS-POINT release on the guest's foreign arrival (INFO, no 60s timeout),
-    // not sit through the anti-hang. A generous explicit timeout proves the RELEASE wins, not the timer. =====
-    const shopPoint = `shop:${ME_WAVE}:${ME_COUNTER}`;
-    const phantomCmdPoint = `cmd:${ME_WAVE}:${ME_COUNTER + 1}`;
-    const hostBarrier = withClientSync(rig.hostCtx, () => {
-      const rv = getCoopRendezvous();
-      expect(rv, "host runtime has a live rendezvous").not.toBeNull();
-      return rv!.rendezvous(shopPoint, 30_000);
-    });
-    // The guest arrives at the DIFFERENT (phantom) command point - proving it is at another sync point.
-    withClientSync(rig.guestCtx, () => getCoopRendezvous()!.arrive(phantomCmdPoint));
-    await drainLoopback();
-    const hostRes = await hostBarrier;
-    expect(hostRes.timedOut, "the host shop barrier did NOT eat the anti-hang timeout").toBe(false);
-    expect(hostRes.crossPoint, "the host shop barrier CROSS-POINT released on the guest's foreign arrival").toBe(
-      phantomCmdPoint,
-    );
-
-    // The BUFFERED direction (the exact live ordering: the partner's foreign arrival is buffered BEFORE the
-    // await opens): the guest opens its OWN barrier at the phantom command point with the host's shop arrival
-    // already buffered -> it cross-releases at await-START.
-    const guestRes = await withClient(rig.guestCtx, () => getCoopRendezvous()!.awaitPartner(phantomCmdPoint, 30_000));
-    expect(guestRes.timedOut, "the guest command barrier did NOT eat the anti-hang timeout").toBe(false);
-    expect(guestRes.crossPoint, "the guest command barrier CROSS-POINT released on the buffered shop arrival").toBe(
-      shopPoint,
-    );
-
-    // ===== THE DEADLOCK'S TELL: the anti-hang RENDEZVOUS TIMEOUT WARN must NEVER fire - neither barrier sat
-    // through the 60s. (Pre-fix BOTH sides emitted it after the full anti-hang.) =====
-    expect(
-      warnSpy.mock.calls.some(c => String(c[0]).includes("RENDEZVOUS TIMEOUT")),
-      "NO barrier ate the anti-hang timeout (the berry-bush freeze is gone)",
-    ).toBe(false);
-
-    warnSpy.mockRestore();
     logs.flush();
   }, 300_000);
 });

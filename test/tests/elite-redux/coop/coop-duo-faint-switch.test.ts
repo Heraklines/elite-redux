@@ -472,16 +472,11 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       ).toBe(SpeciesId.LAPRAS);
 
       // The IDLE-fallback guest reaches the replacement checkpoint via the out-of-band CHECKPOINT route
-      // (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady -> continuationReady). That
-      // handshake needs BOTH engines pumped, so first prove the checkpoint has advanced the guest to its
-      // real CoopFinalizeTurnPhase. Only then recreate the abbreviated headless NewBattle/TurnInit input
-      // tail; doing that while the replay is still parked would discard the checkpoint at the wrong address.
+      // (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady -> continuationReady). Its
+      // typed successor may already have advanced through CoopFinalizeTurnPhase into the next CommandPhase
+      // before this assertion runs. Materialize the abbreviated headless input tail from whichever of those
+      // two legal states is current; driving backwards to a transient finalizer manufactures a harness hang.
       await withClient(rig.guestCtx, async () => {
-        await driveClientPhaseQueueTo(rig.guestScene, "timeout replacement CoopFinalizeTurnPhase", {
-          matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
-          perPhaseTimeoutMs: 5_000,
-          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
-        });
         await materializeGuestInputAfterReplacement(rig.guestScene);
         await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after timeout replacement", {
           matches: phase =>

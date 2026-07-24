@@ -6268,14 +6268,11 @@ function prepareCoopV2OrdinaryReplacementControlSurface(
 /**
  * Install an ordinary replica's exact V2 successor when the obsolete local phase tree cannot reach it.
  *
- * Most interaction phases still arrive naturally at their committed successor and are proven in place. A
- * Mystery presentation is different: its immutable state can arrive while the replica is still inside the
- * previous wave's asynchronous NextEncounter tween. Waiting for that local tween to independently construct
- * MysteryEncounterPhase makes CPU/tween timing part of consensus and, in the observed browser failure, the
- * tween never completed after the authoritative state adoption. Only the authenticated ME_PRESENT capsule
- * may replace that predecessor with CoopReplayMePhase. DATA remains separate: this function runs from the
- * control projector after materialApplied, and the new phase must still open its real handler before
- * controlInstalled can be signed.
+ * No interaction successor is allowed to depend on the replica independently reproducing the authority's
+ * local phase tree. An immutable V2 entry either installs a modal over its ordered predecessor or replaces
+ * obsolete sequential progression with the exact committed surface. DATA remains separate: this function
+ * runs only after materialApplied, and the new phase must still open its real handler before controlInstalled
+ * can be signed.
  */
 function prepareCoopV2OrdinaryInteractionControlSurface(
   runtime: CoopRuntime,
@@ -6339,14 +6336,14 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
     return true;
   }
 
-  // Mid-turn modal interactions have no replica-local causal phase tree. Their immutable presentation
-  // entry is therefore the only event that can create the guest surface. Recovery has always rebuilt these
-  // exact phases from the same closed projection plan; use that constructor during ordinary delivery too so
-  // Revival and Move Learn cannot depend on a suppressed legacy prompt winning a listener race. The replica
-  // may already have consumed the generic override slot while replay parked its ordered finalizer, so replace
-  // that obsolete standby with the current V2 predecessor rather than allowing overridePhase to refuse.
+  // Modal interactions temporarily return to their exact ordered predecessor. Recovery rebuilds these same
+  // phases from the closed projection plan; ordinary delivery must use the identical constructor so no
+  // suppressed legacy prompt, occupied override slot, or local callback race can own their appearance.
   if (
-    plan.kind === "learn-move"
+    plan.kind === "ability"
+    || plan.kind === "catch-full"
+    || plan.kind === "colosseum"
+    || plan.kind === "learn-move"
     || plan.kind === "learn-move-batch"
     || plan.kind === "revival"
     || plan.kind === "stormglass"
@@ -6360,7 +6357,21 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
     return true;
   }
 
-  if (plan.kind !== "mystery" || (!current.is("NextEncounterPhase") && !current.is("MysteryEncounterPhase"))) {
+  // These are progression successors, not temporary prompts. Their authenticated entry is the sole authority
+  // for what runs next, even when a speculative local tail has already opened an obsolete CommandPhase. Clear
+  // that tree without calling its terminal: ending it would let legacy code derive another successor after the
+  // ordered log already selected this one. Keeping the explicit closed list makes a newly registered surface a
+  // compile-time failure until its ordinary projection semantics are chosen.
+  if (
+    plan.kind !== "bargain"
+    && plan.kind !== "biome"
+    && plan.kind !== "crossroads"
+    && plan.kind !== "mystery"
+    && plan.kind !== "reward"
+    && plan.kind !== "market"
+  ) {
+    const unhandledPlan: never = plan;
+    coopWarn("v2-interaction", "unhandled ordinary interaction projection", unhandledPlan);
     return false;
   }
   const phase = materializeCoopV2InteractionProjection(runtime, control, plan);
@@ -6375,7 +6386,7 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
     runtime.v2ProjectedInteractionControlId = null;
     return false;
   }
-  coopLog("v2-interaction", `projected exact mystery generation for ${controlId} from ${current.phaseName}`);
+  coopLog("v2-interaction", `projected exact ${plan.kind} generation for ${controlId} from ${current.phaseName}`);
   return true;
 }
 

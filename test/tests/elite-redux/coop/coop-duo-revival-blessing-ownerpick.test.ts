@@ -88,11 +88,11 @@ describe.skipIf(!RUN)(
         .startingWave(1)
         .enemySpecies(SpeciesId.MAGIKARP)
         .enemyLevel(1)
-        .enemyMoveset(MoveId.SPLASH)
+        .enemyMoveset(MoveId.PROTECT)
         .startingLevel(50)
         // The guest lead (field 1) uses REVIVAL_BLESSING; the host lead (field 0) uses PROTECT. Elite
-        // Redux Splash is a damaging move, so treating it as harmless can KO the level-1 fixture enemies
-        // and park the headless runner in a damage animation unrelated to the revival boundary.
+        // Redux Splash is a damaging move. Protect on both sides keeps enemy and companion actions from
+        // parking the headless runner in a damage animation unrelated to the revival boundary.
         .moveset([MoveId.REVIVAL_BLESSING, MoveId.PROTECT, MoveId.TACKLE])
         .disableTrainerWaves();
     });

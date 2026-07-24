@@ -181,7 +181,7 @@ export class SelectBiomePhase extends BattlePhase {
   /** Runtime/durability selectors captured before any rendezvous, timer, or Phaser UI callback can resume. */
   private coopBiomeOperationBinding: CoopBiomeOperationBinding | null = null;
   /** Exact runtime retained across UI/network callbacks in the two-engine topology. */
-  private readonly coopOwningRuntime = getCoopRuntime();
+  private coopOwningRuntime = getCoopRuntime();
 
   constructor(coopSourceWave: number | null = null, coopSourceTurn: number | null = null) {
     super();
@@ -276,6 +276,15 @@ export class SelectBiomePhase extends BattlePhase {
     const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
     if (coopController != null) {
       try {
+        // A chained Crossroads continuation can construct this phase from an async predecessor before the
+        // destination browser becomes ambient in the one-process duo harness. Phase start is the first
+        // address-exact point at which the owning scene, controller and runtime are installed together.
+        // Rebind here so receipt continuations cannot queue against the peer runtime captured at construction.
+        const owningRuntime = getCoopRuntime();
+        if (owningRuntime == null) {
+          throw new Error("[coop-op] surface=biome has no active owning runtime at phase start");
+        }
+        this.coopOwningRuntime = owningRuntime;
         const binding = this.requireCoopBiomeOperationBinding();
         if (binding.opState.localRole !== coopController.role) {
           throw new Error(

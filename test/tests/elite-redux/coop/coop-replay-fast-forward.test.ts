@@ -179,7 +179,10 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     if (!game.scene.phaseManager.replaceWithCoopAuthoritativePhase(predecessor, replay)) {
       throw new Error(`pacing fixture could not replace ${predecessor.phaseName} with authoritative replay`);
     }
-    await new Promise(r => setTimeout(r, 0));
+    // Animation-enabled HP and move phases legitimately remain current across several timer turns. A fixed
+    // zero-delay poll re-entered the same phase dozens of times and exhausted the fixture loop before the
+    // finalizer applied its checkpoint. Advance only on the causal phase transition a real renderer exposes.
+    await vi.waitUntil(() => game.scene.phaseManager.getCurrentPhase() !== replay, { interval: 1, timeout: 5_000 });
     for (let i = 0; i < 40; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
       if (cur == null || !REPLAY_DRAIN_PHASES.some(name => cur.is(name))) {
@@ -188,7 +191,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
       const wasFinalize = cur.is("CoopFinalizeTurnPhase");
       sequence.push(cur.phaseName);
       cur.start();
-      await new Promise(r => setTimeout(r, 0));
+      await vi.waitUntil(() => game.scene.phaseManager.getCurrentPhase() !== cur, { interval: 1, timeout: 5_000 });
       if (wasFinalize) {
         break;
       }

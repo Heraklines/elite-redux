@@ -282,7 +282,10 @@ describe.skipIf(!RUN)(
       withClientSync(rig.hostCtx, () => {
         for (const enemy of rig.hostScene.getEnemyField()) {
           enemy.hp = 1;
-          enemy.moveset = [new PokemonMove(MoveId.SPLASH)];
+          // Active battlers read the summoned moveset override, not their persistent party moveset.
+          // Set the live combat surface that EnemyCommandPhase will actually inspect; changing only
+          // `enemy.moveset` leaves the already-summoned Rock Slide override intact.
+          enemy.summonData.moveset = [new PokemonMove(MoveId.SPLASH)];
         }
         expect(
           rig.hostScene.getEnemyField().every(enemy => enemy.hp === 1),

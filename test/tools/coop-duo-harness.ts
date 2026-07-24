@@ -2155,8 +2155,17 @@ async function materializeMirroredShowdownGuestCommandFrontier(scene: BattleScen
  */
 export async function pumpDuoDestinations(rig: DuoRig, rounds = 2): Promise<void> {
   for (let round = 0; round < rounds; round++) {
-    await withClient(rig.hostCtx, () => drainLoopback());
-    await withClient(rig.guestCtx, () => drainLoopback());
+    await withClient(rig.hostCtx, async () => {
+      await drainLoopback();
+      // Promise continuations created by this delivery belong to the receiving browser. Give them one
+      // event-loop turn before restoring the shared-process globals; otherwise the callback can be queued
+      // under the host but execute later while the guest is ambient (or vice versa).
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    await withClient(rig.guestCtx, async () => {
+      await drainLoopback();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
   }
 }
 
@@ -2394,6 +2403,11 @@ export async function driveDuoGuestTackleThroughPublicUi(
       }
     });
 
+    // Opening a reciprocal command surface is a two-browser crossing: the host's arrival may resolve the
+    // guest's rendezvous only after its receiver-realm promise continuation runs. A transport drain alone is
+    // not proof that the public handler is actionable. Pump both destination event loops with a finite bound
+    // before asserting the guest menu, matching the independent loops used in the production browser test.
+    await pumpDuoDestinations(rig, 2);
     await withClient(rig.guestCtx, async () => {
       await drainLoopback();
       expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);
