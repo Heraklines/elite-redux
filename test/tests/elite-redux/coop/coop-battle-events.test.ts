@@ -73,6 +73,7 @@ import {
   CoopShowAbilityReplayPhase,
 } from "#phases/coop-replay-phases";
 import { CoopPresentationReceiptPhase } from "#phases/coop-replay-turn-phase";
+import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import Phaser from "phaser";
@@ -434,6 +435,45 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     (runtime.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
     return field;
   };
+
+  it("an authoritative host fails closed when its queued turn commit lost the recording", async () => {
+    await startCoopHost();
+    endCoopRecording();
+    const runtime = getCoopRuntime()!;
+    const failureSpy = vi
+      .spyOn(runtime.battleStream, "broadcastAuthorityFailure")
+      .mockReturnValue(new Promise(() => {}));
+    const phase = new CoopTurnCommitPhase();
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(failureSpy, "the missing host entry becomes a correlated shared terminal").toHaveBeenCalledWith(
+      expect.objectContaining({
+        wave: globalScene.currentBattle.waveIndex,
+        turn: globalScene.currentBattle.turn,
+        boundary: "turnResolution",
+      }),
+    );
+    expect(
+      endSpy,
+      "the host cannot release a boundary whose authoritative entry does not exist",
+    ).not.toHaveBeenCalled();
+  });
+
+  it("an authoritative guest does not try to author the host turn commit", async () => {
+    await startCoopGuest();
+    endCoopRecording();
+    const runtime = getCoopRuntime()!;
+    const failureSpy = vi.spyOn(runtime.battleStream, "broadcastAuthorityFailure");
+    const phase = new CoopTurnCommitPhase();
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(failureSpy).not.toHaveBeenCalled();
+    expect(endSpy, "the guest correctly leaves turn authorship to the host").toHaveBeenCalledTimes(1);
+  });
 
   /** Capture the same complete P32 carrier production emits, then put this one-engine guest fixture back. */
   const carrierWithFieldHp = (turn: number, hp: number) => {
@@ -1214,11 +1254,12 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     const animSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation(() => {});
     const updateSpy = vi.spyOn(pokemon, "updateInfo").mockReturnValue(new Promise(() => {}));
+    const runtime = getCoopRuntime()!;
     let watchdogCallback: (() => void) | undefined;
-    const timer = { remove: vi.fn() };
-    const timerSpy = vi.spyOn(globalScene.time, "delayedCall").mockImplementation((_delay, callback) => {
-      watchdogCallback = () => callback();
-      return timer as never;
+    const cancelTimer = vi.fn();
+    const timerSpy = vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
+      watchdogCallback = callback;
+      return cancelTimer;
     });
     const phase = new CoopHpDrainReplayPhase(pokemon.getBattlerIndex(), fromHp, toHp, maxHp, pokemon.species.speciesId);
     const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
@@ -1229,7 +1270,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     expect(pokemon.hp, "the timeout still installs the immutable authority HP").toBe(toHp);
     expect(endSpy, "the timeout releases even when updateInfo never settles").toHaveBeenCalledTimes(1);
-    expect(timer.remove, "release retires the watchdog exactly once").toHaveBeenCalledTimes(1);
+    expect(cancelTimer, "release retires the runtime-owned watchdog exactly once").toHaveBeenCalledTimes(1);
 
     animSpy.mockRestore();
     updateSpy.mockRestore();
@@ -1248,12 +1289,13 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     const animSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation(() => {});
     const updateSpy = vi.spyOn(pokemon, "updateInfo").mockReturnValue(new Promise(() => {}));
+    const runtime = getCoopRuntime()!;
     const watchdogCallbacks: Array<() => void> = [];
-    const timers = Array.from({ length: 2 }, () => ({ remove: vi.fn() }));
-    const timerSpy = vi.spyOn(globalScene.time, "delayedCall").mockImplementation((_delay, callback) => {
+    const cancelTimers = Array.from({ length: 2 }, () => vi.fn());
+    const timerSpy = vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
       const index = watchdogCallbacks.length;
-      watchdogCallbacks.push(() => callback());
-      return timers[index] as never;
+      watchdogCallbacks.push(callback);
+      return cancelTimers[index];
     });
     const phase = new CoopHpDrainReplayPhase(pokemon.getBattlerIndex(), fromHp, toHp, maxHp, pokemon.species.speciesId);
     const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
@@ -1271,7 +1313,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
       watchdogCallbacks[1]();
       expect(endSpy, "no progress in the renewed interval still fails closed").toHaveBeenCalledTimes(1);
-      expect(timers[1].remove, "completion retires the active renewed watchdog").toHaveBeenCalledTimes(1);
+      expect(cancelTimers[1], "completion retires the active renewed watchdog").toHaveBeenCalledTimes(1);
     } finally {
       loop.frame = originalFrame;
       animSpy.mockRestore();

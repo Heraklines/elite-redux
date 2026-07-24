@@ -5,6 +5,7 @@
  */
 
 import { globalScene } from "#app/global-scene";
+import { coopSessionGeneration, getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
 
 /** A renderer that makes no frame progress for this long has stalled its current presentation. */
 export const COOP_PRESENTATION_STALL_MS = 5000;
@@ -13,6 +14,11 @@ const COOP_PRESENTATION_HARD_WALL_MS = 120_000;
 
 export interface CoopPresentationProgressWatchdog {
   remove(): void;
+}
+
+function scheduleWallClock(callback: () => void, ms: number): () => void {
+  const timer = globalThis.setTimeout(callback, ms);
+  return () => globalThis.clearTimeout(timer);
 }
 
 /**
@@ -24,30 +30,53 @@ export function armCoopPresentationProgressWatchdog(
   onExpired: () => void,
   stallMs = COOP_PRESENTATION_STALL_MS,
 ): CoopPresentationProgressWatchdog {
-  const startedAt = Date.now();
-  let lastFrame = globalScene.game.loop.frame;
+  // Bind every read and timer to the exact renderer runtime that armed the proof. A scene timer cannot
+  // enforce liveness when that same scene is paused/destroyed, and a late ambient globalScene read can point
+  // at a replacement session. The stream scheduler is wall-clock-owned and context-aware in the duo harness;
+  // the fallback remains a wall timer for defensive non-runtime construction.
+  const scene = globalScene;
+  const streamer = getCoopBattleStreamer();
+  const generation = coopSessionGeneration();
+  const now = streamer == null ? Date.now : () => streamer.authorityNow();
+  const schedule =
+    streamer == null
+      ? scheduleWallClock
+      : (callback: () => void, ms: number) => streamer.scheduleAuthorityRetry(callback, ms);
+  const startedAt = now();
+  let lastFrame = scene.game.loop.frame;
   let removed = false;
-  let timer: Phaser.Time.TimerEvent | undefined;
+  let cancelTimer: (() => void) | undefined;
   const check = () => {
     if (removed) {
       return;
     }
-    const frame = globalScene.game.loop.frame;
-    if (frame > lastFrame && Date.now() - startedAt < COOP_PRESENTATION_HARD_WALL_MS) {
+    if (streamer != null && (generation !== coopSessionGeneration() || getCoopBattleStreamer() !== streamer)) {
+      // The old runtime no longer owns presentation or terminal UI. Its teardown replaces the phase tree.
+      removed = true;
+      return;
+    }
+    if (streamer == null && globalScene !== scene) {
+      // Defensive non-runtime construction still belongs to the exact scene that armed it. A replacement
+      // scene owns neither this proof nor its failure UI, so retire the stale wall callback silently.
+      removed = true;
+      return;
+    }
+    const frame = scene.game.loop.frame;
+    if (frame > lastFrame && now() - startedAt < COOP_PRESENTATION_HARD_WALL_MS) {
       lastFrame = frame;
-      timer = globalScene.time.delayedCall(stallMs, check);
+      cancelTimer = schedule(check, stallMs);
       return;
     }
     onExpired();
   };
-  timer = globalScene.time.delayedCall(stallMs, check);
+  cancelTimer = schedule(check, stallMs);
   return {
     remove: () => {
       if (removed) {
         return;
       }
       removed = true;
-      timer?.remove();
+      cancelTimer?.();
     },
   };
 }

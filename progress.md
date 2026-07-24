@@ -2462,3 +2462,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   not advance or end. The static architecture guard now forbids direct post-queue watermark advancement and
   was repaired to follow the current outcome-token, actor-aware switch/Tera, and browser-ledger APIs; all 11
   source-contract checks pass locally. Co-op engine execution remains hosted-only per `AGENTS.md`.
+
+# 2026-07-24 - Presentation liveness and turn capture stay bound to their authority runtime
+
+- Presentation watchdogs now capture the exact scene, stream, and session generation that armed them. Their
+  checks use the stream's injected wall-clock scheduler rather than Phaser's scene clock, so a paused or
+  destroyed renderer cannot also pause its own liveness deadline; callbacks from replaced runtimes/scenes are
+  retired without touching the successor session.
+- `CoopTurnCommitPhase` now separates legitimate guest/solo exits from an authoritative host failure. A host
+  that reaches the immutable commit boundary without its recording broadcasts a correlated turn failure and
+  keeps progression closed; an orphaned valid recording in a shared mode likewise enters shared-terminal
+  handling instead of silently becoming local mechanics.
+- Failure-first engine cases cover host fail-close and guest no-op behavior, while the static architecture
+  suite forbids the old umbrella early return; all 13 source-contract checks pass locally. Exact-SHA focused
+  run `30060087357` for the preceding entry-proof commit was a planner refusal (six affected shard candidates
+  exceeded its five-shard cap), not a runtime red; its public-browser journey remains queued separately.

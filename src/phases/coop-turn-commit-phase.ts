@@ -12,9 +12,10 @@ import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   captureCoopDeferredWaveOutcomeForTurnCommit,
   coopSessionGeneration,
+  failCoopSharedSession,
   flushCoopWaveResolvedAfterTurnCommit,
-  getCoopBattleStreamer,
-  getCoopController,
+  getCoopRuntime,
+  isAuthoritativeBattleSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { StatusEffect } from "#enums/status-effect";
@@ -63,29 +64,52 @@ export class CoopTurnCommitPhase extends Phase {
   public override start(): void {
     super.start();
     const recording = endCoopRecording();
-    const controller = getCoopController();
-    const streamer = getCoopBattleStreamer();
-    if (controller == null || streamer == null || controller.role !== "host" || recording.turn < 0) {
+    const runtime = getCoopRuntime();
+    const sharedMode = (globalScene.gameMode?.isCoop ?? false) || (globalScene.gameMode?.isShowdown ?? false);
+    if (runtime == null) {
+      if (sharedMode && recording.turn >= 0) {
+        failCoopSharedSession(`Shared battle authority disappeared before turn ${recording.turn} could be committed.`, {
+          boundary: "authority",
+          reasonCode: "capture-failed",
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: recording.turn,
+        });
+        return;
+      }
       this.end();
       return;
     }
+    const controller = runtime.controller;
+    if (controller.role !== "host" || !isAuthoritativeBattleSession()) {
+      // Guests consume the host's retained entry; solo/legacy sessions do not author V2 turn commits.
+      this.end();
+      return;
+    }
+    const streamer = runtime.battleStream;
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    const fatal = (reason: string): void => {
+    const turn = recording.turn >= 0 ? recording.turn : (globalScene.currentBattle?.turn ?? 0);
+    const fatal = (reason: string, boundaryTurn = turn): void => {
       const generation = coopSessionGeneration();
       void streamer
         .broadcastAuthorityFailure({
           epoch: controller.sessionEpoch,
           wave,
-          turn: recording.turn,
+          turn: boundaryTurn,
           boundary: "turnResolution",
           reason,
         })
         .then(() => {
-          if (generation === coopSessionGeneration()) {
+          if (generation === coopSessionGeneration() && getCoopRuntime() === runtime) {
             terminateCoopAuthoritySession(reason);
           }
         });
     };
+    if (recording.turn < 0) {
+      const reason = `Host lost the authoritative turn recording at the commit boundary for wave ${wave}, turn ${turn}.`;
+      coopWarn("checkpoint", reason);
+      fatal(reason);
+      return;
+    }
     try {
       const unsettled = unsettledTurnReason();
       if (unsettled != null) {

@@ -149,6 +149,28 @@ test("every authority event receives an ordered renderer-completion receipt in t
   assert.match(harness, /ordered presentation ledger diverged/u);
 });
 
+test("presentation liveness uses an exact runtime wall scheduler rather than the ambient Phaser scene clock", () => {
+  const watchdog = read("src/phases/coop-presentation-watchdog.ts");
+
+  assert.match(watchdog, /const scene = globalScene/u);
+  assert.match(watchdog, /streamer\.scheduleAuthorityRetry\(callback, ms\)/u);
+  assert.match(watchdog, /generation !== coopSessionGeneration\(\) \|\| getCoopBattleStreamer\(\) !== streamer/u);
+  assert.doesNotMatch(watchdog, /globalScene\.time\.delayedCall/u);
+});
+
+test("an authoritative host turn commit cannot silently release without its immutable recording", () => {
+  const commit = read("src/phases/coop-turn-commit-phase.ts");
+
+  assert.match(commit, /const runtime = getCoopRuntime\(\)/u);
+  assert.match(commit, /controller\.role !== "host" \|\| !isAuthoritativeBattleSession\(\)/u);
+  assert.match(commit, /if \(recording\.turn < 0\) \{/u);
+  assert.match(commit, /fatal\(reason\)/u);
+  assert.doesNotMatch(
+    commit,
+    /controller == null \|\| streamer == null \|\| controller\.role !== "host" \|\| recording\.turn < 0/u,
+  );
+});
+
 test("V2 replacement animation drains before its checkpoint can install", () => {
   const replay = read("src/phases/coop-replay-turn-phase.ts");
   const presentationGate = replay.indexOf("hasRenderedReplacementPresentation(envelope)");
