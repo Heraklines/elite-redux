@@ -4324,5 +4324,120 @@
     "trainerSprite": "volo",
     "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
     "weight": 10
+  },
+  "TRAINER_70024": {
+    "battleBgm": "battle_kalos_champion",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "Très bien! Let us waste no time moving onto the next battle, yes?",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70024,
+    "introDialogue": "Magnificent! Alors shall we begin our tout?",
+    "maxWave": 180,
+    "minWave": 160,
+    "name": "Jacinthe",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SALAC_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "QUASH",
+          "STEALTH_ROCK",
+          "BODY_PRESS",
+          "MISTY_EXPLOSION"
+        ],
+        "species": 703,
+        "vitamins": {
+          "hp": 2
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "LOVELY_BITE",
+          "IRON_FANGS",
+          "FIRE_FANG",
+          "CRUNCH"
+        ],
+        "sanityOff": true,
+        "species": 10119,
+        "vitamins": {
+          "hp": 2
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "BLIZZARD",
+          "AURORA_VEIL",
+          "ROCK_POLISH",
+          "SHEER_COLD"
+        ],
+        "species": 699,
+        "vitamins": {
+          "hp": 2
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "ECHOED_VOICE",
+          "ESPER_WALTZ",
+          "MYSTICAL_FIRE",
+          "CALM_MIND"
+        ],
+        "species": 10117,
+        "vitamins": {
+          "hp": 2
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "PIXIE_BEAM",
+          "YAWN",
+          "SWIFT",
+          "TRUMP_CARD"
+        ],
+        "species": 700,
+        "vitamins": {
+          "hp": 2
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "LIGHT_OF_RUIN",
+          "HURRICANE",
+          "HYPER_VOICE",
+          "COSMIC_POWER"
+        ],
+        "sanityOff": true,
+        "species": 10470,
+        "vitamins": {
+          "hp": 2
+        }
+      }
+    ],
+    "trainerClass": "SBCLEADER",
+    "trainerSprite": "jacinthe_1",
+    "victoryDialogue": "The agony of defeat is nothing compared to the joy of witnessing such magnificent might!",
+    "weight": 5
   }
 }
