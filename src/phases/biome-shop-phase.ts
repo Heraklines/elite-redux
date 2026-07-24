@@ -187,6 +187,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       || projection.pinned < 0
       || projection.reroll !== COOP_BIOME_STOCK_REROLL
       || projection.remainingStock.length !== projection.options.length
+      || (this.coopBiomeStart >= 0 && this.coopBiomeStart !== projection.pinned)
       || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
     ) {
       return false;

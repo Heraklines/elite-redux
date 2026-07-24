@@ -3326,3 +3326,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   captured by an asynchronous predecessor.
 - Local static interaction contracts are 45/45 green and `git diff --check` is clean. Co-op behavioral
   verification remains external-only; the next exact-SHA aggregate gate must qualify this finite batch.
+
+# 2026-07-24 - Exact live reward and market generations bind without replacement
+
+- Exact full-gate run `30120777523` at `8e201ebec` rejected the first complete ordinary projector in B/C/P.
+  The logs consistently showed a natural `SelectModifierPhase` or market phase already current at the exact
+  generation when its immutable presentation arrived. Destructively replacing that same-class phase left
+  its already-armed async watcher and owner continuation attached to the obsolete object, producing the
+  stale-shop drop and reward/market hangs observed across exploration, Mystery, and production-fidelity
+  tests. This is a production lifecycle defect, not a fixture timeout.
+- Ordinary projection now first asks an already-current reward or exact market class to install the immutable
+  operation, pin, reroll, surface, and stock in place. The phase installers reject a different constructor
+  address, operation, reward surface, or market kind. Only an obsolete/wrong predecessor takes the existing
+  destructive Authority V2 replacement path, preserving the required quiz-to-reward transition.
+- Relay options are materialized only after an installer accepts the generation, so a rejected phase cannot
+  publish stock for control it does not own. The static gate contract requires both in-place paths to precede
+  the destructive fallback and pins their constructor-address validation. Behavioral proof remains the next
+  exact-SHA GitHub-hosted aggregate gate and public two-browser journey; no local co-op Vitest or browser was
+  run.

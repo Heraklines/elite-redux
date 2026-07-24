@@ -461,6 +461,31 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
     "every authenticated sequential successor reports its destructive projection",
   );
 
+  const bindReward = projector.indexOf("bound exact reward generation");
+  const bindMarket = projector.indexOf("bound exact market generation");
+  const destructiveSequentialProjection = projector.indexOf(
+    "phaseManager.replaceWithCoopAuthoritativePhase(current, phase)",
+  );
+  assert.ok(bindReward >= 0, "an exact already-live reward generation is bound in place");
+  assert.ok(bindMarket >= 0, "an exact already-live market generation is bound in place");
+  assert.ok(
+    bindReward < destructiveSequentialProjection && bindMarket < destructiveSequentialProjection,
+    "live reward and market continuations are preserved before obsolete predecessors are replaced",
+  );
+  assert.match(
+    projector,
+    /current\.is\("SelectModifierPhase"\)[\s\S]*?installCoopV2RewardProjection\(plan\.operationId, plan\.projection\)/u,
+    "the reward fast path validates the existing constructor generation before binding it",
+  );
+  assert.match(
+    projector,
+    /current\.is\(coopV2MarketProjectionPhaseName\(plan\)\)[\s\S]*?installCoopV2MarketProjection\(plan\.operationId, plan\.projection\)/u,
+    "the market fast path validates the exact market class and generation before binding it",
+  );
+  assert.match(selectModifierPhase, /this\.rerollCount !== projection\.reroll/u);
+  assert.match(selectModifierPhase, /this\.coopInteractionStart !== projection\.pinned/u);
+  assert.match(biomeShopPhase, /this\.coopBiomeStart !== projection\.pinned/u);
+
   const modalStart = phaseManager.indexOf("public replaceWithCoopAuthoritativeModal(");
   const modalEnd = phaseManager.indexOf("\n  /**\n   * Determine the next phase", modalStart);
   assert.ok(modalStart >= 0 && modalEnd > modalStart, "PhaseManager exposes a bounded V2 modal replacement");

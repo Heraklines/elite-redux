@@ -322,6 +322,8 @@ export class SelectModifierPhase extends BattlePhase {
       || projection.pinned < 0
       || projection.reroll < 0
       || !sameRewardSurface
+      || this.rerollCount !== projection.reroll
+      || (this.coopInteractionStart >= 0 && this.coopInteractionStart !== projection.pinned)
       || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
     ) {
       return false;

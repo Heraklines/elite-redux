@@ -6012,6 +6012,37 @@ function buildCoopV2LiveSeams(
   return seams;
 }
 
+function materializeCoopV2RewardOptionsProjection(
+  runtime: CoopRuntime,
+  plan: Extract<CoopV2InteractionProjectionPlan, { kind: "reward" | "market" }>,
+): void {
+  runtime.interactionRelay.materializeCommittedRewardOptions(
+    plan.projection.pinned,
+    plan.projection.reroll,
+    structuredClone(plan.projection.options) as CoopSerializedRewardOption[],
+    plan.projection.rewardSurface,
+    plan.operationId,
+    plan.kind === "market"
+      ? {
+          marketKind: plan.projection.marketKind,
+          remainingStock: [...plan.projection.remainingStock],
+        }
+      : undefined,
+  );
+}
+
+function coopV2MarketProjectionPhaseName(
+  plan: Extract<CoopV2InteractionProjectionPlan, { kind: "market" }>,
+): "BiomeShopPhase" | "ExoticShopPhase" | "BlackMarketShopPhase" | "ImportBazaarShopPhase" {
+  return plan.projection.marketKind === "biome"
+    ? "BiomeShopPhase"
+    : plan.projection.marketKind === "exotic"
+      ? "ExoticShopPhase"
+      : plan.projection.marketKind === "black-market"
+        ? "BlackMarketShopPhase"
+        : "ImportBazaarShopPhase";
+}
+
 function materializeCoopV2InteractionProjection(
   runtime: CoopRuntime,
   control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
@@ -6112,13 +6143,6 @@ function materializeCoopV2InteractionProjection(
     case "revival":
       return phaseManager.create("CoopGuestRevivalPhase", plan.fieldIndex, plan.operationId, ownerIsLocal);
     case "reward": {
-      runtime.interactionRelay.materializeCommittedRewardOptions(
-        plan.projection.pinned,
-        plan.projection.reroll,
-        structuredClone(plan.projection.options) as CoopSerializedRewardOption[],
-        plan.projection.rewardSurface,
-        plan.operationId,
-      );
       const phase = phaseManager.create(
         "SelectModifierPhase",
         plan.projection.reroll,
@@ -6136,28 +6160,14 @@ function materializeCoopV2InteractionProjection(
           projection: Extract<CoopRewardPresentationPayload, { readonly surface: "reward" }>,
         ): boolean;
       };
-      return phase.installCoopV2RewardProjection(plan.operationId, plan.projection) ? phase : null;
+      if (!phase.installCoopV2RewardProjection(plan.operationId, plan.projection)) {
+        return null;
+      }
+      materializeCoopV2RewardOptionsProjection(runtime, plan);
+      return phase;
     }
     case "market": {
-      runtime.interactionRelay.materializeCommittedRewardOptions(
-        plan.projection.pinned,
-        plan.projection.reroll,
-        structuredClone(plan.projection.options) as CoopSerializedRewardOption[],
-        plan.projection.rewardSurface,
-        plan.operationId,
-        {
-          marketKind: plan.projection.marketKind,
-          remainingStock: [...plan.projection.remainingStock],
-        },
-      );
-      const phaseName =
-        plan.projection.marketKind === "biome"
-          ? "BiomeShopPhase"
-          : plan.projection.marketKind === "exotic"
-            ? "ExoticShopPhase"
-            : plan.projection.marketKind === "black-market"
-              ? "BlackMarketShopPhase"
-              : "ImportBazaarShopPhase";
+      const phaseName = coopV2MarketProjectionPhaseName(plan);
       const phase = phaseManager.create(phaseName, 0, undefined, undefined, false, {
         kind: "inherited",
         address: { wave: control.wave, turn: control.turn },
@@ -6167,7 +6177,11 @@ function materializeCoopV2InteractionProjection(
           projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
         ): boolean;
       };
-      return phase.installCoopV2MarketProjection(plan.operationId, plan.projection) ? phase : null;
+      if (!phase.installCoopV2MarketProjection(plan.operationId, plan.projection)) {
+        return null;
+      }
+      materializeCoopV2RewardOptionsProjection(runtime, plan);
+      return phase;
     }
     case "stormglass": {
       const phase = phaseManager.create("ErStormglassPickerPhase") as Phase & {
@@ -6302,6 +6316,41 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
   if (currentOperationId === control.operationId) {
     runtime.v2ProjectedInteractionControlId = controlId;
     return true;
+  }
+
+  // Reward and market phases can already be current when their immutable presentation entry arrives: the
+  // natural phase opens first and waits for the authority's options. Bind that exact live generation in
+  // place when its constructor address matches. Replacing it with an identical class would strand the
+  // already-armed watcher/owner continuation on an obsolete object and briefly close a real human surface.
+  // If validation refuses the current phase (wrong reroll, pin, market kind, or Mystery surface), the
+  // destructive projector below remains the fail-closed path for an actually obsolete predecessor.
+  if (plan.kind === "reward" && current.is("SelectModifierPhase")) {
+    const rewardPhase = current as Phase & {
+      installCoopV2RewardProjection(
+        operationId: string,
+        projection: Extract<CoopRewardPresentationPayload, { readonly surface: "reward" }>,
+      ): boolean;
+    };
+    if (rewardPhase.installCoopV2RewardProjection(plan.operationId, plan.projection)) {
+      materializeCoopV2RewardOptionsProjection(runtime, plan);
+      runtime.v2ProjectedInteractionControlId = controlId;
+      coopLog("v2-interaction", `bound exact reward generation ${controlId} to live ${current.phaseName}`);
+      return true;
+    }
+  }
+  if (plan.kind === "market" && current.is(coopV2MarketProjectionPhaseName(plan))) {
+    const marketPhase = current as Phase & {
+      installCoopV2MarketProjection(
+        operationId: string,
+        projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
+      ): boolean;
+    };
+    if (marketPhase.installCoopV2MarketProjection(plan.operationId, plan.projection)) {
+      materializeCoopV2RewardOptionsProjection(runtime, plan);
+      runtime.v2ProjectedInteractionControlId = controlId;
+      coopLog("v2-interaction", `bound exact market generation ${controlId} to live ${current.phaseName}`);
+      return true;
+    }
   }
 
   // A Bargain can be the first ordered control after a settled combat turn. The authoritative engine opens
