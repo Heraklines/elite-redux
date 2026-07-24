@@ -1,0 +1,41 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:3e62b960bb9db0b3e6c568b8bdeaec3695b3541d:run-30054443901.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+platform: Win32
+screen:   1366x768 @1x  devmem:4 GB
+boot:     boot-start@0ms -> loading-complete@121546ms -> title-shown@132260ms
+lastSess: ok (reached title)
+mode:     0  wave:null  difficulty:ace
+seed:     kzQjCvEWy8Ay1X19gz0LG5M9
+party:    
+
+----- DESCRIPTION -----
+Same ghost trainer
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:3e62b960bb9db0b3e6c568b8bdeaec3695b3541d:run-30054443901.1","source":"github","sha":"3e62b960bb9db0b3e6c568b8bdeaec3695b3541d","workflow":{"provider":"github-actions","runId":"30054443901","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"codex/save-sync-triple-layout-20260723"},"deployment":null}
+
+----- CONSOLE -----
+[23:52:36.902] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[23:52:39.116] LOG: [ER] build {"version":1,"id":"github:3e62b960bb9db0b3e6c568b8bdeaec3695b3541d:run-30054443901.1","source":"github","sha":"3e62b960bb9db0b3e6c568b8bdeaec3695b3541d","workflow":{"provider":"github-actions","runId":"30054443901","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"codex/save-sync-triple-layout-20260723"},"deployment":null}
+[23:54:27.380] DEBUG: Destroying loading scene
+[23:54:27.382] DEBUG: Destroyed loading scene
+[23:54:27.927] LOG: Seed: kzQjCvEWy8Ay1X19gz0LG5M9
+[23:54:27.927] LOG: Wave Seed: kzQjCvEWy8Ay1X19gz0LG5M9 0
+[23:54:35.247] LOG: %cStart Phase LoginPhase color:green;
+[23:54:35.930] LOG: Client Session: XTOE7DUWlbpPq53YkeEjhjkAtp6RLqAg
+[23:54:37.613] DEBUG: Using cached system data
+[23:54:37.978] LOG: %cStart Phase TitlePhase color:green;
+[23:54:38.004] LOG: Getting Session Slot id: %d 0
+[23:54:38.051] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[23:54:38.052] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[23:54:38.052] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[23:54:38.052] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[23:54:38.052] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[23:54:38.052] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[23:54:38.109] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
