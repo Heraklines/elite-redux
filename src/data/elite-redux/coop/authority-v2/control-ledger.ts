@@ -84,6 +84,7 @@ interface InteractionControlClaim {
     readonly observation:
       | { readonly kind: "ordered-wait" }
       | { readonly kind: "mechanical" }
+      | { readonly kind: "automatic-replacement" }
       | {
           readonly kind: "executable";
           readonly phaseName: string;
@@ -287,6 +288,10 @@ export class CoopV2ControlLedger {
       };
     }
     const installed = claim.installed;
+    if (installed?.observation.kind === "automatic-replacement") {
+      this.activeControlId = controlId;
+      return { kind: "already-installed", controlId };
+    }
     if (installed?.observation.kind === "authority-proposal-wait") {
       // A cosmetic authority-side phase can become visible after the exact
       // remote ingress was armed. It must never replace that stronger proof
@@ -469,6 +474,47 @@ export class CoopV2ControlLedger {
     }
     if (result.kind === "installed" || result.kind === "already-installed") {
       claim.installed = { controlId, observation: { kind: "mechanical" } };
+      this.activeControlId = controlId;
+    }
+    return result;
+  }
+
+  /**
+   * Prove an exact REPLACEMENT frontier whose owner has no legal selectable mon.
+   *
+   * This is deliberately separate from {@linkcode project}: an empty-slot resolution exposes no PARTY
+   * handler and grants no human input. It is also deliberately separate from generic mechanical projection
+   * so an arbitrary caller cannot use the command/wave projector to bypass a real replacement picker. The
+   * engine-owned installer must prove the exact live SwitchPhase and the absence of a legal same-owner bench.
+   */
+  projectAutomaticReplacement(
+    control: Extract<CoopV2InteractionControl, { kind: "REPLACEMENT" }>,
+    install: () => CoopControlInstallResult,
+  ): CoopControlInstallResult {
+    const controlId = controlIdOf(control);
+    const claim = this.claims.get(controlId);
+    if (claim == null || claim.superseded || !controlsEqual(claim.control, control)) {
+      return { kind: "rejected", reason: `no authenticated replacement claim owns ${controlId}` };
+    }
+    if (!claim.materialApplied) {
+      return { kind: "deferred", reason: `replacement material is not applied for ${controlId}` };
+    }
+    if (claim.installed?.observation.kind === "automatic-replacement") {
+      this.activeControlId = controlId;
+      return { kind: "already-installed", controlId };
+    }
+    if (claim.installed != null) {
+      return { kind: "rejected", reason: `a different replacement proof already owns ${controlId}` };
+    }
+    const result = install();
+    if ((result.kind === "installed" || result.kind === "already-installed") && result.controlId !== controlId) {
+      return {
+        kind: "rejected",
+        reason: `automatic replacement projector installed ${result.controlId}, expected ${controlId}`,
+      };
+    }
+    if (result.kind === "installed" || result.kind === "already-installed") {
+      claim.installed = { controlId, observation: { kind: "automatic-replacement" } };
       this.activeControlId = controlId;
     }
     return result;

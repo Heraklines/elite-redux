@@ -2902,3 +2902,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the change removes only shared-process scheduler order as a source of false liveness decisions.
 - The existing real two-engine biome-choice scenarios remain the failure-first coverage. No legacy relay,
   timeout, authority bypass, or synthetic result was added.
+
+# 2026-07-24 - Half-wiped replacement commits prove their non-interactive V2 control
+
+- Exact B11 diagnostics showed the new half-wipe REPLACEMENT head existed and its explicit null result was
+  staged, but the authority log refused that result because no PARTY picker had installed the predecessor.
+  Opening a picker would be incorrect: the owning seat has no legal same-owner reserve and the menu cannot
+  be completed or cancelled.
+- The global control ledger now has a dedicated automatic-replacement proof which never grants human input
+  and cannot replace an existing picker proof. The authority runtime accepts it only from the exact current
+  SwitchPhase, at the immutable replacement address, after independently rechecking the owner's full bench.
+- SwitchPhase installs that proof before retaining its typed empty-slot result. Normal selectable
+  replacements still require the existing exact PARTY phase/handler proof; Showdown and Tournament paths
+  are unchanged.

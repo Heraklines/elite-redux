@@ -28,6 +28,7 @@ import {
   getCoopInteractionRelay,
   getCoopNetcodeMode,
   getCoopRuntime,
+  installCoopV2AutomaticNoReplacementControl,
   isShowdownSyncSession,
   isVersusSession,
   notifyCoopV2InteractionSurfaceReady,
@@ -429,6 +430,20 @@ export class SwitchPhase extends BattlePhase {
           `owner slot=${this.fieldIndex}: no legal same-owner replacement (half wiped) -> close picker, slot stays empty`,
         );
         if (authoritative) {
+          if (
+            isCoopV2ReplacementCutoverActive()
+            && (this.coopV2ControlOperationId == null
+              || !installCoopV2AutomaticNoReplacementControl({
+                operationId: this.coopV2ControlOperationId,
+                ownerSeatId,
+                ...operationSourceAddress,
+                fieldIndex: this.fieldIndex,
+                phaseToken: this,
+              }))
+          ) {
+            failCoopSharedSession("The authoritative empty replacement could not prove its exact V2 control.");
+            return;
+          }
           const data = addressCoopFaintSwitchChoiceData(
             [0],
             {

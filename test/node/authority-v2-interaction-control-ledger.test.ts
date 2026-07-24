@@ -272,6 +272,54 @@ describe("Authority V2 interaction control ledger", () => {
     ).toBe(false);
   });
 
+  it("admits an explicit null replacement only after its exact automatic-resolution proof", () => {
+    const ledger = new CoopV2InteractionControlLedger();
+    const replacement: Extract<CoopNextControl, { kind: "REPLACEMENT" }> = {
+      kind: "REPLACEMENT",
+      operationId: "RC/e3/w5/t1/o0/f0/s0",
+      ownerSeatId: 0,
+      epoch: CONTEXT.sessionEpoch,
+      wave: 5,
+      turn: 1,
+      occurrence: 0,
+      fieldIndex: 0,
+      remaining: [],
+    };
+    const turn: CoopAuthorityEntry = {
+      ...interactionEntry(1, "TURN/e3/w5/t1", replacement),
+      kind: "TURN_COMMIT",
+      material: { digest: "digest-turn", payload: { epoch: CONTEXT.sessionEpoch, wave: 5, turn: 1 } },
+    };
+    const result: CoopAuthorityEntry = {
+      ...interactionEntry(2, replacement.operationId, TERMINAL_CONTROL),
+      kind: "REPLACEMENT_COMMIT",
+      material: {
+        digest: "digest-empty-replacement",
+        payload: { sourceAddress: { epoch: CONTEXT.sessionEpoch, wave: 5, turn: 1 } },
+      },
+    };
+    expect(ledger.registerEntry(turn)).toBe(true);
+    expect(ledger.markMaterialApplied(turn)).toBe(true);
+    expect(ledger.prepareAuthorityEntry(result)).toBeNull();
+    expect(
+      ledger.projectAutomaticReplacement(replacement, () => ({
+        kind: "installed",
+        controlId: "wrong-control",
+      })),
+    ).toMatchObject({ kind: "rejected" });
+    expect(
+      ledger.projectAutomaticReplacement(replacement, () => ({
+        kind: "installed",
+        controlId: controlIdOf(replacement),
+      })),
+    ).toMatchObject({ kind: "installed" });
+    expect(ledger.project(replacement, observation({}, {}, { operationId: replacement.operationId }), 0)).toMatchObject(
+      { kind: "already-installed" },
+    );
+    expect(ledger.allowsHumanInput(0, observation())).toBe(false);
+    expect(ledger.prepareAuthorityEntry(result)).not.toBeNull();
+  });
+
   it("installs a remote-owner interaction only from its exact live authority proposal waiter", () => {
     const ledger = new CoopV2InteractionControlLedger();
     const control = shared();

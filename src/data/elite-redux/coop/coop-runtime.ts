@@ -399,7 +399,12 @@ import {
   COOP_STORMGLASS_CHOICE_KINDS,
   COOP_STORMGLASS_SEQ,
 } from "#data/elite-redux/coop/coop-seq-registry";
-import { coopFieldIndexOf, coopInteractionOwnerSeat, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
+import {
+  coopFieldIndexOf,
+  coopInteractionOwnerSeat,
+  coopOwnerOfFieldSlot,
+  coopSwitchBlocksMonForOwner,
+} from "#data/elite-redux/coop/coop-session";
 import type { CoopP33AuthenticatedContextV1 } from "#data/elite-redux/coop/coop-session-binding";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type {
@@ -7027,6 +7032,81 @@ export function enterCoopV2ReplacementControlBoundary(input: {
   });
   coopLog("v2-control", `retired early replacement picker until ordered control ${controlId}`);
   return "deferred";
+}
+
+/**
+ * Install the authority's exact replacement control when the owning seat has no legal bench selection.
+ *
+ * A half-wiped seat still has a mechanically meaningful REPLACEMENT -> REPLACEMENT_COMMIT edge, but it
+ * must not open an impossible PARTY picker. This proof is accepted only from the exact current SwitchPhase,
+ * at the immutable faint address, after independently rechecking that the owner has no legal reserve.
+ */
+export function installCoopV2AutomaticNoReplacementControl(input: {
+  readonly operationId: string;
+  readonly ownerSeatId: number;
+  readonly wave: number;
+  readonly turn: number;
+  readonly occurrence: number;
+  readonly fieldIndex: number;
+  readonly phaseToken: object;
+}): boolean {
+  const runtime = active;
+  if (
+    runtime == null
+    || !coopV2ReplacementCutovers.has(runtime)
+    || runtime.controller.authorityRole !== "authority"
+    || runtime.controller.localSeatId !== input.ownerSeatId
+  ) {
+    return false;
+  }
+  const control = runtime.v2ControlLedger.latestControl;
+  if (
+    control?.kind !== "REPLACEMENT"
+    || control.operationId !== input.operationId
+    || control.ownerSeatId !== input.ownerSeatId
+    || control.epoch !== runtime.controller.sessionEpoch
+    || control.wave !== input.wave
+    || control.turn !== input.turn
+    || control.occurrence !== input.occurrence
+    || control.fieldIndex !== input.fieldIndex
+    || !runtime.v2ControlLedger.isMaterialApplied(control)
+  ) {
+    return false;
+  }
+  const receiverScene = runtimeSceneBindings.get(runtime);
+  if (receiverScene != null && receiverScene !== globalScene) {
+    return false;
+  }
+  const phase = globalScene.phaseManager?.getCurrentPhase();
+  const phaseOperationId =
+    typeof (phase as { coopV2ControlOperationId?: unknown } | null)?.coopV2ControlOperationId === "string"
+      ? (phase as { coopV2ControlOperationId: string }).coopV2ControlOperationId
+      : null;
+  if (phase !== input.phaseToken || !phase?.is("SwitchPhase") || phaseOperationId !== control.operationId) {
+    return false;
+  }
+  const battlerCount = globalScene.currentBattle.getBattlerCount();
+  const ownerRole = coopOwnerOfPlayerFieldSlot(input.fieldIndex);
+  if (ownerRole !== runtime.controller.role) {
+    return false;
+  }
+  const legalReplacement = globalScene
+    .getPlayerParty()
+    .some(
+      (mon, partyIndex) =>
+        partyIndex >= battlerCount
+        && partyIndex < 6
+        && mon.isAllowedInBattle()
+        && !coopSwitchBlocksMonForOwner(ownerRole, mon.coopOwner),
+    );
+  if (legalReplacement) {
+    return false;
+  }
+  const projected = runtime.v2ControlLedger.projectAutomaticReplacement(control, () => ({
+    kind: "installed",
+    controlId: controlIdOf(control),
+  }));
+  return projected.kind === "installed" || projected.kind === "already-installed";
 }
 
 /**
