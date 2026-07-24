@@ -2493,3 +2493,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Public journey `30060653903` on the preceding tip stopped in a stale source-regex contract after the entry
   finalizer renamed its queued log. The contract now proves both queueing and the new outcome finalizer/proof
   instead of requiring the retired `installed` text; no browser process had started in that failed run.
+
+# 2026-07-24 - Retired move targets are omitted at the recording boundary
+
+- Public two-browser evidence on both seat orientations reproduced a deterministic presentation terminal:
+  a target fainted and left the Phaser field, then a later queued `moveUsed` event retained that party object
+  and serialized its immutable id. The renderer correctly rejected the now-absent target as
+  `move-target-not-displayed`.
+- `MovePhase.showMoveText()` now omits a target when its exact object is no longer a member of the displayed
+  field. Failure-first B13 run `30063910939` observed the stale `[2]`; focused qualification
+  `30064368046` is fully green, including the exact regression and all selected static/Showdown coverage.
+- Exact-SHA two-real-browser run `30064059318` is still active against the production fix. Its result owns
+  the claim that the public turn-2 frontier is repaired; do not infer browser success from the engine shard.
+
+# 2026-07-24 - Batch learn fixtures cross the real V2 input boundary
+
+- B11 showed both batch-learn cases inspecting the replica after one transport drain: the immutable prompt
+  was admitted and material-applied, but its queue-owned panel had not completed `setMode` or
+  `controlInstalled`. That was an impossible human-input schedule, not evidence for weakening projection.
+- The fixture now makes the host batch phase the real current phase, alternates both destination runtimes,
+  requires both exact active handlers, and verifies the owner's V2 input lease before pressing public UI.
+  Local Biome and diff checks are green; runtime verification remains hosted-only per `AGENTS.md`.

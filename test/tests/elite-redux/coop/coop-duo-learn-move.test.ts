@@ -29,6 +29,7 @@ import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-re
 import {
   clearCoopRuntime,
   isCoopLearnMoveForwardInFlightEmpty,
+  isCoopV2InteractionHumanInputFrozen,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -44,6 +45,7 @@ import {
   type DuoRig,
   drainLoopback,
   installDuoLogCapture,
+  pumpDuoDestinations,
   retireDuoInitialCommandForBoundaryTest,
   withClient,
   withClientSync,
@@ -136,6 +138,57 @@ describe.skipIf(!RUN)(
       };
     }
 
+    /**
+     * Wait for the exact V2 presentation generation on both engines and for the owner input lease.
+     *
+     * A committed prompt is intentionally not an actionable panel: the replica still has to install the
+     * queue-owned phase, finish the real setMode transition, and publish its exact phase/handler proof. The
+     * retired fixture asserted after one transport drain, which can only observe the entry at materialApplied.
+     * Alternating both destination runtimes models two independent browsers and refuses to synthesize input
+     * until the owner could physically press a key in production.
+     */
+    async function awaitBatchPanels(rig: DuoRig, owner: "host" | "guest"): Promise<void> {
+      let hostReady = false;
+      let guestReady = false;
+      let ownerLeaseInstalled = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        hostReady = withClientSync(rig.hostCtx, () => {
+          const handler = rig.hostScene.ui.getHandler() as unknown as {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          };
+          return (
+            rig.hostScene.ui.getMode() === UiMode.LEARN_MOVE_BATCH
+            && handler.active === true
+            && handler.isCoopV2InputActionable?.() === true
+          );
+        });
+        guestReady = withClientSync(rig.guestCtx, () => {
+          const handler = rig.guestScene.ui.getHandler() as unknown as {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          };
+          return (
+            rig.guestScene.ui.getMode() === UiMode.LEARN_MOVE_BATCH
+            && handler.active === true
+            && handler.isCoopV2InputActionable?.() === true
+          );
+        });
+        const ownerRuntime = owner === "host" ? rig.hostRuntime : rig.guestRuntime;
+        const ownerCtx = owner === "host" ? rig.hostCtx : rig.guestCtx;
+        ownerLeaseInstalled = withClientSync(ownerCtx, () => !isCoopV2InteractionHumanInputFrozen(ownerRuntime));
+        if (hostReady && guestReady && ownerLeaseInstalled) {
+          return;
+        }
+        await withClient(ownerCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
+      }
+      throw new Error(
+        `${owner}-owned batch panels never became actionable `
+          + `(hostReady=${hostReady} guestReady=${guestReady} ownerLeaseInstalled=${ownerLeaseInstalled})`,
+      );
+    }
+
     it("GUEST-owned mon: guest DRIVES the panel, host applies, BOTH panels close (the P0 fix)", async () => {
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
       const pair = createLoopbackPair();
@@ -156,16 +209,15 @@ describe.skipIf(!RUN)(
       // await is parked. Keeping the present un-delivered here is what lets the GUEST listener open the panel
       // UNDER the guest ctx (a delivery under the host ctx would see isCoopAuthoritativeGuest()=false + skip).
       withClientSync(rig.hostCtx, () => {
-        rig.hostScene.phaseManager.create("LearnMoveBatchPhase", guestOwnedSlot, [NEW_MOVE]).start();
+        const phase = rig.hostScene.phaseManager.create("LearnMoveBatchPhase", guestOwnedSlot, [NEW_MOVE]);
+        expect(
+          rig.hostScene.phaseManager.overridePhase(phase),
+          "the host batch watcher is the real current production phase",
+        ).toBe(true);
       });
-      expect(rig.hostScene.ui.getMode(), "the HOST opened the read-only watcher panel").toBe(UiMode.LEARN_MOVE_BATCH);
-
-      // GUEST: draining under the guest ctx delivers the present -> the persistent listener opens the OWNER
-      // panel (and the host's parked await registers on the host relay object).
-      await withClient(rig.guestCtx, () => drainLoopback());
-      expect(rig.guestScene.ui.getMode(), "the GUEST (mon owner) opened the shared batch Move Learn panel").toBe(
-        UiMode.LEARN_MOVE_BATCH,
-      );
+      // The V2 prompt projects the guest overlay asynchronously. Wait for both exact phase/handler
+      // generations and the guest's physical-input lease instead of equating one drain with UI readiness.
+      await awaitBatchPanels(rig, "guest");
 
       // The guest human picks the replacement. withClientSync = SEND-ONLY: it clears the in-flight mark + relays
       // the terminal (queued) + closes the guest panel, all synchronously under the guest ctx; the host's await
@@ -216,14 +268,14 @@ describe.skipIf(!RUN)(
       // HOST owns + DRIVES: withClientSync = SEND-ONLY. The batch phase opens the real OWNER panel on the host
       // (synchronous) + streams the present (queued, not yet delivered).
       withClientSync(rig.hostCtx, () => {
-        rig.hostScene.phaseManager.create("LearnMoveBatchPhase", hostOwnedSlot, [NEW_MOVE]).start();
+        const phase = rig.hostScene.phaseManager.create("LearnMoveBatchPhase", hostOwnedSlot, [NEW_MOVE]);
+        expect(
+          rig.hostScene.phaseManager.overridePhase(phase),
+          "the host batch owner is the real current production phase",
+        ).toBe(true);
       });
-      expect(rig.hostScene.ui.getMode(), "the HOST (mon owner) opened the batch panel").toBe(UiMode.LEARN_MOVE_BATCH);
-
-      // GUEST: draining under the guest ctx delivers the present -> the listener opens the read-only WATCHER
-      // panel + arms the terminal await.
-      await withClient(rig.guestCtx, () => drainLoopback());
-      expect(rig.guestScene.ui.getMode(), "the GUEST opened the read-only watcher panel").toBe(UiMode.LEARN_MOVE_BATCH);
+      // The replica watcher and authority owner both have to prove the real panel before host input is legal.
+      await awaitBatchPanels(rig, "host");
 
       // The HOST human picks (drives its own panel). withClientSync = SEND-ONLY: done() relays the terminal
       // (queued) + closes the host panel synchronously.
