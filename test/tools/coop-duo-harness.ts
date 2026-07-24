@@ -5278,11 +5278,9 @@ export async function replayCoopTrace(
   let wavesReplayed = 0;
 
   for (const wave of waves) {
-    // The guest's battle must mirror the host's CURRENT (this-wave) field before the host plays.
-    if (wavesReplayed > 0) {
-      await remirrorWave(rig);
-    }
-
+    // Wave successors are installed by the ordinary V2 WAVE_ADVANCE projector below. Re-mirroring here
+    // would overwrite that production-owned battle with a synthetic fixture reconstruction and can race
+    // a completely legal transition whose currentBattle is momentarily absent.
     const waveCommands = commandEvents.filter(c => c.wave === wave);
     const hostCmd = waveCommands.find(c => c.slotFieldIndex === COOP_HOST_FIELD_INDEX);
     const guestCmd = waveCommands.find(c => c.slotFieldIndex === COOP_GUEST_FIELD_INDEX);

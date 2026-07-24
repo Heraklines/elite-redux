@@ -29,6 +29,7 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
@@ -83,6 +84,10 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
     setCoopWaveBarrierMs(50);
     setCoopFaintSwitchWaitMs(4000);
+    // The public two-client driver now keeps both real command surfaces alive concurrently. Use the
+    // production rendezvous budget so a slower headless renderer cannot terminalize an otherwise-valid
+    // second-turn CONTROL_COMMIT after the old 50 ms Vitest default.
+    setCoopRendezvousWaitMs(60_000);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`trainer-mirror-${Date.now()}`);
     game.override
@@ -105,6 +110,7 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
     setCoopFaintSwitchWaitMs(60_000);
+    resetCoopRendezvousWaitMs();
     accuracySpy?.mockRestore();
     accuracySpy = undefined;
     logs.dispose();

@@ -202,7 +202,9 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     });
     await new Promise(r => setTimeout(r, 0));
     const sequence = await driveReplayTurnCapturingSequence(turn);
-    for (const mon of field) {
+    // Applying the immutable checkpoint may reconstruct party identities. Read the production field again
+    // instead of asserting against the pre-recovery object references retained by this fixture.
+    for (const mon of game.scene.getPlayerField()) {
       expect(mon.hp, "field snaps to the host checkpoint hp").toBe(9);
     }
     return { sequence, converged: coopEngine.captureCoopChecksum() === carrier.checksum };

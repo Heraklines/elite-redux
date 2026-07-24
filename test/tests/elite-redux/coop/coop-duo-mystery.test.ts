@@ -37,7 +37,8 @@ import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { type CoopMePresentPayload, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
@@ -62,6 +63,7 @@ import {
   driveHostRewardShopOwner,
   type ErQuizPhaseSeam,
   installDuoLogCapture,
+  pumpDuoDestinations,
   relayGuestMeOptionIndexOnly,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
@@ -207,6 +209,7 @@ describe.skipIf(!RUN)(
     });
 
     beforeEach(() => {
+      setCoopRendezvousWaitMs(60_000);
       game = new GameManager(phaserGame);
       logs = installDuoLogCapture(`mystery-${Date.now()}`);
       game.override
@@ -218,6 +221,7 @@ describe.skipIf(!RUN)(
     });
 
     afterEach(() => {
+      resetCoopRendezvousWaitMs();
       logs.dispose();
       clearCoopRuntime();
       // #710 harness-citizenship: buildDuoForMe()/buildGuestScene() constructs a 2nd BattleScene (the
@@ -1497,37 +1501,54 @@ describe.skipIf(!RUN)(
       // money), then fire the REAL path - host stamps its authoritative checksum, the guest's onMeChecksum
       // handler mismatches, requests a stateSync, the host answers with its full snapshot, and the guest
       // applies it WHILE parked in the divert. =====
-      const applyFullSnapshotSpy = vi.spyOn(coopEngine, "applyCoopFullSnapshot");
       const meSeq = (replay as unknown as { seq: number }).seq;
+      const recoveryProofsBefore = withClientSync(
+        rig.guestCtx,
+        () => getCoopV2Shadow(rig.guestRuntime)?.diagnostics().recovery?.completedReplicaProofs ?? 0,
+      );
       withClientSync(rig.guestCtx, () => {
         rig.guestScene.money += 424_242; // diverge so captureCoopChecksum mismatches the host's
       });
-      withClientSync(rig.hostCtx, () => {
-        rig.hostRuntime.battleStream.sendMeChecksum(meSeq, coopEngine.captureCoopChecksum());
-      });
-      // Complete the async round-trip across ctxs: (guest) recv checksum -> requestStateSync; (host) answer
-      // with its authoritative snapshot under the HOST scene; (guest) receive + apply the heal. Destination
-      // scheduling is essential in the one-process fixture: a real second browser can never receive and
-      // apply the recovery response while the authority's globalScene is installed.
+      // Queue the complete checksum -> request -> bundle -> applied-proof round trip BEFORE the checksum is
+      // sent. Enabling destination scheduling afterwards is too late for an ordinary loopback: its nested
+      // synchronous handlers can otherwise apply the guest recovery while the host globalScene is ambient,
+      // an execution two independent browsers cannot produce.
       rig.pair.setDestinationContextDelivery?.(true);
       try {
-        await withClient(rig.guestCtx, () => drainLoopback());
-        await withClient(rig.hostCtx, () => drainLoopback());
-        await withClient(rig.guestCtx, () => drainLoopback());
+        withClientSync(rig.hostCtx, () => {
+          rig.hostRuntime.battleStream.sendMeChecksum(meSeq, coopEngine.captureCoopChecksum());
+        });
+        for (let attempt = 0; attempt < 200; attempt++) {
+          await pumpDuoDestinations(rig, 1);
+          const completed = withClientSync(
+            rig.guestCtx,
+            () => getCoopV2Shadow(rig.guestRuntime)?.diagnostics().recovery?.completedReplicaProofs ?? 0,
+          );
+          if (completed > recoveryProofsBefore) {
+            break;
+          }
+          await withClient(rig.guestCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
+        }
       } finally {
         rig.pair.setDestinationContextDelivery?.(false);
       }
 
-      // The heal fired, and it was SAFE: suppressResummon=TRUE on every me-entry apply (the runtime's own
-      // choice - a revert to FALSE fails here). applyCoopFullSnapshot touches no phase queue and cancels no
-      // relay waiter, so the divert is undisturbed.
-      const heals = applyFullSnapshotSpy.mock.calls;
-      expect(heals.length, "the me-entry mismatch fired the stateSync heal mid-divert").toBeGreaterThan(0);
+      // Authority V2 recovery is the correctness owner now. Prove the correlated immutable bundle applied,
+      // installed its exact control, returned an applied proof, and reopened the common recovery fence.
+      const recoveryAfter = withClientSync(
+        rig.guestCtx,
+        () => getCoopV2Shadow(rig.guestRuntime)?.diagnostics().recovery,
+      );
       expect(
-        heals.every(c => c[2] === true),
-        "every mid-divert me-entry heal ran with suppressResummon=TRUE (advisory, no field re-summon) (#839)",
-      ).toBe(true);
-      applyFullSnapshotSpy.mockRestore();
+        recoveryAfter?.completedReplicaProofs ?? 0,
+        "the me-entry mismatch completed one correlated Authority V2 recovery proof",
+      ).toBeGreaterThan(recoveryProofsBefore);
+      expect(recoveryAfter?.activeReplicaRequest, "the replica recovery request retired after proof").toBeNull();
+      expect(recoveryAfter?.fenceState, "ordinary control reopened after the exact recovery proof").toBe("open");
+      expect(
+        withClientSync(rig.guestCtx, () => rig.guestScene.money),
+        "the V2 recovery material restored the host's authoritative money",
+      ).toBe(withClientSync(rig.hostCtx, () => rig.hostScene.money));
 
       // The in-flight ME divert SURVIVED the heal: the guest is STILL parked in CoopReplayMePhase (not
       // orphaned), NOT settled, its on-field composition intact, and the money healed to the host's value.

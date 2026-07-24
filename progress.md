@@ -3058,3 +3058,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   replacement assertions inspected a nonexistent `entry` property on an `authorityEntry` envelope.
 - Both assertions now inspect the canonical `body.kind`. This changes no runtime behavior; it restores typed
   evidence that the real post-summon carrier emitted a `REPLACEMENT_COMMIT` at the public replacement edge.
+
+# 2026-07-24 - Public two-client migrations preserve production timing and V2 ownership
+
+- Exact full run `30100787579` and focused B9 run `30101100165` showed several migrated journeys still
+  inherited Vitest's 50 ms rendezvous default. Their first public turn was green; the next valid V2 control
+  was then terminalized before the replica renderer completed retained material and successor projection.
+  Trainer-switch, faint-chain, Mystery, Pokeball, and party-transposition journeys now retain the 60 s live
+  budget while their own bounded phase drivers continue to fail actual stalls quickly.
+- Trace replay no longer reconstructs each later wave with `remirrorWave`. The ordinary retained
+  WAVE_ADVANCE projector owns the next battle; a synthetic remirror could race its legal no-currentBattle
+  transition and hide the production successor under test.
+- The Mystery checksum regression now proves the negotiated V2 recovery request/bundle/applied-proof and
+  common fence reopening. It enables destination scheduling before the checksum is sent, replacing its stale
+  assertion against the retired legacy `applyCoopFullSnapshot` correctness path.
+- The idle faint fallback alternates both browser realms while rev-3 replacement delivery requests and fills
+  its retained rev-2 tail. The previous guest-only pump synchronously handled the tail request under the wrong
+  scene and manufactured a gap-release terminal impossible across independent browsers.
+- Party transposition installs and verifies its deterministic enemy HP under the host realm, and replay pacing
+  rereads the field after immutable material may reconstruct Pokemon identities instead of asserting against
+  stale pre-apply objects.

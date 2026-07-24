@@ -60,7 +60,6 @@ import {
   type ReplayGameManager,
   reachInterceptedRewardShop,
   reachQueuedRewardShop,
-  remirrorWave,
   replayCoopTrace,
   withClient,
 } from "#test/tools/coop-duo-harness";
@@ -339,9 +338,6 @@ describe.skipIf(!RUN)(
       expect(isReplayRecording(), "the recorder began on the co-op host").toBe(true);
 
       for (let w = 1; w <= RECORD_WAVES; w++) {
-        if (w > 1) {
-          await remirrorWave(rig);
-        }
         const turn = rig.hostScene.currentBattle.turn;
         // Both seats TACKLE the frail Magikarps through their real public COMMAND/FIGHT/TARGET handlers.
         // The production command taps therefore record the same UI -> relay path a captured player run uses.

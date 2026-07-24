@@ -14,6 +14,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
@@ -56,6 +57,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
   });
 
   beforeEach(() => {
+    setCoopRendezvousWaitMs(60_000);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`pokeball-reward-${Date.now()}`);
     game.override
@@ -70,6 +72,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
   });
 
   afterEach(() => {
+    resetCoopRendezvousWaitMs();
     logs.dispose();
     clearCoopRuntime();
     initGlobalScene(game.scene);

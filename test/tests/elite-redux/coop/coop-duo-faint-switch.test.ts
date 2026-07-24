@@ -44,6 +44,7 @@ import {
   installDuoLogCapture,
   materializeGuestInputAfterReplacement,
   presentedFieldMon,
+  pumpDuoDestinations,
   settleDuoPromise,
   withClient,
   withClientSync,
@@ -364,6 +365,10 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       // Start the host's real post-turn phase crossing. It times out the idle guest and retains a
       // concrete fallback. Legacy parks before summon on its operation-journal material barrier; V2 stages
       // the answer, summons, then retains the complete carrier in its one authority log.
+      // From the timeout onward every carrier must execute in its destination browser realm. In particular,
+      // a rev-3 replacement can request the retained rev-2 tail while its picker-closing promise is pending;
+      // synchronous one-realm loopback delivery manufactured a false gap-release terminal here.
+      rig.pair.setDestinationContextDelivery?.(true);
       await withClient(rig.hostCtx, async () => {
         hostAdvance = game.phaseInterceptor.to("CommandPhase", false);
         if (V2_REPLACEMENT_CUTOVER) {
@@ -402,17 +407,17 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       }
       expect(pickerCloses, "the retained envelope has not yet been pumped into the guest engine").toBe(0);
 
-      // Pump the retained authority only under the guest context. Its first application closes the modal
-      // and shifts the phase but cannot claim installed material before that asynchronous boundary completes.
-      await withClient(rig.guestCtx, async () => {
-        for (
-          let attempt = 0;
-          attempt < 100 && (V2_REPLACEMENT_CUTOVER ? pickerCloses === 0 : materialAcks.length === 0);
-          attempt++
-        ) {
-          await drainLoopback();
-          await new Promise<void>(resolve => setTimeout(resolve, 10));
-        }
+      // Keep both browser loops alive while the retained tail closes the guest modal and returns its exact
+      // proof. Material cannot be acknowledged before that asynchronous public-surface boundary completes.
+      for (
+        let attempt = 0;
+        attempt < 100 && (V2_REPLACEMENT_CUTOVER ? pickerCloses === 0 : materialAcks.length === 0);
+        attempt++
+      ) {
+        await pumpDuoDestinations(rig, 1);
+        await withClient(rig.guestCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
+      }
+      withClientSync(rig.guestCtx, () => {
         expect(pickerCloses, "authority closed the idle picker through its real MESSAGE transition").toBe(1);
         expect(
           rig.guestScene.phaseManager.getCurrentPhase()?.phaseName,
@@ -513,6 +518,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
 
       logs.flush();
     } finally {
+      rig.pair.setDestinationContextDelivery?.(false);
       offHostAck();
       restoreGuestUi();
       materialBarrierSpy.mockRestore();

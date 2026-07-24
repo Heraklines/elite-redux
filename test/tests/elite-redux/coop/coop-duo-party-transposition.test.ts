@@ -97,10 +97,10 @@ describe.skipIf(!RUN)(
       accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
       setCoopFaintSwitchWaitMs(4000);
       setCoopWaveBarrierMs(50);
-      // #839 next-command barrier: the harness drives the host's turn then replays on the guest (never
-      // concurrent command points), so the host's barrier never sees the guest's arrival - fast-pass it
-      // via the anti-hang timeout instead of the 60s live default (same pattern as the wave barrier).
-      setCoopRendezvousWaitMs(50);
+      // Public-input migration drives both real clients through the reciprocal command frontier. Preserve
+      // the production rendezvous budget: the old 50 ms sequential-fixture escape hatch now tears down a
+      // healthy session before the replica finishes its retained material and successor projection.
+      setCoopRendezvousWaitMs(60_000);
       setCoopHarnessLiveEvents(true);
       game = new GameManager(phaserGame);
       logs = installDuoLogCapture(`party-transposition-${Date.now()}`);
@@ -270,9 +270,15 @@ describe.skipIf(!RUN)(
       rig.hostScene.getPlayerParty()[0].level = 55;
       rig.hostScene.getPlayerParty()[0].exp += 5000;
       rig.hostScene.getPlayerParty()[0].calculateStats();
-      for (const enemy of rig.hostScene.getEnemyField()) {
-        enemy.hp = 1;
-      }
+      withClientSync(rig.hostCtx, () => {
+        for (const enemy of rig.hostScene.getEnemyField()) {
+          enemy.hp = 1;
+        }
+        expect(
+          rig.hostScene.getEnemyField().every(enemy => enemy.hp === 1),
+          "the deterministic second-turn win is installed on the host engine",
+        ).toBe(true);
+      });
       await driveDuoGuestTackleThroughPublicUi(game, rig, {
         restartAlreadyOpenHost: false,
         guestTarget: BattlerIndex.ENEMY_2,
