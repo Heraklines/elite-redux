@@ -814,6 +814,24 @@ interface RetiredAuthorityTombstone {
   digest: string;
 }
 
+interface RetiredAuthorityFrontier {
+  epoch: number;
+  wave: number;
+  turn: number;
+  revision: number;
+}
+
+function compareAuthorityFrontier(left: RetiredAuthorityFrontier, right: RetiredAuthorityFrontier): number {
+  return left.epoch - right.epoch || left.wave - right.wave || left.turn - right.turn || left.revision - right.revision;
+}
+
+function advanceAuthorityFrontier(
+  frontier: RetiredAuthorityFrontier | null,
+  value: RetiredAuthorityFrontier,
+): RetiredAuthorityFrontier {
+  return frontier == null || compareAuthorityFrontier(value, frontier) > 0 ? { ...value } : frontier;
+}
+
 interface AckEvidence<T> {
   stage: CoopAuthorityAckStage;
   canonical: string;
@@ -1135,7 +1153,7 @@ export class CoopBattleStreamer {
   private readonly seenTurnAuthority = new Map<string, SeenAuthority<CoopTurnResolution>>();
   /** Bounded completed duplicate/conflict proofs; older revisions are rejected by the scalar frontier. */
   private readonly retiredTurnAuthority = new Map<string, RetiredAuthorityTombstone>();
-  private retiredTurnThroughRevision = 0;
+  private retiredTurnThrough: RetiredAuthorityFrontier | null = null;
   /** A finalizer explicitly requested one idempotent redelivery after a transient apply failure. */
   private readonly turnRedeliveryRequests = new Set<string>();
   /** HOST: complete turn commits remain replayable until the guest ACKs exact convergence. */
@@ -1379,7 +1397,7 @@ export class CoopBattleStreamer {
   private readonly highestSeenReplacementAuthority = new Map<string, SeenAuthority<CoopCheckpointEnvelope>>();
   private readonly seenReplacementAuthority = new Map<string, SeenAuthority<CoopCheckpointEnvelope>>();
   private readonly retiredReplacementAuthority = new Map<string, RetiredAuthorityTombstone>();
-  private retiredReplacementThroughRevision = 0;
+  private retiredReplacementThrough: RetiredAuthorityFrontier | null = null;
   private readonly replacementRedeliveryRequests = new Set<string>();
   /** HOST: latest complete replacement frame, retained for explicit guest retransmit requests. */
   private readonly sentReplacementCheckpoints = new Map<string, CoopCheckpointEnvelope>();
@@ -1838,7 +1856,7 @@ export class CoopBattleStreamer {
     highestByAddress: Map<string, SeenAuthority<T>>,
     seenByRevision: Map<string, SeenAuthority<T>>,
     retiredByRevision: Map<string, RetiredAuthorityTombstone>,
-    retiredThroughRevision: number,
+    retiredThrough: RetiredAuthorityFrontier | null,
     value: T,
   ): AuthorityAdmission<T> {
     const addressKey = pendingTurnKey(value);
@@ -1850,7 +1868,7 @@ export class CoopBattleStreamer {
     }
     // Once a full carrier has aged out of the bounded tombstone window, its monotonic state tick remains
     // permanently retired for this stream. It can never become executable again, even after a very late retry.
-    if (value.revision <= retiredThroughRevision) {
+    if (retiredThrough != null && compareAuthorityFrontier(value, retiredThrough) <= 0) {
       return { kind: "older" };
     }
     const exact = seenByRevision.get(exactKey);
@@ -1887,11 +1905,11 @@ export class CoopBattleStreamer {
     seenByRevision: Map<string, SeenAuthority<T>>,
     retiredByRevision: Map<string, RetiredAuthorityTombstone>,
     value: T,
-  ): number {
+  ): void {
     const exactKey = authorityKey(value);
     const seen = seenByRevision.get(exactKey);
     if (seen == null) {
-      return value.revision;
+      return;
     }
     const address = pendingTurnKey(value);
     const tombstone: RetiredAuthorityTombstone = {
@@ -1914,33 +1932,28 @@ export class CoopBattleStreamer {
     if (highest != null && highest.revision === value.revision) {
       highestByAddress.delete(address);
     }
-    return value.revision;
   }
 
   private retireTurnAuthority(resolution: CoopTurnResolution): void {
-    this.retiredTurnThroughRevision = Math.max(
-      this.retiredTurnThroughRevision,
-      this.retireAuthority(
-        "turnResolution",
-        this.highestSeenTurnAuthority,
-        this.seenTurnAuthority,
-        this.retiredTurnAuthority,
-        resolution,
-      ),
+    this.retireAuthority(
+      "turnResolution",
+      this.highestSeenTurnAuthority,
+      this.seenTurnAuthority,
+      this.retiredTurnAuthority,
+      resolution,
     );
+    this.retiredTurnThrough = advanceAuthorityFrontier(this.retiredTurnThrough, resolution);
   }
 
   private retireReplacementAuthority(envelope: CoopCheckpointEnvelope): void {
-    this.retiredReplacementThroughRevision = Math.max(
-      this.retiredReplacementThroughRevision,
-      this.retireAuthority(
-        "replacement",
-        this.highestSeenReplacementAuthority,
-        this.seenReplacementAuthority,
-        this.retiredReplacementAuthority,
-        envelope,
-      ),
+    this.retireAuthority(
+      "replacement",
+      this.highestSeenReplacementAuthority,
+      this.seenReplacementAuthority,
+      this.retiredReplacementAuthority,
+      envelope,
     );
+    this.retiredReplacementThrough = advanceAuthorityFrontier(this.retiredReplacementThrough, envelope);
   }
 
   private turnWaitAddress(turn: number, sourceWave?: number): { key: string; address: CoopTurnAddress | null } {
@@ -2054,11 +2067,11 @@ export class CoopBattleStreamer {
     this.highestSeenTurnAuthority.clear();
     this.seenTurnAuthority.clear();
     this.retiredTurnAuthority.clear();
-    this.retiredTurnThroughRevision = 0;
+    this.retiredTurnThrough = null;
     this.highestSeenReplacementAuthority.clear();
     this.seenReplacementAuthority.clear();
     this.retiredReplacementAuthority.clear();
-    this.retiredReplacementThroughRevision = 0;
+    this.retiredReplacementThrough = null;
     this.turnCommitHandlers.clear();
     this.checkpointEnvelopeHandlers.clear();
     this.liveEventHandler = null;
@@ -4688,7 +4701,10 @@ export class CoopBattleStreamer {
         // following transport microtask can otherwise win before that reaction runs, despite being older.
         // Admission is synchronous, so its immutable ledger is the ordering source of truth here.
         const admittedTurn = this.highestSeenTurnAuthority.get(pendingTurnKey(envelope));
-        if (Math.max(admittedTurn?.revision ?? 0, this.retiredTurnThroughRevision) >= envelope.revision) {
+        if (
+          (admittedTurn != null && admittedTurn.revision >= envelope.revision)
+          || (this.retiredTurnThrough != null && compareAuthorityFrontier(this.retiredTurnThrough, envelope) >= 0)
+        ) {
           return;
         }
         settled = true;
@@ -4993,7 +5009,7 @@ export class CoopBattleStreamer {
     this.highestSeenTurnAuthority.clear();
     this.seenTurnAuthority.clear();
     this.retiredTurnAuthority.clear();
-    this.retiredTurnThroughRevision = 0;
+    this.retiredTurnThrough = null;
     this.enemyPartyWaiters.clear();
     this.entryPresentationWaiters.clear();
     this.meBattlePartyWaiters.clear();
@@ -5016,7 +5032,7 @@ export class CoopBattleStreamer {
     this.highestSeenReplacementAuthority.clear();
     this.seenReplacementAuthority.clear();
     this.retiredReplacementAuthority.clear();
-    this.retiredReplacementThroughRevision = 0;
+    this.retiredReplacementThrough = null;
     for (const cancel of this.sentReplacementTimers.values()) {
       cancel();
     }
@@ -5370,7 +5386,7 @@ export class CoopBattleStreamer {
           this.highestSeenTurnAuthority,
           this.seenTurnAuthority,
           this.retiredTurnAuthority,
-          this.retiredTurnThroughRevision,
+          this.retiredTurnThrough,
           res,
         );
         if (admission.kind === "conflict") {
@@ -5578,7 +5594,7 @@ export class CoopBattleStreamer {
           this.highestSeenReplacementAuthority,
           this.seenReplacementAuthority,
           this.retiredReplacementAuthority,
-          this.retiredReplacementThroughRevision,
+          this.retiredReplacementThrough,
           envelope,
         );
         if (admission.kind === "conflict") {
