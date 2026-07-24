@@ -15,19 +15,17 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
   beginRewardShopWatch,
   buildDuo,
   type DuoRig,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
@@ -36,7 +34,6 @@ import {
   pumpDuoDestinations,
   reachInterceptedRewardShop,
   reachQueuedRewardShop,
-  remirrorWave,
   withClient,
 } from "#test/tools/coop-duo-harness";
 import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
@@ -82,21 +79,18 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
     // best-effort
   });
 
-  function wireGuestCommand(rig: DuoRig): void {
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
-  }
-
-  async function hostPlayWave(rig: DuoRig): Promise<void> {
+  async function hostPlayWave(rig: DuoRig): Promise<number> {
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+      hostTarget: BattlerIndex.ENEMY,
+      guestTarget: BattlerIndex.ENEMY_2,
+    });
+    const turn = rig.hostScene.currentBattle.turn;
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
+    return turn;
   }
 
   /** Drive ONE alternating reward interaction where the OWNER TAKES the forced (non-party) ball reward. */
@@ -139,7 +133,6 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
 
     const hostBase = ballCount(rig.hostScene);
     const guestBase = ballCount(rig.guestScene);
@@ -147,8 +140,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
 
     // ===== WAVE 1 (host-owned, even counter): take the ball reward. =====
     {
-      const turn = rig.hostScene.currentBattle.turn;
-      await hostPlayWave(rig);
+      const turn = await hostPlayWave(rig);
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn, { pumpHostVictoryTail: true });
       });
@@ -160,20 +152,14 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
 
     // ===== Cross to wave 2 (force another ball reward). =====
     forceItemRewards(game.override, [{ name: "GREAT_BALL" }]);
-    await arriveGuestCommandBoundary(rig, 2, 1, { proveGuestCommand: true });
-    await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase");
-    });
-    expect(rig.hostScene.currentBattle.waveIndex, "host advanced to wave 2").toBe(2);
-    await remirrorWave(rig);
-
     // ===== WAVE 2 (guest-owned, odd counter): take the ball reward. =====
     {
       const hostBefore = ballCount(rig.hostScene);
       const guestBefore = ballCount(rig.guestScene);
       expect(guestBefore, "wave 2 start: guest ball count matches host (no residual drift)").toBe(hostBefore);
-      const turn = rig.hostScene.currentBattle.turn;
-      await hostPlayWave(rig);
+      const turn = await hostPlayWave(rig);
+      expect(rig.hostScene.currentBattle.waveIndex, "host advanced to wave 2 through the public boundary").toBe(2);
+      expect(rig.guestScene.currentBattle.waveIndex, "guest adopted wave 2 through the public boundary").toBe(2);
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn, { pumpHostVictoryTail: true });
       });

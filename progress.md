@@ -2993,3 +2993,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   its second win so the test exercises the intended replacement-to-wave graph rather than creating an unrelated
   second ally faint. The one-shot raw turn-resolution twin remains asserted only as cosmetic compatibility;
   V2 material/projection assertions continue to own correctness.
+
+# 2026-07-24 - Reward journeys cross the same public command frontier as players
+
+- The interaction-counter and Pokeball reward journeys no longer inject moves through `game.move.select`,
+  answer `onCommandRequest` directly, or manufacture a wave-two command boundary with a harness remirror.
+  Both seats now traverse the real COMMAND/FIGHT/TARGET handlers before the host reaches its retained turn.
+- Wave two is reached through the preceding authoritative reward and wave transition. The tests assert both
+  engines adopted that wave at the public command frontier, so a queued replay or missing command release is
+  visible as the same hang a player would encounter instead of being bypassed by synthetic state mutation.
+- The shared public driver also models the browser concurrency at a non-command turn successor: when the
+  renderer is parked on `CoopFinalizeTurnPhase`, it lets the authority run its real replacement tail only as
+  far as the next `CommandPhase`. That emits the ordered V2 successor before either side supplies input and
+  prevents a one-process fixture from starving the authority while it waits on the renderer first.

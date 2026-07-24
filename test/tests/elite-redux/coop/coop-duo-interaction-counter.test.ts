@@ -28,9 +28,7 @@ import { initGlobalScene } from "#app/global-scene";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
-import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -103,12 +101,8 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     initGlobalScene(game.scene);
   });
 
-  async function hostPlayWave(rig: DuoRig, guestCommandAlreadyCommitted = false): Promise<void> {
+  async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
-      if (!guestCommandAlreadyCommitted) {
-        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-        game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      }
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
@@ -168,7 +162,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       restartAlreadyOpenHost: false,
       submitHostTackle: true,
     });
-    await hostPlayWave(rig, true);
+    await hostPlayWave(rig);
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
     // From this point onward, deliver each retained continuation under its addressed client's
     // process-global context. The ordinary loopback resumes both sides in whichever context happened
@@ -300,13 +294,13 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     expect(rig.hostScene.currentBattle.waveIndex, "host generated wave 2 before command input").toBe(2);
     expect(rig.guestScene.currentBattle.waveIndex, "guest consumed the authoritative wave-2 carrier").toBe(2);
     for (let t = 0; t < 2; t++) {
-      await driveDuoGuestTackleThroughPublicUi(game, rig);
+      await driveDuoGuestTackleThroughPublicUi(game, rig, { submitHostTackle: true });
       if (t === 0) {
         expect(rig.hostScene.currentBattle.waveIndex, "host crossed into wave 2").toBe(2);
         expect(rig.guestScene.currentBattle.waveIndex, "guest adopted wave 2").toBe(2);
       }
       const w2turn = rig.hostScene.currentBattle.turn;
-      await hostPlayWave(rig, true);
+      await hostPlayWave(rig);
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, w2turn));
       // Guest kept converging turn-by-turn (a wedge would THROW inside driveGuestReplayTurn).
       if (rig.guestScene.currentBattle.enemyParty.every(e => e.isFainted())) {
