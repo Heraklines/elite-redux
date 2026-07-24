@@ -20,6 +20,7 @@ import { globalScene } from "#app/global-scene";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { applyCoopEnemies, applyCoopEnemyHeldItems } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { failCoopSharedSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopSerializedEnemy, CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
@@ -35,6 +36,20 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 function coopNum(blob: CoopSerializedPokemon, key: string): number | undefined {
   const v = blob[key];
   return typeof v === "number" ? v : undefined;
+}
+
+/** Remove one obsolete enemy display object without executing switch/leave battle mechanics. */
+function removeEnemyPresentation(enemy: EnemyPokemon | null | undefined): void {
+  if (enemy == null) {
+    return;
+  }
+  try {
+    enemy.hideInfo();
+    enemy.setVisible(false);
+    globalScene.field.remove(enemy, true);
+  } catch {
+    // A damaged cosmetic child must never prevent the authoritative party shape from being installed.
+  }
 }
 
 /**
@@ -262,23 +277,17 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       const level = coopNum(entry.data, "level") ?? existing?.level ?? battle.enemyLevels?.[entry.fieldIndex] ?? 1;
       const built = buildCoopEnemy(entry.data, level, trainerSlot);
       if (built == null) {
-        continue; // unresolvable blob - leave the local mon (corrector will warn on mismatch)
+        failCoopSharedSession(
+          `The authoritative enemy at field slot ${entry.fieldIndex} could not be reconstructed from its immutable identity.`,
+        );
+        return;
       }
       // Renderer adoption is a structural projection, not a battle switch.  Pokemon.leaveField runs
       // mechanics (PreLeaveField abilities/form changes) and may throw before removing the stale child;
       // either outcome is invalid on a pure renderer.  Remove the obsolete objects directly, exactly as
       // the later authoritative presenter does, so teardown cannot prevent the new identity being seated.
       for (const stale of new Set([existing, activeEnemy])) {
-        if (stale == null) {
-          continue;
-        }
-        try {
-          stale.hideInfo();
-          stale.setVisible(false);
-          globalScene.field.remove(stale, true);
-        } catch {
-          /* stale sprite teardown must not block the adopt */
-        }
+        removeEnemyPresentation(stale);
       }
       battle.enemyParty[entry.fieldIndex] = built;
       if (activeFieldIndex >= 0) {
@@ -329,11 +338,7 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       // Drop local extras beyond the authoritative count (a leftover local wild roll).
       while (battle.enemyParty.length > enemies.length) {
         const extra = battle.enemyParty.pop();
-        try {
-          extra?.leaveField(true, true, true);
-        } catch {
-          /* ditto */
-        }
+        removeEnemyPresentation(extra);
         rebuilt++;
       }
       // WILD battle shape follows the authoritative party (trainer field size is variant-

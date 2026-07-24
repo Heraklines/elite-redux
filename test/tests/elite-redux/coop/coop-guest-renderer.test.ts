@@ -493,6 +493,43 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     ).toBe(true);
   });
 
+  it("structural adoption removes an extra wild renderer child without executing leave mechanics", async () => {
+    await startCoopGuest();
+    const battle = globalScene.currentBattle;
+    const retained = battle.enemyParty[0];
+    const extra = battle.enemyParty[1];
+    const leaveField = vi.spyOn(extra, "leaveField");
+    expect(globalScene.field.getIndex(extra), "the locally rolled extra begins on the field").toBeGreaterThanOrEqual(0);
+
+    adoptCoopEnemiesStructural([
+      {
+        fieldIndex: 0,
+        data: { id: retained.id, speciesId: retained.species.speciesId, level: retained.level },
+      },
+    ]);
+
+    expect(
+      leaveField,
+      "renderer truncation never invokes pre-leave abilities or form mechanics",
+    ).not.toHaveBeenCalled();
+    expect(battle.enemyParty).toEqual([retained]);
+    expect(globalScene.field.getIndex(extra), "the obsolete display child is removed directly").toBe(-1);
+    expect(battle.double, "wild battle shape follows the one-slot authority image").toBe(false);
+  });
+
+  it("an undecodable authoritative enemy identity terminates instead of preserving a local roll", async () => {
+    await startCoopGuest();
+    const runtime = getCoopRuntime();
+    expect(runtime).not.toBeNull();
+
+    adoptCoopEnemiesStructural([{ fieldIndex: 0, data: { level: 5 } }]);
+
+    expect(
+      runtime?.membership.snapshot().state,
+      "invalid immutable enemy authority synchronously freezes the shared mechanics pending terminal quorum",
+    ).toBe("terminated");
+  });
+
   it("turn-one structural adoption replaces a retained-state field identity after its party slot changed", async () => {
     await startCoopGuest();
     const battle = globalScene.currentBattle;

@@ -2604,3 +2604,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   it before each reused-scene bootstrap and before disabling destination isolation. This preserves the same
   production two-process lifetime while preventing a completed test's runtime from manufacturing a softlock
   in the next case.
+
+# 2026-07-24 - Enemy structural projection is mechanics-free and fail-closed
+
+- The stale audit's two residual enemy-adopter findings were still source-valid. Truncating an extra local
+  wild slot called `Pokemon.leaveField()`, allowing pre-leave abilities and form mechanics to run on the
+  renderer, while an undecodable authority identity preserved the guest's locally rolled opponent.
+- Structural replacement and truncation now share one direct Phaser-container removal primitive that never
+  enters battle mechanics. An immutable enemy identity that cannot be reconstructed synchronously freezes
+  the shared membership and enters the retained terminal transaction instead of continuing with local
+  derived state.
+- Engine regressions cover both invariants: no `leaveField` call for an extra display child, and immediate
+  terminal fencing for an authority blob without a reconstructable species identity.
