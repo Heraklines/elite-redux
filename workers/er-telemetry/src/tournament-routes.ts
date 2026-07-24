@@ -404,8 +404,35 @@ async function updateTournament(env: TournamentEnv, t: TournamentRecord): Promis
 // #endregion
 // #region serialization for the client
 
+type TournamentViewerStatus = "not_registered" | "registered" | "eliminated" | "dropped_out";
+
+function tournamentViewerStatus(
+  t: TournamentRecord,
+  entrants: EntrantRecord[],
+  viewer: string | undefined,
+): TournamentViewerStatus | undefined {
+  if (!viewer) {
+    return;
+  }
+  if (t.bracket?.kicked?.includes(viewer)) {
+    return "dropped_out";
+  }
+  const eliminated = t.bracket?.rounds.some(round =>
+    round.some(match => match.winner !== null && match.winner !== viewer && (match.a === viewer || match.b === viewer)),
+  );
+  if (eliminated) {
+    return "eliminated";
+  }
+  return entrants.some(entrant => entrant.participant === viewer) ? "registered" : "not_registered";
+}
+
 /** The public view of a tournament (list/bracket response). `entrants` is the ACTIVE field. */
-function tournamentView(t: TournamentRecord, entrants: EntrantRecord[], waitlist: EntrantRecord[] = []) {
+function tournamentView(
+  t: TournamentRecord,
+  entrants: EntrantRecord[],
+  waitlist: EntrantRecord[] = [],
+  viewer?: string,
+) {
   return {
     id: t.id,
     name: t.name,
@@ -425,6 +452,7 @@ function tournamentView(t: TournamentRecord, entrants: EntrantRecord[], waitlist
     community: t.community,
     // Kept in the light list view so a walked-over entrant is not still labelled registered.
     kicked: t.bracket?.kicked ?? [],
+    viewerStatus: tournamentViewerStatus(t, entrants, viewer),
     entrantCount: entrants.length,
     entrants: entrants.map(e => ({
       participant: e.participant,
@@ -824,7 +852,7 @@ async function handleReady(body: any, caller: Caller, env: TournamentEnv, cors: 
   return readyResponse(t, caller.u, pairing.matchId, env, cors);
 }
 
-async function handleList(env: TournamentEnv, cors: Cors): Promise<Response> {
+async function handleList(caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
   await ensureTournamentTables(env);
   const res = await env.DB.prepare(
     "SELECT * FROM tournaments WHERE state IN ('registration','in_progress','complete') ORDER BY created_at DESC LIMIT 50",
@@ -838,13 +866,13 @@ async function handleList(env: TournamentEnv, cors: Cors): Promise<Response> {
     const entrants = await loadEntrants(env, t.id);
     const waitlist = await loadWaitlist(env, t.id);
     // list view is light: no full bracket
-    const { bracket: _bracket, ...light } = tournamentView(t, entrants, waitlist);
+    const { bracket: _bracket, ...light } = tournamentView(t, entrants, waitlist, caller.u);
     list.push(light);
   }
   return json({ ok: true, tournaments: list }, 200, cors);
 }
 
-async function handleBracket(url: URL, env: TournamentEnv, cors: Cors): Promise<Response> {
+async function handleBracket(url: URL, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
   const id = url.searchParams.get("id") ?? "";
   const loaded = await loadTournament(env, id);
   if (!loaded) {
@@ -853,7 +881,7 @@ async function handleBracket(url: URL, env: TournamentEnv, cors: Cors): Promise<
   const t = await refreshTournament(env, loaded, Date.now());
   const entrants = await loadEntrants(env, t.id);
   const waitlist = await loadWaitlist(env, t.id);
-  return json({ ok: true, tournament: tournamentView(t, entrants, waitlist) }, 200, cors);
+  return json({ ok: true, tournament: tournamentView(t, entrants, waitlist, caller.u) }, 200, cors);
 }
 
 async function handleResult(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
@@ -1212,10 +1240,10 @@ export async function handleTournamentRoute(
   // GET routes
   if (request.method === "GET") {
     if (url.pathname === "/tournament/list") {
-      return handleList(env, cors);
+      return handleList(caller, env, cors);
     }
     if (url.pathname === "/tournament/bracket") {
-      return handleBracket(url, env, cors);
+      return handleBracket(url, caller, env, cors);
     }
     return json({ error: "not found" }, 404, cors);
   }

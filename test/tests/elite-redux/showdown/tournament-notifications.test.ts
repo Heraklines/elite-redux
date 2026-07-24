@@ -10,6 +10,10 @@
 // =============================================================================
 
 import {
+  clearTournamentMatchContext,
+  setTournamentMatchContext,
+} from "#data/elite-redux/showdown/tournament-match-context";
+import {
   actionableTournamentNotifications,
   canOpenTournamentDeepLink,
   openTournamentDeepLink,
@@ -18,6 +22,7 @@ import {
   TOURNAMENT_NOTIF_TYPE,
   type TournamentDeepLink,
   tournamentDeepLinkOf,
+  tournamentNotificationsSuppressed,
 } from "#data/elite-redux/showdown/tournament-notifications";
 import type { TournamentView } from "#data/elite-redux/showdown/tournament-types";
 import { isTournamentPairingCurrent } from "#data/elite-redux/showdown/tournament-types";
@@ -95,6 +100,7 @@ function view(overrides: Partial<TournamentView> = {}): TournamentView {
 describe("tournament challenge notifications - derivation", () => {
   afterEach(() => {
     notificationManager.clear();
+    clearTournamentMatchContext();
     setTournamentFlowOpener(null);
     setTournamentGameplayOpener(null);
   });
@@ -102,6 +108,12 @@ describe("tournament challenge notifications - derivation", () => {
   it("does not notify merely because a pairing exists", () => {
     const out = actionableTournamentNotifications(view(), "Carla", NOW);
     expect(out).toHaveLength(0);
+  });
+
+  it("suppresses page-level offers while an exact tournament launch owns the client", () => {
+    expect(tournamentNotificationsSuppressed()).toBe(false);
+    setTournamentMatchContext({ tournamentId: "cup", matchId: "r0m0", expectedOpponent: "AshK" });
+    expect(tournamentNotificationsSuppressed()).toBe(true);
   });
 
   it("invalidates a lobby binding when the same bracket slot gets a different opponent", () => {

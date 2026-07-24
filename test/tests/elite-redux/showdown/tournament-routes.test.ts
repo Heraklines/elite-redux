@@ -379,6 +379,14 @@ describe("tournament routes — lifecycle + attestation", () => {
     const sbody = (await settle.json()) as any;
     expect(sbody.resolution).toBe("settled");
     expect(sbody.match.winner).toBe(pa);
+
+    // The light list response carries viewer status directly, so the title screen does not need
+    // a second blocking bracket fetch merely to distinguish the winner from the eliminated player.
+    const winnerList = (await (await call("/tournament/list", "GET", player(pa))).json()) as any;
+    const loserList = (await (await call("/tournament/list", "GET", player(pb))).json()) as any;
+    expect(winnerList.tournaments[0].viewerStatus).toBe("registered");
+    expect(loserList.tournaments[0].viewerStatus).toBe("eliminated");
+    expect(loserList.tournaments[0].bracket).toBeUndefined();
   });
 
   it("records readiness only for the caller's exact live pairing and clears it", async () => {

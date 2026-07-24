@@ -49,6 +49,7 @@ import {
   queueShowdownTeam,
   restoreShowdownMatchmaking,
   setShowdownMatchLaunchHandler,
+  suspendShowdownMatchmaking,
 } from "#data/elite-redux/showdown/showdown-matchmaking";
 import { shouldAwaitShowdownLaunchSnapshot } from "#data/elite-redux/showdown/showdown-sync-launch";
 import { validateShowdownTeam } from "#data/elite-redux/showdown/showdown-team";
@@ -63,6 +64,7 @@ import {
 import { buildOwnGhostIconSummary } from "#data/elite-redux/showdown/tournament-ghost-icon";
 import {
   clearTournamentMatchContext,
+  getTournamentMatchContext,
   setTournamentMatchContext,
 } from "#data/elite-redux/showdown/tournament-match-context";
 import {
@@ -714,6 +716,22 @@ export class TitlePhase extends Phase {
     };
 
     const enterMatch = (tournamentId: string, matchId: string, opponent: string): void => {
+      const activeContext = getTournamentMatchContext();
+      if (activeContext != null && activeContext.tournamentId === tournamentId && activeContext.matchId === matchId) {
+        return;
+      }
+      if (activeContext != null || getCoopRuntime() != null) {
+        return;
+      }
+
+      // Claim the exact match before the validation fetch. This closes duplicate notification/deep-link
+      // races and immediately suppresses page-lifetime tournament polling while the launch is in flight.
+      setTournamentMatchContext({
+        tournamentId,
+        matchId,
+        expectedOpponent: opponent,
+        ownParticipant: ownName,
+      });
       void (async () => {
         // Re-fetch at the last possible moment. A reseed, dropout, or organizer correction may have
         // changed this slot since the board's previous poll; never create a transport for stale peers.
@@ -732,14 +750,15 @@ export class TitlePhase extends Phase {
 
         const presets = gameData.listShowdownTeamPresets();
         if (presets.length === 0) {
+          clearTournamentMatchContext();
           notice("You need a saved team preset first. Build one in the Showdown menu.", () => backToTitle());
           return;
         }
         setPendingShowdownPresetStarters(presets[0].mons.map(manifestToStarter));
 
-        // Tournament lobbies are ephemeral. Clear a failed prior versus transport before creating
-        // this exact pairing, then carry the freshly validated server format into the match.
-        clearTournamentMatchContext();
+        // A normal Showdown queue and a tournament cannot own the account's one P33 presence together.
+        // Release the queue controller while preserving its persisted active state for title restoration.
+        suspendShowdownMatchmaking();
         clearCoopRuntime();
         setTournamentMatchContext({
           tournamentId,
@@ -761,7 +780,10 @@ export class TitlePhase extends Phase {
             }
             return isTournamentPairingCurrent(current.data.tournament, ownName, matchId, opponent);
           },
-          onLeave: () => void openBracket(tournamentId),
+          onLeave: () => {
+            restoreShowdownMatchmaking();
+            void openBracket(tournamentId);
+          },
         });
       })();
     };
@@ -837,19 +859,8 @@ export class TitlePhase extends Phase {
         notice(res.error, () => backToTitle());
         return;
       }
-      const tournaments = await Promise.all(
-        res.data.tournaments.map(async tournament => {
-          const needsBracket =
-            tournament.state === "in_progress" && tournament.entrants.some(entrant => entrant.participant === ownName);
-          if (!needsBracket) {
-            return tournament;
-          }
-          const bracket = await getTournamentBracket(tournament.id);
-          return bracket.ok ? bracket.data.tournament : tournament;
-        }),
-      );
       void globalScene.ui.setMode(UiMode.TOURNAMENT_LIST, {
-        tournaments,
+        tournaments: res.data.tournaments,
         ownParticipant: ownName,
         now: Date.now(),
         onOpen: (id: string) => void openBracket(id),

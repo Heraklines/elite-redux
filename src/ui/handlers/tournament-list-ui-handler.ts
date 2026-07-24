@@ -452,10 +452,15 @@ export class TournamentListUiHandler extends UiHandler {
       const t = list[i];
       const y = ROW_Y0 + (i - this.scrollTop) * ROW_HEIGHT;
       const droppedOut =
-        t.kicked?.includes(cfg.ownParticipant)
-        ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant);
-      const eliminated = !droppedOut && isEliminatedParticipant(t.bracket, cfg.ownParticipant);
-      const registered = !droppedOut && !eliminated && t.entrants.some(e => e.participant === cfg.ownParticipant);
+        t.viewerStatus === "dropped_out"
+        || (t.kicked?.includes(cfg.ownParticipant)
+          ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant));
+      const eliminated =
+        !droppedOut && (t.viewerStatus === "eliminated" || isEliminatedParticipant(t.bracket, cfg.ownParticipant));
+      const registered =
+        !droppedOut
+        && !eliminated
+        && (t.viewerStatus === "registered" || t.entrants.some(e => e.participant === cfg.ownParticipant));
       const chip = stateChip(t);
 
       // state chip (left)
@@ -514,9 +519,15 @@ export class TournamentListUiHandler extends UiHandler {
     }
     const t = cfg.tournaments[this.cursor];
     const droppedOut =
-      t.kicked?.includes(cfg.ownParticipant)
-      ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant);
-    const registered = !droppedOut && t.entrants.some(e => e.participant === cfg.ownParticipant);
+      t.viewerStatus === "dropped_out"
+      || (t.kicked?.includes(cfg.ownParticipant)
+        ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant));
+    const eliminated =
+      !droppedOut && (t.viewerStatus === "eliminated" || isEliminatedParticipant(t.bracket, cfg.ownParticipant));
+    const registered =
+      !droppedOut
+      && !eliminated
+      && (t.viewerStatus === "registered" || t.entrants.some(e => e.participant === cfg.ownParticipant));
     if (t.state === "registration" && !registered) {
       this.hint.setText("A: Register    B: Back");
     } else if (t.state === "registration") {

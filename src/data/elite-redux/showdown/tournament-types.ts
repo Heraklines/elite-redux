@@ -282,6 +282,11 @@ export interface TournamentView {
   community?: boolean;
   /** Participants removed after play began; retained for bracket history. */
   kicked?: TournamentParticipant[];
+  /**
+   * Current authenticated viewer's state, derived by the worker from the authoritative bracket.
+   * Optional for compatibility with older workers and local fixtures.
+   */
+  viewerStatus?: "not_registered" | "registered" | "eliminated" | "dropped_out";
   /** P3: entrants queued beyond cap (admin surface). */
   waitlist?: WaitlistEntryView[];
   /** Present on the bracket endpoint; omitted (undefined) in the list endpoint. */

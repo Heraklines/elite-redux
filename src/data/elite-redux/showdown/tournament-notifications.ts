@@ -18,6 +18,8 @@
 
 import { loggedInUser } from "#app/account";
 import { SESSION_ID_COOKIE_NAME } from "#app/constants";
+import { getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { isQueuedShowdownMatchInProgress } from "#data/elite-redux/showdown/showdown-matchmaking";
 import {
   dropOutOfTournament,
   getTournamentBracket,
@@ -25,6 +27,7 @@ import {
   pingTournamentPresence,
   syncPendingTournamentResults,
 } from "#data/elite-redux/showdown/tournament-client";
+import { getTournamentMatchContext } from "#data/elite-redux/showdown/tournament-match-context";
 import {
   autoResolutionLabel,
   type BracketMatchView,
@@ -215,7 +218,7 @@ export function actionableTournamentNotifications(t: TournamentView, me: string,
 async function fetchTournamentNotifications(_since: number): Promise<ErNotification[]> {
   const me = loggedInUser?.username;
   const token = getCookie(SESSION_ID_COOKIE_NAME);
-  if (!me || !token || typeof fetch !== "function") {
+  if (!me || !token || typeof fetch !== "function" || tournamentNotificationsSuppressed()) {
     return [];
   }
   await syncPendingTournamentResults();
@@ -250,6 +253,11 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null;
 let toastCountdownTimer: ReturnType<typeof setInterval> | null = null;
 const MATCH_ACCEPT_MS = 60_000;
 const announcedOnlineMatches = new Set<string>();
+
+/** Never surface or poll tournament offers while a versus/tournament transport owns this page. */
+export function tournamentNotificationsSuppressed(): boolean {
+  return getTournamentMatchContext() != null || getCoopRuntime() != null || isQueuedShowdownMatchInProgress();
+}
 
 function dismissTournamentToast(): void {
   if (toastTimer != null) {
@@ -344,6 +352,10 @@ export function showTournamentMatchToast(notification: ErNotification): boolean 
 /** Poll once, heartbeat active entrants, persist inbox items, and surface a live-match alert. */
 export async function pollTournamentPresenceNotifications(): Promise<void> {
   if (presencePollPending || (typeof document !== "undefined" && document.visibilityState === "hidden")) {
+    return;
+  }
+  if (tournamentNotificationsSuppressed()) {
+    dismissTournamentToast();
     return;
   }
   presencePollPending = true;

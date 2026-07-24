@@ -160,7 +160,12 @@ export class ShowdownResultPhase extends BattlePhase {
             .then(result => {
               if (!result.ok) {
                 console.warn(`[tournament-result] report retained for retry: ${result.error}`);
+                return;
               }
+              console.log(
+                `[tournament-result] ${tournamentCtx.tournamentId}/${tournamentCtx.matchId} `
+                  + `winner=${winnerName} resolution=${result.data.resolution}`,
+              );
             })
             .catch(error => {
               console.warn("[tournament-result] report retained for retry", error);

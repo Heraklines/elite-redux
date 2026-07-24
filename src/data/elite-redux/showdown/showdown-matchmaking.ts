@@ -46,6 +46,7 @@ let pendingLaunch: ShowdownMatchLaunch | null = null;
 let returnSlot: number | null = null;
 let restoreReady = false;
 let queuedMatchInProgress = false;
+let matchmakingSuspended = false;
 let lastPlayers: LobbyPlayer[] = [];
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let offerTimer: ReturnType<typeof setTimeout> | null = null;
@@ -246,7 +247,7 @@ function acceptOffer(): void {
 }
 
 function scheduleReconnect(): void {
-  if (reconnectTimer != null || stored?.active !== true) {
+  if (matchmakingSuspended || reconnectTimer != null || stored?.active !== true) {
     return;
   }
   reconnectTimer = setTimeout(() => {
@@ -289,8 +290,11 @@ function dispatchPendingLaunch(): boolean {
 function startController(): void {
   if (
     stored?.active !== true
+    || matchmakingSuspended
     || controller != null
     || getCoopRuntime() != null
+    || queuedMatchInProgress
+    || pendingLaunch != null
     || loggedInUser?.username !== stored.username
   ) {
     return;
@@ -393,6 +397,7 @@ export function queueShowdownTeam(presetName: string, mons: readonly ShowdownMon
   controller = null;
   offer = null;
   dismissToast();
+  matchmakingSuspended = false;
   stored = { username, presetName, mons: mons.map(mon => structuredClone(mon)), active: true };
   persist();
   startController();
@@ -405,7 +410,24 @@ export function restoreShowdownMatchmaking(): void {
   if (stored?.username !== loggedInUser?.username) {
     return;
   }
+  matchmakingSuspended = false;
   startController();
+}
+
+/**
+ * Release the ordinary Showdown queue's signaling presence before a tournament match claims it.
+ * The persisted queue remains active and is restored automatically on the next title screen.
+ */
+export function suspendShowdownMatchmaking(): void {
+  matchmakingSuspended = true;
+  if (reconnectTimer != null) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  controller?.cancel();
+  controller = null;
+  offer = null;
+  dismissToast();
 }
 
 export function isShowdownQueueActive(): boolean {
@@ -470,6 +492,7 @@ export function resetShowdownMatchmakingForTests(): void {
   launchHandler = null;
   returnSlot = null;
   restoreReady = false;
+  matchmakingSuspended = false;
   if (reconnectTimer != null) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
