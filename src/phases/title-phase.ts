@@ -6,7 +6,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
-import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
+import { bootOptimizationsEnabled, bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
@@ -184,8 +184,8 @@ export class TitlePhase extends Phase {
     // #ios-stability (P3): the ER-custom icon atlases were pulled off the iOS boot preload
     // (loading-scene.ts) to spare the pre-title crash window ~1,850 CDN requests. Now that the
     // title is up, stream them in paced background batches. Idempotent per session; no-op on
-    // desktop (icons were preloaded at boot).
-    if (isIOSDevice()) {
+    // desktop unless the staging boot path deferred the icons too.
+    if (isIOSDevice() || bootOptimizationsEnabled) {
       loadEliteReduxCustomIconsInBackground(globalScene);
     }
 

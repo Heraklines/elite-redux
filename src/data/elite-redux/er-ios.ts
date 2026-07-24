@@ -78,7 +78,7 @@ export function resetIOSDeviceCacheForTest(): void {
  * `loadBgm(key)` -> `audio/bgm/${key}.mp3` path would 404. The on-demand players
  * ({@linkcode BattleScene.playBgm} / {@linkcode BattleScene.playSoundWithoutBgm}) look the
  * correct filename up here so a first play load-then-plays SEAMLESSLY instead of failing
- * silently. Desktop preloads all of these eagerly, so this map is never consulted there.
+ * silently. The reversible staging boot path also uses this map on desktop.
  */
 export const ER_IOS_DEFERRED_BGM_FILES: ReadonlyMap<string, string> = new Map<string, string>([
   ["victory_trainer", "bw/victory_trainer.mp3"],

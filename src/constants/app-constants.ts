@@ -18,6 +18,9 @@ export const isApp = import.meta.env.MODE === "app";
 /** `true` if running automated tests via Vitest. */
 export const IS_TEST = import.meta.env.MODE === "test";
 
+/** Enables the reversible, staging-first boot loading path. */
+export const bootOptimizationsEnabled = import.meta.env.VITE_BOOT_OPTIMIZATIONS === "1";
+
 const configuredBypassLogin = import.meta.env.VITE_BYPASS_LOGIN === "1";
 
 /**

@@ -2,6 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { initializeGame, initializeGameYielding } from "#app/init/init";
 import { SceneBase } from "#app/scene-base";
 import { isMobile } from "#app/touch-controls";
+import { bootOptimizationsEnabled } from "#constants/app-constants";
 import { getErBiomeBackgroundTextureKeys } from "#data/elite-redux/er-biome-backgrounds";
 import { markBootMilestone } from "#data/elite-redux/er-boot-diagnostics";
 import { isIOSDevice } from "#data/elite-redux/er-ios";
@@ -516,8 +517,8 @@ export class LoadingScene extends SceneBase {
     // the #1 suspected WKWebView jetsam trigger) are NOT preloaded/decoded at boot on iOS.
     // Each is loaded on demand at first play - playBgm / playSoundWithoutBgm look its `bw/`
     // filename up in ER_IOS_DEFERRED_BGM_FILES so the on-demand fetch resolves seamlessly.
-    // Desktop keeps the eager path (identical set + load order).
-    if (isIOSDevice()) {
+    // The staging boot flag exercises the same on-demand path on every platform.
+    if (isIOSDevice() || bootOptimizationsEnabled) {
       markBootMilestone("ios-bgm-deferred");
     } else {
       this.loadBgm("victory_trainer", "bw/victory_trainer.mp3")
@@ -533,8 +534,8 @@ export class LoadingScene extends SceneBase {
     // #ios-stability (P4): the long, synchronous game-data init blocks the main thread
     // during boot - on a slow iOS device that can trip the kill-the-tab watchdog. On iOS
     // run it yielding between phases and await it in create() before the battle scene starts
-    // (init order/semantics are identical). Desktop keeps the single synchronous pass.
-    if (isIOSDevice()) {
+    // (init order/semantics are identical). The staging boot flag exercises this path on desktop too.
+    if (isIOSDevice() || bootOptimizationsEnabled) {
       this.erInitPromise = initializeGameYielding();
     } else {
       initializeGame();
@@ -807,8 +808,8 @@ export class LoadingScene extends SceneBase {
     // #ios-stability (P3): the ~1,850 ER-custom icon requests are pulled OUT of the
     // blocking iOS boot preload and streamed at the title instead (title-phase.ts ->
     // loadEliteReduxCustomIconsInBackground), so the fetch fan can't stall the WKWebView
-    // connection pool during the pre-title crash window. Desktop keeps the eager preload.
-    if (isIOSDevice()) {
+    // connection pool during the pre-title crash window. The staging boot flag defers them everywhere.
+    if (isIOSDevice() || bootOptimizationsEnabled) {
       markBootMilestone("ios-icons-deferred");
     } else {
       this.loadEliteReduxCustomIcons();

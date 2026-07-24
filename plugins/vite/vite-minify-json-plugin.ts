@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import type { Logger, Plugin as VitePlugin } from "vite";
+import { createLocaleBundle } from "./locale-bundle";
 
 const NAME = "minify-public-json-files";
 const VERSION = "3.0.0";
@@ -40,6 +41,7 @@ export function minifyPublicJsonFiles(): VitePlugin {
   let logger: Logger;
   let count = 0;
   let standalone = false;
+  let bundleLocales = false;
   const errors: Error[] = [];
   const { cyan, gray, red, yellow, green } = chalk;
 
@@ -51,6 +53,7 @@ export function minifyPublicJsonFiles(): VitePlugin {
     configResolved(resolvedConfig): void {
       logger = resolvedConfig.logger;
       standalone = resolvedConfig.mode === "standalone";
+      bundleLocales = resolvedConfig.env.VITE_BOOT_OPTIMIZATIONS === "1";
     },
     buildStart(): void {
       logger.info(cyan(`\t→ Plugin: ${NAME} v${VERSION}`));
@@ -115,6 +118,18 @@ export function minifyPublicJsonFiles(): VitePlugin {
 
       minifyJsonFiles(assetsDir, outputDir);
       minifyJsonFiles(localesDir, path.join(outputDir, "locales"));
+
+      if (bundleLocales) {
+        for (const language of fs.readdirSync(localesDir, { withFileTypes: true })) {
+          if (!language.isDirectory() || language.name.startsWith(".")) {
+            continue;
+          }
+          const sourceDir = path.join(localesDir, language.name);
+          const destination = path.join(outputDir, "locales", language.name, "bundle.json");
+          fs.writeFileSync(destination, JSON.stringify(createLocaleBundle(sourceDir)), "utf8");
+          count++;
+        }
+      }
 
       logger.info(cyan("JSON minification complete."));
     },

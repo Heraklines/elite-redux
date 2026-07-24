@@ -38,6 +38,7 @@ test("production uses shared telemetry while excluding co-op and developer bindi
   assert.match(workflow, /command: deploy --config workers\/er-save-api\/wrangler\.toml/u);
   assert.doesNotMatch(workflow, /echo "VITE_DEV_TOOLS=/u);
   assert.doesNotMatch(workflow, /VITE_ENABLE_SHOWDOWN_TOURNAMENTS/u);
+  assert.doesNotMatch(workflow, /VITE_BOOT_OPTIMIZATIONS/u);
   assert.doesNotMatch(workflow, /VITE_COOP_SERVER_URL/u);
   assert.doesNotMatch(workflow, /workers\/er-coop-api/u);
   assert.doesNotMatch(workflow, /wrangler\.staging\.toml/u);

@@ -1,10 +1,11 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { namespaceMap } from "#app/i18n-namespace-map";
-import { getCachedUrl } from "#utils/fetch-utils";
+import { bootOptimizationsEnabled } from "#constants/app-constants";
+import { cachedFetch, getCachedUrl } from "#utils/fetch-utils";
 import { toKebabCase } from "#utils/strings";
 import i18next from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
-import HttpBackend from "i18next-http-backend";
+import HttpBackend, { type HttpBackendOptions } from "i18next-http-backend";
 import { KoreanPostpositionProcessor } from "i18next-korean-postposition-processor";
 
 //#region Interfaces/Types
@@ -102,6 +103,61 @@ const fonts: LoadingFontFaceProperty[] = [
     extraOptions: { sizeAdjust: "133%" },
   },
 ];
+
+type LocaleBundle = Record<string, unknown>;
+
+const localeBundleRequests = new Map<string, Promise<LocaleBundle>>();
+
+function getLocaleFileName(ns: string): string {
+  if (namespaceMap[ns]) {
+    return namespaceMap[ns];
+  }
+  if (ns.startsWith("mysteryEncounters/")) {
+    return toKebabCase(ns + "-dialogue");
+  }
+  return toKebabCase(ns);
+}
+
+async function fetchLocaleBundle(url: string): Promise<LocaleBundle> {
+  let request = localeBundleRequests.get(url);
+  if (!request) {
+    request = cachedFetch(url).then(async response => {
+      if (!response.ok) {
+        throw new Error(`Locale bundle request failed with ${response.status}`);
+      }
+      return (await response.json()) as LocaleBundle;
+    });
+    localeBundleRequests.set(url, request);
+  }
+  return request;
+}
+
+const requestBundledLocale: NonNullable<HttpBackendOptions["request"]> = (_options, url, _payload, callback) => {
+  const parsedUrl = new URL(url, window.location.href);
+  const language = parsedUrl.searchParams.get("lng");
+  const namespace = parsedUrl.searchParams.get("ns");
+  parsedUrl.searchParams.delete("lng");
+  parsedUrl.searchParams.delete("ns");
+
+  if (!language || !namespace) {
+    callback(new Error("Bundled locale request is missing its language or namespace"), null);
+    return;
+  }
+
+  const bundleUrl = parsedUrl.href;
+  void fetchLocaleBundle(bundleUrl)
+    .then(bundle => {
+      callback(null, { status: 200, data: (bundle[getLocaleFileName(namespace)] ?? {}) as never });
+    })
+    .catch(async bundleError => {
+      try {
+        const fallbackResponse = await cachedFetch(`./locales/${language}/${getLocaleFileName(namespace)}.json`);
+        callback(null, { status: fallbackResponse.status, data: (await fallbackResponse.text()) as never });
+      } catch (fallbackError) {
+        callback(fallbackError ?? bundleError, null);
+      }
+    });
+};
 
 //#endregion
 
@@ -202,18 +258,14 @@ await i18next
       ],
       backend: {
         loadPath(lng: string, [ns]: string[]) {
-          // Use namespace maps where required
-          let fileName: string;
-          if (namespaceMap[ns]) {
-            fileName = namespaceMap[ns];
-          } else if (ns.startsWith("mysteryEncounters/")) {
-            fileName = toKebabCase(ns + "-dialogue"); // mystery-encounters/a-trainers-test-dialogue
-          } else {
-            fileName = toKebabCase(ns);
+          if (bootOptimizationsEnabled) {
+            const bundleUrl = getCachedUrl(`./locales/${lng}/bundle.json`);
+            const separator = bundleUrl.includes("?") ? "&" : "?";
+            return `${bundleUrl}${separator}lng=${encodeURIComponent(lng)}&ns=${encodeURIComponent(ns)}`;
           }
-          // ex: "./locales/en/move-anims?t=1234567890"
-          return getCachedUrl(`./locales/${lng}/${fileName}.json`);
+          return getCachedUrl(`./locales/${lng}/${getLocaleFileName(ns)}.json`);
         },
+        ...(bootOptimizationsEnabled ? { request: requestBundledLocale } : {}),
       },
       defaultNS: "menu",
       detection: {

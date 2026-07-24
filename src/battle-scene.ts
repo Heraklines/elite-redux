@@ -26,6 +26,7 @@ import { UiInputs } from "#app/ui-inputs";
 import { STARTING_WAVE } from "#balance/misc";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
+import { bootOptimizationsEnabled } from "#constants/app-constants";
 import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets } from "#data/battle-anims";
 import {
   type BattleFormat,
@@ -3293,9 +3294,10 @@ export class BattleScene extends SceneBase {
     this.bgmCache.add(bgmName);
     // #ios-stability: a track deferred off the iOS boot preload (victory/evolution BGM)
     // lives under `bw/`, so the default `${key}.mp3` on-demand fetch would 404. Look its
-    // real filename up so this first play load-then-plays seamlessly. Desktop preloads every
-    // track (deferredBgmFile is undefined), so the load call is byte-identical there.
-    const deferredBgmFile = isIOSDevice() ? ER_IOS_DEFERRED_BGM_FILES.get(bgmName) : undefined;
+    // real filename up so this first play load-then-plays seamlessly. The staging boot path
+    // exercises the same deferred behavior on desktop.
+    const deferredBgmFile =
+      isIOSDevice() || bootOptimizationsEnabled ? ER_IOS_DEFERRED_BGM_FILES.get(bgmName) : undefined;
     if (deferredBgmFile) {
       this.loadBgm(bgmName, deferredBgmFile);
     } else {
@@ -3468,8 +3470,9 @@ export class BattleScene extends SceneBase {
     // #ios-stability: a track deferred off the iOS boot preload (e.g. "evolution") may not be
     // cached the first time it's requested here as an SE-style sound. Load-then-play it instead
     // of failing silently (which would also strand the just-paused BGM). Once cached, the retry
-    // takes the normal path below. Desktop preloads every track, so this branch never runs there.
-    const deferredBgmFile = isIOSDevice() ? ER_IOS_DEFERRED_BGM_FILES.get(soundName) : undefined;
+    // takes the normal path below. The staging boot path also exercises this branch on desktop.
+    const deferredBgmFile =
+      isIOSDevice() || bootOptimizationsEnabled ? ER_IOS_DEFERRED_BGM_FILES.get(soundName) : undefined;
     if (deferredBgmFile && !this.cache.audio.exists(soundName)) {
       this.loadBgm(soundName, deferredBgmFile);
       this.load.once(Phaser.Loader.Events.COMPLETE, () => {

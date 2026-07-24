@@ -4,7 +4,7 @@ import "#init/init-manifest"; // initializes the manifest, must be done *before*
 import "#app/i18n"; // Initializes i18n on import
 
 import { InvertPostFX } from "#app/pipelines/invert";
-import { isBeta, isDev } from "#constants/app-constants";
+import { bootOptimizationsEnabled, isBeta, isDev } from "#constants/app-constants";
 import { initBootDiagnostics } from "#data/elite-redux/er-boot-diagnostics";
 import { isIOSDevice } from "#data/elite-redux/er-ios";
 import { version } from "#package.json";
@@ -23,8 +23,14 @@ if (isBeta || isDev) {
 }
 
 async function startGame(): Promise<void> {
-  const LoadingScene = (await import("./loading-scene")).LoadingScene;
-  const BattleScene = (await import("./battle-scene")).BattleScene;
+  let LoadingScene: typeof import("./loading-scene").LoadingScene;
+  let BattleScene: typeof import("./battle-scene").BattleScene;
+  if (bootOptimizationsEnabled) {
+    [{ LoadingScene }, { BattleScene }] = await Promise.all([import("./loading-scene"), import("./battle-scene")]);
+  } else {
+    LoadingScene = (await import("./loading-scene")).LoadingScene;
+    BattleScene = (await import("./battle-scene")).BattleScene;
+  }
   const gameConfig: Phaser.Types.Core.GameConfig = {
     type: Phaser.WEBGL,
     parent: "app",
