@@ -9,8 +9,8 @@
 // pressure). Records one row per showdown match for balance analytics.
 //
 // AUTH: production can reuse er-save-api's exact HMAC token scheme with the same
-// `SESSION_SECRET`. Isolated environments can instead set `AUTH_API_URL`; the worker
-// validates the bearer token against that save API's `/account/info` endpoint.
+// `SESSION_SECRET`. Isolated environments can instead bind `AUTH_API` (or set
+// `AUTH_API_URL`); the worker validates the bearer token through `/account/info`.
 // No new login. The pure ingest validation is in ./telemetry-ingest.ts.
 //
 // Ingest: POST /telemetry/battle (authed, 64KB body cap, per-uid rate limit). The client
@@ -26,6 +26,8 @@ interface Env {
   DB: D1Database;
   /** SAME value as er-save-api's SESSION_SECRET (shared HMAC token scheme). */
   SESSION_SECRET?: string;
+  /** Staging service binding used to validate bearer tokens without copying its signing secret. */
+  AUTH_API?: Fetcher;
   /** Optional save API used to validate bearer tokens without copying its signing secret. */
   AUTH_API_URL?: string;
   /** Optional origin allowlist; "*"/unset = allow all. */
@@ -126,6 +128,24 @@ async function verifyTokenWithAuthApi(token: string, authApiUrl: string): Promis
   }
 }
 
+async function verifyTokenWithAuthService(token: string, authApi: Fetcher): Promise<TokenPayload | null> {
+  try {
+    const response = await authApi.fetch("https://auth.internal/account/info", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const account = (await response.json()) as { accountId?: unknown; username?: unknown };
+    const accountId = typeof account.accountId === "string" ? /^er-account:(\d+)$/u.exec(account.accountId) : null;
+    const username = typeof account.username === "string" ? account.username.trim() : "";
+    const uid = Number(accountId?.[1]);
+    return Number.isSafeInteger(uid) && uid > 0 && username.length > 0 ? { uid, u: username, iat: Date.now() } : null;
+  } catch {
+    return null;
+  }
+}
+
 async function authUser(request: Request, env: Env): Promise<TokenPayload | null> {
   const header = request.headers.get("Authorization");
   if (!header) {
@@ -136,6 +156,9 @@ async function authUser(request: Request, env: Env): Promise<TokenPayload | null
     return null;
   }
 
+  if (env.AUTH_API) {
+    return verifyTokenWithAuthService(token, env.AUTH_API);
+  }
   if (env.AUTH_API_URL) {
     return verifyTokenWithAuthApi(token, env.AUTH_API_URL);
   }

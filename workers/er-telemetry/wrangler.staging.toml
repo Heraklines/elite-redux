@@ -11,8 +11,11 @@ binding = "DB"
 database_name = "er-telemetry-staging"
 database_id = "5655c98e-4de8-48c1-865c-6bf5744f752a"
 
+[[services]]
+binding = "AUTH_API"
+service = "er-save-api-staging"
+
 [vars]
-AUTH_API_URL = "https://er-save-api-staging.heraklines.workers.dev"
 SAVE_API_URL = "https://er-save-api-staging.heraklines.workers.dev"
 EDITOR_API_URL = "https://er-editor-api.heraklines.workers.dev"
 ALLOWED_ORIGIN = "*"
