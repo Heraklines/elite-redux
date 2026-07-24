@@ -2835,3 +2835,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Guest faint narration now uses an ordinary auto-dismissing message. The localization regression captures
   the real queue call and requires the faint line to remain guest-localized while never requesting an ACTION
   prompt. No authority, timing, or input gate is relaxed.
+
+# 2026-07-24 - Mystery lifecycle surfaces eagerly resume their already-admitted V2 entries
+
+- Focused B5 run `30089029513` reduced its exact red to four cases in one Mystery file. Three reached the
+  guest's real `PostMysteryEncounterPhase` with the final `ME_TERMINAL` already parked at
+  `materialDeferred`; the battle-handoff case reached the real `MysteryEncounterPhase` after `ME_PRESENT`
+  had already materialized. Both surfaces were correct but waited for a later authority retransmission
+  before revisiting the central projector.
+- Both phase-start boundaries now issue the existing eager V2 retry/projector signal. The replica ledger
+  still owns ordering, deduplication, material application, and control proof; the authority log still owns
+  retention. The wake only removes network-backoff timing from a real engine surface that has just become
+  actionable, matching the established command, wave, and interaction proof-edge pattern.

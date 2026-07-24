@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "fbe95df792f338b24c948692827613fa5eafd663",
+  "baseSha": "d1ed1df37d3144d6ed733288c5652375df1392d9",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -15,6 +15,7 @@
     "src/data/elite-redux/coop/coop-webrtc-connect.ts",
     "src/phases/coop-guest-faint-switch-phase.ts",
     "src/phases/coop-replay-phases.ts",
+    "src/phases/mystery-encounter-phases.ts",
     "src/phases/the-bargain-phase.ts",
     "src/phases/title-phase.ts",
     "test/browser/coop-public-ui/public-ui-harness.mjs",

@@ -54,6 +54,8 @@ import {
   getCoopNetcodeMode,
   getCoopRuntime,
   isCoopAuthoritativeGuest,
+  notifyCoopV2InteractionSurfaceReady,
+  retryCoopV2PendingAuthorityAtSafeBoundary,
   setCoopMeBattleInteractionCounter,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -416,6 +418,10 @@ export class MysteryEncounterPhase extends Phase {
           counter: interactionCounter,
           wave: globalScene.currentBattle?.waveIndex,
         });
+        // The immutable presentation may already be admitted/materialized after racing this local
+        // classifier. Revisit the central projector from the real phase-start edge so it can replace this
+        // exact predecessor immediately; liveness must not depend on a later network redelivery timer.
+        notifyCoopV2InteractionSurfaceReady(getCoopRuntime());
         return;
       }
       // #813 (live 'the other person threw out a pokemon'): the guest's LOCAL wave setup may
@@ -1555,7 +1561,13 @@ export class PostMysteryEncounterPhase extends Phase {
         // leave step. Keep the pin and this exact phase live until that DATA+destination transaction
         // applies; clearing locally would race the final host image and authorize NewBattle from inference.
         coopLog("me", "authoritative guest: PostMysteryEncounterPhase holds for retained final leave");
-        getCoopRuntime()?.durability?.reconnect();
+        const runtime = getCoopRuntime();
+        // The terminal commonly arrived one phase early and is already parked at materialDeferred. This
+        // exact lifecycle surface is its missing proof, so retry the one ordered replica now rather than
+        // waiting for transport backoff. Retention remains the fallback when the entry has not arrived yet.
+        if (retryCoopV2PendingAuthorityAtSafeBoundary(runtime) === 0) {
+          runtime?.durability?.reconnect();
+        }
         return;
       }
       coopLog("me", "authoritative guest: PostMysteryEncounterPhase terminal (clearing pin)", {
