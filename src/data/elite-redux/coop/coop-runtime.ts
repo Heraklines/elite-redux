@@ -6274,6 +6274,38 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
     return true;
   }
 
+  // A Bargain can be the first ordered control after a settled combat turn. The authoritative engine opens
+  // it from its event schedule, while the pure renderer is deliberately parked in CoopFinalizeTurnPhase and
+  // has no permission to reproduce that local schedule. Project the exact retained presentation behind the
+  // finalizer, then release that fence with the same entry claim. Queue insertion alone is not authority:
+  // the finalizer still verifies that this revision is a legal successor of the settled TURN_COMMIT.
+  if (plan.kind === "bargain" && current.is("CoopFinalizeTurnPhase")) {
+    const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
+    const claim = sourceEntry == null ? null : coopV2ControlSuccessorClaim(sourceEntry);
+    const finalizer = current as Phase & {
+      canReleaseForCoopV2Control?: (successor: CoopV2ControlSuccessorClaim) => boolean;
+    };
+    if (
+      sourceEntry == null
+      || !controlsEqual(sourceEntry.nextControl, control)
+      || claim == null
+      || finalizer.canReleaseForCoopV2Control?.(claim) !== true
+    ) {
+      return false;
+    }
+    const phase = materializeCoopV2InteractionProjection(runtime, control, plan);
+    if (phase == null) {
+      return false;
+    }
+    phaseManager.unshiftPhase(phase);
+    runtime.v2ProjectedInteractionControlId = controlId;
+    if (!releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry)) {
+      throw new Error(`Authority V2 Bargain projection could not release its verified predecessor ${controlId}`);
+    }
+    coopLog("v2-interaction", `projected exact bargain generation for ${controlId} behind settled turn`);
+    return true;
+  }
+
   // Mid-turn modal interactions have no replica-local causal phase tree. Their immutable presentation
   // entry is therefore the only event that can create the guest surface. Recovery has always rebuilt these
   // exact phases from the same closed projection plan; use that constructor during ordinary delivery too so

@@ -4095,9 +4095,10 @@ export async function driveHostPartyRewardOwner(
 
   const selectedType = (hostPhase.typeOptions[idx] as { type?: unknown }).type;
   if (selectedType instanceof FusePokemonModifierType) {
-    // SPLICE is a four-confirm public flow: choose the base mon, choose APPLY, choose the partner mon,
-    // choose SPLICE. The old generic helper skipped both option confirms and generated a cadence no human
-    // could produce, so V2 correctly retained no result and the watcher waited forever.
+    // The current fusion-preview UI is a three-confirm public flow: choose the base mon, choose APPLY,
+    // then choose the partner mon. ACTION on that partner invokes the preview's Fuse action directly; there
+    // is no second SPLICE option menu. The retired helper waited for that nonexistent fourth confirmation,
+    // leaving the completed surface mounted and contaminating every later shared-process fixture.
     if (!globalScene.ui.processInput(Button.ACTION)) {
       throw new Error(`fusion reward could not choose APPLY at interaction ${pinned}`);
     }
@@ -4110,10 +4111,6 @@ export async function driveHostPartyRewardOwner(
         throw new Error(`fusion reward UI could not navigate to splice slot ${option} at interaction ${pinned}`);
       }
     }
-    if (!globalScene.ui.processInput(Button.ACTION)) {
-      throw new Error(`fusion reward UI could not open splice confirmation at interaction ${pinned}`);
-    }
-    await awaitPartyState("the SPLICE confirmation", handler => handler.optionsMode === true);
     if (!globalScene.ui.processInput(Button.ACTION)) {
       throw new Error(`fusion reward UI rejected splice slot ${option} at interaction ${pinned}`);
     }

@@ -2741,3 +2741,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   projection instead of deep-comparing Phaser renderer internals.
 - T4 remains unrelated pre-existing Elite Redux ghost/triples probability debt. It does not touch co-op or
   Showdown mechanics and is intentionally left to its existing owner under the staging false-red policy.
+
+# 2026-07-24 - The aggregate exposes a missing ordered Bargain projection and the real fusion-preview cadence
+
+- Exact gate `30083386840` reached the post-turn Giratina boundary with revision 3 admitted and its complete
+  `BARGAIN_PRESENT` material applied, but the guest remained parked in `CoopFinalizeTurnPhase`. Ordinary V2
+  delivery had a decoder and recovery constructor for Bargain while its live projector still returned false,
+  implicitly waiting for the pure renderer to reproduce the authority's local event schedule. Bargain is now
+  projected behind that exact settled-turn fence and may release it only with the source entry's verified
+  successor claim; handler readiness still owns `controlInstalled`.
+- B5's DNA-Splicer failure was the opposite category: the production fusion-preview UI intentionally fuses
+  when ACTION selects the partner, so there is no later SPLICE option menu. The public test driver now sends
+  the real three confirmations (base, APPLY, partner) instead of waiting for a nonexistent fourth input. That
+  stale wait had left the completed PARTY surface mounted and caused the later shared-process fixture cascade.
+- The focused-gate manifest now advances its integration-batch base on every push as required by
+  `docs/coop-task-ownership.md`; run `30083562237` proves the previously noisy self-train ownership gate green.
