@@ -26,6 +26,7 @@ import {
   getCoopInteractionRelay,
   getCoopRuntime,
   notifyCoopV2InteractionSurfaceReady,
+  runWhenCoopRuntimeActive,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REVIVAL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
@@ -139,7 +140,7 @@ export class CoopGuestRevivalPhase extends Phase {
               this.coopOwningRuntime,
             );
           }
-          void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
+          this.closePickerInOwningRuntime();
         },
         PartyUiHandler.FilterFainted,
       );
@@ -180,6 +181,32 @@ export class CoopGuestRevivalPhase extends Phase {
       );
       return;
     }
-    void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
+    this.closePickerInOwningRuntime();
+  }
+
+  /**
+   * Close the public picker and its queue-owned phase under the runtime that created it.
+   *
+   * A UI transition may resolve asynchronously. In the two-engine harness the ambient scene can therefore
+   * belong to the peer by the time its continuation runs; a real browser has the same ownership requirement
+   * even though each peer has a separate global. Bind both the UI close and the final scheduler mutation to
+   * this phase's captured runtime so an immutable result cannot close the other client's phase tree.
+   */
+  private closePickerInOwningRuntime(): void {
+    const endInOwningRuntime = (): void => {
+      if (this.coopOwningRuntime == null) {
+        this.end();
+        return;
+      }
+      runWhenCoopRuntimeActive(this.coopOwningRuntime, () => this.end());
+    };
+    const closePicker = (): void => {
+      void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(endInOwningRuntime);
+    };
+    if (this.coopOwningRuntime == null) {
+      closePicker();
+      return;
+    }
+    runWhenCoopRuntimeActive(this.coopOwningRuntime, closePicker);
   }
 }

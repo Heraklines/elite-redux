@@ -3078,3 +3078,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Party transposition installs and verifies its deterministic enemy HP under the host realm, and replay pacing
   rereads the field after immutable material may reconstruct Pokemon identities instead of asserting against
   stale pre-apply objects.
+
+# 2026-07-24 - Public B11 surfaces keep production timing and runtime ownership
+
+- The biome public-input suite no longer gives ordinary retained receipts a global 20 ms deadline. It keeps
+  a production-like 60 s budget; the two explicit exhaustion regressions still opt into their own 10 ms
+  deadlines, so failure behavior remains fast and deliberate.
+- Revival Blessing now closes both its Party UI and exact queue-owned phase under the runtime captured when
+  the surface was created. An asynchronous UI continuation can no longer resume under the peer scene and
+  leave the real owner's immutable-result watcher open.

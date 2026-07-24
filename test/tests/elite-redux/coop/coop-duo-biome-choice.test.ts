@@ -172,7 +172,9 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     setCoopWaveBarrierMs(50);
     setCoopRendezvousWaitMs(50);
     setCoopOrphanGraceMs(20); // #863: fast orphan-backstop poll for the stuck-map repro
-    setCoopBiomeCommitWaitMs(20);
+    // Public two-client input must retain the same production-like receipt budget as a real browser. Tests
+    // that deliberately exercise exhaustion override this to 10 ms at the individual failure boundary.
+    setCoopBiomeCommitWaitMs(60_000);
     // This suite DRIVES the real crossroads / World-Map picker through public input, so opt OUT of the
     // vitest owner auto-resolve. Reset in afterEach (anti-latch).
     setCoopBiomePickerDrivenByTest();
