@@ -282,10 +282,16 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect(datalist).toContain('value="Jumpluff Mega"');
 
     const key = newTrainer();
-    setSpecies(0, "Mega Jumpluff");
+    const speciesInput = q('.ctr-species[data-idx="0"]') as HTMLInputElement;
+    speciesInput.value = "Mega Jumpluff";
+    ct.onCustomTrainerInput(speciesInput);
+    // Keep the user's text intact while typing so the native datalist remains open.
+    expect(speciesInput.value).toBe("Mega Jumpluff");
+    ct.onCustomTrainerChange(speciesInput);
     const member = ct.ctr.current[key].team[0];
     expect(member.species).toBe(mega.const);
     expect(member.formIndex).toBe(1);
+    expect((q('.ctr-species[data-idx="0"]') as HTMLInputElement).value).toBe(mega.const);
     expect(q('.ctr-abil[data-idx="0"] option')?.textContent).toContain("Moxie");
 
     const saved = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
