@@ -49,12 +49,7 @@ import {
   createCoopRuntimeOpState,
   setActiveCoopRuntimeOpState,
 } from "#data/elite-redux/coop/coop-operation-runtime";
-import {
-  clearCoopRuntime,
-  coopHostStreamMeMessage,
-  getCoopInteractionRelay,
-  setCoopRuntime,
-} from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, coopHostStreamMeMessage, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
@@ -73,6 +68,7 @@ import {
   driveGuestMeReplay,
   driveHostMeRewardShopWithGuestReplay,
   installDuoLogCapture,
+  relayGuestMeOptionIndexOnly,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
   settleDuoPromise,
@@ -422,29 +418,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // then relay option index 0 synchronously (send-only). The race remains deferred until STEP D solely
     // because this two-engine harness shares one module graph; production browsers do not share globals.
     const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-    withClientSync(rig.guestCtx, () => {
-      const relay = getCoopInteractionRelay();
-      const seq = (replay as unknown as { seq: number }).seq;
-      if (relay == null) {
-        throw new Error("guest-owned ME test lost its production interaction relay");
-      }
-      const operationId = meOp.commitMeOwnerIntent({
-        kind: "ME_PICK",
-        seq,
-        pinned: counterBefore,
-        step: 0,
-        payload: { optionIndex: 0 },
-        localRole: "guest",
-        wave: rig.guestScene.currentBattle.waveIndex,
-        // An ME operation is a transaction pinned on the authority turn sentinel (COOP_ME_AUTHORITY_TURN=0),
-        // NOT the live battle turn: commitMeOwnerIntent fails closed on any other turn. Mirrors the catch-full
-        // sub-pick idiom.
-        turn: meOp.COOP_ME_AUTHORITY_TURN,
-        resend: () => relay.sendInteractionChoice(seq, "me", 0, [0]),
-      });
-      expect(operationId, "the public guest intent enters retained control before its raw proposal").not.toBeNull();
-      relay.sendInteractionChoice(seq, "me", 0, [0]);
-    });
+    withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
 
     // STEP C (host): flush the relayed index; the host commits the guest's ME_PICK (invariant 3) + applies it,
     // then reaches the embedded reward shop (the #828 pick-watcher on a guest-owned ME - rolls + streams).
@@ -580,26 +554,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // STEP B (guest): start the divert -> CoopReplayMePhase (opens the selector as owner), then relay
     // option index 0 send-only (the harness split; the outcome race defers to STEP D).
     const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-    withClientSync(rig.guestCtx, () => {
-      const relay = getCoopInteractionRelay();
-      const seq = (replay as unknown as { seq: number }).seq;
-      if (relay == null) {
-        throw new Error("guest-owned narration ME test lost its production interaction relay");
-      }
-      const operationId = meOp.commitMeOwnerIntent({
-        kind: "ME_PICK",
-        seq,
-        pinned: counterBefore,
-        step: 0,
-        payload: { optionIndex: 0 },
-        localRole: "guest",
-        wave: rig.guestScene.currentBattle.waveIndex,
-        turn: 0,
-        resend: () => relay.sendInteractionChoice(seq, "me", 0, [0]),
-      });
-      expect(operationId, "the guest intent enters retained control before its raw proposal").not.toBeNull();
-      relay.sendInteractionChoice(seq, "me", 0, [0]);
-    });
+    withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
 
     // STEP C (host): flush the relayed index; the host COMMITS the guest's ME_PICK (invariant 3), applies
     // it, and BROADCASTS the retained pick envelope. It then streams a post-pick NARRATION line (the guest

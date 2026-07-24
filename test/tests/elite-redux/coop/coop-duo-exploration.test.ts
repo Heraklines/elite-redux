@@ -29,9 +29,14 @@ import {
   resetCoopBargainOperationFlag,
   setCoopBargainOperationEnabled,
 } from "#data/elite-redux/coop/coop-bargain-operation";
-import { clearCoopRuntime, getCoopInteractionRelay, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  getCoopInteractionRelay,
+  isCoopV2InteractionHumanInputFrozen,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
@@ -44,6 +49,7 @@ import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-p
 import { ErAbilityCapsulePhase } from "#phases/er-ability-capsule-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
@@ -267,7 +273,14 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
 
     // OWNER (host): take the capsule from the shop targeting slot 1, then drive the capsule's
     // own picker phase (choice menu -> innate picker) to the CAP_RUNUNLOCK commit + relay.
-    await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: PARTNER_SLOT }));
+    await withClient(rig.hostCtx, () =>
+      driveHostPartyRewardOwner(hostShop, {
+        slot: PARTNER_SLOT,
+        partnerReady: async () => {
+          await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+        },
+      }),
+    );
     const ownerDrove = await withClient(rig.hostCtx, () => driveCapsulePickerOnCurrent(PARTNER_SLOT, unlockSlot));
     expect(ownerDrove, "HARNESS: the owner's ErAbilityCapsulePhase was current after the shop pick").toBe(true);
     expect(
@@ -278,7 +291,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // WATCHER (guest): its shop watch re-applies the relayed capsule pick (unshifting ITS
     // ErAbilityCapsulePhase as watcher), then the watcher phase applies the buffered
     // CAP_RUNUNLOCK outcome. If the queued phase never runs, that is the live #789 queue-starve.
-    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
     const guestTarget = rig.guestScene.getPlayerParty()[PARTNER_SLOT];
     // HARNESS GAP (found by heap instrumentation): a mid-run HEAL can REBUILD guest party mons
     // (applyCaptureParty), and rebuilt mons lose the no-op battleInfo stub - their updateInfo()
@@ -383,7 +396,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         });
       }
       expect(marketReady, "owner reached the real market input surface").toBe(true);
-      const options = (hostMarket as unknown as { typeOptions: { type?: { id?: string } }[] }).typeOptions;
+      const options = (hostMarket as unknown as { shopOptions: { type?: { id?: string } }[] }).shopOptions;
       let buyIndex = options.findIndex(option => (option.type?.id ?? "").includes("LURE"));
       if (buyIndex < 0) {
         buyIndex = options.findIndex(option => option.type != null);
@@ -663,40 +676,6 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       ).toBe(true);
 
       // GUEST renders both faints, but the authority log orders the host-owned f0 picker first.
-      // Keep the public PARTY driver armed across the later host crossing: only the first
-      // post-summon REPLACEMENT_COMMIT is allowed to install the guest-owned f1 picker.
-      const guestUi = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
-      const realGuestSetMode = guestUi.setMode.bind(guestUi);
-      let guestPickCount = 0;
-      guestUi.setMode = (...args: unknown[]): unknown => {
-        if (args[0] === UiMode.PARTY) {
-          guestPickCount += 1;
-          expect(guestPickCount, "the ordered V2 chain opened exactly one guest picker").toBe(1);
-          const opened = realGuestSetMode(...args);
-          publicReplacementPicks.push(
-            Promise.resolve(opened).then(
-              () =>
-                new Promise<void>(resolve => {
-                  setTimeout(() => {
-                    withClientSync(rig.guestCtx, () => {
-                      expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
-                      expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
-                      expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
-                      expect(rig.guestScene.ui.processInput(Button.ACTION)).toBe(true);
-                      expect(rig.guestScene.ui.processInput(Button.ACTION)).toBe(true);
-                    });
-                    resolve();
-                  }, 0);
-                }),
-            ),
-          );
-          return opened;
-        }
-        if (args[0] === UiMode.MESSAGE) {
-          return;
-        }
-        return realGuestSetMode(...args);
-      };
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
@@ -715,13 +694,42 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
           await drainLoopback();
         });
         expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+
+        // The first post-summon entry is itself the ordered permit for the guest-owned second picker. The
+        // replica must render/materialize that entry before its deferred CoopGuestFaintSwitchPhase can be
+        // reconstructed. Drive the real guest phase queue to that exact phase, then press through its real
+        // PARTY handler. Merely intercepting setMode without advancing the replica queue left revision 3 at
+        // materialDeferred and let the host's bounded replacement wait auto-pick instead.
+        await withClient(rig.guestCtx, async () => {
+          const picker = await driveClientPhaseQueueTo(rig.guestScene, "ordered double-KO guest replacement", {
+            matches: phase => phase.phaseName === "CoopGuestFaintSwitchPhase",
+            pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+          });
+          picker.start();
+          let actionable = false;
+          for (let i = 0; i < 100 && !actionable; i++) {
+            await drainLoopback();
+            const handler = rig.guestScene.ui.getHandler() as unknown as {
+              active?: boolean;
+              isCoopV2InputActionable?: () => boolean;
+            };
+            actionable =
+              rig.guestScene.ui.getMode() === UiMode.PARTY
+              && handler.active === true
+              && handler.isCoopV2InputActionable?.() === true;
+          }
+          expect(actionable, "the ordered V2 chain opened one actionable guest picker").toBe(true);
+          expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
+          expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
+          expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
+          expect(rig.guestScene.ui.processInput(Button.ACTION)).toBe(true);
+          expect(rig.guestScene.ui.processInput(Button.ACTION)).toBe(true);
+        });
         await settleDuoPromise(rig, hostAdvance!, "exploration double-KO host crossing");
         await Promise.all(publicReplacementPicks);
       } finally {
         hostUi.setMode = realHostSetMode;
-        guestUi.setMode = realGuestSetMode;
       }
-      expect(guestPickCount, "the guest supplied one human action after its V2 control became public").toBe(1);
       const hostSlot0 = rig.hostScene.getPlayerField()[0];
       const hostSlot1 = rig.hostScene.getPlayerField()[1];
       expect(hostSlot0?.species.speciesId, "host slot 0 refilled with the HOST's pick").toBe(SpeciesId.LAPRAS);
@@ -976,15 +984,18 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // HOST publishes the immutable prompt. The guest then opens the projected replay phase and chooses
     // through SUMMARY input; the retired test pre-buffered an unidentified raw relay proposal before the
     // prompt existed, which Authority V2 must reject.
-    let forwardEmitted = false;
+    let v2PromptCommitted = false;
     const offSpy = pair.host.onMessage(() => {});
     const realSend = pair.host.send.bind(pair.host);
-    (pair.host as { send: (m: unknown) => void }).send = (m: unknown) => {
-      const msg = m as { t?: string; outcome?: { k?: string } };
-      if (msg.t === "interactionOutcome" && msg.outcome?.k === "learnMoveForward") {
-        forwardEmitted = true;
+    (pair.host as { send: (m: CoopMessage) => void }).send = (msg: CoopMessage) => {
+      if (
+        msg.t === "authorityEntry"
+        && msg.body.kind === "INTERACTION_COMMIT"
+        && msg.body.operationId.includes(":LEARN_MOVE:")
+      ) {
+        v2PromptCommitted = true;
       }
-      realSend(m as never);
+      realSend(msg);
     };
     let phaseDone = false;
     await withClient(rig.hostCtx, () => {
@@ -1027,7 +1038,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       await pumpDuoDestinations(rig, 1);
     }
     offSpy();
-    expect(forwardEmitted, "the forget prompt was FORWARDED to the guest (never host-side)").toBe(true);
+    expect(v2PromptCommitted, "the forget prompt entered the immutable V2 log (never legacy-only)").toBe(true);
     expect(phaseDone, "the host learn phase completed on the guest's buffered pick").toBe(true);
     const movesAfter = gengar.moveset.map(m => m?.moveId);
     expect(movesAfter, "the guest's pick applied: slot 0 forgotten, the new move learned").toContain(NEW_MOVE);
@@ -1058,9 +1069,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     const { TheBargainPhase } = await import("#phases/the-bargain-phase");
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
 
-    // Stage both real phases before input, then leave through ER_BARGAIN's public handler. The retired
-    // fixture invoked onLeave from the setMode call itself, before the mode promise could install the
-    // presentation control; Authority V2 correctly rejected that impossible browser ordering.
+    // Stage the real authority phase, then let the immutable BARGAIN_PRESENT entry project the watcher's
+    // passive Bargain surface. The retired fixture constructed an unrelated watcher phase before the log
+    // entry existed, so the exact shared-interaction control could never prove its projected generation.
     let ownerDone = false;
     let watchDone = false;
     await withClient(rig.hostCtx, async () => {
@@ -1071,34 +1082,52 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         ownerDone = true;
         realEndO();
       };
-      haltQueueAfterCurrent();
-      phase.start();
+      expect(rig.hostScene.phaseManager.overridePhase(phase), "the owner Bargain is the real current phase").toBe(true);
       await drainLoopback();
     });
     await withClient(rig.guestCtx, async () => {
-      const phase = new TheBargainPhase();
-      haltQueueAfterCurrent();
-      const seam = phase as unknown as { end: () => void };
-      const realEnd = seam.end.bind(phase);
+      const projected = await driveClientPhaseQueueTo(rig.guestScene, "projected Giratina bargain", {
+        matches: phase => phase.phaseName === "TheBargainPhase",
+        pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+      });
+      const seam = projected as unknown as { end: () => void };
+      const realEnd = seam.end.bind(projected);
       seam.end = () => {
         watchDone = true;
         realEnd();
       };
-      phase.start();
+      projected.start();
       await drainLoopback();
     });
 
+    // Let the real carried-input guard expire while the watcher's own runtime/scene is active. Its exact
+    // false -> true notification is what turns the replica's projected surface into controlInstalled.
+    await withClient(rig.guestCtx, () => new Promise(resolve => setTimeout(resolve, 650)));
+
     let bargainReady = false;
+    let watcherProjected = false;
     for (let i = 0; i < 80 && !bargainReady; i++) {
       await pumpDuoDestinations(rig, 1);
+      watcherProjected = await withClient(rig.guestCtx, () => {
+        const current = rig.guestScene.phaseManager.getCurrentPhase();
+        return current?.phaseName === "TheBargainPhase" || rig.guestScene.ui.getMode() === UiMode.ER_BARGAIN;
+      });
       bargainReady = await withClient(rig.hostCtx, () => {
-        const handler = rig.hostScene.ui.getHandler() as unknown as { active?: boolean };
-        return rig.hostScene.ui.getMode() === UiMode.ER_BARGAIN && handler.active === true;
+        const handler = rig.hostScene.ui.getHandler() as unknown as {
+          active?: boolean;
+          isCoopV2InputActionable?: () => boolean;
+        };
+        const exactControlInstalled = !isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
+        return (
+          rig.hostScene.ui.getMode() === UiMode.ER_BARGAIN
+          && handler.active === true
+          && handler.isCoopV2InputActionable?.() === true
+          && exactControlInstalled
+        );
       });
     }
-    expect(bargainReady, "owner reached the real Giratina bargain handler").toBe(true);
-    // ErBargainUiHandler deliberately ignores carried-over input for 600ms, exactly as production does.
-    await withClient(rig.hostCtx, () => new Promise(resolve => setTimeout(resolve, 650)));
+    expect(watcherProjected, "the V2 entry projected the watcher's passive Giratina surface").toBe(true);
+    expect(bargainReady, "owner reached the exact actionable Giratina bargain handler").toBe(true);
     await withClient(rig.hostCtx, () => {
       expect(rig.hostScene.ui.processInput(Button.CANCEL), "owner leaves through ER_BARGAIN input").toBe(true);
     });

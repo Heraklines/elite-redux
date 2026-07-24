@@ -42,6 +42,7 @@ import {
   getCoopInteractionRelay,
   getCoopRuntime,
   isCoopV2InteractionHumanInputFrozen,
+  notifyCoopV2InteractionSurfaceReady,
   retainCoopV2InteractionProposal,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -154,6 +155,7 @@ export class TheBargainPhase extends Phase {
         }
         if (!owns) {
           this.coopV2ControlOperationId = presentationOperationId;
+          this.openWatcherScreen(sins);
           void this.coopBargainWatch();
           return;
         }
@@ -302,10 +304,12 @@ export class TheBargainPhase extends Phase {
     this.flushCoopBargainTerminal();
   }
 
-  /** Co-op WATCHER (#795): never opens the bargain; adopts the owner's outcome verbatim. */
+  /** Co-op WATCHER (#795): renders the immutable offer passively and adopts the owner's outcome verbatim. */
   private async coopBargainWatch(): Promise<void> {
     try {
-      globalScene.ui.showText("Your partner is bargaining with Giratina...");
+      if (globalScene.ui.getMode() !== UiMode.ER_BARGAIN) {
+        globalScene.ui.showText("Your partner is bargaining with Giratina...");
+      }
       isCoopV2InteractionHumanInputFrozen();
     } catch {
       /* cosmetic */
@@ -413,6 +417,7 @@ export class TheBargainPhase extends Phase {
       return;
     }
     if (!owns) {
+      this.openWatcherScreen(sins);
       void this.coopBargainWatch();
       return;
     }
@@ -444,16 +449,38 @@ export class TheBargainPhase extends Phase {
     // the intro (the full ominous monologue still plays elsewhere as needed).
     const greeting = i18next.t(`${ns}:introDialogue`).split("$").slice(0, 2).join(" ");
 
-    globalScene.ui.setMode(
-      UiMode.ER_BARGAIN,
-      labels,
-      descs,
-      greeting,
-      offers,
-      (sinIndex: number) => this.beginSin(sins, sins[sinIndex]),
-      () => this.leave(),
-      () => this.checkTeam(sins),
-    );
+    void globalScene.ui
+      .setMode(
+        UiMode.ER_BARGAIN,
+        labels,
+        descs,
+        greeting,
+        offers,
+        (sinIndex: number) => this.beginSin(sins, sins[sinIndex]),
+        () => this.leave(),
+        () => this.checkTeam(sins),
+      )
+      .then(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
+  }
+
+  /** Render the same immutable offer on the non-owner without giving mirrored cursor input local authority. */
+  private openWatcherScreen(sins: BargainSinKey[]): void {
+    const labels = [...sins.map(k => i18next.t(`${ns}:sins.${k}.name`)), i18next.t(`${ns}:option.leave.label`)];
+    const descs = [...sins.map(k => i18next.t(`${ns}:sins.${k}.tooltip`)), i18next.t(`${ns}:option.leave.tooltip`)];
+    const offers = sins.map(k => i18next.t(`${ns}:sins.${k}.offer`));
+    const greeting = i18next.t(`${ns}:introDialogue`).split("$").slice(0, 2).join(" ");
+    void globalScene.ui
+      .setMode(
+        UiMode.ER_BARGAIN,
+        labels,
+        descs,
+        greeting,
+        offers,
+        () => {},
+        () => {},
+        () => {},
+      )
+      .then(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
   }
 
   /** View the party read-only (the Check Team button), then re-open the bargain screen. */

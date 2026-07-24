@@ -26,6 +26,11 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import {
+  getCoopRuntime,
+  notifyCoopV2InteractionSurfaceReady,
+  runWhenCoopRuntimeActive,
+} from "#data/elite-redux/coop/coop-runtime";
 import { Button } from "#enums/buttons";
 import { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
@@ -111,6 +116,8 @@ export class ErBargainUiHandler extends UiHandler {
   private speakingIndex = 0;
   /** Wall-clock time (ms) the current offer line began showing. */
   private spokeAt = 0;
+  /** Publishes the carried-input guard's false -> true edge to the exact owning co-op runtime. */
+  private coopV2ActionabilityTimer: ReturnType<typeof setTimeout> | null = null;
 
   // --- Generic picker mode (Curiosity 7-ability chooser) ---
   /** When set, the screen is a generic scrollable picker, not the Sins list. */
@@ -326,6 +333,7 @@ export class ErBargainUiHandler extends UiHandler {
     this.openedAt = performance.now();
     this.container.setVisible(true);
     this.active = true;
+    this.armCoopV2ActionabilityEdge();
     return true;
   }
 
@@ -375,7 +383,38 @@ export class ErBargainUiHandler extends UiHandler {
     this.openedAt = performance.now();
     this.container.setVisible(true);
     this.active = true;
+    this.armCoopV2ActionabilityEdge();
     return true;
+  }
+
+  /**
+   * The carried-input guard is a real human-input boundary. Authority V2 must not prove the Bargain merely
+   * because its container is visible, but it also cannot wait for a keypress: Ui rejects human input while
+   * the exact control is uninstalled. Publish the false -> true edge after the same 600ms guard expires.
+   */
+  private armCoopV2ActionabilityEdge(): void {
+    const openedAt = this.openedAt;
+    const runtime = getCoopRuntime();
+    if (this.coopV2ActionabilityTimer != null) {
+      clearTimeout(this.coopV2ActionabilityTimer);
+    }
+    const publishWhenReady = (): void => {
+      this.coopV2ActionabilityTimer = null;
+      if (!this.active || this.openedAt !== openedAt) {
+        return;
+      }
+      const remainingMs = 600 - (performance.now() - openedAt);
+      if (remainingMs > 0) {
+        this.coopV2ActionabilityTimer = setTimeout(publishWhenReady, Math.ceil(remainingMs));
+        return;
+      }
+      if (runtime == null) {
+        notifyCoopV2InteractionSurfaceReady();
+      } else {
+        runWhenCoopRuntimeActive(runtime, () => notifyCoopV2InteractionSurfaceReady(runtime));
+      }
+    };
+    this.coopV2ActionabilityTimer = setTimeout(publishWhenReady, 600);
   }
 
   /**
@@ -689,8 +728,20 @@ export class ErBargainUiHandler extends UiHandler {
     return moved;
   }
 
+  override isCoopV2InputActionable(): boolean {
+    return (
+      this.active
+      && performance.now() - this.openedAt >= 600
+      && (!this.speaking || performance.now() - this.spokeAt >= 250)
+    );
+  }
+
   clear(): void {
     super.clear();
+    if (this.coopV2ActionabilityTimer != null) {
+      clearTimeout(this.coopV2ActionabilityTimer);
+      this.coopV2ActionabilityTimer = null;
+    }
     this.giratina.stop();
     this.giratina.setVisible(false);
     this.container.setVisible(false);

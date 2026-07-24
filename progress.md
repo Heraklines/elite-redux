@@ -2416,3 +2416,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The guest learn-move probe now retires COMMAND legally, consumes the host's immutable prompt in a real
   `CoopReplayLearnMovePhase`, and chooses the forgotten move through SUMMARY. Unidentified pre-buffered raw
   proposals are no longer treated as valid Authority V2 behavior.
+
+# 2026-07-24 - Bargain readiness is an exact V2 control edge
+
+- Focused run `30057944792` kept static, A1, and all eight Showdown shards green. Its B1 evidence separated
+  five migrated-fixture defects from one live interaction fault: Giratina's Bargain made its owner handler
+  visible during a 600 ms carried-input guard, while the replica never rendered the immutable offer. Neither
+  side could therefore publish the exact actionable/active surface needed for `controlInstalled`, and the
+  UI gate rejected every owner keypress that might otherwise have advanced it.
+- The Bargain now renders the same host-authored immutable offer on both clients. The watcher receives no-op
+  mechanics callbacks, so mirrored cursor presentation cannot mutate local state; only the owner retains the
+  real callbacks. The handler's existing debounce is now part of `isCoopV2InputActionable()` and publishes
+  its false-to-true edge against the exact owning runtime, with generation checks and teardown cancellation.
+- The B1 exploration probes now traverse the real reward, market, double-replacement, learn-move, and Bargain
+  controls instead of calling captured callbacks or asserting suppressed legacy echoes. The two LEG2 Mystery
+  variants likewise submit through the retained public helper rather than manually constructing raw relay
+  traffic. Local Biome and diff checks are clean; the branch-focused remote matrix owns runtime verification.
