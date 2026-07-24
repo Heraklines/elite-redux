@@ -47,9 +47,22 @@ export type BattleFormat = "singles" | "doubles" | "triples";
 export type SeriesFormat = "single" | "bo3" | "bo5";
 /** P3: reward-pool place (mirror of the worker RewardPlace). */
 export type RewardPlace = "champion" | "runnerUp" | "semifinalist";
+/** P3: reward shiny tier (T4 is the ER black shiny). */
+export type ShinyTier = 1 | 2 | 3 | 4;
+/** P3: Shiny Lab reward category. */
+export type LabEffectCategory = "palette" | "surface" | "around";
 
 /** P3: a single reward settlement mutation (mirror of the worker TournamentRewardMutation). */
 export type TournamentRewardMutation =
+  | { kind: "grantShinyChosen"; speciesId: number; tier: ShinyTier }
+  | {
+      kind: "grantShinyRandom";
+      tier: ShinyTier;
+      unownedOnly: boolean;
+      speciesPool: number[];
+      resolvedSpeciesId?: number;
+    }
+  | { kind: "grantLabEffect"; speciesId: number; category: LabEffectCategory; effectIndex: number }
   | { kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
   | { kind: "grantCandy"; speciesId: number; candy: number };
 
