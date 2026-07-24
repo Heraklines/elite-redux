@@ -387,11 +387,19 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       for (let i = 0; i < 80 && !marketReady; i++) {
         await pumpDuoDestinations(rig, 1);
         marketReady = await withClient(rig.hostCtx, () => {
-          const handler = rig.hostScene.ui.getHandler() as unknown as { active?: boolean };
-          return rig.hostScene.ui.getMode() === UiMode.BIOME_SHOP && handler.active === true;
+          const handler = rig.hostScene.ui.getHandler() as unknown as {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          };
+          return (
+            rig.hostScene.ui.getMode() === UiMode.BIOME_SHOP
+            && handler.active === true
+            && handler.isCoopV2InputActionable?.() === true
+            && !isCoopV2InteractionHumanInputFrozen(rig.hostRuntime)
+          );
         });
       }
-      expect(marketReady, "owner reached the real market input surface").toBe(true);
+      expect(marketReady, "owner reached the exact actionable market input surface").toBe(true);
       const options = (hostMarket as unknown as { shopOptions: { type?: { id?: string } }[] }).shopOptions;
       let buyIndex = options.findIndex(option => (option.type?.id ?? "").includes("LURE"));
       if (buyIndex < 0) {
@@ -608,7 +616,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       .enemyMoveset(MoveId.GROWL)
       .startingLevel(50);
     await game.classicMode.startBattle(SpeciesId.BLISSEY, SpeciesId.SNORLAX, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
     const { setCoopFaintSwitchWaitMs } = await import("#data/elite-redux/coop/coop-interaction-relay");
@@ -675,6 +683,11 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
+      // Replacement commits can synchronously close the guest's public PARTY modal. From this boundary
+      // onward, deliver every frame only while its destination's complete client context is installed;
+      // otherwise the one-process loopback can resume that guest close under the host scene, a schedule
+      // two independent browsers cannot produce and which correctly trips the production phase fence.
+      pair.setAutomaticDelivery(false);
 
       // HOST: its first SwitchPhase resolves and commits an intermediate post-summon image.
       // That exact entry opens the guest picker above; only its result may release the second
@@ -1084,11 +1097,13 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       phase.start();
       await drainLoopback();
     });
+    let watcherProjected = false;
     await withClient(rig.guestCtx, async () => {
       const projected = await driveClientPhaseQueueTo(rig.guestScene, "projected Giratina bargain", {
         matches: phase => phase.phaseName === "TheBargainPhase",
         pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
       });
+      watcherProjected = projected.phaseName === "TheBargainPhase";
       const seam = projected as unknown as { end: () => void };
       const realEnd = seam.end.bind(projected);
       seam.end = () => {
@@ -1104,10 +1119,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     await withClient(rig.guestCtx, () => new Promise(resolve => setTimeout(resolve, 650)));
 
     let bargainReady = false;
-    let watcherProjected = false;
-    for (let i = 0; i < 80 && !bargainReady; i++) {
+    for (let i = 0; i < 80 && (!bargainReady || !watcherProjected); i++) {
       await pumpDuoDestinations(rig, 1);
-      watcherProjected = await withClient(rig.guestCtx, () => {
+      watcherProjected ||= await withClient(rig.guestCtx, () => {
         const current = rig.guestScene.phaseManager.getCurrentPhase();
         return current?.phaseName === "TheBargainPhase" || rig.guestScene.ui.getMode() === UiMode.ER_BARGAIN;
       });

@@ -31,11 +31,8 @@
 // =============================================================================
 
 import { initGlobalScene } from "#app/global-scene";
-import {
-  setCoopFaintSwitchWaitMs,
-  setCoopRendezvousWaitMs,
-  setCoopWaveBarrierMs,
-} from "#data/elite-redux/coop/coop-interaction-relay";
+import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";

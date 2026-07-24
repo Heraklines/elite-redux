@@ -2649,3 +2649,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   behavior. Host-issued failure-authentication keys are now bounded tails as well. A repeated newer wave
   proof can republish a compacted replacement's exact final ACK from its bounded tombstone/evidence pair,
   without retaining or resurrecting the full checkpoint.
+# 2026-07-24 - Exact B1 evidence separates public control from one-process scheduling
+
+- Exact-SHA gate `30079308415` confirmed the production-fidelity P1 red was only a mis-imported
+  rendezvous timeout seam; the test now imports it from `coop-rendezvous`, matching every other transition
+  suite. The same run kept fast V2 contracts, mutation assurance, and the completed S shards green.
+- B1's market probe no longer equates a visible BIOME_SHOP handler with usable human control. It now waits
+  for the handler's public actionability and the exact V2 input lease before sending ordinary grid keys.
+- The Giratina probe latches the exact projected phase returned by the V2 queue driver and waits for both
+  owner and watcher surfaces; it can no longer miss a real projection merely because owner readiness wins
+  the first polling round.
+- The double-KO replacement tail now switches to destination-addressed scheduled delivery before either
+  replacement commit closes a modal. Its old synchronous loopback resumed a guest MESSAGE transition while
+  the host process-global context was installed, an impossible two-browser schedule that correctly caused
+  the production boundary fence to terminate the synthetic session.
