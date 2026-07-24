@@ -30,7 +30,9 @@ const TODO = 0x8a93b4;
 const BOARD = 0x0b1838;
 const OPEN_GREEN = 0x78e08a;
 
-const VISIBLE_ROWS = 6;
+const VISIBLE_ROWS = 5;
+const ROW_Y0 = 48;
+const ROW_HEIGHT = 20;
 
 /** Config the caller passes to render the list. */
 export interface TournamentListConfig {
@@ -150,7 +152,7 @@ export class TournamentListUiHandler extends UiHandler {
     this.hint.setTint(0xc0c8e0);
     this.container.add(this.hint);
 
-    this.cursorObj = globalScene.add.rectangle(0, 0, w - 22, 15, 0xffffff, 0);
+    this.cursorObj = globalScene.add.rectangle(0, 0, w - 22, ROW_HEIGHT - 1, 0xffffff, 0);
     this.cursorObj.setStrokeStyle(2, GOLD);
     this.cursorObj.setOrigin(0, 0);
     this.cursorObj.setVisible(false);
@@ -187,24 +189,22 @@ export class TournamentListUiHandler extends UiHandler {
     const list = cfg.tournaments;
     this.emptyText.setVisible(list.length === 0);
 
-    const rowY0 = 48;
-    const rowH = 16;
     const end = Math.min(this.scrollTop + VISIBLE_ROWS, list.length);
     for (let i = this.scrollTop; i < end; i++) {
       const t = list[i];
-      const y = rowY0 + (i - this.scrollTop) * rowH;
+      const y = ROW_Y0 + (i - this.scrollTop) * ROW_HEIGHT;
       const registered = t.entrants.some(e => e.participant === cfg.ownParticipant);
       const chip = stateChip(t);
 
       // state chip (left)
-      const chipText = addTextObject(14, y + 2, chip.text, TextStyle.WINDOW, { fontSize: "30px" });
+      const chipText = addTextObject(14, y + 1, chip.text, TextStyle.WINDOW, { fontSize: "30px" });
       chipText.setOrigin(0, 0);
       chipText.setTint(chip.color);
       this.container.add(chipText);
       this.rows.push(chipText);
 
       // name
-      const name = addTextObject(46, y + 2, t.name, TextStyle.WINDOW, { fontSize: "34px" });
+      const name = addTextObject(46, y + 1, t.name, TextStyle.WINDOW, { fontSize: "34px" });
       name.setOrigin(0, 0);
       name.setTint(0xffffff);
       this.container.add(name);
@@ -213,7 +213,7 @@ export class TournamentListUiHandler extends UiHandler {
       // right-side detail: entrants / cap, or champion
       const detail =
         t.state === "complete" && t.champion ? `Champion: ${t.champion}` : `${t.entrantCount}/${t.maxEntrants} entered`;
-      const detailText = addTextObject(w - 14, y + 2, detail, TextStyle.PARTY, { fontSize: "30px" });
+      const detailText = addTextObject(w - 14, y + 1, detail, TextStyle.PARTY, { fontSize: "30px" });
       detailText.setOrigin(1, 0);
       detailText.setTint(t.state === "complete" ? GOLD : TODO);
       this.container.add(detailText);
@@ -222,7 +222,7 @@ export class TournamentListUiHandler extends UiHandler {
       // second line: window + your-status
       const windowHrs = Math.round(t.roundWindowMs / 3_600_000);
       const sub = registered ? "You are registered" : `${windowHrs}h rounds`;
-      const subText = addTextObject(46, y + 9, sub, TextStyle.PARTY, { fontSize: "26px" });
+      const subText = addTextObject(46, y + 10, sub, TextStyle.PARTY, { fontSize: "26px" });
       subText.setOrigin(0, 0);
       subText.setTint(registered ? OPEN_GREEN : TODO);
       this.container.add(subText);
@@ -241,6 +241,8 @@ export class TournamentListUiHandler extends UiHandler {
     const registered = t.entrants.some(e => e.participant === cfg.ownParticipant);
     if (t.state === "registration" && !registered) {
       this.hint.setText("A: Register    B: Back");
+    } else if (t.state === "registration") {
+      this.hint.setText("A: View entrants    B: Back");
     } else {
       this.hint.setText("A: View bracket    B: Back");
     }
@@ -253,7 +255,7 @@ export class TournamentListUiHandler extends UiHandler {
       return;
     }
     const visibleIndex = index - this.scrollTop;
-    const y = 47 + visibleIndex * 16;
+    const y = ROW_Y0 - 1 + visibleIndex * ROW_HEIGHT;
     this.cursorObj.setPosition(11, y);
     this.cursorObj.setVisible(true);
   }

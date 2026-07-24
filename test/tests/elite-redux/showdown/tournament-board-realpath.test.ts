@@ -107,6 +107,28 @@ describe.runIf(RUN)("showdown tournament board - real-path acceptance", () => {
     expect(backed, "B fired onBack").toBe(true);
   });
 
+  it.each([1, 2])("shows the registration roster before a %i-entrant bracket exists", async entrantCount => {
+    const cfg = buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" });
+    cfg.tournament.state = "registration";
+    cfg.tournament.startedAt = null;
+    cfg.tournament.bracket = null;
+    cfg.tournament.entrants = cfg.tournament.entrants.slice(0, entrantCount).map(entrant => ({
+      ...entrant,
+      seed: null,
+    }));
+    cfg.tournament.entrantCount = entrantCount;
+
+    await openBoard(cfg);
+    const h = handler();
+
+    expect(h.container.visible, "the registration board is shown").toBe(true);
+    expect(h.cardTitle.text).toBe("REGISTRATION OPEN");
+    expect(h.cardBody.text).toContain(`${entrantCount}/4 entered`);
+    expect(h.nodes.length, "registration panel and entrant rows were rendered").toBeGreaterThanOrEqual(
+      6 + entrantCount * 6,
+    );
+  });
+
   it("deep-link: initialBrowse opens the board ON the target match (challenge-notification realpath)", async () => {
     // A challenge notification deep-links to a specific match via initialBrowse (the title flow
     // passes it into the board config). The board must land its browse cursor there on show().

@@ -396,7 +396,12 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.nodes = [];
     const cfg = this.config;
     const bracket = cfg?.tournament.bracket;
-    if (cfg == null || bracket == null) {
+    if (cfg == null) {
+      this.layoutCard();
+      return;
+    }
+    if (bracket == null) {
+      this.layoutRegistration(cfg);
       this.layoutCard();
       return;
     }
@@ -475,6 +480,89 @@ export class TournamentBracketUiHandler extends UiHandler {
     }
 
     this.layoutCard();
+  }
+
+  /** Registration has no bracket yet; show its entrants instead of an empty board. */
+  private layoutRegistration(cfg: TournamentBracketConfig): void {
+    const w = globalScene.scaledCanvas.width;
+    const h = globalScene.scaledCanvas.height;
+    const t = cfg.tournament;
+    const panelX = 12;
+    const panelY = 34;
+    const panelW = w - panelX * 2;
+    const panelH = h - BOTTOM_CARD_H - panelY - 7;
+    this.plate(this.nodes, panelX, panelY, panelW, panelH, { fill: 0x0d1836, border: GOLD, borderW: 1.4 });
+
+    const heading = addTextObject(w / 2, panelY + 7, "REGISTRATION OPEN", TextStyle.WINDOW, { fontSize: "40px" });
+    heading.setOrigin(0.5, 0);
+    heading.setTint(GOLD);
+    this.container.add(heading);
+    this.nodes.push(heading);
+
+    const count = addTextObject(
+      w / 2,
+      panelY + 19,
+      `${t.entrantCount}/${t.maxEntrants} players registered`,
+      TextStyle.PARTY,
+      { fontSize: "30px" },
+    );
+    count.setOrigin(0.5, 0);
+    count.setTint(SUBTLE);
+    this.container.add(count);
+    this.nodes.push(count);
+
+    const schedule =
+      t.closeAt == null
+        ? "Bracket starts when registration closes."
+        : `Registration closes ${formatDeadline(t.closeAt, cfg.now)}.`;
+    const scheduleText = addTextObject(w / 2, panelY + 29, schedule, TextStyle.PARTY, { fontSize: "26px" });
+    scheduleText.setOrigin(0.5, 0);
+    scheduleText.setTint(TODO);
+    this.container.add(scheduleText);
+    this.nodes.push(scheduleText);
+
+    const visibleEntrants = t.entrants.slice(0, 8);
+    const columns = 2;
+    const gap = 6;
+    const rowH = 12;
+    const colW = (panelW - 12 - gap) / columns;
+    const listY = panelY + 41;
+    visibleEntrants.forEach((entrant, index) => {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      const x = panelX + 6 + col * (colW + gap);
+      const y = listY + row * rowH;
+      const own = entrant.participant === cfg.ownParticipant;
+      this.plate(this.nodes, x, y, colW, rowH - 1, {
+        fill: own ? 0x203768 : PLATE,
+        border: own ? NEXT : GOLD_DEEP,
+        borderAlpha: own ? 1 : 0.65,
+      });
+      this.drawTrainerIcon(x + 7, y + rowH - 2, rowH - 3, entrant.ghost?.spriteKey ?? null, {
+        dim: false,
+        empty: false,
+      });
+      const name = addTextObject(x + 15, y + (rowH - 1) / 2, entrant.name, TextStyle.WINDOW, { fontSize: "27px" });
+      name.setOrigin(0, 0.5);
+      name.setTint(own ? NEXT : WHITE);
+      this.container.add(name);
+      this.nodes.push(name);
+      this.fitText(name, colW - 19);
+    });
+
+    if (t.entrants.length > visibleEntrants.length) {
+      const more = addTextObject(
+        w / 2,
+        panelY + panelH - 8,
+        `+${t.entrants.length - visibleEntrants.length} more registered`,
+        TextStyle.PARTY,
+        { fontSize: "24px" },
+      );
+      more.setOrigin(0.5, 0);
+      more.setTint(TODO);
+      this.container.add(more);
+      this.nodes.push(more);
+    }
   }
 
   /**
@@ -1062,9 +1150,22 @@ export class TournamentBracketUiHandler extends UiHandler {
       this.cardHint.setText("B: Back");
       return;
     }
-    if (cfg == null || cfg.tournament.bracket == null) {
+    if (cfg == null) {
       this.cardTitle.setText("");
       this.cardBody.setText("");
+      this.cardHint.setText("B: Back");
+      return;
+    }
+    if (cfg.tournament.bracket == null) {
+      const registration = cfg.tournament.state === "registration";
+      this.cardTitle.setTint(registration ? GOLD : TODO);
+      this.cardTitle.setText(registration ? "REGISTRATION OPEN" : "BRACKET PENDING");
+      this.cardBody.setTint(SUBTLE);
+      this.cardBody.setText(
+        registration
+          ? `${cfg.tournament.entrantCount}/${cfg.tournament.maxEntrants} entered. Bracket starts when registration closes.`
+          : "The bracket is being prepared.",
+      );
       this.cardHint.setText("B: Back");
       return;
     }

@@ -1202,6 +1202,21 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildTournamentListDemoConfig()],
     diffTolerance: 0,
   },
+  // Registration is still open, so the bracket endpoint has no tree yet. The board must show
+  // the current entrants instead of the old empty canvas.
+  "tournament-registration-2": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => {
+      const cfg = buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" });
+      cfg.tournament.state = "registration";
+      cfg.tournament.startedAt = null;
+      cfg.tournament.bracket = null;
+      cfg.tournament.entrants = cfg.tournament.entrants.slice(0, 2).map(entrant => ({ ...entrant, seed: null }));
+      cfg.tournament.entrantCount = 2;
+      return [cfg];
+    },
+    diffTolerance: 0,
+  },
   // Bracket tree (8-field, round-1 settled): the your-next-match card is PLAYABLE (opponent + deadline
   // + Play hint).
   "tournament-bracket-8": {
