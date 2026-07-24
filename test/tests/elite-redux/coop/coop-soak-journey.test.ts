@@ -10,6 +10,7 @@
 
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { BattleType } from "#enums/battle-type";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -80,6 +81,7 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
     // was still draining; keep a bounded test timeout while allowing the real presentation path to finish.
     setCoopWaveBarrierMs(2_000);
     setCoopFaintSwitchWaitMs(4_000);
+    setCoopRendezvousWaitMs(1_000);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`soak-journey-${Date.now()}`);
     game.override
@@ -95,6 +97,7 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
     setCoopFaintSwitchWaitMs(60_000);
+    resetCoopRendezvousWaitMs();
     accuracySpy?.mockRestore();
     logs.dispose();
     clearCoopRuntime();
