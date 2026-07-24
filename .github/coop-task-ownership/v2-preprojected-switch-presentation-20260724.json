@@ -1,0 +1,12 @@
+{
+  "taskId": "v2-preprojected-switch-presentation-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
+  "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
+  "baseSha": "f92c38fe8d4b4d61f01fa4309187ddf414f06e54",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
+    "src/phases/coop-replay-phases.ts"
+  ],
+  "lockedSchemaFiles": []
+}

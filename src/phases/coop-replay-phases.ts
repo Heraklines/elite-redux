@@ -1040,8 +1040,7 @@ export class CoopSwitchReplayPhase extends Phase {
       }
       const party = player ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
       const exactSlot = party.findIndex(mon => mon?.id === this.presentation.pokemonId);
-      const partySlot = exactSlot;
-      if (partySlot < 0 || partySlot === located.position) {
+      if (exactSlot < 0) {
         coopWarn(
           "replay",
           `switch presentation could not resolve incoming id=${this.presentation.pokemonId} `
@@ -1050,13 +1049,28 @@ export class CoopSwitchReplayPhase extends Phase {
         finish({ kind: "failed", reason: "switch-incoming-identity-unresolved", actorFingerprint });
         return;
       }
-      const outgoing = party[located.position];
+      // A pre-command trainer replacement is recorded at the start of the new turn. Its CONTROL_COMMIT
+      // must install the post-replacement state before command input, so the exact incoming actor can
+      // legitimately be seated already by the time the retained TURN_COMMIT presents that switch. This is
+      // not an identity failure: recovery and redelivery require presentation to be idempotent against an
+      // already-installed authoritative image. The event's original party slot now holds the outgoing actor
+      // after the same array swap, which still lets us preserve the authored return narration.
+      const alreadyProjected = exactSlot === located.position;
+      const partySlot = exactSlot;
+      const recordedPartySlot = Math.trunc(this.presentation.partySlot);
+      const outgoing = alreadyProjected
+        ? recordedPartySlot >= 0 && recordedPartySlot !== located.position
+          ? party[recordedPartySlot]
+          : undefined
+        : party[located.position];
       const projectIncoming = (): void => {
         try {
-          if (player) {
-            summonCoopPlayerField(located.position, partySlot);
-          } else {
-            summonCoopEnemyField(located.position, partySlot);
+          if (!alreadyProjected) {
+            if (player) {
+              summonCoopPlayerField(located.position, partySlot);
+            } else {
+              summonCoopEnemyField(located.position, partySlot);
+            }
           }
           incoming = party[located.position];
           if (
@@ -1174,7 +1188,7 @@ export class CoopSwitchReplayPhase extends Phase {
         () => finish({ kind: "failed", reason: "switch-watchdog-expired", actorFingerprint }),
         COOP_PRESENTATION_STALL_MS + 2_000,
       );
-      if (this.presentation.doReturn && outgoing?.isOnField()) {
+      if (this.presentation.doReturn && outgoing != null && outgoing.id !== this.presentation.pokemonId) {
         globalScene.ui.showText(
           player
             ? i18next.t("battle:playerComeBack", { pokemonName: getPokemonNameWithAffix(outgoing) })
@@ -1190,6 +1204,13 @@ export class CoopSwitchReplayPhase extends Phase {
               }),
         );
         if (!globalScene.moveAnimations) {
+          projectIncoming();
+          return;
+        }
+        // The authoritative control image may already have removed the outgoing actor from the field. Its
+        // exact narration is still renderable, but re-adding it would mutate mechanical field membership.
+        // Continue directly to the incoming ball animation in that recovery/idempotent shape.
+        if (!outgoing.isOnField()) {
           projectIncoming();
           return;
         }
