@@ -2712,3 +2712,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   its continuation then re-enters and requires the captured runtime before settlement or phase shift.
 - No authority, successor, timeout, or failure policy was relaxed. This is the same schedule as two isolated
   browser realms, expressed explicitly in the single-realm engine harness.
+
+# 2026-07-24 - Market coverage uses the real phase-manager boundary
+
+- Exact-SHA gate `30081880339` proved the replacement correction: double-KO and all twelve other active B1
+  probes passed. Its only red was the market fixture, whose helper constructed a detached `BiomeShopPhase`,
+  manually called `start()`, and monkeypatched the phase's production liveness check to always return true.
+- The central V2 projector correctly refused to install human control for that impossible state because the
+  phase manager still owned another phase. The helper now clears the synthetic tail, queues the real market,
+  shifts it into the current slot through `PhaseManager`, and asserts object identity before public UI input.
+  No production check is bypassed; the test now covers the actual UI -> phase -> projector -> relay chain.

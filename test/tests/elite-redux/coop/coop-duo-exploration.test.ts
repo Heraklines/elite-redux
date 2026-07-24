@@ -116,8 +116,13 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
 
   function liveBiomeShop(): BiomeShopPhase {
     const phase = new BiomeShopPhase();
-    (phase as unknown as { coopBoundaryStillLive(generation: number, wave: number): boolean }).coopBoundaryStillLive =
-      () => true;
+    // Install the actual phase as the manager-owned current boundary. Authority V2 deliberately rejects a
+    // detached object whose start() was invoked by a fixture: no real browser can have a visible shop that
+    // its phase manager does not own, and such an object cannot publish an address-exact control proof.
+    globalScene.phaseManager.clearPhaseQueue();
+    globalScene.phaseManager.unshiftPhase(phase);
+    globalScene.phaseManager.shiftPhase();
+    expect(globalScene.phaseManager.getCurrentPhase(), "the real biome market owns the phase boundary").toBe(phase);
     return phase;
   }
 
