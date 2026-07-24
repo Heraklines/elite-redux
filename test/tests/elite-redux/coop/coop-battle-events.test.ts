@@ -58,11 +58,13 @@ import { GameModes } from "#enums/game-modes";
 import { HitResult } from "#enums/hit-result";
 import { CommonAnim } from "#enums/move-anims-common";
 import { MoveId } from "#enums/move-id";
+import { MoveUseMode } from "#enums/move-use-mode";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
+import { PokemonMove } from "#moves/pokemon-move";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
 import {
   CoopFaintReplayPhase,
@@ -74,6 +76,7 @@ import {
 } from "#phases/coop-replay-phases";
 import { CoopPresentationReceiptPhase } from "#phases/coop-replay-turn-phase";
 import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
+import { MovePhase } from "#phases/move-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import Phaser from "phaser";
@@ -608,6 +611,32 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // The faint event names the KOd enemy's battler index.
     const faint = events.find(e => e.k === "faint");
     expect(faint?.k === "faint" ? faint.bi : -1).toBe(enemy0.getBattlerIndex());
+  });
+
+  it("(A) omits a target that already left the display before a later queued move begins", async () => {
+    const field = await startCoopHost();
+    const user = field[COOP_HOST_FIELD_INDEX];
+    const retiredTarget = globalScene.getEnemyField(false)[0];
+    const targetBi = retiredTarget.getBattlerIndex();
+
+    // Reproduce the browser failure exactly: getField() still exposes the party-slot sentinel after
+    // FaintPhase removed its visual container. A later queued move can retain that battler index, but
+    // the guest must not be told that the retired actor is a required on-screen animation target.
+    globalScene.field.remove(retiredTarget);
+    expect(globalScene.getField()[targetBi], "the engine retains the party-slot sentinel").toBe(retiredTarget);
+    expect(globalScene.field.getIndex(retiredTarget), "the target is no longer displayed").toBe(-1);
+
+    beginCoopRecording(globalScene.currentBattle.turn, "retired-target-presentation");
+    new MovePhase(user, [targetBi], new PokemonMove(MoveId.TACKLE), MoveUseMode.NORMAL).showMoveText();
+    const recording = endCoopRecording();
+    const moveUsed = recording.events.find(event => event.k === "moveUsed");
+
+    expect(moveUsed, "the later move still has a presentation event").toBeDefined();
+    expect(moveUsed?.k === "moveUsed" ? moveUsed.targets : null, "no stale target index crosses the wire").toEqual([]);
+    expect(
+      moveUsed?.k === "moveUsed" ? moveUsed.targetActors : null,
+      "no retired actor is advertised as display-required",
+    ).toEqual([]);
   });
 
   it("(A) commits Yawn sleep only after the delayed TurnEnd status phase has settled", async () => {
