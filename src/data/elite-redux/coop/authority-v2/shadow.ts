@@ -277,6 +277,8 @@ export interface CoopV2LiveRecoverySeams {
   captureMaterial(ctx: CoopRuntimeContext): CoopAuthoritativeMaterial | null;
   /** Replica: transactionally apply + checksum-verify the complete material image. */
   applyMaterial(ctx: CoopRuntimeContext, material: CoopAuthoritativeMaterial): boolean | Promise<boolean>;
+  /** Invoke an engine-facing recovery verb under the destination runtime/scene. */
+  runEngineVerb?<T>(ctx: CoopRuntimeContext, verb: () => T | Promise<T>): Promise<T>;
   /** Adopt the validated recovery frontier into the ordinary runtime control ledger. */
   prepareControl(ctx: CoopRuntimeContext, bundle: CoopRecoveryBundle): boolean;
   /** Replica: prove the host-stated successor on the real engine, never in the shadow ledger. */
@@ -631,6 +633,7 @@ export class CoopAuthorityV2Shadow {
     this.onProtocolViolation = deps.onProtocolViolation;
     this.projector = new CoopShadowControlProjector(this.ledger, this.liveReplica);
     const liveRecovery = deps.liveRecovery;
+    const runRecoveryEngineVerb = liveRecovery?.runEngineVerb;
     this.recoveryChannel =
       liveRecovery == null
         ? null
@@ -643,6 +646,9 @@ export class CoopAuthorityV2Shadow {
             send: frame => this.sendFrame(frame),
             captureMaterial: ctx => liveRecovery.captureMaterial(ctx),
             applyMaterial: (ctx, material) => liveRecovery.applyMaterial(ctx, material),
+            ...(runRecoveryEngineVerb == null
+              ? {}
+              : { runEngineVerb: (ctx, verb) => runRecoveryEngineVerb(ctx, verb) }),
             prepareControl: (ctx, bundle) => liveRecovery.prepareControl(ctx, bundle),
             onTerminal: reason => liveRecovery.onTerminal(reason),
             onRecovered: () => liveRecovery.onRecovered(),

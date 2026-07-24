@@ -105,6 +105,8 @@ export interface CoopRecoveryChannelV2Deps {
   readonly captureMaterial: (ctx: CoopRuntimeContext) => CoopAuthoritativeMaterial | null;
   /** Replica-only: atomically install and verify the full snapshot. */
   readonly applyMaterial: (ctx: CoopRuntimeContext, material: CoopAuthoritativeMaterial) => boolean | Promise<boolean>;
+  /** Run one engine-facing recovery verb under the destination runtime/scene. */
+  readonly runEngineVerb?: <T>(ctx: CoopRuntimeContext, verb: () => T | Promise<T>) => Promise<T>;
   /** Install the validated final tail entry in the same control ledger ordinary delivery uses. */
   readonly prepareControl?: (ctx: CoopRuntimeContext, bundle: CoopRecoveryBundle) => boolean;
   /** Synchronous fail-closed integration hook. */
@@ -218,6 +220,7 @@ export class CoopRecoveryChannelV2 {
     }
     const context = this.deps.context();
     const frame = this.deps.frame();
+    const runEngineVerb = this.deps.runEngineVerb;
     const requestId =
       `REC/e${frame.sessionEpoch}/m${frame.membershipRevision}/s${context.localSeatId}`
       + `/g${frame.connectionGeneration}/q${++this.requestSequence}`;
@@ -236,6 +239,11 @@ export class CoopRecoveryChannelV2 {
       reason,
       request: (_ctx, request, signal) => this.openReplicaRequest(request, signal),
       applyMaterial: (_ctx, material) => this.deps.applyMaterial(this.deps.context(), material),
+      ...(runEngineVerb == null
+        ? {}
+        : {
+            runEngineVerb: (_ctx, verb) => runEngineVerb(this.deps.context(), verb),
+          }),
       prepareControl: (_ctx, bundle) => this.deps.prepareControl?.(this.deps.context(), bundle) ?? true,
       acknowledge: (_ctx, proof) => this.completeReplicaRecovery(proof),
       requestTimeoutMs: this.deps.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
@@ -243,10 +251,10 @@ export class CoopRecoveryChannelV2 {
     this.activeTransaction = transaction;
     const outcome = transaction
       .run()
-      .then(result => {
+      .then(async result => {
         if (result === "recovered") {
           try {
-            this.deps.onRecovered?.();
+            await this.runEngineVerb(() => this.deps.onRecovered?.());
           } catch (error) {
             this.failClosed(`Authority V2 recovery release hook threw: ${describeError(error)}.`);
             return "terminalized" as const;
@@ -767,6 +775,22 @@ export class CoopRecoveryChannelV2 {
     for (const response of [...this.authorityResponses.values()]) {
       this.releaseAuthorityResponse(response);
     }
-    this.deps.onTerminal(reason);
+    this.runEngineVerb(() => this.deps.onTerminal(reason)).catch(() => {
+      // The protocol fence is already terminal. A runtime teardown can cancel a deferred engine hook;
+      // there is no weaker local progression state to resume in that case.
+    });
+  }
+
+  private runEngineVerb<T>(verb: () => T | Promise<T>): Promise<T> {
+    const context = this.deps.context();
+    const executor = this.deps.runEngineVerb;
+    if (executor != null) {
+      return executor(context, verb);
+    }
+    try {
+      return Promise.resolve(verb());
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 }

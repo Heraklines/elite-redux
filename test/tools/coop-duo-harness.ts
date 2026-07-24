@@ -5164,9 +5164,15 @@ function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable
   for (const [index, raw] of checkpoint.party.entries()) {
     const checkpointMoves = (raw.moveset ?? []).map(move => PokemonMove.loadMove(move));
     const data = new PokemonData(raw);
+    const species = getPokemonSpecies(data.species);
     data.ivs ??= [31, 31, 31, 31, 31, 31];
+    // Real replay windows are full PokemonData snapshots. The hand-authored schema fixture also covers the
+    // documented compact/older trace form, whose missing presentation fields must be normalized exactly once
+    // at this loader boundary rather than crashing the first real CommandPhase's game-info projection.
+    data.gender ??= species.generateGender();
+    data.teraType ??= species.type1;
     const mon = new PlayerPokemon(
-      getPokemonSpecies(data.species),
+      species,
       data.level,
       data.abilityIndex,
       data.formIndex,

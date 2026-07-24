@@ -88,6 +88,12 @@ export interface CoopRecoveryTransactionDeps {
   ) => Promise<CoopRecoveryBundle>;
   /** Install the canonical material image; returns whether it applied exactly. */
   readonly applyMaterial: (ctx: CoopRuntimeContext, material: CoopAuthoritativeMaterial) => boolean | Promise<boolean>;
+  /**
+   * Invoke one engine-facing verb under the runtime/scene captured by this transaction. Production has one
+   * ambient engine and may omit this. The two-engine harness supplies it because an awaited wire response can
+   * resume after the peer scene has become ambient; every apply/project verb must still target this replica.
+   */
+  readonly runEngineVerb?: <T>(ctx: CoopRuntimeContext, verb: () => T | Promise<T>) => Promise<T>;
   /** Bind the validated frontier entry into the ordinary runtime control ledger before projection. */
   readonly prepareControl?: (ctx: CoopRuntimeContext, bundle: CoopRecoveryBundle) => boolean;
   /**
@@ -321,7 +327,8 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
       return this.terminalize(`adoptFrontier threw: ${describeError(error)}`);
     }
     try {
-      if (this.deps.prepareControl?.(this.ctx, bundle) === false) {
+      const prepared = await this.runEngineVerb(() => this.deps.prepareControl?.(this.ctx, bundle) ?? true);
+      if (!prepared) {
         return this.terminalize("ordinary control ledger refused the recovery frontier");
       }
     } catch (error) {
@@ -377,7 +384,7 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
   private async installMaterial(bundle: CoopRecoveryBundle): Promise<string | undefined> {
     let applied: boolean;
     try {
-      applied = await this.deps.applyMaterial(this.ctx, bundle.material);
+      applied = await this.runEngineVerb(() => this.deps.applyMaterial(this.ctx, bundle.material));
     } catch (error) {
       return `material apply threw: ${describeError(error)}`;
     }
@@ -395,6 +402,7 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
     if (bundle.nextControl == null) {
       return { ok: true };
     }
+    const nextControl = bundle.nextControl;
     const timeoutMs = this.deps.controlInstallTimeoutMs ?? DEFAULT_CONTROL_INSTALL_TIMEOUT_MS;
     const retryMs = this.deps.controlRetryMs ?? DEFAULT_CONTROL_RETRY_MS;
     const startedAt = this.ctx.scheduler.now("recovery");
@@ -412,7 +420,7 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
       }
       let result: ReturnType<CoopControlProjector["project"]>;
       try {
-        result = this.deps.projector.project(this.ctx, bundle.nextControl);
+        result = await this.runEngineVerb(() => this.deps.projector.project(this.ctx, nextControl));
       } catch (error) {
         return { ok: false, reason: `control projection threw: ${describeError(error)}` };
       }
@@ -421,7 +429,7 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
         if (operationId == null) {
           return { ok: false, reason: "control projection installed without a frontier operation" };
         }
-        const expectedControlId = controlIdOf(bundle.nextControl);
+        const expectedControlId = controlIdOf(nextControl);
         if (result.controlId !== expectedControlId) {
           return {
             ok: false,
@@ -442,6 +450,18 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
       ok: false,
       reason: `control projection exceeded ${timeoutMs}ms while deferred: ${lastDeferredReason}`,
     };
+  }
+
+  private runEngineVerb<T>(verb: () => T | Promise<T>): Promise<T> {
+    const executor = this.deps.runEngineVerb;
+    if (executor != null) {
+      return executor(this.ctx, verb);
+    }
+    try {
+      return Promise.resolve(verb());
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   private waitForControlProofPace(delayMs: number): Promise<boolean> {

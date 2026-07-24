@@ -6515,6 +6515,7 @@ function buildCoopV2LiveRecoverySeams(
   };
   return {
     captureMaterial: ctx => captureCoopV2RecoveryMaterial(runtime, ctx),
+    runEngineVerb: (ctx, verb) => runCoopV2RecoveryEngineVerb(runtime, ctx, verb),
     applyMaterial: (ctx, material) => {
       if (
         runtime.controller.authorityRole === "authority"
@@ -6613,6 +6614,67 @@ function buildCoopV2LiveRecoverySeams(
       });
     },
   };
+}
+
+/**
+ * Run one recovery engine verb against the runtime that owns the correlated transaction. Awaited transport
+ * and snapshot work can resume after the other synthetic browser becomes ambient; production never observes
+ * that topology, while the two-engine harness must delay the verb until its complete scene/runtime bundle is
+ * installed. Each transaction verb is rebound independently because snapshot apply itself is asynchronous.
+ */
+function runCoopV2RecoveryEngineVerb<T>(
+  runtime: CoopRuntime,
+  ctx: CoopRuntimeContext,
+  verb: () => T | Promise<T>,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    let cancelActivation = (): void => {};
+    const rejectCancelled = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cancelActivation();
+      ctx.cancellation.removeEventListener("abort", rejectCancelled);
+      reject(new Error("Authority V2 recovery engine verb cancelled with its runtime context"));
+    };
+    if (ctx.cancellation.aborted) {
+      rejectCancelled();
+      return;
+    }
+    ctx.cancellation.addEventListener("abort", rejectCancelled, { once: true });
+    cancelActivation = runWhenCoopRuntimeActive(runtime, () => {
+      if (settled) {
+        return;
+      }
+      ctx.cancellation.removeEventListener("abort", rejectCancelled);
+      let outcome: T | Promise<T>;
+      try {
+        // Invoke synchronously inside the active-runtime callback. Deferring this call to a microtask would
+        // let withClientSync restore the peer scene before the engine verb even begins.
+        outcome = verb();
+      } catch (error) {
+        settled = true;
+        reject(error);
+        return;
+      }
+      Promise.resolve(outcome).then(
+        value => {
+          settled = true;
+          resolve(value);
+        },
+        error => {
+          settled = true;
+          reject(error);
+        },
+      );
+    });
+    // Cancellation can race the listener registration and queued-activation insertion.
+    if (ctx.cancellation.aborted) {
+      rejectCancelled();
+    }
+  });
 }
 
 /** Resolve the immutable v2 shadow identity from a runtime's session controller, or null if unavailable. */

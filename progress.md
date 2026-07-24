@@ -3159,3 +3159,29 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   already buffered; the detached async continuation sees `aborted`/`ended` and cannot shift a newer phase.
 - The ME victory fixture now observes VictoryPhase's synchronous transition correctly: the retained
   BattleEnd is already current, not still queued. This changes only the assertion/driver, not production.
+
+# 2026-07-24 - Recovery engine verbs retain their destination browser context
+
+- Exact B9 recovery evidence from `30106371311` showed the guest accepted a correlated Mystery recovery
+  bundle but never entered `CoopApplyResyncPhase` or returned `recoveryApplied`. The transaction resumed from
+  its awaited response after the single-process duo harness had restored the peer's ambient scene.
+- The recovery transaction now routes snapshot apply, ordinary-ledger frontier preparation, and every
+  control projection attempt through one injected destination-runtime executor. Recovery release and shared
+  terminal hooks use the same executor. Production remains synchronous in its one-runtime browser; the duo
+  harness queues each independent verb until the captured runtime and its bound scene are installed.
+- The #839 Mystery regression now enforces the Authority V2 model: recovery destroys the stale selector
+  generation, reconstructs a different `CoopReplayMePhase` from the immutable frontier, proves the same exact
+  operation address, and completes through that new public UI. It no longer blesses the retired advisory
+  stateSync behavior of preserving an old phase object.
+- A node-pure contract asserts that material apply, frontier preparation, and control projection all cross
+  the runtime executor. Local TypeScript, targeted Biome, ownership resolution, and diff checks are clean;
+  co-op behavioral verification remains external-only per `AGENTS.md`.
+
+# 2026-07-24 - Remaining synthetic replay fixtures enter through Authority V2
+
+- Replay fast-forward tests no longer inject raw `turnResolution` traffic, which is cosmetic after the full
+  cutover. They begin at the already-authenticated V2 material boundary and provide the exact next command
+  frontier, preserving their renderer-pacing scope without granting legacy traffic mechanical authority.
+- Compact replay-window Pokemon data now normalizes missing gender and Tera type at its trace loader boundary.
+  Real saved windows already carry those fields; the normalization prevents a hand-authored compatibility
+  fixture from crashing the real game-info projection before it can exercise replay recovery.

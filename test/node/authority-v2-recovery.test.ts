@@ -33,11 +33,11 @@ import type {
   CoopTimeClass,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import {
   type CoopRecoveryTransactionDeps,
   createRecoveryTransaction,
 } from "#data/elite-redux/coop/authority-v2/recovery";
-import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import type {
   CoopRecoveryAppliedProofV2,
   CoopRecoveryBundle,
@@ -253,6 +253,8 @@ function makeHarness(
     project?: () => CoopControlInstallResult;
     applyResult?: boolean;
     applyMaterial?: CoopRecoveryTransactionDeps["applyMaterial"];
+    runEngineVerb?: CoopRecoveryTransactionDeps["runEngineVerb"];
+    prepareControl?: CoopRecoveryTransactionDeps["prepareControl"];
     frame?: () => CoopFrameContextV2;
   } = {},
 ): Harness {
@@ -274,6 +276,8 @@ function makeHarness(
     reason: "unit-test",
     request,
     applyMaterial,
+    ...(opts.runEngineVerb == null ? {} : { runEngineVerb: opts.runEngineVerb }),
+    ...(opts.prepareControl == null ? {} : { prepareControl: opts.prepareControl }),
     acknowledge,
     requestTimeoutMs: 1_000,
     onPhase: p => phases.push(p),
@@ -394,6 +398,19 @@ describe("authority-v2 recovery transaction", () => {
       materialDigest: "material-digest",
       controlId: controlIdOf(COMMAND_CONTROL),
     });
+  });
+
+  it("routes every engine-facing recovery stage through the captured runtime executor", async () => {
+    const executor = vi.fn(async <T>(_ctx: CoopRuntimeContext, verb: () => T | Promise<T>): Promise<T> => verb());
+    const h = makeHarness(async () => makeBundle(), {
+      runEngineVerb: executor,
+      prepareControl: vi.fn(() => true),
+    });
+
+    expect(await createRecoveryTransaction(h.ctx, h.deps).run()).toBe("recovered");
+    expect(executor, "material apply, frontier preparation, and control projection each rebind").toHaveBeenCalledTimes(
+      3,
+    );
   });
 
   it("terminalizes a non-empty recovery frontier with no successor control", async () => {

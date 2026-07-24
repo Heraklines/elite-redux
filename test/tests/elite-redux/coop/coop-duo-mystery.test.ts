@@ -1435,24 +1435,13 @@ describe.skipIf(!RUN)(
     }, 300_000);
 
     // ===========================================================================================
-    // IT #6 - #839 MID-DIVERT ME-ENTRY HEAL SAFETY (the live co-op softlock). A guest-owned ME opens; the
-    // guest's me-entry full-state checksum MISMATCHES the host's (the live root: an ME-granted mon's
-    // divergent per-client id diverged the saveDataDigest - closed by the H1 fix in coop-savedata-digest,
-    // but ANY mismatch here must be handled the same). The guest requests a stateSync and applies the
-    // host's full snapshot WHILE it is diverting into CoopReplayMePhase. PRE-#839 that heal ran with
-    // suppressResummon=FALSE: the field COMPOSITION re-summon (reconcileCoopEnemyField / reconcileCoopPlayerField)
-    // tore the ME field/divert down out from under the parked selector -> the guest orphaned its
-    // CoopReplayMePhase and softlocked (one screen continued, the other could not). POST-#839 the heal is
-    // suppressResummon=TRUE (advisory, cheap scalar + module-let writes only; it never re-summons the
-    // field, never touches the phase queue, never cancels a relay waiter), so the divert SURVIVES and the
-    // ME proceeds to convergence regardless of whether the early heal fully closed the gap.
-    //
-    // This drives the REAL me-entry path (host stamps its authoritative checksum -> guest handler
-    // mismatches -> requestStateSync -> host answers with captureCoopFullSnapshot -> guest applies), so it
-    // asserts the runtime's OWN suppressResummon choice (a revert to FALSE fails the spy assert), then
-    // proves no orphan by completing the guest-owned ME (relay pick -> host applies -> lockstep convergence).
+    // IT #6 - #839 MID-DIVERT ME-ENTRY RECOVERY. A guest-owned ME opens and its entry checksum mismatches.
+    // Authority V2 must replace the entire stale phase/handler generation with a fresh generation built from
+    // the retained immutable frontier, prove that exact public control, and only then reopen progression.
+    // The historical advisory stateSync kept the old selector object alive; that is no longer the correctness
+    // model. Keeping old UI generations through recovery would let stale callbacks mutate the recovered state.
     // ===========================================================================================
-    it("DUO ME (#839): a me-entry checksum MISMATCH mid-divert heals with suppressResummon=TRUE - the guest keeps its selector, never orphans CoopReplayMePhase, and completes the ME in lockstep", async () => {
+    it("DUO ME (#839): a mid-divert checksum mismatch rebuilds the exact V2 selector and completes in lockstep", async () => {
       await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [
         SpeciesId.SNORLAX,
         SpeciesId.GENGAR,
@@ -1496,6 +1485,9 @@ describe.skipIf(!RUN)(
         "guest diverted into CoopReplayMePhase with its selector open",
       ).toBe("CoopReplayMePhase");
       const guestFieldBefore = withClientSync(rig.guestCtx, () => rig.guestScene.getPlayerField().length);
+      const meControlOperationId = (replay as unknown as { coopV2ControlOperationId: string | null })
+        .coopV2ControlOperationId;
+      expect(meControlOperationId, "the original selector was owned by an exact V2 interaction").not.toBeNull();
 
       // ===== INJECT the mid-divert me-entry heal (#839): force a checksum MISMATCH (diverge the guest's
       // money), then fire the REAL path - host stamps its authoritative checksum, the guest's onMeChecksum
@@ -1550,25 +1542,29 @@ describe.skipIf(!RUN)(
         "the V2 recovery material restored the host's authoritative money",
       ).toBe(withClientSync(rig.hostCtx, () => rig.hostScene.money));
 
-      // The in-flight ME divert SURVIVED the heal: the guest is STILL parked in CoopReplayMePhase (not
-      // orphaned), NOT settled, its on-field composition intact, and the money healed to the host's value.
+      // Recovery intentionally destroys the stale handler generation. Its immutable frontier must recreate
+      // a different CoopReplayMePhase carrying the same operation address and a newly-proven actionable UI.
+      const recoveredReplay = withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase());
+      expect(recoveredReplay?.phaseName, "guest recovery projected a new actionable CoopReplayMePhase").toBe(
+        "CoopReplayMePhase",
+      );
+      if (recoveredReplay == null) {
+        throw new Error("Authority V2 recovery proved no reconstructed Mystery control phase");
+      }
+      expect(recoveredReplay, "recovery did not reuse a stale phase/handler generation").not.toBe(replay);
       expect(
-        rig.guestScene.phaseManager.getCurrentPhase()?.phaseName,
-        "guest is STILL in CoopReplayMePhase after the mid-divert heal (divert not orphaned) (#839)",
-      ).toBe("CoopReplayMePhase");
-      expect(
-        (replay as unknown as { settled: boolean }).settled,
-        "guest ME divert did NOT settle/leave on the advisory heal (#839)",
-      ).toBe(false);
+        (recoveredReplay as unknown as { coopV2ControlOperationId: string | null }).coopV2ControlOperationId,
+        "the reconstructed selector is address-exact to the retained V2 frontier",
+      ).toBe(meControlOperationId);
       expect(
         withClientSync(rig.guestCtx, () => rig.guestScene.getPlayerField().length),
-        "guest on-field composition intact through the heal (no field re-summon torn it down) (#839)",
+        "the complete recovery image preserved the authoritative field composition",
       ).toBe(guestFieldBefore);
 
       // ===== PROVE NO ORPHAN by completing the guest-owned ME through convergence (the IT #2 handshake).
-      // The selector is still live, so the guest relays its pick, the host applies it, and both advance in
-      // lockstep - impossible if the heal had orphaned the divert. =====
-      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+      // The reconstructed selector is live, so the guest relays its pick, the host applies it, and both
+      // advance in lockstep. A queued-but-not-actionable phase could not pass the prior control proof. =====
+      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(recoveredReplay, 0));
 
       let hostShop!: ShopPhaseSeam;
       await withClient(rig.hostCtx, async () => {

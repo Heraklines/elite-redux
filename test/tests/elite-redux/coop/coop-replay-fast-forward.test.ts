@@ -38,6 +38,7 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -66,6 +67,33 @@ function completeTurnCarrier(turn: number) {
     revision: carrier.authoritativeState.tick,
     ...carrier,
   };
+}
+
+/**
+ * This is a renderer-pacing unit, so its input begins at the already-authenticated V2 material boundary.
+ * Raw `turnResolution` is deliberately cosmetic under the complete cutover and may never wake mechanics.
+ */
+function ingestV2Turn(message: Extract<CoopMessage, { t: "turnResolution" }>): void {
+  const runtime = getCoopRuntime();
+  if (runtime == null) {
+    throw new Error("test has no live co-op runtime for Authority V2 turn ingestion");
+  }
+  const commands = globalScene
+    .getPlayerField()
+    .flatMap((mon, fieldIndex) =>
+      mon.isFainted() ? [] : [{ ownerSeatId: mon.coopOwner === "guest" ? 1 : 0, pokemonId: mon.id, fieldIndex }],
+    );
+  runtime.battleStream.ingestAuthoritativeV2Turn(
+    message,
+    {
+      kind: "COMMAND_FRONTIER",
+      epoch: message.epoch,
+      wave: message.wave,
+      turn: message.turn + 1,
+      commands,
+    },
+    1,
+  );
 }
 
 // The presentation phases the guest drains for a non-faint stream, plus the MessagePhase a
@@ -194,7 +222,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     const turn = globalScene.currentBattle.turn;
     const enemy0 = globalScene.getEnemyField(false)[0];
     const carrier = carrierWithFieldHp(turn, 9);
-    getCoopRuntime()!.partnerTransport!.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -248,7 +276,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     const damageSpy = vi.spyOn(globalScene.damageNumberHandler, "add");
     const infoSpy = vi.spyOn(target, "updateInfo");
     const carrier = carrierWithFieldHp(turn, 9);
-    getCoopRuntime()!.partnerTransport!.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -282,7 +310,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     const target = field[COOP_HOST_FIELD_INDEX];
     const damageSpy = vi.spyOn(globalScene.damageNumberHandler, "add");
     const carrier = carrierWithFieldHp(turn, 9);
-    getCoopRuntime()!.partnerTransport!.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -312,7 +340,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     const enemy0 = globalScene.getEnemyField(false)[0];
     const textSpy = vi.spyOn(globalScene.ui, "showText");
     const carrier = carrierWithFieldHp(turn, 9);
-    getCoopRuntime()!.partnerTransport!.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -346,7 +374,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     const enemy0 = globalScene.getEnemyField(false)[0];
     const textSpy = vi.spyOn(globalScene.ui, "showText");
     const carrier = carrierWithFieldHp(turn, 9);
-    getCoopRuntime()!.partnerTransport!.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
