@@ -114,6 +114,9 @@ let ABILS_RICH = []; // [{id, name, description}]
 // The Pokedex Editor's species universe = ALL registered species (evolutions +
 // forms too), NOT just the starter pool in SPECIES, so any evolution is editable.
 let POKEDEX_SPECIES = []; // [{const, name, slug, id, dex}]
+// Recently-added megas/partners share a base species ID. They are separate
+// Custom Trainer choices carrying an exact formIndex, not Pokedex override keys.
+let TRAINER_SPECIES_FORMS = []; // [{const, baseConst, name, slug, id, formIndex, abilities}]
 let EVOS = {}; // speciesId → { to: number[], from: number[] }
 const moveById = new Map(); // moveId → rich move
 const abilById = new Map(); // abilityId → rich ability
@@ -138,6 +141,10 @@ const trainerAtlasCache = new Map();
 // In-flight atlas fetches (CDN url → Promise), so N cards/cells sharing a class
 // fire ONE fetch, not N concurrent ones (caps concurrency on the trainer list).
 const trainerAtlasInflight = new Map();
+// Animated Pokemon art can be a tall multi-frame TexturePacker sheet. Cache the
+// atlas metadata so previews crop one frame instead of shrinking the whole sheet.
+const pokemonAtlasCache = new Map();
+const pokemonAtlasInflight = new Map();
 // Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
 // committed override JSON is human-readable and consistent with the other tabs.
 const learn = { current: {}, baseline: {} }; // const → [[level, moveId], ...]
@@ -1148,6 +1155,15 @@ async function saveMon() {
 // const/id → species object, filled in init() (avoids O(n²) lookups in render).
 const spByConst = new Map();
 const spById = new Map();
+const spByBattleIdentity = new Map(); // `${speciesId}:${formIndex}` -> base/form picker entry
+
+function battleIdentityKey(speciesId, formIndex) {
+  return `${speciesId}:${Number.isInteger(formIndex) ? formIndex : 0}`;
+}
+
+function ctrSpeciesEntryForIdentity(speciesId, formIndex) {
+  return spByBattleIdentity.get(battleIdentityKey(speciesId, formIndex)) || spById.get(speciesId) || null;
+}
 
 /** The Pokedex tabs' species list: ALL species, filtered by the header search, sorted. */
 function pokedexList() {
@@ -2088,10 +2104,11 @@ function ctrLiveToEdit(entry) {
 
 /** Map ONE live member's fields (species by id) to edit fields (species by CONST). */
 function ctrLiveMemberFieldsToEdit(m) {
-  const idToConst = id => spById.get(id)?.const ?? "";
+  const idToConst = (id, formIndex) => ctrSpeciesEntryForIdentity(id, formIndex)?.const ?? "";
+  const formIndex = Number.isInteger(m.formIndex) ? m.formIndex : 0;
   return {
-    species: idToConst(m.species),
-    formIndex: Number.isInteger(m.formIndex) ? m.formIndex : 0,
+    species: idToConst(m.species, formIndex),
+    formIndex,
     level: typeof m.level === "number" ? m.level : null,
     moves: [...(m.moves || []), "", "", "", ""].slice(0, 4),
     abilitySlot: [0, 1, 2].includes(m.abilitySlot) ? m.abilitySlot : 0,
@@ -2099,7 +2116,7 @@ function ctrLiveMemberFieldsToEdit(m) {
     fusion:
       m.fusion && Number.isInteger(m.fusion.species)
         ? {
-            species: idToConst(m.fusion.species),
+            species: idToConst(m.fusion.species, m.fusion.formIndex),
             formIndex: Number.isInteger(m.fusion.formIndex) ? m.fusion.formIndex : 0,
             abilitySlot: [0, 1, 2].includes(m.fusion.abilitySlot) ? m.fusion.abilitySlot : 0,
           }
@@ -2196,7 +2213,8 @@ function ctrWarnings(t) {
 /** Label for one ability slot (0/1/2) of a species CONST: "0 · Pressure".
  *  Falls back to the bare slot number when the species/ability doesn't resolve. */
 function ctrAbilLabel(speciesConst, slot) {
-  const ab = speciesConst ? abil.current[speciesConst] : null;
+  const species = speciesConst ? spByConst.get(speciesConst) : null;
+  const ab = species?.abilities || (speciesConst ? abil.current[species.baseConst || speciesConst] : null);
   if (!ab) {
     return String(slot);
   }
@@ -2214,7 +2232,8 @@ function ctrAbilOptions(speciesConst, selected) {
 
 /** The authored factory sets for a species CONST (empty when the species has none). */
 function factorySetsFor(speciesConst) {
-  return speciesConst ? factoryByConst.get(speciesConst) || [] : [];
+  const species = speciesConst ? spByConst.get(speciesConst) : null;
+  return speciesConst ? factoryByConst.get(species?.baseConst || speciesConst) || [] : [];
 }
 
 /** A short "MOVE_A / MOVE_B / …" summary of a set's moves (for the option tooltip). */
@@ -2230,8 +2249,10 @@ function setMovesSummary(set) {
  * species itself when there is no evo data (e.g. the jsdom smoke harness).
  */
 function ctrPreEvoLineConsts(speciesConst) {
-  const consts = new Set([speciesConst]);
-  const startId = spByConst.get(speciesConst)?.id;
+  const selected = spByConst.get(speciesConst);
+  const baseConst = selected?.baseConst || speciesConst;
+  const consts = new Set([baseConst]);
+  const startId = selected?.id;
   if (startId === undefined) {
     return consts;
   }
@@ -2655,11 +2676,12 @@ function ctrFusedName(speciesAName, speciesBName) {
   return `${speciesAPrefix || speciesBPrefix}${fragA}${fragB}${speciesBSuffix || speciesASuffix}`;
 }
 
-/** A species CONST's front-sprite CDN url (same slug path the game/editor mon
- *  previews use), or "" when the species/slug can't be resolved. */
-function ctrSpeciesSpriteUrl(speciesConst) {
-  const s = speciesConst ? spByConst.get(speciesConst) : null;
-  return s && s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
+/** Placeholder painted from the first frame in a Pokemon's front atlas. */
+function ctrPokemonFrameHtml(speciesConst, targetSize) {
+  const species = speciesConst ? spByConst.get(speciesConst) : null;
+  return species?.slug
+    ? `<span class="ctr-pokemon-frame" data-ctrpokemon="${esc(species.slug)}" data-ctrpokemon-size="${targetSize}" aria-label="${esc(species.name || speciesConst)}"></span>`
+    : '<span class="dyn">?</span>';
 }
 
 /** Fusion preview: the two base + fusion battle sprites side by side + the fused
@@ -2676,12 +2698,8 @@ function ctrFusionPreviewHtml(m) {
     return "";
   }
   const fused = ctrFusedName(base.name || m.species, other.name || fus.species);
-  const img = url =>
-    url
-      ? `<img src="${esc(url)}" style="width:56px;height:56px;image-rendering:pixelated" onerror="this.style.visibility='hidden'" />`
-      : '<span class="dyn">?</span>';
   return `<div class="ctr-fusion-preview">
-    <div class="ctr-fusion-sprites">${img(ctrSpeciesSpriteUrl(m.species))}<span class="ctr-fusion-plus">+</span>${img(ctrSpeciesSpriteUrl(fus.species))}</div>
+    <div class="ctr-fusion-sprites">${ctrPokemonFrameHtml(m.species, 56)}<span class="ctr-fusion-plus">+</span>${ctrPokemonFrameHtml(fus.species, 56)}</div>
     <div class="ctr-fusion-name">Fused name: <b>${esc(fused)}</b></div>
     <div class="hint">Approximation: in-game fusion also blends palettes.</div>
   </div>`;
@@ -2826,6 +2844,65 @@ function firstAtlasFrame(atlas) {
     return null;
   }
   return { crop: fr.frame, sheet: tx.size };
+}
+
+function fetchPokemonAtlas(slug) {
+  const url = `${SPRITE_BASE}/${slug}/front.json`;
+  if (pokemonAtlasCache.has(url)) {
+    return Promise.resolve(pokemonAtlasCache.get(url));
+  }
+  if (pokemonAtlasInflight.has(url)) {
+    return pokemonAtlasInflight.get(url);
+  }
+  const request = fetch(url)
+    .then(response => (response.ok ? response.json() : null))
+    .catch(() => null)
+    .then(atlas => {
+      pokemonAtlasCache.set(url, atlas);
+      pokemonAtlasInflight.delete(url);
+      return atlas;
+    });
+  pokemonAtlasInflight.set(url, request);
+  return request;
+}
+
+/** Crop the first frame from a static or animated Pokemon front atlas. */
+function renderPokemonFrame(slug, el, targetSize) {
+  const paint = atlas => {
+    if (!el.isConnected) {
+      return;
+    }
+    const size = Number(targetSize) || 64;
+    const info = firstAtlasFrame(atlas);
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    el.style.backgroundImage = `url("${SPRITE_BASE}/${slug}/front.png")`;
+    el.style.backgroundRepeat = "no-repeat";
+    el.style.imageRendering = "pixelated";
+    if (!info) {
+      el.style.backgroundSize = "contain";
+      el.style.backgroundPosition = "center";
+      return;
+    }
+    const { crop, sheet } = info;
+    const scale = Math.min(size / crop.w, size / crop.h);
+    const left = (size - crop.w * scale) / 2 - crop.x * scale;
+    const top = (size - crop.h * scale) / 2 - crop.y * scale;
+    el.style.backgroundSize = `${sheet.w * scale}px ${sheet.h * scale}px`;
+    el.style.backgroundPosition = `${left}px ${top}px`;
+  };
+  const url = `${SPRITE_BASE}/${slug}/front.json`;
+  if (pokemonAtlasCache.has(url)) {
+    paint(pokemonAtlasCache.get(url));
+    return;
+  }
+  fetchPokemonAtlas(slug).then(paint);
+}
+
+function paintCustomTrainerPokemonFrames(root) {
+  for (const el of root.querySelectorAll("[data-ctrpokemon]")) {
+    renderPokemonFrame(el.dataset.ctrpokemon, el, Number(el.dataset.ctrpokemonSize));
+  }
 }
 
 /** Fetch (and cache) a trainer atlas json, sharing ONE in-flight request per url. */
@@ -3062,10 +3139,7 @@ function ctrPreviewPanelHtml(t) {
   const idx = Math.max(0, Math.min(ctrFocusIdx, team.length - 1));
   const m = team[idx] || null;
   const spName = m && m.species ? spByConst.get(m.species)?.name || m.species : "(empty)";
-  const spriteUrl = m ? ctrSpeciesSpriteUrl(m.species) : "";
-  const memberSprite = spriteUrl
-    ? `<img src="${esc(spriteUrl)}" style="width:64px;height:64px;image-rendering:pixelated" onerror="this.style.visibility='hidden'" />`
-    : '<span class="dyn">no sprite</span>';
+  const memberSprite = m?.species ? ctrPokemonFrameHtml(m.species, 64) : '<span class="dyn">no sprite</span>';
   const shiny = m ? ctrNormShiny(m.shiny) : ctrNormShiny(null);
   const fusionPreview = m ? ctrFusionPreviewHtml(m) : "";
   // Battle-music now-playing indicator: the chosen track + a live "playing" tag.
@@ -3112,9 +3186,7 @@ function ctrCardSpriteFile(t) {
  *  Empty/unresolvable species -> an empty neutral box (never a broken image). */
 function ctrCardMonIcon(m) {
   const sp = (Array.isArray(m.variants) && m.variants[0] && m.variants[0].species) || m.species || "";
-  const url = ctrSpeciesSpriteUrl(sp);
-  const img = url ? `<img src="${esc(url)}" alt="" loading="lazy" onerror="this.style.display='none'" />` : "";
-  return `<span class="ctr-card-mon" title="${esc(sp || "empty slot")}">${img}</span>`;
+  return `<span class="ctr-card-mon" title="${esc(sp || "empty slot")}">${sp ? ctrPokemonFrameHtml(sp, 28) : ""}</span>`;
 }
 
 function renderCustomTrainers(root) {
@@ -3272,6 +3344,7 @@ function renderCustomTrainers(root) {
   for (const el of root.querySelectorAll("[data-ctrsprite]")) {
     renderTrainerFrame(el.dataset.ctrsprite, el, { targetH: 44 });
   }
+  paintCustomTrainerPokemonFrames(root);
 }
 
 // ---- Custom Trainers: input + click handling -------------------------------
@@ -3332,9 +3405,18 @@ function onCustomTrainerInput(el) {
   } else if (el.classList.contains("ctr-species") && m) {
     m.species = el.value.trim().toUpperCase();
     el.value = m.species;
-    el.style.borderColor = m.species === "" || spByConst.has(m.species) ? "" : ERR;
+    const selected = spByConst.get(m.species);
+    if (selected) {
+      m.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
+    }
+    el.style.borderColor = m.species === "" || selected ? "" : ERR;
   } else if (el.classList.contains("ctr-form") && m) {
     m.formIndex = Number(el.value) || 0;
+    const speciesId = spByConst.get(m.species)?.id;
+    const selected = ctrSpeciesEntryForIdentity(speciesId, m.formIndex);
+    if (selected) {
+      m.species = selected.const;
+    }
   } else if (el.classList.contains("ctr-level") && m) {
     m.level = el.value === "" ? null : Number(el.value);
   } else if (el.classList.contains("ctr-move") && m) {
@@ -3377,9 +3459,18 @@ function onCustomTrainerInput(el) {
   } else if (el.classList.contains("ctr-fusion-species") && m && m.fusion) {
     m.fusion.species = el.value.trim().toUpperCase();
     el.value = m.fusion.species;
-    el.style.borderColor = m.fusion.species === "" || spByConst.has(m.fusion.species) ? "" : ERR;
+    const selected = spByConst.get(m.fusion.species);
+    if (selected) {
+      m.fusion.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
+    }
+    el.style.borderColor = m.fusion.species === "" || selected ? "" : ERR;
   } else if (el.classList.contains("ctr-fusion-form") && m && m.fusion) {
     m.fusion.formIndex = Number(el.value) || 0;
+    const speciesId = spByConst.get(m.fusion.species)?.id;
+    const selected = ctrSpeciesEntryForIdentity(speciesId, m.fusion.formIndex);
+    if (selected) {
+      m.fusion.species = selected.const;
+    }
   } else {
     return false;
   }
@@ -5506,6 +5597,7 @@ async function init() {
       tmLive,
       abLive,
       allSpeciesData,
+      speciesFormsData,
       evosData,
       ctrLive,
       ctrConfigLive,
@@ -5542,6 +5634,8 @@ async function init() {
       fetchJson(`${RAW_BASE}/er-species-abilities.json${bust}`, {}),
       // Pokedex editor: the FULL species universe (evolutions/forms) + evo graph.
       fetchJson("./data/all-species.json", []),
+      // Exact form choices used only by Custom Trainer team/fusion selectors.
+      fetchJson("./data/species-forms.json", []),
       fetchJson("./data/evolutions.json", {}),
       // Live custom-trainers override file (resilient: missing on the branch → empty).
       fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
@@ -5597,6 +5691,7 @@ async function init() {
     // Pokedex universe = ALL species (evolutions/forms); fall back to the starter
     // list if the fuller dump isn't present yet. EVOS powers the chain navigator.
     POKEDEX_SPECIES = Array.isArray(allSpeciesData) && allSpeciesData.length > 0 ? allSpeciesData : SPECIES;
+    TRAINER_SPECIES_FORMS = Array.isArray(speciesFormsData) ? speciesFormsData : [];
     EVOS = evosData && typeof evosData === "object" ? evosData : {};
     for (const m of MOVES_RICH) {
       moveById.set(m.id, m);
@@ -5605,9 +5700,13 @@ async function init() {
       abilById.set(a.id, a);
       abilIdByNormalizedName.set(a.name.trim().toLowerCase(), a.id);
     }
+    spByConst.clear();
+    spById.clear();
+    spByBattleIdentity.clear();
     for (const s of POKEDEX_SPECIES) {
       spByConst.set(s.const, s);
       spById.set(s.id, s);
+      spByBattleIdentity.set(battleIdentityKey(s.id, 0), s);
       const base = (lsData[s.id] || []).map(([lvl, mv]) => [lvl, mv]);
       learn.current[s.const] = Array.isArray(lsLive[s.const]) ? lsLive[s.const].map(([lvl, mv]) => [lvl, mv]) : base;
       const tmBase = (tmData[s.id] || []).slice();
@@ -5626,6 +5725,13 @@ async function init() {
         hidden: o.hidden ?? abBase.hidden ?? 0,
         innates: [oi[0] || 0, oi[1] || 0, oi[2] || 0],
       };
+    }
+    for (const form of TRAINER_SPECIES_FORMS) {
+      if (!form || !form.const || !Number.isInteger(form.id) || !Number.isInteger(form.formIndex)) {
+        continue;
+      }
+      spByConst.set(form.const, form);
+      spByBattleIdentity.set(battleIdentityKey(form.id, form.formIndex), form);
     }
     learn.baseline = JSON.parse(JSON.stringify(learn.current));
     tms.baseline = JSON.parse(JSON.stringify(tms.current));
@@ -5802,7 +5908,10 @@ async function init() {
     // Custom Trainers: species picker (full universe), trainer-class + held-item pickers.
     const sdl = document.createElement("datalist");
     sdl.id = "species-list";
-    sdl.innerHTML = POKEDEX_SPECIES.map(s => `<option value="${s.const}">${esc(s.name)}</option>`).join("");
+    sdl.innerHTML = [...POKEDEX_SPECIES, ...TRAINER_SPECIES_FORMS]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(s => `<option value="${s.const}">${esc(s.name)}</option>`)
+      .join("");
     document.body.appendChild(sdl);
     const tcdl = document.createElement("datalist");
     tcdl.id = "trainerclass-list";
