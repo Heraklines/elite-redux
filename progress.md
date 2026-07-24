@@ -3040,3 +3040,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The battle-handoff reward and replay-pacing fixtures install their asynchronous settlement/replay phases as
   real phase-manager boundaries. The faint fallback assertion now observes the real REPLACEMENT_COMMIT wire
   entry rather than the deliberately retired shadow diagnostics surface.
+
+# 2026-07-24 - Mutual-KO victories retain their executable replacement edge
+
+- Exact B9 artifacts from `30099373184` showed the authority already knew the wave was won when it retained
+  TURN_COMMIT, so it stated `TURN -> WAVE_ADVANCE` and suppressed the simultaneously-required replacement
+  control. The engine then performed its real SwitchPhase and correctly failed closed when the post-summon
+  REPLACEMENT_COMMIT had no active predecessor.
+- A staged wave destination no longer erases a replacement that the immutable turn image and event stream
+  prove is executable. The graph is now `TURN -> REPLACEMENT`; after the final summon, the replacement
+  adapter's existing terminal wait admits the retained WAVE_ADVANCE (or TERMINAL_COMMIT) at N/N+1. Surviving
+  battles still receive their command frontier, and a won wave cannot open a phantom next-turn command.

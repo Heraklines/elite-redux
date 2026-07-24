@@ -2906,10 +2906,14 @@ export class CoopBattleStreamer {
     // post-replacement commits. This includes Showdown's explicitly-owned authoritative enemy side while
     // omitting ordinary AI enemies; an unowned human seat fails the whole commit instead of being guessed.
     const completeCommands = [...commandFrontier.commands];
-    const replacementControl =
-      hasImmediateCommand || hasDeferredWaveAdvance
-        ? null
-        : resolveCoopV2ReplacementControl(epoch, authoritativeState, events);
+    // Engine order wins over the already-known terminal destination. A mutual KO can stage WIN while a
+    // living reserve still makes SwitchPhase the next real boundary. Skipping that replacement here states
+    // TURN -> WAVE, then the engine's post-summon REPLACEMENT_COMMIT is correctly rejected as an unowned
+    // sibling. Keep the executable replacement first; its final broad ordered wait explicitly admits the
+    // retained WAVE_ADVANCE/TERMINAL successor without ever opening a phantom command on the won wave.
+    const replacementControl = hasImmediateCommand
+      ? null
+      : resolveCoopV2ReplacementControl(epoch, authoritativeState, events);
     const operationId = `TURN/e${epoch}/w${wave}/t${turn}`;
     const deferredWaveWait = deferredCoopV2WaveSuccessorWait(operationId, epoch, wave, turn, boundary);
     // A Mystery-spawned battle terminates through the retained ME transaction, not WAVE_ADVANCE. That
@@ -2917,24 +2921,25 @@ export class CoopBattleStreamer {
     // on turn N. State the inverse edge exactly here; a generic turn-N wait correctly rejects turn 0 and used
     // to terminate an otherwise checksum-converged run at the post-battle reward handoff (gate C1 wave 32).
     const nextSuccessorWait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null =
-      deferredWaveWait
-      ?? (!hasImmediateCommand
-      && replacementControl == null
-      && boundary.mysteryBattle
-      && authoritativePartyIsDefeated(authoritativeState.enemyParty)
-      && !authoritativePartyIsDefeated(authoritativeState.playerParty)
-        ? {
-            kind: "AWAIT_SUCCESSOR",
-            afterOperationId: operationId,
-            epoch,
-            wave,
-            turn,
-            allowedKinds: ["INTERACTION_COMMIT"],
-            allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave, turn: 0 }],
-            allowNextWaveStart: false,
-            expectedOperationId: null,
-          }
-        : null);
+      replacementControl == null
+        ? (deferredWaveWait
+          ?? (!hasImmediateCommand
+          && boundary.mysteryBattle
+          && authoritativePartyIsDefeated(authoritativeState.enemyParty)
+          && !authoritativePartyIsDefeated(authoritativeState.playerParty)
+            ? {
+                kind: "AWAIT_SUCCESSOR",
+                afterOperationId: operationId,
+                epoch,
+                wave,
+                turn,
+                allowedKinds: ["INTERACTION_COMMIT"],
+                allowedInteractionAddresses: [{ surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave, turn: 0 }],
+                allowNextWaveStart: false,
+                expectedOperationId: null,
+              }
+            : null))
+        : null;
     const input: CoopV2ShadowTurnTap = {
       operationId,
       capture,
