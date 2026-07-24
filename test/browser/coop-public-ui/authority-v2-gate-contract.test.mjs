@@ -198,6 +198,27 @@ test("wave/terminal cutover carries full settled state and retires every legacy 
   );
 });
 
+test("wave DATA waits for the exact started BattleEnd boundary instead of trusting a queued phase name", () => {
+  const applyStart = coopRuntime.indexOf("function applyCoopV2WaveDataAtBoundary(");
+  const applyEnd = coopRuntime.indexOf("\n/**\n * Adopt the ordered settlement cursor", applyStart);
+  assert.notEqual(applyStart, -1, "the runtime exposes one retained V2 wave material boundary");
+  assert.ok(applyEnd > applyStart, "the retained V2 wave material boundary has a bounded source block");
+  const apply = coopRuntime.slice(applyStart, applyEnd);
+  const phaseProof = apply.indexOf('phaseName === "BattleEndPhase"');
+  const callbackProof = apply.indexOf("isCoopSettledWaveBoundaryPending(sourceWave)");
+  const applyState = apply.indexOf("applyCoopAuthoritativeBattleState(immutableState, true)");
+  assert.ok(phaseProof >= 0, "wave material still requires the real BattleEnd phase");
+  assert.ok(
+    callbackProof > phaseProof && applyState > callbackProof,
+    "wave material cannot retire before BattleEnd.start installs its exact source-wave release callback",
+  );
+  assert.match(
+    apply,
+    /if \(!exactBattleEnd && !exactTerminalFinalizer\) \{\s*return false;/u,
+    "a merely queued BattleEnd remains deferred until its runtime-owned boundary is actionable",
+  );
+});
+
 test("the post-victory seal accepts the exact completed V2 wave transaction after successor installation", () => {
   const helperStart = coopRuntime.indexOf("function settledCoopV2WaveTransaction(");
   const helperEnd = coopRuntime.indexOf("\n}", helperStart);

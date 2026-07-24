@@ -4853,26 +4853,30 @@ function bootstrapCoopV2WaveTransaction(runtime: CoopRuntime, transaction: CoopV
 }
 
 function applyCoopV2WaveDataAtBoundary(runtime: CoopRuntime, transaction: CoopV2WaveLiveTransaction): boolean {
-  if (transaction.dataApplied) {
-    return releaseCoopSettledWaveBoundary(transaction.transition.wave);
-  }
   if (active !== runtime || runtime.controller.authorityRole !== "replica") {
     return false;
   }
   const sourceWave = transaction.transition.wave;
   const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
   const phaseName = globalScene.phaseManager?.getCurrentPhase()?.phaseName;
-  const exactQueuedBattleEnd =
-    phaseName === "BattleEndPhase" && currentWave === sourceWave + 1 && isCoopSettledWaveBoundaryPending(sourceWave);
+  // PhaseManager publishes a queued phase as current before start() necessarily installs its retained
+  // release callback. A synchronous authority redelivery in that gap used to apply and retire the wave
+  // transaction while releaseCoopSettledWaveBoundary still had no boundary to release. BattleEnd.start()
+  // would then park forever against the already-retired transaction. The phase name is therefore not a
+  // safe material boundary by itself: require the exact source-wave callback installed by the real phase.
+  const exactBattleEnd =
+    phaseName === "BattleEndPhase"
+    && (currentWave === sourceWave || currentWave === sourceWave + 1)
+    && isCoopSettledWaveBoundaryPending(sourceWave);
   const exactTerminalFinalizer =
     transaction.transition.outcome === "gameOver"
     && phaseName === "CoopFinalizeTurnPhase"
     && currentWave === sourceWave;
-  if (
-    (currentWave !== sourceWave && !exactQueuedBattleEnd)
-    || (phaseName !== "BattleEndPhase" && !exactTerminalFinalizer)
-  ) {
+  if (!exactBattleEnd && !exactTerminalFinalizer) {
     return false;
+  }
+  if (transaction.dataApplied) {
+    return exactBattleEnd ? releaseCoopSettledWaveBoundary(sourceWave) : true;
   }
 
   const immutableState = structuredClone(transaction.authoritativeState);
@@ -4895,7 +4899,7 @@ function applyCoopV2WaveDataAtBoundary(runtime: CoopRuntime, transaction: CoopV2
   }
   transaction.dataApplied = true;
   coopLog("v2-wave", `DATA applied rev=${transaction.entryRevision} wave=${sourceWave} tick=${immutableState.tick}`);
-  return releaseCoopSettledWaveBoundary(sourceWave);
+  return exactBattleEnd ? releaseCoopSettledWaveBoundary(sourceWave) : true;
 }
 
 /**

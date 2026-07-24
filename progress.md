@@ -2847,3 +2847,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   still owns ordering, deduplication, material application, and control proof; the authority log still owns
   retention. The wake only removes network-backoff timing from a real engine surface that has just become
   actionable, matching the established command, wave, and interaction proof-edge pattern.
+
+# 2026-07-24 - V2 wave material waits for the started BattleEnd release boundary
+
+- Exact C1 journey `30089977550` played through wave 35 before the guest parked forever on
+  `BattleEndPhase` while the host opened the reward shop. Revision 197's immutable wave state had applied
+  and the V2 frontier reached `197/197/197`, but the expected `GUEST retained WAVE_ADVANCE BattleEnd
+  release wave=35` edge never occurred; the next retry reported that the already-completed transaction was
+  missing.
+- The authority redelivery arrived after PhaseManager exposed `BattleEndPhase` as current but before that
+  phase's `start()` installed `pendingSettledWaveBoundary`. The material applier trusted the class name,
+  applied and retired revision 197, and its no-op release found no callback. The later real phase then held
+  against a transaction that could no longer wake it.
+- Wave DATA now requires both the exact BattleEnd phase/wave and its runtime-owned source-wave release
+  callback before material application. The terminal finalizer retains its separate exact proof. A public
+  Authority V2 contract pins that ordering so a queued-but-not-started phase can never again consume and
+  retire its own wake source.
