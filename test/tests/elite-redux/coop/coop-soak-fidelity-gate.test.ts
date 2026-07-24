@@ -31,7 +31,11 @@
 // =============================================================================
 
 import { initGlobalScene } from "#app/global-scene";
-import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  setCoopFaintSwitchWaitMs,
+  setCoopRendezvousWaitMs,
+  setCoopWaveBarrierMs,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
@@ -79,6 +83,11 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
       accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
       setCoopWaveBarrierMs(50);
       setCoopFaintSwitchWaitMs(4000);
+      // Entry presentation is production work, not a synchronization failure. The real session permits
+      // seven 60-second rendezvous attempts; retaining the historical 50ms test shortcut allowed only
+      // 350ms total and expired while a legitimate multi-ability biome entry was still rendering. Keep the
+      // soak bounded, but budget enough wall time for its real public presentation chain.
+      setCoopRendezvousWaitMs(2000);
       game = new GameManager(phaserGame);
       logs = installDuoLogCapture(`soak-fidelity-gate-${Date.now()}`);
       // Force the GOD profile (steamrolls the bounded low-wave run so a wipe is a real regression, not content).
@@ -97,6 +106,7 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
     afterEach(() => {
       setCoopWaveBarrierMs(60_000);
       setCoopFaintSwitchWaitMs(60_000);
+      setCoopRendezvousWaitMs(60_000);
       accuracySpy?.mockRestore();
       accuracySpy = undefined;
       logs.dispose();
