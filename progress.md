@@ -2684,3 +2684,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   The test also observes the real phase-manager departure because the
   production owner terminal deliberately calls `super.end()` and cannot be intercepted by overriding
   `phase.end` on the fixture instance.
+
+# 2026-07-24 - Exact B1 follow-up binds transition tails to their owning runtime
+
+- Exact-SHA gate `30080760906` reduced B1 from three failures to two and proved the Bargain V2-only path
+  green with zero legacy fault injection. Its remaining market and double-KO artifacts were both
+  one-process destination-context schedules, not weakened authority or missing immutable material.
+- The market test previously staged both browsers before either mock-Phaser delayed hand-off finished,
+  then waited under each context after the promise continuation had already captured the wrong ambient
+  runtime. Each real phase now keeps its owner installed for the timer and microtask tail before the other
+  browser is staged; the 1.3-second blanket sleeps are removed.
+- `CoopGuestFaintSwitchPhase` now reactivates its captured runtime around the asynchronous MESSAGE-close
+  continuation, matching the existing host replacement fence. Generation, runtime identity, phase token,
+  wave, and turn remain mandatory; the change does not loosen the fail-closed material boundary. In two
+  actual browsers this is a no-op, while the duo harness can no longer terminate a valid guest picker merely
+  because the host was ambient when the shared JavaScript microtask ran.

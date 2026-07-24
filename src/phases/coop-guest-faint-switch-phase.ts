@@ -180,17 +180,23 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       });
     };
     const closePicker = (): void => {
-      void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result => {
-        if (coopSessionGeneration() !== sourceGeneration) {
-          return;
-        }
-        if (result === "superseded" || !boundaryStillLive()) {
-          failCoopSharedSession("The replacement picker lost its exact material boundary while closing.");
-          return;
-        }
-        markPickerMaterialized();
-        scene.phaseManager.shiftPhase();
-      });
+      // In the one-realm duo harness the host can become ambient while this async UI transition resolves.
+      // Judge the terminal and mutate the queue only after this picker's captured runtime is active again.
+      // Real browsers are permanently bound to their own runtime, so this is a no-op there; it preserves
+      // the same strict generation/runtime/phase/wave/turn fence in both schedules.
+      scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result =>
+        runWhenCoopRuntimeActive(runtime, () => {
+          if (coopSessionGeneration() !== sourceGeneration) {
+            return;
+          }
+          if (result === "superseded" || !boundaryStillLive()) {
+            failCoopSharedSession("The replacement picker lost its exact material boundary while closing.");
+            return;
+          }
+          markPickerMaterialized();
+          scene.phaseManager.shiftPhase();
+        }),
+      );
     };
     unregisterTerminal = registerCoopFaintSwitchPickerTerminal(
       {

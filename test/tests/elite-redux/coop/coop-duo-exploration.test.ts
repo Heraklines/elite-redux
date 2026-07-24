@@ -365,6 +365,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         haltQueueAfterCurrent();
         phase.start();
         await drainLoopback();
+        // Keep the owner installed while the mock Phaser timer and its promise continuation publish the
+        // address-exact input proof. Staging the other browser first creates an impossible ambient schedule.
+        await new Promise<void>(resolve => setTimeout(resolve, 25));
       });
 
       await withClient(rig.guestCtx, async () => {
@@ -378,13 +381,8 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         haltQueueAfterCurrent();
         phase.start();
         await drainLoopback();
+        await new Promise<void>(resolve => setTimeout(resolve, 25));
       });
-
-      // BIOME_SHOP is a real transition mode (250ms fade + 100ms delayed hand-off). Keep each browser's
-      // complete context installed while its own Phaser clock resolves that transition, exactly as two
-      // independent browser event loops do. Tight zero-delay relay pumps never advance this visual boundary.
-      await withClient(rig.hostCtx, () => new Promise(resolve => setTimeout(resolve, 650)));
-      await withClient(rig.guestCtx, () => new Promise(resolve => setTimeout(resolve, 650)));
 
       // Wait for the actual BIOME_SHOP handler. The retired fixture invoked the callback captured from
       // setMode before that promise resolved, bypassing the V2 human-input gate and manufacturing a commit

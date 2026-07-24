@@ -7,6 +7,7 @@
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/phases/coop-guest-faint-switch-phase.ts",
     "src/phases/coop-replay-phases.ts",
     "src/phases/the-bargain-phase.ts",
     "progress.md",
