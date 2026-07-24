@@ -5175,6 +5175,10 @@ function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable
     mon.hp = typeof data.hp === "number" ? Math.min(data.hp, mon.getMaxHp()) : mon.getMaxHp();
     // Test overrides may replace a constructor's moveset; the checkpoint is authoritative.
     mon.moveset = checkpointMoves;
+    // This replay path reconstructs checkpoint Pokemon after the normal init() boundary. Real SummonPhase
+    // and authoritative state application still update battleInfo, so give the restored identity the same
+    // stateful headless surface used by every other mirrored Pokemon before it enters the live phase queue.
+    stubBattleInfo(mon);
     party.push(mon);
   }
 

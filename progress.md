@@ -3125,3 +3125,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   wave transitions or allowing local phase order to choose progression.
 - The co-op wire protocol is now `er-coop-48`; mixed builds fail negotiation instead of accepting a command
   material shape whose presentation contract they cannot understand.
+
+# 2026-07-24 - B10 replay fixtures preserve authoritative adoption and live UI surfaces
+
+- Party transposition now installs its deterministic one-HP enemy state after the reciprocal public-command
+  driver has completed any legitimate immutable host-image adoption. The old ordering silently restored the
+  full enemy HP and changed the intended replacement-to-wave proof into an unrelated later-turn battle.
+- Window replay checkpoint Pokemon now receive the same stateful headless `battleInfo` surface as every other
+  mirrored live Pokemon before real SummonPhase runs. The fixture can therefore exercise production summon,
+  info refresh, and V2 material application instead of crashing on an object the harness reconstructed only
+  halfway.
+- The focused ownership train was rebased to exact qualified predecessor `99b2fe918` so the next external run
+  covers both B9's embedded-battle command boundary and B10's repaired replay fixtures.

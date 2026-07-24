@@ -192,8 +192,10 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       ).toBe(false);
     });
 
-    // Play the spawned battle through the same public Command/Fight/Target handlers as two browsers. The
-    // former fixture jumped both scenes directly from the turn-1 handoff to a synthetic turn-3 BattleEnd,
+    // Play the spawned battle through the same public Command/Fight/Target handlers as two browsers. Reaching
+    // those handlers now also proves the embedded battle consumed the sealed entry-presentation prefix from
+    // its exact turn-one CONTROL_COMMIT; there is intentionally no synthetic ordinary-wave carrier here.
+    // The former fixture jumped both scenes directly from the turn-1 handoff to a synthetic turn-3 BattleEnd,
     // omitting the intervening Authority V2 turn entry that legally owns that successor. That manufactured
     // an impossible global-log gap. One-HP enemies keep this production journey fast while the real turn
     // records both faints, applies the checkpoint, and authors the ME victory tail.

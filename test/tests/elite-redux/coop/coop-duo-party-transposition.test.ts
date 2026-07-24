@@ -270,18 +270,22 @@ describe.skipIf(!RUN)(
       rig.hostScene.getPlayerParty()[0].level = 55;
       rig.hostScene.getPlayerParty()[0].exp += 5000;
       rig.hostScene.getPlayerParty()[0].calculateStats();
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        guestTarget: BattlerIndex.ENEMY_2,
+      });
+      // The public guest driver may adopt the latest immutable host image while opening the reciprocal
+      // command frontier. Install the deterministic enemy HP only after that adoption; setting it before
+      // the driver let a legitimate authoritative-state apply overwrite the fixture and turned this into
+      // a normal multi-turn battle instead of the intended replacement-to-wave boundary regression.
       withClientSync(rig.hostCtx, () => {
         for (const enemy of rig.hostScene.getEnemyField()) {
           enemy.hp = 1;
         }
         expect(
           rig.hostScene.getEnemyField().every(enemy => enemy.hp === 1),
-          "the deterministic second-turn win is installed on the host engine",
+          "the deterministic second-turn win is installed after reciprocal command adoption",
         ).toBe(true);
-      });
-      await driveDuoGuestTackleThroughPublicUi(game, rig, {
-        restartAlreadyOpenHost: false,
-        guestTarget: BattlerIndex.ENEMY_2,
       });
       const settledTurn = rig.hostScene.currentBattle.turn;
       await withClient(rig.hostCtx, async () => {
