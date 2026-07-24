@@ -2331,3 +2331,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   outcomes before resolving a source actor or starting `CommonBattleAnim`. A direct regression proves those
   mechanical lanes never claim rendered pixels; animations-enabled browser lanes remain callback-proven and
   fail closed on stalls or throws.
+
+# 2026-07-24 - Structural adoption reads the real Phaser child count
+
+- Exact-SHA B7 evidence from gate `30054897928` proved the remaining structural-adoption failure was not a
+  relative-reordering defect: every diagnostic reported `expected=NaN`. `Phaser.GameObjects.Container` does
+  not expose its child count through `.length`, so the renderer always threw after seating the rebuilt actor
+  and entered the compatibility corrector.
+- The adopter now snapshots `field.getAll().length` after removing the stale identity and before adding the
+  rebuild. Its anchor, insertion index, and verified postcondition therefore use the actual renderer order;
+  this also prevents the fallback from leaving duplicate/stale display identities that can poison later
+  exact-actor HP/faint presentation.

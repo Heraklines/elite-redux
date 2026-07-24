@@ -286,8 +286,13 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
         // stable relative depth anchor. Anchoring against that child is more reliable than an unverified
         // numeric move: Phaser's headless container has accepted moveTo() without changing the order in
         // this reconstruction path, leaving the battler appended above unrelated field presentation.
-        const restoreIndex = Math.min(activeFieldIndex, globalScene.field.length);
-        const depthAnchor = restoreIndex < globalScene.field.length ? globalScene.field.getAt(restoreIndex) : null;
+        // Phaser.Container is not array-like: its public child count is not exposed as `.length`.
+        // The headless renderer therefore produced `Math.min(activeFieldIndex, undefined) === NaN`,
+        // making every retained-adoption postcondition fail and enter the compatibility corrector.
+        // Snapshot the actual child list after removing the stale identity, before adding the rebuild.
+        const fieldLength = globalScene.field.getAll().length;
+        const restoreIndex = Math.min(activeFieldIndex, fieldLength);
+        const depthAnchor = restoreIndex < fieldLength ? globalScene.field.getAt(restoreIndex) : null;
         built.setFieldPosition(fieldPositionForSlot(entry.fieldIndex, battle.arrangement.enemyCapacity));
         // Pokemon construction does not put the container on Phaser's display list. SummonPhase always
         // calls add.existing before seating it; structural replay must do the same.
