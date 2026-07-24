@@ -58,6 +58,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import type {
   CoopAuthorityFailure,
+  CoopBattleStreamer,
   CoopCheckpointEnvelope,
   CoopTurnResolution,
 } from "#data/elite-redux/coop/coop-battle-stream";
@@ -1806,6 +1807,83 @@ export interface CoopV2ControlSuccessorClaim {
   readonly kind: CoopAuthorityEntryKind;
   readonly operationId: string;
   readonly nextControl: CoopNextControl;
+}
+
+/**
+ * Final proof fence for the retained turn-one presentation prefix.
+ *
+ * The entry replay queues ability, weather, terrain, stat, switch, and other presentation phases before the
+ * first CommandPhase. Merely queueing those phases is not evidence that they rendered: each concrete phase
+ * must settle its outcome token, and this phase runs last on the same phase-tree level. Only a completely
+ * successful prefix may advance the shared render watermark and release command control.
+ */
+export class CoopFinalizeEntryPresentationPhase extends Phase {
+  public readonly phaseName = "CoopFinalizeEntryPresentationPhase";
+
+  private readonly controller = getCoopController();
+  private readonly generation = coopSessionGeneration();
+
+  constructor(
+    private readonly turn: number,
+    private readonly sourceWave: number,
+    private readonly throughCount: number,
+    private readonly presentationOutcomeTokens: readonly CoopPresentationOutcomeToken[],
+    private readonly streamer: CoopBattleStreamer,
+  ) {
+    super();
+  }
+
+  public override start(): void {
+    super.start();
+    if (
+      this.generation !== coopSessionGeneration()
+      || getCoopBattleStreamer() !== this.streamer
+      || getCoopController() !== this.controller
+    ) {
+      // A torn-down/replaced session owns neither this phase nor its terminal UI. Its teardown replaces the
+      // phase tree; an obsolete continuation must never act on the next runtime.
+      return;
+    }
+    if (this.controller == null || this.controller.role !== "guest") {
+      terminateCoopAuthoritySession(
+        `Wave ${this.sourceWave} entry presentation reached its proof fence without its guest authority runtime.`,
+      );
+      return;
+    }
+    const presentation = inspectCoopPresentationOutcomes(this.presentationOutcomeTokens);
+    if (presentation.pending > 0 || presentation.failed.length > 0) {
+      const firstFailure = presentation.failed[0];
+      const reason =
+        `Wave ${this.sourceWave} entry presentation did not complete exactly `
+        + `(pending=${presentation.pending} failed=${presentation.failed.length}`
+        + `${firstFailure?.kind === "failed" ? ` reason=${firstFailure.reason}` : ""}).`;
+      const generation = this.generation;
+      void this.streamer
+        .broadcastAuthorityFailure({
+          epoch: this.controller.sessionEpoch,
+          wave: this.sourceWave,
+          turn: this.turn,
+          boundary: "turnResolution",
+          reason,
+        })
+        .then(() => {
+          if (
+            generation === coopSessionGeneration()
+            && getCoopBattleStreamer() === this.streamer
+            && getCoopController() === this.controller
+          ) {
+            terminateCoopAuthoritySession(reason);
+          }
+        });
+      return;
+    }
+    this.streamer.noteRenderedThrough(this.turn, this.throughCount, this.sourceWave);
+    coopLog(
+      "replay",
+      `guest entry presentation PROVED wave=${this.sourceWave} turn=${this.turn} events=${this.throughCount}`,
+    );
+    this.end();
+  }
 }
 
 export class CoopFinalizeTurnPhase extends Phase {

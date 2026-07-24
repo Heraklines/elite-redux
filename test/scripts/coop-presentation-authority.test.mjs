@@ -20,7 +20,10 @@ test("switch presentation is host-authored and the renderer never predicts its o
   assert.match(producer, /recordCoopEvent\(\{\s*k:\s*"switch"/u);
   assert.match(producer, /pokemonId:\s*incoming\.id/u);
   assert.match(producer, /speciesId:\s*incomingSpeciesId/u);
-  assert.match(replay, /case\s+"switch":\s*pm\.unshiftNew\("CoopSwitchReplayPhase",\s*event\)/u);
+  assert.match(
+    replay,
+    /case\s+"switch":[\s\S]+pm\.unshiftNew\("CoopSwitchReplayPhase",\s*event,\s*undefined,\s*outcomeToken\)/u,
+  );
   assert.match(rendererGate, /"CoopSwitchReplayPhase"/u);
   assert.match(
     replayPhases,
@@ -55,7 +58,7 @@ test("damage effectiveness and critical presentation are authority-authored end 
   const replay = read("src/phases/coop-replay-phases.ts");
 
   assert.match(pokemon, /presentationResult[\s\S]+result: presentationResult, critical: presentationCritical/u);
-  assert.match(transport, /result\?: number; critical\?: boolean/u);
+  assert.match(transport, /result\?: number;\s*critical\?: boolean/u);
   assert.match(replay, /damageNumberHandler\.add\(mon, amount, damageResult, this\.critical\)/u);
   assert.match(replay, /HitResult\.SUPER_EFFECTIVE[\s\S]+playSound\("se\/hit_strong"\)/u);
   assert.match(replay, /repeat:\s*5[\s\S]+setVisible/u);
@@ -68,9 +71,13 @@ test("Terastallization is authority-authored and replayed without renderer mecha
   const replayPump = read("src/phases/coop-replay-turn-phase.ts");
 
   assert.match(producer, /recordCoopEvent\(\{[\s\S]+k: "tera"[\s\S]+teraType: this\.pokemon\.getTeraType\(\)/u);
-  assert.match(transport, /\| \{ k: "tera"; bi: number; pokemonId: number; partySlot: number; teraType: number \}/u);
-  assert.match(replay, /class CoopTeraReplayPhase[\s\S]+CommonAnim\.TERASTALLIZE/u);
-  assert.doesNotMatch(replay, /class CoopTeraReplayPhase[\s\S]+isTerastallized = true/u);
+  assert.match(transport, /k: "tera";\s*bi: number;\s*pokemonId: number;\s*partySlot: number;\s*teraType: number;/u);
+  const teraReplay = replay.slice(
+    replay.indexOf("export class CoopTeraReplayPhase"),
+    replay.indexOf("export class", replay.indexOf("export class CoopTeraReplayPhase") + 1),
+  );
+  assert.match(teraReplay, /CommonAnim\.TERASTALLIZE/u);
+  assert.doesNotMatch(teraReplay, /isTerastallized = true/u);
   assert.match(replayPump, /case "tera":[\s\S]+"CoopTeraReplayPhase"/u);
 });
 
@@ -79,6 +86,8 @@ test("ordinary co-op and Showdown both replay retained entry presentation before
   const initEncounter = read("src/phases/init-encounter-phase.ts");
   const command = read("src/phases/command-phase.ts");
   const turnInit = read("src/phases/turn-init-phase.ts");
+  const replay = read("src/phases/coop-replay-turn-phase.ts");
+  const replayPhases = read("src/phases/coop-replay-phases.ts");
 
   assert.match(
     summon,
@@ -98,6 +107,21 @@ test("ordinary co-op and Showdown both replay retained entry presentation before
     /if \(globalScene\.currentBattle\.turn === 1\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+globalScene\.currentBattle\.waveIndex,[\s\S]+true,/u,
   );
   assert.doesNotMatch(turnInit, /isShowdownGuestFlipGated\(\) && globalScene\.currentBattle\.turn === 1/u);
+  const entryPump = replay.slice(
+    replay.indexOf("private async pumpEntryPresentation"),
+    replay.indexOf("private handleAuthorityFailure"),
+  );
+  assert.match(entryPump, /this\.renderEvents\(events\)[\s\S]+"CoopFinalizeEntryPresentationPhase"/u);
+  assert.doesNotMatch(
+    entryPump,
+    /this\.renderEvents\(events\)[\s\S]+streamer\.noteRenderedThrough/u,
+    "queueing entry cues is not permission to advance their watermark",
+  );
+  assert.match(
+    replayPhases,
+    /class CoopFinalizeEntryPresentationPhase[\s\S]+inspectCoopPresentationOutcomes[\s\S]+noteRenderedThrough[\s\S]+this\.end\(\)/u,
+    "the last queued phase must prove every outcome before command control can open",
+  );
 });
 
 test("renderer fixtures cannot manufacture legacy wave authority", () => {
@@ -121,7 +145,7 @@ test("every authority event receives an ordered renderer-completion receipt in t
   assert.match(replay, /if \(hasCoopPresentationObserver\(\)\)[\s\S]+CoopPresentationReceiptPhase/u);
   assert.match(browser, /\[coop-browser:presentation-event\]/u);
   assert.match(harness, /assertPresentationLedger\(battleCursors, commandMatch/u);
-  assert.match(harness, /assertPresentationLedger\(outcomeCursors, commandMatch/u);
+  assert.match(harness, /assertPresentationLedger\(presentationCursors, commandMatch/u);
   assert.match(harness, /ordered presentation ledger diverged/u);
 });
 

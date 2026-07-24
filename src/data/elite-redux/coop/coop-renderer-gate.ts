@@ -109,6 +109,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
 
   // ── COOP REPLAY / RENDER FAMILY (§3.1) - the guest's OWN render + adopt pipeline ──
   "CoopReplayTurnPhase", // the guest's per-turn render driver
+  "CoopFinalizeEntryPresentationPhase", // proves every turn-one cue before command control opens
   "CoopFinalizeTurnPhase", // guest turn-finalize + checksum verify
   "CoopReplayMePhase", // mystery-encounter render on the guest
   "CoopReplayLearnMovePhase", // learn-move render on the guest

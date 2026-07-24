@@ -2447,3 +2447,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   green. It reduced B1 to five independently classified migration failures; B5 now names six Mystery fixture
   failures plus four reward sub-picker terminals, and P1 isolates one legacy transition driver parked in
   `CoopReplayTurnPhase`. These remain red and are not being treated as release evidence.
+
+# 2026-07-24 - Entry presentation is proved before command control opens
+
+- The retained turn-one entry path previously queued ability, weather, terrain, stat, switch, and Tera cues,
+  immediately advanced the shared render watermark, and ended into CommandPhase. Unlike ordinary turn replay,
+  it never inspected the concrete presentation outcome tokens, so a failed/watchdog-expired ability flyout
+  could still authorize player input.
+- `CoopFinalizeEntryPresentationPhase` now drains last on the same phase-tree level, inspects every concrete
+  outcome, and only then advances the exact wave/turn watermark and releases the queued command surface.
+  Pending or failed outcomes emit a correlated shared authority failure; a replaced runtime cannot terminate
+  or mutate its successor session.
+- Failure-first engine coverage proves rendered prefixes advance exactly once while pending/failed prefixes do
+  not advance or end. The static architecture guard now forbids direct post-queue watermark advancement and
+  was repaired to follow the current outcome-token, actor-aware switch/Tera, and browser-ledger APIs; all 11
+  source-contract checks pass locally. Co-op engine execution remains hosted-only per `AGENTS.md`.

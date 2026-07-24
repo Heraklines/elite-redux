@@ -858,11 +858,21 @@ export class CoopReplayTurnPhase extends Phase {
       }
       const events = [...prefix.events];
       this.renderEvents(events);
-      streamer.noteRenderedThrough(this.turn, events.length, this.sourceWave);
       coopLog(
         "replay",
-        `guest replay turn=${this.turn}: retained entry presentation installed stateTick=${prefix.stateTick} `
-          + `events=${events.length}`,
+        `guest replay turn=${this.turn}: retained entry presentation queued stateTick=${prefix.stateTick} `
+          + `events=${events.length}; awaiting exact outcome proof`,
+      );
+      // This finalizer is appended after every presentation phase created above. Phase-tree FIFO therefore
+      // makes it the exact proof fence: only settled, non-failed outcomes may advance the watermark and let
+      // the already-queued CommandPhase become current.
+      globalScene.phaseManager.unshiftNew(
+        "CoopFinalizeEntryPresentationPhase",
+        this.turn,
+        this.sourceWave,
+        events.length,
+        this.presentationOutcomeTokens,
+        streamer,
       );
       this.end();
     } catch {

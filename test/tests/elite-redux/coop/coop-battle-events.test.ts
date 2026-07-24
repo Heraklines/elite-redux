@@ -66,6 +66,7 @@ import type { Pokemon } from "#field/pokemon";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
 import {
   CoopFaintReplayPhase,
+  CoopFinalizeEntryPresentationPhase,
   CoopFinalizeTurnPhase,
   CoopHpDrainReplayPhase,
   CoopMoveAnimReplayPhase,
@@ -177,6 +178,49 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
         actorFingerprint: "player:bi0:slot0:p17",
       },
     ]);
+  });
+
+  it("entry presentation advances its watermark only after every concrete outcome is proved", async () => {
+    await startCoopGuest();
+    const runtime = getCoopRuntime();
+    expect(runtime).not.toBeNull();
+    const token = createCoopPresentationOutcomeToken();
+    expect(settleCoopPresentationOutcome(token, { kind: "rendered", actorFingerprint: "enemy:p17" })).toBe(true);
+    const renderedSpy = vi.spyOn(runtime!.battleStream, "noteRenderedThrough");
+    const phase = new CoopFinalizeEntryPresentationPhase(1, 7, 3, [token], runtime!.battleStream);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(renderedSpy, "the prefix watermark advances only at the proof fence").toHaveBeenCalledWith(1, 3, 7);
+    expect(endSpy, "successful proof releases the queued command continuation").toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["pending", undefined],
+    ["failed", { kind: "failed" as const, reason: "ability-watchdog-expired" }],
+  ])("entry presentation fails closed for a %s outcome instead of opening command control", async (_kind, outcome) => {
+    await startCoopGuest();
+    const runtime = getCoopRuntime();
+    expect(runtime).not.toBeNull();
+    const token = createCoopPresentationOutcomeToken();
+    if (outcome != null) {
+      expect(settleCoopPresentationOutcome(token, outcome)).toBe(true);
+    }
+    const renderedSpy = vi.spyOn(runtime!.battleStream, "noteRenderedThrough");
+    const failureSpy = vi
+      .spyOn(runtime!.battleStream, "broadcastAuthorityFailure")
+      .mockReturnValue(new Promise(() => {}));
+    const phase = new CoopFinalizeEntryPresentationPhase(1, 7, 3, [token], runtime!.battleStream);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(renderedSpy, "an unproved prefix must not advance its render watermark").not.toHaveBeenCalled();
+    expect(failureSpy, "the presentation failure is shared and correlated").toHaveBeenCalledWith(
+      expect.objectContaining({ wave: 7, turn: 1, boundary: "turnResolution" }),
+    );
+    expect(endSpy, "command control stays closed behind the failed proof fence").not.toHaveBeenCalled();
   });
 
   it("a visible exact ability flyout is rendered even when its cosmetic tween remains throttled", async () => {

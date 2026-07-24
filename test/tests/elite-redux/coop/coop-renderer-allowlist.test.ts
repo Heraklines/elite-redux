@@ -51,6 +51,7 @@ const COOP_GUEST_OBSERVED_PHASES: readonly string[] = [
   "CommonAnimPhase",
   "CoopFaintReplayPhase",
   "CoopFinalizeTurnPhase",
+  "CoopFinalizeEntryPresentationPhase",
   "CoopGuestCatchFullPhase",
   "CoopGuestFaintSwitchPhase",
   "CoopGuestRevivalPhase",
