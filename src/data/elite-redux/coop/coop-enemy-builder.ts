@@ -261,17 +261,24 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       // follows its ordinary SummonPhase.
       const activeFieldIndex = activeEnemy == null ? -1 : globalScene.field.getIndex(activeEnemy);
       const wantSpecies = coopNum(entry.data, "speciesId");
+      if (wantSpecies === undefined || !Number.isSafeInteger(wantSpecies) || getPokemonSpecies(wantSpecies) == null) {
+        // A same-species local roll used to bypass buildCoopEnemy when the host identity omitted or
+        // corrupted speciesId. That preserved whichever enemy happened to exist locally—the exact
+        // renderer divergence this projector exists to prevent. Immutable identity is mandatory even when
+        // a local object appears compatible; freeze the shared run before mechanics consume unproven state.
+        failCoopSharedSession(
+          `The authoritative enemy at field slot ${entry.fieldIndex} carried no decodable species identity.`,
+          { boundary: "authority", reasonCode: "invalid-authority" },
+        );
+        return;
+      }
       // A material-state apply can reconstruct the party member before this retained manifest arrives,
       // leaving a distinct object with the SAME id/species on Phaser's field.  Species equality is not
       // sufficient in that shape: HP/status updates would hit the detached party object while the player
       // keeps seeing the stale displayed object.  Rebuild whenever the display identity and party identity
       // are split, even when their species already agree.
       const detachedDisplayedIdentity = displayedIdentity != null && displayedIdentity !== existing;
-      if (
-        existing != null
-        && !detachedDisplayedIdentity
-        && (wantSpecies === undefined || existing.species.speciesId === wantSpecies)
-      ) {
+      if (existing != null && !detachedDisplayedIdentity && existing.species.speciesId === wantSpecies) {
         continue; // same mon - the corrector pass below converges its state
       }
       const level = coopNum(entry.data, "level") ?? existing?.level ?? battle.enemyLevels?.[entry.fieldIndex] ?? 1;

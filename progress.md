@@ -2722,3 +2722,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   phase manager still owned another phase. The helper now clears the synthetic tail, queues the real market,
   shifts it into the current slot through `PhaseManager`, and asserts object identity before public UI input.
   No production check is bypassed; the test now covers the actual UI -> phase -> projector -> relay chain.
+
+# 2026-07-24 - Final aggregate reds are classified at their real ownership boundary
+
+- Exact gate `30082231271` made B1 fully green, including all real market, Bargain, and double-KO public
+  chains. B5 then exposed two impossible reward-subpicker cadences: the old helper treated semantic
+  `PartyOption` values as cursor counts and skipped DNA Splicer's two explicit confirmation steps. The
+  helper now sends only public party inputs after each actionable sub-surface is observable.
+- C3 proved `dexSync` reached the guest's validated interaction relay but never reached the account merger.
+  The account-only carrier was split across a runtime-owned relay plus a second module-global transport
+  listener. It is now applied directly at the relay's exact address/payload/remote-authority boundary and
+  bound to the captured guest runtime, removing the one-process receiver seam without putting account
+  telemetry into the mechanical V2 log.
+- B7 caught one real fail-closed gap: a missing species identity could match an existing local enemy because
+  the structural projector compared the local roll before invoking the strict builder. Species identity is
+  now validated before any compatibility match; invalid authority synchronously freezes membership and the
+  phase manager. The adjacent structural cleanup assertion now checks authoritative identity and visible
+  projection instead of deep-comparing Phaser renderer internals.
+- T4 remains unrelated pre-existing Elite Redux ghost/triples probability debt. It does not touch co-op or
+  Showdown mechanics and is intentionally left to its existing owner under the staging false-red policy.

@@ -209,6 +209,7 @@ import type { ModifierOverride } from "#modifiers/modifier-type";
 import {
   ErLearnersShroomModifierType,
   ErTmCaseModifierType,
+  FusePokemonModifierType,
   PokemonModifierType,
   PokemonReviveModifierType,
   RememberMoveModifierType,
@@ -4068,16 +4069,77 @@ export async function driveHostPartyRewardOwner(
   if (!globalScene.ui.processInput(Button.ACTION)) {
     throw new Error(`party reward UI could not open options for slot ${slot} at interaction ${pinned}`);
   }
-  // Ordinary PokemonModifierType rewards expose APPLY as the first option. The optional legacy `option`
-  // remains supported for callers that need a later option, but navigation still travels through the real
-  // options handler instead of calling its callback.
-  for (let cursor = 0; cursor < option; cursor++) {
-    if (!globalScene.ui.processInput(Button.DOWN)) {
-      throw new Error(`party reward UI could not navigate to option ${option} at interaction ${pinned}`);
+  type PartyHandlerSeam = {
+    active?: boolean;
+    isCoopV2InputActionable?: () => boolean;
+    optionsMode?: boolean;
+    transferMode?: boolean;
+    options?: number[];
+  };
+  const awaitPartyState = async (label: string, predicate: (handler: PartyHandlerSeam) => boolean): Promise<void> => {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      await drainLoopback();
+      const handler = globalScene.ui.getHandler() as unknown as PartyHandlerSeam;
+      if (
+        globalScene.ui.getMode() === UiMode.PARTY
+        && handler.active === true
+        && handler.isCoopV2InputActionable?.() === true
+        && predicate(handler)
+      ) {
+        return;
+      }
     }
-  }
-  if (!globalScene.ui.processInput(Button.ACTION)) {
-    throw new Error(`party reward UI rejected option ${option} at interaction ${pinned}`);
+    throw new Error(`party reward ${idx} never exposed ${label} at interaction ${pinned}`);
+  };
+  await awaitPartyState("an actionable option list", handler => handler.optionsMode === true);
+
+  const selectedType = (hostPhase.typeOptions[idx] as { type?: unknown }).type;
+  if (selectedType instanceof FusePokemonModifierType) {
+    // SPLICE is a four-confirm public flow: choose the base mon, choose APPLY, choose the partner mon,
+    // choose SPLICE. The old generic helper skipped both option confirms and generated a cadence no human
+    // could produce, so V2 correctly retained no result and the watcher waited forever.
+    if (!globalScene.ui.processInput(Button.ACTION)) {
+      throw new Error(`fusion reward could not choose APPLY at interaction ${pinned}`);
+    }
+    await awaitPartyState(
+      "the second fusion target cursor",
+      handler => handler.optionsMode === false && handler.transferMode === true,
+    );
+    for (let cursor = slot; cursor < option; cursor++) {
+      if (!globalScene.ui.processInput(Button.DOWN)) {
+        throw new Error(`fusion reward UI could not navigate to splice slot ${option} at interaction ${pinned}`);
+      }
+    }
+    if (!globalScene.ui.processInput(Button.ACTION)) {
+      throw new Error(`fusion reward UI could not open splice confirmation at interaction ${pinned}`);
+    }
+    await awaitPartyState("the SPLICE confirmation", handler => handler.optionsMode === true);
+    if (!globalScene.ui.processInput(Button.ACTION)) {
+      throw new Error(`fusion reward UI rejected splice slot ${option} at interaction ${pinned}`);
+    }
+  } else {
+    // PartyOption values are semantic enum values, not cursor offsets. Navigate by the actual visible list
+    // so MOVE_1 cannot wrap through unrelated summary/cancel entries. Retain the helper's historical small
+    // integer cursor form (`0` = the first APPLY option) for ordinary held-item callers.
+    const handler = globalScene.ui.getHandler() as unknown as PartyHandlerSeam;
+    const exactOptionCursor = handler.options?.indexOf(option) ?? -1;
+    const optionCursor =
+      exactOptionCursor >= 0
+        ? exactOptionCursor
+        : Number.isSafeInteger(option) && option >= 0 && option < (handler.options?.length ?? 0)
+          ? option
+          : -1;
+    if (optionCursor < 0) {
+      throw new Error(`party reward ${idx} did not offer option ${option} at interaction ${pinned}`);
+    }
+    for (let cursor = 0; cursor < optionCursor; cursor++) {
+      if (!globalScene.ui.processInput(Button.DOWN)) {
+        throw new Error(`party reward UI could not navigate to option ${option} at interaction ${pinned}`);
+      }
+    }
+    if (!globalScene.ui.processInput(Button.ACTION)) {
+      throw new Error(`party reward UI rejected option ${option} at interaction ${pinned}`);
+    }
   }
   // The handler terminal restores MODIFIER_SELECT asynchronously, then the authoritative result publishes.
   for (let i = 0; i < 8; i++) {

@@ -2969,7 +2969,6 @@ export function coopBroadcastDexSync(): void {
   }
 }
 
-let offDexSync: (() => void) | null = null;
 let offDisconnectReaction: (() => void) | null = null;
 
 /**
@@ -3897,17 +3896,17 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
 }
 
 // #805 rejoin-resync seq band (#840: declared in coop-seq-registry, imported above).
-function wireCoopDexSync(transport: CoopTransport): void {
-  offDexSync = transport.onMessage(msg => {
-    if (msg.t !== "interactionOutcome" || msg.outcome.k !== "dexSync") {
-      return;
-    }
-    if (!isCoopAuthoritativeGuest()) {
+function wireCoopDexSync(relay: CoopInteractionRelay, runtime: CoopRuntime): void {
+  relay.onDexSync = dex => {
+    // The relay already validated the exact dexSync address/payload and remote authority. Use the captured
+    // runtime role rather than the ambient process-global runtime so the one-process duo harness has the
+    // same independently owned receiver as two real browser processes.
+    if (runtime.controller.role !== "guest" || runtime.controller.netcodeMode !== "authoritative") {
       return;
     }
     coopLog("runtime", "recv dexSync -> merging partner acquisition credit onto local account");
-    applyCoopDexDelta(msg.outcome.dex);
-  });
+    applyCoopDexDelta(dex);
+  };
 }
 
 function wireCoopLearnMoveForward(relay: CoopInteractionRelay): void {
@@ -11245,7 +11244,7 @@ export function assembleCoopRuntime(
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(interactionRelay);
   wireCoopLearnMoveBatchForward(interactionRelay);
-  wireCoopDexSync(transport);
+  wireCoopDexSync(interactionRelay, runtime);
   wireShowdownResult(transport, runtime);
   wireCoopDisconnectReaction(transport, runtime);
   wireCoopStallWatchdog(transport, interactionRelay, battleStream, runtime);
@@ -11448,8 +11447,6 @@ export function clearCoopRuntime(): void {
   offLearnMoveForward = null;
   offLearnMoveBatchForward?.();
   offLearnMoveBatchForward = null;
-  offDexSync?.();
-  offDexSync = null;
   offDisconnectReaction?.();
   offDisconnectReaction = null;
   offStallWatchdog?.();

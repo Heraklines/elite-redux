@@ -43,6 +43,7 @@ import {
   getCoopInteractionRelay,
   getCoopRuntime,
   getCoopV2Shadow,
+  isCoopSharedTerminalFrozen,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -512,7 +513,11 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       leaveField,
       "renderer truncation never invokes pre-leave abilities or form mechanics",
     ).not.toHaveBeenCalled();
-    expect(battle.enemyParty).toEqual([retained]);
+    expect(battle.enemyParty, "the authoritative one-slot party is installed").toHaveLength(1);
+    expect(battle.enemyParty[0].id, "the retained authoritative identity survives structural cleanup").toBe(
+      retained.id,
+    );
+    expect(battle.enemyParty[0].visible, "the retained authoritative renderer remains visible").toBe(true);
     expect(globalScene.field.getIndex(extra), "the obsolete display child is removed directly").toBe(-1);
     expect(battle.double, "wild battle shape follows the one-slot authority image").toBe(false);
   });
@@ -525,9 +530,12 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     adoptCoopEnemiesStructural([{ fieldIndex: 0, data: { level: 5 } }]);
 
     expect(
-      runtime?.membership.snapshot().state,
-      "invalid immutable enemy authority synchronously freezes the shared mechanics pending terminal quorum",
-    ).toBe("terminated");
+      isCoopSharedTerminalFrozen(runtime),
+      "invalid immutable enemy authority synchronously freezes shared mechanics pending terminal quorum",
+    ).toBe(true);
+    expect(runtime?.membership.snapshot().state, "the local membership cannot continue after invalid authority").toBe(
+      "terminated",
+    );
   });
 
   it("turn-one structural adoption replaces a retained-state field identity after its party slot changed", async () => {

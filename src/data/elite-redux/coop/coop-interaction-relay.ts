@@ -1723,6 +1723,9 @@ export class CoopInteractionRelay {
     | ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveBatchForward" }>, operationId?: string) => void)
     | null = null;
 
+  /** Exact, merge-only partner acquisition carrier; never advances mechanics or chooses a successor. */
+  onDexSync: ((dex: string) => void) | null = null;
+
   /**
    * #856: fired when the partner (the sole-engine host) asks THIS client - the CATCHER - to drive the
    * full-party keep/release picker for a wild catch it threw. Wired by the runtime (queues
@@ -1832,15 +1835,19 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t === "interactionOutcome") {
+      if (!this.isLocalAuthority() && isCoopV2AccountMergeOutcome(msg.seq, msg.kind, msg.outcome)) {
+        // Account acquisition is deliberately outside the mechanical V2 log, but it still belongs to
+        // this runtime-owned relay. Routing it through a second ambient transport listener made the
+        // one-process duo harness lose the receiver whenever another synthetic client owned the module-
+        // global unsubscribe handle. The relay already performs the exact address, payload, and sender-role
+        // validation, so production and the representative harness now consume one validated path.
+        this.onDexSync?.(msg.outcome.dex);
+        coopLog("v2-interaction", `accepted account-local dexSync carrier seq=${msg.seq}`);
+        return;
+      }
       if (this.isInteractionAuthorityV2()) {
         if (this.isLocalAuthority() && msg.kind === "bargain") {
           this.handleV2BargainOutcomeProposal(msg);
-          return;
-        }
-        if (!this.isLocalAuthority() && isCoopV2AccountMergeOutcome(msg.seq, msg.kind, msg.outcome)) {
-          // `wireCoopDexSync` consumes this merge-only account telemetry directly from the transport.
-          // Do not place it in a phase-local legacy outcome FIFO.
-          coopLog("v2-interaction", `accepted account-local dexSync carrier seq=${msg.seq}`);
           return;
         }
         coopLog(
