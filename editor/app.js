@@ -1212,6 +1212,59 @@ function speciesDatalistOptionsHtml(speciesEntries) {
     .join("");
 }
 
+function matchingSpeciesEntries(query, limit = 24) {
+  const queryKey = speciesSearchKey(query);
+  if (!queryKey) {
+    return [];
+  }
+  const queryTokens = queryKey.split(" ");
+  const ranked = [];
+  for (const species of spByConst.values()) {
+    const keys = speciesSearchValues(species).map(speciesSearchKey);
+    let score = 99;
+    for (const key of keys) {
+      if (key === queryKey) {
+        score = Math.min(score, 0);
+      } else if (key.startsWith(queryKey)) {
+        score = Math.min(score, 1);
+      } else if (key.includes(queryKey)) {
+        score = Math.min(score, 2);
+      } else if (queryTokens.every(token => key.includes(token))) {
+        score = Math.min(score, 3);
+      }
+    }
+    if (score < 99) {
+      ranked.push({ species, score });
+    }
+  }
+  return ranked
+    .sort((a, b) => a.score - b.score || a.species.name.localeCompare(b.species.name))
+    .slice(0, limit)
+    .map(entry => entry.species);
+}
+
+function openCtrSpeciesDrop(input) {
+  const drop = input.parentElement?.querySelector(".ctr-species-drop");
+  if (!drop) {
+    return;
+  }
+  const matches = matchingSpeciesEntries(input.value);
+  const fusion = input.classList.contains("ctr-fusion-species");
+  drop.innerHTML = matches
+    .map(species => {
+      const form = Number.isInteger(species.formIndex) ? `Form ${species.formIndex}` : "Base species";
+      return `<button type="button" class="ctr-species-opt" role="option" data-idx="${input.dataset.idx}" data-species="${esc(species.const)}" data-fusion="${fusion ? "1" : "0"}">
+        <span>${esc(species.name)}</span><small>${esc(species.const)} · ${form}</small>
+      </button>`;
+    })
+    .join("");
+  drop.classList.toggle("open", matches.length > 0);
+}
+
+function closeCtrSpeciesDrops() {
+  document.querySelectorAll(".ctr-species-drop.open").forEach(drop => drop.classList.remove("open"));
+}
+
 /** The Pokedex tabs' species list: ALL species, filtered by the header search, sorted. */
 function pokedexList() {
   const f = ($("#search").value || "").trim().toLowerCase();
@@ -2840,7 +2893,7 @@ function ctrMemberHtml(m, i) {
   return `<fieldset class="ctr-member open">
     <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
     ${slotCtrls}
-    <label>Species <input class="ctr-species" list="species-list" data-idx="${i}" value="${esc(m.species || "")}" placeholder="SPECIES_…" spellcheck="false" style="width:170px" /></label>
+    <label>Species <span class="ctr-species-combo"><input class="ctr-species" list="species-list" data-idx="${i}" value="${esc(m.species || "")}" placeholder="Search Pokemon" spellcheck="false" autocomplete="off" aria-autocomplete="list" /><span class="ctr-species-drop" role="listbox"></span></span></label>
     <label>Form <input type="number" class="ctr-form" data-idx="${i}" value="${m.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
     <label>Ability slot <select class="ctr-abil" data-idx="${i}">${ctrAbilOptions(m.species, m.abilitySlot)}</select></label>
     <label title="Uncheck to set an explicit level">Wave-scale level <input type="checkbox" class="ctr-scale" data-idx="${i}"${scale ? " checked" : ""} /></label>
@@ -2868,7 +2921,7 @@ function ctrMemberHtml(m, i) {
       <label>Fusion <input type="checkbox" class="ctr-fusion-on" data-idx="${i}"${fus ? " checked" : ""} /></label>
       ${
         fus
-          ? `<input class="ctr-fusion-species" list="species-list" data-idx="${i}" value="${esc(fus.species || "")}" placeholder="fusion SPECIES_…" spellcheck="false" style="width:170px" />
+          ? `<span class="ctr-species-combo"><input class="ctr-fusion-species" list="species-list" data-idx="${i}" value="${esc(fus.species || "")}" placeholder="Search fusion Pokemon" spellcheck="false" autocomplete="off" aria-autocomplete="list" /><span class="ctr-species-drop" role="listbox"></span></span>
           <label>Form <input type="number" class="ctr-fusion-form" data-idx="${i}" value="${fus.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
           <label>Ability slot <select class="ctr-fusion-abil" data-idx="${i}">${ctrAbilOptions(fus.species, fus.abilitySlot)}</select></label>`
           : ""
@@ -3456,6 +3509,7 @@ function onCustomTrainerInput(el) {
       m.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
     }
     el.style.borderColor = m.species === "" || selected ? "" : ERR;
+    openCtrSpeciesDrop(el);
   } else if (el.classList.contains("ctr-form") && m) {
     m.formIndex = Number(el.value) || 0;
     const speciesId = spByConst.get(m.species)?.id;
@@ -3509,6 +3563,7 @@ function onCustomTrainerInput(el) {
       m.fusion.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
     }
     el.style.borderColor = m.fusion.species === "" || selected ? "" : ERR;
+    openCtrSpeciesDrop(el);
   } else if (el.classList.contains("ctr-fusion-form") && m && m.fusion) {
     m.fusion.formIndex = Number(el.value) || 0;
     const speciesId = spByConst.get(m.fusion.species)?.id;
@@ -3734,6 +3789,60 @@ function ctrResetMemberUiState() {
   ctrOpenMembers.clear();
   ctrSetSel.clear();
   ctrFocusIdx = 0;
+}
+
+function selectCtrSpeciesOption(option) {
+  const t = ctrCur();
+  const idx = Number(option.dataset.idx);
+  const member = t?.team[idx];
+  const species = spByConst.get(option.dataset.species);
+  if (!member || !species) {
+    return false;
+  }
+  const formIndex = Number.isInteger(species.formIndex) ? species.formIndex : 0;
+  if (option.dataset.fusion === "1") {
+    if (!member.fusion) {
+      return false;
+    }
+    member.fusion.species = species.const;
+    member.fusion.formIndex = formIndex;
+  } else {
+    member.species = species.const;
+    member.formIndex = formIndex;
+    ctrSetSel.set(idx, -1);
+  }
+  ctrFocusIdx = idx;
+  render();
+  return true;
+}
+
+function onCustomTrainerSpeciesPointerDown(e) {
+  const option = e.target.closest?.(".ctr-species-opt");
+  if (!option) {
+    return false;
+  }
+  e.preventDefault?.();
+  return selectCtrSpeciesOption(option);
+}
+
+function onCustomTrainerSpeciesKeyDown(e) {
+  const input = e.target;
+  if (!input.classList?.contains("ctr-species") && !input.classList?.contains("ctr-fusion-species")) {
+    return false;
+  }
+  const drop = input.parentElement?.querySelector(".ctr-species-drop.open");
+  if (e.key === "Escape") {
+    closeCtrSpeciesDrops();
+    return true;
+  }
+  if ((e.key === "Enter" || e.key === "ArrowDown") && drop) {
+    const first = drop.querySelector(".ctr-species-opt");
+    if (first) {
+      e.preventDefault();
+      return selectCtrSpeciesOption(first);
+    }
+  }
+  return false;
 }
 
 function onCustomTrainerClick(e) {
@@ -5985,6 +6094,16 @@ async function init() {
     const content = $("#content");
     content.addEventListener("input", onInput);
     content.addEventListener("click", onClick);
+    content.addEventListener("pointerdown", e => {
+      if (activeTab === "customtrainers") {
+        onCustomTrainerSpeciesPointerDown(e);
+      }
+    });
+    content.addEventListener("keydown", e => {
+      if (activeTab === "customtrainers") {
+        onCustomTrainerSpeciesKeyDown(e);
+      }
+    });
     // `change` fires once per completed edit (blur / pick from list) → one undo step,
     // and on the Trainers tab it refreshes the default/overridden badges.
     content.addEventListener("change", e => {
@@ -6029,11 +6148,23 @@ async function init() {
       if (e.target.classList && e.target.classList.contains("abil-input")) {
         openAbilDrop(e.target.dataset.slot, e.target.value);
       }
+      if (
+        e.target.classList
+        && (e.target.classList.contains("ctr-species") || e.target.classList.contains("ctr-fusion-species"))
+      ) {
+        openCtrSpeciesDrop(e.target);
+      }
     });
     content.addEventListener("focusout", e => {
       // Delay so a click on an option registers before the dropdown closes.
       if (e.target.classList && e.target.classList.contains("abil-input")) {
         setTimeout(closeAbilDrops, 150);
+      }
+      if (
+        e.target.classList
+        && (e.target.classList.contains("ctr-species") || e.target.classList.contains("ctr-fusion-species"))
+      ) {
+        setTimeout(closeCtrSpeciesDrops, 150);
       }
     });
     let dragMoveId = null;

@@ -64,6 +64,7 @@ interface EditorHarness {
   spBySearchKey: Map<string, unknown>;
   registerSpeciesSearchEntry(species: Record<string, unknown>): void;
   speciesDatalistOptionsHtml(species: Record<string, unknown>[]): string;
+  onCustomTrainerSpeciesPointerDown(e: { target: Element; preventDefault(): void }): boolean;
   pokemonAtlasCache: Map<string, unknown>;
   renderPokemonFrame(slug: string, el: HTMLElement, targetSize: number): void;
   trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
@@ -145,7 +146,7 @@ beforeAll(() => {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
       ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, ctrConfig, spByConst, spById, spByBattleIdentity, spBySearchKey, registerSpeciesSearchEntry, speciesDatalistOptionsHtml, pokemonAtlasCache, renderPokemonFrame, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, abilById, abilIdByNormalizedName, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, ctrConfig, spByConst, spById, spByBattleIdentity, spBySearchKey, registerSpeciesSearchEntry, speciesDatalistOptionsHtml, onCustomTrainerSpeciesPointerDown, pokemonAtlasCache, renderPokemonFrame, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, abilById, abilIdByNormalizedName, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
@@ -285,9 +286,22 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     const speciesInput = q('.ctr-species[data-idx="0"]') as HTMLInputElement;
     speciesInput.value = "Mega Jumpluff";
     ct.onCustomTrainerInput(speciesInput);
-    // Keep the user's text intact while typing so the native datalist remains open.
+    // Keep the user's text intact and show an editor-rendered result menu.
     expect(speciesInput.value).toBe("Mega Jumpluff");
-    ct.onCustomTrainerChange(speciesInput);
+    const customDrop = q(".ctr-species-drop");
+    expect(customDrop?.classList.contains("open")).toBe(true);
+    const customChoice = [...customDrop!.querySelectorAll(".ctr-species-opt")].find(option =>
+      option.textContent?.includes("Mega Jumpluff"),
+    );
+    expect(customChoice).not.toBeUndefined();
+    let prevented = false;
+    ct.onCustomTrainerSpeciesPointerDown({
+      target: customChoice!,
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+    expect(prevented).toBe(true);
     const member = ct.ctr.current[key].team[0];
     expect(member.species).toBe(mega.const);
     expect(member.formIndex).toBe(1);
