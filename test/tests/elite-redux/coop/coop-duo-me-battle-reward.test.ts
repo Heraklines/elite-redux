@@ -274,6 +274,19 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       const rewards = hostScene.phaseManager.getCurrentPhase();
       expect(rewards?.phaseName, "host reached the post-prepare settlement owner").toBe("MysteryEncounterRewardsPhase");
       rewards.start();
+      // Reward preparation is intentionally async. Keep this browser's complete scene/runtime context
+      // installed until that continuation captures the settlement and ends the phase; otherwise the
+      // one-process fixture restores the guest global between `start()` and its Promise continuation and
+      // silently fails the phase-identity guard. Separate browsers cannot suffer that ambient-context swap.
+      await vi.waitFor(
+        () =>
+          expect(
+            hostScene.phaseManager.getCurrentPhase(),
+            "host retained its post-preparation ME settlement before yielding browser context",
+          ).not.toBe(rewards),
+        { timeout: 2_000, interval: 10 },
+      );
+      await drainLoopback();
     });
     await withClient(rig.guestCtx, async () => {
       // Production clients never share a scene. Pump the retained envelope only after the guest's complete

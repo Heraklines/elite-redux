@@ -142,6 +142,12 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
   const driveReplayTurnCapturingSequence = async (turn: number): Promise<string[]> => {
     const sequence: string[] = [];
     const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
+    // Install the replay as the phase manager's real current phase before starting it. A detached phase can
+    // enqueue presentation work behind the still-current CommandPhase, making this driver return with an
+    // empty sequence while the checkpoint never applies—an execution no browser can produce.
+    game.scene.phaseManager.clearPhaseQueue();
+    game.scene.phaseManager.unshiftPhase(replay);
+    game.scene.phaseManager.shiftPhase();
     replay.start();
     await new Promise(r => setTimeout(r, 0));
     for (let i = 0; i < 40; i++) {

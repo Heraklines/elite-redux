@@ -25,7 +25,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
@@ -256,6 +256,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     setCoopFaintSwitchWaitMs(30);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const hostTransportSendSpy = vi.spyOn(rig.pair.host, "send");
 
     // LAPRAS is the first legal guest-owned bench mon. The test deliberately never invokes the
     // guest's real PARTY callback, so the authoritative timeout must select this exact fallback.
@@ -292,9 +293,9 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     }
     const materialBarrierSpy = vi.spyOn(hostDurability, "waitForOperationMaterialApplied");
     const unshiftSpy = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
-    const v2CommittedBefore = V2_REPLACEMENT_CUTOVER
-      ? withClientSync(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed ?? 0)
-      : 0;
+    const v2CommittedBefore = hostTransportSendSpy.mock.calls.filter(
+      ([message]) => message.t === "authorityEntry" && message.entry.kind === "REPLACEMENT_COMMIT",
+    ).length;
     let hostAdvance: Promise<void> | undefined;
 
     try {
@@ -445,9 +446,10 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
       await settleDuoPromise(rig, hostAdvance!, "idle faint fallback host crossing");
       if (V2_REPLACEMENT_CUTOVER) {
-        const diagnostics = withClientSync(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime)?.diagnostics());
         expect(
-          diagnostics?.committed,
+          hostTransportSendSpy.mock.calls.filter(
+            ([message]) => message.t === "authorityEntry" && message.entry.kind === "REPLACEMENT_COMMIT",
+          ).length,
           "the host committed the staged fallback only after the post-summon carrier phase executed",
         ).toBeGreaterThan(v2CommittedBefore);
       }

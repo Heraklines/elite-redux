@@ -2313,33 +2313,36 @@ export async function driveDuoGuestTackleThroughPublicUi(
     guestTarget?: BattlerIndex;
   } = {},
 ): Promise<void> {
-  // Between public command surfaces the renderer may be parked on an ordered-successor finalizer,
-  // NextEncounter, or another retained wave/replacement boundary while the authority still has to run the
-  // real tail that constructs the next CommandPhase. Two browsers advance those event loops concurrently.
-  // In this single-process fixture, asking the guest for a command first starves the host tail and reports
-  // a false successor hang. Advance the authority only to its real next CommandPhase (do not run or answer
-  // it); the resulting WAVE/REPLACEMENT/CONTROL entry releases the guest through the production projector.
-  if (
-    rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase"
-    && rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase"
-  ) {
-    await withClient(rig.hostCtx, async () => {
-      await hostGame.phaseInterceptor.to("CommandPhase");
-    });
-  }
-  const guestOwnCommand = await withClient(rig.guestCtx, () =>
-    driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
-      matches: phase =>
-        phase.phaseName === "CommandPhase"
-        && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
-    }),
-  );
   // Promise continuations from a reciprocal rendezvous must resume in the RECEIVER's realm. In two
   // browsers that is automatic; in this shared-process harness an automatically delivered host arrival
-  // can otherwise resolve the guest's pending barrier while the host owns globalScene. Queue the complete
-  // handshake and let each drain below deliver only that client's inbox under its installed ClientCtx.
+  // can otherwise resolve the guest's pending barrier while the host owns globalScene. Enable destination
+  // scheduling before the between-wave authority tail too: that tail emits the WAVE/CONTROL successor that
+  // constructs the replica's next CommandPhase, and applying it under the authority context can leave the
+  // replica on its inert boot TitlePhase even though the exact entry arrived.
   rig.pair.setDestinationContextDelivery?.(true);
   try {
+    // Between public command surfaces the renderer may be parked on an ordered-successor finalizer,
+    // NextEncounter, or another retained wave/replacement boundary while the authority still has to run the
+    // real tail that constructs the next CommandPhase. Two browsers advance those event loops concurrently.
+    // In this single-process fixture, asking the guest for a command first starves the host tail and reports
+    // a false successor hang. Advance the authority only to its real next CommandPhase (do not run or answer
+    // it); the resulting WAVE/REPLACEMENT/CONTROL entry releases the guest through the production projector.
+    if (
+      rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase"
+      && rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase"
+    ) {
+      await withClient(rig.hostCtx, async () => {
+        await hostGame.phaseInterceptor.to("CommandPhase");
+      });
+      await withClient(rig.guestCtx, () => drainLoopback());
+    }
+    const guestOwnCommand = await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+      }),
+    );
     await withClient(rig.guestCtx, async () => {
       if (rig.guestScene.ui.getMode() !== UiMode.COMMAND && rig.guestScene.ui.getMode() !== UiMode.FIGHT) {
         guestOwnCommand.start();

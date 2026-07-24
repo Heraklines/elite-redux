@@ -171,6 +171,7 @@ async function pickHostMeOption(
   }
   await drainLoopback(); // flush the round's streamed mePresent onto the guest relay's 8M outcome inbox
   const uiHandler = hostScene.ui.getHandler() as unknown as { unblockInput(): void; processInput(b: number): boolean };
+  const selectedPhase = hostScene.phaseManager.getCurrentPhase();
   uiHandler.unblockInput(); // ME handler blocks input for 1s on show; tests clear it
   for (const move of cursorMoves) {
     hostScene.ui.processInput(move);
@@ -178,8 +179,18 @@ async function pickHostMeOption(
   hostScene.ui.processInput(Button.ACTION);
   if (options.startNextRound) {
     // The option callback is async (narration, chip damage, rewards). Do not install the guest's
-    // process-global scene while that callback is still live: wait under hostCtx until the real next
-    // MysteryEncounterPhase has started and exposed its public selector.
+    // process-global scene while that callback is still live. First prove the selected phase instance
+    // actually retired: asking PhaseInterceptor for MysteryEncounterPhase immediately can otherwise match
+    // the still-current OLD round and return before the async option chain creates the next one.
+    await vi.waitFor(
+      () =>
+        expect(
+          hostScene.phaseManager.getCurrentPhase(),
+          "the selected Mystery round retired before awaiting its successor",
+        ).not.toBe(selectedPhase),
+      { timeout: 2_000, interval: 10 },
+    );
+    // Now remain under hostCtx until the real successor has started and exposed its public selector.
     await game.phaseInterceptor.to("MysteryEncounterPhase");
   }
 }
@@ -1495,10 +1506,17 @@ describe.skipIf(!RUN)(
         rig.hostRuntime.battleStream.sendMeChecksum(meSeq, coopEngine.captureCoopChecksum());
       });
       // Complete the async round-trip across ctxs: (guest) recv checksum -> requestStateSync; (host) answer
-      // with its authoritative snapshot under the HOST scene; (guest) receive + apply the heal.
-      await withClient(rig.guestCtx, () => drainLoopback());
-      await withClient(rig.hostCtx, () => drainLoopback());
-      await withClient(rig.guestCtx, () => drainLoopback());
+      // with its authoritative snapshot under the HOST scene; (guest) receive + apply the heal. Destination
+      // scheduling is essential in the one-process fixture: a real second browser can never receive and
+      // apply the recovery response while the authority's globalScene is installed.
+      rig.pair.setDestinationContextDelivery?.(true);
+      try {
+        await withClient(rig.guestCtx, () => drainLoopback());
+        await withClient(rig.hostCtx, () => drainLoopback());
+        await withClient(rig.guestCtx, () => drainLoopback());
+      } finally {
+        rig.pair.setDestinationContextDelivery?.(false);
+      }
 
       // The heal fired, and it was SAFE: suppressResummon=TRUE on every me-entry apply (the runtime's own
       // choice - a revert to FALSE fails here). applyCoopFullSnapshot touches no phase queue and cancels no

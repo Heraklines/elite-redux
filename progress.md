@@ -3021,3 +3021,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The barrier regression no longer invents turn N+1 and waits for a result the authority never authored.
   It asserts the retained replacement carrier installs the real command successor with no leaked request or
   retry timer—the invariant Authority V2 now owns.
+
+# 2026-07-24 - B9 retains fast observations and real browser execution contexts
+
+- Exact focused run `30099373184` reduced B9 again: barrier-deadlock and the first public faint journey are
+  green. Its remaining Mystery evidence isolated one production timing hole and two one-process scheduler
+  errors instead of an undifferentiated interaction failure.
+- A fast host may answer an embedded Mystery quiz after the replica has admitted and materially applied its
+  exact ME_PRESENT claim but before the replica renderer starts ErQuizPhase. The answer is non-mechanical
+  presentation data, so it is now authenticated against that latest material claim and buffered by its exact
+  operation address; it still cannot install control, consume a global revision, or mutate state.
+- The repeated-delve fixture now proves the selected Mystery phase object retires before asking the
+  interceptor for its same-named successor. The old helper immediately matched the prior round, switched the
+  process-global scene during its async option callback, and consequently never authored round two.
+- ME checksum recovery and between-wave public-command driving enable destination-context delivery before
+  the authority sends the response/successor. This mirrors separate browser event loops and prevents a valid
+  recovery bundle or WAVE/CONTROL entry from applying against the sender's scene.
+- The battle-handoff reward and replay-pacing fixtures install their asynchronous settlement/replay phases as
+  real phase-manager boundaries. The faint fallback assertion now observes the real REPLACEMENT_COMMIT wire
+  entry rather than the deliberately retired shadow diagnostics surface.

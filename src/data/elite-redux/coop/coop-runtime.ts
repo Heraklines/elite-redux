@@ -11111,12 +11111,21 @@ export function assembleCoopRuntime(
     },
     onV2AuthorityProposalViolation: reason => failCoopRuntimeSharedSession(runtime, reason),
     validateV2QuizAnswerObservation: ({ seq, choice, questionIndex, operationId }) => {
-      const control = runtime?.v2ControlLedger.activeControl;
+      // A fast authority can answer while the replica has admitted and materially applied the retained
+      // quiz presentation but before its slower renderer has started ErQuizPhase. The answer is only a
+      // presentation observation and remains parked in the address-keyed relay FIFO until that public
+      // surface arms its waiter, so requiring an already-installed control here creates a speed-dependent
+      // packet-loss window. Authenticate it against the latest materially-applied claim instead: the V2
+      // entry still owns the exact epoch/pin/operation address, while merely queuing the observation cannot
+      // install control, advance a revision, or mutate mechanical state.
+      const ledger = runtime?.v2ControlLedger;
+      const control = ledger?.latestControl;
       if (
         control?.kind !== "SHARED_INTERACTION"
         || control.surfaceClass !== "op:me"
         || control.operationKind !== "QUIZ_ANSWER"
         || control.ownerSeatId !== controller.authoritySeatId
+        || ledger?.isMaterialApplied(control) !== true
         || !Number.isSafeInteger(choice)
         || choice < 0
         || choice >= 64
