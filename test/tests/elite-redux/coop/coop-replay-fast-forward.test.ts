@@ -46,7 +46,7 @@ import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
-import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
+import { installLocalV2TurnReplicaFixture, negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -149,6 +149,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     getCoopRuntime()!.spoof?.dispose();
     getCoopController()!.role = "guest";
     (getCoopRuntime()!.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
+    installLocalV2TurnReplicaFixture(runtime);
     return field;
   };
 

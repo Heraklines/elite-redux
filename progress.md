@@ -3226,3 +3226,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   focused replacement-to-wave turn; an unrelated second KO can no longer open another host PARTY picker and
   prevent the test from reaching its intended identity/order/EXP assertions.
 - Local TypeScript, targeted Biome, and diff checks are clean. B10 remains remotely qualified only.
+
+# 2026-07-24 - Single-scene presentation fixtures cross the real V2 turn boundary
+
+- Full-gate run `30110836606` proved that replay-pacing, localization, and battle-event fixtures were
+  feeding `ingestAuthoritativeV2Turn` into a runtime whose CPU spoof had correctly negotiated every V2
+  capability off. Those tests therefore exercised neither the V2 suppression rules nor the live turn
+  cutover and observed unchanged field state/presentation queues.
+- The shared single-scene fixture now explicitly replaces the spoof negotiation with the minimal
+  `authority.v2shadow` + `authority.v2turn` pair and builds the production turn cutover after the local
+  engine has adopted the guest seat. This seam is limited to renderer tests that begin after authenticated
+  admission; all protocol/progression tests continue to require two real runtimes.
+- The P3 battle-control test imports the V2 harness accessor from its actual runtime owner, repairing the
+  independent static-gate failure without weakening its exact two-engine assertions.

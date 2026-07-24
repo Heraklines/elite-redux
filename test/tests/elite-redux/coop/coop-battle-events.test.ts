@@ -78,7 +78,7 @@ import { CoopPresentationReceiptPhase } from "#phases/coop-replay-turn-phase";
 import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
 import { MovePhase } from "#phases/move-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
+import { installLocalV2TurnReplicaFixture, negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -461,6 +461,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // role. This legacy single-engine fixture changes seats after assembly, so move both
     // identities together just as the guest-renderer fixture does.
     (runtime.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
+    installLocalV2TurnReplicaFixture(runtime);
     return field;
   };
 

@@ -45,7 +45,7 @@ import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { GameManager } from "#test/framework/game-manager";
-import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
+import { installLocalV2TurnReplicaFixture, negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import i18next from "i18next";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -137,6 +137,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     // role. This legacy single-engine fixture changes seats after assembly, so move both
     // identities together just as the guest-renderer fixture does.
     (runtime.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
+    installLocalV2TurnReplicaFixture(runtime);
     return field;
   };
 

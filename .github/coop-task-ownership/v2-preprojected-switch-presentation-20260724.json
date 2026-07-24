@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "0979183c75f8568fb84c76d26245d628cf983912",
+  "baseSha": "de4ea382149c3dd7eebd898245aa959d885007d1",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -77,6 +77,7 @@
     "test/tests/elite-redux/coop/coop-transition-t2-mystery.test.ts",
     "test/tests/elite-redux/showdown/showdown-sync-duo.test.ts",
     "test/tools/coop-duo-harness.ts",
+    "test/tools/coop-local-peer.ts",
     "test/utils/encounter-test-utils.ts"
   ],
   "lockedSchemaFiles": []

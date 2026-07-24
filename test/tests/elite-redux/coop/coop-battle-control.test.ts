@@ -25,7 +25,6 @@
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
-import { getCoopV2Shadow } from "#data/elite-redux/coop/authority-v2/shadow";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resolvePartnerCommand } from "#data/elite-redux/coop/coop-partner-ai";
 import { coopGiveMonToPartner, coopReorderParty } from "#data/elite-redux/coop/coop-party-ops";
@@ -33,6 +32,7 @@ import {
   clearCoopRuntime,
   getCoopController,
   getCoopRuntime,
+  getCoopV2Shadow,
   getCoopWaveBoundaryStatus,
   setCoopRuntime,
   startLocalCoopSession,
