@@ -553,6 +553,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.promptText = _message;
     this.render();
     const clearPrompt = () => {
+      ui.clearText();
       this.promptText = null;
       this.render();
     };
