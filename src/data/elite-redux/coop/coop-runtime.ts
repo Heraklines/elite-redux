@@ -2923,8 +2923,8 @@ export function clearCoopLearnMoveBatchInFlight(partySlot: number): void {
 // so the partner can only GAIN entries - a stale blob can never remove anything.
 // =============================================================================
 
-let dexSyncPending: { relay: CoopInteractionRelay; blob: string } | null = null;
-let dexSyncTimerArmed = false;
+const dexSyncPending = new WeakMap<CoopRuntime, { relay: CoopInteractionRelay; blob: string }>();
+const dexSyncTimerArmed = new WeakSet<CoopRuntime>();
 /** Injectable for tests: 0 = flush on the next macrotask. */
 let dexSyncDelayMs = 500;
 export function setCoopDexSyncDelayMs(ms: number): void {
@@ -2938,40 +2938,47 @@ export function setCoopDexSyncDelayMs(ms: number): void {
  * in multi-client processes like the duo harness). A burst overwrites the pending blob
  * (capture-after-write means the latest capture reflects every write), one trailing send.
  */
-export function coopBroadcastDexSync(): void {
-  try {
-    if (getCoopRuntime() == null || !globalScene.gameMode?.isCoop || isCoopAuthoritativeGuest()) {
-      return;
-    }
-    const relay = getCoopInteractionRelay();
-    if (relay == null) {
-      return;
-    }
-    dexSyncPending = { relay, blob: captureCoopDexDelta() };
-    if (dexSyncTimerArmed) {
-      return;
-    }
-    dexSyncTimerArmed = true;
-    setTimeout(() => {
-      dexSyncTimerArmed = false;
-      const pending = dexSyncPending;
-      dexSyncPending = null;
-      if (pending == null) {
+export function coopBroadcastDexSync(runtime: CoopRuntime | null = getCoopRuntime()): void {
+  if (runtime == null) {
+    return;
+  }
+  // setPokemonCaught is asynchronous. In two real browsers its continuation necessarily resumes in the
+  // same client, but the representative two-engine harness can have the peer's scene/runtime installed
+  // when that Promise settles. Re-enter the runtime captured at the acquisition call before reading the
+  // account-local dex image. This also prevents one synthetic client's throttle from overwriting the
+  // other's pending blob; production still has exactly one runtime in this WeakMap.
+  runWhenCoopRuntimeActive(runtime, () => {
+    try {
+      if (!globalScene.gameMode?.isCoop || isCoopAuthoritativeGuest()) {
         return;
       }
-      try {
-        pending.relay.sendInteractionOutcome(COOP_DEX_SYNC_SEQ, "dexSync", {
-          k: "dexSync",
-          dex: pending.blob,
-        });
-        coopLog("runtime", "dexSync broadcast (acquisition -> partner account credited)");
-      } catch {
-        coopWarn("runtime", "dexSync broadcast threw (handled - next ME terminal still converges)");
+      const relay = runtime.interactionRelay;
+      dexSyncPending.set(runtime, { relay, blob: captureCoopDexDelta() });
+      if (dexSyncTimerArmed.has(runtime)) {
+        return;
       }
-    }, dexSyncDelayMs);
-  } catch {
-    /* an acquisition write must never fail because of the sync hook */
-  }
+      dexSyncTimerArmed.add(runtime);
+      setTimeout(() => {
+        dexSyncTimerArmed.delete(runtime);
+        const pending = dexSyncPending.get(runtime);
+        dexSyncPending.delete(runtime);
+        if (pending == null) {
+          return;
+        }
+        try {
+          pending.relay.sendInteractionOutcome(COOP_DEX_SYNC_SEQ, "dexSync", {
+            k: "dexSync",
+            dex: pending.blob,
+          });
+          coopLog("runtime", "dexSync broadcast (acquisition -> partner account credited)");
+        } catch {
+          coopWarn("runtime", "dexSync broadcast threw (handled - next ME terminal still converges)");
+        }
+      }, dexSyncDelayMs);
+    } catch {
+      /* an acquisition write must never fail because of the sync hook */
+    }
+  });
 }
 
 let offDisconnectReaction: (() => void) | null = null;

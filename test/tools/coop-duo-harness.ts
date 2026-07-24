@@ -2268,7 +2268,7 @@ export async function materializeGuestInputAfterReplacement(scene: BattleScene):
   materializeMirroredGuestInputTurn(scene);
 }
 
-function selectFightMoveThroughPublicUi(scene: BattleScene, moveIndex: number, label: string): void {
+export function selectFightMoveThroughPublicUi(scene: BattleScene, moveIndex: number, label: string): void {
   const moveCount = scene.phaseManager.getCurrentPhase()?.is("CommandPhase")
     ? (scene.phaseManager.getCurrentPhase() as Phase & { getPokemon(): Pokemon }).getPokemon().getMoveset().length
     : 0;

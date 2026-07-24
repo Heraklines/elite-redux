@@ -6807,8 +6807,12 @@ export class GameData {
     // catch, DexNav grant, ME-granted mon, Picnic join, ...). After the dex write lands,
     // the HOST streams its dex/starter blob so the partner's account is credited NOW - not
     // only at the next ME terminal. No-op outside an active co-op run (guarded inside).
+    // Capture the owning runtime before this asynchronous write. In production there is one browser-local
+    // runtime; the two-engine harness deliberately swaps runtimes while Promises settle. Passing the exact
+    // owner lets the broadcast re-enter the correct account/scene before serializing its dex delta.
+    const coopAcquisitionRuntime = getCoopRuntime();
     const coopShareAcquisition = <T>(v: T): T => {
-      coopBroadcastDexSync();
+      coopBroadcastDexSync(coopAcquisitionRuntime);
       return v;
     };
     return this.setPokemonSpeciesCaught(

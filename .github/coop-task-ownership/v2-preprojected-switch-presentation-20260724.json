@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "de4ea382149c3dd7eebd898245aa959d885007d1",
+  "baseSha": "6a0a457596909d1e5a19e5d30de466b1885ef9e3",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -31,6 +31,7 @@
     "src/phases/the-bargain-phase.ts",
     "src/phases/title-phase.ts",
     "src/phases/turn-init-phase.ts",
+    "src/system/game-data.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",

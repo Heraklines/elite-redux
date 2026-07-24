@@ -3239,3 +3239,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   admission; all protocol/progression tests continue to require two real runtimes.
 - The P3 battle-control test imports the V2 harness accessor from its actual runtime owner, repairing the
   independent static-gate failure without weakening its exact two-engine assertions.
+
+# 2026-07-24 - Async account credit and Revival input retain real browser ownership
+
+- Full-gate run `30110836606` reached wave 3's successful catch with converged party and ball state, but the
+  delayed `setPokemonCaught().then(...)` callback ran while the other synthetic browser owned the ambient
+  runtime. The host dex broadcast therefore classified itself as the authoritative guest and returned. The
+  acquisition call now captures its owning runtime, re-enters that exact runtime before serializing the dex
+  image, and throttles independently per runtime. Production remains one-runtime; the representative
+  two-engine harness now models that browser ownership instead of dropping the account-local merge.
+- The Revival Blessing regression no longer assumes two RIGHT presses identify Splash. It reads the live
+  public FIGHT cursor and navigates to Splash's actual move slot through ordinary UI input, preserving the
+  owner-pick journey while removing a layout-dependent false red.
+- Local targeted Biome completed with only the repository's existing informational complexity diagnostics;
+  `git diff --check` is clean. Behavioral qualification remains GitHub-hosted only per `AGENTS.md`.

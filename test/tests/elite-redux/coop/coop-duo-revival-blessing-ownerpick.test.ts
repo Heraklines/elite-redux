@@ -48,6 +48,7 @@ import {
   installCoopResyncProbe,
   installDuoLogCapture,
   pumpDuoDestinations,
+  selectFightMoveThroughPublicUi,
   settleDuoPromise,
   withClient,
   withClientSync,
@@ -152,9 +153,11 @@ describe.skipIf(!RUN)(
         );
         expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Fight through COMMAND UI").toBe(true);
         expect(rig.hostScene.ui.getMode(), "host reaches the move picker").toBe(UiMode.FIGHT);
-        expect(rig.hostScene.ui.processInput(Button.RIGHT), "host moves past Revival Blessing").toBe(true);
-        expect(rig.hostScene.ui.processInput(Button.RIGHT), "host moves from Tackle to Splash").toBe(true);
-        expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Splash through FIGHT UI").toBe(true);
+        const splashIndex = rig.hostScene
+          .getPlayerField()[0]
+          .getMoveset()
+          .findIndex(move => move.moveId === MoveId.SPLASH);
+        selectFightMoveThroughPublicUi(rig.hostScene, splashIndex, "host Revival Blessing companion");
 
         const postMove = await driveClientPhaseQueueTo(rig.hostScene, "Splash commit or RevivalBlessingPhase", {
           matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "RevivalBlessingPhase",
