@@ -2566,3 +2566,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   starts. Every control/rendezvous frame is therefore applied only while `pumpDuoDestinations` has installed
   the receiving scene, runtime, operation state, and module-let snapshot together; public handler and input
   assertions remain unchanged.
+
+# 2026-07-24 - Trainer presentation damage cannot strand SwitchSummon
+
+- Focused run `30066471551` confirms the destination-context repair: ordinary Crossroads Stay and the
+  authority-loss map case are now green, reducing B11 from eleven failures to nine while static and Showdown
+  S7 remain green. The surviving biome reds now reach their public surfaces and expose narrower successor,
+  orphan, and legacy-carrier contracts instead of false watcher-start failures.
+- The automatic-victory journey still reproduced a wave-1 hard exception in `BattlePhase.showEnemyTrainer`:
+  after both enemy leads fainted, a reserve `SwitchSummonPhase` indexed a missing positional trainer layer
+  and wrote `.x` on `undefined`. A cosmetic Phaser child therefore stranded the mechanical phase forever.
+- Trainer reveal now treats each main/tint child as a recoverable presentation layer. Every surviving layer
+  is positioned and revealed, an exact missing-layer diagnostic is emitted, and the authoritative queue is
+  allowed to continue to its next checkpoint instead of softlocking. The same ten-wave production-fidelity
+  journey remains the remote regression and will identify the upstream missing layer in its next artifact.

@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "173078d257004ea799b53e141272a357952d05ba",
+  "baseSha": "0e73a3e628e81f30645275851e62f70a3892e3a2",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -41,6 +41,7 @@
     "src/field/pokemon.ts",
     "src/modifier/modifier.ts",
     "src/phase-manager.ts",
+    "src/phases/battle-phase.ts",
     "src/phases/command-phase.ts",
     "src/phases/common-anim-phase.ts",
     "src/phases/coop-presentation-watchdog.ts",
