@@ -2325,14 +2325,19 @@ export async function driveDuoGuestTackleThroughPublicUi(
     // NextEncounter, or another retained wave/replacement boundary while the authority still has to run the
     // real tail that constructs the next CommandPhase. Two browsers advance those event loops concurrently.
     // In this single-process fixture, asking the guest for a command first starves the host tail and reports
-    // a false successor hang. Advance the authority only to its real next CommandPhase (do not run or answer
-    // it); the resulting WAVE/REPLACEMENT/CONTROL entry releases the guest through the production projector.
+    // a false successor hang. Advance the authority only to its real next CommandPhase, then start that
+    // phase without asking the single-process interceptor to observe its reciprocal UI completion. Starting
+    // emits the CONTROL entry and first rendezvous arrival; the guest event loop below installs the exact
+    // matching control and supplies the second arrival. Waiting for the host menu here would require the
+    // guest to run before this callback can return, an impossible dependency that does not exist in browsers.
     if (
       rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase"
       && rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase"
     ) {
       await withClient(rig.hostCtx, async () => {
-        await hostGame.phaseInterceptor.to("CommandPhase");
+        await hostGame.phaseInterceptor.to("CommandPhase", false);
+        rig.hostScene.phaseManager.getCurrentPhase().start();
+        await drainLoopback();
       });
       await withClient(rig.guestCtx, () => drainLoopback());
     }

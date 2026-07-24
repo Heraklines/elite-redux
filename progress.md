@@ -3087,3 +3087,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Revival Blessing now closes both its Party UI and exact queue-owned phase under the runtime captured when
   the surface was created. An asynchronous UI continuation can no longer resume under the peer scene and
   leave the real owner's immutable-result watcher open.
+
+# 2026-07-24 - The public command driver runs reciprocal browsers concurrently
+
+- Exact focused run `30102553515` showed trainer replacement and Pokeball journeys reach the next host
+  CommandPhase, emit its V2 control, and then wait for the guest rendezvous while the single-process phase
+  interceptor still owned the host callback. The guest was never allowed to execute, although independent
+  browsers would run concurrently.
+- The public driver now stops before that host CommandPhase, starts it without waiting for menu completion,
+  and advances the guest event loop to install the same CONTROL entry and return the reciprocal arrival. It
+  still uses only the production phase scheduler, public input handlers, and destination-context delivery.
