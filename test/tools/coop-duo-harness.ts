@@ -2313,15 +2313,15 @@ export async function driveDuoGuestTackleThroughPublicUi(
     guestTarget?: BattlerIndex;
   } = {},
 ): Promise<void> {
-  // After a non-terminal turn the renderer can be parked on its ordered-successor finalizer while the
-  // authority still has to run the real trainer/player replacement tail that constructs the next
-  // CommandPhase. Two browsers advance those event loops concurrently. In this single-process fixture,
-  // trying to find the guest command first starves the host tail and produces a false successor hang.
-  // Advance the authority only to its real next CommandPhase (do not run or answer it); the resulting
-  // REPLACEMENT/CONTROL entry then releases the guest through the same production projector as a player.
+  // Between public command surfaces the renderer may be parked on an ordered-successor finalizer,
+  // NextEncounter, or another retained wave/replacement boundary while the authority still has to run the
+  // real tail that constructs the next CommandPhase. Two browsers advance those event loops concurrently.
+  // In this single-process fixture, asking the guest for a command first starves the host tail and reports
+  // a false successor hang. Advance the authority only to its real next CommandPhase (do not run or answer
+  // it); the resulting WAVE/REPLACEMENT/CONTROL entry releases the guest through the production projector.
   if (
-    rig.guestScene.phaseManager.getCurrentPhase()?.phaseName === "CoopFinalizeTurnPhase"
-    && rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase"
+    rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase"
+    && rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase"
   ) {
     await withClient(rig.hostCtx, async () => {
       await hostGame.phaseInterceptor.to("CommandPhase");

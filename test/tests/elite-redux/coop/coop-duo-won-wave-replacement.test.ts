@@ -45,10 +45,8 @@ import {
   enterCoopV2CommandControlBoundary,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -56,9 +54,9 @@ import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
-  type DuoRig,
   drainLoopback,
   driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   installDuoLogCapture,
   settleDuoPromise,
@@ -121,21 +119,10 @@ describe.skipIf(!RUN)(
       initGlobalScene(game.scene);
     });
 
-    /** The guest's TURN-1 own-slot command answer (the genuine production CoopBattleSync relay). */
-    function wireGuestCommand(rig: DuoRig): void {
-      rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-        command: Command.FIGHT,
-        cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-        moveId: MoveId.SPLASH,
-        targets: [BattlerIndex.ENEMY],
-      }));
-    }
-
     it("suppresses the won-wave phantom command and drains the held replay into the wave-advance victory tail", async () => {
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
       const pair = createLoopbackPair();
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-      wireGuestCommand(rig);
 
       // Guest-owned bench (LAPRAS + CHARIZARD), so the guest's faint has an own bench to replace from and
       // the host lead (SNORLAX, slot 0) is the sole host mon - it survives, so no host faint/auto-pick.
@@ -152,9 +139,13 @@ describe.skipIf(!RUN)(
 
       // TURN 1 (host): SNORLAX EARTHQUAKE (spread) faints BOTH lv3 Magikarp AND the 1-HP guest Gengar the
       // same turn = a WON wave with a guest-owned faint. The guest slot's relayed SPLASH is moot.
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        submitHostTackle: true,
+        hostMoveId: MoveId.EARTHQUAKE,
+        guestMoveId: MoveId.SPLASH,
+      });
       await withClient(rig.hostCtx, async () => {
-        game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
-        game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
         await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       expect(
@@ -277,7 +268,6 @@ describe.skipIf(!RUN)(
         await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
         const pair = createLoopbackPair();
         const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-        wireGuestCommand(rig);
 
         for (const scene of [rig.hostScene, rig.guestScene]) {
           scene.getPlayerParty()[2].coopOwner = "guest";
@@ -290,9 +280,13 @@ describe.skipIf(!RUN)(
 
         const turn = rig.hostScene.currentBattle.turn;
 
+        await driveDuoGuestTackleThroughPublicUi(game, rig, {
+          restartAlreadyOpenHost: false,
+          submitHostTackle: true,
+          hostMoveId: MoveId.EARTHQUAKE,
+          guestMoveId: MoveId.SPLASH,
+        });
         await withClient(rig.hostCtx, async () => {
-          game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
-          game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
           await game.phaseInterceptor.to("CoopTurnCommitPhase");
         });
 

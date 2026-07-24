@@ -6,29 +6,13 @@
 // =============================================================================
 // TWO-ENGINE next-command-barrier / turn-commit deadlock (Track R, campaign run 29651275134).
 //
-// After a mid-turn replacement fills the GUEST's OWN field slot, the guest opens its OWN
-// post-replacement CommandPhase for the refilled mon (`replacement filled OUR slot 1 -> opening
-// own CommandPhase`). The HOST, at that same turn, reaches its partner-path CommandPhase for the
-// guest slot and parks in `requestPartnerCommand` awaiting the guest's PRODUCTION broadcast (a live
-// human never installs a command responder - it broadcasts its own-slot command from its own
-// CommandPhase).
+// After a mid-turn replacement fills the GUEST's OWN field slot, Authority V2 must install the exact
+// post-replacement CommandPhase without first manufacturing a future replay wait. The host then parks in
+// its partner CommandPhase until the guest broadcasts through its own public command handler.
 //
-// THE DEADLOCK (browser trace): when the guest diverted the turn to CoopReplayTurnPhase it armed a
-// `requestTurnCommit(turn)` retry loop (awaitTurn) that keeps pinging the host (host replies
-// `turnCommitPending`) FOREVER. That stale await is never cancelled at the replay->command PIVOT, so
-// the guest is simultaneously "passively awaiting the host's turn resolution" (renderer model) AND
-// "about to COMMAND its own slot" (command model) - a contradictory state while the host is (correctly)
-// awaiting the guest's command. Existing duo replacement tests BYPASS this pivot (they reach the
-// post-replacement CommandPhase via materializeGuestInputAfterReplacement, a fresh TurnInit), so the
-// leaked request never surfaced.
-//
-// THE REPRO drives the EXACT production replay->command pivot across two real engines and forces the
-// live MID-PARK ordering with a single-shot dropped checkpoint (the guest reaches `awaitTurn(2)` and
-// arms the request BEFORE the retained re-send delivers the auto-summon checkpoint). It then asserts NO
-// leaked turn-commit request/timer survives the pivot. RED before the fix (requests=1: the
-// requestTurnCommit -> turnCommitPending loop), GREEN after (the pivot cancels the premature request;
-// the re-queued CoopReplayTurnPhase behind the guest's own CommandPhase re-arms the await AFTER the
-// command is broadcast).
+// This reproduction delays the first replacement carrier, proves its retained resend still installs the
+// command successor, and asserts that no stale requestTurnCommit retry survives. Both turn-one commands
+// and the post-replacement boundary are driven through production phases and public UI handlers.
 //
 // HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-barrier-deadlock.test.ts
@@ -39,10 +23,8 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -50,9 +32,9 @@ import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
-  type DuoRig,
   drainLoopback,
   driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   installDuoLogCapture,
   settleDuoPromise,
@@ -108,21 +90,10 @@ describe.skipIf(!RUN)(
       initGlobalScene(game.scene);
     });
 
-    /** The guest's TURN-1 own-slot command answer (the genuine production CoopBattleSync relay). */
-    function wireGuestCommand(rig: DuoRig): void {
-      rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-        command: Command.FIGHT,
-        cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-        moveId: MoveId.SPLASH,
-        targets: [BattlerIndex.ENEMY],
-      }));
-    }
-
     it("cancels the premature turn-commit request at the replay->command pivot (no turnCommitPending softlock loop)", async () => {
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
       const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0xba1e17 });
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-      wireGuestCommand(rig);
 
       // Guest-owned bench (LAPRAS + CHARIZARD), so the guest's faint has an own bench to replace from.
       for (const scene of [rig.hostScene, rig.guestScene]) {
@@ -138,9 +109,13 @@ describe.skipIf(!RUN)(
 
       // TURN 1 (host): Snorlax EARTHQUAKE (spread) faints the 1-HP guest Gengar deterministically; the
       // guest slot's relayed SPLASH is moot. Level-100 Magikarp shrug it off (GROWL harmless).
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        submitHostTackle: true,
+        hostMoveId: MoveId.EARTHQUAKE,
+        guestMoveId: MoveId.SPLASH,
+      });
       await withClient(rig.hostCtx, async () => {
-        game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
-        game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
         await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const hostSlotAfterFaint = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
@@ -158,13 +133,21 @@ describe.skipIf(!RUN)(
         ui.setMode = (...args: unknown[]): unknown => {
           if (args[0] === UiMode.PARTY) {
             ui.setMode = realSetMode; // one-shot
-            setCoopRuntime(rig.hostRuntime);
-            try {
-              (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
-            } finally {
-              setCoopRuntime(rig.guestRuntime);
-            }
-            return;
+            const opened = realSetMode(...args);
+            Promise.resolve(opened).then(
+              () => {
+                queueMicrotask(() => {
+                  setCoopRuntime(rig.hostRuntime);
+                  try {
+                    (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
+                  } finally {
+                    setCoopRuntime(rig.guestRuntime);
+                  }
+                });
+              },
+              () => undefined,
+            );
+            return opened;
           }
           if (args[0] === UiMode.MESSAGE) {
             return; // the picker's close transition - a no-op headlessly
@@ -178,10 +161,8 @@ describe.skipIf(!RUN)(
         }
       });
 
-      // MID-PARK ORDERING (the live deadlock's exact timing): DROP the first replacement checkpoint so the
-      // guest's turn-2 CoopReplayTurnPhase reaches its `awaitTurn(2)` PARK (arming the requestTurnCommit retry
-      // loop) BEFORE the host's retained re-send delivers the checkpoint. Production hits this naturally -
-      // the guest reaches its next-turn await before the auto-summon checkpoint arrives.
+      // Delay the first replacement carrier. The renderer must remain on the ordered successor wait until
+      // the retained resend arrives; it must never convert that wait into a guessed future turn replay.
       pair.armNextDrop(V2_REPLACEMENT_CUTOVER ? "authorityEntry" : "battleCheckpoint", "host");
 
       // HOST: summon the guest's pick and push the out-of-band replacement checkpoint. Settle the
@@ -198,13 +179,10 @@ describe.skipIf(!RUN)(
         SpeciesId.CHARIZARD,
       );
 
-      // GUEST: drive the REAL turn-2 replay so it reaches its own next CommandPhase through the PRODUCTION
-      // replay->command PIVOT (coop-replay-turn-phase.ts: the replacement checkpoint arrives mid-park and
-      // the guest unshifts its OWN CommandPhase for the refilled slot). This is the exact path the live
-      // deadlock takes - existing duo tests bypass it via materializeGuestInputAfterReplacement.
+      // GUEST: follow the ordered replacement successor to its real own-slot CommandPhase. Authority V2
+      // does not manufacture or await a turn-2 replay before that successor exists; the retained replacement
+      // entry releases the parked finalizer directly through the production projector.
       await withClient(rig.guestCtx, async () => {
-        rig.guestScene.currentBattle.turn = turn + 1;
-        await driveGuestReplayTurn(rig.guestScene, turn + 1);
         await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after replacement", {
           matches: phase =>
             phase.phaseName === "CommandPhase"
@@ -218,12 +196,8 @@ describe.skipIf(!RUN)(
         `the mid-park ${V2_REPLACEMENT_CUTOVER ? "V2 replacement entry" : "legacy checkpoint"} delivery was actually delayed`,
       ).toBe(1);
 
-      // RED (pre-fix) -> GREEN (post-fix): at the replay->command PIVOT the guest was passively awaiting the
-      // host's turn-2 resolution (`awaitTurn(2)` armed `requestTurnCommit(2)` + its retry timer). Now that the
-      // replacement filled the guest's OWN slot it will COMMAND that turn, not await it - so the premature
-      // request MUST be cancelled at the pivot. Pre-fix this leaks: the guest pings the host
-      // `requestTurnCommit -> turnCommitPending` FOREVER while the host is (correctly) awaiting the guest's
-      // command - the observed barrier / turn-commit softlock shape.
+      // The renderer is now the command owner, so no passive turn-resolution request or retry timer may be
+      // live while the authority waits for that command.
       const guestStreamerDiag = (
         rig.guestRuntime as unknown as {
           battleStream: { retainedAuthorityDiagnostics: () => { requests: number; requestTimers: number } };

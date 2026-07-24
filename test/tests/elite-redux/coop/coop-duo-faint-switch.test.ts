@@ -26,10 +26,8 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -38,9 +36,9 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type CoopResyncProbe,
-  type DuoRig,
   drainLoopback,
   driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
@@ -101,16 +99,6 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     initGlobalScene(game.scene);
   });
 
-  /** The guest's own-slot command answer (the genuine production CoopBattleSync relay). */
-  function wireGuestCommand(rig: DuoRig): void {
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.SPLASH,
-      targets: [BattlerIndex.ENEMY],
-    }));
-  }
-
   it("guest picks CHARIZARD; the host summons THE GUEST'S pick; the guest materializes + can command it", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
     const pair = wrapCoopFaultPair(
@@ -124,7 +112,6 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       { seed: 0xfa1718 },
     );
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
     // DETECTION MODEL (#807): a guest-faint replacement is a PLAYER-FACING interaction - it must converge
     // with ZERO forced resyncs (a resync means a divergence the chooser could see before the heal).
     resyncProbe = installCoopResyncProbe(rig.guestRuntime);
@@ -150,9 +137,13 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     // 1-HP Gengar faints deterministically (no enemy AI, no target rolls). The LEVEL-100 foes
     // shrug the EQ off (nothing can end the wave early - ER's rebalanced Splash even KILLED
     // level-1 foes in an earlier draft of this repro) and their GROWL is harmless.
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+      hostMoveId: MoveId.EARTHQUAKE,
+      guestMoveId: MoveId.SPLASH,
+    });
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
-      game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     const hostSlotAfterFaint = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
@@ -171,16 +162,24 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       ui.setMode = (...args: unknown[]): unknown => {
         if (args[0] === UiMode.PARTY) {
           ui.setMode = realSetMode; // one-shot
-          // Exercise the real public picker callback after the peer becomes the ambient runtime. Production
-          // browsers cannot share this selector, while the two-engine harness deliberately can; the callback
-          // must use the immutable guest binding captured when its phase opened.
-          setCoopRuntime(rig.hostRuntime);
-          try {
-            (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
-          } finally {
-            setCoopRuntime(rig.guestRuntime);
-          }
-          return;
+          const opened = realSetMode(...args);
+          // Exercise the public callback only after the real PARTY handler has become actionable and its
+          // address-exact V2 control proof is installed. Then swap the ambient runtime to preserve the
+          // original immutable-browser-binding regression.
+          Promise.resolve(opened).then(
+            () => {
+              queueMicrotask(() => {
+                setCoopRuntime(rig.hostRuntime);
+                try {
+                  (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
+                } finally {
+                  setCoopRuntime(rig.guestRuntime);
+                }
+              });
+            },
+            () => undefined,
+          );
+          return opened;
         }
         if (args[0] === UiMode.MESSAGE) {
           return; // the picker's close transition - a no-op headlessly
@@ -257,7 +256,6 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     setCoopFaintSwitchWaitMs(30);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
 
     // LAPRAS is the first legal guest-owned bench mon. The test deliberately never invokes the
     // guest's real PARTY callback, so the authoritative timeout must select this exact fallback.
@@ -271,9 +269,13 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     });
 
     const turn = rig.hostScene.currentBattle.turn;
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+      hostMoveId: MoveId.EARTHQUAKE,
+      guestMoveId: MoveId.SPLASH,
+    });
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
-      game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 
@@ -332,18 +334,15 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
           return realSetModeBoundedWhen(...args);
         };
 
-        const replay = rig.guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
-        // Reproduce the live me-asym race exactly: TurnInit has already advanced ambient scene.turn
-        // before the delayed faint presentation opens its picker. The proposal and retained terminal
-        // must still use the immutable streamed faint turn, never this later mutable value.
+        await driveGuestReplayTurn(rig.guestScene, turn, { returnAtReplacementPicker: true });
+        const picker = rig.guestScene.phaseManager.getCurrentPhase();
+        expect(picker?.phaseName, "the ordered V2 successor installed the real guest picker").toBe(
+          "CoopGuestFaintSwitchPhase",
+        );
+        // Reproduce the live me-asym race after the exact picker captured its source address: ambient
+        // scene.turn advances before the human responds, but the proposal and retained terminal must keep
+        // using the immutable streamed faint turn.
         rig.guestScene.currentBattle.turn = turn + 1;
-        replay.start();
-        await drainLoopback();
-        const picker = await driveClientPhaseQueueTo(rig.guestScene, "CoopGuestFaintSwitchPhase", {
-          perPhaseTimeoutMs: 5_000,
-        });
-        picker.start();
-        await drainLoopback();
 
         expect(pickerOpens, "the real guest-owned PARTY picker opened exactly once").toBe(1);
         expect(idlePickerCallback, "the real picker exposed its human selection callback").toBeTypeOf("function");

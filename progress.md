@@ -3006,3 +3006,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   renderer is parked on `CoopFinalizeTurnPhase`, it lets the authority run its real replacement tail only as
   far as the next `CommandPhase`. That emits the ordered V2 successor before either side supplies input and
   prevents a one-process fixture from starving the authority while it waits on the renderer first.
+
+# 2026-07-24 - Faint and won-wave regressions follow ordered V2 successors
+
+- The barrier-deadlock, guest faint-switch, and won-wave replacement journeys now submit both seats through
+  the real COMMAND/FIGHT/TARGET handlers. They no longer install a guest command responder or mutate the
+  host's move selections behind the UI.
+- Replacement choices wait until the real PARTY handler is actionable, which installs the address-exact V2
+  proof before the callback runs. The idle-picker case uses the replay driver's authenticated replacement
+  frontier instead of creating a detached duplicate replay and advancing mutable `scene.turn` first.
+- The public command driver now models concurrent browsers across every between-command retained boundary,
+  including NextEncounter: it advances the authority without input only to its real next CommandPhase, then
+  lets the emitted WAVE/REPLACEMENT/CONTROL successor release the renderer before either player chooses.
+- The barrier regression no longer invents turn N+1 and waits for a result the authority never authored.
+  It asserts the retained replacement carrier installs the real command successor with no leaked request or
+  retry timer—the invariant Authority V2 now owns.
