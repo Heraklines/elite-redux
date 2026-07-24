@@ -11,9 +11,9 @@
 //
 // BOTH sides are REAL BattleScene engines paired over createLoopbackPair, driven with
 // the harness owner/watcher pattern (the reward-shop recipe): the owner drives the real
-// phase; the World-Map case presses the public ER_MAP UI while the simpler crossroads captures
-// its option callback, streams its cursor + relays its pick; the watcher opens the mirrored copy and
-// adopts the relayed pick. Asserts, across two engines:
+// phase. Both Crossroads and World-Map install the exact current phase, wait for the projected owner and
+// watcher handlers plus the V2 input lease, then press only public UI keys. The watcher opens the mirrored
+// copy and adopts the retained authoritative result. Asserts, across two engines:
 //   1. CROSSROADS STAY: owner picks Stay -> both continue in the SAME biome, matching
 //      overstay/notoriety state; the counter advances exactly once on BOTH.
 //   2. CROSSROADS LEAVE + WORLD-MAP PICK: owner picks Leave (deferring its terminal) then
@@ -34,6 +34,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import type { Phase } from "#app/phase";
 import { applyCoopFullSnapshot, captureCoopFullSnapshot } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   coopBiomeOperationId,
@@ -55,7 +56,12 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopBiomeTransitionTailPermit } from "#data/elite-redux/coop/coop-renderer-gate";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  getCoopV2Shadow,
+  isCoopV2InteractionHumanInputFrozen,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_SEQ_BASE, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
@@ -102,72 +108,9 @@ function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
 
-/** Headless UI capture: record the last ER_MAP / OPTION_SELECT config; fire showText callbacks. */
-type ErMapCfg = { nodes?: ErRouteNode[]; origin?: BiomeId; onSelect: (b: BiomeId) => void };
-type OptionCfg = { options: { label: string; handler: () => boolean }[] };
-interface UiCapture {
-  erMapConfig?: ErMapCfg;
-  optionConfig?: OptionCfg;
-  restore: () => void;
-}
-
-function installUiCapture(scene: BattleScene): UiCapture {
-  const ui = scene.ui as unknown as {
-    setMode: (mode: number, ...args: unknown[]) => Promise<void>;
-    setModeBoundedWhen: (
-      mode: number,
-      timeoutMs: number,
-      isCurrent: (() => boolean) | undefined,
-      ...args: unknown[]
-    ) => Promise<"completed" | "forced" | "superseded">;
-    showText: (text: string, delay?: number | null, cb?: (() => void) | null, ...rest: unknown[]) => void;
-  };
-  const realSetMode = ui.setMode.bind(ui);
-  const realSetModeBoundedWhen = ui.setModeBoundedWhen;
-  const realShowText = ui.showText.bind(ui);
-  const cap: UiCapture = {
-    restore: () => {
-      ui.setMode = realSetMode;
-      ui.setModeBoundedWhen = realSetModeBoundedWhen;
-      ui.showText = realShowText;
-    },
-  };
-  ui.setMode = (mode: number, ...args: unknown[]): Promise<void> => {
-    if (mode === UiMode.ER_MAP) {
-      cap.erMapConfig = args[0] as ErMapCfg;
-    } else if (mode === UiMode.OPTION_SELECT) {
-      cap.optionConfig = args[0] as OptionCfg;
-    }
-    return Promise.resolve();
-  };
-  ui.setModeBoundedWhen = (
-    mode: number,
-    _timeoutMs: number,
-    isCurrent: (() => boolean) | undefined,
-    ...args: unknown[]
-  ): Promise<"completed" | "forced" | "superseded"> => {
-    if (!(isCurrent?.() ?? true)) {
-      return Promise.resolve("superseded");
-    }
-    if (mode === UiMode.ER_MAP) {
-      cap.erMapConfig = args[0] as ErMapCfg;
-    } else if (mode === UiMode.OPTION_SELECT) {
-      cap.optionConfig = args[0] as OptionCfg;
-    }
-    return Promise.resolve("completed");
-  };
-  ui.showText = (_text: string, _delay?: number | null, cb?: (() => void) | null): void => {
-    if (typeof cb === "function") {
-      cb();
-    }
-  };
-  return cap;
-}
-
 /**
- * #863: a REAL ui-mode TRACKER (vs {@linkcode installUiCapture}, which only records the config). Records
- * the last target mode so a test can assert the watcher's UI mode LEAVES the map (the "stuck in the map
- * screen" symptom is an observable UI-mode state, not just a config). Fires showText callbacks.
+ * #863: a UI-mode tracker retained only for the legacy state-adoption probe below. Production-facing
+ * owner/watcher journeys use the real handler and inspect scene.ui directly.
  */
 function installUiModeTracker(scene: BattleScene): { mode: () => number; restore: () => void } {
   const ui = scene.ui as unknown as {
@@ -219,6 +162,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
+  let explicitlyStartedPhases: WeakSet<Phase>;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -229,9 +173,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     setCoopRendezvousWaitMs(50);
     setCoopOrphanGraceMs(20); // #863: fast orphan-backstop poll for the stuck-map repro
     setCoopBiomeCommitWaitMs(20);
-    // This suite DRIVES the real crossroads / World-Map picker (the owner opens the actual screen and we
-    // invoke its callbacks), so opt OUT of the vitest owner auto-resolve. Reset in afterEach (anti-latch).
+    // This suite DRIVES the real crossroads / World-Map picker through public input, so opt OUT of the
+    // vitest owner auto-resolve. Reset in afterEach (anti-latch).
     setCoopBiomePickerDrivenByTest();
+    explicitlyStartedPhases = new WeakSet<Phase>();
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`biome-choice-${Date.now()}`);
     game.override
@@ -279,12 +224,6 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       : { ownerCtx: rig.guestCtx, watcherCtx: rig.hostCtx, hostOwns };
   }
 
-  /** Materialize the other engine's real reciprocal-boundary arrival before driving one side. */
-  async function arriveBoundary(ctx: ClientCtx, point: string): Promise<void> {
-    await withClient(ctx, () => ctx.runtime.rendezvous.arrive(point));
-    await drainLoopback();
-  }
-
   function setPendingNodesForBoth(rig: DuoRig, nodes: readonly ErRouteNode[]): void {
     withClientSync(rig.hostCtx, () => setErPendingNodes(nodes.map(node => ({ ...node }))));
     withClientSync(rig.guestCtx, () => setErPendingNodes(nodes.map(node => ({ ...node }))));
@@ -299,18 +238,151 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     return rig;
   }
 
-  interface CrossroadsSeam {
-    phaseName: string;
-    start(): void;
-    resolving: boolean;
+  /**
+   * The headless duo schedulers intentionally make PhaseManager.startCurrentPhase inert. Install the
+   * boundary as the exact current phase, then reproduce the one production scheduler edge explicitly.
+   * This permanently retires the synthetic command predecessor; unlike overridePhase, ending this phase
+   * cannot resurrect that unrelated command ahead of a chained SelectBiomePhase.
+   */
+  function installCurrentBoundaryPhase<T extends Phase>(ctx: ClientCtx, create: () => T): T {
+    return withClientSync(ctx, () => {
+      const predecessor = ctx.scene.phaseManager.getCurrentPhase();
+      expect(predecessor, `${ctx.label} has a live predecessor for the V2 boundary`).toBeDefined();
+      const phase = create();
+      expect(
+        ctx.scene.phaseManager.replaceWithCoopAuthoritativePhase(predecessor!, phase),
+        `${ctx.label} installs ${phase.phaseName} as its exact current phase`,
+      ).toBe(true);
+      explicitlyStartedPhases.add(phase);
+      phase.start();
+      return phase;
+    });
   }
 
-  /** These legacy focused probes construct a phase directly; make that synthetic instance the live seam. */
-  function liveCrossroads(sourceWave: number | null = null): ErCrossroadsPhase {
-    const phase = new ErCrossroadsPhase(sourceWave);
-    (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
-      true;
-    return phase;
+  function startCurrentPhaseOnce<T extends Phase>(ctx: ClientCtx, expected: string): T {
+    return withClientSync(ctx, () => {
+      const phase = ctx.scene.phaseManager.getCurrentPhase();
+      expect(phase?.phaseName, `${ctx.label} reached ${expected}`).toBe(expected);
+      if (!explicitlyStartedPhases.has(phase!)) {
+        explicitlyStartedPhases.add(phase!);
+        phase!.start();
+      }
+      return phase as T;
+    });
+  }
+
+  function startCrossroadsPair(
+    rig: DuoRig,
+    sourceWave: number | null = null,
+  ): { host: ErCrossroadsPhase; guest: ErCrossroadsPhase } {
+    const host = installCurrentBoundaryPhase(rig.hostCtx, () => new ErCrossroadsPhase(sourceWave));
+    const guest = installCurrentBoundaryPhase(rig.guestCtx, () => new ErCrossroadsPhase(sourceWave));
+    return { host, guest };
+  }
+
+  function startNaturalBiomePair(
+    rig: DuoRig,
+    sourceWave: number | null = null,
+  ): { host: SelectBiomePhase; guest: SelectBiomePhase } {
+    const host = installCurrentBoundaryPhase(rig.hostCtx, () => new SelectBiomePhase(sourceWave));
+    const guest = installCurrentBoundaryPhase(rig.guestCtx, () => new SelectBiomePhase(sourceWave));
+    return { host, guest };
+  }
+
+  async function startQueuedBiomePair(rig: DuoRig): Promise<{ host: SelectBiomePhase; guest: SelectBiomePhase }> {
+    for (let attempt = 0; attempt < 160; attempt++) {
+      await pumpDuoDestinations(rig, 1);
+      if (
+        rig.hostScene.phaseManager.getCurrentPhase()?.phaseName === "SelectBiomePhase"
+        && rig.guestScene.phaseManager.getCurrentPhase()?.phaseName === "SelectBiomePhase"
+      ) {
+        return {
+          host: startCurrentPhaseOnce<SelectBiomePhase>(rig.hostCtx, "SelectBiomePhase"),
+          guest: startCurrentPhaseOnce<SelectBiomePhase>(rig.guestCtx, "SelectBiomePhase"),
+        };
+      }
+    }
+    throw new Error(
+      "crossroads Leave did not install paired SelectBiomePhase controls "
+        + `(host=${rig.hostScene.phaseManager.getCurrentPhase()?.phaseName}, `
+        + `guest=${rig.guestScene.phaseManager.getCurrentPhase()?.phaseName})`,
+    );
+  }
+
+  async function waitForProjectedPublicSurface(
+    rig: DuoRig,
+    ownerCtx: ClientCtx,
+    watcherCtx: ClientCtx,
+    ownerPhase: Phase,
+    watcherPhase: Phase,
+    mode: UiMode,
+  ): Promise<void> {
+    type ActionableHandler = { active?: boolean; isCoopV2InputActionable?: () => boolean };
+    let ownerState = "not-observed";
+    let watcherState = "not-observed";
+    for (let attempt = 0; attempt < 240; attempt++) {
+      await pumpDuoDestinations(rig, 1);
+      const ownerReady = withClientSync(ownerCtx, () => {
+        const handler = ownerCtx.scene.ui.getHandler() as ActionableHandler;
+        const current = ownerCtx.scene.phaseManager.getCurrentPhase();
+        const frozen = isCoopV2InteractionHumanInputFrozen(ownerCtx.runtime);
+        ownerState =
+          `${current?.phaseName ?? "none"}/${UiMode[ownerCtx.scene.ui.getMode()] ?? ownerCtx.scene.ui.getMode()}`
+          + `/active=${String(handler?.active)}/actionable=${String(handler?.isCoopV2InputActionable?.())}`
+          + `/frozen=${String(frozen)}`;
+        return (
+          current === ownerPhase
+          && ownerCtx.scene.ui.getMode() === mode
+          && handler?.active === true
+          && handler.isCoopV2InputActionable?.() === true
+          && !frozen
+        );
+      });
+      const watcherReady = withClientSync(watcherCtx, () => {
+        const handler = watcherCtx.scene.ui.getHandler() as ActionableHandler;
+        const current = watcherCtx.scene.phaseManager.getCurrentPhase();
+        watcherState =
+          `${current?.phaseName ?? "none"}/${UiMode[watcherCtx.scene.ui.getMode()] ?? watcherCtx.scene.ui.getMode()}`
+          + `/active=${String(handler?.active)}/actionable=${String(handler?.isCoopV2InputActionable?.())}`;
+        return (
+          current === watcherPhase
+          && watcherCtx.scene.ui.getMode() === mode
+          && handler?.active === true
+          && handler.isCoopV2InputActionable?.() === true
+        );
+      });
+      if (ownerReady && watcherReady) {
+        return;
+      }
+      await withClient(ownerCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
+    }
+    throw new Error(
+      `projected ${UiMode[mode]} surface did not become public: owner=${ownerState} watcher=${watcherState}`,
+    );
+  }
+
+  async function drivePublicCrossroads(
+    rig: DuoRig,
+    ownerCtx: ClientCtx,
+    watcherCtx: ClientCtx,
+    phases: { host: ErCrossroadsPhase; guest: ErCrossroadsPhase },
+    moveOn: boolean,
+  ): Promise<void> {
+    const ownerPhase = ownerCtx === rig.hostCtx ? phases.host : phases.guest;
+    const watcherPhase = watcherCtx === rig.hostCtx ? phases.host : phases.guest;
+    await waitForProjectedPublicSurface(rig, ownerCtx, watcherCtx, ownerPhase, watcherPhase, UiMode.OPTION_SELECT);
+    if (moveOn) {
+      expect(
+        await withClient(ownerCtx, () => ownerCtx.scene.ui.processInput(Button.DOWN)),
+        "owner selects Leave through OPTION_SELECT",
+      ).toBe(true);
+      await pumpDuoDestinations(rig, 1);
+    }
+    expect(
+      await withClient(ownerCtx, () => ownerCtx.scene.ui.processInput(Button.ACTION)),
+      `owner commits ${moveOn ? "Leave" : "Stay"} through OPTION_SELECT`,
+    ).toBe(true);
+    await pumpDuoDestinations(rig, 2);
   }
 
   function liveSelectBiome(sourceWave: number | null = null): SelectBiomePhase {
@@ -541,72 +613,17 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     });
   });
 
-  /** Drive the OWNER crossroads: start (opens mocked OPTION_SELECT after the #858 boundary barrier), then
-   *  press Stay(0)/Leave(1). The owner drives alone here, so its reciprocal boundary barrier resolves via
-   *  the anti-hang timeout (setCoopRendezvousWaitMs(50)) - poll for the menu across it. */
-  async function driveCrossroadsOwner(cap: UiCapture, moveOn: boolean): Promise<void> {
-    const phase = liveCrossroads();
-    phase.start();
-    for (let i = 0; i < 80 && cap.optionConfig == null; i++) {
-      await drainLoopback();
-    }
-    const opts = cap.optionConfig?.options;
-    expect(opts, "owner crossroads opened the Stay/Leave menu (mirrored)").toBeDefined();
-    // Press Stay (0) or Leave (1).
-    opts![moveOn ? 1 : 0].handler();
-    await drainLoopback();
-  }
-
-  /** Drive the WATCHER crossroads: start (opens mirrored copy + awaits), drain until it applies. */
-  async function driveCrossroadsWatch(): Promise<CrossroadsSeam> {
-    const phase = liveCrossroads() as unknown as CrossroadsSeam;
-    phase.start();
-    for (let i = 0; i < 40; i++) {
-      await drainLoopback();
-      if (phase.resolving) {
-        return phase;
-      }
-    }
-    throw new Error("crossroads WATCH HANG: watcher never applied the owner's pick");
-  }
-
   it("retains one Crossroads source when the guest renderer already exposes the next battle", async () => {
     const sourceWave = 5;
     const rig = await bootBoundaryAtWave(sourceWave);
     // Victory passes the completed source explicitly even if the renderer's ambient next battle won the race.
     rig.guestScene.currentBattle.waveIndex = sourceWave + 1;
-    const hostPhase = withClientSync(rig.hostCtx, () => liveCrossroads(sourceWave));
-    const guestPhase = withClientSync(rig.guestCtx, () => liveCrossroads(sourceWave));
     const hostSend = vi.spyOn(rig.pair.host, "send");
     const guestSend = vi.spyOn(rig.pair.guest, "send");
     rig.pair.setDestinationContextDelivery?.(true);
     try {
-      await withClient(rig.hostCtx, async () => {
-        hostPhase.start();
-        await drainLoopback();
-      });
-      await withClient(rig.guestCtx, async () => {
-        guestPhase.start();
-        await drainLoopback();
-      });
-
-      for (let attempt = 0; attempt < 320; attempt++) {
-        await pumpDuoDestinations(rig, 1);
-        if (rig.hostScene.ui.getMode() === UiMode.OPTION_SELECT) {
-          break;
-        }
-        await withClient(rig.hostCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
-      }
-      expect(rig.hostScene.ui.getMode(), "the source-wave owner opens the real Crossroads surface").toBe(
-        UiMode.OPTION_SELECT,
-      );
-      for (let attempt = 0; attempt < 80; attempt++) {
-        const accepted = await withClient(rig.hostCtx, () => rig.hostScene.ui.processInput(Button.ACTION));
-        await pumpDuoDestinations(rig, 1);
-        if (accepted) {
-          break;
-        }
-      }
+      const phases = startCrossroadsPair(rig, sourceWave);
+      await drivePublicCrossroads(rig, rig.hostCtx, rig.guestCtx, phases, false);
       for (let attempt = 0; attempt < 80; attempt++) {
         await pumpDuoDestinations(rig, 1);
         if (
@@ -619,8 +636,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
 
       const rendezvousPoints = (spy: typeof hostSend): string[] =>
         spy.mock.calls.flatMap(call => (call[0].t === "rendezvous" ? [call[0].point] : []));
-      expect(hostPhase.requireCoopSourceWave()).toBe(sourceWave);
-      expect(guestPhase.requireCoopSourceWave()).toBe(sourceWave);
+      expect(phases.host.requireCoopSourceWave()).toBe(sourceWave);
+      expect(phases.guest.requireCoopSourceWave()).toBe(sourceWave);
       expect(rendezvousPoints(hostSend), "host retains the completed-wave Crossroads address").toContain(
         `xroads:${sourceWave}`,
       );
@@ -650,16 +667,16 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
     const biomeBefore = rig.hostScene.arena.biomeId;
 
-    const ownerCap = installUiCapture(ownerCtx.scene);
-    const watcherCap = installUiCapture(watcherCtx.scene);
-    try {
-      await arriveBoundary(watcherCtx, "xroads:26");
-      // OWNER first (buffers its relay), THEN watcher (drains it) - sequential, per-ctx.
-      await withClient(ownerCtx, () => driveCrossroadsOwner(ownerCap, /* moveOn */ false));
-      await withClient(watcherCtx, () => driveCrossroadsWatch());
-    } finally {
-      ownerCap.restore();
-      watcherCap.restore();
+    const phases = startCrossroadsPair(rig);
+    await drivePublicCrossroads(rig, ownerCtx, watcherCtx, phases, false);
+    for (let attempt = 0; attempt < 80; attempt++) {
+      await pumpDuoDestinations(rig, 1);
+      if (
+        rig.hostRuntime.controller.interactionCounter() === counterBefore + 1
+        && rig.guestRuntime.controller.interactionCounter() === counterBefore + 1
+      ) {
+        break;
+      }
     }
 
     // Both engines stayed in the SAME biome (no SwitchBiomePhase queued).
@@ -713,16 +730,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
 
     // ===== Step A: the CROSSROADS (owner picks LEAVE - defers its terminal to the map pick). =====
-    const ownerCap = installUiCapture(ownerCtx.scene);
-    let watcherCap = installUiCapture(watcherCtx.scene);
-    try {
-      await arriveBoundary(watcherCtx, "xroads:11");
-      await withClient(ownerCtx, () => driveCrossroadsOwner(ownerCap, /* moveOn */ true));
-      await withClient(watcherCtx, () => driveCrossroadsWatch());
-    } finally {
-      ownerCap.restore();
-      watcherCap.restore();
-    }
+    const crossroads = startCrossroadsPair(rig);
+    await drivePublicCrossroads(rig, ownerCtx, watcherCtx, crossroads, true);
 
     // LEAVE defers: the counter has NOT advanced yet (the chained map pick owns the single terminal).
     expect(rig.hostRuntime.controller.interactionCounter(), "LEAVE defers - host counter unchanged").toBe(
@@ -742,42 +751,26 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const watcherPinAfterLeave = withClientSync(watcherCtx, () => coopBiomeInteractionStartValue());
     expect(ownerPinAfterLeave, "the crossroads Leave pinned the owner biome interaction").toBe(counterBefore);
     expect(watcherPinAfterLeave, "the crossroads Leave pinned the watcher biome interaction").toBe(counterBefore);
-    watcherCap = installUiCapture(watcherCtx.scene);
-    try {
-      await arriveBoundary(watcherCtx, "biomepick:11");
-      await withClient(ownerCtx, async () => {
-        const phase = liveSelectBiome();
-        phase.start(); // reaches coopBiomePickOwner and opens the real ER_MAP handler
-        for (let i = 0; i < 100 && ownerCtx.scene.ui.getMode() !== UiMode.ER_MAP; i++) {
-          await drainLoopback();
-        }
-        expect(ownerCtx.scene.ui.getMode(), "owner opened the real ER_MAP route picker").toBe(UiMode.ER_MAP);
-        resetCoopUiRelayTrace();
-        expect(ownerCtx.scene.ui.processInput(Button.RIGHT), "owner moves to the non-default route via UI").toBe(true);
-        expect(ownerCtx.scene.ui.processInput(Button.ACTION), "owner commits VOLCANO via the real map UI").toBe(true);
-        expect(
-          getCoopUiRelayEdges().some(edge => edge.mode === UiMode.ER_MAP && edge.carrier === "interactionChoice"),
-          "the public World-Map input reached the production biome relay",
-        ).toBe(true);
-        await drainLoopback();
-      });
-      expect(
-        rig.hostRuntime.durability?.unackedCount(),
-        "the exact interactive terminal stays retained until the watcher opens its continuation",
-      ).toBeGreaterThan(0);
-      await withClient(watcherCtx, async () => {
-        const phase = liveSelectBiome();
-        phase.start(); // reaches coopBiomePickWatch (ER_MAP mocked), beginSession("watcher"), awaits relay
-        for (let i = 0; i < 40; i++) {
-          await drainLoopback();
-          if (biomeArg(guestSwitch) !== undefined) {
-            return;
-          }
-        }
-        throw new Error("biome pick WATCH HANG: watcher never adopted the owner's biome");
-      });
-    } finally {
-      watcherCap.restore();
+    const biomePhases = await startQueuedBiomePair(rig);
+    const ownerBiomePhase = ownerCtx === rig.hostCtx ? biomePhases.host : biomePhases.guest;
+    const watcherBiomePhase = watcherCtx === rig.hostCtx ? biomePhases.host : biomePhases.guest;
+    await waitForProjectedPublicSurface(rig, ownerCtx, watcherCtx, ownerBiomePhase, watcherBiomePhase, UiMode.ER_MAP);
+    resetCoopUiRelayTrace();
+    expect(
+      await withClient(ownerCtx, () => ownerCtx.scene.ui.processInput(Button.RIGHT)),
+      "owner moves to the non-default route via UI",
+    ).toBe(true);
+    await pumpDuoDestinations(rig, 1);
+    expect(
+      await withClient(ownerCtx, () => ownerCtx.scene.ui.processInput(Button.ACTION)),
+      "owner commits VOLCANO via the real map UI",
+    ).toBe(true);
+    expect(
+      getCoopUiRelayEdges().some(edge => edge.mode === UiMode.ER_MAP && edge.carrier === "interactionChoice"),
+      "the public World-Map input reached the production biome relay",
+    ).toBe(true);
+    for (let attempt = 0; attempt < 80 && biomeArg(guestSwitch) === undefined; attempt++) {
+      await pumpDuoDestinations(rig, 1);
     }
 
     // BOTH engines switch to the owner's CHOSEN (non-default) biome - the core mechanic, restored.
@@ -810,18 +803,18 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // derive a biome locally. It remains parked until the exact host BIOME_PICK is journaled.
   // =====================================================================================
   it("AUTHORITY LOSS: a timed-out owner pick parks without renderer RNG, mutation, or counter advance", async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-
-    rig.hostScene.currentBattle.waveIndex = 11;
-    rig.guestScene.currentBattle.waveIndex = 11;
+    const rig = await bootBoundaryAtWave(11);
     setPendingNodesForBoth(rig, [
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
     ]);
 
-    // Force EVERY relay await to TIME OUT (simulate a disconnected owner) - the anti-hang path.
-    vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice").mockResolvedValue(null);
+    // Let both real public surfaces install first, then make the owner disappear without a result.
+    let releaseMissingChoice!: () => void;
+    const missingChoice = new Promise<null>(resolve => {
+      releaseMissingChoice = () => resolve(null);
+    });
+    vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice").mockImplementation(() => missingChoice);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
@@ -830,28 +823,20 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const randomBiome = vi.spyOn(watcherCtx.scene, "generateRandomBiome");
     const sourceBiome = watcherCtx.scene.arena.biomeId;
 
-    // The owner reached the shared boundary, then disappeared before sending a choice. This lets the
-    // watcher cross the reciprocal barrier while still exercising the deterministic relay fallback.
-    await arriveBoundary(ownerCtx, "biomepick:11");
-    const cap = installUiCapture(watcherCtx.scene);
-    const ui = watcherCtx.scene.ui as unknown as {
-      showText: (text: string, delay?: number | null, cb?: (() => void) | null, ...rest: unknown[]) => void;
-    };
-    ui.showText = () => {
-      // Hold the explicit recovery action: authority loss must park rather than self-select.
-    };
-    const phase = liveSelectBiome();
+    const phases = startNaturalBiomePair(rig);
+    const ownerPhase = ownerCtx === rig.hostCtx ? phases.host : phases.guest;
+    const watcherPhase = watcherCtx === rig.hostCtx ? phases.host : phases.guest;
     try {
-      await withClient(watcherCtx, async () => {
-        phase.start();
-        for (let i = 0; i < 40; i++) {
-          await drainLoopback();
-          await new Promise(resolve => setTimeout(resolve, 2));
+      await waitForProjectedPublicSurface(rig, ownerCtx, watcherCtx, ownerPhase, watcherPhase, UiMode.ER_MAP);
+      releaseMissingChoice();
+      for (let i = 0; i < 80; i++) {
+        await pumpDuoDestinations(rig, 1);
+        if (watcherCtx.scene.ui.getMode() !== UiMode.ER_MAP) {
+          break;
         }
-      });
+      }
     } finally {
-      (phase as unknown as { clearBiomeCommitRecovery(): void }).clearBiomeCommitRecovery();
-      cap.restore();
+      (watcherPhase as unknown as { clearBiomeCommitRecovery(): void }).clearBiomeCommitRecovery();
     }
 
     expect(
@@ -900,16 +885,14 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
 
     const beginSpy = vi.spyOn(CoopUiMirror.prototype, "beginSession");
-    const watcherTracker = installUiModeTracker(watcherCtx.scene);
     const switchSpy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
     const randomBiome = vi.spyOn(watcherCtx.scene, "generateRandomBiome");
     const sourceBiome = watcherCtx.scene.arena.biomeId;
-    const ui = watcherCtx.scene.ui as unknown as {
-      showText: (text: string, delay?: number | null, cb?: (() => void) | null, ...rest: unknown[]) => void;
-    };
-    ui.showText = () => {
-      // Hold the recovery action after the orphan detector closes the map.
-    };
+
+    const phases = startNaturalBiomePair(rig);
+    const ownerPhase = ownerCtx === rig.hostCtx ? phases.host : phases.guest;
+    const watcherPhase = watcherCtx === rig.hostCtx ? phases.host : phases.guest;
+    await waitForProjectedPublicSurface(rig, ownerCtx, watcherCtx, ownerPhase, watcherPhase, UiMode.ER_MAP);
 
     // The OWNER commits + moves on WITHOUT relaying a biomePick: advance the shared interaction counter and
     // broadcast it. The watcher receives ONLY this advance (never a pick) - the exact one-sided orphan.
@@ -922,25 +905,21 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       "a counter-only orphan is not biome authority",
     ).toBeNull();
 
-    const phase = liveSelectBiome();
     try {
-      await withClient(watcherCtx, async () => {
-        setCoopBiomeInteractionStart(counterBefore); // chained pin -> the watcher takes coopBiomePickWatch
-        phase.start();
-        for (let i = 0; i < 200; i++) {
-          await drainLoopback();
-          await new Promise(resolve => setTimeout(resolve, 2));
-          if (watcherTracker.mode() !== UiMode.ER_MAP) {
-            return;
-          }
+      for (let i = 0; i < 200; i++) {
+        await pumpDuoDestinations(rig, 1);
+        if (watcherCtx.scene.ui.getMode() !== UiMode.ER_MAP) {
+          break;
         }
+        await withClient(watcherCtx, () => new Promise(resolve => setTimeout(resolve, 2)));
+      }
+      if (watcherCtx.scene.ui.getMode() === UiMode.ER_MAP) {
         throw new Error(
           "biome pick ORPHAN HANG: the watcher never left ER_MAP - it is stuck on the 20-min relay timeout (#863 fails-before)",
         );
-      });
+      }
     } finally {
-      (phase as unknown as { clearBiomeCommitRecovery(): void }).clearBiomeCommitRecovery();
-      watcherTracker.restore();
+      (watcherPhase as unknown as { clearBiomeCommitRecovery(): void }).clearBiomeCommitRecovery();
     }
 
     // The watcher opened the MIRRORED map (so this is the real owner-alternated path), then LEFT it.
@@ -948,7 +927,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       beginSpy.mock.calls.some(c => c[0] === "watcher"),
       "the watcher opened a mirrored MAP session before the orphan dismiss",
     ).toBe(true);
-    expect(watcherTracker.mode(), "the watcher's UI mode LEFT the map (not stuck in ER_MAP) (#863)").not.toBe(
+    expect(watcherCtx.scene.ui.getMode(), "the watcher's UI mode LEFT the map (not stuck in ER_MAP) (#863)").not.toBe(
       UiMode.ER_MAP,
     );
     expect(
@@ -981,28 +960,29 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
 
     const sendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
-
-    await arriveBoundary(watcherCtx, "biomepick:11");
-    await withClient(ownerCtx, async () => {
-      const phase = liveSelectBiome();
-      phase.start();
-      // Poll across the #858 boundary barrier after the watcher has genuinely arrived; then the real handler opens.
-      let opened = false;
-      for (let i = 0; i < 120 && !opened; i++) {
-        await drainLoopback();
-        opened = ownerCtx.scene.ui.getMode() === UiMode.ER_MAP;
+    const phases = startNaturalBiomePair(rig);
+    const ownerPhase = ownerCtx === rig.hostCtx ? phases.host : phases.guest;
+    const watcherPhase = watcherCtx === rig.hostCtx ? phases.host : phases.guest;
+    await waitForProjectedPublicSurface(rig, ownerCtx, watcherCtx, ownerPhase, watcherPhase, UiMode.ER_MAP);
+    expect(
+      await withClient(ownerCtx, () => ownerCtx.scene.ui.processInput(Button.RIGHT)),
+      "owner selects the second real map node",
+    ).toBe(true);
+    await pumpDuoDestinations(rig, 1);
+    expect(
+      await withClient(ownerCtx, () => ownerCtx.scene.ui.processInput(Button.ACTION)),
+      "owner confirms the real map node",
+    ).toBe(true);
+    for (let attempt = 0; attempt < 80; attempt++) {
+      await pumpDuoDestinations(rig, 1);
+      if (
+        withClientSync(rig.hostCtx, () =>
+          getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore }),
+        ) != null
+      ) {
+        break;
       }
-      // eslint-disable-next-line no-console
-      console.log(
-        `[PROBE #864] after start: ui.getMode()=${ownerCtx.scene.ui.getMode()} (ER_MAP=${UiMode.ER_MAP}) opened=${opened}`,
-      );
-      if (opened) {
-        // Drive the REAL picker: RIGHT to the 2nd node (VOLCANO), ACTION to travel.
-        ownerCtx.scene.ui.processInput(Button.RIGHT);
-        ownerCtx.scene.ui.processInput(Button.ACTION);
-        await drainLoopback();
-      }
-    });
+    }
 
     const biomePickSends = sendSpy.mock.calls.filter(c => c[1] === "biomePick");
     // eslint-disable-next-line no-console

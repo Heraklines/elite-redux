@@ -2535,3 +2535,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   object identity. They still cannot construct a detached surface, replace `setMode`, or call a private UI
   completion callback. Batch input is split into two accepted public key presses with a destination pump
   between them so the UI -> relay -> authoritative result chain is observable.
+
+# 2026-07-24 - Stale audit reconciliation and public biome fixture cutover
+
+- The audit anchored at `22e047ca5` remains useful only as a hardening-debt register. Its P0 reward watcher,
+  protocol-47 identity, entry-presentation proof, runtime-owned watchdog, turn-commit fail-close, and B2
+  target-consumption findings are closed on this line. Its production mutation-ledger, bounded immutable
+  history, side-effect-free extra-enemy removal, and invalid-enemy recovery findings remain source-valid.
+- Focused run `30065201578` proves the batch-learn migration worked: both batch failures disappeared while
+  static and Showdown S1 stayed green. B11 now has ten failures: five stale biome-choice schedules, the
+  automatic-victory SwitchSummon renderer crash, enemy-switch/half-wipe downstream frontiers, Revival
+  entering after a contaminated Title state, and one obsolete wave-terminal expectation.
+- The Crossroads and world-map production-facing cases no longer construct detached phases, replace
+  `setMode`, capture option callbacks, pre-arrive one side, or press before control installation. They now
+  retire the synthetic command predecessor, install the exact current phase on both engines, reproduce the
+  deliberately-inert headless scheduler edge once, wait for both real handlers plus the owner's V2 input
+  lease, and use only public `Button` input. Authority-loss and orphan probes now begin from the same paired
+  projected ER_MAP surface before faulting the result path.
