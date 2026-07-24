@@ -54,10 +54,9 @@ import {
   awaitRewardShopPhaseExit,
   buildDuoForMe,
   drainGuestMeReplayNewRounds,
-  drainGuestMeReplayToSettle,
   drainLoopback,
   driveClientPhaseQueueTo,
-  driveGuestMeReplay,
+  driveDuoGuestMeReplay,
   driveGuestMirrorQuiz,
   driveGuestRewardWatch,
   driveHostMeRewardShopWithGuestReplay,
@@ -66,6 +65,7 @@ import {
   installDuoLogCapture,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
+  settleDuoGuestMeReplay,
   startGuestMeOutcomeRace,
   startGuestMeReplay,
   startGuestMeShopOwner,
@@ -335,7 +335,7 @@ describe.skipIf(!RUN)(
       // ===== Drive the GUEST's REAL CoopReplayMePhase: it consumes the host's buffered 8M present +
       // 8M meResync + 9M LEAVE (FIFO), applies the outcome, leaves the encounter, advances once. A
       // no-progress stall THROWS (the hang detection). =====
-      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
+      const guestReplay = await settleDuoGuestMeReplay(rig, replay);
 
       // The guest left the encounter exactly once (the single `settled` terminal).
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
@@ -416,9 +416,10 @@ describe.skipIf(!RUN)(
         expect(hostScene.ui.processInput(Button.ACTION), "owner can commit Move on through the ME pump").toBe(true);
         expect(
           getCoopUiRelayEdges().some(
-            edge => edge.mode === UiMode.MYSTERY_ENCOUNTER && edge.carrier === "interactionChoice",
+            edge =>
+              edge.mode === UiMode.MYSTERY_ENCOUNTER && edge.carrier === "operation" && edge.operationClass === "op:me",
           ),
-          "the public mystery-event UI input reached the production interaction relay",
+          "the public mystery-event UI input committed through the Authority V2 operation relay",
         ).toBe(true);
         expect(hostScene.ui.getMode(), "the selected line switched to the message handler").toBe(UiMode.MESSAGE);
 
@@ -440,7 +441,7 @@ describe.skipIf(!RUN)(
       expect(rig.hostRuntime.controller.interactionCounter(), "host completed the Hot Spring exactly once").toBe(
         counterBefore + 1,
       );
-      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
+      const guestReplay = await settleDuoGuestMeReplay(rig, replay);
       expect(guestReplay.settled, "guest left the exact Hot Spring terminal without parking").toBe(true);
       expect(rig.guestRuntime.controller.interactionCounter(), "guest Hot Spring counter converged").toBe(
         counterBefore + 1,
@@ -462,7 +463,6 @@ describe.skipIf(!RUN)(
       const pair = createLoopbackPair();
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
-      let replay!: Phase;
 
       await withClient(rig.hostCtx, async () => {
         await runMysteryEncounterToEnd(game, 1);
@@ -471,7 +471,7 @@ describe.skipIf(!RUN)(
         // consume the retained reward-settled image through its real replay phase first.
         await game.phaseInterceptor.to("PostMysteryEncounterPhase", false);
       });
-      replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
       await withClient(rig.hostCtx, () => {
         hostScene.phaseManager.getCurrentPhase().start();
       });
@@ -480,7 +480,7 @@ describe.skipIf(!RUN)(
         rig.hostRuntime.controller.interactionCounter(),
         "the fieldless no-shop terminal committed instead of terminating the shared session",
       ).toBe(counterBefore + 1);
-      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
+      const guestReplay = await settleDuoGuestMeReplay(rig, replay);
       expect(guestReplay.settled, "the guest adopted the final complete terminal and left once").toBe(true);
       expect(rig.guestRuntime.controller.interactionCounter(), "both clients advanced the same ME exactly once").toBe(
         counterBefore + 1,
@@ -654,10 +654,8 @@ describe.skipIf(!RUN)(
       // BUFFER-HIT the host's already-buffered meResync on 8M + LEAVE on 9M and resolve under the GUEST
       // scene), then drain to the terminal: applyCoopMeOutcome + leaveEncounterWithoutBattle + advance all
       // run against the GUEST scene, so the guest genuinely converges. =====
-      const guestReplay = await withClient(rig.guestCtx, async () => {
-        startGuestMeOutcomeRace(replay);
-        return drainGuestMeReplayToSettle(replay);
-      });
+      withClientSync(rig.guestCtx, () => startGuestMeOutcomeRace(replay));
+      const guestReplay = await settleDuoGuestMeReplay(rig, replay);
 
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
       expect(
@@ -726,9 +724,9 @@ describe.skipIf(!RUN)(
       ).toBe(counterBefore);
 
       // ===== Drive the GUEST's CoopReplayMePhase. Its now-live retained receiver requests any fast host
-      // tail, applies the complete state image, and opens the exact battle destination. driveGuestMeReplay
+      // tail, applies the complete state image, and opens the exact battle destination. driveDuoGuestMeReplay
       // drains to `settled`; a no-progress stall THROWS (the #693 hang detection). =====
-      const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+      const guestReplay = await driveDuoGuestMeReplay(rig);
 
       // The guest settled (ended) - via the BATTLE-HANDOFF branch, NOT a leave. Discriminators:
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (ended once) at the battle-handoff").toBe(true);
@@ -792,7 +790,7 @@ describe.skipIf(!RUN)(
         await runSelectMysteryEncounterOption(game, 1);
         await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
       });
-      const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+      const guestReplay = await driveDuoGuestMeReplay(rig);
 
       expect(guestReplay.settled).toBe(true);
       expect(rig.hostRuntime.controller.interactionCounter()).toBe(counterBefore);
@@ -1588,10 +1586,8 @@ describe.skipIf(!RUN)(
       });
       const hostSeed = hostScene.seed;
 
-      const guestReplay = await withClient(rig.guestCtx, async () => {
-        startGuestMeOutcomeRace(replay);
-        return drainGuestMeReplayToSettle(replay);
-      });
+      withClientSync(rig.guestCtx, () => startGuestMeOutcomeRace(replay));
+      const guestReplay = await settleDuoGuestMeReplay(rig, replay);
 
       // CONVERGENCE + LOCKSTEP: the guest settled once, applied the host's meResync once, its seed converged,
       // and BOTH counters advanced exactly once - the ME proceeded to completion despite the mid-divert heal.

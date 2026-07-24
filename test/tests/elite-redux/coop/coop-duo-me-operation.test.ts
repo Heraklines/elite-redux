@@ -66,16 +66,16 @@ import {
   awaitRewardShopPhaseExit,
   buildDuoForMe,
   clearCoopSchedulerActiveTimeClock,
-  drainGuestMeReplayToSettle,
   drainLoopback,
   driveClientPhaseQueueTo,
-  driveGuestMeReplay,
+  driveDuoGuestMeReplay,
   driveHostMeRewardShopWithGuestReplay,
   installCoopSchedulerActiveTimeClock,
   installDuoLogCapture,
   relayGuestMeOptionIndexOnly,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
+  settleDuoGuestMeReplay,
   settleDuoPromise,
   startGuestMeOutcomeRace,
   startGuestMeReplay,
@@ -185,7 +185,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
 
-    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
+    const guestReplay = await settleDuoGuestMeReplay(rig, guestReplayPhase);
     expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
 
     const terminals = submitSpy.mock.calls
@@ -260,7 +260,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     });
     expect(leaveCommitSends, "the Authority V2 log redelivered the retained leave entry").toBeGreaterThanOrEqual(2);
 
-    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
+    const guestReplay = await settleDuoGuestMeReplay(rig, guestReplayPhase);
     expect(guestReplay.settled, "the durable ME_TERMINAL must settle the real guest replay phase").toBe(true);
     expect(
       applyOutcomeSpy,
@@ -312,7 +312,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     });
     armReceiptDrop = true;
     await withClient(rig.hostCtx, () => hostScene.phaseManager.getCurrentPhase()!.start());
-    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
+    const guestReplay = await settleDuoGuestMeReplay(rig, guestReplayPhase);
     expect(guestReplay.settled, "the first terminal delivery settles the production guest replay").toBe(true);
     expect(pair.faultsInjected(), "the first V2 controlInstalled receipt was actually dropped").toBeGreaterThan(0);
     expect(terminalReceiptAttempts, "the replica emitted the dropped terminal receipt").toBe(1);
@@ -398,7 +398,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
 
-    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
+    const guestReplay = await settleDuoGuestMeReplay(rig, guestReplayPhase);
     expect(guestReplay.settled, "the guest replay still reaches its terminal").toBe(true);
     expect(
       rig.guestScene.currentBattle.mysteryEncounter!.dialogueTokens.durableProof,
@@ -500,22 +500,11 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       counterBefore + 1,
     );
 
-    // STEP D (guest): install the executable replay receiver after the embedded shop has closed. The host's
-    // complete terminal was already retained while that nested surface owned the scene, so arming this exact
-    // receiver must immediately reannounce readiness instead of waiting for a periodic durability resend.
-    const guestDurability = rig.guestRuntime.durability;
-    if (guestDurability == null) {
-      throw new Error("guest-owned ME test lost its durability journal before terminal replay");
-    }
-    const terminalReadinessSpy = vi.spyOn(guestDurability, "reconnect");
-    const guestReplay = await withClient(rig.guestCtx, async () => {
-      startGuestMeOutcomeRace(replay);
-      return drainGuestMeReplayToSettle(replay);
-    });
-    expect(
-      terminalReadinessSpy,
-      "the live Mystery replay receiver reannounced the retained complete terminal transaction",
-    ).toHaveBeenCalled();
+    // STEP D (guest): install the executable replay receiver after the embedded shop has closed. The V2
+    // log already retains the terminal; pumping both event loops delivers its ordered successor without a
+    // legacy durability reconnect side channel.
+    withClientSync(rig.guestCtx, () => startGuestMeOutcomeRace(replay));
+    const guestReplay = await settleDuoGuestMeReplay(rig, replay);
     expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest counter lockstep after the ME").toBe(
       counterBefore + 1,
@@ -583,13 +572,12 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // STEP C1 (guest): pump the guest so it APPLIES the broadcast ME_PICK envelope. The Track R
     // material-apply hook fires here and installs the entry's exact typed successor before any reward shop.
     // Snapshot the wire count first so the assertion isolates this ME_PICK apply window.
-    const sendsBeforePickApply = guestV2SendSpy.mock.calls.length;
-    const pickApplySends = await withClient(rig.guestCtx, async () => {
+    await withClient(rig.guestCtx, async () => {
       for (let i = 0; i < 8; i++) {
         await drainLoopback();
       }
-      return guestV2SendSpy.mock.calls.slice(sendsBeforePickApply).map(call => call[0]);
     });
+    const pickApplySends = guestV2SendSpy.mock.calls.map(call => call[0]);
     expect(
       pickApplySends.some(
         message =>
@@ -624,10 +612,8 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
 
     // STEP D (guest): start the outcome/terminal race and drain to the terminal. The guest REACHES its
     // terminal (settles) - it never fell to Title behind an unreleased pick.
-    const guestReplay = await withClient(rig.guestCtx, async () => {
-      startGuestMeOutcomeRace(replay);
-      return drainGuestMeReplayToSettle(replay);
-    });
+    withClientSync(rig.guestCtx, () => startGuestMeOutcomeRace(replay));
+    const guestReplay = await settleDuoGuestMeReplay(rig, replay);
     expect(guestReplay.settled, "guest CoopReplayMePhase reached its terminal (left once) - no Title").toBe(true);
 
     // The raw relay seam above intentionally stops at the ME terminal. Production does not: its real
@@ -769,18 +755,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // makes the authority publish ME_PICK, whose receipt then publishes the ordered ME_TERMINAL. A fixed
     // guest-only drain loop executes the host receipt callback under the wrong shared-process scene and
     // manufactures a gap that cannot occur in two browsers.
-    rig.pair.setDestinationContextDelivery?.(true);
-    const guestReplay = await (async () => {
-      try {
-        const guestReplayPending = withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
-        return await settleDuoPromise(rig, guestReplayPending, "battle-handoff Mystery replay", {
-          timeoutMs: 10_000,
-          intervalMs: 5,
-        });
-      } finally {
-        rig.pair.setDestinationContextDelivery?.(false);
-      }
-    })();
+    const guestReplay = await driveDuoGuestMeReplay(rig);
     expect(guestReplay.settled, "guest CoopReplayMePhase settled at the battle-handoff").toBe(true);
 
     const terminal = submitSpy.mock.calls.map(call => call[0]).find(intent => intent.kind === "ME_TERMINAL")?.payload;

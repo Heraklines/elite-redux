@@ -2807,3 +2807,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   revision 1's receipt callback was executing under the guest's ambient scene, then the guest-only drain loop
   never let the host publish the successor. The test now uses the existing destination-context scheduler and
   pumps both real client contexts until the retained ME_PRESENT -> ME_PICK -> ME_TERMINAL chain settles.
+
+# 2026-07-24 - Mystery integration drivers keep both Authority V2 event loops alive
+
+- Exact B5 run `30087618381` proved every migrated packet-loss fixture crossed the V2 entry/receipt seams;
+  three stopped only after the ordered terminal handed control to the guest's real PostMysteryEncounter tail,
+  and the battle handoff exhausted the old immediate 16-drain guest-only loop. The canonical duo driver now
+  alternates complete host and guest destination contexts until each receipt-triggered successor publishes,
+  then drives the real queued final-leave continuation with the same bounded two-browser pump.
+- B5 and the B9 Mystery/battle-reward fixtures use that shared driver instead of assuming all retained entries
+  were already buffered before the guest ran. This models two independent browser event loops and preserves
+  the existing fail-loud phase/timeout diagnostics; it does not add a production bypass or synthetic result.
+- Authority V2 commits now retain the public UI -> operation trace edge before returning around the deleted
+  `op:global` journal path. The Hot Spring contract therefore proves its real `UI.processInput` reaches an
+  `op:me` V2 commit, rather than looking for a raw `interactionChoice` carrier the cutover suppresses.

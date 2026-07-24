@@ -4705,6 +4705,69 @@ export async function driveGuestMeReplay(guestScene: MeReplayPumpScene): Promise
   return drainGuestMeReplayToSettle(replay);
 }
 
+/**
+ * Settle an already-started Mystery replay while both isolated browser contexts keep processing transport.
+ * Authority V2 publishes each ordered successor only after the replica's exact controlInstalled receipt;
+ * a guest-only pump can therefore strand ME_PICK/ME_TERMINAL behind a host callback that never gets its
+ * own scene/runtime installed in the single-process fixture. Production has two independent event loops,
+ * so this is the representative integration driver for any retained Mystery boundary.
+ */
+async function settleDuoGuestMeReplayWithDelivery(rig: DuoRig, replay: Phase): Promise<GuestMeReplay> {
+  const deadline = Date.now() + 20_000;
+  while (!meReplaySettled(replay) && Date.now() < deadline) {
+    await pumpDuoDestinations(rig, 1);
+    const continuationHandedOff = withClientSync(
+      rig.guestCtx,
+      () => (replay as unknown as { continuationHandedOff: boolean }).continuationHandedOff,
+    );
+    if (continuationHandedOff && !meReplaySettled(replay)) {
+      const continuation = withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "retained Mystery final leave", {
+          matches: () => meReplaySettled(replay),
+          maxPhases: 32,
+        }),
+      );
+      await settleDuoPromise(rig, continuation, "retained Mystery final-leave continuation", {
+        timeoutMs: 10_000,
+        intervalMs: 5,
+      });
+    }
+    if (!meReplaySettled(replay)) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+  }
+  if (!meReplaySettled(replay)) {
+    throw new Error("duo Mystery replay HANG: retained V2 successor never settled with both event loops alive");
+  }
+  // Reuse the ordinary settled-path cleanup (notably its losing legacy waiter cancellation). It returns on
+  // the first iteration because the exact replay is already settled; it cannot manufacture progression.
+  return withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
+}
+
+export async function settleDuoGuestMeReplay(rig: DuoRig, replay: Phase): Promise<GuestMeReplay> {
+  rig.pair.setDestinationContextDelivery?.(true);
+  try {
+    return await settleDuoGuestMeReplayWithDelivery(rig, replay);
+  } finally {
+    rig.pair.setDestinationContextDelivery?.(false);
+  }
+}
+
+/** Start and settle the guest's production Mystery replay with both browser event loops alive. */
+export async function driveDuoGuestMeReplay(rig: DuoRig): Promise<GuestMeReplay> {
+  rig.pair.setDestinationContextDelivery?.(true);
+  try {
+    const startPending = withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+    const replay = await settleDuoPromise(rig, startPending, "production Mystery replay start", {
+      timeoutMs: 20_000,
+      intervalMs: 5,
+    });
+    return await settleDuoGuestMeReplayWithDelivery(rig, replay);
+  } finally {
+    rig.pair.setDestinationContextDelivery?.(false);
+  }
+}
+
 /** The private CoopReplayMePhase seam the repeated-round harness inspects (#831, established cast form). */
 interface GuestMeRoundSeam {
   /** How many REPEATED option-select rounds (bare re-fired mePresents) the phase re-rendered. */

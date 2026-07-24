@@ -55,7 +55,7 @@ import {
   buildDuoForMe,
   drainLoopback,
   driveClientPhaseQueueTo,
-  driveGuestMeReplay,
+  driveDuoGuestMeReplay,
   installDuoLogCapture,
   withClient,
   withClientSync,
@@ -152,8 +152,8 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     //
     // The retained ME_TERMINAL applies the host's exact state before CoopReplayMePhase finishesWithoutLeaving:
     // it does NOT leave/advance, marks the handoff battle STARTED, and boots the declared battle surface. =====
+    const guestReplay = await driveDuoGuestMeReplay(rig);
     const queued = await withClient(rig.guestCtx, async () => {
-      const guestReplay = await driveGuestMeReplay(rig.guestScene);
       expect(guestReplay.settled, "guest CoopReplayMePhase settled at the battle-handoff").toBe(true);
       expect(coopMeInProgress(), "guest ME pin still set through the spawned battle").toBe(true);
       expect(coopMeHandoffBattleStarted(), "guest marked the ME handoff battle STARTED (#817)").toBe(true);

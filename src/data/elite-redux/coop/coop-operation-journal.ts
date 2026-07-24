@@ -287,6 +287,30 @@ export function tryJournalCoopCommittedEnvelopeFor(
   }
   const v2Result = commitCoopV2InteractionEnvelope(cls, envelope, manager);
   if (v2Result !== "not-cutover") {
+    if (v2Result === "committed" && isCoopOperationSurfaceClass(cls)) {
+      // Keep public UI -> authority coverage alive after cutover. The old branch below recorded this edge
+      // only after committing `op:global`; V2 returns above that branch because the AuthorityLog is now the
+      // sole retention domain. Without a V2-side edge, a real UI input could commit successfully while the
+      // browser/harness coverage oracle falsely reported that no production relay call occurred.
+      journalCommittedClasses.add(cls);
+      recordCoopUiRelayCarrier(
+        "operation",
+        `class=${cls} kind=${envelope.pendingOperation?.kind ?? "none"} revision=${envelope.revision}`,
+        cls,
+      );
+      const opId = envelope.pendingOperation?.id ?? `${envelope.sessionEpoch}:revision:${envelope.revision}`;
+      recordCoopCausalEvent({
+        domain: "operation",
+        stage: "committed",
+        causalId: opId,
+        role: "host",
+        epoch: envelope.sessionEpoch,
+        revision: envelope.revision,
+        wave: envelope.wave,
+        turn: envelope.turn,
+        detail: `class=${cls} kind=${envelope.pendingOperation?.kind ?? "none"}`,
+      });
+    }
     return v2Result === "committed";
   }
   if (manager == null) {
