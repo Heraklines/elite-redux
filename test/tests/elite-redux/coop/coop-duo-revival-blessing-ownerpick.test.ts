@@ -28,10 +28,15 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { checksumState } from "#data/elite-redux/coop/coop-battle-checksum";
 import { captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  isCoopV2InteractionHumanInputFrozen,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -45,6 +50,7 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  pumpDuoDestinations,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -60,11 +66,6 @@ const OWNER_PICK_SLOT = 3; // BLASTOISE - the guest owner's actual pick
 
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
-}
-
-/** The minimal guest UI seam whose setMode we stub to drive the REVIVAL_BLESSING picker headlessly. */
-interface StubbableUi {
-  setMode: (...args: unknown[]) => unknown;
 }
 
 describe.skipIf(!RUN)(
@@ -169,29 +170,38 @@ describe.skipIf(!RUN)(
         hostRbp.start();
       });
 
-      // ===== (C) GUEST: the raw revivalPrompt is intentionally suppressed after the Authority V2 cutover.
-      // Install the headless input hook BEFORE delivery: the immutable REVIVAL prompt projects the real
-      // CoopGuestRevivalPhase as the current override and starts it immediately, exactly like the browser.
-      // The owner selects slot 3 through that phase's ordinary PARTY callback. =====
-      const projectedGuestPickers: Array<{ phaseName: string; coopV2ControlOperationId?: string | null }> = [];
-      await withClient(rig.guestCtx, async () => {
-        const ui = rig.guestScene.ui as unknown as StubbableUi;
-        const realSetMode = ui.setMode.bind(ui);
-        ui.setMode = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.PARTY) {
-            projectedGuestPickers.push(rig.guestScene.phaseManager.getCurrentPhase());
-            ui.setMode = realSetMode;
-            // setMode(PARTY, PartyUiMode.REVIVAL_BLESSING, fieldIndex, callback, filter)
-            (args[3] as (slotIndex: number) => void)(OWNER_PICK_SLOT);
-            return Promise.resolve();
-          }
-          return realSetMode(...args);
-        };
-        await drainLoopback();
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-      const projectedGuestPicker = projectedGuestPickers.at(-1);
+      // ===== (C) GUEST: raw revivalPrompt is suppressed after the V2 cutover. Alternate both destination
+      // runtimes until the immutable REVIVAL prompt has projected a real current CoopGuestRevivalPhase,
+      // completed PARTY setup, and installed the guest owner's physical-input lease. The retired fixture
+      // replaced setMode and called its private callback before any of those production boundaries existed.
+      // Drive the second fainted bench mon exclusively through ordinary PARTY keyboard input. =====
+      let projectedGuestPicker: { phaseName: string; coopV2ControlOperationId?: string | null } | undefined;
+      let guestPickerReady = false;
+      for (let attempt = 0; attempt < 100 && !guestPickerReady; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        guestPickerReady = withClientSync(rig.guestCtx, () => {
+          const phase = rig.guestScene.phaseManager.getCurrentPhase() as {
+            phaseName: string;
+            coopV2ControlOperationId?: string | null;
+          };
+          const handler = rig.guestScene.ui.getHandler() as unknown as {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          };
+          projectedGuestPicker = phase;
+          return (
+            phase.phaseName === "CoopGuestRevivalPhase"
+            && rig.guestScene.ui.getMode() === UiMode.PARTY
+            && handler.active === true
+            && handler.isCoopV2InputActionable?.() === true
+            && !isCoopV2InteractionHumanInputFrozen(rig.guestRuntime)
+          );
+        });
+        if (!guestPickerReady) {
+          await withClient(rig.guestCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
+        }
+      }
+      expect(guestPickerReady, "the V2 prompt installed the actionable guest revival picker").toBe(true);
       expect(projectedGuestPicker?.phaseName, "the V2 prompt projected the real guest revival picker").toBe(
         "CoopGuestRevivalPhase",
       );
@@ -199,6 +209,17 @@ describe.skipIf(!RUN)(
         projectedGuestPicker?.coopV2ControlOperationId,
         "the projected picker is bound to the immutable V2 operation",
       ).toMatch(/^\d+:\d+:REVIVAL:/u);
+      withClientSync(rig.guestCtx, () => {
+        for (let slot = 0; slot < OWNER_PICK_SLOT; slot++) {
+          expect(rig.guestScene.ui.processInput(Button.DOWN), `guest navigates PARTY to slot ${slot + 1}`).toBe(true);
+        }
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest opens the selected mon's PARTY options").toBe(
+          true,
+        );
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest chooses Revive through the public PARTY UI").toBe(
+          true,
+        );
+      });
 
       // ===== (E) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the host's
       // awaitInteractionChoice resolves UNDER the host ctx -> applyRevive on the HOST scene + end(). Then run

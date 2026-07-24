@@ -2514,3 +2514,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The fixture now makes the host batch phase the real current phase, alternates both destination runtimes,
   requires both exact active handlers, and verifies the owner's V2 input lease before pressing public UI.
   Local Biome and diff checks are green; runtime verification remains hosted-only per `AGENTS.md`.
+
+# 2026-07-24 - Revival Blessing fixture uses the public PARTY surface
+
+- The remaining Revival Blessing owner-pick fixture replaced `ui.setMode` and invoked the PARTY handler's
+  private completion callback while the V2 projection was still being installed. That schedule could not be
+  produced by a player and bypassed the exact input lease the test was meant to prove.
+- The fixture now alternates both destination runtimes until the immutable REVIVAL entry has installed the
+  real current `CoopGuestRevivalPhase`, active/actionable PARTY handler, and guest-owner input lease. It then
+  navigates to the intended fainted party member and chooses Revive solely with ordinary public key input.
+- Local Biome and diff checks are green. The focused B11 runtime proof will run on hosted Actions only.
