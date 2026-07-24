@@ -275,6 +275,12 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     rig: DuoRig,
     sourceWave: number | null = null,
   ): { host: ErCrossroadsPhase; guest: ErCrossroadsPhase } {
+    // CONTROL_COMMIT and rendezvous callbacks belong to the receiving browser.  The one-process duo
+    // harness otherwise lets the loopback deliver them synchronously while the sender's globalScene is
+    // still installed, so the replica correctly defers projection against the wrong phase tree and never
+    // gets another delivery edge.  Real browsers cannot share that ambient scene.  Queue every frame until
+    // pumpDuoDestinations installs its destination ClientCtx, matching the public-browser topology.
+    rig.pair.setDestinationContextDelivery?.(true);
     const host = installCurrentBoundaryPhase(rig.hostCtx, () => new ErCrossroadsPhase(sourceWave));
     const guest = installCurrentBoundaryPhase(rig.guestCtx, () => new ErCrossroadsPhase(sourceWave));
     return { host, guest };
@@ -284,6 +290,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     rig: DuoRig,
     sourceWave: number | null = null,
   ): { host: SelectBiomePhase; guest: SelectBiomePhase } {
+    // See startCrossroadsPair: all authoritative frames must execute in the destination engine's scene.
+    rig.pair.setDestinationContextDelivery?.(true);
     const host = installCurrentBoundaryPhase(rig.hostCtx, () => new SelectBiomePhase(sourceWave));
     const guest = installCurrentBoundaryPhase(rig.guestCtx, () => new SelectBiomePhase(sourceWave));
     return { host, guest };

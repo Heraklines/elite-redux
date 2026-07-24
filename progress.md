@@ -2552,3 +2552,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   deliberately-inert headless scheduler edge once, wait for both real handlers plus the owner's V2 input
   lease, and use only public `Button` input. Authority-loss and orphan probes now begin from the same paired
   projected ER_MAP surface before faulting the result path.
+
+# 2026-07-24 - Biome duo frames run under their destination browser context
+
+- Exact-SHA public journey `30064059318` is green. Its final host/guest screenshots were inspected: both
+  render the same Town wave, Chikorita/Endivie ally pair, and Pidove/Abra opponents; the apparent labels and
+  species-name differences are the intentionally mixed English/German localization and seat perspective.
+- Focused run `30065825747` kept static and Showdown S2 green and confirmed the five biome cases reached the
+  real owner handler. Their watcher remained in MESSAGE because the one-process loopback resumed reciprocal
+  rendezvous callbacks while the sender's `globalScene` was installed. That schedule cannot occur between
+  browser processes and is the same destination-context class already documented by the duo harness.
+- Paired Crossroads and natural-map fixtures now enable destination-context delivery before either phase
+  starts. Every control/rendezvous frame is therefore applied only while `pumpDuoDestinations` has installed
+  the receiving scene, runtime, operation state, and module-let snapshot together; public handler and input
+  assertions remain unchanged.
