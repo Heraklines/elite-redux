@@ -10,6 +10,7 @@ import type { Phase } from "#app/phase";
 import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
+import { manifestToStarter } from "#data/elite-redux/showdown/showdown-manifest";
 import { applyShowdownSyncCommand } from "#data/elite-redux/showdown/showdown-sync-command";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { BattlerIndex } from "#enums/battler-index";
@@ -30,7 +31,6 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
-import { generateStarters } from "#test/utils/game-manager-utils";
 import { PartyOption } from "#ui/handlers/party-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -144,7 +144,7 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
       toShowdown(game.scene);
       const own = [pikachu()];
       beginShowdownBattle(own, [magikarp()]);
-      const starters = generateStarters(game.scene, [SpeciesId.PIKACHU]);
+      const starters = own.map(manifestToStarter);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       new SelectStarterPhase().initBattle(starters, true, undefined, own);
     });
@@ -226,7 +226,7 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
       toShowdown(game.scene);
       const own = [pikachu()];
       beginShowdownBattle(own, [magikarp(), magikarp()]);
-      const starters = generateStarters(game.scene, [SpeciesId.PIKACHU]);
+      const starters = own.map(manifestToStarter);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       new SelectStarterPhase().initBattle(starters, true, undefined, own);
     });
@@ -285,7 +285,7 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
       toShowdown(game.scene);
       const own = [pikachu()];
       beginShowdownBattle(own, [magikarp(), magikarp(), magikarp()]);
-      const starters = generateStarters(game.scene, [SpeciesId.PIKACHU]);
+      const starters = own.map(manifestToStarter);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       new SelectStarterPhase().initBattle(starters, true, undefined, own);
     });
