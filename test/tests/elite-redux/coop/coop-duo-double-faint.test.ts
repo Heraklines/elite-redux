@@ -286,10 +286,6 @@ describe.skipIf(!RUN)(
         allLogs.some(line => /did not project into the local owner's command slot/.test(line)),
         "no incomplete-field replacement checkpoint projected an empty owned slot onto a seat (double-faint FATAL)",
       ).toBe(false);
-      expect(
-        logs.guest.some(line => /awaits remote-owned successor/.test(line)),
-        "the non-owning replica kept its authenticated replay alive for the chained host replacement",
-      ).toBe(true);
       // Materialize the guest's replacements from the streamed out-of-band replacement checkpoint (the
       // turn N+1 pump), exactly as the sibling showdown double-KO proof does: settleDuoPromise only
       // DELIVERS the host's checkpoint frames to the guest inbox - the guest's real CoopReplayTurnPhase is
@@ -298,6 +294,10 @@ describe.skipIf(!RUN)(
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn + 1);
       });
+      expect(
+        logs.guest.some(line => /awaits remote-owned successor/.test(line)),
+        "the non-owning replica kept its authenticated replay alive for the chained host replacement",
+      ).toBe(true);
       // Both owned replacement slots are active on the GUEST engine too (it applied only complete frames).
       withClientSync(rig.guestCtx, () => {
         const guestOwnHost = rig.guestScene.getPlayerField()[COOP_HOST_FIELD_INDEX];

@@ -1,0 +1,12 @@
+{
+  "taskId": "v2-double-faint-replay-proof-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-double-faint-replay-proof-20260724",
+  "trainRef": "ci/coop/v2-double-faint-replay-proof-20260724",
+  "baseSha": "b5730b011a62461147f3f13a81f308f769102f4e",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-double-faint-replay-proof-20260724.json",
+    "test/tests/elite-redux/coop/coop-duo-double-faint.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
