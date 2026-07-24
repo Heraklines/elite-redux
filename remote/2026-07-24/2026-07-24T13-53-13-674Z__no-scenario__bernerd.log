@@ -1,0 +1,89 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:69c32b4bcac346704166fc9e0fd0c05c836352a0:run-30070866875.1
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36
+platform: Linux armv81
+screen:   384x832 @2.8125x  devmem:8 GB
+boot:     boot-start@0ms -> loading-complete@53066ms -> title-shown@57393ms
+lastSess: ok (reached title)
+mode:     0  wave:?
+seed:     C6kWmZTJsZ5Y0qtNyu5r8cBz
+party:    
+enemy:    
+
+----- COMMENT -----
+Menu disappeared after cycling (too quickly in the menu?) thru showdown 1v1 then tournaments then returning to select a new mode
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:69c32b4bcac346704166fc9e0fd0c05c836352a0:run-30070866875.1","source":"github","sha":"69c32b4bcac346704166fc9e0fd0c05c836352a0","workflow":{"provider":"github-actions","runId":"30070866875","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"codex/staging-lockstep-tournament-20260724"},"deployment":null}
+
+----- CONSOLE -----
+[13:46:05.364] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[13:46:06.055] LOG: [ER] build {"version":1,"id":"github:69c32b4bcac346704166fc9e0fd0c05c836352a0:run-30070866875.1","source":"github","sha":"69c32b4bcac346704166fc9e0fd0c05c836352a0","workflow":{"provider":"github-actions","runId":"30070866875","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"codex/staging-lockstep-tournament-20260724"},"deployment":null}
+[13:46:06.105] LOG: [dev-tools] loaded — 727 scenarios + Send Logs button
+[13:46:57.617] DEBUG: Destroying loading scene
+[13:46:57.618] DEBUG: Destroyed loading scene
+[13:46:57.667] LOG: Seed: C6kWmZTJsZ5Y0qtNyu5r8cBz
+[13:46:57.667] LOG: Wave Seed: C6kWmZTJsZ5Y0qtNyu5r8cBz 0
+[13:46:59.691] LOG: %cStart Phase LoginPhase color:green;
+[13:47:00.366] LOG: Client Session: VNfokS5Nc6957LK32GMmrvop5Dmq34pP
+[13:47:01.934] LOG: %cStart Phase TitlePhase color:green;
+[13:47:01.935] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[13:47:01.935] LOG: Getting Session Slot id: %d 2
+[13:47:01.950] LOG: use seasonal splash messages true
+[13:47:03.013] LOG: %cStart Phase TitlePhase color:green;
+[13:47:03.013] LOG: Getting Session Slot id: %d 2
+[13:47:03.022] LOG: use seasonal splash messages true
+[13:47:05.169] LOG: [coop:lobby] poll players=0
+[13:47:05.699] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:05.700] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[13:47:05.701] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:05.736] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:05.736] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[13:47:05.736] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:06.303] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:06.304] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[13:47:06.304] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:06.551] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:06.552] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[13:47:06.553] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:07.026] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:07.026] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[13:47:07.027] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[13:47:07.033] LOG: [coop:lobby] cancel (id=p33_8EgySOv2B6aKoTxXQEr3Y8mCWCd5dj8g connecting=false)
+[13:47:07.034] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[13:47:07.034] LOG: %cStart Phase TitlePhase color:green;
+[13:47:07.034] LOG: Getting Session Slot id: %d 2
+[13:47:07.045] LOG: use seasonal splash messages true
+[13:47:10.291] LOG: [coop:lobby] poll players=0
+[13:47:11.556] LOG: %cStart Phase TitlePhase color:green;
+[13:47:11.557] LOG: Getting Session Slot id: %d 2
+[13:47:11.568] LOG: use seasonal splash messages true
+[13:47:12.809] LOG: [coop:lobby] poll players=0
+[13:47:14.344] LOG: %cStart Phase TitlePhase color:green;
+[13:47:14.344] LOG: Getting Session Slot id: %d 2
+[13:47:14.362] LOG: use seasonal splash messages true
+[13:47:15.304] LOG: [coop:lobby] poll players=0
+[13:47:16.504] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'revertMode')
+TypeError: Cannot read properties of undefined (reading 'revertMode')
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-Bh-XJ67X.js:1063:5742
+    at new Promise (<anonymous>)
+    at revertModes (https://elite-redux-staging.pages.dev/assets/battle-scene-Bh-XJ67X.js:1063:5679)
+    at executeIf (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:83600)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-Bh-XJ67X.js:1063:5763
+[13:47:17.815] LOG: [coop:lobby] poll players=0
+[13:47:20.367] LOG: [coop:lobby] poll players=0
+[13:47:23.255] LOG: [coop:lobby] poll players=0
+[13:47:25.809] LOG: [coop:lobby] poll players=0
+[13:47:46.929] LOG: [coop:lobby] poll players=0
+[13:47:49.575] LOG: [coop:lobby] poll players=0
+[13:48:25.817] LOG: [coop:lobby] poll players=0
+[13:48:28.373] LOG: [coop:lobby] poll players=0
+[13:49:00.749] LOG: [coop:lobby] poll players=0
+[13:49:03.243] LOG: [coop:lobby] poll players=0
+[13:49:05.710] LOG: [coop:lobby] poll players=0
+[13:49:40.183] LOG: [coop:lobby] poll players=0
+[13:49:43.232] LOG: [coop:lobby] poll players=0
+[13:52:09.204] LOG: [coop:lobby] poll players=0
+
+----- REPLAY TRACE (JSON) -----
+(none)
