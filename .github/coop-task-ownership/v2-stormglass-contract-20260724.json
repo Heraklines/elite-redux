@@ -1,0 +1,12 @@
+{
+  "taskId": "v2-stormglass-contract-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-stormglass-contract-20260724",
+  "trainRef": "ci/coop/v2-stormglass-contract-20260724",
+  "baseSha": "a99638cb49cbeecc0c3db220a6091f5ca95d75fa",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-stormglass-contract-20260724.json",
+    "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs"
+  ],
+  "lockedSchemaFiles": []
+}
