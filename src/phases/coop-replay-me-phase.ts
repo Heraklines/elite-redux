@@ -349,6 +349,11 @@ export class CoopReplayMePhase extends Phase {
     return true;
   }
 
+  /** Whether this exact running shell, rather than a replacement phase, must consume the next round. */
+  public retainsCoopV2MePresentationBoundary(interactionCounter: number): boolean {
+    return interactionCounter === this.interactionCounter && this.boundaryStillLive() && !this.settled;
+  }
+
   /**
    * Move an already-running replay shell onto the next ordered Mystery presentation.
    *

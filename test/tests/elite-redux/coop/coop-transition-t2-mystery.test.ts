@@ -505,9 +505,22 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
       const showDialogue = vi
         .spyOn(rig.hostScene.ui, "showDialogue")
         .mockImplementation((_text, _name, _delay, callback) => callback?.());
+      let terminalStartedAt = 0;
       try {
         await driveGuestOwnedMysteryRounds(game, rig, replay, journey.picks);
         await driveGuestOwnedEmbeddedReward(game, rig);
+
+        // Authority V2 makes the final host ME_TERMINAL the sole permission for the guest to leave its
+        // speculative post-reward replay. The former fixture demanded the guest PostMystery phase first,
+        // deadlocking the renderer before the authority was allowed to author that successor. Inject any
+        // retained-delivery fault, run the real host terminal, then drive the guest to the projected phase.
+        game.override.mysteryEncounterChance(0);
+        if (journey.injectTerminalFault) {
+          pair.reorderNext("guest", message => retainedOperationKind(message) === "ME_TERMINAL");
+          pair.dropNext("guest", message => retainedOperationKind(message) === "ME_TERMINAL");
+        }
+        terminalStartedAt = Date.now();
+        await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
         await driveQueuedPhaseWithPublicDialogue(rig.guestCtx, "PostMysteryEncounterPhase");
       } finally {
         showDialogue.mockRestore();
@@ -515,13 +528,6 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
         rand?.mockRestore();
       }
 
-      game.override.mysteryEncounterChance(0);
-      if (journey.injectTerminalFault) {
-        pair.reorderNext("guest", message => retainedOperationKind(message) === "ME_TERMINAL");
-        pair.dropNext("guest", message => retainedOperationKind(message) === "ME_TERMINAL");
-      }
-      const terminalStartedAt = Date.now();
-      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
       await pumpUntil(
         rig,
         () =>

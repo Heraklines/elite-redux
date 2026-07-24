@@ -226,6 +226,7 @@ describe("Authority V2 immutable interaction projection", () => {
       kind: "biome",
       operationId: entry.nextControl.kind === "SHARED_INTERACTION" ? entry.nextControl.operationId : "",
       sourceWave: STATE.wave,
+      pinned: 9,
     });
   });
 

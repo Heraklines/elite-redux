@@ -33,7 +33,11 @@ import type {
   CoopStormglassPresentationPayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
-import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_BIOME_PICK_SEQ_BASE,
+  COOP_MAX_REACHABLE_COUNTER,
+  COOP_ME_PUMP_SEQ_BASE,
+} from "#data/elite-redux/coop/coop-seq-registry";
 
 type RewardProjection = Extract<CoopRewardPresentationPayload, { readonly surface: "reward" }>;
 type MarketProjection = Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>;
@@ -55,6 +59,7 @@ export type CoopV2InteractionProjectionPlan =
       readonly kind: "biome";
       readonly operationId: string;
       readonly sourceWave: number;
+      readonly pinned: number;
     }
   | {
       readonly kind: "crossroads";
@@ -134,6 +139,18 @@ function rewardProjectionFromOperation(
   return continuation as RewardProjection | MarketProjection | null;
 }
 
+/** Recover the chained interaction coordinate from the exact future BIOME_PICK control address. */
+function biomePinnedFromControlOperationId(operationId: string): number | null {
+  const parsed = parseCoopOperationId(operationId);
+  const pinned = parsed == null ? -1 : parsed.pinnedSeq - COOP_BIOME_PICK_SEQ_BASE;
+  return parsed?.kind === "BIOME_PICK"
+    && Number.isSafeInteger(pinned)
+    && pinned >= 0
+    && pinned <= COOP_MAX_REACHABLE_COUNTER
+    ? pinned
+    : null;
+}
+
 /**
  * Decode one executable shared successor into its complete immutable constructor plan.
  *
@@ -150,6 +167,7 @@ export function projectionPlanOfCoopV2InteractionEntry(
   }
   const controlOpen = decodeInteractionOpenEntry(entry);
   if (controlOpen != null) {
+    const pinned = biomePinnedFromControlOperationId(control.operationId);
     return controlOpen.projection.kind === "crossroads"
       ? {
           kind: "crossroads",
@@ -157,11 +175,14 @@ export function projectionPlanOfCoopV2InteractionEntry(
           sourceWave: controlOpen.projection.sourceWave,
         }
       : controlOpen.projection.kind === "biome"
-        ? {
-            kind: "biome",
-            operationId: control.operationId,
-            sourceWave: controlOpen.projection.sourceWave,
-          }
+        ? pinned == null
+          ? null
+          : {
+              kind: "biome",
+              operationId: control.operationId,
+              sourceWave: controlOpen.projection.sourceWave,
+              pinned,
+            }
         : null;
   }
   const material = decodeCoopV2InteractionEnvelope(entry);
@@ -201,10 +222,12 @@ export function projectionPlanOfCoopV2InteractionEntry(
             sins: [...presentation.sins],
           };
     }
-    case "CROSSROADS_PICK":
-      return payload.optionIndex === 1
-        ? { kind: "biome", operationId: control.operationId, sourceWave: material.envelope.wave }
+    case "CROSSROADS_PICK": {
+      const pinned = biomePinnedFromControlOperationId(control.operationId);
+      return payload.optionIndex === 1 && pinned != null
+        ? { kind: "biome", operationId: control.operationId, sourceWave: material.envelope.wave, pinned }
         : null;
+    }
     case "CATCH_FULL": {
       const prompt = payload as unknown as CoopCatchFullPayload;
       return prompt.type === "prompt"

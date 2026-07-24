@@ -3344,3 +3344,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the destructive fallback and pins their constructor-address validation. Behavioral proof remains the next
   exact-SHA GitHub-hosted aggregate gate and public two-browser journey; no local co-op Vitest or browser was
   run.
+
+# 2026-07-24 - Exact qualification retains live markets, chained biome pins, and Mystery shells
+
+- Exact full-gate run `30121803791` at `10e1a2314` showed that the initial reward lifecycle repair was
+  correct, but exposed three more instances of incomplete ordinary projection. Biome markets intentionally
+  retain legacy `phaseName=SelectModifierPhase`; their concrete V2 identity is `coopV2ProofPhaseName`, so
+  checking `Phase.is(BiomeShopPhase)` could never bind a live market. Ordinary projection now validates that
+  explicit identity before installing immutable stock in place.
+- A guest-owned Crossroads Leave authored the correct future `BIOME_PICK` operation, but destructive V2
+  projection replaced `ErCrossroadsPhase` before its legacy callback copied the interaction pin into the
+  chained map. The closed biome projection plan now derives that pin from the immutable future operation ID,
+  and `SelectBiomePhase` installs it together with wave, turn, and operation address. The executable map no
+  longer depends on an obsolete predecessor callback.
+- Repeated Mystery rounds keep one live `CoopReplayMePhase` and bind each new operation address only after
+  its FIFO waiter consumes the corresponding presentation. The ordinary projector had replaced that live
+  shell in the same delivery stack, orphaning its async continuation and causing a rendered selector whose
+  ACTION input was rejected. It now retains the address-exact live boundary and lets the consumer perform
+  the already-contracted handoff before publishing readiness.
+- The remaining Mystery-transition red was a stale fixture order: it demanded that the guest reach its
+  post-encounter phase before permitting the host to author the final leave entry. The migrated journey now
+  installs its retained-delivery fault first, drives the real host terminal, then observes the guest's
+  projected successor. Contract coverage pins all three product lifecycle rules. Behavioral co-op execution
+  remains GitHub-hosted only; no local co-op Vitest or browser was run.

@@ -6081,9 +6081,16 @@ function materializeCoopV2InteractionProjection(
     }
     case "biome": {
       const phase = phaseManager.create("SelectBiomePhase", plan.sourceWave, control.turn) as Phase & {
-        installCoopV2BiomeProjection(operationId: string, sourceWave: number, sourceTurn: number): boolean;
+        installCoopV2BiomeProjection(
+          operationId: string,
+          sourceWave: number,
+          sourceTurn: number,
+          pinned: number,
+        ): boolean;
       };
-      return phase.installCoopV2BiomeProjection(plan.operationId, plan.sourceWave, control.turn) ? phase : null;
+      return phase.installCoopV2BiomeProjection(plan.operationId, plan.sourceWave, control.turn, plan.pinned)
+        ? phase
+        : null;
     }
     case "crossroads": {
       const phase = phaseManager.create("ErCrossroadsPhase", plan.sourceWave, control.turn) as Phase & {
@@ -6318,6 +6325,22 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
     return true;
   }
 
+  // A repeated Mystery round deliberately reuses one live CoopReplayMePhase. DATA delivery wakes that
+  // shell's FIFO waiter, which binds the new operation address only when it consumes the fresh presentation.
+  // Replacing the shell here would orphan its async continuation after it already won the delivery race;
+  // relabelling it here would let the previous round's handler falsely prove the new address. Retain the
+  // exact live boundary and let its consumer publish readiness after the new selector is rendered.
+  if (plan.kind === "mystery" && current.is("CoopReplayMePhase")) {
+    const replayPhase = current as Phase & {
+      retainsCoopV2MePresentationBoundary(interactionCounter: number): boolean;
+    };
+    if (replayPhase.retainsCoopV2MePresentationBoundary(plan.pinned)) {
+      runtime.v2ProjectedInteractionControlId = controlId;
+      coopLog("v2-interaction", `retained live Mystery shell for ordered generation ${controlId}`);
+      return true;
+    }
+  }
+
   // Reward and market phases can already be current when their immutable presentation entry arrives: the
   // natural phase opens first and waits for the authority's options. Bind that exact live generation in
   // place when its constructor address matches. Replacing it with an identical class would strand the
@@ -6338,19 +6361,23 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
       return true;
     }
   }
-  if (plan.kind === "market" && current.is(coopV2MarketProjectionPhaseName(plan))) {
-    const marketPhase = current as Phase & {
-      installCoopV2MarketProjection(
-        operationId: string,
-        projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
-      ): boolean;
-    };
-    if (marketPhase.installCoopV2MarketProjection(plan.operationId, plan.projection)) {
-      materializeCoopV2RewardOptionsProjection(runtime, plan);
-      runtime.v2ProjectedInteractionControlId = controlId;
-      coopLog("v2-interaction", `bound exact market generation ${controlId} to live ${current.phaseName}`);
-      return true;
-    }
+  const currentMarket = current as Phase & {
+    readonly coopV2ProofPhaseName?: string;
+    installCoopV2MarketProjection?: (
+      operationId: string,
+      projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
+    ) => boolean;
+  };
+  if (
+    plan.kind === "market"
+    && currentMarket.coopV2ProofPhaseName === coopV2MarketProjectionPhaseName(plan)
+    && typeof currentMarket.installCoopV2MarketProjection === "function"
+    && currentMarket.installCoopV2MarketProjection(plan.operationId, plan.projection)
+  ) {
+    materializeCoopV2RewardOptionsProjection(runtime, plan);
+    runtime.v2ProjectedInteractionControlId = controlId;
+    coopLog("v2-interaction", `bound exact market generation ${controlId} to live ${current.phaseName}`);
+    return true;
   }
 
   // A Bargain can be the first ordered control after a settled combat turn. The authoritative engine opens

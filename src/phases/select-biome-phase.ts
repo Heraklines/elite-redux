@@ -25,6 +25,7 @@ import {
   coopBiomeInteractionInProgress,
   coopBiomeInteractionStartValue,
   coopBiomePickerAutoResolvesInTest,
+  setCoopBiomeInteractionStart,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { awaitCoopChoiceWithOrphanBackstop } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -131,6 +132,8 @@ export class SelectBiomePhase extends BattlePhase {
   public readonly phaseName = "SelectBiomePhase";
   /** Exact Authority V2 operation whose public map handler this phase proves. */
   public coopV2ControlOperationId: string | null = null;
+  /** Immutable chained pin staged with the projected phase and published only once that phase is current. */
+  private coopV2ProjectedPinned = -1;
   /** Immutable wave that created this biome transition; never re-read from a speculative next Battle. */
   private coopSourceWave: number | null;
   /**
@@ -197,7 +200,8 @@ export class SelectBiomePhase extends BattlePhase {
   public installCoopV2BiomeProjection(
     operationId: string,
     sourceWave: number,
-    sourceTurn: number = this.coopSourceTurn,
+    sourceTurn: number,
+    pinned: number,
   ): boolean {
     if (
       operationId.length === 0
@@ -205,12 +209,15 @@ export class SelectBiomePhase extends BattlePhase {
       || sourceWave < 0
       || (this.coopSourceWave != null && this.coopSourceWave !== sourceWave)
       || sourceTurn !== this.coopSourceTurn
+      || !Number.isSafeInteger(pinned)
+      || pinned < 0
       || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
     ) {
       return false;
     }
     this.coopSourceWave = sourceWave;
     this.coopV2ControlOperationId = operationId;
+    this.coopV2ProjectedPinned = pinned;
     return true;
   }
 
@@ -251,6 +258,15 @@ export class SelectBiomePhase extends BattlePhase {
 
   start() {
     super.start();
+
+    // Projection construction happens before PhaseManager atomically accepts this successor. Delay the
+    // module-visible chained pin until start(), when this object is the installed current phase, so a lost
+    // replacement race cannot leak authority into an unrelated local map transition.
+    if (this.coopV2ProjectedPinned >= 0) {
+      const pinned = this.coopV2ProjectedPinned;
+      this.coopV2ProjectedPinned = -1;
+      setCoopBiomeInteractionStart(pinned);
+    }
 
     let currentWaveIndex: number;
     try {

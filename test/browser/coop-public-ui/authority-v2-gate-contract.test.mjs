@@ -75,6 +75,10 @@ const interactionCutover = readFileSync(
 );
 const nextControl = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/next-control.ts", root), "utf8");
 const controlLedger = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/control-ledger.ts", root), "utf8");
+const interactionProjection = readFileSync(
+  new URL("src/data/elite-redux/coop/authority-v2/interaction-projection.ts", root),
+  "utf8",
+);
 const proposalAdmission = readFileSync(
   new URL("src/data/elite-redux/coop/authority-v2/proposal-admission.ts", root),
   "utf8",
@@ -479,8 +483,8 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
   );
   assert.match(
     projector,
-    /current\.is\(coopV2MarketProjectionPhaseName\(plan\)\)[\s\S]*?installCoopV2MarketProjection\(plan\.operationId, plan\.projection\)/u,
-    "the market fast path validates the exact market class and generation before binding it",
+    /currentMarket\.coopV2ProofPhaseName === coopV2MarketProjectionPhaseName\(plan\)[\s\S]*?currentMarket\.installCoopV2MarketProjection\(plan\.operationId, plan\.projection\)/u,
+    "the market fast path validates its concrete V2 identity and generation before binding it",
   );
   assert.match(selectModifierPhase, /this\.rerollCount !== projection\.reroll/u);
   assert.match(selectModifierPhase, /this\.coopInteractionStart !== projection\.pinned/u);
@@ -670,6 +674,14 @@ test("repeated Mystery rounds bind the new log address only when their fresh pre
     projector,
     /rebindLiveCoopV2MePresentation/u,
     "the projector cannot relabel the old actionable handler before the new FIFO presentation is consumed",
+  );
+  const retain = projector.indexOf("retainsCoopV2MePresentationBoundary(plan.pinned)");
+  const replace = projector.indexOf("phaseManager.replaceWithCoopAuthoritativePhase(current, phase)");
+  assert.ok(retain >= 0 && replace > retain, "a live repeated-round shell is retained before destructive projection");
+  assert.doesNotMatch(
+    projector.slice(0, replace),
+    /installCoopV2MePresentation/u,
+    "ordinary projection never binds the new Mystery address before the FIFO consumer renders it",
   );
 });
 
@@ -1476,8 +1488,23 @@ test("a chained biome picker preserves its exact interaction coordinate through 
   assert.doesNotMatch(ownerCommit, /turn: 0/u);
   assert.match(
     coopRuntime,
-    /create\("SelectBiomePhase", plan\.sourceWave, control\.turn\)[\s\S]*installCoopV2BiomeProjection\(plan\.operationId, plan\.sourceWave, control\.turn\)/u,
-    "ordinary and recovery projection pass the authority-stated turn into the chained biome picker",
+    /create\("SelectBiomePhase", plan\.sourceWave, control\.turn\)[\s\S]*installCoopV2BiomeProjection\(plan\.operationId, plan\.sourceWave, control\.turn, plan\.pinned\)/u,
+    "ordinary and recovery projection pass the authority-stated turn and pin into the chained biome picker",
+  );
+  assert.match(
+    interactionProjection,
+    /parsed\.pinnedSeq - COOP_BIOME_PICK_SEQ_BASE[\s\S]*kind: "biome"[\s\S]*pinned/u,
+    "the complete biome projection derives its pin from the immutable future BIOME_PICK address",
+  );
+  const projectionInstallerStart = selectBiomePhase.indexOf("public installCoopV2BiomeProjection(");
+  const projectionInstallerEnd = selectBiomePhase.indexOf("\n  /**", projectionInstallerStart);
+  const projectionInstaller = selectBiomePhase.slice(projectionInstallerStart, projectionInstallerEnd);
+  assert.match(projectionInstaller, /Number\.isSafeInteger\(pinned\)/u);
+  assert.match(projectionInstaller, /this\.coopV2ProjectedPinned = pinned/u);
+  assert.match(
+    selectBiomePhase,
+    /start\(\) \{[\s\S]*this\.coopV2ProjectedPinned = -1;[\s\S]*setCoopBiomeInteractionStart\(pinned\)/u,
+    "the pin becomes module-visible only after PhaseManager accepts and starts the projected successor",
   );
   const readyStart = selectBiomePhase.indexOf("private publishCoopBiomeSurfaceWhenActionable(");
   const readyEnd = selectBiomePhase.indexOf("\n  private ", readyStart + 1);
