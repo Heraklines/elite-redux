@@ -2915,3 +2915,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - SwitchPhase installs that proof before retaining its typed empty-slot result. Normal selectable
   replacements still require the existing exact PARTY phase/handler proof; Showdown and Tournament paths
   are unchanged.
+- Full-gate static run `30093196764` found one narrow TypeScript cast-overlap diagnostic in the phase-token
+  read. The token is deliberately opaque at the ledger boundary; the explicit `unknown` bridge now records
+  that intent without weakening any runtime predicate.

@@ -7080,7 +7080,7 @@ export function installCoopV2AutomaticNoReplacementControl(input: {
   const phase = globalScene.phaseManager?.getCurrentPhase();
   const phaseOperationId =
     typeof (phase as { coopV2ControlOperationId?: unknown } | null)?.coopV2ControlOperationId === "string"
-      ? (phase as { coopV2ControlOperationId: string }).coopV2ControlOperationId
+      ? (phase as unknown as { coopV2ControlOperationId: string }).coopV2ControlOperationId
       : null;
   if (phase !== input.phaseToken || !phase?.is("SwitchPhase") || phaseOperationId !== control.operationId) {
     return false;
