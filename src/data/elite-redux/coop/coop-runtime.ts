@@ -7726,7 +7726,14 @@ export function runWhenCoopRuntimeActive(runtime: CoopRuntime, callback: () => v
     queued?.delete(invoke);
     callback();
   };
-  if (active === runtime) {
+  // Runtime identity alone is insufficient in the two-engine topology. An async receipt continuation can
+  // become runnable after withClient restored the peer's globalScene but before it restored/swapped the
+  // module-level runtime pointer. Executing in that sliver consumes the callback once against the wrong
+  // phase tree; its boundary proof then fails and the real destination browser remains parked forever.
+  // setCoopRuntime records the scene installed for this exact runtime before flushing queued callbacks, so
+  // require that binding whenever it exists. Production has one runtime/scene and remains synchronous.
+  const boundScene = runtimeSceneBindings.get(runtime);
+  if (active === runtime && (boundScene == null || boundScene === globalScene)) {
     invoke();
     return () => {};
   }
@@ -8610,32 +8617,36 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
 }
 
 /**
- * Capture the exact normal-victory marker owned by the runtime at the immutable turn boundary.
+ * Capture the exact staged normal-wave marker owned by the runtime at the immutable turn boundary.
  *
- * A missing marker is ordinary (most turns). If one exists, every identity must still match the active
- * host runtime and its staged transition; returning a best-effort value after any mismatch would let a
- * stale map entry choose the next V2 control, so inconsistent state throws and the commit phase terminates
- * the shared session fail-closed.
+ * Win retains an additional deferred compatibility carrier, while capture and forced/player flee publish
+ * their raw presentation hint immediately. All three nevertheless stage the same complete transition before
+ * the resolving TURN_COMMIT. Ignoring the latter two made that turn state COMMAND/AWAIT-generic authority;
+ * the following WAVE_ADVANCE was then correctly rejected and Roar could terminate an otherwise converged
+ * session. A missing marker is ordinary (most turns). Every present identity remains fail-closed.
  */
-export function captureCoopDeferredWaveOutcomeForTurnCommit(wave: number): "win" | null {
-  const deferred = deferredHostWaveResolved.get(wave);
-  if (deferred == null) {
+export function captureCoopDeferredWaveOutcomeForTurnCommit(wave: number): "win" | "capture" | "flee" | null {
+  const staged = pendingHostWaveTransitions.get(wave);
+  if (staged == null || staged.outcome === "gameOver") {
     return null;
   }
-  const staged = pendingHostWaveTransitions.get(wave);
   if (
     active == null
     || active.controller.role !== "host"
-    || deferred.outcome !== "win"
-    || deferred.transition.wave !== wave
-    || staged == null
-    || staged !== deferred.transition
     || staged.wave !== wave
-    || staged.outcome !== "win"
+    || (staged.outcome !== "win" && staged.outcome !== "capture" && staged.outcome !== "flee")
   ) {
-    throw new Error(`the deferred normal-victory marker for wave ${wave} lost its staged transition identity`);
+    throw new Error(`the staged normal-wave marker for wave ${wave} lost its transition identity`);
   }
-  return "win";
+  if (staged.outcome === "win") {
+    const deferred = deferredHostWaveResolved.get(wave);
+    if (deferred == null || deferred.outcome !== "win" || deferred.transition !== staged) {
+      throw new Error(`the deferred normal-victory marker for wave ${wave} lost its staged transition identity`);
+    }
+  } else if (deferredHostWaveResolved.has(wave)) {
+    throw new Error(`the staged ${staged.outcome} marker for wave ${wave} conflicts with a deferred victory`);
+  }
+  return staged.outcome;
 }
 
 // Keep the universal move engine independent from this orchestration module. In any co-op session the

@@ -121,14 +121,14 @@ export interface CoopTurnBoundaryIdentity {
   /** True only for a battle spawned inside a retained Mystery encounter transaction. */
   readonly mysteryBattle: boolean;
   /**
-   * A normal victory already staged by the runtime while this material turn was still recording.
+   * A normal wave transition already staged by the runtime while this material turn was still recording.
    *
    * This is stronger evidence than the captured party/field image: a double battle can transiently retain
    * one apparently-living enemy seat after VictoryPhase has already selected the win branch. In that case
    * re-deriving the successor from the image opens a phantom COMMAND_FRONTIER and the log correctly refuses
    * the real WAVE_ADVANCE. Only the runtime that owns the staged transition may set this marker.
    */
-  readonly deferredWaveOutcome?: "win";
+  readonly deferredWaveOutcome?: "win" | "capture" | "flee";
   /** Runtime mutation-barrier depth at capture; V2 refuses a non-zero value even after outer checks. */
   readonly pendingMutationTokens?: number;
 }
@@ -624,7 +624,7 @@ export function hasCoopV2ImmediateCommandSuccessor(state: CoopAuthoritativeBattl
   });
 }
 
-/** Exact ordered successor for a normal victory staged before its material turn commit. */
+/** Exact ordered successor for a normal wave transition staged before its material turn commit. */
 export function deferredCoopV2WaveSuccessorWait(
   operationId: string,
   epoch: number,
@@ -636,7 +636,7 @@ export function deferredCoopV2WaveSuccessorWait(
     return null;
   }
   if (boundary.mysteryBattle) {
-    throw new Error("a Mystery battle cannot also stage a normal deferred wave victory");
+    throw new Error("a Mystery battle cannot also stage a normal deferred wave transition");
   }
   return {
     kind: "AWAIT_SUCCESSOR",
@@ -2865,7 +2865,7 @@ export class CoopBattleStreamer {
     if (!cutoverActive && !isCoopV2ShadowActive()) {
       return false;
     }
-    const hasDeferredWaveAdvance = boundary.deferredWaveOutcome === "win";
+    const hasDeferredWaveAdvance = boundary.deferredWaveOutcome != null;
     if (hasDeferredWaveAdvance && boundary.mysteryBattle) {
       coopWarn("v2-turn", "host refused conflicting Mystery and deferred-wave turn boundary");
       return false;

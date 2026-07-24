@@ -632,7 +632,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     try {
       const phases = startCrossroadsPair(rig, sourceWave);
       await drivePublicCrossroads(rig, rig.hostCtx, rig.guestCtx, phases, false);
-      for (let attempt = 0; attempt < 80; attempt++) {
+      for (let attempt = 0; attempt < 200; attempt++) {
         await pumpDuoDestinations(rig, 1);
         if (
           rig.hostRuntime.controller.interactionCounter() === 1
@@ -640,6 +640,11 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         ) {
           break;
         }
+        // This regression deliberately exposes the replica's next battle before the completed-wave
+        // Crossroads terminal arrives. Keep the destination browser's timer queue alive while its retained
+        // receipt closes the old public phase; transport-only spins are not equivalent to an independent
+        // browser event loop.
+        await withClient(rig.guestCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
       }
 
       const rendezvousPoints = (spy: typeof hostSend): string[] =>

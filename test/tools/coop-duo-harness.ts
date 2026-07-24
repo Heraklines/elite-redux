@@ -5163,6 +5163,11 @@ function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable
     );
     mon.coopOwner = data.coopOwner ?? (index % 2 === 0 ? "host" : "guest");
     mon.calculateStats();
+    // Window traces may use a compact PokemonData roster without an explicit current HP. Loading that as
+    // zero silently creates a fully fainted field and makes the first real V2 COMMAND frontier empty. A
+    // present HP value (including an intentional zero) remains authoritative; only absence means full HP,
+    // matching a fresh run constructed from the same roster entry.
+    mon.hp = typeof data.hp === "number" ? Math.min(data.hp, mon.getMaxHp()) : mon.getMaxHp();
     // Test overrides may replace a constructor's moveset; the checkpoint is authoritative.
     mon.moveset = checkpointMoves;
     party.push(mon);
@@ -5201,19 +5206,20 @@ function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable
  * `game` is the host {@linkcode GameManager} (already constructed, with overrides stageable). `trace`
  * is validated first (a malformed trace THROWS with the precise reason). `resyncSpy` is an optional
  * counter (a vi spy's call count) the caller wires onto `CoopBattleStreamer.requestStateSync` so the
- * result can report the resync count. `pairFactory` and the two boundary hooks are test-only seams for
- * a fully scheduled transport: boot/battle traffic may remain automatic, then the caller disables it
- * immediately before each retained reward interaction and re-enables it only before the next battle.
- * Their absence preserves the ordinary loopback path exactly.
+ * result can report the resync count. `pairFactory` may supply a fully scheduled transport: automatic
+ * delivery is boot-only and the loader disables it immediately after both runtimes exist, so every gameplay
+ * frame resumes under its destination browser context. Its absence preserves ordinary loopback exactly.
  */
 export async function replayCoopTrace(
   game: ReplayGameManager,
   trace: ReplayTrace,
   opts: {
     resyncCount?: () => number;
-    pairFactory?: () => { host: CoopTransport; guest: CoopTransport };
-    beforeRewardBoundary?: () => void;
-    afterRewardBoundary?: () => void;
+    pairFactory?: () => {
+      host: CoopTransport;
+      guest: CoopTransport;
+      setAutomaticDelivery?: (automatic: boolean) => void;
+    };
   } = {},
 ): Promise<ReplayResult> {
   const validation = validateReplayTrace(trace);
@@ -5261,6 +5267,7 @@ export async function replayCoopTrace(
   // counters, guest owns ODD - the production parity rule buildDuo wires). =====
   const pair = opts.pairFactory?.() ?? createLoopbackPair();
   const rig = await buildDuo(game as unknown as Parameters<typeof buildDuo>[0], pair, setCoopRuntime, replayToCoop);
+  pair.setAutomaticDelivery?.(false);
   if (checkpoint != null) {
     // `buildDuo` constructs a second scene while test overrides are live. Reassert the checkpoint on the
     // host afterward, then mirror that exact post-checkpoint state into the guest before any event replays.
@@ -5317,7 +5324,6 @@ export async function replayCoopTrace(
 
     // ===== The reward shop interaction for this wave: the OWNER (by counter parity) drives, the WATCHER
     // mirrors. Apply the captured interaction for this wave's reward seq (a leave / non-party pick). =====
-    opts.beforeRewardBoundary?.();
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
     const waveInteraction = interactionEvents.find(e => e.seq === counterBefore);
@@ -5327,11 +5333,23 @@ export async function replayCoopTrace(
     if (hostShop.phaseName === "SelectModifierPhase") {
       const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
       if (hostOwns) {
-        await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward }));
-        await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+        await withClient(rig.hostCtx, () =>
+          driveHostRewardShopOwner(hostShop, {
+            takeReward,
+            partnerReady: () => withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop)),
+            partnerSettle: () =>
+              withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true })),
+          }),
+        );
       } else {
-        await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward }));
-        await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+        await withClient(rig.guestCtx, () =>
+          driveHostRewardShopOwner(guestShop, {
+            takeReward,
+            partnerReady: () => withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop)),
+            partnerSettle: () =>
+              withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true })),
+          }),
+        );
       }
       await pumpDuoDestinations(rig);
       if (waveInteraction != null) {
@@ -5353,7 +5371,6 @@ export async function replayCoopTrace(
 
     // ===== Host crosses into the next wave's battle (real EncounterPhase rolls wave w+1). =====
     if (wavesReplayed < waves.length) {
-      opts.afterRewardBoundary?.();
       await arriveGuestCommandBoundary(rig, wave + 1);
       await withClient(rig.hostCtx, async () => {
         await game.phaseInterceptor.to("CommandPhase");

@@ -42,6 +42,7 @@ import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-
 import { clearCoopRuntime, getCoopWaveBoundaryStatus, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -110,7 +111,7 @@ describe.skipIf(!RUN)(
         .enemyLevel(100)
         .enemyMoveset(MoveId.ROCK_SLIDE)
         .startingLevel(50)
-        .moveset([MoveId.SPLASH, MoveId.EARTHQUAKE])
+        .moveset([MoveId.SPLASH, MoveId.ROCK_SLIDE])
         .disableTrainerWaves();
     });
 
@@ -267,21 +268,24 @@ describe.skipIf(!RUN)(
       for (const enemy of rig.hostScene.getEnemyField()) {
         enemy.hp = 1;
       }
-      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: false });
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: false,
+        guestTarget: BattlerIndex.ENEMY_2,
+      });
       const settledTurn = rig.hostScene.currentBattle.turn;
       await withClient(rig.hostCtx, async () => {
         expect(rig.hostScene.ui.getMode(), "host post-replacement COMMAND is actionable").toBe(UiMode.COMMAND);
         expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
         expect(rig.hostScene.ui.getMode()).toBe(UiMode.FIGHT);
-        expect(rig.hostScene.ui.processInput(Button.RIGHT), "host selects Earthquake").toBe(true);
+        expect(rig.hostScene.ui.processInput(Button.RIGHT), "host selects Rock Slide").toBe(true);
         expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
-        const postMovePhase = await driveClientPhaseQueueTo(rig.hostScene, "Earthquake target or turn commit", {
+        const postMovePhase = await driveClientPhaseQueueTo(rig.hostScene, "Rock Slide target or turn commit", {
           matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "CoopTurnCommitPhase",
         });
         if (postMovePhase.phaseName === "SelectTargetPhase") {
           postMovePhase.start();
           expect(rig.hostScene.ui.getMode()).toBe(UiMode.TARGET_SELECT);
-          expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms Earthquake's legal target").toBe(true);
+          expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms Rock Slide's legal target").toBe(true);
         }
         await game.phaseInterceptor.to("CoopTurnCommitPhase");
         await game.phaseInterceptor.to("CoopVictorySealPhase");

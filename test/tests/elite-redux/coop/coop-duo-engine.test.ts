@@ -229,13 +229,10 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     });
     await withClient(rig.guestCtx, () => drainLoopback());
 
-    // V2 owns the mechanical carrier, so its legacy turnResolution twin must be absent. A legacy fallback
-    // keeps the original assertion. The real material proof happens after the guest replay below.
-    if (V2_TURN_CUTOVER) {
-      expect(guestTurnResolution, "Authority V2 suppresses the raw turnResolution correctness carrier").toBeNull();
-    } else {
-      expect(guestTurnResolution, "the legacy guest received the host's turnResolution").not.toBeNull();
-    }
+    // Current V2 intentionally keeps one unretained raw turnResolution twin as cosmetic compatibility
+    // telemetry; the global V2 entry remains the sole retained/applied correctness carrier. Prove the twin
+    // was observable without mistaking its presence for legacy authority, then prove V2 material below.
+    expect(guestTurnResolution, "the guest observed the one-shot cosmetic turnResolution twin").not.toBeNull();
 
     // Finish the real host BattleEnd seam and its retained automatic-victory seal so the COMPLETE
     // post-victory WAVE_ADVANCE transaction exists

@@ -33,19 +33,17 @@ import {
   isCoopV2InteractionHumanInputFrozen,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
   buildDuo,
   type CoopResyncProbe,
+  driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
@@ -120,17 +118,6 @@ describe.skipIf(!RUN)(
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
       pair.setAutomaticDelivery(false);
 
-      // Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay). This is the
-      // ONLY driver for the guest slot (field 1) - the host resolves it via requestPartnerCommand, NOT the
-      // local move.select UI. Revival Blessing is a USER-target move, so the self-target (PLAYER_2, the
-      // guest lead's own battler index) must be relayed or the move fizzles (empty targets -> no effect).
-      rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-        command: Command.FIGHT,
-        cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-        moveId: MoveId.REVIVAL_BLESSING,
-        targets: [BattlerIndex.PLAYER_2],
-      }));
-
       // FAINT both guest-owned bench mons (slots 2 + 3) on BOTH engines + tag them guest-owned.
       for (const scene of [rig.hostScene, rig.guestScene]) {
         for (const slot of [FIRST_FAINTED_SLOT, OWNER_PICK_SLOT]) {
@@ -149,24 +136,34 @@ describe.skipIf(!RUN)(
 
       const turn = rig.hostScene.currentBattle.turn;
 
-      // Cross the guest's real public command boundary before the authority begins the turn. The former
-      // fixture answered requestPartnerCommand directly while leaving the replica's CONTROL_COMMIT parked
-      // at its predecessor, so the later REVIVAL projection temporarily worked but the final TURN_COMMIT
-      // had no live replay consumer and its checksum was sampled before material application.
-      await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, turn, {
-        proveGuestCommand: true,
-      });
+      // Cross the reciprocal command boundary and submit the guest-owned Revival Blessing exclusively
+      // through the production COMMAND/FIGHT UI. The helper's historical name describes its ordinary
+      // campaign use, but it deliberately selects the first configured move; in this scenario that move is
+      // Revival Blessing. This replaces the old synthetic onCommandRequest answer, which could make the host
+      // progress while the replica's real CONTROL_COMMIT remained parked at its predecessor.
+      await driveDuoGuestTackleThroughPublicUi(game, rig);
 
-      // ===== (A) HOST: select moves + advance until the RevivalBlessingPhase is CURRENT (not yet run). =====
-      // The guest lead's Revival Blessing (a triage move) unshifts RevivalBlessingPhase; we stop BEFORE it
-      // so we can start it under controlled cross-ctx conditions (its start() sends the prompt + parks the
-      // await; running it via the interceptor would need the guest to answer synchronously).
+      // Submit the host-owned Tackle through the same public keyboard path. Stop when the real triage phase
+      // is current but not yet started so its owner-pick prompt can be pumped under the destination browser's
+      // complete runtime context below.
       await withClient(rig.hostCtx, async () => {
-        // ONLY the host slot (field 0) is driven via the local move.select UI; the guest slot (field 1) is
-        // resolved by requestPartnerCommand -> onCommandRequest above. A field-1 move.select would leak its
-        // queued prompt onto a LATER command phase (found the hard way: it fired on turn 2's host slot).
-        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-        await game.phaseInterceptor.to("RevivalBlessingPhase", false);
+        expect(rig.hostScene.ui.getMode(), "host command UI remains actionable after the guest submits").toBe(
+          UiMode.COMMAND,
+        );
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Fight through COMMAND UI").toBe(true);
+        expect(rig.hostScene.ui.getMode(), "host reaches the move picker").toBe(UiMode.FIGHT);
+        expect(rig.hostScene.ui.processInput(Button.RIGHT), "host moves from Revival Blessing to Tackle").toBe(true);
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Tackle through FIGHT UI").toBe(true);
+
+        const postMove = await driveClientPhaseQueueTo(rig.hostScene, "Tackle target or RevivalBlessingPhase", {
+          matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "RevivalBlessingPhase",
+        });
+        if (postMove.phaseName === "SelectTargetPhase") {
+          postMove.start();
+          expect(rig.hostScene.ui.getMode(), "host reaches the real target picker").toBe(UiMode.TARGET_SELECT);
+          expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms the first enemy target").toBe(true);
+          await driveClientPhaseQueueTo(rig.hostScene, "RevivalBlessingPhase");
+        }
       });
 
       // ===== (B) HOST (SYNC, no microtask flush): start the RevivalBlessingPhase. On the host with a

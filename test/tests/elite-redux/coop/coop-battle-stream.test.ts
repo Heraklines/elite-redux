@@ -153,13 +153,9 @@ describe("Authority V2 turn successor classification", () => {
     ).toBe(true);
   });
 
-  it("lets a staged normal victory override the otherwise-ambiguous wild co-faint snapshot", () => {
+  it("states the exact WAVE successor for every transition staged before the final turn commit", () => {
     const operationId = "TURN/e7/w4/t1";
-    const wait = deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
-      mysteryBattle: false,
-      deferredWaveOutcome: "win",
-    });
-    expect(wait).toEqual({
+    const expected = {
       kind: "AWAIT_SUCCESSOR",
       afterOperationId: operationId,
       epoch: 7,
@@ -168,7 +164,16 @@ describe("Authority V2 turn successor classification", () => {
       allowedKinds: ["WAVE_ADVANCE"],
       allowNextWaveStart: false,
       expectedOperationId: null,
-    });
+    } as const;
+    for (const outcome of ["win", "capture", "flee"] as const) {
+      expect(
+        deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
+          mysteryBattle: false,
+          deferredWaveOutcome: outcome,
+        }),
+        `${outcome} must authorize the retained WAVE_ADVANCE instead of a phantom command`,
+      ).toEqual(expected);
+    }
     expect(
       deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
         mysteryBattle: false,
@@ -177,7 +182,7 @@ describe("Authority V2 turn successor classification", () => {
     expect(() =>
       deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
         mysteryBattle: true,
-        deferredWaveOutcome: "win",
+        deferredWaveOutcome: "flee",
       }),
     ).toThrow("cannot also stage");
   });

@@ -2946,3 +2946,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   command authority or author an impossible WAVE successor directly from REPLACEMENT. They drive public
   COMMAND/FIGHT/PARTY/TARGET handlers, use the real ordered replacement and battle-end boundaries, and keep
   automatic scheduled delivery boot-only so no guest callback can execute against the host's global scene.
+
+# 2026-07-24 - Staged flee/capture turns and destination-scene continuations stay in the V2 graph
+
+- Focused run `30095336690` made the remaining mechanisms exact: B10 reached 50/57 with the full heavy-faint
+  replacement journey green, while B11 reached 65/68. The residual reds were no longer broad architectural
+  unknowns; each retained its immutable entry and stopped at one specific engine or browser-context edge.
+- A successful Roar staged the host's complete `flee` wave transition before the resolving TURN_COMMIT, but
+  turn successor classification recognized only staged wins. That turn therefore stated a generic successor
+  and the following exact WAVE_ADVANCE was correctly refused. Win, capture, and flee now all state the same
+  address-exact WAVE_ADVANCE wait; win retains its stricter deferred-carrier identity check.
+- `runWhenCoopRuntimeActive` now requires both the captured runtime and that runtime's bound scene. An async
+  Crossroads/World Map receipt can no longer consume its one-shot callback in the shared-process sliver where
+  the guest runtime pointer and host `globalScene` disagree. The existing public B11 journeys prove the exact
+  symptom: guest counter/SwitchBiome must complete after the immutable result is admitted.
+- Replay checkpoint restoration treats an omitted HP field as a fresh full-HP roster entry while preserving
+  an explicit zero. Scheduled replay delivery is boot-only, and reward owner/watcher flows now run concurrently
+  through destination contexts instead of sequentially deadlocking reciprocal readiness.
+- Revival Blessing now submits both guest Revival Blessing and host Tackle through public COMMAND/FIGHT/TARGET
+  inputs before proving the projected PARTY picker. Party transposition uses non-ally-damaging Rock Slide for
+  its second win so the test exercises the intended replacement-to-wave graph rather than creating an unrelated
+  second ally faint. The one-shot raw turn-resolution twin remains asserted only as cosmetic compatibility;
+  V2 material/projection assertions continue to own correctness.

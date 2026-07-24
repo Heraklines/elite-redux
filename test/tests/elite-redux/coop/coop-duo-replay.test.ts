@@ -30,7 +30,6 @@ import { initGlobalScene } from "#app/global-scene";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, maybeBeginReplayRecording, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { clearReplayRecording, getReplayTrace, isReplayRecording } from "#data/elite-redux/replay-recorder";
 import {
   isReplayCommandEvent,
@@ -43,7 +42,6 @@ import {
 } from "#data/elite-redux/replay-trace";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -51,8 +49,10 @@ import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
@@ -106,14 +106,10 @@ function toCoop(scene: BattleScene): void {
 /** A fully scheduled replay transport that is automatic only outside retained reward boundaries. */
 function scheduledReplayTransport(): {
   pairFactory: () => ReturnType<typeof createScheduledCoopPair>;
-  beforeRewardBoundary: () => void;
-  afterRewardBoundary: () => void;
 } {
   const pair = createScheduledCoopPair({ automatic: true });
   return {
     pairFactory: () => pair,
-    beforeRewardBoundary: () => pair.setAutomaticDelivery(false),
-    afterRewardBoundary: () => pair.setAutomaticDelivery(true),
   };
 }
 
@@ -316,13 +312,7 @@ describe.skipIf(!RUN)(
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
       const pair = createScheduledCoopPair({ automatic: true });
       const rig: DuoRig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-      // The guest answers its own slot's command over the real CoopBattleSync relay (TACKLE enemy_2).
-      rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-        command: Command.FIGHT,
-        cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-        moveId: MoveId.TACKLE,
-        targets: [BattlerIndex.ENEMY_2],
-      }));
+      pair.setAutomaticDelivery(false);
 
       // Establish the host's CoopRunConfig (production does this at run-start via broadcastRunConfig; the
       // harness's assembleCoopRuntime doesn't, so set it here so the recorder captures the coop layer).
@@ -353,11 +343,14 @@ describe.skipIf(!RUN)(
           await remirrorWave(rig);
         }
         const turn = rig.hostScene.currentBattle.turn;
-        // Host plays this wave: BOTH slots TACKLE the frail Magikarps (a guaranteed win). The production
-        // command taps (own-slot broadcast + partner-slot resolve) fire here, recording both commands.
+        // Both seats TACKLE the frail Magikarps through their real public COMMAND/FIGHT/TARGET handlers.
+        // The production command taps therefore record the same UI -> relay path a captured player run uses.
+        await driveDuoGuestTackleThroughPublicUi(game, rig, {
+          restartAlreadyOpenHost: false,
+          submitHostTackle: true,
+          guestTarget: BattlerIndex.ENEMY_2,
+        });
         await withClient(rig.hostCtx, async () => {
-          game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-          game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
           await game.phaseInterceptor.to("CoopTurnCommitPhase");
         });
         await withClient(rig.guestCtx, async () => {
@@ -374,15 +367,26 @@ describe.skipIf(!RUN)(
         const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
         const takeReward = w === 1 && hostOwns;
         if (hostOwns) {
-          await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward }));
-          await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+          await withClient(rig.hostCtx, () =>
+            driveHostRewardShopOwner(hostShop, {
+              takeReward,
+              partnerReady: () => withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop)),
+              partnerSettle: () =>
+                withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true })),
+            }),
+          );
         } else {
-          await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
-          await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+          await withClient(rig.guestCtx, () =>
+            driveHostRewardShopOwner(guestShop, {
+              takeReward: false,
+              partnerReady: () => withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop)),
+              partnerSettle: () =>
+                withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true })),
+            }),
+          );
         }
         await pumpDuoDestinations(rig);
         if (w < RECORD_WAVES) {
-          pair.setAutomaticDelivery(true);
           await arriveGuestCommandBoundary(rig, w + 1);
           await withClient(rig.hostCtx, async () => {
             await game.phaseInterceptor.to("CommandPhase");
