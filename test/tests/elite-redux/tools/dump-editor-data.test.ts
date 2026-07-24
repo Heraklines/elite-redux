@@ -25,6 +25,13 @@ import { ER_TRAINER_CADENCE } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
+import {
+  ER_NEWCOMER_EVO_SPECIES,
+  ER_NEWCOMER_PARTNER_FAMILY,
+  ER_PARTNER_FAMILY,
+  ER_REGITUBE_SPECIES_ID,
+  ER_WEBBED_BRUISER_SPECIES_ID,
+} from "#data/elite-redux/er-newcomer-species";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { ER_FACTORY_TEAM_CHANCE_PCT } from "#data/elite-redux/er-trainer-runtime-hook";
@@ -59,11 +66,48 @@ describe("tools — dump editor SPA data", () => {
       }
     }
 
+    const constifyNewcomer = (name: string): string =>
+      `SPECIES_${name
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")}`;
+    const newcomerCatalog = [
+      ...ER_NEWCOMER_EVO_SPECIES.map(def => ({ id: def.speciesId, name: def.name, slug: def.slug })),
+      { id: ER_REGITUBE_SPECIES_ID, name: "Regitube", slug: "regitube" },
+      { id: ER_WEBBED_BRUISER_SPECIES_ID, name: "Webbed Bruiser", slug: "webbed_bruiser" },
+      ...ER_PARTNER_FAMILY.map(def => ({ id: def.partnerId, name: def.name, aliasId: def.base })),
+      ...ER_NEWCOMER_PARTNER_FAMILY.map(def => ({
+        id: def.partnerId,
+        name: def.name,
+        aliasId: def.baseSpeciesId,
+      })),
+    ];
+    for (const entry of newcomerCatalog) {
+      constById.set(entry.id, constifyNewcomer(entry.name));
+    }
+
     // speciesConst → sprite slug.
     const slugByConst = new Map<string, string>();
     for (const entry of ER_SPRITE_MANIFEST) {
       if (!slugByConst.has(entry.speciesConst)) {
         slugByConst.set(entry.speciesConst, entry.slug);
+      }
+    }
+    for (const entry of newcomerCatalog) {
+      const speciesConst = constById.get(entry.id);
+      if (!speciesConst) {
+        continue;
+      }
+      if ("slug" in entry && entry.slug) {
+        slugByConst.set(speciesConst, entry.slug);
+        continue;
+      }
+      if ("aliasId" in entry) {
+        const aliasConst = constById.get(entry.aliasId);
+        const aliasSlug = aliasConst ? slugByConst.get(aliasConst) : undefined;
+        if (aliasSlug) {
+          slugByConst.set(speciesConst, aliasSlug);
+        }
       }
     }
 
@@ -117,7 +161,7 @@ describe("tools — dump editor SPA data", () => {
       eggTier: number | null;
       cost: number;
     }[] = [];
-    let missingConst = 0;
+    const missingConsts: Array<{ id: number; name: string }> = [];
     for (const key of Object.keys(costs)) {
       const id = Number(key);
       const sp = getPokemonSpecies(id);
@@ -126,7 +170,7 @@ describe("tools — dump editor SPA data", () => {
       }
       const speciesConst = constById.get(id);
       if (speciesConst === undefined) {
-        missingConst++;
+        missingConsts.push({ id, name: sp.name });
         continue; // no stable key to edit it by — should not happen
       }
       species.push({
@@ -170,6 +214,24 @@ describe("tools — dump editor SPA data", () => {
       });
     }
     allSpeciesIndex.sort((a, b) => a.name.localeCompare(b.name));
+
+    const indexedNewcomers = new Map(
+      allSpeciesIndex
+        .filter(entry => newcomerCatalog.some(newcomer => newcomer.id === entry.id))
+        .map(entry => [entry.id, entry]),
+    );
+    expect(
+      newcomerCatalog
+        .filter(entry => !indexedNewcomers.has(entry.id))
+        .map(entry => ({ id: entry.id, name: entry.name })),
+      "registered newcomer species missing from the editor catalog",
+    ).toEqual([]);
+    expect(
+      newcomerCatalog
+        .filter(entry => !indexedNewcomers.get(entry.id)?.slug)
+        .map(entry => ({ id: entry.id, name: entry.name })),
+      "registered newcomer species missing an editor sprite slug",
+    ).toEqual([]);
 
     // ---- items.json ---------------------------------------------------------
     const tierNames: ReadonlyArray<readonly [ModifierTier, string]> = [
@@ -271,7 +333,9 @@ describe("tools — dump editor SPA data", () => {
 
     // Sanity: the roster covers every starter-cost entry that is a real species,
     // includes vanilla + ER customs, and lost nobody to a missing const key.
-    expect(missingConst).toBe(0);
+    expect(missingConsts, `starter species missing stable editor constants: ${JSON.stringify(missingConsts)}`).toEqual(
+      [],
+    );
     // 570 vanilla starters (incl. Pikachu, which the old egg-move-key roster
     // dropped) + the ER customs the init passes leave in the grid.
     expect(species.filter(s => s.id < VANILLA_ID_CUTOFF).length).toBeGreaterThanOrEqual(569);
