@@ -7,7 +7,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
 import { applyShowdownSyncCommand } from "#data/elite-redux/showdown/showdown-sync-command";
@@ -66,6 +66,28 @@ function installTurnStart(scene: BattleScene): void {
   phase.start();
 }
 
+async function connectSyncRuntimes(pair: ReturnType<typeof createLoopbackPair>) {
+  const host = assembleCoopRuntime(pair.host, {
+    username: "Host",
+    netcodeMode: "lockstep",
+    kind: "versus",
+  });
+  const guest = assembleCoopRuntime(pair.guest, {
+    username: "Guest",
+    netcodeMode: "lockstep",
+    kind: "versus",
+  });
+  host.controller.role = "host";
+  guest.controller.role = "guest";
+  setCoopRuntime(host);
+  host.controller.connect();
+  setCoopRuntime(guest);
+  guest.controller.connect();
+  await drainLoopback();
+  setCoopRuntime(host);
+  return { host, guest };
+}
+
 function startWithHeadlessPartyPick(scene: BattleScene, phase: Phase, slotIndex: number): () => void {
   const ui = scene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
   const realSetMode = ui.setMode.bind(ui);
@@ -109,6 +131,8 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
   });
 
   it("fields each player's own team and resolves mirrored commands on both engines", async () => {
+    const pair = createLoopbackPair();
+    const connectedRuntimes = await connectSyncRuntimes(pair);
     await game.runToTitle();
     game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
       toShowdown(game.scene);
@@ -125,8 +149,10 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
       new PokemonMove(MoveId.QUICK_ATTACK),
     ];
 
-    const pair = createLoopbackPair();
-    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown, { netcodeMode: "lockstep" });
+    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown, {
+      netcodeMode: "lockstep",
+      connectedRuntimes,
+    });
     expect(rig.hostScene.getPlayerParty()[0].species.speciesId).toBe(SpeciesId.PIKACHU);
     expect(rig.hostScene.getEnemyParty()[0].species.speciesId).toBe(SpeciesId.MAGIKARP);
     expect(rig.guestScene.getPlayerParty()[0].species.speciesId).toBe(SpeciesId.MAGIKARP);
@@ -192,6 +218,8 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
   }, 300_000);
 
   it("relays the guest's forced replacement and seats the same bench mon on both engines", async () => {
+    const pair = createLoopbackPair();
+    const connectedRuntimes = await connectSyncRuntimes(pair);
     await game.runToTitle();
     game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
       toShowdown(game.scene);
@@ -202,8 +230,10 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
     });
     await game.phaseInterceptor.to("CommandPhase");
 
-    const pair = createLoopbackPair();
-    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown, { netcodeMode: "lockstep" });
+    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown, {
+      netcodeMode: "lockstep",
+      connectedRuntimes,
+    });
     const hostReplacementId = rig.hostScene.getEnemyParty()[1].id;
     const guestReplacementSpecies = rig.guestScene.getPlayerParty()[1].species.speciesId;
     expect(guestReplacementSpecies).toBe(rig.hostScene.getEnemyParty()[1].species.speciesId);
@@ -246,6 +276,8 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
   }, 300_000);
 
   it("relays a Teleport replacement instead of letting the mirrored trainer AI choose", async () => {
+    const pair = createLoopbackPair();
+    const connectedRuntimes = await connectSyncRuntimes(pair);
     await game.runToTitle();
     game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
       toShowdown(game.scene);
@@ -256,8 +288,10 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
     });
     await game.phaseInterceptor.to("CommandPhase");
 
-    const pair = createLoopbackPair();
-    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown, { netcodeMode: "lockstep" });
+    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown, {
+      netcodeMode: "lockstep",
+      connectedRuntimes,
+    });
     const chosenPartyIndex = 2;
     const chosenId = rig.guestScene.getPlayerParty()[chosenPartyIndex].id;
     expect(rig.hostScene.getEnemyParty()[chosenPartyIndex].id).toBe(chosenId);

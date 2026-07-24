@@ -5224,7 +5224,15 @@ export async function buildShowdownDuo(
   pair: { host: CoopTransport; guest: CoopTransport },
   setCoopRuntimeFn: (r: CoopRuntime) => void,
   toShowdownGameMode: (scene: BattleScene) => void,
-  opts: { netcodeMode?: CoopNetcodeMode } = {},
+  opts: {
+    netcodeMode?: CoopNetcodeMode;
+    /**
+     * Sync reaches CommandPhase only after the lobby runtime exists in production. Tests that exercise the
+     * orphan-runtime fail-closed guard therefore assemble/connect both peers before booting EncounterPhase
+     * and hand those same runtimes to the mirror builder instead of silently replacing them afterwards.
+     */
+    connectedRuntimes?: { host: CoopRuntime; guest: CoopRuntime };
+  } = {},
 ): Promise<ShowdownDuoRig> {
   const hostScene = hostGame.scene;
   const netcodeMode = opts.netcodeMode ?? "authoritative";
@@ -5232,16 +5240,20 @@ export async function buildShowdownDuo(
   // animation coverage. The public two-browser campaign is the sole visible-presentation oracle.
   hostScene.moveAnimations = false;
   neutralizeCoopCandyBar(hostScene);
-  const hostRuntime = assembleCoopRuntime(pair.host, {
-    username: "Host",
-    netcodeMode,
-    kind: "versus",
-  });
-  const guestRuntime = assembleCoopRuntime(pair.guest, {
-    username: "Guest",
-    netcodeMode,
-    kind: "versus",
-  });
+  const hostRuntime =
+    opts.connectedRuntimes?.host
+    ?? assembleCoopRuntime(pair.host, {
+      username: "Host",
+      netcodeMode,
+      kind: "versus",
+    });
+  const guestRuntime =
+    opts.connectedRuntimes?.guest
+    ?? assembleCoopRuntime(pair.guest, {
+      username: "Guest",
+      netcodeMode,
+      kind: "versus",
+    });
   const scheduledPair = pair as typeof pair & { flush?: (role: "host" | "guest", limit?: number) => number };
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
@@ -5338,12 +5350,15 @@ export async function buildShowdownDuo(
     beginShowdownBattle(own, opponent, hostRelay, null, null, null, battleFormat);
   }
 
-  // Connect both controllers over the live loopback (exchange hello / runConfig).
-  setCoopRuntimeFn(hostRuntime);
-  hostRuntime.controller.connect();
-  setCoopRuntimeFn(guestRuntime);
-  guestRuntime.controller.connect();
-  await drainLoopback();
+  // Connect both controllers over the live loopback (exchange hello / runConfig). A Sync fixture may have
+  // performed this before EncounterPhase so the real CommandPhase fail-closed guard saw its runtime.
+  if (opts.connectedRuntimes == null) {
+    setCoopRuntimeFn(hostRuntime);
+    hostRuntime.controller.connect();
+    setCoopRuntimeFn(guestRuntime);
+    guestRuntime.controller.connect();
+    await drainLoopback();
+  }
 
   // Production installs both versus runtimes before Encounter/Summon. These older direct-mirror fixtures
   // deliberately stop the solo host at CommandPhase first, so pairing otherwise omits TWO required edges:
