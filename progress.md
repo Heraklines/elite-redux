@@ -3097,3 +3097,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The public driver now stops before that host CommandPhase, starts it without waiting for menu completion,
   and advances the guest event loop to install the same CONTROL entry and return the reciprocal arrival. It
   still uses only the production phase scheduler, public input handlers, and destination-context delivery.
+
+# 2026-07-24 - Mystery battle settlement now exercises the real V2 turn predecessor
+
+- Exact B9 evidence from `30102553515` proved the retained battle handoff was valid, but the old regression
+  then set both engines directly to turn 3 and manually constructed Victory/BattleEnd. It omitted every
+  intervening V2 turn entry, so the sole global log correctly rejected the orphan turn-3 ME settlement.
+- The journey now gives the authoritative enemies one HP, submits both seats through the production
+  Command/Fight/Target handlers, records the real turn commit, replays its immutable faint checkpoint, and
+  reaches the renderer and authority Victory/BattleEnd phases through their ordinary schedulers. The test
+  still proves the guest parks at the exact BattleEnd until the post-preparation settlement arrives.

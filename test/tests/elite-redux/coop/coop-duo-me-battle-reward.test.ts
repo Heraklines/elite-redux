@@ -46,16 +46,19 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
-import { StatusEffect } from "#enums/status-effect";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuoForMe,
   drainLoopback,
   driveClientPhaseQueueTo,
   driveDuoGuestMeReplay,
+  driveDuoGuestTackleThroughPublicUi,
+  driveGuestReplayTurn,
   installDuoLogCapture,
   withClient,
   withClientSync,
@@ -70,9 +73,6 @@ const RUN = process.env.ER_SCENARIO === "1";
 const ME_WAVE = 12;
 /** The ME interaction counter the FIGHT_OR_FLIGHT ME opens on (host owns even -> counter 0). */
 const ME_COUNTER = 0;
-/** Settlement cursor after a legitimate multi-turn spawned battle (handoff itself starts on turn 1). */
-const ME_SETTLEMENT_TURN = 3;
-
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
@@ -96,6 +96,7 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       .startingWave(ME_WAVE)
       .mysteryEncounterChance(100)
       .startingLevel(50)
+      .moveset([MoveId.TACKLE])
       .disableTrainerWaves();
   });
 
@@ -153,7 +154,7 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     // The retained ME_TERMINAL applies the host's exact state before CoopReplayMePhase finishesWithoutLeaving:
     // it does NOT leave/advance, marks the handoff battle STARTED, and boots the declared battle surface. =====
     const guestReplay = await driveDuoGuestMeReplay(rig);
-    const queued = await withClient(rig.guestCtx, async () => {
+    await withClient(rig.guestCtx, async () => {
       expect(guestReplay.settled, "guest CoopReplayMePhase settled at the battle-handoff").toBe(true);
       expect(coopMeInProgress(), "guest ME pin still set through the spawned battle").toBe(true);
       expect(coopMeHandoffBattleStarted(), "guest marked the ME handoff battle STARTED (#817)").toBe(true);
@@ -189,32 +190,46 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
         coopMeHandoffBattleWon(),
         "ME battle NOT won while enemies live (guest plays the turn, no premature victory)",
       ).toBe(false);
+    });
 
-      // Apply the host's WIN: KO every enemy - what the host's authoritative post-turn checkpoint does on
-      // the guest (a pure renderer). A fully-fainted party is the host's REAL win (read from the checkpoint,
-      // not locally-chipped), so the guest must now run the ME victory tail instead of a phantom turn.
-      for (const e of enemies) {
-        e.hp = 0;
-        e.doSetStatus(StatusEffect.FAINT);
-        e.leaveField(true, true, false);
-        expect(e.isFainted(true), `${e.name} adopted the authoritative faint status`).toBe(true);
-        expect(e.isOnField(), `${e.name} left the field at the authoritative checkpoint`).toBe(false);
+    // Play the spawned battle through the same public Command/Fight/Target handlers as two browsers. The
+    // former fixture jumped both scenes directly from the turn-1 handoff to a synthetic turn-3 BattleEnd,
+    // omitting the intervening Authority V2 turn entry that legally owns that successor. That manufactured
+    // an impossible global-log gap. One-HP enemies keep this production journey fast while the real turn
+    // records both faints, applies the checkpoint, and authors the ME victory tail.
+    await withClient(rig.hostCtx, async () => {
+      for (const enemy of hostScene.getEnemyParty()) {
+        enemy.hp = 1;
       }
-      // The retained handoff was addressed at turn 1, but a real battle may finish later. This is the
-      // exact C1 race that previously rejected a valid turn-3 BattleEnd before its settlement redelivery.
-      rig.guestScene.currentBattle.turn = ME_SETTLEMENT_TURN;
+    });
+    const turn = rig.hostScene.currentBattle.turn;
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+      hostMoveId: MoveId.TACKLE,
+      guestMoveId: MoveId.TACKLE,
+      hostTarget: BattlerIndex.ENEMY,
+      guestTarget: BattlerIndex.ENEMY_2,
+    });
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
+      expect(
+        hostScene.getEnemyParty().every(enemy => enemy.isFainted()),
+        "the public authoritative turn fainted the complete ME enemy field",
+      ).toBe(true);
+    });
+
+    const queued = await withClient(rig.guestCtx, async () => {
+      await driveGuestReplayTurn(rig.guestScene, turn, { sealRetainedWaveBoundary: false });
       expect(
         coopMeHandoffBattleWon(),
-        "guest detects the ME battle WON directly (spawned ME battle + all enemies fainted) (#847)",
+        "guest detects the ME battle WON from the authoritative turn checkpoint (#847)",
       ).toBe(true);
 
-      // Execute the renderer-created Victory through the real phase factory. This is the regression seam
-      // the former pushNew spy missed: strict-tail gating must construct Victory and its BattleEnd rather
-      // than silently substituting CoopInert after the request was observed.
+      // Execute the Victory queued by the production replay finalizer. Strict-tail gating must preserve its
+      // real BattleEnd rather than substituting CoopInert or opening a phantom command.
       const turnBefore = rig.guestScene.currentBattle.turn;
-      const victory = rig.guestScene.phaseManager.create("VictoryPhase", enemies[0]!.getBattlerIndex());
-      expect(victory.phaseName, "strict renderer gate constructs the sanctioned Victory").toBe("VictoryPhase");
-      expect(rig.guestScene.phaseManager.overridePhase(victory), "real Victory starts on the renderer").toBe(true);
+      const victory = await driveClientPhaseQueueTo(rig.guestScene, "VictoryPhase");
       victory.start();
       const queuedAfterVictory = rig.guestScene.phaseManager.getQueuedPhaseNames();
       expect(queuedAfterVictory, "Victory constructed its real retained BattleEnd").toContain("BattleEndPhase");
@@ -246,23 +261,7 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     // handleMysteryEncounterVictory queues BattleEnd and the reward phase with one immutable plan. BattleEnd
     // keeps the guest parked; the reward phase commits only after its automatic preparation boundary.
     await withClient(rig.hostCtx, async () => {
-      const hostEnemies = hostScene.getEnemyParty();
-      for (const enemy of hostEnemies) {
-        enemy.hp = 0;
-        enemy.doSetStatus(StatusEffect.FAINT);
-        enemy.leaveField(true, true, false);
-        expect(enemy.isFainted(true), `${enemy.name} completed the real faint boundary`).toBe(true);
-        expect(enemy.isOnField(), `${enemy.name} left the field before Victory`).toBe(false);
-      }
-      hostScene.currentBattle.turn = ME_SETTLEMENT_TURN;
-      const victory = hostScene.phaseManager.create("VictoryPhase", hostEnemies[0]!.getBattlerIndex());
-      expect(hostScene.phaseManager.overridePhase(victory), "host runs the real ME Victory").toBe(true);
-      victory.start();
-      expect(hostScene.phaseManager.getQueuedPhaseNames(), "Victory wired the planned BattleEnd").toContain(
-        "BattleEndPhase",
-      );
-      const restored = hostScene.phaseManager.getCurrentPhase();
-      restored.end();
+      await game.phaseInterceptor.to("BattleEndPhase", false);
       expect(hostScene.phaseManager.getCurrentPhase()?.phaseName, "host reached the exact planned BattleEnd").toBe(
         "BattleEndPhase",
       );
