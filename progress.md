@@ -2634,3 +2634,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Node-pure ledger coverage proves idempotent settlement, destination-runtime ownership, and teardown
   invalidation. Engine failure-first coverage proves an active callback token produces a correlated shared
   terminal and emits no partial turn image. Hosted co-op shards remain the required runtime qualification.
+
+# 2026-07-24 - Completed battle authority compacts to bounded tombstones
+
+- Guest turn and replacement admission now retain complete immutable payloads only while their staged
+  material, presentation, or continuation transaction can still perform work. `continuationReady` compacts
+  each payload to `{address, revision, operationId, digest}` in a bounded 64-entry per-boundary window.
+- A monotonic retired-through state-tick frontier permanently rejects older carriers after their tombstone
+  ages out. Identical carriers still inside the window re-ACK without replay; conflicting bytes still enter
+  the shared fatal contract. Active, unretired admission is capped at the existing authority-retention limit.
+- Failure-first stream coverage drives 66 completed turns and 66 completed replacements, proves retained
+  history stays bounded, proves aged-out frames cannot reopen, and proves both in-window replay and conflict
+  behavior. Host-issued failure-authentication keys are now bounded tails as well.

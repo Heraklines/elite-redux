@@ -1345,6 +1345,109 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("compacts completed authority into bounded tombstones without reopening aged-out revisions", async () => {
+      const { host, guest } = createLoopbackPair();
+      const authorityContext = () => ({ epoch: 7, wave: 1, turn: 1 });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext });
+      let observedTurns = 0;
+      let observedReplacements = 0;
+      let turnAcks = 0;
+      let replacementAcks = 0;
+      guestStream.onTurnCommit(() => observedTurns++);
+      guestStream.onCheckpointEnvelope(() => observedReplacements++);
+      host.onMessage(message => {
+        if (message.t === "turnCommitAck") {
+          turnAcks++;
+        } else if (message.t === "battleCheckpointAck") {
+          replacementAcks++;
+        }
+      });
+
+      const turnMessage = (revision: number): Extract<CoopMessage, { t: "turnResolution" }> => ({
+        t: "turnResolution",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision,
+        events: [{ k: "message", text: `turn-${revision}` }],
+        checkpoint: { ...emptyCheckpoint(), tick: revision - 1 },
+        checksum: revision.toString(16).padStart(16, "0"),
+        preimage: `{"revision":${revision}}`,
+        fullField: emptyFullField(),
+        authoritativeState: emptyAuthoritativeState(1, 1, revision),
+      });
+      const replacementMessage = (revision: number): Extract<CoopMessage, { t: "battleCheckpoint" }> => ({
+        t: "battleCheckpoint",
+        reason: "replacement",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision,
+        checkpoint: { ...emptyCheckpoint(), tick: revision - 1 },
+        checksum: revision.toString(16).padStart(16, "0"),
+        fullField: emptyFullField(),
+        authoritativeState: emptyAuthoritativeState(1, 1, revision),
+      });
+
+      const firstTurn = turnMessage(1_001);
+      let lastTurn = firstTurn;
+      for (let revision = 1_001; revision <= 1_066; revision++) {
+        const message = turnMessage(revision);
+        lastTurn = message;
+        const awaited = guestStream.awaitTurn(1);
+        host.send(message);
+        await flushWire();
+        const resolution = await awaited;
+        expect(resolution?.revision).toBe(revision);
+        acknowledgeTurnThroughContinuation(guestStream, resolution!);
+        await flushWire();
+      }
+
+      const firstReplacement = replacementMessage(2_001);
+      let lastReplacement = firstReplacement;
+      for (let revision = 2_001; revision <= 2_066; revision++) {
+        const message = replacementMessage(revision);
+        lastReplacement = message;
+        host.send(message);
+        await flushWire();
+        const envelope = guestStream.consumeCheckpoint();
+        expect(envelope?.revision).toBe(revision);
+        acknowledgeReplacementThroughContinuation(guestStream, envelope!);
+        await flushWire();
+      }
+
+      expect(guestStream.retainedAuthorityDiagnostics().history).toBeLessThanOrEqual(128);
+      expect(observedTurns).toBe(66);
+      expect(observedReplacements).toBe(66);
+
+      // The first full carriers and their tombstones have aged out, but the monotonic retired frontier
+      // still makes them permanently stale rather than executable again.
+      host.send(firstTurn);
+      host.send(firstReplacement);
+      await flushWire();
+      expect(observedTurns).toBe(66);
+      expect(observedReplacements).toBe(66);
+      expect(guestStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+
+      // The newest entries remain inside the bounded tombstone/ACK windows and are re-ACKed exactly,
+      // without re-running a renderer or material applier.
+      const turnAcksBeforeRetry = turnAcks;
+      const replacementAcksBeforeRetry = replacementAcks;
+      host.send(structuredClone(lastTurn));
+      host.send(structuredClone(lastReplacement));
+      await flushWire();
+      expect(turnAcks).toBe(turnAcksBeforeRetry + 1);
+      expect(replacementAcks).toBe(replacementAcksBeforeRetry + 1);
+      expect(observedTurns).toBe(66);
+      expect(observedReplacements).toBe(66);
+
+      // Conflicting bytes for a still-tombstoned immutable revision remain a shared fatal violation.
+      host.send({ ...lastTurn, checksum: "ffffffffffffffff" });
+      await flushWire();
+      expect(guestStream.retainedAuthorityDiagnostics().terminal).toBe(true);
+      guestStream.dispose();
+    });
+
     it("fails both peers closed when continuation evidence skips mandatory stages", async () => {
       const { host, guest } = createLoopbackPair();
       const authorityContext = () => ({ epoch: 7, wave: 1, turn: 1 });
