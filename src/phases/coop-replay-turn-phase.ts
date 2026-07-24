@@ -40,6 +40,7 @@ import {
   getCoopController,
   isCoopAuthoritativeGuest,
   registerCoopActiveReplayTurnAborter,
+  retryCoopV2PendingAuthorityAtSafeBoundary,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent, CoopPresentationActorRef } from "#data/elite-redux/coop/coop-transport";
 import {
@@ -509,6 +510,19 @@ export class CoopReplayTurnPhase extends Phase {
             }
             if (!streamer.acknowledgeReplacement(envelope, "materialApplied")) {
               return;
+            }
+            // The compatibility checkpoint proof and the V2 entry describe the same immutable replacement,
+            // but they retire through separate ledgers. Recording materialApplied makes the exact carrier
+            // queryable; retry V2 now so it can mark this revision applied and admit an already-buffered
+            // chained replacement. Any resulting picker is queued behind THIS replay and cannot become
+            // actionable until the presentation below finishes and continuationReady ends this phase.
+            const completedEntries = retryCoopV2PendingAuthorityAtSafeBoundary();
+            if (completedEntries > 0) {
+              coopLog(
+                "v2-replacement",
+                `safe-boundary retry completed ${completedEntries} ordered V2 entr${completedEntries === 1 ? "y" : "ies"} `
+                  + `after replacement rev=${envelope.authorityRevision ?? "?"} material proof`,
+              );
             }
             const presentation = this.beginReplacementPresentation(streamer, envelope);
             // A destination-scoped headless oracle can prove the projection synchronously. Do not insert

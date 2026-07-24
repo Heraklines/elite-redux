@@ -1,0 +1,12 @@
+{
+  "taskId": "v2-replacement-proof-edge-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-replacement-proof-edge-20260724",
+  "trainRef": "ci/coop/v2-replacement-proof-edge-20260724",
+  "baseSha": "8174605b6133881e8afa905311b1ddca807dc554",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-replacement-proof-edge-20260724.json",
+    "src/phases/coop-replay-turn-phase.ts"
+  ],
+  "lockedSchemaFiles": []
+}
