@@ -33,6 +33,30 @@ function q<T extends Element>(selector: string): T {
   return found as T;
 }
 
+function transientPartFailureFetch(onPartAttempt: () => number) {
+  return vi.fn(async (urlValue: string | URL | Request) => {
+    const url = String(urlValue);
+    if (url.endsWith("/media-upload/start")) {
+      return Response.json(
+        { ok: true, id: "11111111-1111-4111-8111-111111111111", uploadId: "up-1", partSize: 5 * 1024 * 1024 },
+        { status: 201 },
+      );
+    }
+    if (url.includes("/parts/")) {
+      return onPartAttempt() === 1
+        ? Response.json({ ok: false, error: "temporary R2 failure" }, { status: 503 })
+        : Response.json({ ok: true, part: { partNumber: 1, etag: "etag-1" } });
+    }
+    if (url.endsWith("/media-upload/complete")) {
+      return Response.json({ ok: true, queued: true, fileName: "Retry Theme.mp3" }, { status: 202 });
+    }
+    if (url.endsWith("/media-jobs")) {
+      return Response.json({ ok: true, runs: [] });
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
+}
+
 beforeAll(() => {
   const appSource = readFileSync(resolve(process.cwd(), "editor/app.js"), "utf8");
   const stripped = appSource.replace(/\ninit\(\);\s*$/, "\n");
@@ -72,8 +96,9 @@ describe("ER Editor Assets direct media upload", () => {
 
   it("uploads multiple chunks and queues conversion with authored metadata", async () => {
     assets.setMediaSource("upload");
-    const partSize = 5 * 1024 * 1024;
-    const file = new win.File([new Uint8Array(partSize + 17)], "Leader Theme.mp4", { type: "video/mp4" });
+    const partSize = 8 * 1024 * 1024;
+    const fileSize = Math.floor(11.1 * 1024 * 1024);
+    const file = new win.File([new Uint8Array(fileSize)], "Leader Theme.mp4", { type: "video/mp4" });
     const fileInput = q<HTMLInputElement>("#asset-media-file");
     Object.defineProperty(fileInput, "files", { configurable: true, value: [file] });
     assets.onMediaFileChange(fileInput);
@@ -115,7 +140,7 @@ describe("ER Editor Assets direct media upload", () => {
     const partRequests = requests.filter(request => request.url.includes("/parts/"));
     expect(partRequests).toHaveLength(2);
     expect((partRequests[0].init?.body as Blob).size).toBe(partSize);
-    expect((partRequests[1].init?.body as Blob).size).toBe(17);
+    expect((partRequests[1].init?.body as Blob).size).toBe(fileSize - partSize);
     const complete = requests.find(request => request.url.endsWith("/media-upload/complete"));
     const payload = JSON.parse(String(complete?.init?.body));
     expect(payload).toMatchObject({
@@ -132,6 +157,48 @@ describe("ER Editor Assets direct media upload", () => {
     });
     expect(q<HTMLProgressElement>("#asset-upload-progress").value).toBe(100);
     expect(q("#asset-upload-progress-label").textContent).toBe("Queued for conversion");
+  });
+
+  it("retries a transient chunk failure", async () => {
+    assets.setMediaSource("upload");
+    const fileInput = q<HTMLInputElement>("#asset-media-file");
+    Object.defineProperty(fileInput, "files", {
+      configurable: true,
+      value: [new win.File([new Uint8Array(32)], "Retry Theme.mp3", { type: "audio/mpeg" })],
+    });
+    assets.onMediaFileChange(fileInput);
+    q<HTMLSelectElement>("#asset-upload-license").value = "permission";
+    q<HTMLInputElement>("#asset-upload-rights").checked = true;
+
+    let partAttempts = 0;
+    win.fetch = transientPartFailureFetch(() => ++partAttempts) as never;
+
+    await assets.uploadMediaFile();
+
+    expect(partAttempts).toBe(2);
+    expect(q("#asset-upload-progress-label").textContent).toBe("Queued for conversion");
+  });
+
+  it("shows the failing upload stage next to the progress bar", async () => {
+    assets.setMediaSource("upload");
+    const fileInput = q<HTMLInputElement>("#asset-media-file");
+    Object.defineProperty(fileInput, "files", {
+      configurable: true,
+      value: [new win.File([new Uint8Array(32)], "Broken Theme.mp3", { type: "audio/mpeg" })],
+    });
+    assets.onMediaFileChange(fileInput);
+    q<HTMLSelectElement>("#asset-upload-license").value = "permission";
+    q<HTMLInputElement>("#asset-upload-rights").checked = true;
+    win.fetch = vi.fn(async () =>
+      Response.json({ ok: false, error: "direct uploads unavailable" }, { status: 503 }),
+    ) as never;
+
+    await expect(assets.uploadMediaFile()).rejects.toThrow(
+      "Upload failed while opening the upload: direct uploads unavailable",
+    );
+    expect(q("#asset-upload-progress-label").textContent).toBe(
+      "Upload failed while opening the upload: direct uploads unavailable",
+    );
   });
 
   it("rejects incomplete CC BY metadata before uploading the file", async () => {

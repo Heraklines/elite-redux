@@ -1721,20 +1721,27 @@ async function dispatchMediaImport(
   inputs: Record<string, string>,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const workflow = env.MEDIA_IMPORT_WORKFLOW_FILE || "deploy-staging.yml";
-  const response = await fetch(
-    `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/${workflow}/dispatches`,
-    {
-      method: "POST",
-      headers: { ...ghHeaders(env), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ref: env.MEDIA_IMPORT_BRANCH || env.GITHUB_BRANCH,
-        inputs,
-      }),
-    },
-  );
-  return response.status === 204
-    ? { ok: true }
-    : { ok: false, error: `media import dispatch failed: ${response.status} ${await response.text()}` };
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/${workflow}/dispatches`,
+      {
+        method: "POST",
+        headers: { ...ghHeaders(env), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ref: env.MEDIA_IMPORT_BRANCH || env.GITHUB_BRANCH,
+          inputs,
+        }),
+      },
+    );
+    return response.status === 204
+      ? { ok: true }
+      : { ok: false, error: `media import dispatch failed: ${response.status} ${await response.text()}` };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `media import dispatch failed: ${error instanceof Error ? error.message : error}`,
+    };
+  }
 }
 
 async function handleMediaUploadStart(body: MediaUploadStartBody, env: Env): Promise<Response> {
@@ -1759,15 +1766,24 @@ async function handleMediaUploadStart(body: MediaUploadStartBody, env: Env): Pro
   }
 
   const id = crypto.randomUUID();
-  const upload = await env.MEDIA_UPLOADS!.createMultipartUpload(mediaUploadKey(id), {
-    httpMetadata: { contentType: contentType || "application/octet-stream" },
-    customMetadata: {
-      downloadToken: randomMediaToken(),
-      fileName: encodeURIComponent(fileName),
-      expectedSize: String(fileSize),
-      createdAt: new Date().toISOString(),
-    },
-  });
+  let upload: R2MultipartUploadLike;
+  try {
+    upload = await env.MEDIA_UPLOADS!.createMultipartUpload(mediaUploadKey(id), {
+      httpMetadata: { contentType: contentType || "application/octet-stream" },
+      customMetadata: {
+        downloadToken: randomMediaToken(),
+        fileName: encodeURIComponent(fileName),
+        expectedSize: String(fileSize),
+        createdAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    return json(
+      { ok: false, error: `upload initialization failed: ${error instanceof Error ? error.message : error}` },
+      502,
+      env,
+    );
+  }
   return json(
     {
       ok: true,

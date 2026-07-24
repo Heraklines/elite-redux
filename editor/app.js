@@ -4122,9 +4122,37 @@ function onMediaFileChange(input) {
 async function responseJson(response) {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(result.error || `HTTP ${response.status}`);
+    const error = new Error(result.error || `HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
   return result;
+}
+
+function shouldRetryMediaPart(error) {
+  const status = Number(error?.status || 0);
+  return status === 0 || status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+async function uploadMediaPart(url, password, chunk, onRetry) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await responseJson(
+        await fetch(url, {
+          method: "POST",
+          headers: { "X-Editor-Password": password },
+          body: chunk,
+        }),
+      );
+    } catch (error) {
+      if (attempt === maxAttempts || !shouldRetryMediaPart(error)) {
+        throw error;
+      }
+      onRetry(attempt + 1, maxAttempts, error);
+      await new Promise(resolve => setTimeout(resolve, 250 * 2 ** (attempt - 1)));
+    }
+  }
 }
 
 async function abortMediaUpload(password, session) {
@@ -4159,6 +4187,7 @@ async function uploadMediaFile() {
   }
 
   let session = null;
+  let stage = "opening the upload";
   try {
     setMediaUploadProgress(0, "Opening upload");
     session = await responseJson(
@@ -4183,20 +4212,22 @@ async function uploadMediaFile() {
     for (let index = 0; index < totalParts; index++) {
       const partNumber = index + 1;
       const chunk = file.slice(index * partSize, Math.min(file.size, partNumber * partSize));
+      stage = `uploading part ${partNumber}/${totalParts}`;
       setMediaUploadProgress(Math.round((index / totalParts) * 90), `Uploading ${partNumber}/${totalParts}`);
-      const result = await responseJson(
-        await fetch(
-          `${WORKER_URL}/media-upload/${encodeURIComponent(session.id)}/parts/${partNumber}?uploadId=${encodeURIComponent(session.uploadId)}`,
-          {
-            method: "POST",
-            headers: { "X-Editor-Password": password },
-            body: chunk,
-          },
-        ),
+      const result = await uploadMediaPart(
+        `${WORKER_URL}/media-upload/${encodeURIComponent(session.id)}/parts/${partNumber}?uploadId=${encodeURIComponent(session.uploadId)}`,
+        password,
+        chunk,
+        (attempt, maxAttempts, error) =>
+          setMediaUploadProgress(
+            Math.round((index / totalParts) * 90),
+            `Retrying ${partNumber}/${totalParts} (${attempt}/${maxAttempts}): ${error.message || error}`,
+          ),
       );
       parts.push(result.part);
     }
 
+    stage = "queueing conversion";
     setMediaUploadProgress(94, "Queueing conversion");
     const result = await responseJson(
       await fetch(`${WORKER_URL}/media-upload/complete`, {
@@ -4222,11 +4253,18 @@ async function uploadMediaFile() {
     session = null;
     setMediaUploadProgress(100, "Queued for conversion");
     setStatus(`${result.fileName || file.name} uploaded. Conversion is queued.`);
-    await refreshMediaJobs();
   } catch (error) {
     await abortMediaUpload(password, session);
-    setMediaUploadProgress(0, "Upload failed");
-    throw error;
+    const message = error.message || String(error);
+    const detail = `Upload failed while ${stage}: ${message}`;
+    setMediaUploadProgress(0, detail);
+    throw new Error(detail);
+  }
+
+  try {
+    await refreshMediaJobs();
+  } catch (error) {
+    setStatus(`${file.name} uploaded and queued, but the job list could not refresh: ${error.message || error}`, ERR);
   }
 }
 
