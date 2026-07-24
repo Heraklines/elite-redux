@@ -585,6 +585,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
    * the deferred {@linkcode CoopFinalizeTurnPhase} that now applies the checkpoint.
    */
   const REPLAY_DRAIN_PHASES = [
+    "CoopReplayTurnPhase",
     "MessagePhase",
     "CoopMoveAnimReplayPhase",
     "CoopHpDrainReplayPhase",

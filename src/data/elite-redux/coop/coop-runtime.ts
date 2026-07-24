@@ -8516,7 +8516,11 @@ function serializedCommandToReplayKind(command: SerializedCommand): ReplayComman
  * live wave; shallow-copies the kept fields so it never aliases the sent command object.
  */
 export function recordCoopOwnSlotCommand(fieldIndex: number, command: SerializedCommand): void {
-  if (!isReplayRecording()) {
+  // The replay recorder belongs to the authoritative browser. Production peers have separate module
+  // instances; the two-engine harness swaps both runtimes through one realm, so a module-global active
+  // recording alone is not enough to authorize the guest's own-send tap. Recording it here and again when
+  // the host commits the partner slot produces a duplicate command that no real captured trace contains.
+  if (!isReplayRecording() || active?.controller.role !== "host") {
     return;
   }
   recordReplayCommand({
@@ -8535,7 +8539,7 @@ export function recordCoopOwnSlotCommand(fieldIndex: number, command: Serialized
  * {@linkcode SerializedCommand}; no-op unless recording. Shallow.
  */
 export function recordCoopPartnerSlotCommand(fieldIndex: number, command: SerializedCommand): void {
-  if (!isReplayRecording()) {
+  if (!isReplayRecording() || active?.controller.role !== "host") {
     return;
   }
   recordReplayCommand({

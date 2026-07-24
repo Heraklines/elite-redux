@@ -271,14 +271,6 @@ describe.skipIf(!RUN)(
       rig.hostScene.getPlayerParty()[0].level = 55;
       rig.hostScene.getPlayerParty()[0].exp += 5000;
       rig.hostScene.getPlayerParty()[0].calculateStats();
-      // Enemy commands are selected while the public command driver crosses EnemyCommandPhase. Retire the
-      // already-proven Rock Slide before that driver, otherwise changing the moveset afterward is too late:
-      // the queued Rock Slide can KO frail Fennekin and open an unrelated second PARTY picker.
-      withClientSync(rig.hostCtx, () => {
-        for (const enemy of rig.hostScene.getEnemyField()) {
-          enemy.moveset = [new PokemonMove(MoveId.SPLASH)];
-        }
-      });
       await driveDuoGuestTackleThroughPublicUi(game, rig, {
         restartAlreadyOpenHost: false,
         guestTarget: BattlerIndex.ENEMY_2,
@@ -290,10 +282,15 @@ describe.skipIf(!RUN)(
       withClientSync(rig.hostCtx, () => {
         for (const enemy of rig.hostScene.getEnemyField()) {
           enemy.hp = 1;
+          enemy.moveset = [new PokemonMove(MoveId.SPLASH)];
         }
         expect(
           rig.hostScene.getEnemyField().every(enemy => enemy.hp === 1),
           "the deterministic second-turn win is installed after reciprocal command adoption",
+        ).toBe(true);
+        expect(
+          rig.hostScene.getEnemyField().every(enemy => enemy.getMoveset().every(move => move.moveId === MoveId.SPLASH)),
+          "the already-adopted foes cannot open an unrelated second replacement",
         ).toBe(true);
       });
       const settledTurn = rig.hostScene.currentBattle.turn;

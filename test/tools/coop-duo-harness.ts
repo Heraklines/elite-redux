@@ -5421,13 +5421,10 @@ export async function replayCoopTrace(
 
     wavesReplayed++;
 
-    // ===== Host crosses into the next wave's battle (real EncounterPhase rolls wave w+1). =====
-    if (wavesReplayed < waves.length) {
-      await arriveGuestCommandBoundary(rig, wave + 1);
-      await withClient(rig.hostCtx, async () => {
-        await game.phaseInterceptor.to("CommandPhase");
-      });
-    }
+    // The next loop owns the one transition into its requested command address. Starting the host's
+    // CommandPhase here and then asking arriveGuestCommandBoundary for the same address again re-enters
+    // the one-shot command rendezvous before the guest arrival has been delivered. That harness-only
+    // double start supersedes the live waiter and eventually trips the real bounded recovery terminal.
   }
 
   return {

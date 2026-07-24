@@ -3269,3 +3269,37 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   second replacement picker.
 - Behavioral checks remain external-only. The next exact-SHA aggregate gate is the qualification evidence
   for these B4/B9/B10/B13 fixture migrations and for any remaining product seam.
+
+# 2026-07-24 - Retained replacement close uses its immutable source address
+
+- B9's idle-picker artifact proved a real fail-closed false positive: the host could legitimately advance
+  `currentBattle.turn` before the retained fallback reached the guest's still-current picker. Its close
+  fence then treated that mutable cursor as lost authority and terminated an otherwise healthy session.
+- The picker already owns an address-exact registered terminal, immutable faint source turn, exact phase
+  token, session generation, runtime identity, and wave fence. Its bounded modal close now uses those facts
+  instead of requiring the live turn cursor to remain frozen. A stale picker still cannot mutate a new
+  phase, runtime, session, or wave.
+
+# 2026-07-24 - Intercepted renderer fixtures start the installed replay boundary
+
+- Exact B13 run `30114806245` proved the authoritative phase replacement succeeded but the test scheduler
+  stopped before starting its newly-current `CoopReplayTurnPhase`. The manual drain allowlist began only at
+  its children, so no renderer or checkpoint work ran.
+- The three single-scene renderer drivers now include that real initial replay phase in their controlled
+  drain. This preserves the destructive V2 transition while accounting for PhaseInterceptor's deliberate
+  no-auto-start behavior; no production path changes.
+
+# 2026-07-24 - Replay and owner-pick fixtures preserve one-browser ownership
+
+- Exact B10 evidence showed the shared-realm guest recording its own public command into the host-owned
+  replay buffer, then the host recording the same committed partner command again. Recorder taps now require
+  the active authoritative host runtime, matching the separate module instances of two production browsers.
+- The replay loader no longer starts the next host CommandPhase twice around the same command rendezvous.
+  The next wave loop owns the single transition, so a valid first waiter is not superseded into bounded
+  recovery by a duplicate harness start.
+- Party transposition installs harmless enemy moves only after the reciprocal command-open adoption, which
+  previously restored the original enemy objects. The Revival owner-pick journey uses Protect rather than
+  Elite Redux's damaging Splash, keeping both tests focused on their intended authoritative boundaries.
+- The remaining biome material deferral now reports the guest browser's active exact transition permit in
+  its failure assertion. Its fail-closed semantics are unchanged; the next isolated B11 artifact will
+  distinguish a leaked browser context from a real same-session transition conflict.

@@ -99,6 +99,7 @@ function ingestV2Turn(message: Extract<CoopMessage, { t: "turnResolution" }>): v
 // The presentation phases the guest drains for a non-faint stream, plus the MessagePhase a
 // message/moveUsed narration queues and the deferred CoopFinalizeTurnPhase (checkpoint).
 const REPLAY_DRAIN_PHASES = [
+  "CoopReplayTurnPhase",
   "MessagePhase",
   "CoopMoveAnimReplayPhase",
   "CoopHpDrainReplayPhase",

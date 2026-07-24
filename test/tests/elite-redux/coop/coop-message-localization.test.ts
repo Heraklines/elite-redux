@@ -170,6 +170,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
   };
 
   const REPLAY_DRAIN_PHASES = [
+    "CoopReplayTurnPhase",
     "MessagePhase",
     "CoopMoveAnimReplayPhase",
     "CoopHpDrainReplayPhase",

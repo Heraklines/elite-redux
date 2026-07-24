@@ -90,8 +90,10 @@ describe.skipIf(!RUN)(
         .enemyLevel(1)
         .enemyMoveset(MoveId.SPLASH)
         .startingLevel(50)
-        // The guest lead (field 1) uses REVIVAL_BLESSING; the host lead (field 0) uses SPLASH.
-        .moveset([MoveId.REVIVAL_BLESSING, MoveId.TACKLE, MoveId.SPLASH])
+        // The guest lead (field 1) uses REVIVAL_BLESSING; the host lead (field 0) uses PROTECT. Elite
+        // Redux Splash is a damaging move, so treating it as harmless can KO the level-1 fixture enemies
+        // and park the headless runner in a damage animation unrelated to the revival boundary.
+        .moveset([MoveId.REVIVAL_BLESSING, MoveId.PROTECT, MoveId.TACKLE])
         .disableTrainerWaves();
     });
 
@@ -144,7 +146,7 @@ describe.skipIf(!RUN)(
       // progress while the replica's real CONTROL_COMMIT remained parked at its predecessor.
       await driveDuoGuestTackleThroughPublicUi(game, rig);
 
-      // Submit the host-owned Splash through the same public keyboard path. Stop when the real triage phase
+      // Submit the host-owned Protect through the same public keyboard path. Stop when the real triage phase
       // is current but not yet started so its owner-pick prompt can be pumped under the destination browser's
       // complete runtime context below.
       await withClient(rig.hostCtx, async () => {
@@ -153,13 +155,13 @@ describe.skipIf(!RUN)(
         );
         expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Fight through COMMAND UI").toBe(true);
         expect(rig.hostScene.ui.getMode(), "host reaches the move picker").toBe(UiMode.FIGHT);
-        const splashIndex = rig.hostScene
+        const protectIndex = rig.hostScene
           .getPlayerField()[0]
           .getMoveset()
-          .findIndex(move => move.moveId === MoveId.SPLASH);
-        selectFightMoveThroughPublicUi(rig.hostScene, splashIndex, "host Revival Blessing companion");
+          .findIndex(move => move.moveId === MoveId.PROTECT);
+        selectFightMoveThroughPublicUi(rig.hostScene, protectIndex, "host Revival Blessing companion");
 
-        const postMove = await driveClientPhaseQueueTo(rig.hostScene, "Splash commit or RevivalBlessingPhase", {
+        const postMove = await driveClientPhaseQueueTo(rig.hostScene, "Protect commit or RevivalBlessingPhase", {
           matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "RevivalBlessingPhase",
         });
         if (postMove.phaseName === "SelectTargetPhase") {

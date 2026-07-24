@@ -98,10 +98,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     const { wave: sourceWave, turn: sourceTurn, occurrence } = sourceAddress;
     const runtime = getCoopRuntime();
     const sourceGeneration = coopSessionGeneration();
-    const phaseBoundary = {
-      wave: scene.currentBattle?.waveIndex ?? 0,
-      turn: scene.currentBattle?.turn ?? 0,
-    };
+    const phaseBoundaryWave = scene.currentBattle?.waveIndex ?? 0;
     if (runtime == null) {
       failCoopSharedSession("The replacement picker lost its active runtime.");
       return;
@@ -149,8 +146,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     const materialBoundaryStillPresent = (): boolean =>
       coopSessionGeneration() === sourceGeneration
       && scene.phaseManager.getCurrentPhase() === this
-      && (scene.currentBattle?.waveIndex ?? -1) === phaseBoundary.wave
-      && (scene.currentBattle?.turn ?? -1) === phaseBoundary.turn;
+      && (scene.currentBattle?.waveIndex ?? -1) === phaseBoundaryWave;
     const boundaryStillLive = (): boolean => getCoopRuntime() === runtime && materialBoundaryStillPresent();
     coopLog("replay", `guest own-faint picker OPEN slot=${this.fieldIndex} seq=${seq} (choose your replacement)`);
     // Suppress the stall watchdog while THIS human's replacement picker is open: the guest's replay is
@@ -186,8 +182,10 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       // the same strict generation/runtime/phase/wave/turn fence in both schedules.
       // The UI transition owns this captured scene. Its internal async predicate must not classify the
       // boundary as superseded merely because the peer runtime is momentarily ambient in the one-realm
-      // duo harness. Generation + phase token + wave + turn still fence the transition itself; the promise
-      // tail reactivates this runtime and then requires the full runtime identity before mutating anything.
+      // duo harness. Generation + phase token + wave still fence the transition itself; the immutable
+      // terminal binding supplies the exact source turn. The live battle turn may legitimately advance
+      // before the retained replacement reaches this picker, so it is not a valid material fence. The
+      // promise tail reactivates this runtime and then requires the full runtime identity before mutating.
       scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, materialBoundaryStillPresent).then(result =>
         runWhenCoopRuntimeActive(runtime, () => {
           if (coopSessionGeneration() !== sourceGeneration) {

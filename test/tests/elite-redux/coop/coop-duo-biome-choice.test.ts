@@ -794,7 +794,12 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
 
     // BOTH engines switch to the owner's CHOSEN (non-default) biome - the core mechanic, restored.
     expect(biomeArg(hostSwitch), "host switches to the owner's chosen biome").toBe(chosen);
-    expect(biomeArg(guestSwitch), "guest switches to the SAME owner-chosen biome").toBe(chosen);
+    expect(
+      biomeArg(guestSwitch),
+      `guest switches to the SAME owner-chosen biome; activePermit=${JSON.stringify(
+        withClientSync(rig.guestCtx, () => getCoopBiomeTransitionTailPermit()),
+      )}`,
+    ).toBe(chosen);
     // The watcher mirror session began for the map screen too.
     expect(
       beginSpy.mock.calls.some(c => c[0] === "watcher"),
