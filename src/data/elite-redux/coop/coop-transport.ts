@@ -132,7 +132,10 @@ export type CoopRole = "host" | "guest";
 // er-coop-46 carries authority-resolved damage result/critical cues and Terastallization presentation.
 // A protocol-45 renderer would turn strong/weak/critical/OHKO/indirect hits into the generic hit cue and
 // silently omit Tera, so mixed builds must refuse pairing instead of presenting a different battle.
-export const COOP_PROTOCOL_VERSION = "er-coop-46";
+// er-coop-47 makes stable actor identity mandatory for every identity-bearing presentation event and
+// aligns every materialized move target with its stable actor. A protocol-46 renderer can still fall back
+// to a transient battler index after switch/faint/reorder, so mixed builds must refuse pairing.
+export const COOP_PROTOCOL_VERSION = "er-coop-47";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1067,8 +1070,8 @@ export interface CoopSwitchPresentation {
   readonly switchType: number;
   /** Whether the host showed the recall animation/text before sending the incoming Pokemon. */
   readonly doReturn: boolean;
-  /** Stable side-local identity of the incoming actor. Additive for retained pre-identity entries. */
-  readonly actor?: CoopPresentationActorRef;
+  /** Stable side-local identity of the incoming actor. */
+  readonly actor: CoopPresentationActorRef;
 }
 
 /**
@@ -1091,10 +1094,10 @@ export type CoopBattleEvent =
       bi: number;
       moveId: number;
       targets: number[];
-      /** Exact actor identity; optional only for retained entries written by an older build. */
-      actor?: CoopPresentationActorRef;
-      /** Exact identities aligned one-for-one with `targets`, when every target was materialized. */
-      targetActors?: CoopPresentationActorRef[];
+      /** Exact actor identity. Protocol 47 never derives it from the transient battler index. */
+      actor: CoopPresentationActorRef;
+      /** Exact identities aligned one-for-one with every materialized `targets` entry. */
+      targetActors: CoopPresentationActorRef[];
     }
   /** Set + tween a mon's hp to this value using the authority-resolved damage presentation, when present. */
   | {
@@ -1105,7 +1108,7 @@ export type CoopBattleEvent =
       sp?: number;
       result?: number;
       critical?: boolean;
-      actor?: CoopPresentationActorRef;
+      actor: CoopPresentationActorRef;
     }
   /**
    * A mon fainted. `narrate` (#691, additive optional) is true IFF the host shows an "X fainted!" message
@@ -1116,11 +1119,11 @@ export type CoopBattleEvent =
    * an older host -> the guest treats it as falsy and does not narrate (today's silent behavior); the flag
    * stays on the wire (not hardcoded on the guest) so the gating + forward-compat semantics hold.
    */
-  | { k: "faint"; bi: number; narrate?: boolean; sp?: number; actor?: CoopPresentationActorRef }
+  | { k: "faint"; bi: number; narrate?: boolean; sp?: number; actor: CoopPresentationActorRef }
   /** A mon's stat stage changed to this absolute value (`Stat` enum). */
-  | { k: "statStage"; bi: number; stat: number; value: number; actor?: CoopPresentationActorRef }
+  | { k: "statStage"; bi: number; stat: number; value: number; actor: CoopPresentationActorRef }
   /** A mon's status changed (`StatusEffect` enum, 0 = cured). */
-  | { k: "status"; bi: number; status: number; actor?: CoopPresentationActorRef }
+  | { k: "status"; bi: number; status: number; actor: CoopPresentationActorRef }
   /** Show one exact ability activation without asking the renderer to derive which ability fired. */
   | {
       k: "showAbility";
@@ -1131,7 +1134,7 @@ export type CoopBattleEvent =
       passive: boolean;
       /** ER innate or shared GIFT source index, resolved by the authority. */
       passiveSlot: number;
-      actor?: CoopPresentationActorRef;
+      actor: CoopPresentationActorRef;
     }
   /** Show the exact authority-selected Terastallization without running its mechanics on the renderer. */
   | {
@@ -1140,7 +1143,7 @@ export type CoopBattleEvent =
       pokemonId: number;
       partySlot: number;
       teraType: number;
-      actor?: CoopPresentationActorRef;
+      actor: CoopPresentationActorRef;
     }
   /** Weather changed (`WeatherType` enum); `anim` is the already-resolved presentation cue. */
   | { k: "weather"; weather: number; turnsLeft: number; anim?: number }

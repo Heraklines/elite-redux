@@ -6856,7 +6856,10 @@ export function commitCoopV2ReplacementAuthority(
     state.field.find(seat => seat.side === replacementSide && seat.bi === replacementBi && seat.presented) ?? null;
   return cutover.commitStagedHostReplacements({
     authorityCarrier,
-    presentationSeat: replacementSeat == null ? null : { bi: replacementSeat.bi, pokemonId: replacementSeat.pokemonId },
+    presentationSeat:
+      replacementSeat == null
+        ? null
+        : { side: replacementSeat.side, bi: replacementSeat.bi, pokemonId: replacementSeat.pokemonId },
     activeControl,
     commands: commandFrontier.commands,
     nextSuccessorWait,

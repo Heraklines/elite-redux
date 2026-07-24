@@ -769,6 +769,10 @@ function decodeReplacementPresentation(value: unknown): CoopSwitchPresentation |
     || !isPositiveInt(value.speciesId)
     || !isNonNegativeInt(value.switchType)
     || typeof value.doReturn !== "boolean"
+    || !isPlainObject(value.actor)
+    || (value.actor.side !== "player" && value.actor.side !== "enemy")
+    || !isPositiveInt(value.actor.pokemonId)
+    || value.actor.pokemonId !== value.pokemonId
   ) {
     return;
   }
@@ -779,6 +783,7 @@ function decodeReplacementPresentation(value: unknown): CoopSwitchPresentation |
     speciesId: value.speciesId,
     switchType: value.switchType,
     doReturn: value.doReturn,
+    actor: { side: value.actor.side, pokemonId: value.actor.pokemonId },
   };
 }
 

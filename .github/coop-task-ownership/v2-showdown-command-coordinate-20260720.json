@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "3bd3e0b067a5d506ff0c9e56f1e9b4fed0d8bc7a",
+  "baseSha": "78b0db699c34dcbf25e2657ba5a4543a4211549d",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -76,12 +76,14 @@
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
     "test/data/battle-format.test.ts",
     "test/mocks/mocks-container/mock-container.ts",
+    "test/node/authority-v2-command-frontier.test.ts",
     "test/node/authority-v2-control-open.test.ts",
     "test/node/authority-v2-cutover-interaction.test.ts",
     "test/node/authority-v2-cutover-replacement.test.ts",
     "test/node/authority-v2-replacement.test.ts",
     "test/node/authority-v2-turn.test.ts",
     "test/node/coop-replacement-continuation-park.test.ts",
+    "test/node/coop-turn-recorder-summon-window.test.ts",
     "test/scripts/coop-focused-static-workflow.test.mjs",
     "test/scripts/coop-presentation-authority.test.mjs",
     "test/tests/elite-redux/coop/**",
@@ -127,5 +129,5 @@
     "test/tools/repro-triple-battle-bugs.test.ts",
     "test/visual/rich-notification-qa.mjs"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": ["src/data/elite-redux/coop/coop-transport.ts"]
 }

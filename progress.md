@@ -2477,3 +2477,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   suite forbids the old umbrella early return; all 13 source-contract checks pass locally. Exact-SHA focused
   run `30060087357` for the preceding entry-proof commit was a planner refusal (six affected shard candidates
   exceeded its five-shard cap), not a runtime red; its public-browser journey remains queued separately.
+
+# 2026-07-24 - Protocol 47 closes transient presentation identity fallback
+
+- Exact-SHA focused run `30060653934` proved the preceding watchdog/turn-capture batch in static, A1, B13,
+  and Showdown S4. Its sole red, P1, is the already-classified three-round Mystery fixture parked in
+  `CoopReplayTurnPhase`; the production-fidelity soak in that lane remained green.
+- The live wire now advertises `er-coop-47`. Every identity-bearing battle event requires immutable side +
+  Pokemon ID material, move targets are emitted only as aligned battler/actor pairs, and Showdown reflects
+  both the coordinate and stable identity. Protocol-46 cached clients therefore cannot pair and silently
+  restore the old battler-index fallback.
+- V2 replacement material now carries the replacement seat side through commit construction and strict
+  decoding. All synthetic presentation fixtures were migrated to the current wire shape; missing actor or
+  target-identity material is covered as malformed authority rather than a replay fallback.
+- Public journey `30060653903` on the preceding tip stopped in a stale source-regex contract after the entry
+  finalizer renamed its queued log. The contract now proves both queueing and the new outcome finalizer/proof
+  instead of requiring the retired `installed` text; no browser process had started in that failed run.

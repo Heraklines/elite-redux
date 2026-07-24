@@ -96,11 +96,27 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
     const { host, received } = captureGuestInbox();
     const events: CoopBattleEvent[] = [
       { k: "message", text: "Bulbasaur used Vine Whip!" },
-      { k: "moveUsed", bi: 0, moveId: 22, targets: [2] },
-      { k: "hp", bi: 2, hp: 3, maxHp: 14 },
-      { k: "faint", bi: 2 },
-      { k: "statStage", bi: 1, stat: 1, value: -1 },
-      { k: "showAbility", bi: 1, pokemonId: 991, partySlot: 3, abilityId: 22, passive: true, passiveSlot: 2 },
+      {
+        k: "moveUsed",
+        bi: 0,
+        moveId: 22,
+        targets: [2],
+        actor: { side: "player", pokemonId: 101 },
+        targetActors: [{ side: "enemy", pokemonId: 201 }],
+      },
+      { k: "hp", bi: 2, hp: 3, maxHp: 14, actor: { side: "enemy", pokemonId: 201 } },
+      { k: "faint", bi: 2, actor: { side: "enemy", pokemonId: 201 } },
+      { k: "statStage", bi: 1, stat: 1, value: -1, actor: { side: "player", pokemonId: 991 } },
+      {
+        k: "showAbility",
+        bi: 1,
+        pokemonId: 991,
+        partySlot: 3,
+        abilityId: 22,
+        passive: true,
+        passiveSlot: 2,
+        actor: { side: "player", pokemonId: 991 },
+      },
       { k: "weather", weather: 3, turnsLeft: 5, anim: 7 },
     ];
     const checkpoint: CoopBattleCheckpoint = {

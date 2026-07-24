@@ -180,12 +180,19 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(replay, /CoopSwitchReplayPhase[\s\S]+CoopReplayTurnPhase[\s\S]+this\.end\(\)/u);
 });
 
-test("live replacement material cannot omit the immutable presentation result", () => {
+test("protocol 47 requires immutable presentation results and stable live actor identities", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
+  const stream = read("src/data/elite-redux/coop/coop-battle-stream.ts");
+  const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-46"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-47"/u);
+  assert.match(transport, /actor: CoopPresentationActorRef/u);
+  assert.doesNotMatch(transport, /actor\?: CoopPresentationActorRef/u);
+  assert.match(stream, /event\.targetActors\.length === event\.targets\.length/u);
+  assert.match(move, /targets: targetEntries\.map\(entry => entry\.target\)/u);
+  assert.match(move, /targetActors: targetEntries\.map\(entry => entry\.actor\)/u);
 });
 
 test("every co-op renderer boundary triggers the production two-browser journey", () => {

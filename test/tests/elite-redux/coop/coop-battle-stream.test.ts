@@ -297,7 +297,16 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         7,
         1,
         1,
-        [{ k: "moveUsed", bi: 0, moveId: 1, targets: [-1] }],
+        [
+          {
+            k: "moveUsed",
+            bi: 0,
+            moveId: 1,
+            targets: [-1],
+            actor: { side: "player", pokemonId: 1 },
+            targetActors: [{ side: "enemy", pokemonId: 2 }],
+          },
+        ],
         emptyCheckpoint(),
         "deadbeefdeadbeef",
         "{}",
@@ -311,6 +320,33 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         1,
         1,
         [{ k: "tera", bi: 0, pokemonId: 7, partySlot: -1, teraType: 2 } as never],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
+    expect(stream.retainedAuthorityDiagnostics().turnCommits).toBe(0);
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
+        [{ k: "hp", bi: 0, hp: 5, maxHp: 10 } as never],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
+        [{ k: "moveUsed", bi: 0, moveId: 1, targets: [] } as never],
         emptyCheckpoint(),
         "deadbeefdeadbeef",
         "{}",
@@ -375,7 +411,16 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         7,
         1,
         1,
-        [{ k: "moveUsed", bi: 0, moveId: 1, targets: [] }],
+        [
+          {
+            k: "moveUsed",
+            bi: 0,
+            moveId: 1,
+            targets: [],
+            actor: { side: "player", pokemonId: 1 },
+            targetActors: [],
+          },
+        ],
         emptyCheckpoint(),
         "deadbeefdeadbeef",
         "{}",
@@ -502,6 +547,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         abilityId: 22,
         passive: false,
         passiveSlot: 0 as const,
+        actor: { side: "enemy" as const, pokemonId: 77 },
       },
       { k: "terrain" as const, terrain: 1, turnsLeft: 5, anim: 7 },
     ];
@@ -563,6 +609,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
           abilityId: 0,
           passive: false,
           passiveSlot: 0,
+          actor: { side: "enemy", pokemonId: 77 },
         },
       ]),
     ).toThrow("malformed entry presentation");
@@ -718,12 +765,18 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     const guestStream = new CoopBattleStreamer(guest);
 
     // Host is faster: it sends turn 2 before the guest reaches its await.
-    emitCompleteTurn(hostStream, 2, [{ k: "faint", bi: 2 }], emptyCheckpoint(), "deadbeefdeadbeef");
+    emitCompleteTurn(
+      hostStream,
+      2,
+      [{ k: "faint", bi: 2, actor: { side: "enemy", pokemonId: 2 } }],
+      emptyCheckpoint(),
+      "deadbeefdeadbeef",
+    );
     await new Promise(r => setTimeout(r, 0)); // let it land in the guest buffer
 
     const res = await guestStream.awaitTurn(2);
     expect(res).not.toBeNull();
-    expect(res?.events[0]).toEqual({ k: "faint", bi: 2 });
+    expect(res?.events[0]).toEqual({ k: "faint", bi: 2, actor: { side: "enemy", pokemonId: 2 } });
   });
 
   it("a turn that never arrives resolves null after the timeout (guest shows 'waiting')", async () => {

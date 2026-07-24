@@ -143,6 +143,7 @@ describe("co-op replacement continuation releases from the command-barrier park 
       speciesId: 25,
       switchType: 1,
       doReturn: false,
+      actor: { side: "player", pokemonId: 101 },
     } as const;
     guestStream.ingestAuthoritativeV2Replacement(message, nextControl, 41, presentation);
     const delivered = guestStream.consumeCheckpoint();

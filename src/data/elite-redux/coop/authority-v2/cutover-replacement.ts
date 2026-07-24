@@ -95,7 +95,11 @@ type StagedReplacementTap = Omit<CoopV2ShadowReplacementTap, "authorityCarrier" 
 export interface CoopV2ReplacementCommitBatch {
   readonly authorityCarrier: ReplacementAuthorityCarrier;
   /** Canonical host field seat occupied by the resolved replacement after the summon. */
-  readonly presentationSeat: { readonly bi: number; readonly pokemonId: number } | null;
+  readonly presentationSeat: {
+    readonly side: "player" | "enemy";
+    readonly bi: number;
+    readonly pokemonId: number;
+  } | null;
   /** Exact currently-executable replacement head authored by the preceding mechanical entry. */
   readonly activeControl: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
   /** Exact mechanical successor command frontier after the final same-boundary faint is materialized. */
@@ -254,6 +258,7 @@ export class CoopV2ReplacementCutover {
     if (
       selected != null
       && (batch.presentationSeat == null
+        || (batch.presentationSeat.side !== "player" && batch.presentationSeat.side !== "enemy")
         || !Number.isSafeInteger(batch.presentationSeat.bi)
         || batch.presentationSeat.bi < 0
         || !Number.isSafeInteger(batch.presentationSeat.pokemonId)
@@ -275,6 +280,7 @@ export class CoopV2ReplacementCutover {
               // already fainted, so presentation sends the committed replacement without a recall.
               switchType: 1,
               doReturn: false,
+              actor: { side: batch.presentationSeat.side, pokemonId: batch.presentationSeat.pokemonId },
             },
     };
     const entry = this.harness.tapReplacementCommit({

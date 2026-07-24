@@ -167,6 +167,7 @@ function carrier(turn = 5): ReplacementAuthorityCarrier {
       speciesId: 25,
       switchType: 1,
       doReturn: false,
+      actor: { side: "player", pokemonId: 101 },
     },
   };
 }
@@ -276,7 +277,7 @@ describe("authority-v2 replacement staged transaction", () => {
     expect(stage(cutover, proposal())).toBe(true);
     const result = cutover.commitStagedHostReplacements({
       authorityCarrier: carrier(),
-      presentationSeat: { bi: 0, pokemonId: 101 },
+      presentationSeat: { side: "player", bi: 0, pokemonId: 101 },
       activeControl: replacementControl(proposal()),
       commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
     });
@@ -324,7 +325,7 @@ describe("authority-v2 replacement staged transaction", () => {
       // This is the public-browser failure shape: the post-summon phase seals complete material while the
       // mutable battle is still on source turn N, then TurnInit immediately opens CommandPhase at N+1.
       authorityCarrier: carrier(4),
-      presentationSeat: { bi: 0, pokemonId: 101 },
+      presentationSeat: { side: "player", bi: 0, pokemonId: 101 },
       activeControl: replacementControl(proposal()),
       commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
     });
@@ -368,7 +369,7 @@ describe("authority-v2 replacement staged transaction", () => {
 
     const result = cutover.commitStagedHostReplacements({
       authorityCarrier: carrier(),
-      presentationSeat: { bi: 0, pokemonId: 101 },
+      presentationSeat: { side: "player", bi: 0, pokemonId: 101 },
       activeControl,
       commands: [],
       nextSuccessorWait,
@@ -401,7 +402,7 @@ describe("authority-v2 replacement staged transaction", () => {
     expect(
       cutover.commitStagedHostReplacements({
         authorityCarrier: carrier(),
-        presentationSeat: { bi: 0, pokemonId: 101 },
+        presentationSeat: { side: "player", bi: 0, pokemonId: 101 },
         activeControl,
         commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
         nextSuccessorWait: wait,
@@ -426,7 +427,7 @@ describe("authority-v2 replacement staged transaction", () => {
 
     const result = cutover.commitStagedHostReplacements({
       authorityCarrier: carrier(),
-      presentationSeat: { bi: 0, pokemonId: 101 },
+      presentationSeat: { side: "player", bi: 0, pokemonId: 101 },
       activeControl: replacementControl(first, [second]),
       commands: [
         { ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 },
@@ -476,7 +477,7 @@ describe("authority-v2 replacement staged transaction", () => {
     const missing = proposal({ sourceAddress: source({ occurrence: 7, fieldIndex: 0 }) });
     const result = cutover.commitStagedHostReplacements({
       authorityCarrier: carrier(),
-      presentationSeat: { bi: 0, pokemonId: 101 },
+      presentationSeat: { side: "player", bi: 0, pokemonId: 101 },
       activeControl: replacementControl(missing),
       commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
     });

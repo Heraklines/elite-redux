@@ -1273,6 +1273,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
           speciesId: benchSpecies,
           switchType: SwitchType.SWITCH,
           doReturn: true,
+          actor: { side: "player", pokemonId: bench.id },
         },
       ],
     });

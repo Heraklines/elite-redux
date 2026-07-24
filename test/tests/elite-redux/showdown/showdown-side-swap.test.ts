@@ -164,11 +164,27 @@ describe("showdown-side-swap: authoritative state", () => {
 describe("showdown-side-swap: battle events", () => {
   const events: CoopBattleEvent[] = [
     { k: "message", text: "It worked!" },
-    { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: 33, targets: [BattlerIndex.ENEMY, BattlerIndex.ENEMY_2] },
-    { k: "hp", bi: BattlerIndex.ENEMY, hp: 40, maxHp: 100, sp: 2 },
-    { k: "faint", bi: BattlerIndex.ENEMY_2, narrate: true },
-    { k: "statStage", bi: BattlerIndex.PLAYER_2, stat: 1, value: -1 },
-    { k: "status", bi: BattlerIndex.ENEMY, status: 4 },
+    {
+      k: "moveUsed",
+      bi: BattlerIndex.PLAYER,
+      moveId: 33,
+      targets: [BattlerIndex.ENEMY, BattlerIndex.ENEMY_2],
+      actor: { side: "player", pokemonId: 11 },
+      targetActors: [
+        { side: "enemy", pokemonId: 21 },
+        { side: "enemy", pokemonId: 22 },
+      ],
+    },
+    { k: "hp", bi: BattlerIndex.ENEMY, hp: 40, maxHp: 100, sp: 2, actor: { side: "enemy", pokemonId: 21 } },
+    { k: "faint", bi: BattlerIndex.ENEMY_2, narrate: true, actor: { side: "enemy", pokemonId: 22 } },
+    {
+      k: "statStage",
+      bi: BattlerIndex.PLAYER_2,
+      stat: 1,
+      value: -1,
+      actor: { side: "player", pokemonId: 12 },
+    },
+    { k: "status", bi: BattlerIndex.ENEMY, status: 4, actor: { side: "enemy", pokemonId: 21 } },
     {
       k: "showAbility",
       bi: BattlerIndex.PLAYER_2,
@@ -177,6 +193,7 @@ describe("showdown-side-swap: battle events", () => {
       abilityId: 22,
       passive: true,
       passiveSlot: 2,
+      actor: { side: "player", pokemonId: 91 },
     },
     {
       k: "switch",
@@ -186,6 +203,7 @@ describe("showdown-side-swap: battle events", () => {
       speciesId: 25,
       switchType: 1,
       doReturn: true,
+      actor: { side: "player", pokemonId: 91 },
     },
     { k: "weather", weather: 2, turnsLeft: 5 },
     { k: "terrain", terrain: 1, turnsLeft: 3 },
@@ -195,6 +213,11 @@ describe("showdown-side-swap: battle events", () => {
     const move = swapBattleEvent(events[1]) as Extract<CoopBattleEvent, { k: "moveUsed" }>;
     expect(move.bi).toBe(BattlerIndex.ENEMY);
     expect(move.targets).toEqual([BattlerIndex.PLAYER, BattlerIndex.PLAYER_2]);
+    expect(move.actor).toEqual({ side: "enemy", pokemonId: 11 });
+    expect(move.targetActors).toEqual([
+      { side: "player", pokemonId: 21 },
+      { side: "player", pokemonId: 22 },
+    ]);
     expect((swapBattleEvent(events[2]) as Extract<CoopBattleEvent, { k: "hp" }>).bi).toBe(BattlerIndex.PLAYER);
     expect((swapBattleEvent(events[3]) as Extract<CoopBattleEvent, { k: "faint" }>).bi).toBe(BattlerIndex.PLAYER_2);
     expect((swapBattleEvent(events[4]) as Extract<CoopBattleEvent, { k: "statStage" }>).bi).toBe(BattlerIndex.ENEMY_2);

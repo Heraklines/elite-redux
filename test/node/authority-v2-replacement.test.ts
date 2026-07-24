@@ -89,6 +89,7 @@ const AUTHORITY_CARRIER: ReplacementAuthorityCarrier = {
     speciesId: 279,
     switchType: 1,
     doReturn: false,
+    actor: { side: "player", pokemonId: 4242 },
   },
 };
 

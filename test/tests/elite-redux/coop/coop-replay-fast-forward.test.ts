@@ -160,11 +160,24 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     return sequence;
   };
 
-  const richStreamEvents = (enemyBi: number) => [
+  const richStreamEvents = (enemyBi: number, playerId: number, enemyId: number) => [
     { k: "message" as const, text: "Snorlax used Tackle!" },
-    { k: "moveUsed" as const, bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [enemyBi] },
-    { k: "hp" as const, bi: enemyBi, hp: 9, maxHp: 20 },
-    { k: "statStage" as const, bi: BattlerIndex.PLAYER, stat: Stat.ATK, value: 2 },
+    {
+      k: "moveUsed" as const,
+      bi: BattlerIndex.PLAYER,
+      moveId: MoveId.TACKLE,
+      targets: [enemyBi],
+      actor: { side: "player" as const, pokemonId: playerId },
+      targetActors: [{ side: "enemy" as const, pokemonId: enemyId }],
+    },
+    { k: "hp" as const, bi: enemyBi, hp: 9, maxHp: 20, actor: { side: "enemy" as const, pokemonId: enemyId } },
+    {
+      k: "statStage" as const,
+      bi: BattlerIndex.PLAYER,
+      stat: Stat.ATK,
+      value: 2,
+      actor: { side: "player" as const, pokemonId: playerId },
+    },
   ];
 
   // Drive one fresh guest through the rich stream at the given animation setting; return the drained
@@ -179,7 +192,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
       t: "turnResolution",
       turn,
       ...carrier,
-      events: richStreamEvents(enemy0.getBattlerIndex()),
+      events: richStreamEvents(enemy0.getBattlerIndex(), field[COOP_HOST_FIELD_INDEX].id, enemy0.id),
     });
     await new Promise(r => setTimeout(r, 0));
     const sequence = await driveReplayTurnCapturingSequence(turn);
@@ -231,7 +244,15 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
       t: "turnResolution",
       turn,
       ...carrier,
-      events: [{ k: "hp", bi: target.getBattlerIndex(), hp: 9, maxHp: target.getMaxHp() }],
+      events: [
+        {
+          k: "hp",
+          bi: target.getBattlerIndex(),
+          hp: 9,
+          maxHp: target.getMaxHp(),
+          actor: { side: "player", pokemonId: target.id },
+        },
+      ],
     });
     await new Promise(r => setTimeout(r, 0));
     await driveReplayTurnCapturingSequence(turn);
@@ -257,7 +278,15 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
       t: "turnResolution",
       turn,
       ...carrier,
-      events: [{ k: "hp", bi: target.getBattlerIndex(), hp: 9, maxHp: target.getMaxHp() }],
+      events: [
+        {
+          k: "hp",
+          bi: target.getBattlerIndex(),
+          hp: 9,
+          maxHp: target.getMaxHp(),
+          actor: { side: "player", pokemonId: target.id },
+        },
+      ],
     });
     await new Promise(r => setTimeout(r, 0));
     await driveReplayTurnCapturingSequence(turn);
@@ -281,7 +310,13 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
       ...carrier,
       events: [
         { k: "message", text: "The foe is hurt!" },
-        { k: "hp", bi: enemy0.getBattlerIndex(), hp: 9, maxHp: 20 },
+        {
+          k: "hp",
+          bi: enemy0.getBattlerIndex(),
+          hp: 9,
+          maxHp: 20,
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
       ],
     });
     await new Promise(r => setTimeout(r, 0));
@@ -309,7 +344,13 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
       ...carrier,
       events: [
         { k: "message", text: "The foe is hurt!" },
-        { k: "hp", bi: enemy0.getBattlerIndex(), hp: 9, maxHp: 20 },
+        {
+          k: "hp",
+          bi: enemy0.getBattlerIndex(),
+          hp: 9,
+          maxHp: 20,
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
       ],
     });
     await new Promise(r => setTimeout(r, 0));

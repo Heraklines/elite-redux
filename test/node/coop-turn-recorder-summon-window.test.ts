@@ -21,6 +21,7 @@ describe("co-op turn recorder summon window", () => {
       abilityId: 22,
       passive: false,
       passiveSlot: 0,
+      actor: { side: "enemy", pokemonId: 701 },
     });
 
     beginCoopRecording(4, "epoch-a:9");
@@ -38,6 +39,7 @@ describe("co-op turn recorder summon window", () => {
           abilityId: 22,
           passive: false,
           passiveSlot: 0,
+          actor: { side: "enemy", pokemonId: 701 },
         },
         { k: "message", text: "turn started" },
       ],

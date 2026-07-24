@@ -164,37 +164,23 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
         ...event,
         bi: swapBi(event.bi, enemyBase),
         targets: event.targets.map(t => swapBi(t, enemyBase)),
-        ...(event.actor === undefined ? {} : { actor: swapActor(event.actor) }),
-        ...(event.targetActors === undefined ? {} : { targetActors: event.targetActors.map(swapActor) }),
+        actor: swapActor(event.actor),
+        targetActors: event.targetActors.map(swapActor),
       };
     case "hp":
-      return event.actor === undefined
-        ? { ...event, bi: swapBi(event.bi, enemyBase) }
-        : { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "faint":
-      return event.actor === undefined
-        ? { ...event, bi: swapBi(event.bi, enemyBase) }
-        : { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "statStage":
-      return event.actor === undefined
-        ? { ...event, bi: swapBi(event.bi, enemyBase) }
-        : { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "status":
-      return event.actor === undefined
-        ? { ...event, bi: swapBi(event.bi, enemyBase) }
-        : { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "showAbility":
-      return event.actor === undefined
-        ? { ...event, bi: swapBi(event.bi, enemyBase) }
-        : { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "tera":
-      return event.actor === undefined
-        ? { ...event, bi: swapBi(event.bi, enemyBase) }
-        : { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "switch":
-      return event.actor === undefined
-        ? { ...event, bi: swapBi(event.bi, enemyBase) }
-        : { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     default:
       // message / weather / terrain carry no side.
       return event;

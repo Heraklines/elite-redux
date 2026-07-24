@@ -148,6 +148,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       abilityId: 2,
       passive: false,
       passiveSlot: 0,
+      actor: { side: "player", pokemonId: 17 },
     };
     const observations: unknown[] = [];
     const token = createCoopPresentationOutcomeToken();
@@ -776,10 +777,34 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       ...carrier,
       events: [
         { k: "message", text: "Snorlax used Tackle!" },
-        { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [enemy0.getBattlerIndex()] },
-        { k: "hp", bi: enemy0.getBattlerIndex(), hp: 9, maxHp: enemy0.getMaxHp() },
-        { k: "statStage", bi: BattlerIndex.PLAYER, stat: Stat.ATK, value: 2 },
-        { k: "status", bi: enemy0.getBattlerIndex(), status: 0 },
+        {
+          k: "moveUsed",
+          bi: BattlerIndex.PLAYER,
+          moveId: MoveId.TACKLE,
+          targets: [enemy0.getBattlerIndex()],
+          actor: { side: "player", pokemonId: hostMon.id },
+          targetActors: [{ side: "enemy", pokemonId: enemy0.id }],
+        },
+        {
+          k: "hp",
+          bi: enemy0.getBattlerIndex(),
+          hp: 9,
+          maxHp: enemy0.getMaxHp(),
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
+        {
+          k: "statStage",
+          bi: BattlerIndex.PLAYER,
+          stat: Stat.ATK,
+          value: 2,
+          actor: { side: "player", pokemonId: hostMon.id },
+        },
+        {
+          k: "status",
+          bi: enemy0.getBattlerIndex(),
+          status: 0,
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
         {
           k: "showAbility",
           bi: hostMon.getBattlerIndex(),
@@ -788,8 +813,9 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
           abilityId: hostMon.getAbility().id,
           passive: false,
           passiveSlot: 0,
+          actor: { side: "player", pokemonId: hostMon.id },
         },
-        { k: "faint", bi: enemy0.getBattlerIndex() },
+        { k: "faint", bi: enemy0.getBattlerIndex(), actor: { side: "enemy", pokemonId: enemy0.id } },
       ],
     });
     await new Promise(r => setTimeout(r, 0));
@@ -836,9 +862,28 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       turn,
       ...carrier,
       events: [
-        { k: "moveUsed", bi: enemy0.getBattlerIndex(), moveId: MoveId.TACKLE, targets: [BattlerIndex.PLAYER] },
-        { k: "hp", bi: BattlerIndex.PLAYER, hp: 5, maxHp: hostMon.getMaxHp() },
-        { k: "statStage", bi: BattlerIndex.PLAYER, stat: Stat.ATK, value: 2 },
+        {
+          k: "moveUsed",
+          bi: enemy0.getBattlerIndex(),
+          moveId: MoveId.TACKLE,
+          targets: [BattlerIndex.PLAYER],
+          actor: { side: "enemy", pokemonId: enemy0.id },
+          targetActors: [{ side: "player", pokemonId: hostMon.id }],
+        },
+        {
+          k: "hp",
+          bi: BattlerIndex.PLAYER,
+          hp: 5,
+          maxHp: hostMon.getMaxHp(),
+          actor: { side: "player", pokemonId: hostMon.id },
+        },
+        {
+          k: "statStage",
+          bi: BattlerIndex.PLAYER,
+          stat: Stat.ATK,
+          value: 2,
+          actor: { side: "player", pokemonId: hostMon.id },
+        },
       ],
     });
     await new Promise(r => setTimeout(r, 0));
@@ -942,9 +987,22 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       turn,
       ...carrier,
       events: [
-        { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
-        { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
-        { k: "faint", bi: koBi },
+        {
+          k: "moveUsed",
+          bi: BattlerIndex.PLAYER,
+          moveId: MoveId.TACKLE,
+          targets: [koBi],
+          actor: { side: "player", pokemonId: field[COOP_HOST_FIELD_INDEX].id },
+          targetActors: [{ side: "enemy", pokemonId: enemy0.id }],
+        },
+        {
+          k: "hp",
+          bi: koBi,
+          hp: 0,
+          maxHp: enemy0.getMaxHp(),
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
+        { k: "faint", bi: koBi, actor: { side: "enemy", pokemonId: enemy0.id } },
       ],
     });
     await new Promise(r => setTimeout(r, 0));
@@ -1339,8 +1397,14 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       ...carrier,
       events: [
         { k: "message", text: "The enemy is hurt by poison!" },
-        { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
-        { k: "faint", bi: koBi },
+        {
+          k: "hp",
+          bi: koBi,
+          hp: 0,
+          maxHp: enemy0.getMaxHp(),
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
+        { k: "faint", bi: koBi, actor: { side: "enemy", pokemonId: enemy0.id } },
       ],
     });
     await new Promise(r => setTimeout(r, 0));
@@ -1362,6 +1426,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   it("(Step 3) consumeLiveEvents returns live events sorted by seq + de-dupes a re-sent seq", async () => {
     await startCoopGuest();
     const turn = globalScene.currentBattle.turn;
+    const enemy0 = globalScene.getEnemyField(false)[0];
     const streamer = getCoopRuntime()!.battleStream;
     const partner = getCoopRuntime()!.partnerTransport!;
     const address = {
@@ -1372,7 +1437,17 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // The host streams three live events OUT OF ORDER (seq 2 then 0 then 1), and RE-SENDS seq 1
     // (a duplicate the transport can deliver). The guest must return them sorted asc by seq, with the
     // re-sent seq de-duped (the latest copy for a seq wins, one entry per seq).
-    partner.send({ t: "battleEvent", ...address, turn, seq: 2, event: { k: "faint", bi: BattlerIndex.ENEMY } });
+    partner.send({
+      t: "battleEvent",
+      ...address,
+      turn,
+      seq: 2,
+      event: {
+        k: "faint",
+        bi: BattlerIndex.ENEMY,
+        actor: { side: "enemy", pokemonId: enemy0.id },
+      },
+    });
     partner.send({ t: "battleEvent", ...address, turn, seq: 0, event: { k: "message", text: "live-0" } });
     partner.send({ t: "battleEvent", ...address, turn, seq: 1, event: { k: "message", text: "live-1-first" } });
     partner.send({ t: "battleEvent", ...address, turn, seq: 1, event: { k: "message", text: "live-1-resent" } });
@@ -1410,7 +1485,13 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       ...address,
       turn,
       seq: 1,
-      event: { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
+      event: {
+        k: "hp",
+        bi: koBi,
+        hp: 0,
+        maxHp: enemy0.getMaxHp(),
+        actor: { side: "enemy", pokemonId: enemy0.id },
+      },
     });
     partner.send({
       t: "turnResolution",
@@ -1418,8 +1499,14 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       ...carrier,
       events: [
         { k: "message", text: "The enemy is hurt by poison!" },
-        { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
-        { k: "faint", bi: koBi },
+        {
+          k: "hp",
+          bi: koBi,
+          hp: 0,
+          maxHp: enemy0.getMaxHp(),
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
+        { k: "faint", bi: koBi, actor: { side: "enemy", pokemonId: enemy0.id } },
       ],
     });
     await new Promise(r => setTimeout(r, 0));

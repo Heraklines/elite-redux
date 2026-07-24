@@ -214,10 +214,9 @@ test("the real-browser oracle requires streamed ability and environment presenta
   assert.match(start, /Showdown presentation did not complete on both clients before the shared command frontier/u);
   assert.match(start, /showdown-presentation-proof/u);
   assert.match(harness, /driveShowdownTurn\(\)[\s\S]*assertShowdownEntryPresentation/u);
-  assert.match(
-    replay,
-    /entryPresentationOnly[\s\S]*awaitEntryPresentation[\s\S]*retained entry presentation installed/u,
-  );
+  assert.match(replay, /entryPresentationOnly[\s\S]*awaitEntryPresentation[\s\S]*retained entry presentation queued/u);
+  assert.match(replay, /CoopFinalizeEntryPresentationPhase/u);
+  assert.match(replayPhases, /entry presentation PROVED/u);
   assert.match(stream, /awaitEntryPresentation[\s\S]*requestEnemyParty/u);
   assert.match(transport, /enemyPartySync[\s\S]*entryPresentation\?: CoopBattleEvent\[\]/u);
 });

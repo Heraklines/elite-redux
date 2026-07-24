@@ -285,9 +285,22 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
       turn,
       ...carrier,
       events: [
-        { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
-        { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
-        { k: "faint", bi: koBi, narrate: true },
+        {
+          k: "moveUsed",
+          bi: BattlerIndex.PLAYER,
+          moveId: MoveId.TACKLE,
+          targets: [koBi],
+          actor: { side: "player", pokemonId: field[COOP_HOST_FIELD_INDEX].id },
+          targetActors: [{ side: "enemy", pokemonId: enemy0.id }],
+        },
+        {
+          k: "hp",
+          bi: koBi,
+          hp: 0,
+          maxHp: enemy0.getMaxHp(),
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
+        { k: "faint", bi: koBi, narrate: true, actor: { side: "enemy", pokemonId: enemy0.id } },
       ],
     });
     await new Promise(r => setTimeout(r, 0));
@@ -319,8 +332,14 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
       turn,
       ...carrier,
       events: [
-        { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
-        { k: "faint", bi: koBi, narrate: false },
+        {
+          k: "hp",
+          bi: koBi,
+          hp: 0,
+          maxHp: enemy0.getMaxHp(),
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
+        { k: "faint", bi: koBi, narrate: false, actor: { side: "enemy", pokemonId: enemy0.id } },
       ],
     });
     await new Promise(r => setTimeout(r, 0));
@@ -388,9 +407,22 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
       turn,
       ...carrier,
       events: [
-        { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
-        { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
-        { k: "faint", bi: koBi, narrate: true },
+        {
+          k: "moveUsed",
+          bi: BattlerIndex.PLAYER,
+          moveId: MoveId.TACKLE,
+          targets: [koBi],
+          actor: { side: "player", pokemonId: field[COOP_HOST_FIELD_INDEX].id },
+          targetActors: [{ side: "enemy", pokemonId: enemy0.id }],
+        },
+        {
+          k: "hp",
+          bi: koBi,
+          hp: 0,
+          maxHp: enemy0.getMaxHp(),
+          actor: { side: "enemy", pokemonId: enemy0.id },
+        },
+        { k: "faint", bi: koBi, narrate: true, actor: { side: "enemy", pokemonId: enemy0.id } },
       ],
     });
     await new Promise(r => setTimeout(r, 0));

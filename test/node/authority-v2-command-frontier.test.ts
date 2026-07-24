@@ -186,7 +186,7 @@ describe("resolveCoopV2ReplacementControl", () => {
       ),
       [
         { k: "message", text: "before" },
-        { k: "faint", bi: 1 },
+        { k: "faint", bi: 1, actor: { side: "player", pokemonId: 11 } },
       ],
     );
 
@@ -214,7 +214,7 @@ describe("resolveCoopV2ReplacementControl", () => {
           { id: 91, hp: 20 },
         ],
       ),
-      [{ k: "faint", bi: 1 }],
+      [{ k: "faint", bi: 1, actor: { side: "enemy", pokemonId: 90 } }],
     );
 
     expect(result).toMatchObject({
@@ -238,7 +238,7 @@ describe("resolveCoopV2ReplacementControl", () => {
         ],
         [{ id: 90, hp: 30 }],
       ),
-      [{ k: "faint", bi: 0 }],
+      [{ k: "faint", bi: 0, actor: { side: "player", pokemonId: 42 } }],
     );
 
     expect(result).toMatchObject({
@@ -262,9 +262,9 @@ describe("resolveCoopV2ReplacementControl", () => {
         [],
       ),
       [
-        { k: "faint", bi: 0 },
+        { k: "faint", bi: 0, actor: { side: "player", pokemonId: 10 } },
         { k: "message", text: "between" },
-        { k: "faint", bi: 1 },
+        { k: "faint", bi: 1, actor: { side: "player", pokemonId: 11 } },
       ],
     );
 
