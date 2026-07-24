@@ -246,6 +246,14 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const battle = globalScene.currentBattle;
     const displayed = battle.enemyParty[0];
     const partySlot = 0;
+    const occupiedIds = new Set(
+      globalScene.field.list
+        .filter(candidate => candidate !== displayed && typeof (candidate as { id?: unknown }).id === "number")
+        .map(candidate => (candidate as { id: number }).id),
+    );
+    while (occupiedIds.has(displayed.id)) {
+      displayed.id = (displayed.id + 1) >>> 0;
+    }
     const detachedParty = globalScene.addEnemyPokemon(displayed.species, displayed.level, displayed.trainerSlot, false);
     detachedParty.id = displayed.id;
     battle.enemyParty[partySlot] = detachedParty;
@@ -255,6 +263,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const token = createCoopPresentationOutcomeToken();
     const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility").mockResolvedValue();
     vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(false);
+    const displayedRevealSpy = vi.spyOn(displayed, "revealAbility");
+    const detachedRevealSpy = vi.spyOn(detachedParty, "revealAbility");
     const phase = new CoopShowAbilityReplayPhase(
       displayed.getBattlerIndex(),
       displayed.id,
@@ -270,6 +280,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     await Promise.resolve();
 
     expect(showSpy, "the immutable visible actor still owns its authority-selected flyout").toHaveBeenCalled();
+    expect(displayedRevealSpy, "presentation reveals the actor whose pixels are still seated").toHaveBeenCalledOnce();
+    expect(detachedRevealSpy, "the invisible material replacement is not presented").not.toHaveBeenCalled();
     expect(coopPresentationOutcome(token)?.kind).toBe("rendered");
   });
 
@@ -1058,6 +1070,19 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const fromHp = maxHp;
     const toHp = maxHp - 7;
     displayed.hp = fromHp;
+
+    // The shared GameManager deliberately reuses one headless scene, and old field children can retain
+    // the same deterministic seeded Pokemon id across tests. Production identity is unique within a
+    // battle; make that premise explicit so this regression exercises a detached party reference rather
+    // than correctly tripping the duplicate-identity fail-closed guard.
+    const occupiedIds = new Set(
+      globalScene.field.list
+        .filter(candidate => candidate !== displayed && typeof (candidate as { id?: unknown }).id === "number")
+        .map(candidate => (candidate as { id: number }).id),
+    );
+    while (occupiedIds.has(displayed.id)) {
+      displayed.id = (displayed.id + 1) >>> 0;
+    }
 
     const detachedParty = globalScene.addEnemyPokemon(displayed.species, displayed.level, displayed.trainerSlot, false);
     detachedParty.id = displayed.id;

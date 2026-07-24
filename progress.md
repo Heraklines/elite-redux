@@ -2364,3 +2364,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The mock now implements Phaser's uniqueness, ordered movement, top/back movement, and exact `getIndex`
   semantics. Structural adoption uses the real `Container.addAt` primitive with the real child count and
   retains its exact postcondition, so the same code path is exercised in headless gates and browsers.
+
+# 2026-07-24 - Detached presentation prefers pixels and tests preserve the unique-id premise
+
+- Gate `30056004206` collapsed the matrix from twenty-four red jobs to three early reds after the container
+  repair. Its remaining HP identity regression reused a deterministic Pokemon id already held by an old
+  field child in the shared headless scene; the exact resolver correctly refused multiple distinct display
+  objects instead of guessing. The fixture now establishes the production invariant that an immutable id is
+  unique within the battle before creating its detached material object.
+- Ability replay now prefers the exact displayed identity before an exact logical-party replacement. The
+  detached regression proves `revealAbility` runs on the seated actor and never on the invisible replacement,
+  closing a false-green assertion that previously checked only whether some flyout was requested.
