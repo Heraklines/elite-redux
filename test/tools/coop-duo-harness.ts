@@ -3088,9 +3088,18 @@ export async function arriveGuestCommandBoundary(
   // replay the pure-renderer guest parks at its finalize "waiting for next ordered authority entry" (it has
   // NOT reached turn 2's CommandPhase), so an arrival-only pass would throw the not-materialized check. Only
   // broaden the gate under proveGuestCommand so every existing arrival-only caller keeps its exact behavior.
-  const behind = (scene: BattleScene): boolean =>
-    scene.currentBattle.waveIndex < wave
-    || (opts.proveGuestCommand === true && scene.currentBattle.waveIndex === wave && scene.currentBattle.turn < turn);
+  const behind = (scene: BattleScene): boolean => {
+    const battle = scene.currentBattle;
+    // WAVE_ADVANCE deliberately clears currentBattle while NewBattle/Encounter materializes the ordered
+    // successor. That transient absence is "behind the requested address", not an exceptional replay
+    // state. Treating it as a dereferenceable battle made recorded multi-wave traces crash precisely at the
+    // real production transition they are supposed to reproduce.
+    return (
+      battle == null
+      || battle.waveIndex < wave
+      || (opts.proveGuestCommand === true && battle.waveIndex === wave && battle.turn < turn)
+    );
+  };
   const needsAddressDrive = behind(rig.hostScene) || behind(rig.guestScene);
   const currentGuest = rig.guestScene.phaseManager.getCurrentPhase();
   const guestAlreadyAtProofBoundary =
@@ -3155,16 +3164,20 @@ export async function arriveGuestCommandBoundary(
     markRealGuestCommandBoundary(rig.guestScene, wave, turn);
   }
 
+  const hostBattle = rig.hostScene.currentBattle;
+  const guestBattle = rig.guestScene.currentBattle;
   if (
-    rig.hostScene.currentBattle.waveIndex !== wave
-    || rig.guestScene.currentBattle.waveIndex !== wave
-    || rig.hostScene.currentBattle.turn !== turn
-    || rig.guestScene.currentBattle.turn !== turn
+    hostBattle == null
+    || guestBattle == null
+    || hostBattle.waveIndex !== wave
+    || guestBattle.waveIndex !== wave
+    || hostBattle.turn !== turn
+    || guestBattle.turn !== turn
   ) {
     throw new Error(
       `command boundary ${wave}:${turn} was not materialized on both clients `
-        + `(host=${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}, `
-        + `guest=${rig.guestScene.currentBattle.waveIndex}:${rig.guestScene.currentBattle.turn})`,
+        + `(host=${hostBattle == null ? "none" : `${hostBattle.waveIndex}:${hostBattle.turn}`}, `
+        + `guest=${guestBattle == null ? "none" : `${guestBattle.waveIndex}:${guestBattle.turn}`})`,
     );
   }
 

@@ -3214,3 +3214,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local TypeScript, formatting, ownership inventory, and diff checks cover this batch. Co-op behavioral
   verification remains external-only; the existing exact barrier-deadlock journey is the failure-first
   regression for the production seam.
+
+# 2026-07-24 - B10 replay transitions and transposition scope stay production-shaped
+
+- The trace replay driver now treats a temporarily absent `currentBattle` as the expected in-flight
+  WAVE_ADVANCE state and drives the real NewBattle/Encounter successor to the requested command address.
+  It no longer dereferences the deliberately cleared battle between waves, so recorded multi-wave traces
+  continue through the same transition a browser uses rather than requiring a synthetic remirror.
+- Party transposition still uses the level-100 Rock Slide to force its first-turn host-owned faint and real
+  PARTY replacement. After that replacement is proven, the already-existing foes receive Splash for the
+  focused replacement-to-wave turn; an unrelated second KO can no longer open another host PARTY picker and
+  prevent the test from reaching its intended identity/order/EXP assertions.
+- Local TypeScript, targeted Biome, and diff checks are clean. B10 remains remotely qualified only.

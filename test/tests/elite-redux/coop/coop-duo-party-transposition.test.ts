@@ -50,6 +50,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { Move } from "#moves/move";
+import { PokemonMove } from "#moves/pokemon-move";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -281,6 +282,11 @@ describe.skipIf(!RUN)(
       withClientSync(rig.hostCtx, () => {
         for (const enemy of rig.hostScene.getEnemyField()) {
           enemy.hp = 1;
+          // Rock Slide is required to create the first-turn host replacement. It is not part of the
+          // transposition assertion after that replacement and can KO the frail Fennekin before the
+          // deterministic winning move, opening an unrelated second PARTY picker. Make the already-proven
+          // foes harmless for this focused replacement->wave edge while retaining their real command path.
+          enemy.moveset = [new PokemonMove(MoveId.SPLASH)];
         }
         expect(
           rig.hostScene.getEnemyField().every(enemy => enemy.hp === 1),
