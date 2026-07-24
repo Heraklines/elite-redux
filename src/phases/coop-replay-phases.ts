@@ -286,7 +286,9 @@ export function coopNarrateMoveUsed(bi: number, moveId: number, actor?: CoopPres
  * structured `faint` event. Called from {@linkcode CoopFaintReplayPhase} ONLY when the host streamed
  * `narrate=true` (i.e. a real `FaintPhase` ran on the host), so the guest narrates exactly the KOs the
  * host narrated. The host SUPPRESSES streaming its own (host-language) `fainted` message (faint-phase.ts),
- * so this is the SOLE source of the line on the guest. PRESENTATION ONLY: only `queueMessage`; the whole
+ * so this is the SOLE source of the line on the guest. This pure-renderer copy must auto-dismiss: a prompt
+ * would ask the non-authoritative guest for structural battle input while the renderer gate correctly blocks
+ * it, parking TURN_COMMIT at `materialDeferred` forever. PRESENTATION ONLY: only `queueMessage`; the whole
  * body is in try/catch so a bad bi degrades to no line and NEVER throws into the replay pump.
  */
 export function coopNarrateFaint(bi: number, actor?: CoopPresentationActorRef): void {
@@ -300,7 +302,7 @@ export function coopNarrateFaint(bi: number, actor?: CoopPresentationActorRef): 
         pokemonNameWithAffix: getPokemonNameWithAffix(mon),
       }),
       null,
-      true,
+      false,
     );
   } catch {
     // A bad bi must never throw into the replay pump - skip the cosmetic line.
@@ -1597,8 +1599,9 @@ export class CoopFaintReplayPhase extends PokemonPhase {
         return;
       }
       // #691: regenerate the "X fainted!" line in the GUEST'S language while the mon is still on-field
-      // (before the cry / drop), ONLY when the host narrated this KO. queueMessage enqueues a
-      // self-terminating MessagePhase - no new awaited callback, so the no-hang guarantee is preserved.
+      // (before the cry / drop), ONLY when the host narrated this KO. The renderer-local copy explicitly
+      // has no ACTION prompt, so MessagePhase self-terminates after its ordinary read dwell and cannot park
+      // behind authoritative-guest input suppression.
       if (this.narrate) {
         coopNarrateFaint(this.battlerIndex, this.actor);
       }

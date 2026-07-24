@@ -272,10 +272,12 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     });
     const guestFainted = i18next.t("battle:fainted", { pokemonNameWithAffix: getPokemonNameWithAffix(enemy0) });
 
-    const queued: string[] = [];
+    const queued: Array<{ message: string; prompt: boolean | null | undefined }> = [];
     const queueSpy = vi
       .spyOn(globalScene.phaseManager, "queueMessage")
-      .mockImplementation((message: string) => queued.push(message));
+      .mockImplementation((message: string, _callbackDelay, prompt) => {
+        queued.push({ message, prompt });
+      });
 
     // The host's stream carries the STRUCTURED events with NO host-language message line for them.
     const partner = getCoopRuntime()!.partnerTransport!;
@@ -308,8 +310,16 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     await driveReplayTurn(turn);
     queueSpy.mockRestore();
 
-    expect(queued, "the guest regenerated the useMove line in its own language").toContain(guestUseMove);
-    expect(queued, "the guest regenerated the fainted line in its own language").toContain(guestFainted);
+    expect(
+      queued.map(entry => entry.message),
+      "the guest regenerated the useMove line in its own language",
+    ).toContain(guestUseMove);
+    const faintNarration = queued.find(entry => entry.message === guestFainted);
+    expect(faintNarration, "the guest regenerated the fainted line in its own language").toBeDefined();
+    expect(
+      faintNarration?.prompt,
+      "the non-authoritative faint narration auto-dismisses instead of requesting blocked guest input",
+    ).toBe(false);
   });
 
   it("(c) a faint with narrate=false regenerates NO fainted line", async () => {

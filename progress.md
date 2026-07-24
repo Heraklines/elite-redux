@@ -2821,3 +2821,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Authority V2 commits now retain the public UI -> operation trace edge before returning around the deleted
   `op:global` journal path. The Hot Spring contract therefore proves its real `UI.processInput` reaches an
   `op:me` V2 commit, rather than looking for a raw `interactionChoice` carrier the cutover suppresses.
+
+# 2026-07-24 - Real two-browser wave-one faint replay exposed a blocked renderer prompt
+
+- Exact public-UI run `30086203224` reached a real fresh two-browser battle, then timed out with the host at
+  turn 2 and the guest still at turn 1. The guest had admitted `TURN_COMMIT` revision 2 but left its material
+  pending; the following replacement entry arrived as a revision gap. This is a production-reachable
+  softlock, not a campaign-oracle or shared-process harness failure.
+- The causal phase trace ended in the guest's localized faint `MessagePhase` with `awaitingActionInput=true`
+  while authoritative renderer input was correctly blocked. `coopNarrateFaint` had incorrectly passed
+  `prompt=true` to `queueMessage`, so no legal public input could dismiss the cosmetic narration and finish
+  the turn material.
+- Guest faint narration now uses an ordinary auto-dismissing message. The localization regression captures
+  the real queue call and requires the faint line to remain guest-localized while never requesting an ACTION
+  prompt. No authority, timing, or input gate is relaxed.
