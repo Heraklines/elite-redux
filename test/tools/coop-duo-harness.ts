@@ -3962,28 +3962,61 @@ export async function driveHostPartyRewardOwner(
   if (idx < 0) {
     throw new Error("driveHostPartyRewardOwner: no party-target reward in the forced shop options");
   }
-  // The owner's openModifierMenu opens UiMode.PARTY with a (slotIndex, option) callback. Stub the ONE
-  // PARTY open so the headless autopilot "picks" our slot - driving the REAL coopFlushPending relay +
-  // host applyModifier. (The callback also calls ui.setMode(MODIFIER_SELECT).then(...), so we drain.)
-  const ui = globalScene.ui as unknown as { setModeWithoutClear: (...args: unknown[]) => unknown };
-  const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
-  ui.setModeWithoutClear = (...args: unknown[]): unknown => {
-    if (args[0] === UiMode.PARTY) {
-      ui.setModeWithoutClear = realSetModeWithoutClear; // one-shot: restore before invoking the picker
-      (args[3] as (slotIndex: number, option: number) => void)(slot, option);
-      return;
+  // Drive the same public handler chain as a player. The old helper invoked the PARTY callback directly,
+  // before MODIFIER_SELECT's setMode promise had proved its handler actionable. Authority V2 correctly
+  // refused the resulting commit because the presentation predecessor was still uninstalled; the test had
+  // manufactured an input that a real browser could not send. Keep this helper at the UI boundary so it
+  // proves reward control, nested PARTY control, and the production callback/relay path together.
+  await awaitRewardShopOwnerInputReady(hostPhase);
+  for (let cursor = 0; cursor < idx; cursor++) {
+    if (!globalScene.ui.processInput(Button.RIGHT)) {
+      throw new Error(`party reward UI could not navigate to reward ${idx} at interaction ${pinned}`);
     }
-    return realSetModeWithoutClear(...args);
-  };
-  try {
-    hostPhase.selectRewardModifierOption(idx, () => false);
-    // The picker callback's setMode(MODIFIER_SELECT).then(...) runs on a microtask; drain repeatedly so
-    // it fires (relay + apply) and the relayed pick reaches the watcher's inbox.
-    for (let i = 0; i < 8; i++) {
-      await drainLoopback();
+  }
+  if (!globalScene.ui.processInput(Button.ACTION)) {
+    throw new Error(`party reward UI rejected reward ${idx} at interaction ${pinned}`);
+  }
+  let partyReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    await drainLoopback();
+    const handler = globalScene.ui.getHandler() as unknown as {
+      active?: boolean;
+      isCoopV2InputActionable?: () => boolean;
+    };
+    if (
+      globalScene.ui.getMode() === UiMode.PARTY
+      && handler.active === true
+      && handler.isCoopV2InputActionable?.() === true
+    ) {
+      partyReady = true;
+      break;
     }
-  } finally {
-    ui.setModeWithoutClear = realSetModeWithoutClear; // restore even if the PARTY open never came
+  }
+  if (!partyReady) {
+    throw new Error(`party reward ${idx} did not open an actionable PARTY surface at interaction ${pinned}`);
+  }
+  for (let cursor = 0; cursor < slot; cursor++) {
+    if (!globalScene.ui.processInput(Button.DOWN)) {
+      throw new Error(`party reward UI could not navigate to party slot ${slot} at interaction ${pinned}`);
+    }
+  }
+  if (!globalScene.ui.processInput(Button.ACTION)) {
+    throw new Error(`party reward UI could not open options for slot ${slot} at interaction ${pinned}`);
+  }
+  // Ordinary PokemonModifierType rewards expose APPLY as the first option. The optional legacy `option`
+  // remains supported for callers that need a later option, but navigation still travels through the real
+  // options handler instead of calling its callback.
+  for (let cursor = 0; cursor < option; cursor++) {
+    if (!globalScene.ui.processInput(Button.DOWN)) {
+      throw new Error(`party reward UI could not navigate to option ${option} at interaction ${pinned}`);
+    }
+  }
+  if (!globalScene.ui.processInput(Button.ACTION)) {
+    throw new Error(`party reward UI rejected option ${option} at interaction ${pinned}`);
+  }
+  // The handler terminal restores MODIFIER_SELECT asynchronously, then the authoritative result publishes.
+  for (let i = 0; i < 8; i++) {
+    await drainLoopback();
   }
   await opts.partnerSettle?.();
   await drainLoopback();

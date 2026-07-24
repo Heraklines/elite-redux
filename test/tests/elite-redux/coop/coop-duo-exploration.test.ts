@@ -34,6 +34,7 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -46,6 +47,7 @@ import {
   buildDuo,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostPartyRewardOwner,
@@ -144,40 +146,82 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     if (cur?.phaseName !== "ErAbilityCapsulePhase") {
       return false;
     }
-    const ui = globalScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
-    const realSetMode = ui.setMode.bind(ui);
-    let stubCalls = 0;
-    ui.setMode = (...args: unknown[]): unknown => {
-      const mode = args[0];
-      if (++stubCalls > 100) {
-        throw new Error(`[probe] setMode LOOP detected: call ${stubCalls} mode=${String(mode)}`);
+    // Park the queue behind the capsule phase: when it end()s, the manager must NOT auto-run
+    // the next wave's phases under this manual drive (headless NewBattlePhase OOM artifact).
+    haltQueueAfterCurrent();
+    cur.start();
+    let optionReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      await drainLoopback();
+      const handler = globalScene.ui.getHandler() as unknown as {
+        active?: boolean;
+        isCoopV2InputActionable?: () => boolean;
+        config?: { options?: unknown[] };
+        options?: unknown[];
+      };
+      if (
+        globalScene.ui.getMode() === UiMode.OPTION_SELECT
+        && handler.active === true
+        && handler.isCoopV2InputActionable?.() === true
+      ) {
+        const optionCount = handler.config?.options?.length ?? handler.options?.length ?? 0;
+        // Cancel is last; the committing innate-unlock choice immediately precedes it.
+        for (let cursor = 0; cursor < Math.max(0, optionCount - 2); cursor++) {
+          expect(globalScene.ui.processInput(Button.DOWN), "capsule owner navigates its real option handler").toBe(
+            true,
+          );
+        }
+        expect(globalScene.ui.processInput(Button.ACTION), "capsule owner commits through OPTION_SELECT").toBe(true);
+        optionReady = true;
+        break;
       }
-      if (mode === UiMode.OPTION_SELECT) {
-        const cfg = args[1] as { options: { label: string; handler: () => boolean }[] };
-        // The last option is always Cancel; the one before it is "unlock an innate" when the
-        // mon has a run-unlockable slot (else "change ability" - either way, a committing pick).
-        const pick = cfg.options[Math.max(0, cfg.options.length - 2)];
-        pick.handler();
-        return Promise.resolve(true);
+    }
+    if (!optionReady) {
+      throw new Error("capsule owner never reached an actionable OPTION_SELECT surface");
+    }
+    let partyReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      await drainLoopback();
+      const handler = globalScene.ui.getHandler() as unknown as {
+        active?: boolean;
+        isCoopV2InputActionable?: () => boolean;
+        options?: PartyOption[];
+      };
+      if (
+        globalScene.ui.getMode() === UiMode.PARTY
+        && handler.active === true
+        && handler.isCoopV2InputActionable?.() === true
+      ) {
+        for (let cursor = 0; cursor < partySlot; cursor++) {
+          expect(globalScene.ui.processInput(Button.DOWN), "capsule owner navigates to the partner slot").toBe(true);
+        }
+        expect(globalScene.ui.processInput(Button.ACTION), "capsule owner opens the partner ability options").toBe(
+          true,
+        );
+        const desired = PartyOption.ABILITY_SLOT_0 + unlockSlot;
+        const desiredIndex = (handler.options ?? []).indexOf(desired);
+        if (desiredIndex < 0) {
+          throw new Error(`capsule owner did not expose ability option ${desired}`);
+        }
+        for (let cursor = 0; cursor < desiredIndex; cursor++) {
+          expect(
+            globalScene.ui.processInput(Button.DOWN),
+            "capsule owner navigates to the immutable ability slot",
+          ).toBe(true);
+        }
+        expect(
+          globalScene.ui.processInput(Button.ACTION),
+          "capsule owner confirms the ability slot through PARTY",
+        ).toBe(true);
+        partyReady = true;
+        break;
       }
-      if (mode === UiMode.PARTY) {
-        const cb = args[3] as (slotIndex: number, option: number) => void;
-        cb(partySlot, PartyOption.ABILITY_SLOT_0 + unlockSlot);
-        return Promise.resolve(true);
-      }
-      // MESSAGE restores etc: resolve so the phase's `.then(...)` chains keep flowing.
-      return Promise.resolve(true);
-    };
-    try {
-      // Park the queue behind the capsule phase: when it end()s, the manager must NOT auto-run
-      // the next wave's phases under this manual drive (headless NewBattlePhase OOM artifact).
-      haltQueueAfterCurrent();
-      cur.start();
-      for (let i = 0; i < 12; i++) {
-        await drainLoopback();
-      }
-    } finally {
-      ui.setMode = realSetMode;
+    }
+    if (!partyReady) {
+      throw new Error("capsule owner never reached an actionable PARTY surface");
+    }
+    for (let i = 0; i < 12; i++) {
+      await drainLoopback();
     }
     return true;
   }
@@ -298,120 +342,16 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     let boughtTypeId = "";
     let ownerDone = false;
     let watcherDone = false;
-    let restoreHostUi: (() => void) | null = null;
+    let hostMarket: BiomeShopPhase | null = null;
     try {
       await withClient(rig.hostCtx, async () => {
         const phase = liveBiomeShop();
+        hostMarket = phase;
         const ownerSeam = phase as unknown as { end: () => void };
         const realOwnerEnd = ownerSeam.end.bind(phase);
         ownerSeam.end = () => {
           ownerDone = true;
           realOwnerEnd();
-        };
-        // The leave-confirm path first hides the shop backdrop via real UI handler calls the
-        // headless mock cannot service - neutralize it (purely cosmetic; the flow continues).
-        (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
-        // The post-buy repaint calls getHandler().updateCostText() - real handlers have it, the
-        // headless mock does not; inject a noop so the buy's tail (the coop relay) can run.
-        const uiAny = globalScene.ui as unknown as { getHandler: () => Record<string, unknown> };
-        const realGetHandler = uiAny.getHandler.bind(globalScene.ui);
-        uiAny.getHandler = () => {
-          const h = realGetHandler() as Record<string, unknown>;
-          if (h != null && typeof h.updateCostText !== "function") {
-            h.updateCostText = () => {};
-          }
-          return h;
-        };
-        const ui = globalScene.ui as unknown as {
-          setMode: (...args: unknown[]) => unknown;
-          setModeBoundedWhen: (...args: unknown[]) => Promise<"completed" | "forced" | "superseded">;
-          setModeWithoutClear: (...args: unknown[]) => unknown;
-          setOverlayMode: (...args: unknown[]) => unknown;
-          showText: (...args: unknown[]) => unknown;
-        };
-        const realSetMode = ui.setMode.bind(ui);
-        const realSetModeBoundedWhen = ui.setModeBoundedWhen.bind(ui);
-        const realSetModeWC = ui.setModeWithoutClear.bind(ui);
-        const realSetOverlay = ui.setOverlayMode.bind(ui);
-        const realShowText = ui.showText.bind(ui);
-        let bought = false;
-        restoreHostUi = () => {
-          uiAny.getHandler = realGetHandler;
-          ui.setMode = realSetMode;
-          ui.setModeBoundedWhen = realSetModeBoundedWhen;
-          ui.setModeWithoutClear = realSetModeWC;
-          ui.setOverlayMode = realSetOverlay;
-          ui.showText = realShowText;
-        };
-        // Party-target market goods open the party menu via setModeWithoutClear - auto-pick slot 0.
-        ui.setModeWithoutClear = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.PARTY) {
-            (args[3] as (slotIndex: number, option: number) => void)(0, 0);
-            return Promise.resolve(true);
-          }
-          return Promise.resolve(true);
-        };
-        const driveBiomeShop = (options: { type?: { id?: string } }[], cb: (index: number) => boolean): void => {
-          if (!bought) {
-            // Buy a KNOWN NON-party item (balls/lures apply directly, no party sub-menu) so the
-            // probe stays deterministic; the relay path is identical for party-target goods.
-            // LURE: non-party AND lands in scene.modifiers (balls only bump the ball inventory,
-            // which this probe does not observe). The harness seed makes the stock deterministic.
-            let idx = options.findIndex(o => (o?.type?.id ?? "").includes("LURE"));
-            if (idx < 0) {
-              idx = options.findIndex(o => o?.type != null);
-            }
-            boughtTypeId = options[idx]?.type?.id ?? "";
-            bought = true;
-            // A paid non-party purchase keeps the same public grid open. Issue the leave click on the
-            // next task only after the buy callback has synchronously applied and retained its result.
-            queueMicrotask(() => {
-              cb(idx);
-              setTimeout(() => cb(-1), 0);
-            });
-          }
-        };
-        ui.setMode = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.BIOME_SHOP) {
-            driveBiomeShop(args[1] as { type?: { id?: string } }[], args[3] as (index: number) => boolean);
-            return Promise.resolve(true);
-          }
-          if (args[0] === UiMode.PARTY) {
-            const cb = args[3] as (slotIndex: number, option: number) => void;
-            cb(0, 0);
-            return Promise.resolve(true);
-          }
-          if (args[0] === UiMode.CONFIRM) {
-            (args[1] as () => void)(); // co-op uses bounded base-mode confirm, not an overlay
-            return Promise.resolve(true);
-          }
-          return Promise.resolve(true);
-        };
-        ui.setModeBoundedWhen = (...args: unknown[]): Promise<"completed" | "superseded"> => {
-          const stillLive = args[2] as (() => boolean) | undefined;
-          if (!(stillLive?.() ?? true)) {
-            return Promise.resolve("superseded");
-          }
-          if (args[0] === UiMode.BIOME_SHOP) {
-            // Production co-op opens the market only through the bounded transition seam:
-            // mode, timeout, liveness fence, stock, biome, public selection callback, quantities.
-            driveBiomeShop(args[3] as { type?: { id?: string } }[], args[5] as (index: number) => boolean);
-          } else if (args[0] === UiMode.CONFIRM) {
-            queueMicrotask(args[3] as () => void); // YES: leave the market
-          }
-          return Promise.resolve("completed");
-        };
-        ui.showText = (...args: unknown[]): unknown => {
-          const cb = args[2] as (() => void) | undefined;
-          cb?.();
-          return realShowText === null ? undefined : undefined;
-        };
-        ui.setOverlayMode = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.CONFIRM) {
-            (args[1] as () => void)(); // YES: leave the market
-            return Promise.resolve(true);
-          }
-          return realSetOverlay(...args);
         };
         haltQueueAfterCurrent();
         phase.start();
@@ -431,15 +371,61 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         await drainLoopback();
       });
 
+      // Wait for the actual BIOME_SHOP handler. The retired fixture invoked the callback captured from
+      // setMode before that promise resolved, bypassing the V2 human-input gate and manufacturing a commit
+      // no real browser could send.
+      let marketReady = false;
+      for (let i = 0; i < 80 && !marketReady; i++) {
+        await pumpDuoDestinations(rig, 1);
+        marketReady = await withClient(rig.hostCtx, () => {
+          const handler = rig.hostScene.ui.getHandler() as unknown as { active?: boolean };
+          return rig.hostScene.ui.getMode() === UiMode.BIOME_SHOP && handler.active === true;
+        });
+      }
+      expect(marketReady, "owner reached the real market input surface").toBe(true);
+      const options = (hostMarket as unknown as { typeOptions: { type?: { id?: string } }[] }).typeOptions;
+      let buyIndex = options.findIndex(option => (option.type?.id ?? "").includes("LURE"));
+      if (buyIndex < 0) {
+        buyIndex = options.findIndex(option => option.type != null);
+      }
+      expect(buyIndex, "the authoritative market contains a buyable item").toBeGreaterThanOrEqual(0);
+      boughtTypeId = options[buyIndex]?.type?.id ?? "";
+      await withClient(rig.hostCtx, () => {
+        for (let row = 0; row < Math.floor(buyIndex / 4); row++) {
+          expect(rig.hostScene.ui.processInput(Button.DOWN), "owner navigates the real market grid row").toBe(true);
+        }
+        for (let col = 0; col < buyIndex % 4; col++) {
+          expect(rig.hostScene.ui.processInput(Button.RIGHT), "owner navigates the real market grid column").toBe(true);
+        }
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "owner buys through BIOME_SHOP input").toBe(true);
+      });
+      await pumpDuoDestinations(rig, 12);
+
+      // A buy publishes a new immutable result before the continuing grid becomes actionable again. Retry
+      // CANCEL only while it is correctly frozen; once accepted, confirm through the ordinary public UI.
+      let leaveOpened = false;
+      for (let i = 0; i < 80 && !leaveOpened; i++) {
+        await pumpDuoDestinations(rig, 1);
+        leaveOpened = await withClient(rig.hostCtx, () => rig.hostScene.ui.processInput(Button.CANCEL));
+      }
+      expect(leaveOpened, "owner can request market leave only after the successor installs").toBe(true);
+      let confirmReady = false;
+      for (let i = 0; i < 80 && !confirmReady; i++) {
+        await pumpDuoDestinations(rig, 1);
+        confirmReady = await withClient(rig.hostCtx, () => rig.hostScene.ui.getMode() === UiMode.CONFIRM);
+      }
+      expect(confirmReady, "market leave opens the real confirmation handler").toBe(true);
+      await withClient(rig.hostCtx, () => {
+        const handler = rig.hostScene.ui.getHandler() as unknown as { unblockInput?: () => void };
+        handler.unblockInput?.();
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "owner confirms market leave through UI").toBe(true);
+      });
       for (let i = 0; i < 40 && (!ownerDone || !watcherDone); i++) {
         await withClient(rig.hostCtx, () => drainLoopback());
         await withClient(rig.guestCtx, () => drainLoopback());
       }
       await pumpDuoDestinations(rig);
     } finally {
-      if (restoreHostUi != null) {
-        await withClient(rig.hostCtx, () => restoreHostUi!());
-      }
       Overrides.WAIVE_ROLL_FEE_OVERRIDE = waiveBefore;
     }
     expect(ownerDone, "OWNER completed the reciprocal market rendezvous").toBe(true);
@@ -630,6 +616,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         rig.guestScene.getPlayerField()[1].hp = 1;
       });
       const turn = rig.hostScene.currentBattle.turn;
+      const publicReplacementPicks: Promise<void>[] = [];
 
       // TURN 1 on the HOST: Blissey explodes - Blissey user-faints, 1-HP Snorlax dies to the
       // blast. The host's OWN picker (slot 0) opens on the post-turn SwitchPhase, which runs
@@ -640,8 +627,26 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       hostUi.setMode = (...args: unknown[]): unknown => {
         if (args[0] === UiMode.PARTY) {
           hostUi.setMode = realHostSetMode; // one-shot
-          (args[3] as (slotIndex: number, option: number) => void)(2, 0);
-          return;
+          const opened = realHostSetMode(...args);
+          // Wait beyond the mode promise so the phase's address-exact readiness notifier installs this
+          // replacement lease first, then submit through the same PARTY handler a player uses.
+          publicReplacementPicks.push(
+            Promise.resolve(opened).then(
+              () =>
+                new Promise<void>(resolve => {
+                  setTimeout(() => {
+                    withClientSync(rig.hostCtx, () => {
+                      expect(rig.hostScene.ui.processInput(Button.DOWN)).toBe(true);
+                      expect(rig.hostScene.ui.processInput(Button.DOWN)).toBe(true);
+                      expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
+                      expect(rig.hostScene.ui.processInput(Button.ACTION)).toBe(true);
+                    });
+                    resolve();
+                  }, 0);
+                }),
+            ),
+          );
+          return opened;
         }
         return realHostSetMode(...args);
       };
@@ -667,8 +672,25 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         if (args[0] === UiMode.PARTY) {
           guestPickCount += 1;
           expect(guestPickCount, "the ordered V2 chain opened exactly one guest picker").toBe(1);
-          (args[3] as (slotIndex: number, option: number) => void)(3, 0);
-          return;
+          const opened = realGuestSetMode(...args);
+          publicReplacementPicks.push(
+            Promise.resolve(opened).then(
+              () =>
+                new Promise<void>(resolve => {
+                  setTimeout(() => {
+                    withClientSync(rig.guestCtx, () => {
+                      expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
+                      expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
+                      expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
+                      expect(rig.guestScene.ui.processInput(Button.ACTION)).toBe(true);
+                      expect(rig.guestScene.ui.processInput(Button.ACTION)).toBe(true);
+                    });
+                    resolve();
+                  }, 0);
+                }),
+            ),
+          );
+          return opened;
         }
         if (args[0] === UiMode.MESSAGE) {
           return;
@@ -694,6 +716,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         });
         expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
         await settleDuoPromise(rig, hostAdvance!, "exploration double-KO host crossing");
+        await Promise.all(publicReplacementPicks);
       } finally {
         hostUi.setMode = realHostSetMode;
         guestUi.setMode = realGuestSetMode;
@@ -940,7 +963,8 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
-    const { LearnMovePhase, COOP_LEARN_MOVE_FWD_SEQ_BASE } = await import("#phases/learn-move-phase");
+    await retireDuoInitialCommandForBoundaryTest(rig);
+    const { LearnMovePhase } = await import("#phases/learn-move-phase");
     const { PokemonMove } = await import("#moves/pokemon-move");
     const PARTY_SLOT = 1; // GENGAR - the guest-owned lead
     const FULL_MOVESET = [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.HYPNOSIS, MoveId.PROTECT];
@@ -949,15 +973,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     expect((gengar as unknown as { coopOwner?: string }).coopOwner, "HARNESS: slot 1 is guest-owned").toBe("guest");
     gengar.moveset = FULL_MOVESET.map(m => new PokemonMove(m));
 
-    // The GUEST's pick (forget slot 0) is PRE-BUFFERED - the host's forward await buffer-hits.
-    // #861: send the REAL forward kind "learnMove" (the value the guest's coopGuestForwardOwnedLearnMove /
-    // CoopReplayLearnMovePhase actually send on this channel); the host await declares COOP_LEARN_MOVE_CHOICE_KINDS
-    // and kind-validation now re-buffers a mismatched kind, so the fixture must use the genuine one.
-    withClientSync(rig.guestCtx, () => {
-      getCoopInteractionRelay()?.sendInteractionChoice(COOP_LEARN_MOVE_FWD_SEQ_BASE + PARTY_SLOT, "learnMove", 0);
-    });
-
-    // HOST: spy the wire for the forward emission, stub the read-only UI, run the phase.
+    // HOST publishes the immutable prompt. The guest then opens the projected replay phase and chooses
+    // through SUMMARY input; the retired test pre-buffered an unidentified raw relay proposal before the
+    // prompt existed, which Authority V2 must reject.
     let forwardEmitted = false;
     const offSpy = pair.host.onMessage(() => {});
     const realSend = pair.host.send.bind(pair.host);
@@ -969,7 +987,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       realSend(m as never);
     };
     let phaseDone = false;
-    await withClient(rig.hostCtx, async () => {
+    await withClient(rig.hostCtx, () => {
       const phase = new LearnMovePhase(PARTY_SLOT, NEW_MOVE);
       const seam = phase as unknown as { end: () => void };
       const realEnd = seam.end.bind(phase);
@@ -977,31 +995,37 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         phaseDone = true;
         realEnd();
       };
-      const ui = rig.hostScene.ui as unknown as {
-        setModeWithoutClear: (...args: unknown[]) => unknown;
-        showTextPromise: (...args: unknown[]) => unknown;
-        setMode: (...args: unknown[]) => unknown;
-      };
-      const saved = {
-        smwc: ui.setModeWithoutClear?.bind(rig.hostScene.ui),
-        stp: ui.showTextPromise?.bind(rig.hostScene.ui),
-        sm: ui.setMode.bind(rig.hostScene.ui),
-      };
-      try {
-        ui.setModeWithoutClear = () => Promise.resolve(true);
-        ui.showTextPromise = () => Promise.resolve();
-        ui.setMode = () => Promise.resolve(true);
-        haltQueueAfterCurrent();
-        phase.start();
-        for (let i = 0; i < 30 && !phaseDone; i++) {
-          await drainLoopback();
-        }
-      } finally {
-        ui.setModeWithoutClear = saved.smwc as typeof ui.setModeWithoutClear;
-        ui.showTextPromise = saved.stp as typeof ui.showTextPromise;
-        ui.setMode = saved.sm;
-      }
+      haltQueueAfterCurrent();
+      phase.start();
     });
+    await pumpDuoDestinations(rig, 8);
+    await withClient(rig.guestCtx, async () => {
+      if (rig.guestScene.ui.getMode() !== UiMode.SUMMARY) {
+        const replay = await driveClientPhaseQueueTo(rig.guestScene, "projected learn-move replay", {
+          matches: phase => phase.phaseName === "CoopReplayLearnMovePhase",
+        });
+        replay.start();
+      }
+      let summaryReady = false;
+      for (let i = 0; i < 100 && !summaryReady; i++) {
+        await drainLoopback();
+        const handler = rig.guestScene.ui.getHandler() as unknown as {
+          active?: boolean;
+          isCoopV2InputActionable?: () => boolean;
+        };
+        summaryReady =
+          rig.guestScene.ui.getMode() === UiMode.SUMMARY
+          && handler.active === true
+          && handler.isCoopV2InputActionable?.() === true;
+      }
+      expect(summaryReady, "guest reached the exact projected learn-move SUMMARY").toBe(true);
+      // LEARN_MOVE opens on the pink new-move row. DOWN wraps to existing move slot 0, ACTION forgets it.
+      expect(rig.guestScene.ui.processInput(Button.DOWN), "guest navigates to move slot 0").toBe(true);
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest submits the forget pick through SUMMARY").toBe(true);
+    });
+    for (let i = 0; i < 80 && !phaseDone; i++) {
+      await pumpDuoDestinations(rig, 1);
+    }
     offSpy();
     expect(forwardEmitted, "the forget prompt was FORWARDED to the guest (never host-side)").toBe(true);
     expect(phaseDone, "the host learn phase completed on the guest's buffered pick").toBe(true);
@@ -1034,10 +1058,11 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     const { TheBargainPhase } = await import("#phases/the-bargain-phase");
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
 
-    // OWNER (host, even counter): play the real phase; the stub screen immediately leaves.
-    // Drain until the phase's async leave() chain fully ENDS - exiting with the chain
-    // mid-flight leaks its continuations into the NEXT test's boot (cross-ctx bleed).
+    // Stage both real phases before input, then leave through ER_BARGAIN's public handler. The retired
+    // fixture invoked onLeave from the setMode call itself, before the mode promise could install the
+    // presentation control; Authority V2 correctly rejected that impossible browser ordering.
     let ownerDone = false;
+    let watchDone = false;
     await withClient(rig.hostCtx, async () => {
       const phase = new TheBargainPhase();
       const seamO = phase as unknown as { end: () => void };
@@ -1046,49 +1071,10 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         ownerDone = true;
         realEndO();
       };
-      const ui = globalScene.ui as unknown as {
-        setMode: (...args: unknown[]) => unknown;
-        showDialogue: (...args: unknown[]) => unknown;
-        showText: (...args: unknown[]) => unknown;
-      };
-      const savedSetMode = ui.setMode.bind(globalScene.ui);
-      const savedShowDialogue = ui.showDialogue?.bind(globalScene.ui);
-      const savedShowText = ui.showText.bind(globalScene.ui);
-      try {
-        ui.setMode = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.ER_BARGAIN) {
-            const onLeave = args[6] as () => void;
-            queueMicrotask(() => onLeave());
-          }
-          return Promise.resolve(true);
-        };
-        ui.showDialogue = (...args: unknown[]): unknown => {
-          (args[3] as (() => void) | undefined)?.();
-          return;
-        };
-        ui.showText = (...args: unknown[]): unknown => {
-          (args[2] as (() => void) | undefined)?.();
-          return;
-        };
-        haltQueueAfterCurrent();
-        phase.start();
-        for (let i = 0; i < 20 && !ownerDone; i++) {
-          await drainLoopback();
-        }
-      } finally {
-        ui.setMode = savedSetMode;
-        ui.showDialogue = savedShowDialogue as typeof ui.showDialogue;
-        ui.showText = savedShowText;
-      }
+      haltQueueAfterCurrent();
+      phase.start();
+      await drainLoopback();
     });
-    expect(ownerDone, "HARNESS: the owner bargain chain fully completed before exit").toBe(true);
-    expect(pair.faultsInjected(), "the requested legacy bargain echo was dropped").toBe(1);
-    expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the bargain interaction").toBe(
-      counterBefore + 1,
-    );
-
-    // WATCHER (guest): never opens the screen; buffer-hits the outcome blob + advances.
-    let watchDone = false;
     await withClient(rig.guestCtx, async () => {
       const phase = new TheBargainPhase();
       haltQueueAfterCurrent();
@@ -1099,11 +1085,32 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         realEnd();
       };
       phase.start();
-      for (let i = 0; i < 12 && !watchDone; i++) {
-        await drainLoopback();
-      }
+      await drainLoopback();
     });
+
+    let bargainReady = false;
+    for (let i = 0; i < 80 && !bargainReady; i++) {
+      await pumpDuoDestinations(rig, 1);
+      bargainReady = await withClient(rig.hostCtx, () => {
+        const handler = rig.hostScene.ui.getHandler() as unknown as { active?: boolean };
+        return rig.hostScene.ui.getMode() === UiMode.ER_BARGAIN && handler.active === true;
+      });
+    }
+    expect(bargainReady, "owner reached the real Giratina bargain handler").toBe(true);
+    // ErBargainUiHandler deliberately ignores carried-over input for 600ms, exactly as production does.
+    await withClient(rig.hostCtx, () => new Promise(resolve => setTimeout(resolve, 650)));
+    await withClient(rig.hostCtx, () => {
+      expect(rig.hostScene.ui.processInput(Button.CANCEL), "owner leaves through ER_BARGAIN input").toBe(true);
+    });
+    for (let i = 0; i < 80 && (!ownerDone || !watchDone); i++) {
+      await pumpDuoDestinations(rig, 1);
+    }
     await pumpDuoDestinations(rig);
+    expect(ownerDone, "owner bargain chain fully completed after public input").toBe(true);
+    expect(pair.faultsInjected(), "the requested legacy bargain echo was dropped").toBe(1);
+    expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the bargain interaction").toBe(
+      counterBefore + 1,
+    );
     expect(watchDone, "watcher converged and ended").toBe(true);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the bargain interaction").toBe(
       counterBefore + 1,

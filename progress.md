@@ -2402,3 +2402,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   proposals enter the authority once, retries cannot poison the next same-sequence waiter, and a new stable
   operation id remains a distinct human action. The mixed legacy Giratina variant was retired from the
   all-V2 matrix; its compatibility echo is still faulted to prove it has no correctness ownership.
+
+# 2026-07-24 - Exploration input now crosses the real V2 control gate
+
+- Focused run `30057075418` reduced B1 to five failures and exposed one common fixture mechanism: reward,
+  market, bargain, replacement, and learn-move tests invoked captured callbacks or sent raw choices before
+  their public handler had installed the immutable predecessor control. The production ledger correctly
+  rejected those impossible browser orderings with `authority-local successor reservation refused`.
+- The shared party-reward driver now traverses the real MODIFIER_SELECT and PARTY handlers via public input.
+  Ability Capsule, biome market, Giratina bargain, both sides of a double replacement, and guest-owned
+  learn-move coverage likewise wait for their exact actionable surface and submit through the production UI
+  adapter. No fixture can false-green by bypassing the UI-to-relay/V2-lease chain in these paths.
+- The guest learn-move probe now retires COMMAND legally, consumes the host's immutable prompt in a real
+  `CoopReplayLearnMovePhase`, and chooses the forgotten move through SUMMARY. Unidentified pre-buffered raw
+  proposals are no longer treated as valid Authority V2 behavior.
