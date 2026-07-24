@@ -1097,6 +1097,23 @@ function replacementIsSubsumedByOperation(
   );
 }
 
+function replacementAckIsSubsumedByOperation(
+  retained: Extract<CoopMessage, { t: "battleCheckpointAck" }>,
+  authority: CoopAuthoritativeEnvelopeV1,
+): boolean {
+  const state = authority.authoritativeState;
+  const addressNotOlder =
+    authority.wave > retained.wave || (authority.wave === retained.wave && authority.turn >= retained.turn);
+  return (
+    retained.reason === "replacement"
+    && authority.sessionEpoch === retained.epoch
+    && authority.wave === state.wave
+    && authority.turn === state.turn
+    && addressNotOlder
+    && state.tick > retained.stateTick
+  );
+}
+
 function replacementAckIdentity(envelope: CoopCheckpointEnvelope): ReplacementAckIdentity {
   return {
     epoch: envelope.epoch,
@@ -3454,6 +3471,7 @@ export class CoopBattleStreamer {
           || left.revision - right.revision,
       );
     let completed = 0;
+    const completedThisCall = new Set<string>();
     for (const envelope of candidates) {
       const key = authorityKey(envelope);
       const prior = this.ackedReplacementCommits.get(key);
@@ -3470,11 +3488,33 @@ export class CoopBattleStreamer {
       }
       this.pendingCheckpoints.delete(bufferedAuthorityKey("replacement", envelope));
       this.appliedOutOfBandCheckpoints.delete(bufferedAuthorityKey("replacement", envelope));
+      completedThisCall.add(key);
       completed++;
       coopLog(
         "checkpoint",
         `guest ACK replacement through newer operation state key=${key} operation=${authority.pendingOperation?.kind ?? "none"} `
           + `stateTick=${authority.authoritativeState.tick}`,
+      );
+    }
+    // Once continuationReady compacts the full checkpoint, a repeated newer operation proof still has one
+    // useful job: republish the exact tiny final ACK if its first transmission was lost. The bounded digest
+    // tombstone authenticates that the completed transaction existed; the ACK evidence supplies its exact
+    // checkpoint/state/checksum identity without resurrecting the full mechanical carrier.
+    for (const [key, evidence] of this.ackedReplacementCommits) {
+      if (
+        completedThisCall.has(key)
+        || evidence.stage !== "continuationReady"
+        || !this.retiredReplacementAuthority.has(key)
+        || !replacementAckIsSubsumedByOperation(evidence.value, authority)
+      ) {
+        continue;
+      }
+      this.transport.send(evidence.value);
+      completed++;
+      coopLog(
+        "checkpoint",
+        `guest RE-ACK compacted replacement through newer operation key=${key} `
+          + `operation=${authority.pendingOperation.kind} stateTick=${authority.authoritativeState.tick}`,
       );
     }
     return completed;

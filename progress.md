@@ -2646,4 +2646,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   fatal contract. Active, unretired admission is capped at the existing authority-retention limit.
 - Failure-first stream coverage drives 66 completed turns and 66 completed replacements, proves retained
   history stays bounded, proves aged-out frames cannot reopen, and proves both in-window replay and conflict
-  behavior. Host-issued failure-authentication keys are now bounded tails as well.
+  behavior. Host-issued failure-authentication keys are now bounded tails as well. A repeated newer wave
+  proof can republish a compacted replacement's exact final ACK from its bounded tombstone/evidence pair,
+  without retaining or resurrecting the full checkpoint.
