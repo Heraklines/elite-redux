@@ -385,6 +385,85 @@ describe("authority-v2 shadow harness", () => {
     guest.dispose();
   });
 
+  it("keeps ordinary pending-control retries behind the correlated recovery fence", async () => {
+    const clock = new FakeClock();
+    let finishRecoveryMaterial!: (applied: boolean) => void;
+    const recoveryMaterial = new Promise<boolean>(resolve => {
+      finishRecoveryMaterial = resolve;
+    });
+    let ordinaryProjections = 0;
+    let host!: CoopAuthorityV2Shadow;
+    let guest!: CoopAuthorityV2Shadow;
+    const deliver = (target: () => CoopAuthorityV2Shadow) => (frame: CoopFrameV2) =>
+      routeCoopV2InboundFrameInto(target(), encodeFrameV2(frame));
+    const authorityRecovery = {
+      captureMaterial: () => ({ digest: "full-snapshot", payload: { wave: 5, hp: [100, 100] } }),
+      applyMaterial: async () => true,
+      prepareControl: () => true,
+      projectControl: (_ctx: unknown, control: NonNullable<CoopNextControl>) => ({
+        kind: "installed" as const,
+        controlId: controlIdOf(control),
+      }),
+      onTerminal: vi.fn(),
+      onRecovered: vi.fn(),
+    };
+    host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => deliver(() => guest)(frame),
+      scheduler: createCoopScheduler(clock),
+      liveRecovery: authorityRecovery,
+    });
+    guest = new CoopAuthorityV2Shadow({
+      identity: identity(1),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => deliver(() => host)(frame),
+      scheduler: createCoopScheduler(clock),
+      liveReplica: {
+        ownsEntry: entry => entry.kind === "TURN_COMMIT",
+        ownsControl: control => control.kind === "COMMAND_FRONTIER",
+        applyMaterial: () => true,
+        projectControl: () => {
+          ordinaryProjections += 1;
+          return { kind: "deferred" as const, reason: "public command phase has not opened" };
+        },
+      },
+      liveRecovery: {
+        captureMaterial: () => null,
+        applyMaterial: () => recoveryMaterial,
+        prepareControl: () => true,
+        projectControl: (_ctx, control) => ({ kind: "installed", controlId: controlIdOf(control) }),
+        onTerminal: vi.fn(),
+        onRecovered: vi.fn(),
+      },
+    });
+
+    host.tapTurnCommit(turnTap("TURN/recovery-fences-ordinary-control"));
+    expect(ordinaryProjections).toBe(1);
+    expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 0 });
+
+    const recovery = guest.recover("pending control watchdog");
+    expect(recovery).not.toBeNull();
+    for (let i = 0; i < 4; i++) {
+      await Promise.resolve();
+    }
+    expect(guest.recoveryFencePredicates()?.isMaterializationFrozen()).toBe(true);
+
+    // A late phase-ready callback and an authority redelivery both enter this same retry path. Neither may
+    // project/sign the ordinary pending control while recovery owns the exact captured frontier.
+    expect(guest.retryPendingReplicaEntries()).toBe(0);
+    expect(ordinaryProjections).toBe(1);
+
+    finishRecoveryMaterial(true);
+    await expect(recovery).resolves.toBe("recovered");
+    expect(authorityRecovery.onTerminal).not.toHaveBeenCalled();
+
+    host.dispose();
+    guest.dispose();
+  });
+
   it("taps commit entries, the replica admits+applies over the channel, and the authority retires them", () => {
     const clock = new FakeClock();
     const duo = buildDuo(clock);

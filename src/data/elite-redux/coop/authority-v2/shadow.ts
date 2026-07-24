@@ -1560,6 +1560,15 @@ export class CoopAuthorityV2Shadow {
     } else if (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control") {
       this.pendingReplicaEntries.set(entry.revision, entry);
     }
+    if (this.recoveryChannel?.fencePredicates().isMaterializationFrozen() === true) {
+      // The correlated recovery transaction is the sole material/control projector while its fence is held.
+      // This guard must cover duplicate-pending-control too: that resume path skips applyMaterialRouted(), so
+      // the older material-only fence let a public-surface wake project the recovery frontier through the
+      // ordinary replica, emit controlInstalled, and make the authority publish its successor while recovery
+      // was still proving the captured frontier. Keep the admitted entry retained; ordinary authority
+      // redelivery or a real surface wake retries it after the recovery transaction releases the fence.
+      return false;
+    }
     const resume =
       result.kind === "duplicate-pending-control"
         ? "materialApplied"

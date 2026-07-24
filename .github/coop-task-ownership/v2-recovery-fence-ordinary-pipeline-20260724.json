@@ -1,0 +1,13 @@
+{
+  "taskId": "v2-recovery-fence-ordinary-pipeline-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-recovery-fence-ordinary-pipeline-20260724",
+  "trainRef": "ci/coop/v2-recovery-fence-ordinary-pipeline-20260724",
+  "baseSha": "af2ef18f180e4eff2d17dc60b8411f2a219d023d",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-recovery-fence-ordinary-pipeline-20260724.json",
+    "src/data/elite-redux/coop/authority-v2/shadow.ts",
+    "test/node/authority-v2-shadow.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
