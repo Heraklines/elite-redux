@@ -3311,6 +3311,30 @@ export class IncrementMovePriorityAttr extends MoveAttr {
 }
 
 /**
+ * Returns the party members that contribute hits to Beat Up, in party order.
+ * The user always contributes; allies must be conscious and free of status.
+ */
+const beatUpContributorSnapshots = new WeakMap<Pokemon, Pokemon[]>();
+
+function getBeatUpContributors(user: Pokemon, snapshot = false): Pokemon[] {
+  if (!snapshot) {
+    const existing = beatUpContributorSnapshots.get(user);
+    if (existing) {
+      return existing;
+    }
+  }
+
+  const party = user.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+  const contributors = party.filter(
+    pokemon =>
+      pokemon.id === user.id
+      || (!pokemon.isFainted() && (!pokemon.status || pokemon.status.effect === StatusEffect.NONE)),
+  );
+  beatUpContributorSnapshots.set(user, contributors);
+  return contributors;
+}
+
+/**
  * Attribute used for attack moves that hit multiple times per use, e.g. Bullet Seed.
  *
  * @remarks
@@ -3399,14 +3423,7 @@ export class MultiHitAttr extends MoveAttr {
       case MultiHitType.TEN:
         return 10;
       case MultiHitType.BEAT_UP: {
-        const party = user.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-        // No status means the ally pokemon can contribute to Beat Up
-        return party.reduce((total, pokemon) => {
-          return (
-            total
-            + (pokemon.id === user.id ? 1 : pokemon?.status && pokemon.status.effect !== StatusEffect.NONE ? 0 : 1)
-          );
-        }, 0);
+        return getBeatUpContributors(user, true).length;
       }
     }
   }
@@ -5529,28 +5546,6 @@ export class SetBasePowerAttr extends VariablePowerAttr {
   }
 }
 
-/**
- * Helper function to calculate the the base power of an ally's hit when using Beat Up.
- * @param user The Pokemon that used Beat Up.
- * @param allyIndex The party position of the ally contributing to Beat Up.
- * @returns The base power of the Beat Up hit.
- */
-const beatUpFunc = (user: Pokemon, allyIndex: number): number => {
-  const party = user.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-
-  for (let i = allyIndex; i < party.length; i++) {
-    const pokemon = party[i];
-
-    // The user contributes to Beat Up regardless of status condition.
-    // Allies can contribute only if they do not have a non-volatile status condition.
-    if (pokemon.id !== user.id && pokemon?.status && pokemon.status.effect !== StatusEffect.NONE) {
-      continue;
-    }
-    return pokemon.species.getBaseStat(Stat.ATK) / 10 + 5;
-  }
-  return 0;
-};
-
 export class BeatUpAttr extends VariablePowerAttr {
   /**
    * Gets the next party member to contribute to a Beat Up hit, and calculates the base power for it.
@@ -5563,12 +5558,14 @@ export class BeatUpAttr extends VariablePowerAttr {
   apply(user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
     const power = args[0] as NumberHolder;
 
-    const party = user.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-    const allyCount = party.filter(pokemon => {
-      return pokemon.id === user.id || !pokemon.status?.effect;
-    }).length;
-    const allyIndex = (user.turnData.hitCount - user.turnData.hitsLeft) % allyCount;
-    power.value = beatUpFunc(user, allyIndex);
+    const contributors = getBeatUpContributors(user);
+    if (contributors.length === 0) {
+      return false;
+    }
+
+    const hitIndex = (user.turnData.hitCount - user.turnData.hitsLeft) % contributors.length;
+    const contributor = contributors[hitIndex];
+    power.value = 5 + Math.floor(contributor.species.getBaseStat(Stat.ATK) / 10);
     return true;
   }
 }

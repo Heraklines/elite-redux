@@ -19781,7 +19781,54 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
-  // Move: Fling (543) — base power comes from the flung item's Fling table BP
+  // Move: Beat Up (251) - only conscious, status-free allies contribute
+  // ===========================================================================
+  {
+    label: "Move: Beat Up uses eligible allies once",
+    description:
+      "Beat Up now follows its mainline contributor rules. The user always attacks; each\n"
+      + "ALLY contributes exactly once only if it is conscious and has no status condition.\n"
+      + "Each hit uses 5 + floor(that contributor's base Attack / 10) power.\n"
+      + "SETUP: Bulbasaur is burned and Squirtle is fainted; only Magikarp and Charmander\n"
+      + "are eligible. DO: use Beat Up on Snorlax.\n"
+      + "EXPECT: exactly TWO hits, not four. The burned and fainted allies do not attack,\n"
+      + "and no healthy contributor is repeated or skipped.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MAGIKARP, {
+          moveset: [MoveId.BEAT_UP, MoveId.SPLASH, MoveId.TACKLE, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.BULBASAUR, {
+          moveset: [MoveId.TACKLE, MoveId.VINE_WHIP, MoveId.GROWL, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.CHARMANDER, {
+          moveset: [MoveId.TACKLE, MoveId.EMBER, MoveId.GROWL, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.SQUIRTLE, {
+          moveset: [MoveId.TACKLE, MoveId.WATER_GUN, MoveId.TAIL_WHIP, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onPartyReady: () => {
+      const party = globalScene.getPlayerParty();
+      party[1]?.doSetStatus(StatusEffect.BURN);
+      if (party[3]) {
+        party[3].hp = 0;
+      }
+    },
+  },
+  // ===========================================================================
+  // Move: Fling (543) - base power comes from the flung item's Fling table BP
   // ===========================================================================
   {
     label: "Move: Fling uses the item's Fling BP",
