@@ -1,0 +1,12 @@
+{
+  "taskId": "v2-replay-peer-pump-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-replay-peer-pump-20260724",
+  "trainRef": "ci/coop/v2-replay-peer-pump-20260724",
+  "baseSha": "3f532ccddf3cdd73d99387b6b0b4c555e7da5a6a",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-replay-peer-pump-20260724.json",
+    "test/tools/coop-duo-harness.ts"
+  ],
+  "lockedSchemaFiles": []
+}

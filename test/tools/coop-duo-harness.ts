@@ -3247,12 +3247,13 @@ export async function driveGuestReplayTurn(
       cur.start();
     }
     await drainLoopback();
-    // A parked replica may have just emitted tailRequest / a compatibility ACK
-    // whose authority-side handling produces the frame that unblocks it. Keep
-    // the authority browser's event loop alive exactly as production does, then
-    // restore this guest context and deliver the response. This is scheduling,
-    // never a synthetic authority or direct state mutation.
-    if (guestScene.phaseManager.getCurrentPhase() === cur && peerCtx != null) {
+    // A replica phase may have just emitted tailRequest / a compatibility ACK whose authority-side
+    // handling produces its immediate successor. Keep the authority browser's event loop alive exactly
+    // as production does even when the guest phase advanced during the local drain: returning at that
+    // moment strands the final receipt in the host inbox and makes a chained successor wait for a lease
+    // redelivery that two independent browsers would process immediately. This is scheduling only; no
+    // synthetic authority or direct state mutation is introduced.
+    if (peerCtx != null) {
       if (options.pumpHostVictoryTail === true) {
         // The stall is the host parked UNSTARTED at its victory tail; start it (bounded) so the seal stream
         // the replay AWAITs is emitted. Falls back to a plain drain once the tail is inert (peer is guest).
