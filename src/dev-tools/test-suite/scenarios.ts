@@ -2504,6 +2504,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Volo appears in the Custom Trainers picker",
+    description:
+      "CATALOG fix - Volo's Elite and Hell records were committed and deployed, but both used the\n"
+      + "display label WIELDER as trainerClass. Because WIELDER is not a real TrainerType, runtime\n"
+      + "validation silently dropped both records before the picker or organic spawn selection.\n"
+      + "DO: Title -> Dev Scenarios -> Custom Trainers and scroll near the bottom.\n"
+      + "EXPECT: Volo #70022 and Volo #70023 both appear and can launch. The Volo sprite remains\n"
+      + "selected; CYNTHIA is only the valid internal base class. The editor now rejects unknown\n"
+      + "typed class labels before saving. Headless catalog coverage lives in\n"
+      + "test/tests/elite-redux/er-custom-trainer-catalog.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Held-item icons align in the summary items row (vanilla + ER)",
     description:
       "UI ALIGNMENT fix (not a battle behavior) - the ER-custom held items (tactical / reactive /\n"

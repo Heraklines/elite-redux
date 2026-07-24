@@ -4152,7 +4152,7 @@
         }
       }
     ],
-    "trainerClass": "WIELDER",
+    "trainerClass": "CYNTHIA",
     "trainerEffect": "holyrays",
     "trainerSprite": "volo",
     "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
@@ -4319,7 +4319,7 @@
         }
       }
     ],
-    "trainerClass": "WIELDER",
+    "trainerClass": "CYNTHIA",
     "trainerEffect": "holyrays",
     "trainerSprite": "volo",
     "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
