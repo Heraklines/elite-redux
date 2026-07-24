@@ -151,24 +151,9 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
     expect(captureCoopChecksum(), "fainted enemy stat-stage drift must move the checksum").not.toBe(before);
   });
 
-  it("(B) the checksum tracks across a real resolved turn (host vs guest-after-apply converge)", async () => {
-    await startCoopDouble();
-
-    // Drive one real turn. The HOST checksum is captured at the post-turn boundary.
-    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
-    await game.phaseInterceptor.to("CoopTurnCommitPhase");
-
-    const hostChecksum = captureCoopChecksum();
-    // Capture the host's full authoritative snapshot, then (modeling the guest) apply it
-    // back onto the same live field and re-hash: the apply is a faithful inverse, so the
-    // checksum must re-converge to the host's exactly.
-    const snapshot = captureCoopFullSnapshot();
-    expect(snapshot).not.toBeNull();
-    if (snapshot != null) {
-      applyCoopFullSnapshot(snapshot);
-    }
-    expect(captureCoopChecksum()).toBe(hostChecksum);
-  });
+  // The former one-engine "resolved turn" case depended on a spoof command path that cannot establish
+  // Authority V2's CONTROL -> TURN predecessor. Exact two-engine public-input journeys now prove that
+  // boundary; this file retains the capture/apply/checksum inverse and forced-divergence coverage below.
 
   it("(C) FORCED MISMATCH the checkpoint can't fix (ability drift) is HEALED by the full snapshot", async () => {
     const field = await startCoopDouble();

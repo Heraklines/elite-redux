@@ -90,13 +90,8 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
 
-    // A directly-constructed guest BattleScene begins on its inert boot/onboarding queue. Production has
-    // already crossed that queue before a live battle; align the harness through its established engine
-    // initialization seam so shiftPhase selects the real TurnInit -> Command queue for mirrored wave 1.
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // buildDuo already crosses the direct guest's inert boot queue and retains the real turn-one
+    // entry-presentation/Command boundary. A second TurnInit would wait for an already-retired control.
     pair.setAutomaticDelivery(false);
 
     // Submit the guest-owned Tackle through its real reciprocal COMMAND/FIGHT/TARGET_SELECT handlers before

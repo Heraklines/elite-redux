@@ -784,7 +784,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       getCoopUiRelayEdges().some(edge => edge.mode === UiMode.ER_MAP && edge.carrier === "interactionChoice"),
       "the public World-Map input reached the production biome relay",
     ).toBe(true);
-    for (let attempt = 0; attempt < 200 && biomeArg(guestSwitch) === undefined; attempt++) {
+    for (let attempt = 0; attempt < 600 && biomeArg(guestSwitch) === undefined; attempt++) {
       await pumpDuoDestinations(rig, 1);
       // The watcher closes ER_MAP through an asynchronous setMode(MESSAGE) continuation before it projects
       // SwitchBiomePhase. Transport-only spins can exhaust their bound without ever yielding the watcher's
@@ -871,97 +871,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     logs.flush();
   }, 300_000);
 
-  // =====================================================================================
-  // SCENARIO 5 (#863): ORPHAN backstop - "partner chose map but I am stuck in the map screen".
-  //
-  // Live wave-10 report (build mrbdf344): the biome-pick WATCHER pins the interaction, opens the
-  // mirrored ER_MAP, and awaits the owner's relayed biome on COOP_BIOME_PICK_SEQ_BASE + counter. The
-  // OWNER picked + advanced PAST the interaction, but its relay never reached the watcher's waiter (a
-  // lost/raced pick at the wave boundary). The generic seq-based orphan-rescue can't see this OFFSET band
-  // (it compares the relay seq against the peer's COUNTER), there is no between-wave resync to fire it, and
-  // the stall watchdog only recovers a MUTUAL stall - so the watcher FROZE on the 20-min COOP_BIOME_WAIT_MS,
-  // input-blocked by the still-open cursor mirror.
-  //
-  // Here BOTH engines are real: the OWNER advances the shared interaction counter past the pinned biome
-  // pick (committed + moved on) WITHOUT ever relaying a biomePick choice. Unlike SCENARIO 4 (which forces
-  // EVERY relay await to time out), this leaves COOP_BIOME_WAIT_MS at its real 20-min value: only the
-  // one-sided ORPHAN backstop (owner-advanced-past, no pick) can dismiss the watcher.
-  //
-  // FAILS-BEFORE: with only the choice-relay await, the watcher's UI mode never leaves ER_MAP (it sits on
-  // the 20-min timeout) - the drain loop below never satisfies "mode left ER_MAP", so it throws.
-  // PASSES-AFTER: the orphan backstop returns null promptly, the watcher ends its mirror, tears the map
-  // down to MESSAGE, and parks for the missing exact commit without choosing a biome locally.
-  // =====================================================================================
-  it("ORPHAN (#863): owner advances with NO exact commit -> watcher leaves the map and parks without mutation", async () => {
-    const rig = await bootBoundaryAtWave(11);
-
-    setPendingNodesForBoth(rig, [
-      { biome: BiomeId.FOREST, revealed: true },
-      { biome: BiomeId.VOLCANO, revealed: true },
-    ]);
-
-    const counterBefore = rig.hostRuntime.controller.interactionCounter();
-    const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
-
-    const beginSpy = vi.spyOn(CoopUiMirror.prototype, "beginSession");
-    const switchSpy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
-    const randomBiome = vi.spyOn(watcherCtx.scene, "generateRandomBiome");
-    const sourceBiome = watcherCtx.scene.arena.biomeId;
-
-    const phases = startNaturalBiomePair(rig);
-    const ownerPhase = ownerCtx === rig.hostCtx ? phases.host : phases.guest;
-    const watcherPhase = watcherCtx === rig.hostCtx ? phases.host : phases.guest;
-    await waitForProjectedPublicSurface(rig, ownerCtx, watcherCtx, ownerPhase, watcherPhase, UiMode.ER_MAP);
-
-    // The OWNER commits + moves on WITHOUT relaying a biomePick: advance the shared interaction counter and
-    // broadcast it. The watcher receives ONLY this advance (never a pick) - the exact one-sided orphan.
-    withClientSync(ownerCtx, () => ownerCtx.runtime.controller.advanceInteraction(counterBefore));
-    // Destination-addressed delivery deliberately refuses to apply a frame while the sender's globals are
-    // installed. Pump both destination inboxes so this remains a real two-client orphan instead of a harness-
-    // manufactured sender-only queue.
-    await pumpDuoDestinations(rig, 1);
-    expect(
-      withClientSync(ownerCtx, () =>
-        getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore }),
-      ),
-      "a counter-only orphan is not biome authority",
-    ).toBeNull();
-
-    try {
-      for (let i = 0; i < 200; i++) {
-        await pumpDuoDestinations(rig, 1);
-        if (watcherCtx.scene.ui.getMode() !== UiMode.ER_MAP) {
-          break;
-        }
-        await withClient(watcherCtx, () => new Promise(resolve => setTimeout(resolve, 2)));
-      }
-      if (watcherCtx.scene.ui.getMode() === UiMode.ER_MAP) {
-        throw new Error(
-          "biome pick ORPHAN HANG: the watcher never left ER_MAP - it is stuck on the 20-min relay timeout (#863 fails-before)",
-        );
-      }
-    } finally {
-      (watcherPhase as unknown as { clearBiomeCommitRecovery(): void }).clearBiomeCommitRecovery();
-    }
-
-    // The watcher opened the MIRRORED map (so this is the real owner-alternated path), then LEFT it.
-    expect(
-      beginSpy.mock.calls.some(c => c[0] === "watcher"),
-      "the watcher opened a mirrored MAP session before the orphan dismiss",
-    ).toBe(true);
-    expect(watcherCtx.scene.ui.getMode(), "the watcher's UI mode LEFT the map (not stuck in ER_MAP) (#863)").not.toBe(
-      UiMode.ER_MAP,
-    );
-    expect(
-      switchSpy.mock.calls.some(c => c[0] === "SwitchBiomePhase"),
-      "the renderer cannot queue SwitchBiomePhase without the exact journal commit",
-    ).toBe(false);
-    expect(randomBiome, "the orphan path cannot derive a renderer fallback").not.toHaveBeenCalled();
-    expect(watcherCtx.scene.arena.biomeId, "the orphan path leaves authoritative run state untouched").toBe(
-      sourceBiome,
-    );
-    logs.flush();
-  }, 300_000);
+  // The former #863 counter-only orphan case belonged to the retired legacy interaction clock. Under the
+  // V2 cutover a counter broadcast cannot supersede an exact BIOME_PICK control or dismiss its public map.
+  // The AUTHORITY LOSS case above owns the remaining fail-closed/no-local-mutation behavior, while the V2
+  // lease/recovery contracts own bounded teardown of a genuinely missing authoritative result.
 
   // =====================================================================================
   // PROBE (#864): drive the REAL ErMapUiHandler owner path via the REAL ui.processInput mirror

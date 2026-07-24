@@ -147,10 +147,8 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // Preserve buildDuo's authenticated turn-one command generation. Rebooting the direct guest here would
+    // manufacture a second entry-presentation wait with no second CONTROL_COMMIT.
     pair.setAutomaticDelivery(false);
 
     // ===== WAVE 1 (host-owned, even counter): a party-target HELD ITEM. =====
@@ -226,10 +224,8 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // Preserve buildDuo's authenticated turn-one command generation; this scenario changes only the reward
+    // owner and must not rebuild the battle's one-shot command-open boundary.
     pair.setAutomaticDelivery(false);
 
     // Force the first reward interaction onto the guest-owned odd counter: this is the live direction that

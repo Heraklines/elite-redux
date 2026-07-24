@@ -176,7 +176,6 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     game.scene.phaseManager.clearPhaseQueue();
     game.scene.phaseManager.unshiftPhase(replay);
     game.scene.phaseManager.shiftPhase();
-    replay.start();
     await new Promise(r => setTimeout(r, 0));
     for (let i = 0; i < 40; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();

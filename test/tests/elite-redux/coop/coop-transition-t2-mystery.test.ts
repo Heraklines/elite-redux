@@ -479,10 +479,8 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
     const pair: ScheduledCoopPair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     const hostSend = vi.spyOn(pair.host, "send");
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // buildDuo already installed and proved the real initial command boundary. Retain it so this transition
+    // test begins from the same single CONTROL_COMMIT generation as two independent browsers.
     pair.setAutomaticDelivery(false);
     const resync = installCoopResyncProbe(rig.guestRuntime);
     try {

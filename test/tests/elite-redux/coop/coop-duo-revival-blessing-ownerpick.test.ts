@@ -89,7 +89,7 @@ describe.skipIf(!RUN)(
         .enemyLevel(1)
         .enemyMoveset(MoveId.SPLASH)
         .startingLevel(50)
-        // The guest lead (field 1) uses REVIVAL_BLESSING; the host lead (field 0) TACKLEs.
+        // The guest lead (field 1) uses REVIVAL_BLESSING; the host lead (field 0) uses SPLASH.
         .moveset([MoveId.REVIVAL_BLESSING, MoveId.TACKLE, MoveId.SPLASH])
         .disableTrainerWaves();
     });
@@ -143,7 +143,7 @@ describe.skipIf(!RUN)(
       // progress while the replica's real CONTROL_COMMIT remained parked at its predecessor.
       await driveDuoGuestTackleThroughPublicUi(game, rig);
 
-      // Submit the host-owned Tackle through the same public keyboard path. Stop when the real triage phase
+      // Submit the host-owned Splash through the same public keyboard path. Stop when the real triage phase
       // is current but not yet started so its owner-pick prompt can be pumped under the destination browser's
       // complete runtime context below.
       await withClient(rig.hostCtx, async () => {
@@ -152,10 +152,11 @@ describe.skipIf(!RUN)(
         );
         expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Fight through COMMAND UI").toBe(true);
         expect(rig.hostScene.ui.getMode(), "host reaches the move picker").toBe(UiMode.FIGHT);
-        expect(rig.hostScene.ui.processInput(Button.RIGHT), "host moves from Revival Blessing to Tackle").toBe(true);
-        expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Tackle through FIGHT UI").toBe(true);
+        expect(rig.hostScene.ui.processInput(Button.RIGHT), "host moves past Revival Blessing").toBe(true);
+        expect(rig.hostScene.ui.processInput(Button.RIGHT), "host moves from Tackle to Splash").toBe(true);
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "host selects Splash through FIGHT UI").toBe(true);
 
-        const postMove = await driveClientPhaseQueueTo(rig.hostScene, "Tackle target or RevivalBlessingPhase", {
+        const postMove = await driveClientPhaseQueueTo(rig.hostScene, "Splash commit or RevivalBlessingPhase", {
           matches: phase => phase.phaseName === "SelectTargetPhase" || phase.phaseName === "RevivalBlessingPhase",
         });
         if (postMove.phaseName === "SelectTargetPhase") {
@@ -255,7 +256,7 @@ describe.skipIf(!RUN)(
 
       // ===== (E) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the host's
       // awaitInteractionChoice resolves UNDER the host ctx -> applyRevive on the HOST scene + end(). Then run
-      // the rest of the turn to TurnEndPhase (host lead's tackle, enemy moves, checkpoint emit). =====
+      // the rest of the turn to TurnEndPhase (non-damaging moves, checkpoint emit). =====
       let hostAdvance!: Promise<void>;
       await withClient(rig.hostCtx, () => {
         hostAdvance = game.phaseInterceptor.to("CoopTurnCommitPhase") as Promise<void>;

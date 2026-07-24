@@ -188,12 +188,9 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
-    // The directly constructed guest starts at TitlePhase. Align it to the same real TurnInit/Command
-    // queue a second browser would own, then make every packet destination-context scheduled.
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // buildDuo has already replaced the direct scene's inert boot tail with the real one-shot
+    // TurnInit/entry-presentation/Command generation. Keep it intact, then make every packet
+    // destination-context scheduled.
     pair.setAutomaticDelivery(false);
 
     const WAVES = 3;

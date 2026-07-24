@@ -21,8 +21,6 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
@@ -32,7 +30,6 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   buildGuestScene,
-  buildRuntime,
   drainLoopback,
   driveClientPhaseQueueTo,
   driveDuoGuestTackleThroughPublicUi,
@@ -122,61 +119,9 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     expect(gameplayAhead.currentName()).toBe("TitlePhase");
   });
 
-  it("HOST smoke: a real authoritative-host co-op double EMITs a turnResolution over the loopback", async () => {
-    // --- Boot the host engine into a real battle. ---
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const hostScene = game.scene;
-
-    // --- Pair over the loopback; the HOST runtime sits on the `host` endpoint. ---
-    const pair = createLoopbackPair();
-    const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
-    hostRuntime.spoof = new SpoofGuest(pair.guest);
-    hostRuntime.spoof.connect();
-    setCoopRuntime(hostRuntime);
-    hostRuntime.controller.connect();
-    expect(
-      await hostRuntime.controller.awaitPartnerCompatibility(),
-      "the engine fixture negotiates a complete same-build peer before gameplay",
-    ).not.toBeNull();
-    // Flip into co-op + tag field ownership, host role.
-    hostScene.gameMode = getGameMode(GameModes.COOP);
-    const field = hostScene.getPlayerField();
-    field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
-    field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
-    hostRuntime.controller.role = "host";
-
-    // Observe the OTHER endpoint. SpoofGuest is the representative negotiated local peer and
-    // answers the partner command through the production CoopBattleSync request path.
-    const guestEnd = pair.guest;
-    let emittedTurnResolution = false;
-    let emittedAuthoritativeState: Record<string, unknown> | undefined;
-    guestEnd.onMessage(msg => {
-      if (msg.t === "turnResolution") {
-        emittedTurnResolution = true;
-        emittedAuthoritativeState = msg.authoritativeState as unknown as Record<string, unknown> | undefined;
-      }
-    });
-
-    // --- Drive the host turn: both player slots FIGHT move 0 at the frail enemies. ---
-    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-    game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-
-    await game.phaseInterceptor.to("CoopTurnCommitPhase");
-    await drainLoopback();
-
-    expect(emittedTurnResolution, "host emitted a turnResolution over the loopback").toBe(true);
-    expect(emittedAuthoritativeState?.version, "turnResolution carries authoritativeState v1").toBe(1);
-    expect(emittedAuthoritativeState?.playerParty, "authoritativeState carries full PokemonData parties").toEqual(
-      expect.arrayContaining([expect.objectContaining({ summonData: expect.any(Object) })]),
-    );
-    const emittedField = emittedAuthoritativeState?.field as Record<string, unknown>[] | undefined;
-    expect(emittedField, "authoritativeState carries seating").toEqual(expect.any(Array));
-    expect(
-      emittedField?.every(seat => !("tags" in seat) && !("statStages" in seat) && !("transform" in seat)),
-      "authoritativeState.field is seating-only; live state rides PokemonData.summonData",
-    ).toBe(true);
-    logs.flush();
-  }, 120_000);
+  // The retired one-engine host/spoof smoke could emit cosmetic turnResolution without establishing the
+  // V2 CONTROL predecessor. The exact DUO journey below now owns this coverage through both public command
+  // surfaces and proves TURN_COMMIT material, replica application, presentation, and the next control.
 
   it("GUEST scene boots: a 2nd real BattleScene constructs + injects mocks without re-seeding RND", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);

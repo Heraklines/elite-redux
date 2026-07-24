@@ -3185,3 +3185,32 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Compact replay-window Pokemon data now normalizes missing gender and Tera type at its trace loader boundary.
   Real saved windows already carry those fields; the normalization prevents a hand-authored compatibility
   fixture from crashing the real game-info projection before it can exercise replay recovery.
+
+# 2026-07-24 - Full-gate migration tail uses real phase and V2 boundaries
+
+- Exact full-gate run `30108391403` showed that several older duo fixtures erased the command frontier that
+  `buildDuo` had already installed and proved, then manufactured a second entry-only replay for the same
+  retired CONTROL_COMMIT. Those post-build queue resets are removed; launch, reward, multiwave, transition,
+  interaction-counter, wild-flee, and save journeys now begin at the real one-shot command frontier.
+- Remaining renderer tests no longer inject raw legacy turn traffic, start detached replay objects twice, or
+  keep single-engine host/spoof journeys that cannot exercise the Authority V2 graph. Their mechanics enter
+  through V2 material, their replay phase is queue-owned, and exact two-engine public journeys now own the
+  command, presentation, localization, faint, reward, and convergence assertions.
+- Recovery's node contract now uses a typed destination executor and advances its fake clock only after the
+  retry scheduler is armed. Biome and Revival public-surface tests retain production runtime ownership and
+  enough runner time to observe their exact UI completion without changing product deadlines.
+
+# 2026-07-24 - Turn-one replacement cannot recreate retired entry presentation
+
+- B9's barrier-deadlock artifact exposed a production lifecycle bug, not harness noise. After the guest
+  selected an own-faint replacement, its picker could close before the host authored REPLACEMENT_COMMIT.
+  TurnInit then re-entered while the local battle cursor was still numerically turn one and queued a second
+  entry-presentation-only replay. The original CONTROL_COMMIT had already been materially consumed and
+  retired, so that replay waited forever in front of the replacement carrier and the turn-two rendezvous.
+- The battle stream now exposes its exact-once consumed entry-presentation watermark, and authoritative guest
+  TurnInit consults that stream-owned fact rather than treating `turn === 1` as sufficient authority to
+  create a consumer. A legitimate first wave-start replay is unchanged; replacement-era re-entry proceeds
+  directly to the pending replacement/command graph without waiting for retired material.
+- Local TypeScript, formatting, ownership inventory, and diff checks cover this batch. Co-op behavioral
+  verification remains external-only; the existing exact barrier-deadlock journey is the failure-first
+  regression for the production seam.

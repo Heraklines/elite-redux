@@ -44,7 +44,7 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
+import type { CoopBattleEvent, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import {
   beginCoopRecording,
   endCoopRecording,
@@ -99,6 +99,30 @@ function completeTurnCarrier(turn: number) {
     revision: carrier.authoritativeState.tick,
     ...carrier,
   };
+}
+
+/** Deliver turn mechanics through Authority V2; legacy turnResolution remains presentation telemetry only. */
+function ingestV2Turn(message: Extract<CoopMessage, { t: "turnResolution" }>): void {
+  const runtime = getCoopRuntime();
+  if (runtime == null) {
+    throw new Error("test has no live co-op runtime for Authority V2 turn ingestion");
+  }
+  const commands = globalScene
+    .getPlayerField()
+    .flatMap((mon, fieldIndex) =>
+      mon.isFainted() ? [] : [{ ownerSeatId: mon.coopOwner === "guest" ? 1 : 0, pokemonId: mon.id, fieldIndex }],
+    );
+  runtime.battleStream.ingestAuthoritativeV2Turn(
+    message,
+    {
+      kind: "COMMAND_FRONTIER",
+      epoch: message.epoch,
+      wave: message.wave,
+      turn: message.turn + 1,
+      commands,
+    },
+    1,
+  );
 }
 
 describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, animation layer)", () => {
@@ -580,7 +604,9 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
    */
   const driveReplayTurn = async (turn: number): Promise<void> => {
     const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    replay.start();
+    game.scene.phaseManager.clearPhaseQueue();
+    game.scene.phaseManager.unshiftPhase(replay);
+    game.scene.phaseManager.shiftPhase();
     await new Promise(r => setTimeout(r, 0));
     for (let i = 0; i < 32; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
@@ -600,48 +626,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   // (A) HOST RECORDS the new structured event kinds.
   // ===========================================================================
 
-  it("(A) a real authoritative-host turn EMITS a turnResolution whose events carry moveUsed + hp + faint", async () => {
-    await startCoopHost();
-    expect(getCoopController()?.role).toBe("host");
-
-    // Make one enemy frail (1 HP) so the host's TACKLE KOs it this turn -> a `faint` event;
-    // the damage itself -> an `hp` event; the move -> a `moveUsed` event.
-    const enemy0 = globalScene.getEnemyField(false)[0];
-    enemy0.hp = 1;
-
-    // Capture every turnResolution the host emits over the loopback to the partner (the guest).
-    const partner = getCoopRuntime()!.partnerTransport!;
-    const events: CoopBattleEvent[] = [];
-    partner.onMessage(msg => {
-      if (msg.t === "turnResolution") {
-        events.push(...msg.events);
-      }
-    });
-
-    // Drive a REAL host turn: the human TACKLEs (single-target -> target select), the guest auto-resolves.
-    game.move.select(MoveId.TACKLE, BattlerIndex.PLAYER, enemy0.getBattlerIndex());
-    await game.phaseInterceptor.to("CoopTurnCommitPhase");
-    // Let the emit (sent on a microtask) land on the partner.
-    await new Promise(r => setTimeout(r, 0));
-
-    const kinds = new Set(events.map(e => e.k));
-    expect(kinds.has("moveUsed"), "the host records the move usage as a structured moveUsed event").toBe(true);
-    expect(kinds.has("hp"), "the host records the per-hit hp as a structured hp event").toBe(true);
-    expect(kinds.has("faint"), "the host records the KO as a structured faint event").toBe(true);
-
-    // The moveUsed event carries the host's TACKLE and a concrete target battler index.
-    const moveUsed = events.find(e => e.k === "moveUsed");
-    expect(moveUsed?.k === "moveUsed" ? moveUsed.moveId : -1).toBe(MoveId.TACKLE);
-    expect(moveUsed?.k === "moveUsed" ? moveUsed.targets.length : 0).toBeGreaterThan(0);
-
-    // The hp event for the KOd enemy carries hp 0 (the host's authoritative post-hit value).
-    const koHp = events.find(e => e.k === "hp" && e.bi === enemy0.getBattlerIndex());
-    expect(koHp?.k === "hp" ? koHp.hp : -1).toBe(0);
-
-    // The faint event names the KOd enemy's battler index.
-    const faint = events.find(e => e.k === "faint");
-    expect(faint?.k === "faint" ? faint.bi : -1).toBe(enemy0.getBattlerIndex());
-  });
+  // The old one-engine host/spoof turn could emit cosmetic turnResolution without a legal V2 predecessor.
+  // `coop-battle-control` now proves moveUsed/hp/faint inside the exact public two-engine TURN_COMMIT.
 
   it("(A) omits a target that already left the display before a later queued move begins", async () => {
     const field = await startCoopHost();
@@ -673,7 +659,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   });
 
   it("(A) commits Yawn sleep only after the delayed TurnEnd status phase has settled", async () => {
-    const field = await startCoopHost();
+    // Yawn's ordering is an engine settlement contract. Drive the real turn locally, then capture the same
+    // authoritative state image the V2 sentinel commits; relay legality is covered by the exact DUO turn.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const field = game.scene.getPlayerField();
     const sleeper = field[COOP_GUEST_FIELD_INDEX];
     expect(sleeper.addTag(BattlerTagType.DROWSY), "the test installed Yawn's real Drowsy tag").toBe(true);
     // DrowsyTag deliberately owns its two-turn duration and ignores addTag's generic turnCount.
@@ -682,20 +671,16 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(drowsy).toBeDefined();
     drowsy!.turnCount = 1;
 
-    const emittedStates: ReturnType<typeof completeTurnCarrier>["authoritativeState"][] = [];
-    getCoopRuntime()!.partnerTransport!.onMessage(message => {
-      if (message.t === "turnResolution") {
-        emittedStates.push(message.authoritativeState);
-      }
-    });
-
     game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
     game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
-    await game.phaseInterceptor.to("CoopTurnCommitPhase");
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await game.phaseInterceptor.to("TurnEndPhase");
 
-    expect(sleeper.status?.effect, "the host materialized Yawn before the commit sentinel").toBe(StatusEffect.SLEEP);
-    const wireSleeper = emittedStates.at(-1)?.playerParty.find(pokemon => pokemon.id === sleeper.id);
+    expect(sleeper.status?.effect, "the engine materialized Yawn before authoritative capture").toBe(
+      StatusEffect.SLEEP,
+    );
+    const settledState = coopEngine.captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+    expect(settledState, "the settled turn has a complete authoritative state image").not.toBeNull();
+    const wireSleeper = settledState?.playerParty.find(pokemon => pokemon.id === sleeper.id);
     const wireStatus = wireSleeper?.status as { effect?: StatusEffect; sleepTurnsRemaining?: number } | undefined;
     expect(wireStatus?.effect, "turnResolution carries the settled sleep status").toBe(StatusEffect.SLEEP);
     expect(wireStatus?.sleepTurnsRemaining, "turnResolution carries the authoritative sleep duration").toBe(
@@ -831,9 +816,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     // A rich event stream: a move animation, an HP drain on the host's mon, a stat change, a status anim,
     // and a faint on an enemy. Every kind the host can emit. The checkpoint snaps every mon to hp=9.
-    const partner = getCoopRuntime()!.partnerTransport!;
     const carrier = carrierWithFieldHp(turn, 9);
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -918,8 +902,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     // Inject the host's authoritative turnResolution: a stream that ANIMATES the same outcome (a move,
     // an hp drain to 5, a stat rise to +2) plus the authoritative checkpoint + the host's checksum.
-    const partner = getCoopRuntime()!.partnerTransport!;
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -969,8 +952,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     // P32 validates the entire carrier before it can enter a replay inbox.  A corrupt presentation
     // event cannot be smuggled beside otherwise valid mechanical authority.
-    const partner = getCoopRuntime()!.partnerTransport!;
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...completeTurnCarrier(turn),
@@ -1043,8 +1025,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     const finalizeSpy = vi.spyOn(CoopFinalizeTurnPhase.prototype, "start");
 
-    const partner = getCoopRuntime()!.partnerTransport!;
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -1451,9 +1432,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     // The host's recorded stream for an end-of-turn poison KO: a message, the hp drain to 0, the faint -
     // NO moveUsed (poison is not a move). The checkpoint marks the enemy fainted (its end state).
-    const partner = getCoopRuntime()!.partnerTransport!;
     const carrier = carrierWithKo(turn, enemy0);
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -1555,7 +1535,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
         actor: { side: "enemy", pokemonId: enemy0.id },
       },
     });
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,

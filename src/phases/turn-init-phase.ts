@@ -102,10 +102,17 @@ export class TurnInitPhase extends FieldPhase {
       return true;
     }
     const deferCommand = this.shouldDeferVersusGuestCommandForEnemyReplacement();
-    if (globalScene.currentBattle.turn === 1) {
+    if (
+      globalScene.currentBattle.turn === 1
+      && !getCoopBattleStreamer()?.hasConsumedEntryPresentationThroughWave(globalScene.currentBattle.waveIndex)
+    ) {
       // Entry abilities/environment cues are host-authored during Summon/PostSummon in both shared co-op
       // and Showdown. Consume their complete retained prefix before either real command opens; the shared
       // event watermark prevents best-effort live copies and the ordinary turn batch from showing twice.
+      // The stream watermark is essential here: a turn-one faint replacement can legitimately re-enter
+      // TurnInit while the local battle cursor is still one. Replaying solely from that numeric cursor would
+      // create a second entry-only phase whose CONTROL_COMMIT was already retired, permanently fencing the
+      // following REPLACEMENT_COMMIT and command frontier.
       globalScene.phaseManager.pushNew(
         "CoopReplayTurnPhase",
         globalScene.currentBattle.turn,

@@ -143,12 +143,9 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    // Align the directly-constructed guest to its real TurnInit/Command queue, then make all gameplay
-    // delivery addressed-context-only. Wave 1 and wave 2 both use the public command UI below.
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // buildDuo has already crossed the guest's real TurnInit/entry-presentation/Command boundary. Preserve
+    // that one-shot V2 control generation; rebuilding TurnInit here would create a second turn-one entry
+    // waiter after CONTROL_COMMIT retired. Wave 1 and wave 2 both use the public command UI below.
     pair.setAutomaticDelivery(false);
     // This scenario verifies reward relay/counter symmetry for returning players. The first-time item
     // tutorial is a separate MESSAGE interaction that deliberately blocks reward ACTION input until its

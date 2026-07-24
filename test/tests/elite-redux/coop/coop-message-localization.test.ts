@@ -36,7 +36,7 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
+import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -67,6 +67,30 @@ function completeTurnCarrier(turn: number) {
     revision: carrier.authoritativeState.tick,
     ...carrier,
   };
+}
+
+/** Enter the renderer through the authenticated V2 material seam; raw turnResolution is cosmetic. */
+function ingestV2Turn(message: Extract<CoopMessage, { t: "turnResolution" }>): void {
+  const runtime = getCoopRuntime();
+  if (runtime == null) {
+    throw new Error("test has no live co-op runtime for Authority V2 turn ingestion");
+  }
+  const commands = globalScene
+    .getPlayerField()
+    .flatMap((mon, fieldIndex) =>
+      mon.isFainted() ? [] : [{ ownerSeatId: mon.coopOwner === "guest" ? 1 : 0, pokemonId: mon.id, fieldIndex }],
+    );
+  runtime.battleStream.ingestAuthoritativeV2Turn(
+    message,
+    {
+      kind: "COMMAND_FRONTIER",
+      epoch: message.epoch,
+      wave: message.wave,
+      turn: message.turn + 1,
+      commands,
+    },
+    1,
+  );
 }
 
 describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant lines (#691)", () => {
@@ -161,7 +185,11 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
    */
   const driveReplayTurn = async (turn: number): Promise<void> => {
     const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    replay.start();
+    // A browser reaches replay through the phase manager. Detached starts leave presentation children
+    // behind an unrelated CommandPhase; starting again after shift creates two consumers for one commit.
+    game.scene.phaseManager.clearPhaseQueue();
+    game.scene.phaseManager.unshiftPhase(replay);
+    game.scene.phaseManager.shiftPhase();
     await new Promise(r => setTimeout(r, 0));
     for (let i = 0; i < 32; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
@@ -181,78 +209,9 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
   // (a) HOST suppresses RECORDING its host-language useMove + fainted lines.
   // ===========================================================================
 
-  it("(a) a real host turn records moveUsed + faint but NO host-language useMove / fainted message", async () => {
-    await startCoopHost();
-    expect(getCoopController()?.role).toBe("host");
-
-    // Make one enemy frail (1 HP) so the host's TACKLE KOs it -> a real FaintPhase (narrate=true) runs.
-    const enemy0 = globalScene.getEnemyField(false)[0];
-    enemy0.hp = 1;
-
-    // Capture every turnResolution the host streams to the partner (the guest).
-    const partner = getCoopRuntime()!.partnerTransport!;
-    const events: CoopBattleEvent[] = [];
-    partner.onMessage(msg => {
-      if (msg.t === "turnResolution") {
-        events.push(...msg.events);
-      }
-    });
-
-    // The exact host-language strings the host SHOWS locally - which it must NOT also stream.
-    const player = globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX];
-    const hostUseMove = i18next.t("battle:useMove", {
-      pokemonNameWithAffix: getPokemonNameWithAffix(player),
-      moveName: new PokemonMove(MoveId.TACKLE).getName(),
-    });
-    const hostFainted = i18next.t("battle:fainted", { pokemonNameWithAffix: getPokemonNameWithAffix(enemy0) });
-
-    game.move.select(MoveId.TACKLE, BattlerIndex.PLAYER, enemy0.getBattlerIndex());
-    await game.phaseInterceptor.to("CoopTurnCommitPhase");
-    await new Promise(r => setTimeout(r, 0));
-
-    // The structured events are still recorded (the guest regenerates the lines from them).
-    const kinds = new Set(events.map(e => e.k));
-    expect(kinds.has("moveUsed"), "the host still records the structured moveUsed event").toBe(true);
-    expect(kinds.has("faint"), "the host still records the structured faint event").toBe(true);
-
-    // The KO ran a real FaintPhase, so its faint event carries narrate=true.
-    const faint = events.find(e => e.k === "faint" && e.bi === enemy0.getBattlerIndex());
-    expect(faint?.k === "faint" ? faint.narrate : undefined, "the narrated KO carries narrate=true").toBe(true);
-
-    // The host-language lines were SUPPRESSED from the stream (no `message` event equals them).
-    const messageTexts = events.filter(e => e.k === "message").map(e => (e.k === "message" ? e.text : ""));
-    expect(messageTexts, "the host did NOT stream its host-language useMove line").not.toContain(hostUseMove);
-    expect(messageTexts, "the host did NOT stream its host-language fainted line").not.toContain(hostFainted);
-  });
-
-  it("(a) a DIRECT move-hit KO records faint with narrate=true (the deferred FaintPhase still shows a message)", async () => {
-    await startCoopHost();
-    const enemy0 = globalScene.getEnemyField(false)[0];
-    enemy0.hp = 1;
-
-    // The dominant narrated case: a direct move hit. MoveEffectPhase calls damage(ignoreFaintPhase=true)
-    // (the FaintPhase is DEFERRED to onFaintTarget) - so the "X fainted!" message IS shown. The recorded
-    // faint event must carry narrate=true (the deviation from the spec's literal `!ignoreFaintPhase`, which
-    // would have wrongly suppressed the guest's regenerated line for the most common KO type).
-    const partner = getCoopRuntime()!.partnerTransport!;
-    const events: CoopBattleEvent[] = [];
-    partner.onMessage(msg => {
-      if (msg.t === "turnResolution") {
-        events.push(...msg.events);
-      }
-    });
-
-    game.move.select(MoveId.TACKLE, BattlerIndex.PLAYER, enemy0.getBattlerIndex());
-    await game.phaseInterceptor.to("CoopTurnCommitPhase");
-    await new Promise(r => setTimeout(r, 0));
-
-    const faint = events.find(e => e.k === "faint" && e.bi === enemy0.getBattlerIndex());
-    expect(faint, "the move-hit KO records a faint event").toBeDefined();
-    expect(
-      faint?.k === "faint" ? faint.narrate : undefined,
-      "a direct move-hit KO carries narrate=true (deferred FaintPhase still narrates)",
-    ).toBe(true);
-  });
+  // Host suppression and direct-KO narrate=true now run inside the exact two-engine public TURN_COMMIT
+  // journey in coop-battle-control. Keeping a second spoof-driven host turn here would validate a carrier
+  // that is intentionally non-authoritative after the V2 cutover.
 
   // ===========================================================================
   // (b)+(c) GUEST regenerates the lines in its OWN language, gated on narrate.
@@ -280,9 +239,8 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
       });
 
     // The host's stream carries the STRUCTURED events with NO host-language message line for them.
-    const partner = getCoopRuntime()!.partnerTransport!;
     const carrier = carrierWithKo(turn, enemy0);
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -335,9 +293,8 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
       .spyOn(globalScene.phaseManager, "queueMessage")
       .mockImplementation((message: string) => queued.push(message));
 
-    const partner = getCoopRuntime()!.partnerTransport!;
     const carrier = carrierWithKo(turn, enemy0);
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,
@@ -374,8 +331,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     let accepted = 0;
     const offCommit = getCoopRuntime()!.battleStream.onTurnCommit(() => accepted++);
 
-    const partner = getCoopRuntime()!.partnerTransport!;
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...completeTurnCarrier(turn),
@@ -411,8 +367,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     expect(carrier.fullField, "production carrier captured the just-fainted mon").not.toBeNull();
     expect(enemy0.isOnField(), "enemy0 is alive on the guest's pre-turn field").toBe(true);
 
-    const partner = getCoopRuntime()!.partnerTransport!;
-    partner.send({
+    ingestV2Turn({
       t: "turnResolution",
       turn,
       ...carrier,

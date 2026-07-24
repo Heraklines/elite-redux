@@ -257,12 +257,8 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair: ScheduledCoopPair = createScheduledCoopPair({ automatic: true });
     const rig = await buildSavedataDuo(pair);
-    // Align the direct guest scene to the real TurnInit/Command queue. Its constructor starts on TitlePhase;
-    // shiftPhase on an empty queue selects production TurnInitPhase, which builds both command slots.
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // buildDuo already replaced the direct guest's inert boot queue with the authenticated one-shot
+    // TurnInit/entry-presentation/Command generation. Keep it intact for the digest journey.
     // The handshake may use ordinary delivery, but every gameplay continuation is delivered only while
     // its addressed client's complete process-global context is installed. This models two browser
     // processes and prevents either engine's async phase tail from running against its partner's scene.

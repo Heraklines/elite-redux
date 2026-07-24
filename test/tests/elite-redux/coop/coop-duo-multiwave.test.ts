@@ -162,13 +162,8 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
-    // The direct guest BattleScene constructor begins at TitlePhase. Align only this initial harness boot
-    // to the real battle turn boundary; shiftPhase() on an empty queue selects production TurnInitPhase,
-    // which then builds the actual command/enemy/TurnStart queue under the guest renderer gate.
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // buildDuo already migrated the direct guest from its inert boot queue through the real one-shot
+    // TurnInit/entry-presentation/Command boundary. Do not erase that authenticated phase generation.
     pair.setAutomaticDelivery(false);
 
     const guestResetSpy = vi.spyOn(rig.guestScene, "reset");

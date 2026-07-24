@@ -401,16 +401,21 @@ describe("authority-v2 recovery transaction", () => {
   });
 
   it("routes every engine-facing recovery stage through the captured runtime executor", async () => {
-    const executor = vi.fn(async <T>(_ctx: CoopRuntimeContext, verb: () => T | Promise<T>): Promise<T> => verb());
+    let executorCalls = 0;
+    const executor: NonNullable<CoopRecoveryTransactionDeps["runEngineVerb"]> = async <T>(
+      _ctx: CoopRuntimeContext,
+      verb: () => T | Promise<T>,
+    ): Promise<T> => {
+      executorCalls += 1;
+      return verb();
+    };
     const h = makeHarness(async () => makeBundle(), {
       runEngineVerb: executor,
       prepareControl: vi.fn(() => true),
     });
 
     expect(await createRecoveryTransaction(h.ctx, h.deps).run()).toBe("recovered");
-    expect(executor, "material apply, frontier preparation, and control projection each rebind").toHaveBeenCalledTimes(
-      3,
-    );
+    expect(executorCalls, "material apply, frontier preparation, and control projection each rebind").toBe(3);
   });
 
   it("terminalizes a non-empty recovery frontier with no successor control", async () => {
@@ -469,10 +474,13 @@ describe("authority-v2 recovery transaction", () => {
     const txn = createRecoveryTransaction(h.ctx, h.deps);
     const running = txn.run();
 
-    for (let i = 0; i < 8 && h.project.mock.calls.length === 0; i++) {
+    for (let i = 0; i < 8 && (h.project.mock.calls.length === 0 || h.scheduler.armed === 0); i++) {
       await Promise.resolve();
     }
     expect(h.project).toHaveBeenCalledTimes(1);
+    expect(h.scheduler.armed, "the deferred projection installed its scheduler-owned retry before time advances").toBe(
+      1,
+    );
     expect(h.acknowledge).not.toHaveBeenCalled();
     expect(h.log.receivedThrough(), "snapshot material is installed while its successor remains pending").toBe(12);
     expect(h.log.appliedThrough()).toBe(12);

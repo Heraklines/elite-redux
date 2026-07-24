@@ -24,6 +24,8 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
+import { getPokemonNameWithAffix } from "#app/messages";
+import { getCoopV2Shadow } from "#data/elite-redux/coop/authority-v2/shadow";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resolvePartnerCommand } from "#data/elite-redux/coop/coop-partner-ai";
 import { coopGiveMonToPartner, coopReorderParty } from "#data/elite-redux/coop/coop-party-ops";
@@ -42,7 +44,7 @@ import {
   coopOwnerOfFieldIndex,
   coopSwitchBlocksMon,
 } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopBattleEvent, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { captureGhostTeam } from "#data/elite-redux/er-ghost-teams";
 import { BattlerIndex } from "#enums/battler-index";
@@ -53,6 +55,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { PokemonMove } from "#moves/pokemon-move";
 import type { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -148,89 +151,10 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(coopOwnerOfFieldIndex(COOP_GUEST_FIELD_INDEX)).not.toBe(getCoopController()?.role);
   });
 
-  it("the GUEST slot is resolved OVER THE TRANSPORT (relay round-trip), menu never opens (LIVE-C)", async () => {
-    await startCoopDouble();
-
-    const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
-    // Spy the host transport: the partner slot must go through the relay - the
-    // host sends a `commandRequest` and the SpoofGuest answers it over loopback.
-    const sendSpy = vi.spyOn(getCoopRuntime()!.localTransport, "send");
-    globalScene.currentBattle.turnCommands = {};
-
-    const guestPhase = game.scene.phaseManager.create("CommandPhase", COOP_GUEST_FIELD_INDEX) as CommandPhase;
-    guestPhase.start();
-    // The command now arrives asynchronously (request -> spoof reply -> apply, all
-    // over the loopback transport on microtasks); flush them.
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    // The host requested the partner's command for the guest slot over the wire...
-    const sentRequest = sendSpy.mock.calls
-      .map(([msg]) => msg)
-      .find(msg => msg.t === "commandRequest" && msg.fieldIndex === COOP_GUEST_FIELD_INDEX);
-    expect(sentRequest).toBeDefined();
-    if (sentRequest?.t === "commandRequest") {
-      expect(sentRequest.offer, "protocol 24 request carries the complete host-authored legal set").toBeDefined();
-      expect(sentRequest.offer?.moves.length).toBeGreaterThan(0);
-      expect(sentRequest.offer?.moves.every(move => move.targetSets.length > 0)).toBe(true);
-      expect(sentRequest.offer?.switches.every(switchOffer => switchOffer.slot >= 0)).toBe(true);
-    }
-
-    // ...the spoof's reply was applied as a populated FIGHT command...
-    const cmd = globalScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX];
-    expect(cmd).toBeDefined();
-    expect(cmd?.command).toBe(Command.FIGHT);
-
-    // ...and the interactive command menu was NEVER opened for the partner slot.
-    const openedCommandForGuest = setModeSpy.mock.calls.some(
-      ([mode, fieldIndex]) => mode === UiMode.COMMAND && fieldIndex === COOP_GUEST_FIELD_INDEX,
-    );
-    expect(openedCommandForGuest).toBe(false);
-  });
-
-  it("the HOST's OWN FIGHT command is BROADCAST with its RESOLVED target (lockstep, LIVE-C)", async () => {
-    await startCoopDouble();
-
-    // The host commits its own slot's move; in co-op that command must be broadcast
-    // as a `command` message for the LOCAL field index, so a real peer's partner-slot
-    // await resolves with the host's actual pick instead of its AI. Crucially the
-    // broadcast must carry the RESOLVED single target, NOT the multi-candidate set:
-    // TACKLE in a double has several legal targets (both foes + the ally), and the
-    // partner must not re-open target-select on a mon it does not control. For such a
-    // move the broadcast is DEFERRED until the human picks the target (sent from
-    // SelectTargetPhase) - this is the live "guest got the target cursor for the host's
-    // mon and was stuck choosing its own move" fix.
-    const sendSpy = vi.spyOn(getCoopRuntime()!.localTransport, "send");
-
-    // Drive a REAL turn: the human picks TACKLE for the host slot (single-target,
-    // multiple candidates -> goes through target selection); the guest auto-resolves.
-    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
-    await game.phaseInterceptor.to("CoopTurnCommitPhase");
-
-    const hostBroadcasts = sendSpy.mock.calls
-      .map(([msg]) => msg)
-      .filter(
-        msg => msg.t === "command" && msg.fieldIndex === COOP_HOST_FIELD_INDEX && msg.command.command === Command.FIGHT,
-      );
-    // The host's own pick reached the wire as a FIGHT command for the local slot...
-    expect(hostBroadcasts.length).toBeGreaterThan(0);
-    // ...carrying exactly ONE resolved target (the chosen mon), never the candidate set.
-    const lastBroadcast = hostBroadcasts.at(-1);
-    expect(lastBroadcast?.t === "command" ? lastBroadcast.command.targets : undefined).toBeDefined();
-    expect(lastBroadcast?.t === "command" ? lastBroadcast.command.targets?.length : -1).toBe(1);
-    // UI -> relay CONTRACT: this command committed through the real SelectTargetPhase adapter.
-    // The adapter must carry the same full address as CommandPhase's host request. A relay-only
-    // test cannot catch an omitted wrapper argument (the live wave-1 softlock on 2026-07-12).
-    if (lastBroadcast?.t === "command") {
-      expect(lastBroadcast.owner).toBe("host");
-      expect(lastBroadcast.epoch).toBe(getCoopController()?.sessionEpoch);
-      expect(lastBroadcast.wave).toBe(globalScene.currentBattle.waveIndex);
-      expect(lastBroadcast.pokemonId).toBe(globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX].id);
-    }
-    expect(
-      getCoopUiRelayEdges().some(edge => edge.mode === UiMode.TARGET_SELECT && edge.carrier === "battleCommand"),
-      "a public TARGET_SELECT UI input reached the production battle-command carrier",
-    ).toBe(true);
-  });
+  // The former one-engine commandRequest/command assertions lived on the retired spoof/legacy carrier and
+  // could not exercise V2 control admission. Their coverage is consolidated into the exact two-engine P3
+  // journey below: both public command surfaces, addressed partner request/consumption, resolved targets,
+  // turn commit, presentation replay, and the next authoritative surface are proven in one live graph.
 
   it("a SOLO (non-coop) FIGHT command is NOT broadcast (guard holds)", async () => {
     await startCoopDouble();
@@ -297,22 +221,6 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     });
     expect(blockMsg).not.toBe("partyUiHandler:coopPartnerMon");
     expect(blockMsg.length).toBeGreaterThan(0);
-  });
-
-  it("LIVE turn: the human selects ONLY their slot, the partner slot auto-resolves and the turn completes", async () => {
-    await startCoopDouble();
-
-    // The human commands ONLY field slot 0 (the host). The guest slot is never
-    // prompted - if it were, this turn would hang waiting for a second selection.
-    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
-
-    // The turn drives to completion with a single human selection, proving the
-    // partner's CommandPhase auto-submitted (both slots' commands resolved).
-    await game.phaseInterceptor.to("CoopTurnCommitPhase");
-
-    // A fresh CommandPhase for the NEXT turn opens - the run is healthy, not stuck.
-    await game.phaseInterceptor.to("CommandPhase");
-    expect(getCoopController()?.role).toBe("host");
   });
 
   // Multi-wave continuation belongs to the production-shaped two-engine journeys:
@@ -580,12 +488,8 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     });
     installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
 
-    // Align the direct guest scene to the same real command boundary as a browser client. Once booted,
-    // destination-scheduled delivery guarantees that every continuation runs under its own client context.
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // buildDuo leaves the direct guest at the same real command boundary as a browser client. Keep that
+    // exact one-shot V2 generation; destination-scheduled delivery below preserves each client context.
     pair.setAutomaticDelivery(false);
     const resync = installCoopResyncProbe(rig.guestRuntime);
 
@@ -612,9 +516,26 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
         enemy.hp = 1;
       }
     });
+    const hostNarration = withClientSync(rig.hostCtx, () => {
+      const player = rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX];
+      const enemies = rig.hostScene.getEnemyField();
+      return {
+        useMove: i18next.t("battle:useMove", {
+          pokemonNameWithAffix: getPokemonNameWithAffix(player),
+          moveName: new PokemonMove(MoveId.TACKLE).getName(),
+        }),
+        fainted: enemies.map(enemy =>
+          i18next.t("battle:fainted", { pokemonNameWithAffix: getPokemonNameWithAffix(enemy) }),
+        ),
+      };
+    });
     const turn = rig.hostScene.currentBattle.turn;
     const guestBroadcastSpy = vi.spyOn(rig.guestRuntime.battleSync, "broadcastLocalCommand");
+    const hostBroadcastSpy = vi.spyOn(rig.hostRuntime.battleSync, "broadcastLocalCommand");
     const hostRequestSpy = vi.spyOn(rig.hostRuntime.battleSync, "requestPartnerCommand");
+    const hostV2 = getCoopV2Shadow(rig.hostRuntime);
+    expect(hostV2, "the exact journey negotiated the Authority V2 log").not.toBeNull();
+    const turnCommitSpy = vi.spyOn(hostV2!, "tapTurnCommit");
     await driveDuoGuestTackleThroughPublicUi(game, rig, {
       restartAlreadyOpenHost: false,
       guestTarget: BattlerIndex.ENEMY_2,
@@ -652,6 +573,25 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
         rig.hostScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.targets,
         "the host selected the first 1-HP enemy",
       ).toEqual([BattlerIndex.ENEMY]);
+      expect(
+        hostBroadcastSpy.mock.calls.some(
+          ([fieldIndex, sentTurn, command, owner, address]) =>
+            fieldIndex === COOP_HOST_FIELD_INDEX
+            && sentTurn === turn
+            && command.command === Command.FIGHT
+            && command.targets?.length === 1
+            && command.targets[0] === BattlerIndex.ENEMY
+            && owner === "host"
+            && address?.epoch === rig.hostRuntime.controller.sessionEpoch
+            && address.wave === rig.hostScene.currentBattle.waveIndex
+            && address.pokemonId === rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX].id,
+        ),
+        "the host public target selection emitted one fully-addressed resolved FIGHT intent",
+      ).toBe(true);
+      expect(
+        getCoopUiRelayEdges().some(edge => edge.mode === UiMode.TARGET_SELECT && edge.carrier === "battleCommand"),
+        "the public TARGET_SELECT input crossed the production battle-command adapter",
+      ).toBe(true);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
       const guestRequestIndex = hostRequestSpy.mock.calls.findIndex(
         ([fieldIndex, requestedTurn]) => fieldIndex === COOP_GUEST_FIELD_INDEX && requestedTurn === turn,
@@ -666,6 +606,30 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
         rig.hostScene.currentBattle.enemyParty.every(enemy => enemy.isFainted()),
         "both targets were KO'd",
       ).toBe(true);
+      const committedTurn = turnCommitSpy.mock.calls.find(([tap]) => tap.capture.turn === turn)?.[0];
+      expect(committedTurn, "the public turn crossed the production V2 TURN_COMMIT adapter").toBeDefined();
+      const committedEvents = (committedTurn?.capture.turnResolution ?? []) as CoopBattleEvent[];
+      const committedKinds = new Set(committedEvents.map(event => event.k));
+      expect(committedKinds.has("moveUsed"), "the immutable turn carries move presentation material").toBe(true);
+      expect(committedKinds.has("hp"), "the immutable turn carries HP presentation material").toBe(true);
+      expect(committedKinds.has("faint"), "the immutable turn carries faint presentation material").toBe(true);
+      const committedFaints = committedEvents.filter(event => event.k === "faint");
+      expect(committedFaints, "both one-HP enemies have explicit immutable faint events").toHaveLength(2);
+      expect(
+        committedFaints.every(event => event.narrate === true),
+        "direct move KOs retain guest-localizable narration intent",
+      ).toBe(true);
+      const committedMessages = committedEvents
+        .filter(event => event.k === "message")
+        .map(event => (event.k === "message" ? event.text : ""));
+      expect(committedMessages, "host-language move narration is not embedded in V2 material").not.toContain(
+        hostNarration.useMove,
+      );
+      for (const fainted of hostNarration.fainted) {
+        expect(committedMessages, "host-language faint narration is not embedded in V2 material").not.toContain(
+          fainted,
+        );
+      }
       expect(
         rig.hostScene.phaseManager.getCurrentPhase().phaseName,
         "Victory/EXP completed and reached the exact retained boundary",

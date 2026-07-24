@@ -1544,10 +1544,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // buildDuo already installed and proved the initial one-shot V2 command boundary. Preserve it.
     pair.setAutomaticDelivery(false);
     const headlessAtlas = withClientSync(rig.guestCtx, () => installHeadlessPlayerAtlasCompletion(rig.guestScene));
 
@@ -1758,10 +1755,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearAllPhases();
-      rig.guestScene.phaseManager.shiftPhase();
-    });
+    // buildDuo already installed and proved the initial one-shot V2 command boundary. Preserve it.
     pair.setAutomaticDelivery(false);
     const headlessAtlas = withClientSync(rig.guestCtx, () => installHeadlessPlayerAtlasCompletion(rig.guestScene));
 

@@ -2459,6 +2459,18 @@ export class CoopBattleStreamer {
   }
 
   /**
+   * Whether this run has already crossed the exact-once pre-command presentation boundary for `wave`.
+   *
+   * A turn-one faint replacement can re-enter TurnInit before the authoritative replacement advances the
+   * local battle cursor. Numeric `turn === 1` is therefore not proof that the wave-start presentation is
+   * still pending. Expose the stream-owned watermark so TurnInit cannot manufacture a second V2 consumer
+   * for a CONTROL_COMMIT that has already been materially consumed and retired.
+   */
+  hasConsumedEntryPresentationThroughWave(wave: number): boolean {
+    return Number.isSafeInteger(wave) && wave >= 0 && wave <= this.consumedEntryPresentationThroughWave;
+  }
+
+  /**
    * Await the retained post-summon carrier and re-request it on a bounded cadence. Unlike best-effort
    * live battleEvent packets, this complete prefix survives a drop/reconnect and cannot strand command input.
    */
