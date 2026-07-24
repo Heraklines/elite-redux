@@ -1,0 +1,12 @@
+{
+  "taskId": "showdown-sync-duo-manifest-launch-20260724",
+  "version": 2,
+  "branch": "ci/coop/showdown-sync-duo-manifest-launch-20260724",
+  "trainRef": "ci/coop/showdown-sync-duo-manifest-launch-20260724",
+  "baseSha": "eefd92a7480cec8a4b88fa23e471e1059a6875df",
+  "allowedFiles": [
+    ".github/coop-task-ownership/showdown-sync-duo-manifest-launch-20260724.json",
+    "test/tests/elite-redux/showdown/showdown-sync-duo.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
