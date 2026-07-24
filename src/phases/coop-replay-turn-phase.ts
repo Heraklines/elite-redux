@@ -599,7 +599,12 @@ export class CoopReplayTurnPhase extends Phase {
                 `guest replacement rev=${envelope.authorityRevision ?? "?"} installed next picker `
                   + `${nextReplacement.operationId} (${nextReplacement.remaining.length} later)`,
               );
-              continue;
+              // The central projector queued this exact successor behind the idle replay while applying
+              // the current replacement entry. Waiting for another turn carrier here strands that PARTY
+              // phase forever (the host cannot produce the next replacement until the player picks).
+              // End only after continuationReady so the phase manager presents the authenticated picker.
+              this.end();
+              return;
             }
             if (!hasLocalCommandSlot && hasLivingLocalMon) {
               this.failAuthority(

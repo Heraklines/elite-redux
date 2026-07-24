@@ -6183,7 +6183,9 @@ function prepareCoopV2OrdinaryReplacementControlSurface(
     runtime.v2ProjectedReplacementControlId = controlId;
     return true;
   }
-  if (!current.is("CoopFinalizeTurnPhase")) {
+  const projectsBehindTurnFinalizer = current.is("CoopFinalizeTurnPhase");
+  const projectsBehindReplacementReplay = current.is("CoopReplayTurnPhase");
+  if (!projectsBehindTurnFinalizer && !projectsBehindReplacementReplay) {
     return false;
   }
   phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", control.fieldIndex, {
@@ -6192,7 +6194,13 @@ function prepareCoopV2OrdinaryReplacementControlSurface(
     occurrence: control.occurrence,
   });
   runtime.v2ProjectedReplacementControlId = controlId;
-  releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry);
+  // TURN_COMMIT successors park in CoopFinalizeTurnPhase and must be released through its exact claim.
+  // A chained REPLACEMENT_COMMIT is applied by the already-idle CoopReplayTurnPhase that consumed the
+  // out-of-band checkpoint. That replay has no generic finalizer release seam: it ends only after the
+  // checkpoint transaction ACKs continuationReady, at which point the queued picker becomes current.
+  if (projectsBehindTurnFinalizer) {
+    releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry);
+  }
   coopLog("v2-control", `projected exact replacement generation for ${controlId} from immutable control`);
   return true;
 }
