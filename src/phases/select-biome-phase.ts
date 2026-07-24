@@ -717,6 +717,16 @@ export class SelectBiomePhase extends BattlePhase {
     } catch {
       coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
     }
+    const role = this.requireCoopBiomeOperationRole();
+    const binding = this.requireCoopBiomeOperationBinding();
+    const operationId = coopBiomeOperationId("BIOME_PICK", COOP_BIOME_PICK_SEQ_BASE + pinned, pinned, binding);
+    // A durable/V2 watcher consumes the immutable receipt directly. Waiting for the compatibility relay
+    // first makes correctness depend on a second, unordered carrier and can strand a fast owner result in
+    // the relay's pre-waiter buffer. The legacy relay remains below solely for negotiated rollback.
+    if (coopBiomeCommitRequired(role, binding)) {
+      await this.finishCommittedBiomeWatcher(revealed, operationId, pinned);
+      return;
+    }
     const relay = getCoopInteractionRelay();
     // #863: bound the wait with the one-sided ORPHAN backstop. If the OWNER commits its pick + advances
     // PAST this interaction but its relay never reaches us (the live wave-10 "partner chose map, I'm stuck
@@ -741,17 +751,6 @@ export class SelectBiomePhase extends BattlePhase {
     // stale-/late-rejecting a pick from an earlier interaction or a prior epoch - the #861 shape). When the
     // flag is OFF this passes the relay through verbatim (legacy fallback); a reject falls to the
     // deterministic backstop below exactly like a relay timeout.
-    const role = this.requireCoopBiomeOperationRole();
-    const operationId = coopBiomeOperationId(
-      "BIOME_PICK",
-      COOP_BIOME_PICK_SEQ_BASE + pinned,
-      pinned,
-      this.requireCoopBiomeOperationBinding(),
-    );
-    if (coopBiomeCommitRequired(role, this.requireCoopBiomeOperationBinding())) {
-      await this.finishCommittedBiomeWatcher(revealed, operationId, pinned);
-      return;
-    }
     await this.applyBiomeWatcherDecision(
       revealed,
       operationId,
@@ -813,6 +812,7 @@ export class SelectBiomePhase extends BattlePhase {
       });
       return;
     }
+    getCoopUiMirror()?.endSession();
     if (deterministic && receipt != null) {
       await this.applyDeterministicBiomeWatcherReceipt(
         receipt,

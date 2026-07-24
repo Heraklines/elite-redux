@@ -8662,9 +8662,10 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
     ) {
       return false;
     }
-    if (deterministicAddress) {
-      // No interaction exists for a deterministic transition. Publish its exact receipt/permit directly;
-      // buffering it in InteractionRelay would create a phantom owner/watcher action at this wave address.
+    if (deterministicAddress || isCoopV2InteractionCutoverActive(runtime.durability)) {
+      // No interaction exists for a deterministic transition. Under V2, an interactive result is likewise
+      // consumed from this exact immutable receipt by the projected watcher; buffering a second legacy
+      // interactionChoice would restore the dual-ordering race that the cutover is meant to remove.
       return publishCoopBiomeJournalMaterialization(plan, binding);
     }
     try {
@@ -8686,6 +8687,9 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
       || (payload.optionIndex !== 0 && payload.optionIndex !== 1)
     ) {
       return false;
+    }
+    if (isCoopV2InteractionCutoverActive(runtime.durability)) {
+      return publishCoopBiomeJournalMaterialization(plan, binding);
     }
     try {
       runtime.interactionRelay.materializeCommittedInteractionChoice(

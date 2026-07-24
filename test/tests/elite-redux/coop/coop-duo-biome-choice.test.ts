@@ -905,7 +905,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     // The OWNER commits + moves on WITHOUT relaying a biomePick: advance the shared interaction counter and
     // broadcast it. The watcher receives ONLY this advance (never a pick) - the exact one-sided orphan.
     withClientSync(ownerCtx, () => ownerCtx.runtime.controller.advanceInteraction(counterBefore));
-    await drainLoopback();
+    // Destination-addressed delivery deliberately refuses to apply a frame while the sender's globals are
+    // installed. Pump both destination inboxes so this remains a real two-client orphan instead of a harness-
+    // manufactured sender-only queue.
+    await pumpDuoDestinations(rig, 1);
     expect(
       withClientSync(ownerCtx, () =>
         getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore }),
@@ -967,7 +970,9 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
 
-    const sendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
+    const relaySendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
+    const authorityTransport = ownerCtx === rig.hostCtx ? rig.pair.host : rig.pair.guest;
+    const transportSendSpy = vi.spyOn(authorityTransport, "send");
     const phases = startNaturalBiomePair(rig);
     const ownerPhase = ownerCtx === rig.hostCtx ? phases.host : phases.guest;
     const watcherPhase = watcherCtx === rig.hostCtx ? phases.host : phases.guest;
@@ -992,12 +997,16 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       }
     }
 
-    const biomePickSends = sendSpy.mock.calls.filter(c => c[1] === "biomePick");
+    const biomePickRelayCalls = relaySendSpy.mock.calls.filter(c => c[1] === "biomePick");
+    const rawBiomePickFrames = transportSendSpy.mock.calls.filter(
+      c => c[0].t === "interactionChoice" && c[0].kind === "biomePick",
+    );
     // eslint-disable-next-line no-console
     console.log(
-      `[PROBE #864] sendInteractionChoice calls=${JSON.stringify(sendSpy.mock.calls.map(c => ({ seq: c[0], kind: c[1], choice: c[2], data: c[3] })))} counterBefore=${counterBefore} counterAfter=${rig.hostRuntime.controller.interactionCounter()}`,
+      `[PROBE #864] sendInteractionChoice calls=${JSON.stringify(relaySendSpy.mock.calls.map(c => ({ seq: c[0], kind: c[1], choice: c[2], data: c[3] })))} rawBiomePickFrames=${rawBiomePickFrames.length} counterBefore=${counterBefore} counterAfter=${rig.hostRuntime.controller.interactionCounter()}`,
     );
-    expect(biomePickSends.length, "the cut-over owner does not emit a raw biomePick correctness carrier").toBe(0);
+    expect(biomePickRelayCalls.length, "the public handler still reaches the compatibility suppression seam").toBe(1);
+    expect(rawBiomePickFrames.length, "the cut-over owner does not emit a raw biomePick correctness carrier").toBe(0);
     const receipt = withClientSync(rig.hostCtx, () =>
       getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore }),
     );

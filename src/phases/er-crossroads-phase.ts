@@ -674,6 +674,15 @@ export class ErCrossroadsPhase extends Phase {
     } catch {
       /* cosmetic - the awaited relay still drives the authoritative apply below */
     }
+    const role = getCoopController()?.role ?? "guest";
+    const binding = this.requireCoopBiomeOperationBinding();
+    const operationId = coopBiomeOperationId("CROSSROADS_PICK", COOP_CROSSROADS_SEQ_BASE + pinned, pinned, binding);
+    // Durable/V2 authority is the exact immutable receipt. Do not park it behind the legacy relay FIFO:
+    // that creates two ordering authorities and races when the owner commits before this waiter opens.
+    if (coopBiomeCommitRequired(role, binding)) {
+      await this.finishCommittedCrossroadsWatcher(operationId, pinned);
+      return;
+    }
     const relay = getCoopInteractionRelay();
     // #863: bound the wait with the one-sided ORPHAN backstop (same class as the biome pick). If the OWNER
     // commits Stay/Leave + advances PAST this interaction but its relay never reaches us, dismiss PROMPTLY
@@ -696,13 +705,6 @@ export class ErCrossroadsPhase extends Phase {
     // Wave-2a: gate adoption through the authoritative operation primitive (idempotent + stale-/late-
     // rejecting, the #861 shape). Flag OFF -> pass-through (legacy). A reject falls to the deterministic
     // backstop below, exactly like a relay timeout.
-    const role = getCoopController()?.role ?? "guest";
-    const binding = this.requireCoopBiomeOperationBinding();
-    const operationId = coopBiomeOperationId("CROSSROADS_PICK", COOP_CROSSROADS_SEQ_BASE + pinned, pinned, binding);
-    if (coopBiomeCommitRequired(role, binding)) {
-      await this.finishCommittedCrossroadsWatcher(operationId, pinned);
-      return;
-    }
     this.applyCrossroadsWatcherDecision(
       pinned,
       operationId,
@@ -742,6 +744,7 @@ export class ErCrossroadsPhase extends Phase {
       });
       return;
     }
+    getCoopUiMirror()?.endSession();
     this.applyCrossroadsWatcherDecision(pinned, operationId, "guest", { choice }, true);
   }
 

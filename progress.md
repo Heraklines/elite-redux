@@ -2580,3 +2580,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   is positioned and revealed, an exact missing-layer diagnostic is emitted, and the authoritative queue is
   allowed to continue to its next checkpoint instead of softlocking. The same ten-wave production-fidelity
   journey remains the remote regression and will identify the upstream missing layer in its next artifact.
+
+# 2026-07-24 - V2 biome results no longer wait on a legacy relay twin
+
+- B11's public Crossroads Leave path exposed a real dual-authority race. The immutable `BIOME_PICK` reached
+  the replica and published its exact journal receipt, but `SelectBiomePhase` still waited for an
+  `interactionChoice` compatibility twin before reading that receipt. A fast owner could therefore commit
+  while the renderer was opening ER_MAP, leaving the V2 entry retained at `materialDeferred` behind a
+  pre-waiter legacy FIFO entry.
+- Commit-required Crossroads and map watchers now wait directly on their immutable operation receipt. Under
+  the negotiated V2 cutover, biome materialization publishes only that receipt and no longer buffers a
+  second raw choice; the old relay wait remains solely on the legacy fallback path.
+- Two harness assertions were also corrected without weakening coverage: destination-addressed orphan
+  delivery pumps the receiving client, and the raw-carrier probe observes actual transport frames rather
+  than treating invocation of the production suppression seam as a network send.
