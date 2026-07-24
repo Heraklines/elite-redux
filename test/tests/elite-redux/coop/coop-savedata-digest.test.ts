@@ -88,6 +88,7 @@ import {
   driveHostRewardShopOwner,
   installDuoLogCapture,
   reachQueuedRewardShop,
+  retireDuoInitialCommandForBoundaryTest,
   type ShopPhaseSeam,
   setCoopHarnessModuleLetIsolation,
   withClient,
@@ -529,17 +530,17 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // This test DRIVES the real owner picker (mocked ER_MAP + invoked onSelect), so opt OUT of the vitest
     // owner auto-resolve (reset in afterEach).
     setCoopBiomePickerDrivenByTest();
+    const WAVE = 11; // a biome-boundary wave (not a %50 END wave)
+    game.override.startingWave(WAVE);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildSavedataDuo(pair);
+    await retireDuoInitialCommandForBoundaryTest(rig);
     wireGuestCommand(rig);
 
     // The guest is seed-pinned to the host (adoptCoopHostRunConfig, #658 - proven in coop-duo-launch-sync).
     expect(rig.guestScene.seed, "the guest is seed-pinned to the host").toBe(rig.hostScene.seed);
 
-    const WAVE = 11; // a biome-boundary wave (not a %50 END wave)
-    rig.hostScene.currentBattle.waveIndex = WAVE;
-    rig.guestScene.currentBattle.waveIndex = WAVE;
     // Two REVEALED onward nodes (shared er-map state); the owner picks the SECOND (a non-default choice).
     const routeNodes = [
       { biome: BiomeId.FOREST, revealed: true },

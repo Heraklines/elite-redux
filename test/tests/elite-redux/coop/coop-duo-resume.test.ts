@@ -1855,10 +1855,16 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         }
         const sessions = await withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume());
         expect(sessions.get(slot)?.sessionJson).toBe(cloudRaw);
-        expect(
-          decrypt(localStorage.getItem(localKey)!, false),
-          `${cloudKind} cloud becomes the exact local replica`,
-        ).toBe(cloudRaw);
+        if (cloudKind === "coop") {
+          const cached = localStorage.getItem(localKey);
+          expect(cached, "the live co-op authority is cached locally").not.toBeNull();
+          expect(decrypt(cached!, false), "co-op cloud becomes the exact local replica").toBe(cloudRaw);
+        } else {
+          expect(
+            localStorage.getItem(localKey),
+            "solo discovery remains read-only and does not repopulate the local cache",
+          ).toBeNull();
+        }
         return { local, remote };
       };
 

@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "78b0db699c34dcbf25e2657ba5a4543a4211549d",
+  "baseSha": "64b2634343d263f2ff95226e22e7cc65fee21e1c",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -129,5 +129,5 @@
     "test/tools/repro-triple-battle-bugs.test.ts",
     "test/visual/rich-notification-qa.mjs"
   ],
-  "lockedSchemaFiles": ["src/data/elite-redux/coop/coop-transport.ts"]
+  "lockedSchemaFiles": []
 }

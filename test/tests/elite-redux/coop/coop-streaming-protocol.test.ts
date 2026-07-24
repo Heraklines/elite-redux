@@ -170,7 +170,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
     // Ordered + discriminated events survive.
     expect(msg.events[0]).toEqual({ k: "message", text: "Bulbasaur used Vine Whip!" });
     const faint = msg.events.find(e => e.k === "faint");
-    expect(faint).toEqual({ k: "faint", bi: 2 });
+    expect(faint).toEqual({ k: "faint", bi: 2, actor: { side: "enemy", pokemonId: 201 } });
     const ability = msg.events.find(e => e.k === "showAbility");
     expect(ability).toEqual({
       k: "showAbility",
@@ -180,6 +180,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
       abilityId: 22,
       passive: true,
       passiveSlot: 2,
+      actor: { side: "player", pokemonId: 991 },
     });
     // The authoritative checkpoint is intact: the enemy is at 0 hp + fainted.
     const enemyState = msg.checkpoint.field.find(f => f.bi === 2);

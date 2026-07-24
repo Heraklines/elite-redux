@@ -614,6 +614,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     });
     const turn = rig.hostScene.currentBattle.turn;
     const guestBroadcastSpy = vi.spyOn(rig.guestRuntime.battleSync, "broadcastLocalCommand");
+    const hostRequestSpy = vi.spyOn(rig.hostRuntime.battleSync, "requestPartnerCommand");
     await driveDuoGuestTackleThroughPublicUi(game, rig, {
       restartAlreadyOpenHost: false,
       guestTarget: BattlerIndex.ENEMY_2,
@@ -652,9 +653,14 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
         "the host selected the first 1-HP enemy",
       ).toEqual([BattlerIndex.ENEMY]);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
+      const guestRequestIndex = hostRequestSpy.mock.calls.findIndex(
+        ([fieldIndex, requestedTurn]) => fieldIndex === COOP_GUEST_FIELD_INDEX && requestedTurn === turn,
+      );
+      expect(guestRequestIndex, "the authority requested the addressed guest command").toBeGreaterThanOrEqual(0);
+      const consumedGuestCommand = await hostRequestSpy.mock.results[guestRequestIndex].value;
       expect(
-        rig.hostScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX]?.targets,
-        "the authority consumed the guest's second-enemy target before committing the turn",
+        consumedGuestCommand?.targets,
+        "the authority consumed the guest's second-enemy target at the relay boundary",
       ).toEqual([BattlerIndex.ENEMY_2]);
       expect(
         rig.hostScene.currentBattle.enemyParty.every(enemy => enemy.isFainted()),
