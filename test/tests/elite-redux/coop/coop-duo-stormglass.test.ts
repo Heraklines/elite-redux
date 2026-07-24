@@ -136,6 +136,10 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
       // keep the real UI transition: replacing showText/setMode left the old COMMAND handler installed, which
       // made the exact V2 presentation correctly impossible to prove.
       projected.start();
+      await vi.waitUntil(
+        () => globalScene.ui.getMode() === UiMode.MESSAGE && globalScene.ui.getHandler()?.active === true,
+        { timeout: 5_000, interval: 5 },
+      );
     });
     for (let i = 0; i < 80; i++) {
       await pumpDuoDestinations(rig, 1);

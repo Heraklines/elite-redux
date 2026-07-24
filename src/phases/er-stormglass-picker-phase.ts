@@ -230,6 +230,12 @@ export class ErStormglassPickerPhase extends Phase {
    */
   private async coopWatch(): Promise<void> {
     try {
+      // showText() writes into the message handler but deliberately does not activate it. A watcher commonly
+      // inherits COMMAND or another interaction mode, so announcing readiness immediately afterward used that
+      // unrelated handler as the supposed STORMGLASS_PRESENT proof and left the retained decision behind a
+      // permanent revision gap. Install the passive public surface first; only its real active generation may
+      // satisfy Authority V2 controlInstalled.
+      await globalScene.ui.setMode(UiMode.MESSAGE);
       globalScene.ui.showText(STORMGLASS_WATCH_PROMPT);
       notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
     } catch {
