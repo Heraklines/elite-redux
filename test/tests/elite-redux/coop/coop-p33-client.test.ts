@@ -588,4 +588,38 @@ describe("authenticated P33 browser client", () => {
     expect(polls).toBeGreaterThanOrEqual(2);
     controller.cancel();
   });
+
+  it("ends a paired P33 run when initial WebRTC setup fails", async () => {
+    const urls: string[] = [];
+    const fetcher: typeof fetch = async input => {
+      const url = String(input);
+      urls.push(url);
+      if (url.endsWith("/coop/v3/lobby/announce")) {
+        return response({
+          presenceId: credential.presenceId,
+          pairingToken: credential.pairingToken,
+          identity,
+          pairing: pairing(),
+        });
+      }
+      if (url.endsWith("/coop/v3/end")) {
+        return response({ ok: true, state: "ended" });
+      }
+      return response({ error: "unexpected request" }, 500);
+    };
+    const connectP33 = vi.fn().mockRejectedValue(new Error("SDP setup failed"));
+    const onError = vi.fn();
+    const controller = new CoopLobbyController(
+      identity.displayName,
+      { onPlayers: vi.fn(), onConnecting: vi.fn(), onConnected: vi.fn(), onError },
+      { protocol: "p33", connectP33, p33Dependencies: baseDependencies(fetcher) },
+    );
+
+    await controller.start();
+
+    expect(connectP33).toHaveBeenCalledTimes(1);
+    expect(urls.some(url => url.endsWith("/coop/v3/end"))).toBe(true);
+    expect(urls.some(url => url.endsWith("/coop/v3/leave"))).toBe(false);
+    expect(onError).toHaveBeenCalledWith("SDP setup failed");
+  });
 });

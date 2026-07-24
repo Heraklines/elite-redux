@@ -27,9 +27,9 @@ import {
   CoopP33HttpError,
   type CoopP33LobbyCredentialV1,
   type CoopP33PairingV1,
+  endP33Run,
   fetchP33Lobby,
   leaveP33Lobby,
-  leaveP33Run,
   requestP33Player,
   respondToP33Request,
 } from "#data/elite-redux/coop/coop-p33-client";
@@ -594,6 +594,7 @@ export class CoopLobbyController {
         p33Dependencies: this.p33Dependencies,
       });
       if (this.stopped) {
+        await runtime.p33Signaling?.end().catch(() => {});
         runtime.localTransport.close();
         return;
       }
@@ -604,7 +605,9 @@ export class CoopLobbyController {
         `P33 lobby connect failed pairing=${pairing.pairingId} transportRole=${pairing.transportRole}: ${message(error)}`,
       );
       try {
-        await leaveP33Run(this.p33Credential, pairing.code, this.p33Dependencies);
+        // No live runtime exists to rejoin after initial SDP setup fails. Ending the pairing releases
+        // both account-unique presence rows immediately; `/leave` would strand them in two-minute grace.
+        await endP33Run(this.p33Credential, pairing.code, this.p33Dependencies);
       } catch {
         // The credential may already be stale; the original error is the useful one.
       }

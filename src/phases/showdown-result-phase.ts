@@ -195,14 +195,22 @@ export class ShowdownResultPhase extends BattlePhase {
       voided: this.voided,
     });
 
-    // A lobbyless queue match returns to waiting after every result. End the authenticated
-    // signaling run before clearing the runtime so the account can announce a fresh queue presence.
+    // Every Showdown battle is ephemeral, including tournament matches. `/leave` deliberately preserves
+    // a co-op run for hot rejoin, so ending only queued matches leaves tournament accounts locked behind
+    // a two-minute presence lease. Start the authenticated terminal request before local transport teardown,
+    // then hold the result screen until it settles so an immediate next-bracket notification cannot race it.
+    let signalingEnd: Promise<void> | null = null;
+    try {
+      signalingEnd =
+        runtime?.p33Signaling?.end().catch(error => {
+          console.warn("[showdown-result] signaling end failed; worker cleanup will recover it", error);
+        }) ?? null;
+    } catch (error) {
+      console.warn("[showdown-result] signaling end threw; worker cleanup will recover it", error);
+    }
+
+    // A lobbyless queue match returns to waiting after every result.
     if (isQueuedShowdownMatchInProgress()) {
-      try {
-        void runtime?.p33Signaling?.end().catch(() => {});
-      } catch {
-        // The next queue announce also reconciles a stale terminal run.
-      }
       completeQueuedShowdownMatch();
     }
 
@@ -294,12 +302,13 @@ export class ShowdownResultPhase extends BattlePhase {
       }
     };
     const beginResultText = () => {
-      if (tournamentReport == null) {
+      const pending = [tournamentReport, signalingEnd].filter((task): task is Promise<void> => task != null);
+      if (pending.length === 0) {
         runResultText();
         return;
       }
-      scene.ui.showText("Finalizing tournament result...", null);
-      void tournamentReport.then(() => {
+      scene.ui.showText(tournamentReport == null ? "Finalizing match..." : "Finalizing tournament result...", null);
+      void Promise.all(pending).then(() => {
         if (ownsScenePhase()) {
           runResultText();
         }

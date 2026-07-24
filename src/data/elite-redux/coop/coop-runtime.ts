@@ -3123,7 +3123,7 @@ export interface CoopRuntime {
    * Resolves true when the channel is re-established within the grace window.
    */
   rejoinDriver?: () => Promise<boolean>;
-  /** Authenticated P33 signaling lifecycle. `end` is called only by the shared terminal supervisor. */
+  /** Authenticated P33 signaling lifecycle. `end` is called by a shared terminal or an ephemeral match result. */
   p33Signaling?: {
     heartbeat: () => Promise<void>;
     leave: () => Promise<void>;

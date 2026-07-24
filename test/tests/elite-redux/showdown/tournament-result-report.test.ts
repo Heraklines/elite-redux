@@ -201,7 +201,23 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
 
     startLocalCoopSession({ kind: "versus", username: "carla" });
     await startShowdown();
-    const localName = getCoopRuntime()?.controller.localName() ?? "";
+    const runtime = getCoopRuntime();
+    const localName = runtime?.controller.localName() ?? "";
+    let resolveSignalingEnd: (() => void) | null = null;
+    const signalingEnd = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          resolveSignalingEnd = resolve;
+        }),
+    );
+    if (runtime != null) {
+      runtime.p33Signaling = {
+        heartbeat: async () => {},
+        leave: async () => {},
+        end: signalingEnd,
+        dispose: () => {},
+      };
+    }
     const expectedOpponent = "server-validated-rival";
     setTournamentMatchContext({
       tournamentId: "cup",
@@ -213,9 +229,16 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
     game.scene.phaseManager.clearPhaseQueue();
     game.scene.phaseManager.unshiftNew("ShowdownResultPhase", false, "victory", false, false);
     game.scene.phaseManager.getCurrentPhase()?.end();
-    await game.phaseInterceptor.to("TitlePhase");
+    const returnToTitle = game.phaseInterceptor.to("TitlePhase");
 
-    expect(reportTournament).toHaveBeenCalledWith("cup", "cup-r0-m0", expectedOpponent, 0);
+    await vi.waitFor(() => {
+      expect(reportTournament).toHaveBeenCalledWith("cup", "cup-r0-m0", expectedOpponent, 0);
+      expect(signalingEnd).toHaveBeenCalledTimes(1);
+    });
+    expect(game.scene.phaseManager.getCurrentPhase()?.phaseName).toBe("ShowdownResultPhase");
+    expect(resolveSignalingEnd).not.toBeNull();
+    (resolveSignalingEnd as () => void)();
+    await returnToTitle;
   });
 
   it("reports a peer-routed result and keeps the match context until attestation completes", async () => {
