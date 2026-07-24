@@ -3452,7 +3452,6 @@ function onCustomTrainerInput(el) {
   } else if (el.classList.contains("ctr-species") && m) {
     const selected = resolveSpeciesInput(el.value);
     m.species = selected?.const || el.value.trim().toUpperCase();
-    el.value = m.species;
     if (selected) {
       m.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
     }
@@ -3506,7 +3505,6 @@ function onCustomTrainerInput(el) {
   } else if (el.classList.contains("ctr-fusion-species") && m && m.fusion) {
     const selected = resolveSpeciesInput(el.value);
     m.fusion.species = selected?.const || el.value.trim().toUpperCase();
-    el.value = m.fusion.species;
     if (selected) {
       m.fusion.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
     }
