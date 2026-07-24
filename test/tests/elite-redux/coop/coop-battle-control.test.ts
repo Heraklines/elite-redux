@@ -651,11 +651,11 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
         rig.hostScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.targets,
         "the host selected the first 1-HP enemy",
       ).toEqual([BattlerIndex.ENEMY]);
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
       expect(
         rig.hostScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX]?.targets,
-        "the authority normalized the guest's implicit sole target before committing the turn",
+        "the authority consumed the guest's second-enemy target before committing the turn",
       ).toEqual([BattlerIndex.ENEMY_2]);
-      await game.phaseInterceptor.to("CoopTurnCommitPhase");
       expect(
         rig.hostScene.currentBattle.enemyParty.every(enemy => enemy.isFainted()),
         "both targets were KO'd",

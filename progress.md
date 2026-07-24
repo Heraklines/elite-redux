@@ -2384,3 +2384,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The public duo command driver can now select the second enemy through the real TARGET UI. The two-engine
   victory progression regression uses that option so host and guest intentionally defeat distinct targets;
   default-target journeys and single-target production behavior remain unchanged.
+
+# 2026-07-24 - Exact target proof observes the authority consumption boundary
+
+- Focused run `30056574097` proved the guest's public TARGET UI emitted `ENEMY_2`, but the victory fixture
+  inspected the host command array before its partner-slot `CommandPhase` had consumed that asynchronous
+  proposal. The assertion now runs at the real pre-commit boundary, where both authoritative commands exist.
+- New display-identity fixtures now cross Phaser's generic `GameObject` type through `unknown` explicitly;
+  this preserves the runtime identity check while restoring the branch-scoped static contract.

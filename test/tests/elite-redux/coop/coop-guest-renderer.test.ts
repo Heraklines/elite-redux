@@ -96,8 +96,8 @@ function completeTurnCarrier(turn: number) {
 function makeDisplayedIdentityUnique(pokemon: Pokemon): void {
   const occupiedIds = new Set(
     globalScene.field.list
-      .filter(candidate => candidate !== pokemon && typeof (candidate as { id?: unknown }).id === "number")
-      .map(candidate => (candidate as { id: number }).id),
+      .filter(candidate => candidate !== pokemon && typeof (candidate as unknown as { id?: unknown }).id === "number")
+      .map(candidate => (candidate as unknown as { id: number }).id),
   );
   while (occupiedIds.has(pokemon.id)) {
     pokemon.id = (pokemon.id + 1) >>> 0;

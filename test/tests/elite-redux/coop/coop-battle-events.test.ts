@@ -248,8 +248,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const partySlot = 0;
     const occupiedIds = new Set(
       globalScene.field.list
-        .filter(candidate => candidate !== displayed && typeof (candidate as { id?: unknown }).id === "number")
-        .map(candidate => (candidate as { id: number }).id),
+        .filter(
+          candidate => candidate !== displayed && typeof (candidate as unknown as { id?: unknown }).id === "number",
+        )
+        .map(candidate => (candidate as unknown as { id: number }).id),
     );
     while (occupiedIds.has(displayed.id)) {
       displayed.id = (displayed.id + 1) >>> 0;
@@ -1077,8 +1079,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // than correctly tripping the duplicate-identity fail-closed guard.
     const occupiedIds = new Set(
       globalScene.field.list
-        .filter(candidate => candidate !== displayed && typeof (candidate as { id?: unknown }).id === "number")
-        .map(candidate => (candidate as { id: number }).id),
+        .filter(
+          candidate => candidate !== displayed && typeof (candidate as unknown as { id?: unknown }).id === "number",
+        )
+        .map(candidate => (candidate as unknown as { id: number }).id),
     );
     while (occupiedIds.has(displayed.id)) {
       displayed.id = (displayed.id + 1) >>> 0;
