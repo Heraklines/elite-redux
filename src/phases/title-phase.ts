@@ -79,6 +79,9 @@ import i18next from "i18next";
 const NO_SAVE_SLOT = -1;
 export const SHOWDOWN_1V1_ENABLED = true;
 export const SHOWDOWN_TOURNAMENTS_ENABLED = false;
+export const SHOWDOWN_NETCODE_MODE: CoopNetcodeMode = "lockstep";
+const SHOWDOWN_TOURNAMENTS_BUILD_ENABLED =
+  (import.meta.env as unknown as Record<string, string | undefined>).VITE_ENABLE_SHOWDOWN_TOURNAMENTS === "1";
 const SHOWDOWN_MODE_OVERRIDE_PARAM = "enableShowdown";
 const SHOWDOWN_1V1_OVERRIDE_PARAM = "enableShowdown1v1";
 const SHOWDOWN_TOURNAMENTS_OVERRIDE_PARAM = "enableShowdownTournaments";
@@ -109,8 +112,21 @@ export function isShowdown1v1Enabled(search = typeof window === "undefined" ? ""
 
 export function areShowdownTournamentsEnabled(
   search = typeof window === "undefined" ? "" : window.location.search,
+  buildEnabled = SHOWDOWN_TOURNAMENTS_BUILD_ENABLED,
 ): boolean {
-  return isShowdownFeatureEnabled(search, SHOWDOWN_TOURNAMENTS_OVERRIDE_PARAM, SHOWDOWN_TOURNAMENTS_ENABLED);
+  return isShowdownFeatureEnabled(
+    search,
+    SHOWDOWN_TOURNAMENTS_OVERRIDE_PARAM,
+    SHOWDOWN_TOURNAMENTS_ENABLED || buildEnabled,
+  );
+}
+
+export function showdownTournamentLaunchConfig(): {
+  netcodeMode: CoopNetcodeMode;
+  sessionKind: CoopSessionKind;
+  launchMode: GameModes;
+} {
+  return { netcodeMode: SHOWDOWN_NETCODE_MODE, sessionKind: "versus", launchMode: GameModes.SHOWDOWN };
 }
 
 export class TitlePhase extends Phase {
@@ -300,7 +316,7 @@ export class TitlePhase extends Phase {
                 showTemporarilyDisabled();
                 return true;
               }
-              this.openShowdownTeamMenu(setModeAndEnd, "lockstep");
+              this.openShowdownTeamMenu(setModeAndEnd, SHOWDOWN_NETCODE_MODE);
               return true;
             },
           });
@@ -549,7 +565,7 @@ export class TitlePhase extends Phase {
    */
   private openShowdownTeamMenu(
     setModeAndEnd: (gameMode: GameModes) => void,
-    netcodeMode: CoopNetcodeMode = "lockstep",
+    netcodeMode: CoopNetcodeMode = SHOWDOWN_NETCODE_MODE,
   ): void {
     const { gameData } = globalScene;
     const showMenu = (): void => {
@@ -659,7 +675,8 @@ export class TitlePhase extends Phase {
         ...(battleFormat && battleFormat !== "singles" ? { battleFormat } : {}),
         ...(seriesFormat && seriesFormat !== "single" ? { seriesFormat, gameIndex: 0 } : {}),
       });
-      this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
+      const launch = showdownTournamentLaunchConfig();
+      this.openCoopLobby(setModeAndEnd, launch.netcodeMode, launch.sessionKind, launch.launchMode);
     };
 
     const openBracket = async (id: string, initialBrowse?: { round: number; slot: number }): Promise<void> => {
@@ -857,7 +874,7 @@ export class TitlePhase extends Phase {
     let incoming: { id: string; name: string } | null = null;
     // The aesthetic stage (backdrop + two seat cards + status strip); the option
     // panel below is the INPUT. Torn down on every exit path.
-    const stage = new CoopLobbyStage(username);
+    const stage = new CoopLobbyStage(username, sessionKind === "versus" ? "showdown" : "coop");
     let lobbyTerminated = false;
     let lobbyCompleted = false;
     let flowRuntime: CoopRuntime | null = null;
@@ -1120,9 +1137,9 @@ export class TitlePhase extends Phase {
         const isCurrentSession = (): boolean =>
           !lobbyTerminated && !lobbyCompleted && this.isExactCoopSession(runtime, controller, sessionGeneration);
         // Versus launches no longer broadcast a runConfig, so BOTH clients must pin the mode selected
-        // by their title route before entering the battle flow. Showdown 1v1 runs the dual-engine
-        // lockstep path; tournaments retain their existing authoritative route. Co-op's host remains
-        // the config authority.
+        // by their title route before entering the battle flow. All Showdown matches, including
+        // scheduled tournament matches, run the same dual-engine lockstep path. Co-op's host remains
+        // the config authority for co-op sessions.
         if (sessionKind === "versus" || runtime.controller.role === "host") {
           runtime.controller.setNetcodeMode(netcodeMode);
         }

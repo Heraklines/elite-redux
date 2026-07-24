@@ -209,6 +209,7 @@ jobs:
             # Showdown battle telemetry (D5): dedicated worker + er-telemetry D1.
             # Without this the client falls back to VITE_SERVER_URL (404 no-op).
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry.heraklines.workers.dev"
+            echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"
             # Enable the in-game dev TEST SUITE on STAGING only (Dev Scenarios menu,
             # Pass/Fail, Send Logs). Production's Cloudflare Pages build does NOT set
             # this, so the suite never activates there. See CLAUDE.md.

@@ -38,6 +38,7 @@ test("staging promotes one verified browser/Worker contract without cancellable 
 });
 
 test("staging browser and signaling deployment are pinned to P33 without production bindings", () => {
+  assert.match(workflow, /echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"/u);
   assert.match(workflow, /echo "VITE_COOP_SERVER_URL=https:\/\/er-coop-api-staging\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_COOP_SIGNALING_PROTOCOL=p33"/u);
   assert.match(workflow, /node scripts\/materialize-coop-staging-config\.mjs/u);

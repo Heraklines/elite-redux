@@ -7,8 +7,15 @@ import type { BattleScene } from "#app/battle-scene";
 import { GameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { GameModes } from "#enums/game-modes";
-import { areShowdownTournamentsEnabled, isShowdown1v1Enabled, TitlePhase } from "#phases/title-phase";
+import {
+  areShowdownTournamentsEnabled,
+  isShowdown1v1Enabled,
+  SHOWDOWN_NETCODE_MODE,
+  showdownTournamentLaunchConfig,
+  TitlePhase,
+} from "#phases/title-phase";
 import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
+import { getCoopLobbyStageTitle } from "#ui/coop-lobby-stage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("title mode selection", () => {
@@ -152,15 +159,30 @@ describe("title mode selection", () => {
     expect(showdownOption?.label).toBe(GameMode.getModeName(GameModes.SHOWDOWN));
     expect(modeOptions).not.toContainEqual(expect.objectContaining({ semanticId: "showdown-sync" }));
     showdownOption?.handler();
-    expect(teamMenuSpy).toHaveBeenCalledWith(expect.any(Function), "lockstep");
+    expect(teamMenuSpy).toHaveBeenCalledWith(expect.any(Function), SHOWDOWN_NETCODE_MODE);
   });
 
   it("supports explicit URL overrides for testing and emergency shutdown", () => {
     expect(isShowdown1v1Enabled("")).toBe(true);
     expect(areShowdownTournamentsEnabled("")).toBe(false);
+    expect(areShowdownTournamentsEnabled("", true)).toBe(true);
+    expect(areShowdownTournamentsEnabled("?enableShowdownTournaments=0", true)).toBe(false);
     expect(isShowdown1v1Enabled("?enableShowdown1v1=0")).toBe(false);
     expect(areShowdownTournamentsEnabled("?enableShowdownTournaments=1")).toBe(true);
     expect(isShowdown1v1Enabled("?enableShowdown=0")).toBe(false);
     expect(areShowdownTournamentsEnabled("?enableShowdown=1")).toBe(true);
+  });
+
+  it("launches tournament matches through the same lockstep Showdown runtime", () => {
+    expect(showdownTournamentLaunchConfig()).toEqual({
+      netcodeMode: "lockstep",
+      sessionKind: "versus",
+      launchMode: GameModes.SHOWDOWN,
+    });
+  });
+
+  it("labels versus lobbies as Showdown without changing co-op lobbies", () => {
+    expect(getCoopLobbyStageTitle("coop")).toBe("CO-OP LOBBY");
+    expect(getCoopLobbyStageTitle("showdown")).toBe("SHOWDOWN LOBBY");
   });
 });

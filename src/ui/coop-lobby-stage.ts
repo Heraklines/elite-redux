@@ -28,6 +28,13 @@ export interface SeatState {
   dot: "green" | "amber" | "red";
 }
 
+export type CoopLobbyStageVariant = "coop" | "showdown";
+
+/** Player-facing lobby title. Matchmaking still uses the shared co-op transport underneath. */
+export function getCoopLobbyStageTitle(variant: CoopLobbyStageVariant): string {
+  return variant === "showdown" ? "SHOWDOWN LOBBY" : "CO-OP LOBBY";
+}
+
 // LEFT-COLUMN layout (v2): the input OPTION_SELECT panel is right-edge anchored (it grows
 // up-left from the bottom-right), so the stage keeps ALL its content in the left column and
 // dresses the right side as an "ACTIONS" dock the panel visually docks into - no overlap.
@@ -58,7 +65,7 @@ export class CoopLobbyStage {
   private pulse: Phaser.Tweens.Tween | null = null;
   private destroyed = false;
 
-  constructor(localName: string) {
+  constructor(localName: string, variant: CoopLobbyStageVariant = "coop") {
     // The game's LOGICAL resolution is a fixed 320x180 (1920x1080 canvas at the x6 ui
     // scale; FIT scaling never changes the internal canvas). Fixed constants, NOT
     // `game.canvas.width / 6`: headless environments carry a differently-sized mock
@@ -91,7 +98,9 @@ export class CoopLobbyStage {
     this.root.add(dockLabel);
 
     // LEFT: header (title + accent underline) centered over the left column.
-    const title = addTextObject(LEFT_CENTER, 6, "CO-OP LOBBY", TextStyle.SETTINGS_LABEL, { fontSize: "112px" });
+    const title = addTextObject(LEFT_CENTER, 6, getCoopLobbyStageTitle(variant), TextStyle.SETTINGS_LABEL, {
+      fontSize: "112px",
+    });
     title.setOrigin(0.5, 0);
     this.root.add(title);
     const underline = globalScene.add.rectangle(LEFT_CENTER, 22, 132, 1.5, 0x78c8f0, 0.9).setOrigin(0.5, 0);
