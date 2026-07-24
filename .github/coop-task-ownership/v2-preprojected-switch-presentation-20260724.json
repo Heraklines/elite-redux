@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "37701f4c44cc182be6796a82d7f0288aa0a36692",
+  "baseSha": "3b5ee4432df08fd805e839df0c546d23c9f36bdb",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -16,6 +16,8 @@
     "src/phases/coop-replay-phases.ts",
     "src/phases/the-bargain-phase.ts",
     "src/phases/title-phase.ts",
+    "test/browser/coop-public-ui/public-ui-harness.mjs",
+    "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
     "test/tests/elite-redux/coop/coop-duo-exploration.test.ts",
     "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
     "test/tests/elite-redux/coop/coop-lobby.test.ts",
@@ -23,7 +25,8 @@
     "test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts",
     "test/tests/elite-redux/coop/coop-soak-me.test.ts",
     "test/tests/elite-redux/showdown/showdown-sync-duo.test.ts",
-    "test/tools/coop-duo-harness.ts"
+    "test/tools/coop-duo-harness.ts",
+    "test/utils/encounter-test-utils.ts"
   ],
   "lockedSchemaFiles": []
 }

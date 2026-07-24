@@ -4482,6 +4482,20 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
     replay.start();
     await drainLoopback();
   }
+  // The real handler intentionally blocks accidental click-through for one second and publishes its V2
+  // readiness only on that timer's false -> true edge. Headless tests do not advance wall-clock time while
+  // alternating the two browser realms, so cross that same public handler edge explicitly before a guest
+  // owner is allowed to relay its choice. Without this, the old helper bypassed UI.processInput while the
+  // ledger correctly had no executable lease, then blamed the later terminal for refusing succession.
+  if (globalScene.ui.getMode() === UiMode.MYSTERY_ENCOUNTER) {
+    const handler = globalScene.ui.getHandler() as unknown as {
+      active?: boolean;
+      unblockInput?: () => void;
+    };
+    if (handler.active === true) {
+      handler.unblockInput?.();
+    }
+  }
   return replay;
 }
 

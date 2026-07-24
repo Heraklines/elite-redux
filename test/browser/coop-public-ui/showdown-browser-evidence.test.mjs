@@ -202,10 +202,11 @@ test("the real-browser oracle requires streamed ability and environment presenta
     harness.indexOf("async assertShowdownEntryPresentation("),
     harness.indexOf("\n  /** Submit a voluntary switch", harness.indexOf("async assertShowdownEntryPresentation(")),
   );
-  assert.match(start, /authority Showdown ability flyout/u);
-  assert.match(start, /renderer Showdown ability flyout/u);
-  assert.match(start, /authority Showdown environment animation/u);
-  assert.match(start, /renderer Showdown environment animation/u);
+  assert.match(start, /host Showdown ability flyout/u);
+  assert.match(start, /guest Showdown ability flyout/u);
+  assert.match(start, /host Showdown environment animation/u);
+  assert.match(start, /guest Showdown environment animation/u);
+  assert.doesNotMatch(start, /CoopShowAbilityReplayPhase/u);
   assert.match(start, /hostEnvironmentView\.anim !== guestEnvironmentView\.anim/u);
   assert.match(start, /hostEnvironmentView\.environmentPresentation\?\.value/u);
   assert.match(start, /hostEnvironmentView\.weather !== guestEnvironmentView\.weather/u);

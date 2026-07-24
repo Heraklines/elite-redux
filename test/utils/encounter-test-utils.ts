@@ -8,7 +8,6 @@ import * as EncounterPhaseUtils from "#mystery-encounters/encounter-phase-utils"
 import { MysteryEncounterRewardsPhase } from "#phases/mystery-encounter-phases";
 import { VictoryPhase } from "#phases/victory-phase";
 import type { GameManager } from "#test/framework/game-manager";
-import type { MessageUiHandler } from "#ui/message-ui-handler";
 import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
 import type { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
 import type { PartyUiHandler } from "#ui/party-ui-handler";
@@ -35,8 +34,7 @@ export async function runMysteryEncounterToEnd(
     "MysteryEncounterOptionSelectedPhase",
     UiMode.MESSAGE,
     () => {
-      const uiHandler = game.scene.ui.getHandler<MysteryEncounterUiHandler>();
-      uiHandler.processInput(Button.ACTION);
+      game.scene.ui.processInput(Button.ACTION);
     },
     () => game.isCurrentPhase("MysteryEncounterBattlePhase") || game.isCurrentPhase("MysteryEncounterRewardsPhase"),
   );
@@ -61,8 +59,7 @@ export async function runSelectMysteryEncounterOption(
     "MessagePhase",
     UiMode.MESSAGE,
     () => {
-      const uiHandler = game.scene.ui.getHandler<MessageUiHandler>();
-      uiHandler.processInput(Button.ACTION);
+      game.scene.ui.processInput(Button.ACTION);
     },
     () => game.isCurrentPhase("MysteryEncounterOptionSelectedPhase", "CommandPhase", "TurnInitPhase"),
   );
@@ -76,8 +73,7 @@ export async function runSelectMysteryEncounterOption(
     "MysteryEncounterPhase",
     UiMode.MESSAGE,
     () => {
-      const uiHandler = game.scene.ui.getHandler<MysteryEncounterUiHandler>();
-      uiHandler.processInput(Button.ACTION);
+      game.scene.ui.processInput(Button.ACTION);
     },
     () => game.isCurrentPhase("MysteryEncounterOptionSelectedPhase", "CommandPhase", "TurnInitPhase"),
   );
@@ -90,14 +86,14 @@ export async function runSelectMysteryEncounterOption(
 
   switch (optionNo) {
     case 2:
-      uiHandler.processInput(Button.RIGHT);
+      game.scene.ui.processInput(Button.RIGHT);
       break;
     case 3:
-      uiHandler.processInput(Button.DOWN);
+      game.scene.ui.processInput(Button.DOWN);
       break;
     case 4:
-      uiHandler.processInput(Button.RIGHT);
-      uiHandler.processInput(Button.DOWN);
+      game.scene.ui.processInput(Button.RIGHT);
+      game.scene.ui.processInput(Button.DOWN);
       break;
     default:
       // no movement needed. Default cursor position
@@ -105,7 +101,9 @@ export async function runSelectMysteryEncounterOption(
   }
 
   if (secondaryOptionSelect?.pokemonNo == null) {
-    uiHandler.processInput(Button.ACTION);
+    if (!game.scene.ui.processInput(Button.ACTION)) {
+      throw new Error("Mystery encounter public input rejected the selected option");
+    }
   } else {
     await handleSecondaryOptionSelect(game, secondaryOptionSelect.pokemonNo, secondaryOptionSelect.optionNo);
   }
@@ -116,19 +114,18 @@ async function handleSecondaryOptionSelect(game: GameManager, pokemonNo: number,
   const partyUiHandler = game.scene.ui.handlers[UiMode.PARTY] as PartyUiHandler;
   vi.spyOn(partyUiHandler, "show");
 
-  const encounterUiHandler = game.scene.ui.getHandler<MysteryEncounterUiHandler>();
-  encounterUiHandler.processInput(Button.ACTION);
+  game.scene.ui.processInput(Button.ACTION);
 
   await vi.waitFor(() => expect(partyUiHandler.show).toHaveBeenCalled());
 
   for (let i = 1; i < pokemonNo; i++) {
-    partyUiHandler.processInput(Button.DOWN);
+    game.scene.ui.processInput(Button.DOWN);
   }
 
   // Open options on Pokemon
-  partyUiHandler.processInput(Button.ACTION);
+  game.scene.ui.processInput(Button.ACTION);
   // Click "Select" on Pokemon options
-  partyUiHandler.processInput(Button.ACTION);
+  game.scene.ui.processInput(Button.ACTION);
 
   // If there is a second choice to make after selecting a Pokemon
   if (optionNo != null) {
@@ -139,11 +136,11 @@ async function handleSecondaryOptionSelect(game: GameManager, pokemonNo: number,
 
     // Navigate down to the correct option
     for (let i = 1; i < optionNo!; i++) {
-      secondOptionUiHandler.processInput(Button.DOWN);
+      game.scene.ui.processInput(Button.DOWN);
     }
 
     // Select the option
-    secondOptionUiHandler.processInput(Button.ACTION);
+    game.scene.ui.processInput(Button.ACTION);
   }
 }
 

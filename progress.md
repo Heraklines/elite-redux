@@ -2771,3 +2771,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Legacy and authenticated P33 lobby contracts both prove that `lockstep` plus `versus` reaches the connector
   in its construction options. The fix changes launch wiring only; no Authority V2 mechanical rule is
   weakened and ordinary co-op continues to construct as `authoritative` plus `coop`.
+
+# 2026-07-24 - Public Mystery tests and Showdown evidence follow the active authority model
+
+- Exact gate `30084867160` proves the static, public UI/Authority V2 contracts, mutation shards, sealed
+  browser bundle, browser-native WebRTC/rejoin, and the large majority of A/B/C/P/S/T lanes green at
+  `3b5ee4432`. B5/B9/B10/B11 remain evidence-bearing reds; T4 remains the separately owned Elite Redux
+  ghost/triples probability debt.
+- B5's first Mystery failure was a test-authority violation: the shared helper called the active handler
+  directly while `ME_PRESENT` had not installed an actionable V2 control lease. The UI mutation therefore
+  bypassed the freeze/relay chain and the following `ME_TERMINAL` correctly failed closed when it could not
+  reserve the promised successor. All Mystery navigation now enters through public `UI.processInput`, and
+  the alternating-realm replay helper crosses the production handler's one-second unblock/readiness edge
+  before guest-owned input. This tests UI -> lease -> relay -> V2 commit instead of manufacturing local state.
+- Two-browser Showdown run `30084868893` proves the launch fix: both seats negotiate `netcode=lockstep`,
+  reach wave 1, exchange voluntary-switch commands, render identical switched-Arcanine ability material
+  (`abilityId=22`), and continue through the resulting stat change. The red was an obsolete oracle predicate
+  that still required the guest's authoritative-co-op `CoopShowAbilityReplayPhase`; lockstep correctly runs
+  ordinary `ShowAbilityPhase` on both engines. The oracle now requires that ordinary phase on each seat and
+  retains its exact payload, presentation-ledger, and before-command ordering comparisons.
+- The branch-wide typecheck still reports the repository's known unrelated baseline. It reports no error in
+  any file changed by this batch; owned-file formatting and `git diff --check` remain clean.

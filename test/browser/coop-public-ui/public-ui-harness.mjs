@@ -2514,25 +2514,22 @@ export class DuoPublicUiRig {
       this.host.evidence.waitFor(/\[coop-browser:presentation\] \{.*"kind":"ability".*"phase":"ShowAbilityPhase"/u, {
         from: battleCursors[this.host.label],
         timeoutMs: this.config.timeoutMs,
-        description: "authority Showdown ability flyout",
+        description: "host Showdown ability flyout",
       }),
-      this.guest.evidence.waitFor(
-        /\[coop-browser:presentation\] \{.*"kind":"ability".*"phase":"CoopShowAbilityReplayPhase"/u,
-        {
-          from: battleCursors[this.guest.label],
-          timeoutMs: this.config.timeoutMs,
-          description: "renderer Showdown ability flyout",
-        },
-      ),
+      this.guest.evidence.waitFor(/\[coop-browser:presentation\] \{.*"kind":"ability".*"phase":"ShowAbilityPhase"/u, {
+        from: battleCursors[this.guest.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "guest Showdown ability flyout",
+      }),
       this.host.evidence.waitFor(/\[coop-browser:presentation\] \{.*"kind":"environment"/u, {
         from: battleCursors[this.host.label],
         timeoutMs: this.config.timeoutMs,
-        description: "authority Showdown environment animation",
+        description: "host Showdown environment animation",
       }),
       this.guest.evidence.waitFor(/\[coop-browser:presentation\] \{.*"kind":"environment"/u, {
         from: battleCursors[this.guest.label],
         timeoutMs: this.config.timeoutMs,
-        description: "renderer Showdown environment animation",
+        description: "guest Showdown environment animation",
       }),
     ]);
     const presentation = event => JSON.parse(event.text.slice(presentationPrefix.length));
