@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "trainRef": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "baseSha": "2e318438824ea79be7e09bceb49ec0dd1d5f6da7",
+  "baseSha": "4c7927f2f77b020c2695f389bfbe0819b4a791c2",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     ".github/workflows/coop-focused-branch.yml",

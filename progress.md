@@ -2604,6 +2604,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   it before each reused-scene bootstrap and before disabling destination isolation. This preserves the same
   production two-process lifetime while preventing a completed test's runtime from manufacturing a softlock
   in the next case.
+- P2 exact-SHA rerun `30067284356` proved explicit runtime disposal alone was insufficient: the same three
+  every-fifth cases still inherited a replay phase. Existing raw-timeout closures and Phaser delayed events
+  retained their destination-context wrapper after the rig registry was cleared. Every pinned callback now
+  carries a rig-lifetime fence, old scene clock events are removed during teardown, and an outstanding
+  interceptor cannot start another phase after disposal.
 
 # 2026-07-24 - Enemy structural projection is mechanics-free and fail-closed
 

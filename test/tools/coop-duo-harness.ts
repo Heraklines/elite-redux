@@ -2393,13 +2393,24 @@ const duoCtxPinDisposers = new WeakMap<DuoRig, (() => void)[]>();
 
 function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
   const disposers: (() => void)[] = [];
+  let disposed = false;
+  // This fence must run before any individual wrapper is unwound. Already-scheduled raw callbacks retain
+  // their wrapper closure even after global setTimeout is restored; without a lifetime bit they can re-enter
+  // a retired client during the next reused-scene test.
+  disposers.push(() => {
+    disposed = true;
+  });
   const pinClock = (scene: BattleScene, ctx: ClientCtx): void => {
     const clock = scene.time as unknown as {
       update: (time: number, delta: number) => void;
       _active?: unknown[];
+      removeAllEvents?: () => void;
     };
     const originalUpdate = clock.update.bind(scene.time);
     clock.update = (time: number, delta: number): void => {
+      if (disposed) {
+        return;
+      }
       // Only a tick that can FIRE callbacks needs the swap; an idle clock stays a cheap direct call.
       if ((clock._active?.length ?? 0) === 0 || activeClientLabel === ctx.label) {
         originalUpdate(time, delta);
@@ -2408,6 +2419,7 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
       withClientSync(ctx, () => originalUpdate(time, delta));
     };
     disposers.push(() => {
+      clock.removeAllEvents?.();
       clock.update = originalUpdate;
     });
   };
@@ -2417,6 +2429,9 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
   const interceptor = hostGame.phaseInterceptor as unknown as { run: (phase: Phase) => Promise<void> };
   const originalRun = interceptor.run.bind(hostGame.phaseInterceptor);
   interceptor.run = (phase: Phase): Promise<void> => {
+    if (disposed) {
+      return Promise.resolve();
+    }
     if (activeClientLabel === rig.hostCtx.label) {
       return originalRun(phase);
     }
@@ -2453,6 +2468,9 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
       return callback;
     }
     return () => {
+      if (disposed) {
+        return;
+      }
       if (activeClientLabel === owner.label) {
         callback();
         return;
@@ -2477,6 +2495,9 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
     const fn = handler as (...a: unknown[]) => void;
     return (originalSetTimeout as (...a: unknown[]) => unknown)(
       (...cbArgs: unknown[]) => {
+        if (disposed) {
+          return;
+        }
         if (activeClientLabel === owner.label) {
           fn(...cbArgs);
           return;
