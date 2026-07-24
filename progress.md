@@ -2342,3 +2342,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   rebuild. Its anchor, insertion index, and verified postcondition therefore use the actual renderer order;
   this also prevents the fallback from leaving duplicate/stale display identities that can poison later
   exact-actor HP/faint presentation.
+
+# 2026-07-24 - Ability presentation follows immutable display identity through material replacement
+
+- Gate `30054897928` showed real two-engine turns terminalizing on `ability-actor-identity-mismatch` after
+  an authoritative material apply detached the logical party object from the still-visible battler. Ability
+  replay alone searched only party arrays, so its banner disappeared even though the exact immutable actor
+  remained seated in Phaser's field.
+- Ability replay now resolves an exact side/id first from the authoritative party and then from the exact
+  displayed identity, matching HP/faint's material/presentation separation without introducing a slot or
+  same-species fallback. A direct regression replaces the party reference while retaining the visible enemy
+  and proves the authority-selected ability flyout still renders for that object.

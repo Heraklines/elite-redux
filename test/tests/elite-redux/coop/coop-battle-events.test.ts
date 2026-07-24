@@ -241,6 +241,38 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(coopPresentationOutcome(token)?.kind).toBe("rendered");
   });
 
+  it("replays an ability against the displayed identity after material detached the party reference", async () => {
+    await startCoopGuest();
+    const battle = globalScene.currentBattle;
+    const displayed = battle.enemyParty[0];
+    const partySlot = 0;
+    const detachedParty = globalScene.addEnemyPokemon(displayed.species, displayed.level, displayed.trainerSlot, false);
+    detachedParty.id = displayed.id;
+    battle.enemyParty[partySlot] = detachedParty;
+    expect(globalScene.field.getIndex(displayed)).toBeGreaterThanOrEqual(0);
+    expect(globalScene.field.getIndex(detachedParty)).toBe(-1);
+
+    const token = createCoopPresentationOutcomeToken();
+    const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility").mockResolvedValue();
+    vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(false);
+    const phase = new CoopShowAbilityReplayPhase(
+      displayed.getBattlerIndex(),
+      displayed.id,
+      partySlot,
+      displayed.getAbility().id,
+      false,
+      0,
+      token,
+      { side: "enemy", pokemonId: displayed.id },
+    );
+
+    phase.start();
+    await Promise.resolve();
+
+    expect(showSpy, "the immutable visible actor still owns its authority-selected flyout").toHaveBeenCalled();
+    expect(coopPresentationOutcome(token)?.kind).toBe("rendered");
+  });
+
   it("an exact combat event cannot report presentation success for a missing actor", async () => {
     const field = await startCoopGuest();
     const token = createCoopPresentationOutcomeToken();

@@ -368,7 +368,11 @@ export class CoopShowAbilityReplayPhase extends Phase {
       candidate => candidate.id === this.pokemonId,
     );
     const pokemon =
-      exactActor == null ? (legacyMatches.length === 1 ? legacyMatches[0] : null) : exactPartyActor(exactActor);
+      exactActor == null
+        ? legacyMatches.length === 1
+          ? legacyMatches[0]
+          : null
+        : (exactPartyActor(exactActor) ?? exactDisplayedActor(exactActor));
     const playerSide = exactActor?.side === "player" || (exactActor == null && (pokemon?.isPlayer() ?? false));
     const ability = allAbilities[this.abilityId];
     const actorFingerprint = `${playerSide ? "player" : "enemy"}:bi${this.bi}:slot${this.partySlot}:p${this.pokemonId}`;
