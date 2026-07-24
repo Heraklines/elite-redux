@@ -4721,16 +4721,18 @@ async function settleDuoGuestMeReplayWithDelivery(rig: DuoRig, replay: Phase): P
       () => (replay as unknown as { continuationHandedOff: boolean }).continuationHandedOff,
     );
     if (continuationHandedOff && !meReplaySettled(replay)) {
-      const continuation = withClient(rig.guestCtx, () =>
+      // Once the retained transaction hands control to the guest's ordinary phase queue, run that
+      // queue inside one uninterrupted guest realm. `settleDuoPromise` is for promises whose protocol
+      // crossing is still pending; wrapping this local continuation in it repeatedly pre-empted the
+      // shared-process `globalScene` while EggLapsePhase/PostMysteryEncounterPhase were ending. Two real
+      // browsers cannot suffer that ambient-scene swap. Any later Authority V2 frame is still deferred
+      // and will be drained by the outer alternating loop after the local phase has yielded.
+      await withClient(rig.guestCtx, () =>
         driveClientPhaseQueueTo(rig.guestScene, "retained Mystery final leave", {
           matches: () => meReplaySettled(replay),
           maxPhases: 32,
         }),
       );
-      await settleDuoPromise(rig, continuation, "retained Mystery final-leave continuation", {
-        timeoutMs: 10_000,
-        intervalMs: 5,
-      });
     }
     if (!meReplaySettled(replay)) {
       await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -4757,11 +4759,12 @@ export async function settleDuoGuestMeReplay(rig: DuoRig, replay: Phase): Promis
 export async function driveDuoGuestMeReplay(rig: DuoRig): Promise<GuestMeReplay> {
   rig.pair.setDestinationContextDelivery?.(true);
   try {
-    const startPending = withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-    const replay = await settleDuoPromise(rig, startPending, "production Mystery replay start", {
-      timeoutMs: 20_000,
-      intervalMs: 5,
-    });
+    // Admit any already-buffered authority entry before the guest constructs its render surface, then
+    // keep startGuestMeReplay's phase creation and immediate callbacks in one guest realm. The helper's
+    // own drain is bounded; protocol successors that still require a host receipt are handled by the
+    // alternating settlement loop below.
+    await pumpDuoDestinations(rig, 1);
+    const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
     return await settleDuoGuestMeReplayWithDelivery(rig, replay);
   } finally {
     rig.pair.setDestinationContextDelivery?.(false);
@@ -4796,6 +4799,24 @@ export async function drainGuestMeReplayNewRounds(replay: Phase, expected: numbe
     }
   }
   return seam.newRoundsRendered;
+}
+
+/** Render repeated Mystery rounds while both Authority V2 receipt/successor loops remain schedulable. */
+export async function drainDuoGuestMeReplayNewRounds(rig: DuoRig, replay: Phase, expected: number): Promise<number> {
+  const seam = replay as unknown as GuestMeRoundSeam;
+  rig.pair.setDestinationContextDelivery?.(true);
+  try {
+    const deadline = Date.now() + 10_000;
+    while (seam.newRoundsRendered < expected && !seam.settled && Date.now() < deadline) {
+      await pumpDuoDestinations(rig, 1);
+      if (seam.newRoundsRendered < expected && !seam.settled) {
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+      }
+    }
+    return seam.newRoundsRendered;
+  } finally {
+    rig.pair.setDestinationContextDelivery?.(false);
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -36,9 +36,8 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
-import * as meOp from "#data/elite-redux/coop/coop-me-operation";
 import { type CoopMePresentPayload, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
-import { clearCoopRuntime, getCoopInteractionRelay, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
@@ -53,7 +52,7 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   awaitRewardShopPhaseExit,
   buildDuoForMe,
-  drainGuestMeReplayNewRounds,
+  drainDuoGuestMeReplayNewRounds,
   drainLoopback,
   driveClientPhaseQueueTo,
   driveDuoGuestMeReplay,
@@ -63,6 +62,7 @@ import {
   driveHostRewardShopOwner,
   type ErQuizPhaseSeam,
   installDuoLogCapture,
+  relayGuestMeOptionIndexOnly,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
   settleDuoGuestMeReplay,
@@ -135,35 +135,6 @@ function committedMePresentations(
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
-}
-
-/**
- * Mint the same retained owner intent and addressed proposal ordinal as the public Mystery selector.
- * The two-engine harness defers the replay's outcome race until the host has run, so it cannot invoke the
- * selector handler directly without resolving its promises under the shared process-global host context.
- */
-function relayGuestMePickWithIntent(replay: Phase, scene: BattleScene, pinned: number, optionIndex: number): void {
-  const relay = getCoopInteractionRelay();
-  if (relay == null) {
-    throw new Error("guest-owned ME test lost its production interaction relay");
-  }
-  const seq = (replay as unknown as { seq: number }).seq;
-  const step = 0;
-  const operationId = meOp.commitMeOwnerIntent({
-    kind: "ME_PICK",
-    seq,
-    pinned,
-    step,
-    payload: { optionIndex },
-    localRole: "guest",
-    wave: scene.currentBattle.waveIndex,
-    turn: scene.currentBattle.turn,
-    resend: () => relay.sendInteractionChoice(seq, "me", optionIndex, [step]),
-  });
-  if (operationId == null) {
-    throw new Error("guest-owned ME test could not retain its typed ME_PICK intent");
-  }
-  relay.sendInteractionChoice(seq, "me", optionIndex, [step]);
 }
 
 /**
@@ -561,7 +532,7 @@ describe.skipIf(!RUN)(
       // mysteryEncounterSaveData is the harness's #1 footgun). The guest's OWN outcome/terminal race is
       // deferred to STEP D so ITS awaits also resolve under the guest scene. =====
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-      withClientSync(rig.guestCtx, () => relayGuestMePickWithIntent(replay, rig.guestScene, counterBefore, 0));
+      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
 
       // ===== STEP C (host): the relayed index's deliver-microtask is queued but UNFIRED. Pump the host
       // UNDER hostCtx: the first drainLoopback flushes it, the coopHostAwaitGuestIndex await resolves (its
@@ -931,28 +902,35 @@ describe.skipIf(!RUN)(
 
       // ===== STEP A2 (guest): start the retained replay while the owner is visibly parked in the quiz.
       // Capture the exact ErQuizPhase production creates; no synthetic phase or private outcome is injected.
-      await withClient(rig.guestCtx, async () => {
-        const factory = rig.guestScene.phaseManager as unknown as {
-          create: (phaseName: string, ...args: unknown[]) => Phase;
-        };
-        const originalCreate = factory.create;
-        factory.create = function captureMirrorQuiz(phaseName: string, ...args: unknown[]): Phase {
-          const created = originalCreate.call(this, phaseName, ...args);
-          if (phaseName === "ErQuizPhase") {
-            guestQuizPhase = created as unknown as ErQuizPhaseSeam;
-            const originalStart = created.start;
-            created.start = function observeMirrorQuizStart(): void {
-              guestQuizStartObserved = true;
-              originalStart.call(this);
-            };
-          }
-          return created;
-        };
-        try {
-          guestMePhase = await startGuestMeReplay(rig.guestScene);
-        } finally {
-          factory.create = originalCreate;
+      const factory = rig.guestScene.phaseManager as unknown as {
+        create: (phaseName: string, ...args: unknown[]) => Phase;
+      };
+      const originalCreate = factory.create;
+      factory.create = function captureMirrorQuiz(phaseName: string, ...args: unknown[]): Phase {
+        const created = originalCreate.call(this, phaseName, ...args);
+        if (phaseName === "ErQuizPhase") {
+          guestQuizPhase = created as unknown as ErQuizPhaseSeam;
+          const originalStart = created.start;
+          created.start = function observeMirrorQuizStart(): void {
+            guestQuizStartObserved = true;
+            originalStart.call(this);
+          };
         }
+        return created;
+      };
+      try {
+        guestMePhase = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+        rig.pair.setDestinationContextDelivery?.(true);
+        const deadline = Date.now() + 10_000;
+        while (guestQuizPhase == null && Date.now() < deadline) {
+          await withClient(rig.hostCtx, () => drainLoopback());
+          await withClient(rig.guestCtx, () => drainLoopback());
+        }
+      } finally {
+        rig.pair.setDestinationContextDelivery?.(false);
+        factory.create = originalCreate;
+      }
+      await withClient(rig.guestCtx, async () => {
         if (guestQuizPhase == null) {
           throw new Error("concurrent guest quiz replay created no production ErQuizPhase");
         }
@@ -1275,10 +1253,8 @@ describe.skipIf(!RUN)(
         try {
           // Round 0: pick DIVE (starts the press-your-luck loop -> re-fires round 1).
           await pickHostMeOption(game, hostScene, DIVE_OPTION_CURSOR, { startNextRound: true });
-          await withClient(rig.guestCtx, async () => {
-            replay = await startGuestMeReplay(rig.guestScene);
-            newRounds = await drainGuestMeReplayNewRounds(replay, 1);
-          });
+          replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+          newRounds = await drainDuoGuestMeReplayNewRounds(rig, replay, 1);
           expect(newRounds, "guest rendered repeated delve round 1 while the owner waited").toBe(1);
 
           // Round 1: pick PUSH -> survives (randSeedInt mocked to max) -> re-fires round 2.
@@ -1286,9 +1262,7 @@ describe.skipIf(!RUN)(
             alreadyStarted: true,
             startNextRound: true,
           });
-          await withClient(rig.guestCtx, async () => {
-            newRounds = await drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS);
-          });
+          newRounds = await drainDuoGuestMeReplayNewRounds(rig, replay, EXPECTED_NEW_ROUNDS);
           expect(newRounds, "guest rendered repeated delve round 2 while the owner waited").toBe(EXPECTED_NEW_ROUNDS);
 
           // Round 2: pick BANK -> ends the delve (sets rewards + leaves) -> embedded reward shop.
@@ -1555,7 +1529,7 @@ describe.skipIf(!RUN)(
       // ===== PROVE NO ORPHAN by completing the guest-owned ME through convergence (the IT #2 handshake).
       // The selector is still live, so the guest relays its pick, the host applies it, and both advance in
       // lockstep - impossible if the heal had orphaned the divert. =====
-      withClientSync(rig.guestCtx, () => relayGuestMePickWithIntent(replay, rig.guestScene, counterBefore, 0));
+      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
 
       let hostShop!: ShopPhaseSeam;
       await withClient(rig.hostCtx, async () => {
