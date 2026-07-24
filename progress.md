@@ -2679,6 +2679,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The Bargain failure contained one real V2 lane bug: a guest watching a host-owned offer called the
   authority-only proposal waiter and therefore failed closed immediately instead of awaiting the committed
   result materialized by the V2 log. Host watchers still consume guest proposals; guest watchers now await
-  the ordinary committed-result FIFO. The test also observes the real phase-manager departure because the
+  the ordinary committed-result FIFO. Its armed legacy-outcome detector now requires zero transport sends,
+  proving convergence uses only the immutable entry rather than passing because a compatibility twin won.
+  The test also observes the real phase-manager departure because the
   production owner terminal deliberately calls `super.end()` and cannot be intercepted by overriding
   `phase.end` on the fixture instance.

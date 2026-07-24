@@ -1075,11 +1075,12 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
-  it("DURABILITY #795: Authority V2 Giratina bargain converges when its legacy echo is dropped", async () => {
+  it("DURABILITY #795: Authority V2 Giratina bargain converges without a legacy outcome echo", async () => {
     // The Bargain is the 4th owner/watcher surface: at most ONE deal per visit, so the whole
-    // relay is a single comprehensive outcome blob (the proven ME-terminal resync) + a uniform
-    // terminal. This probe drives the LEAVE path end-to-end across two engines; the deal-commit
-    // path reuses applyCoopMeOutcome verbatim (already proven by the duo ME tests).
+    // V2 result is a single comprehensive state blob (the proven ME-terminal resync) + a uniform
+    // terminal. The fault wrapper is intentionally armed for the retired raw outcome: zero injected
+    // faults proves that carrier never reached the transport. This probe drives the LEAVE path end-to-end;
+    // the deal-commit path reuses applyCoopMeOutcome verbatim (already proven by the duo ME tests).
     setCoopBargainOperationEnabled(true);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = wrapCoopFaultPair(
@@ -1166,7 +1167,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     }
     await pumpDuoDestinations(rig);
     expect(ownerDone, "owner bargain chain fully completed after public input").toBe(true);
-    expect(pair.faultsInjected(), "the requested legacy bargain echo was dropped").toBe(1);
+    expect(pair.faultsInjected(), "Authority V2 emitted no legacy bargain outcome carrier").toBe(0);
     expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the bargain interaction").toBe(
       counterBefore + 1,
     );
