@@ -343,18 +343,12 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     logs.flush();
   }, 300_000);
 
-  it("keeps reciprocal watcher cursors isolated and rejects a role-mismatched captured runtime", async () => {
+  it("rejects a role-mismatched captured runtime without consulting the retired surface cursor", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
 
-    const hostBinding = await withClient(rig.hostCtx, () => {
-      setCoopOperationDurability(null);
-      return captureCoopBiomeOperationBinding();
-    });
-    const guestBinding = await withClient(rig.guestCtx, () => {
-      setCoopOperationDurability(null);
-      return captureCoopBiomeOperationBinding();
-    });
+    const hostBinding = await withClient(rig.hostCtx, () => captureCoopBiomeOperationBinding());
+    const guestBinding = await withClient(rig.guestCtx, () => captureCoopBiomeOperationBinding());
 
     const decision = (pinned: number, localRole: "host" | "guest", biomeId: BiomeId, binding: typeof hostBinding) =>
       adoptBiomeWatcherChoice(
@@ -378,15 +372,14 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
         binding,
       );
 
-    expect(decision(5, "host", BiomeId.SWAMP, hostBinding).adopt).toBe(true);
-    expect(
-      decision(2, "guest", BiomeId.VOLCANO, guestBinding).adopt,
-      "the host watcher's later pin cannot make the guest runtime reject its own earlier valid pin",
-    ).toBe(true);
     expect(
       () => decision(7, "host", BiomeId.LAKE, guestBinding),
       "a callback cannot execute host authority against a captured guest runtime",
     ).toThrow(/binding role=guest.*localRole=host/);
+    expect(
+      () => decision(8, "guest", BiomeId.SWAMP, hostBinding),
+      "a callback cannot execute guest materialization against a captured host runtime",
+    ).toThrow(/binding role=host.*localRole=guest/);
   }, 300_000);
 
   it("DURABILITY: dropping the first V2 entry still materializes the committed op through the real guest travel path", async () => {

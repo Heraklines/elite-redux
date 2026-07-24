@@ -2863,3 +2863,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   callback before material application. The terminal finalizer retains its separate exact proof. A public
   Authority V2 contract pins that ordering so a queued-but-not-started phase can never again consume and
   retire its own wake source.
+
+# 2026-07-24 - Crossroads replica control no longer re-derives authority from a speculative battle
+
+- Exact B11 evidence showed the replica had admitted and materialized the host's Crossroads CONTROL_COMMIT
+  at wave 5, while its renderer had already exposed the speculative wave-6 battle. The Crossroads boundary
+  nevertheless compared the local ambient battle to wave 5 before consulting the V2 ledger, failed the
+  session, and left the watcher on Title. The replica now validates the immutable control address directly
+  against its materialized global ledger; only the authority must capture an exact current-wave state before
+  authoring a new control.
+- The adjacent biome-operation fixture no longer expects independent legacy surface cursors to accept raw
+  watcher choices after the V2 cutover. It retains the useful captured-runtime role fence in both directions;
+  public UI and durability tests in the same file continue to prove real V2 adoption.

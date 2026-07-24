@@ -7077,16 +7077,7 @@ function enterCoopV2BiomeInteractionControlBoundary(
     || input.sourceWave <= 0
     || !Number.isSafeInteger(input.sourceTurn)
     || input.sourceTurn < 0
-    || battle.waveIndex !== input.sourceWave
   ) {
-    return "failed";
-  }
-  // The picker is enqueued at the exact post-BattleEnd settlement turn and starts only after the terminal
-  // reward result has installed its wait at that same address. Its constructor-captured coordinate is also
-  // used by the eventual result envelope, so open, result, recovery, and replay remain one ordered w/t
-  // boundary instead of consulting a later speculative battle.
-  const state = captureCoopAuthoritativeBattleState(input.sourceTurn);
-  if (state == null || state.wave !== input.sourceWave || state.turn !== input.sourceTurn) {
     return "failed";
   }
   const control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }> = {
@@ -7095,8 +7086,8 @@ function enterCoopV2BiomeInteractionControlBoundary(
     operationId: input.operationId,
     ownerSeatId: input.ownerSeatId,
     epoch: runtime.controller.sessionEpoch,
-    wave: state.wave,
-    turn: state.turn,
+    wave: input.sourceWave,
+    turn: input.sourceTurn,
     operationKind: spec.operationKind,
     successor: {
       operationKinds: [spec.operationKind],
@@ -7113,6 +7104,17 @@ function enterCoopV2BiomeInteractionControlBoundary(
     return "ready";
   }
   if (runtime.controller.authorityRole === "authority") {
+    // Only authority may author the interaction-open. It must still be sitting at the exact immutable
+    // settlement address whose complete state it is about to commit. A replica never re-derives this proof
+    // from its renderer: it may legitimately expose the speculative next Battle before the Crossroads phase
+    // starts, and the already-admitted V2 ledger entry is its sole ordering authority.
+    if (battle.waveIndex !== input.sourceWave) {
+      return "failed";
+    }
+    const state = captureCoopAuthoritativeBattleState(input.sourceTurn);
+    if (state == null || state.wave !== input.sourceWave || state.turn !== input.sourceTurn) {
+      return "failed";
+    }
     const cutover = coopV2ControlCutovers.get(runtime);
     const frontier = cutover?.authorityFrontier()?.nextControl ?? null;
     if (frontier != null && controlsEqual(frontier, control)) {
