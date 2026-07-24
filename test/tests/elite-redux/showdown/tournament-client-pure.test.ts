@@ -14,6 +14,7 @@ import type { BracketView } from "#data/elite-redux/showdown/tournament-types";
 import {
   formatDeadline,
   isBracketComplete,
+  isEliminatedParticipant,
   nextMatchFor,
   opponentOf,
   roundLabel,
@@ -89,6 +90,12 @@ describe("tournament-types view helpers", () => {
     expect(isBracketComplete(b)).toBe(false);
     b.rounds[1][0].winner = "carla";
     expect(isBracketComplete(b)).toBe(true);
+  });
+  it("marks only the loser of a decided bracket match as eliminated", () => {
+    const b = bracket();
+    expect(isEliminatedParticipant(b, "ash")).toBe(true);
+    expect(isEliminatedParticipant(b, "carla")).toBe(false);
+    expect(isEliminatedParticipant(b, "misty")).toBe(false);
   });
   it("roundLabel names the last rounds", () => {
     expect(roundLabel(2, 3)).toBe("Final");

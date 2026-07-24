@@ -28,6 +28,8 @@ export interface TournamentMatchContext {
   matchId: string;
   /** The account username of the bracket opponent this match MUST be against. */
   expectedOpponent: string;
+  /** The authenticated account username that entered this bracket match. */
+  ownParticipant?: string;
   /**
    * The field width this match is played at (from the tournament record's battleFormat). Both
    * clients read the SAME server-authoritative TournamentView, so this is agreed by construction;
@@ -71,6 +73,15 @@ export function isTournamentMatch(): boolean {
  */
 export function isTournamentPeerAllowed(peerName: string): boolean {
   return context === null || peerName === context.expectedOpponent;
+}
+
+/** Resolve the exact bracket winner without relying on transport state during result teardown. */
+export function tournamentWinnerParticipant(
+  ctx: TournamentMatchContext,
+  fallbackLocalParticipant: string,
+  localWon: boolean,
+): string {
+  return localWon ? (ctx.ownParticipant ?? fallbackLocalParticipant) : ctx.expectedOpponent;
 }
 
 /** Clear the tournament match context (match ended / aborted / returned to title). */

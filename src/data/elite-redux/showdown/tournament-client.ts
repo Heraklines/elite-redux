@@ -78,6 +78,7 @@ interface PendingTournamentResult {
   tournamentId: string;
   matchId: string;
   winner: string;
+  gameIndex?: number;
   queuedAt: number;
 }
 
@@ -115,15 +116,24 @@ function writePendingResults(results: PendingTournamentResult[]): void {
 
 function retainPendingResult(input: Omit<PendingTournamentResult, "queuedAt">): void {
   const pending = readPendingResults();
-  if (!pending.some(entry => entry.tournamentId === input.tournamentId && entry.matchId === input.matchId)) {
+  if (
+    !pending.some(
+      entry =>
+        entry.tournamentId === input.tournamentId
+        && entry.matchId === input.matchId
+        && (entry.gameIndex ?? 0) === (input.gameIndex ?? 0),
+    )
+  ) {
     pending.push({ ...input, queuedAt: Date.now() });
     writePendingResults(pending);
   }
 }
 
-function clearPendingResult(tournamentId: string, matchId: string): void {
+function clearPendingResult(tournamentId: string, matchId: string, gameIndex: number): void {
   writePendingResults(
-    readPendingResults().filter(entry => entry.tournamentId !== tournamentId || entry.matchId !== matchId),
+    readPendingResults().filter(
+      entry => entry.tournamentId !== tournamentId || entry.matchId !== matchId || (entry.gameIndex ?? 0) !== gameIndex,
+    ),
   );
 }
 
@@ -131,11 +141,12 @@ async function sendTournamentResult(
   tournamentId: string,
   matchId: string,
   winner: string,
+  gameIndex: number,
 ): Promise<ClientResult<{ resolution: string }>> {
   return request(
     "POST",
     "/tournament/result",
-    { tournamentId, matchId, winner },
+    { tournamentId, matchId, winner, gameIndex },
     { keepalive: true, timeoutMs: 8_000 },
   );
 }
@@ -231,11 +242,12 @@ export function reportTournamentResult(
   tournamentId: string,
   matchId: string,
   winner: string,
+  gameIndex = 0,
 ): Promise<ClientResult<{ resolution: string }>> {
-  retainPendingResult({ tournamentId, matchId, winner });
-  return sendTournamentResult(tournamentId, matchId, winner).then(result => {
+  retainPendingResult({ tournamentId, matchId, winner, gameIndex });
+  return sendTournamentResult(tournamentId, matchId, winner, gameIndex).then(result => {
     if (result.ok) {
-      clearPendingResult(tournamentId, matchId);
+      clearPendingResult(tournamentId, matchId, gameIndex);
     }
     return result;
   });
@@ -244,9 +256,10 @@ export function reportTournamentResult(
 /** Retry terminal attestations retained through a disconnect or scene teardown. */
 export async function syncPendingTournamentResults(): Promise<void> {
   for (const pending of readPendingResults()) {
-    const result = await sendTournamentResult(pending.tournamentId, pending.matchId, pending.winner);
+    const gameIndex = pending.gameIndex ?? 0;
+    const result = await sendTournamentResult(pending.tournamentId, pending.matchId, pending.winner, gameIndex);
     if (result.ok) {
-      clearPendingResult(pending.tournamentId, pending.matchId);
+      clearPendingResult(pending.tournamentId, pending.matchId, gameIndex);
     }
   }
 }

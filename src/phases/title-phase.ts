@@ -745,6 +745,7 @@ export class TitlePhase extends Phase {
           tournamentId,
           matchId,
           expectedOpponent: opponent,
+          ownParticipant: ownName,
           ...(t.battleFormat && t.battleFormat !== "singles" ? { battleFormat: t.battleFormat } : {}),
           ...(t.seriesFormat && t.seriesFormat !== "single" ? { seriesFormat: t.seriesFormat, gameIndex: 0 } : {}),
         });
@@ -836,8 +837,19 @@ export class TitlePhase extends Phase {
         notice(res.error, () => backToTitle());
         return;
       }
+      const tournaments = await Promise.all(
+        res.data.tournaments.map(async tournament => {
+          const needsBracket =
+            tournament.state === "in_progress" && tournament.entrants.some(entrant => entrant.participant === ownName);
+          if (!needsBracket) {
+            return tournament;
+          }
+          const bracket = await getTournamentBracket(tournament.id);
+          return bracket.ok ? bracket.data.tournament : tournament;
+        }),
+      );
       void globalScene.ui.setMode(UiMode.TOURNAMENT_LIST, {
-        tournaments: res.data.tournaments,
+        tournaments,
         ownParticipant: ownName,
         now: Date.now(),
         onOpen: (id: string) => void openBracket(id),

@@ -148,7 +148,12 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
     const matchId = bracket.rounds[0][0].id;
     expect(bracket.rounds[0][0].a).toBe(localName);
     expect(bracket.rounds[0][0].b).toBe(rival);
-    setTournamentMatchContext({ tournamentId: "cup", matchId, expectedOpponent: rival });
+    setTournamentMatchContext({
+      tournamentId: "cup",
+      matchId,
+      expectedOpponent: rival,
+      ownParticipant: localName,
+    });
 
     // Drive the real result phase for a local WIN, all the way back to the title.
     game.scene.phaseManager.clearPhaseQueue();
@@ -161,7 +166,7 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
 
     // 2. RESULT REPORTED to the tournament worker with the winner (the local player won).
     expect(reportTournament).toHaveBeenCalledTimes(1);
-    expect(reportTournament).toHaveBeenCalledWith("cup", matchId, localName);
+    expect(reportTournament).toHaveBeenCalledWith("cup", matchId, localName, 0);
 
     // 3. BRACKET ADVANCE: feed the reported winner into the engine (both clients report; here we
     //    apply the local + a matching peer report) — the winner advances into the final slot.
@@ -189,6 +194,30 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
     expect(reportTournament).not.toHaveBeenCalled();
   });
 
+  it("reports the validated bracket opponent as winner after a local LOSS", async () => {
+    const reportTournament = vi
+      .spyOn(tournamentClient, "reportTournamentResult")
+      .mockResolvedValue({ ok: true, data: { resolution: "settled" } });
+
+    startLocalCoopSession({ kind: "versus", username: "carla" });
+    await startShowdown();
+    const localName = getCoopRuntime()?.controller.localName() ?? "";
+    const expectedOpponent = "server-validated-rival";
+    setTournamentMatchContext({
+      tournamentId: "cup",
+      matchId: "cup-r0-m0",
+      expectedOpponent,
+      ownParticipant: localName,
+    });
+
+    game.scene.phaseManager.clearPhaseQueue();
+    game.scene.phaseManager.unshiftNew("ShowdownResultPhase", false, "victory", false, false);
+    game.scene.phaseManager.getCurrentPhase()?.end();
+    await game.phaseInterceptor.to("TitlePhase");
+
+    expect(reportTournament).toHaveBeenCalledWith("cup", "cup-r0-m0", expectedOpponent, 0);
+  });
+
   it("reports a peer-routed result and keeps the match context until attestation completes", async () => {
     let resolveReport: ((value: tournamentClient.ClientResult<{ resolution: string }>) => void) | null = null;
     const reportTournament = vi.spyOn(tournamentClient, "reportTournamentResult").mockReturnValue(
@@ -201,7 +230,12 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
     await startShowdown();
     const localName = getCoopRuntime()?.controller.localName() ?? "";
     const rival = getCoopRuntime()?.controller.partnerName ?? "rival";
-    setTournamentMatchContext({ tournamentId: "cup", matchId: "cup-r0-m0", expectedOpponent: rival });
+    setTournamentMatchContext({
+      tournamentId: "cup",
+      matchId: "cup-r0-m0",
+      expectedOpponent: rival,
+      ownParticipant: localName,
+    });
 
     game.scene.phaseManager.clearPhaseQueue();
     // silent=true mirrors a result routed from the peer; it suppresses wire re-emission, not HTTP attestation.
@@ -209,11 +243,15 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
     game.scene.phaseManager.getCurrentPhase()?.end();
     const returnToTitle = game.phaseInterceptor.to("TitlePhase");
 
-    await vi.waitFor(() => expect(reportTournament).toHaveBeenCalledWith("cup", "cup-r0-m0", localName));
+    await vi.waitFor(() => expect(reportTournament).toHaveBeenCalledWith("cup", "cup-r0-m0", localName, 0));
     expect(getTournamentMatchContext(), "context survives until the result request settles").not.toBeNull();
     expect(game.scene.phaseManager.getCurrentPhase()?.phaseName).toBe("ShowdownResultPhase");
 
-    resolveReport?.({ ok: true, data: { resolution: "settled" } });
+    expect(resolveReport).not.toBeNull();
+    (resolveReport as (value: tournamentClient.ClientResult<{ resolution: string }>) => void)({
+      ok: true,
+      data: { resolution: "settled" },
+    });
     await returnToTitle;
     expect(getTournamentMatchContext()).toBeNull();
   });

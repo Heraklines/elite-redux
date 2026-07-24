@@ -28,7 +28,7 @@ import type {
   TournamentRewardMutation,
   TournamentView,
 } from "#data/elite-redux/showdown/tournament-types";
-import { isKickedParticipant } from "#data/elite-redux/showdown/tournament-types";
+import { isEliminatedParticipant, isKickedParticipant } from "#data/elite-redux/showdown/tournament-types";
 import { Button } from "#enums/buttons";
 import { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
@@ -454,7 +454,8 @@ export class TournamentListUiHandler extends UiHandler {
       const droppedOut =
         t.kicked?.includes(cfg.ownParticipant)
         ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant);
-      const registered = !droppedOut && t.entrants.some(e => e.participant === cfg.ownParticipant);
+      const eliminated = !droppedOut && isEliminatedParticipant(t.bracket, cfg.ownParticipant);
+      const registered = !droppedOut && !eliminated && t.entrants.some(e => e.participant === cfg.ownParticipant);
       const chip = stateChip(t);
 
       // state chip (left)
@@ -487,10 +488,16 @@ export class TournamentListUiHandler extends UiHandler {
 
       // second line: window + your-status
       const windowHrs = Math.round(t.roundWindowMs / 3_600_000);
-      const sub = droppedOut ? "Dropped out" : registered ? "You are registered" : `${windowHrs}h rounds`;
+      const sub = droppedOut
+        ? "Dropped out"
+        : eliminated
+          ? "Eliminated"
+          : registered
+            ? "You are registered"
+            : `${windowHrs}h rounds`;
       const subText = addTextObject(46, y + 10, sub, TextStyle.PARTY, { fontSize: "26px" });
       subText.setOrigin(0, 0);
-      subText.setTint(registered ? OPEN_GREEN : TODO);
+      subText.setTint(registered ? OPEN_GREEN : eliminated ? 0xf07070 : TODO);
       this.container.add(subText);
       this.rows.push(subText);
 

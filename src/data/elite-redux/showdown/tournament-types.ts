@@ -113,6 +113,22 @@ export function isKickedParticipant(bracket: BracketView, participant: Tournamen
   return participant !== null && (bracket.kicked?.includes(participant) ?? false);
 }
 
+/** True once a decided single-elimination match records this participant as the loser. */
+export function isEliminatedParticipant(
+  bracket: BracketView | null | undefined,
+  participant: TournamentParticipant | null,
+): boolean {
+  if (bracket == null || participant === null) {
+    return false;
+  }
+  return bracket.rounds.some(round =>
+    round.some(
+      match =>
+        match.winner !== null && match.winner !== participant && (match.a === participant || match.b === participant),
+    ),
+  );
+}
+
 /**
  * The entrant's ghost-trainer APPEARANCE SUMMARY (P1.5 board) — mirror of the worker's
  * GhostIconSummary. Presentation-only: sprite key + authored name + title, drawn as each

@@ -36,6 +36,7 @@ import { reportTournamentResult } from "#data/elite-redux/showdown/tournament-cl
 import {
   clearTournamentMatchContext,
   getTournamentMatchContext,
+  tournamentWinnerParticipant,
 } from "#data/elite-redux/showdown/tournament-match-context";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
@@ -148,10 +149,14 @@ export class ShowdownResultPhase extends BattlePhase {
     if (tournamentCtx != null) {
       if (!this.voided) {
         const localName = getCoopRuntime()?.controller.localName() ?? "";
-        const partnerName = getCoopRuntime()?.controller.partnerName ?? "";
-        const winnerName = this.localWon ? localName : partnerName;
+        const winnerName = tournamentWinnerParticipant(tournamentCtx, localName, this.localWon);
         if (winnerName) {
-          tournamentReport = reportTournamentResult(tournamentCtx.tournamentId, tournamentCtx.matchId, winnerName)
+          tournamentReport = reportTournamentResult(
+            tournamentCtx.tournamentId,
+            tournamentCtx.matchId,
+            winnerName,
+            tournamentCtx.gameIndex ?? 0,
+          )
             .then(result => {
               if (!result.ok) {
                 console.warn(`[tournament-result] report retained for retry: ${result.error}`);
