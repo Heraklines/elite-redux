@@ -38,6 +38,7 @@ import {
   isCoopSharedTerminalFrozen,
   isCoopV2CommandAdmissionFrozen,
   isCoopV2ControlSurfaceStartFrozen,
+  isShowdownSyncSession,
   isVersusSession,
   pendingCoopAuthoritativeReplacementReplayTurn,
   recordCoopOwnSlotCommand,
@@ -618,6 +619,15 @@ export class CommandPhase extends FieldPhase {
         turn: globalScene.currentBattle?.turn,
       });
       return false;
+    }
+    // Showdown Sync deliberately runs both complete engines in lockstep. Its combat presentation and
+    // mechanics are produced locally from the exchanged commands, so there is no host-owned wave-start
+    // carrier to publish or consume here. Applying the Authority V2 entry-state boundary to this mode
+    // terminalizes the first CommandPhase with "could not publish its complete entry presentation" even
+    // though the lockstep session is healthy. Keep the orphan-runtime fail-close above for every shared
+    // mode, then leave the authoritative checkpoint path strictly to authoritative sessions.
+    if (isShowdownSyncSession()) {
+      return true;
     }
     const { turn, waveIndex } = globalScene.currentBattle;
     // M6c (#633): the LOCKSTEP per-turn checkpoint broadcast/adopt that used to live here was

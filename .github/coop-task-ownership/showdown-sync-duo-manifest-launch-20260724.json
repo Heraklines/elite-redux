@@ -6,6 +6,7 @@
   "baseSha": "eefd92a7480cec8a4b88fa23e471e1059a6875df",
   "allowedFiles": [
     ".github/coop-task-ownership/showdown-sync-duo-manifest-launch-20260724.json",
+    "src/phases/command-phase.ts",
     "test/tests/elite-redux/showdown/showdown-sync-duo.test.ts"
   ],
   "lockedSchemaFiles": []
