@@ -52,21 +52,18 @@ import {
   listTournaments,
   pingTournamentPresence,
   registerForTournament,
-  setTournamentMatchReady,
 } from "#data/elite-redux/showdown/tournament-client";
 import { buildOwnGhostIconSummary } from "#data/elite-redux/showdown/tournament-ghost-icon";
 import {
   clearTournamentMatchContext,
   setTournamentMatchContext,
 } from "#data/elite-redux/showdown/tournament-match-context";
-import { setTournamentFlowOpener, type TournamentDeepLink } from "#data/elite-redux/showdown/tournament-notifications";
 import {
-  isEntrantReadyForMatch,
-  isTournamentPairingCurrent,
-  nextMatchFor,
-  opponentOf,
-  type TournamentView,
-} from "#data/elite-redux/showdown/tournament-types";
+  setTournamentFlowOpener,
+  setTournamentGameplayOpener,
+  type TournamentDeepLink,
+} from "#data/elite-redux/showdown/tournament-notifications";
+import { isTournamentPairingCurrent, opponentOf } from "#data/elite-redux/showdown/tournament-types";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -255,6 +252,27 @@ export class TitlePhase extends Phase {
         ? (target: TournamentDeepLink) => this.openShowdownTournaments(gm => this.launchGameMode(gm), target)
         : null,
     );
+    let tournamentExitPending = false;
+    setTournamentGameplayOpener(() => {
+      if (
+        tournamentExitPending
+        || globalScene.currentBattle == null
+        || globalScene.gameMode.isCoop
+        || globalScene.gameMode.isShowdown
+        || isVersusSession()
+      ) {
+        return false;
+      }
+      tournamentExitPending = true;
+      const finishQuit = () => {
+        globalScene.ui.setMode(UiMode.LOADING, {
+          buttonActions: [],
+          fadeOut: () => globalScene.reset(true),
+        });
+      };
+      void globalScene.gameData.saveAll(true, true, true, true, true).then(finishQuit, finishQuit);
+      return true;
+    });
     const options: OptionSelectItem[] = [];
     // Add a "continue" menu if the session slot ID is >-1
     if (lastSessionSlot > NO_SAVE_SLOT) {
@@ -672,21 +690,12 @@ export class TitlePhase extends Phase {
         // changed this slot since the board's previous poll; never create a transport for stale peers.
         const latest = await getTournamentBracket(tournamentId);
         const t = latest.ok ? latest.data.tournament : null;
-        const match = t?.bracket == null ? null : nextMatchFor(t.bracket, ownName);
-        const currentOpponent = match == null ? null : opponentOf(match, ownName);
-        const ownEntrant = t?.entrants.find(e => e.participant === ownName);
-        const opponentEntrant = t?.entrants.find(e => e.participant === currentOpponent);
-        const bothReady =
-          match != null
-          && currentOpponent != null
-          && isEntrantReadyForMatch(ownEntrant, match.id, currentOpponent)
-          && isEntrantReadyForMatch(opponentEntrant, match.id, ownName);
         const pairingCurrent = t != null && isTournamentPairingCurrent(t, ownName, matchId, opponent);
-        if (!latest.ok || t == null || !pairingCurrent || !bothReady) {
+        if (!latest.ok || t == null || !pairingCurrent) {
           clearTournamentMatchContext();
           clearCoopRuntime();
           notice(
-            latest.ok ? "That pairing changed or is no longer ready. The bracket has been refreshed." : latest.error,
+            latest.ok ? "That pairing changed. The bracket has been refreshed." : latest.error,
             () => void openBracket(tournamentId),
           );
           return;
@@ -725,26 +734,6 @@ export class TitlePhase extends Phase {
       })();
     };
 
-    const browseForMatch = (tournament: TournamentView, matchId: string) => {
-      for (let round = 0; round < (tournament.bracket?.rounds.length ?? 0); round++) {
-        const slot = tournament.bracket?.rounds[round].findIndex(match => match.id === matchId) ?? -1;
-        if (slot >= 0) {
-          return { round, slot };
-        }
-      }
-      return;
-    };
-
-    const changeReady = (tournamentId: string, matchId: string, ready: boolean): void => {
-      void setTournamentMatchReady(tournamentId, matchId, ready).then(res => {
-        if (!res.ok) {
-          notice(res.error, () => void openBracket(tournamentId));
-          return;
-        }
-        void openBracket(tournamentId, browseForMatch(res.data.tournament, matchId));
-      });
-    };
-
     const requestDropOut = (tournamentId: string): void => {
       notice("Drop out of this tournament? This may give your opponent a walkover.", () => {
         globalScene.ui.setOverlayMode(
@@ -781,7 +770,6 @@ export class TitlePhase extends Phase {
         ownParticipant: ownName,
         now: Date.now(),
         onPlayMatch: (matchId: string, opponent: string) => enterMatch(t.id, matchId, opponent),
-        onReadyChange: (matchId: string, ready: boolean) => changeReady(t.id, matchId, ready),
         onDropOut: () => requestDropOut(t.id),
         onBack: () => void showList(),
         // P1.5 live board: poll the worker for the advancing bracket + ping presence while open.
@@ -833,6 +821,21 @@ export class TitlePhase extends Phase {
       // Deep-link (from a challenge notification): jump straight to the board on the match.
       if (deepLink == null) {
         await showList();
+      } else if (deepLink.autoJoin) {
+        const latest = await getTournamentBracket(deepLink.tournamentId);
+        const tournament = latest.ok ? latest.data.tournament : null;
+        const match = tournament?.bracket?.rounds[deepLink.round]?.[deepLink.slot] ?? null;
+        const opponent = match == null ? null : opponentOf(match, ownName);
+        if (
+          tournament != null
+          && match != null
+          && opponent != null
+          && isTournamentPairingCurrent(tournament, ownName, match.id, opponent)
+        ) {
+          enterMatch(tournament.id, match.id, opponent);
+        } else {
+          await openBracket(deepLink.tournamentId, { round: deepLink.round, slot: deepLink.slot });
+        }
       } else {
         await openBracket(deepLink.tournamentId, { round: deepLink.round, slot: deepLink.slot });
       }

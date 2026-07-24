@@ -50,23 +50,7 @@ describe.runIf(RUN)("showdown tournament board - real-path acceptance", () => {
     await wait(50);
   };
 
-  it("A on YOUR match first marks the exact pairing ready", async () => {
-    const cfg = buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" });
-    let readiness: { matchId: string; ready: boolean } | null = null;
-    cfg.onReadyChange = (matchId, ready) => {
-      readiness = { matchId, ready };
-    };
-    const mine = cfg.tournament
-      .bracket!.rounds.flat()
-      .find(m => m.winner === null && (m.a === "Carla" || m.b === "Carla"))!;
-
-    await openBoard(cfg);
-    handler().processInput(Button.ACTION);
-    await wait(20);
-    expect(readiness).toEqual({ matchId: mine.id, ready: true });
-  });
-
-  it("A routes into the exact tournament lobby only after both entrants are ready", async () => {
+  it.each(["online", "offline"])("A routes into the exact tournament lobby while the opponent is %s", async state => {
     // Fresh 4-bracket (Sample Cup shape): the viewer's semifinal is live + playable, cursor defaults onto it.
     const cfg = buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" });
     let played: { matchId: string; opponent: string } | null = null;
@@ -78,12 +62,9 @@ describe.runIf(RUN)("showdown tournament board - real-path acceptance", () => {
     const bracket = cfg.tournament.bracket!;
     const mine = bracket.rounds.flat().find(m => m.winner === null && (m.a === "Carla" || m.b === "Carla"))!;
     const opponent = mine.a === "Carla" ? mine.b : mine.a;
-    const ownEntrant = cfg.tournament.entrants.find(e => e.participant === "Carla")!;
     const opponentEntrant = cfg.tournament.entrants.find(e => e.participant === opponent)!;
-    Object.assign(ownEntrant, { readyMatchId: mine.id, readyOpponent: opponent });
-    Object.assign(opponentEntrant, { readyMatchId: mine.id, readyOpponent: "Carla" });
+    opponentEntrant.lastSeen = state === "online" ? cfg.now - 10_000 : null;
 
-    // Open after mutating the worker view so the card derives JOIN rather than I'M READY.
     await openBoard(cfg);
     expect(mode()).toBe(UiMode.TOURNAMENT_BRACKET);
     expect(handler().container.visible, "the board container is shown").toBe(true);

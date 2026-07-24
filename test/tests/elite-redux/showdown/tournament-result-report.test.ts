@@ -28,13 +28,17 @@ import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-te
 import * as tournamentClient from "#data/elite-redux/showdown/tournament-client";
 import {
   clearTournamentMatchContext,
+  getTournamentMatchContext,
   setTournamentMatchContext,
 } from "#data/elite-redux/showdown/tournament-match-context";
+import { Status } from "#data/status-effect";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
+import { VictoryPhase } from "#phases/victory-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { generateStarters } from "#test/utils/game-manager-utils";
 import Phaser from "phaser";
@@ -92,6 +96,24 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
     });
     await game.phaseInterceptor.to("CommandPhase");
   }
+
+  it("routes a swept Showdown trainer directly to the result phase", async () => {
+    startLocalCoopSession({ kind: "versus", username: "carla" });
+    await startShowdown();
+    const enemy = game.scene.getEnemyParty()[0];
+    enemy.hp = 0;
+    enemy.status = new Status(StatusEffect.FAINT);
+
+    const pushNew = vi.spyOn(game.scene.phaseManager, "pushNew");
+    const victory = new VictoryPhase(enemy.getBattlerIndex());
+    vi.spyOn(victory, "end").mockImplementation(() => {});
+    victory.start();
+
+    const queued = pushNew.mock.calls.map(([name]) => name);
+    expect(queued).toContain("ShowdownResultPhase");
+    expect(queued).not.toContain("BattleEndPhase");
+    expect(queued).not.toContain("TrainerVictoryPhase");
+  });
 
   it("reports to the tournament worker (not escrow) and advances the local bracket on a WIN", async () => {
     // Loopback-stub the worker client seams.
@@ -165,5 +187,34 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
     await game.phaseInterceptor.to("TitlePhase");
 
     expect(reportTournament).not.toHaveBeenCalled();
+  });
+
+  it("reports a peer-routed result and keeps the match context until attestation completes", async () => {
+    let resolveReport: ((value: tournamentClient.ClientResult<{ resolution: string }>) => void) | null = null;
+    const reportTournament = vi.spyOn(tournamentClient, "reportTournamentResult").mockReturnValue(
+      new Promise(resolve => {
+        resolveReport = resolve;
+      }),
+    );
+
+    startLocalCoopSession({ kind: "versus", username: "carla" });
+    await startShowdown();
+    const localName = getCoopRuntime()?.controller.localName() ?? "";
+    const rival = getCoopRuntime()?.controller.partnerName ?? "rival";
+    setTournamentMatchContext({ tournamentId: "cup", matchId: "cup-r0-m0", expectedOpponent: rival });
+
+    game.scene.phaseManager.clearPhaseQueue();
+    // silent=true mirrors a result routed from the peer; it suppresses wire re-emission, not HTTP attestation.
+    game.scene.phaseManager.unshiftNew("ShowdownResultPhase", true, "victory", false, true);
+    game.scene.phaseManager.getCurrentPhase()?.end();
+    const returnToTitle = game.phaseInterceptor.to("TitlePhase");
+
+    await vi.waitFor(() => expect(reportTournament).toHaveBeenCalledWith("cup", "cup-r0-m0", localName));
+    expect(getTournamentMatchContext(), "context survives until the result request settles").not.toBeNull();
+    expect(game.scene.phaseManager.getCurrentPhase()?.phaseName).toBe("ShowdownResultPhase");
+
+    resolveReport?.({ ok: true, data: { resolution: "settled" } });
+    await returnToTitle;
+    expect(getTournamentMatchContext()).toBeNull();
   });
 });

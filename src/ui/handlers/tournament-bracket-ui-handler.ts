@@ -15,8 +15,8 @@
 //     the browsed match's card + the opponent card always show the full name.
 //   - real CONNECTING LINES: elbow segments with clean joins, bright gold along
 //     RESOLVED paths, dim along pending ones — scaling 4 / 8 / 16 cleanly.
-//   - YOUR next fight is gold-highlighted with the VS badge; A marks the exact pairing
-//     ready, then changes to JOIN after both entrants are ready. Menu offers dropout;
+//   - YOUR next fight is gold-highlighted with the VS badge; entrants are always ready and A
+//     joins the exact-opponent lobby immediately. Menu offers dropout;
 //     B returns to the list.
 //   - the bottom OPPONENT card frames the opponent portrait, their custom TITLE as
 //     flavor, the deadline countdown + a live presence chip, and the FIGHT prompt.
@@ -35,7 +35,6 @@ import {
   formatDeadline,
   formatLastSeen,
   isBracketComplete,
-  isEntrantReadyForMatch,
   isKickedParticipant,
   isPresent,
   nextMatchFor,
@@ -80,8 +79,6 @@ export interface TournamentBracketConfig {
   now: number;
   /** Enter the constrained tournament lobby for a playable own match. */
   onPlayMatch: (matchId: string, opponent: string) => void;
-  /** Mark or clear readiness for an exact match. */
-  onReadyChange?: (matchId: string, ready: boolean) => void;
   /** Leave the tournament, with confirmation handled by the flow owner. */
   onDropOut?: () => void;
   /** Leave the board (back to the list). */
@@ -125,7 +122,7 @@ export class TournamentBracketUiHandler extends UiHandler {
   private playableOpponent: string | null = null;
   /** The match id A acts on (the pinned your-match; may differ from the browsed cell when paginated). */
   private playableMatchId: string | null = null;
-  private playableAction: "ready" | "unready" | "join" | null = null;
+  private playableAction: "join" | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private requestedAtlases = new Set<string>();
 
@@ -1255,7 +1252,6 @@ export class TournamentBracketUiHandler extends UiHandler {
     const h = globalScene.scaledCanvas.height;
     const cardY = h - BOTTOM_CARD_H - 2;
     const ent = this.entrantOf(opponent);
-    const ownEnt = this.entrantOf(cfg.ownParticipant);
     const seed = ent?.seed ?? null;
     const oppName = this.displayName(opponent);
     const oppTitle = this.ghostTitleOf(opponent);
@@ -1271,47 +1267,31 @@ export class TournamentBracketUiHandler extends UiHandler {
     const dueSoon = match.deadline != null && match.deadline - cfg.now <= 3_600_000;
     const countdown = formatDeadline(match.deadline, cfg.now);
     const present = isPresent(ent?.lastSeen, cfg.now);
-    const ownReady = isEntrantReadyForMatch(ownEnt, match.id, opponent);
-    const opponentReady = isEntrantReadyForMatch(ent, match.id, cfg.ownParticipant);
-    const presence = opponentReady
-      ? `${oppName} is ready`
-      : present
-        ? "Online now"
-        : `Last seen ${formatLastSeen(ent?.lastSeen, cfg.now)}`;
+    const presence = present ? "Online now" : `Last seen ${formatLastSeen(ent?.lastSeen, cfg.now)}`;
     this.cardBody.setTint(dueSoon ? DUE_SOON : WHITE);
     const titlePart = oppTitle ? `"${oppTitle}"   ` : "";
     this.cardBody.setText(`${titlePart}${countdown}   ${presence}`);
 
     // presence chip above the portrait
     const chip = globalScene.add.rectangle(portraitCx, cardY + 2, 30, 8, CHIP_NAVY, 1).setOrigin(0.5, 0);
-    chip.setStrokeStyle(1, opponentReady || present ? PRESENT_GREEN : TODO, 1);
+    chip.setStrokeStyle(1, present ? PRESENT_GREEN : TODO, 1);
     this.container.add(chip);
     this.cardNodes.push(chip);
-    const chipT = addTextObject(
-      portraitCx,
-      cardY + 3.5,
-      opponentReady ? "READY" : present ? "ONLINE" : "OFFLINE",
-      TextStyle.PARTY,
-      { fontSize: "22px" },
-    );
+    const chipT = addTextObject(portraitCx, cardY + 3.5, present ? "ONLINE" : "OFFLINE", TextStyle.PARTY, {
+      fontSize: "22px",
+    });
     chipT.setOrigin(0.5, 0);
-    chipT.setTint(opponentReady || present ? PRESENT_GREEN : TODO);
+    chipT.setTint(present ? PRESENT_GREEN : TODO);
     this.container.add(chipT);
     this.cardNodes.push(chipT);
 
     this.playableOpponent = opponent;
     this.playableMatchId = match.id;
-    this.playableAction = ownReady && opponentReady ? "join" : ownReady ? "unready" : "ready";
+    this.playableAction = "join";
     // Match action prompt, shifted LEFT of the portrait so nothing overlaps.
     this.cardHint.setX(portraitCx - 24);
-    this.cardHint.setTint(this.playableAction === "join" ? GOLD : NEXT);
-    this.cardHint.setText(
-      this.playableAction === "join"
-        ? "A: JOIN   B: Back"
-        : this.playableAction === "unready"
-          ? "A: NOT READY   B: Back"
-          : "A: I'M READY   B: Back",
-    );
+    this.cardHint.setTint(GOLD);
+    this.cardHint.setText("A: JOIN   B: Back");
   }
 
   private drawPairingCard(match: BracketMatchView, entered: boolean, hasUpcoming: boolean): void {
@@ -1438,19 +1418,11 @@ export class TournamentBracketUiHandler extends UiHandler {
     }
     switch (button) {
       case Button.ACTION:
-        if (this.playableOpponent != null && this.playableMatchId != null) {
-          if (this.playableAction === "join") {
-            globalScene.ui.playSelect();
-            this.stopPolling();
-            cfg.onPlayMatch(this.playableMatchId, this.playableOpponent);
-            return true;
-          }
-          if (this.playableAction != null && cfg.onReadyChange != null) {
-            globalScene.ui.playSelect();
-            this.stopPolling();
-            cfg.onReadyChange(this.playableMatchId, this.playableAction === "ready");
-            return true;
-          }
+        if (this.playableOpponent != null && this.playableMatchId != null && this.playableAction === "join") {
+          globalScene.ui.playSelect();
+          this.stopPolling();
+          cfg.onPlayMatch(this.playableMatchId, this.playableOpponent);
+          return true;
         }
         return false;
       case Button.MENU: {

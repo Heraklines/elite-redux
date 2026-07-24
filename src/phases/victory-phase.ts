@@ -181,9 +181,16 @@ export class VictoryPhase extends PokemonPhase {
         (!isCoopAuthoritativeGuest() && !captureKeepsBattleEndSettlement) || authoritativeTransition?.outcome === "win"
           ? captureCoopAutomaticVictorySealIdentity(currentWaveIndex)
           : null;
-      globalScene.phaseManager.pushNew("BattleEndPhase", true, automaticVictorySeal);
-      if (isTrainerWin) {
-        globalScene.phaseManager.pushNew("TrainerVictoryPhase");
+      // A Showdown duel is ephemeral: its terminal phase owns teardown and result reporting. Do not
+      // enqueue the normal run-settlement tail here. In particular, the opponent is represented by a
+      // trainer battle until this branch resolves; queueing TrainerVictoryPhase and then changing the
+      // battle type to CLEAR below makes that already-queued phase throw before ShowdownResultPhase can
+      // run (the tournament end-of-match freeze).
+      if (!gameMode.isShowdown) {
+        globalScene.phaseManager.pushNew("BattleEndPhase", true, automaticVictorySeal);
+        if (isTrainerWin) {
+          globalScene.phaseManager.pushNew("TrainerVictoryPhase");
+        }
       }
 
       // LLM effects are automatic shared mutations and must be inside the retained image. Their narration

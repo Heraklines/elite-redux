@@ -515,6 +515,98 @@ a {
   animation: blink normal 4s infinite ease-in-out; /* Opera and prob css3 final iteration */
 }
 
+/* Clickable exact-opponent alert shown over normal gameplay. */
+.er-tournament-match-toast {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 99990;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 32px;
+  align-items: center;
+  gap: 10px;
+  width: min(460px, calc(100vw - 24px));
+  min-height: 64px;
+  box-sizing: border-box;
+  padding: 10px;
+  color: #edf4f8;
+  background: #101d40;
+  border: 2px solid #f8d030;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 55%);
+  font-family: Arial, sans-serif;
+  touch-action: manipulation;
+}
+
+.er-tournament-match-toast-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.er-tournament-match-toast-copy strong,
+.er-tournament-match-toast-copy span {
+  overflow-wrap: anywhere;
+  letter-spacing: 0;
+}
+
+.er-tournament-match-toast-copy strong {
+  color: #ffe066;
+  font-size: 15px;
+}
+
+.er-tournament-match-toast-copy span {
+  color: #dbe7f1;
+  font-size: 13px;
+}
+
+.er-tournament-match-toast button {
+  min-height: 36px;
+  color: #f7fbfd;
+  background: #176947;
+  border: 1px solid #55b88a;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.er-tournament-match-toast button:hover,
+.er-tournament-match-toast button:focus-visible {
+  border-color: #ffe066;
+  outline: 2px solid #ffe066;
+  outline-offset: 1px;
+}
+
+.er-tournament-match-toast-open {
+  padding: 7px 12px;
+}
+
+.er-tournament-match-toast-close {
+  width: 32px;
+  padding: 0;
+  background: #263746 !important;
+  border-color: #71879a !important;
+}
+
+@media (max-width: 520px) {
+  .er-tournament-match-toast {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    grid-template-columns: minmax(0, 1fr) 32px;
+  }
+
+  .er-tournament-match-toast-open {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .er-tournament-match-toast-close {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
 /* Rich inbox entries (patch notes / announcements). This sits above Phaser's
    canvas and uses native scrolling so long Markdown remains usable on touch. */
 .er-rich-notification-backdrop {

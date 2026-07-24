@@ -12,6 +12,7 @@
 // never throws, so callers degrade gracefully.
 // =============================================================================
 
+import { loggedInUser } from "#app/account";
 import { SESSION_ID_COOKIE_NAME } from "#app/constants";
 import type {
   BattleFormat,
@@ -22,6 +23,11 @@ import type {
 import { getCookie } from "#utils/cookies";
 
 export type ClientResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
+interface RequestOptions {
+  keepalive?: boolean;
+  timeoutMs?: number;
+}
 
 /** The telemetry worker base URL, or null when unconfigured (local dev). */
 function tournamentBase(): string | null {
@@ -34,16 +40,25 @@ function authHeaders(): Record<string, string> {
   return { "Content-Type": "application/json", Authorization: getCookie(SESSION_ID_COOKIE_NAME) };
 }
 
-async function request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<ClientResult<T>> {
+async function request<T>(
+  method: "GET" | "POST",
+  path: string,
+  body?: unknown,
+  options: RequestOptions = {},
+): Promise<ClientResult<T>> {
   const base = tournamentBase();
   if (base == null) {
     return { ok: false, error: "tournaments are unavailable offline" };
   }
+  const controller = options.timeoutMs == null ? null : new AbortController();
+  const timeout = controller == null ? null : setTimeout(() => controller.abort(), Math.max(1, options.timeoutMs ?? 1));
   try {
     const res = await fetch(`${base}${path}`, {
       method,
       headers: authHeaders(),
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(options.keepalive ? { keepalive: true } : {}),
+      ...(controller == null ? {} : { signal: controller.signal }),
     });
     const json = (await res.json().catch(() => ({}))) as { error?: string } & Record<string, unknown>;
     if (!res.ok) {
@@ -52,7 +67,77 @@ async function request<T>(method: "GET" | "POST", path: string, body?: unknown):
     return { ok: true, data: json as T };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "network error" };
+  } finally {
+    if (timeout != null) {
+      clearTimeout(timeout);
+    }
   }
+}
+
+interface PendingTournamentResult {
+  tournamentId: string;
+  matchId: string;
+  winner: string;
+  queuedAt: number;
+}
+
+const PENDING_RESULT_PREFIX = "er-pending-tournament-results";
+
+function pendingResultKey(): string {
+  return `${PENDING_RESULT_PREFIX}_${loggedInUser?.username ?? "guest"}`;
+}
+
+function readPendingResults(): PendingTournamentResult[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(pendingResultKey()) ?? "[]") as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter(
+          (entry): entry is PendingTournamentResult =>
+            typeof entry === "object"
+            && entry != null
+            && typeof (entry as PendingTournamentResult).tournamentId === "string"
+            && typeof (entry as PendingTournamentResult).matchId === "string"
+            && typeof (entry as PendingTournamentResult).winner === "string",
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingResults(results: PendingTournamentResult[]): void {
+  try {
+    localStorage.setItem(pendingResultKey(), JSON.stringify(results));
+  } catch {
+    // Persistence is an offline retry aid; the live report still proceeds when storage is unavailable.
+  }
+}
+
+function retainPendingResult(input: Omit<PendingTournamentResult, "queuedAt">): void {
+  const pending = readPendingResults();
+  if (!pending.some(entry => entry.tournamentId === input.tournamentId && entry.matchId === input.matchId)) {
+    pending.push({ ...input, queuedAt: Date.now() });
+    writePendingResults(pending);
+  }
+}
+
+function clearPendingResult(tournamentId: string, matchId: string): void {
+  writePendingResults(
+    readPendingResults().filter(entry => entry.tournamentId !== tournamentId || entry.matchId !== matchId),
+  );
+}
+
+async function sendTournamentResult(
+  tournamentId: string,
+  matchId: string,
+  winner: string,
+): Promise<ClientResult<{ resolution: string }>> {
+  return request(
+    "POST",
+    "/tournament/result",
+    { tournamentId, matchId, winner },
+    { keepalive: true, timeoutMs: 8_000 },
+  );
 }
 
 /** GET the tournament list (registration / in-progress / recently finished). */
@@ -112,9 +197,8 @@ export function cancelTournament(id: string): Promise<ClientResult<unknown>> {
 }
 
 /**
- * Presence ping (P1.5): stamp the caller's last-seen on this tournament while they sit on the
- * board / in the tournament lobby, so an opponent's board shows "A: FIGHT" vs "last seen <ago>".
- * Best-effort and display-only (the P2 activity-win logic is out of scope).
+ * Presence ping: stamp the caller's last-seen while they are online. The board and page-lifetime
+ * tournament notifier use this to show exact-opponent availability.
  */
 export function pingTournamentPresence(id: string): Promise<ClientResult<unknown>> {
   return request("POST", "/tournament/ping", { id });
@@ -148,5 +232,21 @@ export function reportTournamentResult(
   matchId: string,
   winner: string,
 ): Promise<ClientResult<{ resolution: string }>> {
-  return request("POST", "/tournament/result", { tournamentId, matchId, winner });
+  retainPendingResult({ tournamentId, matchId, winner });
+  return sendTournamentResult(tournamentId, matchId, winner).then(result => {
+    if (result.ok) {
+      clearPendingResult(tournamentId, matchId);
+    }
+    return result;
+  });
+}
+
+/** Retry terminal attestations retained through a disconnect or scene teardown. */
+export async function syncPendingTournamentResults(): Promise<void> {
+  for (const pending of readPendingResults()) {
+    const result = await sendTournamentResult(pending.tournamentId, pending.matchId, pending.winner);
+    if (result.ok) {
+      clearPendingResult(pending.tournamentId, pending.matchId);
+    }
+  }
 }
