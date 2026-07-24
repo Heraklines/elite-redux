@@ -2875,3 +2875,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The adjacent biome-operation fixture no longer expects independent legacy surface cursors to accept raw
   watcher choices after the V2 cutover. It retains the useful captured-runtime role fence in both directions;
   public UI and durability tests in the same file continue to prove real V2 adoption.
+
+# 2026-07-24 - Half-wiped seats retain an explicit Authority V2 replacement head
+
+- B11's real two-engine half-wipe reproduced a production fail-closed terminal: the turn successor withheld
+  COMMAND because the engine would run SwitchPhase, then the replacement resolver omitted that same phase
+  because the fainted seat had no same-owner bench. The phase correctly staged an explicit null selection,
+  but no REPLACEMENT head existed for its checkpoint commit.
+- Replacement extraction now follows the engine boundary: when the shared side has any living off-field
+  reserve, every fainted human seat receives an ordered replacement address. A wiped owner can therefore
+  commit the typed empty-slot result; when the whole side has no reserve, no transaction is invented because
+  SwitchPhase is skipped. Node-pure contracts pin both sides of this distinction.
+- The enemy-switch renderer fixture now proves the guest's real next command boundary before asking the host
+  to cross the trainer send-out. Its render/checksum assertions are unchanged; the edit removes a synthetic
+  one-process scheduling assumption already absent from the stronger trainer-mirror fixture.

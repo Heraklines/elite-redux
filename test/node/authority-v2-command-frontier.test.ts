@@ -291,6 +291,52 @@ describe("resolveCoopV2ReplacementControl", () => {
     });
     expect(validateNextControl(result)).toEqual({ ok: true });
   });
+
+  it("retains a wiped seat's explicit empty-slot resolution while its partner still has a reserve", () => {
+    const result = resolveCoopV2ReplacementControl(
+      9,
+      state(
+        [fieldSeat("player", 0, 10, { ownerSeatId: 0 }), fieldSeat("player", 1, 11, { ownerSeatId: 1 })],
+        [
+          { id: 10, hp: 0, coopOwnerSeatId: 0 },
+          { id: 11, hp: 30, coopOwnerSeatId: 1 },
+          { id: 20, hp: 0, coopOwnerSeatId: 0 },
+          { id: 21, hp: 20, coopOwnerSeatId: 1 },
+        ],
+        [{ id: 90, hp: 40 }],
+      ),
+      [{ k: "faint", bi: 0, actor: { side: "player", pokemonId: 10 } }],
+    );
+
+    expect(result).toEqual({
+      kind: "REPLACEMENT",
+      operationId: "RC/e9/w1/t1/o0/f0/s0",
+      ownerSeatId: 0,
+      epoch: 9,
+      wave: 1,
+      turn: 1,
+      occurrence: 0,
+      fieldIndex: 0,
+      remaining: [],
+    });
+  });
+
+  it("does not invent a replacement transaction when the side has no off-field survivor", () => {
+    const result = resolveCoopV2ReplacementControl(
+      9,
+      state(
+        [fieldSeat("player", 0, 10, { ownerSeatId: 0 }), fieldSeat("player", 1, 11, { ownerSeatId: 1 })],
+        [
+          { id: 10, hp: 0, coopOwnerSeatId: 0 },
+          { id: 11, hp: 30, coopOwnerSeatId: 1 },
+        ],
+        [{ id: 90, hp: 40 }],
+      ),
+      [{ k: "faint", bi: 0, actor: { side: "player", pokemonId: 10 } }],
+    );
+
+    expect(result).toBeNull();
+  });
 });
 
 describe("resolveCoopV2ShowdownCommandProof", () => {

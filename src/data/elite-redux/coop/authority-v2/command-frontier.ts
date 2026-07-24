@@ -61,13 +61,6 @@ function roleSeatId(seat: CoopAuthoritativeFieldSeat): number | null {
   return null;
 }
 
-function partyRecordOwnerSeatId(record: Record<string, unknown>): number | null {
-  if (Number.isSafeInteger(record.coopOwnerSeatId) && (record.coopOwnerSeatId as number) >= 0) {
-    return record.coopOwnerSeatId as number;
-  }
-  return record.coopOwner === "host" ? 0 : record.coopOwner === "guest" ? 1 : null;
-}
-
 function seatHp(state: CoopAuthoritativeBattleStateV1, seat: CoopAuthoritativeFieldSeat): number | null {
   const party = seat.side === "player" ? state.playerParty : state.enemyParty;
   // Identity is the protocol address. Party index is only a compatibility fallback for older complete
@@ -128,31 +121,17 @@ export function resolveCoopV2CommandFrontier(state: CoopAuthoritativeBattleState
   return { commands, unresolved };
 }
 
-function hasLegalHumanReplacement(
+function sideHasLivingOffFieldReserve(
   state: CoopAuthoritativeBattleStateV1,
   seat: CoopAuthoritativeFieldSeat,
-  ownerSeatId: number,
 ): boolean {
   const party = seat.side === "player" ? state.playerParty : state.enemyParty;
-  // In Showdown each whole side belongs to one authenticated participant. The active enemy seat is the
-  // unambiguous wire marker that this is a human-vs-human state; save-oriented PokemonData records do not
-  // carry classic co-op's per-mon ownership tags. Requiring those tags on the host/player bench made a host
-  // faint publish AWAIT_SUCCESSOR instead of its exact REPLACEMENT head, so the later post-summon commit was
-  // correctly rejected and both browsers entered the shared terminal. Classic co-op has no owned enemy seat
-  // and therefore keeps the strict per-mon ownership check below.
-  const wholePartyOwnedBySeat =
-    seat.side === "enemy" || state.field.some(candidate => candidate.side === "enemy" && roleSeatId(candidate) != null);
   const activeIds = new Set(
     state.field.filter(fieldSeat => fieldSeat.side === seat.side).map(fieldSeat => fieldSeat.pokemonId),
   );
   return party.some(record => {
     const hp = record.hp;
-    if (typeof hp !== "number" || !Number.isFinite(hp) || hp <= 0 || activeIds.has(record.id as number)) {
-      return false;
-    }
-    // Showdown parties are side-owned. Ordinary co-op player parties carry per-mon ownership and must match
-    // it exactly so one seat can never select another participant's bench as co-op expands beyond two seats.
-    return wholePartyOwnedBySeat || partyRecordOwnerSeatId(record) === ownerSeatId;
+    return typeof hp === "number" && Number.isFinite(hp) && hp > 0 && !activeIds.has(record.id as number);
   });
 }
 
@@ -160,9 +139,11 @@ function hasLegalHumanReplacement(
  * Resolve the ordered exact human replacement chain made necessary by a settled turn image.
  *
  * The head is the only executable picker. Every later same-boundary address is carried immutably in
- * `remaining` and becomes executable only after the preceding post-summon REPLACEMENT_COMMIT. AI-enemy
- * faints and wiped human halves are deliberately omitted: neither opens a human picker, so they remain
- * explicit ordered waits for their later wave/terminal authority.
+ * `remaining` and becomes executable only after the preceding post-summon REPLACEMENT_COMMIT. A human
+ * seat whose own half is wiped is still included when the shared side has another off-field survivor:
+ * the real SwitchPhase runs and commits an explicit null selection to seal that slot empty. Omitting that
+ * address left the later null commit without an active V2 head. A side with no off-field survivor is omitted
+ * because the engine skips SwitchPhase entirely and proceeds directly to command or terminal authority.
  */
 export function resolveCoopV2ReplacementControl(
   epoch: number,
@@ -190,7 +171,7 @@ export function resolveCoopV2ReplacementControl(
       continue;
     }
     const ownerSeatId = roleSeatId(seat);
-    if (ownerSeatId == null || !hasLegalHumanReplacement(state, seat, ownerSeatId)) {
+    if (ownerSeatId == null || !sideHasLivingOffFieldReserve(state, seat)) {
       continue;
     }
     const fieldIndex = seat.side === "enemy" ? seat.bi - enemyOffset : seat.bi;
