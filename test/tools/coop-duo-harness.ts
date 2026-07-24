@@ -2236,7 +2236,11 @@ export async function materializeGuestInputAfterReplacement(scene: BattleScene):
 export async function driveDuoGuestTackleThroughPublicUi(
   hostGame: GameManager,
   rig: DuoRig,
-  options: { restartAlreadyOpenHost?: boolean; submitHostTackle?: boolean } = {},
+  options: {
+    restartAlreadyOpenHost?: boolean;
+    submitHostTackle?: boolean;
+    guestTarget?: BattlerIndex;
+  } = {},
 ): Promise<void> {
   const guestOwnCommand = await withClient(rig.guestCtx, () =>
     driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
@@ -2310,11 +2314,16 @@ export async function driveDuoGuestTackleThroughPublicUi(
         postMovePhase.start();
         await drainLoopback();
         expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
-        // A real player may confirm the default target. Requiring RIGHT conflated command-relay coverage
-        // with the fixture having a second selectable foe: when only one target is legal, production
-        // correctly returns false and leaves the default cursor actionable. Dedicated target-navigation
-        // suites own multi-target cursor behavior; this helper owns the public Command -> Fight -> submit chain.
-        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the default legal enemy target").toBe(
+        if (options.guestTarget === BattlerIndex.ENEMY_2) {
+          expect(
+            rig.guestScene.ui.processInput(Button.RIGHT),
+            "guest navigates to the requested second enemy through TARGET UI",
+          ).toBe(true);
+        }
+        // Keep the ordinary journey on the default target, but let exact progression regressions request the
+        // second visible foe through the same RIGHT input a player uses. When only one target is legal,
+        // production skips TARGET_SELECT entirely and the branch above is never entered.
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the selected legal enemy target").toBe(
           true,
         );
         await drainLoopback();

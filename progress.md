@@ -2375,3 +2375,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Ability replay now prefers the exact displayed identity before an exact logical-party replacement. The
   detached regression proves `revealAbility` runs on the seated actor and never on the invisible replacement,
   closing a false-green assertion that previously checked only whether some flyout was requested.
+
+# 2026-07-24 - Remaining structural fixtures and public target selection match production
+
+- The two retained enemy-adoption regressions now establish the same battle-local Pokemon-id uniqueness
+  invariant as production before recording display depth. This prevents a stale headless field child from
+  impersonating the authoritative actor while preserving the renderer's exact-id, fail-closed lookup.
+- The public duo command driver can now select the second enemy through the real TARGET UI. The two-engine
+  victory progression regression uses that option so host and guest intentionally defeat distinct targets;
+  default-target journeys and single-target production behavior remain unchanged.

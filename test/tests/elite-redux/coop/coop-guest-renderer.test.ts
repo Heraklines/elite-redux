@@ -93,6 +93,17 @@ function completeTurnCarrier(turn: number) {
   };
 }
 
+function makeDisplayedIdentityUnique(pokemon: Pokemon): void {
+  const occupiedIds = new Set(
+    globalScene.field.list
+      .filter(candidate => candidate !== pokemon && typeof (candidate as { id?: unknown }).id === "number")
+      .map(candidate => (candidate as { id: number }).id),
+  );
+  while (occupiedIds.has(pokemon.id)) {
+    pokemon.id = (pokemon.id + 1) >>> 0;
+  }
+}
+
 describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 Phase B)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
@@ -487,6 +498,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const battle = globalScene.currentBattle;
     const displayed = battle.enemyParty[0];
     const displayedFieldIndex = globalScene.field.getIndex(displayed);
+    makeDisplayedIdentityUnique(displayed);
     const authoritativeId = displayed.id;
     game.override.enemySpecies(null);
 
@@ -518,6 +530,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const battle = globalScene.currentBattle;
     const displayed = battle.enemyParty[0];
     const displayedFieldIndex = globalScene.field.getIndex(displayed);
+    makeDisplayedIdentityUnique(displayed);
     const authoritativeId = displayed.id;
     game.override.enemySpecies(null);
 
