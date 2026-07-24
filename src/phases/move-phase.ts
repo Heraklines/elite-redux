@@ -769,7 +769,12 @@ export class MovePhase extends PokemonPhase {
           return [];
         }
         const targetPokemon = globalScene.getField()[target];
-        if (targetPokemon == null) {
+        // `getField()` is a party-slot view, not a display view: after FaintPhase removes a Pokemon's
+        // container, the same retired object can remain at this battler index until replacement. A
+        // later queued move may still retain that index. It has no guest-side sprite to target, so do
+        // not serialize it as a required presentation actor; MoveAnim already uses its user when the
+        // immutable cue has no displayable target.
+        if (targetPokemon == null || globalScene.field.getIndex(targetPokemon) < 0) {
           return [];
         }
         return [
