@@ -1,7 +1,6 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { initializeGame, initializeGameYielding } from "#app/init/init";
 import { SceneBase } from "#app/scene-base";
-import { isMobile } from "#app/touch-controls";
 import { bootOptimizationsEnabled } from "#constants/app-constants";
 import { getErBiomeBackgroundTextureKeys } from "#data/elite-redux/er-biome-backgrounds";
 import { markBootMilestone } from "#data/elite-redux/er-boot-diagnostics";
@@ -322,8 +321,7 @@ export class LoadingScene extends SceneBase {
     // Bake crossOrigin "anonymous" into the cached entry once it loads, so every
     // `add.video(.., "evo_bg")` (EvolutionPhase + the Weird Dream encounter)
     // builds a CORS-clean element. jsDelivr sends Access-Control-Allow-Origin: *,
-    // so the texture is never tainted. Mirrors the intro video's existing
-    // loadURL(.., "anonymous") fix (see `intro.loadURL` below).
+    // so the texture is never tainted.
     this.load.once(`${Phaser.Loader.Events.FILE_KEY_COMPLETE}video-evo_bg`, () => {
       const evoBg = this.cache.video.get("evo_bg");
       if (evoBg) {
@@ -543,30 +541,26 @@ export class LoadingScene extends SceneBase {
   }
 
   private loadLoadingScreen() {
-    const mobile = isMobile();
-
     const bg = this.add //
       .image(0, 0, "")
       .setOrigin(0)
       .setScale(6)
       .setVisible(false);
 
-    const graphics = this.add //
-      .graphics()
-      .lineStyle(4, 0xff00ff, 1)
-      .setDepth(10);
+    const progressBar = this.add.graphics().setDepth(21);
 
-    const progressBar = this.add.graphics();
-
-    const progressBox = this.add //
-      .graphics()
-      .lineStyle(5, 0xff00ff, 1.0)
-      .fillStyle(0x222222, 0.8);
+    const progressBox = this.add.graphics().setDepth(20);
 
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
     const midWidth = width / 2;
     const midHeight = height / 2;
+
+    progressBox
+      .fillStyle(0x222222, 0.85)
+      .fillRect(midWidth - 324, 356, 648, 72)
+      .lineStyle(5, 0xda3838, 1)
+      .strokeRect(midWidth - 324, 356, 648, 72);
 
     const logo = this.add //
       .image(midWidth, 240, "")
@@ -584,7 +578,8 @@ export class LoadingScene extends SceneBase {
           color: "#ffffff",
         },
       })
-      .setOrigin(0.5, 0.5);
+      .setOrigin(0.5, 0.5)
+      .setDepth(21);
 
     const assetText = this.make
       .text({
@@ -596,7 +591,8 @@ export class LoadingScene extends SceneBase {
           color: "#ffffff",
         },
       })
-      .setOrigin(0.5, 0.5);
+      .setOrigin(0.5, 0.5)
+      .setDepth(21);
 
     const disclaimerText = this.make
       .text({
@@ -626,7 +622,6 @@ export class LoadingScene extends SceneBase {
     const loadingGraphics: (GameObjects.Image | GameObjects.Graphics | GameObjects.Text)[] = [];
     loadingGraphics.push(
       bg,
-      graphics,
       progressBar,
       progressBox,
       logo,
@@ -636,45 +631,11 @@ export class LoadingScene extends SceneBase {
       disclaimerDescriptionText,
     );
 
-    if (!mobile) {
-      loadingGraphics.forEach(g => {
-        g.setVisible(false);
-      });
-    }
-
-    const intro = this.add
-      .video(0, 0)
-      .setOrigin(0)
-      .setScale(3)
-      .once(Phaser.GameObjects.Events.VIDEO_COMPLETE, (video: Phaser.GameObjects.Video) => {
-        this.tweens.add({
-          targets: intro,
-          duration: 500,
-          alpha: 0,
-          ease: "Sine.easeIn",
-          onComplete: () => video.destroy(),
-        });
-        for (const g of loadingGraphics) {
-          g.setVisible(true);
-        }
-      });
+    // The static staged boot indicator covers module/i18n startup before Phaser exists.
+    // Replace it only after the real progress UI is ready to render.
+    document.getElementById("er-boot-loader")?.remove();
 
     this.load
-      .once(this.LOAD_EVENTS.START, () => {
-        // videos do not need to be preloaded.
-        // crossOrigin "anonymous" is REQUIRED in prod: the asset path redirects to
-        // jsDelivr (a different origin), and without it the browser taints the
-        // <video> so WebGL's texImage2D throws an uncaught SecurityError when the
-        // frame is uploaded as a texture — which could freeze the intro for some
-        // first-time users. jsDelivr sends Access-Control-Allow-Origin: *, so the
-        // anonymous request loads cleanly and the texture is never tainted.
-        intro.loadURL("images/intro_dark.mp4", true, "anonymous");
-        if (mobile) {
-          intro.video?.setAttribute("webkit-playsinline", "webkit-playsinline");
-          intro.video?.setAttribute("playsinline", "playsinline");
-        }
-        intro.play();
-      })
       .on(this.LOAD_EVENTS.PROGRESS, (progress: number) => {
         percentText.setText(`${Math.floor(progress * 100)}%`);
         // need to reset fill style due to `clear` restting it
@@ -687,16 +648,10 @@ export class LoadingScene extends SceneBase {
         assetText.setText(i18next.t("menu:loadingAsset", { assetName: key }));
         switch (key) {
           case "loading_bg":
-            bg.setTexture("loading_bg");
-            if (mobile) {
-              bg.setVisible(true);
-            }
+            bg.setTexture("loading_bg").setVisible(true);
             break;
           case "logo":
-            logo.setTexture("logo");
-            if (mobile) {
-              logo.setVisible(true);
-            }
+            logo.setTexture("logo").setVisible(true);
             break;
         }
       })
@@ -707,7 +662,6 @@ export class LoadingScene extends SceneBase {
         for (const g of loadingGraphics) {
           g.destroy();
         }
-        intro.destroy();
       });
   }
 
