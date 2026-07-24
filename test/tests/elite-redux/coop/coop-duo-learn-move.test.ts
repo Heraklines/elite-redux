@@ -69,6 +69,7 @@ describe.skipIf(!RUN)(
     let phaserGame: Phaser.Game;
     let game: GameManager;
     let logs: ReturnType<typeof installDuoLogCapture>;
+    const startedBatchPhases = new WeakSet<object>();
 
     beforeAll(() => {
       phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -120,10 +121,22 @@ describe.skipIf(!RUN)(
      * always lands in `pickSlot`): ACTION selects the learnable move -> ACTION assigns slot 0 -> the panel
      * thins to empty -> finish -> done relays the terminal + closes. Runs under the owner's client ctx.
      */
-    function driveOwnerPickFirstSlot(scene: BattleScene): void {
-      expect(scene.ui.getMode(), "the owner's batch Move Learn panel is open").toBe(UiMode.LEARN_MOVE_BATCH);
-      scene.ui.processInput(Button.ACTION); // confirm the learnable move -> full moveset -> pickSlot
-      scene.ui.processInput(Button.ACTION); // assign it over slot 0 -> learned, list empty -> finish/done
+    async function driveOwnerPickFirstSlot(rig: DuoRig, owner: "host" | "guest"): Promise<void> {
+      const ctx = owner === "host" ? rig.hostCtx : rig.guestCtx;
+      const scene = owner === "host" ? rig.hostScene : rig.guestScene;
+      expect(
+        withClientSync(ctx, () => scene.ui.getMode()),
+        "the owner's batch Move Learn panel is open",
+      ).toBe(UiMode.LEARN_MOVE_BATCH);
+      expect(
+        withClientSync(ctx, () => scene.ui.processInput(Button.ACTION)),
+        "the owner selects the offered move through public input",
+      ).toBe(true);
+      await pumpDuoDestinations(rig, 1);
+      expect(
+        withClientSync(ctx, () => scene.ui.processInput(Button.ACTION)),
+        "the owner replaces slot zero through public input",
+      ).toBe(true);
     }
 
     /** Invert only the phase callback's runtime; public UI dispatch must still begin on its real owner. */
@@ -151,26 +164,46 @@ describe.skipIf(!RUN)(
       let hostReady = false;
       let guestReady = false;
       let ownerLeaseInstalled = false;
+      let hostPhaseName = "none";
+      let guestPhaseName = "none";
       for (let attempt = 0; attempt < 100; attempt++) {
         await pumpDuoDestinations(rig, 1);
         hostReady = withClientSync(rig.hostCtx, () => {
+          const phase = rig.hostScene.phaseManager.getCurrentPhase();
+          hostPhaseName = phase?.phaseName ?? "none";
+          if (phase?.phaseName === "LearnMoveBatchPhase" && !startedBatchPhases.has(phase)) {
+            // The test PhaseInterceptor suppresses PhaseManager.startCurrentPhase(). Production starts this
+            // exact current phase synchronously after override; reproduce only that missing scheduler edge.
+            startedBatchPhases.add(phase);
+            phase.start();
+          }
           const handler = rig.hostScene.ui.getHandler() as unknown as {
             active?: boolean;
             isCoopV2InputActionable?: () => boolean;
           };
           return (
-            rig.hostScene.ui.getMode() === UiMode.LEARN_MOVE_BATCH
+            phase?.phaseName === "LearnMoveBatchPhase"
+            && rig.hostScene.ui.getMode() === UiMode.LEARN_MOVE_BATCH
             && handler.active === true
             && handler.isCoopV2InputActionable?.() === true
           );
         });
         guestReady = withClientSync(rig.guestCtx, () => {
+          const phase = rig.guestScene.phaseManager.getCurrentPhase();
+          guestPhaseName = phase?.phaseName ?? "none";
+          if (phase?.phaseName === "CoopReplayLearnMoveBatchPhase" && !startedBatchPhases.has(phase)) {
+            // The synthetic guest uses the same inert startCurrentPhase scheduler as the host interceptor.
+            // Start only the V2-projected current phase; never construct or invoke a detached picker.
+            startedBatchPhases.add(phase);
+            phase.start();
+          }
           const handler = rig.guestScene.ui.getHandler() as unknown as {
             active?: boolean;
             isCoopV2InputActionable?: () => boolean;
           };
           return (
-            rig.guestScene.ui.getMode() === UiMode.LEARN_MOVE_BATCH
+            phase?.phaseName === "CoopReplayLearnMoveBatchPhase"
+            && rig.guestScene.ui.getMode() === UiMode.LEARN_MOVE_BATCH
             && handler.active === true
             && handler.isCoopV2InputActionable?.() === true
           );
@@ -185,7 +218,8 @@ describe.skipIf(!RUN)(
       }
       throw new Error(
         `${owner}-owned batch panels never became actionable `
-          + `(hostReady=${hostReady} guestReady=${guestReady} ownerLeaseInstalled=${ownerLeaseInstalled})`,
+          + `(host=${hostPhaseName}/${hostReady} guest=${guestPhaseName}/${guestReady} `
+          + `ownerLeaseInstalled=${ownerLeaseInstalled})`,
       );
     }
 
@@ -214,6 +248,10 @@ describe.skipIf(!RUN)(
           rig.hostScene.phaseManager.overridePhase(phase),
           "the host batch watcher is the real current production phase",
         ).toBe(true);
+        // PhaseInterceptor intentionally suppresses automatic current-phase starts. Production starts the
+        // override synchronously; invoke that exact installed phase once and track it against re-entry.
+        startedBatchPhases.add(phase);
+        phase.start();
       });
       // The V2 prompt projects the guest overlay asynchronously. Wait for both exact phase/handler
       // generations and the guest's physical-input lease instead of equating one drain with UI readiness.
@@ -227,8 +265,8 @@ describe.skipIf(!RUN)(
         // production done callback resumes with the host runtime ambient. Its captured guest binding + relay
         // must still arm/cancel only the guest's exact retry state.
         invertRuntimeWhenPanelCommits(rig.guestScene, rig.hostRuntime);
-        driveOwnerPickFirstSlot(rig.guestScene);
       });
+      await driveOwnerPickFirstSlot(rig, "guest");
       // THE P0: the OWNER (guest) signalled back + tore its picker down - it did NOT strand.
       expect(isCoopLearnMoveForwardInFlightEmpty(), "the guest released the picker (no strand - the P0 fix)").toBe(
         true,
@@ -273,6 +311,8 @@ describe.skipIf(!RUN)(
           rig.hostScene.phaseManager.overridePhase(phase),
           "the host batch owner is the real current production phase",
         ).toBe(true);
+        startedBatchPhases.add(phase);
+        phase.start();
       });
       // The replica watcher and authority owner both have to prove the real panel before host input is legal.
       await awaitBatchPanels(rig, "host");
@@ -283,8 +323,8 @@ describe.skipIf(!RUN)(
         // Reciprocal callback schedule: public input starts on the real host owner, then the production done
         // callback resumes with the guest runtime ambient. Retention must stay on the captured host ledger.
         invertRuntimeWhenPanelCommits(rig.hostScene, rig.guestRuntime);
-        driveOwnerPickFirstSlot(rig.hostScene);
       });
+      await driveOwnerPickFirstSlot(rig, "host");
       expect(rig.hostScene.ui.getMode(), "the HOST owner's panel CLOSED").not.toBe(UiMode.LEARN_MOVE_BATCH);
 
       // GUEST: the relayed terminal (delivered under the guest ctx) force-closes the watcher panel.

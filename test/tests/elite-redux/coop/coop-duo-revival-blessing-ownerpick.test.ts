@@ -177,13 +177,21 @@ describe.skipIf(!RUN)(
       // Drive the second fainted bench mon exclusively through ordinary PARTY keyboard input. =====
       let projectedGuestPicker: { phaseName: string; coopV2ControlOperationId?: string | null } | undefined;
       let guestPickerReady = false;
+      const startedGuestPickers = new WeakSet<object>();
       for (let attempt = 0; attempt < 100 && !guestPickerReady; attempt++) {
         await pumpDuoDestinations(rig, 1);
         guestPickerReady = withClientSync(rig.guestCtx, () => {
           const phase = rig.guestScene.phaseManager.getCurrentPhase() as {
             phaseName: string;
             coopV2ControlOperationId?: string | null;
+            start: () => void;
           };
+          if (phase.phaseName === "CoopGuestRevivalPhase" && !startedGuestPickers.has(phase)) {
+            // Both headless phase schedulers intentionally suppress startCurrentPhase(). Production starts
+            // the override immediately, so start only this already-projected current V2 phase once.
+            startedGuestPickers.add(phase);
+            phase.start();
+          }
           const handler = rig.guestScene.ui.getHandler() as unknown as {
             active?: boolean;
             isCoopV2InputActionable?: () => boolean;

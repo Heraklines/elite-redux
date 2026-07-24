@@ -2524,3 +2524,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   real current `CoopGuestRevivalPhase`, active/actionable PARTY handler, and guest-owner input lease. It then
   navigates to the intended fainted party member and chooses Revive solely with ordinary public key input.
 - Local Biome and diff checks are green. The focused B11 runtime proof will run on hosted Actions only.
+
+# 2026-07-24 - Headless V2 surfaces reproduce the production scheduler edge
+
+- Focused run `30064735002` showed that the first batch migration correctly refused premature input but
+  never emitted its interaction entry. Both headless phase schedulers deliberately replace
+  `PhaseManager.startCurrentPhase`; `overridePhase()` therefore established the right current object without
+  invoking its `start()`. Production does invoke that scheduler edge.
+- Batch learn and Revival Blessing now start only the already-installed current V2 phase once, tracked by
+  object identity. They still cannot construct a detached surface, replace `setMode`, or call a private UI
+  completion callback. Batch input is split into two accepted public key presses with a destination pump
+  between them so the UI -> relay -> authoritative result chain is observable.
