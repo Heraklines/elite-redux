@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "506e53ac0678a700e6065191339c091b0b40fc8a",
+  "baseSha": "e7f7d88e32792d8eac0a1dcaf68ed135a540ebb8",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -18,8 +18,8 @@
     "src/phases/mystery-encounter-phases.ts",
     "src/phases/the-bargain-phase.ts",
     "src/phases/title-phase.ts",
-    "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
+    "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
     "test/tests/elite-redux/coop/coop-duo-exploration.test.ts",
     "test/tests/elite-redux/coop/coop-duo-me-battle-reward.test.ts",
