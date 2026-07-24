@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { broadcastCoopOwnSlotCommand } from "#data/elite-redux/coop/coop-runtime";
+import { broadcastShowdownSyncPlayerCommand } from "#data/elite-redux/showdown/showdown-sync-command";
 import type { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { UiMode } from "#enums/ui-mode";
@@ -72,6 +73,14 @@ export class SelectTargetPhase extends PokemonPhase {
             // move whose broadcast was deferred to this resolved-target phase.
             const tera = globalScene.currentBattle.preTurnCommands[this.fieldIndex]?.command === Command.TERA;
             broadcastCoopOwnSlotCommand(this.fieldIndex, {
+              command: Command.FIGHT,
+              cursor: turnCommand.cursor ?? -1,
+              moveId: turnCommand.move.move,
+              targets,
+              useMode: turnCommand.move.useMode,
+              ...(tera ? { tera: true } : {}),
+            });
+            broadcastShowdownSyncPlayerCommand(this.fieldIndex, {
               command: Command.FIGHT,
               cursor: turnCommand.cursor ?? -1,
               moveId: turnCommand.move.move,

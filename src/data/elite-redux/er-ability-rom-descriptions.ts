@@ -366,7 +366,7 @@ export const ER_ABILITY_ROM_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "speedforce": "Adds 20% of the user's Speed stat to damage when using contact moves. Choice Scarf does not affect this ability.",
   "seaguardian": "When entering battle during rain, Sea Guardian boosts your highest stat by one stage. Works with any rain type. Triggers once per switch-in.",
   "moltendown": "Molten Down makes Fire-type moves super effective against Rock-types instead of resisted.",
-  "hyperaggressive": "Makes all attacks hit twice in succession. The first hit deals 100%, while the second hit deals 25%. Each hit rolls secondary effects independently (except flinch).",
+  "hyperaggressive": "Makes all attacks hit twice in succession. The first hit deals 100%, while the second hit deals 25%. While enraged, the attack strikes a third time, also at 25%. Each hit rolls secondary effects independently (except flinch).",
   "flock": "Boosts the power of Flying-type moves by 20%, or by 50% at 1/3 HP or lower.",
   "fieldexplorer": "Boosts the power of moves that can be used in the overworld by 50%. Includes all HM moves, (Zen) Headbutt, Ice Spinner, Hidden/Secret Power, and Dig.",
   "striker": "Striker increases the power of all kicking moves by 30%. Includes Pyro Ball.",

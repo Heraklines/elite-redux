@@ -4,7 +4,7 @@ export enum Command {
   POKEMON,
   RUN,
   TERA,
-  /** ER dev-tools: reload the current wave (lose-retry path). Gated at the command UI. */
+  /** ER: reload the current wave through the lose-retry path. */
   RESET,
   /**
    * Multi-format (triple+): reposition by SWAPPING this Pokemon's field slot with a chosen

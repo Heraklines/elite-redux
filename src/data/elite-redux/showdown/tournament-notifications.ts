@@ -8,9 +8,7 @@
 // Showdown TOURNAMENT — CHALLENGE notifications (Showdown Tournament P3 polish).
 // A concrete notification TYPE + pull SOURCE wired into the shared, type-agnostic
 // `notificationManager` (same framework as the ghost-battle inbox). It surfaces a
-// title-screen alert when a tournament match becomes ACTIONABLE for you:
-//   - "ready": your pairing is set (bracket generated / advanced) and undecided.
-//   - "present": your opponent is currently in the tournament lobby, challenging you.
+// title-screen alert when an opponent explicitly marks the exact pairing ready.
 // Each notification carries a DEEP-LINK target ({tournamentId, round, slot}); the
 // inbox opens the tournament BOARD on that match (A: FIGHT from there). Ids are
 // STABLE per (tournament, match, kind) so the manager dedupes to once-per-state-
@@ -25,7 +23,7 @@ import {
   autoResolutionLabel,
   type BracketMatchView,
   type BracketView,
-  isPresent,
+  isEntrantReadyForMatch,
   nextMatchFor,
   opponentOf,
   type TournamentView,
@@ -43,12 +41,14 @@ export interface TournamentDeepLink {
 }
 
 interface TournamentNotifData extends TournamentDeepLink {
-  kind: "ready" | "present" | "advanced";
+  kind: "opponent-ready" | "advanced";
   tournamentName: string;
   opponent: string;
   matchId: string;
   /** For an "advanced" notif: how you advanced without playing (e.g. "Activity win", "Walkover"). */
   reason?: string;
+  /** Readiness timestamp; changes only when the opponent explicitly readies again. */
+  readyAt?: number;
 }
 
 /** The P2 auto-resolution kinds that advance a player WITHOUT them playing (drives the "advanced" notif). */
@@ -113,13 +113,14 @@ function makeNotif(
   t: TournamentView,
   match: BracketMatchView,
   opponent: string,
-  kind: "ready" | "present" | "advanced",
+  kind: "opponent-ready" | "advanced",
   now: number,
   reason?: string,
+  readyAt?: number,
 ): ErNotification {
   return {
     // Stable id => the manager dedupes to once per state change (not once per poll).
-    id: `${TOURNAMENT_NOTIF_TYPE}:${t.id}:${match.id}:${kind}`,
+    id: `${TOURNAMENT_NOTIF_TYPE}:${t.id}:${match.id}:${kind}${readyAt == null ? "" : `:${readyAt}`}`,
     type: TOURNAMENT_NOTIF_TYPE,
     timestamp: now,
     read: false,
@@ -132,6 +133,7 @@ function makeNotif(
       opponent,
       matchId: match.id,
       ...(reason ? { reason } : {}),
+      ...(readyAt == null ? {} : { readyAt }),
     } satisfies TournamentNotifData,
   };
 }
@@ -139,9 +141,8 @@ function makeNotif(
 /**
  * PURE derivation: the viewer's ACTIONABLE notifications for a single fetched tournament view.
  * Returns [] unless the viewer is an entrant of an in-progress tournament with a set, undecided
- * next pairing. Emits a "ready" notification for the pairing and, if the opponent is present in
- * the lobby right now, an additional "present" (challenging-you) notification. Stable ids =>
- * the manager dedupes to once per state change. Exported for unit tests.
+ * next pairing. It emits only after the opponent explicitly readies for this exact match + opponent;
+ * ordinary board presence is not matchmaking intent. Exported for unit tests.
  */
 export function actionableTournamentNotifications(t: TournamentView, me: string, now: number): ErNotification[] {
   if (t.state !== "in_progress" || t.bracket == null) {
@@ -152,15 +153,14 @@ export function actionableTournamentNotifications(t: TournamentView, me: string,
   }
   const out: ErNotification[] = [];
 
-  // (a/b) your NEXT pairing is set + undecided => ready to play (+ present if the opponent is in the lobby).
+  // Your next pairing is actionable only after the opponent explicitly readies this exact pairing.
   const match = nextMatchFor(t.bracket, me);
   if (match != null && match.a != null && match.b != null && match.winner == null) {
     const opponent = opponentOf(match, me);
     if (opponent != null) {
-      out.push(makeNotif(t, match, opponent, "ready", now));
       const oppEnt = t.entrants.find(e => e.participant === opponent);
-      if (isPresent(oppEnt?.lastSeen, now)) {
-        out.push(makeNotif(t, match, opponent, "present", now));
+      if (isEntrantReadyForMatch(oppEnt, match.id, me)) {
+        out.push(makeNotif(t, match, opponent, "opponent-ready", now, undefined, oppEnt?.readyAt ?? undefined));
       }
     }
   }
@@ -219,10 +219,7 @@ export function initTournamentNotifications(): void {
       if (d.kind === "advanced") {
         return `${d.tournamentName}: you advanced without playing (${d.reason ?? "auto"})`;
       }
-      if (d.kind === "present") {
-        return `${d.opponent} is in the lobby - ${d.tournamentName}`;
-      }
-      return `${d.tournamentName}: your match vs ${d.opponent} is ready`;
+      return `${d.opponent} is ready - ${d.tournamentName}`;
     },
     detail(n) {
       const d = n.data as TournamentNotifData;
@@ -235,11 +232,8 @@ export function initTournamentNotifications(): void {
           customView: TOURNAMENT_NOTIF_TYPE,
         };
       }
-      const title = d.kind === "present" ? "Opponent is waiting" : "Tournament match ready";
-      const body =
-        d.kind === "present"
-          ? `${d.opponent} is present in the ${d.tournamentName} lobby and ready to battle.\n\nOpen the bracket and FIGHT.`
-          : `Your next ${d.tournamentName} match against ${d.opponent} is set.\n\nOpen the bracket to view it, then FIGHT when ready.`;
+      const title = "Opponent is ready";
+      const body = `${d.opponent} marked your ${d.tournamentName} match ready.\n\nOpen the bracket, mark yourself ready, and join the match.`;
       // customView tells the inbox UI to offer the "A: Open bracket" deep-link prompt.
       return { title, body, customView: TOURNAMENT_NOTIF_TYPE };
     },

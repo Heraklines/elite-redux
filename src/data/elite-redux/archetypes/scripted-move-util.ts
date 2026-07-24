@@ -42,6 +42,7 @@ import {
   PreMoveMessageAttr,
   RechargeAttr,
   ScaledHpPowerAttr,
+  // biome-ignore lint/suspicious/noImportCycles: Scripted move construction requires the concrete move attribute classes.
 } from "#moves/move";
 import { randSeedIntRange } from "#utils/common";
 import type { NumberHolder } from "#utils/value-holder";

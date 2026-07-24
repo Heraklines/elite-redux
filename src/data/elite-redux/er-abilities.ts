@@ -2163,7 +2163,7 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
   {
     "id": 358,
     "name": "Hyper Aggressive",
-    "description": "Moves hit twice. Second hit does 25% damage.",
+    "description": "Moves hit twice (2nd hit 25% power); a third 25% hit while enraged.",
     "archetype": "unknown"
   },
   {

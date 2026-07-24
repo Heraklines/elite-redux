@@ -50,7 +50,23 @@ describe.runIf(RUN)("showdown tournament board - real-path acceptance", () => {
     await wait(50);
   };
 
-  it("A on YOUR match routes into the tournament lobby entry (matchId + opponent)", async () => {
+  it("A on YOUR match first marks the exact pairing ready", async () => {
+    const cfg = buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" });
+    let readiness: { matchId: string; ready: boolean } | null = null;
+    cfg.onReadyChange = (matchId, ready) => {
+      readiness = { matchId, ready };
+    };
+    const mine = cfg.tournament
+      .bracket!.rounds.flat()
+      .find(m => m.winner === null && (m.a === "Carla" || m.b === "Carla"))!;
+
+    await openBoard(cfg);
+    handler().processInput(Button.ACTION);
+    await wait(20);
+    expect(readiness).toEqual({ matchId: mine.id, ready: true });
+  });
+
+  it("A routes into the exact tournament lobby only after both entrants are ready", async () => {
     // Fresh 4-bracket (Sample Cup shape): the viewer's semifinal is live + playable, cursor defaults onto it.
     const cfg = buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" });
     let played: { matchId: string; opponent: string } | null = null;
@@ -58,15 +74,19 @@ describe.runIf(RUN)("showdown tournament board - real-path acceptance", () => {
       played = { matchId, opponent };
     };
 
-    await openBoard(cfg);
-    expect(mode()).toBe(UiMode.TOURNAMENT_BRACKET);
-    // visibility-asserted realpath: the board is actually up (not a blank strand).
-    expect(handler().container.visible, "the board container is shown").toBe(true);
-
     // The viewer's live match + its bracket opponent (worker-authoritative), the exact fight A must open.
     const bracket = cfg.tournament.bracket!;
     const mine = bracket.rounds.flat().find(m => m.winner === null && (m.a === "Carla" || m.b === "Carla"))!;
     const opponent = mine.a === "Carla" ? mine.b : mine.a;
+    const ownEntrant = cfg.tournament.entrants.find(e => e.participant === "Carla")!;
+    const opponentEntrant = cfg.tournament.entrants.find(e => e.participant === opponent)!;
+    Object.assign(ownEntrant, { readyMatchId: mine.id, readyOpponent: opponent });
+    Object.assign(opponentEntrant, { readyMatchId: mine.id, readyOpponent: "Carla" });
+
+    // Open after mutating the worker view so the card derives JOIN rather than I'M READY.
+    await openBoard(cfg);
+    expect(mode()).toBe(UiMode.TOURNAMENT_BRACKET);
+    expect(handler().container.visible, "the board container is shown").toBe(true);
 
     handler().processInput(Button.ACTION);
     await wait(20);
@@ -105,6 +125,41 @@ describe.runIf(RUN)("showdown tournament board - real-path acceptance", () => {
     handler().processInput(Button.CANCEL);
     await wait(20);
     expect(backed, "B fired onBack").toBe(true);
+  });
+
+  it("MENU offers the entrant's server-backed dropout action", async () => {
+    const cfg = buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" });
+    let dropped = false;
+    cfg.onDropOut = () => {
+      dropped = true;
+    };
+    await openBoard(cfg);
+
+    handler().processInput(Button.MENU);
+    await wait(20);
+    expect(dropped).toBe(true);
+  });
+
+  it.each([1, 2])("shows the registration roster before a %i-entrant bracket exists", async entrantCount => {
+    const cfg = buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" });
+    cfg.tournament.state = "registration";
+    cfg.tournament.startedAt = null;
+    cfg.tournament.bracket = null;
+    cfg.tournament.entrants = cfg.tournament.entrants.slice(0, entrantCount).map(entrant => ({
+      ...entrant,
+      seed: null,
+    }));
+    cfg.tournament.entrantCount = entrantCount;
+
+    await openBoard(cfg);
+    const h = handler();
+
+    expect(h.container.visible, "the registration board is shown").toBe(true);
+    expect(h.cardTitle.text).toBe("REGISTRATION OPEN");
+    expect(h.cardBody.text).toContain(`${entrantCount}/4 entered`);
+    expect(h.nodes.length, "registration panel and entrant rows were rendered").toBeGreaterThanOrEqual(
+      6 + entrantCount * 6,
+    );
   });
 
   it("deep-link: initialBrowse opens the board ON the target match (challenge-notification realpath)", async () => {

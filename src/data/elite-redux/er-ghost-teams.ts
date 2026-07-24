@@ -106,6 +106,8 @@ export interface GhostMember {
 export interface GhostTeamSnapshot {
   /** Stable-ish id (seed + timestamp), used for de-duplication. */
   id: string;
+  /** Stable source-account key supplied by the shared API (never displayed). */
+  sourceUserId?: string | undefined;
   /** Display label for the ghost trainer (the uploader's name, best-effort). */
   trainerName: string;
   difficulty: ErDifficulty;
@@ -154,6 +156,10 @@ export interface GhostTeamSnapshot {
 const MAX_PARTY = 6;
 /** Local backlog of past runs kept per device (seeds the pool on first login). */
 const LOCAL_STORE_CAP = 100;
+/** Cross-player samples retained for network-loss fallback. */
+const SHARED_CACHE_CAP = 240;
+/** Preferred source-run proximity; +40 is used only when this band is empty. */
+const GHOST_PRIMARY_WAVE_WINDOW = 20;
 /** Prefetch this many waves ahead of the run's FIRST ghost wave (#364). */
 const PREFETCH_LEAD_WAVES = 15;
 /**
@@ -303,6 +309,7 @@ async function sampleRunsFromServer(
   difficulty: ErDifficulty,
   count: number,
   minWave: number,
+  maxWave = 200,
 ): Promise<GhostTeamSnapshot[]> {
   const base = serverBase();
   const token = getCookie(sessionIdKey);
@@ -313,7 +320,7 @@ async function sampleRunsFromServer(
   }
   try {
     const res = await fetch(
-      `${base}/savedata/run/sample?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}`,
+      `${base}/savedata/run/sample?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}`,
       { method: "GET", headers: { Accept: "application/json", Authorization: token } },
     );
     if (!res.ok) {
@@ -413,6 +420,43 @@ function saveLocalGhostTeam(snapshot: GhostTeamSnapshot): void {
     localStorage.setItem(localStoreKey(), JSON.stringify(list.slice(-LOCAL_STORE_CAP)));
   } catch {
     // Storage may be unavailable / full — non-fatal.
+  }
+}
+
+function sharedCacheKey(): string {
+  return `er-ghost-shared-cache-v1_${loggedInUser?.username ?? "guest"}`;
+}
+
+function loadSharedGhostCache(): GhostTeamSnapshot[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(sharedCacheKey()) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter(isValidSnapshot) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSharedGhostCache(snapshots: GhostTeamSnapshot[]): void {
+  try {
+    const merged = [...loadSharedGhostCache(), ...snapshots];
+    const seenIds = new Set<string>();
+    const seenTeams = new Set<string>();
+    const unique: GhostTeamSnapshot[] = [];
+    for (const snapshot of merged) {
+      if (!isErGhostTeamLegal(snapshot)) {
+        continue;
+      }
+      const fingerprint = ghostTeamFingerprint(snapshot);
+      if (seenIds.has(snapshot.id) || seenTeams.has(fingerprint)) {
+        continue;
+      }
+      seenIds.add(snapshot.id);
+      seenTeams.add(fingerprint);
+      unique.push(snapshot);
+    }
+    localStorage.setItem(sharedCacheKey(), JSON.stringify(unique.slice(-SHARED_CACHE_CAP)));
+  } catch {
+    // Cache persistence is optional; a full/quota-disabled store must not block play.
   }
 }
 
@@ -770,7 +814,74 @@ export function recordGhostTeamOnGameOver(isVictory: boolean): void {
 let prefetched: GhostTeamSnapshot[] | null = null;
 let prefetchStarted = false;
 const usedGhostIds = new Set<string>();
+const usedGhostUploaders = new Set<string>();
+const usedGhostTeamFingerprints = new Set<string>();
 const ghostByWave = new Map<number, GhostTeamSnapshot>();
+const requestedGhostBands = new Set<string>();
+const ghostBandRetryAfter = new Map<string, number>();
+let sharedCacheSeeded = false;
+
+function ghostUploaderKey(snapshot: GhostTeamSnapshot): string {
+  const sourceId = typeof snapshot.sourceUserId === "string" ? snapshot.sourceUserId.trim() : "";
+  const trainerName = typeof snapshot.trainerName === "string" ? snapshot.trainerName : "Trainer";
+  return sourceId ? `id:${sourceId}` : `name:${trainerName.trim().toLocaleLowerCase()}`;
+}
+
+/** Stable semantic team hash: cosmetic variants do not make an otherwise identical team new. */
+export function ghostTeamFingerprint(snapshot: GhostTeamSnapshot): string {
+  const semanticParty = snapshot.party
+    .map(member =>
+      JSON.stringify([
+        member.speciesId,
+        member.formIndex,
+        member.abilityIndex,
+        member.nature,
+        member.passive,
+        Array.isArray(member.ivs) ? member.ivs : [],
+        Array.isArray(member.moves) ? member.moves.slice().sort((a, b) => a - b) : [],
+        Array.isArray(member.heldItems)
+          ? member.heldItems.slice().sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+          : [],
+      ]),
+    )
+    .sort();
+  const value = JSON.stringify(semanticParty);
+  let a = 0x811c9dc5;
+  let b = 0x9e3779b9;
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    a = Math.imul(a ^ code, 0x01000193) >>> 0;
+    b = (Math.imul(b ^ code, 33) + i) >>> 0;
+  }
+  return `${a.toString(36)}:${b.toString(36)}`;
+}
+
+function mergeGhostPool(teams: GhostTeamSnapshot[], persist = false): void {
+  if (persist && teams.length > 0) {
+    saveSharedGhostCache(teams);
+  }
+  const merged = [...(prefetched ?? []), ...teams].filter(isErGhostTeamLegal);
+  const ids = new Set<string>();
+  const fingerprints = new Set<string>();
+  prefetched = merged.filter(team => {
+    const fingerprint = ghostTeamFingerprint(team);
+    if (ids.has(team.id) || fingerprints.has(fingerprint)) {
+      return false;
+    }
+    ids.add(team.id);
+    fingerprints.add(fingerprint);
+    return true;
+  });
+  onGhostPoolPublished?.(prefetched);
+}
+
+function seedGhostPoolFromSharedCache(): void {
+  if (sharedCacheSeeded) {
+    return;
+  }
+  sharedCacheSeeded = true;
+  mergeGhostPool(loadSharedGhostCache());
+}
 
 // =============================================================================
 // Co-op ghost-pool sync (#633). The ghost POOL is fetched per-client from the shared
@@ -805,10 +916,13 @@ export function setGhostPoolPublisher(cb: ((pool: GhostTeamSnapshot[]) => void) 
  * (no re-sort) so `pickGhost`'s seeded index lands on the same team as the host.
  */
 export function setCoopGhostPool(pool: GhostTeamSnapshot[]): void {
-  if (ghostByWave.size > 0) {
+  const legal = pool.filter(isErGhostTeamLegal);
+  const currentIds = (prefetched ?? []).map(team => team.id);
+  const isAppendOnly = currentIds.every((id, index) => legal[index]?.id === id);
+  if (ghostByWave.size > 0 && !isAppendOnly) {
     return;
   }
-  prefetched = pool.filter(isErGhostTeamLegal);
+  prefetched = legal;
   prefetchStarted = true;
 }
 
@@ -856,11 +970,17 @@ function isValidSnapshot(s: unknown): s is GhostTeamSnapshot {
   );
 }
 
-async function fetchGhostTeams(difficulty: ErDifficulty, count: number, minWave: number): Promise<GhostTeamSnapshot[]> {
+async function fetchGhostTeams(
+  difficulty: ErDifficulty,
+  count: number,
+  minWave: number,
+  maxWave = 200,
+): Promise<GhostTeamSnapshot[]> {
   // Preferred: the authenticated shared pool (other players' runs that got deep
   // enough — `minWave` keeps shallow runs out of late ghost waves).
-  const fromServer = await sampleRunsFromServer(difficulty, count, minWave);
+  const fromServer = await sampleRunsFromServer(difficulty, count, minWave, maxWave);
   if (fromServer.length > 0) {
+    saveSharedGhostCache(fromServer);
     return fromServer;
   }
   const url = endpoint();
@@ -868,13 +988,14 @@ async function fetchGhostTeams(difficulty: ErDifficulty, count: number, minWave:
     try {
       const sep = url.includes("?") ? "&" : "?";
       const res = await fetch(
-        `${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}`,
+        `${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}`,
         { method: "GET", headers: { Accept: "application/json" } },
       );
       if (res.ok) {
         const data = await res.json();
         const list = (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isValidSnapshot);
         if (list.length > 0) {
+          saveSharedGhostCache(list as GhostTeamSnapshot[]);
           return list as GhostTeamSnapshot[];
         }
       }
@@ -882,127 +1003,95 @@ async function fetchGhostTeams(difficulty: ErDifficulty, count: number, minWave:
       // Fall through to the local pool.
     }
   }
-  // Local fallback: the player's own stored teams that reached at least minWave
-  // (prefer the right difficulty), most-recent first.
-  const local = loadLocalGhostTeams().filter(s => isValidSnapshot(s) && s.waveReached >= minWave);
-  const matched = local.filter(s => s.difficulty === difficulty);
-  // #difficulty-pools: when no exact-tier team exists, fall back only to teams that are
-  // NOT HARDER than the requested tier (never field a Hell roster on a Youngster run).
-  const notHarder = local.filter(s => ghostDifficultyRank(s.difficulty) <= ghostDifficultyRank(difficulty));
-  return (matched.length > 0 ? matched : notHarder).slice().reverse();
+  // Network loss: use only previously fetched cross-player snapshots that still
+  // fit this exact request. No fitting cache means a normal trainer, never an
+  // out-of-range team or the current player's own uploaded run.
+  const cached = loadSharedGhostCache().filter(
+    snapshot =>
+      snapshot.waveReached >= minWave
+      && snapshot.waveReached <= maxWave
+      && ghostDifficultyRank(snapshot.difficulty) <= ghostDifficultyRank(difficulty),
+  );
+  return cached.slice(-count);
 }
 
 /**
  * Kick off (once, lazily) pre-fetching enough ghost teams for the run's
  * difficulty. Safe to call every wave — it only fires once, around wave 150.
  */
-export function maybePrefetchGhostTeams(waveIndex: number): void {
-  if (prefetchStarted) {
+function requestGhostBand(
+  difficulty: ErDifficulty,
+  minWave: number,
+  maxWave: number,
+  count: number,
+): void {
+  if (minWave > maxWave) {
     return;
   }
-  // Co-op GUEST (#633): never fetch from the server; the host broadcasts its
-  // authoritative pool and the guest adopts it (setCoopGhostPool), so both clients'
-  // seeded ghost picks are identical. Mark started so the lazy fetch never fires.
+  const key = `${difficulty}:${minWave}:${maxWave}`;
+  if (requestedGhostBands.has(key) || (ghostBandRetryAfter.get(key) ?? 0) > Date.now()) {
+    return;
+  }
+  requestedGhostBands.add(key);
+  void fetchGhostTeams(difficulty, count, minWave, maxWave)
+    .then(teams => {
+      if (teams.length === 0) {
+        requestedGhostBands.delete(key);
+        ghostBandRetryAfter.set(key, Date.now() + 15_000);
+        return;
+      }
+      ghostBandRetryAfter.delete(key);
+      mergeGhostPool(teams, true);
+    })
+    .catch(error => {
+      requestedGhostBands.delete(key);
+      ghostBandRetryAfter.set(key, Date.now() + 15_000);
+      // biome-ignore lint/suspicious/noConsole: included in Send Logs diagnostics.
+      console.warn(`[er-ghost] rolling prefetch ${key} failed:`, error);
+    });
+}
+
+/**
+ * Keep a wave-targeted pool warm without ever blocking battle creation. Challenge
+ * runs refresh two ten-wave buckets ahead; scheduled runs fetch their next exact
+ * ghost wave fifteen waves early. Each bucket has a +20 primary and +40 fallback.
+ */
+export function maybePrefetchGhostTeams(waveIndex: number): void {
+  // The host owns all network sampling in co-op and publishes append-only pools.
   if (coopGhostFetchSuppressed?.()) {
     prefetchStarted = true;
     return;
   }
-  // ER (#422): Ghost Trainers challenge - ghosts can appear from wave 1, so
-  // prefetch a full batch immediately (floor 1). The pool endpoint filters by
-  // DIFFICULTY, and a difficulty with few stored runs (Ace!) starved the
-  // challenge into constant normal-trainer fallbacks - so under the challenge
-  // we top up from EASIER difficulties' pools too (current first, then easier),
-  // de-duped by id. #difficulty-pools: the top-up is capped at the run's tier so
-  // an easy run never draws a HARDER (Hell/Elite) team - the Youngster-sees-Hell bug.
-  // Mystery Gauntlet uses its fixed scripted carrier and must not depend on an external fetch.
-  const immediateGhostPool = isErGhostChallengeActive();
-  if (immediateGhostPool) {
-    prefetchStarted = true;
-    void (async () => {
-      const collected: GhostTeamSnapshot[] = [];
-      const order: ErDifficulty[] = ghostChallengePoolOrder(getErDifficulty());
-      const tried = new Set<string>();
-      for (const diff of order) {
-        if (tried.has(diff)) {
-          continue;
-        }
-        tried.add(diff);
-        try {
-          const batch = await fetchGhostTeams(diff, 20, 1);
-          collected.push(...batch);
-          // biome-ignore lint/suspicious/noConsole: live diagnostic (#422) - lands in Send Logs captures
-          console.log(`[er-ghost] challenge prefetch: +${batch.length} from '${diff}' pool`);
-        } catch (err) {
-          // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
-          console.warn(`[er-ghost] challenge prefetch '${diff}' failed:`, err);
-        }
-        // Publish INCREMENTALLY: the old code assigned the pool only after
-        // ALL (up to 5 sequential) fetches finished, so the first trainer
-        // waves raced several network round-trips against an empty pool.
-        const byId = new Map(collected.filter(isErGhostTeamLegal).map(t => [t.id, t] as const));
-        // Cap teams per UPLOADER (3): one prolific early-dying tester can
-        // otherwise own most of the sampled pool and appear every wave.
-        const perUploader = new Map<string, number>();
-        prefetched = [...byId.values()].filter(t => {
-          const k = t.trainerName ?? "";
-          const n = perUploader.get(k) ?? 0;
-          if (n >= 3) {
-            return false;
-          }
-          perUploader.set(k, n + 1);
-          return true;
-        });
-        // Co-op HOST (#633): broadcast the (incrementally grown) pool so the guest
-        // adopts the SAME teams - no-op solo / on the guest.
-        onGhostPoolPublished?.(prefetched);
-        if (collected.length >= 30) {
-          break;
-        }
-      }
-      // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
-      console.log(`[er-ghost] challenge pool ready: ${prefetched?.length ?? 0} team(s) of ${collected.length} fetched`);
-      if (!prefetched || prefetched.length === 0) {
-        // EVERY source came back empty (auth token not ready at wave 1, a
-        // network blip, ...). The old code left the pool empty for the WHOLE
-        // run - every trainer stayed a normal trainer. Allow a retry on a
-        // later wave instead.
-        // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
-        console.warn("[er-ghost] challenge pool EMPTY after prefetch - retrying next wave");
-        prefetchStarted = false;
-      }
-    })().catch(err => {
-      // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
-      console.warn("[er-ghost] challenge prefetch crashed - retrying next wave:", err);
-      prefetched = prefetched ?? [];
-      prefetchStarted = false;
-    });
+  seedGhostPoolFromSharedCache();
+
+  const targets: number[] = [];
+  if (isErGhostChallengeActive()) {
+    const currentBucket = Math.floor((Math.max(1, waveIndex) - 1) / 10) * 10 + 1;
+    targets.push(currentBucket);
+    if (currentBucket + 10 <= 200) {
+      targets.push(currentBucket + 10);
+    }
+  } else {
+    const next = ghostWavesForCurrentRun().find(
+      ghostWave => ghostWave >= waveIndex && ghostWave - waveIndex <= PREFETCH_LEAD_WAVES,
+    );
+    if (next != null) {
+      targets.push(next);
+    }
+  }
+
+  if (targets.length === 0) {
     return;
   }
-  const waves = ghostWavesForCurrentRun();
-  if (waves.length === 0 || waveIndex < Math.min(...waves) - PREFETCH_LEAD_WAVES) {
-    return;
-  }
+
   prefetchStarted = true;
-  // Pool floor = the earliest ghost wave; takeGhostForWave then assigns each
-  // fetched team only to waves at/below how far that run actually reached.
-  // Over-fetch (2x, capped at the worker's 20/request) so the per-wave
-  // eligibility window (>= wave, <= wave + ER_GHOST_WAVE_WINDOW) still finds
-  // matches for the early ghost waves.
-  const minWave = Math.min(...waves);
-  void fetchGhostTeams(getErDifficulty(), Math.min(20, waves.length * 2), minWave)
-    .then(teams => {
-      // Single choke point for pool integrity: hacked/banned teams are dropped
-      // here no matter which source (server pool / legacy endpoint / local)
-      // they came from.
-      prefetched = teams.filter(isErGhostTeamLegal);
-      // Co-op HOST (#633): broadcast the authoritative pool to the guest (~15 waves
-      // ahead of the first ghost wave) so its seeded pick is deterministic. No-op
-      // solo / on the guest.
-      onGhostPoolPublished?.(prefetched);
-    })
-    .catch(() => {
-      prefetched = [];
-    });
+  const difficulty = getErDifficulty();
+  for (const target of targets) {
+    const primaryEnd = Math.min(200, target + GHOST_PRIMARY_WAVE_WINDOW);
+    const fallbackEnd = Math.min(200, target + ER_GHOST_WAVE_WINDOW);
+    requestGhostBand(difficulty, target, primaryEnd, 20);
+    requestGhostBand(difficulty, primaryEnd + 1, fallbackEnd, 10);
+  }
 }
 
 /** The uploader of the most recently fielded ghost - the picker avoids
@@ -1128,51 +1217,38 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     // carrier so asymmetric fetch timing cannot make two real browsers cache different trainers.
     const scripted = mysteryGauntletGhost();
     usedGhostIds.add(scripted.id);
+    usedGhostUploaders.add(ghostUploaderKey(scripted));
+    usedGhostTeamFingerprints.add(ghostTeamFingerprint(scripted));
     lastGhostUploader = scripted.trainerName ?? "";
     ghostByWave.set(waveIndex, scripted);
     console.log(`[er-ghost] wave ${waveIndex}: ghost '${scripted.trainerName}' (scripted gauntlet carrier)`);
     return scripted;
   }
   const pool = prefetched ?? [];
-  // A run that ended at wave W can only be fielded at waves <= W (its team is
-  // only proven viable up to where it died) AND at waves >= W - 20
-  // (ER_GHOST_WAVE_WINDOW: an endgame team must not appear at an early ghost
-  // wave where players aren't that strong yet). Prefer the shallowest
-  // still-eligible team so deeper teams stay available for later ghost waves.
-  // The ban filter runs again here as defense-in-depth (covers test-injected
-  // pools and any stale prefetch).
-  // ER (#422): the Ghost Trainers challenge needs ghosts on every trainer
-  // wave, but the 20-wave fairness window stays PRIMARY (maintainer: never
-  // field full endgame teams early). Only when a window comes up empty does
-  // the search widen step by step (30/40/60 waves past the current wave) -
-  // and a team taken from BEYOND the 20-wave window has its members DEVOLVED
-  // on build (see applyErGhostOverride) so the player is not swept. If even
-  // the widest window is empty, the wave falls back to a normal trainer.
-  // Pool exhaustion recycles used teams (within the same windows) before
-  // giving up. Scheduled ghost waves on normal runs keep the strict window.
+  // A source run must have ended at or after this wave. Prefer an unseen source
+  // within +20; allow +40 only when primary is empty. Snapshot ids, source
+  // accounts, and semantic team hashes are never recycled during a run. If both
+  // bands are empty, the caller fields a normal trainer.
   const challengeMode = isErGhostChallengeActive();
-  const legal = pool.filter(s => isErGhostTeamLegal(s));
-  const windows = challengeMode ? [ER_GHOST_WAVE_WINDOW, 60, 80] : [ER_GHOST_WAVE_WINDOW];
-  let next: GhostTeamSnapshot | undefined;
-  for (const window of windows) {
-    const eligible = legal.filter(s => s.waveReached >= waveIndex && s.waveReached <= waveIndex + window);
-    const unused = eligible.filter(s => !usedGhostIds.has(s.id));
-    next = pickGhost(unused.length > 0 ? unused : challengeMode ? eligible : [], waveIndex);
-    if (next) {
-      break;
-    }
-  }
-  // ER (#422): challenge last resort - the pool is dominated by DEEP runs
-  // (victories end at 200), so a wave can miss even the widest window and the
-  // player kept meeting normal trainers in ghost mode. Take the CLOSEST deeper
-  // team instead; applyErGhostOverride re-levels it to the wave (and, below wave
-  // 100 only, devolves it by overshoot so an endgame roster can't sweep early).
-  if (!next && challengeMode) {
-    const anyDeeper = legal.filter(s => s.waveReached >= waveIndex);
-    const unused = anyDeeper.filter(s => !usedGhostIds.has(s.id));
-    const closest = (unused.length > 0 ? unused : anyDeeper).sort((a, b) => a.waveReached - b.waveReached).slice(0, 3);
-    next = pickGhost(closest, waveIndex);
-  }
+  const legal = pool.filter(snapshot => isErGhostTeamLegal(snapshot));
+  const unseen = legal.filter(snapshot => {
+    return (
+      !usedGhostIds.has(snapshot.id)
+      && !usedGhostUploaders.has(ghostUploaderKey(snapshot))
+      && !usedGhostTeamFingerprints.has(ghostTeamFingerprint(snapshot))
+    );
+  });
+  const primary = unseen.filter(
+    snapshot =>
+      snapshot.waveReached >= waveIndex
+      && snapshot.waveReached <= waveIndex + GHOST_PRIMARY_WAVE_WINDOW,
+  );
+  const fallback = unseen.filter(
+    snapshot =>
+      snapshot.waveReached >= waveIndex
+      && snapshot.waveReached <= waveIndex + ER_GHOST_WAVE_WINDOW,
+  );
+  const next = pickGhost(primary.length > 0 ? primary : fallback, waveIndex);
   if (!next) {
     if (challengeMode) {
       // biome-ignore lint/suspicious/noConsole: live diagnostic (#422) - the smoking gun for "normal trainer in ghost mode"
@@ -1187,6 +1263,8 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     console.log(`[er-ghost] wave ${waveIndex}: ghost '${next.trainerName}' (run ended at ${next.waveReached})`);
   }
   usedGhostIds.add(next.id);
+  usedGhostUploaders.add(ghostUploaderKey(next));
+  usedGhostTeamFingerprints.add(ghostTeamFingerprint(next));
   lastGhostUploader = next.trainerName ?? "";
   ghostByWave.set(waveIndex, next);
   return next;
@@ -1197,13 +1275,66 @@ export function resetErGhostRunState(): void {
   prefetched = null;
   prefetchStarted = false;
   usedGhostIds.clear();
+  usedGhostUploaders.clear();
+  usedGhostTeamFingerprints.clear();
   ghostByWave.clear();
+  requestedGhostBands.clear();
+  ghostBandRetryAfter.clear();
+  sharedCacheSeeded = false;
   lastGhostUploader = null;
 }
 
+export interface ErGhostRepeatLedgerSaveData {
+  version: 1;
+  snapshotIds: string[];
+  uploaderKeys: string[];
+  teamFingerprints: string[];
+}
+
+/** Compact run-save ledger; the shared candidate cache remains device-local. */
+export function getErGhostRepeatLedger(): ErGhostRepeatLedgerSaveData {
+  return {
+    version: 1,
+    snapshotIds: [...usedGhostIds],
+    uploaderKeys: [...usedGhostUploaders],
+    teamFingerprints: [...usedGhostTeamFingerprints],
+  };
+}
+
+export function restoreErGhostRepeatLedger(data: ErGhostRepeatLedgerSaveData | undefined): void {
+  prefetched = null;
+  prefetchStarted = false;
+  ghostByWave.clear();
+  requestedGhostBands.clear();
+  ghostBandRetryAfter.clear();
+  sharedCacheSeeded = false;
+  lastGhostUploader = null;
+  usedGhostIds.clear();
+  usedGhostUploaders.clear();
+  usedGhostTeamFingerprints.clear();
+  if (data?.version !== 1) {
+    return;
+  }
+  for (const id of data.snapshotIds ?? []) {
+    if (typeof id === "string" && id.length <= 160) {
+      usedGhostIds.add(id);
+    }
+  }
+  for (const key of data.uploaderKeys ?? []) {
+    if (typeof key === "string" && key.length <= 160) {
+      usedGhostUploaders.add(key);
+    }
+  }
+  for (const fingerprint of data.teamFingerprints ?? []) {
+    if (typeof fingerprint === "string" && fingerprint.length <= 80) {
+      usedGhostTeamFingerprints.add(fingerprint);
+    }
+  }
+}
+
 /**
- * A frozen capture of the per-run ghost cache quartet (+ the last-uploader picker cursor). These are the
- * ONLY per-run mutable state this module owns; capturing them fully save/restores a client's ghost cache.
+ * A frozen capture of all per-run ghost cache and picker state. Capturing it fully
+ * save/restores a client's ghost context in the two-engine harness.
  * Arrays/maps are shallow-COPIED so a later mutation of the live cache cannot bleed into a held snapshot
  * (and vice-versa); the {@linkcode GhostTeamSnapshot} elements are treated as immutable.
  */
@@ -1211,7 +1342,12 @@ export interface ErGhostRunStateSnapshot {
   prefetched: GhostTeamSnapshot[] | null;
   prefetchStarted: boolean;
   usedGhostIds: string[];
+  usedGhostUploaders: string[];
+  usedGhostTeamFingerprints: string[];
   ghostByWave: [number, GhostTeamSnapshot][];
+  requestedGhostBands: string[];
+  ghostBandRetryAfter: [string, number][];
+  sharedCacheSeeded: boolean;
   lastGhostUploader: string | null;
 }
 
@@ -1228,15 +1364,20 @@ export function snapshotErGhostRunState(): ErGhostRunStateSnapshot {
     prefetched: prefetched == null ? null : [...prefetched],
     prefetchStarted,
     usedGhostIds: [...usedGhostIds],
+    usedGhostUploaders: [...usedGhostUploaders],
+    usedGhostTeamFingerprints: [...usedGhostTeamFingerprints],
     ghostByWave: [...ghostByWave.entries()],
+    requestedGhostBands: [...requestedGhostBands],
+    ghostBandRetryAfter: [...ghostBandRetryAfter.entries()],
+    sharedCacheSeeded,
     lastGhostUploader,
   };
 }
 
 /**
  * TWO-ENGINE co-op harness (#633 bounded-scope): install a previously-{@linkcode snapshotErGhostRunState}d
- * ghost cache as the live per-run state (the inverse of the snapshot). Restores the whole quartet + picker
- * cursor, re-copying so the live cache never aliases the held snapshot. Production never calls this.
+ * ghost cache as the live per-run state (the inverse of the snapshot). Re-copies
+ * collections so the live cache never aliases the held snapshot. Production never calls this.
  */
 export function restoreErGhostRunState(snap: ErGhostRunStateSnapshot): void {
   prefetched = snap.prefetched == null ? null : [...snap.prefetched];
@@ -1245,16 +1386,44 @@ export function restoreErGhostRunState(snap: ErGhostRunStateSnapshot): void {
   for (const id of snap.usedGhostIds) {
     usedGhostIds.add(id);
   }
+  usedGhostUploaders.clear();
+  for (const key of snap.usedGhostUploaders ?? []) {
+    usedGhostUploaders.add(key);
+  }
+  usedGhostTeamFingerprints.clear();
+  for (const fingerprint of snap.usedGhostTeamFingerprints ?? []) {
+    usedGhostTeamFingerprints.add(fingerprint);
+  }
   ghostByWave.clear();
   for (const [wave, team] of snap.ghostByWave) {
     ghostByWave.set(wave, team);
   }
+  requestedGhostBands.clear();
+  for (const key of snap.requestedGhostBands ?? []) {
+    requestedGhostBands.add(key);
+  }
+  ghostBandRetryAfter.clear();
+  for (const [key, retryAt] of snap.ghostBandRetryAfter ?? []) {
+    ghostBandRetryAfter.set(key, retryAt);
+  }
+  sharedCacheSeeded = snap.sharedCacheSeeded ?? false;
   lastGhostUploader = snap.lastGhostUploader;
 }
 
 /** A CLEAN (empty) ghost-cache snapshot: the per-client starting slate for the duo harness swap. */
 export function emptyErGhostRunStateSnapshot(): ErGhostRunStateSnapshot {
-  return { prefetched: null, prefetchStarted: false, usedGhostIds: [], ghostByWave: [], lastGhostUploader: null };
+  return {
+    prefetched: null,
+    prefetchStarted: false,
+    usedGhostIds: [],
+    usedGhostUploaders: [],
+    usedGhostTeamFingerprints: [],
+    ghostByWave: [],
+    requestedGhostBands: [],
+    ghostBandRetryAfter: [],
+    sharedCacheSeeded: false,
+    lastGhostUploader: null,
+  };
 }
 
 /**
@@ -1300,12 +1469,6 @@ export function buildGhostDialogueCtx(): GhostDialogueContext {
 /** Flag a freshly-built Trainer as a ghost, and size its party to the snapshot. */
 export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot): void {
   GHOST_BY_TRAINER.set(trainer, snapshot);
-  // ER (#419 follow-up): mark the whole battle as a ghost so the universal BST power
-  // gate (enforceErEliteBstCurve) exempts every member of the fielded roster - the
-  // ghost is shown VERBATIM (fairness is the +40-wave eligibility window, not species
-  // mutation). A plain boolean read there needs no cross-module import (avoids the
-  // circular-init hazard this module guards against).
-  trainer.erIsGhost = true;
   const size = Math.min(snapshot.party.length, MAX_PARTY);
   // Shadow the instance method so getPartyLevels / genParty field exactly the
   // ghost's team size (the shared trainer config is left untouched).
@@ -1470,21 +1633,13 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     }
     const level = battle?.enemyLevels?.[index] ?? member.level;
     const trainerSlot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
-    // ER (#419 follow-up): a ghost is fielded VERBATIM (the uploader's exact roster).
-    // Its eligibility is already gated by the +40-wave fairness window at SELECTION, so
-    // the universal BST cap must NOT additionally devolve/SWAP the stored species to the
-    // wave ceiling (e.g. a wave-63 hell ghost's Skarmory -> Clamperl) - that swap was the
-    // reported "ghost mons became a different species / wrong moves" bug. The whole ghost
-    // battle is exempt from enforceErEliteBstCurve via the trainer's `erIsGhost` marker
-    // (set in markTrainerAsGhost), which covers EVERY construction pass (party-gen AND
-    // the send-out rebuild). Our own fairness devolve above (below ER_GHOST_NO_DEVOLVE_WAVE
-    // only) is the intended depth-gate and still ran.
+    // addEnemyPokemon runs the universal BST gate. Ghost selection's +40-wave
+    // window is not sufficient on its own: the uploader may already own a
+    // legendary or mega. Over-cap members are therefore devolved/replaced here.
     const enemy = globalScene.addEnemyPokemon(species, level, trainerSlot);
-    // With the BST cap suppressed the final species now equals the stored member, so the
-    // stored loadout (form + ability slot + exact moveset) is restored below. The match
-    // check is kept as defense-in-depth: our fairness devolve (early challenge waves)
-    // legitimately changes the species, and in that case the level-appropriate moveset
-    // addEnemyPokemon generated for the devolved species is kept instead.
+    // Restore the stored loadout only when the species survived the gate. A second
+    // gate pass after party construction validates the restored form itself, so a
+    // stored mega cannot bypass the cap through a legal base species.
     const speciesMatchesStored = enemy.species.speciesId === member.speciesId;
     if (member.formIndex >= 0 && speciesMatchesStored && member.formIndex < (enemy.species.forms?.length ?? 0)) {
       enemy.formIndex = member.formIndex;

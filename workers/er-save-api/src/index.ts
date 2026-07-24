@@ -2479,6 +2479,7 @@ async function handleGhostNotifications(
 /** Row shape returned by the ghost-sample query. */
 type RunSampleRow = {
   id: string;
+  user_id: number;
   username: string | null;
   outcome: string | null;
   difficulty: string | null;
@@ -2502,6 +2503,41 @@ export const GHOST_SAMPLE_MAX_WAVE = 200;
 /** Modes that must never seed the ghost pool (endless/daily contamination). */
 const NON_GHOST_MODES_SQL = "'endless', 'spliced_endless', 'daily'";
 
+type RunSampleCandidate = { rid: number; wave: number; userId: number };
+
+async function enumerateEligibleRunCandidates(
+  env: Env,
+  uid: number,
+  minWave: number,
+  maxWave: number,
+  pageSize: number,
+): Promise<RunSampleCandidate[]> {
+  const candidates: RunSampleCandidate[] = [];
+  let cursorWave = minWave - 1;
+  let cursorRowid = 0;
+  for (;;) {
+    const page = await env.DB.prepare(
+      `SELECT rowid AS rid, wave, user_id AS userId FROM runs
+         WHERE wave >= ?1 AND wave <= ?2 AND user_id != ?3
+           AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+           AND (wave > ?4 OR (wave = ?4 AND rowid > ?5))
+         ORDER BY wave, rowid LIMIT ?6`,
+    )
+      .bind(minWave, maxWave, uid, cursorWave, cursorRowid, pageSize)
+      .all<RunSampleCandidate>();
+    const rows = page.results ?? [];
+    for (const row of rows) {
+      candidates.push(row);
+      cursorWave = row.wave;
+      cursorRowid = row.rid;
+    }
+    if (rows.length < pageSize) {
+      break;
+    }
+  }
+  return candidates;
+}
+
 /**
  * Enumerate the rowid of EVERY ghost-eligible run — the FULL, de-restricted candidate
  * pool. A run is eligible when it isn't the caller's own (`user_id != uid`), reached at
@@ -2520,6 +2556,7 @@ export async function enumerateEligibleRunRowids(
   uid: number,
   minWave: number,
   pageSize = 2000,
+  maxWave = GHOST_SAMPLE_MAX_WAVE,
 ): Promise<number[]> {
   const rowids: number[] = [];
   let cursorWave = minWave - 1;
@@ -2532,7 +2569,7 @@ export async function enumerateEligibleRunRowids(
            AND (wave > ?4 OR (wave = ?4 AND rowid > ?5))
          ORDER BY wave, rowid LIMIT ?6`,
     )
-      .bind(minWave, GHOST_SAMPLE_MAX_WAVE, uid, cursorWave, cursorRowid, pageSize)
+      .bind(minWave, maxWave, uid, cursorWave, cursorRowid, pageSize)
       .all<{ rid: number; wave: number }>();
     const rows = page.results ?? [];
     for (const row of rows) {
@@ -2564,6 +2601,13 @@ async function handleRunSample(
   // viable up to where it died).
   const minWaveParsed = Number.parseInt(url.searchParams.get("minWave") ?? "", 10);
   const minWave = Number.isFinite(minWaveParsed) ? Math.max(minWaveParsed, 0) : 0;
+  const maxWaveParsed = Number.parseInt(url.searchParams.get("maxWave") ?? "", 10);
+  const maxWave = Number.isFinite(maxWaveParsed)
+    ? Math.min(Math.max(maxWaveParsed, minWave), GHOST_SAMPLE_MAX_WAVE)
+    : GHOST_SAMPLE_MAX_WAVE;
+  if (minWave > GHOST_SAMPLE_MAX_WAVE) {
+    return json({ teams: [] }, 200, cors);
+  }
   // Pool from EVERYONE, across all difficulties — a ghost can come from any
   // player's run of any difficulty, as long as it got deep enough (wave >=
   // minWave) and isn't the caller's own. (`difficulty` is accepted for forward
@@ -2583,24 +2627,50 @@ async function handleRunSample(
   // paid rows-read budget), so we no longer restrict ourselves: the candidate pool
   // is EVERY eligible run.
   //
-  // Full breadth, still efficient (not one unbounded blob): enumerate the rowid of
-  // every eligible run via KEYSET PAGINATION (enumerateEligibleRunRowids), then
-  // uniformly sample `count` of them and fetch only those `count` full rows. Every
-  // eligible run has an equal chance; no wave band or uploader is unreachable.
+  // Full breadth, still efficient: enumerate the requested wave band via keyset
+  // pagination, maximise distinct uploaders, then fetch only the selected rows.
+  // This avoids both shallow-row bias and prolific-uploader domination.
   const cols =
-    "id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation";
+    "id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation";
   // Index the (wave, rowid) keyset walk. Cheap no-op once created; lazy so an
   // already-deployed prod DB gains it without a manual migration (mirrors
   // ensureRunsGhostIndex). schema.sql declares it for a fresh DB.
   await ensureRunSampleIndex(env);
-  const eligibleRowids = await enumerateEligibleRunRowids(env, auth.uid, minWave);
-  // Uniform random sample of `count` distinct eligible rowids (partial Fisher-Yates).
-  const k = Math.min(count, eligibleRowids.length);
-  for (let i = 0; i < k; i++) {
-    const j = i + Math.floor(Math.random() * (eligibleRowids.length - i));
-    [eligibleRowids[i], eligibleRowids[j]] = [eligibleRowids[j], eligibleRowids[i]];
+  const eligible = await enumerateEligibleRunCandidates(env, auth.uid, minWave, maxWave, 2000);
+  const byUploader = new Map<number, RunSampleCandidate[]>();
+  for (const candidate of eligible) {
+    const group = byUploader.get(candidate.userId) ?? [];
+    group.push(candidate);
+    byUploader.set(candidate.userId, group);
   }
-  const chosen = eligibleRowids.slice(0, k);
+
+  // Maximise uploader diversity before selecting a second run from anyone.
+  const uploaders = [...byUploader.keys()];
+  for (let i = 0; i < uploaders.length; i++) {
+    const j = i + Math.floor(Math.random() * (uploaders.length - i));
+    [uploaders[i], uploaders[j]] = [uploaders[j], uploaders[i]];
+  }
+  const chosenCandidates: RunSampleCandidate[] = [];
+  for (const uploader of uploaders) {
+    if (chosenCandidates.length >= count) {
+      break;
+    }
+    const group = byUploader.get(uploader)!;
+    chosenCandidates.push(group[Math.floor(Math.random() * group.length)]);
+  }
+
+  // Tiny test/dev pools can have fewer uploaders than the requested batch.
+  if (chosenCandidates.length < count) {
+    const chosenRowids = new Set(chosenCandidates.map(candidate => candidate.rid));
+    const remaining = eligible.filter(candidate => !chosenRowids.has(candidate.rid));
+    const needed = Math.min(count - chosenCandidates.length, remaining.length);
+    for (let i = 0; i < needed; i++) {
+      const j = i + Math.floor(Math.random() * (remaining.length - i));
+      [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+      chosenCandidates.push(remaining[i]);
+    }
+  }
+  const chosen = chosenCandidates.map(candidate => candidate.rid);
   let results: RunSampleRow[] = [];
   if (chosen.length > 0) {
     const placeholders = chosen.map((_, i) => `?${i + 1}`).join(", ");
@@ -2614,6 +2684,7 @@ async function handleRunSample(
       try {
         return {
           id: row.id,
+          sourceUserId: String(row.user_id),
           trainerName: row.username ?? "Trainer",
           difficulty: row.difficulty ?? difficulty,
           mode: row.mode ?? undefined,

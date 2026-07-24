@@ -16,13 +16,35 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import type { TournamentView } from "#data/elite-redux/showdown/tournament-types";
+import {
+  ER_SHINY_LAB_DEFAULT_PARAMS,
+  ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
+  type ErShinyLabCategory,
+  type ErShinyLabLoadout,
+} from "#data/elite-redux/er-shiny-lab-effects";
+import type {
+  RewardPlace,
+  ShinyTier,
+  TournamentRewardMutation,
+  TournamentView,
+} from "#data/elite-redux/showdown/tournament-types";
+import { isKickedParticipant } from "#data/elite-redux/showdown/tournament-types";
 import { Button } from "#enums/buttons";
+import { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import {
+  applyErShinyLabSpriteFxTexture,
+  clearErShinyLabSpriteFxTexture,
+  ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
+  type ErShinyLabSpriteFxLook,
+  getErShinyLabSpeciesIconSource,
+} from "#sprites/er-shiny-lab-sprite-fx";
+import { getVariantIcon, getVariantTint, type Variant } from "#sprites/variant";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const GOLD = 0xf8d030;
 const NEXT = 0x48c8f8;
@@ -30,7 +52,140 @@ const TODO = 0x8a93b4;
 const BOARD = 0x0b1838;
 const OPEN_GREEN = 0x78e08a;
 
-const VISIBLE_ROWS = 6;
+const VISIBLE_ROWS = 5;
+const ROW_Y0 = 48;
+const ROW_HEIGHT = 20;
+const SUMMARY_X = 137;
+const PRIZE_ICON_X = 168;
+
+type LabEffectReward = Extract<TournamentRewardMutation, { kind: "grantLabEffect" }>;
+
+export interface TournamentRewardPreview {
+  place: RewardPlace;
+  speciesId?: number;
+  randomSpecies: boolean;
+  shinyTier?: ShinyTier;
+  candy?: number;
+  labEffects: LabEffectReward[];
+  extraMutationCount: number;
+}
+
+function mutationSpeciesId(mutation: TournamentRewardMutation): number | undefined {
+  switch (mutation.kind) {
+    case "grantShinyChosen":
+    case "grantLabEffect":
+    case "grantUnlock":
+    case "grantCandy":
+      return mutation.speciesId;
+    case "grantShinyRandom":
+      return mutation.resolvedSpeciesId ?? (mutation.speciesPool.length === 1 ? mutation.speciesPool[0] : undefined);
+  }
+}
+
+/** Reduce the winner's reward bundle to one compact list-row preview without losing paired Lab FX. */
+export function tournamentRewardPreview(tournament: TournamentView): TournamentRewardPreview | null {
+  const entry =
+    tournament.rewardPool?.find(reward => reward.place === "champion")
+    ?? tournament.rewardPool?.find(reward => reward.mutations.length > 0);
+  if (!entry || entry.mutations.length === 0) {
+    return null;
+  }
+
+  const primary = entry.mutations.find(mutation => mutation.kind !== "grantLabEffect") ?? entry.mutations[0];
+  const speciesId = mutationSpeciesId(primary);
+  const labEffects = entry.mutations.filter(
+    (mutation): mutation is LabEffectReward =>
+      mutation.kind === "grantLabEffect" && speciesId !== undefined && mutation.speciesId === speciesId,
+  );
+  let shinyTier: ShinyTier | undefined;
+  let candy: number | undefined;
+  let randomSpecies = false;
+  switch (primary.kind) {
+    case "grantShinyChosen":
+      shinyTier = primary.tier;
+      break;
+    case "grantShinyRandom":
+      shinyTier = primary.tier;
+      randomSpecies = speciesId === undefined;
+      break;
+    case "grantUnlock":
+      shinyTier = primary.erBlackShiny
+        ? 4
+        : primary.shiny
+          ? (Math.max(1, Math.min(3, Math.floor(primary.variant) + 1)) as ShinyTier)
+          : undefined;
+      break;
+    case "grantCandy":
+      candy = primary.candy;
+      break;
+  }
+
+  const consumed = 1 + labEffects.filter(effect => effect !== primary).length;
+  return {
+    place: entry.place,
+    ...(speciesId === undefined ? {} : { speciesId }),
+    randomSpecies,
+    ...(shinyTier === undefined ? {} : { shinyTier }),
+    ...(candy === undefined ? {} : { candy }),
+    labEffects,
+    extraMutationCount: Math.max(0, entry.mutations.length - consumed),
+  };
+}
+
+function shortBattleRules(tournament: TournamentView): string {
+  const battle =
+    tournament.battleFormat === "doubles" ? "Doubles" : tournament.battleFormat === "triples" ? "Triples" : "Singles";
+  const series = tournament.seriesFormat === "bo3" ? "BO3" : tournament.seriesFormat === "bo5" ? "BO5" : "1 game";
+  return `${battle} / ${series}`;
+}
+
+function clipped(text: string, maxLength: number): string {
+  return text.length <= maxLength ? text : `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function rewardLook(effects: LabEffectReward[]): ErShinyLabSpriteFxLook | null {
+  const loadout: ErShinyLabLoadout = { palette: null, surface: null, around: null };
+  for (const effect of effects) {
+    const category = effect.category as ErShinyLabCategory;
+    const definition = ER_SHINY_LAB_EFFECTS_BY_CATEGORY[category]?.[effect.effectIndex - 1];
+    if (definition) {
+      loadout[category] = definition.id;
+    }
+  }
+  return loadout.palette || loadout.surface || loadout.around
+    ? { loadout, params: { ...ER_SHINY_LAB_DEFAULT_PARAMS } }
+    : null;
+}
+
+function rewardPlaceLabel(place: RewardPlace): string {
+  return place === "champion" ? "WIN" : place === "runnerUp" ? "2ND" : "SF";
+}
+
+function rewardSpecies(preview: TournamentRewardPreview): ReturnType<typeof getPokemonSpecies> | null {
+  if (preview.speciesId === undefined) {
+    return null;
+  }
+  try {
+    return getPokemonSpecies(preview.speciesId as SpeciesId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function rewardText(preview: TournamentRewardPreview, speciesName?: string): string {
+  const fallbackName = preview.speciesId === undefined ? "Random Pokemon" : `Pokemon #${preview.speciesId}`;
+  const name = speciesName ?? fallbackName;
+  const effectLabel = preview.labEffects
+    .map(effect => ER_SHINY_LAB_EFFECTS_BY_CATEGORY[effect.category]?.[effect.effectIndex - 1]?.label)
+    .find(Boolean);
+  const main =
+    preview.candy === undefined
+      ? effectLabel && preview.shinyTier === undefined
+        ? `${name} + ${effectLabel}`
+        : name
+      : `${name} Candy x${preview.candy}`;
+  return `${main}${preview.extraMutationCount > 0 ? ` +${preview.extraMutationCount}` : ""}`;
+}
 
 /** Config the caller passes to render the list. */
 export interface TournamentListConfig {
@@ -89,6 +244,7 @@ export class TournamentListUiHandler extends UiHandler {
   private hint: Phaser.GameObjects.Text;
   private emptyText: Phaser.GameObjects.Text;
   private rows: Phaser.GameObjects.GameObject[] = [];
+  private rewardFxSprites: Phaser.GameObjects.Sprite[] = [];
   private cursorObj: Phaser.GameObjects.Rectangle;
 
   private config: TournamentListConfig | null = null;
@@ -150,7 +306,7 @@ export class TournamentListUiHandler extends UiHandler {
     this.hint.setTint(0xc0c8e0);
     this.container.add(this.hint);
 
-    this.cursorObj = globalScene.add.rectangle(0, 0, w - 22, 15, 0xffffff, 0);
+    this.cursorObj = globalScene.add.rectangle(0, 0, w - 22, ROW_HEIGHT - 1, 0xffffff, 0);
     this.cursorObj.setStrokeStyle(2, GOLD);
     this.cursorObj.setOrigin(0, 0);
     this.cursorObj.setVisible(false);
@@ -173,11 +329,115 @@ export class TournamentListUiHandler extends UiHandler {
     return true;
   }
 
-  private layout(): void {
+  private clearRows(): void {
+    for (const sprite of this.rewardFxSprites) {
+      clearErShinyLabSpriteFxTexture(sprite, false);
+    }
+    this.rewardFxSprites = [];
     for (const row of this.rows) {
       row.destroy();
     }
     this.rows = [];
+  }
+
+  private addRowObject<T extends Phaser.GameObjects.GameObject>(object: T): T {
+    this.container.add(object);
+    this.rows.push(object);
+    return object;
+  }
+
+  private renderRewardPokemonIcon(
+    preview: TournamentRewardPreview,
+    species: ReturnType<typeof getPokemonSpecies> | null,
+    look: ErShinyLabSpriteFxLook | null,
+    y: number,
+  ): void {
+    if (!species) {
+      return;
+    }
+    const variant = (preview.shinyTier ? Math.min(2, preview.shinyTier - 1) : 0) as Variant;
+    const source = getErShinyLabSpeciesIconSource(species, false, 0, preview.shinyTier !== undefined, variant, look);
+    const icon = globalScene.add
+      .sprite(PRIZE_ICON_X, y + 14, source.key, source.frame ?? undefined)
+      .setOrigin(0.5, 0.5)
+      .setScale(0.3);
+    this.addRowObject(icon);
+    if (!look) {
+      return;
+    }
+    applyErShinyLabSpriteFxTexture(icon, look, {
+      source,
+      keyPrefix: "tournament-reward",
+      time: 0,
+      renderPad: ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
+    });
+    this.rewardFxSprites.push(icon);
+  }
+
+  private renderRewardShinyMarker(preview: TournamentRewardPreview, y: number): void {
+    if (preview.shinyTier === undefined) {
+      return;
+    }
+    const variant = Math.min(2, preview.shinyTier - 1) as Variant;
+    if (preview.shinyTier === 4) {
+      const outline = globalScene.add
+        .sprite(PRIZE_ICON_X + 5, y + 9, "shiny_icons")
+        .setOrigin(0.5, 0.5)
+        .setScale(0.38)
+        .setFrame(getVariantIcon(variant))
+        .setTint(0xe8e8e8);
+      this.addRowObject(outline);
+    }
+    const star = globalScene.add
+      .sprite(PRIZE_ICON_X + 5, y + 9, "shiny_icons")
+      .setOrigin(0.5, 0.5)
+      .setScale(preview.shinyTier === 4 ? 0.3 : 0.29)
+      .setFrame(getVariantIcon(variant))
+      .setTint(preview.shinyTier === 4 ? 0x0a0a0a : getVariantTint(variant));
+    this.addRowObject(star);
+  }
+
+  private renderReward(tournament: TournamentView, y: number): void {
+    const preview = tournamentRewardPreview(tournament);
+    const place = addTextObject(
+      SUMMARY_X,
+      y + 10,
+      preview ? rewardPlaceLabel(preview.place) : "PRIZE",
+      TextStyle.PARTY,
+      {
+        fontSize: "22px",
+      },
+    );
+    place.setOrigin(0, 0).setTint(preview ? GOLD : TODO);
+    this.addRowObject(place);
+
+    if (!preview) {
+      const none = addTextObject(PRIZE_ICON_X - 7, y + 10, "No prize", TextStyle.PARTY, { fontSize: "22px" });
+      none.setOrigin(0, 0).setTint(TODO);
+      this.addRowObject(none);
+      return;
+    }
+
+    const species = rewardSpecies(preview);
+    const look = rewardLook(preview.labEffects);
+    this.renderRewardPokemonIcon(preview, species, look, y);
+    this.renderRewardShinyMarker(preview, y);
+
+    const label = addTextObject(
+      PRIZE_ICON_X + (species ? 9 : -7),
+      y + 10,
+      clipped(rewardText(preview, species?.name), 22),
+      TextStyle.PARTY,
+      {
+        fontSize: "22px",
+      },
+    );
+    label.setOrigin(0, 0).setTint(0xffffff);
+    this.addRowObject(label);
+  }
+
+  private layout(): void {
+    this.clearRows();
     const cfg = this.config;
     if (cfg == null) {
       return;
@@ -187,33 +447,39 @@ export class TournamentListUiHandler extends UiHandler {
     const list = cfg.tournaments;
     this.emptyText.setVisible(list.length === 0);
 
-    const rowY0 = 48;
-    const rowH = 16;
     const end = Math.min(this.scrollTop + VISIBLE_ROWS, list.length);
     for (let i = this.scrollTop; i < end; i++) {
       const t = list[i];
-      const y = rowY0 + (i - this.scrollTop) * rowH;
-      const registered = t.entrants.some(e => e.participant === cfg.ownParticipant);
+      const y = ROW_Y0 + (i - this.scrollTop) * ROW_HEIGHT;
+      const droppedOut =
+        t.kicked?.includes(cfg.ownParticipant)
+        ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant);
+      const registered = !droppedOut && t.entrants.some(e => e.participant === cfg.ownParticipant);
       const chip = stateChip(t);
 
       // state chip (left)
-      const chipText = addTextObject(14, y + 2, chip.text, TextStyle.WINDOW, { fontSize: "30px" });
+      const chipText = addTextObject(14, y + 1, chip.text, TextStyle.WINDOW, { fontSize: "30px" });
       chipText.setOrigin(0, 0);
       chipText.setTint(chip.color);
       this.container.add(chipText);
       this.rows.push(chipText);
 
       // name
-      const name = addTextObject(46, y + 2, t.name, TextStyle.WINDOW, { fontSize: "34px" });
+      const name = addTextObject(46, y + 1, clipped(t.name, 18), TextStyle.WINDOW, { fontSize: "34px" });
       name.setOrigin(0, 0);
       name.setTint(0xffffff);
       this.container.add(name);
       this.rows.push(name);
 
+      // compact, enforceable tournament rules
+      const rules = addTextObject(SUMMARY_X, y + 1, shortBattleRules(t), TextStyle.PARTY, { fontSize: "22px" });
+      rules.setOrigin(0, 0).setTint(NEXT);
+      this.addRowObject(rules);
+
       // right-side detail: entrants / cap, or champion
       const detail =
         t.state === "complete" && t.champion ? `Champion: ${t.champion}` : `${t.entrantCount}/${t.maxEntrants} entered`;
-      const detailText = addTextObject(w - 14, y + 2, detail, TextStyle.PARTY, { fontSize: "30px" });
+      const detailText = addTextObject(w - 14, y + 1, detail, TextStyle.PARTY, { fontSize: "30px" });
       detailText.setOrigin(1, 0);
       detailText.setTint(t.state === "complete" ? GOLD : TODO);
       this.container.add(detailText);
@@ -221,12 +487,14 @@ export class TournamentListUiHandler extends UiHandler {
 
       // second line: window + your-status
       const windowHrs = Math.round(t.roundWindowMs / 3_600_000);
-      const sub = registered ? "You are registered" : `${windowHrs}h rounds`;
-      const subText = addTextObject(46, y + 9, sub, TextStyle.PARTY, { fontSize: "26px" });
+      const sub = droppedOut ? "Dropped out" : registered ? "You are registered" : `${windowHrs}h rounds`;
+      const subText = addTextObject(46, y + 10, sub, TextStyle.PARTY, { fontSize: "26px" });
       subText.setOrigin(0, 0);
       subText.setTint(registered ? OPEN_GREEN : TODO);
       this.container.add(subText);
       this.rows.push(subText);
+
+      this.renderReward(t, y);
     }
     this.updateHint();
   }
@@ -238,9 +506,14 @@ export class TournamentListUiHandler extends UiHandler {
       return;
     }
     const t = cfg.tournaments[this.cursor];
-    const registered = t.entrants.some(e => e.participant === cfg.ownParticipant);
+    const droppedOut =
+      t.kicked?.includes(cfg.ownParticipant)
+      ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant);
+    const registered = !droppedOut && t.entrants.some(e => e.participant === cfg.ownParticipant);
     if (t.state === "registration" && !registered) {
       this.hint.setText("A: Register    B: Back");
+    } else if (t.state === "registration") {
+      this.hint.setText("A: View entrants    B: Back");
     } else {
       this.hint.setText("A: View bracket    B: Back");
     }
@@ -253,7 +526,7 @@ export class TournamentListUiHandler extends UiHandler {
       return;
     }
     const visibleIndex = index - this.scrollTop;
-    const y = 47 + visibleIndex * 16;
+    const y = ROW_Y0 - 1 + visibleIndex * ROW_HEIGHT;
     this.cursorObj.setPosition(11, y);
     this.cursorObj.setVisible(true);
   }
@@ -299,7 +572,10 @@ export class TournamentListUiHandler extends UiHandler {
           return false;
         }
         const t = cfg.tournaments[this.cursor];
-        const registered = t.entrants.some(e => e.participant === cfg.ownParticipant);
+        const droppedOut =
+          t.kicked?.includes(cfg.ownParticipant)
+          ?? isKickedParticipant(t.bracket ?? { size: 0, rounds: [] }, cfg.ownParticipant);
+        const registered = !droppedOut && t.entrants.some(e => e.participant === cfg.ownParticipant);
         globalScene.ui.playSelect();
         if (t.state === "registration" && !registered) {
           cfg.onRegister(t.id);
@@ -320,10 +596,7 @@ export class TournamentListUiHandler extends UiHandler {
     super.clear();
     this.container.setVisible(false);
     this.cursorObj.setVisible(false);
-    for (const row of this.rows) {
-      row.destroy();
-    }
-    this.rows = [];
+    this.clearRows();
     this.config = null;
   }
 }
@@ -359,9 +632,35 @@ export function buildTournamentListDemoConfig(): TournamentListConfig {
     onRegister: () => {},
     onExit: () => {},
     tournaments: [
-      mk("t1", "Spring Showdown Cup", "registration", ["carla", "ash", "misty"]),
-      mk("t2", "Weekly Blitz", "registration", ["ash", "brock", "gary", "may"], { roundWindowMs: 8 * hour }),
-      mk("t3", "Champions League", "in_progress", ["carla", "ash", "misty", "brock", "gary", "may", "dawn", "iris"]),
+      mk("t1", "Staging Lockstep Test Cup", "registration", ["carla", "ash", "misty"], {
+        maxEntrants: 4,
+        battleFormat: "doubles",
+        seriesFormat: "bo3",
+        rewardPool: [
+          {
+            place: "champion",
+            mutations: [
+              { kind: "grantShinyChosen", speciesId: SpeciesId.EEVEE, tier: 2 },
+              { kind: "grantLabEffect", speciesId: SpeciesId.EEVEE, category: "around", effectIndex: 1 },
+            ],
+          },
+        ],
+      }),
+      mk("t2", "Weekly Blitz", "registration", ["ash", "brock", "gary", "may"], {
+        roundWindowMs: 8 * hour,
+        battleFormat: "singles",
+        seriesFormat: "single",
+        rewardPool: [
+          { place: "champion", mutations: [{ kind: "grantCandy", speciesId: SpeciesId.PIKACHU, candy: 50 }] },
+        ],
+      }),
+      mk("t3", "Champions League", "in_progress", ["carla", "ash", "misty", "brock", "gary", "may", "dawn", "iris"], {
+        battleFormat: "triples",
+        seriesFormat: "bo5",
+        rewardPool: [
+          { place: "champion", mutations: [{ kind: "grantShinyRandom", tier: 4, unownedOnly: true, speciesPool: [] }] },
+        ],
+      }),
       mk("t4", "Winter Classic", "complete", ["ash", "gary"], { champion: "gary" }),
     ],
   };

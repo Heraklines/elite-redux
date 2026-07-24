@@ -153,6 +153,7 @@ import {
   isCoopBargainOperationEnabled,
   resetCoopBargainOperationState,
   setCoopBargainOperationRevisionFloor,
+  // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates bargain callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-bargain-operation";
 import { COOP_CHECKSUM_SENTINEL, canonicalize, fnv1a64 } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
@@ -172,6 +173,7 @@ import {
   drainCoopApplyFailures,
   reapplyAcceptedCoopAuthoritativeBattleState,
   resetCoopStateTicks,
+  // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates battle-engine callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   CoopBattleStreamer,
@@ -187,6 +189,7 @@ import {
   publishCoopBiomeJournalMaterialization,
   resetCoopBiomeOperationState,
   setCoopBiomeOperationRevisionFloor,
+  // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates biome callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-biome-operation";
 import {
   COOP_CAP_AUTHORITY_V2_INTERACTION,
@@ -264,6 +267,7 @@ import {
   receiveCoopMeTerminalTransactionFor,
   resetCoopMeOperationState,
   setCoopMeOperationRevisionFloor,
+  // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates ME operation callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
   canMaterializeCoopMeCommittedTerminal,
@@ -320,6 +324,7 @@ import {
   COOP_ME_REWARD_SETTLED_CHOICE,
   parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+// biome-ignore lint/suspicious/noImportCycles: Epoch application is owned by the runtime composition root.
 import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-epoch";
 import {
   applyCoopOperationEnvelopeThroughRegisteredApplier,
@@ -363,6 +368,7 @@ import {
   isValidCoopRewardSurfaceIdentity,
   resetCoopRewardOperationState,
   setCoopRewardOperationRevisionFloor,
+  // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates reward callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-reward-operation";
 import {
   COOP_ABILITY_CHOICE_KINDS,
@@ -491,6 +497,7 @@ import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { UiMode } from "#enums/ui-mode";
+// biome-ignore lint/suspicious/noImportCycles: Runtime ghost-pool synchronization serializes live Pokemon data.
 import { PokemonData } from "#system/pokemon-data";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
 
@@ -2680,6 +2687,11 @@ function flushPendingShowdownResult(runtime: CoopRuntime): void {
 function wireShowdownResult(transport: CoopTransport, runtime: CoopRuntime): void {
   transport.onMessage(msg => {
     if (msg.t !== "showdownResult" && msg.t !== "showdownVoid") {
+      return;
+    }
+    // In Sync, both engines settle their own canonical simulation. Accepting the peer terminal as an
+    // authoritative interrupt would race the local Victory/GameOver phase and can tear down mid-turn.
+    if (runtime.controller.netcodeMode === "lockstep") {
       return;
     }
     // First terminal wins. Duplicates are idempotent; a conflicting late terminal cannot overwrite the
@@ -7813,16 +7825,13 @@ export function applyCoopControlPlaneSaveData(data: unknown): boolean {
 }
 
 /**
- * The active co-op netcode (#633, M6c: authoritative-ONLY), or `"lockstep"` when there is no
- * live session. Co-op has exactly one netcode since M3: a LIVE session is ALWAYS authoritative
- * (the guest renders, the host resolves), unconditionally - the old selectable toggle, the
- * controller's netcodeMode consultation, and the transient-read LATCH are all retired. The
- * "lockstep" return survives ONLY as the no-session sentinel every solo gate keys off
- * (`=== "authoritative"` is false -> solo is byte-for-byte unaffected). Deliberately does NOT
- * touch globalScene - it is a pure runtime read so the engine-free unit tests can call it.
+ * The active session's explicitly negotiated netcode, or `"lockstep"` when there is no session.
+ * Normal co-op and Showdown still start as `"authoritative"`; the controller read exists so the
+ * staging-only Showdown Sync route can opt into the retained dual-engine protocol without changing
+ * either production default. Deliberately does not touch globalScene.
  */
 export function getCoopNetcodeMode(): CoopNetcodeMode {
-  return active == null ? "lockstep" : "authoritative";
+  return active?.controller.netcodeMode ?? "lockstep";
 }
 
 /**
@@ -7854,6 +7863,11 @@ export function getCoopSessionKind(): CoopSessionKind {
  */
 export function isVersusSession(): boolean {
   return active != null && active.controller.isVersusSession();
+}
+
+/** Whether the staging-only dual-engine Showdown compatibility mode is active. */
+export function isShowdownSyncSession(): boolean {
+  return isVersusSession() && getCoopNetcodeMode() === "lockstep";
 }
 
 /**
@@ -7906,7 +7920,10 @@ export function isShowdownGuestFlip(): boolean {
   // gates the DATA mappers (ingress side swap + egress checksum un-swap) plus the one legitimate
   // guest-only presentation choice left - the C7 opponent-trainer re-skin. HARD `false` for solo /
   // co-op / host (narrower than isCoopAuthoritativeGuest, which is true for co-op guests too).
-  return isVersusSession() && getCoopController()?.role === "guest";
+  // Showdown Sync keeps both engines in the host-oriented canonical world. That is required for
+  // deterministic dual simulation because ER has mechanics whose activation depends on player/enemy
+  // ownership. The authoritative renderer keeps today's data-level guest flip unchanged.
+  return isVersusSession() && getCoopNetcodeMode() === "authoritative" && getCoopController()?.role === "guest";
 }
 
 /**

@@ -234,6 +234,11 @@ export class UiInputs {
         // overlay (only Backspace/X did, and that path is the "back yanks me to title" bug being fixed).
         globalScene.ui.processInput(Button.MENU);
         break;
+      case UiMode.TOURNAMENT_BRACKET:
+        // Tournament dropout is owned by the board so the same Menu control works on keyboard,
+        // controller, and the mobile virtual pad instead of opening or swallowing the pause menu.
+        globalScene.ui.processInput(Button.MENU);
+        break;
       case UiMode.MENU:
         globalScene.ui.revertMode();
         globalScene.playSound("ui/select");

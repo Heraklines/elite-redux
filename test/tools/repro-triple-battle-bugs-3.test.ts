@@ -167,7 +167,7 @@ describe.skipIf(!RUN)("repro: triple-battle bugs round 3 (2026-07-07 report)", (
       // This test owns two simultaneous vacancies, not random ER passive follow-ups. A generated Stunky
       // previously used Aftermath/Explosion and created a third KO; both reserves were correctly on field,
       // but the fixture then demanded three living battlers from only two available reserves.
-      .enemyPassiveAbility(AbilityId.BALL_FETCH);
+      .enemyHasPassiveAbility(false);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIDGEOT, SpeciesId.PIDGEOT);
 
     const field = globalScene.getEnemyField();
@@ -180,11 +180,12 @@ describe.skipIf(!RUN)("repro: triple-battle bugs round 3 (2026-07-07 report)", (
 
     // The CENTRE quakes (hits all adjacent); the two WING foes sit at 1 HP and faint in
     // the SAME MoveEffectPhase. My Pidgeot wings are airborne (Earthquake immune) and
-    // just Harden. Give the centre foe an explicit fixture-only HP reserve so species/defence
-    // randomization cannot silently turn this two-vacancy case into three KOs with only two reserves.
+    // just Harden. Keep the center foe Ground-immune so later damage-table changes cannot
+    // turn this two-KO replacement regression into an unrelated full-field wipe.
     field[0].hp = 1;
     field[1].hp = 10_000;
     field[2].hp = 1;
+    game.field.mockAbility(field[1], AbilityId.LEVITATE);
     game.move.select(MoveId.HARDEN, 0);
     game.move.select(MoveId.EARTHQUAKE, 1);
     game.move.select(MoveId.HARDEN, 2);

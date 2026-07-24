@@ -37,6 +37,9 @@ interface EntrantRow {
   registered_at: number;
   ghost_json: string | null;
   last_seen: number | null;
+  ready_match_id: string | null;
+  ready_opponent: string | null;
+  ready_at: number | null;
   waitlisted: number | null;
 }
 
@@ -145,6 +148,9 @@ class FakeStmt {
         registered_at: Number(a[5]),
         ghost_json: a[6] as string | null,
         last_seen: a[7] as number | null,
+        ready_match_id: null,
+        ready_opponent: null,
+        ready_at: null,
         waitlisted: a[8] as number | null,
       });
       return;
@@ -168,6 +174,25 @@ class FakeStmt {
       const row = this.db.entrants.find(e => e.tournament_id === String(a[0]) && e.participant === String(a[1]));
       if (row) {
         row.last_seen = a[2] as number;
+      }
+      return;
+    }
+    if (s.startsWith("UPDATE tournament_entrants SET ready_match_id=NULL")) {
+      const row = this.db.entrants.find(e => e.tournament_id === String(a[0]) && e.participant === String(a[1]));
+      if (row) {
+        row.ready_match_id = null;
+        row.ready_opponent = null;
+        row.ready_at = null;
+      }
+      return;
+    }
+    if (s.startsWith("UPDATE tournament_entrants SET ready_match_id=?3")) {
+      const row = this.db.entrants.find(e => e.tournament_id === String(a[0]) && e.participant === String(a[1]));
+      if (row) {
+        row.ready_match_id = String(a[2]);
+        row.ready_opponent = String(a[3]);
+        row.ready_at = Number(a[4]);
+        row.last_seen = Number(a[4]);
       }
       return;
     }
@@ -354,6 +379,81 @@ describe("tournament routes — lifecycle + attestation", () => {
     const sbody = (await settle.json()) as any;
     expect(sbody.resolution).toBe("settled");
     expect(sbody.match.winner).toBe(pa);
+  });
+
+  it("records readiness only for the caller's exact live pairing and clears it", async () => {
+    const id = await createTour();
+    await register(id, ["alice", "bob", "carol", "dave"]);
+    await call("/tournament/close-registration", "POST", ADMIN, { id });
+    const match = (await bracketOf(id)).bracket.rounds[0][0];
+    const [pa, pb] = [match.a, match.b];
+
+    const unrelated = await call("/tournament/ready", "POST", player("carol"), {
+      tournamentId: id,
+      matchId: match.id,
+      ready: true,
+    });
+    expect(unrelated.status).toBe(409);
+
+    const first = await call("/tournament/ready", "POST", player(pa), {
+      tournamentId: id,
+      matchId: match.id,
+      ready: true,
+    });
+    expect(first.status).toBe(200);
+    expect(((await first.json()) as any).opponentReady).toBe(false);
+    let t = await bracketOf(id);
+    const readyA = t.entrants.find((e: any) => e.participant === pa);
+    expect(readyA).toMatchObject({ readyMatchId: match.id, readyOpponent: pb });
+
+    const second = await call("/tournament/ready", "POST", player(pb), {
+      tournamentId: id,
+      matchId: match.id,
+      ready: true,
+    });
+    expect(((await second.json()) as any).opponentReady).toBe(true);
+
+    await call("/tournament/ready", "POST", player(pa), {
+      tournamentId: id,
+      matchId: match.id,
+      ready: false,
+    });
+    t = await bracketOf(id);
+    expect(t.entrants.find((e: any) => e.participant === pa)).toMatchObject({
+      readyMatchId: null,
+      readyOpponent: null,
+      readyAt: null,
+    });
+  });
+
+  it("lets an entrant drop out and resolves a progressed bracket by walkover", async () => {
+    const id = await createTour();
+    await register(id, ["alice", "bob", "carol", "dave"]);
+    await call("/tournament/close-registration", "POST", ADMIN, { id });
+    const initial = (await bracketOf(id)).bracket;
+    const played = initial.rounds[0][0];
+    await call("/tournament/result", "POST", player(played.a), {
+      tournamentId: id,
+      matchId: played.id,
+      winner: played.a,
+    });
+    await call("/tournament/result", "POST", player(played.b), {
+      tournamentId: id,
+      matchId: played.id,
+      winner: played.a,
+    });
+
+    const pending = (await bracketOf(id)).bracket.rounds[0][1];
+    const dropped = pending.b;
+    const survivor = pending.a;
+    const res = await call("/tournament/drop-out", "POST", player(dropped), { id });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.kind).toBe("walkover");
+    const settled = body.tournament.bracket.rounds[0][1];
+    expect(settled.winner).toBe(survivor);
+    expect(settled.resolution).toBe("walkover");
+    expect(body.tournament.bracket.kicked).toContain(dropped);
   });
 
   it("BO3 series: per-game reports accumulate, clinch at 2-0, advance the bracket", async () => {

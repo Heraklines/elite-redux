@@ -143,7 +143,7 @@ function pickStarterCost(tier: EggTier): number {
 }
 
 function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: number): boolean {
-  return (
+  const isBattleForm =
     findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also // battle-only forms reached via the Bond chain off the base Darmanitan Redux, // never base/root mons, so they must be excluded the same way. AURA is // Darmanitan Redux's Zen-Mode-style alternate battle form // (SPECIES_DARMANITAN_REDUX_AURA, "Darmanitan Aura") — likewise a // battle-emergent form that must NOT hatch (it was leaking into RARE eggs).
     || /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)|(?:^|_)BOND(?:_|$)|(?:^|_)BLUNDER(?:_|$)|(?:^|_)AURA(?:_|$)|(?:^|_)BLADE(?:_|$)|(?:^|_)SCHOOL(?:_|$)|(?:^|_)ZEN(?:_|$)|(?:^|_)NOICE(?:_|$)|(?:^|_)CROWNED(?:_|$)|(?:^|_)ORIGIN(?:_|$)|(?:^|_)GIGANTAMAX(?:_|$)|(?:^|_)GMAX(?:_|$)|(?:^|_)ETERNAMAX(?:_|$)/.test(
       draft.speciesConst,
@@ -151,17 +151,16 @@ function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: num
     || /\b(Mega|Primal|Hangry|Bond|Blunder|Blade|School|Zen|Noice|Crowned|Origin|Gigantamax|Eternamax|Busted|Gulping|Gorging|Sunshine)\b/i.test(
       draft.name ?? "",
     )
-    || /^Darmanitan Aura$/i.test(draft.name ?? "") // Vanilla ALTERNATE-FORM species (#438): the ER dump models vanilla form // variants as standalone species (SPECIES_UNOWN_B..Z, SPECIES_ARCEUS_FIRE, // SPECIES_LANDORUS_THERIAN, Castform weathers, Deoxys modes, Flabebe
-    || // colors, Calyrex riders...). They have no prevolution and no form-change
-    // edge, so they leaked past every gate above and HATCHED FROM EGGS while
-    // being absent from starter select. Only the BASE species may hatch; the
-    // vanilla form mechanics (plates, Reveal Glass, form cycling) stay the way
-    // to reach the forms. REDUX/APEX suffixed customs are real ER mons - keep.
-    (/^SPECIES_(UNOWN|ARCEUS|CASTFORM|DEOXYS|BURMY|WORMADAM|SHELLOS|GASTRODON|ROTOM|SHAYMIN|GIRATINA|BASCULIN|DEERLING|SAWSBUCK|TORNADUS|THUNDURUS|LANDORUS|ENAMORUS|KELDEO|MELOETTA|GENESECT|VIVILLON|FLABEBE|FLOETTE|FLORGES|FURFROU|PUMPKABOO|GOURGEIST|ZYGARDE|HOOPA|ORICORIO|LYCANROC|MINIOR|NECROZMA|MAGEARNA|KYUREM|SILVALLY|TOXTRICITY|ALCREMIE|INDEEDEE|MEOWSTIC|BASCULEGION|OINKOLOGNE|URSHIFU|CALYREX|ZARUDE|SQUAWKABILLY|TATSUGIRI|DUDUNSPARCE|MAUSHOLD|PIKACHU|EEVEE|TERAPAGOS|MIMIKYU|CRAMORANT|EISCUE|MORPEKO|WISHIWASHI)_[A-Z0-9]/.test(
+    || /^Darmanitan Aura$/i.test(draft.name ?? "");
+
+  // Vanilla alternate-form mechanics remain the only way to reach these
+  // standalone dump entries. REDUX/APEX suffixed customs remain hatchable.
+  const isStandaloneVanillaForm =
+    /^SPECIES_(UNOWN|ARCEUS|CASTFORM|DEOXYS|BURMY|WORMADAM|SHELLOS|GASTRODON|ROTOM|SHAYMIN|GIRATINA|BASCULIN|DEERLING|SAWSBUCK|TORNADUS|THUNDURUS|LANDORUS|ENAMORUS|KELDEO|MELOETTA|GENESECT|VIVILLON|FLABEBE|FLOETTE|FLORGES|FURFROU|PUMPKABOO|GOURGEIST|ZYGARDE|HOOPA|ORICORIO|LYCANROC|MINIOR|NECROZMA|MAGEARNA|KYUREM|SILVALLY|TOXTRICITY|ALCREMIE|INDEEDEE|MEOWSTIC|BASCULEGION|OINKOLOGNE|URSHIFU|CALYREX|ZARUDE|SQUAWKABILLY|TATSUGIRI|DUDUNSPARCE|MAUSHOLD|PIKACHU|EEVEE|TERAPAGOS|MIMIKYU|CRAMORANT|EISCUE|MORPEKO|WISHIWASHI)_[A-Z0-9]/.test(
       draft.speciesConst,
-    )
-      && !/_(REDUX|APEX)(?:_|$)/.test(draft.speciesConst))
-  );
+    ) && !/_(REDUX|APEX)(?:_|$)/.test(draft.speciesConst);
+
+  return isBattleForm || isStandaloneVanillaForm;
 }
 
 function removeRuntimeStarterRegistration(speciesId: number): void {

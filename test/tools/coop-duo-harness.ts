@@ -129,6 +129,7 @@ import { captureCoopTrainerVictoryBoundary } from "#data/elite-redux/coop/coop-t
 import {
   type CoopActiveMysteryEncounterSnapshotV1,
   type CoopMessage,
+  type CoopNetcodeMode,
   type CoopRecoveryReason,
   type CoopRole,
   type CoopTransport,
@@ -982,7 +983,7 @@ function adoptCoopHostRunConfig(hostScene: BattleScene, guestScene: BattleScene)
 export function mirrorHostBattleToGuest(
   hostScene: BattleScene,
   guestScene: BattleScene,
-  opts?: { preserveGuestPlayerParty?: boolean },
+  opts?: { preserveGuestPlayerParty?: boolean; forceGuestPerspective?: boolean },
 ): void {
   // Production's enemyPartySync now pairs the new enemy manifest with a complete authoritative boundary
   // state. Capture it under the host scene before reconstructing the guest, then apply it after the streamed
@@ -1019,7 +1020,7 @@ export function mirrorHostBattleToGuest(
   // production launch-snapshot ingress swap (swapSessionData) produces, so the egress un-swap in
   // captureVersusGuestChecksumState maps back to the host's authoritative orientation and the wave-start
   // checksums converge. FALSE for co-op / solo (byte-identical mirror as before).
-  const flip = isShowdownGuestFlipGated();
+  const flip = opts?.forceGuestPerspective === true || isShowdownGuestFlipGated();
   // 1. Same game mode + arena/biome as the host.
   guestScene.gameMode = hostScene.gameMode;
   guestScene.newArena(hostScene.arena.biomeId);
@@ -1075,7 +1076,8 @@ export function mirrorHostBattleToGuest(
   }
   // Versus flip: the guest's local PLAYER party is the host's ENEMY party (its own team). Co-op: the
   // host's own player party (the shared team).
-  for (const hostMon of preservePlayer ? [] : flip ? hostScene.getEnemyParty() : hostScene.getPlayerParty()) {
+  const playerSources = preservePlayer ? [] : flip ? hostScene.getEnemyParty() : hostScene.getPlayerParty();
+  for (const [sourceIndex, hostMon] of playerSources.entries()) {
     const data = new PokemonData(hostMon);
     const mon = new PlayerPokemon(
       getPokemonSpecies(hostMon.species.speciesId),
@@ -1091,7 +1093,19 @@ export function mirrorHostBattleToGuest(
     );
     // coopOwner is a runtime tag (typed on PlayerPokemon; the versus-flip source may be an EnemyPokemon).
     mon.coopOwner = (hostMon as PlayerPokemon).coopOwner ?? "host";
+    if (flip && guestScene.gameMode.isShowdown) {
+      mon.customPokemonData.erRunUnlockedAbilitySlots = [1, 2, 3];
+    }
     mon.calculateStats();
+    // Flipping an EnemyPokemon into a PlayerPokemon changes which constructor/stat modifiers run. Carry
+    // the source battler's exact live scalar state so both simulations resolve damage from identical stats.
+    const sourceScalar = (flip ? hostEnemyScalars : hostPlayerScalars)[sourceIndex];
+    if (sourceScalar?.stats.length === 6) {
+      mon.stats = [...sourceScalar.stats];
+    }
+    const maxHp = sourceScalar?.maxHp ?? mon.getMaxHp();
+    mon.setStat(Stat.HP, maxHp);
+    mon.hp = Math.max(0, Math.min(sourceScalar?.hp ?? hostMon.hp, maxHp));
     guestSceneInternal.party.push(mon);
   }
 
@@ -1192,7 +1206,13 @@ export function mirrorHostBattleToGuest(
       guestScene.field.add(mon);
     }
   }
-  applyCoopAuthoritativeBattleState(waveBoundaryState ?? undefined, true);
+  // A flipped versus mirror is already reconstructed from PokemonData in the guest's local orientation.
+  // The captured boundary is in the host's orientation, so applying it verbatim would undo the flip and
+  // turn the Sync proof back into an authoritative-host renderer. Production performs the equivalent side
+  // swap at launch ingress; the direct harness mirror must leave the reconstructed local parties intact.
+  if (!flip) {
+    applyCoopAuthoritativeBattleState(waveBoundaryState ?? undefined, true);
+  }
   // setFormat/applyCoopAuthoritativeBattleState may recalculate enemy stats after construction. Re-assert
   // the production carrier's authoritative max-HP rule at the completed mirror boundary.
   if (!flip) {
@@ -5204,20 +5224,22 @@ export async function buildShowdownDuo(
   pair: { host: CoopTransport; guest: CoopTransport },
   setCoopRuntimeFn: (r: CoopRuntime) => void,
   toShowdownGameMode: (scene: BattleScene) => void,
+  opts: { netcodeMode?: CoopNetcodeMode } = {},
 ): Promise<ShowdownDuoRig> {
   const hostScene = hostGame.scene;
+  const netcodeMode = opts.netcodeMode ?? "authoritative";
   // Like buildDuo, this two-engine fixture proves mechanics/V2 sequencing without claiming visible
   // animation coverage. The public two-browser campaign is the sole visible-presentation oracle.
   hostScene.moveAnimations = false;
   neutralizeCoopCandyBar(hostScene);
   const hostRuntime = assembleCoopRuntime(pair.host, {
     username: "Host",
-    netcodeMode: "authoritative",
+    netcodeMode,
     kind: "versus",
   });
   const guestRuntime = assembleCoopRuntime(pair.guest, {
     username: "Guest",
-    netcodeMode: "authoritative",
+    netcodeMode,
     kind: "versus",
   });
   const scheduledPair = pair as typeof pair & { flush?: (role: "host" | "guest", limit?: number) => number };
@@ -5285,20 +5307,19 @@ export async function buildShowdownDuo(
     toShowdownGameMode(guestScene);
     // The mirror reconstructs the guest's world in its LOCAL (flipped) orientation (Task F1): its OWN
     // team is its local PLAYER party (bottom) and the opponent (host team) its local ENEMY party (top).
-    mirrorHostBattleToGuest(hostScene, guestScene);
-    // Reconstruct the guest's persistent-modifier stacks in its LOCAL (flipped) orientation. The mirror's
-    // adoptCoopHostRunConfig rebuilt the host's PLAYER-wide modifiers onto the guest PLAYER side (correct
-    // for co-op, WRONG for versus where they are the opponent's), so CLEAR both lists and repopulate from
-    // the host's cloned stacks flipped: guest PLAYER <- host ENEMY (own team), guest ENEMY <- host PLAYER
-    // (opponent). This mirrors the launch-snapshot swap, so the egress un-swap reproduces the host's hash.
+    mirrorHostBattleToGuest(hostScene, guestScene, { forceGuestPerspective: netcodeMode === "lockstep" });
+    // Reconstruct the guest's persistent-modifier stacks in local perspective for both transports:
+    // guest PLAYER <- host ENEMY, guest ENEMY <- host PLAYER.
     const guestPlayerModifiers = (guestScene as unknown as { modifiers: PersistentModifier[] }).modifiers;
     const guestEnemyModifiers = (guestScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers;
     guestPlayerModifiers.length = 0;
     guestEnemyModifiers.length = 0;
-    for (const m of clonedHostEnemyModifiers) {
+    const playerModifiers = clonedHostEnemyModifiers;
+    const enemyModifiers = clonedHostPlayerModifiers;
+    for (const m of playerModifiers) {
       guestPlayerModifiers.push(m);
     }
-    for (const m of clonedHostPlayerModifiers) {
+    for (const m of enemyModifiers) {
       guestEnemyModifiers.push(m);
     }
     guestScene.updateModifiers(false);
@@ -5330,24 +5351,30 @@ export async function buildShowdownDuo(
   // from the already-settled immutable host state before re-entering the parked CommandPhase. The prefix is
   // intentionally empty: summon presentation happened before pairing and must not be guessed after the fact;
   // real ability/weather/terrain event identity is covered by the public two-browser launch journey.
-  await withClient(hostCtx, async () => {
-    const battle = hostScene.currentBattle;
-    const authoritativeState = captureCoopAuthoritativeBattleState(battle.turn);
-    if (authoritativeState == null) {
-      throw new Error("direct-mirror Showdown fixture could not capture its pre-command authoritative state");
-    }
-    hostRuntime.battleStream.sendEnemyParty(
-      battle.waveIndex,
-      captureCoopEnemies(),
-      battle.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
-      battle.battleType,
-      authoritativeState,
-      captureCoopEncounterAuthority(battle),
-    );
-    beginCoopRecording(battle.turn, `${hostRuntime.controller.sessionEpoch}:${battle.waveIndex}`);
-    await drainLoopback();
-    await hostGame.phaseInterceptor.to("CommandPhase");
-  });
+  if (netcodeMode === "authoritative") {
+    await withClient(hostCtx, async () => {
+      const battle = hostScene.currentBattle;
+      const authoritativeState = captureCoopAuthoritativeBattleState(battle.turn);
+      if (authoritativeState == null) {
+        throw new Error("direct-mirror Showdown fixture could not capture its pre-command authoritative state");
+      }
+      hostRuntime.battleStream.sendEnemyParty(
+        battle.waveIndex,
+        captureCoopEnemies(),
+        battle.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+        battle.battleType,
+        authoritativeState,
+        captureCoopEncounterAuthority(battle),
+      );
+      beginCoopRecording(battle.turn, `${hostRuntime.controller.sessionEpoch}:${battle.waveIndex}`);
+      await drainLoopback();
+      await hostGame.phaseInterceptor.to("CommandPhase");
+    });
+  } else {
+    // Building the synthetic flipped scene constructs a second set of battlers in this one process and
+    // advances only its saved RNG cursor. Real Sync clients both begin resolution from the negotiated seed.
+    guestCtx.rndState = hostCtx.rndState;
+  }
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
   // The direct mirror omitted the guest browser's real Encounter -> TurnInit path. Materialize only that

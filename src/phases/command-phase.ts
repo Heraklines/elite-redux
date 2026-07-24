@@ -58,6 +58,7 @@ import {
   buildShowdownFightCommand,
   buildShowdownSwitchCommand,
 } from "#data/elite-redux/showdown/showdown-guest-command";
+import { broadcastShowdownSyncPlayerCommand } from "#data/elite-redux/showdown/showdown-sync-command";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -963,7 +964,7 @@ export class CommandPhase extends FieldPhase {
    * Targets are a presentation default (the host re-derives them). Returns true when it shipped.
    */
   private tryShipShowdownGuestCommand(command: Command, cursor: number, useMode: boolean | MoveUseMode): boolean {
-    if (!isVersusSession() || getCoopController()?.role !== "guest") {
+    if (!isVersusSession() || getCoopNetcodeMode() !== "authoritative" || getCoopController()?.role !== "guest") {
       return false;
     }
     if (command === Command.FIGHT || command === Command.TERA) {
@@ -1399,6 +1400,14 @@ export class CommandPhase extends FieldPhase {
       // teras the partner's mon too. Without it the broadcast hardcoded FIGHT and the
       // partner never terastallized -> the two engines diverged (type/STAB/stat changes).
       this.broadcastLocalCoopCommand(turnCommand, moveId, moveTargets.targets, useMode, command === Command.TERA);
+      broadcastShowdownSyncPlayerCommand(this.fieldIndex, {
+        command: Command.FIGHT,
+        cursor: turnCommand.cursor ?? cursor,
+        moveId,
+        targets: turnCommand.move?.targets ?? moveTargets.targets,
+        useMode,
+        ...(command === Command.TERA ? { tera: true } : {}),
+      });
     }
 
     return true;
@@ -1874,6 +1883,9 @@ export class CommandPhase extends FieldPhase {
         // live wave-4 "he switched and we desynced" report). `cursor` is the party slot
         // (the merged party is identical on both clients), and the Baton flag rides along.
         this.broadcastLocalCoopActionCommand(command, cursor, typeof useMode === "boolean" ? useMode : false);
+        const syncSwitch = buildShowdownSwitchCommand(cursor);
+        syncSwitch.baton = typeof useMode === "boolean" ? useMode : false;
+        broadcastShowdownSyncPlayerCommand(this.fieldIndex, syncSwitch);
       }
       // #record-replay (single-player): capture this committed player command (move/switch/ball/run).
       // Fires AFTER the co-op broadcast above (behavior-preserving) and is a hard no-op in co-op (the

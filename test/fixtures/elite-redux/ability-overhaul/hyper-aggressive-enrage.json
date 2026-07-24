@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "name": "Hyper Aggressive gains second strike only while enraged",
+  "name": "Hyper Aggressive hits a third time while enraged",
   "run": {
     "wave": 146,
     "level": 100,
@@ -26,10 +26,11 @@
       }
     ]
   },
+  "start": { "enemyStages": [0, 6, 0, 6, 0, 0, 0] },
   "script": [{ "move": "TAIL_WHIP", "enemyMove": "SWAGGER" }, { "move": "TACKLE", "enemyMove": "SWORDS_DANCE" }],
   "expect": {
     "outcome": "max-turns-reached",
-    "maxHits": 2,
+    "maxHits": 3,
     "playerTags": ["ER_ENRAGE"],
     "enemyDamaged": true
   }

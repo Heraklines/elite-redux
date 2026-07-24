@@ -4004,5 +4004,325 @@
     "trainerClass": "BLACK_BELT",
     "victoryDialogue": "Back to training.",
     "weight": 100
+  },
+  "TRAINER_70022": {
+    "battleBgm": "battle_sinnoh_champion",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "You lack desperation.",
+    "difficulties": [
+      "elite"
+    ],
+    "endless": false,
+    "id": 70022,
+    "introDialogue": "If you want to keep this world from disappearing, then face me in battle!",
+    "maxWave": 199,
+    "minWave": 181,
+    "name": "Volo",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "KINGS_ROCK"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "RAGING_FURY",
+          "CRUNCH",
+          "ROCK_SLIDE",
+          "RLA"
+        ],
+        "species": 6059,
+        "vitamins": {
+          "atk": 2,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "POISON_BARB"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SPIKES",
+          "PETAL_DANCE",
+          "POISON_JAB",
+          "FIERY_DANCE"
+        ],
+        "sanityOff": true,
+        "species": 10607,
+        "vitamins": {
+          "spatk": 1,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FAIRY_FEATHER"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "MOONBLAST",
+          "EXTRASENSORY",
+          "AIR_SLASH",
+          "CALM_MIND"
+        ],
+        "sanityOff": true,
+        "species": 468,
+        "vitamins": {
+          "spd": 3
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "level": null,
+        "moves": [
+          "CLOSE_COMBAT",
+          "VACUUM_WAVE",
+          "BULK_UP",
+          "BULLET_PUNCH"
+        ],
+        "sanityOff": true,
+        "species": 448,
+        "vitamins": {
+          "spatk": 4
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "DRAGON_CLAW",
+          "LANDS_WRATH",
+          "SLASH",
+          "EXCALIBUR"
+        ],
+        "sanityOff": true,
+        "species": 10134
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "insanity": {
+          "ability": 5323,
+          "innates": [
+            231,
+            5333,
+            5069
+          ]
+        },
+        "level": null,
+        "moves": [
+          "AURA_SPHERE",
+          "DRAGON_CLAW",
+          "EARTH_POWER",
+          "POLTERGEIST"
+        ],
+        "shiny": {
+          "around": "hellsigil",
+          "palette": "whosthat"
+        },
+        "species": 10240,
+        "vitamins": {
+          "hp": 4
+        }
+      }
+    ],
+    "trainerClass": "WIELDER",
+    "trainerEffect": "holyrays",
+    "trainerSprite": "volo",
+    "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
+    "weight": 10
+  },
+  "TRAINER_70023": {
+    "battleBgm": "battle_sinnoh_champion",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "You lack desperation.",
+    "difficulties": [
+      "hell"
+    ],
+    "endless": false,
+    "id": 70023,
+    "introDialogue": "If you want to keep this world from disappearing, then face me in battle!",
+    "maxWave": 199,
+    "minWave": 181,
+    "name": "Volo",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 3,
+            "item": "WIDE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FLARE_BLITZ",
+          "HEAD_SMASH",
+          "VOLT_TACKLE",
+          "DRAGON_DANCE"
+        ],
+        "species": 6059,
+        "vitamins": {
+          "atk": 2,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "POISON_BARB"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SPIKES",
+          "TOXIC_NEEDLES",
+          "BULLET_SEED",
+          "FIERY_DANCE"
+        ],
+        "sanityOff": true,
+        "species": 10607,
+        "vitamins": {
+          "spatk": 1,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FAIRY_FEATHER"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "MOONBLAST",
+          "FIERY_DANCE",
+          "AIR_SLASH",
+          "BATON_PASS"
+        ],
+        "sanityOff": true,
+        "species": 468,
+        "vitamins": {
+          "spd": 3
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "level": null,
+        "moves": [
+          "FOCUS_BLAST",
+          "VACUUM_WAVE",
+          "NASTY_PLOT",
+          "FLASH_CANNON"
+        ],
+        "sanityOff": true,
+        "species": 10537,
+        "vitamins": {
+          "spatk": 4
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "DRAGON_CLAW",
+          "DRAGON_DANCE",
+          "SEISMIC_BLADE",
+          "EXCALIBUR"
+        ],
+        "sanityOff": true,
+        "species": 10134,
+        "vitamins": {
+          "atk": 2
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "REVIVER_SEED"
+          }
+        ],
+        "insanity": {
+          "ability": 5323,
+          "innates": [
+            231,
+            5333,
+            5069
+          ]
+        },
+        "level": null,
+        "moves": [
+          "OBLIVION_WING",
+          "DRAGON_CLAW",
+          "HYPERSPACE_HOLE",
+          "REST"
+        ],
+        "sanityOff": true,
+        "shiny": {
+          "around": "hellsigil",
+          "palette": "whosthat"
+        },
+        "species": 10240,
+        "vitamins": {
+          "hp": 4
+        }
+      }
+    ],
+    "trainerClass": "WIELDER",
+    "trainerEffect": "holyrays",
+    "trainerSprite": "volo",
+    "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
+    "weight": 10
   }
 }

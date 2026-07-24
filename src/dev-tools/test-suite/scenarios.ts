@@ -2475,6 +2475,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Custom trainers preserve doubles / triples battle format",
+    description:
+      "FORMAT fix - a custom trainer authored as a single battle could overwrite the format that the\n"
+      + "run had already resolved, recalling the second/third player Pokemon and turning a 2v2 or 3v3\n"
+      + "fight into 1v1. Custom-trainer metadata may still upgrade a single wave to doubles, but can no\n"
+      + "longer downgrade an existing multi battle.\n"
+      + "DO (this is a CUSTOM-TRAINERS-PICKER check, ignore the throwaway battle you spawn into): from\n"
+      + "the title, choose a Doubles Only or Triples Only run/ghost, then Dev Scenarios -> Custom\n"
+      + "Trainers -> pick a staff trainer authored as SINGLE -> Fight with random ghost team.\n"
+      + "EXPECT: the custom trainer fight stays 2v2 or 3v3. No player partner is recalled and the enemy\n"
+      + "fields the same number of active slots. Headless wave-transition coverage lives in\n"
+      + "test/tests/elite-redux/er-custom-trainer-format-challenge.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.SURF, MoveId.GRASS_KNOT, MoveId.NASTY_PLOT],
+        }),
+        makeStarter(SpeciesId.EEVEE, {
+          moveset: [MoveId.BODY_SLAM, MoveId.BITE, MoveId.QUICK_ATTACK, MoveId.WISH],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Held-item icons align in the summary items row (vanilla + ER)",
     description:
       "UI ALIGNMENT fix (not a battle behavior) - the ER-custom held items (tactical / reactive /\n"
@@ -3033,6 +3062,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.SNORLAX, {
           moveset: [MoveId.SWAGGER, MoveId.REST, MoveId.BODY_SLAM, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability — Hyper Aggressive: 2 hits normally, 3 when enraged
+  // ===========================================================================
+  {
+    label: "Hyper Aggressive: 2 hits, 3 when enraged",
+    description:
+      "ER Hyper Aggressive (ability 358). Damaging moves always hit TWICE (the 2nd\n"
+      + "hit does 25% power). While the holder is ENRAGED, the move strikes a THIRD\n"
+      + "time, also at 25%. Your Snorlax has Hyper Aggressive forced as its active\n"
+      + "ability. DO: first attack the foe with Body Slam - you should see it hit\n"
+      + "TWICE. Then let the foe use Swagger on you (it may miss - retry until it\n"
+      + "lands and you become enraged, your Attack rises). Attack again with Body\n"
+      + "Slam - now it hits THREE times. EXPECT: 2 hits before enrage, 3 hits while\n"
+      + "enraged (each extra hit at 25% power). (Headless-verified + unit test\n"
+      + "test/tests/elite-redux/er-ability-overhaul-requested-batch.test.ts.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.HYPER_AGGRESSIVE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX, // bulky enough to survive the multi-hits
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SWAGGER, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.TACKLE, MoveId.REST, MoveId.PROTECT],
         }),
       ];
     },
@@ -19900,18 +19960,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) Ghost teams: identity survives reload; verbatim roster; no repeats; difficulty-gated",
+    label: "(note) Ghost teams: identity survives reload; wave-capped roster; no repeats; difficulty-gated",
     description:
       "GHOST-POOL fixes (pool/serialization, not a single forcible battle) - verify via the Ghost\n"
       + "Trainers challenge and a mid-battle save/reload:\n"
       + "1. IDENTITY (#ghost-identity): save + reload DURING a ghost battle - the trainer KEEPS its\n"
       + "   uploader name, piano BGM, and authored dialogue (was reverting to a plain NPC).\n"
-      + "2. VERBATIM (#419): a fielded ghost shows the uploader's EXACT species (no BST-cap devolve/\n"
-      + "   swap to the wave ceiling - e.g. a Snorlax stays Snorlax at an early ghost wave).\n"
+      + "2. BST CAP (#419): legal ghost members keep their exact species/moves, while over-cap species\n"
+      + "   and forms devolve/revert/swap to the receiving wave's ceiling.\n"
       + "3. NO-REPEAT (#ghost-repeat): consecutive ghost waves do NOT field the same player 3x+ in a row.\n"
       + "4. DIFFICULTY (#345): a Youngster/Ace run NEVER meets a Hell-scaled ghost team (challenge pool is\n"
       + "   capped at the run's tier and easier).\n"
-      + "Unit-tested: er-ghost-identity-reload / er-ghost-species-verbatim / er-ghost-repeat-suppression /\n"
+      + "Unit-tested: er-ghost-identity-reload / er-ghost-bst-cap / er-ghost-repeat-suppression /\n"
       + "er-ghost-difficulty-pool.test.ts.",
     setup: () => {
       resetDevOverrides();
@@ -19993,6 +20053,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "EXPECT: its large preview changes to the actual Black Shiny art and Luck reads 5. Add it, then\n"
       + "try to add the second as Black Shiny. EXPECT: the second is refused with the one-per-team message.\n"
       + "Headless reproduction: node scripts/run-ui-scenario.mjs --surface starter-black-shiny.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });
+      return [
+        makeStarter(SpeciesId.BULBASAUR, {
+          moveset: [MoveId.TACKLE, MoveId.VINE_WHIP, MoveId.GROWL, MoveId.GROWTH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Scenario Builder lists newcomer species and forms",
+    description:
+      "DEV-TOOLS UI fix - the Scenario Builder species autocomplete now rebuilds from the live species\n"
+      + "registry every time it opens and includes named entries for every form instead of requiring staff\n"
+      + "to guess a numeric form index.\n"
+      + "DO: return to Dev Scenarios, open Scenario Builder, then search the player/enemy species field.\n"
+      + "EXPECT: standalone newcomers such as Drawclops, Dustnoir, and Webbed Bruiser are available.\n"
+      + "Search for Yveltal (Mega Z) or Metagross (Battle Bond), select it, and verify the Form field is\n"
+      + "filled automatically. Launch or copy/import the scenario; the selected form must be preserved.\n"
+      + "Headless regression: test/tests/elite-redux/er-scenario-builder-newcomers.test.ts.",
     setup: () => {
       resetDevOverrides();
       setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });

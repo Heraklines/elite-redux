@@ -16,6 +16,7 @@ import {
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   beginCoopFaintSwitchWindow,
+  COOP_FAINT_SWITCH_SEQ_BASE,
   endCoopFaintSwitchWindow,
   getCoopFaintSwitchWaitMs,
 } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -27,6 +28,7 @@ import {
   getCoopInteractionRelay,
   getCoopNetcodeMode,
   getCoopRuntime,
+  isShowdownSyncSession,
   isVersusSession,
   notifyCoopV2InteractionSurfaceReady,
   runWhenCoopRuntimeActive,
@@ -53,6 +55,7 @@ export class SwitchPhase extends BattlePhase {
   private readonly isModal: boolean;
   private readonly doReturn: boolean;
   private readonly faintSourceAddress: CoopFaintSourceAddress | undefined;
+  private readonly showdownSyncMoveReplacement: boolean;
 
   /**
    * Creates a new SwitchPhase
@@ -69,7 +72,7 @@ export class SwitchPhase extends BattlePhase {
     fieldIndex: number,
     isModal: boolean,
     doReturn: boolean,
-    faintSourceAddress?: CoopFaintSourceAddress,
+    faintSourceAddressOrShowdownSyncMoveReplacement?: CoopFaintSourceAddress | boolean,
   ) {
     super();
 
@@ -77,7 +80,14 @@ export class SwitchPhase extends BattlePhase {
     this.fieldIndex = fieldIndex;
     this.isModal = isModal;
     this.doReturn = doReturn;
-    this.faintSourceAddress = faintSourceAddress;
+    this.faintSourceAddress =
+      typeof faintSourceAddressOrShowdownSyncMoveReplacement === "boolean"
+        ? undefined
+        : faintSourceAddressOrShowdownSyncMoveReplacement;
+    this.showdownSyncMoveReplacement =
+      typeof faintSourceAddressOrShowdownSyncMoveReplacement === "boolean"
+        ? faintSourceAddressOrShowdownSyncMoveReplacement
+        : false;
   }
 
   start() {
@@ -121,6 +131,10 @@ export class SwitchPhase extends BattlePhase {
       || globalScene.getPokemonAllowedInBattle().length > 1
         ? this.fieldIndex
         : 0;
+
+    if (this.tryShowdownSyncPlayerReplacement(fieldIndex)) {
+      return;
+    }
 
     // Co-op (#633): a replacement is chosen ONLY by the player who owns the field slot
     // (host = slot 0, guest = slot 1). The partner must NOT pick the other player's
@@ -669,9 +683,57 @@ export class SwitchPhase extends BattlePhase {
    * SwitchPhase); the checkpoint phase is host-role-gated + a no-op besides. Solo / co-op never enter here.
    */
   private maybePushVersusHostReplacementCheckpoint(): void {
-    if (isVersusSession() && getCoopController()?.role === "host") {
+    if (isVersusSession() && getCoopNetcodeMode() === "authoritative" && getCoopController()?.role === "host") {
       globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
     }
+  }
+
+  /** In Sync, each client chooses and relays faint or move-triggered replacements for its own party. */
+  private tryShowdownSyncPlayerReplacement(fieldIndex: number): boolean {
+    const relayedReplacement = !this.doReturn || this.showdownSyncMoveReplacement;
+    if (!isShowdownSyncSession() || !this.isModal || !relayedReplacement) {
+      return false;
+    }
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      return false;
+    }
+    const scene = globalScene;
+    const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
+    const finish = (slotIndex: number, switchType: SwitchType): void => {
+      const picked = scene.getPlayerParty()[slotIndex];
+      if (picked != null && !picked.isFainted() && !picked.isOnField()) {
+        scene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
+      }
+      const close = (): void => {
+        if (scene.phaseManager.getCurrentPhase() === this) {
+          scene.phaseManager.shiftPhase();
+        }
+      };
+      void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(close, close);
+    };
+
+    scene.ui.setMode(
+      UiMode.PARTY,
+      PartyUiMode.FAINT_SWITCH,
+      fieldIndex,
+      (slotIndex: number, option: PartyOption) => {
+        if (scene.phaseManager.getCurrentPhase() !== this) {
+          return;
+        }
+        const picked = scene.getPlayerParty()[slotIndex];
+        const switchType = option === PartyOption.PASS_BATON ? SwitchType.BATON_PASS : this.switchType;
+        relay.sendInteractionChoice(faintSeq, "switch", slotIndex, [
+          switchType === SwitchType.BATON_PASS ? 1 : 0,
+          picked?.species?.speciesId ?? 0,
+          picked?.id ?? 0,
+          switchType,
+        ]);
+        finish(slotIndex, switchType);
+      },
+      PartyUiHandler.FilterNonFainted,
+    );
+    return true;
   }
 
   /**

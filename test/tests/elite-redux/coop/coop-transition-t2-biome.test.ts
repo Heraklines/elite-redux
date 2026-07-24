@@ -71,6 +71,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { BattleSceneEventType } from "#events/battle-scene";
+import { MoneyInterestModifier } from "#modifiers/modifier";
 import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
 import { EncounterPhase } from "#phases/encounter-phase";
 import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
@@ -1577,7 +1578,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       await driveRealBiomeMarketLeave(rig);
       await driveRealCrossroads(rig, leave);
       const guestApplyModifiers = leave ? vi.spyOn(rig.guestScene, "applyModifiers") : null;
-      let guestSelectBiomeApplyModifierCalls: number | null = null;
+      let guestSelectBiomeMoneyInterestCalls: number | null = null;
       const guestInitSession = leave ? vi.spyOn(rig.guestScene, "initSession") : null;
       const guestEncounterEvent = leave ? vi.spyOn(rig.guestScene.eventTarget, "dispatchEvent") : null;
       const guestTailQueue = leave ? vi.spyOn(rig.guestScene.phaseManager, "unshiftNew") : null;
@@ -1592,7 +1593,13 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         // Scope this guard to the SelectBiome renderer itself. The later post-summon authoritative
         // carrier intentionally uses applyModifiers while adopting/recalculating host state; counting
         // that required apply as a map-owned MoneyInterest mutation would be a false positive.
-        guestSelectBiomeApplyModifierCalls = guestApplyModifiers?.mock.calls.length ?? null;
+        // V2's complete immutable result legitimately rebuilds Pokémon stats on the renderer, and those
+        // calculations call applyModifiers for stat classes. The forbidden local mechanic is specifically
+        // SelectBiome's MoneyInterest tick; count that class rather than conflating state reconstruction
+        // with an independently executed biome reward.
+        guestSelectBiomeMoneyInterestCalls =
+          guestApplyModifiers?.mock.calls.filter(([modifierType]) => modifierType === MoneyInterestModifier).length
+          ?? null;
         guestApplyModifiers?.mockRestore();
       }
       const guestMeChanceBeforeNewBiome = rig.guestScene.mysteryEncounterSaveData.encounterSpawnChance;
@@ -1675,10 +1682,9 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       );
       expect(resync.count(), "the UI-driven boundary requires no forced recovery").toBe(0);
       if (leave) {
-        expect(
-          guestSelectBiomeApplyModifierCalls,
-          "SelectBiome renderer skips MoneyInterest and every modifier mutation",
-        ).toBe(0);
+        expect(guestSelectBiomeMoneyInterestCalls, "SelectBiome renderer skips the local MoneyInterest mutation").toBe(
+          0,
+        );
         expect(
           guestTailQueue?.mock.calls.some(call => call[0] === "PartyHealPhase" || call[0] === "SelectModifierPhase"),
           "SelectBiome renderer cannot queue local heal/challenge rewards",

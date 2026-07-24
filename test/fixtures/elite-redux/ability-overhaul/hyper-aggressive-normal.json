@@ -1,0 +1,37 @@
+{
+  "v": 1,
+  "name": "Hyper Aggressive hits twice when not enraged",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "hyper-aggressive-normal"
+  },
+  "party": [
+    {
+      "species": "BLASTOISE",
+      "ability": 5096,
+      "passiveAbility": "NO_GUARD",
+      "moves": ["TACKLE", "TAIL_WHIP"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["SWORDS_DANCE", "DEFENSE_CURL"]
+      }
+    ]
+  },
+  "start": { "enemyStages": [0, 6, 0, 6, 0, 0, 0] },
+  "script": [{ "move": "TACKLE", "enemyMove": "SWORDS_DANCE" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "maxHits": 2,
+    "playerTagsAbsent": ["ER_ENRAGE"],
+    "enemyDamaged": true
+  }
+}

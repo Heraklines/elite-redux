@@ -98,6 +98,7 @@ import { SettingsGamepadUiHandler } from "#ui/settings-gamepad-ui-handler";
 import { SettingsKeyboardUiHandler } from "#ui/settings-keyboard-ui-handler";
 import { SettingsUiHandler } from "#ui/settings-ui-handler";
 import { ShowdownSetEditorUiHandler } from "#ui/showdown-set-editor-ui-handler";
+import { ShowdownSyncCommandUiHandler } from "#ui/showdown-sync-command-ui-handler";
 import { ShowdownTeamMenuUiHandler } from "#ui/showdown-team-menu-ui-handler";
 import { ShowdownWagerUiHandler } from "#ui/showdown-wager-ui-handler";
 import { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
@@ -287,6 +288,7 @@ export class UI extends Phaser.GameObjects.Container {
       new ShowdownTeamMenuUiHandler(),
       new TournamentListUiHandler(),
       new TournamentBracketUiHandler(),
+      new ShowdownSyncCommandUiHandler(),
     ];
   }
 

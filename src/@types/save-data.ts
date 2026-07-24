@@ -150,6 +150,11 @@ export interface SessionSaveData {
    */
   erUsedCustomTrainerWindows?: number[];
   /**
+   * ER ghost no-repeat ledger. Candidate payloads remain in the device cache;
+   * only compact identities persist through local/cloud save and resume.
+   */
+  erGhostRepeatLedger?: import("#data/elite-redux/er-ghost-teams").ErGhostRepeatLedgerSaveData;
+  /**
    * ER (#348): per-mon faint-free money-streak counters ([pokemonId, waves]),
    * so a reload keeps each mon's streak. Optional for backwards compatibility
    * (older saves restore fresh streaks).

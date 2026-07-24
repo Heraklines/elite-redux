@@ -122,12 +122,27 @@ describe("requested ability overhaul - replacements and riders", () => {
     expect(attrs.every(attr => attr.perFaintedAlly === 0.05)).toBe(true);
   });
 
-  it("gates Hyper Aggressive's extra strike and quarter-power rider on Enrage", () => {
-    const attrs = erAbility(358).attrs;
-    const strike = attrs.find(attr => attr instanceof HitMultiplierAbAttr);
-    const power = attrs.find(attr => attr instanceof HitMultiplierPowerAbAttr);
-    expect(strike?.getCondition()).not.toBeNull();
-    expect(power?.getCondition()).not.toBeNull();
+  // Hyper Aggressive (358) plus its composites that carry the same kit:
+  // Raging Goddess (721), Balloon Blitz (755), Frenzied Phantom (790),
+  // Witch Broom (961), Ghost Frenzy (999).
+  it.each([
+    358, 721, 755, 790, 961, 999,
+  ])("keeps ability %i's base second strike unconditional and adds an enrage-gated third strike", id => {
+    const attrs = erAbility(id).attrs;
+    const strikes = attrs.filter(attr => attr instanceof HitMultiplierAbAttr) as HitMultiplierAbAttr[];
+    const power = attrs.find(
+      attr => attr instanceof HitMultiplierPowerAbAttr && attr.isExtraStrikesOnly() && attr.getMultiplier() === 0.25,
+    ) as HitMultiplierPowerAbAttr | undefined;
+    // Two strike-count layers: an always-on base +1 (2 hits) and an enrage-gated
+    // +1 (3 hits while enraged).
+    const unconditional = strikes.filter(attr => attr.getExtraStrikes() === 1 && attr.getCondition() === null);
+    const enrageGated = strikes.filter(attr => attr.getExtraStrikes() === 1 && attr.getCondition() !== null);
+    expect(unconditional.length).toBeGreaterThanOrEqual(1);
+    expect(enrageGated).toHaveLength(1);
+    // The per-strike 25% power scaling stays UNCONDITIONAL and applies to every
+    // strike past the first (covers both the 2nd and the enraged 3rd hit).
+    expect(power).toBeDefined();
+    expect(power?.getCondition()).toBeNull();
   });
 
   it("replaces Grappler and Chokehold with four-turn quarter-HP binding", () => {

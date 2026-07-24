@@ -170,6 +170,11 @@ input:-internal-autofill-selected {
 
 /* Hide buttons on specific UIs */
 
+/* The Showdown set editor commits with SUBMIT (Enter), not ACTION (A). */
+#touchControls:not(.config-mode):not([data-ui-mode="SHOWDOWN_SET_EDITOR"]) #apadSubmit {
+  display: none;
+}
+
 /* Show #apadPreviousTab and #apadNextTab only in settings, except in touch configuration panel */
 #touchControls:not([data-ui-mode^="SETTINGS"]) #apadPreviousTab,
 #touchControls:not([data-ui-mode^="SETTINGS"]) #apadNextTab,

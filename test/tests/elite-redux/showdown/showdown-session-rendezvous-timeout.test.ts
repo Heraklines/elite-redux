@@ -55,6 +55,24 @@ function makeManualScheduler() {
 }
 
 describe("Showdown negotiation rendezvous exhaustion", () => {
+  it("recovers when the first handshake was consumed before the peer session subscribed", async () => {
+    const { host, guest } = createLoopbackPair();
+    const offGuestGeneric = guest.onMessage(() => {});
+    const hostSession = new ShowdownSession(host, { isMegaForm: () => false, timeoutMs: 1_000 });
+    const hostNegotiation = hostSession.negotiate(legalTeam(100));
+
+    // Reproduce the live race: generic runtime listeners consumed the host's first team/ready before
+    // SelectStarterPhase constructed the guest ShowdownSession.
+    await flush();
+    const guestSession = new ShowdownSession(guest, { isMegaForm: () => false, timeoutMs: 1_000 });
+    const guestNegotiation = guestSession.negotiate(legalTeam(200));
+
+    await expect(Promise.all([hostNegotiation, guestNegotiation])).resolves.toHaveLength(2);
+    hostSession.dispose();
+    guestSession.dispose();
+    offGuestGeneric();
+  });
+
   it("rejects instead of entering battle when showdown-ready never receives a peer arrival", async () => {
     const { host, guest } = createLoopbackPair();
     const manual = makeManualScheduler();

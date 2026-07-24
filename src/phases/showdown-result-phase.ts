@@ -5,7 +5,7 @@
  */
 
 import { globalScene } from "#app/global-scene";
-import { clearCoopRuntime, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopRuntime, isShowdownSyncSession } from "#data/elite-redux/coop/coop-runtime";
 import { resolveGhostDialogue } from "#data/elite-redux/er-ghost-profile";
 import { buildGhostDialogueCtx } from "#data/elite-redux/er-ghost-teams";
 import { erRecordShowdownResult } from "#data/elite-redux/er-social-achievement-tracker";
@@ -101,7 +101,7 @@ export class ShowdownResultPhase extends BattlePhase {
     // strand the return to title. Skipped when this phase was itself ROUTED from a received peer
     // result/void (silent) - otherwise the two clients ping-pong.
     try {
-      const transport = this.silent ? null : runtime?.localTransport;
+      const transport = this.silent || isShowdownSyncSession() ? null : runtime?.localTransport;
       if (transport != null) {
         if (this.voided) {
           transport.send({ t: "showdownVoid", matchId, reason: this.reason as ShowdownVoidReason });

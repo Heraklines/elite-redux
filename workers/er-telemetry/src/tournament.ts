@@ -374,6 +374,12 @@ export interface EntrantRecord {
   ghost?: GhostIconSummary | null;
   /** P1.5: epoch ms of this entrant's last presence ping (additive; null = never seen). */
   lastSeen?: number | null;
+  /** Exact bracket match this entrant marked ready for. */
+  readyMatchId?: string | null;
+  /** Opponent paired with the entrant when readiness was recorded. */
+  readyOpponent?: Participant | null;
+  /** Epoch ms of the latest ready action (notification dedupe token). */
+  readyAt?: number | null;
   /** P3: true when this entrant is on the WAITLIST (beyond cap); promoted into the field on a kick. */
   waitlisted?: boolean;
 }

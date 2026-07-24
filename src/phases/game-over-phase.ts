@@ -15,6 +15,7 @@ import { erRecordDailySeedWon } from "#data/elite-redux/er-achievement-detection
 import { enqueueFounderPublish, recordLocalDraftAttempt } from "#data/elite-redux/er-community-challenges";
 import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
+import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BattleType } from "#enums/battle-type";
 import { Challenges } from "#enums/challenges";
@@ -64,7 +65,7 @@ export class GameOverPhase extends BattlePhase {
     // achievements / cloud). Route the player's loss (or an unexpected showdown game-over) to the
     // ephemeral showdown result flow instead. Showdown-only -> every other mode is untouched.
     if (globalScene.gameMode.isShowdown) {
-      globalScene.phaseManager.unshiftNew("ShowdownResultPhase", this.isVictory, "victory");
+      globalScene.phaseManager.unshiftNew("ShowdownResultPhase", localShowdownResult(this.isVictory), "victory");
       return this.end();
     }
 

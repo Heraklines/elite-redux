@@ -191,7 +191,15 @@ export function beginShowdownBattle(
     pendingRelay.dispose();
   }
   pendingRelay = null;
-  state = { ownManifest, opponentManifest, relay, opponentProfile, matchId, ranked, battleFormat };
+  state = {
+    ownManifest,
+    opponentManifest,
+    relay,
+    opponentProfile,
+    matchId,
+    ranked,
+    battleFormat,
+  };
 }
 
 /** The live match state, or null when no showdown match is active. */
@@ -201,6 +209,11 @@ export function getShowdownBattleState(): Readonly<ShowdownBattleState> | null {
 
 /** The OPPONENT's team (the host's enemy party is built from this), or null. */
 export function getShowdownOpponentManifest(): ShowdownMonManifest[] | null {
+  return state?.opponentManifest ?? null;
+}
+
+/** The manifest currently occupying the engine's enemy side. */
+export function getShowdownFieldOpponentManifest(): ShowdownMonManifest[] | null {
   return state?.opponentManifest ?? null;
 }
 
@@ -216,6 +229,16 @@ export function getShowdownOwnManifest(): ShowdownMonManifest[] | null {
  */
 export function getShowdownOpponentProfile(): GhostTrainerProfile | null {
   return state?.opponentProfile ?? null;
+}
+
+/** The profile currently presenting the engine's enemy trainer. */
+export function getShowdownFieldOpponentProfile(): GhostTrainerProfile | null {
+  return state?.opponentProfile ?? null;
+}
+
+/** Explicit enemy-trainer fallback name for the current field orientation. */
+export function getShowdownFieldOpponentName(): string | null {
+  return null;
 }
 
 /** The enemy-command relay (C4), or null (host-solo bootstrap / no match). */

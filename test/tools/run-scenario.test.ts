@@ -128,7 +128,7 @@ import { Nature } from "#enums/nature";
 import { PokeballType } from "#enums/pokeball";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
-import { Stat } from "#enums/stat";
+import { type EffectiveStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
@@ -378,6 +378,13 @@ const STAT_BY_NAME: Record<string, StageStat> = {
   SPD: Stat.SPD,
   ACC: Stat.ACC,
   EVA: Stat.EVA,
+};
+const EFFECTIVE_STAT_BY_NAME: Record<string, EffectiveStat> = {
+  ATK: Stat.ATK,
+  DEF: Stat.DEF,
+  SPATK: Stat.SPATK,
+  SPDEF: Stat.SPDEF,
+  SPD: Stat.SPD,
 };
 
 function parseForcedMove(v: string | undefined): MoveId | null {
@@ -886,7 +893,7 @@ function expectSideStats(label: string, mon: Pokemon | undefined, c: SideCheck, 
     }
   }
   if (c.effectiveStat) {
-    const stat = STAT_BY_NAME[c.effectiveStat.stat.toUpperCase()];
+    const stat = EFFECTIVE_STAT_BY_NAME[c.effectiveStat.stat.toUpperCase()];
     const value = stat == null || !mon ? Number.NaN : mon.getEffectiveStat(stat);
     checkNum(`${label} ${c.effectiveStat.stat} effective stat`, value, c.effectiveStat.value, fails);
   }

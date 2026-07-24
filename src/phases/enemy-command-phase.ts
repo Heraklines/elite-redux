@@ -3,6 +3,7 @@ import { isReleasedCommander } from "#data/elite-redux/ability-upgrades/requeste
 import {
   getCoopController,
   isAuthoritativeBattleSession,
+  isShowdownSyncSession,
   isVersusSession,
   recordCoopV2CommandControlStarted,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -11,6 +12,7 @@ import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from 
 import { isReplayRecording, recordReplayCommand } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
+import { applyShowdownSyncCommand } from "#data/elite-redux/showdown/showdown-sync-command";
 import { getMoveTargets } from "#data/moves/move-utils";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -79,11 +81,9 @@ export class EnemyCommandPhase extends FieldPhase {
       return this.end();
     }
 
-    // Showdown 1v1 (C4): the HOST awaits the REMOTE player's command for this enemy slot instead
-    // of rolling the AI (the enemy side is a real human). On a timeout/null (disconnect) it falls
-    // back to the AI so the turn never hangs. The guest short-circuit above already handled the
-    // guest; solo / co-op never take this branch (isVersusSession is false).
-    if (isVersusSession() && getCoopController()?.role === "host") {
+    // Authoritative Showdown resolves remote commands only on the host. Sync runs both engines in
+    // local perspective, so both peers await the opponent and apply that choice to their enemy side.
+    if (isShowdownSyncSession() || (isVersusSession() && getCoopController()?.role === "host")) {
       void this.resolveVersusEnemyCommand();
       return;
     }
@@ -98,7 +98,16 @@ export class EnemyCommandPhase extends FieldPhase {
   private async resolveVersusEnemyCommand(): Promise<void> {
     const relay = getShowdownRelay();
     const turn = globalScene.currentBattle.turn;
-    const command = relay == null ? null : await relay.requestEnemyCommand(turn, this.fieldIndex);
+    const sync = isShowdownSyncSession();
+    const command =
+      relay == null
+        ? null
+        : await (sync ? relay.awaitCommand(turn, this.fieldIndex) : relay.requestEnemyCommand(turn, this.fieldIndex));
+    if (sync && command != null && applyShowdownSyncCommand("enemy", this.fieldIndex, command)) {
+      this.recordVersusEnemyCommand();
+      this.end();
+      return;
+    }
     // Host-authoritative validation: an out-of-range / illegal relayed pick falls back to the AI
     // (same as a timeout), so a hostile/buggy peer can never force an illegal enemy action.
     if (command == null || !this.isRelayedCommandLegal(command)) {

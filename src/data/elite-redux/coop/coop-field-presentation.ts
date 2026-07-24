@@ -8,6 +8,7 @@ import { globalScene } from "#app/global-scene";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { FieldPosition } from "#enums/field-position";
+// biome-ignore lint/suspicious/noImportCycles: Presentation projection needs runtime class identity for field-child and enemy checks.
 import { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { PokeballTray } from "#ui/containers/pokeball-tray";
 import { EnemyBattleInfo } from "#ui/enemy-battle-info";
@@ -283,15 +284,16 @@ function inspectCoopPokemonPresentationReadiness(pokemon: Pokemon): CoopPokemonP
       readiness.onField
       && readiness.pokemonVisible
       && readiness.pokemonAlpha > 0
-      && readiness.spritePresent
-      && (readiness.spriteVisible || readiness.fxOverlayVisible)
-      && ((readiness.spriteAlpha ?? 0) > 0 || readiness.fxOverlayVisible)
+      && (readiness.fxOverlayVisible
+        || (readiness.spritePresent
+          && readiness.spriteVisible
+          && (readiness.spriteAlpha ?? 0) > 0
+          && readiness.exactLiveKey
+          && readiness.textureCached
+          && readiness.animationCached))
       && readiness.infoPresent
       && readiness.infoVisible
-      && (readiness.infoAlpha ?? 0) > 0
-      && readiness.exactLiveKey
-      && readiness.textureCached
-      && readiness.animationCached,
+      && (readiness.infoAlpha ?? 0) > 0,
   };
 }
 

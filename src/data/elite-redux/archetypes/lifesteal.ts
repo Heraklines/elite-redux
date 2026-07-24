@@ -424,7 +424,7 @@ export interface ScavengerLootOptions {
  */
 export class ScavengerLootAbAttr extends PostKnockOutAbAttr {
   private readonly lootChance: number;
-  private lootItem?: PokemonHeldItemModifier;
+  private lootItem: PokemonHeldItemModifier | undefined;
 
   constructor(opts: ScavengerLootOptions) {
     if (!(opts.chance > 0 && opts.chance <= 1)) {

@@ -6,9 +6,9 @@
 
 // =============================================================================
 // #441 - Universal power gate: EVERY EnemyPokemon construction (wild, trainer,
-// mystery encounter, scripted) passes the wave BST ceiling on every difficulty
-// except Hell. Species origin does not matter - an ER custom that fits the
-// curve is allowed; a vanilla box legendary at wave 1 is not. ER_SCENARIO=1.
+// mystery encounter, scripted) passes the wave BST ceiling on every difficulty.
+// Hell uses a steeper ladder. Species origin does not matter: an ER custom that
+// fits the curve is allowed; a vanilla box legendary at wave 1 is not.
 // =============================================================================
 
 import { allSpecies } from "#data/data-lists";
@@ -82,10 +82,11 @@ describe.skipIf(!RUN)("ER universal power gate (#441)", () => {
     enemy.destroy();
   });
 
-  it("HELL: exempt - the legendary stays (early spikes are the identity)", () => {
+  it("HELL: the steeper early ladder still caps an overpowered legendary", () => {
     setErDifficulty("hell");
     const enemy = new EnemyPokemon(getPokemonSpecies(SpeciesId.KYOGRE), 20, TrainerSlot.NONE, false);
-    expect(enemy.species.speciesId).toBe(SpeciesId.KYOGRE);
+    expect(enemy.species.speciesId).not.toBe(SpeciesId.KYOGRE);
+    expect(enemy.getSpeciesForm().getBaseStatTotal()).toBeLessThanOrEqual(460);
     enemy.destroy();
   });
 });

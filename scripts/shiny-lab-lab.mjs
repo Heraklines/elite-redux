@@ -48,7 +48,8 @@ const opts = {
   seed: 0,
   anim: "",
 };
-for (let i = 0; i < argv.length; i++) {
+let i = 0;
+while (i < argv.length) {
   const a = argv[i];
   const next = () => argv[++i];
   if (a === "--species") {
@@ -76,6 +77,7 @@ for (let i = 0; i < argv.length; i++) {
   } else if (a === "--anim") {
     opts.anim = next();
   }
+  i++;
 }
 
 if (!command || command === "--help" || command === "-h") {
@@ -466,7 +468,6 @@ async function cmdGallery() {
       console.log(`[gallery] ${fx.id}: render failed`);
       continue;
     }
-    const rgba = opts.bg === "transparent" ? rendered.data : rendered.data;
     writePng(
       join(outDir, `${fx.id.replace(/[^a-z0-9]+/gi, "_")}.png`),
       toCanvas(rendered.width, rendered.height, compositeOntoBg(rendered.data, DARK_BG), opts.zoom, bg),

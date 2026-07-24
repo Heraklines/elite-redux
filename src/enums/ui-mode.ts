@@ -86,4 +86,6 @@ export enum UiMode {
   TOURNAMENT_LIST,
   /** Showdown Tournament: the single-elim BRACKET tree + your-next-match card. */
   TOURNAMENT_BRACKET,
+  /** Showdown Sync: the guest commands its canonical enemy-side team in dual-engine mode. */
+  SHOWDOWN_SYNC_COMMAND,
 }

@@ -1,5 +1,4 @@
 import { globalScene } from "#app/global-scene";
-import { TRIPLE_FORMAT } from "#data/battle-format";
 import {
   applyErCustomTrainerDisplayName,
   applyErCustomTrainerPresentation,
@@ -14,7 +13,6 @@ import {
   setErCustomTrainerBstBypass,
 } from "#data/elite-redux/er-custom-trainers";
 import { BattleType } from "#enums/battle-type";
-import { Challenges } from "#enums/challenges";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
@@ -138,14 +136,12 @@ export function installErCustomTrainerForCurrentWave(): void {
     battle.trainer = trainer;
     battle.battleType = BattleType.TRAINER;
     battle.enemyParty = [];
-    // Authored encounter width must not clobber a run-wide format challenge.
-    // This was the wave-boundary "Triples Only became 1v1" regression (and the
-    // equivalent Doubles Only report): the battle resolver created the forced
-    // format, then this installer overwrote it from the trainer's own metadata.
-    if (globalScene.gameMode.hasChallenge(Challenges.TRIPLES_ONLY)) {
-      battle.setFormat(TRIPLE_FORMAT);
-    } else {
-      battle.setDouble(resolved.isDouble || globalScene.gameMode.hasChallenge(Challenges.DOUBLES_ONLY));
+    // newBattle() has already resolved the authoritative wave format from every
+    // source: challenges, dev overrides, natural rolls, and future format rules.
+    // Custom-trainer metadata may upgrade a single wave to doubles, but must not
+    // downgrade an existing multi battle (the reported 2v2/3v3 -> 1v1 recall).
+    if (battle.getBattlerCount() === 1 && resolved.isDouble) {
+      battle.setDouble(true);
     }
 
     // Resolve the FINAL fielded party for this run (seed-deterministic): per
@@ -220,7 +216,7 @@ export function installErCustomTrainerForCurrentWave(): void {
     // a triple falls back to a DOUBLE here until triples support lands.
     const tripleNote = resolved.isTriplePending ? " (triple pending #902 -> double)" : "";
     console.info(
-      `[er-custom-trainers] installed "${resolved.name}" (${resolved.key}) wave=${wave} type=${resolved.trainerType} double=${resolved.isDouble} team=${fielded.length}/${resolved.slots.length}${tripleNote}`,
+      `[er-custom-trainers] installed "${resolved.name}" (${resolved.key}) wave=${wave} type=${resolved.trainerType} authoredDouble=${resolved.isDouble} format=${battle.arrangement.format.id} team=${fielded.length}/${resolved.slots.length}${tripleNote}`,
     );
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);

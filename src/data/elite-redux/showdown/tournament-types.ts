@@ -47,9 +47,22 @@ export type BattleFormat = "singles" | "doubles" | "triples";
 export type SeriesFormat = "single" | "bo3" | "bo5";
 /** P3: reward-pool place (mirror of the worker RewardPlace). */
 export type RewardPlace = "champion" | "runnerUp" | "semifinalist";
+/** P3: reward shiny tier (T4 is the ER black shiny). */
+export type ShinyTier = 1 | 2 | 3 | 4;
+/** P3: Shiny Lab reward category. */
+export type LabEffectCategory = "palette" | "surface" | "around";
 
 /** P3: a single reward settlement mutation (mirror of the worker TournamentRewardMutation). */
 export type TournamentRewardMutation =
+  | { kind: "grantShinyChosen"; speciesId: number; tier: ShinyTier }
+  | {
+      kind: "grantShinyRandom";
+      tier: ShinyTier;
+      unownedOnly: boolean;
+      speciesPool: number[];
+      resolvedSpeciesId?: number;
+    }
+  | { kind: "grantLabEffect"; speciesId: number; category: LabEffectCategory; effectIndex: number }
   | { kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean; cost: number }
   | { kind: "grantCandy"; speciesId: number; candy: number };
 
@@ -124,8 +137,23 @@ export interface EntrantView {
   ghost?: GhostIconSummary | null;
   /** P1.5: epoch ms of this entrant's last presence ping (null = never seen). */
   lastSeen?: number | null;
+  /** Exact bracket match this entrant marked ready for. */
+  readyMatchId?: string | null;
+  /** Opponent paired with the entrant when readiness was recorded. */
+  readyOpponent?: TournamentParticipant | null;
+  /** Epoch ms of the latest ready action. */
+  readyAt?: number | null;
   /** P3: the saved team preset the entrant registered with (admin surface). */
   presetName?: string;
+}
+
+/** True only when readiness belongs to this exact match and opponent pairing. */
+export function isEntrantReadyForMatch(
+  entrant: EntrantView | null | undefined,
+  matchId: string,
+  opponent: TournamentParticipant,
+): boolean {
+  return entrant?.readyMatchId === matchId && entrant.readyOpponent === opponent;
 }
 
 /** P3: a waitlisted (beyond-cap) entrant summary (admin surface). */
@@ -236,6 +264,8 @@ export interface TournamentView {
   rewardsGranted?: boolean;
   /** P3: true when a non-admin player created this via the community route (prize-free, cap-capped). */
   community?: boolean;
+  /** Participants removed after play began; retained for bracket history. */
+  kicked?: TournamentParticipant[];
   /** P3: entrants queued beyond cap (admin surface). */
   waitlist?: WaitlistEntryView[];
   /** Present on the bracket endpoint; omitted (undefined) in the list endpoint. */
@@ -263,6 +293,20 @@ export function opponentOf(match: BracketMatchView, participant: TournamentParti
     return match.a;
   }
   return null;
+}
+
+/** True only while the participant's server-authoritative front is this exact match and opponent. */
+export function isTournamentPairingCurrent(
+  tournament: TournamentView,
+  participant: TournamentParticipant,
+  matchId: string,
+  opponent: TournamentParticipant,
+): boolean {
+  if (tournament.state !== "in_progress" || tournament.bracket == null) {
+    return false;
+  }
+  const match = nextMatchFor(tournament.bracket, participant);
+  return match?.id === matchId && opponentOf(match, participant) === opponent;
 }
 
 /** True once the bracket final is decided. */

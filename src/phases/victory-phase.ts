@@ -21,6 +21,7 @@ import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BiomeId } from "#enums/biome-id";
@@ -377,7 +378,7 @@ export class VictoryPhase extends PokemonPhase {
         // to the ephemeral result flow (message + return to title, NO save/score/clear), never the
         // classic GameOver path. C6 emits the showdownResult wire message from the result phase.
         globalScene.currentBattle.battleType = BattleType.CLEAR;
-        globalScene.phaseManager.pushNew("ShowdownResultPhase", true, "victory");
+        globalScene.phaseManager.pushNew("ShowdownResultPhase", localShowdownResult(true), "victory");
       } else {
         if (automaticVictorySeal != null) {
           globalScene.phaseManager.pushNew("CoopVictorySealPhase", automaticVictorySeal);

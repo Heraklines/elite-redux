@@ -82,7 +82,7 @@ registerLabPrototype({
   label: "LAB: Medial Filigree",
   mechanism:
     "engraved tracery following the mon's true midline skeleton (voro midlines), fading to lacquer near the rim",
-  fn: (r, g, b, x, y, t, c) => {
+  fn: (r, g, b, _x, _y, t, c) => {
     if (!c.topo) {
       return [r, g, b, 1];
     }
@@ -110,7 +110,7 @@ registerLabPrototype({
   label: "LAB: Matcap Relief",
   mechanism:
     "per-normal lighting of a fake relief sphere (matcapZ from sdf) - carved gem / cast metal from flat pixels",
-  fn: (r, g, b, x, y, t, c) => {
+  fn: (r, g, b, _x, _y, _t, c) => {
     if (!c.topo) {
       return [r, g, b, 1];
     }
@@ -135,7 +135,7 @@ registerLabPrototype({
   label: "LAB: Temporal Echo",
   mechanism:
     "the actual previous/next animation frames ghosted through the current one - a slow shutter on real motion",
-  fn: (r, g, b, x, y, t, c) => {
+  fn: (r, g, b, x, y, _t, c) => {
     if (!c.frameCount || c.frameCount < 2) {
       return [r, g, b, 1];
     }
@@ -175,7 +175,7 @@ registerLabPrototype({
       return [r, g, b, 1];
     }
     const glass = 0.5 + 0.08 * Math.sin(t * 0.6);
-    const [h, s, v] = rgb2hsv(f0[0], f0[1], f0[2]);
+    const [, s, v] = rgb2hsv(f0[0], f0[1], f0[2]);
     const mono = hsv2rgb(0.6, s * 0.4 + 0.1, clamp(v * 0.55 + 0.2));
     const m = clamp(f0[3] * glass);
     return [mix(r, mono[0], m), mix(g, mono[1], m), mix(b, mono[2], m), 1];
@@ -191,7 +191,7 @@ registerLabPrototype({
   label: "LAB: Through-Body Lens",
   mechanism:
     "each body pixel resampled along the inward normal proportional to depth - the mon bends its own image like glass",
-  fn: (r, g, b, x, y, t, c) => {
+  fn: (r, g, b, x, y, _t, c) => {
     if (!c.topo) {
       return [r, g, b, 1];
     }
@@ -286,7 +286,7 @@ registerLabPrototype({
   label: "LAB: Per-Region Clockwork",
   mechanism:
     "escapement windows cut THROUGH the body at voro-cell positions, each ticking a brass gear-face at its own phase; the rest stays plumage",
-  fn: (r, g, b, x, y, t, c) => {
+  fn: (r, g, b, _x, _y, t, c) => {
     if (!c.topo) {
       return [r, g, b, 1];
     }
@@ -361,7 +361,7 @@ registerLabPrototype({
   mechanism:
     "pad pixels near a small orbiting mass sample the SPRITE pulled toward it - space (and the mon's own image) visibly bends",
   overlay: false,
-  fn: (nx, ny, df, t, c) => {
+  fn: (nx, ny, _df, t, c) => {
     // Mass position: slow orbit at the mon's shoulder, anchored to the STABLE
     // centroid so it never wobbles with the pose.
     const ang = t * 0.35;
@@ -446,7 +446,7 @@ registerLabPrototype({
   label: "LAB: Amber Inclusion",
   mechanism:
     "warm depth-graded fossil amber transmission with a tiny dark inclusion sampled from a scaled-down OTHER animation frame",
-  fn: (r, g, b, x, y, t, c) => {
+  fn: (r, g, b, x, y, _t, c) => {
     if (!c.topo) {
       return [r, g, b, 1];
     }

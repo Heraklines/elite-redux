@@ -146,6 +146,14 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     expect(coopColosseumSeq(-1)).toBe(COOP_COLOSSEUM_SEQ_BASE);
   });
 
+  it("treats a solo board decision as a successful no-op", () => {
+    clearCoopRuntime();
+    setCoopMeInteractionStart(-1);
+
+    expect(coopColosseumSendDecision(COLOSSEUM_CONTINUE)).toBe(true);
+    expect(getCoopInteractionRelay()).toBeNull();
+  });
+
   it("streams the board present + relays the decision so the partner watcher adopts both (host-owned)", async () => {
     // Host-owned board (even counter): the host DRIVES its real board and streams the present + its
     // resolved decision over the explicit rollback carrier. P33 journal materialization is proved below.

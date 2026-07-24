@@ -23,5 +23,20 @@
     "tags": [
       "galar"
     ]
+  },
+  "volo": {
+    "author": "Kyle Dove",
+    "genders": false,
+    "kind": "other",
+    "label": "Pokemon Wielder",
+    "license": "cc-by",
+    "sourceUrl": "https://pokengine.org/trainers/01jbrd82/Volo",
+    "spriteKey": "volo",
+    "tags": [
+      "hisui",
+      "cynthia",
+      "evil",
+      "villain"
+    ]
   }
 }

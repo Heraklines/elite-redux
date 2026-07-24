@@ -1244,8 +1244,12 @@ export class CoopReplayTurnPhase extends Phase {
     // at RENDER time (the guest's own context), covering both the live per-event and batched paths that
     // merge into here. No-op off the versus-guest path.
     const canonicalEvents = events;
-    const localEvents = isShowdownGuestFlipGated() ? canonicalEvents.map(swapBattleEvent) : canonicalEvents;
-    coopLog("replay", `guest replay turn=${this.turn}: rendering ${events.length} event(s)`);
+    // Do not pass swapBattleEvent directly to map: its optional second argument is enemyBase, while
+    // Array.map supplies the event index as the callback's second argument.
+    const localEvents = isShowdownGuestFlipGated()
+      ? canonicalEvents.map(event => swapBattleEvent(event))
+      : canonicalEvents;
+    coopLog("replay", `guest replay turn=${this.turn}: rendering ${localEvents.length} event(s)`);
     // Running per-mon hp so multi-hit drains chain (hit1: cur->hp1, hit2: hp1->hp2, ...). Seeded
     // lazily from the live (pre-checkpoint) hp the first time a mon is seen. INSTANCE state (#782):
     // the chain is carried across live-pump continuations via the ctor, so an increment boundary
