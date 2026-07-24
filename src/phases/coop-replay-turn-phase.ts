@@ -608,17 +608,28 @@ export class CoopReplayTurnPhase extends Phase {
               if (!streamer.acknowledgeReplacement(envelope, "continuationReady")) {
                 return;
               }
+              if (nextReplacement.ownerSeatId === controller?.localSeatId) {
+                coopLog(
+                  "replay",
+                  `guest replacement rev=${envelope.authorityRevision ?? "?"} installed next picker `
+                    + `${nextReplacement.operationId} (${nextReplacement.remaining.length} later)`,
+                );
+                // The central projector queues an exact successor phase only for a replacement owned by
+                // THIS replica. Waiting for another carrier here would strand its actionable PARTY picker
+                // (the authority cannot produce the next replacement until this player chooses).
+                this.end();
+                return;
+              }
+              // A remote-owned successor deliberately has no local picker: non-owners install the ordered
+              // control in the ledger without manufacturing a UI. Keep this already-idle replay alive so it
+              // consumes the next REPLACEMENT_COMMIT checkpoint. Ending here would fall into a locally-derived
+              // phase with the checkpoint buffered forever—the two-faint 3-vs-2/softlock race.
               coopLog(
                 "replay",
-                `guest replacement rev=${envelope.authorityRevision ?? "?"} installed next picker `
+                `guest replacement rev=${envelope.authorityRevision ?? "?"} awaits remote-owned successor `
                   + `${nextReplacement.operationId} (${nextReplacement.remaining.length} later)`,
               );
-              // The central projector queued this exact successor behind the idle replay while applying
-              // the current replacement entry. Waiting for another turn carrier here strands that PARTY
-              // phase forever (the host cannot produce the next replacement until the player picks).
-              // End only after continuationReady so the phase manager presents the authenticated picker.
-              this.end();
-              return;
+              continue;
             }
             if (!hasLocalCommandSlot && hasLivingLocalMon) {
               this.failAuthority(

@@ -1,0 +1,13 @@
+{
+  "taskId": "v2-double-faint-remote-successor-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-double-faint-remote-successor-20260724",
+  "trainRef": "ci/coop/v2-double-faint-remote-successor-20260724",
+  "baseSha": "6f19c0b47fa9abf5d18b6a5eef019d92503f9efb",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-double-faint-remote-successor-20260724.json",
+    "src/phases/coop-replay-turn-phase.ts",
+    "test/tests/elite-redux/coop/coop-duo-double-faint.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
