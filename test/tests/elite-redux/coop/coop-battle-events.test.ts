@@ -605,9 +605,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
    */
   const driveReplayTurn = async (turn: number): Promise<void> => {
     const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    game.scene.phaseManager.clearPhaseQueue();
-    game.scene.phaseManager.unshiftPhase(replay);
-    game.scene.phaseManager.shiftPhase();
+    const predecessor = game.scene.phaseManager.getCurrentPhase();
+    if (!game.scene.phaseManager.replaceWithCoopAuthoritativePhase(predecessor, replay)) {
+      throw new Error(`renderer fixture could not replace ${predecessor.phaseName} with authoritative turn replay`);
+    }
     await new Promise(r => setTimeout(r, 0));
     for (let i = 0; i < 32; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
@@ -675,6 +676,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
     game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
     await game.phaseInterceptor.to("TurnEndPhase");
+    // Drowsy expires during TurnEnd and queues the real ObtainStatusEffectPhase as a child. Capturing at
+    // TurnEnd itself is therefore deliberately too early; the authoritative mutation barrier also waits
+    // for this child before TURN_COMMIT. Cross that exact delayed mutation before taking the state image.
+    await game.phaseInterceptor.to("ObtainStatusEffectPhase");
 
     expect(sleeper.status?.effect, "the engine materialized Yawn before authoritative capture").toBe(
       StatusEffect.SLEEP,

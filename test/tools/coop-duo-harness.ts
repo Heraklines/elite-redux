@@ -5324,6 +5324,11 @@ export async function replayCoopTrace(
     const hostCmd = waveCommands.find(c => c.slotFieldIndex === COOP_HOST_FIELD_INDEX);
     const guestCmd = waveCommands.find(c => c.slotFieldIndex === COOP_GUEST_FIELD_INDEX);
 
+    // WAVE_ADVANCE clears currentBattle while its ordered NewBattle/Encounter successor materializes.
+    // Prove the exact public frontier before reading the next turn; sampling the transient null shell here
+    // made the replay loader fail even though the real authority transition was still progressing normally.
+    await arriveGuestCommandBoundary(rig, wave);
+
     // Phase-1 traces currently admit FIGHT moves against one of the two enemy slots. Drive those choices through the
     // actual COMMAND/FIGHT/TARGET handlers on both engines; a direct battleSync responder or game.move.select
     // bypasses the very UI -> relay -> V2 chain this replay harness exists to verify.

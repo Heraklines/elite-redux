@@ -171,12 +171,13 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
   const driveReplayTurnCapturingSequence = async (turn: number): Promise<string[]> => {
     const sequence: string[] = [];
     const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    // Install the replay as the phase manager's real current phase before starting it. A detached phase can
-    // enqueue presentation work behind the still-current CommandPhase, making this driver return with an
-    // empty sequence while the checkpoint never applies—an execution no browser can produce.
-    game.scene.phaseManager.clearPhaseQueue();
-    game.scene.phaseManager.unshiftPhase(replay);
-    game.scene.phaseManager.shiftPhase();
+    // Install replay through the same destructive authoritative transition the V2 projector uses. Merely
+    // shifting a locally fabricated queue is not a legal post-cutover control edge and may remain parked on
+    // CommandPhase, producing an empty renderer sequence that no production browser can produce.
+    const predecessor = game.scene.phaseManager.getCurrentPhase();
+    if (!game.scene.phaseManager.replaceWithCoopAuthoritativePhase(predecessor, replay)) {
+      throw new Error(`pacing fixture could not replace ${predecessor.phaseName} with authoritative replay`);
+    }
     await new Promise(r => setTimeout(r, 0));
     for (let i = 0; i < 40; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();

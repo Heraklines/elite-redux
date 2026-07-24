@@ -271,6 +271,14 @@ describe.skipIf(!RUN)(
       rig.hostScene.getPlayerParty()[0].level = 55;
       rig.hostScene.getPlayerParty()[0].exp += 5000;
       rig.hostScene.getPlayerParty()[0].calculateStats();
+      // Enemy commands are selected while the public command driver crosses EnemyCommandPhase. Retire the
+      // already-proven Rock Slide before that driver, otherwise changing the moveset afterward is too late:
+      // the queued Rock Slide can KO frail Fennekin and open an unrelated second PARTY picker.
+      withClientSync(rig.hostCtx, () => {
+        for (const enemy of rig.hostScene.getEnemyField()) {
+          enemy.moveset = [new PokemonMove(MoveId.SPLASH)];
+        }
+      });
       await driveDuoGuestTackleThroughPublicUi(game, rig, {
         restartAlreadyOpenHost: false,
         guestTarget: BattlerIndex.ENEMY_2,
@@ -282,11 +290,6 @@ describe.skipIf(!RUN)(
       withClientSync(rig.hostCtx, () => {
         for (const enemy of rig.hostScene.getEnemyField()) {
           enemy.hp = 1;
-          // Rock Slide is required to create the first-turn host replacement. It is not part of the
-          // transposition assertion after that replacement and can KO the frail Fennekin before the
-          // deterministic winning move, opening an unrelated second PARTY picker. Make the already-proven
-          // foes harmless for this focused replacement->wave edge while retaining their real command path.
-          enemy.moveset = [new PokemonMove(MoveId.SPLASH)];
         }
         expect(
           rig.hostScene.getEnemyField().every(enemy => enemy.hp === 1),

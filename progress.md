@@ -3253,3 +3253,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   owner-pick journey while removing a layout-dependent false red.
 - Local targeted Biome completed with only the repository's existing informational complexity diagnostics;
   `git diff --check` is clean. Behavioral qualification remains GitHub-hosted only per `AGENTS.md`.
+
+# 2026-07-24 - Remaining renderer and replay fixtures follow executable V2 edges
+
+- Single-scene presentation fixtures now replace their current predecessor through the phase manager's
+  destructive co-op-authoritative transition. They no longer clear and shift a fabricated local queue, an
+  invalid post-cutover edge that could leave CommandPhase current while the detached replay never ran.
+- The Yawn presentation regression waits for the real delayed `ObtainStatusEffectPhase` mutation before
+  capturing immutable state, matching the turn barrier rather than sampling during TurnEnd.
+- Multi-wave trace replay waits for the projected two-client command frontier before reading `currentBattle`;
+  the V2 wave projector deliberately leaves that field absent while NewBattle/Encounter installs the next
+  battle. The recorder likewise stops synthesizing an extra post-wave interceptor transition.
+- Party transposition makes the already-proven enemies harmless before EnemyCommandPhase selects their
+  second-turn moves. Changing the moveset after the public driver was too late and could open an unrelated
+  second replacement picker.
+- Behavioral checks remain external-only. The next exact-SHA aggregate gate is the qualification evidence
+  for these B4/B9/B10/B13 fixture migrations and for any remaining product seam.

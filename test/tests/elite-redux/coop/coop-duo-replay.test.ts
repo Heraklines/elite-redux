@@ -338,6 +338,9 @@ describe.skipIf(!RUN)(
       expect(isReplayRecording(), "the recorder began on the co-op host").toBe(true);
 
       for (let w = 1; w <= RECORD_WAVES; w++) {
+        // The V2 wave projector deliberately leaves currentBattle null while NewBattle/Encounter installs
+        // the next immutable frontier. Wait for that real two-client Command boundary before sampling turn.
+        await arriveGuestCommandBoundary(rig, w);
         const turn = rig.hostScene.currentBattle.turn;
         // Both seats TACKLE the frail Magikarps through their real public COMMAND/FIGHT/TARGET handlers.
         // The production command taps therefore record the same UI -> relay path a captured player run uses.
@@ -388,12 +391,6 @@ describe.skipIf(!RUN)(
           );
         }
         await pumpDuoDestinations(rig);
-        if (w < RECORD_WAVES) {
-          await arriveGuestCommandBoundary(rig, w + 1);
-          await withClient(rig.hostCtx, async () => {
-            await game.phaseInterceptor.to("CommandPhase");
-          });
-        }
       }
 
       // ===== CAPTURE the recorded trace (stash for KILLER #2). =====

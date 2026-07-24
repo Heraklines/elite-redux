@@ -186,11 +186,12 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
    */
   const driveReplayTurn = async (turn: number): Promise<void> => {
     const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    // A browser reaches replay through the phase manager. Detached starts leave presentation children
-    // behind an unrelated CommandPhase; starting again after shift creates two consumers for one commit.
-    game.scene.phaseManager.clearPhaseQueue();
-    game.scene.phaseManager.unshiftPhase(replay);
-    game.scene.phaseManager.shiftPhase();
+    // Enter through the same destructive authoritative transition used by the V2 projector. Clearing and
+    // shifting an invented local queue is no longer a legal control edge and can leave CommandPhase current.
+    const predecessor = game.scene.phaseManager.getCurrentPhase();
+    if (!game.scene.phaseManager.replaceWithCoopAuthoritativePhase(predecessor, replay)) {
+      throw new Error(`localization fixture could not replace ${predecessor.phaseName} with authoritative replay`);
+    }
     await new Promise(r => setTimeout(r, 0));
     for (let i = 0; i < 32; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
