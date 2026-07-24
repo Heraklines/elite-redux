@@ -1,0 +1,612 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:eeb6b9fbf1ec5ea96229db91d292d68be48904f7:run-30063628749.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 OPR/133.0.0.0
+platform: Win32
+screen:   1536x864 @1.25x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@15936ms -> title-shown@54850ms
+lastSess: ok (reached title)
+mode:     0  wave:?
+seed:     YnzLzJB6HqnMpKZLU8JoYSsj
+party:    
+enemy:    
+
+----- COMMENT -----
+upon finishing the match, my side of the battle froze
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:eeb6b9fbf1ec5ea96229db91d292d68be48904f7:run-30063628749.1","source":"github","sha":"eeb6b9fbf1ec5ea96229db91d292d68be48904f7","workflow":{"provider":"github-actions","runId":"30063628749","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[03:17:42.988] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[03:17:43.486] LOG: [ER] build {"version":1,"id":"github:eeb6b9fbf1ec5ea96229db91d292d68be48904f7:run-30063628749.1","source":"github","sha":"eeb6b9fbf1ec5ea96229db91d292d68be48904f7","workflow":{"provider":"github-actions","runId":"30063628749","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[03:17:43.561] LOG: [dev-tools] loaded — 727 scenarios + Send Logs button
+[03:18:31.127] DEBUG: Destroying loading scene
+[03:18:31.127] DEBUG: Destroyed loading scene
+[03:18:31.217] LOG: Seed: vRrqUnid0GJkd5964SjrjGnm
+[03:18:31.217] LOG: Wave Seed: vRrqUnid0GJkd5964SjrjGnm 0
+[03:18:33.726] LOG: %cStart Phase LoginPhase color:green;
+[03:18:34.291] LOG: Client Session: kGWBSp1OlYDsN9PnthiG6EOn653cRKiQ
+[03:18:36.013] LOG: %cStart Phase TitlePhase color:green;
+[03:18:36.014] LOG: Getting Session Slot id: %d 4
+[03:18:36.052] LOG: use seasonal splash messages true
+[03:18:36.475] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of null (reading 'deviceMapping') @ https://elite-redux-staging.pages.dev/assets/battle-scene-DUwfaGNv.js:2:26415
+[03:18:43.046] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[03:18:46.069] LOG: [coop:lobby] poll players=1
+[03:18:48.525] LOG: [coop:lobby] poll players=1
+[03:18:50.982] LOG: [coop:lobby] poll players=1
+[03:18:53.407] LOG: [coop:lobby] poll players=1
+[03:18:53.983] LOG: [coop:lobby] cancel (id=p33_NTnN_uKH3sr1d1Hv9_p8FBcjkmvlnp5w connecting=false)
+[03:18:53.984] LOG: %cStart Phase TitlePhase color:green;
+[03:18:53.985] LOG: Getting Session Slot id: %d 4
+[03:18:54.021] LOG: use seasonal splash messages true
+[03:19:01.943] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[03:19:05.009] LOG: [coop:lobby] poll players=1
+[03:19:07.470] LOG: [coop:lobby] poll players=1
+[03:19:09.935] LOG: [coop:lobby] poll players=1
+[03:19:12.611] LOG: [coop:lobby] poll players=1
+[03:19:15.027] LOG: [coop:lobby] poll players=1
+[03:19:17.442] LOG: [coop:lobby] poll players=1
+[03:19:19.963] LOG: [coop:lobby] poll players=1
+[03:19:22.428] LOG: [coop:lobby] poll players=1
+[03:19:24.876] LOG: [coop:lobby] poll players=2
+[03:19:27.336] LOG: [coop:lobby] poll players=2
+[03:19:29.935] LOG: [coop:lobby] poll: incoming request from=p33_X_EZmBPm0swYDWx4MPVPsc_aun-moeaX name=eros
+[03:19:29.939] LOG: [coop:lobby] poll players=2
+[03:19:32.558] LOG: [coop:lobby] poll players=2
+[03:19:35.222] LOG: [coop:lobby] poll players=2
+[03:19:37.881] LOG: [coop:lobby] poll players=2
+[03:19:38.183] LOG: [coop:lobby] respond accept=true from=p33_X_EZmBPm0swYDWx4MPVPsc_aun-moeaX (self=p33_0TLXL1rW33-CL3QpgIbefunvApTDKKCY)
+[03:19:40.340] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[03:19:43.932] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[03:19:44.334] LOG: [coop:launch] data channel OPEN
+[03:19:44.335] LOG: [coop:webrtc] peer connection state role=guest state=connected channel=open
+[03:19:44.335] LOG: [coop:webrtc] ICE connection state role=guest state=connected channel=open
+[03:19:44.335] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[03:19:44.344] LOG: [coop:launch] connectCoopSession role=guest state=connected username=BerNerd1499 netcode=authoritative
+[03:19:44.347] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[03:19:44.349] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[03:19:44.349] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[03:19:44.349] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[03:19:44.349] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[03:19:44.349] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[03:19:44.350] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[03:19:44.350] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[03:19:44.351] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[03:19:44.351] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[03:19:44.351] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=BerNerd1499 version=er-coop-37 tiebreak=0.8828912389738454
+[03:19:44.352] LOG: [coop:webrtc] raw tx QUEUE role=guest t=hello bytes=542
+[03:19:44.428] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=d934626e515c046f(1108) movesName=c262a065143b9028(1108) movesets=3cd1aab08a835678(1932) abilitiesData=750d7c1a57ed5701(1148) abilitiesName=a4b0c40bb2b9398c(1148)
+[03:19:44.428] LOG: [coop:webrtc] raw tx QUEUE role=guest t=dataFingerprint bytes=329
+[03:19:44.432] LOG: %cStart Phase SelectStarterPhase color:green;
+[03:19:44.433] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownTeam bytes=1630
+[03:19:44.434] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownReady bytes=51
+[03:19:44.441] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=532 handlers=13
+[03:19:44.444] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[03:19:44.445] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[03:19:44.445] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[03:19:44.475] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=13
+[03:19:44.476] LOG: [coop:checksum] MATCH - data tables identical across clients
+[03:19:44.476] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[03:19:44.476] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[03:19:44.484] LOG: [coop:webrtc] raw rx role=guest t=showdownTeam bytes=1415 handlers=13
+[03:19:44.484] LOG: [coop:webrtc] raw rx role=guest t=showdownReady bytes=51 handlers=13
+[03:19:44.484] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownTeam bytes=1630
+[03:19:44.484] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownReady bytes=51
+[03:19:44.485] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=guest
+[03:19:44.486] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=43
+[03:19:44.487] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=guest
+[03:19:44.537] LOG: [coop:webrtc] raw rx role=guest t=showdownTeam bytes=1415 handlers=13
+[03:19:44.538] LOG: [coop:webrtc] raw rx role=guest t=showdownReady bytes=51 handlers=13
+[03:19:44.538] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=43 handlers=13
+[03:19:44.538] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=guest
+[03:19:44.538] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=43
+[03:19:44.538] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=guest
+[03:19:44.540] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownStakeOffer bytes=106
+[03:19:44.545] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[03:19:44.548] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[03:19:44.587] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=43 handlers=13
+[03:19:44.587] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> DUPLICATE (already seen) role=guest
+[03:19:44.595] LOG: [coop:webrtc] raw rx role=guest t=showdownStakeOffer bytes=106 handlers=13
+[03:19:44.609] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[03:19:44.613] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[03:19:45.075] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[03:19:45.078] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[03:19:48.421] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[03:19:48.426] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[03:19:48.454] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=guest
+[03:19:48.454] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=50
+[03:19:48.454] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit timeoutMs=600000 -> network-wait role=guest
+[03:19:49.355] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[03:19:49.356] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=900ms machineWaits=coop-rendezvous:showdown-wager-commit@900ms peerBeat=- lastRx=5s transport=connected journal=0/0 queue=0
+[03:19:59.354] LOG: [coop:webrtc] raw tx QUEUE role=guest t=stallBeat bytes=35
+[03:20:04.353] LOG: [coop:webrtc] raw tx QUEUE role=guest t=stallBeat bytes=35
+[03:20:09.363] LOG: [coop:webrtc] raw tx QUEUE role=guest t=stallBeat bytes=35
+[03:20:14.360] LOG: [coop:webrtc] raw tx QUEUE role=guest t=stallBeat bytes=35
+[03:20:16.844] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=50 handlers=13
+[03:20:16.844] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> deliver-to-waiter role=guest
+[03:20:16.844] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=50
+[03:20:16.844] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit RESOLVE both-arrived role=guest
+[03:20:16.850] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[03:20:16.851] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[03:20:16.866] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[03:20:16.867] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[03:20:16.881] LOG: Wave Seed: showdown-sync:b599b06b49e98dd6:b7a468f4d403d1e6 0
+[03:20:19.364] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[03:20:19.365] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=3s transport=connected journal=0/0 queue=0
+[03:20:19.507] LOG: Wave Seed: tipxepxo.tzod;c6::c17c5:f:9ee7;c8b579g5e514e2f7 1
+[03:20:19.510] LOG: %cStart Phase EncounterPhase color:green;
+[03:20:19.541] LOG: Pokemon: Foe Charizard | Species ID: 6 | Level: 100 | Nature: Serious (-)
+[03:20:19.541] LOG: Stats (IVs): HP: 299 (31), Atk: 204 (31), Def: 192 (31), Spatk: 254 (31), Spdef: 206 (31), Spd: 236 (31)
+[03:20:19.541] LOG: Ability: Molten Down | Passive Ability: Blaze 
+[03:20:19.542] LOG: Moveset: ["Air Slash","Dragon Pulse","Flamethrower","Mystic Dance"]
+[03:20:19.559] LOG: Pokemon: Foe Gengar | Species ID: 94 | Level: 100 | Nature: Hardy (-)
+[03:20:19.559] LOG: Stats (IVs): HP: 271 (31), Atk: 166 (31), Def: 156 (31), Spatk: 296 (31), Spdef: 186 (31), Spd: 256 (31)
+[03:20:19.559] LOG: Ability: Vengeance | Passive Ability: Levitate 
+[03:20:19.559] LOG: Moveset: ["Night Shade","Aura Sphere","Shadow Ball","Smog"]
+[03:20:19.571] LOG: Pokemon: Foe Moltres | Species ID: 146 | Level: 100 | Nature: Hardy (-)
+[03:20:19.571] LOG: Stats (IVs): HP: 321 (31), Atk: 236 (31), Def: 216 (31), Spatk: 286 (31), Spdef: 206 (31), Spd: 216 (31)
+[03:20:19.571] LOG: Ability: Air Blower | Passive Ability: Flash Fire 
+[03:20:19.571] LOG: Moveset: ["Air Slash","Calm Mind","Gust","Torch Song"]
+[03:20:19.587] LOG: Pokemon: Foe Regigigas | Species ID: 486 | Level: 100 | Nature: Quirky (-)
+[03:20:19.587] LOG: Stats (IVs): HP: 421 (31), Atk: 356 (31), Def: 276 (31), Spatk: 176 (31), Spdef: 276 (31), Spd: 156 (31)
+[03:20:19.587] LOG: Ability: Adaptability | Passive Ability: Power Core 
+[03:20:19.587] LOG: Moveset: ["Asteroid Shot","Drain Punch","Body Slam","Crush Claw"]
+[03:20:19.624] LOG: Pokemon: Foe Koraidon | Species ID: 1007 | Level: 100 | Nature: Hardy (-)
+[03:20:19.624] LOG: Stats (IVs): HP: 341 (31), Atk: 306 (31), Def: 266 (31), Spatk: 206 (31), Spdef: 236 (31), Spd: 306 (31)
+[03:20:19.624] LOG: Ability: Rock Head | Passive Ability: Orichalcum Pulse 
+[03:20:19.624] LOG: Moveset: ["Draconic Fangs","Bitter Blade","Bulk Up","Dragon Darts (P)"]
+[03:20:19.637] LOG: Pokemon: Foe Baxcalibur | Species ID: 998 | Level: 100 | Nature: Hardy (-)
+[03:20:19.637] LOG: Stats (IVs): HP: 371 (31), Atk: 326 (31), Def: 220 (31), Spatk: 186 (31), Spdef: 208 (31), Spd: 210 (31)
+[03:20:19.638] LOG: Ability: Freezing Point | Passive Ability: Thermal Exchange 
+[03:20:19.638] LOG: Moveset: ["Dragon Dance","Draco Meteor","Behemoth Blade","Frost Brand"]
+[03:20:20.743] LOG: Generated AI funcs
+[03:20:20.749] LOG: Wave Seed: tipxepxo.tzod;c6::c17c5:f:9ee7;c8b579g5e514e2f7 1
+[03:20:20.952] LOG: Veteran eros
+[03:20:21.480] LOG: Dialogue saved as seen: dialogue:veteran.encounter.1
+[03:20:21.516] LOG: Veteran eros
+[03:20:22.481] LOG: %cStart Phase SummonPhase color:green;
+[03:20:22.482] LOG: eros
+[03:20:22.736] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:20:22.839] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:20:22.944] LOG: %cStart Phase SummonPhase color:green;
+[03:20:23.214] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[03:20:23.218] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:20:23.220] LOG: %cStart Phase PostSummonPhase color:green;
+[03:20:23.220] LOG: Ran PSP for: Charizard
+[03:20:23.222] LOG: %cStart Phase PostSummonPhase color:green;
+[03:20:23.222] LOG: Ran PSP for: Pincurchin
+[03:20:23.223] LOG: %cStart Phase PostSummonPhase color:green;
+[03:20:23.227] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:20:23.390] LOG: %cStart Phase CommonAnimPhase color:green;
+[03:20:23.676] LOG: %cStart Phase MessagePhase color:green;
+[03:20:23.934] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:20:23.957] LOG: %cStart Phase TurnInitPhase color:green;
+[03:20:23.958] LOG: %cStart Phase CommandPhase color:green;
+[03:20:25.864] LOG: Move: VOLT_SWITCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Pincurchin
+[03:20:25.864] LOG: [coop:relay] showdown peer sendCommand turn=1 slot=0 command=0 cursor=2
+[03:20:25.865] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=106
+[03:20:25.867] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:20:25.868] LOG: [coop:relay] showdown host requestEnemyCommand SEND turn=1 slot=0 (awaiting peer)
+[03:20:34.817] LOG: [coop:webrtc] raw rx role=guest t=showdownCommand bytes=107 handlers=12
+[03:20:34.817] LOG: [coop:relay] showdown recv command turn=1 slot=0 command=0 -> resolved awaiting request
+[03:20:34.817] LOG: %cStart Phase TurnStartPhase color:green;
+[03:20:34.824] LOG: %cStart Phase MovePhase color:green;
+[03:20:34.825] LOG: %cUser: Charizard
+Move: MYSTIC_DANCE
+Use Mode: NORMAL color:orchid
+[03:20:34.833] LOG: %cStart Phase MessagePhase color:green;
+[03:20:34.943] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:20:35.318] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:20:35.319] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:20:35.503] LOG: %cStart Phase MessagePhase color:green;
+[03:20:35.719] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:20:35.901] LOG: %cStart Phase MessagePhase color:green;
+[03:20:36.109] LOG: %cStart Phase MoveEndPhase color:green;
+[03:20:36.110] LOG: %cStart Phase MovePhase color:green;
+[03:20:36.110] LOG: %cUser: Pincurchin
+Move: VOLT_SWITCH
+Use Mode: NORMAL color:orchid
+[03:20:36.114] LOG: %cStart Phase MessagePhase color:green;
+[03:20:36.237] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:20:36.241] LOG: Battle Seed: ghoXeltI5Vhplxkd
+[03:20:36.494] LOG: crit stage: +0
+[03:20:36.499] LOG: Move: Volt Switch | Base damage: 69.93398058252427 | Power: 70 | Source attack: 238 | Target defense: 206
+[03:20:36.502] LOG: Move: Volt Switch | Attack damage: 392
+[03:20:36.510] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:20:36.524] LOG: %cStart Phase MessagePhase color:green;
+[03:20:36.700] LOG: %cStart Phase MessagePhase color:green;
+[03:20:36.908] LOG: %cStart Phase FaintPhase color:green;
+[03:20:38.251] LOG: %cStart Phase MessagePhase color:green;
+[03:20:38.518] LOG: %cStart Phase VictoryPhase color:green;
+[03:20:38.522] LOG: %cStart Phase SwitchPhase color:green;
+[03:20:48.619] LOG: [coop:relay] SEND interactionChoice seq=90000 kind=switch kind=? choice=1 data=[0,230,1949216439,1]
+[03:20:48.619] LOG: [coop:webrtc] raw tx QUEUE role=guest t=interactionChoice bytes=92
+[03:20:48.675] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:20:48.986] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:20:49.092] LOG: %cStart Phase PostSummonPhase color:green;
+[03:20:49.092] LOG: Ran PSP for: Mega Kingdra Y
+[03:20:49.093] LOG: %cStart Phase MoveEndPhase color:green;
+[03:20:49.093] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:20:49.094] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:20:49.094] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:20:49.094] LOG: %cStart Phase BerryPhase color:green;
+[03:20:49.096] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:20:49.096] LOG: %cStart Phase TurnEndPhase color:green;
+[03:20:49.101] LOG: %cStart Phase ShowdownEnemyFaintSwitchPhase color:green;
+[03:20:49.101] LOG: [coop:replay] versus host awaiting opponent replacement pick slot=0 seq=90000
+[03:20:49.104] LOG: [coop:relay] AWAIT interactionChoice seq=90000 timeoutMs=60000 expected=[switch] -> network-wait
+[03:20:54.358] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[03:20:54.358] LOG: [coop:health] tick=0g turn=2 wave=1 counter=0 assertions=0 wait=5254ms machineWaits=- peerBeat=- lastRx=5s transport=connected journal=0/0 queue=0
+[03:20:56.013] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=91 handlers=12
+[03:20:56.013] LOG: [coop:relay] DELIVER interactionChoice seq=90000 -> waiter kind=switch choice=1 data=[0,94,1949216439,1]
+[03:20:56.014] LOG: [coop:relay] AWAIT interactionChoice seq=90000 RESOLVE kind=switch choice=1 data=[0,94,1949216439,1]
+[03:20:56.014] LOG: [coop:replay] versus applies opponent replacement slot=0 -> enemyParty[1] type=SWITCH
+[03:20:56.014] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:20:56.235] LOG: eros
+[03:20:56.441] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:20:56.541] LOG: %cStart Phase PostSummonPhase color:green;
+[03:20:56.542] LOG: Ran PSP for: Gengar
+[03:20:56.542] LOG: %cStart Phase TurnInitPhase color:green;
+[03:20:56.543] LOG: %cStart Phase CommandPhase color:green;
+[03:20:58.272] LOG: Move: OCTAZOOKA Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Kingdra Y
+[03:20:58.272] LOG: [coop:relay] showdown peer sendCommand turn=2 slot=0 command=0 cursor=1
+[03:20:58.272] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=106
+[03:20:58.275] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:20:58.275] LOG: [coop:relay] showdown host requestEnemyCommand SEND turn=2 slot=0 (awaiting peer)
+[03:20:59.804] LOG: [coop:webrtc] raw rx role=guest t=showdownCommand bytes=106 handlers=12
+[03:20:59.804] LOG: [coop:relay] showdown recv command turn=2 slot=0 command=0 -> resolved awaiting request
+[03:20:59.804] LOG: %cStart Phase TurnStartPhase color:green;
+[03:20:59.810] LOG: %cStart Phase MovePhase color:green;
+[03:20:59.810] LOG: %cUser: Mega Kingdra Y
+Move: OCTAZOOKA
+Use Mode: NORMAL color:orchid
+[03:20:59.814] LOG: %cStart Phase MessagePhase color:green;
+[03:20:59.916] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:21:00.160] LOG: crit stage: +0
+[03:21:00.160] LOG: Battle Seed: ghoXeltI5Vhplxkd
+[03:21:00.163] LOG: Move: Octazooka | Base damage: 169.90967741935484 | Power: 130 | Source attack: 286 | Target defense: 186
+[03:21:00.166] LOG: Move: Octazooka | Attack damage: 231
+[03:21:00.170] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:21:00.182] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:21:00.370] LOG: %cStart Phase MessagePhase color:green;
+[03:21:00.579] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:00.579] LOG: %cStart Phase MovePhase color:green;
+[03:21:00.579] LOG: %cUser: Gengar
+Move: SHADOW_BALL
+Use Mode: NORMAL color:orchid
+[03:21:00.586] LOG: %cStart Phase MessagePhase color:green;
+[03:21:00.693] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:21:00.699] LOG: %cStart Phase MessagePhase color:green;
+[03:21:00.922] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:00.923] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:21:00.923] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:21:00.923] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:21:00.923] LOG: %cStart Phase BerryPhase color:green;
+[03:21:00.924] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:21:00.926] LOG: %cStart Phase TurnEndPhase color:green;
+[03:21:00.930] LOG: Applied Leftovers (enemy)
+[03:21:00.931] LOG: %cStart Phase PokemonHealPhase color:green;
+[03:21:01.047] LOG: %cStart Phase MessagePhase color:green;
+[03:21:01.314] LOG: %cStart Phase TurnInitPhase color:green;
+[03:21:01.314] LOG: %cStart Phase CommandPhase color:green;
+[03:21:03.452] LOG: Move: WATER_GUN Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Kingdra Y
+[03:21:03.452] LOG: [coop:relay] showdown peer sendCommand turn=3 slot=0 command=0 cursor=3
+[03:21:03.452] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=105
+[03:21:03.454] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:21:03.455] LOG: [coop:relay] showdown host requestEnemyCommand SEND turn=3 slot=0 (awaiting peer)
+[03:21:05.531] LOG: [coop:webrtc] raw rx role=guest t=showdownCommand bytes=106 handlers=12
+[03:21:05.531] LOG: [coop:relay] showdown recv command turn=3 slot=0 command=0 -> resolved awaiting request
+[03:21:05.532] LOG: %cStart Phase TurnStartPhase color:green;
+[03:21:05.536] LOG: %cStart Phase MovePhase color:green;
+[03:21:05.536] LOG: %cUser: Mega Kingdra Y
+Move: WATER_GUN
+Use Mode: NORMAL color:orchid
+[03:21:05.541] LOG: %cStart Phase MessagePhase color:green;
+[03:21:05.641] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:21:05.874] LOG: crit stage: +0
+[03:21:05.874] LOG: Battle Seed: ghoXeltI5Vhplxkd
+[03:21:05.877] LOG: Move: Water Gun | Base damage: 69.16387096774193 | Power: 52 | Source attack: 286 | Target defense: 186
+[03:21:05.880] LOG: Move: Water Gun | Attack damage: 100
+[03:21:05.882] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:21:05.891] LOG: %cStart Phase FaintPhase color:green;
+[03:21:07.059] LOG: %cStart Phase MessagePhase color:green;
+[03:21:07.375] LOG: %cStart Phase VictoryPhase color:green;
+[03:21:07.378] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:07.378] LOG: %cStart Phase MovePhase color:green;
+[03:21:07.378] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:07.378] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:21:07.378] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:21:07.378] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:21:07.378] LOG: %cStart Phase BerryPhase color:green;
+[03:21:07.378] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:21:07.378] LOG: %cStart Phase TurnEndPhase color:green;
+[03:21:07.379] LOG: %cStart Phase ShowdownEnemyFaintSwitchPhase color:green;
+[03:21:07.379] LOG: [coop:replay] versus host awaiting opponent replacement pick slot=0 seq=90000
+[03:21:07.380] LOG: [coop:relay] AWAIT interactionChoice seq=90000 timeoutMs=60000 expected=[switch] -> network-wait
+[03:21:09.119] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=91 handlers=12
+[03:21:09.119] LOG: [coop:relay] DELIVER interactionChoice seq=90000 -> waiter kind=switch choice=4 data=[0,1007,75590450,1]
+[03:21:09.119] LOG: [coop:relay] AWAIT interactionChoice seq=90000 RESOLVE kind=switch choice=4 data=[0,1007,75590450,1]
+[03:21:09.119] LOG: [coop:replay] versus applies opponent replacement slot=0 -> enemyParty[4] type=SWITCH
+[03:21:09.119] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:21:09.348] LOG: eros
+[03:21:09.547] LOG: %cStart Phase PostSummonPhase color:green;
+[03:21:09.547] LOG: Ran PSP for: Koraidon
+[03:21:09.548] LOG: %cStart Phase PostSummonPhase color:green;
+[03:21:09.553] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:21:09.715] LOG: %cStart Phase CommonAnimPhase color:green;
+[03:21:09.922] LOG: %cStart Phase MessagePhase color:green;
+[03:21:10.131] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:21:10.154] LOG: %cStart Phase PostSummonPhase color:green;
+[03:21:10.155] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:21:10.320] LOG: %cStart Phase MessagePhase color:green;
+[03:21:10.562] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:21:10.586] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:21:10.743] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:21:10.773] LOG: %cStart Phase TurnInitPhase color:green;
+[03:21:10.773] LOG: %cStart Phase CommandPhase color:green;
+[03:21:12.321] LOG: [coop:webrtc] raw rx role=guest t=showdownCommand bytes=106 handlers=12
+[03:21:12.321] LOG: [coop:relay] showdown recv command turn=4 slot=0 command=0 -> BUFFERED (no awaiter yet)
+[03:21:12.734] LOG: Move: DRAGON_ENERGY Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Kingdra Y
+[03:21:12.734] LOG: [coop:relay] showdown peer sendCommand turn=4 slot=0 command=0 cursor=2
+[03:21:12.734] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=106
+[03:21:12.736] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:21:12.736] LOG: [coop:relay] showdown host requestEnemyCommand turn=4 slot=0 -> consumed BUFFERED command=0
+[03:21:12.737] LOG: %cStart Phase TurnStartPhase color:green;
+[03:21:12.743] LOG: %cStart Phase MovePhase color:green;
+[03:21:12.743] LOG: %cUser: Mega Kingdra Y
+Move: DRAGON_ENERGY
+Use Mode: NORMAL color:orchid
+[03:21:12.749] LOG: %cStart Phase MessagePhase color:green;
+[03:21:12.861] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:21:13.227] LOG: crit stage: +0
+[03:21:13.227] LOG: Battle Seed: ghoXeltI5Vhplxkd
+[03:21:13.231] LOG: Move: Dragon Energy | Base damage: 200.50338983050847 | Power: 195 | Source attack: 286 | Target defense: 236
+[03:21:13.234] LOG: Move: Dragon Energy | Attack damage: 535
+[03:21:13.236] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:21:13.251] LOG: %cStart Phase MessagePhase color:green;
+[03:21:13.449] LOG: %cStart Phase FaintPhase color:green;
+[03:21:16.167] LOG: %cStart Phase MessagePhase color:green;
+[03:21:16.453] LOG: %cStart Phase VictoryPhase color:green;
+[03:21:16.453] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:16.454] LOG: %cStart Phase MovePhase color:green;
+[03:21:16.454] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:16.454] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:21:16.454] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:21:16.689] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:21:16.689] LOG: %cStart Phase BerryPhase color:green;
+[03:21:16.689] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:21:16.689] LOG: %cStart Phase TurnEndPhase color:green;
+[03:21:16.692] LOG: %cStart Phase ShowdownEnemyFaintSwitchPhase color:green;
+[03:21:16.692] LOG: [coop:replay] versus host awaiting opponent replacement pick slot=0 seq=90000
+[03:21:16.692] LOG: [coop:relay] AWAIT interactionChoice seq=90000 timeoutMs=60000 expected=[switch] -> network-wait
+[03:21:18.487] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=92 handlers=12
+[03:21:18.487] LOG: [coop:relay] DELIVER interactionChoice seq=90000 -> waiter kind=switch choice=5 data=[0,998,3642832970,1]
+[03:21:18.487] LOG: [coop:relay] AWAIT interactionChoice seq=90000 RESOLVE kind=switch choice=5 data=[0,998,3642832970,1]
+[03:21:18.487] LOG: [coop:replay] versus applies opponent replacement slot=0 -> enemyParty[5] type=SWITCH
+[03:21:18.488] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:21:18.713] LOG: eros
+[03:21:18.927] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:21:19.029] LOG: %cStart Phase PostSummonPhase color:green;
+[03:21:19.029] LOG: Ran PSP for: Baxcalibur
+[03:21:19.030] LOG: %cStart Phase PostSummonPhase color:green;
+[03:21:19.030] LOG: %cStart Phase TurnInitPhase color:green;
+[03:21:19.030] LOG: %cStart Phase CommandPhase color:green;
+[03:21:20.091] LOG: Move: DRAGON_ENERGY Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Kingdra Y
+[03:21:20.091] LOG: [coop:relay] showdown peer sendCommand turn=5 slot=0 command=0 cursor=2
+[03:21:20.091] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=106
+[03:21:20.093] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:21:20.093] LOG: [coop:relay] showdown host requestEnemyCommand SEND turn=5 slot=0 (awaiting peer)
+[03:21:21.506] LOG: [coop:webrtc] raw rx role=guest t=showdownCommand bytes=106 handlers=12
+[03:21:21.506] LOG: [coop:relay] showdown recv command turn=5 slot=0 command=0 -> resolved awaiting request
+[03:21:21.507] LOG: %cStart Phase TurnStartPhase color:green;
+[03:21:21.511] LOG: %cStart Phase MovePhase color:green;
+[03:21:21.511] LOG: %cUser: Mega Kingdra Y
+Move: DRAGON_ENERGY
+Use Mode: NORMAL color:orchid
+[03:21:21.519] LOG: %cStart Phase MessagePhase color:green;
+[03:21:21.641] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:21:22.029] LOG: crit stage: +0
+[03:21:22.029] LOG: Battle Seed: ghoXeltI5Vhplxkd
+[03:21:22.032] LOG: Move: Dragon Energy | Base damage: 227.225 | Power: 195 | Source attack: 286 | Target defense: 208
+[03:21:22.035] LOG: Move: Dragon Energy | Attack damage: 681
+[03:21:22.036] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:21:22.052] LOG: %cStart Phase MessagePhase color:green;
+[03:21:22.250] LOG: %cStart Phase FaintPhase color:green;
+[03:21:25.569] LOG: %cStart Phase MessagePhase color:green;
+[03:21:25.871] LOG: %cStart Phase VictoryPhase color:green;
+[03:21:25.872] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:25.872] LOG: %cStart Phase MovePhase color:green;
+[03:21:25.872] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:25.872] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:21:25.872] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:21:26.109] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:21:26.109] LOG: %cStart Phase BerryPhase color:green;
+[03:21:26.109] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:21:26.109] LOG: %cStart Phase TurnEndPhase color:green;
+[03:21:26.114] LOG: %cStart Phase ShowdownEnemyFaintSwitchPhase color:green;
+[03:21:26.114] LOG: [coop:replay] versus host awaiting opponent replacement pick slot=0 seq=90000
+[03:21:26.115] LOG: [coop:relay] AWAIT interactionChoice seq=90000 timeoutMs=60000 expected=[switch] -> network-wait
+[03:21:27.848] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=92 handlers=12
+[03:21:27.848] LOG: [coop:relay] DELIVER interactionChoice seq=90000 -> waiter kind=switch choice=3 data=[0,486,2355981966,1]
+[03:21:27.848] LOG: [coop:relay] AWAIT interactionChoice seq=90000 RESOLVE kind=switch choice=3 data=[0,486,2355981966,1]
+[03:21:27.848] LOG: [coop:replay] versus applies opponent replacement slot=0 -> enemyParty[3] type=SWITCH
+[03:21:27.848] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:21:28.080] LOG: eros
+[03:21:28.290] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:21:28.390] LOG: %cStart Phase PostSummonPhase color:green;
+[03:21:28.390] LOG: Ran PSP for: Regigigas
+[03:21:28.390] LOG: %cStart Phase TurnInitPhase color:green;
+[03:21:28.390] LOG: %cStart Phase CommandPhase color:green;
+[03:21:29.352] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[03:21:29.352] LOG: [coop:health] tick=0g turn=6 wave=1 counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=2s transport=connected journal=0/0 queue=0
+[03:21:30.009] LOG: [coop:webrtc] raw rx role=guest t=showdownCommand bytes=106 handlers=12
+[03:21:30.009] LOG: [coop:relay] showdown recv command turn=6 slot=0 command=0 -> BUFFERED (no awaiter yet)
+[03:21:31.069] LOG: Move: DRAGON_ENERGY Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Kingdra Y
+[03:21:31.069] LOG: [coop:relay] showdown peer sendCommand turn=6 slot=0 command=0 cursor=2
+[03:21:31.069] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=106
+[03:21:31.072] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:21:31.072] LOG: [coop:relay] showdown host requestEnemyCommand turn=6 slot=0 -> consumed BUFFERED command=0
+[03:21:31.072] LOG: %cStart Phase TurnStartPhase color:green;
+[03:21:31.077] LOG: %cStart Phase MovePhase color:green;
+[03:21:31.077] LOG: %cUser: Mega Kingdra Y
+Move: DRAGON_ENERGY
+Use Mode: NORMAL color:orchid
+[03:21:31.081] LOG: %cStart Phase MessagePhase color:green;
+[03:21:31.193] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:21:31.556] LOG: crit stage: +0
+[03:21:31.556] LOG: Battle Seed: ghoXeltI5Vhplxkd
+[03:21:31.559] LOG: Move: Dragon Energy | Base damage: 171.73478260869564 | Power: 195 | Source attack: 286 | Target defense: 276
+[03:21:31.561] LOG: Move: Dragon Energy | Attack damage: 239
+[03:21:31.564] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:21:31.580] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:31.581] LOG: %cStart Phase MovePhase color:green;
+[03:21:31.581] LOG: %cUser: Regigigas
+Move: CRUSH_CLAW
+Use Mode: NORMAL color:orchid
+[03:21:31.586] LOG: %cStart Phase MessagePhase color:green;
+[03:21:31.698] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:21:31.967] LOG: crit stage: +0
+[03:21:31.970] LOG: Move: Crush Claw | Base damage: 129.55172413793105 | Power: 75 | Source attack: 411 | Target defense: 203
+[03:21:31.973] LOG: Move: Crush Claw | Attack damage: 115
+[03:21:31.976] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:21:31.989] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:21:32.175] LOG: %cStart Phase MessagePhase color:green;
+[03:21:32.386] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:32.386] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:21:32.386] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:21:32.646] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:21:32.646] LOG: %cStart Phase BerryPhase color:green;
+[03:21:32.649] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:21:32.652] LOG: %cStart Phase TurnEndPhase color:green;
+[03:21:32.655] LOG: Applied Leftovers (enemy)
+[03:21:32.656] LOG: %cStart Phase PokemonHealPhase color:green;
+[03:21:32.765] LOG: %cStart Phase MessagePhase color:green;
+[03:21:33.036] LOG: %cStart Phase TurnInitPhase color:green;
+[03:21:33.036] LOG: %cStart Phase CommandPhase color:green;
+[03:21:33.542] LOG: Move: ZAP_CANNON Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Kingdra Y
+[03:21:33.542] LOG: [coop:relay] showdown peer sendCommand turn=7 slot=0 command=0 cursor=0
+[03:21:33.542] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=106
+[03:21:33.544] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:21:33.544] LOG: [coop:relay] showdown host requestEnemyCommand SEND turn=7 slot=0 (awaiting peer)
+[03:21:34.371] LOG: [coop:webrtc] raw rx role=guest t=showdownCommand bytes=106 handlers=12
+[03:21:34.371] LOG: [coop:relay] showdown recv command turn=7 slot=0 command=0 -> resolved awaiting request
+[03:21:34.372] LOG: %cStart Phase TurnStartPhase color:green;
+[03:21:34.378] LOG: %cStart Phase MovePhase color:green;
+[03:21:34.378] LOG: %cUser: Mega Kingdra Y
+Move: ZAP_CANNON
+Use Mode: NORMAL color:orchid
+[03:21:34.382] LOG: %cStart Phase MessagePhase color:green;
+[03:21:34.499] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:21:34.752] LOG: crit stage: +0
+[03:21:34.752] LOG: Battle Seed: ghoXeltI5Vhplxkd
+[03:21:34.755] LOG: Move: Zap Cannon | Base damage: 205.6817391304348 | Power: 234 | Source attack: 286 | Target defense: 276
+[03:21:34.756] LOG: Move: Zap Cannon | Attack damage: 229
+[03:21:34.760] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:21:34.773] LOG: %cStart Phase FaintPhase color:green;
+[03:21:37.311] LOG: %cStart Phase MessagePhase color:green;
+[03:21:37.398] LOG: %cStart Phase VictoryPhase color:green;
+[03:21:37.399] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:37.399] LOG: %cStart Phase MovePhase color:green;
+[03:21:37.399] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:37.399] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:21:37.399] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:21:37.660] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:21:37.660] LOG: %cStart Phase BerryPhase color:green;
+[03:21:37.660] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:21:37.660] LOG: %cStart Phase TurnEndPhase color:green;
+[03:21:37.663] LOG: %cStart Phase ShowdownEnemyFaintSwitchPhase color:green;
+[03:21:37.663] LOG: [coop:replay] versus host awaiting opponent replacement pick slot=0 seq=90000
+[03:21:37.664] LOG: [coop:relay] AWAIT interactionChoice seq=90000 timeoutMs=60000 expected=[switch] -> network-wait
+[03:21:38.649] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=91 handlers=12
+[03:21:38.649] LOG: [coop:relay] DELIVER interactionChoice seq=90000 -> waiter kind=switch choice=2 data=[0,146,988389896,1]
+[03:21:38.649] LOG: [coop:relay] AWAIT interactionChoice seq=90000 RESOLVE kind=switch choice=2 data=[0,146,988389896,1]
+[03:21:38.649] LOG: [coop:replay] versus applies opponent replacement slot=0 -> enemyParty[2] type=SWITCH
+[03:21:38.650] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:21:38.878] LOG: eros
+[03:21:39.091] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:21:39.191] LOG: %cStart Phase PostSummonPhase color:green;
+[03:21:39.191] LOG: Ran PSP for: Moltres
+[03:21:39.192] LOG: %cStart Phase PostSummonPhase color:green;
+[03:21:39.194] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:21:39.355] LOG: %cStart Phase MessagePhase color:green;
+[03:21:39.622] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:21:39.645] LOG: %cStart Phase TurnInitPhase color:green;
+[03:21:39.645] LOG: %cStart Phase CommandPhase color:green;
+[03:21:40.916] LOG: [coop:webrtc] raw rx role=guest t=showdownCommand bytes=106 handlers=12
+[03:21:40.917] LOG: [coop:relay] showdown recv command turn=8 slot=0 command=0 -> BUFFERED (no awaiter yet)
+[03:21:44.012] LOG: crit stage: +0
+[03:21:48.231] LOG: Move: ZAP_CANNON Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Kingdra Y
+[03:21:48.231] LOG: [coop:relay] showdown peer sendCommand turn=8 slot=0 command=0 cursor=0
+[03:21:48.231] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=106
+[03:21:48.233] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:21:48.233] LOG: [coop:relay] showdown host requestEnemyCommand turn=8 slot=0 -> consumed BUFFERED command=0
+[03:21:48.233] LOG: %cStart Phase TurnStartPhase color:green;
+[03:21:48.239] LOG: %cStart Phase MovePhase color:green;
+[03:21:48.239] LOG: %cUser: Mega Kingdra Y
+Move: ZAP_CANNON
+Use Mode: NORMAL color:orchid
+[03:21:48.244] LOG: %cStart Phase MessagePhase color:green;
+[03:21:48.353] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:21:48.615] LOG: crit stage: +0
+[03:21:48.615] LOG: Battle Seed: ghoXeltI5Vhplxkd
+[03:21:48.618] LOG: Move: Zap Cannon | Base damage: 274.89398058252425 | Power: 234 | Source attack: 286 | Target defense: 206
+[03:21:48.621] LOG: Move: Zap Cannon | Attack damage: 657
+[03:21:48.624] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:21:48.633] LOG: %cStart Phase MessagePhase color:green;
+[03:21:48.841] LOG: %cStart Phase FaintPhase color:green;
+[03:21:50.599] LOG: %cStart Phase MessagePhase color:green;
+[03:21:51.323] LOG: %cStart Phase VictoryPhase color:green;
+[03:21:51.327] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:51.328] LOG: %cStart Phase MovePhase color:green;
+[03:21:51.328] LOG: %cStart Phase MoveEndPhase color:green;
+[03:21:51.328] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:21:51.328] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:21:51.564] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:21:51.564] LOG: %cStart Phase BerryPhase color:green;
+[03:21:51.564] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:21:51.564] LOG: %cStart Phase TurnEndPhase color:green;
+[03:21:51.568] LOG: %cStart Phase MessagePhase color:green;
+[03:21:51.828] LOG: %cStart Phase BattleEndPhase color:green;
+[03:21:51.829] LOG: Battle Score: 14739 (8 Turns x0.69)
+[03:21:51.829] LOG: Total Score: 14739
+[03:21:51.857] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[03:21:51.857] ERROR: [uncaught] Uncaught Error: TrainerVictoryPhase started without a trainer battle @ https://elite-redux-staging.pages.dev/assets/battle-scene-DUwfaGNv.js:462:3113
+[03:21:59.353] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[03:21:59.353] LOG: [coop:health] tick=0g turn=9 wave=1 counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=5s transport=connected journal=0/0 queue=0
+[03:22:29.353] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[03:22:29.353] LOG: [coop:health] tick=0g turn=9 wave=1 counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=5s transport=connected journal=0/0 queue=0
+[03:22:33.569] WARN: [coop:webrtc] channel ERROR role=guest readyState=closed err=User-Initiated Abort, reason=Close called
+[03:22:33.569] WARN: [coop:webrtc] carrier LOST role=guest state=connected gen=0 reason=User-Initiated Abort, reason=Close called
+[03:22:33.570] LOG: [coop:webrtc] state role=guest connected -> disconnected
+[03:22:33.570] WARN: [coop:runtime] partner channel disconnected -> entering membership recovery (shared waits retained)
+[03:22:35.242] WARN: [coop:launch] P33 heartbeat lost authenticated ownership status=409; closing channel
+[03:22:35.243] LOG: [coop:webrtc] close() role=guest state=disconnected
+[03:22:35.243] LOG: [coop:webrtc] state role=guest disconnected -> closed
+[03:22:35.243] WARN: [coop:runtime] partner channel closed -> entering membership recovery (shared waits retained)
+[03:22:35.243] WARN: [coop:runtime] shared session terminal requested: Your partner disconnected and no authenticated rejoin path is available.
+[03:22:35.244] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[03:22:35.245] LOG: [coop:launch] clearCoopRuntime role=guest netcode=lockstep gen->1
+[03:22:35.246] LOG: [coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[03:22:35.246] LOG: [coop:relay] dispose() (no in-flight waiters)
+[03:22:35.246] LOG: [coop:pump] end session {"wasOwner":false,"seq":-1,"termSeq":-1}
+[03:22:35.247] LOG: [coop:webrtc] close() role=guest state=closed
+[03:22:35.247] LOG: [coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[03:22:35.247] LOG: [coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[03:22:35.259] LOG: Seed: YnzLzJB6HqnMpKZLU8JoYSsj
+[03:22:35.259] LOG: Wave Seed: YnzLzJB6HqnMpKZLU8JoYSsj 0
+[03:22:35.261] LOG: %cStart Phase TitlePhase color:green;
+[03:22:35.261] LOG: Getting Session Slot id: %d 4
+[03:22:35.285] LOG: use seasonal splash messages true
+[03:22:36.366] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[03:22:38.387] LOG: Getting Session Slot id: %d 4
+
+----- REPLAY TRACE (JSON) -----
+(none)
