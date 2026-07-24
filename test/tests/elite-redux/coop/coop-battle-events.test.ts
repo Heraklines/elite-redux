@@ -632,6 +632,9 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const moveUsed = recording.events.find(event => event.k === "moveUsed");
 
     expect(moveUsed, "the later move still has a presentation event").toBeDefined();
+    expect(moveUsed?.k === "moveUsed" ? moveUsed.actor.pokemonId : null, "the displayed user remains exact").toBe(
+      user.id,
+    );
     expect(moveUsed?.k === "moveUsed" ? moveUsed.targets : null, "no stale target index crosses the wire").toEqual([]);
     expect(
       moveUsed?.k === "moveUsed" ? moveUsed.targetActors : null,
