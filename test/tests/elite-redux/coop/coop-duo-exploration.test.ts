@@ -380,6 +380,12 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         await drainLoopback();
       });
 
+      // BIOME_SHOP is a real transition mode (250ms fade + 100ms delayed hand-off). Keep each browser's
+      // complete context installed while its own Phaser clock resolves that transition, exactly as two
+      // independent browser event loops do. Tight zero-delay relay pumps never advance this visual boundary.
+      await withClient(rig.hostCtx, () => new Promise(resolve => setTimeout(resolve, 650)));
+      await withClient(rig.guestCtx, () => new Promise(resolve => setTimeout(resolve, 650)));
+
       // Wait for the actual BIOME_SHOP handler. The retired fixture invoked the callback captured from
       // setMode before that promise resolved, bypassing the V2 human-input gate and manufacturing a commit
       // no real browser could send.
@@ -733,6 +739,20 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
           expect(rig.guestScene.ui.processInput(Button.DOWN)).toBe(true);
           expect(rig.guestScene.ui.processInput(Button.ACTION)).toBe(true);
           expect(rig.guestScene.ui.processInput(Button.ACTION)).toBe(true);
+
+          // Keep this browser installed until its terminal closes the PARTY modal. The selection is relayed
+          // to the authority, whose replacement commit then returns to this browser; leaving the async scope
+          // immediately after ACTION lets the one-process harness run setModeBoundedWhen's promise tail under
+          // the host globals, a state impossible in two independent browsers and correctly rejected by the
+          // production phase fence.
+          let pickerClosed = false;
+          for (let i = 0; i < 100 && !pickerClosed; i++) {
+            await withClient(rig.hostCtx, () => drainLoopback());
+            await drainLoopback();
+            await new Promise<void>(resolve => setTimeout(resolve, 0));
+            pickerClosed = rig.guestScene.phaseManager.getCurrentPhase() !== picker;
+          }
+          expect(pickerClosed, "the guest picker closed under its owning browser context").toBe(true);
         });
         await settleDuoPromise(rig, hostAdvance!, "exploration double-KO host crossing");
         await Promise.all(publicReplacementPicks);
@@ -1083,14 +1103,10 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // entry existed, so the exact shared-interaction control could never prove its projected generation.
     let ownerDone = false;
     let watchDone = false;
+    let ownerPhase: InstanceType<typeof TheBargainPhase> | null = null;
     await withClient(rig.hostCtx, async () => {
       const phase = new TheBargainPhase();
-      const seamO = phase as unknown as { end: () => void };
-      const realEndO = seamO.end.bind(phase);
-      seamO.end = () => {
-        ownerDone = true;
-        realEndO();
-      };
+      ownerPhase = phase;
       expect(rig.hostScene.phaseManager.overridePhase(phase), "the owner Bargain is the real current phase").toBe(true);
       // PhaseInterceptor suppresses PhaseManager's automatic start in engine tests. Start the exact current
       // phase once; without this edge no BARGAIN_PRESENT exists and the guest correctly waits forever.
@@ -1146,6 +1162,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     });
     for (let i = 0; i < 80 && (!ownerDone || !watchDone); i++) {
       await pumpDuoDestinations(rig, 1);
+      ownerDone = await withClient(rig.hostCtx, () => rig.hostScene.phaseManager.getCurrentPhase() !== ownerPhase);
     }
     await pumpDuoDestinations(rig);
     expect(ownerDone, "owner bargain chain fully completed after public input").toBe(true);

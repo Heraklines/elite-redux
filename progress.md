@@ -2663,3 +2663,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   replacement commit closes a modal. Its old synchronous loopback resumed a guest MESSAGE transition while
   the host process-global context was installed, an impossible two-browser schedule that correctly caused
   the production boundary fence to terminate the synthetic session.
+
+# 2026-07-24 - B1 drives real transition time and the correct Bargain V2 result lane
+
+- Exact-SHA gate `30079891780` proves static, fast V2 contracts, browser bundle, the corrected 2-second P1
+  budget, and Showdown S6 green. B1's three remaining failures were inspected from their exact host/guest
+  logs; T4 remains the inherited Elite Redux ghost/triples roll-test debt owned by the aggregate repair train.
+- BIOME_SHOP was already mechanically correct but its test performed 80 relay-only zero-delay pumps while
+  the real 250ms fade plus 100ms Phaser hand-off had not run. The probe now holds each independent client
+  context across that real visual transition before demanding an actionable V2 input lease.
+- The double-KO log proved the guest chose Charizard and the host accepted the exact addressed choice, then
+  the one-process fixture let the guest modal-close promise resume after leaving the guest context. The
+  probe now keeps the guest browser installed while pumping the host authority and the returning terminal,
+  so the production boundary fence is tested under a schedule two separate browsers can actually produce.
+- The Bargain failure contained one real V2 lane bug: a guest watching a host-owned offer called the
+  authority-only proposal waiter and therefore failed closed immediately instead of awaiting the committed
+  result materialized by the V2 log. Host watchers still consume guest proposals; guest watchers now await
+  the ordinary committed-result FIFO. The test also observes the real phase-manager departure because the
+  production owner terminal deliberately calls `super.end()` and cannot be intercepted by overriding
+  `phase.end` on the fixture instance.

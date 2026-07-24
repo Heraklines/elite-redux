@@ -314,17 +314,21 @@ export class TheBargainPhase extends Phase {
     } catch {
       /* cosmetic */
     }
-    const relay = getCoopInteractionRelay();
-    const outcome =
-      relay == null
-        ? null
-        : await relay.awaitInteractionOutcomeProposal(
-            COOP_BARGAIN_SEQ_BASE + this.coopBargainStart,
-            "bargain",
-            coopBargainOperationId(this.coopBargainStart),
-            COOP_BIOME_WAIT_MS,
-          );
     const controller = getCoopController();
+    const relay = getCoopInteractionRelay();
+    const seq = COOP_BARGAIN_SEQ_BASE + this.coopBargainStart;
+    const operationId = coopBargainOperationId(this.coopBargainStart);
+    // The host watching a guest-owned Bargain consumes a non-authority proposal and turns it into the
+    // ordered V2 result. The guest watching a host-owned Bargain must instead wait for that already-committed
+    // result: Authority V2 materializes it into the ordinary outcome FIFO only after the complete state has
+    // applied. Sending the replica through awaitInteractionOutcomeProposal() fails closed immediately (it is
+    // correctly not the local authority), which used to dismiss the watcher before the host's commit arrived.
+    const outcome =
+      relay == null || controller == null
+        ? null
+        : controller.role === "host"
+          ? await relay.awaitInteractionOutcomeProposal(seq, "bargain", operationId, COOP_BIOME_WAIT_MS)
+          : await relay.awaitInteractionOutcome(seq, COOP_BIOME_WAIT_MS);
     const adoption =
       controller == null
         ? {
