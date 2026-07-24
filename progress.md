@@ -2392,3 +2392,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   proposal. The assertion now runs at the real pre-commit boundary, where both authoritative commands exist.
 - New display-identity fixtures now cross Phaser's generic `GameObject` type through `unknown` explicitly;
   this preserves the runtime identity check while restoring the branch-scoped static contract.
+
+# 2026-07-24 - Exploration relays stop asserting retired symmetric authority
+
+- The isolated biome-market and Giratina durability probes now retire the real initial COMMAND into an
+  ordered `AWAIT_SUCCESSOR` before opening their target interaction. They no longer splice a market or
+  bargain directly after an unrelated turn whose immutable successor permits only wave advancement.
+- The old simultaneous raw-choice probe now exercises Authority V2's actual direction: identified guest
+  proposals enter the authority once, retries cannot poison the next same-sequence waiter, and a new stable
+  operation id remains a distinct human action. The mixed legacy Giratina variant was retired from the
+  all-V2 matrix; its compatibility echo is still faulted to prove it has no correctness ownership.

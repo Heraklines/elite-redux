@@ -54,6 +54,7 @@ import {
   installDuoLogCapture,
   pumpDuoDestinations,
   reachQueuedRewardShop,
+  retireDuoInitialCommandForBoundaryTest,
   type ShopPhaseSeam,
   settleDuoPromise,
   stubBattleInfo,
@@ -281,12 +282,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
-
-    const turn = rig.hostScene.currentBattle.turn;
-    await hostPlayWave(rig);
-    await withClient(rig.guestCtx, async () => {
-      await driveGuestReplayTurn(rig.guestScene, turn);
-    });
+    await retireDuoInitialCommandForBoundaryTest(rig);
     // From the market boundary onward, deliver every frame only while its destination client context is
     // installed. Boot and battle stay automatic so this focused probe pays no unrelated scheduling cost.
     pair.setAutomaticDelivery(false);
@@ -802,48 +798,52 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
-  it("PROBE #808: SIMULTANEOUS same-seq choices from both clients resolve deterministically (no cross-consumption)", async () => {
-    // The matrix's last untested adversarial row: both clients fire an interactionChoice on the
-    // SAME seq at the same instant (a lag burst / double-driver bug shape). Contract: each side
-    // deterministically receives exactly the PEER's message, exactly once - no self-echo, no
-    // duplicate consumption, no corruption of a subsequent await on the same seq.
+  it("PROBE #808: same-seq V2 proposal retries do not cross-consume the next human action", async () => {
+    // Under Authority V2 the guest sends an identified proposal and the host publishes the immutable
+    // result; a symmetric raw choice exchange is retired. Exercise the integrated proposal admission
+    // contract instead: retries of one operation id are duplicates, while the next stable id on the same
+    // relay sequence remains a distinct human action.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
     const SEQ = 4_040_404;
+    const firstOperationId = `${rig.hostRuntime.controller.sessionEpoch}:1:probe:${SEQ}:1`;
+    const secondOperationId = `${rig.hostRuntime.controller.sessionEpoch}:1:probe:${SEQ}:2`;
 
-    // Both send "simultaneously" (loopback delivers synchronously; order host-then-guest).
-    withClientSync(rig.hostCtx, () => {
-      getCoopInteractionRelay()?.sendInteractionChoice(SEQ, "interleave", 1, [11]);
-    });
-    withClientSync(rig.guestCtx, () => {
-      getCoopInteractionRelay()?.sendInteractionChoice(SEQ, "interleave", 2, [22]);
-    });
-
-    // Each side awaits the seq: buffered peer message resolves instantly and deterministically.
-    const hostGot = await withClient(rig.hostCtx, () => getCoopInteractionRelay()!.awaitInteractionChoice(SEQ, 5_000));
-    const guestGot = await withClient(rig.guestCtx, () =>
-      getCoopInteractionRelay()!.awaitInteractionChoice(SEQ, 5_000),
+    const firstWait = withClientSync(rig.hostCtx, () =>
+      getCoopInteractionRelay()!.awaitInteractionChoice(SEQ, 5_000, ["interleave"]),
     );
-    expect(hostGot?.choice, "host received the GUEST's choice (never its own echo)").toBe(2);
-    expect(guestGot?.choice, "guest received the HOST's choice (never its own echo)").toBe(1);
-
-    // Idempotence: the buffered messages were consumed EXACTLY once - a second await on the
-    // same seq parks (no stale duplicate) and resolves only when a fresh message arrives.
-    let second: unknown = "unresolved";
-    const secondWait = withClient(rig.hostCtx, () =>
-      getCoopInteractionRelay()!.awaitInteractionChoice(SEQ, 3_000),
-    ).then(r => {
-      second = r;
-      return r;
-    });
-    expect(second, "no duplicate delivery from the consumed buffer").toBe("unresolved");
     withClientSync(rig.guestCtx, () => {
-      getCoopInteractionRelay()?.sendInteractionChoice(SEQ, "interleave", 3, [33]);
+      getCoopInteractionRelay()?.sendInteractionChoice(SEQ, "interleave", 2, [22], undefined, firstOperationId);
+    });
+    await expect(firstWait).resolves.toMatchObject({
+      operationId: firstOperationId,
+      choice: 2,
+      data: [22],
+    });
+
+    const secondWait = withClientSync(rig.hostCtx, () =>
+      getCoopInteractionRelay()!.awaitInteractionChoice(SEQ, 5_000, ["interleave"]),
+    );
+    let second: unknown = "unresolved";
+    void secondWait.then(r => {
+      second = r;
+    });
+    withClientSync(rig.guestCtx, () => {
+      getCoopInteractionRelay()?.sendInteractionChoice(SEQ, "interleave", 2, [22], undefined, firstOperationId);
+    });
+    await pumpDuoDestinations(rig, 2);
+    expect(second, "the retained retry never entered the next same-sequence waiter").toBe("unresolved");
+    withClientSync(rig.guestCtx, () => {
+      getCoopInteractionRelay()?.sendInteractionChoice(SEQ, "interleave", 3, [33], undefined, secondOperationId);
     });
     const fresh = await secondWait;
-    expect((fresh as { choice?: number })?.choice, "a FRESH message resolves the new await").toBe(3);
+    expect(fresh, "the next immutable proposal resolves the same-sequence waiter exactly once").toMatchObject({
+      operationId: secondOperationId,
+      choice: 3,
+      data: [33],
+    });
     logs.flush();
   }, 240_000);
 
@@ -1011,23 +1011,17 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
-  it.each([
-    { operationEnabled: true, droppedLegacy: true },
-    { operationEnabled: false, droppedLegacy: false },
-  ])("DURABILITY #795: Giratina bargain converges operation=$operationEnabled droppedLegacy=$droppedLegacy", async ({
-    operationEnabled,
-    droppedLegacy,
-  }) => {
+  it("DURABILITY #795: Authority V2 Giratina bargain converges when its legacy echo is dropped", async () => {
     // The Bargain is the 4th owner/watcher surface: at most ONE deal per visit, so the whole
     // relay is a single comprehensive outcome blob (the proven ME-terminal resync) + a uniform
     // terminal. This probe drives the LEAVE path end-to-end across two engines; the deal-commit
     // path reuses applyCoopMeOutcome verbatim (already proven by the duo ME tests).
-    setCoopBargainOperationEnabled(operationEnabled);
+    setCoopBargainOperationEnabled(true);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       {
-        drop: droppedLegacy ? 1 : 0,
+        drop: 1,
         reorder: 0,
         delay: 0,
         faultable: msg => msg.t === "interactionOutcome" && msg.kind === "bargain",
@@ -1036,11 +1030,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     );
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
-    const turn = rig.hostScene.currentBattle.turn;
-    await hostPlayWave(rig);
-    await withClient(rig.guestCtx, async () => {
-      await driveGuestReplayTurn(rig.guestScene, turn);
-    });
+    await retireDuoInitialCommandForBoundaryTest(rig);
     const { TheBargainPhase } = await import("#phases/the-bargain-phase");
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
 
@@ -1092,7 +1082,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       }
     });
     expect(ownerDone, "HARNESS: the owner bargain chain fully completed before exit").toBe(true);
-    expect(pair.faultsInjected(), "the requested legacy bargain fault count was honored").toBe(droppedLegacy ? 1 : 0);
+    expect(pair.faultsInjected(), "the requested legacy bargain echo was dropped").toBe(1);
     expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the bargain interaction").toBe(
       counterBefore + 1,
     );
