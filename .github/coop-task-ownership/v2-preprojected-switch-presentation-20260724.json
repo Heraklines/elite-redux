@@ -6,7 +6,8 @@
   "baseSha": "f92c38fe8d4b4d61f01fa4309187ddf414f06e54",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
-    "src/phases/coop-replay-phases.ts"
+    "src/phases/coop-replay-phases.ts",
+    "test/tests/elite-redux/coop/coop-soak-me.test.ts"
   ],
   "lockedSchemaFiles": []
 }

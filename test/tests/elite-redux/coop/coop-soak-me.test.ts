@@ -21,6 +21,7 @@
 
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Move } from "#moves/move";
@@ -54,6 +55,13 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
     // Mystery campaigns still traverse ordinary entry presentations. Do not let the test-only rendezvous
     // ceiling expire while the renderer is visibly replaying an ability-heavy wave opening.
     setCoopWaveBarrierMs(2_000);
+    // Vitest's global 50 ms rendezvous shortcut is suitable for cooperatively pumped unit fixtures, but
+    // this production-fidelity soak drains the guest's real retained entry presentation while the host is
+    // already waiting at the next command point. Twenty-two ability/message/stat phases legitimately took
+    // more than the resulting 7 x 50 ms retry budget on a hosted runner and manufactured a shared terminal
+    // just before the guest arrived. Keep the wait bounded and fast, while allowing the public presentation
+    // chain to finish exactly as it does in two independent browsers.
+    setCoopRendezvousWaitMs(2_000);
     setCoopFaintSwitchWaitMs(4000);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`soak-me-${Date.now()}`);
@@ -71,6 +79,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
 
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
+    resetCoopRendezvousWaitMs();
     setCoopFaintSwitchWaitMs(60_000);
     accuracySpy?.mockRestore();
     accuracySpy = undefined;
