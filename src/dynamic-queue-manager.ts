@@ -26,6 +26,14 @@ const nonDynamicPokemonPhases: readonly PhaseString[] = [
   "ExpPhase",
   "ShowPartyExpBarPhase",
   "HidePartyExpBarPhase",
+  // Authority V2 replay phases are an immutable presentation log. Their host-authored event order must
+  // never be re-sorted by local Pokemon speed (two adjacent HP/stat/status/faint events can legitimately
+  // target different battlers). Ordinary mechanics use the dynamic queues above; replicas play these four
+  // presentation-only phases in the exact order recorded by the authority.
+  "CoopHpDrainReplayPhase",
+  "CoopStatStageReplayPhase",
+  "CoopStatusReplayPhase",
+  "CoopFaintReplayPhase",
 ] as const;
 
 /**

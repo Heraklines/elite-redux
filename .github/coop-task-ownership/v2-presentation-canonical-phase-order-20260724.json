@@ -1,0 +1,13 @@
+{
+  "taskId": "v2-presentation-canonical-phase-order-20260724",
+  "version": 2,
+  "branch": "ci/coop/v2-presentation-canonical-phase-order-20260724",
+  "trainRef": "ci/coop/v2-presentation-canonical-phase-order-20260724",
+  "baseSha": "2d7be6dea825c9ad060b7dbd70d5996dd824575e",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-presentation-canonical-phase-order-20260724.json",
+    "src/dynamic-queue-manager.ts",
+    "test/browser/coop-public-ui/presentation-phase-order-contract.test.mjs"
+  ],
+  "lockedSchemaFiles": []
+}
