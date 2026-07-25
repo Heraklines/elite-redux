@@ -1931,6 +1931,23 @@ const manuallyStartedDuoPhases = new WeakSet<Phase>();
  */
 const adoptedCommandReentryPermits = new WeakSet<Phase>();
 
+/**
+ * A reciprocal peer pump can start the exact command object before its owning client driver receives it.
+ * If that start's Promise resumes while the peer realm is ambient, the one-process fixture leaves the phase
+ * current at MESSAGE. Real browsers resume in their own realm. Permit one explicit re-entry only for that
+ * already-started, exact-current command object when the public driver is about to consume it.
+ */
+function permitDuoCommandTargetReentry(scene: BattleScene, phase: Phase): void {
+  if (
+    scene.phaseManager.getCurrentPhase() === phase
+    && manuallyStartedDuoPhases.has(phase)
+    && scene.ui.getMode() !== UiMode.COMMAND
+    && scene.ui.getMode() !== UiMode.FIGHT
+  ) {
+    adoptedCommandReentryPermits.add(phase);
+  }
+}
+
 function startDuoCommandPhaseIfNeeded(scene: BattleScene, phase: Phase): void {
   const alreadyStarted = manuallyStartedDuoPhases.has(phase);
   const uiActionable = scene.ui.getMode() === UiMode.COMMAND || scene.ui.getMode() === UiMode.FIGHT;
@@ -2412,6 +2429,7 @@ export async function driveDuoGuestTackleThroughPublicUi(
       }),
     );
     await withClient(rig.guestCtx, async () => {
+      permitDuoCommandTargetReentry(rig.guestScene, guestOwnCommand);
       startDuoCommandPhaseIfNeeded(rig.guestScene, guestOwnCommand);
       await drainLoopback();
     });

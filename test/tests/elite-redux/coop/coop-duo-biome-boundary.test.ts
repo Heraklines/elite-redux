@@ -210,13 +210,12 @@ describe.skipIf(!RUN)("co-op DUO wave-boundary barrier (#858): shop -> crossroad
   }, 120_000);
 
   // ===========================================================================================
-  // B. A REAL ErCrossroadsPhase ARRIVES + AWAITS at xroads:<wave> - proving the crossroads wiring
-  // (er-crossroads-phase.ts coopAwaitBoundaryBarrier) is live. The owner drives it so there is no
-  // 20-minute watcher relay await; the barrier fires BEFORE the owner/watcher split, so it is what we
-  // assert. The lone owner's barrier resolves via the fast anti-hang timeout (setCoopRendezvousWaitMs).
+  // B. A REAL Authority V2 ErCrossroadsPhase obtains an exact operation address without entering the
+  // legacy xroads:<wave> barrier. The ordered reward terminal -> Crossroads control entry is now the one
+  // correctness barrier; requiring a replica Crossroads arrival before publishing that entry is cyclic.
   // ===========================================================================================
-  it("a real ErCrossroadsPhase arrives + awaits at xroads:<wave> before pinning the interaction", async () => {
-    setCoopRendezvousWaitMs(50); // fast anti-hang fallback (this test drives one side only)
+  it("a real V2 ErCrossroadsPhase pins exact control without entering the legacy xroads barrier", async () => {
+    setCoopRendezvousWaitMs(50);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
 
@@ -231,13 +230,12 @@ describe.skipIf(!RUN)("co-op DUO wave-boundary barrier (#858): shop -> crossroad
     const awaitSpy = vi.spyOn(ownerCtx.runtime.rendezvous, "awaitPartner");
 
     const restoreUi = stubUi(ownerCtx.scene);
+    let phase!: ReturnType<typeof liveCrossroads>;
     try {
       await withClient(ownerCtx, async () => {
-        liveCrossroads().start();
-        // Drain enough for the lone-owner barrier to time out (setCoopRendezvousWaitMs(50)) and the phase to
-        // FULLY settle under the UI stub before restoreUi() - do NOT break early on the arrive, or restoreUi
-        // would fire while coopStart is still parked and its deferred real setMode(OPTION_SELECT) would leak
-        // an open menu into the next test's TitlePhase.
+        phase = liveCrossroads();
+        phase.start();
+        // Drain enough for the ordered control entry and its UI continuation to settle under the stub.
         for (let i = 0; i < 120; i++) {
           await drainLoopback();
         }
@@ -248,8 +246,12 @@ describe.skipIf(!RUN)("co-op DUO wave-boundary barrier (#858): shop -> crossroad
 
     const arrived = arriveSpy.mock.calls.map(c => String(c[0]));
     const awaited = awaitSpy.mock.calls.map(c => String(c[0]));
-    expect(arrived, "the real crossroads ARRIVED at xroads:10").toContain("xroads:10");
-    expect(awaited, "the real crossroads AWAITED the partner at xroads:10 before pinning").toContain("xroads:10");
+    expect(
+      phase.coopV2ControlOperationId,
+      "the real crossroads retained one exact V2 operation address",
+    ).not.toBeNull();
+    expect(arrived, "full V2 never enters the obsolete xroads arrival barrier").not.toContain("xroads:10");
+    expect(awaited, "full V2 never waits on the cyclic legacy xroads barrier").not.toContain("xroads:10");
     logs.flush();
   }, 200_000);
 

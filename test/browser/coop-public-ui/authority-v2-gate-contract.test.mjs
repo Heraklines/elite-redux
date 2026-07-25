@@ -298,6 +298,11 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     /const messageReady = this\.coopOwningScene\.ui\.setMode\(UiMode\.MESSAGE\);\s*this\.coopResumeAfterOwningUiTransition\(messageReady, finish\)/u,
     "an asynchronous picked-item close ends only its construction-time browser phase tree",
   );
+  assert.match(
+    selectModifierPhase,
+    /const finish = \(\): void => \{[\s\S]*?this\.coopCommitPendingAuthorityResult\(operationId\)[\s\S]*?this\.coopEndOwningPhaseIfCurrent\("free reward terminal"\)/u,
+    "a retained reward terminal cannot let its late parent callback shift an already-current sub-picker",
+  );
   const uiResumeStart = selectModifierPhase.indexOf("private coopResumeAfterOwningUiTransition(");
   const uiResumeEnd = selectModifierPhase.indexOf("\n  /**", uiResumeStart + 1);
   assert.ok(uiResumeStart >= 0 && uiResumeEnd > uiResumeStart, "the phase-owned UI completion helper is bounded");
@@ -306,6 +311,12 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     /Promise\.resolve\(transition\)\.then\(\(\) => this\.coopResumeOnOwningRuntime\(callback\)\)/u,
     "a resolved UI promise cannot mutate whichever browser happens to be ambient",
   );
+  const phaseEndStart = selectModifierPhase.indexOf("private coopEndOwningPhaseIfCurrent(");
+  const phaseEndEnd = selectModifierPhase.indexOf("\n  /**", phaseEndStart + 1);
+  assert.ok(phaseEndStart >= 0 && phaseEndEnd > phaseEndStart, "the phase-owned terminal helper is bounded");
+  const phaseEnd = selectModifierPhase.slice(phaseEndStart, phaseEndEnd);
+  assert.match(phaseEnd, /getCurrentPhase\(\)[\s\S]*?current !== this[\s\S]*?return false/u);
+  assert.match(phaseEnd, /super\.end\(\);\s*return true/u);
   assert.match(
     selectModifierPhase,
     /pushNew\("NewBattlePhase", \{[\s\S]*?afterOperationId: wait\.afterOperationId,[\s\S]*?epoch: wait\.epoch,[\s\S]*?wave: wait\.wave,[\s\S]*?turn: wait\.turn/u,
@@ -345,6 +356,19 @@ test("post-battle continuation identity follows the active V2 wave into complete
     /\.\.\.runtime\.v2CompletedWaveTransactions\.values\(\)/u,
     "historical completed waves never become competing continuation candidates",
   );
+});
+
+test("ability result materialization credits the destination runtime even when another client is ambient", () => {
+  const start = coopRuntime.indexOf("function materializeCoopAbilityOutcomeFromOp(");
+  const end = coopRuntime.indexOf("\n/**", start + 1);
+  assert.ok(start >= 0 && end > start, "the ability materializer has a bounded source block");
+  const materializer = coopRuntime.slice(start, end);
+  assert.match(
+    materializer,
+    /const abilityBinding = \{\s*opState: runtime\.opState,\s*durability: runtime\.durability \?\? null,\s*\}/u,
+  );
+  assert.match(materializer, /isCoopAbilityOperationSettled\(operation\.id, abilityBinding\)/u);
+  assert.match(materializer, /armCoopAbilityJournalMaterialization\(operation\.id, abilityBinding\)/u);
 });
 
 test("correlated recovery is wired through all four production progression fences", () => {

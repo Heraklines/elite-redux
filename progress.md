@@ -3839,3 +3839,29 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The public source contract pins both sides of the safety boundary: the bypass consults the phase's exact
   construction-time runtime, and only a runtime registered in the complete control-cutover map can bypass the
   legacy barrier. Behavioral proof remains remote-only under `AGENTS.md`.
+
+## 2026-07-25 - Exact phase ownership and interceptor-start parity
+
+- Exact-SHA aggregate gate `30144988831` at `e346261186` separated four independent mechanisms instead of
+  treating every red as a production desync. B1 exposed a real late-parent teardown bug: a free-reward
+  `SelectModifierPhase` committed an Ability Capsule child, then its delayed MESSAGE callback shifted that
+  already-current child out of the queue. Terminal teardown now requires exact current-phase identity, so an
+  obsolete parent cannot orphan an authoritative sub-picker.
+- Ability-result delivery also had a real two-engine destination-binding defect. The raw carrier woke the
+  guest picker while settlement lookup and materialization credit consulted the ambient host operation state.
+  Both checks are now explicitly bound to the receiving runtime and its durability journal.
+- C1/C3/C5/P1 and the related B11 evidence proved the production Crossroads projector installed the exact
+  signed `ErCrossroadsPhase`. The engine-test `PhaseInterceptor` deliberately suppresses
+  `PhaseManager.startCurrentPhase()`, but the soak driver treated the projected operation ID as start proof and
+  left the guest at MESSAGE. The driver now starts that exact returned object when its public OPTION_SELECT UI
+  is not open; it still requires both public handlers and never injects a private choice.
+- B8/B11 expectations are migrated from the obsolete `xroads:<wave>` rendezvous to shared, exact V2 operation
+  identity and explicitly prove that complete V2 cutover does not enter the circular legacy barrier. The B9
+  correlated-recovery test now drives the fresh recovered replay object instead of its destroyed predecessor.
+  The one-process duo command driver grants a one-use re-entry only to an already-started, exact-current command
+  object stranded outside COMMAND/FIGHT by a peer-realm Promise continuation; real newly-created commands
+  remain start-once.
+- The Stormglass assertion now reads the guest's journal under the guest runtime rather than the ambient host.
+  Local verification is static-only per `AGENTS.md`: TypeScript is green, targeted Biome is clean,
+  `node --check` passes for the browser contract, and `git diff --check` passes. All behavioral proof remains
+  on GitHub-hosted runners.

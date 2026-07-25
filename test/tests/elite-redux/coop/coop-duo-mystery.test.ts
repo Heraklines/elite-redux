@@ -1624,8 +1624,8 @@ describe.skipIf(!RUN)(
       });
       const hostSeed = hostScene.seed;
 
-      withClientSync(rig.guestCtx, () => startGuestMeOutcomeRace(replay));
-      const guestReplay = await settleDuoGuestMeReplay(rig, replay);
+      withClientSync(rig.guestCtx, () => startGuestMeOutcomeRace(recoveredReplay));
+      const guestReplay = await settleDuoGuestMeReplay(rig, recoveredReplay);
 
       // CONVERGENCE + LOCKSTEP: the guest settled once, applied the host's meResync once, its seed converged,
       // and BOTH counters advanced exactly once - the ME proceeded to completion despite the mid-divert heal.

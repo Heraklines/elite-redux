@@ -9585,7 +9585,11 @@ function materializeCoopAbilityOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
   ) {
     return false;
   }
-  if (isCoopAbilityOperationSettled(operation.id)) {
+  const abilityBinding = {
+    opState: runtime.opState,
+    durability: runtime.durability ?? null,
+  };
+  if (isCoopAbilityOperationSettled(operation.id, abilityBinding)) {
     return true;
   }
   if (operation.owner === runtime.controller.localSeatId) {
@@ -9597,7 +9601,10 @@ function materializeCoopAbilityOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
   if (!Number.isSafeInteger(pinned) || pinned < 0) {
     return false;
   }
-  armCoopAbilityJournalMaterialization(operation.id);
+  // Receiver callbacks can run while the other duo fixture is ambient. Bind both the settlement lookup and
+  // materialization credit to the destination runtime; otherwise the raw carrier wakes the guest phase while
+  // the credit lands in the host's op-state and the exact guest adoption is rejected as an apparent duplicate.
+  armCoopAbilityJournalMaterialization(operation.id, abilityBinding);
   runtime.interactionRelay.materializeCommittedInteractionChoice(
     coopAbilityPickerSeq(pinned),
     COOP_ABILITY_KIND,

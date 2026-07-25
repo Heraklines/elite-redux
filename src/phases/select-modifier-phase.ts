@@ -1236,7 +1236,12 @@ export class SelectModifierPhase extends BattlePhase {
         if (!this.coopCommitPendingAuthorityResult(operationId)) {
           return;
         }
-        super.end();
+        // addModifier() can synchronously hand control to an authoritative sub-picker (for example the
+        // Ability Capsule) while the reward phase's MESSAGE transition is still settling. Phase.end() is
+        // process-global: calling it from this now-obsolete parent would shift the *current child* out of
+        // the queue and orphan the exact V2 result it is waiting to consume. End only when this object still
+        // owns the scheduler; otherwise the already-current child is the intended continuation.
+        this.coopEndOwningPhaseIfCurrent("free reward terminal");
         // Co-op (#633): picking a free reward that does NOT queue a move-learn
         // continuation ends the whole interaction -> advance the alternation turn
         // (host-authoritative; a no-op off the host / outside co-op).
@@ -2309,6 +2314,20 @@ export class SelectModifierPhase extends BattlePhase {
   /** Complete one phase-owned UI transition only after its construction-time runtime is ambient again. */
   private coopResumeAfterOwningUiTransition(transition: PromiseLike<unknown>, callback: () => void): void {
     void Promise.resolve(transition).then(() => this.coopResumeOnOwningRuntime(callback));
+  }
+
+  /** Never let a late parent callback shift an authoritative child that already owns this scene. */
+  private coopEndOwningPhaseIfCurrent(context: string): boolean {
+    const current = this.coopOwningScene.phaseManager.getCurrentPhase();
+    if (current !== this) {
+      coopLog(
+        "reward",
+        `phase-owned end skipped (${context}): current=${current?.phaseName ?? "none"} parent=${this.phaseName}`,
+      );
+      return false;
+    }
+    super.end();
+    return true;
   }
 
   /** Awaitable form for post-network continuations that return a loop disposition under the owning runtime. */

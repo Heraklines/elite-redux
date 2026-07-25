@@ -653,12 +653,21 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         spy.mock.calls.flatMap(call => (call[0].t === "rendezvous" ? [call[0].point] : []));
       expect(phases.host.requireCoopSourceWave()).toBe(sourceWave);
       expect(phases.guest.requireCoopSourceWave()).toBe(sourceWave);
-      expect(rendezvousPoints(hostSend), "host retains the completed-wave Crossroads address").toContain(
+      expect(
+        phases.host.coopV2ControlOperationId,
+        "host retains one exact completed-wave Crossroads operation",
+      ).not.toBeNull();
+      expect(
+        phases.guest.coopV2ControlOperationId,
+        "speculative guest binds that same ordered Crossroads operation",
+      ).toBe(phases.host.coopV2ControlOperationId);
+      expect(rendezvousPoints(hostSend), "full V2 host does not enter the obsolete xroads barrier").not.toContain(
         `xroads:${sourceWave}`,
       );
-      expect(rendezvousPoints(guestSend), "speculative guest still retains the completed-wave address").toContain(
-        `xroads:${sourceWave}`,
-      );
+      expect(
+        rendezvousPoints(guestSend),
+        "full V2 speculative guest does not enter the obsolete xroads barrier",
+      ).not.toContain(`xroads:${sourceWave}`);
       expect(rendezvousPoints(guestSend), "guest never invents a next-wave Crossroads address").not.toContain(
         `xroads:${sourceWave + 1}`,
       );

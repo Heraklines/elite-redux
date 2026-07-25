@@ -3110,8 +3110,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
     hostOpen = withClientSync(rig.hostCtx, () => rig.hostScene.ui.getMode() === UiMode.OPTION_SELECT);
     let guestOpen = withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode() === UiMode.OPTION_SELECT);
-    if (!guestOpen && guestPhase.coopV2ControlOperationId == null) {
+    if (!guestOpen) {
       await withClient(rig.guestCtx, async () => {
+        // replaceWithCoopAuthoritativePhase starts this exact signed phase in production. PhaseInterceptor
+        // suppresses PhaseManager.startCurrentPhase in engine tests, so an operation id proves which object
+        // to start; it is not evidence that start() already ran. Refusing a projected phase here left the
+        // guest permanently at MESSAGE while the authority's real picker was actionable.
         guestPhase.start();
         await drainLoopback();
       });

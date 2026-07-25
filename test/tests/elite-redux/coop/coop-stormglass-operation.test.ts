@@ -82,6 +82,7 @@ describe("co-op Stormglass operation migration", () => {
     // operation ACKable; this mirrors ErStormglassPickerPhase rather than pre-settling a still-live wait.
     expect(settleCoopStormglassOperation(decisionOperationId!, guestBinding)).toBe(true);
     expect(settleCoopV2InteractionOperation(decisionOperationId!, guestRuntime)).toBe(true);
+    setCoopRuntime(guestRuntime);
     expect(
       getCoopOperationJournalApplied().find(envelope => envelope.pendingOperation?.kind === "STORMGLASS")
         ?.pendingOperation?.payload,
