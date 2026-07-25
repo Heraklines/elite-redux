@@ -690,11 +690,29 @@ describe("authority-v2 shadow harness", () => {
       liveReplica,
     });
 
+    const gapTurnTap = (turn: number) => ({
+      operationId: `TURN/gap-buffer/${turn}`,
+      capture: {
+        wave: 5,
+        turn,
+        turnResolution: { events: [turn] },
+        checkpoint: { hp: 100 - turn },
+      },
+      nextCommandFrontier: {
+        epoch: SESSION.epoch,
+        wave: 5,
+        resolvedTurn: turn,
+        commands: [{ ownerSeatId: 0, pokemonId: 42, fieldIndex: 0 }],
+      },
+      legacyDigest: `legacy-turn-${turn}`,
+    });
+
     // Revision 1 journals but waits for its real engine boundary. Revisions 2 and 3 are valid authenticated
-    // successors, so the replica must retain their delivery instead of depending on a later lease resend.
-    expect(host.tapTurnCommit(turnTap("TURN/gap-buffer/1"))).not.toBeNull();
-    expect(host.tapTurnCommit(turnTap("TURN/gap-buffer/2"))).not.toBeNull();
-    expect(host.tapTurnCommit(turnTap("TURN/gap-buffer/3"))).not.toBeNull();
+    // turn successors at N+1 and N+2, so the replica must retain their delivery instead of depending on a
+    // later lease resend. The authority-log predecessor graph remains active in this regression fixture.
+    expect(host.tapTurnCommit(gapTurnTap(1))).not.toBeNull();
+    expect(host.tapTurnCommit(gapTurnTap(2))).not.toBeNull();
+    expect(host.tapTurnCommit(gapTurnTap(3))).not.toBeNull();
     expect(guest.diagnostics()).toMatchObject({
       receivedThrough: 1,
       controlInstalledThrough: 0,

@@ -3714,3 +3714,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Focused planner run `30142625726` stopped before test selection because the manifest omitted the directly
   changed double-faint regression file. The integration diff itself was valid; the next metadata-only push
   adds that exact path and advances the declared CAS base to `74358a22a`.
+
+# 2026-07-25 - Gap-buffer contracts preserve the real successor graph
+
+- Aggregate fast-contract job `89638704954` proved all 521 pre-existing node-pure contracts except one stale
+  replacement fixture, and rejected the first gap-buffer fixture before it could exercise the replica. The
+  fixture had authored three same-address `TURN_COMMIT`s; Authority V2 correctly refused revision two because
+  revision one's `COMMAND_FRONTIER` authorizes the next turn, not another copy of the resolved turn.
+- The failure-first gap regression now authors turns N, N+1, and N+2 with exact command-frontier succession.
+  Revision one remains material-deferred on the replica while the authority validly commits revisions two and
+  three, preserving the intended proof that authenticated future delivery is buffered and drained in order.
+- The older replacement supersession test omitted the source wave/turn from its turn capture after exact
+  successor validation became mandatory. Its fixture now carries wave 8 / turn 4, matching the replacement
+  address it asserts; production code remains unchanged by this false-signal repair.
+- Local verification remains static-only per `AGENTS.md`: targeted Biome and `git diff --check` pass. The
+  corrected node contracts will run only on GitHub-hosted runners.

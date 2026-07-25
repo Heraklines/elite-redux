@@ -327,7 +327,12 @@ describe("authority-v2 replacement staged transaction", () => {
     });
     const pick = proposal({ ownerSeatId: 1 });
     const activeControl = replacementControl(pick);
-    const capture = { turnResolution: { events: ["guest-faint"] }, checkpoint: { hp: [100, 0] } };
+    const capture = {
+      wave: 8,
+      turn: 4,
+      turnResolution: { events: ["guest-faint"] },
+      checkpoint: { hp: [100, 0] },
+    };
     expect(
       host.tapTurnCommit({
         operationId: "TURN/e7/w8/t4",
