@@ -388,6 +388,11 @@ test("a legacy enemy manifest cannot overwrite a newer V2 wave image", () => {
     /battle\.enemyParty = rebuilt;[\s\S]*?this\.coopEnemyAuthority =[\s\S]*?enemies\.filter\(entry => !reusableV2Enemies\.has\(entry\.fieldIndex\)\)[\s\S]*?if \(reusableV2Enemies\.size > 0/u,
     "the complete hybrid party is installed and the final legacy corrector excludes every reused V2 object",
   );
+  assert.match(
+    encounterPhase,
+    /enemyPokemon\.fieldSetup\(!this\.coopV2PreservedEnemyFields\.has\(e\)\)/u,
+    "encounter presentation cannot reset summonData on an exact enemy object preserved from newer V2 state",
+  );
 });
 
 test("post-battle continuation identity follows the active V2 wave into completed evidence", () => {
@@ -594,6 +599,15 @@ test("the real command proof edge eagerly completes V2 and the duo fixture creat
   assert.match(startHelper, /if \(alreadyStarted && !permittedBootstrapReentry\) \{\s*return;/u);
   assert.match(startHelper, /adoptedCommandReentryPermits\.delete\(phase\)/u);
   assert.match(startHelper, /phase\.start\(\)/u);
+});
+
+test("the reciprocal command continuation resumes only in its captured runtime and exact phase", () => {
+  assert.match(commandPhase, /const barrierRuntime = getCoopRuntime\(\);\s*const barrierScene = globalScene;/u);
+  assert.match(
+    commandPhase,
+    /pendingBarrier\.then\(crossed => \{[\s\S]*?barrierScene\.phaseManager\.getCurrentPhase\(\) !== this[\s\S]*?runWhenCoopRuntimeActive\(barrierRuntime, openOwnedSurface\)/u,
+    "a peer arrival cannot resume a host CommandPhase against the guest phase tree or a superseding phase",
+  );
 });
 
 test("interaction DATA cannot wait on a successor phase that ordinary V2 projection must create", () => {

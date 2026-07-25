@@ -45,6 +45,7 @@ import {
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
   recordCoopV2CommandControlStarted,
+  runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import type {
   CoopBattleCommandOffer,
@@ -959,12 +960,31 @@ export class CommandPhase extends FieldPhase {
       this.enterOwnCommandBoundary();
       return;
     }
+    const barrierRuntime = getCoopRuntime();
+    const barrierScene = globalScene;
     void pendingBarrier.then(crossed => {
-      if (crossed) {
+      if (!crossed) {
+        return;
+      }
+      const openOwnedSurface = (): void => {
+        // A late arrival may outlive this exact command object during recovery/terminal replacement. It is
+        // pacing only, never authority to open whichever phase happens to be current by then.
+        if (barrierScene.phaseManager.getCurrentPhase() !== this) {
+          return;
+        }
         // The single continuation funnel re-consumes the latest wave-start authority immediately before
         // public input opens, including after a retained phase-route displacement.
         this.enterOwnCommandBoundary();
+      };
+      if (barrierRuntime == null) {
+        openOwnedSurface();
+        return;
       }
+      // Authority-V2 migration note: the reciprocal barrier Promise is created by one authenticated runtime
+      // but can resolve while another in-process client (or a replacement runtime during rejoin) is ambient.
+      // Re-enter the captured runtime before touching phase/UI state. Production's one-runtime path invokes
+      // synchronously; the two-engine harness queues this until the destination scene is installed.
+      runWhenCoopRuntimeActive(barrierRuntime, openOwnedSurface);
     });
   }
 

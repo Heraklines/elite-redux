@@ -501,6 +501,12 @@ export class EncounterPhase extends BattlePhase {
    */
   private coopEnemyAuthority: CoopSerializedEnemy[] | null = null;
 
+  /**
+   * Enemy slots whose exact objects already carry a newer complete Authority V2 summon image. Encounter
+   * presentation may initialize their render substrate, but must not reset their authoritative summonData.
+   */
+  private readonly coopV2PreservedEnemyFields = new Set<number>();
+
   /** Immutable lifetime of the ordinary authoritative carrier wait. */
   private coopEnemyAdoptionBoundary: {
     readonly generation: number;
@@ -870,6 +876,7 @@ export class EncounterPhase extends BattlePhase {
     // objects only when the applied tick dominates this exact manifest and every identity/slot agrees; any
     // ambiguity falls through to the fail-closed reconstruction path below.
     const reusableV2Enemies = new Map<number, EnemyPokemon>();
+    this.coopV2PreservedEnemyFields.clear();
     if (isCoopV2ControlCutoverActive() && rawState?.tick != null && coopAppliedStateTick() >= rawState.tick) {
       let allExistingObjectsMatch = true;
       for (const [fieldIndex, current] of preDescriptorEnemyParty.entries()) {
@@ -929,6 +936,9 @@ export class EncounterPhase extends BattlePhase {
     // final corrector only for slots this method genuinely reconstructed from the compatibility manifest.
     this.coopEnemyAuthority =
       reusableV2Enemies.size === 0 ? enemies : enemies.filter(entry => !reusableV2Enemies.has(entry.fieldIndex));
+    for (const fieldIndex of reusableV2Enemies.keys()) {
+      this.coopV2PreservedEnemyFields.add(fieldIndex);
+    }
     if (reusableV2Enemies.size > 0 && rawState?.tick != null) {
       coopLog(
         "stream",
@@ -1191,7 +1201,10 @@ export class EncounterPhase extends BattlePhase {
       const enemyPokemon = globalScene.getEnemyParty()[e];
       if (e < battle.arrangement.enemyCapacity) {
         enemyPokemon.setX(-66 + enemyPokemon.getFieldPositionOffset()[0]);
-        enemyPokemon.fieldSetup(true);
+        // A dominating V2 command image already contains the exact post-summon tags/forms/stages for a
+        // reused object. `fieldSetup(true)` rebuilds summonData and erased Aqua Ring after the newer image
+        // was accepted. Reconstructed compatibility objects still take the ordinary full reset.
+        enemyPokemon.fieldSetup(!this.coopV2PreservedEnemyFields.has(e));
       }
 
       if (!this.loaded) {

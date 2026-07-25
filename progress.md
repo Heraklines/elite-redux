@@ -3921,3 +3921,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   COMMAND/FIGHT handler into its identity ledger and never re-enters it; non-actionable parked phases retain the
   existing one-use receiver-realm re-entry rule.
 - The child train is declared against exact base `821020756`. Behavioral validation remains remote-only.
+
+## 2026-07-25 - Exact-SHA `4b197f3f7` retained continuation and summon-state closure
+
+- Aggregate gate `30147455257` left only co-op B9 and B11 red while static, A1, P1/P2, browser-native WebRTC,
+  mutation, and the remaining completed co-op shards were green; T4 remains outside this co-op-only task.
+- B9 proved the guest's own command phase reached its reciprocal barrier, yet the guest phase tree advanced to
+  `TurnStartPhase` before public input. The authority host's barrier Promise was resuming while the other
+  in-process runtime was ambient. Its continuation is now captured to the originating runtime and exact phase;
+  a late peer arrival cannot mutate a superseding or peer phase tree.
+- B11 proved the raw final corrector was no longer touching preserved V2 objects, but ordinary encounter setup
+  still called `fieldSetup(true)` on them. That rebuilt `summonData` and deleted the accepted Aqua Ring tag.
+  Preserved V2 field identities now receive render setup without resetting their authoritative summon state;
+  compatibility-reconstructed enemies retain the full ordinary reset.
+- This child train is declared against exact base `4b197f3f7`. Behavioral validation remains GitHub-hosted.
