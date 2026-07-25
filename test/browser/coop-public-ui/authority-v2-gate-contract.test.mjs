@@ -1605,6 +1605,46 @@ test("a chained biome picker preserves its exact interaction coordinate through 
   );
 });
 
+test("Crossroads and World Map interpret every asynchronous surface completion only in their owning runtime", () => {
+  for (const [name, source, continuation] of [
+    ["Crossroads", crossroadsPhase, "this.continueCoopStart(controller, spoofed);"],
+    ["World Map", selectBiomePhase, "this.continueCoopBiomePickFlow(controller, revealed, origin, spoofed);"],
+  ]) {
+    const awaitBarrier = source.indexOf("const barrier = await this.coopAwaitBoundaryBarrier();");
+    const runtimeResume = source.indexOf("this.resumeInOwningRuntime(() => {", awaitBarrier);
+    const acceptBarrier = source.indexOf("this.acceptCoopBoundaryBarrier(barrier)", runtimeResume);
+    const continueFlow = source.indexOf(continuation, acceptBarrier);
+    assert.ok(
+      awaitBarrier >= 0
+        && runtimeResume > awaitBarrier
+        && acceptBarrier > runtimeResume
+        && continueFlow > acceptBarrier,
+      `${name} binds the complete post-await owner/watcher split to its own runtime`,
+    );
+  }
+
+  for (const [name, source, watcherContinuation, legacyHelper] of [
+    ["Crossroads", crossroadsPhase, "this.continueCoopWatchFlow(", "finishLegacyCrossroadsWatcher"],
+    ["World Map", selectBiomePhase, "this.continueCoopBiomePickWatch(", "finishLegacyBiomeWatcher"],
+  ]) {
+    const settledMode = source.indexOf("const settledMode = mode;");
+    const watcherResume = source.indexOf("this.resumeInOwningRuntime(", settledMode);
+    const watcherContinue = source.indexOf(watcherContinuation, watcherResume);
+    assert.ok(
+      settledMode >= 0 && watcherResume > settledMode && watcherContinue > watcherResume,
+      `${name} binds its post-UI watcher continuation to its own runtime`,
+    );
+
+    const legacyStart = source.indexOf(`private async ${legacyHelper}`);
+    const legacyAwait = source.indexOf("awaitCoopChoiceWithOrphanBackstop(", legacyStart);
+    const legacyResume = source.indexOf("this.resumeInOwningRuntime(() => {", legacyAwait);
+    assert.ok(
+      legacyStart >= 0 && legacyAwait > legacyStart && legacyResume > legacyAwait,
+      `${name} binds legacy relay completion to its own runtime`,
+    );
+  }
+});
+
 test("overlapping duo scopes cannot overwrite a newer browser-local biome permit snapshot", () => {
   assert.match(
     duoHarness,

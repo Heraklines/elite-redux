@@ -30,7 +30,7 @@ import {
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { awaitCoopChoiceWithOrphanBackstop } from "#data/elite-redux/coop/coop-interaction-relay";
 import type { CoopBiomePickPayload } from "#data/elite-redux/coop/coop-operation-envelope";
-import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { type CoopRendezvousResult, getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   advanceCoopInteractionForContinuation,
   coopSessionGeneration,
@@ -551,9 +551,27 @@ export class SelectBiomePhase extends BattlePhase {
     // that finished the shop and raced ahead could otherwise drift the lagging client's counter (the
     // coop-session pendingRemote fold) past this interaction, mismatching the relay seq and forcing a
     // one-sided deterministic fallback. Skipped when chained (already barriered) or spoofed (no real peer).
-    if (!this.coopChained && !spoofed && !(await this.coopAwaitBoundaryBarrier())) {
+    if (!this.coopChained && !spoofed) {
+      const barrier = await this.coopAwaitBoundaryBarrier();
+      // The two-engine harness can make the peer scene ambient while this promise settles. Re-enter the
+      // phase's bound runtime before reading the counter or constructing either public map surface.
+      this.resumeInOwningRuntime(() => {
+        if (this.acceptCoopBoundaryBarrier(barrier)) {
+          this.continueCoopBiomePickFlow(controller, revealed, origin, spoofed);
+        }
+      });
       return;
     }
+    this.continueCoopBiomePickFlow(controller, revealed, origin, spoofed);
+  }
+
+  /** Continue only while this phase's owning runtime and scene are installed together. */
+  private continueCoopBiomePickFlow(
+    controller: CoopSessionController,
+    revealed: ErRouteNode[],
+    origin: BiomeId,
+    spoofed: boolean,
+  ): void {
     if (this.coopAdvancePinned < 0) {
       // Natural biome-end multi-node pick: pin its own counter AFTER the boundary barrier, in lockstep.
       this.coopAdvancePinned = controller.interactionCounter();
@@ -625,52 +643,56 @@ export class SelectBiomePhase extends BattlePhase {
    * WAVE only (never the drifting counter), so both compute it identically. Lost arrivals retransmit;
    * teardown/error aborts remain closed rather than pinning a counter independently.
    */
-  private async coopAwaitBoundaryBarrier(): Promise<boolean> {
+  private async coopAwaitBoundaryBarrier(): Promise<CoopRendezvousResult | null> {
     const generation = coopSessionGeneration();
     const wave = this.requireCoopSourceWave();
     if (!this.boundaryStillLive(generation, wave)) {
-      return false;
+      return null;
     }
+    const point = `biomepick:${wave}`;
     try {
       const rendezvous = getCoopRendezvous();
       if (rendezvous == null || wave < 0) {
-        return true;
+        return { point, timedOut: false };
       }
-      const point = `biomepick:${wave}`;
       coopLog("rendezvous", `biome-pick boundary barrier RENDEZVOUS ${point} (#858)`);
-      const result = await rendezvous.rendezvous(point, getCoopRendezvousWaitMs());
-      if (!this.boundaryStillLive(generation, wave)) {
-        return false;
-      }
-      if (result.timedOut) {
-        coopWarn(
-          "rendezvous",
-          `biome-pick boundary barrier ${point} ABORTED during teardown/recovery - remaining closed (#858)`,
-        );
-        return false;
-      }
-      if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
-        coopWarn(
-          "rendezvous",
-          `biome-pick boundary ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing stale phase`,
-        );
-        this.end();
-        return false;
-      }
-      if (result.crossPoint !== undefined) {
-        coopLog(
-          "rendezvous",
-          `biome-pick boundary ${point} host-authoritative route ACKED (partner had ${result.crossPoint}); proceeding (#858)`,
-        );
-      }
-      return true;
+      return await rendezvous.rendezvous(point, getCoopRendezvousWaitMs());
     } catch (e) {
-      if (!this.boundaryStillLive(generation, wave)) {
-        return false;
-      }
       coopWarn("rendezvous", "biome-pick boundary barrier threw - FAIL CLOSED (#858)", e);
+      return null;
+    }
+  }
+
+  /** Interpret a settled barrier only under the phase's bound runtime. */
+  private acceptCoopBoundaryBarrier(result: CoopRendezvousResult | null): boolean {
+    const generation = coopSessionGeneration();
+    const wave = this.requireCoopSourceWave();
+    const point = `biomepick:${wave}`;
+    if (!this.boundaryStillLive(generation, wave) || result == null) {
       return false;
     }
+    if (result.timedOut) {
+      coopWarn(
+        "rendezvous",
+        `biome-pick boundary barrier ${point} ABORTED during teardown/recovery - remaining closed (#858)`,
+      );
+      return false;
+    }
+    if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
+      coopWarn(
+        "rendezvous",
+        `biome-pick boundary ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing stale phase`,
+      );
+      this.end();
+      return false;
+    }
+    if (result.crossPoint !== undefined) {
+      coopLog(
+        "rendezvous",
+        `biome-pick boundary ${point} host-authoritative route ACKED (partner had ${result.crossPoint}); proceeding (#858)`,
+      );
+    }
+    return true;
   }
 
   /** OWNER: drive the real ER_MAP picker + stream its cursor; relay the chosen biome, then apply. */
@@ -691,20 +713,22 @@ export class SelectBiomePhase extends BattlePhase {
         },
       })
       .then(result => {
-        if (!this.boundaryStillLive(generation, wave)) {
-          return;
-        }
-        if (result === "superseded") {
-          this.parkBiomeCommitRecovery(() => this.coopBiomePickOwner(revealed, origin, pinned));
-          return;
-        }
-        // Relay the owner's live cursor only after the bounded map transition is genuinely active.
-        this.clearBiomeCommitRecovery();
-        getCoopUiMirror()?.beginSession("owner", UiMode.ER_MAP, mirrorSeq);
-        // A retained biome boundary is continuation-safe only once this exact phase owns a live, actionable
-        // ER_MAP handler. Phase construction and the completed rendezvous are not public surfaces. The runtime
-        // revalidates phase, mode, handler activity and source wave before releasing retained authority.
-        this.publishCoopBiomeSurfaceWhenActionable(generation, wave);
+        this.resumeInOwningRuntime(() => {
+          if (!this.boundaryStillLive(generation, wave)) {
+            return;
+          }
+          if (result === "superseded") {
+            this.parkBiomeCommitRecovery(() => this.coopBiomePickOwner(revealed, origin, pinned));
+            return;
+          }
+          // Relay the owner's live cursor only after the bounded map transition is genuinely active.
+          this.clearBiomeCommitRecovery();
+          getCoopUiMirror()?.beginSession("owner", UiMode.ER_MAP, mirrorSeq);
+          // A retained biome boundary is continuation-safe only once this exact phase owns a live, actionable
+          // ER_MAP handler. Phase construction and the completed rendezvous are not public surfaces. The runtime
+          // revalidates phase, mode, handler activity and source wave before releasing retained authority.
+          this.publishCoopBiomeSurfaceWhenActionable(generation, wave);
+        });
       });
   }
 
@@ -722,8 +746,9 @@ export class SelectBiomePhase extends BattlePhase {
     const mirrorSeq = COOP_BIOME_PICK_SEQ_BASE + pinned;
     const generation = coopSessionGeneration();
     const boundaryWave = this.requireCoopSourceWave();
+    let mode: "completed" | "forced" | "superseded" | null = null;
     try {
-      const mode = await globalScene.ui.setModeBoundedWhen(
+      mode = await globalScene.ui.setModeBoundedWhen(
         UiMode.ER_MAP,
         2_000,
         () => this.boundaryStillLive(generation, boundaryWave),
@@ -737,25 +762,43 @@ export class SelectBiomePhase extends BattlePhase {
           },
         },
       );
-      if (!this.boundaryStillLive(generation, boundaryWave)) {
-        return;
-      }
-      if (mode === "superseded") {
-        this.parkBiomeCommitRecovery(() => {
-          this.coopBiomePickWatch(revealed, origin, pinned).catch(error =>
-            coopWarn("reward", "biome pick WATCHER UI retry threw - remaining closed", error),
-          );
-        });
-        return;
-      }
+    } catch {
+      coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
+    }
+    const settledMode = mode;
+    this.resumeInOwningRuntime(() =>
+      this.continueCoopBiomePickWatch(revealed, origin, pinned, mirrorSeq, generation, boundaryWave, settledMode),
+    );
+  }
+
+  /** Continue the watcher only under its own runtime after the bounded map promise settles. */
+  private continueCoopBiomePickWatch(
+    revealed: ErRouteNode[],
+    origin: BiomeId,
+    pinned: number,
+    mirrorSeq: number,
+    generation: number,
+    boundaryWave: number,
+    mode: "completed" | "forced" | "superseded" | null,
+  ): void {
+    if (!this.boundaryStillLive(generation, boundaryWave)) {
+      return;
+    }
+    if (mode === "superseded") {
+      this.parkBiomeCommitRecovery(() => {
+        this.coopBiomePickWatch(revealed, origin, pinned).catch(error =>
+          coopWarn("reward", "biome pick WATCHER UI retry threw - remaining closed", error),
+        );
+      });
+      return;
+    }
+    if (mode != null) {
       this.clearBiomeCommitRecovery();
       getCoopUiMirror()?.beginSession("watcher", UiMode.ER_MAP, mirrorSeq);
       // The watcher exposes the same real map handler, but its onSelect is deliberately inert and authority
       // remains the awaited owner relay below. Publishing here proves the renderer has an executable public
       // continuation without granting it any mechanical decision authority.
       this.publishCoopBiomeSurfaceWhenActionable(generation, boundaryWave);
-    } catch {
-      coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
     }
     const role = this.requireCoopBiomeOperationRole();
     const binding = this.requireCoopBiomeOperationBinding();
@@ -764,9 +807,25 @@ export class SelectBiomePhase extends BattlePhase {
     // first makes correctness depend on a second, unordered carrier and can strand a fast owner result in
     // the relay's pre-waiter buffer. The legacy relay remains below solely for negotiated rollback.
     if (coopBiomeCommitRequired(role, binding)) {
-      await this.finishCommittedBiomeWatcher(revealed, operationId, pinned);
+      this.finishCommittedBiomeWatcher(revealed, operationId, pinned).catch(error =>
+        coopWarn("reward", "biome pick WATCHER exact receipt threw - remaining closed", error),
+      );
       return;
     }
+    this.finishLegacyBiomeWatcher(revealed, operationId, pinned, role, generation, boundaryWave).catch(error =>
+      coopWarn("reward", "biome pick WATCHER legacy relay threw - remaining closed", error),
+    );
+  }
+
+  /** Legacy rollback only: bind the post-relay apply to the same runtime as the public watcher. */
+  private async finishLegacyBiomeWatcher(
+    revealed: ErRouteNode[],
+    operationId: string,
+    pinned: number,
+    role: "host" | "guest",
+    generation: number,
+    boundaryWave: number,
+  ): Promise<void> {
     const relay = getCoopInteractionRelay();
     // #863: bound the wait with the one-sided ORPHAN backstop. If the OWNER commits its pick + advances
     // PAST this interaction but its relay never reaches us (the live wave-10 "partner chose map, I'm stuck
@@ -782,23 +841,25 @@ export class SelectBiomePhase extends BattlePhase {
             pinned,
             COOP_BIOME_PICK_CHOICE_KINDS,
           );
-    if (!this.boundaryStillLive(generation, boundaryWave)) {
+    this.resumeInOwningRuntime(() => {
+      if (!this.boundaryStillLive(generation, boundaryWave)) {
+        getCoopUiMirror()?.endSession();
+        return;
+      }
       getCoopUiMirror()?.endSession();
-      return;
-    }
-    getCoopUiMirror()?.endSession();
-    // Wave-2a: gate adoption through the authoritative operation primitive (idempotent by operationId,
-    // stale-/late-rejecting a pick from an earlier interaction or a prior epoch - the #861 shape). When the
-    // flag is OFF this passes the relay through verbatim (legacy fallback); a reject falls to the
-    // deterministic backstop below exactly like a relay timeout.
-    await this.applyBiomeWatcherDecision(
-      revealed,
-      operationId,
-      pinned,
-      role,
-      res == null ? null : { choice: res.choice, data: res.data, operationId: res.operationId },
-      false,
-    );
+      // Wave-2a: gate adoption through the authoritative operation primitive (idempotent by operationId,
+      // stale-/late-rejecting a pick from an earlier interaction or a prior epoch - the #861 shape). When the
+      // flag is OFF this passes the relay through verbatim (legacy fallback); a reject falls to the
+      // deterministic backstop below exactly like a relay timeout.
+      this.applyBiomeWatcherDecision(
+        revealed,
+        operationId,
+        pinned,
+        role,
+        res == null ? null : { choice: res.choice, data: res.data, operationId: res.operationId },
+        false,
+      ).catch(error => coopWarn("reward", "biome pick WATCHER legacy apply threw - remaining closed", error));
+    });
   }
 
   private committedBiomePayload(

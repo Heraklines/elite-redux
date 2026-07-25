@@ -3437,3 +3437,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The static contract now rejects reintroduction of the circular preconditions and fixes the post-DATA stage
   order. All 47 Authority V2 contracts pass, targeted Biome reports no errors, TypeScript is clean, and no
   local co-op behavioral test or browser was run.
+
+# 2026-07-25 - Crossroads and World Map continuations stay in their owning runtime
+
+- B11 diagnostics from exact run `30135436500` showed both public biome surfaces opening actionably on the
+  owner while the watcher stayed in `MESSAGE`. The rendezvous itself completed on both sides; its promise
+  continuation ran while the peer engine was ambient in the one-process duo topology, so the watcher's
+  `boundaryStillLive` check read the peer scene and silently abandoned its owner/watcher split.
+- Crossroads and World Map now return the raw rendezvous result without consulting scene/controller globals
+  after the await. The complete result validation and owner/watcher split are queued onto the phase's bound
+  runtime and scene. Their bounded UI-open continuations and legacy relay completions use the same binding,
+  so no asynchronous surface can apply, prove, retry, or close against the peer engine's globals.
+- The source contract pins rendezvous, post-UI watcher, and post-relay binding for both surfaces. Authority V2
+  contracts are 48/48 green and targeted formatting is clean. The exact `9e7c29589` focused P2 evidence also
+  identified a separate remaining guest-owned Leave seam: after its BIOME_PICK receipt the replica advances
+  its interaction counter but enters stale wave-10 turn replay instead of the projected biome tail. This
+  runtime-binding commit does not claim to fix that next root. No local co-op behavioral test or browser ran.
