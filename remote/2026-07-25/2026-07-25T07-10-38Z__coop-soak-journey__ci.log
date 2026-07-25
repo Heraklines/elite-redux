@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run_mode: calibrated-release
+calibration_id: journey-45-thirteen-event
+target_sha: cae9c0e232c081183b67ab2640bc210db82c0cc8
+checked_out_sha: cae9c0e232c081183b67ab2640bc210db82c0cc8
+base_seed: 20260725
+campaign_seed: fixed-in-test (matrix candidate 20260725 not consumed)
+run: 30148771892 (workflow source cae9c0e232c081183b67ab2640bc210db82c0cc8)
+timestamp: 2026-07-25T07-10-38Z
+
+----- driver lines -----
+[22m[39m[coop-soak] RUN ENDED at wave 12 (seed 828633): host at terminal phase TitlePhase. Survey stops here.
+
+----- vitest result tail -----
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: 8_000_013, termSeq: -1, wasOwner: false }
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:107:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mco-op continuous journey: many mystery events plus biome transitions > plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m45430[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-journey.test.ts:107:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:107:3[22m[2m > [22mco-op continuous journey: many mystery events plus biome transitions[2m > [22mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[31m[1mAssertionError[22m: the campaign continued after the final forced event: expected 11 to be 45 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 45[39m
+[31m+ 11[39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak-journey.test.ts:[2m125:90[22m[39m
+    [90m123|[39m     })[33m;[39m
+    [90m124|[39m
+    [90m125|[39m     expect(result.wavesCompleted, "the campaign continued after the fi…
+    [90m   |[39m                                                                                          [31m^[39m
+    [90m126|[39m     expect(result.runEnded, "the campaign did not silently terminal/de…
+    [90m127|[39m     const biomeMarketActions = result.actionScript.filter(action => ac…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 07:09:26
+[2m   Duration [22m 71.83s[2m (transform 20.58s, setup 24.81s, import 309ms, tests 45.87s, environment 686ms)[22m
+
