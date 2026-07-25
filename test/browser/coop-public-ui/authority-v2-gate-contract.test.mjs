@@ -1931,3 +1931,21 @@ test("soaks budget command rendezvous for authoritative presentation and restore
     "cleanup must restore test-aware semantics instead of latching the live interval into later files",
   );
 });
+
+test("a projected Mystery phase cannot attest through its predecessor's active handler", () => {
+  assert.match(
+    replayMePhase,
+    /public isCoopV2ControlSurfaceReady\(handlerToken: object\): boolean[\s\S]*?this\.initialPresentationEntered[\s\S]*?this\.boundaryStillLive\(\)[\s\S]*?globalScene\.ui\.getHandler\(\) === handlerToken/u,
+    "Mystery proof is owned by the started replay generation and its consumed presentation",
+  );
+  const observerStart = coopRuntime.indexOf("function observeCoopV2InteractionSurface(");
+  const observerEnd = coopRuntime.indexOf("\n/**\n * Physical UI input gate", observerStart);
+  assert.ok(observerStart >= 0 && observerEnd > observerStart, "the interaction observer has a bounded source block");
+  const observer = coopRuntime.slice(observerStart, observerEnd);
+  const readinessFence = observer.indexOf("isCoopV2ControlSurfaceReady");
+  const handlerActive = observer.indexOf("const handlerActive");
+  assert.ok(
+    readinessFence >= 0 && handlerActive > readinessFence,
+    "phase-owned readiness rejects a queued/stale generation before generic handler evidence is read",
+  );
+});

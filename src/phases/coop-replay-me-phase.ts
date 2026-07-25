@@ -289,6 +289,19 @@ export class CoopReplayMePhase extends Phase {
     );
   }
 
+  /**
+   * Phase-owned proof that this projected Mystery generation has crossed its real scheduler edge.
+   *
+   * `replaceWithCoopAuthoritativePhase` makes the new phase current before `PhaseManager` necessarily calls
+   * `start()`. During that narrow gap the obsolete Mystery handler can still be active in the same UI mode.
+   * Class/mode/address matching alone must not let that old handler attest this new generation. The runtime
+   * observer calls this optional fence with the handler it is about to record; only the started, bound replay
+   * which consumed its initial immutable presentation may sign controlInstalled.
+   */
+  public isCoopV2ControlSurfaceReady(handlerToken: object): boolean {
+    return this.initialPresentationEntered && this.boundaryStillLive() && globalScene.ui.getHandler() === handlerToken;
+  }
+
   private openModeBounded(mode: UiMode, ...args: unknown[]): Promise<"completed" | "forced" | "superseded"> {
     return globalScene.ui.setModeBoundedWhen(mode, 2_000, () => this.boundaryStillLive(), ...args);
   }

@@ -3593,3 +3593,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the shared-module shard.
 - This is harness timing only: the production interval remains 60 seconds and no production source changed.
   Behavioral C5 execution remains GitHub-hosted only.
+
+# 2026-07-25 - A projected Mystery phase cannot inherit its predecessor's handler proof
+
+- Aggregate C1 at `839d137eb` reached its wave-39 Cleansing Font with the complete `ME_PRESENT` and both
+  terminal entries ordered, but the guest admitted the first terminal before its projected
+  `CoopReplayMePhase.start()` ran. `replaceWithCoopAuthoritativePhase` had made the new object current while
+  the obsolete local Mystery handler remained active in the same UI mode; the generic observer therefore
+  signed `controlInstalled` for a phase which had not crossed its scheduler edge.
+- Interaction observation now honors an optional phase-owned readiness fence. `CoopReplayMePhase` refuses
+  proof until that exact instance is active, runtime/scene/generation/pin-bound, has consumed its initial
+  immutable presentation, and owns the handler token being recorded. The following terminal consequently
+  remains gap-retained until the real replay opens and its existing readiness notifier retries the ordered
+  log; a queued/current object or stale same-mode handler can no longer advance authority.
+- This closes the architectural `phase queued != controlInstalled` invariant on Mystery without weakening
+  any other interaction proof. Behavioral C1 and Mystery qualification remain GitHub-hosted only.

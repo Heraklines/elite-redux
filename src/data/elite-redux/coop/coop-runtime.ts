@@ -5439,6 +5439,14 @@ function observeCoopV2InteractionSurface(
     if (phase == null || handler == null || typeof phase !== "object" || typeof handler !== "object") {
       return null;
     }
+    const phaseOwnedReady = (
+      phase as {
+        isCoopV2ControlSurfaceReady?: (handlerToken: object) => boolean;
+      }
+    ).isCoopV2ControlSurfaceReady;
+    if (typeof phaseOwnedReady === "function" && !phaseOwnedReady.call(phase, handler)) {
+      return null;
+    }
     const handlerActive = handler.active === true;
     const actionable =
       handlerActive && typeof handler.isCoopV2InputActionable === "function" && handler.isCoopV2InputActionable();
