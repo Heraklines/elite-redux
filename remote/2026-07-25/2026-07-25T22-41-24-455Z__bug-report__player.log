@@ -1,0 +1,1556 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:69c32b4bcac346704166fc9e0fd0c05c836352a0:run-30096000311.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0
+platform: Win32
+screen:   1280x720 @1.5x  devmem:4 GB
+boot:     boot-start@0ms -> loading-complete@50697ms -> title-shown@68330ms
+lastSess: ok (reached title)
+mode:     0  wave:null  difficulty:ace
+seed:     U2Y3VcRR2paj6XmTF9PSd1sn
+party:    
+
+----- DESCRIPTION -----
+showdown dosnt queue me up like its ment to
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:69c32b4bcac346704166fc9e0fd0c05c836352a0:run-30096000311.1","source":"github","sha":"69c32b4bcac346704166fc9e0fd0c05c836352a0","workflow":{"provider":"github-actions","runId":"30096000311","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[22:25:19.967] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[22:25:21.518] LOG: [ER] build {"version":1,"id":"github:69c32b4bcac346704166fc9e0fd0c05c836352a0:run-30096000311.1","source":"github","sha":"69c32b4bcac346704166fc9e0fd0c05c836352a0","workflow":{"provider":"github-actions","runId":"30096000311","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[22:26:05.940] DEBUG: Destroying loading scene
+[22:26:05.940] DEBUG: Destroyed loading scene
+[22:26:06.369] LOG: Seed: U2Y3VcRR2paj6XmTF9PSd1sn
+[22:26:06.371] LOG: Wave Seed: U2Y3VcRR2paj6XmTF9PSd1sn 0
+[22:26:19.220] LOG: %cStart Phase LoginPhase color:green;
+[22:26:21.122] LOG: Client Session: zx5lVWpn7vyloHhYcQYRuE9SFtNn1nHU
+[22:26:22.625] DEBUG: Using cached system data
+[22:26:23.520] LOG: %cStart Phase TitlePhase color:green;
+[22:26:23.522] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:23.523] LOG: Getting Session Slot id: %d 0
+[22:26:23.567] LOG: use seasonal splash messages true
+[22:26:23.793] WARN: Could not get co-op identity ticket! 503 
+[22:26:23.793] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:25.795] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:25.842] WARN: Could not get co-op identity ticket! 503 
+[22:26:25.843] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:27.844] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:27.900] WARN: Could not get co-op identity ticket! 503 
+[22:26:27.901] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:29.901] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:29.940] WARN: Could not get co-op identity ticket! 503 
+[22:26:29.940] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:31.941] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:31.979] WARN: Could not get co-op identity ticket! 503 
+[22:26:31.979] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:33.981] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:34.030] WARN: Could not get co-op identity ticket! 503 
+[22:26:34.031] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:36.032] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:36.091] WARN: Could not get co-op identity ticket! 503 
+[22:26:36.091] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:38.092] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:38.132] WARN: Could not get co-op identity ticket! 503 
+[22:26:38.133] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:40.134] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:40.173] WARN: Could not get co-op identity ticket! 503 
+[22:26:40.174] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:42.175] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:42.213] WARN: Could not get co-op identity ticket! 503 
+[22:26:42.213] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:44.215] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:44.256] WARN: Could not get co-op identity ticket! 503 
+[22:26:44.257] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:45.933] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:45.935] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:45.958] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:45.959] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:46.044] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:46.297] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:46.298] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:46.312] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:46.313] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:46.341] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:46.405] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:46.584] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:46.584] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:46.600] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:46.601] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:46.648] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:46.729] WARN: Could not get co-op identity ticket! 503 
+[22:26:46.729] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:48.219] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:48.219] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:48.230] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:48.231] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:48.592] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:48.593] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:48.602] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:48.603] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:48.731] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:48.779] WARN: Could not get co-op identity ticket! 503 
+[22:26:48.780] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:50.781] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:50.819] WARN: Could not get co-op identity ticket! 503 
+[22:26:50.819] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:51.415] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:51.415] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:51.424] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:51.425] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:52.773] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:52.773] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:52.780] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:26:52.780] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:26:52.824] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:52.826] LOG: %cStart Phase TitlePhase color:green;
+[22:26:52.828] LOG: Getting Session Slot id: %d 0
+[22:26:52.873] LOG: use seasonal splash messages true
+[22:26:52.912] WARN: Could not get co-op identity ticket! 503 
+[22:26:52.912] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:54.913] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:54.957] WARN: Could not get co-op identity ticket! 503 
+[22:26:54.958] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:56.958] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:56.994] WARN: Could not get co-op identity ticket! 503 
+[22:26:56.994] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:26:59.005] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:26:59.054] WARN: Could not get co-op identity ticket! 503 
+[22:26:59.054] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:01.055] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:01.098] WARN: Could not get co-op identity ticket! 503 
+[22:27:01.098] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:03.099] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:03.144] WARN: Could not get co-op identity ticket! 503 
+[22:27:03.144] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:05.144] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:05.186] WARN: Could not get co-op identity ticket! 503 
+[22:27:05.186] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:07.187] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:07.227] WARN: Could not get co-op identity ticket! 503 
+[22:27:07.228] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:09.228] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:09.273] WARN: Could not get co-op identity ticket! 503 
+[22:27:09.273] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:11.274] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:11.321] WARN: Could not get co-op identity ticket! 503 
+[22:27:11.321] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:13.321] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:13.361] WARN: Could not get co-op identity ticket! 503 
+[22:27:13.361] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:15.362] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:15.407] WARN: Could not get co-op identity ticket! 503 
+[22:27:15.407] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:17.408] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:17.449] WARN: Could not get co-op identity ticket! 503 
+[22:27:17.450] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:19.451] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:19.495] WARN: Could not get co-op identity ticket! 503 
+[22:27:19.495] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:21.500] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:21.609] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:21.610] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:27:21.625] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:21.626] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:27:21.670] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:21.740] WARN: Could not get co-op identity ticket! 503 
+[22:27:21.740] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:21.984] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:21.985] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:27:21.993] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:21.994] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:27:22.022] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:22.752] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:22.753] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:27:22.759] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:22.760] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:27:22.778] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:23.741] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:23.780] WARN: Could not get co-op identity ticket! 503 
+[22:27:23.780] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:25.080] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:25.081] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:27:25.087] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:25.088] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:27:25.107] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:27:25.127] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:25.128] LOG: %cStart Phase TitlePhase color:green;
+[22:27:25.130] LOG: Getting Session Slot id: %d 0
+[22:27:25.163] LOG: use seasonal splash messages true
+[22:27:25.198] WARN: Could not get co-op identity ticket! 503 
+[22:27:25.198] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:25.782] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:25.826] WARN: Could not get co-op identity ticket! 503 
+[22:27:25.826] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:27.827] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:27.870] WARN: Could not get co-op identity ticket! 503 
+[22:27:27.870] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:29.872] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:29.913] WARN: Could not get co-op identity ticket! 503 
+[22:27:29.913] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:31.915] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:31.954] WARN: Could not get co-op identity ticket! 503 
+[22:27:31.954] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:33.957] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:33.995] WARN: Could not get co-op identity ticket! 503 
+[22:27:33.995] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:35.996] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:36.043] WARN: Could not get co-op identity ticket! 503 
+[22:27:36.043] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:38.047] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:38.099] WARN: Could not get co-op identity ticket! 503 
+[22:27:38.100] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:40.101] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:40.138] WARN: Could not get co-op identity ticket! 503 
+[22:27:40.138] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:42.141] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:42.184] WARN: Could not get co-op identity ticket! 503 
+[22:27:42.184] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:44.193] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:44.237] WARN: Could not get co-op identity ticket! 503 
+[22:27:44.238] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:46.243] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:46.282] WARN: Could not get co-op identity ticket! 503 
+[22:27:46.282] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:48.297] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:48.346] WARN: Could not get co-op identity ticket! 503 
+[22:27:48.346] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:50.347] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:50.395] WARN: Could not get co-op identity ticket! 503 
+[22:27:50.395] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:52.397] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:52.436] WARN: Could not get co-op identity ticket! 503 
+[22:27:52.436] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:54.440] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:54.481] WARN: Could not get co-op identity ticket! 503 
+[22:27:54.482] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:56.483] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:56.527] WARN: Could not get co-op identity ticket! 503 
+[22:27:56.527] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:27:58.529] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:27:58.567] WARN: Could not get co-op identity ticket! 503 
+[22:27:58.568] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:00.568] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:00.621] WARN: Could not get co-op identity ticket! 503 
+[22:28:00.621] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:02.623] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:02.663] WARN: Could not get co-op identity ticket! 503 
+[22:28:02.663] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:04.665] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:04.712] WARN: Could not get co-op identity ticket! 503 
+[22:28:04.712] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:06.713] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:06.776] WARN: Could not get co-op identity ticket! 503 
+[22:28:06.776] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:08.778] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:08.818] WARN: Could not get co-op identity ticket! 503 
+[22:28:08.819] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:10.820] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:10.864] WARN: Could not get co-op identity ticket! 503 
+[22:28:10.864] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:12.865] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:12.917] WARN: Could not get co-op identity ticket! 503 
+[22:28:12.917] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:14.918] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:14.958] WARN: Could not get co-op identity ticket! 503 
+[22:28:14.958] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:16.959] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:17.002] WARN: Could not get co-op identity ticket! 503 
+[22:28:17.003] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:19.008] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:19.058] WARN: Could not get co-op identity ticket! 503 
+[22:28:19.058] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:21.063] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:21.103] WARN: Could not get co-op identity ticket! 503 
+[22:28:21.104] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:23.105] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:23.145] WARN: Could not get co-op identity ticket! 503 
+[22:28:23.145] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:25.146] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:25.199] WARN: Could not get co-op identity ticket! 503 
+[22:28:25.199] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:27.200] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:27.239] WARN: Could not get co-op identity ticket! 503 
+[22:28:27.240] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:29.241] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:29.284] WARN: Could not get co-op identity ticket! 503 
+[22:28:29.284] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:31.285] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:31.329] WARN: Could not get co-op identity ticket! 503 
+[22:28:31.330] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:33.336] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:33.385] WARN: Could not get co-op identity ticket! 503 
+[22:28:33.386] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:35.387] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:35.435] WARN: Could not get co-op identity ticket! 503 
+[22:28:35.436] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:37.437] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:37.496] WARN: Could not get co-op identity ticket! 503 
+[22:28:37.496] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:39.501] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:39.540] WARN: Could not get co-op identity ticket! 503 
+[22:28:39.541] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:41.545] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:41.588] WARN: Could not get co-op identity ticket! 503 
+[22:28:41.588] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:43.589] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:43.633] WARN: Could not get co-op identity ticket! 503 
+[22:28:43.634] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:45.634] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:45.682] WARN: Could not get co-op identity ticket! 503 
+[22:28:45.682] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:47.683] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:47.734] WARN: Could not get co-op identity ticket! 503 
+[22:28:47.734] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:49.735] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:49.773] WARN: Could not get co-op identity ticket! 503 
+[22:28:49.774] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:51.780] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:51.836] WARN: Could not get co-op identity ticket! 503 
+[22:28:51.836] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:53.838] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:53.880] WARN: Could not get co-op identity ticket! 503 
+[22:28:53.881] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:55.881] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:55.922] WARN: Could not get co-op identity ticket! 503 
+[22:28:55.923] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:57.923] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:28:57.983] WARN: Could not get co-op identity ticket! 503 
+[22:28:57.984] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:28:59.985] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:00.324] WARN: Could not get co-op identity ticket! 503 
+[22:29:00.324] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:02.325] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:02.364] WARN: Could not get co-op identity ticket! 503 
+[22:29:02.364] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:04.366] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:04.417] WARN: Could not get co-op identity ticket! 503 
+[22:29:04.417] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:06.418] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:06.463] WARN: Could not get co-op identity ticket! 503 
+[22:29:06.463] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:08.464] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:08.521] WARN: Could not get co-op identity ticket! 503 
+[22:29:08.522] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:10.522] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:10.569] WARN: Could not get co-op identity ticket! 503 
+[22:29:10.569] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:12.569] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:12.612] WARN: Could not get co-op identity ticket! 503 
+[22:29:12.613] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:14.613] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:14.660] WARN: Could not get co-op identity ticket! 503 
+[22:29:14.661] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:16.661] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:16.704] WARN: Could not get co-op identity ticket! 503 
+[22:29:16.705] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:18.707] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:18.754] WARN: Could not get co-op identity ticket! 503 
+[22:29:18.754] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:20.758] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:20.801] WARN: Could not get co-op identity ticket! 503 
+[22:29:20.802] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:22.803] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:22.845] WARN: Could not get co-op identity ticket! 503 
+[22:29:22.846] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:24.847] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:24.893] WARN: Could not get co-op identity ticket! 503 
+[22:29:24.893] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:26.910] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:26.955] WARN: Could not get co-op identity ticket! 503 
+[22:29:26.955] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:28.957] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:28.995] WARN: Could not get co-op identity ticket! 503 
+[22:29:28.995] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:30.997] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:31.043] WARN: Could not get co-op identity ticket! 503 
+[22:29:31.043] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:33.048] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:33.087] WARN: Could not get co-op identity ticket! 503 
+[22:29:33.087] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:35.098] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:35.155] WARN: Could not get co-op identity ticket! 503 
+[22:29:35.156] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:36.996] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:36.997] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:37.005] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:37.005] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:37.075] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:37.157] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:37.237] WARN: Could not get co-op identity ticket! 503 
+[22:29:37.237] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:37.396] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:37.396] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:37.403] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:37.403] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:37.425] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:37.959] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:37.960] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:37.966] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:37.967] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:38.626] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:38.626] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:38.633] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:38.633] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:39.238] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:39.278] WARN: Could not get co-op identity ticket! 503 
+[22:29:39.278] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:41.285] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:41.333] WARN: Could not get co-op identity ticket! 503 
+[22:29:41.333] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:41.992] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:41.993] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:42.004] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:42.005] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:42.061] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:42.064] LOG: %cStart Phase TitlePhase color:green;
+[22:29:42.069] LOG: Getting Session Slot id: %d 0
+[22:29:42.120] LOG: use seasonal splash messages true
+[22:29:42.215] WARN: Could not get co-op identity ticket! 503 
+[22:29:42.215] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:43.374] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:43.420] WARN: Could not get co-op identity ticket! 503 
+[22:29:43.420] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:44.182] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:44.183] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:44.190] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:44.190] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:44.214] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:44.551] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:44.551] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:44.559] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:44.560] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:44.584] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:44.747] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:44.748] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:44.760] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:44.761] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:45.045] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:45.046] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:45.056] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:45.057] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:45.421] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:45.467] WARN: Could not get co-op identity ticket! 503 
+[22:29:45.467] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:45.721] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:45.721] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:45.731] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:45.732] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:45.786] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:45.787] LOG: %cStart Phase TitlePhase color:green;
+[22:29:45.789] LOG: Getting Session Slot id: %d 0
+[22:29:45.817] LOG: use seasonal splash messages true
+[22:29:45.832] WARN: Could not get co-op identity ticket! 503 
+[22:29:45.832] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:47.468] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:47.505] WARN: Could not get co-op identity ticket! 503 
+[22:29:47.505] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:48.077] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:48.077] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:48.088] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:48.088] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:48.109] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:48.390] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:48.390] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:48.397] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:48.398] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:48.496] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:48.498] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:48.505] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:48.505] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:48.968] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:48.969] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:48.979] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:48.979] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:49.507] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:49.550] WARN: Could not get co-op identity ticket! 503 
+[22:29:49.551] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:50.138] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:50.139] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:50.145] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:50.146] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:50.832] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:50.832] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:50.839] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:50.840] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:51.498] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:51.499] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:51.506] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:29:51.507] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:29:51.560] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:51.561] LOG: %cStart Phase TitlePhase color:green;
+[22:29:51.564] LOG: Getting Session Slot id: %d 0
+[22:29:51.599] LOG: use seasonal splash messages true
+[22:29:51.665] WARN: Could not get co-op identity ticket! 503 
+[22:29:51.666] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:53.666] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:53.704] WARN: Could not get co-op identity ticket! 503 
+[22:29:53.704] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:55.705] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:55.750] WARN: Could not get co-op identity ticket! 503 
+[22:29:55.750] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:57.751] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:57.801] WARN: Could not get co-op identity ticket! 503 
+[22:29:57.802] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:29:59.814] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:29:59.853] WARN: Could not get co-op identity ticket! 503 
+[22:29:59.857] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:01.859] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:01.910] WARN: Could not get co-op identity ticket! 503 
+[22:30:01.911] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:03.914] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:03.952] WARN: Could not get co-op identity ticket! 503 
+[22:30:03.952] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:05.952] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:06.004] WARN: Could not get co-op identity ticket! 503 
+[22:30:06.004] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:08.005] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:08.057] WARN: Could not get co-op identity ticket! 503 
+[22:30:08.058] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:10.058] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:10.096] WARN: Could not get co-op identity ticket! 503 
+[22:30:10.096] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:12.096] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:12.135] WARN: Could not get co-op identity ticket! 503 
+[22:30:12.136] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:14.139] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:14.181] WARN: Could not get co-op identity ticket! 503 
+[22:30:14.182] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:16.186] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:16.226] WARN: Could not get co-op identity ticket! 503 
+[22:30:16.226] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:18.227] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:18.271] WARN: Could not get co-op identity ticket! 503 
+[22:30:18.271] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:20.280] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:20.331] WARN: Could not get co-op identity ticket! 503 
+[22:30:20.332] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:22.333] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:22.379] WARN: Could not get co-op identity ticket! 503 
+[22:30:22.380] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:24.383] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:24.425] WARN: Could not get co-op identity ticket! 503 
+[22:30:24.426] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:26.426] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:26.473] WARN: Could not get co-op identity ticket! 503 
+[22:30:26.473] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:28.475] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:28.519] WARN: Could not get co-op identity ticket! 503 
+[22:30:28.520] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:30.527] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:30.577] WARN: Could not get co-op identity ticket! 503 
+[22:30:30.577] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:32.578] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:32.620] WARN: Could not get co-op identity ticket! 503 
+[22:30:32.620] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:34.621] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:34.679] WARN: Could not get co-op identity ticket! 503 
+[22:30:34.679] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:36.680] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:36.722] WARN: Could not get co-op identity ticket! 503 
+[22:30:36.723] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:38.724] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:38.761] WARN: Could not get co-op identity ticket! 503 
+[22:30:38.761] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:40.762] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:40.807] WARN: Could not get co-op identity ticket! 503 
+[22:30:40.807] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:42.808] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:42.854] WARN: Could not get co-op identity ticket! 503 
+[22:30:42.855] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:44.856] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:44.898] WARN: Could not get co-op identity ticket! 503 
+[22:30:44.898] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:46.899] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:46.941] WARN: Could not get co-op identity ticket! 503 
+[22:30:46.941] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:48.941] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:48.984] WARN: Could not get co-op identity ticket! 503 
+[22:30:48.984] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:50.984] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:51.024] WARN: Could not get co-op identity ticket! 503 
+[22:30:51.024] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:53.025] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:53.068] WARN: Could not get co-op identity ticket! 503 
+[22:30:53.068] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:55.071] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:55.119] WARN: Could not get co-op identity ticket! 503 
+[22:30:55.119] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:57.120] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:57.160] WARN: Could not get co-op identity ticket! 503 
+[22:30:57.160] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:30:59.160] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:30:59.207] WARN: Could not get co-op identity ticket! 503 
+[22:30:59.207] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:01.208] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:01.246] WARN: Could not get co-op identity ticket! 503 
+[22:31:01.246] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:03.246] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:03.282] WARN: Could not get co-op identity ticket! 503 
+[22:31:03.282] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:05.284] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:05.323] WARN: Could not get co-op identity ticket! 503 
+[22:31:05.323] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:07.325] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:07.361] WARN: Could not get co-op identity ticket! 503 
+[22:31:07.361] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:09.363] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:09.407] WARN: Could not get co-op identity ticket! 503 
+[22:31:09.408] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:11.408] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:11.453] WARN: Could not get co-op identity ticket! 503 
+[22:31:11.453] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:13.458] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:13.496] WARN: Could not get co-op identity ticket! 503 
+[22:31:13.496] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:15.497] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:15.541] WARN: Could not get co-op identity ticket! 503 
+[22:31:15.541] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:17.541] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:17.582] WARN: Could not get co-op identity ticket! 503 
+[22:31:17.582] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:19.583] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:19.644] WARN: Could not get co-op identity ticket! 503 
+[22:31:19.645] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:21.651] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:21.689] WARN: Could not get co-op identity ticket! 503 
+[22:31:21.690] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:23.691] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:23.738] WARN: Could not get co-op identity ticket! 503 
+[22:31:23.738] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:25.739] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:25.787] WARN: Could not get co-op identity ticket! 503 
+[22:31:25.787] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:27.787] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:27.828] WARN: Could not get co-op identity ticket! 503 
+[22:31:27.828] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:29.828] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:29.867] WARN: Could not get co-op identity ticket! 503 
+[22:31:29.867] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:31.867] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:31.908] WARN: Could not get co-op identity ticket! 503 
+[22:31:31.908] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:33.909] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:33.965] WARN: Could not get co-op identity ticket! 503 
+[22:31:33.965] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:35.967] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:36.005] WARN: Could not get co-op identity ticket! 503 
+[22:31:36.005] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:38.006] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:38.052] WARN: Could not get co-op identity ticket! 503 
+[22:31:38.052] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:40.054] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:40.096] WARN: Could not get co-op identity ticket! 503 
+[22:31:40.096] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:42.097] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:42.142] WARN: Could not get co-op identity ticket! 503 
+[22:31:42.142] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:44.148] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:44.198] WARN: Could not get co-op identity ticket! 503 
+[22:31:44.199] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:46.200] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:46.252] WARN: Could not get co-op identity ticket! 503 
+[22:31:46.253] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:48.254] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:48.304] WARN: Could not get co-op identity ticket! 503 
+[22:31:48.305] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:50.306] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:50.342] WARN: Could not get co-op identity ticket! 503 
+[22:31:50.343] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:52.344] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:52.381] WARN: Could not get co-op identity ticket! 503 
+[22:31:52.381] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:54.382] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:54.429] WARN: Could not get co-op identity ticket! 503 
+[22:31:54.430] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:56.430] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:56.472] WARN: Could not get co-op identity ticket! 503 
+[22:31:56.472] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:31:58.474] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:31:58.513] WARN: Could not get co-op identity ticket! 503 
+[22:31:58.513] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:00.514] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:00.549] WARN: Could not get co-op identity ticket! 503 
+[22:32:00.550] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:02.557] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:02.598] WARN: Could not get co-op identity ticket! 503 
+[22:32:02.598] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:04.607] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:04.649] WARN: Could not get co-op identity ticket! 503 
+[22:32:04.649] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:06.649] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:06.693] WARN: Could not get co-op identity ticket! 503 
+[22:32:06.693] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:08.697] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:08.751] WARN: Could not get co-op identity ticket! 503 
+[22:32:08.751] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:10.753] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:10.794] WARN: Could not get co-op identity ticket! 503 
+[22:32:10.794] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:12.795] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:12.836] WARN: Could not get co-op identity ticket! 503 
+[22:32:12.837] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:14.838] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:14.891] WARN: Could not get co-op identity ticket! 503 
+[22:32:14.892] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:16.893] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:16.938] WARN: Could not get co-op identity ticket! 503 
+[22:32:16.938] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:18.938] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:18.983] WARN: Could not get co-op identity ticket! 503 
+[22:32:18.983] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:20.989] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:21.041] WARN: Could not get co-op identity ticket! 503 
+[22:32:21.042] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:23.042] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:23.083] WARN: Could not get co-op identity ticket! 503 
+[22:32:23.083] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:25.084] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:25.135] WARN: Could not get co-op identity ticket! 503 
+[22:32:25.136] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:27.137] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:27.177] WARN: Could not get co-op identity ticket! 503 
+[22:32:27.178] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:29.178] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:29.266] WARN: Could not get co-op identity ticket! 503 
+[22:32:29.266] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:31.267] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:31.311] WARN: Could not get co-op identity ticket! 503 
+[22:32:31.311] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:33.312] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:33.374] WARN: Could not get co-op identity ticket! 503 
+[22:32:33.374] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:35.375] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:35.417] WARN: Could not get co-op identity ticket! 503 
+[22:32:35.418] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:37.419] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:37.460] WARN: Could not get co-op identity ticket! 503 
+[22:32:37.461] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:39.461] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:39.501] WARN: Could not get co-op identity ticket! 503 
+[22:32:39.502] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:41.503] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:41.543] WARN: Could not get co-op identity ticket! 503 
+[22:32:41.543] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:43.546] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:43.602] WARN: Could not get co-op identity ticket! 503 
+[22:32:43.602] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:45.605] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:45.648] WARN: Could not get co-op identity ticket! 503 
+[22:32:45.648] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:47.650] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:47.701] WARN: Could not get co-op identity ticket! 503 
+[22:32:47.701] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:49.705] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:49.744] WARN: Could not get co-op identity ticket! 503 
+[22:32:49.745] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:51.746] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:51.792] WARN: Could not get co-op identity ticket! 503 
+[22:32:51.793] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:53.794] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:53.835] WARN: Could not get co-op identity ticket! 503 
+[22:32:53.835] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:55.837] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:55.907] WARN: Could not get co-op identity ticket! 503 
+[22:32:55.907] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:57.907] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:32:57.951] WARN: Could not get co-op identity ticket! 503 
+[22:32:57.951] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:32:59.956] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:00.237] WARN: Could not get co-op identity ticket! 503 
+[22:33:00.238] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:02.239] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:02.278] WARN: Could not get co-op identity ticket! 503 
+[22:33:02.279] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:04.284] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:04.334] WARN: Could not get co-op identity ticket! 503 
+[22:33:04.334] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:06.336] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:06.376] WARN: Could not get co-op identity ticket! 503 
+[22:33:06.377] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:08.379] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:08.417] WARN: Could not get co-op identity ticket! 503 
+[22:33:08.417] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:10.419] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:10.465] WARN: Could not get co-op identity ticket! 503 
+[22:33:10.466] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:12.466] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:12.510] WARN: Could not get co-op identity ticket! 503 
+[22:33:12.511] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:14.512] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:14.553] WARN: Could not get co-op identity ticket! 503 
+[22:33:14.553] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:16.555] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:16.607] WARN: Could not get co-op identity ticket! 503 
+[22:33:16.607] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:18.609] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:18.656] WARN: Could not get co-op identity ticket! 503 
+[22:33:18.657] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:20.661] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:20.699] WARN: Could not get co-op identity ticket! 503 
+[22:33:20.700] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:22.701] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:22.742] WARN: Could not get co-op identity ticket! 503 
+[22:33:22.742] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:24.743] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:24.783] WARN: Could not get co-op identity ticket! 503 
+[22:33:24.783] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:26.784] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:26.825] WARN: Could not get co-op identity ticket! 503 
+[22:33:26.825] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:28.826] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:28.868] WARN: Could not get co-op identity ticket! 503 
+[22:33:28.868] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:30.871] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:30.916] WARN: Could not get co-op identity ticket! 503 
+[22:33:30.916] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:32.918] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:32.961] WARN: Could not get co-op identity ticket! 503 
+[22:33:32.961] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:34.963] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:35.013] WARN: Could not get co-op identity ticket! 503 
+[22:33:35.014] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:37.015] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:37.076] WARN: Could not get co-op identity ticket! 503 
+[22:33:37.076] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:39.077] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:39.118] WARN: Could not get co-op identity ticket! 503 
+[22:33:39.118] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:41.119] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:41.166] WARN: Could not get co-op identity ticket! 503 
+[22:33:41.166] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:43.167] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:43.204] WARN: Could not get co-op identity ticket! 503 
+[22:33:43.204] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:45.205] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:45.250] WARN: Could not get co-op identity ticket! 503 
+[22:33:45.250] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:47.253] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:47.292] WARN: Could not get co-op identity ticket! 503 
+[22:33:47.293] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:49.294] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:49.342] WARN: Could not get co-op identity ticket! 503 
+[22:33:49.342] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:51.345] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:51.383] WARN: Could not get co-op identity ticket! 503 
+[22:33:51.383] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:53.384] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:53.426] WARN: Could not get co-op identity ticket! 503 
+[22:33:53.426] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:55.428] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:55.469] WARN: Could not get co-op identity ticket! 503 
+[22:33:55.470] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:57.471] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:57.507] WARN: Could not get co-op identity ticket! 503 
+[22:33:57.508] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:33:59.509] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:33:59.547] WARN: Could not get co-op identity ticket! 503 
+[22:33:59.547] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:01.549] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:01.590] WARN: Could not get co-op identity ticket! 503 
+[22:34:01.590] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:03.592] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:03.645] WARN: Could not get co-op identity ticket! 503 
+[22:34:03.646] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:05.647] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:05.694] WARN: Could not get co-op identity ticket! 503 
+[22:34:05.695] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:07.697] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:07.743] WARN: Could not get co-op identity ticket! 503 
+[22:34:07.744] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:09.747] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:09.792] WARN: Could not get co-op identity ticket! 503 
+[22:34:09.792] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:11.793] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:11.843] WARN: Could not get co-op identity ticket! 503 
+[22:34:11.844] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:13.845] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:13.884] WARN: Could not get co-op identity ticket! 503 
+[22:34:13.884] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:15.885] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:15.932] WARN: Could not get co-op identity ticket! 503 
+[22:34:15.932] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:17.933] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:17.979] WARN: Could not get co-op identity ticket! 503 
+[22:34:17.980] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:19.981] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:20.256] WARN: Could not get co-op identity ticket! 503 
+[22:34:20.257] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:22.266] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:22.321] WARN: Could not get co-op identity ticket! 503 
+[22:34:22.322] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:24.322] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:24.359] WARN: Could not get co-op identity ticket! 503 
+[22:34:24.359] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:26.360] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:26.400] WARN: Could not get co-op identity ticket! 503 
+[22:34:26.400] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:28.403] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:28.445] WARN: Could not get co-op identity ticket! 503 
+[22:34:28.446] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:30.446] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:30.488] WARN: Could not get co-op identity ticket! 503 
+[22:34:30.488] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:32.491] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:32.534] WARN: Could not get co-op identity ticket! 503 
+[22:34:32.535] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:34.536] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:34.586] WARN: Could not get co-op identity ticket! 503 
+[22:34:34.586] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:36.596] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:36.642] WARN: Could not get co-op identity ticket! 503 
+[22:34:36.642] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:38.646] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:38.699] WARN: Could not get co-op identity ticket! 503 
+[22:34:38.699] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:40.700] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:40.759] WARN: Could not get co-op identity ticket! 503 
+[22:34:40.759] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:42.760] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:42.806] WARN: Could not get co-op identity ticket! 503 
+[22:34:42.806] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:44.808] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:44.846] WARN: Could not get co-op identity ticket! 503 
+[22:34:44.846] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:46.851] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:46.903] WARN: Could not get co-op identity ticket! 503 
+[22:34:46.904] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:48.905] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:48.948] WARN: Could not get co-op identity ticket! 503 
+[22:34:48.949] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:50.950] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:50.989] WARN: Could not get co-op identity ticket! 503 
+[22:34:50.989] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:52.991] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:53.031] WARN: Could not get co-op identity ticket! 503 
+[22:34:53.031] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:55.039] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:55.095] WARN: Could not get co-op identity ticket! 503 
+[22:34:55.095] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:57.102] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:57.140] WARN: Could not get co-op identity ticket! 503 
+[22:34:57.140] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:34:59.141] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:34:59.177] WARN: Could not get co-op identity ticket! 503 
+[22:34:59.177] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:01.178] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:01.227] WARN: Could not get co-op identity ticket! 503 
+[22:35:01.227] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:03.228] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:03.278] WARN: Could not get co-op identity ticket! 503 
+[22:35:03.278] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:05.280] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:05.320] WARN: Could not get co-op identity ticket! 503 
+[22:35:05.320] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:07.320] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:07.362] WARN: Could not get co-op identity ticket! 503 
+[22:35:07.362] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:09.363] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:09.407] WARN: Could not get co-op identity ticket! 503 
+[22:35:09.408] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:11.408] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:11.453] WARN: Could not get co-op identity ticket! 503 
+[22:35:11.453] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:13.453] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:13.495] WARN: Could not get co-op identity ticket! 503 
+[22:35:13.495] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:15.497] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:15.542] WARN: Could not get co-op identity ticket! 503 
+[22:35:15.542] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:17.543] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:17.593] WARN: Could not get co-op identity ticket! 503 
+[22:35:17.593] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:19.604] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:19.648] WARN: Could not get co-op identity ticket! 503 
+[22:35:19.648] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:21.658] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:21.700] WARN: Could not get co-op identity ticket! 503 
+[22:35:21.700] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:23.702] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:23.755] WARN: Could not get co-op identity ticket! 503 
+[22:35:23.755] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:25.757] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:25.800] WARN: Could not get co-op identity ticket! 503 
+[22:35:25.800] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:27.801] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:27.841] WARN: Could not get co-op identity ticket! 503 
+[22:35:27.841] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:29.842] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:29.888] WARN: Could not get co-op identity ticket! 503 
+[22:35:29.888] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:31.889] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:31.934] WARN: Could not get co-op identity ticket! 503 
+[22:35:31.934] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:33.935] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:33.972] WARN: Could not get co-op identity ticket! 503 
+[22:35:33.972] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:35.973] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:36.014] WARN: Could not get co-op identity ticket! 503 
+[22:35:36.015] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:38.022] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:38.082] WARN: Could not get co-op identity ticket! 503 
+[22:35:38.082] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:40.084] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:40.144] WARN: Could not get co-op identity ticket! 503 
+[22:35:40.144] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:42.145] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:42.199] WARN: Could not get co-op identity ticket! 503 
+[22:35:42.200] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:44.200] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:44.251] WARN: Could not get co-op identity ticket! 503 
+[22:35:44.251] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:46.252] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:46.290] WARN: Could not get co-op identity ticket! 503 
+[22:35:46.291] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:48.292] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:48.330] WARN: Could not get co-op identity ticket! 503 
+[22:35:48.331] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:50.332] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:50.378] WARN: Could not get co-op identity ticket! 503 
+[22:35:50.378] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:52.379] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:52.421] WARN: Could not get co-op identity ticket! 503 
+[22:35:52.421] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:54.430] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:54.470] WARN: Could not get co-op identity ticket! 503 
+[22:35:54.471] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:56.472] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:56.518] WARN: Could not get co-op identity ticket! 503 
+[22:35:56.518] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:35:58.520] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:35:58.567] WARN: Could not get co-op identity ticket! 503 
+[22:35:58.567] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:00.568] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:00.610] WARN: Could not get co-op identity ticket! 503 
+[22:36:00.610] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:02.611] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:02.649] WARN: Could not get co-op identity ticket! 503 
+[22:36:02.649] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:04.651] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:04.692] WARN: Could not get co-op identity ticket! 503 
+[22:36:04.693] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:06.693] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:06.737] WARN: Could not get co-op identity ticket! 503 
+[22:36:06.737] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:08.739] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:08.781] WARN: Could not get co-op identity ticket! 503 
+[22:36:08.782] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:10.782] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:10.828] WARN: Could not get co-op identity ticket! 503 
+[22:36:10.828] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:12.829] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:12.886] WARN: Could not get co-op identity ticket! 503 
+[22:36:12.886] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:14.887] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:14.927] WARN: Could not get co-op identity ticket! 503 
+[22:36:14.927] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:16.935] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:16.977] WARN: Could not get co-op identity ticket! 503 
+[22:36:16.977] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:18.978] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:19.025] WARN: Could not get co-op identity ticket! 503 
+[22:36:19.025] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:21.028] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:21.070] WARN: Could not get co-op identity ticket! 503 
+[22:36:21.070] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:23.072] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:23.115] WARN: Could not get co-op identity ticket! 503 
+[22:36:23.116] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:25.117] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:25.169] WARN: Could not get co-op identity ticket! 503 
+[22:36:25.170] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:27.170] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:27.211] WARN: Could not get co-op identity ticket! 503 
+[22:36:27.212] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:29.216] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:29.269] WARN: Could not get co-op identity ticket! 503 
+[22:36:29.269] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:31.270] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:31.338] WARN: Could not get co-op identity ticket! 503 
+[22:36:31.338] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:33.339] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:33.384] WARN: Could not get co-op identity ticket! 503 
+[22:36:33.385] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:35.385] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:35.425] WARN: Could not get co-op identity ticket! 503 
+[22:36:35.426] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:37.427] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:37.467] WARN: Could not get co-op identity ticket! 503 
+[22:36:37.467] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:39.468] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:39.508] WARN: Could not get co-op identity ticket! 503 
+[22:36:39.508] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:41.509] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:41.551] WARN: Could not get co-op identity ticket! 503 
+[22:36:41.552] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:43.553] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:43.596] WARN: Could not get co-op identity ticket! 503 
+[22:36:43.597] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:45.597] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:45.642] WARN: Could not get co-op identity ticket! 503 
+[22:36:45.642] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:47.644] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:47.695] WARN: Could not get co-op identity ticket! 503 
+[22:36:47.696] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:49.700] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:49.738] WARN: Could not get co-op identity ticket! 503 
+[22:36:49.738] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:51.740] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:51.804] WARN: Could not get co-op identity ticket! 503 
+[22:36:51.804] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:53.812] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:53.848] WARN: Could not get co-op identity ticket! 503 
+[22:36:53.848] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:55.848] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:55.885] WARN: Could not get co-op identity ticket! 503 
+[22:36:55.885] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:57.886] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:36:57.936] WARN: Could not get co-op identity ticket! 503 
+[22:36:57.936] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:36:59.937] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:00.055] WARN: Could not get co-op identity ticket! 503 
+[22:37:00.055] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:02.056] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:02.101] WARN: Could not get co-op identity ticket! 503 
+[22:37:02.102] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:04.102] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:04.141] WARN: Could not get co-op identity ticket! 503 
+[22:37:04.141] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:06.143] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:06.192] WARN: Could not get co-op identity ticket! 503 
+[22:37:06.192] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:08.193] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:08.236] WARN: Could not get co-op identity ticket! 503 
+[22:37:08.236] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:10.237] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:10.278] WARN: Could not get co-op identity ticket! 503 
+[22:37:10.278] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:12.280] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:12.325] WARN: Could not get co-op identity ticket! 503 
+[22:37:12.326] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:14.328] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:14.370] WARN: Could not get co-op identity ticket! 503 
+[22:37:14.370] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:16.370] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:16.411] WARN: Could not get co-op identity ticket! 503 
+[22:37:16.411] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:18.415] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:18.457] WARN: Could not get co-op identity ticket! 503 
+[22:37:18.457] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:20.462] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:20.514] WARN: Could not get co-op identity ticket! 503 
+[22:37:20.514] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:22.516] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:22.573] WARN: Could not get co-op identity ticket! 503 
+[22:37:22.574] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:24.574] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:24.628] WARN: Could not get co-op identity ticket! 503 
+[22:37:24.628] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:26.629] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:26.666] WARN: Could not get co-op identity ticket! 503 
+[22:37:26.666] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:28.668] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:28.719] WARN: Could not get co-op identity ticket! 503 
+[22:37:28.719] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:30.720] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:30.778] WARN: Could not get co-op identity ticket! 503 
+[22:37:30.778] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:32.779] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:32.823] WARN: Could not get co-op identity ticket! 503 
+[22:37:32.823] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:34.825] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:34.864] WARN: Could not get co-op identity ticket! 503 
+[22:37:34.864] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:36.867] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:36.908] WARN: Could not get co-op identity ticket! 503 
+[22:37:36.909] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:38.910] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:38.949] WARN: Could not get co-op identity ticket! 503 
+[22:37:38.949] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:40.950] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:41.003] WARN: Could not get co-op identity ticket! 503 
+[22:37:41.004] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:43.004] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:43.065] WARN: Could not get co-op identity ticket! 503 
+[22:37:43.065] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:45.066] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:45.126] WARN: Could not get co-op identity ticket! 503 
+[22:37:45.126] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:47.134] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:47.174] WARN: Could not get co-op identity ticket! 503 
+[22:37:47.175] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:49.181] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:49.218] WARN: Could not get co-op identity ticket! 503 
+[22:37:49.219] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:51.222] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:51.267] WARN: Could not get co-op identity ticket! 503 
+[22:37:51.269] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:53.273] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:53.315] WARN: Could not get co-op identity ticket! 503 
+[22:37:53.315] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:55.317] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:55.366] WARN: Could not get co-op identity ticket! 503 
+[22:37:55.366] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:57.370] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:57.415] WARN: Could not get co-op identity ticket! 503 
+[22:37:57.416] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:37:59.417] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:37:59.460] WARN: Could not get co-op identity ticket! 503 
+[22:37:59.461] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:01.470] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:01.526] WARN: Could not get co-op identity ticket! 503 
+[22:38:01.526] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:03.527] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:03.584] WARN: Could not get co-op identity ticket! 503 
+[22:38:03.584] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:05.585] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:05.623] WARN: Could not get co-op identity ticket! 503 
+[22:38:05.624] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:07.637] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:07.684] WARN: Could not get co-op identity ticket! 503 
+[22:38:07.684] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:09.685] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:09.735] WARN: Could not get co-op identity ticket! 503 
+[22:38:09.735] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:11.736] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:11.780] WARN: Could not get co-op identity ticket! 503 
+[22:38:11.781] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:13.782] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:13.832] WARN: Could not get co-op identity ticket! 503 
+[22:38:13.832] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:15.834] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:15.886] WARN: Could not get co-op identity ticket! 503 
+[22:38:15.887] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:17.897] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:17.939] WARN: Could not get co-op identity ticket! 503 
+[22:38:17.939] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:19.940] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:20.071] WARN: Could not get co-op identity ticket! 503 
+[22:38:20.072] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:22.087] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:22.127] WARN: Could not get co-op identity ticket! 503 
+[22:38:22.127] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:24.129] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:24.169] WARN: Could not get co-op identity ticket! 503 
+[22:38:24.169] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:26.170] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:26.215] WARN: Could not get co-op identity ticket! 503 
+[22:38:26.216] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:28.217] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:28.258] WARN: Could not get co-op identity ticket! 503 
+[22:38:28.258] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:30.259] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:30.305] WARN: Could not get co-op identity ticket! 503 
+[22:38:30.305] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:32.311] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:32.361] WARN: Could not get co-op identity ticket! 503 
+[22:38:32.361] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:34.362] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:34.402] WARN: Could not get co-op identity ticket! 503 
+[22:38:34.402] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:36.408] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:36.462] WARN: Could not get co-op identity ticket! 503 
+[22:38:36.463] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:38.465] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:38.506] WARN: Could not get co-op identity ticket! 503 
+[22:38:38.506] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:40.509] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:40.547] WARN: Could not get co-op identity ticket! 503 
+[22:38:40.548] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:42.549] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:42.596] WARN: Could not get co-op identity ticket! 503 
+[22:38:42.597] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:44.599] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:44.644] WARN: Could not get co-op identity ticket! 503 
+[22:38:44.644] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:46.645] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:46.684] WARN: Could not get co-op identity ticket! 503 
+[22:38:46.685] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:48.689] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:48.732] WARN: Could not get co-op identity ticket! 503 
+[22:38:48.733] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:50.734] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:50.780] WARN: Could not get co-op identity ticket! 503 
+[22:38:50.780] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:52.781] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:52.827] WARN: Could not get co-op identity ticket! 503 
+[22:38:52.827] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:54.829] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:54.893] WARN: Could not get co-op identity ticket! 503 
+[22:38:54.893] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:56.894] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:56.935] WARN: Could not get co-op identity ticket! 503 
+[22:38:56.935] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:38:58.939] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:38:58.982] WARN: Could not get co-op identity ticket! 503 
+[22:38:58.982] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:00.992] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:01.061] WARN: Could not get co-op identity ticket! 503 
+[22:39:01.061] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:03.062] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:03.108] WARN: Could not get co-op identity ticket! 503 
+[22:39:03.108] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:05.109] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:05.152] WARN: Could not get co-op identity ticket! 503 
+[22:39:05.152] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:07.157] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:07.206] WARN: Could not get co-op identity ticket! 503 
+[22:39:07.206] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:09.207] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:09.250] WARN: Could not get co-op identity ticket! 503 
+[22:39:09.250] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:11.254] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:11.312] WARN: Could not get co-op identity ticket! 503 
+[22:39:11.312] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:13.313] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:13.354] WARN: Could not get co-op identity ticket! 503 
+[22:39:13.354] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:15.356] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:15.394] WARN: Could not get co-op identity ticket! 503 
+[22:39:15.394] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:17.395] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:17.439] WARN: Could not get co-op identity ticket! 503 
+[22:39:17.439] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:19.439] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:19.493] WARN: Could not get co-op identity ticket! 503 
+[22:39:19.494] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:21.499] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:21.542] WARN: Could not get co-op identity ticket! 503 
+[22:39:21.543] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:23.545] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:23.588] WARN: Could not get co-op identity ticket! 503 
+[22:39:23.589] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:25.592] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:25.635] WARN: Could not get co-op identity ticket! 503 
+[22:39:25.636] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:27.637] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:27.679] WARN: Could not get co-op identity ticket! 503 
+[22:39:27.680] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:29.361] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:29.363] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:29.382] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:29.383] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:29.436] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:29.686] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:29.686] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:29.695] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:29.695] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:29.729] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:29.760] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:29.819] WARN: Could not get co-op identity ticket! 503 
+[22:39:29.819] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:30.237] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:30.237] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:30.245] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:30.245] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:31.829] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:31.870] WARN: Could not get co-op identity ticket! 503 
+[22:39:31.870] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:32.636] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:32.636] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:32.644] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:32.644] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:33.625] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:33.625] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:33.632] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:39:33.633] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:39:33.678] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:33.679] LOG: %cStart Phase TitlePhase color:green;
+[22:39:33.681] LOG: Getting Session Slot id: %d 0
+[22:39:33.714] LOG: use seasonal splash messages true
+[22:39:33.733] WARN: Could not get co-op identity ticket! 503 
+[22:39:33.734] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:33.871] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:33.915] WARN: Could not get co-op identity ticket! 503 
+[22:39:33.915] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:35.916] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:35.959] WARN: Could not get co-op identity ticket! 503 
+[22:39:35.960] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:37.961] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:38.010] WARN: Could not get co-op identity ticket! 503 
+[22:39:38.010] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:40.011] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:40.094] WARN: Could not get co-op identity ticket! 503 
+[22:39:40.094] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:42.101] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:42.146] WARN: Could not get co-op identity ticket! 503 
+[22:39:42.146] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:44.147] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:44.185] WARN: Could not get co-op identity ticket! 503 
+[22:39:44.185] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:46.186] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:46.250] WARN: Could not get co-op identity ticket! 503 
+[22:39:46.250] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:48.251] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:48.294] WARN: Could not get co-op identity ticket! 503 
+[22:39:48.295] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:50.295] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:50.336] WARN: Could not get co-op identity ticket! 503 
+[22:39:50.337] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:52.338] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:52.391] WARN: Could not get co-op identity ticket! 503 
+[22:39:52.392] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:54.392] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:54.431] WARN: Could not get co-op identity ticket! 503 
+[22:39:54.431] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:56.431] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:56.467] WARN: Could not get co-op identity ticket! 503 
+[22:39:56.468] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:39:58.469] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:39:58.530] WARN: Could not get co-op identity ticket! 503 
+[22:39:58.530] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:00.531] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:00.568] WARN: Could not get co-op identity ticket! 503 
+[22:40:00.568] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:02.569] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:02.607] WARN: Could not get co-op identity ticket! 503 
+[22:40:02.607] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:04.608] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:04.651] WARN: Could not get co-op identity ticket! 503 
+[22:40:04.652] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:06.653] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:06.697] WARN: Could not get co-op identity ticket! 503 
+[22:40:06.698] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:08.698] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:08.744] WARN: Could not get co-op identity ticket! 503 
+[22:40:08.744] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:10.746] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:10.787] WARN: Could not get co-op identity ticket! 503 
+[22:40:10.788] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:12.792] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:12.828] WARN: Could not get co-op identity ticket! 503 
+[22:40:12.828] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:14.830] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:14.871] WARN: Could not get co-op identity ticket! 503 
+[22:40:14.872] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:16.874] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:16.918] WARN: Could not get co-op identity ticket! 503 
+[22:40:16.918] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:18.919] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:18.966] WARN: Could not get co-op identity ticket! 503 
+[22:40:18.966] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:20.970] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:21.029] WARN: Could not get co-op identity ticket! 503 
+[22:40:21.029] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:23.030] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:23.073] WARN: Could not get co-op identity ticket! 503 
+[22:40:23.073] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:24.111] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:24.112] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:24.120] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:24.121] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:24.144] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:24.529] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:24.530] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:24.537] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:24.537] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:24.560] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:24.698] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:24.699] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:24.711] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:24.712] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:25.075] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:25.116] WARN: Could not get co-op identity ticket! 503 
+[22:40:25.116] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:25.251] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:25.251] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:25.261] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:25.262] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:25.818] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:25.818] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:25.829] WARN: Texture "%s" has no frame "%s" items er_rocky_helmet
+[22:40:25.830] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[22:40:25.882] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:25.883] LOG: %cStart Phase TitlePhase color:green;
+[22:40:25.886] LOG: Getting Session Slot id: %d 0
+[22:40:25.919] LOG: use seasonal splash messages true
+[22:40:25.939] WARN: Could not get co-op identity ticket! 503 
+[22:40:25.940] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:27.117] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:27.158] WARN: Could not get co-op identity ticket! 503 
+[22:40:27.158] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:29.161] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:29.200] WARN: Could not get co-op identity ticket! 503 
+[22:40:29.201] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:31.202] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:31.247] WARN: Could not get co-op identity ticket! 503 
+[22:40:31.247] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:33.247] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:33.288] WARN: Could not get co-op identity ticket! 503 
+[22:40:33.288] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:35.288] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:35.335] WARN: Could not get co-op identity ticket! 503 
+[22:40:35.335] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:37.341] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:37.396] WARN: Could not get co-op identity ticket! 503 
+[22:40:37.396] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:39.397] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:39.434] WARN: Could not get co-op identity ticket! 503 
+[22:40:39.434] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:41.436] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:41.474] WARN: Could not get co-op identity ticket! 503 
+[22:40:41.475] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:43.479] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:43.515] WARN: Could not get co-op identity ticket! 503 
+[22:40:43.515] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:45.516] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:45.551] WARN: Could not get co-op identity ticket! 503 
+[22:40:45.552] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:47.554] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:47.590] WARN: Could not get co-op identity ticket! 503 
+[22:40:47.590] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:49.590] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:49.632] WARN: Could not get co-op identity ticket! 503 
+[22:40:49.632] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:51.634] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:51.674] WARN: Could not get co-op identity ticket! 503 
+[22:40:51.674] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:53.688] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:53.724] WARN: Could not get co-op identity ticket! 503 
+[22:40:53.725] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:55.730] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:55.768] WARN: Could not get co-op identity ticket! 503 
+[22:40:55.768] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:57.769] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:57.807] WARN: Could not get co-op identity ticket! 503 
+[22:40:57.807] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:40:59.808] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:40:59.847] WARN: Could not get co-op identity ticket! 503 
+[22:40:59.848] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:01.850] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:01.888] WARN: Could not get co-op identity ticket! 503 
+[22:41:01.888] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:03.889] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:03.927] WARN: Could not get co-op identity ticket! 503 
+[22:41:03.927] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:05.928] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:05.967] WARN: Could not get co-op identity ticket! 503 
+[22:41:05.968] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:07.969] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:08.061] WARN: Could not get co-op identity ticket! 503 
+[22:41:08.062] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:10.062] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:10.098] WARN: Could not get co-op identity ticket! 503 
+[22:41:10.099] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:12.099] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:12.136] WARN: Could not get co-op identity ticket! 503 
+[22:41:12.136] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:14.149] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:14.201] WARN: Could not get co-op identity ticket! 503 
+[22:41:14.201] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:16.202] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:16.244] WARN: Could not get co-op identity ticket! 503 
+[22:41:16.244] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:18.245] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:18.289] WARN: Could not get co-op identity ticket! 503 
+[22:41:18.289] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:20.302] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:20.345] WARN: Could not get co-op identity ticket! 503 
+[22:41:20.345] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[22:41:22.346] LOG: [coop:lobby] start announce name=TheBestBeyblader protocol=p33
+[22:41:22.403] WARN: Could not get co-op identity ticket! 503 
+[22:41:22.403] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+
+----- REPLAY TRACE (JSON) -----
+(none)
