@@ -922,7 +922,13 @@ export class EncounterPhase extends BattlePhase {
     battle.enemyParty = rebuilt;
     // The generation loop must not roll modifiers over the verbatim party; that would double held items.
     this.coopAdoptedEnemyParty = true;
-    this.coopEnemyAuthority = enemies;
+    // `finalizeCoopEncounterAuthority()` reasserts the compatibility manifest after modifier
+    // initialization. Never run that older, lossy corrector over an object already materialized from the
+    // dominating V2 image: it rewrites HP/stages/moves and, critically, replaces the live summon substrate
+    // with the pre-PostSummon carrier (Aqua Ring was removed here at the first command boundary). Keep the
+    // final corrector only for slots this method genuinely reconstructed from the compatibility manifest.
+    this.coopEnemyAuthority =
+      reusableV2Enemies.size === 0 ? enemies : enemies.filter(entry => !reusableV2Enemies.has(entry.fieldIndex));
     if (reusableV2Enemies.size > 0 && rawState?.tick != null) {
       coopLog(
         "stream",

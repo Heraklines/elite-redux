@@ -3907,3 +3907,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - This child train is declared against exact base `0031a7045`. Local checks remain static-only: targeted Biome
   error diagnostics, formatting, `git diff --check`, and JS parsing are clean. A1/B9/B11 behavioral proof runs
   only on GitHub-hosted focused shards.
+
+## 2026-07-25 - Exact-SHA `821020756` B9/B11 residual closure
+
+- A1 is green after the fixture migration. B11 confirms the newer V2 enemy objects now survive the encounter
+  descriptor reset, but the final compatibility corrector was still applied to those same objects and removed
+  Aqua Ring from the post-PostSummon image. The corrector is now retained only for slots actually reconstructed
+  from the older manifest; V2-reused slots cannot be overwritten at finalization.
+- B9's expanded diagnostic proved there was no stale command cell or move queue. The exact guest command control
+  was installed, but the production V2 release could start and open the target CommandPhase while the harness
+  was still draining its predecessor. The driver then started that already-actionable exact object a second
+  time and advanced it to TurnStart without public input. The lifecycle helper now adopts an already-open
+  COMMAND/FIGHT handler into its identity ledger and never re-enters it; non-actionable parked phases retain the
+  existing one-use receiver-realm re-entry rule.
+- The child train is declared against exact base `821020756`. Behavioral validation remains remote-only.

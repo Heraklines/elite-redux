@@ -385,8 +385,8 @@ test("a legacy enemy manifest cannot overwrite a newer V2 wave image", () => {
   );
   assert.match(
     adoption,
-    /battle\.enemyParty = rebuilt;[\s\S]*?if \(reusableV2Enemies\.size > 0/u,
-    "the complete hybrid party is installed without applying the older state over its V2 objects",
+    /battle\.enemyParty = rebuilt;[\s\S]*?this\.coopEnemyAuthority =[\s\S]*?enemies\.filter\(entry => !reusableV2Enemies\.has\(entry\.fieldIndex\)\)[\s\S]*?if \(reusableV2Enemies\.size > 0/u,
+    "the complete hybrid party is installed and the final legacy corrector excludes every reused V2 object",
   );
 });
 
@@ -586,6 +586,11 @@ test("the real command proof edge eagerly completes V2 and the duo fixture creat
   const startHelper = duoHarness.slice(startHelperStart, startHelperEnd);
   assert.match(startHelper, /manuallyStartedDuoPhases\.has\(phase\)/u);
   assert.match(startHelper, /adoptedCommandReentryPermits\.has\(phase\)/u);
+  assert.match(
+    startHelper,
+    /if \(uiActionable\) \{\s*manuallyStartedDuoPhases\.add\(phase\);\s*adoptedCommandReentryPermits\.delete\(phase\);\s*return;/u,
+    "an exact command phase already opened by a production V2 resume is adopted, never started twice",
+  );
   assert.match(startHelper, /if \(alreadyStarted && !permittedBootstrapReentry\) \{\s*return;/u);
   assert.match(startHelper, /adoptedCommandReentryPermits\.delete\(phase\)/u);
   assert.match(startHelper, /phase\.start\(\)/u);

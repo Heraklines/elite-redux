@@ -1951,6 +1951,16 @@ function permitDuoCommandTargetReentry(scene: BattleScene, phase: Phase): void {
 function startDuoCommandPhaseIfNeeded(scene: BattleScene, phase: Phase): void {
   const alreadyStarted = manuallyStartedDuoPhases.has(phase);
   const uiActionable = scene.ui.getMode() === UiMode.COMMAND || scene.ui.getMode() === UiMode.FIGHT;
+  // A production V2 release can resume `phase.start()` while the driver is still advancing the preceding
+  // replay/finalizer. In that case the exact current phase already owns an actionable public handler even
+  // though the harness did not initiate (and therefore did not record) that start. Starting it again is not
+  // a second-browser action: it re-enters a one-shot CommandPhase and can advance it to TurnStart before the
+  // public driver presses anything. Adopt this real, already-open lifecycle edge into the identity ledger.
+  if (uiActionable) {
+    manuallyStartedDuoPhases.add(phase);
+    adoptedCommandReentryPermits.delete(phase);
+    return;
+  }
   const permittedBootstrapReentry = alreadyStarted && adoptedCommandReentryPermits.has(phase) && !uiActionable;
   if (alreadyStarted && !permittedBootstrapReentry) {
     return;
