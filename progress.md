@@ -3403,3 +3403,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Static contracts require the immutable marker, pre-await queue order, and one-shot consumption. The task
   manifest advances to the reviewed `f285a8d48` checkpoint so remote qualification measures only this delta;
   no local co-op behavioral test or browser was run.
+
+# 2026-07-25 - Projected biome tails consume their exact destination carrier
+
+- Focused run `30135430021` proved the Mystery finalizer repair: six former B5 final-leave hangs passed. Its
+  remaining B5 red attached the replay factory observer after a buffered `ME_PRESENT` had already projected
+  the runtime-owned replay, and P1 required a transient `PostMysteryEncounterPhase` even when the ordered
+  terminal had already advanced the browser to `NextEncounterPhase`. Both drivers now prefer durable V2
+  evidence instead of recreating or latching a transient local phase.
+- The independent P1 soak exposed a real progression gap after guest-owned Crossroads -> BIOME_PICK. The V2
+  projector correctly destroyed the replica's speculative queue and queued `SwitchBiomePhase`, but that tail
+  ended before the wave-6 command carrier applied. Its empty queue fell through to `TurnInitPhase` on the
+  completed wave-5 battle and stranded the renderer in `CoopReplayTurnPhase`.
+- `SwitchBiomePhase` is now the address-exact DATA consumer for that one destination `CONTROL_COMMIT`. It
+  validates the immutable permit, source/destination waves, epoch, turn-one command frontier, and sealed
+  entry presentation. Only after the carrier installs the complete N+1 battle does it queue the sanctioned
+  `NewBiomeEncounterPhase` and end. A static contract pins the validation and queue order; Authority V2
+  contracts are 47/47 green, formatting and TypeScript are clean, and behavioral execution remains remote.

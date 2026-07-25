@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "f285a8d48bfa5390bf29e8dd3a702a0535ee5c8b",
+  "baseSha": "b54ff3f7fe7f502039043e5a6136d433815a9640",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -31,6 +31,7 @@
     "src/phases/mystery-encounter-phases.ts",
     "src/phases/select-biome-phase.ts",
     "src/phases/select-modifier-phase.ts",
+    "src/phases/switch-biome-phase.ts",
     "src/phases/switch-phase.ts",
     "src/phases/the-bargain-phase.ts",
     "src/phases/title-phase.ts",

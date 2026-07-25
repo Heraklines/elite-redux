@@ -521,7 +521,14 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
         }
         terminalStartedAt = Date.now();
         await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
-        await driveQueuedPhaseWithPublicDialogue(rig.guestCtx, "PostMysteryEncounterPhase");
+        await driveQueuedPhaseWithPublicDialogue(rig.guestCtx, "PostMysteryEncounterPhase", {
+          // The ordered terminal can cross and complete the transient PostMystery phase during the same
+          // destination-browser pump. Requiring that internal phase to remain observable races production.
+          // The shared counter is the durable proof that its exact ME_TERMINAL applied before any later
+          // NextEncounter/NewBattle surface is accepted.
+          matches: phase =>
+            phase.phaseName === "PostMysteryEncounterPhase" || rig.guestRuntime.controller.interactionCounter() >= 2,
+        });
       } finally {
         showDialogue.mockRestore();
         showText.mockRestore();

@@ -1653,6 +1653,22 @@ test("biome result materialization cannot invalidate its exact queued transition
   );
 });
 
+test("a projected biome transition consumes the exact destination command carrier before leaving its source battle", () => {
+  assert.match(switchBiomePhase, /public canReleaseForCoopV2Control\(successor:/u);
+  assert.match(switchBiomePhase, /successor\.kind === "CONTROL_COMMIT"/u);
+  assert.match(switchBiomePhase, /command\?\.kind === "COMMAND_FRONTIER"/u);
+  assert.match(switchBiomePhase, /permit\.wave === \(this\.coopSourceWave \?\? this\.coopWave\)/u);
+  assert.match(switchBiomePhase, /permit\.nextWave === command\.wave/u);
+  assert.match(switchBiomePhase, /material\.entryPresentation\.length > 0/u);
+  const release = switchBiomePhase.indexOf("public releaseForCoopV2Control(");
+  const queueEncounter = switchBiomePhase.indexOf(
+    'globalScene.phaseManager.unshiftNew("NewBiomeEncounterPhase")',
+    release,
+  );
+  const endSwitch = switchBiomePhase.indexOf("this.end();", queueEncounter);
+  assert.ok(release >= 0 && queueEncounter > release && endSwitch > queueEncounter);
+});
+
 test("a V2 biome receipt is consumed without consulting the retired operation revision clock", () => {
   const watcherStart = biomeOperation.indexOf("export function adoptBiomeWatcherChoice(");
   const watcherEnd = biomeOperation.indexOf(

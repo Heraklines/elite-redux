@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import type { CoopAuthorityEntryKind, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { captureCoopAuthoritativeBattleState, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
@@ -39,6 +40,20 @@ import { BattlePhase } from "#phases/battle-phase";
 import { captureCoopEncounterAuthority } from "#phases/encounter-phase";
 import { getBiomeName } from "#utils/common";
 
+interface CoopV2BiomeCommandSuccessorClaim {
+  readonly sessionEpoch: number;
+  readonly revision: number;
+  readonly kind: CoopAuthorityEntryKind;
+  readonly operationId: string;
+  readonly nextControl: CoopNextControl;
+  readonly commandOpenMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+    readonly entryPresentation: readonly unknown[];
+  };
+}
+
 export class SwitchBiomePhase extends BattlePhase {
   public readonly phaseName = "SwitchBiomePhase";
   private readonly nextBiome: BiomeId;
@@ -67,6 +82,61 @@ export class SwitchBiomePhase extends BattlePhase {
     readonly destinationBiomeId: number;
     readonly nextWave: number;
   } | null = null;
+
+  /**
+   * A destructively projected BIOME_PICK has no speculative NewBattlePhase behind it. The exact next
+   * CONTROL_COMMIT must therefore use this live transition as its DATA consumer, then release it only after
+   * the complete destination battle image is installed. Without this bridge an empty phase queue falls
+   * through to TurnInit on the completed source battle and parks the renderer in CoopReplayTurnPhase.
+   */
+  public canReleaseForCoopV2Control(successor: CoopV2BiomeCommandSuccessorClaim): boolean {
+    const permit = getCoopBiomeTransitionTailPermit();
+    const command = successor.nextControl;
+    const material = successor.commandOpenMaterial;
+    const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
+    return (
+      this.coopGeneration >= 0
+      && coopSessionGeneration() === this.coopGeneration
+      && globalScene.phaseManager.getCurrentPhase() === this
+      && successor.sessionEpoch === getCoopController()?.sessionEpoch
+      && successor.kind === "CONTROL_COMMIT"
+      && successor.operationId.length > 0
+      && command?.kind === "COMMAND_FRONTIER"
+      && material != null
+      && command.epoch === successor.sessionEpoch
+      && command.wave === material.wave
+      && command.turn === material.turn
+      && command.turn === 1
+      && material.entryPresentation.length > 0
+      && permit != null
+      && permit.switchAdopted
+      && permit.historyRecorded
+      && permit.switchPrepared
+      && permit.destinationBiomeId === this.nextBiome
+      && permit.wave === (this.coopSourceWave ?? this.coopWave)
+      && permit.nextWave === command.wave
+      && globalScene.arena?.biomeId === permit.destinationBiomeId
+      && (ambientWave === permit.wave || ambientWave === permit.nextWave)
+    );
+  }
+
+  /** Install the exact post-switch presentation phase after CONTROL_COMMIT DATA changed source N to N+1. */
+  public releaseForCoopV2Control(successor: CoopV2BiomeCommandSuccessorClaim): boolean {
+    if (!this.canReleaseForCoopV2Control(successor)) {
+      return false;
+    }
+    const command = successor.nextControl;
+    if (
+      command.kind !== "COMMAND_FRONTIER"
+      || globalScene.currentBattle?.waveIndex !== command.wave
+      || globalScene.currentBattle.turn !== command.turn
+    ) {
+      return false;
+    }
+    globalScene.phaseManager.unshiftNew("NewBiomeEncounterPhase");
+    this.end();
+    return globalScene.phaseManager.getCurrentPhase() !== this;
+  }
 
   constructor(nextBiome: BiomeId, coopSourceWave: number | null = null) {
     super();
