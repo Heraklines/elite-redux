@@ -303,6 +303,14 @@ jobs:
         continue-on-error: true
         env:
           ER_SCENARIO: "1"
+          # Release soaks must execute the same complete Authority V2 graph as staging and the exhaustive
+          # co-op gate. Leaving these unset silently falls back to the legacy operation journal and can both
+          # miss V2 regressions and report legacy-only failures as release blockers.
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
           # #832: run each matrix leg under its own SOAK_PROFILE (god = today's deep-wave run; level = the
           # faint-heavy level-85 party). SOAK_PROFILE=god is byte-identical to leaving it unset.
           SOAK_PROFILE: ${{ matrix.soak_profile }}

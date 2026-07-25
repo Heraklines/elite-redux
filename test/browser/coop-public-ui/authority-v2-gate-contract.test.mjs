@@ -17,6 +17,8 @@ const root = new URL("../../../", import.meta.url);
 const gateWorkflow = readFileSync(new URL(".github/workflows/coop-gate-sharded.yml", root), "utf8");
 const campaignWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-campaign.yml", root), "utf8");
 const journeyWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-journey.yml", root), "utf8");
+const focusedSoakWorkflow = readFileSync(new URL(".github/workflows/coop-soak-focused.yml", root), "utf8");
+const nightlySoakWorkflow = readFileSync(new URL(".github/workflows/nightly-coop-soak.yml", root), "utf8");
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
 const battleStream = readFileSync(new URL("src/data/elite-redux/coop/coop-battle-stream.ts", root), "utf8");
@@ -126,6 +128,38 @@ test("every real-engine shard qualifies Authority V2 instead of hiding behind le
     /COOP_AUTHORITY_V2_(?:TURN|REPLACEMENT|WAVE|INTERACTION|RECOVERY):\s*"(?:off|false|0)"/u,
     "the exhaustive gameplay matrix may never downgrade the production architecture",
   );
+});
+
+test("every release soak and focused replay executes the complete Authority V2 graph", () => {
+  const nightlySoak = jobBlock(nightlySoakWorkflow, "soak");
+  const focusedSoak = jobBlock(focusedSoakWorkflow, "replay");
+  const gameOverPrerequisiteStart = journeyWorkflow.indexOf(
+    "      - name: Verify retained GameOver two-engine operation regression",
+  );
+  const gameOverPrerequisiteEnd = journeyWorkflow.indexOf(
+    "      - name: Enforce public-driver boundary",
+    gameOverPrerequisiteStart,
+  );
+  assert.notEqual(gameOverPrerequisiteStart, -1, "the public journey owns its two-engine prerequisite");
+  assert.ok(gameOverPrerequisiteEnd > gameOverPrerequisiteStart, "the prerequisite step has a bounded source block");
+  const gameOverPrerequisite = journeyWorkflow.slice(gameOverPrerequisiteStart, gameOverPrerequisiteEnd);
+
+  for (const [label, block] of [
+    ["nightly release soak", nightlySoak],
+    ["focused soak replay", focusedSoak],
+    ["GameOver two-engine prerequisite", gameOverPrerequisite],
+  ]) {
+    assert.match(block, /COOP_AUTHORITY_V2_TURN:\s*"on"/u, `${label} enables V2 turn authority`);
+    assert.match(block, /COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u, `${label} enables V2 replacement authority`);
+    assert.match(block, /COOP_AUTHORITY_V2_WAVE:\s*"on"/u, `${label} enables V2 wave authority`);
+    assert.match(block, /COOP_AUTHORITY_V2_INTERACTION:\s*"on"/u, `${label} enables V2 interaction authority`);
+    assert.match(block, /COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u, `${label} enables V2 recovery authority`);
+    assert.doesNotMatch(
+      block,
+      /COOP_AUTHORITY_V2_(?:TURN|REPLACEMENT|WAVE|INTERACTION|RECOVERY):\s*"(?:off|false|0)"/u,
+      `${label} may not downgrade the release architecture`,
+    );
+  }
 });
 
 test("public-browser campaign and staging bundle qualify the same V2 cutover", () => {

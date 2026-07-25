@@ -3963,3 +3963,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   remain intentionally excluded; this changes only immutable authoritative material projection.
 - The superseded aggregate was cancelled before consuming the full matrix. Static-only local qualification
   precedes a new exact-SHA focused and aggregate dispatch.
+
+## 2026-07-25 - Release-soak Authority V2 migration
+
+- Exact aggregate `30148515719` is green across every in-scope co-op shard at `cae9c0e23`; its only red is the
+  explicitly excluded Showdown/Tournament T4 lane. B6, B9, B11, browser-native WebRTC, static contracts, and
+  all mutation shards pass together.
+- Nightly run `30148771892` exposed two apparent failures, but its negotiated capability log proved the six
+  release profiles were still exercising legacy operation authority: none of the workflow steps enabled the
+  five Authority V2 build flags. The level profile then stranded a legacy `FAINT_SWITCH` transaction after a
+  wave-2 guest faint, and the journey deliberately aborted when the legacy operation cursor rejected the
+  first guest-owned `ME_PICK`. These are valid legacy findings but not qualification of staging's V2 graph.
+- `nightly-coop-soak.yml`, `coop-soak-focused.yml`, and the public GameOver journey's two-engine prerequisite
+  now enable turn, replacement, wave, interaction, and recovery V2 together. A source contract reads all three
+  exact job/step blocks and fails if any surface is absent or explicitly downgraded.
+- Next proof: replay the exact level seed `20260725` and fixed journey seed `828633` remotely under V2. Only a
+  reproduced V2 failure authorizes a product/harness patch; green means the obsolete legacy failures remain
+  diagnostic evidence while release qualification proceeds on the intended architecture.

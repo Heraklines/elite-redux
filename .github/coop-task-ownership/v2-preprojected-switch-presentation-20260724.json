@@ -3,9 +3,12 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "6c555712dded688b75586cefeacde15c82126d2d",
+  "baseSha": "cae9c0e232c081183b67ab2640bc210db82c0cc8",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
+    ".github/workflows/coop-public-ui-journey.yml",
+    ".github/workflows/coop-soak-focused.yml",
+    ".github/workflows/nightly-coop-soak.yml",
     "progress.md",
     "src/battle-scene.ts",
     "src/data/elite-redux/coop/authority-v2/authority-ledger.ts",

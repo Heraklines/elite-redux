@@ -56,6 +56,12 @@ jobs:
       - name: Run isolated campaign replay
         env:
           ER_SCENARIO: "1"
+          # An isolated replay must reproduce the release architecture, not the legacy fallback.
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
           SOAK_FIDELITY: production
           NODE_OPTIONS: "--max-old-space-size=8192"
         shell: bash

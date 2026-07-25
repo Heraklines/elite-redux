@@ -215,6 +215,13 @@ jobs:
         if: inputs.journey == 'game-over'
         env:
           ER_SCENARIO: "1"
+          # The build below is full Authority V2; its exact two-engine prerequisite must qualify the same
+          # authority graph rather than accidentally exercising legacy progression.
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: >-
           npx vitest run
