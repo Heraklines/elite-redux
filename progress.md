@@ -3798,3 +3798,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Record the proof (which also queues the signed `NewBattlePhase` bridge) before ending the phase. Also
   treat an already-recorded address-exact proof as monotonic: later redelivery no longer requires the retired
   phase to exist merely to reinstall the same callback.
+
+## 2026-07-25 - Crossroads campaign driver follows real browser scheduling
+
+- Exact-SHA gate `30144376074` proves the terminal-reward repair: C2 and C4 are green, including resume and
+  learn-move paths that previously parked at waves 2/4. C1, C5, and P1 all reached the same later frontier at
+  wave 6: the guest correctly retained `NewBattlePhase` after reward revision 25 while waiting for the next
+  typed entry, but the driver withheld the authority's already-current `ErCrossroadsPhase.start()` and then
+  waited for the guest to reach Crossroads. No interaction-open revision could exist in that order.
+- The soak driver now schedules this boundary like two independent browsers: start the authority's real
+  queued Crossroads phase first, let it author the exact `CONTROL_COMMIT/interaction-open`, then drive the
+  replica. The existing central V2 projector may consequently replace its battle-shaped ordered-wait carrier
+  with the immutable Crossroads generation; both real OPTION_SELECT handlers are still required before input.
+- This is a harness false red, not a production bypass. No product authority path changed, no private choice
+  was injected, and the public Crossroads owner still supplies Stay/Leave through UI input. Behavioral proof
+  remains GitHub-hosted only under `AGENTS.md`; local verification is static-only.

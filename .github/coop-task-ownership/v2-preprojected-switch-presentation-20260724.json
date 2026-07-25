@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "15ec6833634d5cecd82a93e042d1fce0df4ebe80",
+  "baseSha": "be65ee4d39e49b1e49384e8a7f838c093e809b6d",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -94,6 +94,7 @@
     "test/tests/elite-redux/showdown/showdown-sync-duo.test.ts",
     "test/tools/coop-duo-harness.ts",
     "test/tools/coop-local-peer.ts",
+    "test/tools/coop-soak-driver.ts",
     "test/utils/encounter-test-utils.ts"
   ],
   "lockedSchemaFiles": []

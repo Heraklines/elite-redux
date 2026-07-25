@@ -3045,6 +3045,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
   type CrossroadsPhaseSeam = {
     readonly phaseName: "ErCrossroadsPhase";
+    readonly coopV2ControlOperationId: string | null;
     start(): void;
   };
 
@@ -3070,6 +3071,20 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     if (hostPhase?.phaseName !== "ErCrossroadsPhase") {
       fail("no-park", wave, `expected queued ErCrossroadsPhase, reached ${hostPhase?.phaseName ?? "none"}`);
     }
+
+    // PhaseInterceptor stops BEFORE the matched host phase starts. In two real browsers the authority's
+    // PhaseManager starts Crossroads immediately and authors its CONTROL_COMMIT; the replica can then
+    // replace a battle-shaped AWAIT_SUCCESSOR carrier with the exact projected Crossroads phase. Driving
+    // the replica to ErCrossroadsPhase before starting this authority phase creates a harness-only cycle:
+    // guest waits in NewBattlePhase for interaction-open while the test withholds the only phase allowed to
+    // author it. Start the real authority phase first, exactly as its independent browser event loop does.
+    let hostOpen = withClientSync(rig.hostCtx, () => rig.hostScene.ui.getMode() === UiMode.OPTION_SELECT);
+    if (!hostOpen && hostPhase.coopV2ControlOperationId == null) {
+      await withClient(rig.hostCtx, async () => {
+        hostPhase.start();
+        await drainLoopback();
+      });
+    }
     const guestPhase = (await withClient(rig.guestCtx, () =>
       driveClientPhaseQueueTo(rig.guestScene, "ErCrossroadsPhase"),
     )) as unknown as CrossroadsPhaseSeam;
@@ -3093,24 +3108,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       fail("desync", wave, `Crossroads owner parity diverged at pinned=${pinned}`);
     }
 
-    let hostOpen = withClientSync(rig.hostCtx, () => rig.hostScene.ui.getMode() === UiMode.OPTION_SELECT);
+    hostOpen = withClientSync(rig.hostCtx, () => rig.hostScene.ui.getMode() === UiMode.OPTION_SELECT);
     let guestOpen = withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode() === UiMode.OPTION_SELECT);
-    if (hostOpen !== guestOpen) {
-      fail(
-        "desync",
-        wave,
-        `Crossroads public surface was already asymmetric hostOpen=${hostOpen} guestOpen=${guestOpen}`,
-      );
-    }
-    if (!hostOpen) {
-      await withClient(rig.hostCtx, async () => {
-        hostPhase.start();
-        await drainLoopback();
-      });
+    if (!guestOpen && guestPhase.coopV2ControlOperationId == null) {
       await withClient(rig.guestCtx, async () => {
         guestPhase.start();
         await drainLoopback();
       });
+    }
+    if (!hostOpen || !guestOpen) {
       for (let attempt = 0; attempt < 320; attempt++) {
         hostOpen = await withClient(rig.hostCtx, async () => {
           await drainLoopback();
