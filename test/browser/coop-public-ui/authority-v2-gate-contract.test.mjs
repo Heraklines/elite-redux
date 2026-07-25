@@ -58,6 +58,11 @@ const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts"
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
 const biomeShopPhase = readFileSync(new URL("src/phases/biome-shop-phase.ts", root), "utf8");
 const soakDriver = readFileSync(new URL("test/tools/coop-soak-driver.ts", root), "utf8");
+const soakTest = readFileSync(new URL("test/tests/elite-redux/coop/coop-soak.test.ts", root), "utf8");
+const soakFidelityGate = readFileSync(
+  new URL("test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts", root),
+  "utf8",
+);
 const hostFaintSoak = readFileSync(new URL("test/tests/elite-redux/coop/coop-soak-host-faint.test.ts", root), "utf8");
 const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "utf8");
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
@@ -1908,5 +1913,21 @@ test("the replacement harness preserves an already-installed command frontier", 
   assert.ok(
     commandReturn >= 0 && bootFallback > commandReturn,
     "an exact V2 CommandPhase is retained before the mirrored-boot fallback is considered",
+  );
+});
+
+test("soaks budget command rendezvous for authoritative presentation and restore the test default", () => {
+  assert.match(
+    soakTest,
+    /setCoopRendezvousWaitMs\(2_000\)/u,
+    "the normal soak cannot compress a healthy entry presentation into the generic 350ms retry ceiling",
+  );
+  assert.match(soakTest, /resetCoopRendezvousWaitMs\(\)/u);
+  assert.match(soakFidelityGate, /setCoopRendezvousWaitMs\(2000\)/u);
+  assert.match(soakFidelityGate, /resetCoopRendezvousWaitMs\(\)/u);
+  assert.doesNotMatch(
+    soakFidelityGate,
+    /afterEach\([\s\S]*?setCoopRendezvousWaitMs\(60_000\)/u,
+    "cleanup must restore test-aware semantics instead of latching the live interval into later files",
   );
 });

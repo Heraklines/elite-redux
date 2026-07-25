@@ -32,7 +32,7 @@
 
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
@@ -103,7 +103,7 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
     afterEach(() => {
       setCoopWaveBarrierMs(60_000);
       setCoopFaintSwitchWaitMs(60_000);
-      setCoopRendezvousWaitMs(60_000);
+      resetCoopRendezvousWaitMs();
       accuracySpy?.mockRestore();
       accuracySpy = undefined;
       logs.dispose();

@@ -24,6 +24,7 @@
 import { initGlobalScene } from "#app/global-scene";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { Stat } from "#enums/stat";
 import { Move } from "#moves/move";
@@ -95,6 +96,11 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     // Production waits 60 seconds. Two seconds remains aggressively bounded for CI while allowing the
     // renderer to drain a large immutable entry-presentation ledger before it reaches COMMAND.
     setCoopWaveBarrierMs(2_000);
+    // The command rendezvous has seven live 60-second recovery attempts. Vitest's generic 50ms shortcut
+    // compresses that entire presentation budget to 350ms, which is shorter than a healthy multi-ability
+    // entry replay. Preserve a bounded CI wait while allowing the real public presentation chain to reach
+    // its command surface; failure still closes deterministically within the test's NO-PARK budget.
+    setCoopRendezvousWaitMs(2_000);
     // #786 faint replacement: bound the host's wait for the guest's relayed replacement pick so a
     // guest-owned faint resolves fast via the harness's auto-picker instead of the 60s live default.
     setCoopFaintSwitchWaitMs(4000);
@@ -141,6 +147,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
     setCoopFaintSwitchWaitMs(60_000);
+    resetCoopRendezvousWaitMs();
     accuracySpy?.mockRestore();
     accuracySpy = undefined;
     recoverySpy?.mockRestore();

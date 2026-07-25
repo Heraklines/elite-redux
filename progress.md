@@ -3579,3 +3579,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   and removes a false B5 red without relaxing the retained terminal or public-surface assertions.
 - The static contract requires scheduler ownership and runtime ownership to disagree before the harness may
   call `start()`. Behavioral B5 verification remains GitHub-hosted only.
+
+# 2026-07-25 - The normal soak preserves a realistic command-presentation rendezvous budget
+
+- Aggregate C5 at `839d137eb` reached wave 6 with both engines mechanically converged and the guest correctly
+  rendering the immutable 16-event biome-entry presentation. The host nevertheless exhausted seven command
+  rendezvous attempts because Vitest's generic 50 ms shortcut compressed the live seven-by-60-second budget
+  to only 350 ms, then entered the shared terminal before the healthy renderer could announce its command.
+- The normal soak now uses the same bounded two-second rendezvous interval already justified by its
+  production-fidelity sibling. This preserves the real public presentation chain while retaining a finite
+  14-second worst-case command failure inside the NO-PARK budget. Both files restore the test-aware default
+  with `resetCoopRendezvousWaitMs()`, preventing an explicit 60-second value from leaking into later files in
+  the shared-module shard.
+- This is harness timing only: the production interval remains 60 seconds and no production source changed.
+  Behavioral C5 execution remains GitHub-hosted only.
