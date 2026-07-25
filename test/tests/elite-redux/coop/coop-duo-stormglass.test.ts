@@ -122,6 +122,8 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
       await drainLoopback();
       expect(getStormglassWeather()).toBe(WeatherType.SANDSTORM);
       expect(globalScene.arena.weather?.weatherType).toBe(WeatherType.SANDSTORM);
+      expect(globalScene.arena.weather?.turnsLeft).toBe(5);
+      expect(globalScene.arena.weather?.maxDuration).toBe(5);
     });
 
     expect(pair.faultsInjected(), "Authority V2 emits no raw stormglass correctness carrier").toBe(0);
@@ -153,6 +155,7 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
       expect(getStormglassWeather()).toBe(WeatherType.SANDSTORM);
       expect(globalScene.arena.weather?.weatherType).toBe(WeatherType.SANDSTORM);
       expect(globalScene.arena.weather?.turnsLeft).toBe(5);
+      expect(globalScene.arena.weather?.maxDuration).toBe(5);
     });
 
     expect(

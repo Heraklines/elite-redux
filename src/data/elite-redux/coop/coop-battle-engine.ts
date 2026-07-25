@@ -54,6 +54,7 @@ import {
   ensureCoopPokemonPresentationNodes,
   getActuallyFieldedCoopPokemon,
   settleCoopFieldPresentation,
+  // biome-ignore lint/suspicious/noImportCycles: the established engine adapter/renderer bridge cycle predates this scoped V2 material projection change.
 } from "#data/elite-redux/coop/coop-field-presentation";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type {
@@ -113,12 +114,14 @@ import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { WeatherType } from "#enums/weather-type";
+// biome-ignore lint/suspicious/noImportCycles: this engine adapter necessarily materializes live Pokemon objects; removing the existing runtime cycle is a separate architectural migration.
 import { EnemyPokemon, type PlayerPokemon, type Pokemon } from "#field/pokemon";
 // biome-ignore lint/performance/noNamespaceImport: held-item reconstruction resolves the modifier class by serialized name (`Modifier[className]`), exactly like the save-load path in game-data.ts.
 import * as Modifier from "#modifiers/modifier";
 import { PersistentModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
 import { ModifierData } from "#system/modifier-data";
+// biome-ignore lint/suspicious/noImportCycles: authoritative state adoption uses the established save-data constructor path, whose Pokemon dependency participates in the same pre-existing cycle.
 import { PokemonData } from "#system/pokemon-data";
 import type { StarterDataEntry } from "#types/save-data";
 import { EnemyBattleInfo } from "#ui/enemy-battle-info";
@@ -3900,8 +3903,26 @@ function applyCoopAuthoritativeBattleStateInternal(
     if ((arena.weather?.weatherType ?? 0) !== state.weather) {
       arena.trySetWeather(state.weather as WeatherType);
     }
+    // Unlike the cosmetic/per-turn checksum, an Authority V2 entry is a complete immutable mechanical
+    // result. Applying only the weather identity made a user-less trySetWeather() construct duration 0 even
+    // when the signed state carried Stormglass's five turns. Install the exact counter after the type exists;
+    // raise maxDuration as needed so the public arena flyout cannot show a shorter lifetime than the signed
+    // result. Preserve a larger historical maximum because V1 carries the remaining count, not that display
+    // ceiling. Immutable weather legitimately remains 0.
+    if (arena.weather?.weatherType === state.weather) {
+      const weatherTurnsLeft = Math.max(0, Math.trunc(state.weatherTurnsLeft));
+      arena.weather.turnsLeft = weatherTurnsLeft;
+      arena.weather.maxDuration = Math.max(arena.weather.maxDuration, weatherTurnsLeft);
+    }
     if ((arena.terrain?.terrainType ?? 0) !== state.terrain) {
       arena.trySetTerrain(state.terrain as TerrainType, true);
+    }
+    // Terrain is the same authoritative material domain as weather. Leaving this counter at the local
+    // constructor default lets equal terrain identities expire on different turns without a checksum alarm.
+    if (arena.terrain?.terrainType === state.terrain) {
+      const terrainTurnsLeft = Math.max(0, Math.trunc(state.terrainTurnsLeft));
+      arena.terrain.turnsLeft = terrainTurnsLeft;
+      arena.terrain.maxDuration = Math.max(arena.terrain.maxDuration, terrainTurnsLeft);
     }
     reconcileArenaTags(state.arenaTags, true);
     globalScene.money = state.money;

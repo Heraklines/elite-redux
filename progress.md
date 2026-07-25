@@ -3950,3 +3950,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   presentation, or player-facing assertion is weakened.
 - Local validation remains static-only per `AGENTS.md`: targeted Biome has no errors, `git diff --check` is
   clean, and all behavioral requalification remains on GitHub-hosted runners.
+
+## 2026-07-25 - Exact-SHA `313c5fba0` authoritative arena-duration closure
+
+- The completed `bfe2b3b01` aggregate added a late B6 failure after the earlier shard snapshot. Its Stormglass
+  result was mechanically real: V2 state tick 13 carried the host's chosen Sandstorm and remaining duration,
+  but `applyCoopAuthoritativeBattleStateInternal` installed only weather identity. The guest's user-less
+  `trySetWeather` therefore created the right weather with zero turns while the host retained five.
+- Complete V2 state application now installs signed weather and terrain remaining-turn counters after their
+  identities exist, and raises the visible `maxDuration` floor to the signed result. The existing Stormglass
+  duo regression now asserts both `turnsLeft` and `maxDuration` on host and guest. Per-turn checksum counters
+  remain intentionally excluded; this changes only immutable authoritative material projection.
+- The superseded aggregate was cancelled before consuming the full matrix. Static-only local qualification
+  precedes a new exact-SHA focused and aggregate dispatch.
