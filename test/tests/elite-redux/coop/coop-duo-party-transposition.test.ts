@@ -294,8 +294,8 @@ describe.skipIf(!RUN)(
           "the deterministic second-turn win is installed after reciprocal command adoption",
         ).toBe(true);
         expect(
-          rig.hostScene.getEnemyField().every(enemy => enemy.getMoveset().every(move => move.moveId === MoveId.SPLASH)),
-          "the already-adopted foes cannot open an unrelated second replacement",
+          rig.hostScene.getEnemyField().every(enemy => enemy.getMoveset().every(move => move.moveId === MoveId.GROWL)),
+          "the adopted harmless foes remain installed for the post-replacement turn",
         ).toBe(true);
       });
       const settledTurn = rig.hostScene.currentBattle.turn;

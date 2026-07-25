@@ -3608,3 +3608,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   log; a queued/current object or stale same-mode handler can no longer advance authority.
 - This closes the architectural `phase queued != controlInstalled` invariant on Mystery without weakening
   any other interaction proof. Behavioral C1 and Mystery qualification remain GitHub-hosted only.
+
+# 2026-07-25 - The party-transposition fixture checks the move it actually installs
+
+- Aggregate B10 at `839d137eb` did not reach the replacement invariant it named: the fixture replaced both
+  enemy movesets with `GROWL`, then immediately required every move to remain `SPLASH`. That stale expectation
+  became unconditional when the harmless move was migrated from Splash to Growl in `63b1b082d`.
+- The assertion now requires the installed Growl moveset. Its surrounding one-HP, actionable-command, reciprocal
+  adoption, replacement, victory, and transposition checks are unchanged, so the test again exercises the
+  production behavior instead of failing on its own setup.
+- This is a test-only false-signal repair. Behavioral B10 execution remains GitHub-hosted only.
