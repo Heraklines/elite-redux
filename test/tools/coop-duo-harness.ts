@@ -4900,7 +4900,7 @@ export async function driveDuoGuestMeReplay(rig: DuoRig): Promise<GuestMeReplay>
     // own drain is bounded; protocol successors that still require a host receipt are handled by the
     // alternating settlement loop below.
     await pumpDuoDestinations(rig, 1);
-    const replay = await withClient(rig.guestCtx, () => {
+    const replay = await withClient(rig.guestCtx, async () => {
       // A buffered ME_PRESENT can be admitted by the pre-pump and project/start the exact replay before
       // this helper installs its temporary factory observer. Two real browsers do not recreate the local
       // MysteryEncounterPhase after that ordered control already exists. Prefer the runtime-owned replay
@@ -4913,7 +4913,18 @@ export async function driveDuoGuestMeReplay(rig: DuoRig): Promise<GuestMeReplay>
           : current?.phaseName === "CoopReplayMePhase"
             ? current
             : null;
-      return projectedReplay ?? startGuestMeReplay(rig.guestScene);
+      if (projectedReplay == null) {
+        return startGuestMeReplay(rig.guestScene);
+      }
+      if (current === projectedReplay && activeReplay !== projectedReplay) {
+        // PhaseInterceptor deliberately suppresses PhaseManager.startCurrentPhase during engine tests.
+        // The V2 projector still atomically installs its exact phase as current, so reproduce only the
+        // one scheduler edge a real browser performs immediately. An already-active object has crossed
+        // that edge and must never be re-entered: its outcome/terminal arms are single-owner.
+        projectedReplay.start();
+        await drainLoopback();
+      }
+      return projectedReplay;
     });
     return await settleDuoGuestMeReplayWithDelivery(rig, replay);
   } finally {

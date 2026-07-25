@@ -3564,3 +3564,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   remain mandatory before any command target can prove control installed.
 - A source contract pins the retained-source lookup, material-applied and entry-kind gates, and ordering before
   command-proof evaluation. Behavioral C-lane verification remains GitHub-hosted only.
+
+# 2026-07-25 - The duo Mystery driver starts an interceptor-installed V2 replay exactly once
+
+- Focused B5 run `30138638196` failed only the LEG 3 battle-handoff fixture. Its artifact shows the V2
+  `ME_PRESENT` material applying and atomically replacing inert `LoginPhase` with the exact
+  `CoopReplayMePhase`, followed by 20 seconds of pending-control redelivery with no `guest diverted` start
+  line. Production `PhaseManager` starts this phase immediately; the test `PhaseInterceptor` deliberately
+  suppresses `startCurrentPhase`, while `driveDuoGuestMeReplay` incorrectly treated a merely-current
+  projected object as already started.
+- The representative duo driver now starts that exact current object only when the runtime active-replay
+  pointer proves it has not crossed the scheduler edge. Already-active projected replays remain untouched,
+  and absence of any V2 projection still uses the existing legacy divert. This changes no production code
+  and removes a false B5 red without relaxing the retained terminal or public-surface assertions.
+- The static contract requires scheduler ownership and runtime ownership to disagree before the harness may
+  call `start()`. Behavioral B5 verification remains GitHub-hosted only.

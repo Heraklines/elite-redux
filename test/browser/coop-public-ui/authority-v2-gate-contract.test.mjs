@@ -660,6 +660,25 @@ test("V2 Mystery waits for its ordered presentation and destructively replaces t
   );
 });
 
+test("the duo Mystery driver crosses only an interceptor-suppressed projected phase start", () => {
+  const driverStart = duoHarness.indexOf("export async function driveDuoGuestMeReplay(");
+  const driverEnd = duoHarness.indexOf("\n/**", driverStart + 1);
+  assert.notEqual(driverStart, -1, "the duo harness exposes its retained Mystery driver");
+  assert.ok(driverEnd > driverStart, "the retained Mystery driver has a bounded source block");
+  const driver = duoHarness.slice(driverStart, driverEnd);
+  const readsActive = driver.indexOf("getActiveCoopReplayMePhaseForHarness()");
+  const readsCurrent = driver.indexOf("phaseManager.getCurrentPhase()");
+  const provesUnstartedCurrent = driver.indexOf("current === projectedReplay && activeReplay !== projectedReplay");
+  const startsProjected = driver.indexOf("projectedReplay.start()", provesUnstartedCurrent);
+  const legacyFallback = driver.indexOf("startGuestMeReplay(rig.guestScene)");
+  assert.ok(readsActive >= 0 && readsCurrent > readsActive, "the driver observes both runtime and scheduler ownership");
+  assert.ok(
+    provesUnstartedCurrent > readsCurrent && startsProjected > provesUnstartedCurrent,
+    "only a current phase which the interceptor left inactive receives the omitted browser scheduler edge",
+  );
+  assert.ok(legacyFallback > readsCurrent, "legacy construction remains a fallback only when V2 projected no replay");
+});
+
 test("every Mystery result stays on the presentation's pre-battle authority coordinate", () => {
   assert.match(meOperation, /export const COOP_ME_AUTHORITY_TURN = 0;/u);
   assert.match(
