@@ -79,6 +79,8 @@ export class SwitchBiomePhase extends BattlePhase {
   private coopRoutesApplied = false;
   private coopRevealsApplied = false;
   private coopStructureApplied = false;
+  /** True after the exact destination CONTROL_COMMIT authorized creation of its Battle shell. */
+  private coopDestinationBattleCreated = false;
   /** Exact permit whose duplicate NewBattle tail was removed after retained authority advanced already. */
   private coopRetainedBattlePermit: {
     readonly operationId: string;
@@ -99,6 +101,7 @@ export class SwitchBiomePhase extends BattlePhase {
     const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
     return (
       this.coopGeneration >= 0
+      && this.coopAwaitDestinationCarrier
       && coopSessionGeneration() === this.coopGeneration
       && globalScene.phaseManager.getCurrentPhase() === this
       && successor.sessionEpoch === getCoopController()?.sessionEpoch
@@ -121,7 +124,68 @@ export class SwitchBiomePhase extends BattlePhase {
   }
 
   /**
-   * Install the exact post-switch presentation phase after CONTROL_COMMIT DATA changed source N to N+1.
+   * Materialize the destination Battle shell authorized by this exact command-open entry.
+   *
+   * A destructively projected BIOME_PICK intentionally has no speculative NewBattlePhase behind it. The
+   * authoritative state applier reconciles party/field/arena material but does not replace Battle identity,
+   * so applying wave N+1 DATA while the scene still owns wave N leaves every later control proof impossible.
+   * This hook substitutes only that missing structural NewBattle step. It runs after address-exact V2
+   * admission and before DATA, and it cannot choose a wave or successor: the retained permit and signed
+   * turn-one frontier must both name the immediately following battle.
+   */
+  public prepareForCoopV2ControlMaterial(successor: CoopV2BiomeCommandSuccessorClaim): boolean {
+    if (!this.canReleaseForCoopV2Control(successor)) {
+      return false;
+    }
+    const command = successor.nextControl;
+    const permit = getCoopBiomeTransitionTailPermit();
+    const currentBattle = globalScene.currentBattle;
+    if (command.kind !== "COMMAND_FRONTIER" || permit == null || currentBattle == null) {
+      return false;
+    }
+    if (currentBattle.waveIndex === command.wave) {
+      const alreadyPrepared = currentBattle.turn === command.turn;
+      this.coopDestinationBattleCreated ||= alreadyPrepared;
+      return alreadyPrepared;
+    }
+    if (
+      this.coopDestinationBattleCreated
+      || currentBattle.waveIndex !== permit.wave
+      || command.wave !== permit.nextWave
+      || command.wave !== currentBattle.waveIndex + 1
+      || command.turn !== 1
+    ) {
+      return false;
+    }
+    try {
+      const destinationBattle = globalScene.newBattle();
+      if (
+        globalScene.currentBattle !== destinationBattle
+        || destinationBattle.waveIndex !== command.wave
+        || destinationBattle.turn !== command.turn
+      ) {
+        throw new Error(
+          `destination Battle address mismatch expected=${command.wave}:${command.turn} `
+            + `actual=${destinationBattle.waveIndex}:${destinationBattle.turn}`,
+        );
+      }
+      this.coopDestinationBattleCreated = true;
+      coopLog(
+        "v2-control",
+        `SwitchBiomePhase prepared destination Battle shell wave=${permit.wave}->${destinationBattle.waveIndex}`,
+      );
+      return true;
+    } catch (error) {
+      coopWarn("v2-control", "SwitchBiomePhase could not prepare its exact destination Battle shell", error);
+      failCoopSharedSession(
+        `The shared biome transition could not create its authoritative battle at wave ${command.wave}.`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Install the exact post-switch presentation phase after CONTROL_COMMIT DATA sealed the prepared N+1 shell.
    *
    * `canReleaseForCoopV2Control` deliberately does not require the permit's history/preparation stages or
    * destination arena before DATA is applied. A destructively projected biome result can leave this phase
@@ -653,10 +717,11 @@ export class SwitchBiomePhase extends BattlePhase {
   }
 
   private coopBoundaryStillLive(): boolean {
+    const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
     return (
       this.coopGeneration >= 0
       && coopSessionGeneration() === this.coopGeneration
-      && globalScene.currentBattle?.waveIndex === this.coopWave
+      && (ambientWave === this.coopWave || (this.coopDestinationBattleCreated && ambientWave === this.coopWave + 1))
       && globalScene.phaseManager.getCurrentPhase() === this
     );
   }

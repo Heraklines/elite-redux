@@ -466,12 +466,16 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
   );
 
   const bindReward = projector.indexOf("bound exact reward generation");
+  const bindCrossroads = projector.indexOf("bound exact crossroads generation");
+  const bindBiome = projector.indexOf("bound exact biome generation");
   const retainMarket = projector.indexOf("retained live market shell");
   const bindMarket = projector.indexOf("bound exact market generation");
   const destructiveSequentialProjection = projector.indexOf(
     "phaseManager.replaceWithCoopAuthoritativePhase(current, phase)",
   );
   assert.ok(bindReward >= 0, "an exact already-live reward generation is bound in place");
+  assert.ok(bindCrossroads >= 0, "an exact already-live Crossroads generation is bound in place");
+  assert.ok(bindBiome >= 0, "an exact already-live World Map generation is bound in place");
   assert.ok(retainMarket >= 0, "a later market operation retains the one live FIFO consumer");
   assert.ok(bindMarket >= 0, "an exact already-live market generation is bound in place");
   assert.ok(
@@ -489,6 +493,20 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
     projector,
     /current\.is\("SelectModifierPhase"\)[\s\S]*?installCoopV2RewardProjection\(plan\.operationId, plan\.projection\)/u,
     "the reward fast path validates the existing constructor generation before binding it",
+  );
+  assert.match(
+    projector,
+    /current\.is\("ErCrossroadsPhase"\)[\s\S]*?installCoopV2CrossroadsProjection\(plan\.operationId, plan\.sourceWave, control\.turn\)/u,
+    "the Crossroads fast path validates the existing captured source boundary before binding it",
+  );
+  assert.match(
+    projector,
+    /current\.is\("SelectBiomePhase"\)[\s\S]*?installCoopV2BiomeProjection\(plan\.operationId, plan\.sourceWave, control\.turn, plan\.pinned\)/u,
+    "the World Map fast path validates the existing captured source boundary and immutable pin",
+  );
+  assert.ok(
+    bindCrossroads < destructiveSequentialProjection && bindBiome < destructiveSequentialProjection,
+    "live biome generations are retained before the destructive obsolete-predecessor fallback",
   );
   assert.match(
     projector,
@@ -1701,6 +1719,7 @@ test("a projected biome transition consumes the exact destination command carrie
   );
   assert.match(switchBiomePhase, /private readonly coopAwaitDestinationCarrier: boolean/u);
   assert.match(switchBiomePhase, /public canReleaseForCoopV2Control\(successor:/u);
+  assert.match(switchBiomePhase, /public prepareForCoopV2ControlMaterial\(successor:/u);
   assert.match(switchBiomePhase, /successor\.kind === "CONTROL_COMMIT"/u);
   assert.match(switchBiomePhase, /command\?\.kind === "COMMAND_FRONTIER"/u);
   assert.match(switchBiomePhase, /permit\.wave === \(this\.coopSourceWave \?\? this\.coopWave\)/u);
@@ -1710,6 +1729,7 @@ test("a projected biome transition consumes the exact destination command carrie
     switchBiomePhase.indexOf("public canReleaseForCoopV2Control("),
     switchBiomePhase.indexOf("public releaseForCoopV2Control("),
   );
+  assert.match(admission, /this\.coopAwaitDestinationCarrier/u);
   assert.doesNotMatch(
     admission,
     /permit\.(?:historyRecorded|switchPrepared)/u,
@@ -1719,6 +1739,38 @@ test("a projected biome transition consumes the exact destination command carrie
     admission,
     /globalScene\.arena\?\.biomeId === permit\.destinationBiomeId/u,
     "pre-DATA admission accepts the exact carrier while the renderer still shows the source arena",
+  );
+  const preparation = switchBiomePhase.slice(
+    switchBiomePhase.indexOf("public prepareForCoopV2ControlMaterial("),
+    switchBiomePhase.indexOf("public releaseForCoopV2Control("),
+  );
+  assert.match(
+    preparation,
+    /currentBattle\.waveIndex !== permit\.wave[\s\S]*?command\.wave !== permit\.nextWave[\s\S]*?command\.wave !== currentBattle\.waveIndex \+ 1/u,
+    "structural preparation is pinned to the exact immediately-next permitted wave",
+  );
+  assert.match(preparation, /const destinationBattle = globalScene\.newBattle\(\)/u);
+  assert.match(
+    preparation,
+    /destinationBattle\.waveIndex !== command\.wave[\s\S]*?destinationBattle\.turn !== command\.turn/u,
+    "the prepared battle shell must prove the signed destination address",
+  );
+  assert.match(
+    switchBiomePhase,
+    /this\.coopDestinationBattleCreated && ambientWave === this\.coopWave \+ 1/u,
+    "the same retained phase remains lifetime-valid while DATA and queue release finish on its prepared shell",
+  );
+  const controlApplyStart = coopRuntime.indexOf('if (entry.kind === "CONTROL_COMMIT")');
+  const controlApplyEnd = coopRuntime.indexOf('if (entry.kind === "WAVE_ADVANCE"', controlApplyStart);
+  const controlApply = coopRuntime.slice(controlApplyStart, controlApplyEnd);
+  const runtimePrepare = controlApply.indexOf("!prepareCoopV2CommandOpenMaterialConsumer(runtime, entry)");
+  const runtimeApply = controlApply.indexOf("applyCoopAuthoritativeBattleState(material.authoritativeState, true)");
+  assert.ok(
+    controlApplyStart >= 0
+      && controlApplyEnd > controlApplyStart
+      && runtimePrepare >= 0
+      && runtimeApply > runtimePrepare,
+    "the exact structural shell is prepared before immutable command-open DATA is applied",
   );
   const projectedPark = switchBiomePhase.indexOf("if (authoritativeGuest && this.coopAwaitDestinationCarrier)");
   const eagerRetry = switchBiomePhase.indexOf("retryCoopV2PendingAuthorityAtSafeBoundary();", projectedPark);

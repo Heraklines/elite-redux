@@ -4808,6 +4808,38 @@ function hasCoopV2CommandOpenMaterialConsumer(runtime: CoopRuntime, entry: CoopA
 }
 
 /**
+ * Let an exact parked transition create only the structural shell on which command-open DATA must land.
+ *
+ * Ordinary CommandPhase consumers already own the addressed battle and need no preparation. A projected
+ * transition can instead be the sole exact consumer while its local speculative NewBattlePhase was removed;
+ * that phase must materialize the destination Battle object before the immutable state transaction runs.
+ * The same non-mutating admission proof gates this hook, so merely implementing a similarly named method
+ * cannot opt an arbitrary screen into V2 mechanical authority.
+ */
+function prepareCoopV2CommandOpenMaterialConsumer(runtime: CoopRuntime, entry: CoopAuthorityEntry): boolean {
+  const control = entry.nextControl;
+  if (control.kind !== "COMMAND_FRONTIER") {
+    return false;
+  }
+  const successor = coopV2ControlSuccessorClaim(entry);
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        canReleaseForCoopV2Control?: (claim: CoopV2ControlSuccessorClaim) => boolean;
+        prepareForCoopV2ControlMaterial?: (claim: CoopV2ControlSuccessorClaim) => boolean;
+      }
+    | undefined;
+  if (phase?.prepareForCoopV2ControlMaterial != null) {
+    return phase.canReleaseForCoopV2Control?.(successor) === true && phase.prepareForCoopV2ControlMaterial(successor);
+  }
+  if (phase?.canReleaseForCoopV2Control?.(successor) === true) {
+    return true;
+  }
+  // A real CommandPhase registered its complete address in v2DeferredCommandStarts. It already owns the
+  // correct battle shell, so there is no transition-local structural work to perform.
+  return [...runtime.v2DeferredCommandStarts.values()].some(claim => commandOpenControlAddressesClaim(control, claim));
+}
+
+/**
  * Release the real turn finalizer parked by a null-successor TURN_COMMIT. The successor's live adapter must
  * call this only after installing its own phase wake or stream carrier, so Phaser can never fall through an
  * empty queue into a locally-derived command.
@@ -5829,6 +5861,17 @@ function buildCoopV2LiveSeams(
             );
             return "deferred";
           }
+          if (material.kind === "command-open" && !prepareCoopV2CommandOpenMaterialConsumer(runtime, entry)) {
+            // Structural preparation is an exact part of material installation, not a locally inferred
+            // successor. Retain the globally ordered entry until that same consumer can prove the shell;
+            // applying destination DATA to the predecessor Battle object is forbidden.
+            coopLog(
+              "v2-control",
+              `deferred command-open rev=${entry.revision} until its exact engine shell is prepared `
+                + `phase=${globalScene.phaseManager?.getCurrentPhase()?.phaseName ?? "none"}`,
+            );
+            return "deferred";
+          }
           const stateApplied =
             applyCoopAuthoritativeBattleState(material.authoritativeState, true)
             || reapplyAcceptedCoopAuthoritativeBattleState(material.authoritativeState, true);
@@ -6337,6 +6380,38 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
     if (replayPhase.retainsCoopV2MePresentationBoundary(plan.pinned)) {
       runtime.v2ProjectedInteractionControlId = controlId;
       coopLog("v2-interaction", `retained live Mystery shell for ordered generation ${controlId}`);
+      return true;
+    }
+  }
+
+  // Crossroads and World Map can already be the exact live sequential phase when the authority's open
+  // entry arrives. Their reciprocal rendezvous intentionally starts before owner parity is known. Replacing
+  // that same constructor generation after the wait resolves or while its continuation is queued orphans
+  // the only callback which can open the watcher surface. Bind the immutable address/pin onto the live phase
+  // when its captured source boundary matches; a wrong wave/turn/operation is rejected and still falls
+  // through to destructive projection below.
+  if (plan.kind === "crossroads" && current.is("ErCrossroadsPhase")) {
+    const crossroadsPhase = current as Phase & {
+      installCoopV2CrossroadsProjection(operationId: string, sourceWave: number, sourceTurn: number): boolean;
+    };
+    if (crossroadsPhase.installCoopV2CrossroadsProjection(plan.operationId, plan.sourceWave, control.turn)) {
+      runtime.v2ProjectedInteractionControlId = controlId;
+      coopLog("v2-interaction", `bound exact crossroads generation ${controlId} to live ${current.phaseName}`);
+      return true;
+    }
+  }
+  if (plan.kind === "biome" && current.is("SelectBiomePhase")) {
+    const biomePhase = current as Phase & {
+      installCoopV2BiomeProjection(
+        operationId: string,
+        sourceWave: number,
+        sourceTurn: number,
+        pinned: number,
+      ): boolean;
+    };
+    if (biomePhase.installCoopV2BiomeProjection(plan.operationId, plan.sourceWave, control.turn, plan.pinned)) {
+      runtime.v2ProjectedInteractionControlId = controlId;
+      coopLog("v2-interaction", `bound exact biome generation ${controlId} to live ${current.phaseName}`);
       return true;
     }
   }

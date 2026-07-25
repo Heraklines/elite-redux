@@ -3472,3 +3472,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   carriers, while the owning-runtime acceptance step proves that a replaced phase remains closed. The static
   contract pins the projection marker and requires the carrier park/retry to precede all local transition
   preparation. Authority V2 contracts remain 48/48 green; behavioral execution remains GitHub-hosted only.
+
+# 2026-07-25 - Projected biome carriers seal the destination Battle shell and retain live map generations
+
+- Focused P2 run `30137409101` at `db5ce7677` proved the projected switch now remains current, admits the
+  exact wave-11 `CONTROL_COMMIT`, and applies its tick-26 DATA. It still parked afterward because the state
+  transaction deliberately reconciles party, field, arena, and run material without replacing the scene's
+  `Battle` identity: the live object remained wave 10 turn 2, so the wave-11 turn-1 release proof correctly
+  refused it. The exact failure artifact is
+  `dev-logs/ci/run-30137409101/coop-focused-P-2-of-2-failure/dev-logs/coop-duo/transition-t2-biome-1784941069411`.
+- Command-open materialization now has one address-exact pre-DATA structural hook. Only a destructively
+  projected `SwitchBiomePhase` whose session, source permit, immediately-next destination, and signed
+  turn-one frontier all match can create the missing destination `Battle` shell. Immutable V2 DATA then
+  lands once on that correct shell; the phase stays lifetime-valid through release, prepares only its
+  renderer permit/arena, and queues `NewBiomeEncounterPhase`. Ordinary `CommandPhase` consumers and every
+  other screen retain their existing no-preparation path.
+- The same full-gate evidence exposed an independent lifecycle defect in B11: an exact live Crossroads or
+  World Map phase had already entered its reciprocal rendezvous when the immutable interaction-open arrived.
+  Replacing that same constructor generation orphaned the only continuation able to open the watcher. The
+  ordinary projector now binds the V2 operation and pin onto that live, source-address-matched phase before
+  its destructive obsolete-predecessor fallback, matching the already-proven reward/market lifecycle rule.
+- Source contracts pin pre-DATA shell ordering, exact next-wave validation, destination lifetime fencing,
+  and both in-place biome-surface binds. All 48 Authority V2 contracts and targeted Biome checks are green;
+  no co-op Vitest or browser behavior ran locally. Focused P2/B11 and aggregate qualification remain remote.
