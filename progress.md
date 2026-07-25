@@ -3986,3 +3986,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Replaced the solo campaign's retired `cursor:0` command target with the live mirror's stable `command:fight` identity.
 - Added a fail-closed source contract so future command-surface refactors cannot silently restore numeric cursor navigation and create a false campaign red.
 - Replaced the fresh/resume lobby's fixed 12-key pulse window with a handler-ready `TitlePhase` message proof. Fresh runs now choose semantic `no` when a retained resume exists; resume runs choose semantic `yes` only after the real confirmation is actionable.
+
+## 2026-07-25 - Presentation-ledger render-profile correction
+
+- Mystery-gauntlet campaign `30148771212` reached the shared wave-1 turn-2 command frontier with an exact,
+  ordered guest receipt for every authority-recorded event. The oracle nevertheless rejected the run because
+  the explicitly animation-free profile correctly reported typed `renderer-skipped` / `animations-disabled`
+  outcomes for move/HP/stat/status animation phases.
+- Renderer-ledger proof now permits that single typed skip only when both independent real browsers' latest
+  public Settings attestations say move animations are disabled. Animation-on runs remain completion-only;
+  a failed receipt, unknown skip reason, wrong role, missing attestation, or split browser setting remains red.
+  Canonical event count, order, address, and payload comparison is unchanged for skipped events.
+- A node-pure policy contract covers animation-on strictness, the exact animation-off exception, rejection of
+  failed/unknown receipts, and latest-attestation ownership. Local validation remains static-only; the public
+  campaign and fast-contract behavioral proof run on GitHub-hosted runners.

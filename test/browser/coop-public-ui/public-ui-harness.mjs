@@ -15,6 +15,10 @@ import {
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
 import { delay, EvidenceSink } from "./evidence.mjs";
+import {
+  isAcceptedRendererPresentationReceipt,
+  latestMoveAnimationsAttestation,
+} from "./presentation-ledger-policy.mjs";
 
 const TITLE_PHASE = /Start Phase TitlePhase/u;
 const LOGIN_PHASE = /Start Phase LoginPhase/u;
@@ -2403,8 +2407,23 @@ export class DuoPublicUiRig {
     if (hostLedger.some(entry => entry.stage !== "authority-recorded" || entry.role !== "host")) {
       throw new Error(`${proofName}: authority presentation ledger contains a non-authority receipt`);
     }
-    if (guestLedger.some(entry => entry.stage !== "renderer-completed" || entry.role !== "guest")) {
-      throw new Error(`${proofName}: renderer presentation ledger contains a non-renderer receipt`);
+    const moveAnimationsAttestations = [this.host, this.guest].map(client =>
+      latestMoveAnimationsAttestation(client.evidence.events),
+    );
+    // Fail closed unless BOTH independently-rendered Settings surfaces attested animations off. This
+    // prevents an unexpected renderer skip in the animation-fidelity lane from being mislabeled valid,
+    // while allowing the calibrated depth/mystery profiles to prove exact ordered delivery without
+    // claiming pixels they explicitly disabled.
+    const allowAnimationsDisabledSkip = moveAnimationsAttestations.every(value => value === false);
+    const invalidRendererReceipt = guestLedger.find(
+      entry => !isAcceptedRendererPresentationReceipt(entry, allowAnimationsDisabledSkip),
+    );
+    if (invalidRendererReceipt != null) {
+      throw new Error(
+        `${proofName}: renderer presentation ledger contains an invalid receipt `
+          + `(stage=${invalidRendererReceipt.stage} reason=${invalidRendererReceipt.reason ?? "none"} `
+          + `moveAnimations=${JSON.stringify(moveAnimationsAttestations)})`,
+      );
     }
     const comparable = entries =>
       entries.map(entry => ({
@@ -2425,6 +2444,8 @@ export class DuoPublicUiRig {
       client.evidence.record("presentation-ledger-proof", {
         proofName,
         eventCount: authority.length,
+        moveAnimationsAttestations,
+        intentionallySkipped: guestLedger.filter(entry => entry.stage === "renderer-skipped").length,
         first: authority[0],
         last: authority.at(-1),
       });

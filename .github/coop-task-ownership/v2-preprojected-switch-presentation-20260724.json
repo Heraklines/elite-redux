@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "8c3b4f0210819dee225fd066342b9aac989ffd41",
+  "baseSha": "b193bb81cf0850603e89e2a5f03768deacca2b0a",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     ".github/workflows/coop-public-ui-journey.yml",
@@ -47,6 +47,8 @@
     "src/phases/turn-init-phase.ts",
     "src/system/game-data.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
+    "test/browser/coop-public-ui/presentation-ledger-policy.mjs",
+    "test/browser/coop-public-ui/presentation-ledger-policy.test.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
     "test/browser/coop-public-ui/solo-classic.mjs",
