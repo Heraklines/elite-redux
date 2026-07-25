@@ -158,7 +158,7 @@ export class SwitchBiomePhase extends BattlePhase {
       return false;
     }
     try {
-      const destinationBattle = globalScene.newBattle();
+      const destinationBattle = globalScene.newCoopV2ProjectedBattle();
       if (
         globalScene.currentBattle !== destinationBattle
         || destinationBattle.waveIndex !== command.wave

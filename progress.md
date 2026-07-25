@@ -3495,3 +3495,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Source contracts pin pre-DATA shell ordering, exact next-wave validation, destination lifetime fencing,
   and both in-place biome-surface binds. All 48 Authority V2 contracts and targeted Biome checks are green;
   no co-op Vitest or browser behavior ran locally. Focused P2/B11 and aggregate qualification remain remote.
+
+# 2026-07-25 - A projected battle shell cannot derive a competing encounter successor
+
+- Aggregate run `30137992708` proved that the exact destination shell and immutable wave-6 state now install,
+  but its C3/C5/P1/P2 artifacts exposed two encounter tails. The shell called ordinary `newBattle()`, whose
+  guest cleanup derived `NextEncounterPhase` from the still-visible source biome; the V2 release then installed
+  its sanctioned `NewBiomeEncounterPhase`. The first consumed the one-shot enemy carrier and the second
+  re-requested it, leaving the renderer in `CoopReplayTurnPhase` before any real destination command control.
+- `BattleScene` now exposes a guest-only projected-battle constructor that shares battle construction but
+  explicitly suppresses local post-battle cleanup and its successor derivation. `SwitchBiomePhase` may use it
+  only after its exact session/permit/immediately-next turn-one carrier admission. The V2 projector remains the
+  sole owner of the ensuing encounter tail; ordinary, solo, host, save-resume, and legacy battle creation keep
+  their complete cleanup path unchanged.
+- The source contract requires the projected constructor, its authoritative-renderer guard, and cleanup-free
+  delegation. All 48 Authority V2 contracts, targeted Biome checks, `git diff --check`, and TypeScript pass;
+  no co-op Vitest or browser behavior ran locally. The next focused/full qualification must prove the duplicate
+  enemy-carrier consumption and destination `CoopReplayTurnPhase` stall are gone.

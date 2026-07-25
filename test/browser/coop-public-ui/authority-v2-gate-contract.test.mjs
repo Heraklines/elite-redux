@@ -34,6 +34,7 @@ const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8")
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
+const battleScene = readFileSync(new URL("src/battle-scene.ts", root), "utf8");
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
 const mysteryEncounterPhases = readFileSync(new URL("src/phases/mystery-encounter-phases.ts", root), "utf8");
 const mysteryEncounterUiHandler = readFileSync(
@@ -1749,11 +1750,25 @@ test("a projected biome transition consumes the exact destination command carrie
     /currentBattle\.waveIndex !== permit\.wave[\s\S]*?command\.wave !== permit\.nextWave[\s\S]*?command\.wave !== currentBattle\.waveIndex \+ 1/u,
     "structural preparation is pinned to the exact immediately-next permitted wave",
   );
-  assert.match(preparation, /const destinationBattle = globalScene\.newBattle\(\)/u);
+  assert.match(preparation, /const destinationBattle = globalScene\.newCoopV2ProjectedBattle\(\)/u);
   assert.match(
     preparation,
     /destinationBattle\.waveIndex !== command\.wave[\s\S]*?destinationBattle\.turn !== command\.turn/u,
     "the prepared battle shell must prove the signed destination address",
+  );
+  const projectedBattleStart = battleScene.indexOf("public newCoopV2ProjectedBattle(): Battle");
+  const projectedBattleEnd = battleScene.indexOf("\n  private createBattle(", projectedBattleStart);
+  assert.ok(
+    projectedBattleStart >= 0 && projectedBattleEnd > projectedBattleStart,
+    "BattleScene exposes one bounded projected-battle constructor",
+  );
+  const projectedBattle = battleScene.slice(projectedBattleStart, projectedBattleEnd);
+  assert.match(projectedBattle, /if \(!isCoopAuthoritativeGuest\(\)\)/u);
+  assert.match(projectedBattle, /return this\.createBattle\(undefined, false\)/u);
+  assert.doesNotMatch(
+    projectedBattle,
+    /doPostBattleCleanup/u,
+    "the projected shell cannot derive or queue a renderer-local encounter successor",
   );
   assert.match(
     switchBiomePhase,

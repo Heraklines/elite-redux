@@ -3,10 +3,11 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "db5ce7677dc1552f2a6a33b329068c8c365d06c4",
+  "baseSha": "e04f47ce8b32e05d4ec568c8535a8fd1a0d3cae7",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
+    "src/battle-scene.ts",
     "src/data/elite-redux/coop/authority-v2/command-frontier.ts",
     "src/data/elite-redux/coop/authority-v2/control-ledger.ts",
     "src/data/elite-redux/coop/authority-v2/interaction-projection.ts",

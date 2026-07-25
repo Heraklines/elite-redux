@@ -1687,6 +1687,25 @@ export class BattleScene extends SceneBase {
    * @returns The newly created `Battle` instance.
    */
   public newBattle(fromSession?: SessionSaveData): Battle {
+    return this.createBattle(fromSession, true);
+  }
+
+  /**
+   * Construct only the destination Battle identity required by an admitted Authority V2 command carrier.
+   *
+   * The ordinary {@linkcode newBattle} path also derives and queues the next encounter from renderer-local
+   * post-battle state. A destructively projected guest has no authority to choose that successor: the signed
+   * V2 entry owns it. Keeping this as a separate, guest-only entry point makes it impossible for the structural
+   * shell to manufacture a competing `NextEncounterPhase` before the projector installs the committed tail.
+   */
+  public newCoopV2ProjectedBattle(): Battle {
+    if (!isCoopAuthoritativeGuest()) {
+      throw new Error("newCoopV2ProjectedBattle is restricted to an authoritative co-op renderer");
+    }
+    return this.createBattle(undefined, false);
+  }
+
+  private createBattle(fromSession: SessionSaveData | undefined, runPostBattleCleanup: boolean): Battle {
     const props = this.getNewBattleProps(fromSession);
     const { waveIndex, mysteryEncounterType } = props;
     const resolved: NewBattleInitialProps = { waveIndex, mysteryEncounterType };
@@ -1749,7 +1768,7 @@ export class BattleScene extends SceneBase {
     );
     this.currentBattle.incrementTurn();
 
-    if (!fromSession?.waveIndex && lastBattle) {
+    if (runPostBattleCleanup && !fromSession?.waveIndex && lastBattle) {
       this.doPostBattleCleanup(lastBattle, maxExpLevel);
     }
     return this.currentBattle;
