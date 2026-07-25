@@ -1650,21 +1650,29 @@ export class PublicUiClient {
     return this.publicRole;
   }
 
-  async pulseActionUntil(pattern, purpose, maxPresses = 12) {
-    const from = this.evidence.cursor();
-    for (let press = 1; press <= maxPresses; press++) {
-      const found = this.evidence.find(pattern, from);
-      if (found) {
-        return found;
-      }
-      await this.press("Space", `${purpose}:${press}/${maxPresses}`);
-      await delay(this.config.settleDelayMs);
-    }
-    const found = this.evidence.find(pattern, from);
-    if (found) {
-      return found;
-    }
-    throw new Error(`${this.label}: ${purpose} never produced ${pattern}`);
+  /**
+   * Wait for the real TitlePhase message callback a human can act on. Save reconciliation is
+   * deliberately asynchronous and may take tens of seconds on a CPU-starved browser or an account
+   * with several cloud saves. A fixed burst of Space keys races that work and can finish before the
+   * prompt exists; the semantic mirror exposes the exact handler/callback readiness instead.
+   */
+  async waitForActionableCoopLaunchMessage(from = this.evidence.cursor(), purpose = "co-op launch decision") {
+    return this.evidence.waitForCondition(
+      sink => {
+        const event = sink.findLastSemanticSurface(from, "battle:message");
+        const observation = event?.observation;
+        return observation?.phase === "TitlePhase"
+          && observation.localRole === "host"
+          && observation.localSeat === this.publicSeat
+          && observation.seatsWithInput?.includes(this.publicSeat)
+          && observation.ready?.handlerActive === true
+          && observation.ready.awaitingActionInput === true
+          && observation.ready.inputBlocked !== true
+          ? event
+          : null;
+      },
+      { timeoutMs: this.config.timeoutMs, description: `actionable ${purpose}` },
+    );
   }
 
   async waitForLocalCommand(from = 0, progressBudgetOptions = {}) {
@@ -2973,9 +2981,43 @@ export class DuoPublicUiRig {
     const phaseCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
-    // Drive the host's "Press to start co-op" launch decision, then confirm BOTH clients now
-    // hold their stable-seat binding (the guest binds only in response to this press).
-    await this.host.pulseActionUntil(/SEND resumeStartNew/u, "host-confirm-fresh-run");
+    // Wait for save discovery to publish its REAL human-action callback before pressing anything.
+    // A fresh account commits directly from this message. An account with a matching retained run
+    // opens Resume/New Game; explicitly select New Game instead of blindly defaulting to Resume.
+    const launchDecisionCursor = this.host.evidence.cursor();
+    await this.host.waitForActionableCoopLaunchMessage(launchDecisionCursor, "fresh co-op launch decision");
+    const launchCommitCursor = this.host.evidence.cursor();
+    await this.host.press("Space", "host-open-fresh-run-decision");
+    const launchOutcome = await this.host.evidence.waitForCondition(
+      sink => {
+        const committed = sink.find(/SEND resumeStartNew/u, launchCommitCursor);
+        if (committed != null) {
+          return { kind: "committed", event: committed };
+        }
+        const confirmation = sink.findLastSemanticSurface(launchCommitCursor, "confirm:TitlePhase");
+        const observation = confirmation?.observation;
+        return observation?.ready?.handlerActive === true
+          && observation.ready.inputBlocked !== true
+          && observation.optionIds?.includes("no")
+          ? { kind: "confirmation", event: confirmation }
+          : null;
+      },
+      { timeoutMs: this.config.timeoutMs, description: "fresh launch commit or Resume/New Game confirmation" },
+    );
+    if (launchOutcome.kind === "confirmation") {
+      await selectOptionById(this.host, {
+        surfaceId: "confirm:TitlePhase",
+        targetId: "no",
+        navKeys: ["ArrowUp", "ArrowDown"],
+        timeoutMs: this.config.timeoutMs,
+        fromCursor: launchCommitCursor,
+      });
+      await this.host.evidence.waitFor(/SEND resumeStartNew/u, {
+        from: launchCommitCursor,
+        timeoutMs: this.config.timeoutMs,
+        description: "durable fresh-run decision after choosing New Game",
+      });
+    }
     await this.completePairingBinding();
     const hostEntrySurface = await this.host.evidence.waitForCondition(
       sink =>
@@ -3108,7 +3150,36 @@ export class DuoPublicUiRig {
     const resumeCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
-    await this.host.pulseActionUntil(/SEND resumeOffer/u, "host-open-and-confirm-resume");
+    // Resume discovery owns the same asynchronous human boundary as a fresh launch. Wait until the
+    // prompt's concrete callback is installed, open it once, then choose Yes by semantic identity.
+    const resumeDecisionCursor = this.host.evidence.cursor();
+    await this.host.waitForActionableCoopLaunchMessage(resumeDecisionCursor, "resume co-op launch decision");
+    const resumeConfirmCursor = this.host.evidence.cursor();
+    await this.host.press("Space", "host-open-resume-decision");
+    await this.host.evidence.waitForCondition(
+      sink => {
+        const confirmation = sink.findLastSemanticSurface(resumeConfirmCursor, "confirm:TitlePhase");
+        const observation = confirmation?.observation;
+        return observation?.ready?.handlerActive === true
+          && observation.ready.inputBlocked !== true
+          && observation.optionIds?.includes("yes")
+          ? confirmation
+          : null;
+      },
+      { timeoutMs: this.config.timeoutMs, description: "actionable Resume/New Game confirmation" },
+    );
+    await selectOptionById(this.host, {
+      surfaceId: "confirm:TitlePhase",
+      targetId: "yes",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: resumeConfirmCursor,
+    });
+    await this.host.evidence.waitFor(/SEND resumeOffer/u, {
+      from: resumeConfirmCursor,
+      timeoutMs: this.config.timeoutMs,
+      description: "host sends the selected resume offer",
+    });
     await guestClient.evidence.waitFor(/RECV resumeOffer/u, {
       from: resumeCursors[guestClient.label],
       timeoutMs: this.config.timeoutMs,

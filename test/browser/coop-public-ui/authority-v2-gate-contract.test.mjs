@@ -31,6 +31,7 @@ const operationSurfaceRegistry = readFileSync(
 const sessionController = readFileSync(new URL("src/data/elite-redux/coop/coop-session-controller.ts", root), "utf8");
 const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root), "utf8");
 const publicUiHarness = readFileSync(new URL("test/browser/coop-public-ui/public-ui-harness.mjs", root), "utf8");
+const soloClassic = readFileSync(new URL("test/browser/coop-public-ui/solo-classic.mjs", root), "utf8");
 const campaignDriver = readFileSync(new URL("test/browser/coop-public-ui/campaign.mjs", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
@@ -160,6 +161,34 @@ test("every release soak and focused replay executes the complete Authority V2 g
       `${label} may not downgrade the release architecture`,
     );
   }
+});
+
+test("solo public-browser navigation uses the stable command identity", () => {
+  assert.match(
+    soloClassic,
+    /surfaceId: COMMAND_SURFACE,\s+targetId: "command:fight"/u,
+    "the live command mirror exposes command:fight rather than the retired numeric cursor identity",
+  );
+  assert.doesNotMatch(soloClassic, /surfaceId: COMMAND_SURFACE,\s+targetId: "cursor:0"/u);
+});
+
+test("public co-op launch waits for an actionable save decision and chooses semantically", () => {
+  assert.match(publicUiHarness, /waitForActionableCoopLaunchMessage/u);
+  assert.match(
+    publicUiHarness,
+    /async startFreshRun[\s\S]*?waitForActionableCoopLaunchMessage[\s\S]*?targetId: "no"/u,
+    "fresh launch waits for completed save discovery and explicitly chooses New Game when a resume exists",
+  );
+  assert.match(
+    publicUiHarness,
+    /async resumeRun[\s\S]*?waitForActionableCoopLaunchMessage[\s\S]*?targetId: "yes"/u,
+    "resume waits for completed save discovery and explicitly accepts the retained run",
+  );
+  assert.doesNotMatch(
+    publicUiHarness,
+    /pulseActionUntil/u,
+    "save decisions may not regress to fixed blind input bursts",
+  );
 });
 
 test("public-browser campaign and staging bundle qualify the same V2 cutover", () => {

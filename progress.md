@@ -3980,3 +3980,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Next proof: replay the exact level seed `20260725` and fixed journey seed `828633` remotely under V2. Only a
   reproduced V2 failure authorizes a product/harness patch; green means the obsolete legacy failures remain
   diagnostic evidence while release qualification proceeds on the intended architecture.
+
+## 2026-07-25 — Public campaign semantic command repair
+
+- Replaced the solo campaign's retired `cursor:0` command target with the live mirror's stable `command:fight` identity.
+- Added a fail-closed source contract so future command-surface refactors cannot silently restore numeric cursor navigation and create a false campaign red.
+- Replaced the fresh/resume lobby's fixed 12-key pulse window with a handler-ready `TitlePhase` message proof. Fresh runs now choose semantic `no` when a retained resume exists; resume runs choose semantic `yes` only after the real confirmation is actionable.

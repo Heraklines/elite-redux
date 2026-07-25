@@ -161,12 +161,12 @@ export async function runSoloClassic(client) {
 
   // Validate the primitive against the LIVE mirror:
   //  1. a nav keypress changes the observed selection;
-  //  2. selectOptionById navigates back to Fight (cursor:0), verifying each press moved the
+  //  2. selectOptionById navigates back to Fight by its stable semantic id, verifying each press moved the
   //     cursor, then submits - opening the real Fight move menu.
   await assertMirrorReactsToInput(client);
   await selectOptionById(client, {
     surfaceId: COMMAND_SURFACE,
-    targetId: "cursor:0",
+    targetId: "command:fight",
     navKeys: ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"],
     submit: true,
   });
