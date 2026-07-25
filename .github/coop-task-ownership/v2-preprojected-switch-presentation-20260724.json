@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "569fefb8e50a71d990cc19fa77ec666f6abc1355",
+  "baseSha": "74358a22a2db0ae6dc1398aad904ca7e71f594bf",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -57,6 +57,7 @@
     "test/tests/elite-redux/coop/coop-duo-barrier-deadlock.test.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-double-faint.test.ts",
     "test/tests/elite-redux/coop/coop-duo-enemy-faint-chain.test.ts",
     "test/tests/elite-redux/coop/coop-duo-enemy-switch-render.test.ts",
     "test/tests/elite-redux/coop/coop-duo-engine.test.ts",

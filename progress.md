@@ -3711,3 +3711,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   source contract now checks the one-use adopted-command re-entry lifecycle rather than an obsolete expression.
 - Local verification remains static-only: TypeScript is green, targeted Biome has no blocking diagnostics,
   and `git diff --check` passes. Behavioral B6/B9/C1 and node/public contracts remain GitHub-hosted only.
+- Focused planner run `30142625726` stopped before test selection because the manifest omitted the directly
+  changed double-faint regression file. The integration diff itself was valid; the next metadata-only push
+  adds that exact path and advances the declared CAS base to `74358a22a`.
