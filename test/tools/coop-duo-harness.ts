@@ -4588,6 +4588,26 @@ function meReplaySettled(p: Phase): boolean {
 }
 
 /**
+ * Whether a recovery-created replay phase is the new generation of the same retained Mystery transaction.
+ * Recovery may replace the phase object, but it preserves the exact operation address and interaction
+ * counter. Following object identity alone makes a successful recovery look like a permanent hang.
+ */
+function isSameMeReplayTransaction(prior: Phase, candidate: Phase): boolean {
+  if (candidate.phaseName !== "CoopReplayMePhase") {
+    return false;
+  }
+  const priorSeam = prior as unknown as { coopV2ControlOperationId: string | null; seq: number };
+  const candidateSeam = candidate as unknown as { coopV2ControlOperationId: string | null; seq: number };
+  if (priorSeam.seq !== candidateSeam.seq) {
+    return false;
+  }
+  return (
+    priorSeam.coopV2ControlOperationId == null
+    || candidateSeam.coopV2ControlOperationId === priorSeam.coopV2ControlOperationId
+  );
+}
+
+/**
  * START the guest's REAL authoritative-ME divert and return the queued {@linkcode CoopReplayMePhase}
  * (started, but NOT yet drained to its terminal). Runs the guest's REAL {@linkcode MysteryEncounterPhase},
  * which (because `isCoopAuthoritativeGuest()` is true) DIVERTS: it pins the guest's ME interaction counter
@@ -4898,13 +4918,27 @@ export async function driveGuestMeReplay(guestScene: MeReplayPumpScene): Promise
  */
 async function settleDuoGuestMeReplayWithDelivery(rig: DuoRig, replay: Phase): Promise<GuestMeReplay> {
   const deadline = Date.now() + 20_000;
-  while (!meReplaySettled(replay) && Date.now() < deadline) {
+  let activeReplay = replay;
+  while (!meReplaySettled(activeReplay) && Date.now() < deadline) {
     await pumpDuoDestinations(rig, 1);
+    activeReplay = withClientSync(rig.guestCtx, () => {
+      const runtimeOwned = getActiveCoopReplayMePhaseForHarness();
+      const current = rig.guestScene.phaseManager.getCurrentPhase();
+      const candidate =
+        runtimeOwned?.phaseName === "CoopReplayMePhase"
+          ? runtimeOwned
+          : current?.phaseName === "CoopReplayMePhase"
+            ? current
+            : null;
+      return candidate != null && candidate !== activeReplay && isSameMeReplayTransaction(activeReplay, candidate)
+        ? candidate
+        : activeReplay;
+    });
     const continuationHandedOff = withClientSync(
       rig.guestCtx,
-      () => (replay as unknown as { continuationHandedOff: boolean }).continuationHandedOff,
+      () => (activeReplay as unknown as { continuationHandedOff: boolean }).continuationHandedOff,
     );
-    if (continuationHandedOff && !meReplaySettled(replay)) {
+    if (continuationHandedOff && !meReplaySettled(activeReplay)) {
       // Once the retained transaction hands control to the guest's ordinary phase queue, run that
       // queue inside one uninterrupted guest realm. `settleDuoPromise` is for promises whose protocol
       // crossing is still pending; wrapping this local continuation in it repeatedly pre-empted the
@@ -4913,22 +4947,22 @@ async function settleDuoGuestMeReplayWithDelivery(rig: DuoRig, replay: Phase): P
       // and will be drained by the outer alternating loop after the local phase has yielded.
       await withClient(rig.guestCtx, () =>
         driveClientPhaseQueueTo(rig.guestScene, "retained Mystery final leave", {
-          matches: () => meReplaySettled(replay),
+          matches: () => meReplaySettled(activeReplay),
           maxPhases: 32,
         }),
       );
     }
-    if (!meReplaySettled(replay)) {
+    if (!meReplaySettled(activeReplay)) {
       await new Promise<void>(resolve => setTimeout(resolve, 0));
     }
   }
-  if (!meReplaySettled(replay)) {
+  if (!meReplaySettled(activeReplay)) {
     throw new Error("duo Mystery replay HANG: retained V2 successor never settled with both event loops alive");
   }
   // Reuse the ordinary settled-path cleanup (notably its losing legacy waiter cancellation). It returns on
   // the first iteration because the exact replay is already settled; it cannot manufacture progression.
   return withClient(rig.guestCtx, async () => {
-    const settled = await drainGuestMeReplayToSettle(replay);
+    const settled = await drainGuestMeReplayToSettle(activeReplay);
     // `drainGuestMeReplayToSettle` can complete inside a nested/pre-empted guest scope. Claim the live
     // transaction pins before this realm is swapped out so an older outer finally cannot restore the
     // pre-handoff snapshot. Independent browsers never share this synthetic ambient-state hazard.

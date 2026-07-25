@@ -485,7 +485,6 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
             phase.phaseName === "CommandPhase"
             && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
           perPhaseTimeoutMs: 5_000,
-          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
         });
       });
       withClientSync(rig.guestCtx, () => {

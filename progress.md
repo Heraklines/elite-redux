@@ -3690,3 +3690,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local verification remains static-only per `AGENTS.md`. The existing B9 Mystery recovery and battle-handoff
   journeys are the failure-first behavioral coverage; focused remote qualification must prove their public
   handlers, correlated proof, and ensuing combat boundary.
+
+# 2026-07-25 - Replica gap delivery is retained until its exact predecessor completes
+
+- Aggregate run `30141774968` reached wave 39 in the continuous Mystery soak, then exposed a real ordering
+  liveness defect. The guest had admitted `ME_PRESENT` revision 230 but was still proving its real selector
+  when terminal revisions 231 and 232 arrived. Both authenticated frames were classified as gaps and dropped;
+  the synchronous tail response could only repeat 230 at that instant, so later progress depended on a lease
+  timer redelivering frames the replica had already received.
+- The V2 replica now owns a bounded 64-entry delivery reorder buffer. Future authenticated revisions remain
+  mechanically inert until `AuthorityLog` reports their contiguous predecessor complete, then enter the same
+  ordinary admit/material/project/receipt pipeline immediately and in order. Duplicate buffered revisions
+  must match operation, kind, digest, successor, and subsumption identity; conflicts or overflow enter the
+  protocol-violation terminal. Hot rejoin drops old-generation buffered frames before synchronous replacement-
+  channel redelivery, with transactional restoration if rebind itself fails.
+- Node-pure failure-first coverage pins three entries arriving while revision one is material-deferred and
+  requires all three to apply in order without a clock advance. B9 harness repairs follow the active exact
+  Mystery replay generation after correlated recovery, assert the actual chained V2 double-faint successor,
+  and let the idle-fallback command driver run the peer's real CommandPhase scheduler edge. The stale public
+  source contract now checks the one-use adopted-command re-entry lifecycle rather than an obsolete expression.
+- Local verification remains static-only: TypeScript is green, targeted Biome has no blocking diagnostics,
+  and `git diff --check` passes. Behavioral B6/B9/C1 and node/public contracts remain GitHub-hosted only.

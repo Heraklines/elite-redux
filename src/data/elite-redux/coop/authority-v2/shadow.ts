@@ -180,6 +180,8 @@ import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
 // mechanics; the shadow only computes + compares alongside it.
 // ---------------------------------------------------------------------------
 const COOP_V2_SHADOW_ENABLED = typeof process === "undefined" || process.env?.COOP_AUTHORITY_V2_SHADOW !== "off";
+/** Hard memory/protocol ceiling for authenticated out-of-order delivery. Normal gameplay stays near zero. */
+const MAX_BUFFERED_REPLICA_GAPS = 64;
 
 /** Whether this build ADVERTISES the authority-v2 shadow capability (default ON; force off with env COOP_AUTHORITY_V2_SHADOW=off). */
 export function isCoopV2ShadowEnabled(): boolean {
@@ -436,6 +438,8 @@ export interface CoopV2ShadowDiagnostics {
   readonly pendingTimers: number;
   readonly controlLedgerSize: number;
   readonly shadowStateSize: number;
+  /** Authenticated future revisions retained until the contiguous mechanical frontier reaches them. */
+  readonly bufferedReplicaGaps: number;
   readonly disposed: boolean;
   readonly recovery: CoopRecoveryChannelV2Diagnostics | null;
 }
@@ -571,8 +575,16 @@ export class CoopAuthorityV2Shadow {
    * mechanically incomplete revision, so this cannot become a second journal.
    */
   private readonly pendingReplicaEntries = new Map<number, CoopAuthorityEntry>();
+  /**
+   * Authenticated future revisions that arrived while an earlier revision was still installing material or
+   * control. This is a delivery reorder buffer, not a second journal: AuthorityLog remains the only cursor,
+   * and an entry leaves this map before it is admitted through that log's ordinary pipeline.
+   */
+  private readonly replicaGapEntries = new Map<number, CoopAuthorityEntry>();
   /** Re-entrant delivery guard: applying material may synchronously emit a receipt and redeliver this revision. */
   private readonly replicaEntriesInFlight = new Set<number>();
+  /** Prevent a successful contiguous drain from recursively starting another drain through receipt re-entry. */
+  private drainingReplicaGapEntries = false;
   /** V2-native phase barriers resolved exclusively from authenticated authority-log receipt quorum. */
   private readonly authorityPeerStageWaiters = new Set<AuthorityPeerStageWaiter>();
   /** Guest proposals retained until their exact ordered V2 result is admitted. Never progression authority. */
@@ -1412,6 +1424,7 @@ export class CoopAuthorityV2Shadow {
     const prior = this.frameContext;
     const priorRuntimeContext = this.runtimeContext;
     const priorPeerBindings = this.peerBindings;
+    const priorReplicaGapEntries = new Map(this.replicaGapEntries);
     const nextRuntimeContext = Object.freeze({
       ...this.ctx,
       membershipRevision: identity.membershipRevision,
@@ -1421,6 +1434,9 @@ export class CoopAuthorityV2Shadow {
     this.frameContext = Object.freeze({ ...next });
     this.runtimeContext = nextRuntimeContext;
     this.peerBindings = identity.peerBindings;
+    // Buffered frames are authenticated to the old connection generation. Drop them before rebind so only
+    // synchronous redelivery on the replacement channel can populate the new generation's delivery buffer.
+    this.replicaGapEntries.clear();
     let redelivered: number;
     try {
       redelivered = this.log.rebindConnection(next, identity.peerBindings);
@@ -1428,6 +1444,10 @@ export class CoopAuthorityV2Shadow {
       this.frameContext = prior;
       this.runtimeContext = priorRuntimeContext;
       this.peerBindings = priorPeerBindings;
+      this.replicaGapEntries.clear();
+      for (const [revision, entry] of priorReplicaGapEntries) {
+        this.replicaGapEntries.set(revision, entry);
+      }
       throw error;
     }
     this.recoveryChannel?.rebind();
@@ -1491,7 +1511,9 @@ export class CoopAuthorityV2Shadow {
     }
     this.shadowState.clear();
     this.pendingReplicaEntries.clear();
+    this.replicaGapEntries.clear();
     this.replicaEntriesInFlight.clear();
+    this.drainingReplicaGapEntries = false;
     this.ledger.clear();
   }
 
@@ -1512,6 +1534,7 @@ export class CoopAuthorityV2Shadow {
       pendingTimers: this.scheduler.pendingTimerCount,
       controlLedgerSize: this.ledger.size,
       shadowStateSize: this.shadowState.size,
+      bufferedReplicaGaps: this.replicaGapEntries.size,
       disposed: this.disposed,
       recovery: this.recoveryChannel?.diagnostics() ?? null,
     };
@@ -1546,11 +1569,16 @@ export class CoopAuthorityV2Shadow {
       return false;
     }
     this.replicaEntriesInFlight.add(entry.revision);
+    let applied = false;
     try {
-      return this.applyReplicaEntryOnce(entry);
+      applied = this.applyReplicaEntryOnce(entry);
     } finally {
       this.replicaEntriesInFlight.delete(entry.revision);
     }
+    if (applied) {
+      this.drainReplicaGapEntries();
+    }
+    return applied;
   }
 
   /** One non-re-entrant ordered admission/application attempt. */
@@ -1564,9 +1592,12 @@ export class CoopAuthorityV2Shadow {
     if (result.kind === "gap") {
       // A later authenticated replacement may carry the exact terminal needed to let the currently
       // admitted turn finish its presentation/finalize path. Release only that local modal edge; the
-      // gap entry remains unadmitted and emits no receipt until ordinary ordered redelivery reaches it.
-      // The live seam's address/owner checks make unrelated future entries inert.
-      this.releaseBlockedPredecessor(entry);
+      // gap entry remains unadmitted and emits no receipt until the contiguous ordered pipeline reaches it.
+      // Retain the authenticated frame locally so liveness does not depend on a later lease tick. The live
+      // seam's address/owner checks make unrelated future entries inert.
+      if (this.bufferReplicaGapEntry(entry)) {
+        this.releaseBlockedPredecessor(entry);
+      }
       return false;
     }
     if (result.kind === "staleEpoch") {
@@ -1585,7 +1616,9 @@ export class CoopAuthorityV2Shadow {
       }
       for (const revision of entry.subsumes) {
         this.pendingReplicaEntries.delete(revision);
+        this.replicaGapEntries.delete(revision);
       }
+      this.replicaGapEntries.delete(entry.revision);
       this.admitted += 1;
       this.pendingReplicaEntries.set(entry.revision, entry);
     } else if (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control") {
@@ -1620,6 +1653,69 @@ export class CoopAuthorityV2Shadow {
     }
     this.applied += 1;
     return true;
+  }
+
+  /** Retain one authenticated future revision without allowing it to advance mechanical truth. */
+  private bufferReplicaGapEntry(entry: CoopAuthorityEntry): boolean {
+    const existing = this.replicaGapEntries.get(entry.revision);
+    if (existing != null) {
+      if (!sameReplicaEntryIdentity(existing, entry)) {
+        this.reportReplicaDeliveryViolation("entry.buffered-revision-identity-conflict");
+        return false;
+      }
+      return true;
+    }
+    if (this.replicaGapEntries.size >= MAX_BUFFERED_REPLICA_GAPS) {
+      this.reportReplicaDeliveryViolation("entry.replica-gap-buffer-overflow");
+      return false;
+    }
+    // The inbound frame is JSON-shaped. Own a private copy so a carrier cannot mutate buffered evidence after
+    // validation but before the ordered log admits it.
+    this.replicaGapEntries.set(entry.revision, structuredClone(entry));
+    coopLog(
+      "v2-replica",
+      `buffer gap rev=${entry.revision} kind=${entry.kind} buffered=${this.replicaGapEntries.size}`,
+    );
+    return true;
+  }
+
+  /**
+   * Admit contiguous buffered deliveries immediately after their predecessor mechanically completes.
+   * A newly admitted entry may still defer on a real engine surface; in that case pendingReplicaEntries owns
+   * it and this drain stops until the ordinary surface wake retries the exact revision.
+   */
+  private drainReplicaGapEntries(): void {
+    if (this.disposed || this.drainingReplicaGapEntries) {
+      return;
+    }
+    this.drainingReplicaGapEntries = true;
+    try {
+      for (;;) {
+        const nextRevision = this.log.diagnostics().receivedThrough + 1;
+        const entry = this.replicaGapEntries.get(nextRevision);
+        if (entry == null) {
+          return;
+        }
+        this.replicaGapEntries.delete(nextRevision);
+        if (!this.applyReplicaEntry(entry)) {
+          return;
+        }
+      }
+    } finally {
+      this.drainingReplicaGapEntries = false;
+    }
+  }
+
+  /** A buffer conflict/overflow is a protocol terminal in live cutover and evidence-only in pure shadow. */
+  private reportReplicaDeliveryViolation(issue: string): void {
+    reportProtocolViolation(
+      {
+        kind: "protocol-violation",
+        frameType: "authorityEntry",
+        issues: [issue],
+      },
+      this.onProtocolViolation,
+    );
   }
 
   /** Commit an entry to the shadow log (which delivers it over the wire) and count it. */
@@ -1941,6 +2037,18 @@ export function clearCoopV2ShadowInbound(handler?: (frame: CoopFrameV2) => void)
 /** The classification a routed inbound frame received. */
 export type CoopV2InboundRouting = "routed" | "cosmetic-drop" | "protocol-violation";
 type CoopV2ProtocolViolation = Extract<CoopInboundFrameResultV2, { kind: "protocol-violation" }>;
+
+/** Exact immutable identity required when the carrier repeats a buffered revision. */
+function sameReplicaEntryIdentity(a: CoopAuthorityEntry, b: CoopAuthorityEntry): boolean {
+  return (
+    a.revision === b.revision
+    && a.operationId === b.operationId
+    && a.kind === b.kind
+    && a.material.digest === b.material.digest
+    && JSON.stringify(a.nextControl) === JSON.stringify(b.nextControl)
+    && JSON.stringify(a.subsumes) === JSON.stringify(b.subsumes)
+  );
+}
 
 /**
  * THE transport boundary for a v===2 frame. Validates via the ONE boundary

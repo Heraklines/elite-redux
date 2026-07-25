@@ -411,16 +411,31 @@ test("the real command proof edge eagerly completes V2 and the duo fixture creat
   const adoptsHost = build.indexOf("adoptAlreadyOpenHostCommandBoundary");
   const materializesGuest = build.indexOf("materializeMirroredGuestInputTurn");
   const startsGuest = build.indexOf("guestOwnCommand.start()");
+  const permitsGuestReentry = build.indexOf("adoptedCommandReentryPermits.add(guestOwnCommand)");
   const marksGuest = build.indexOf("markRealGuestCommandBoundary");
-  const restartsHost = build.indexOf("hostScene.phaseManager.getCurrentPhase().start()");
+  const restartsHost = build.indexOf("hostCommand.start()");
+  const permitsHostReentry = build.indexOf("adoptedCommandReentryPermits.add(hostCommand)");
   assert.ok(adoptsHost >= 0, "the already-real host control is adopted");
   assert.ok(
     materializesGuest > adoptsHost
       && startsGuest > materializesGuest
-      && marksGuest > startsGuest
-      && restartsHost > marksGuest,
-    "the synthetic second browser crosses the same TurnInit/Command/proof/pacing order as production",
+      && permitsGuestReentry > startsGuest
+      && marksGuest > permitsGuestReentry
+      && restartsHost > marksGuest
+      && permitsHostReentry > restartsHost,
+    "the synthetic second browser crosses the same TurnInit/Command/proof/pacing order with one bootstrap re-entry permit per adopted control",
   );
+
+  const startHelperStart = duoHarness.indexOf("function startDuoCommandPhaseIfNeeded(");
+  const startHelperEnd = duoHarness.indexOf("\n}\n", startHelperStart) + 2;
+  assert.notEqual(startHelperStart, -1, "duo harness exposes one command-start lifecycle helper");
+  assert.ok(startHelperEnd > startHelperStart, "command-start lifecycle helper has a bounded source block");
+  const startHelper = duoHarness.slice(startHelperStart, startHelperEnd);
+  assert.match(startHelper, /manuallyStartedDuoPhases\.has\(phase\)/u);
+  assert.match(startHelper, /adoptedCommandReentryPermits\.has\(phase\)/u);
+  assert.match(startHelper, /if \(alreadyStarted && !permittedBootstrapReentry\) \{\s*return;/u);
+  assert.match(startHelper, /adoptedCommandReentryPermits\.delete\(phase\)/u);
+  assert.match(startHelper, /phase\.start\(\)/u);
 });
 
 test("interaction DATA cannot wait on a successor phase that ordinary V2 projection must create", () => {

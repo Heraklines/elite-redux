@@ -295,8 +295,16 @@ describe.skipIf(!RUN)(
         await driveGuestReplayTurn(rig.guestScene, turn + 1);
       });
       expect(
-        logs.guest.some(line => /awaits remote-owned successor/.test(line)),
-        "the non-owning replica kept its authenticated replay alive for the chained host replacement",
+        logs.guest.some(line =>
+          /kind=TURN_COMMIT .*outcome=applied control=REPLACEMENT\/.*\/remaining:[^ ]+/.test(line),
+        ),
+        "the turn commit installed the first replacement plus its immutable chained successor",
+      ).toBe(true);
+      expect(
+        logs.guest.some(line =>
+          /kind=REPLACEMENT_COMMIT .*outcome=applied control=REPLACEMENT\/.*\/remaining:/.test(line),
+        ),
+        "the first committed replacement advanced the same V2 chain to the other owner's exact slot",
       ).toBe(true);
       // Both owned replacement slots are active on the GUEST engine too (it applied only complete frames).
       withClientSync(rig.guestCtx, () => {

@@ -655,6 +655,67 @@ describe("authority-v2 shadow harness", () => {
     guest.dispose();
   });
 
+  it("buffers authenticated future revisions until the mechanically incomplete predecessor settles", () => {
+    const clock = new FakeClock();
+    let host!: CoopAuthorityV2Shadow;
+    let guest!: CoopAuthorityV2Shadow;
+    let materialReady = false;
+    const appliedOperationIds: string[] = [];
+    const liveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: () => true,
+      ownsControl: () => true,
+      admitEntry: () => true,
+      applyMaterial: (_ctx, entry) => {
+        if (!materialReady) {
+          return "deferred";
+        }
+        appliedOperationIds.push(entry.operationId);
+        return true;
+      },
+      projectControl: (_ctx, control) => ({ kind: "installed", controlId: controlIdOf(control) }),
+    };
+    host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => guest.handleInboundFrame(frame),
+      scheduler: createCoopScheduler(clock),
+    });
+    guest = new CoopAuthorityV2Shadow({
+      identity: identity(1),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => host.handleInboundFrame(frame),
+      scheduler: createCoopScheduler(clock),
+      liveReplica,
+    });
+
+    // Revision 1 journals but waits for its real engine boundary. Revisions 2 and 3 are valid authenticated
+    // successors, so the replica must retain their delivery instead of depending on a later lease resend.
+    expect(host.tapTurnCommit(turnTap("TURN/gap-buffer/1"))).not.toBeNull();
+    expect(host.tapTurnCommit(turnTap("TURN/gap-buffer/2"))).not.toBeNull();
+    expect(host.tapTurnCommit(turnTap("TURN/gap-buffer/3"))).not.toBeNull();
+    expect(guest.diagnostics()).toMatchObject({
+      receivedThrough: 1,
+      controlInstalledThrough: 0,
+      bufferedReplicaGaps: 2,
+    });
+
+    materialReady = true;
+    expect(guest.retryPendingReplicaEntries()).toBe(1);
+    expect(appliedOperationIds).toEqual(["TURN/gap-buffer/1", "TURN/gap-buffer/2", "TURN/gap-buffer/3"]);
+    expect(guest.diagnostics()).toMatchObject({
+      applied: 3,
+      receivedThrough: 3,
+      controlInstalledThrough: 3,
+      bufferedReplicaGaps: 0,
+    });
+    expect(host.diagnostics().retained).toBe(0);
+
+    host.dispose();
+    guest.dispose();
+  });
+
   it("teardown leaves zero armed timers even with an un-retired entry (no replica)", () => {
     const clock = new FakeClock();
     // A host with NO peer: the delivered entry is never admitted, so its redelivery lease stays armed.
