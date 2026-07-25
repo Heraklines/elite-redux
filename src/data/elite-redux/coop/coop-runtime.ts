@@ -5413,6 +5413,7 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
  * The phase queues that bridge only when its real operation handler proves completion, before it ends.
  */
 function prepareCoopV2InteractionTerminalSuccessor(
+  runtime: CoopRuntime,
   entry: CoopAuthorityEntry,
   surfaceClass: CoopOperationSurfaceClass,
   envelope: CoopAuthoritativeEnvelopeV1,
@@ -5434,10 +5435,22 @@ function prepareCoopV2InteractionTerminalSuccessor(
         installCoopV2TerminalSuccessor?: (
           operationId: string,
           successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>,
+          settle: () => boolean,
         ) => boolean;
       }
     | undefined;
-  return phase?.installCoopV2TerminalSuccessor?.(entry.operationId, entry.nextControl) ?? false;
+  let settlementRequested = false;
+  const settleExactRuntime = (): boolean => {
+    if (settlementRequested) {
+      return true;
+    }
+    settlementRequested = true;
+    runWhenCoopRuntimeActive(runtime, () => {
+      settleCoopV2InteractionOperation(entry.operationId, runtime);
+    });
+    return true;
+  };
+  return phase?.installCoopV2TerminalSuccessor?.(entry.operationId, entry.nextControl, settleExactRuntime) ?? false;
 }
 
 /** Capture the exact current phase/handler generation; a keepalive or queued phase is never actionable proof. */
@@ -5857,7 +5870,7 @@ function buildCoopV2LiveSeams(
           runtime.v2InteractionStateApplied.add(entry.operationId);
           if (
             requiresCoopV2InteractionTerminalProof(material.surfaceClass, material.envelope)
-            && !prepareCoopV2InteractionTerminalSuccessor(entry, material.surfaceClass, material.envelope)
+            && !prepareCoopV2InteractionTerminalSuccessor(runtime, entry, material.surfaceClass, material.envelope)
           ) {
             return "deferred";
           }

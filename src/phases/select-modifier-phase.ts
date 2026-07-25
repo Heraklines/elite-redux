@@ -300,6 +300,12 @@ export class SelectModifierPhase extends BattlePhase {
   /** Signed terminal wait to queue before this phase can end; absent for natural queues and Mystery rewards. */
   private coopV2NextWaveAwait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null = null;
   private coopV2NextWaveAwaitQueued = false;
+  /**
+   * Exact runtime-ledger proof installed with the terminal V2 entry. Projected phases can be constructed
+   * while another in-process client owns the ambient runtime, so the constructor capture is only a legacy
+   * fallback and may never decide which replica revision this result retires.
+   */
+  private coopV2TerminalSettlement: { readonly operationId: string; readonly settle: () => boolean } | null = null;
 
   /**
    * Bind one completed reward action to this exact phase generation. For an ordered-wait result this is
@@ -316,7 +322,12 @@ export class SelectModifierPhase extends BattlePhase {
     // own the process-global runtime by then; production also benefits from making this proof explicitly
     // phase-owned. Publishing it through ambient `active` can settle the replica while the authority's
     // local ledger refuses the exact result as unproved.
-    settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+    const terminalSettlement = this.coopV2TerminalSettlement;
+    if (terminalSettlement?.operationId === operationId) {
+      terminalSettlement.settle();
+    } else {
+      settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+    }
   }
 
   /** Mark only a phase constructed by the V2 projector; binding an already-live natural phase never calls this. */
@@ -335,6 +346,7 @@ export class SelectModifierPhase extends BattlePhase {
   public installCoopV2TerminalSuccessor(
     operationId: string,
     successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>,
+    settle: () => boolean,
   ): boolean {
     if (
       operationId.length === 0
@@ -345,6 +357,10 @@ export class SelectModifierPhase extends BattlePhase {
     ) {
       return false;
     }
+    if (this.coopV2TerminalSettlement != null && this.coopV2TerminalSettlement.operationId !== operationId) {
+      return false;
+    }
+    this.coopV2TerminalSettlement ??= { operationId, settle };
     // A natural phase retained the host-stated wave tail that constructed it. A Mystery reward has its own
     // PostMysteryEncounter finalizer. Only a destructive ordinary reward/market needs this missing bridge.
     if (!this.coopV2DestructivelyProjected || this.coopRewardSurface != null || !successor.allowNextWaveStart) {

@@ -3751,3 +3751,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   prepare/release only under the exact command carrier. Local verification stayed static-only: TypeScript is
   zero-error, targeted Biome/error diagnostics are clean, and `git diff --check` passes. The common C/P race
   and focused Authority V2 contracts remain GitHub-hosted failure-first verification.
+
+## 2026-07-25 — exact replica binding for projected reward terminal proofs
+
+- Full gate `30143437210` proved the signed bridge itself: the guest now queued and parked on the addressed
+  `NewBattlePhase` instead of falling through into the stale wave. P1 still exposed revision 5 retained at
+  `materialDeferred` while revision 6 was correctly held as a gap.
+- The terminal reward phase did execute its real completion edge, but `coopProveV2RewardOperationComplete`
+  settled the runtime captured by the phase constructor. A destructively projected phase can be constructed
+  while the other duo client owns the process-global runtime, so that capture can point at the wrong V2
+  ledger. The admitted guest revision consequently never observed its own proof.
+- `prepareCoopV2InteractionTerminalSuccessor` now installs an operation-specific settlement closure bound to
+  the exact `CoopRuntime` applying the immutable terminal entry. The phase queues its signed structural wait
+  first, then invokes that closure; the constructor runtime remains only a legacy/natural-phase fallback.
+- The fast Authority V2 source contract now pins both sides of that identity handoff so future terminal
+  surfaces cannot regress to ambient-runtime settlement.

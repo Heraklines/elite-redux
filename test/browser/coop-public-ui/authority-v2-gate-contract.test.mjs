@@ -254,12 +254,17 @@ test("the post-victory seal accepts the exact completed V2 wave transaction afte
 test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COMMIT installs the battle", () => {
   assert.match(
     coopRuntime,
-    /requiresCoopV2InteractionTerminalProof[\s\S]*?prepareCoopV2InteractionTerminalSuccessor\(entry, material\.surfaceClass, material\.envelope\)/u,
+    /requiresCoopV2InteractionTerminalProof[\s\S]*?prepareCoopV2InteractionTerminalSuccessor\(runtime, entry, material\.surfaceClass, material\.envelope\)/u,
     "terminal interaction DATA arms its stated successor before the operation applier can end the phase",
   );
   assert.match(
+    coopRuntime,
+    /const settleExactRuntime[\s\S]*?runWhenCoopRuntimeActive\(runtime,[\s\S]*?settleCoopV2InteractionOperation\(entry\.operationId, runtime\)[\s\S]*?installCoopV2TerminalSuccessor\?\.\([\s\S]*?settleExactRuntime/u,
+    "the terminal phase is bound to the exact replica runtime that admitted its immutable result",
+  );
+  assert.match(
     selectModifierPhase,
-    /queueCoopV2NextWaveAwait\(operationId\)[\s\S]*?settleCoopV2InteractionOperation/u,
+    /queueCoopV2NextWaveAwait\(operationId\)[\s\S]*?terminalSettlement\?\.operationId === operationId[\s\S]*?terminalSettlement\.settle\(\)/u,
     "the real terminal proof queues the signed structural wait before it settles and tears down",
   );
   assert.match(
