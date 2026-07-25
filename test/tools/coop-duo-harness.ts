@@ -1922,6 +1922,31 @@ async function pumpHostVictoryTail(hostCtx: ClientCtx, started: WeakSet<Phase>):
  */
 const manuallyStartedDuoPhases = new WeakSet<Phase>();
 
+/**
+ * The initial command objects are adopted after the solo engine already constructed them, before the duo
+ * scheduler can bind every reciprocal Promise continuation to its destination realm. If that one bootstrap
+ * start resolves while the peer realm is ambient, production would resume in the owning browser but this
+ * one-process fixture leaves the exact phase current at MESSAGE. Permit one explicit re-entry for only those
+ * adopted bootstrap objects; ordinary phases remain strictly start-once by identity.
+ */
+const adoptedCommandReentryPermits = new WeakSet<Phase>();
+
+function startDuoCommandPhaseIfNeeded(scene: BattleScene, phase: Phase): void {
+  const alreadyStarted = manuallyStartedDuoPhases.has(phase);
+  const uiActionable = scene.ui.getMode() === UiMode.COMMAND || scene.ui.getMode() === UiMode.FIGHT;
+  const permittedBootstrapReentry = alreadyStarted && adoptedCommandReentryPermits.has(phase) && !uiActionable;
+  if (alreadyStarted && !permittedBootstrapReentry) {
+    return;
+  }
+  if (!alreadyStarted) {
+    manuallyStartedDuoPhases.add(phase);
+  }
+  if (permittedBootstrapReentry) {
+    adoptedCommandReentryPermits.delete(phase);
+  }
+  phase.start();
+}
+
 export async function driveClientPhaseQueueTo(
   scene: BattleScene,
   target: string,
@@ -2374,7 +2399,7 @@ export async function driveDuoGuestTackleThroughPublicUi(
     ) {
       await withClient(rig.hostCtx, async () => {
         await hostGame.phaseInterceptor.to("CommandPhase", false);
-        rig.hostScene.phaseManager.getCurrentPhase().start();
+        startDuoCommandPhaseIfNeeded(rig.hostScene, rig.hostScene.phaseManager.getCurrentPhase());
         await drainLoopback();
       });
       await withClient(rig.guestCtx, () => drainLoopback());
@@ -2387,10 +2412,7 @@ export async function driveDuoGuestTackleThroughPublicUi(
       }),
     );
     await withClient(rig.guestCtx, async () => {
-      if (!manuallyStartedDuoPhases.has(guestOwnCommand)) {
-        manuallyStartedDuoPhases.add(guestOwnCommand);
-        guestOwnCommand.start();
-      }
+      startDuoCommandPhaseIfNeeded(rig.guestScene, guestOwnCommand);
       await drainLoopback();
     });
 
@@ -2403,10 +2425,7 @@ export async function driveDuoGuestTackleThroughPublicUi(
         // actionable menu instead of starting the same command rendezvous twice and putting its UI back into
         // MESSAGE while the helper waits for a second arrival that can never exist.
         const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
-        if (!manuallyStartedDuoPhases.has(hostCommand)) {
-          manuallyStartedDuoPhases.add(hostCommand);
-          hostCommand.start();
-        }
+        startDuoCommandPhaseIfNeeded(rig.hostScene, hostCommand);
         await drainLoopback();
       } else if (rig.hostScene.phaseManager.getCurrentPhase().phaseName === "CommandPhase") {
         // Between-wave callers deliberately stop BEFORE this exact phase so both clients can materialize
@@ -2416,10 +2435,7 @@ export async function driveDuoGuestTackleThroughPublicUi(
         // intentionally ran the target CommandPhase before the next loop; preserve that already-open surface
         // instead of starting the same phase twice.
         const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
-        if (!manuallyStartedDuoPhases.has(hostCommand)) {
-          manuallyStartedDuoPhases.add(hostCommand);
-          hostCommand.start();
-        }
+        startDuoCommandPhaseIfNeeded(rig.hostScene, hostCommand);
         await drainLoopback();
       } else {
         await hostGame.phaseInterceptor.to("CommandPhase");
@@ -2968,6 +2984,7 @@ export async function buildDuo(
         });
         manuallyStartedDuoPhases.add(guestOwnCommand);
         guestOwnCommand.start();
+        adoptedCommandReentryPermits.add(guestOwnCommand);
         await drainLoopback();
         markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
       }
@@ -2979,6 +2996,7 @@ export async function buildDuo(
       const hostCommand = hostScene.phaseManager.getCurrentPhase();
       manuallyStartedDuoPhases.add(hostCommand);
       hostCommand.start();
+      adoptedCommandReentryPermits.add(hostCommand);
       await drainLoopback();
     });
     await pumpDuoDestinations(rig, 2);
@@ -3192,10 +3210,7 @@ export async function arriveGuestCommandBoundary(
             pumpPeer: () => drainLoopback(),
           });
         }
-        if (!manuallyStartedDuoPhases.has(guestCommand)) {
-          manuallyStartedDuoPhases.add(guestCommand);
-          guestCommand.start();
-        }
+        startDuoCommandPhaseIfNeeded(rig.guestScene, guestCommand);
         await drainLoopback();
         if (rig.guestScene.phaseManager.getCurrentPhase().phaseName !== "CoopReplayTurnPhase") {
           // TurnStart -> CoopReplayTurnPhase is a purely local guest progression; keep the peer host at its

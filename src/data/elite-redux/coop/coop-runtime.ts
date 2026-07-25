@@ -6115,6 +6115,7 @@ function materializeCoopV2InteractionProjection(
   runtime: CoopRuntime,
   control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
   plan: CoopV2InteractionProjectionPlan,
+  source: "ordinary" | "recovery" = "ordinary",
 ): Phase | null {
   const phaseManager = globalScene.phaseManager;
   const ownerIsLocal = control.ownerSeatId === runtime.controller.localSeatId;
@@ -6206,7 +6207,13 @@ function materializeCoopV2InteractionProjection(
         plan.presentation,
         plan.operationId,
       );
-      const phase = phaseManager.create("CoopReplayMePhase", plan.pinned, undefined, plan.operationId) as Phase & {
+      const phase = phaseManager.create(
+        "CoopReplayMePhase",
+        plan.pinned,
+        undefined,
+        plan.operationId,
+        source === "recovery",
+      ) as Phase & {
         installCoopV2MePresentation(
           operationId: string,
           interactionCounter: number,
@@ -6620,7 +6627,7 @@ function prepareCoopV2RecoveryControlSurface(runtime: CoopRuntime, control: NonN
     if (plan == null) {
       return false;
     }
-    const phase = materializeCoopV2InteractionProjection(runtime, control, plan);
+    const phase = materializeCoopV2InteractionProjection(runtime, control, plan, "recovery");
     if (phase == null) {
       return false;
     }
@@ -9875,6 +9882,15 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     ) {
       restoreCoopMeControlTransactionState(priorMysteryControl);
       return false;
+    }
+    // The ordered ME_PRESENT can outrun the guest's local MysteryEncounterPhase classifier (notably while
+    // LoginPhase/NextEncounter is still current). In that path the immutable entry establishes the primary
+    // pin above, but coopSetMePinForGuest never runs to establish the runtime's equivalent battle-handoff
+    // pin. Combat gates intentionally read that mirror so a spawned ME battle uses the normal command path
+    // while remaining inside the one retained encounter. Install it only after the complete presentation
+    // transaction validated, so a rejected entry cannot leak an in-progress ME into later combat.
+    if (getCoopMeBattleInteractionCounter() !== pinned) {
+      setCoopMeBattleInteractionCounter(pinned);
     }
     // DATA application deliberately does not require or install a phase. The ordered V2 control projector
     // reconstructs CoopReplayMePhase from this same immutable entry and separately proves its real handler.

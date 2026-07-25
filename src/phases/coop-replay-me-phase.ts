@@ -247,6 +247,8 @@ export class CoopReplayMePhase extends Phase {
   public readonly phaseName = "CoopReplayMePhase";
   /** Exact immutable V2 presentation address owned by this replay generation. */
   public coopV2ControlOperationId: string | null;
+  /** Presentation installed on this exact V2 generation before its scheduler edge (not a legacy carrier). */
+  private coopV2InstalledPresentation: Extract<CoopInteractionOutcome, { k: "mePresent" }> | null = null;
 
   private readonly interactionCounter: number;
   /** Guest->host pick / sub-pick + host->guest present / outcome channel (`8_000_000 + counter`). */
@@ -327,6 +329,7 @@ export class CoopReplayMePhase extends Phase {
     interactionCounter: number,
     resumeSettlement?: CoopMeBattleSettlementResume,
     operationId: string | null = null,
+    private readonly consumeInstalledV2Presentation = false,
   ) {
     super();
     this.interactionCounter = interactionCounter;
@@ -358,7 +361,8 @@ export class CoopReplayMePhase extends Phase {
     // ordered operation ID. The V2 runtime is the sole caller and has already admitted that newer entry;
     // replacing the address here is the required generation handoff, not local successor derivation.
     this.coopV2ControlOperationId = operationId;
-    setCoopMeHostPresentation(structuredClone(presentation));
+    this.coopV2InstalledPresentation = structuredClone(presentation);
+    setCoopMeHostPresentation(structuredClone(this.coopV2InstalledPresentation));
     return true;
   }
 
@@ -521,7 +525,17 @@ export class CoopReplayMePhase extends Phase {
       });
       relay.onRewardOptionsBuffered(bufferedShopKey);
     }
-    const prearmedPresentation = this.prearmedPresentationOutcome;
+    const installedPresentation = this.coopV2InstalledPresentation;
+    this.coopV2InstalledPresentation = null;
+    // Ordinary delivery also places ME_PRESENT on the compatibility relay, but recovery legitimately
+    // reconstructs this phase after that operation ID was already consumed and deduplicated. The V2
+    // projector attached the same immutable presentation to this exact phase generation above, so consume
+    // it directly. Waiting for a second legacy carrier would leave atomic recovery permanently unable to
+    // prove its real selector handler.
+    const prearmedPresentation =
+      this.consumeInstalledV2Presentation && installedPresentation != null
+        ? Promise.resolve(installedPresentation)
+        : this.prearmedPresentationOutcome;
     this.prearmedPresentationOutcome = undefined;
     this.awaitHostPresentationThenEnter(relay, prearmedPresentation);
   }

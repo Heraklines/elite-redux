@@ -3670,3 +3670,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local checks remain static-only: targeted Biome and diff checks pass; the inherited TypeScript snapshot is
   202 diagnostics with zero in these changed files. Ownership verification runs on the committed exact SHA
   before focused dispatch. No local co-op Vitest or browser test ran.
+
+# 2026-07-25 - Exact V2 Mystery generations no longer depend on a second legacy carrier
+
+- Focused run `30141295191` at exact `a329688d8` reduced B9/B10/P1 to one shared bootstrap failure plus two
+  independent Mystery defects. The initial adopted command objects had already crossed their scheduler edge,
+  but their reciprocal continuation could resolve while the other synthetic browser realm was ambient. A
+  one-use re-entry permit now applies only to those two adopted bootstrap identities; every newly-created
+  command phase remains strictly start-once even when it inherits a stale COMMAND/FIGHT mode.
+- A fast ordered `ME_PRESENT` can replace LoginPhase before the guest's local Mystery classifier runs. The V2
+  material path already established the canonical Mystery pin, but omitted its equivalent runtime battle pin,
+  so a retained battle handoff appeared outside an ME. The complete, validated presentation transaction now
+  establishes both pins; rejected material still restores without leaking either boundary.
+- Correlated recovery successfully applied its atomic image and created a fresh address-exact
+  `CoopReplayMePhase`, but that phase waited for a second copy of the already-consumed compatibility outcome.
+  Recovery-created generations now consume the immutable presentation installed directly by the V2 projector.
+  Ordinary delivery deliberately continues consuming its relay copy, so it cannot leave a duplicate selector
+  payload queued ahead of the next Mystery result.
+- Local verification remains static-only per `AGENTS.md`. The existing B9 Mystery recovery and battle-handoff
+  journeys are the failure-first behavioral coverage; focused remote qualification must prove their public
+  handlers, correlated proof, and ensuing combat boundary.
