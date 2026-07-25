@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "63b1b082d613edb9536ca878704b7db66186c3e7",
+  "baseSha": "0e2e11e08ae4e836496aded3f752216acd7bcbca",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",

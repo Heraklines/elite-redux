@@ -1743,7 +1743,16 @@ test("a projected biome transition consumes the exact destination command carrie
   assert.match(switchBiomePhase, /command\?\.kind === "COMMAND_FRONTIER"/u);
   assert.match(switchBiomePhase, /permit\.wave === \(this\.coopSourceWave \?\? this\.coopWave\)/u);
   assert.match(switchBiomePhase, /permit\.nextWave === command\.wave/u);
-  assert.match(switchBiomePhase, /material\.entryPresentation\.length > 0/u);
+  assert.match(
+    switchBiomePhase,
+    /Array\.isArray\(material\.entryPresentation\)/u,
+    "an exact command carrier may seal a legitimate zero-event presentation",
+  );
+  assert.doesNotMatch(
+    switchBiomePhase,
+    /material\.entryPresentation\.length > 0/u,
+    "zero cosmetic events cannot invalidate complete mechanical command authority",
+  );
   const admission = switchBiomePhase.slice(
     switchBiomePhase.indexOf("public canReleaseForCoopV2Control("),
     switchBiomePhase.indexOf("public releaseForCoopV2Control("),

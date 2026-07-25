@@ -113,7 +113,7 @@ export class SwitchBiomePhase extends BattlePhase {
       && command.wave === material.wave
       && command.turn === material.turn
       && command.turn === 1
-      && material.entryPresentation.length > 0
+      && Array.isArray(material.entryPresentation)
       && permit != null
       && permit.switchAdopted
       && permit.destinationBiomeId === this.nextBiome

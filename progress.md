@@ -3535,3 +3535,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   has no sanctioned battle tail and therefore retains the exact command-carrier shell path.
 - Static contracts pin the sanction, the zero-carrier wait rule, and ambiguous-successor refusal. Behavioral
   T2 Mystery and ordinary Crossroads/soak qualification remain remote; no co-op test ran locally.
+
+# 2026-07-25 - Zero-event command presentations remain complete destination carriers
+
+- Focused P2 run `30138491184` at `0e2e11e08` proved the duplicate encounter tail is gone: the projected
+  Crossroads Leave switch remained current with an empty queue and revision 9 repeatedly reached the exact
+  command-material consumer. Admission still refused it only because its valid entry presentation contained
+  zero cosmetic events. The destination state, session, permit, wave, turn, and command address all matched.
+- `SwitchBiomePhase` now requires the decoded presentation field to be an array but does not require it to be
+  non-empty. A quiet battle entrance is mechanically complete authority; animation count cannot gate battle
+  identity or progression. The contract both permits zero events and prevents the length check returning.
+- Authority V2 source contracts, targeted formatting, and diff checks pass locally. P2 and the aggregate
+  behavioral matrix remain remote-only.
