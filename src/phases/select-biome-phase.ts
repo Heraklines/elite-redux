@@ -30,6 +30,7 @@ import {
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { awaitCoopChoiceWithOrphanBackstop } from "#data/elite-redux/coop/coop-interaction-relay";
 import type { CoopBiomePickPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import { isCoopWaveTailSanctioned } from "#data/elite-redux/coop/coop-renderer-gate";
 import { type CoopRendezvousResult, getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   advanceCoopInteractionForContinuation,
@@ -1664,13 +1665,29 @@ export class SelectBiomePhase extends BattlePhase {
       }
 
       if (completion?.authoritativeProjection === true || isCoopAuthoritativeGuestGated()) {
+        const queuedPhases = globalScene.phaseManager.getQueuedPhaseNames();
+        const sanctionedBattleAdvances = queuedPhases.filter(
+          phaseName => phaseName === "NewBattlePhase" && isCoopWaveTailSanctioned(phaseName),
+        ).length;
+        // A wave victory can already own one exact NewBattle continuation. That ordered tail must remain the
+        // battle carrier because its destination may be a Mystery interaction with no CommandPhase at all.
+        // Crossroads and other interaction-only transitions have no sanctioned NewBattle behind this picker;
+        // only those shapes retain SwitchBiome until the signed destination command carrier constructs a shell.
+        const awaitProjectedDestinationCarrier =
+          completion?.authoritativeProjection === true && sanctionedBattleAdvances === 0;
+        if (sanctionedBattleAdvances > 1) {
+          throw new Error(
+            `Biome transition ${currentWaveIndex}->${nextWaveIndex} has ${sanctionedBattleAdvances} sanctioned NewBattle successors`,
+          );
+        }
         // The renderer owns no between-biome run mutation. The committed BIOME_PICK already armed the exact
-        // transition permit; queue only its presentation tail and wait for the next complete host carrier.
+        // transition permit; queue only its presentation tail. A projection without an already-ordered battle
+        // advance waits for the next complete host carrier, while a WAVE_ADVANCE tail keeps its own successor.
         globalScene.phaseManager.unshiftNew(
           "SwitchBiomePhase",
           nextBiome,
           currentWaveIndex,
-          completion?.authoritativeProjection === true,
+          awaitProjectedDestinationCarrier,
         );
         if (this.coopAdvancePinned >= 0) {
           const controller = getCoopController();

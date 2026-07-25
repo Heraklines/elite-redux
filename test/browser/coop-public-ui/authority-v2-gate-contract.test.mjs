@@ -1718,6 +1718,24 @@ test("a projected biome transition consumes the exact destination command carrie
     /completion\?\.authoritativeProjection === true/u,
     "the projected result explicitly marks the switch as a destination-carrier consumer",
   );
+  const rendererBiomeTail = selectBiomePhase.slice(
+    selectBiomePhase.indexOf("const sanctionedBattleAdvances ="),
+    selectBiomePhase.indexOf(
+      "this.coopAppliedTerminal =",
+      selectBiomePhase.indexOf("const sanctionedBattleAdvances ="),
+    ),
+  );
+  assert.match(rendererBiomeTail, /phaseName === "NewBattlePhase" && isCoopWaveTailSanctioned\(phaseName\)/u);
+  assert.match(
+    rendererBiomeTail,
+    /completion\?\.authoritativeProjection === true && sanctionedBattleAdvances === 0/u,
+    "only a projection without an ordered WAVE_ADVANCE battle carrier waits for a command shell",
+  );
+  assert.match(
+    rendererBiomeTail,
+    /if \(sanctionedBattleAdvances > 1\) \{[\s\S]*?throw new Error/u,
+    "ambiguous ordered battle successors fail closed",
+  );
   assert.match(switchBiomePhase, /private readonly coopAwaitDestinationCarrier: boolean/u);
   assert.match(switchBiomePhase, /public canReleaseForCoopV2Control\(successor:/u);
   assert.match(switchBiomePhase, /public prepareForCoopV2ControlMaterial\(successor:/u);

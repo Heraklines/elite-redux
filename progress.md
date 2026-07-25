@@ -3522,3 +3522,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The fixture now installs Growl, a real `StatusMove` already used by co-op no-damage scenarios, preserving its
   intended replacement-to-victory coverage without changing production behavior or relaxing any assertion.
   Static checks only ran locally; the exact B10 behavior remains GitHub-hosted per repository policy.
+
+# 2026-07-25 - Projected biome switches preserve an ordered wave-to-Mystery battle carrier
+
+- Aggregate P1 at `e04f47ce8` exposed a destination that never opens a command frontier. After wave 11's
+  authoritative victory, its `WAVE_ADVANCE` already sanctioned and queued one `NewBattlePhase`; BIOME_PICK
+  then projected the biome switch, but the new command-carrier wait parked before that battle tail. The host
+  correctly created a wave-12 Mystery battle while the guest remained on wave 11 indefinitely.
+- A projected switch now waits for a command-built shell only when no `WAVE_ADVANCE`-sanctioned NewBattle is
+  already queued. One ordered battle carrier is preserved because it can resolve to either combat command or
+  Mystery interaction authority; more than one fails closed. Crossroads/interaction-only biome travel still
+  has no sanctioned battle tail and therefore retains the exact command-carrier shell path.
+- Static contracts pin the sanction, the zero-carrier wait rule, and ambiguous-successor refusal. Behavioral
+  T2 Mystery and ordinary Crossroads/soak qualification remain remote; no co-op test ran locally.
