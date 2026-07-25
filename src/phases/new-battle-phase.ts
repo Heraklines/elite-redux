@@ -1,4 +1,13 @@
 import { globalScene } from "#app/global-scene";
+import type { CoopAuthorityEntryKind, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
+import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import {
+  coopSessionGeneration,
+  failCoopSharedSession,
+  getCoopController,
+  retryCoopV2PendingAuthorityAtSafeBoundary,
+} from "#data/elite-redux/coop/coop-runtime";
 import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
@@ -26,6 +35,34 @@ export interface ErGauntletBargainQueue {
   pushNew(name: "TheBargainPhase" | "NewBattlePhase"): unknown;
 }
 
+/**
+ * Exact ordered wait installed by a terminal Authority V2 interaction.
+ *
+ * This is renderer-local structural authority, not a second network message: every field comes from the
+ * committed AWAIT_SUCCESSOR that explicitly permits wave N+1 to start. The following CONTROL_COMMIT still
+ * owns creation and mutation of the destination battle.
+ */
+export interface CoopV2NextWaveAwaitPermit {
+  readonly afterOperationId: string;
+  readonly epoch: number;
+  readonly wave: number;
+  readonly turn: number;
+}
+
+interface CoopV2NextWaveCommandClaim {
+  readonly sessionEpoch: number;
+  readonly revision: number;
+  readonly kind: CoopAuthorityEntryKind;
+  readonly operationId: string;
+  readonly nextControl: CoopNextControl;
+  readonly commandOpenMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+    readonly entryPresentation: readonly unknown[];
+  };
+}
+
 /** Replace the synthetic Bargain wave's ordinary encounter tail with one durable phase. */
 export function queueErGauntletBargainTransition(
   queue: ErGauntletBargainQueue,
@@ -44,7 +81,144 @@ export function queueErGauntletBargainTransition(
 
 export class NewBattlePhase extends BattlePhase {
   public readonly phaseName = "NewBattlePhase";
+  private readonly coopV2Await: CoopV2NextWaveAwaitPermit | null;
+  private coopV2Generation = -1;
+  private coopV2DestinationBattleCreated = false;
+
+  constructor(coopV2Await: CoopV2NextWaveAwaitPermit | null = null) {
+    super();
+    this.coopV2Await = coopV2Await;
+  }
+
+  /**
+   * Prove that the next CONTROL_COMMIT is the exact N+1/t1 successor of this signed ordered wait.
+   * Merely reaching NewBattlePhase is never enough: the phase remains parked until this address-exact claim
+   * is admitted by the global V2 log.
+   */
+  public canReleaseForCoopV2Control(successor: CoopV2NextWaveCommandClaim): boolean {
+    const wait = this.coopV2Await;
+    const command = successor.nextControl;
+    const material = successor.commandOpenMaterial;
+    const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
+    return (
+      wait != null
+      && this.coopV2Generation >= 0
+      && coopSessionGeneration() === this.coopV2Generation
+      && globalScene.phaseManager.getCurrentPhase() === this
+      && successor.sessionEpoch === wait.epoch
+      && successor.sessionEpoch === getCoopController()?.sessionEpoch
+      && successor.kind === "CONTROL_COMMIT"
+      && successor.operationId.length > 0
+      && command?.kind === "COMMAND_FRONTIER"
+      && material != null
+      && command.epoch === successor.sessionEpoch
+      && command.wave === material.wave
+      && command.turn === material.turn
+      && command.wave === wait.wave + 1
+      && command.turn === 1
+      && Array.isArray(material.entryPresentation)
+      && (ambientWave === wait.wave || ambientWave === command.wave)
+    );
+  }
+
+  /** Build only the Battle identity required for the signed command image; no encounter tail is inferred. */
+  public prepareForCoopV2ControlMaterial(successor: CoopV2NextWaveCommandClaim): boolean {
+    if (!this.canReleaseForCoopV2Control(successor)) {
+      return false;
+    }
+    const wait = this.coopV2Await;
+    const command = successor.nextControl;
+    const currentBattle = globalScene.currentBattle;
+    if (wait == null || command.kind !== "COMMAND_FRONTIER" || currentBattle == null) {
+      return false;
+    }
+    if (currentBattle.waveIndex === command.wave) {
+      const alreadyPrepared = currentBattle.turn === command.turn;
+      this.coopV2DestinationBattleCreated ||= alreadyPrepared;
+      return alreadyPrepared;
+    }
+    if (
+      this.coopV2DestinationBattleCreated
+      || currentBattle.waveIndex !== wait.wave
+      || command.wave !== currentBattle.waveIndex + 1
+      || command.turn !== 1
+    ) {
+      return false;
+    }
+    try {
+      const destinationBattle = globalScene.newCoopV2ProjectedBattle();
+      if (
+        globalScene.currentBattle !== destinationBattle
+        || destinationBattle.waveIndex !== command.wave
+        || destinationBattle.turn !== command.turn
+      ) {
+        throw new Error(
+          `destination Battle address mismatch expected=${command.wave}:${command.turn} `
+            + `actual=${destinationBattle.waveIndex}:${destinationBattle.turn}`,
+        );
+      }
+      this.coopV2DestinationBattleCreated = true;
+      coopLog(
+        "v2-control",
+        `NewBattlePhase prepared signed destination shell wave=${wait.wave}->${destinationBattle.waveIndex} `
+          + `after=${wait.afterOperationId}`,
+      );
+      return true;
+    } catch (error) {
+      coopWarn("v2-control", "NewBattlePhase could not prepare its signed destination Battle shell", error);
+      failCoopSharedSession(`The shared interaction could not create battle wave ${command.wave}.`);
+      return false;
+    }
+  }
+
+  /** Release only after CONTROL_COMMIT DATA has installed the complete N+1 battle image. */
+  public releaseForCoopV2Control(successor: CoopV2NextWaveCommandClaim): boolean {
+    if (!this.canReleaseForCoopV2Control(successor)) {
+      return false;
+    }
+    const command = successor.nextControl;
+    if (
+      command.kind !== "COMMAND_FRONTIER"
+      || globalScene.currentBattle?.waveIndex !== command.wave
+      || globalScene.currentBattle.turn !== command.turn
+    ) {
+      return false;
+    }
+    coopLog("v2-control", `NewBattlePhase consumed signed destination carrier wave=${command.wave}`);
+    globalScene.phaseManager.pushNew("NextEncounterPhase");
+    this.end();
+    return globalScene.phaseManager.getCurrentPhase() !== this;
+  }
+
   start() {
+    if (this.coopV2Await != null) {
+      if (!isCoopAuthoritativeGuestGated()) {
+        failCoopSharedSession("A signed next-wave wait opened outside the authoritative renderer.");
+        return;
+      }
+      this.coopV2Generation = coopSessionGeneration();
+      super.start();
+      globalScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
+      const battle = globalScene.currentBattle;
+      if (
+        battle == null
+        || getCoopController()?.sessionEpoch !== this.coopV2Await.epoch
+        || (battle.waveIndex !== this.coopV2Await.wave && battle.waveIndex !== this.coopV2Await.wave + 1)
+      ) {
+        failCoopSharedSession(
+          `The signed next-wave wait lost its source address ${this.coopV2Await.wave}:${this.coopV2Await.turn}.`,
+        );
+        return;
+      }
+      coopLog(
+        "v2-control",
+        `NewBattlePhase parked for signed destination carrier wave=${this.coopV2Await.wave}->${
+          this.coopV2Await.wave + 1
+        }`,
+      );
+      retryCoopV2PendingAuthorityAtSafeBoundary();
+      return;
+    }
     super.start();
 
     globalScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");

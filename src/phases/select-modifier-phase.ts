@@ -1,6 +1,7 @@
 import { consumePendingDevShop } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
@@ -294,6 +295,11 @@ export class SelectModifierPhase extends BattlePhase {
    * at start, so a retry or a naturally-created already-started phase cannot duplicate the finalizer.
    */
   private coopV2ProjectedMysteryFinalizer = false;
+  /** This exact phase replaced a local tail and therefore needs an ordered structural successor of its own. */
+  private coopV2DestructivelyProjected = false;
+  /** Signed terminal wait to queue before this phase can end; absent for natural queues and Mystery rewards. */
+  private coopV2NextWaveAwait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null = null;
+  private coopV2NextWaveAwaitQueued = false;
 
   /**
    * Bind one completed reward action to this exact phase generation. For an ordered-wait result this is
@@ -305,11 +311,71 @@ export class SelectModifierPhase extends BattlePhase {
       return;
     }
     this.coopV2ControlOperationId = operationId;
+    this.queueCoopV2NextWaveAwait(operationId);
     // The handler terminal often resumes from a UI promise. In the two-engine harness another client can
     // own the process-global runtime by then; production also benefits from making this proof explicitly
     // phase-owned. Publishing it through ambient `active` can settle the replica while the authority's
     // local ledger refuses the exact result as unproved.
     settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+  }
+
+  /** Mark only a phase constructed by the V2 projector; binding an already-live natural phase never calls this. */
+  public markCoopV2DestructiveProjection(operationId: string): boolean {
+    if (operationId.length === 0 || this.coopV2ControlOperationId !== operationId) {
+      return false;
+    }
+    this.coopV2DestructivelyProjected = true;
+    return true;
+  }
+
+  /**
+   * Retain the exact ordered wait before applying its terminal action. The operation proof queues the bridge
+   * before phase teardown, so an async UI completion cannot fall through an empty queue into a stale turn.
+   */
+  public installCoopV2TerminalSuccessor(
+    operationId: string,
+    successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>,
+  ): boolean {
+    if (
+      operationId.length === 0
+      || successor.afterOperationId !== operationId
+      || successor.epoch !== getCoopController()?.sessionEpoch
+      || successor.wave !== this.coopRewardWave()
+      || successor.turn !== this.coopRewardTurn()
+    ) {
+      return false;
+    }
+    // A natural phase retained the host-stated wave tail that constructed it. A Mystery reward has its own
+    // PostMysteryEncounter finalizer. Only a destructive ordinary reward/market needs this missing bridge.
+    if (!this.coopV2DestructivelyProjected || this.coopRewardSurface != null || !successor.allowNextWaveStart) {
+      return true;
+    }
+    if (this.coopV2NextWaveAwait != null && JSON.stringify(this.coopV2NextWaveAwait) !== JSON.stringify(successor)) {
+      return false;
+    }
+    this.coopV2NextWaveAwait = structuredClone(successor);
+    return true;
+  }
+
+  /** Install the signed N+1 wait before the current terminal is allowed to shift Phaser's queue. */
+  private queueCoopV2NextWaveAwait(operationId: string): void {
+    const wait = this.coopV2NextWaveAwait;
+    if (
+      wait == null
+      || this.coopV2NextWaveAwaitQueued
+      || wait.afterOperationId !== operationId
+      || !wait.allowNextWaveStart
+    ) {
+      return;
+    }
+    this.coopOwningScene.phaseManager.pushNew("NewBattlePhase", {
+      afterOperationId: wait.afterOperationId,
+      epoch: wait.epoch,
+      wave: wait.wave,
+      turn: wait.turn,
+    });
+    this.coopV2NextWaveAwaitQueued = true;
+    coopLog("v2-interaction", `queued signed next-wave wait after ${operationId}`);
   }
 
   /**
@@ -2627,9 +2693,9 @@ export class SelectModifierPhase extends BattlePhase {
       // a cosmetic mode-transition promise: a scene/context replacement can outlive that promise and leave
       // the watcher parked after it has already materialized and ACKed the authoritative result.
       void globalScene.ui.setMode(UiMode.MESSAGE);
+      this.coopProveV2RewardOperationComplete(operationId);
       super.end();
       this.coopAdvanceInteraction();
-      this.coopProveV2RewardOperationComplete(operationId);
       return true;
     }
     if (action.choice === COOP_INTERACTION_REROLL) {
@@ -2651,8 +2717,8 @@ export class SelectModifierPhase extends BattlePhase {
         );
         globalScene.ui.clearText();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
-          super.end();
           this.coopProveV2RewardOperationComplete(decision?.operationId);
+          super.end();
         });
       } else {
         this.rerollModifiers();

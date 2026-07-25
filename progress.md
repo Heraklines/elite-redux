@@ -3729,3 +3729,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   address it asserts; production code remains unchanged by this false-signal repair.
 - Local verification remains static-only per `AGENTS.md`: targeted Biome and `git diff --check` pass. The
   corrected node contracts will run only on GitHub-hosted runners.
+
+# 2026-07-25 - Projected reward terminals retain their signed next-wave bridge
+
+- Aggregate run `30142642490` exposed one common real wave-2 race in every C lane and P1 after the new replica
+  gap buffer correctly delivered `REWARD_PRESENT` immediately behind `WAVE_ADVANCE`. The guest projected that
+  exact reward while `EggLapsePhase` was current; the destructive projector cleared the V2-sanctioned
+  `NewBattlePhase`, and the terminal reward later let an empty PhaseManager queue manufacture source-wave
+  `TurnInitPhase -> CoopReplayTurnPhase`. The next command carrier was valid but could never find its N+1
+  Battle consumer.
+- A destructively projected reward/market now arms the terminal result's immutable `AWAIT_SUCCESSOR` before
+  its operation applier runs. The real phase-owned terminal proof queues one signed `NewBattlePhase` before
+  teardown. Natural reward queues and Mystery reward finalizers remain unchanged; a rejected or incomplete
+  result cannot queue the bridge.
+- The projected `NewBattlePhase` is an inert ordered wait. It requires the exact N+1/t1 `CONTROL_COMMIT`,
+  constructs only the renderer Battle identity through `newCoopV2ProjectedBattle`, lets the V2 runtime install
+  the complete immutable command state, and only then releases to `NextEncounterPhase`. A later interaction
+  entry may still supersede the wait destructively, so biome/crossroads/Mystery successors retain global-log
+  ownership.
+- The public source contract pins all three boundaries: arm before terminal apply, queue before phase end, and
+  prepare/release only under the exact command carrier. Local verification stayed static-only: TypeScript is
+  zero-error, targeted Biome/error diagnostics are clean, and `git diff --check` passes. The common C/P race
+  and focused Authority V2 contracts remain GitHub-hosted failure-first verification.

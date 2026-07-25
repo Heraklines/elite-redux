@@ -5408,6 +5408,38 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
   return true;
 }
 
+/**
+ * Arm a destructively projected reward/market with the exact structural wait stated by its terminal result.
+ * The phase queues that bridge only when its real operation handler proves completion, before it ends.
+ */
+function prepareCoopV2InteractionTerminalSuccessor(
+  entry: CoopAuthorityEntry,
+  surfaceClass: CoopOperationSurfaceClass,
+  envelope: CoopAuthoritativeEnvelopeV1,
+): boolean {
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as { readonly terminal?: unknown } | undefined;
+  if (
+    surfaceClass !== "op:reward"
+    || (operation?.kind !== "REWARD" && operation?.kind !== "SHOP_BUY")
+    || payload?.terminal !== true
+  ) {
+    return true;
+  }
+  if (entry.nextControl.kind !== "AWAIT_SUCCESSOR") {
+    return false;
+  }
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        installCoopV2TerminalSuccessor?: (
+          operationId: string,
+          successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>,
+        ) => boolean;
+      }
+    | undefined;
+  return phase?.installCoopV2TerminalSuccessor?.(entry.operationId, entry.nextControl) ?? false;
+}
+
 /** Capture the exact current phase/handler generation; a keepalive or queued phase is never actionable proof. */
 interface CoopV2InteractionProofContract {
   readonly phaseNames: readonly string[];
@@ -5823,6 +5855,12 @@ function buildCoopV2LiveSeams(
             return false;
           }
           runtime.v2InteractionStateApplied.add(entry.operationId);
+          if (
+            requiresCoopV2InteractionTerminalProof(material.surfaceClass, material.envelope)
+            && !prepareCoopV2InteractionTerminalSuccessor(entry, material.surfaceClass, material.envelope)
+          ) {
+            return "deferred";
+          }
           const outcome = withActiveCoopRuntimeOpState(runtime.opState, () =>
             applyCoopOperationEnvelopeThroughRegisteredApplier(material.surfaceClass, material.envelope, {
               authority: "v2",
@@ -6241,8 +6279,12 @@ function materializeCoopV2InteractionProjection(
           operationId: string,
           projection: Extract<CoopRewardPresentationPayload, { readonly surface: "reward" }>,
         ): boolean;
+        markCoopV2DestructiveProjection(operationId: string): boolean;
       };
       if (!phase.installCoopV2RewardProjection(plan.operationId, plan.projection)) {
+        return null;
+      }
+      if (!phase.markCoopV2DestructiveProjection(plan.operationId)) {
         return null;
       }
       materializeCoopV2RewardOptionsProjection(runtime, plan);
@@ -6258,8 +6300,12 @@ function materializeCoopV2InteractionProjection(
           operationId: string,
           projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
         ): boolean;
+        markCoopV2DestructiveProjection(operationId: string): boolean;
       };
       if (!phase.installCoopV2MarketProjection(plan.operationId, plan.projection)) {
+        return null;
+      }
+      if (!phase.markCoopV2DestructiveProjection(plan.operationId)) {
         return null;
       }
       materializeCoopV2RewardOptionsProjection(runtime, plan);

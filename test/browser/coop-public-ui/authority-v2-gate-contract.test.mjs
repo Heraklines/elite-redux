@@ -96,6 +96,7 @@ const selectModifierPhase = readFileSync(new URL("src/phases/select-modifier-pha
 const theBargainPhase = readFileSync(new URL("src/phases/the-bargain-phase.ts", root), "utf8");
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
+const newBattlePhase = readFileSync(new URL("src/phases/new-battle-phase.ts", root), "utf8");
 
 function jobBlock(workflow, job) {
   const lines = workflow.split(/\r?\n/gu);
@@ -248,6 +249,40 @@ test("the post-victory seal accepts the exact completed V2 wave transaction afte
     /const staged = settledCoopV2WaveTransaction\(runtime, identity\.wave\)/u,
     "successor installation may retire the live transaction before the later victory seal proves it",
   );
+});
+
+test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COMMIT installs the battle", () => {
+  assert.match(
+    coopRuntime,
+    /requiresCoopV2InteractionTerminalProof[\s\S]*?prepareCoopV2InteractionTerminalSuccessor\(entry, material\.surfaceClass, material\.envelope\)/u,
+    "terminal interaction DATA arms its stated successor before the operation applier can end the phase",
+  );
+  assert.match(
+    selectModifierPhase,
+    /queueCoopV2NextWaveAwait\(operationId\)[\s\S]*?settleCoopV2InteractionOperation/u,
+    "the real terminal proof queues the signed structural wait before it settles and tears down",
+  );
+  assert.match(
+    selectModifierPhase,
+    /pushNew\("NewBattlePhase", \{[\s\S]*?afterOperationId: wait\.afterOperationId,[\s\S]*?epoch: wait\.epoch,[\s\S]*?wave: wait\.wave,[\s\S]*?turn: wait\.turn/u,
+    "the bridge preserves the immutable AWAIT_SUCCESSOR address",
+  );
+  assert.match(
+    newBattlePhase,
+    /canReleaseForCoopV2Control[\s\S]*?successor\.kind === "CONTROL_COMMIT"[\s\S]*?command\.wave === wait\.wave \+ 1[\s\S]*?command\.turn === 1/u,
+    "the projected NewBattle shell accepts only the exact next-wave command carrier",
+  );
+  const prepare = newBattlePhase.slice(
+    newBattlePhase.indexOf("public prepareForCoopV2ControlMaterial"),
+    newBattlePhase.indexOf("public releaseForCoopV2Control"),
+  );
+  assert.match(prepare, /globalScene\.newCoopV2ProjectedBattle\(\)/u);
+  assert.doesNotMatch(prepare, /globalScene\.newBattle\(\)/u);
+  const release = newBattlePhase.slice(
+    newBattlePhase.indexOf("public releaseForCoopV2Control"),
+    newBattlePhase.indexOf("start()"),
+  );
+  assert.match(release, /pushNew\("NextEncounterPhase"\)[\s\S]*?this\.end\(\)/u);
 });
 
 test("post-battle continuation identity follows the active V2 wave into completed evidence", () => {
