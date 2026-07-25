@@ -3766,3 +3766,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   first, then invokes that closure; the constructor runtime remains only a legacy/natural-phase fallback.
 - The fast Authority V2 source contract now pins both sides of that identity handoff so future terminal
   surfaces cannot regress to ambient-runtime settlement.
+
+## 2026-07-25 — terminal proof recording is synchronous; only projection retry is scene-bound
+
+- Exact-SHA full gate `30143762480` showed the first runtime-binding draft still parked C4 at wave 2. The
+  guest phase queued the signed wait and invoked its bound closure, but revision 6 remained
+  `materialDeferred`: the closure had queued the proof itself behind `runWhenCoopRuntimeActive`.
+- The immutable applier must observe its exact terminal proof in the same stack. Proof recording is only a
+  write to `runtime.v2SettledInteractionOperations`, so it is now synchronous and independent of the
+  process-global scene. Only the follow-up durability/replica/projector retry is rebound through
+  `runWhenCoopRuntimeActive`.
+- This preserves production's synchronous behavior, makes the two-engine topology safe, and prevents an
+  admitted result from waiting for a context activation that cannot occur until its own successor releases.

@@ -4305,30 +4305,37 @@ export function settleCoopV2InteractionOperation(operationId: string, runtime: C
   if (runtime == null || operationId.length === 0) {
     return false;
   }
+  // Recording the address-exact proof is pure runtime-ledger work. Do it synchronously even if a synthetic
+  // two-engine delivery currently exposes the peer scene: the applier that invoked the real phase terminal
+  // must be able to observe this proof before it decides whether the immutable entry is materialApplied.
   runtime.v2SettledInteractionOperations.add(operationId);
-  if (!coopV2InteractionCutovers.has(runtime)) {
-    // A mixed-capability peer pair stays on the legacy retained journal. Its live sink deliberately
-    // deferred until this exact phase terminal; retry now so the decision cancels owner resends and
-    // advances the dense legacy cursor without waiting for a transport backoff.
-    runtime.durability?.retryDeferred("op:global");
-    return true;
-  }
-  // Pace the retained replica entry immediately from the real engine completion edge. Authority
-  // redelivery remains the durability owner; this only avoids making correctness/liveness wait for its
-  // next 250ms backoff when the phase terminal appeared one microtask after material injection.
-  coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries();
-  const control = runtime.v2ControlLedger.latestControl;
-  if (
-    control != null
-    && ((control.kind === "AWAIT_SUCCESSOR" && control.afterOperationId === operationId)
-      || (control.kind === "SHARED_INTERACTION" && control.operationId === operationId))
-    && runtime.v2ControlLedger.isMaterialApplied(control)
-  ) {
-    // The initial replica projector commonly runs in the same stack that only wakes an async phase
-    // waiter, so the real phase terminal/actionable handler appears one microtask later. Retry from the
-    // proof edge itself rather than relying on a network backoff redelivery to revisit this control.
-    projectCoopV2InteractionControl(runtime, control);
-  }
+  // Retrying an applier/projector can touch the process-global scene. Rebind only that follow-up work to
+  // the runtime's scene; production executes it synchronously, while the duo harness queues it safely.
+  runWhenCoopRuntimeActive(runtime, () => {
+    if (!coopV2InteractionCutovers.has(runtime)) {
+      // A mixed-capability peer pair stays on the legacy retained journal. Its live sink deliberately
+      // deferred until this exact phase terminal; retry now so the decision cancels owner resends and
+      // advances the dense legacy cursor without waiting for a transport backoff.
+      runtime.durability?.retryDeferred("op:global");
+      return;
+    }
+    // Pace the retained replica entry immediately from the real engine completion edge. Authority
+    // redelivery remains the durability owner; this only avoids making correctness/liveness wait for its
+    // next 250ms backoff when the phase terminal appeared one microtask after material injection.
+    coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries();
+    const control = runtime.v2ControlLedger.latestControl;
+    if (
+      control != null
+      && ((control.kind === "AWAIT_SUCCESSOR" && control.afterOperationId === operationId)
+        || (control.kind === "SHARED_INTERACTION" && control.operationId === operationId))
+      && runtime.v2ControlLedger.isMaterialApplied(control)
+    ) {
+      // The initial replica projector commonly runs in the same stack that only wakes an async phase
+      // waiter, so the real phase terminal/actionable handler appears one microtask later. Retry from the
+      // proof edge itself rather than relying on a network backoff redelivery to revisit this control.
+      projectCoopV2InteractionControl(runtime, control);
+    }
+  });
   return true;
 }
 
@@ -5445,10 +5452,7 @@ function prepareCoopV2InteractionTerminalSuccessor(
       return true;
     }
     settlementRequested = true;
-    runWhenCoopRuntimeActive(runtime, () => {
-      settleCoopV2InteractionOperation(entry.operationId, runtime);
-    });
-    return true;
+    return settleCoopV2InteractionOperation(entry.operationId, runtime);
   };
   return phase?.installCoopV2TerminalSuccessor?.(entry.operationId, entry.nextControl, settleExactRuntime) ?? false;
 }

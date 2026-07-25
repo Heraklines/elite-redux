@@ -259,8 +259,20 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   );
   assert.match(
     coopRuntime,
-    /const settleExactRuntime[\s\S]*?runWhenCoopRuntimeActive\(runtime,[\s\S]*?settleCoopV2InteractionOperation\(entry\.operationId, runtime\)[\s\S]*?installCoopV2TerminalSuccessor\?\.\([\s\S]*?settleExactRuntime/u,
+    /const settleExactRuntime[\s\S]*?return settleCoopV2InteractionOperation\(entry\.operationId, runtime\)[\s\S]*?installCoopV2TerminalSuccessor\?\.\([\s\S]*?settleExactRuntime/u,
     "the terminal phase is bound to the exact replica runtime that admitted its immutable result",
+  );
+  const settlementStart = coopRuntime.indexOf("export function settleCoopV2InteractionOperation(");
+  const settlementEnd = coopRuntime.indexOf("\n/**", settlementStart);
+  assert.ok(settlementStart >= 0 && settlementEnd > settlementStart, "the terminal proof helper is bounded");
+  const settlement = coopRuntime.slice(settlementStart, settlementEnd);
+  const recordsProof = settlement.indexOf("v2SettledInteractionOperations.add(operationId)");
+  const rebindsRetry = settlement.indexOf("runWhenCoopRuntimeActive(runtime");
+  const retriesReplica = settlement.indexOf("retryPendingReplicaEntries()", rebindsRetry);
+  assert.ok(recordsProof >= 0, "the exact runtime ledger records the terminal proof");
+  assert.ok(
+    rebindsRetry > recordsProof && retriesReplica > rebindsRetry,
+    "only scene-mutating replica/projector retries wait for the owning runtime to become ambient",
   );
   assert.match(
     selectModifierPhase,
