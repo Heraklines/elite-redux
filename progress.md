@@ -3813,3 +3813,29 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - This is a harness false red, not a production bypass. No product authority path changed, no private choice
   was injected, and the public Crossroads owner still supplies Stay/Leave through UI input. Behavioral proof
   remains GitHub-hosted only under `AGENTS.md`; local verification is static-only.
+
+## 2026-07-25 - Reward UI completion is bound to its owning browser
+
+- B1 on exact SHA `be65ee4d3` showed a continuation reward fully committed revisions 5-7, including both
+  authority and replica terminal proofs, while the guest's real `SelectModifierPhase` never exited. The
+  asynchronous `setMode(MESSAGE).then(finish)` resumed while the host was ambient in the shared-process duo
+  scheduler: proof was phase/runtime-bound, but `super.end()` still targeted ambient `globalScene`.
+- The transition now starts on the phase's construction-time scene and re-enters its exact runtime before
+  executing the completion callback. This preserves single-browser production behavior while making the
+  ownership invariant explicit: terminal proof, result commit, and phase teardown all belong to one browser.
+- The fast source contract pins the complete UI-promise-to-runtime-to-phase-manager call chain. No co-op
+  behavioral test ran locally; aggregate/focused proof remains on GitHub-hosted runners only.
+
+## 2026-07-25 - Authority V2 Crossroads drops its circular legacy barrier
+
+- The exact-`5c8da12c8` rerun proved that starting the authority's queued Crossroads before driving the
+  replica was necessary but not sufficient. The authority reached `xroads:5` and awaited the legacy
+  reciprocal rendezvous; the replica remained correctly parked in the signed wave-5-to-6 NewBattle carrier,
+  waiting for the authority's V2 interaction-open. Teardown then aborted the unreleased rendezvous.
+- That is an authority cycle, not a pacing timeout: host waits for guest legacy phase arrival, while guest
+  waits for host ordered control. A runtime with the complete V2 control cutover now uses only the immutable
+  predecessor/order plus interaction-open entry as its boundary. Legacy/non-cutover sessions retain the #858
+  rendezvous unchanged.
+- The public source contract pins both sides of the safety boundary: the bypass consults the phase's exact
+  construction-time runtime, and only a runtime registered in the complete control-cutover map can bypass the
+  legacy barrier. Behavioral proof remains remote-only under `AGENTS.md`.

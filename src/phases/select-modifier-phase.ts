@@ -583,7 +583,7 @@ export class SelectModifierPhase extends BattlePhase {
             UiMode.CONFIRM,
             () => {
               globalScene.ui.revertMode();
-              const messageReady = globalScene.ui.setMode(UiMode.MESSAGE);
+              const messageReady = this.coopOwningScene.ui.setMode(UiMode.MESSAGE);
               // Co-op (#633): relay the skip to the watcher, then advance the turn.
               this.coopEndMirror();
               if (this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip")) {
@@ -594,7 +594,7 @@ export class SelectModifierPhase extends BattlePhase {
                 operationId != null
                 && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)
               ) {
-                void messageReady.then(() => {
+                this.coopResumeAfterOwningUiTransition(messageReady, () => {
                   this.coopProveV2RewardOperationComplete(operationId);
                   if (!this.coopCommitPendingAuthorityResult(operationId)) {
                     return;
@@ -731,7 +731,7 @@ export class SelectModifierPhase extends BattlePhase {
   private selectRewardModifierOption(cursor: number, modifierSelectCallback: ModifierSelectCallback): boolean {
     if (this.typeOptions.length === 0) {
       globalScene.ui.clearText();
-      const messageReady = globalScene.ui.setMode(UiMode.MESSAGE);
+      const messageReady = this.coopOwningScene.ui.setMode(UiMode.MESSAGE);
       // Co-op (#633): no reward to pick is the same as leaving - relay + advance.
       this.coopEndMirror();
       if (this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip")) {
@@ -739,7 +739,7 @@ export class SelectModifierPhase extends BattlePhase {
       }
       const operationId = this.coopPendingAuthorityOperationId;
       if (operationId != null && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
-        void messageReady.then(() => {
+        this.coopResumeAfterOwningUiTransition(messageReady, () => {
           this.coopProveV2RewardOperationComplete(operationId);
           if (!this.coopCommitPendingAuthorityResult(operationId)) {
             return;
@@ -893,7 +893,8 @@ export class SelectModifierPhase extends BattlePhase {
     );
     globalScene.ui.clearText();
     if (operationId != null && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
-      void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+      const messageReady = this.coopOwningScene.ui.setMode(UiMode.MESSAGE);
+      this.coopResumeAfterOwningUiTransition(messageReady, () => {
         this.coopProveV2RewardOperationComplete(operationId);
         if (this.coopCommitPendingAuthorityResult(operationId)) {
           super.end();
@@ -1244,7 +1245,12 @@ export class SelectModifierPhase extends BattlePhase {
         }
       };
       if (operationId != null && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
-        void globalScene.ui.setMode(UiMode.MESSAGE).then(finish);
+        // The UI transition belongs to the phase's immutable scene, and its Promise continuation must mutate
+        // that same browser's PhaseManager. A shared-process two-engine scheduler can make the peer ambient
+        // while the tween resolves; using ambient globalScene here recorded the right terminal proof but
+        // called super.end() against the wrong queue, leaving the real reward phase current indefinitely.
+        const messageReady = this.coopOwningScene.ui.setMode(UiMode.MESSAGE);
+        this.coopResumeAfterOwningUiTransition(messageReady, finish);
       } else {
         globalScene.ui.setMode(UiMode.MESSAGE);
         if (!this.coopCommitPendingAuthorityResult(operationId)) {
@@ -2298,6 +2304,11 @@ export class SelectModifierPhase extends BattlePhase {
       }
       callback();
     });
+  }
+
+  /** Complete one phase-owned UI transition only after its construction-time runtime is ambient again. */
+  private coopResumeAfterOwningUiTransition(transition: PromiseLike<unknown>, callback: () => void): void {
+    void Promise.resolve(transition).then(() => this.coopResumeOnOwningRuntime(callback));
   }
 
   /** Awaitable form for post-network continuations that return a loop disposition under the owning runtime. */

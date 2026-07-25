@@ -295,6 +295,19 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   );
   assert.match(
     selectModifierPhase,
+    /const messageReady = this\.coopOwningScene\.ui\.setMode\(UiMode\.MESSAGE\);\s*this\.coopResumeAfterOwningUiTransition\(messageReady, finish\)/u,
+    "an asynchronous picked-item close ends only its construction-time browser phase tree",
+  );
+  const uiResumeStart = selectModifierPhase.indexOf("private coopResumeAfterOwningUiTransition(");
+  const uiResumeEnd = selectModifierPhase.indexOf("\n  /**", uiResumeStart + 1);
+  assert.ok(uiResumeStart >= 0 && uiResumeEnd > uiResumeStart, "the phase-owned UI completion helper is bounded");
+  assert.match(
+    selectModifierPhase.slice(uiResumeStart, uiResumeEnd),
+    /Promise\.resolve\(transition\)\.then\(\(\) => this\.coopResumeOnOwningRuntime\(callback\)\)/u,
+    "a resolved UI promise cannot mutate whichever browser happens to be ambient",
+  );
+  assert.match(
+    selectModifierPhase,
     /pushNew\("NewBattlePhase", \{[\s\S]*?afterOperationId: wait\.afterOperationId,[\s\S]*?epoch: wait\.epoch,[\s\S]*?wave: wait\.wave,[\s\S]*?turn: wait\.turn/u,
     "the bridge preserves the immutable AWAIT_SUCCESSOR address",
   );
@@ -604,6 +617,28 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
     projector,
     /current\.is\("ErCrossroadsPhase"\)[\s\S]*?installCoopV2CrossroadsProjection\(plan\.operationId, plan\.sourceWave, control\.turn\)/u,
     "the Crossroads fast path validates the existing captured source boundary before binding it",
+  );
+  const crossroadsStart = crossroadsPhase.indexOf("private async coopStart(");
+  const crossroadsContinue = crossroadsPhase.indexOf("private continueCoopStart(", crossroadsStart);
+  assert.ok(
+    crossroadsStart >= 0 && crossroadsContinue > crossroadsStart,
+    "the Crossroads authority start boundary is structurally bounded",
+  );
+  const crossroadsBoundary = crossroadsPhase.slice(crossroadsStart, crossroadsContinue);
+  assert.match(
+    crossroadsBoundary,
+    /const v2ControlCutover = isCoopV2ControlCutoverActive\(this\.coopOwningRuntime\)/u,
+    "Crossroads decides the authority model from its construction-time runtime",
+  );
+  assert.match(
+    crossroadsBoundary,
+    /if \(!spoofed && !recoveredExactControl && !v2ControlCutover\) \{\s*const barrier = await this\.coopAwaitBoundaryBarrier\(\)/u,
+    "the legacy reciprocal rendezvous cannot precede a V2 interaction-open and deadlock its replica",
+  );
+  assert.match(
+    coopRuntime,
+    /export function isCoopV2ControlCutoverActive\(runtime: CoopRuntime \| null = active\): boolean \{\s*return runtime != null && coopV2ControlCutovers\.has\(runtime\)/u,
+    "the barrier bypass is scoped to the exact runtime with the complete V2 control graph",
   );
   assert.match(
     projector,

@@ -69,6 +69,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  isCoopV2ControlCutoverActive,
   notifyCoopV2InteractionSurfaceReady,
   notifyCoopWaveContinuationSurfaceReady,
   runWhenCoopRuntimeActive,
@@ -332,7 +333,13 @@ export class ErCrossroadsPhase extends Phase {
     // The barrier makes the pin below read in LOCKSTEP; timeout retransmits and never authorizes a one-sided
     // pin. Skipped in the hotseat spoof path (no real peer to rendezvous with).
     const recoveredExactControl = this.coopV2ControlOperationId != null;
-    if (!spoofed && !recoveredExactControl) {
+    const v2ControlCutover = isCoopV2ControlCutoverActive(this.coopOwningRuntime);
+    // Under the complete V2 graph the prior committed entry and this interaction-open entry are the one
+    // ordered barrier. Waiting for a reciprocal legacy Crossroads arrival here deadlocks the graph: the
+    // authority cannot publish interaction-open until the wait releases, while the replica's signed
+    // NewBattle carrier cannot install Crossroads until that entry arrives. Retain #858 only for legacy
+    // sessions; recovered V2 projections and naturally queued V2 authority phases use the same log order.
+    if (!spoofed && !recoveredExactControl && !v2ControlCutover) {
       const barrier = await this.coopAwaitBoundaryBarrier();
       // The rendezvous promise may settle while the other engine is ambient in the shared-process duo
       // topology. Do not inspect phase/controller/UI globals on that continuation. Queue the entire

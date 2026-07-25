@@ -7920,9 +7920,14 @@ export function enterCoopV2CommandControlBoundary(
   return "deferred";
 }
 
+/** Whether the complete V2 graph owns ordered control-open boundaries for this exact runtime. */
+export function isCoopV2ControlCutoverActive(runtime: CoopRuntime | null = active): boolean {
+  return runtime != null && coopV2ControlCutovers.has(runtime);
+}
+
 /** Whether the complete V2 graph can carry the sealed pre-command presentation on CONTROL_COMMIT. */
 export function isCoopV2CommandEntryPresentationActive(runtime: CoopRuntime | null = active): boolean {
-  return runtime != null && coopV2ControlCutovers.has(runtime);
+  return isCoopV2ControlCutoverActive(runtime);
 }
 
 /** Release only CommandPhase starts addressed by the applied immutable command frontier. */
