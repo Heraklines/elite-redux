@@ -3512,3 +3512,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   delegation. All 48 Authority V2 contracts, targeted Biome checks, `git diff --check`, and TypeScript pass;
   no co-op Vitest or browser behavior ran locally. The next focused/full qualification must prove the duplicate
   enemy-carrier consumption and destination `CoopReplayTurnPhase` stall are gone.
+
+# 2026-07-25 - The party-transposition fixture uses a genuinely non-damaging enemy move
+
+- Aggregate B10 at `e04f47ce8` failed after its second-turn fixture replaced both enemies' moves with Splash
+  and asserted that no additional player could faint. In Elite Redux, Splash is a 40-power attack; the log
+  shows it fainting Snorlax and Fennekin, after which production correctly opened two new replacement pickers
+  that the narrowly scripted test did not drive. The resulting PARTY wait was a false gate signal.
+- The fixture now installs Growl, a real `StatusMove` already used by co-op no-damage scenarios, preserving its
+  intended replacement-to-victory coverage without changing production behavior or relaxing any assertion.
+  Static checks only ran locally; the exact B10 behavior remains GitHub-hosted per repository policy.

@@ -285,7 +285,9 @@ describe.skipIf(!RUN)(
           // Active battlers read the summoned moveset override, not their persistent party moveset.
           // Set the live combat surface that EnemyCommandPhase will actually inspect; changing only
           // `enemy.moveset` leaves the already-summoned Rock Slide override intact.
-          enemy.summonData.moveset = [new PokemonMove(MoveId.SPLASH)];
+          // Elite Redux turns Splash into a 40-power attack, so it cannot serve as the harmless fixture move.
+          // Growl is an actual StatusMove and keeps this test focused on replacement -> victory progression.
+          enemy.summonData.moveset = [new PokemonMove(MoveId.GROWL)];
         }
         expect(
           rig.hostScene.getEnemyField().every(enemy => enemy.hp === 1),
