@@ -1,0 +1,62 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: ef4c871533859dd030a8cd1f0c25d04f20e31da4
+checked_out_sha: ef4c871533859dd030a8cd1f0c25d04f20e31da4
+base_seed: 20260725
+campaign_seed: 20260725
+run: 30149104406 (workflow source ef4c871533859dd030a8cd1f0c25d04f20e31da4)
+timestamp: 2026-07-25T07-30-32Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260725 WAVES=200 - replay this run with:  SOAK_SEED=20260725 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=80 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":1453,"maxHp":2065,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1501,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":142,"hp":194,"maxHp":194,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5101,"formIndex":0,"isTerastallized":false,"teraType":2,"bossSegments":0,"bossSegmentIndex":0,"moves":[[413,0],[5009,0],[5012,0],[184,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":139,"hp":181,"maxHp":181,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":33,"formIndex":0,"isTerastallized":false,"teraType":5,"bossSegments":0,"bossSegmentIndex":0,"moves":[[57,0],[246,0],[182,0],[321,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":1453,"maxHp":2065,"status":0,"statStages":[0,0,2,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1501,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":142,"hp":194,"maxHp":194,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5101,"formIndex":0,"isTerastallized":false,"teraType":2,"bossSegments":0,"bossSegmentIndex":0,"moves":[[413,0],[5009,0],[5012,0],[184,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":139,"hp":181,"maxHp":181,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":33,"formIndex":0,"isTerastallized":false,"teraType":5,"bossSegments":0,"bossSegmentIndex":0,"moves":[[57,0],[246,0],[182,0],[321,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=86 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1749,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":936,"maxHp":1725,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":227,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":553,"hp":213,"maxHp":213,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":153,"formIndex":0,"isTerastallized":false,"teraType":4,"bossSegments":1,"bossSegmentIndex":0,"moves":[[5059,0],[5000,0],[37,0],[746,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":450,"hp":233,"maxHp":233,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":45,"formIndex":0,"isTerastallized":false,"teraType":4,"bossSegments":2,"bossSegmentIndex":1,"moves":[[838,0],[158,0],[659,0],[281,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1749,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":936,"maxHp":1725,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":227,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":553,"hp":202,"maxHp":202,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":153,"formIndex":0,"isTerastallized":false,"teraType":4,"bossSegments":1,"bossSegmentIndex":0,"moves":[[5059,0],[5000,0],[37,0],[746,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":450,"hp":221,"maxHp":221,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":45,"formIndex":0,"isTerastallized":false,"teraType":4,"bossSegments":2,"bossSegmentIndex":1,"moves":[[838,0],[158,0],[659,0],[281,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[22m[39m[coop-soak] RUN ENDED at wave 112 (seed 20260725): host at terminal phase TitlePhase. Survey stops here.
+[22m[39m[coop-soak] DONE seed=20260725 waves=111/200 resyncHeals=2 assertions=0 findings=0 trainerWaves=18 (fixed=10 random=8) skips={"mysteryEncounterDisabledV1":1} elapsedMs=468132
+[coop-soak] RUN ENDED at wave 112 (seed 20260725) [TitlePhase]: host at terminal phase TitlePhase. Surveyed 111/200 waves under all invariants before the terminal.
+
+----- vitest result tail -----
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > retained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m15419[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:297:3[39m
+
+[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mAssertionError[22m: the god profile is the start-to-finish carrier and may not stop before wave 200: expected { wave: 112, …(3) } to be undefined[39m
+
+[32m- Expected:[39m
+undefined
+
+[31m+ Received:[39m
+{
+  "kind": "verified-terminal",
+  "phase": "TitlePhase",
+  "reason": "host at terminal phase TitlePhase",
+  "wave": 112,
+}
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m245:11[22m[39m
+    [90m243|[39m           result[33m.[39mrunEnded[33m,[39m
+    [90m244|[39m           `the god profile is the start-to-finish carrier and may not …
+    [90m245|[39m         )[33m.[39m[34mtoBeUndefined[39m()[33m;[39m
+    [90m   |[39m           [31m^[39m
+    [90m246|[39m         expect(result.wavesCompleted, "the god profile completed the r…
+    [90m247|[39m       }
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 07:22:04
+[2m   Duration [22m 507.11s[2m (transform 17.50s, setup 21.35s, import 277ms, tests 484.76s, environment 593ms)[22m
+
