@@ -1,0 +1,262 @@
+{
+  "invariant": "no-park",
+  "seed": 20260725,
+  "wave": 3,
+  "detail": "wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase \"SwitchPhase\", UI mode MESSAGE (=0), interceptor state \"running\".\nOriginal: Timed out in waitUntil!",
+  "replay": "SOAK_SEED=20260725",
+  "phaseState": {
+    "hostPhase": "SwitchPhase",
+    "guestPhase": "NewBattlePhase",
+    "hostInteractionCounter": 2,
+    "guestInteractionCounter": 2,
+    "hostWave": 3,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 1701017975,
+        "battlerIndex": -1,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 197,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1729958249,
+        "battlerIndex": -1,
+        "speciesId": 94,
+        "speciesName": "Gengar",
+        "hp": 0,
+        "maxHp": 179,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 1
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [],
+    "guestPlayerField": [
+      {
+        "id": 1701017975,
+        "battlerIndex": 0,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 197,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1729958249,
+        "battlerIndex": 1,
+        "speciesId": 94,
+        "speciesName": "Gengar",
+        "hp": 0,
+        "maxHp": 179,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 1
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 2898478324,
+        "battlerIndex": 2,
+        "speciesId": 293,
+        "speciesName": "Whismur",
+        "hp": 0,
+        "maxHp": 18,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 45,
+            "ppUsed": 0
+          },
+          {
+            "id": 103,
+            "ppUsed": 0
+          },
+          {
+            "id": 336,
+            "ppUsed": 0
+          },
+          {
+            "id": 310,
+            "ppUsed": 1
+          }
+        ]
+      },
+      {
+        "id": 759525187,
+        "battlerIndex": 3,
+        "speciesId": 506,
+        "speciesName": "Lillipup",
+        "hp": 0,
+        "maxHp": 14,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 33,
+            "ppUsed": 0
+          },
+          {
+            "id": 46,
+            "ppUsed": 0
+          },
+          {
+            "id": 45,
+            "ppUsed": 0
+          },
+          {
+            "id": 336,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260725 preseeded=false",
+    "wave 1 turn 1: replay guest crossed cmd:1:1 through real public COMMAND=opened",
+    "wave 1: host slot move=53 guest slot move=53",
+    "wave 1 turn 1: progress enemyHp=[16:0/14,263:0/14] playerHp=[143:303/303,94:179/179]",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=85 guest slot move=85",
+    "wave 2 turn 1: forced-faint guest EXPLOSION self-KO",
+    "wave 2 turn 1: progress enemyHp=[293:0/18,506:0/14] playerHp=[143:197/303,94:0/179]",
+    "wave 2: reward shop owner=guest take-nonparty"
+  ]
+}
