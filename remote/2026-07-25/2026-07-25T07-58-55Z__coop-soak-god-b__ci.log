@@ -1,0 +1,59 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 115
+run_mode: diagnostic
+calibration_id: god-200
+target_sha: c23f558b6c0640d9d665e00c395a1f79345a6a57
+checked_out_sha: c23f558b6c0640d9d665e00c395a1f79345a6a57
+base_seed: 20260725
+campaign_seed: 20365454
+run: 30149955471 (workflow source c23f558b6c0640d9d665e00c395a1f79345a6a57)
+timestamp: 2026-07-25T07-58-55Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365454 WAVES=115 - replay this run with:  SOAK_SEED=20365454 SOAK_WAVES=115 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=31 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":2065,"maxHp":2065,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":1725,"maxHp":1725,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5025,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":622,"hp":62,"maxHp":62,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5011,"formIndex":0,"isTerastallized":false,"teraType":7,"bossSegments":1,"bossSegmentIndex":0,"moves":[[707,0],[70,0],[5,0],[286,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":622,"hp":59,"maxHp":59,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5011,"formIndex":0,"isTerastallized":false,"teraType":7,"bossSegments":1,"bossSegmentIndex":0,"moves":[[707,0],[5,0],[70,0],[309,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":2065,"maxHp":2065,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":1725,"maxHp":1725,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5025,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":622,"hp":62,"maxHp":62,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5011,"formIndex":0,"isTerastallized":false,"teraType":7,"bossSegments":1,"bossSegmentIndex":0,"moves":[[707,0],[70,0],[5,0],[286,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":622,"hp":57,"maxHp":57,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5011,"formIndex":0,"isTerastallized":false,"teraType":7,"bossSegments":1,"bossSegmentIndex":0,"moves":[[707,0],[5,0],[70,0],[309,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[22m[39m[coop-soak] DONE seed=20365454 waves=115/115 resyncHeals=1 assertions=0 findings=0 trainerWaves=21 (fixed=12 random=9) skips={"mysteryEncounterDisabledV1":1} elapsedMs=485978
+
+----- vitest result tail -----
+
+[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mAssertionError[22m: soak observed 1 unexpected pre-heal mismatch(es) (replay SOAK_SEED=20365454): wave31@wave-start[field]: expected [ { wave: 31, …(4) } ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "classification": "unexpected",[39m
+[31m+     "fields": [[39m
+[31m+       "field",[39m
+[31m+     ],[39m
+[31m+     "sample": "field:host=[{\"bi\":0,\"partyIndex\":0,\"speciesId\":890,\"hp\":2065,\"maxHp\":2065,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5258,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":3,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[34,0],[247,0],[53,0],[85,0]],\"tags\":[\"ER_ENRAGE\"],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":1,\"partyIndex\":1,\"speciesId\":150,\"hp\":1725,\"maxHp\":1725,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5025,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":13,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[34,0],[247,0],[53,0],[85,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":2,\"partyIndex\":0,\"speciesId\":622,\"hp\":62,\"maxHp\":62,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5011,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":7,\"bossSegments\":1,\"bossSegmentIndex\":0,\"moves\":[[707,0],[70,0],[5,0],[286,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":3,\"partyIndex\":1,\"speciesId\":622,\"hp\":59,\"maxHp\":59,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5011,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":7,\"bossSegments\":1,\"bossSegmentIndex\":0,\"moves\":[[707,0],[5,0],[70,0],[309,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0}]/guest=[{\"bi\":0,\"partyIndex\":0,\"speciesId\":890,\"hp\":2065,\"maxHp\":2065,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5258,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":3,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[34,0],[247,0],[53,0],[85,0]],\"tags\":[\"ER_ENRAGE\"],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":1,\"partyIndex\":1,\"speciesId\":150,\"hp\":1725,\"maxHp\":1725,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5025,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":13,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[34,0],[247,0],[53,0],[85,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":2,\"partyIndex\":0,\"speciesId\":622,\"hp\":62,\"maxHp\":62,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5011,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":7,\"bossSegments\":1,\"bossSegmentIndex\":0,\"moves\":[[707,0],[70,0],[5,0],[286,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":3,\"partyIndex\":1,\"speciesId\":622,\"hp\":57,\"maxHp\":57,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5011,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":7,\"bossSegments\":1,\"bossSegmentIndex\":0,\"moves\":[[707,0],[5,0],[70,0],[309,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0}]",[39m
+[31m+     "wave": 31,[39m
+[31m+     "where": "wave-start",[39m
+[31m+   },[39m
+[31m+ ][39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m267:9[22m[39m
+    [90m265|[39m           [33m+[39m [32m`(replay SOAK_SEED=[39m[36m${[39mseed[36m}[39m[32m): `[39m
+    [90m266|[39m           + unexpectedPreHeals.map(m => `wave${m.wave}@${m.where}[${m.…
+    [90m267|[39m       )[33m.[39m[34mtoEqual[39m([])[33m;[39m
+    [90m   |[39m         [31m^[39m
+    [90m268|[39m
+    [90m269|[39m       // #838 Phase 5 GATE: the PRODUCTION per-turn checksum ASSERTION…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 07:50:02
+[2m   Duration [22m 532.39s[2m (transform 20.71s, setup 24.96s, import 317ms, tests 506.13s, environment 818ms)[22m
+
