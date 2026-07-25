@@ -3935,3 +3935,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Preserved V2 field identities now receive render setup without resetting their authoritative summon state;
   compatibility-reconstructed enemies retain the full ordinary reset.
 - This child train is declared against exact base `4b197f3f7`. Behavioral validation remains GitHub-hosted.
+
+## 2026-07-25 - Exact-SHA `bfe2b3b01` public-command harness correction
+
+- Aggregate gate `30147942377` remotely proved the production changes: B9 is green after binding the reciprocal
+  command continuation to its originating runtime/phase, and B11's automatic-victory seal now passes with Aqua
+  Ring intact through the next encounter. All four Authority V2 mutation shards and the focused qualification
+  are green; Showdown/Tournament T4 remains outside this co-op-only task.
+- B11's remaining red was a different engine-test-only contradiction. `arriveGuestCommandBoundary` started a
+  real guest-owned CommandPhase, then expected that actionable human-input surface to reach ReplayTurn without
+  any public input. The old cross-client continuation bug had accidentally supplied that impossible advance.
+  The helper now stops at the exact open command frontier (or an already-routed ReplayTurn), rejects any other
+  phase, and leaves the later wired replay driver to consume the command. No production timeout, authority,
+  presentation, or player-facing assertion is weakened.
+- Local validation remains static-only per `AGENTS.md`: targeted Biome has no errors, `git diff --check` is
+  clean, and all behavioral requalification remains on GitHub-hosted runners.

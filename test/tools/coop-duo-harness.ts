@@ -3193,8 +3193,10 @@ export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerPart
  * exactly as `buildDuo` does for wave 1 (its comment: "starting the guest-owned CommandPhase supplies the
  * replica's address-exact proof"). A between-wave guest that only ARRIVEs at (but never starts) its
  * CommandPhase never emits the "local-seat real CommandPhase proof (frontier=N)" the V2 replica's
- * CONTROL_COMMIT awaits, so a subsequent driveGuestReplayTurn parks forever. Opt-in so the existing
- * arrival-only callers (which start the guest command through their own public/UI driver) are unchanged.
+ * CONTROL_COMMIT awaits. The helper deliberately LEAVES an interactive command phase open: a real browser
+ * cannot advance it without public input, and the later driveGuestReplayTurn call installs the already-wired
+ * authoritative replay in place of that proven surface. Opt-in so the existing arrival-only callers (which
+ * start the guest command through their own public/UI driver) are unchanged.
  */
 export async function arriveGuestCommandBoundary(
   rig: DuoRig,
@@ -3265,10 +3267,16 @@ export async function arriveGuestCommandBoundary(
         }
         startDuoCommandPhaseIfNeeded(rig.guestScene, guestCommand);
         await drainLoopback();
-        if (rig.guestScene.phaseManager.getCurrentPhase().phaseName !== "CoopReplayTurnPhase") {
-          // TurnStart -> CoopReplayTurnPhase is a purely local guest progression; keep the peer host at its
-          // still-unstarted wave CommandPhase (hostPlayWave owns starting it) with a drain-only peer pump.
-          await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase", { pumpPeer: () => drainLoopback() });
+        const installed = rig.guestScene.phaseManager.getCurrentPhase();
+        if (
+          installed.phaseName !== "CoopReplayTurnPhase"
+          && (installed.phaseName !== "CommandPhase"
+            || (installed as Phase & { getFieldIndex(): number }).getFieldIndex() !== COOP_GUEST_FIELD_INDEX)
+        ) {
+          throw new Error(
+            `guest ${wave}:${turn} command proof advanced to unexpected ${installed.phaseName}; `
+              + "a public command surface must remain open until the wired command is consumed",
+          );
         }
       }
     });
