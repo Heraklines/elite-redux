@@ -179,6 +179,14 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     if (!game.scene.phaseManager.replaceWithCoopAuthoritativePhase(predecessor, replay)) {
       throw new Error(`pacing fixture could not replace ${predecessor.phaseName} with authoritative replay`);
     }
+    // Production starts the authoritative replacement synchronously. PhaseInterceptor deliberately stubs
+    // PhaseManager.startCurrentPhase() in this engine fixture, so cross the same public mutation boundary and
+    // start the exact queue-owned replay once before awaiting its causal transition.
+    if (game.scene.phaseManager.getCurrentPhase() !== replay) {
+      throw new Error("pacing fixture lost its authoritative replay before the start edge");
+    }
+    game.scene.phaseManager.prepareCurrentPhaseForStart();
+    replay.start();
     // Animation-enabled HP and move phases legitimately remain current across several timer turns. A fixed
     // zero-delay poll re-entered the same phase dozens of times and exhausted the fixture loop before the
     // finalizer applied its checkpoint. Advance only on the causal phase transition a real renderer exposes.

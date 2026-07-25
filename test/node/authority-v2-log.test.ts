@@ -189,6 +189,7 @@ function fullEntry(
     kind?: CoopAuthorityEntry["kind"];
     context?: CoopFrameContextV2;
     nextControl?: CoopNextControl;
+    subsumes?: number[];
   } = {},
 ): CoopAuthorityEntry {
   return { ...entryInput(operationId, opts), revision };
@@ -764,6 +765,48 @@ describe("authority-v2 log", () => {
     expect(scheduler.ownerCount("authority-v2:session-A:seat0:deliver:1")).toBe(0);
     // b itself is only admitted (required = materialApplied since no nextControl), so its retry remains live.
     expect(log.diagnostics().activeDeliveryTimers).toBe(1);
+  });
+
+  it("admits an exact N+1 replacement that explicitly subsumes N's obsolete pending picker", () => {
+    const replica = makeReplicaLog(scheduler, sent);
+    const replacementOperationId = "RC/e1/w1/t1/o0/f0/s1";
+    const predecessor = fullEntry(1, "TURN/e1/w1/t1", {
+      kind: "TURN_COMMIT",
+      nextControl: {
+        kind: "REPLACEMENT",
+        operationId: replacementOperationId,
+        ownerSeatId: 1,
+        epoch: 1,
+        wave: 1,
+        turn: 1,
+        occurrence: 0,
+        fieldIndex: 0,
+        remaining: [],
+      },
+    });
+    expect(replica.admit(predecessor)).toEqual({ kind: "admitted" });
+    expect(replica.recordReplicaStage(predecessor, "materialApplied")).toBe(true);
+    expect(replica.diagnostics()).toMatchObject({
+      receivedThrough: 1,
+      appliedThrough: 1,
+      controlInstalledThrough: 0,
+    });
+
+    const successor = fullEntry(2, replacementOperationId, {
+      kind: "REPLACEMENT_COMMIT",
+      nextControl: commandControl({ turn: 2 }),
+      subsumes: [1],
+    });
+    expect(replica.admit(successor)).toEqual({ kind: "admitted" });
+    expect(replica.diagnostics()).toMatchObject({
+      receivedThrough: 2,
+      appliedThrough: 1,
+      controlInstalledThrough: 1,
+    });
+    expect(replica.recordReplicaStage(predecessor, "controlInstalled")).toBe(false);
+    expect(replica.recordReplicaStage(successor, "materialApplied")).toBe(true);
+    expect(replica.recordReplicaStage(successor, "controlInstalled")).toBe(true);
+    expect(replica.controlInstalledThrough()).toBe(2);
   });
 
   it("presentationSettled is NEVER required for retirement", () => {

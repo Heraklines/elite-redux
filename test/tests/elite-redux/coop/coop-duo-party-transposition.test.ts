@@ -285,16 +285,19 @@ describe.skipIf(!RUN)(
           // Active battlers read the summoned moveset override, not their persistent party moveset.
           // Set the live combat surface that EnemyCommandPhase will actually inspect; changing only
           // `enemy.moveset` leaves the already-summoned Rock Slide override intact.
-          // Elite Redux turns Splash into a 40-power attack, so it cannot serve as the harmless fixture move.
-          // Growl is an actual StatusMove and keeps this test focused on replacement -> victory progression.
-          enemy.summonData.moveset = [new PokemonMove(MoveId.GROWL)];
+          // Elite Redux turns Splash and Growl into damaging attacks, so neither can serve as the harmless
+          // fixture move. Helping Hand cannot damage either player and keeps this test focused on the
+          // replacement -> victory progression it actually owns.
+          enemy.summonData.moveset = [new PokemonMove(MoveId.HELPING_HAND)];
         }
         expect(
           rig.hostScene.getEnemyField().every(enemy => enemy.hp === 1),
           "the deterministic second-turn win is installed after reciprocal command adoption",
         ).toBe(true);
         expect(
-          rig.hostScene.getEnemyField().every(enemy => enemy.getMoveset().every(move => move.moveId === MoveId.GROWL)),
+          rig.hostScene
+            .getEnemyField()
+            .every(enemy => enemy.getMoveset().every(move => move.moveId === MoveId.HELPING_HAND)),
           "the adopted harmless foes remain installed for the post-replacement turn",
         ).toBe(true);
       });

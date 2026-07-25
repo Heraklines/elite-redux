@@ -836,6 +836,24 @@ export class AuthorityLog implements CoopAuthorityLog {
         }
         return { kind: "duplicate-pending-control" };
       case "gap": {
+        const pending = this.pendingReplicaEntry;
+        if (
+          pending != null
+          && entry.revision === pending.revision + 1
+          && entry.subsumes.includes(pending.revision)
+          && controlAllowsSuccessorEntry(pending.nextControl, pending.operationId, entry)
+          && this.ledger.markReceivedAfterSuperseding(pending.revision, entry.revision)
+        ) {
+          // Explicit log-order supersession is the only legal way N+1 can pass an unfinished N. The newer
+          // complete image now owns mechanics, so retaining N's obsolete picker/control as a prerequisite
+          // would deadlock the exact fallback that resolved it.
+          this.pendingReplicaSuccessorControl = null;
+          this.pendingReplicaEntry = freezeAuthorityEntry(cloneEntry(entry));
+          if (this.pendingTailRequestFrom != null && this.pendingTailRequestFrom <= pending.revision) {
+            this.pendingTailRequestFrom = null;
+          }
+          return { kind: "admitted" };
+        }
         // Request the missing tail via the injected send. No local retry loop - the authority's redelivery
         // is the ONLY retry, so a replica can never spin an orphan request loop (the exact prior hazard).
         // Suppress an identical request until that exact mechanical frontier completes. A full tail response

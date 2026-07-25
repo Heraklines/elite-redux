@@ -316,6 +316,48 @@ describe("authority-v2 replacement staged transaction", () => {
     duo.dispose();
   });
 
+  it("explicitly subsumes the retained turn entry whose replacement picker it resolves", () => {
+    const clock = new FakeClock();
+    const host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      scheduler: createCoopScheduler(clock),
+      send: () => {},
+    });
+    const pick = proposal({ ownerSeatId: 1 });
+    const activeControl = replacementControl(pick);
+    const capture = { turnResolution: { events: ["guest-faint"] }, checkpoint: { hp: [100, 0] } };
+    expect(
+      host.tapTurnCommit({
+        operationId: "TURN/e7/w8/t4",
+        capture,
+        nextCommandFrontier: null,
+        nextReplacementControl: activeControl,
+        legacyImage: capture,
+        legacyDigest: "legacy-turn-with-guest-faint",
+      }),
+    ).toMatchObject({ revision: 1, nextControl: activeControl });
+    expect(host.diagnostics().retained).toBe(1);
+
+    const cutover = new CoopV2ReplacementCutover(host);
+    expect(stage(cutover, pick)).toBe(true);
+    const result = cutover.commitStagedHostReplacements({
+      authorityCarrier: carrier(),
+      presentationSeat: { side: "player", bi: 0, pokemonId: 101 },
+      activeControl,
+      commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
+    });
+    expect(result.kind).toBe("committed");
+    if (result.kind !== "committed") {
+      throw new Error("expected committed replacement batch");
+    }
+    expect(result.entries[0]).toMatchObject({ revision: 2, subsumes: [1] });
+
+    cutover.dispose();
+    host.dispose();
+  });
+
   it("states turn N+1 when the post-summon carrier is captured before TurnInit advances", () => {
     const duo = buildDuo();
     const cutover = new CoopV2ReplacementCutover(duo.host);

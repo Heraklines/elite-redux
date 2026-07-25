@@ -272,6 +272,41 @@ describe("Authority V2 interaction control ledger", () => {
     ).toBe(false);
   });
 
+  it("lets an exact replacement commit explicitly subsume its unresolved picker lease", () => {
+    const ledger = new CoopV2InteractionControlLedger();
+    const operationId = "RC/e3/w5/t1/o0/f0/s1";
+    const control: Extract<CoopNextControl, { kind: "REPLACEMENT" }> = {
+      kind: "REPLACEMENT",
+      operationId,
+      ownerSeatId: 1,
+      epoch: CONTEXT.sessionEpoch,
+      wave: 5,
+      turn: 1,
+      occurrence: 0,
+      fieldIndex: 0,
+      remaining: [],
+    };
+    const predecessor: CoopAuthorityEntry = {
+      ...interactionEntry(1, "TURN/e3/w5/t1", control),
+      kind: "TURN_COMMIT",
+      material: { digest: "digest-turn", payload: { epoch: 3, wave: 5, turn: 1 } },
+    };
+    expect(ledger.registerEntry(predecessor)).toBe(true);
+    expect(ledger.markMaterialApplied(predecessor)).toBe(true);
+
+    const replacement: CoopAuthorityEntry = {
+      ...interactionEntry(2, operationId, TERMINAL_CONTROL),
+      kind: "REPLACEMENT_COMMIT",
+      material: {
+        digest: "digest-replacement",
+        payload: { sourceAddress: { epoch: 3, wave: 5, turn: 1 } },
+      },
+      subsumes: [1],
+    };
+    expect(ledger.admitSuccessor(replacement)).toBe(true);
+    expect(ledger.activeControl).toBeNull();
+  });
+
   it("admits an explicit null replacement only after its exact automatic-resolution proof", () => {
     const ledger = new CoopV2InteractionControlLedger();
     const replacement: Extract<CoopNextControl, { kind: "REPLACEMENT" }> = {

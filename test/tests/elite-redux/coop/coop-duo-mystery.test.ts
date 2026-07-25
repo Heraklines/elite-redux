@@ -1046,7 +1046,7 @@ describe.skipIf(!RUN)(
       expect(
         hostQuizControlOperationId,
         "the owner-side ErQuizPhase was bound to an exact ME_PRESENT control address before input",
-      ).toMatch(/:ME_PRESENT$/);
+      ).toMatch(/:ME_PRESENT:\d+$/);
       const streamedSession = quizSessionSends[0];
       expect(
         streamedSession.subPrompt?.kind === "quiz" ? streamedSession.subPrompt.questions.length : -1,
@@ -1506,12 +1506,25 @@ describe.skipIf(!RUN)(
       // synchronous handlers can otherwise apply the guest recovery while the host globalScene is ambient,
       // an execution two independent browsers cannot produce.
       rig.pair.setDestinationContextDelivery?.(true);
+      let recoveryApplyStarted = false;
       try {
         withClientSync(rig.hostCtx, () => {
           rig.hostRuntime.battleStream.sendMeChecksum(meSeq, coopEngine.captureCoopChecksum());
         });
         for (let attempt = 0; attempt < 200; attempt++) {
           await pumpDuoDestinations(rig, 1);
+          await withClient(rig.guestCtx, async () => {
+            const current = rig.guestScene.phaseManager.getCurrentPhase();
+            if (!recoveryApplyStarted && current?.phaseName === "CoopApplyResyncPhase") {
+              // replaceWithCoopRecoveryPhase starts this phase synchronously in production. PhaseInterceptor
+              // deliberately stubs PhaseManager.startCurrentPhase in engine tests, so cross that exact public
+              // mutation boundary once instead of leaving a valid recovery transaction parked unstarted.
+              recoveryApplyStarted = true;
+              rig.guestScene.phaseManager.prepareCurrentPhaseForStart();
+              current.start();
+              await drainLoopback();
+            }
+          });
           const completed = withClientSync(
             rig.guestCtx,
             () => getCoopV2Shadow(rig.guestRuntime)?.diagnostics().recovery?.completedReplicaProofs ?? 0,

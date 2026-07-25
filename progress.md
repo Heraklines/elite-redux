@@ -3618,3 +3618,29 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   adoption, replacement, victory, and transposition checks are unchanged, so the test again exercises the
   production behavior instead of failing on its own setup.
 - This is a test-only false-signal repair. Behavioral B10 execution remains GitHub-hosted only.
+
+# 2026-07-25 - Ordered replacement fallback subsumes its unresolved picker
+
+- Exact aggregate `30139608002` was green in every co-op lane except B9/B10 (plus the independently owned
+  triples T4 shard). Browser-native WebRTC, both production-browser lanes, all five soak shards, fast V2
+  contracts, and all P33 mutation shards passed. B9 exposed a real log-order deadlock: turn revision N had
+  materially applied but its guest replacement picker was not actionable; the authority's retained fallback
+  arrived as N+1, yet the replica called it a gap forever even though N+1 explicitly resolved the same
+  replacement operation.
+- AuthorityLog and both ledgers now implement the existing protocol rule that exact N+1 may retire unfinished
+  N only when `subsumes` names N and the pending typed control authorizes that exact successor kind/address.
+  Replacement commits derive that supersession from the retained matching replacement control, and the
+  replica drops the retired pending image before applying the complete fallback material. Focused node
+  contracts cover log admission, control-lease retirement, and the production replacement tap.
+- The remaining old B9/B10 failures were evidence-backed harness defects: ER Growl is damaging, so that
+  fixture now uses genuinely harmless Helping Hand; the replay
+  fixture omitted PhaseInterceptor's production auto-start edge, the Mystery operation-id expectation omitted
+  its pinned suffix, recovery left an atomically installed apply phase unstarted for the same interceptor
+  reason, and a fixed two-pump command assertion sampled before the receiver event loop became actionable.
+  The two-browser harness also restored a stale outer snapshot after re-entering the same client from a
+  scheduled callback, erasing that browser's Mystery pin. Same-client nesting now preserves the newest client
+  state; real cross-client returns still restore the captured peer exactly.
+- Local verification is static only per `AGENTS.md`: TypeScript passes with zero errors, targeted Biome has no
+  blocking diagnostic, `git diff --check` passes, and B9/B10 inventories are deterministic. The next checkpoint
+  is the focused remote branch gate (Authority V2 contracts plus selected engine shards); no staging or
+  production deploy is authorized by this checkpoint.

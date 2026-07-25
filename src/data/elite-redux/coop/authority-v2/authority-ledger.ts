@@ -106,6 +106,32 @@ export class AuthorityLedger {
   }
 
   /**
+   * Admit the immediate successor that explicitly subsumes the one unfinished revision.
+   *
+   * The newer entry's complete immutable material replaces the pending predecessor by log order, so the
+   * predecessor does not need to manufacture a now-obsolete UI/control proof first. This is deliberately
+   * atomic: only N+1 may retire pending N, and callers must separately validate the entry's explicit
+   * `subsumes` declaration and predecessor-control address before invoking it.
+   */
+  markReceivedAfterSuperseding(pendingRevision: number, successorRevision: number): boolean {
+    if (
+      pendingRevision !== this.controlCursor + 1
+      || this.receivedCursor !== pendingRevision
+      || (this.materialCursor !== this.controlCursor && this.materialCursor !== pendingRevision)
+      || successorRevision !== pendingRevision + 1
+    ) {
+      return false;
+    }
+    // Advancing these cursors means "mechanically retired by explicit supersession", not that the skipped
+    // material/control was locally replayed. The successor remains received-only until its own material and
+    // control proofs complete through the ordinary pipeline.
+    this.materialCursor = pendingRevision;
+    this.controlCursor = pendingRevision;
+    this.receivedCursor = successorRevision;
+    return true;
+  }
+
+  /**
    * Record a verified canonical material install. Entries with no successor mechanically complete here;
    * entries with a successor remain at `duplicate-pending-control` until that exact control is recorded.
    */

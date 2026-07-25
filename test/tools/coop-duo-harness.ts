@@ -668,14 +668,25 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     if (ctx.mePinsSaveGeneration === mePinsSaveGeneration) {
       ctx.mePins = readMePins();
     }
-    initGlobalScene(prev.scene);
-    Phaser.Math.RND.state(prev.rndState);
-    restoreGhostState(prev.ghost);
+    const reenteredSameClient = prevClientCtx === ctx;
+    // Scheduled transport/timer callbacks are rebound with withClientSync even when their owning browser
+    // is already installed by an outer withClient scope. Production remains in that browser process, so
+    // mutations made by the nested callback stay visible to the outer stack. Restoring `prev` here instead
+    // resurrected the outer scope's stale ME pins/RNG/module state and manufactured impossible Mystery and
+    // recovery failures. Reinstall the newest per-client snapshot for same-browser re-entry; only a genuine
+    // cross-browser return restores the captured predecessor.
+    initGlobalScene(reenteredSameClient ? ctx.scene : prev.scene);
+    Phaser.Math.RND.state(reenteredSameClient ? ctx.rndState : prev.rndState);
+    restoreGhostState(reenteredSameClient ? ctx.ghost : prev.ghost);
     if (coopHarnessModuleLetIsolation) {
-      restoreModuleLets(prev.moduleLets);
+      restoreModuleLets(reenteredSameClient ? (ctx.moduleLets ?? prev.moduleLets) : prev.moduleLets);
     }
-    restoreBiomeModuleState(prev.biomeState);
-    restoreScopedMePins(prev.mePins, capturedBoundaryGeneration);
+    restoreBiomeModuleState(reenteredSameClient ? (ctx.biomeState ?? prev.biomeState) : prev.biomeState);
+    if (reenteredSameClient) {
+      writeMePins(ctx.mePins ?? IDLE_ME_PINS);
+    } else {
+      restoreScopedMePins(prev.mePins, capturedBoundaryGeneration);
+    }
     if (prevAccountIdentity != null && loggedInUser != null) {
       loggedInUser.username = prevAccountIdentity;
     }
@@ -685,9 +696,10 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     // A fail-closed terminal may dispose the previously installed peer while this client owns the
     // scoped callback. Never resurrect that dead runtime on scope exit: doing so reinstalled its guest
     // predicates and replay hooks into the following test even though both transports were closed.
-    if (prev.runtime != null && prev.runtime.localTransport.state !== "closed") {
-      setCoopRuntime(prev.runtime);
-      installCoopHooksForActive(prev.runtime);
+    const restoredRuntime = reenteredSameClient ? ctx.runtime : prev.runtime;
+    if (restoredRuntime != null && restoredRuntime.localTransport.state !== "closed") {
+      setCoopRuntime(restoredRuntime);
+      installCoopHooksForActive(restoredRuntime);
     }
   }
 }
@@ -749,23 +761,29 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     if (ctx.mePinsSaveGeneration === mePinsSaveGeneration) {
       ctx.mePins = readMePins();
     }
-    initGlobalScene(prev.scene);
-    Phaser.Math.RND.state(prev.rndState);
-    restoreGhostState(prev.ghost);
+    const reenteredSameClient = prevClientCtx === ctx;
+    initGlobalScene(reenteredSameClient ? ctx.scene : prev.scene);
+    Phaser.Math.RND.state(reenteredSameClient ? ctx.rndState : prev.rndState);
+    restoreGhostState(reenteredSameClient ? ctx.ghost : prev.ghost);
     if (coopHarnessModuleLetIsolation) {
-      restoreModuleLets(prev.moduleLets);
+      restoreModuleLets(reenteredSameClient ? (ctx.moduleLets ?? prev.moduleLets) : prev.moduleLets);
     }
-    restoreBiomeModuleState(prev.biomeState);
-    restoreScopedMePins(prev.mePins, capturedBoundaryGeneration);
+    restoreBiomeModuleState(reenteredSameClient ? (ctx.biomeState ?? prev.biomeState) : prev.biomeState);
+    if (reenteredSameClient) {
+      writeMePins(ctx.mePins ?? IDLE_ME_PINS);
+    } else {
+      restoreScopedMePins(prev.mePins, capturedBoundaryGeneration);
+    }
     if (prevAccountIdentity != null && loggedInUser != null) {
       loggedInUser.username = prevAccountIdentity;
     }
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
     activeClientCtx = prevClientCtx;
-    if (prev.runtime != null && prev.runtime.localTransport.state !== "closed") {
-      setCoopRuntime(prev.runtime);
-      installCoopHooksForActive(prev.runtime);
+    const restoredRuntime = reenteredSameClient ? ctx.runtime : prev.runtime;
+    if (restoredRuntime != null && restoredRuntime.localTransport.state !== "closed") {
+      setCoopRuntime(restoredRuntime);
+      installCoopHooksForActive(restoredRuntime);
     }
   }
 }
@@ -2407,7 +2425,14 @@ export async function driveDuoGuestTackleThroughPublicUi(
     // guest's rendezvous only after its receiver-realm promise continuation runs. A transport drain alone is
     // not proof that the public handler is actionable. Pump both destination event loops with a finite bound
     // before asserting the guest menu, matching the independent loops used in the production browser test.
-    await pumpDuoDestinations(rig, 2);
+    const commandUiDeadline = Date.now() + 5_000;
+    while (
+      withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode()) !== UiMode.COMMAND
+      && Date.now() < commandUiDeadline
+    ) {
+      await pumpDuoDestinations(rig, 1);
+      await new Promise<void>(resolve => setTimeout(resolve, 10));
+    }
     await withClient(rig.guestCtx, async () => {
       await drainLoopback();
       expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);

@@ -226,7 +226,8 @@ export class CoopV2ControlLedger {
     if (active == null) {
       return true;
     }
-    if (active.installed == null || entry.revision !== active.revision + 1) {
+    const explicitlySubsumesUninstalled = active.installed == null && entry.subsumes.includes(active.revision);
+    if ((!explicitlySubsumesUninstalled && active.installed == null) || entry.revision !== active.revision + 1) {
       return false;
     }
     if (!controlAllowsSuccessorEntry(active.control, active.sourceOperationId, entry)) {

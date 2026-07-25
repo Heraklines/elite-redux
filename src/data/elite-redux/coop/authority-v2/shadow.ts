@@ -55,6 +55,7 @@ import {
   type ReplacementResolutionMode,
   type ReplacementSuccessor,
   replacementImageDigest,
+  replacementOperationId,
   shadowParityOfEntry,
   toReplacementCommitImage,
 } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
@@ -781,14 +782,25 @@ export class CoopAuthorityV2Shadow {
       this.lastObservedTurn = input.proposal.sourceAddress.turn;
     }
     return this.runTap("REPLACEMENT_COMMIT", () => {
+      const operationId =
+        input.operationId ?? replacementOperationId(input.proposal.sourceAddress, input.proposal.ownerSeatId);
+      const subsumes =
+        input.subsumes
+        ?? this.log
+          .retained()
+          .filter(
+            retainedEntry =>
+              retainedEntry.nextControl.kind === "REPLACEMENT" && retainedEntry.nextControl.operationId === operationId,
+          )
+          .map(retainedEntry => retainedEntry.revision);
       const built = buildReplacementCommitEntry({
         context: this.frameContext,
         proposal: input.proposal,
         resolution: input.resolution,
         successor: input.successor,
         ...(input.authorityCarrier == null ? {} : { authorityCarrier: input.authorityCarrier }),
-        ...(input.operationId == null ? {} : { operationId: input.operationId }),
-        ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
+        operationId,
+        subsumes,
       });
       const entry = this.commit(built);
       const parity = shadowParityOfEntry(entry);
@@ -1560,6 +1572,9 @@ export class CoopAuthorityV2Shadow {
       if (this.liveReplica?.admitEntry?.(this.runtimeContext, entry) === false) {
         this.reportOwnedReplicaViolation(entry, "entry.control-ledger-admission-refused");
         return false;
+      }
+      for (const revision of entry.subsumes) {
+        this.pendingReplicaEntries.delete(revision);
       }
       this.admitted += 1;
       this.pendingReplicaEntries.set(entry.revision, entry);
