@@ -1694,6 +1694,12 @@ test("biome result materialization cannot invalidate its exact queued transition
 });
 
 test("a projected biome transition consumes the exact destination command carrier before leaving its source battle", () => {
+  assert.match(
+    selectBiomePhase,
+    /completion\?\.authoritativeProjection === true/u,
+    "the projected result explicitly marks the switch as a destination-carrier consumer",
+  );
+  assert.match(switchBiomePhase, /private readonly coopAwaitDestinationCarrier: boolean/u);
   assert.match(switchBiomePhase, /public canReleaseForCoopV2Control\(successor:/u);
   assert.match(switchBiomePhase, /successor\.kind === "CONTROL_COMMIT"/u);
   assert.match(switchBiomePhase, /command\?\.kind === "COMMAND_FRONTIER"/u);
@@ -1713,6 +1719,13 @@ test("a projected biome transition consumes the exact destination command carrie
     admission,
     /globalScene\.arena\?\.biomeId === permit\.destinationBiomeId/u,
     "pre-DATA admission accepts the exact carrier while the renderer still shows the source arena",
+  );
+  const projectedPark = switchBiomePhase.indexOf("if (authoritativeGuest && this.coopAwaitDestinationCarrier)");
+  const eagerRetry = switchBiomePhase.indexOf("retryCoopV2PendingAuthorityAtSafeBoundary();", projectedPark);
+  const ordinaryPreparation = switchBiomePhase.indexOf("this.prepareAuthoritativeTransition(", projectedPark);
+  assert.ok(
+    projectedPark >= 0 && eagerRetry > projectedPark && ordinaryPreparation > eagerRetry,
+    "a destructively projected switch parks and retries its carrier before any local preparation or end",
   );
   const release = switchBiomePhase.indexOf("public releaseForCoopV2Control(");
   const markHistory = switchBiomePhase.indexOf("markCoopBiomeTransitionHistoryRecorded(permit.operationId)", release);

@@ -3453,3 +3453,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   identified a separate remaining guest-owned Leave seam: after its BIOME_PICK receipt the replica advances
   its interaction counter but enters stale wave-10 turn replay instead of the projected biome tail. This
   runtime-binding commit does not claim to fix that next root. No local co-op behavioral test or browser ran.
+
+# 2026-07-25 - Destructively projected biome switches retain the destination carrier boundary
+
+- Focused P2 run `30137027624` at `3572a8caa` reproduced the remaining guest-owned Crossroads Leave failure:
+  the BIOME_PICK result and interaction counter both converged, and the wave-11 command carrier arrived, but
+  the replica had already ended its projected `SwitchBiomePhase`. With no speculative `NewBattlePhase` behind
+  that destructively projected tail, PhaseManager manufactured a source-wave `TurnInitPhase` and parked in
+  `CoopReplayTurnPhase`; revision 9 then had no exact carrier consumer. The independent C1 journey stopped at
+  wave 5 for the same reason when its wave-6 carrier found `SwitchBiomePhase` and was later dissolved.
+- Only a switch constructed by an immutable authoritative projection now carries an explicit
+  `coopAwaitDestinationCarrier` marker. It retains the exact permit and remains current until the N+1
+  `CONTROL_COMMIT` invokes its existing address-exact release path. An eager pending-authority retry covers a
+  carrier admitted in the same delivery stack; later delivery remains owned by normal Authority V2 retention.
+  Legacy and locally authored switches keep their existing preparation path and cannot wait for a capability
+  they did not negotiate.
+- The P2 stale-rendezvous fixture is migrated to the new runtime-bound contract: transport waits return raw
+  carriers, while the owning-runtime acceptance step proves that a replaced phase remains closed. The static
+  contract pins the projection marker and requires the carrier park/retry to precede all local transition
+  preparation. Authority V2 contracts remain 48/48 green; behavioral execution remains GitHub-hosted only.

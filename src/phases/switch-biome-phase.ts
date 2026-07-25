@@ -16,6 +16,7 @@ import {
   failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopController,
+  retryCoopV2PendingAuthorityAtSafeBoundary,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
   type ErRouteNode,
@@ -59,6 +60,8 @@ export class SwitchBiomePhase extends BattlePhase {
   private readonly nextBiome: BiomeId;
   /** Immutable source boundary captured by SelectBiome before speculative NewBattle state can advance. */
   private readonly coopSourceWave: number | null;
+  /** A V2 result projected this tail destructively; only its destination command carrier may release it. */
+  private readonly coopAwaitDestinationCarrier: boolean;
   private coopPermitRecoveryShown = false;
   private coopPermitRecoveryAttempts = 0;
   private historyRecorded = false;
@@ -169,12 +172,13 @@ export class SwitchBiomePhase extends BattlePhase {
     return globalScene.phaseManager.getCurrentPhase() !== this;
   }
 
-  constructor(nextBiome: BiomeId, coopSourceWave: number | null = null) {
+  constructor(nextBiome: BiomeId, coopSourceWave: number | null = null, coopAwaitDestinationCarrier = false) {
     super();
 
     this.nextBiome = nextBiome;
     this.coopSourceWave =
       coopSourceWave != null && Number.isSafeInteger(coopSourceWave) && coopSourceWave >= 0 ? coopSourceWave : null;
+    this.coopAwaitDestinationCarrier = coopAwaitDestinationCarrier;
   }
 
   start() {
@@ -225,6 +229,22 @@ export class SwitchBiomePhase extends BattlePhase {
         `SwitchBiomePhase refused unsanctioned authoritative mutation source=${sourceBiome} destination=${this.nextBiome} ambientWave=${sourceWave} sourceWave=${permitWave}`,
       );
       this.parkForAuthoritativePermit();
+      return;
+    }
+
+    if (authoritativeGuest && this.coopAwaitDestinationCarrier) {
+      // A destructively projected BIOME_PICK deliberately cleared the replica's speculative NewBattle tail.
+      // Preparing this renderer-only switch and ending it here would therefore empty the queue, manufacture
+      // TurnInit on the completed source battle, and strand the next CONTROL_COMMIT behind CoopReplayTurnPhase.
+      // Keep the exact permit + phase current until the immutable N+1 command carrier installs the complete
+      // destination battle through releaseForCoopV2Control(). Retry once now in case the carrier was admitted
+      // in the same delivery stack immediately before this phase became current; authority retention owns all
+      // later redelivery.
+      coopLog(
+        "v2-control",
+        `SwitchBiomePhase parked for projected destination carrier wave=${permit?.wave}->${permit?.nextWave}`,
+      );
+      retryCoopV2PendingAuthorityAtSafeBoundary();
       return;
     }
 

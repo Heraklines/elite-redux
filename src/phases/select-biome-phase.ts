@@ -1666,7 +1666,12 @@ export class SelectBiomePhase extends BattlePhase {
       if (completion?.authoritativeProjection === true || isCoopAuthoritativeGuestGated()) {
         // The renderer owns no between-biome run mutation. The committed BIOME_PICK already armed the exact
         // transition permit; queue only its presentation tail and wait for the next complete host carrier.
-        globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome, currentWaveIndex);
+        globalScene.phaseManager.unshiftNew(
+          "SwitchBiomePhase",
+          nextBiome,
+          currentWaveIndex,
+          completion?.authoritativeProjection === true,
+        );
         if (this.coopAdvancePinned >= 0) {
           const controller = getCoopController();
           advanceCoopInteractionForContinuation(this.coopAdvancePinned);

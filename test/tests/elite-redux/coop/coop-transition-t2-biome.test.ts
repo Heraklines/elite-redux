@@ -1100,13 +1100,34 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       let selectLive = true;
       const select = new SelectBiomePhase() as unknown as {
         boundaryStillLive(generation: number, wave: number): boolean;
-        coopAwaitBoundaryBarrier(): Promise<boolean>;
+        coopAwaitBoundaryBarrier(): Promise<{
+          point: string;
+          timedOut: boolean;
+          authoritativePoint?: string;
+          crossPoint?: string;
+        } | null>;
+        acceptCoopBoundaryBarrier(
+          result: {
+            point: string;
+            timedOut: boolean;
+            authoritativePoint?: string;
+            crossPoint?: string;
+          } | null,
+        ): boolean;
       };
       select.boundaryStillLive = () => selectLive;
       const selectWait = select.coopAwaitBoundaryBarrier();
       selectLive = false;
       boundary.resolve({ point: "select-biome", timedOut: false });
-      await expect(selectWait, "a resolved stale SelectBiome rendezvous stays closed").resolves.toBe(false);
+      const selectResult = await selectWait;
+      expect(selectResult, "the transport wait returns only the raw rendezvous carrier").toEqual({
+        point: "select-biome",
+        timedOut: false,
+      });
+      expect(
+        select.acceptCoopBoundaryBarrier(selectResult),
+        "the owning-runtime continuation rejects a stale SelectBiome boundary",
+      ).toBe(false);
 
       const crossroadsBoundary = deferred<{
         point: string;
@@ -1118,13 +1139,34 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       let crossroadsLive = true;
       const crossroads = new ErCrossroadsPhase() as unknown as {
         boundaryStillLive(generation: number, wave: number): boolean;
-        coopAwaitBoundaryBarrier(): Promise<boolean>;
+        coopAwaitBoundaryBarrier(): Promise<{
+          point: string;
+          timedOut: boolean;
+          authoritativePoint?: string;
+          crossPoint?: string;
+        } | null>;
+        acceptCoopBoundaryBarrier(
+          result: {
+            point: string;
+            timedOut: boolean;
+            authoritativePoint?: string;
+            crossPoint?: string;
+          } | null,
+        ): boolean;
       };
       crossroads.boundaryStillLive = () => crossroadsLive;
       const crossroadsWait = crossroads.coopAwaitBoundaryBarrier();
       crossroadsLive = false;
       crossroadsBoundary.resolve({ point: "crossroads", timedOut: false });
-      await expect(crossroadsWait, "a resolved stale Crossroads rendezvous stays closed").resolves.toBe(false);
+      const crossroadsResult = await crossroadsWait;
+      expect(crossroadsResult, "the transport wait returns only the raw crossroads carrier").toEqual({
+        point: "crossroads",
+        timedOut: false,
+      });
+      expect(
+        crossroads.acceptCoopBoundaryBarrier(crossroadsResult),
+        "the owning-runtime continuation rejects a stale Crossroads boundary",
+      ).toBe(false);
 
       const stock = deferred<null>();
       vi.spyOn(rig.hostRuntime.interactionRelay, "awaitRewardOptions").mockReturnValueOnce(stock.promise);
