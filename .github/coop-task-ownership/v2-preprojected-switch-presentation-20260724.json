@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "6b9600b94428d2d5d5363c5e3742f69ad941f2f0",
+  "baseSha": "5e86794564902e1d50d38be947c2698baa39b7b6",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -80,8 +80,8 @@
     "test/tests/elite-redux/coop/coop-replay-fast-forward.test.ts",
     "test/tests/elite-redux/coop/coop-savedata-digest.test.ts",
     "test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts",
-    "test/tests/elite-redux/coop/coop-soak.test.ts",
     "test/tests/elite-redux/coop/coop-soak-me.test.ts",
+    "test/tests/elite-redux/coop/coop-soak.test.ts",
     "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts",
     "test/tests/elite-redux/coop/coop-transition-t2-mystery.test.ts",
     "test/tests/elite-redux/showdown/showdown-sync-duo.test.ts",
