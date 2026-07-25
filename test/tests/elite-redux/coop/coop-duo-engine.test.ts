@@ -154,7 +154,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // V2 intentionally bypasses that function and proves the immutable carrier reached its material boundary.
     const applyCheckpointSpy = vi.spyOn(coopEngine, "applyCoopCheckpoint");
     let guestTurnResolution: Extract<CoopMessage, { t: "turnResolution" }> | null = null;
-    const guestV2AppliedBefore = getCoopV2Shadow(rig.guestRuntime)?.diagnostics().applied ?? 0;
+    const guestV2MaterialBefore = getCoopV2Shadow(rig.guestRuntime)?.diagnostics().appliedThrough ?? 0;
     pair.guest.onMessage(msg => {
       if (msg.t === "turnResolution") {
         guestTurnResolution = msg;
@@ -205,9 +205,9 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // assertion follows the negotiated implementation instead of demanding an obsolete legacy helper call.
     if (V2_TURN_CUTOVER) {
       expect(
-        getCoopV2Shadow(rig.guestRuntime)?.diagnostics().applied ?? 0,
+        getCoopV2Shadow(rig.guestRuntime)?.diagnostics().appliedThrough ?? 0,
         "the Authority V2 entry completed the guest's live material/finalize boundary",
-      ).toBeGreaterThan(guestV2AppliedBefore);
+      ).toBeGreaterThan(guestV2MaterialBefore);
     } else {
       expect(applyCheckpointSpy, "the guest applied the host's streamed legacy checkpoint").toHaveBeenCalled();
     }

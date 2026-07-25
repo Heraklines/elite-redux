@@ -47,6 +47,7 @@ import { Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import { installLocalV2TurnReplicaFixture, negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
+import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -112,6 +113,7 @@ const REPLAY_DRAIN_PHASES = [
 describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fix-replay-pacing)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
+  let disposeProjectionOracle = () => {};
   // The single-scene constraint forbids two GameManagers in one test (the PromptHandler interval is a
   // process-global singleton). So the INVARIANT is captured across two FRESH per-test guests (one
   // animations-on, one animations-off, each with its own beforeEach GameManager) and compared in a
@@ -126,6 +128,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
   });
 
   beforeEach(() => {
+    disposeProjectionOracle = () => {};
     game = new GameManager(phaserGame);
     game.override
       .battleStyle("double")
@@ -135,6 +138,7 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
   });
 
   afterEach(() => {
+    disposeProjectionOracle();
     clearCoopRuntime();
   });
 
@@ -151,6 +155,11 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
     getCoopController()!.role = "guest";
     (getCoopRuntime()!.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
     installLocalV2TurnReplicaFixture(runtime);
+    // This is a headless pacing unit: retain the production material/projector path, then prove exact
+    // stable-id field membership and ready battle-info nodes with the shared semantic oracle. Atlas and
+    // animation pixels remain the two-real-browser lane's responsibility; asking Phaser.HEADLESS for that
+    // production GPU proof correctly terminalizes the session and tests no pacing behavior.
+    disposeProjectionOracle = installHeadlessCoopSemanticProjectionOracle(game.scene);
     return field;
   };
 

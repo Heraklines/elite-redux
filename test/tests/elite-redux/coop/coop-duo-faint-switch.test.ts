@@ -264,6 +264,8 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     for (const scene of [rig.hostScene, rig.guestScene]) {
       scene.getPlayerParty()[2].coopOwner = "guest";
       scene.getPlayerParty()[3].coopOwner = "guest";
+      (scene.getPlayerParty()[2] as { coopOwnerSeatId?: number }).coopOwnerSeatId = 1;
+      (scene.getPlayerParty()[3] as { coopOwnerSeatId?: number }).coopOwnerSeatId = 1;
     }
     rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
     withClientSync(rig.guestCtx, () => {

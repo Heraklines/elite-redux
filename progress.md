@@ -3644,3 +3644,29 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   blocking diagnostic, `git diff --check` passes, and B9/B10 inventories are deterministic. The next checkpoint
   is the focused remote branch gate (Authority V2 contracts plus selected engine shards); no staging or
   production deploy is authorized by this checkpoint.
+
+# 2026-07-25 - Focused B9/B10 reds now assert the real V2 lifecycle
+
+- Focused run `30140668279` at exact `dac607752` proved the superseding replacement fallback itself: the
+  replica admitted the N+1 `REPLACEMENT_COMMIT`, retired its unresolved picker, installed the checkpoint, and
+  reached frontier `3/3/3`. Its remaining B9 failure came from the fixture changing only the legacy string
+  owner while leaving the numeric six-seat owner on seat 0, so the committed next frontier correctly assigned
+  both field actors to the host. The fixture now changes both ownership representations.
+- The other B9 reds were precise harness lifecycle omissions, not production waits to lengthen. A settled
+  Mystery handoff now claims the live guest pin generation before an older nested scope can restore it;
+  recovery starts the newly projected address-exact replay that `PhaseInterceptor` intentionally leaves
+  unstarted; public command driving tracks whether each concrete phase object crossed `start()` instead of
+  trusting a stale UI mode from its predecessor; and the won-wave regression recognizes the retained V2
+  `WAVE_ADVANCE` supersession path rather than requiring a retired local-derivation log line.
+- The replay-pacing unit did apply the authoritative checkpoint exactly, then asked Phaser.HEADLESS to prove
+  production GPU atlas/sprite readiness. That correctly entered the shared terminal and erased the scene,
+  producing a misleading checksum failure. It now uses the shared semantic headless projection oracle for
+  stable-id membership, visibility, and battle-info readiness; rendered pixels remain release-blocking in the
+  two-real-browser lane.
+- B10's turn material and victory path completed successfully, but its assertion sampled the shadow's
+  synchronous callback counter. Deferred live finalization advances the log frontier without incrementing
+  that counter, so diagnostics now expose the log's received/material/control frontiers and the test requires
+  `appliedThrough` to advance. No mechanical requirement was weakened.
+- Local checks remain static-only: targeted Biome and diff checks pass; the inherited TypeScript snapshot is
+  202 diagnostics with zero in these changed files. Ownership verification runs on the committed exact SHA
+  before focused dispatch. No local co-op Vitest or browser test ran.

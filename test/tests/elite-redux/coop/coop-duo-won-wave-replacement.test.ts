@@ -231,10 +231,13 @@ describe.skipIf(!RUN)(
         allLogs.some(l => /replacement filled OUR slot .* -> opening own CommandPhase/.test(l)),
         "no phantom CommandPhase was opened for the refilled slot on the WON wave (the depth deadlock trigger)",
       ).toBe(false);
-      // The guest took the won-wave suppression branch (positive proof the fix path ran).
+      // The retained V2 WAVE_ADVANCE superseded the phantom next-turn replay before it could derive a
+      // replacement-to-command pivot. This is the current all-authoritative equivalent of the older local
+      // "on a WON wave -> ack continuation" branch: the ordered successor, not local enemy inspection,
+      // owns the decision.
       expect(
-        allLogs.some(l => /on a WON wave .*-> ack continuation/.test(l)),
-        "the guest took the won-wave replacement suppression path",
+        allLogs.some(l => /retained WON wave-advance supersedes phantom next-turn replay/.test(l)),
+        "the retained V2 wave successor suppressed the phantom next-turn replay",
       ).toBe(true);
       // No durable-op continuation-timeout terminal (the host's WAVE_ADVANCE continuation ACKed).
       expect(

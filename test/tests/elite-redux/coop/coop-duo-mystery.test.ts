@@ -1507,6 +1507,7 @@ describe.skipIf(!RUN)(
       // an execution two independent browsers cannot produce.
       rig.pair.setDestinationContextDelivery?.(true);
       let recoveryApplyStarted = false;
+      let recoveredReplayStarted = false;
       try {
         withClientSync(rig.hostCtx, () => {
           rig.hostRuntime.battleStream.sendMeChecksum(meSeq, coopEngine.captureCoopChecksum());
@@ -1520,6 +1521,21 @@ describe.skipIf(!RUN)(
               // deliberately stubs PhaseManager.startCurrentPhase in engine tests, so cross that exact public
               // mutation boundary once instead of leaving a valid recovery transaction parked unstarted.
               recoveryApplyStarted = true;
+              rig.guestScene.phaseManager.prepareCurrentPhaseForStart();
+              current.start();
+              await drainLoopback();
+            }
+            if (
+              recoveryApplyStarted
+              && !recoveredReplayStarted
+              && current?.phaseName === "CoopReplayMePhase"
+              && current !== replay
+            ) {
+              // The recovery projector replaces the stale selector with a fresh address-exact replay and
+              // starts it through PhaseManager in production. PhaseInterceptor suppresses that same public
+              // auto-start in this engine fixture, so cross the boundary once before demanding the runtime's
+              // real handler/actionability proof.
+              recoveredReplayStarted = true;
               rig.guestScene.phaseManager.prepareCurrentPhaseForStart();
               current.start();
               await drainLoopback();

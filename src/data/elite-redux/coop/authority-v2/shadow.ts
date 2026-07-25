@@ -422,6 +422,12 @@ export interface CoopV2ShadowDiagnostics {
   readonly committed: number;
   readonly admitted: number;
   readonly applied: number;
+  /** Highest replica revision whose complete immutable material is installed, including deferred live completion. */
+  readonly appliedThrough: number;
+  /** Highest replica revision received and journaled in exact global order. */
+  readonly receivedThrough: number;
+  /** Highest replica revision whose stated successor control is proven actionable or explicitly retired. */
+  readonly controlInstalledThrough: number;
   readonly receiptsSent: number;
   readonly parityChecks: number;
   readonly parityMatches: number;
@@ -1490,10 +1496,14 @@ export class CoopAuthorityV2Shadow {
   }
 
   diagnostics(): CoopV2ShadowDiagnostics {
+    const logDiagnostics = this.log.diagnostics();
     return {
       committed: this.committed,
       admitted: this.admitted,
       applied: this.applied,
+      appliedThrough: logDiagnostics.appliedThrough,
+      receivedThrough: logDiagnostics.receivedThrough,
+      controlInstalledThrough: logDiagnostics.controlInstalledThrough,
       receiptsSent: this.receiptsSent,
       parityChecks: this.parityChecks,
       parityMatches: this.parityMatches,

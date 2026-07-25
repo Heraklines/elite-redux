@@ -2387,7 +2387,8 @@ export async function driveDuoGuestTackleThroughPublicUi(
       }),
     );
     await withClient(rig.guestCtx, async () => {
-      if (rig.guestScene.ui.getMode() !== UiMode.COMMAND && rig.guestScene.ui.getMode() !== UiMode.FIGHT) {
+      if (!manuallyStartedDuoPhases.has(guestOwnCommand)) {
+        manuallyStartedDuoPhases.add(guestOwnCommand);
         guestOwnCommand.start();
       }
       await drainLoopback();
@@ -2401,8 +2402,10 @@ export async function driveDuoGuestTackleThroughPublicUi(
         // that adoption/re-entry; callers retained this flag during the V2 migration. Preserve an already
         // actionable menu instead of starting the same command rendezvous twice and putting its UI back into
         // MESSAGE while the helper waits for a second arrival that can never exist.
-        if (rig.hostScene.ui.getMode() !== UiMode.COMMAND && rig.hostScene.ui.getMode() !== UiMode.FIGHT) {
-          rig.hostScene.phaseManager.getCurrentPhase().start();
+        const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
+        if (!manuallyStartedDuoPhases.has(hostCommand)) {
+          manuallyStartedDuoPhases.add(hostCommand);
+          hostCommand.start();
         }
         await drainLoopback();
       } else if (rig.hostScene.phaseManager.getCurrentPhase().phaseName === "CommandPhase") {
@@ -2412,8 +2415,10 @@ export async function driveDuoGuestTackleThroughPublicUi(
         // and left the guest correctly sealed at MESSAGE on every wave after the first. A few older journeys
         // intentionally ran the target CommandPhase before the next loop; preserve that already-open surface
         // instead of starting the same phase twice.
-        if (rig.hostScene.ui.getMode() !== UiMode.COMMAND && rig.hostScene.ui.getMode() !== UiMode.FIGHT) {
-          rig.hostScene.phaseManager.getCurrentPhase().start();
+        const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
+        if (!manuallyStartedDuoPhases.has(hostCommand)) {
+          manuallyStartedDuoPhases.add(hostCommand);
+          hostCommand.start();
         }
         await drainLoopback();
       } else {
@@ -2961,6 +2966,7 @@ export async function buildDuo(
             phase.phaseName === "CommandPhase"
             && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
         });
+        manuallyStartedDuoPhases.add(guestOwnCommand);
         guestOwnCommand.start();
         await drainLoopback();
         markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
@@ -2970,7 +2976,9 @@ export async function buildDuo(
       await drainLoopback();
       // The phase opened before rendezvous/runtime wiring existed. Re-enter exactly this verified phase once,
       // matching the production start edge rather than fabricating an arrival from the harness.
-      hostScene.phaseManager.getCurrentPhase().start();
+      const hostCommand = hostScene.phaseManager.getCurrentPhase();
+      manuallyStartedDuoPhases.add(hostCommand);
+      hostCommand.start();
       await drainLoopback();
     });
     await pumpDuoDestinations(rig, 2);
@@ -3184,8 +3192,8 @@ export async function arriveGuestCommandBoundary(
             pumpPeer: () => drainLoopback(),
           });
         }
-        const mode = rig.guestScene.ui.getMode();
-        if (mode !== UiMode.COMMAND && mode !== UiMode.FIGHT) {
+        if (!manuallyStartedDuoPhases.has(guestCommand)) {
+          manuallyStartedDuoPhases.add(guestCommand);
           guestCommand.start();
         }
         await drainLoopback();
@@ -4904,7 +4912,14 @@ async function settleDuoGuestMeReplayWithDelivery(rig: DuoRig, replay: Phase): P
   }
   // Reuse the ordinary settled-path cleanup (notably its losing legacy waiter cancellation). It returns on
   // the first iteration because the exact replay is already settled; it cannot manufacture progression.
-  return withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
+  return withClient(rig.guestCtx, async () => {
+    const settled = await drainGuestMeReplayToSettle(replay);
+    // `drainGuestMeReplayToSettle` can complete inside a nested/pre-empted guest scope. Claim the live
+    // transaction pins before this realm is swapped out so an older outer finally cannot restore the
+    // pre-handoff snapshot. Independent browsers never share this synthetic ambient-state hazard.
+    persistInstalledClientMePins(rig.guestCtx);
+    return settled;
+  });
 }
 
 export async function settleDuoGuestMeReplay(rig: DuoRig, replay: Phase): Promise<GuestMeReplay> {
