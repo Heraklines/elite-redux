@@ -1,0 +1,59 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: cae9c0e232c081183b67ab2640bc210db82c0cc8
+checked_out_sha: cae9c0e232c081183b67ab2640bc210db82c0cc8
+base_seed: 20260725
+campaign_seed: 20260725
+run: 30148771892 (workflow source cae9c0e232c081183b67ab2640bc210db82c0cc8)
+timestamp: 2026-07-25T07-18-06Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260725 WAVES=200 - replay this run with:  SOAK_SEED=20260725 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=80 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":1453,"maxHp":2065,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1501,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":142,"hp":194,"maxHp":194,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5101,"formIndex":0,"isTerastallized":false,"teraType":2,"bossSegments":0,"bossSegmentIndex":0,"moves":[[413,0],[5009,0],[5012,0],[184,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":139,"hp":181,"maxHp":181,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":33,"formIndex":0,"isTerastallized":false,"teraType":5,"bossSegments":0,"bossSegmentIndex":0,"moves":[[57,0],[246,0],[182,0],[321,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":1453,"maxHp":2065,"status":0,"statStages":[0,0,2,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1501,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":142,"hp":194,"maxHp":194,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5101,"formIndex":0,"isTerastallized":false,"teraType":2,"bossSegments":0,"bossSegmentIndex":0,"moves":[[413,0],[5009,0],[5012,0],[184,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":139,"hp":181,"maxHp":181,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":33,"formIndex":0,"isTerastallized":false,"teraType":5,"bossSegments":0,"bossSegmentIndex":0,"moves":[[57,0],[246,0],[182,0],[321,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 114 (seed 20260725): wave driving threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, SelectModifierPhase, GameOverPhase, TitlePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "SwitchPhase", UI mode MESSAGE (=0), interceptor state "running".
+
+----- vitest result tail -----
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:launch] clearCoopRuntime role=host netcode=authoritative gen->6
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state host disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > retained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m19067[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:297:3[39m
+
+[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 114 (seed 20260725): wave driving threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, SelectModifierPhase, GameOverPhase, TitlePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "SwitchPhase", UI mode MESSAGE (=0), interceptor state "running".
+Original: Timed out in waitUntil!. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-25T07-17-46-879Z__seed-20260725__wave-114. Replay: SOAK_SEED=20260725[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1699:11[22m[39m
+    [90m1697|[39m       phaseState: phaseStateDump(rig),
+    [90m1698|[39m     });
+    [90m1699|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1700|[39m   };
+    [90m1701|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4793:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m184:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 07:09:27
+[2m   Duration [22m 518.63s[2m (transform 20.51s, setup 24.83s, import 314ms, tests 492.53s, environment 790ms)[22m
+
