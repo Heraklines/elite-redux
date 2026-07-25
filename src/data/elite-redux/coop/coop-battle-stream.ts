@@ -519,6 +519,24 @@ export function deferredCoopV2WaveSuccessorWait(
   };
 }
 
+/**
+ * Exact replacement successor for a settled turn.
+ *
+ * A runtime-staged win/capture/flee is stronger than a faint in the captured field image: the real host
+ * engine has already selected BattleEnd and does not open a player replacement picker for the defeated wave.
+ * Letting that obsolete picker outrank the staged transition reserves a control the host will never install,
+ * then correctly causes the following WAVE_ADVANCE to fail closed. Surviving battles retain the ordinary
+ * exact replacement chain.
+ */
+export function resolveCoopV2PostTurnReplacementControl(
+  epoch: number,
+  state: CoopAuthoritativeBattleStateV1,
+  events: readonly CoopBattleEvent[],
+  boundary: CoopTurnBoundaryIdentity,
+): Extract<CoopNextControl, { kind: "REPLACEMENT" }> | null {
+  return boundary.deferredWaveOutcome == null ? resolveCoopV2ReplacementControl(epoch, state, events) : null;
+}
+
 function hasCompleteAuthorityCompanions(
   msg: Pick<
     CoopCheckpointEnvelope,
@@ -2798,14 +2816,12 @@ export class CoopBattleStreamer {
     // post-replacement commits. This includes Showdown's explicitly-owned authoritative enemy side while
     // omitting ordinary AI enemies; an unowned human seat fails the whole commit instead of being guessed.
     const completeCommands = [...commandFrontier.commands];
-    // Engine order wins over the already-known terminal destination. A mutual KO can stage WIN while a
-    // living reserve still makes SwitchPhase the next real boundary. Skipping that replacement here states
-    // TURN -> WAVE, then the engine's post-summon REPLACEMENT_COMMIT is correctly rejected as an unowned
-    // sibling. Keep the executable replacement first; its final broad ordered wait explicitly admits the
-    // retained WAVE_ADVANCE/TERMINAL successor without ever opening a phantom command on the won wave.
+    // The runtime-staged transition is the engine's already-selected boundary. A player faint in the same
+    // final turn does not open SwitchPhase after BattleEnd; reserving that obsolete picker would block the
+    // real WAVE_ADVANCE forever. Surviving battles still resolve every executable replacement before command.
     const replacementControl = hasImmediateCommand
       ? null
-      : resolveCoopV2ReplacementControl(epoch, authoritativeState, events);
+      : resolveCoopV2PostTurnReplacementControl(epoch, authoritativeState, events, boundary);
     const operationId = `TURN/e${epoch}/w${wave}/t${turn}`;
     const deferredWaveWait = deferredCoopV2WaveSuccessorWait(operationId, epoch, wave, turn, boundary);
     // A Mystery-spawned battle terminates through the retained ME transaction, not WAVE_ADVANCE. That

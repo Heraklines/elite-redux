@@ -4000,3 +4000,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A node-pure policy contract covers animation-on strictness, the exact animation-off exception, rejection of
   failed/unknown receipts, and latest-attestation ownership. Local validation remains static-only; the public
   campaign and fast-contract behavioral proof run on GitHub-hosted runners.
+
+## 2026-07-25 - Final-turn faint successor correction
+
+- The first all-V2 six-profile nightly (`30149104406`) proved the asymmetric Mystery and thirteen-event
+  journey profiles green. God A, God B, and the level profile all exposed the same product defect at waves
+  112, 162, and 2: a player fainted on the winning turn, TURN_COMMIT reserved a replacement picker, but the
+  real host engine had already selected BattleEnd and advanced directly to victory settlement. The ordered
+  WAVE_ADVANCE was correctly rejected behind the impossible replacement control.
+- A runtime-staged win/capture/flee now supersedes same-turn player replacement derivation and states the exact
+  deferred WAVE_ADVANCE wait. Surviving battles still derive and require the complete replacement chain. A
+  failure-first stream regression uses the recorded wave-112 shape and proves both halves of that distinction.
+- God C reached wave 190 before finding a separate missing staged replacement carrier. That frontier remains
+  independently red and will be diagnosed after this shared terminal-successor correction requalifies.

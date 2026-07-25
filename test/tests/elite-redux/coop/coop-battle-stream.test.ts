@@ -18,6 +18,7 @@ import {
   type CoopCheckpointEnvelope,
   deferredCoopV2WaveSuccessorWait,
   hasCoopV2ImmediateCommandSuccessor,
+  resolveCoopV2PostTurnReplacementControl,
 } from "#data/elite-redux/coop/coop-battle-stream";
 import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import type {
@@ -185,6 +186,37 @@ describe("Authority V2 turn successor classification", () => {
         deferredWaveOutcome: "flee",
       }),
     ).toThrow("cannot also stage");
+  });
+
+  it("lets a staged wave settlement supersede a same-turn player faint picker", () => {
+    const finalTurnState: CoopAuthoritativeBattleStateV1 = {
+      ...emptyAuthoritativeState(112, 5),
+      double: true,
+      playerParty: [
+        { id: 1, hp: 20 },
+        { id: 11, hp: 0 },
+        { id: 12, hp: 20 },
+      ],
+      enemyParty: [{ id: 2, hp: 0 }],
+      field: [
+        { side: "player", bi: 0, partyIndex: 0, pokemonId: 1, presented: true, owner: "host" },
+        { side: "player", bi: 1, partyIndex: 1, pokemonId: 11, presented: true, owner: "guest" },
+        { side: "enemy", bi: 2, partyIndex: 0, pokemonId: 2, presented: true },
+      ],
+    };
+    const faintEvents = [{ k: "faint" as const, bi: 1, actor: { side: "player" as const, pokemonId: 11 } }];
+
+    expect(
+      resolveCoopV2PostTurnReplacementControl(7, finalTurnState, faintEvents, {
+        mysteryBattle: false,
+        deferredWaveOutcome: "win",
+      }),
+      "BattleEnd owns the staged win; no obsolete replacement may block WAVE_ADVANCE",
+    ).toBeNull();
+    expect(
+      resolveCoopV2PostTurnReplacementControl(7, finalTurnState, faintEvents, { mysteryBattle: false }),
+      "the same faint still requires an exact picker while the battle survives",
+    ).toMatchObject({ kind: "REPLACEMENT", ownerSeatId: 1, wave: 112, turn: 5, fieldIndex: 1 });
   });
 
   it("states a REPLACEMENT boundary (not COMMAND) for a co-fainted enemy seat WITH a living reserve", () => {
