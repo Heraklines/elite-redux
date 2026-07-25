@@ -3388,3 +3388,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   owner-only keypress. The proof now searches from the pre-reward frontier and still requires the exact
   owner, address, handler, and non-actionable input state. Static Authority V2 contracts are 46/46 green,
   the public-boundary inventory is green, `tsc --noEmit` is clean, and no local co-op behavioral test ran.
+
+# 2026-07-25 - Projected Mystery rewards retain their ordered terminal fence
+
+- Exact B5/B6/B9 evidence showed `ME_TERMINAL(reward-settled)` followed by a destructively projected
+  `SelectModifierPhase`, after which the final Mystery leave parked in `CoopReplayTurnPhase` with
+  `leaveSurfaceReady=false`. The replacement was correct, but it discarded the local
+  `MysteryEncounterRewardsPhase` before that obsolete tree could queue `PostMysteryEncounterPhase`, so the
+  final authoritative terminal had no exact lifecycle fence to consume it.
+- A destructively projected reward now derives a one-shot Mystery-finalizer marker exclusively from its
+  immutable `rewardSurface`. `SelectModifierPhase.start()` consumes that marker and queues the journal-aware
+  finalizer before any option await or empty-surface exit. The finalizer cannot choose progression under V2;
+  it only exposes the exact surface on which the already-ordered `ME_TERMINAL` installs its typed successor.
+- Static contracts require the immutable marker, pre-await queue order, and one-shot consumption. The task
+  manifest advances to the reviewed `f285a8d48` checkpoint so remote qualification measures only this delta;
+  no local co-op behavioral test or browser was run.

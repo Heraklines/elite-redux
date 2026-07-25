@@ -287,6 +287,13 @@ export class SelectModifierPhase extends BattlePhase {
   private readonly coopContinuationIdentityFailure: string | null;
   /** Stable P36 address of this ordered Mystery reward surface; absent for ordinary reward shops. */
   private readonly coopRewardSurface: CoopRewardSurfaceIdentity | undefined;
+  /**
+   * A destructively projected Mystery reward must recreate its typed finalizer before opening. The local
+   * MysteryEncounterRewardsPhase normally queues this tail, but Authority V2 intentionally discards that
+   * obsolete phase tree. This flag is set only from the immutable reward-surface address and consumed once
+   * at start, so a retry or a naturally-created already-started phase cannot duplicate the finalizer.
+   */
+  private coopV2ProjectedMysteryFinalizer = false;
 
   /**
    * Bind one completed reward action to this exact phase generation. For an ordered-wait result this is
@@ -331,6 +338,7 @@ export class SelectModifierPhase extends BattlePhase {
     this.coopInteractionStart = projection.pinned;
     this.rerollCount = projection.reroll;
     this.coopV2ControlOperationId = operationId;
+    this.coopV2ProjectedMysteryFinalizer = projection.rewardSurface != null;
     return true;
   }
 
@@ -395,6 +403,15 @@ export class SelectModifierPhase extends BattlePhase {
         turn: globalScene.currentBattle?.turn,
       });
       return false;
+    }
+
+    if (this.coopV2ProjectedMysteryFinalizer) {
+      this.coopV2ProjectedMysteryFinalizer = false;
+      // The immutable surface identity is the typed proof that this reward returns to the retained Mystery
+      // lifecycle. Queue the exact journal-aware finalizer before any option await or empty-surface exit can
+      // end this phase. PostMysteryEncounterPhase cannot choose progression under V2; it only exposes the
+      // lifecycle fence that applies the already-ordered final ME_TERMINAL and its stated successor.
+      globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
     }
 
     // Co-op (#633): the reward screen ALTERNATES full control - the player whose turn

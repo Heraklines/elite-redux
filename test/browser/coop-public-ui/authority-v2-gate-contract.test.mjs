@@ -497,6 +497,26 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
   );
   assert.match(selectModifierPhase, /this\.rerollCount !== projection\.reroll/u);
   assert.match(selectModifierPhase, /this\.coopInteractionStart !== projection\.pinned/u);
+  assert.match(
+    selectModifierPhase,
+    /this\.coopV2ProjectedMysteryFinalizer = projection\.rewardSurface != null/u,
+    "the immutable ordered Mystery surface marks destructive reward projection for one finalizer",
+  );
+  const rewardStart = selectModifierPhase.indexOf("  start() {");
+  const rewardOptionsAwait = selectModifierPhase.indexOf("this.startCoopWatch()", rewardStart);
+  const projectedMeFinalizer = selectModifierPhase.indexOf(
+    'globalScene.phaseManager.pushNew("PostMysteryEncounterPhase")',
+    rewardStart,
+  );
+  assert.ok(
+    projectedMeFinalizer > rewardStart && projectedMeFinalizer < rewardOptionsAwait,
+    "the exact Mystery terminal fence is queued before projected reward options can await or exit",
+  );
+  assert.match(
+    selectModifierPhase.slice(rewardStart, projectedMeFinalizer),
+    /this\.coopV2ProjectedMysteryFinalizer = false/u,
+    "a repeated phase start cannot duplicate the projected Mystery finalizer",
+  );
   assert.match(biomeShopPhase, /this\.coopBiomeStart !== projection\.pinned/u);
   const retainedMarketStart = biomeShopPhase.indexOf("public retainsCoopV2MarketProjectionBoundary(");
   const retainedMarketEnd = biomeShopPhase.indexOf("\n  /**", retainedMarketStart + 1);
