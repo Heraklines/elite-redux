@@ -320,6 +320,25 @@ test("recovery rebuilds wave terminals and installs a multi-target command super
     /missing\.length > 0 && !isCoopV2RecoveryCommandBootstrapInstalled/u,
     "only an exact recovery bootstrap bypasses the ordinary all-target-live wait",
   );
+  const retainedSource = liveProject.indexOf("v2ControlLedger.sourceEntryOf(control)");
+  const requiresControlCommit = liveProject.indexOf('sourceEntry?.kind === "CONTROL_COMMIT"', retainedSource);
+  const requiresAppliedMaterial = liveProject.indexOf("v2ControlLedger.isMaterialApplied(control)", retainedSource);
+  const releasesExactConsumer = liveProject.indexOf(
+    "releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry)",
+    retainedSource,
+  );
+  const waitsForCommandProofs = liveProject.indexOf("const missing = localCommands.filter", retainedSource);
+  assert.ok(retainedSource >= 0, "command projection retains the immutable source entry");
+  assert.ok(
+    requiresControlCommit > retainedSource
+      && requiresAppliedMaterial > requiresControlCommit
+      && releasesExactConsumer > requiresAppliedMaterial,
+    "only a materially applied CONTROL_COMMIT is re-presented to its exact current consumer",
+  );
+  assert.ok(
+    waitsForCommandProofs > releasesExactConsumer,
+    "the retained presentation handoff occurs before command proof can leave the entry pending",
+  );
 });
 
 test("an existing Authority V2 runtime rebinds only after the replacement channel is authenticated", () => {

@@ -3547,3 +3547,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   identity or progression. The contract both permits zero events and prevents the length check returning.
 - Authority V2 source contracts, targeted formatting, and diff checks pass locally. P2 and the aggregate
   behavioral matrix remain remote-only.
+
+# 2026-07-25 - Material-applied command entries retain their presentation release edge
+
+- Aggregate C1/C3/C5 artifacts at `0e2e11e08` prove the projected destination state and encounter now
+  converge, but exposed an ordered two-consumer lifecycle. `SwitchBiomePhase` consumed the command entry's
+  first exact release to construct `NewBiomeEncounterPhase`; after that intro, the real turn-one
+  `CoopReplayTurnPhase` waited for the same entry's 14-event presentation prefix. Because the entry was
+  already material-applied, retries resumed in `projectControl` and never revisited `applyMaterial`'s
+  one-shot release call. The legacy wave-keyed compatibility prefix was intentionally retired, leaving the
+  V2 renderer waiting forever while the immutable V2 entry remained control-pending.
+- Command projection now re-presents a materially applied `CONTROL_COMMIT` source entry to the exact current
+  phase before checking aggregate CommandPhase proofs. Existing phase-owned session/address predicates still
+  decide admission: the transition can spend the structural edge, unrelated phases remain inert, and the
+  later replay phase receives the immutable prefix exactly once. Presentation rendering and its outcome fence
+  remain mandatory before any command target can prove control installed.
+- A source contract pins the retained-source lookup, material-applied and entry-kind gates, and ordering before
+  command-proof evaluation. Behavioral C-lane verification remains GitHub-hosted only.

@@ -6018,6 +6018,23 @@ function buildCoopV2LiveSeams(
       }
       try {
         const controlId = controlIdOf(control as ProjectableControl);
+        // A CONTROL_COMMIT's first exact consumer may be a structural transition rather than the eventual
+        // turn-one replay renderer. Projected biome travel is the concrete case: SwitchBiomePhase spends
+        // the initial release edge to create the destination encounter, then NewBiomeEncounterPhase runs
+        // before TurnInit can construct the CoopReplayTurnPhase which must render this same entry's sealed
+        // presentation prefix. Material application is already complete at that point, so replica retries
+        // resume directly in this projector and will never re-enter applyMaterial's one-shot release call.
+        // Re-present the retained source entry to the current exact consumer on every projection attempt.
+        // Each phase's address/session predicate remains the authority gate, and its release is idempotent;
+        // an unrelated phase cannot spend the entry and a real replay receives the immutable prefix once.
+        const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
+        if (
+          sourceEntry?.kind === "CONTROL_COMMIT"
+          && controlsEqual(sourceEntry.nextControl, control)
+          && runtime.v2ControlLedger.isMaterialApplied(control)
+        ) {
+          releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry);
+        }
         // The entry states every human actor, while this authenticated replica proves only its numeric-seat
         // partition. Authority retirement requires every required peer's receipt, so the union is the complete
         // frontier; one renderer never fabricates another player's input phase. A seat controlling multiple
