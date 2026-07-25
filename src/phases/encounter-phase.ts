@@ -16,6 +16,7 @@ import {
   captureCoopAuthoritativeBattleState,
   captureCoopDexBaseline,
   captureCoopEnemies,
+  coopAppliedStateTick,
   coopWaveStartEntryEffectSignature,
   normalizeCoopHpBoundsAtAuthorityBoundary,
 } from "#data/elite-redux/coop/coop-battle-engine";
@@ -37,6 +38,7 @@ import {
   getCoopRuntime,
   isAuthoritativeBattleSession,
   isCoopAuthoritativeGuest,
+  isCoopV2ControlCutoverActive,
   isVersusSession,
   maybeBeginReplayRecording,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -855,6 +857,50 @@ export class EncounterPhase extends BattlePhase {
     const levels = battle.enemyLevels ?? [];
     // Trainer enemies belong in TrainerSlot.TRAINER; wild enemies in NONE.
     const trainerSlot = battle.battleType === BattleType.TRAINER ? TrainerSlot.TRAINER : TrainerSlot.NONE;
+    const rawState = streamer.peekEnemyPartyState(battle.waveIndex);
+    // CONTROL_COMMIT may install a newer complete wave image before the legacy enemy manifest reaches
+    // EncounterPhase. Rebuilding EnemyPokemon objects from that weaker carrier would erase rich V2 material
+    // (tags, held items, forms, and other state not represented by CoopSerializedEnemy). Preserve the existing
+    // objects only when the applied tick dominates this exact manifest and every identity/slot agrees; any
+    // ambiguity falls through to the fail-closed reconstruction path below.
+    const matchedFieldIndices = new Set<number>();
+    const preservesNewerV2EnemyParty =
+      isCoopV2ControlCutoverActive()
+      && rawState?.tick != null
+      && coopAppliedStateTick() >= rawState.tick
+      && battle.enemyParty.length === enemies.length
+      && enemies.every(entry => {
+        if (
+          !Number.isSafeInteger(entry.fieldIndex)
+          || entry.fieldIndex < 0
+          || entry.fieldIndex >= battle.enemyParty.length
+          || matchedFieldIndices.has(entry.fieldIndex)
+        ) {
+          return false;
+        }
+        matchedFieldIndices.add(entry.fieldIndex);
+        const current = battle.enemyParty[entry.fieldIndex];
+        const id = entry.data.id;
+        const speciesId = entry.data.speciesId;
+        return (
+          current != null
+          && typeof id === "number"
+          && Number.isSafeInteger(id)
+          && current.id === id >>> 0
+          && typeof speciesId === "number"
+          && Number.isSafeInteger(speciesId)
+          && current.species.speciesId === speciesId
+        );
+      });
+    if (preservesNewerV2EnemyParty) {
+      this.coopAdoptedEnemyParty = true;
+      this.coopEnemyAuthority = enemies;
+      coopLog(
+        "stream",
+        `preserved V2 enemy objects at wave ${battle.waveIndex}: appliedTick=${coopAppliedStateTick()} rawTick=${rawState.tick}`,
+      );
+      return;
+    }
     const rebuilt: EnemyPokemon[] = [];
     for (const entry of enemies) {
       if (!Number.isInteger(entry.fieldIndex) || entry.fieldIndex < 0 || rebuilt[entry.fieldIndex] != null) {

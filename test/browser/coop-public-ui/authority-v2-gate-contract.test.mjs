@@ -34,6 +34,7 @@ const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8")
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
+const encounterPhase = readFileSync(new URL("src/phases/encounter-phase.ts", root), "utf8");
 const battleScene = readFileSync(new URL("src/battle-scene.ts", root), "utf8");
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
 const mysteryEncounterPhases = readFileSync(new URL("src/phases/mystery-encounter-phases.ts", root), "utf8");
@@ -290,8 +291,24 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   const projectedReward = selectModifierPhase.slice(projectedRewardStart, projectedRewardEnd);
   assert.ok(
     projectedReward.indexOf("this.coopProveV2RewardOperationComplete(decision?.operationId)")
-      < projectedReward.indexOf("super.end()"),
-    "a projected picked item records its signed terminal before ending the phase",
+      < projectedReward.indexOf('this.coopEndOwningPhaseIfCurrent("projected reward terminal")'),
+    "a projected picked item records its signed terminal before ending its exact parent phase",
+  );
+  assert.match(
+    projectedReward,
+    /this\.coopResumeAfterOwningUiTransition\(messageReady, \(\) => \{[\s\S]*?this\.coopEndOwningPhaseIfCurrent\("projected reward terminal"\)/u,
+    "a projected picked item resumes and retires only in its owning browser realm",
+  );
+  const projectedRerollStart = selectModifierPhase.indexOf(
+    "if (projectionOnly) {",
+    selectModifierPhase.indexOf("COOP_INTERACTION_REROLL"),
+  );
+  const projectedRerollEnd = selectModifierPhase.indexOf("} else {", projectedRerollStart);
+  assert.ok(projectedRerollStart >= 0 && projectedRerollEnd > projectedRerollStart, "the projected reroll is bounded");
+  assert.match(
+    selectModifierPhase.slice(projectedRerollStart, projectedRerollEnd),
+    /this\.coopResumeAfterOwningUiTransition\(messageReady, \(\) => \{[\s\S]*?this\.coopEndOwningPhaseIfCurrent\("projected reroll terminal"\)/u,
+    "a projected reroll cannot let its late parent callback shift the new reward phase",
   );
   assert.match(
     selectModifierPhase,
@@ -338,6 +355,27 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     newBattlePhase.indexOf("start()"),
   );
   assert.match(release, /pushNew\("NextEncounterPhase"\)[\s\S]*?this\.end\(\)/u);
+});
+
+test("a legacy enemy manifest cannot overwrite a newer V2 wave image", () => {
+  const adoptStart = encounterPhase.indexOf("private async adoptCoopHostEnemyParty(");
+  const adoptEnd = encounterPhase.indexOf("\n  /**", adoptStart + 1);
+  assert.ok(adoptStart >= 0 && adoptEnd > adoptStart, "the enemy adoption boundary is bounded");
+  const adoption = encounterPhase.slice(adoptStart, adoptEnd);
+  assert.match(
+    adoption,
+    /isCoopV2ControlCutoverActive\(\)[\s\S]*?coopAppliedStateTick\(\) >= rawState\.tick[\s\S]*?battle\.enemyParty\.length === enemies\.length/u,
+    "preservation requires complete V2 cutover, a dominating state tick, and exact party cardinality",
+  );
+  assert.match(
+    adoption,
+    /matchedFieldIndices\.has\(entry\.fieldIndex\)[\s\S]*?current\.id === id >>> 0[\s\S]*?current\.species\.speciesId === speciesId[\s\S]*?if \(preservesNewerV2EnemyParty\)/u,
+    "the weaker carrier is suppressed only when every existing enemy identity matches",
+  );
+  assert.ok(
+    adoption.indexOf("if (preservesNewerV2EnemyParty)") < adoption.indexOf("const rebuilt: EnemyPokemon[] = []"),
+    "newer V2 objects are retained before the legacy reconstruction can destroy rich state",
+  );
 });
 
 test("post-battle continuation identity follows the active V2 wave into completed evidence", () => {
@@ -1685,6 +1723,24 @@ test("a retained V2 replacement is consumed before the next replica command can 
   assert.match(probe, /pending\.epoch !== controller\.sessionEpoch/u);
   assert.match(probe, /pending\.wave !== currentWave/u);
   assert.match(probe, /pending\.turn !== currentTurn && pending\.turn !== currentTurn \+ 1/u);
+
+  const replacementCommandStart = replayTurnPhase.indexOf("const waveWon =");
+  const replacementCommandEnd = replayTurnPhase.indexOf("if (!hasLocalCommandSlot)", replacementCommandStart);
+  assert.ok(
+    replacementCommandStart >= 0 && replacementCommandEnd > replacementCommandStart,
+    "the replacement-to-command boundary is bounded",
+  );
+  const replacementCommand = replayTurnPhase.slice(replacementCommandStart, replacementCommandEnd);
+  assert.doesNotMatch(
+    replacementCommand,
+    /turnCommands\[ownSlot\] == null/u,
+    "a local command cache cannot veto the committed COMMAND_FRONTIER",
+  );
+  assert.match(
+    replacementCommand,
+    /turnCommands\[ownSlot\] = null;[\s\S]*?ownMon\.resetTurnData\(\);[\s\S]*?unshiftNew\("CommandPhase", ownSlot\)/u,
+    "the addressed replacement actor's stale input ephemera is cleared before its exact public command opens",
+  );
 });
 
 test("a committed guest picker settles and buffers its V2 carrier before yielding to TurnInit", () => {

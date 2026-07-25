@@ -3865,3 +3865,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Local verification is static-only per `AGENTS.md`: TypeScript is green, targeted Biome is clean,
   `node --check` passes for the browser contract, and `git diff --check` passes. All behavioral proof remains
   on GitHub-hosted runners.
+
+## 2026-07-25 - Exact-SHA `3f990395c` five-shard closure batch
+
+- Aggregate gate `30145585898` left five co-op shards red while static, browser-native WebRTC, fast public UI,
+  Authority V2 contracts, and mutation jobs were green. The artifacts separated two product defects from
+  three shared-process test contradictions; Showdown/Tournament T4 remains explicitly outside this co-op task.
+- Projection-only reward and reroll terminals now resume under their construction-time browser runtime and
+  end only their exact current parent. A delayed reward callback can no longer shift an Ability Capsule child
+  or a newly queued reroll phase out of the scheduler.
+- A final replacement's committed `COMMAND_FRONTIER` now owns input unconditionally. The replica clears only
+  the addressed actor's stale command/turn ephemera before opening its public CommandPhase instead of letting
+  a legacy `turnCommands` cell veto the signed successor.
+- Encounter adoption now preserves identity-matched enemy objects when an already-applied V2 state tick
+  dominates the raw enemy manifest. The legacy carrier can still supply encounter presentation, but it cannot
+  rebuild the party and erase richer V2 tags, held items, forms, or other authoritative state.
+- The ability-picker fixture explicitly activates the receiving runtime between consecutive operations; the
+  double-faint test proves the designed same-chain subsumption from wire entries instead of demanding that an
+  intermediate revision render separately; and the duo public-command driver spends its receiver-realm
+  re-entry only after peer arrival, matching two independent browser loops.
+- Local verification remains static-only per `AGENTS.md`: TypeScript is zero-error and the public source
+  contract parses. The five affected behavioral shards and aggregate qualification remain GitHub-hosted.

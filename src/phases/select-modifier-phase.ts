@@ -2766,9 +2766,10 @@ export class SelectModifierPhase extends BattlePhase {
           this.coopRewardSurface,
         );
         globalScene.ui.clearText();
-        globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+        const messageReady = this.coopOwningScene.ui.setMode(UiMode.MESSAGE);
+        this.coopResumeAfterOwningUiTransition(messageReady, () => {
           this.coopProveV2RewardOperationComplete(decision?.operationId);
-          super.end();
+          this.coopEndOwningPhaseIfCurrent("projected reroll terminal");
         });
       } else {
         this.rerollModifiers();
@@ -2836,9 +2837,10 @@ export class SelectModifierPhase extends BattlePhase {
           );
         this.coopRelayedMoney = -1;
         this.coopEndMirror();
-        globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+        const messageReady = this.coopOwningScene.ui.setMode(UiMode.MESSAGE);
+        this.coopResumeAfterOwningUiTransition(messageReady, () => {
           this.coopProveV2RewardOperationComplete(decision?.operationId);
-          super.end();
+          this.coopEndOwningPhaseIfCurrent("projected reward terminal");
           if (!continuation) {
             this.coopAdvanceInteraction();
           }

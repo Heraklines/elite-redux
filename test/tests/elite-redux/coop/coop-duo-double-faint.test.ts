@@ -28,7 +28,7 @@ import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -135,6 +135,7 @@ describe.skipIf(!RUN)(
         SpeciesId.VENUSAUR, // 5 guest
       );
       const pair = createLoopbackPair();
+      const hostTransportSendSpy = vi.spyOn(pair.host, "send");
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
       wireGuestCommand(rig);
 
@@ -300,12 +301,33 @@ describe.skipIf(!RUN)(
         ),
         "the turn commit installed the first replacement plus its immutable chained successor",
       ).toBe(true);
+      const replacementEntriesByRevision = new Map<number, Extract<CoopMessage, { t: "authorityEntry" }>["body"]>();
+      for (const [message] of hostTransportSendSpy.mock.calls) {
+        if (message.t === "authorityEntry" && message.body.kind === "REPLACEMENT_COMMIT") {
+          replacementEntriesByRevision.set(message.body.revision, message.body);
+        }
+      }
+      const replacementEntries = [...replacementEntriesByRevision.values()].sort((a, b) => a.revision - b.revision);
+      expect(replacementEntries, "both ordered replacement commits were published").toHaveLength(2);
+      const [firstReplacement, finalReplacement] = replacementEntries;
       expect(
-        logs.guest.some(line =>
-          /kind=REPLACEMENT_COMMIT .*outcome=applied control=REPLACEMENT\/.*\/remaining:/.test(line),
-        ),
-        "the first committed replacement advanced the same V2 chain to the other owner's exact slot",
-      ).toBe(true);
+        firstReplacement?.nextControl,
+        "the first replacement authorizes the other owner's exact remaining slot",
+      ).toMatchObject({
+        kind: "REPLACEMENT",
+        ownerSeatId: 0,
+        fieldIndex: COOP_HOST_FIELD_INDEX,
+      });
+      expect(
+        finalReplacement?.subsumes,
+        "the complete-field replacement explicitly subsumes its intermediate same-chain commit",
+      ).toContain(firstReplacement?.revision);
+      expect(
+        finalReplacement?.nextControl,
+        "the complete replacement field advances to the command frontier",
+      ).toMatchObject({
+        kind: "COMMAND_FRONTIER",
+      });
       // Both owned replacement slots are active on the GUEST engine too (it applied only complete frames).
       withClientSync(rig.guestCtx, () => {
         const guestOwnHost = rig.guestScene.getPlayerField()[COOP_HOST_FIELD_INDEX];

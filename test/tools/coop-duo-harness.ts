@@ -2429,7 +2429,9 @@ export async function driveDuoGuestTackleThroughPublicUi(
       }),
     );
     await withClient(rig.guestCtx, async () => {
-      permitDuoCommandTargetReentry(rig.guestScene, guestOwnCommand);
+      // A newly-installed command gets its one production start immediately. Do not spend the receiver-realm
+      // re-entry permit before the peer arrival exists: that manufactures a second pre-arrival wait and can
+      // leave the exact phase at MESSAGE in this shared-process topology.
       startDuoCommandPhaseIfNeeded(rig.guestScene, guestOwnCommand);
       await drainLoopback();
     });
@@ -2458,6 +2460,14 @@ export async function driveDuoGuestTackleThroughPublicUi(
       } else {
         await hostGame.phaseInterceptor.to("CommandPhase");
       }
+    });
+
+    // In two browsers the guest rendezvous continuation resumes in the guest realm after the host arrival.
+    // Re-enter the already-started exact object once at that same edge in this one-process fixture.
+    await withClient(rig.guestCtx, async () => {
+      permitDuoCommandTargetReentry(rig.guestScene, guestOwnCommand);
+      startDuoCommandPhaseIfNeeded(rig.guestScene, guestOwnCommand);
+      await drainLoopback();
     });
 
     // Opening a reciprocal command surface is a two-browser crossing: the host's arrival may resolve the

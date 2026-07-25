@@ -740,12 +740,7 @@ export class CoopReplayTurnPhase extends Phase {
               coopHasPendingWaveAdvance()
               || coopWaveAdvanceSignaledFor(this.sourceWave)
               || (enemyParty.length > 0 && enemyParty.every(mon => mon == null || mon.isFainted()));
-            if (
-              ownSlot >= 0
-              && hasLocalCommandSlot
-              && !waveWon
-              && globalScene.currentBattle.turnCommands[ownSlot] == null
-            ) {
+            if (ownSlot >= 0 && ownMon?.isActive() === true && !waveWon) {
               if (
                 !streamer.registerReplacementContinuation(envelope, {
                   kind: "command",
@@ -767,6 +762,12 @@ export class CoopReplayTurnPhase extends Phase {
               // host (which is correctly awaiting OUR command). The re-queued CoopReplayTurnPhase below re-arms
               // the await legitimately AFTER the command is broadcast.
               streamer.cancelPendingTurnCommitRequests(envelope.epoch, envelope.wave, envelope.turn);
+              // The committed COMMAND_FRONTIER is the sole authority for this input lease. A stale local
+              // turnCommands cell can survive the replacement crossing, but it may neither veto the signed
+              // successor nor leak the replaced actor's per-turn ephemera into the new command. Reset only the
+              // addressed actor before opening its exact public CommandPhase.
+              globalScene.currentBattle.turnCommands[ownSlot] = null;
+              ownMon.resetTurnData();
               globalScene.phaseManager.unshiftNew("CommandPhase", ownSlot);
               globalScene.phaseManager.unshiftNew(
                 "CoopReplayTurnPhase",

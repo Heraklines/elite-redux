@@ -377,6 +377,12 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
       // first ends its exact operation, then the runtime retries the deferred retained result.
       expect(settleCoopAbilityOperation(adoption.operationId, guestBinding)).toBe(true);
       expect(settleCoopV2InteractionOperation(adoption.operationId, guestRuntime)).toBe(true);
+      // A real guest browser remains its own ambient runtime while the terminal proof retries deferred
+      // material. Give this shared-process fixture that receiver event-loop activation, then restore the host
+      // before the next carrier to preserve the async-binding condition this test is proving.
+      setCoopRuntime(guestRuntime);
+      await Promise.resolve();
+      setCoopRuntime(hostRuntime);
       expect(
         adoptAbilityWatcherOutcome(
           {
