@@ -231,7 +231,9 @@ test("the real-browser oracle compares every authority event to a completed cano
   assert.match(evidence, /sink\.record\("browser-presentation-event"/u);
   assert.match(harness, /assertPresentationLedger\(cursors, commandMatch, proofName,/u);
   assert.match(harness, /entry\.stage !== "authority-recorded"/u);
-  assert.match(harness, /entry\.stage !== "renderer-completed"/u);
+  assert.match(harness, /latestMoveAnimationsAttestation\(client\.evidence\.events\)/u);
+  assert.match(harness, /moveAnimationsAttestations\.every\(value => value === false\)/u);
+  assert.match(harness, /!isAcceptedRendererPresentationReceipt\(entry, allowAnimationsDisabledSkip\)/u);
   assert.match(harness, /ordered presentation ledger diverged/u);
   assert.match(harness, /showdown-entry-presentation-ledger/u);
   assert.match(harness, /`\$\{label\}-presentation-ledger`/u);

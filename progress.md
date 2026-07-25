@@ -4027,3 +4027,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A failure-first recorder regression preserves a prefix event, records the faint at turn 6, and proves the
   delayed consumer receives exactly turn 6 plus the faint's sequence. Remote qualification will replay the
   all-V2 gate and six-profile soak; local validation remains static-only per `AGENTS.md`.
+
+## 2026-07-25 - Presentation-oracle source-contract migration
+
+- Public journey `30149919732` never reached a browser: its build-time source contract still required the
+  retired inline `entry.stage !== "renderer-completed"` expression after receipt validation moved into the
+  node-tested presentation-ledger policy. That was test drift, not a Showdown or co-op runtime failure.
+- The contract now proves the harness reads both browsers' latest render-profile attestations and delegates
+  every renderer receipt to the strict policy. The policy's separate executable tests retain animation-on
+  completion-only behavior and permit only the exact `renderer-skipped/animations-disabled` exception when
+  both real browsers independently attest animations off. No production Showdown/Tournament code changed.
