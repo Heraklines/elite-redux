@@ -3778,3 +3778,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `runWhenCoopRuntimeActive`.
 - This preserves production's synchronous behavior, makes the two-engine topology safe, and prevents an
   admitted result from waiting for a context activation that cannot occur until its own successor releases.
+
+## 2026-07-25 — exact-SHA terminal-proof instrumentation
+
+- Exact-SHA gate `30143925511` remained at the same wave-2 frontier: terminal reward revision 6 stayed
+  `materialDeferred`, revision 7 stayed correctly gapped, and the guest parked on its signed
+  `NewBattlePhase` bridge. Static and fast Authority V2 contracts were green.
+- The existing trace proves the phase queued the immutable wait, but it cannot distinguish a skipped phase
+  settlement callback from a callback writing a different runtime ledger. Add bounded diagnostics at the
+  phase callback and exact runtime-ledger write before making another behavioral change.

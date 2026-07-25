@@ -4308,7 +4308,13 @@ export function settleCoopV2InteractionOperation(operationId: string, runtime: C
   // Recording the address-exact proof is pure runtime-ledger work. Do it synchronously even if a synthetic
   // two-engine delivery currently exposes the peer scene: the applier that invoked the real phase terminal
   // must be able to observe this proof before it decides whether the immutable entry is materialApplied.
+  const alreadyRecorded = runtime.v2SettledInteractionOperations.has(operationId);
   runtime.v2SettledInteractionOperations.add(operationId);
+  coopLog(
+    "v2-interaction",
+    `terminal proof recorded op=${operationId} role=${runtime.controller.role} `
+      + `seat=${runtime.controller.localSeatId} duplicate=${Number(alreadyRecorded)} ambient=${Number(active === runtime)}`,
+  );
   // Retrying an applier/projector can touch the process-global scene. Rebind only that follow-up work to
   // the runtime's scene; production executes it synchronously, while the duo harness queues it safely.
   runWhenCoopRuntimeActive(runtime, () => {

@@ -323,11 +323,15 @@ export class SelectModifierPhase extends BattlePhase {
     // phase-owned. Publishing it through ambient `active` can settle the replica while the authority's
     // local ledger refuses the exact result as unproved.
     const terminalSettlement = this.coopV2TerminalSettlement;
-    if (terminalSettlement?.operationId === operationId) {
-      terminalSettlement.settle();
-    } else {
-      settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
-    }
+    const usesBoundSettlement = terminalSettlement?.operationId === operationId;
+    const settled = usesBoundSettlement
+      ? terminalSettlement.settle()
+      : settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+    coopLog(
+      "v2-interaction",
+      `phase terminal proof op=${operationId} route=${usesBoundSettlement ? "bound" : "constructor-fallback"} `
+        + `accepted=${Number(settled)}`,
+    );
   }
 
   /** Mark only a phase constructed by the V2 projector; binding an already-live natural phase never calls this. */
