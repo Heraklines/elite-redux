@@ -273,20 +273,31 @@ export function sealCoopEntryPresentation(): CoopBattleEvent[] | null {
   return recording.events.slice(0, recording.entryPresentationLength);
 }
 
+export interface CoopRecordedFaintAddress {
+  /** The immutable source turn stamped when the authority opened this recording. */
+  readonly turn: number;
+  /** The faint event's authority-issued sequence within that same turn. */
+  readonly occurrence: number;
+}
+
 /**
- * Bind the next recorded faint occurrence for one battler to its real host FaintPhase. A missing
- * occurrence is normal outside authoritative recording and falls back to zero at the caller.
+ * Atomically bind the next recorded faint event to its real host FaintPhase. Both address fields
+ * come from the same immutable recording: callers must never combine the recorded occurrence with
+ * `currentBattle.turn`, which may already have advanced before delayed faint/replacement phases run.
+ * A missing address is normal outside authoritative recording and falls back at the caller.
  */
-export function consumeCoopRecordedFaintOccurrence(battlerIndex: number): number | null {
-  const occurrences = recording?.faintOccurrences.get(Math.trunc(battlerIndex));
+export function consumeCoopRecordedFaintAddress(battlerIndex: number): CoopRecordedFaintAddress | null {
+  const activeRecording = recording;
+  const normalizedBattlerIndex = Math.trunc(battlerIndex);
+  const occurrences = activeRecording?.faintOccurrences.get(normalizedBattlerIndex);
   if (occurrences == null || occurrences.length === 0) {
     return null;
   }
   const occurrence = occurrences.shift() ?? null;
   if (occurrences.length === 0) {
-    recording?.faintOccurrences.delete(Math.trunc(battlerIndex));
+    activeRecording.faintOccurrences.delete(normalizedBattlerIndex);
   }
-  return occurrence;
+  return occurrence == null ? null : { turn: activeRecording.turn, occurrence };
 }
 
 /**

@@ -4013,3 +4013,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   failure-first stream regression uses the recorded wave-112 shape and proves both halves of that distinction.
 - God C reached wave 190 before finding a separate missing staged replacement carrier. That frontier remains
   independently red and will be diagnosed after this shared terminal-successor correction requalifies.
+
+## 2026-07-25 - Recorder-owned faint replacement address
+
+- God C's wave-190 trace proved the remaining replacement failure was an address split, not a missing player
+  choice: the turn recorder assigned faint sequence 14 to source turn 6, but delayed `FaintPhase` combined that
+  immutable occurrence with the already-incremented ambient turn 7. The host therefore staged
+  `w190/t7/o14` while Authority V2 correctly waited for `w190/t6/o14`, and the compatibility carrier refused
+  to invent an unlogged checkpoint.
+- Faint identity is now consumed atomically as `{ turn, occurrence }` from the same open authority recording.
+  `FaintPhase` uses both recorder-owned fields and consults mutable battle turn only when no authoritative
+  recording exists. No checkpoint matching or successor validation was relaxed.
+- A failure-first recorder regression preserves a prefix event, records the faint at turn 6, and proves the
+  delayed consumer receives exactly turn 6 plus the faint's sequence. Remote qualification will replay the
+  all-V2 gate and six-profile soak; local validation remains static-only per `AGENTS.md`.

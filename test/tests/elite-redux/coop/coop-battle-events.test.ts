@@ -47,6 +47,7 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import type { CoopBattleEvent, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import {
   beginCoopRecording,
+  consumeCoopRecordedFaintAddress,
   endCoopRecording,
   recordCoopEvent,
   setCoopPresentationObserver,
@@ -164,6 +165,23 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       { stage: "authority-recorded", turn: 3, seq: 0, event },
       { stage: "renderer-completed", turn: 3, seq: 0, event },
     ]);
+  });
+
+  it("binds delayed faint replacement to the recorder-owned turn and occurrence", () => {
+    beginCoopRecording(6, "wave-190-turn-6");
+    expect(recordCoopEvent({ k: "message", text: "prefix" })).toBe(0);
+    expect(
+      recordCoopEvent({
+        k: "faint",
+        bi: BattlerIndex.PLAYER,
+        actor: { side: "player", pokemonId: 190_007 },
+      }),
+    ).toBe(1);
+
+    expect(consumeCoopRecordedFaintAddress(BattlerIndex.PLAYER)).toEqual({ turn: 6, occurrence: 1 });
+    expect(consumeCoopRecordedFaintAddress(BattlerIndex.PLAYER)).toBeNull();
+
+    endCoopRecording();
   });
 
   it("a drained presentation cannot overwrite failure with a successful browser receipt", () => {

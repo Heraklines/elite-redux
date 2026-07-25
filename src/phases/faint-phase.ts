@@ -7,7 +7,7 @@ import { erHeartbreakOnAllyFaint } from "#data/elite-redux/abilities/heartbreak"
 import type { CoopFaintSourceAddress } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { getCoopController, isShowdownSyncSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import {
-  consumeCoopRecordedFaintOccurrence,
+  consumeCoopRecordedFaintAddress,
   isCoopRecording,
   withCoopMessageRecordingSuppressed,
 } from "#data/elite-redux/coop/coop-turn-recorder";
@@ -64,10 +64,11 @@ export class FaintPhase extends PokemonPhase {
     super.start();
 
     const faintPokemon = this.getPokemon();
+    const recordedFaintAddress = consumeCoopRecordedFaintAddress(this.battlerIndex);
     this.faintSourceAddress = {
       wave: globalScene.currentBattle.waveIndex,
-      turn: globalScene.currentBattle.turn,
-      occurrence: consumeCoopRecordedFaintOccurrence(this.battlerIndex) ?? 0,
+      turn: recordedFaintAddress?.turn ?? globalScene.currentBattle.turn,
+      occurrence: recordedFaintAddress?.occurrence ?? 0,
     };
 
     if (this.source) {
