@@ -1,0 +1,62 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: fixed
+run_mode: calibrated-release
+calibration_id: me-host-guest-asym-double-faint
+target_sha: cae9c0e232c081183b67ab2640bc210db82c0cc8
+checked_out_sha: cae9c0e232c081183b67ab2640bc210db82c0cc8
+base_seed: 20260725
+campaign_seed: fixed-in-test (matrix candidate 20260725 not consumed)
+run: 30148771892 (workflow source cae9c0e232c081183b67ab2640bc210db82c0cc8)
+timestamp: 2026-07-25T07-12-15Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] RUN ENDED at wave 12 (seed 828633): host at terminal phase TitlePhase. Survey stops here.
+
+----- vitest result tail -----
+[31m+ Received[39m
+
+[32m- 2[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-duo-double-faint.test.ts:[2m311:85[22m[39m
+    [90m309|[39m       }
+    [90m310|[39m       const replacementEntries = [...replacementEntriesByRevision.valu…
+    [90m311|[39m       expect(replacementEntries, "both ordered replacement commits wer…
+    [90m   |[39m                                                                                     [31m^[39m
+    [90m312|[39m       [35mconst[39m [firstReplacement[33m,[39m finalReplacement] [33m=[39m replacementEntries[33m;[39m
+    [90m313|[39m       [34mexpect[39m(
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:224:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mAssertionError[22m: the designated ME was driven inline: expected +0 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m258:84[22m[39m
+    [90m256|[39m
+    [90m257|[39m     // The GUEST-OWNED non-battle path was driven inline at wave 12 (t…
+    [90m258|[39m     expect(result.mysteryEncounters.length, "the designated ME was dri…
+    [90m   |[39m                                                                                    [31m^[39m
+    [90m259|[39m     expect(result.mysteryEncounters[0].wave, "the ME was driven at the…
+    [90m260|[39m     expect(result.mysteryEncounters[0].path, "wave 12 is GUEST-OWNED b…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m4 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 07:09:29
+[2m   Duration [22m 166.24s[2m (transform 56.45s, setup 82.30s, import 982ms, tests 157.11s, environment 3.03s)[22m
+
