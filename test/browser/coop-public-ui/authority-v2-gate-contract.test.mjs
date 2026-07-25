@@ -362,19 +362,31 @@ test("a legacy enemy manifest cannot overwrite a newer V2 wave image", () => {
   const adoptEnd = encounterPhase.indexOf("\n  /**", adoptStart + 1);
   assert.ok(adoptStart >= 0 && adoptEnd > adoptStart, "the enemy adoption boundary is bounded");
   const adoption = encounterPhase.slice(adoptStart, adoptEnd);
-  assert.match(
-    adoption,
-    /isCoopV2ControlCutoverActive\(\)[\s\S]*?coopAppliedStateTick\(\) >= rawState\.tick[\s\S]*?battle\.enemyParty\.length === enemies\.length/u,
-    "preservation requires complete V2 cutover, a dominating state tick, and exact party cardinality",
-  );
-  assert.match(
-    adoption,
-    /matchedFieldIndices\.has\(entry\.fieldIndex\)[\s\S]*?current\.id === id >>> 0[\s\S]*?current\.species\.speciesId === speciesId[\s\S]*?if \(preservesNewerV2EnemyParty\)/u,
-    "the weaker carrier is suppressed only when every existing enemy identity matches",
-  );
+  const snapshot = adoption.indexOf("const preDescriptorEnemyParty = battle.enemyParty.slice()");
+  const descriptorReset = adoption.indexOf("applyCoopEncounterAuthority(battle, encounter)");
   assert.ok(
-    adoption.indexOf("if (preservesNewerV2EnemyParty)") < adoption.indexOf("const rebuilt: EnemyPokemon[] = []"),
-    "newer V2 objects are retained before the legacy reconstruction can destroy rich state",
+    snapshot >= 0 && descriptorReset > snapshot,
+    "the exact preprojected V2 objects are retained before the compatibility descriptor clears the party",
+  );
+  assert.match(
+    adoption,
+    /isCoopV2ControlCutoverActive\(\)[\s\S]*?coopAppliedStateTick\(\) >= rawState\.tick/u,
+    "preservation requires complete V2 cutover and a dominating state tick",
+  );
+  assert.match(
+    adoption,
+    /preDescriptorEnemyParty\.entries\(\)[\s\S]*?enemies\.find\(candidate => candidate\.fieldIndex === fieldIndex\)[\s\S]*?current\.id !== id >>> 0[\s\S]*?current\.species\.speciesId !== speciesId/u,
+    "every already-materialized V2 object must match the carrier's exact field, id, and species",
+  );
+  assert.match(
+    adoption,
+    /reusableV2Enemies\.get\(entry\.fieldIndex\)[\s\S]*?\?\? buildCoopEnemy/u,
+    "matching active V2 objects survive while manifest-only bench members are reconstructed",
+  );
+  assert.match(
+    adoption,
+    /battle\.enemyParty = rebuilt;[\s\S]*?if \(reusableV2Enemies\.size > 0/u,
+    "the complete hybrid party is installed without applying the older state over its V2 objects",
   );
 });
 

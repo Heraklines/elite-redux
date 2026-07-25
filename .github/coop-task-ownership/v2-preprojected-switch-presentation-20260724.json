@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "3f990395c46877565dcd52a67f5ccb27baeb5e09",
+  "baseSha": "0031a70451695f4f3a2e19508a6239e8bd5cf76b",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     "progress.md",
@@ -87,6 +87,7 @@
     "test/tests/elite-redux/coop/coop-lobby.test.ts",
     "test/tests/elite-redux/coop/coop-message-localization.test.ts",
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",
+    "test/tests/elite-redux/coop/coop-replacement-carrier-transaction.test.ts",
     "test/tests/elite-redux/coop/coop-replay-fast-forward.test.ts",
     "test/tests/elite-redux/coop/coop-savedata-digest.test.ts",
     "test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts",

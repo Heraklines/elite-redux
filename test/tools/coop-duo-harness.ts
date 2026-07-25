@@ -2484,7 +2484,22 @@ export async function driveDuoGuestTackleThroughPublicUi(
     }
     await withClient(rig.guestCtx, async () => {
       await drainLoopback();
-      expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);
+      const current = rig.guestScene.phaseManager.getCurrentPhase();
+      const currentField =
+        current?.phaseName === "CommandPhase"
+          ? (current as Phase & { getFieldIndex(): number }).getFieldIndex()
+          : COOP_GUEST_FIELD_INDEX;
+      const currentCommand = rig.guestScene.currentBattle.turnCommands[currentField];
+      const currentMoveQueue = rig.guestScene
+        .getPlayerField()
+        [currentField]?.getMoveQueue()
+        .map(move => ({ move: move.move, useMode: move.useMode }));
+      expect(
+        rig.guestScene.ui.getMode(),
+        `guest command UI opens only after both clients arrive; current=${current?.phaseName ?? "none"} `
+          + `field=${currentField} command=${JSON.stringify(currentCommand)} `
+          + `moveQueue=${JSON.stringify(currentMoveQueue ?? [])}`,
+      ).toBe(UiMode.COMMAND);
       expect(
         rig.guestScene.getEnemyField().filter(mon => mon.isActive(true)).length,
         "the mirrored public command surface has the authority's live enemy targets",

@@ -102,8 +102,8 @@ describe("production replacement carrier transaction", () => {
     clearPhaseQueue = vi.fn();
     showText = vi.fn();
     resetScene = vi.fn();
-    const hostMon = { coopOwner: "host", isActive: () => true };
-    const guestMon = { coopOwner: "guest", isActive: () => true };
+    const hostMon = { coopOwner: "host", isActive: () => true, resetTurnData: vi.fn() };
+    const guestMon = { coopOwner: "guest", isActive: () => true, resetTurnData: vi.fn() };
     initGlobalScene({
       gameMode: { isCoop: true, isShowdown: false },
       currentBattle: { waveIndex: 4, turn: 2, turnCommands: [{}, null] },

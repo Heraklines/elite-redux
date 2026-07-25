@@ -3886,3 +3886,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   re-entry only after peer arrival, matching two independent browser loops.
 - Local verification remains static-only per `AGENTS.md`: TypeScript is zero-error and the public source
   contract parses. The five affected behavioral shards and aggregate qualification remain GitHub-hosted.
+
+## 2026-07-25 - Exact-SHA `0031a7045` residual co-op triage
+
+- Aggregate run `30146420792` reduced the co-op failures to A1, B9, and B11; T4 remains excluded by the
+  co-op-only scope. Ability-picker migration, reward ownership, double-faint succession, every mutation job,
+  the fast public/Authority V2 contracts, and all other co-op shards were green.
+- A1 reached the exact post-replacement `COMMAND_FRONTIER` and then failed only because its hand-written fake
+  player objects predated the production `resetTurnData()` invariant. The fixture now implements that public
+  actor seam; the production reset remains mandatory.
+- B11 proved the V2 tick 183 field image had already installed Aqua Ring, then EncounterPhase accepted the
+  older tick 181 compatibility manifest. `applyCoopEncounterAuthority` cleared `battle.enemyParty` before the
+  preservation check, making that check impossible. Adoption now snapshots the preprojected objects, verifies
+  every existing field/id/species against the manifest, preserves those richer active objects, and reconstructs
+  only missing bench members. An identity or tick ambiguity still falls back to a complete fail-closed rebuild.
+- B9 retired the exact V2 command revision and crossed both reciprocal arrivals, but its public menu remained
+  at MESSAGE. The assertion now records the exact current phase, command cell, and move queue on failure so the
+  next isolated shard distinguishes a stale generated/forced command from another shared-realm continuation;
+  no timeout or player-facing assertion was weakened.
+- This child train is declared against exact base `0031a7045`. Local checks remain static-only: targeted Biome
+  error diagnostics, formatting, `git diff --check`, and JS parsing are clean. A1/B9/B11 behavioral proof runs
+  only on GitHub-hosted focused shards.

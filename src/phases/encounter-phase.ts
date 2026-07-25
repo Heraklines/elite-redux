@@ -847,6 +847,12 @@ export class EncounterPhase extends BattlePhase {
     if ((isCurrent != null && !isCurrent()) || scene.currentBattle !== battle) {
       throw new Error(`Authoritative encounter descriptor for wave ${battle.waveIndex} became stale`);
     }
+    // A complete V2 command image can materialize the active enemy objects before this older compatibility
+    // carrier reaches EncounterPhase. The descriptor reset below deliberately clears `battle.enemyParty`, so
+    // retain those exact objects long enough to reconcile them against the immutable manifest afterward.
+    // Without this snapshot the reset destroys the only path to the richer V2 tags/forms/items, even though
+    // the newer state tick was already accepted.
+    const preDescriptorEnemyParty = battle.enemyParty.slice();
     applyCoopEncounterAuthority(battle, encounter);
     if (battle.battleType !== BattleType.MYSTERY_ENCOUNTER && enemies.length === 0) {
       throw new Error(`Authoritative enemy party was empty at wave ${battle.waveIndex}`);
@@ -863,50 +869,42 @@ export class EncounterPhase extends BattlePhase {
     // (tags, held items, forms, and other state not represented by CoopSerializedEnemy). Preserve the existing
     // objects only when the applied tick dominates this exact manifest and every identity/slot agrees; any
     // ambiguity falls through to the fail-closed reconstruction path below.
-    const matchedFieldIndices = new Set<number>();
-    const preservesNewerV2EnemyParty =
-      isCoopV2ControlCutoverActive()
-      && rawState?.tick != null
-      && coopAppliedStateTick() >= rawState.tick
-      && battle.enemyParty.length === enemies.length
-      && enemies.every(entry => {
-        if (
-          !Number.isSafeInteger(entry.fieldIndex)
-          || entry.fieldIndex < 0
-          || entry.fieldIndex >= battle.enemyParty.length
-          || matchedFieldIndices.has(entry.fieldIndex)
-        ) {
-          return false;
+    const reusableV2Enemies = new Map<number, EnemyPokemon>();
+    if (isCoopV2ControlCutoverActive() && rawState?.tick != null && coopAppliedStateTick() >= rawState.tick) {
+      let allExistingObjectsMatch = true;
+      for (const [fieldIndex, current] of preDescriptorEnemyParty.entries()) {
+        if (current == null) {
+          continue;
         }
-        matchedFieldIndices.add(entry.fieldIndex);
-        const current = battle.enemyParty[entry.fieldIndex];
-        const id = entry.data.id;
-        const speciesId = entry.data.speciesId;
-        return (
-          current != null
-          && typeof id === "number"
-          && Number.isSafeInteger(id)
-          && current.id === id >>> 0
-          && typeof speciesId === "number"
-          && Number.isSafeInteger(speciesId)
-          && current.species.speciesId === speciesId
-        );
-      });
-    if (preservesNewerV2EnemyParty) {
-      this.coopAdoptedEnemyParty = true;
-      this.coopEnemyAuthority = enemies;
-      coopLog(
-        "stream",
-        `preserved V2 enemy objects at wave ${battle.waveIndex}: appliedTick=${coopAppliedStateTick()} rawTick=${rawState.tick}`,
-      );
-      return;
+        const entry = enemies.find(candidate => candidate.fieldIndex === fieldIndex);
+        const id = entry?.data.id;
+        const speciesId = entry?.data.speciesId;
+        if (
+          entry == null
+          || typeof id !== "number"
+          || !Number.isSafeInteger(id)
+          || current.id !== id >>> 0
+          || typeof speciesId !== "number"
+          || !Number.isSafeInteger(speciesId)
+          || current.species.speciesId !== speciesId
+        ) {
+          allExistingObjectsMatch = false;
+          break;
+        }
+        reusableV2Enemies.set(fieldIndex, current);
+      }
+      if (!allExistingObjectsMatch) {
+        reusableV2Enemies.clear();
+      }
     }
     const rebuilt: EnemyPokemon[] = [];
     for (const entry of enemies) {
       if (!Number.isInteger(entry.fieldIndex) || entry.fieldIndex < 0 || rebuilt[entry.fieldIndex] != null) {
         throw new Error(`Invalid authoritative enemy field index ${entry.fieldIndex} at wave ${battle.waveIndex}`);
       }
-      const built = buildCoopEnemy(entry.data, levels[entry.fieldIndex] ?? 1, trainerSlot);
+      const built =
+        reusableV2Enemies.get(entry.fieldIndex)
+        ?? buildCoopEnemy(entry.data, levels[entry.fieldIndex] ?? 1, trainerSlot);
       if (built == null) {
         throw new Error(
           `Could not reconstruct authoritative enemy slot ${entry.fieldIndex} at wave ${battle.waveIndex}`,
@@ -925,6 +923,14 @@ export class EncounterPhase extends BattlePhase {
     // The generation loop must not roll modifiers over the verbatim party; that would double held items.
     this.coopAdoptedEnemyParty = true;
     this.coopEnemyAuthority = enemies;
+    if (reusableV2Enemies.size > 0 && rawState?.tick != null) {
+      coopLog(
+        "stream",
+        `preserved ${reusableV2Enemies.size}/${enemies.length} V2 enemy objects at wave ${battle.waveIndex}: `
+          + `appliedTick=${coopAppliedStateTick()} rawTick=${rawState.tick}`,
+      );
+      return;
+    }
     // The enemy handoff is the first coherent presentation boundary of the new wave. Apply the host's
     // complete state here, but RETAIN it for CommandPhase: summon/entry presentation can mutate stages,
     // abilities and forms after this point, and the last pre-input funnel must reassert or replace it.
