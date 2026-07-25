@@ -2807,8 +2807,8 @@ export class SelectModifierPhase extends BattlePhase {
         this.coopRelayedMoney = -1;
         this.coopEndMirror();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
-          super.end();
           this.coopProveV2RewardOperationComplete(decision?.operationId);
+          super.end();
           if (!continuation) {
             this.coopAdvanceInteraction();
           }

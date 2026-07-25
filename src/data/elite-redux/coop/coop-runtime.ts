@@ -5878,8 +5878,13 @@ function buildCoopV2LiveSeams(
             return false;
           }
           runtime.v2InteractionStateApplied.add(entry.operationId);
+          const requiresTerminalProof = requiresCoopV2InteractionTerminalProof(
+            material.surfaceClass,
+            material.envelope,
+          );
           if (
-            requiresCoopV2InteractionTerminalProof(material.surfaceClass, material.envelope)
+            requiresTerminalProof
+            && !runtime.v2SettledInteractionOperations.has(entry.operationId)
             && !prepareCoopV2InteractionTerminalSuccessor(runtime, entry, material.surfaceClass, material.envelope)
           ) {
             return "deferred";
@@ -5893,10 +5898,7 @@ function buildCoopV2LiveSeams(
             }),
           );
           if (outcome === "applied" || outcome === "duplicate") {
-            if (
-              requiresCoopV2InteractionTerminalProof(material.surfaceClass, material.envelope)
-              && !runtime.v2SettledInteractionOperations.has(entry.operationId)
-            ) {
+            if (requiresTerminalProof && !runtime.v2SettledInteractionOperations.has(entry.operationId)) {
               return "deferred";
             }
             if (!markCoopV2ControlMaterialApplied(runtime, entry)) {

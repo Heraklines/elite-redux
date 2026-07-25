@@ -259,6 +259,11 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   );
   assert.match(
     coopRuntime,
+    /requiresTerminalProof[\s\S]*?!runtime\.v2SettledInteractionOperations\.has\(entry\.operationId\)[\s\S]*?!prepareCoopV2InteractionTerminalSuccessor/u,
+    "a monotonic terminal proof survives phase teardown and makes later redelivery independent of the old phase",
+  );
+  assert.match(
+    coopRuntime,
     /const settleExactRuntime[\s\S]*?return settleCoopV2InteractionOperation\(entry\.operationId, runtime\)[\s\S]*?installCoopV2TerminalSuccessor\?\.\([\s\S]*?settleExactRuntime/u,
     "the terminal phase is bound to the exact replica runtime that admitted its immutable result",
   );
@@ -278,6 +283,15 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     selectModifierPhase,
     /queueCoopV2NextWaveAwait\(operationId\)[\s\S]*?terminalSettlement\?\.operationId === operationId[\s\S]*?terminalSettlement\.settle\(\)/u,
     "the real terminal proof queues the signed structural wait before it settles and tears down",
+  );
+  const projectedRewardStart = selectModifierPhase.indexOf("if (act === COOP_ACT_REWARD)");
+  const projectedRewardEnd = selectModifierPhase.indexOf("if (act === COOP_ACT_SHOP)", projectedRewardStart);
+  assert.ok(projectedRewardStart >= 0 && projectedRewardEnd > projectedRewardStart, "the reward action is bounded");
+  const projectedReward = selectModifierPhase.slice(projectedRewardStart, projectedRewardEnd);
+  assert.ok(
+    projectedReward.indexOf("this.coopProveV2RewardOperationComplete(decision?.operationId)")
+      < projectedReward.indexOf("super.end()"),
+    "a projected picked item records its signed terminal before ending the phase",
   );
   assert.match(
     selectModifierPhase,

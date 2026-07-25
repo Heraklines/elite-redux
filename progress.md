@@ -3787,3 +3787,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The existing trace proves the phase queued the immutable wait, but it cannot distinguish a skipped phase
   settlement callback from a callback writing a different runtime ledger. Add bounded diagnostics at the
   phase callback and exact runtime-ledger write before making another behavioral change.
+
+## 2026-07-25 — picked-item terminal proves before phase teardown
+
+- Instrumented exact-SHA gate `30144247279` showed the runtime binding is correct. Skip/leave terminals
+  recorded the guest proof and advanced cleanly; the resume soak moved from wave 2 to wave 4.
+- Wave 3 picked a terminal item instead of leaving. That projection-only callback called `super.end()`
+  before `coopProveV2RewardOperationComplete`, exposing `TurnInitPhase` to the immediate replica retry.
+  The entry therefore failed terminal-phase reinstallation even though its exact proof was then recorded.
+- Record the proof (which also queues the signed `NewBattlePhase` bridge) before ending the phase. Also
+  treat an already-recorded address-exact proof as monotonic: later redelivery no longer requires the retired
+  phase to exist merely to reinstall the same callback.
