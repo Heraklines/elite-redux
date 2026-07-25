@@ -218,7 +218,17 @@ export class SelectBiomePhase extends BattlePhase {
     this.coopSourceWave = sourceWave;
     this.coopV2ControlOperationId = operationId;
     this.coopV2ProjectedPinned = pinned;
+    // The phase-local authority coordinate is installed atomically with the successor. The module leaf is
+    // still published from start() for legacy callers, but mechanics and proof no longer depend on a
+    // one-process harness preserving that ambient global across an async receiver callback.
+    this.coopAdvancePinned = pinned;
+    this.coopChained = true;
     return true;
+  }
+
+  /** Address-exact pin owned by this installed V2 map successor; legacy/unbound maps report no pin. */
+  public coopV2BiomeInteractionPin(): number {
+    return this.coopChained ? this.coopAdvancePinned : -1;
   }
 
   /** Capture one durable address before any UI/network await can observe a newer ambient battle. */
@@ -320,7 +330,12 @@ export class SelectBiomePhase extends BattlePhase {
     const coopAutoResolve = coopController != null && coopBiomePickerAutoResolvesInTest();
     if (coopController != null && !coopAutoResolve && coopBiomeInteractionInProgress()) {
       this.coopChained = true;
-      this.coopAdvancePinned = coopBiomeInteractionStartValue();
+      // A V2-projected map already owns its immutable pin locally. Reading the module leaf is only the
+      // legacy predecessor handoff; never overwrite the projected coordinate with another browser's
+      // ambient snapshot in the one-process duo harness.
+      if (this.coopAdvancePinned < 0) {
+        this.coopAdvancePinned = coopBiomeInteractionStartValue();
+      }
       // Co-op (#864): the crossroads pinned the counter + already decided the owner; adopt that ownership
       // NOW (before any deterministic terminal runs) so a chained Leave that resolves to a single-node /
       // travel-target biome (never opening the picker) STILL relays the biome to the watcher instead of

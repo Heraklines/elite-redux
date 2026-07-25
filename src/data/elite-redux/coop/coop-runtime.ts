@@ -6363,11 +6363,23 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
   }
   const currentMarket = current as Phase & {
     readonly coopV2ProofPhaseName?: string;
+    retainsCoopV2MarketProjectionBoundary?: (
+      projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
+    ) => boolean;
     installCoopV2MarketProjection?: (
       operationId: string,
       projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
     ) => boolean;
   };
+  if (
+    plan.kind === "market"
+    && currentMarket.coopV2ProofPhaseName === coopV2MarketProjectionPhaseName(plan)
+    && currentMarket.retainsCoopV2MarketProjectionBoundary?.(plan.projection) === true
+  ) {
+    runtime.v2ProjectedInteractionControlId = controlId;
+    coopLog("v2-interaction", `retained live market shell for ordered generation ${controlId}`);
+    return true;
+  }
   if (
     plan.kind === "market"
     && currentMarket.coopV2ProofPhaseName === coopV2MarketProjectionPhaseName(plan)

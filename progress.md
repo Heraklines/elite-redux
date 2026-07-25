@@ -3367,3 +3367,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   installs its retained-delivery fault first, drives the real host terminal, then observes the guest's
   projected successor. Contract coverage pins all three product lifecycle rules. Behavioral co-op execution
   remains GitHub-hosted only; no local co-op Vitest or browser was run.
+
+# 2026-07-25 - Later market generations retain one consumer and biome proofs become phase-local
+
+- Exact gate `30123654540` at `7b6d6e1b` exposed one real market lifecycle bug: SHOP_BUY DATA woke the
+  already-current watcher's FIFO, then the ordinary projector replaced that phase because its control ID
+  still named SHOP_PRESENT. A later buy/leave generation now validates and retains the exact live market
+  class, pin, immutable catalog, runtime, and actionable owner/armed watcher without relabelling it. The
+  consumer that applies the complete post-action state remains the only code allowed to bind and prove the
+  new operation; the projector neither replaces the phase nor republishes stock into the next generation.
+- The same run's C/P/automatic-seal reds all reported `host=5 guest=-1` while the guest's exact projected
+  `SelectBiomePhase` was current. This was a shared-process module-leaf observation artifact, but also
+  revealed an avoidable ambient dependency. The immutable V2 pin is now installed directly on the phase,
+  mechanics keep it over a legacy global snapshot, and the soak inspects that authority-owned coordinate.
+- P2 stopped on a stale wave-10 CommandPhase after both engines had reached wave 11. Its representative
+  driver now requires the destination wave while draining the real queue, so it dissolves obsolete commands
+  exactly as production PhaseManager does before asserting post-summon convergence.
+- Public journey `30123636515` reached a healthy owner reward confirmation and a healthy read-only watcher,
+  then waited 17 minutes for the unchanged watcher browser to emit a second semantic event after an
+  owner-only keypress. The proof now searches from the pre-reward frontier and still requires the exact
+  owner, address, handler, and non-actionable input state. Static Authority V2 contracts are 46/46 green,
+  the public-boundary inventory is green, `tsc --noEmit` is clean, and no local co-op behavioral test ran.

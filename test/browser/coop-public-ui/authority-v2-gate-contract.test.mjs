@@ -466,15 +466,24 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
   );
 
   const bindReward = projector.indexOf("bound exact reward generation");
+  const retainMarket = projector.indexOf("retained live market shell");
   const bindMarket = projector.indexOf("bound exact market generation");
   const destructiveSequentialProjection = projector.indexOf(
     "phaseManager.replaceWithCoopAuthoritativePhase(current, phase)",
   );
   assert.ok(bindReward >= 0, "an exact already-live reward generation is bound in place");
+  assert.ok(retainMarket >= 0, "a later market operation retains the one live FIFO consumer");
   assert.ok(bindMarket >= 0, "an exact already-live market generation is bound in place");
   assert.ok(
-    bindReward < destructiveSequentialProjection && bindMarket < destructiveSequentialProjection,
+    bindReward < destructiveSequentialProjection
+      && retainMarket < bindMarket
+      && bindMarket < destructiveSequentialProjection,
     "live reward and market continuations are preserved before obsolete predecessors are replaced",
+  );
+  assert.match(
+    projector,
+    /currentMarket\.retainsCoopV2MarketProjectionBoundary\?\.\(plan\.projection\) === true[\s\S]*?retained live market shell/u,
+    "later market buy/terminal generations retain the already-armed phase without relabelling it",
   );
   assert.match(
     projector,
@@ -489,6 +498,21 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
   assert.match(selectModifierPhase, /this\.rerollCount !== projection\.reroll/u);
   assert.match(selectModifierPhase, /this\.coopInteractionStart !== projection\.pinned/u);
   assert.match(biomeShopPhase, /this\.coopBiomeStart !== projection\.pinned/u);
+  const retainedMarketStart = biomeShopPhase.indexOf("public retainsCoopV2MarketProjectionBoundary(");
+  const retainedMarketEnd = biomeShopPhase.indexOf("\n  /**", retainedMarketStart + 1);
+  assert.ok(retainedMarketStart >= 0 && retainedMarketEnd > retainedMarketStart, "market retention is bounded");
+  const retainedMarket = biomeShopPhase.slice(retainedMarketStart, retainedMarketEnd);
+  assert.match(retainedMarket, /this\.coopBiomeStart === projection\.pinned/u);
+  assert.match(retainedMarket, /this\.coopBoundaryStillLive\(coopSessionGeneration\(\), wave\)/u);
+  assert.doesNotMatch(retainedMarket, /coopV2ControlOperationId\s*=/u, "retention cannot pre-prove the new operation");
+  const retainMarketCheck = projector.indexOf("currentMarket.retainsCoopV2MarketProjectionBoundary?.(");
+  const retainMarketReturn = projector.indexOf("return true;", retainMarketCheck);
+  assert.ok(retainMarketCheck >= 0 && retainMarketReturn > retainMarketCheck, "market retention branch is bounded");
+  assert.doesNotMatch(
+    projector.slice(retainMarketCheck, retainMarketReturn),
+    /materializeCoopV2RewardOptionsProjection/u,
+    "DATA already woke the retained market FIFO; retention cannot republish stock into the next generation",
+  );
 
   const modalStart = phaseManager.indexOf("public replaceWithCoopAuthoritativeModal(");
   const modalEnd = phaseManager.indexOf("\n  /**\n   * Determine the next phase", modalStart);
@@ -512,6 +536,24 @@ test("Mystery publishes the real actionability edge after its click-through guar
   const proof = unblock.indexOf("notifyCoopV2InteractionSurfaceReady()");
   assert.ok(release >= 0, "the click-through guard is actually released");
   assert.ok(proof > release, "controlInstalled is retried only after the real Mystery handler becomes actionable");
+});
+
+test("opening reward confirmation does not require an unchanged watcher to emit a second surface", () => {
+  const leaveStart = publicUiHarness.indexOf("  async leaveRewardsAndReachWave2(");
+  const leaveEnd = publicUiHarness.indexOf("\n  async ", leaveStart + 1);
+  assert.ok(leaveStart >= 0 && leaveEnd > leaveStart, "the public reward-leave journey has a bounded method");
+  const leave = publicUiHarness.slice(leaveStart, leaveEnd);
+  assert.match(leave, /owner\.waitForOwnedRewardConfirm\(rewardConfirmCursors\[owner\.label\]/u);
+  assert.match(
+    leave,
+    /watcher\.waitForAddressedRewardWatcher\([\s\S]*?ownerCursors\[watcher\.label\]/u,
+    "the exact already-visible watcher is addressed from the pre-reward frontier",
+  );
+  assert.doesNotMatch(
+    leave,
+    /waitForAddressedRewardWatcher\([\s\S]*?rewardConfirmCursors\[watcher\.label\]/u,
+    "an owner-only CONFIRM transition cannot require a fictitious new watcher event",
+  );
 });
 
 test("V2 Mystery waits for its ordered presentation and destructively replaces the local classifier", () => {
@@ -1501,10 +1543,22 @@ test("a chained biome picker preserves its exact interaction coordinate through 
   const projectionInstaller = selectBiomePhase.slice(projectionInstallerStart, projectionInstallerEnd);
   assert.match(projectionInstaller, /Number\.isSafeInteger\(pinned\)/u);
   assert.match(projectionInstaller, /this\.coopV2ProjectedPinned = pinned/u);
+  assert.match(projectionInstaller, /this\.coopAdvancePinned = pinned/u);
+  assert.match(projectionInstaller, /this\.coopChained = true/u);
   assert.match(
     selectBiomePhase,
     /start\(\) \{[\s\S]*this\.coopV2ProjectedPinned = -1;[\s\S]*setCoopBiomeInteractionStart\(pinned\)/u,
     "the pin becomes module-visible only after PhaseManager accepts and starts the projected successor",
+  );
+  assert.match(
+    selectBiomePhase,
+    /public coopV2BiomeInteractionPin\(\): number \{[\s\S]*?this\.coopChained \? this\.coopAdvancePinned : -1/u,
+    "the installed V2 successor exposes its own address rather than requiring a module-global snapshot",
+  );
+  assert.match(
+    soakDriver,
+    /phase\.coopV2BiomeInteractionPin\?\.\(\)[\s\S]*?phasePin >= 0 \? phasePin : coopBiomeInteractionStartValue\(\)/u,
+    "the two-engine soak asserts the actual projected phase coordinate before its legacy leaf fallback",
   );
   const readyStart = selectBiomePhase.indexOf("private publishCoopBiomeSurfaceWhenActionable(");
   const readyEnd = selectBiomePhase.indexOf("\n  private ", readyStart + 1);

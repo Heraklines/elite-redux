@@ -1610,7 +1610,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
       const guestReplicaCommand = await withClient(rig.guestCtx, () =>
         driveClientPhaseQueueTo(rig.guestScene, "first replicated CommandPhase", {
-          matches: phase => phase.phaseName === "CommandPhase",
+          matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === 11,
         }),
       );
       await withClient(rig.guestCtx, async () => {
@@ -1634,6 +1634,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
           matches: phase =>
             phase.phaseName === "CommandPhase"
+            && rig.guestScene.currentBattle.waveIndex === 11
             && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
         }),
       );

@@ -197,6 +197,53 @@ export class BiomeShopPhase extends SelectModifierPhase {
     return true;
   }
 
+  /**
+   * Whether this already-current market owns the same retained buy/leave FIFO as a later V2 generation.
+   *
+   * A market is one interaction lifecycle with several ordered operations: its presentation, zero or more
+   * buys, and its terminal. The watcher/owner async loop is attached to this phase for that whole lifecycle.
+   * Replacing the phase when a buy result arrives would orphan the consumer that already received DATA.
+   * This check is deliberately non-mutating: the live consumer binds and proves the new operation only after
+   * it applies the immutable result, so an earlier generation can never attest a later one prematurely.
+   */
+  public retainsCoopV2MarketProjectionBoundary(
+    projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
+  ): boolean {
+    const wave = this.coopBiomeOwningScene.currentBattle?.waveIndex ?? -1;
+    const optionsMatch = this.shopOptions.every((option, index) => {
+      const projected = projection.options[index];
+      const type = option.type;
+      const rawPregenArgs =
+        "getPregenArgs" in type && typeof (type as { getPregenArgs?: unknown }).getPregenArgs === "function"
+          ? (type as unknown as { getPregenArgs(): unknown[] }).getPregenArgs()
+          : [];
+      const pregenArgs = rawPregenArgs.filter((arg): arg is number => typeof arg === "number");
+      return (
+        projected != null
+        && projected.id === type.id
+        && projected.tier === (type.getOrInferTier() ?? ModifierTier.COMMON)
+        && projected.upgradeCount === option.upgradeCount
+        && projected.cost === option.cost
+        && (projected.pregenArgs ?? []).every((arg, argIndex) => arg === pregenArgs[argIndex])
+        && pregenArgs.length === (projected.pregenArgs ?? []).length
+      );
+    });
+    return (
+      projection.surface === "market"
+      && projection.marketKind === this.coopMarketProjectionKind()
+      && projection.reroll === COOP_BIOME_STOCK_REROLL
+      && projection.pinned >= 0
+      && this.coopBiomeStart === projection.pinned
+      && projection.options.length === projection.remainingStock.length
+      && this.shopOptions.length === projection.options.length
+      && optionsMatch
+      && this.qtys.length === projection.remainingStock.length
+      && this.coopRewardOperationBinding != null
+      && (this.coopBiomeOwner || this.coopBiomeWatcherContinuationReady)
+      && this.coopBoundaryStillLive(coopSessionGeneration(), wave)
+    );
+  }
+
   /** The biome market re-appears (not the vanilla reward screen) after the
    * party-target menu closes on a held-item / TM purchase. */
   protected override getModifierSelectMode(): UiMode {

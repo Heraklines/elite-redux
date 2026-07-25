@@ -4128,7 +4128,11 @@ export class DuoPublicUiRig {
     const [ownerConfirmation, watcherProjection] = await Promise.all([
       owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label], expectedRewardAddress),
       watcher.waitForAddressedRewardWatcher(
-        rewardConfirmCursors[watcher.label],
+        // Opening CONFIRM changes only the owner's browser. The watcher's already-proven read-only reward
+        // handler remains byte-for-byte unchanged, so the semantic observer correctly emits no new event.
+        // Search from the pre-reward frontier and bind the proof to the exact address/owner instead of
+        // requiring a fictitious post-keypress watcher transition (run 30123636515's 17-minute false red).
+        ownerCursors[watcher.label],
         owner.publicSeat,
         expectedRewardAddress,
       ),

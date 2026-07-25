@@ -2127,9 +2127,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const transitionSourceWave = rig.hostScene.currentBattle.waveIndex;
     type BiomeBoundarySeam = {
       readonly phaseName: "SelectBiomePhase";
+      coopV2BiomeInteractionPin(): number;
       requireCoopSourceWave(): number;
       start(): void;
     };
+    const readBiomeInteractionPin = (ctx: DuoRig["hostCtx"]): number =>
+      withClientSync(ctx, () => {
+        const phase = ctx.scene.phaseManager.getCurrentPhase() as unknown as Partial<BiomeBoundarySeam>;
+        const phasePin = phase.coopV2BiomeInteractionPin?.() ?? -1;
+        return phasePin >= 0 ? phasePin : coopBiomeInteractionStartValue();
+      });
     const hostBiomeBinding: CoopBiomeOperationBinding = {
       opState: rig.hostRuntime.opState,
       durability: rig.hostRuntime.durability ?? null,
@@ -2272,8 +2279,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           await pressClientUiUntilAccepted(crossroadsOwnerCtx, Button.DOWN, "Crossroads Leave cursor");
           await pressClientUiUntilAccepted(crossroadsOwnerCtx, Button.ACTION, "Crossroads Leave");
           await waitForBothBoundaryPhasesToExit(hostCrossroads, guestCrossroads, "Crossroads Leave");
-          const hostPin = withClientSync(rig.hostCtx, () => coopBiomeInteractionStartValue());
-          const guestPin = withClientSync(rig.guestCtx, () => coopBiomeInteractionStartValue());
+          const hostPin = readBiomeInteractionPin(rig.hostCtx);
+          const guestPin = readBiomeInteractionPin(rig.guestCtx);
           if (hostPin !== pinned || guestPin !== pinned) {
             fail(
               "desync",
@@ -2301,8 +2308,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             );
           }
           hostBiomeProjected = true;
-          const hostPinBeforeMap = withClientSync(rig.hostCtx, () => coopBiomeInteractionStartValue());
-          const guestPinBeforeMap = withClientSync(rig.guestCtx, () => coopBiomeInteractionStartValue());
+          const hostPinBeforeMap = readBiomeInteractionPin(rig.hostCtx);
+          const guestPinBeforeMap = readBiomeInteractionPin(rig.guestCtx);
           if (hostPinBeforeMap !== guestPinBeforeMap) {
             fail(
               "desync",
