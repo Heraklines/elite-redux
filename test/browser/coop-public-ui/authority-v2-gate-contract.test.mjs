@@ -1660,13 +1660,38 @@ test("a projected biome transition consumes the exact destination command carrie
   assert.match(switchBiomePhase, /permit\.wave === \(this\.coopSourceWave \?\? this\.coopWave\)/u);
   assert.match(switchBiomePhase, /permit\.nextWave === command\.wave/u);
   assert.match(switchBiomePhase, /material\.entryPresentation\.length > 0/u);
+  const admission = switchBiomePhase.slice(
+    switchBiomePhase.indexOf("public canReleaseForCoopV2Control("),
+    switchBiomePhase.indexOf("public releaseForCoopV2Control("),
+  );
+  assert.doesNotMatch(
+    admission,
+    /permit\.(?:historyRecorded|switchPrepared)/u,
+    "pre-DATA admission does not circularly require stages completed from the destination carrier",
+  );
+  assert.doesNotMatch(
+    admission,
+    /globalScene\.arena\?\.biomeId === permit\.destinationBiomeId/u,
+    "pre-DATA admission accepts the exact carrier while the renderer still shows the source arena",
+  );
   const release = switchBiomePhase.indexOf("public releaseForCoopV2Control(");
+  const markHistory = switchBiomePhase.indexOf("markCoopBiomeTransitionHistoryRecorded(permit.operationId)", release);
+  const markPrepared = switchBiomePhase.indexOf("markCoopBiomeTransitionSwitchPrepared(permit.operationId)", release);
+  const materializeArena = switchBiomePhase.indexOf("this.materializeCoopTransition();", release);
   const queueEncounter = switchBiomePhase.indexOf(
     'globalScene.phaseManager.unshiftNew("NewBiomeEncounterPhase")',
     release,
   );
   const endSwitch = switchBiomePhase.indexOf("this.end();", queueEncounter);
-  assert.ok(release >= 0 && queueEncounter > release && endSwitch > queueEncounter);
+  assert.ok(
+    release >= 0
+      && markHistory > release
+      && markPrepared > markHistory
+      && materializeArena > markPrepared
+      && queueEncounter > materializeArena
+      && endSwitch > queueEncounter,
+    "post-DATA release prepares the one-shot permit and arena before exposing the encounter tail",
+  );
 });
 
 test("a V2 biome receipt is consumed without consulting the retired operation revision clock", () => {

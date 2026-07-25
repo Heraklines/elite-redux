@@ -110,17 +110,23 @@ export class SwitchBiomePhase extends BattlePhase {
       && material.entryPresentation.length > 0
       && permit != null
       && permit.switchAdopted
-      && permit.historyRecorded
-      && permit.switchPrepared
       && permit.destinationBiomeId === this.nextBiome
       && permit.wave === (this.coopSourceWave ?? this.coopWave)
       && permit.nextWave === command.wave
-      && globalScene.arena?.biomeId === permit.destinationBiomeId
       && (ambientWave === permit.wave || ambientWave === permit.nextWave)
     );
   }
 
-  /** Install the exact post-switch presentation phase after CONTROL_COMMIT DATA changed source N to N+1. */
+  /**
+   * Install the exact post-switch presentation phase after CONTROL_COMMIT DATA changed source N to N+1.
+   *
+   * `canReleaseForCoopV2Control` deliberately does not require the permit's history/preparation stages or
+   * destination arena before DATA is applied. A destructively projected biome result can leave this phase
+   * parked before those renderer-local stages run; requiring them as a precondition for the only complete
+   * destination carrier creates a circular wait. Once runtime DATA has installed the immutable N+1 image,
+   * finish those one-shot permit stages without rolling/rebuilding any host-owned state, materialize only
+   * the arena presentation, and let NewBiomeEncounter consume the exact prepared permit.
+   */
   public releaseForCoopV2Control(successor: CoopV2BiomeCommandSuccessorClaim): boolean {
     if (!this.canReleaseForCoopV2Control(successor)) {
       return false;
@@ -133,6 +139,31 @@ export class SwitchBiomePhase extends BattlePhase {
     ) {
       return false;
     }
+    let permit = getCoopBiomeTransitionTailPermit();
+    if (permit == null) {
+      return false;
+    }
+    if (!permit.historyRecorded) {
+      erRecordBiomeEntry(permit.sourceBiomeId as BiomeId);
+      permit = markCoopBiomeTransitionHistoryRecorded(permit.operationId);
+      if (permit == null) {
+        return false;
+      }
+    }
+    if (!permit.switchPrepared) {
+      // The CONTROL_COMMIT's authoritative state already contains the host's destination routes, reveals,
+      // biome structure, party, field, and battle. Marking the exact stage here records that completed DATA
+      // install; re-running guest preparation would overwrite that immutable image with empty placeholders.
+      permit = markCoopBiomeTransitionSwitchPrepared(permit.operationId);
+      if (permit == null) {
+        return false;
+      }
+    }
+    this.materializeCoopTransition();
+    coopLog(
+      "v2-control",
+      `SwitchBiomePhase consumed destination command carrier wave=${permit.wave}->${permit.nextWave}`,
+    );
     globalScene.phaseManager.unshiftNew("NewBiomeEncounterPhase");
     this.end();
     return globalScene.phaseManager.getCurrentPhase() !== this;

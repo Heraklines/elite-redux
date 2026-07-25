@@ -3420,3 +3420,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   entry presentation. Only after the carrier installs the complete N+1 battle does it queue the sanctioned
   `NewBiomeEncounterPhase` and end. A static contract pins the validation and queue order; Authority V2
   contracts are 47/47 green, formatting and TypeScript are clean, and behavioral execution remains remote.
+
+# 2026-07-25 - The destination carrier closes the projected biome permit without a circular precondition
+
+- Focused run `30135914696` at `4bf89c80e` showed the first post-biome consumer was still too strict. The
+  wave-6 command carrier arrived while the replica was correctly parked in `SwitchBiomePhase`, but pre-DATA
+  admission required `historyRecorded`, `switchPrepared`, and the destination arena. Those are exactly the
+  renderer-local facts that the complete destination carrier permits the parked phase to finish, so the
+  carrier remained deferred and Phaser manufactured a stale wave-5 `TurnInitPhase` / `CoopReplayTurnPhase`.
+- Pre-DATA admission now remains exact on session epoch, operation kind, source/destination permit, source and
+  destination waves, turn-one command frontier, current phase, and entry presentation, without requiring
+  post-DATA renderer stages. After the immutable N+1 state is applied, release records the committed source
+  history, marks the installed carrier image as the prepared switch, materializes only the destination arena
+  presentation, then opens `NewBiomeEncounterPhase`. It never rolls or replaces the host-owned routes,
+  reveals, biome structure, party, field, or battle carried by Authority V2.
+- The static contract now rejects reintroduction of the circular preconditions and fixes the post-DATA stage
+  order. All 47 Authority V2 contracts pass, targeted Biome reports no errors, TypeScript is clean, and no
+  local co-op behavioral test or browser was run.
