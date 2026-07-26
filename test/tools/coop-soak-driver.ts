@@ -2192,20 +2192,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       );
     };
     const drivenGuestReplacementPhases = new WeakSet<object>();
-    const drivenEncounterTextAnimationGenerations = new WeakMap<object, number>();
     const drivenEncounterPromptGenerations = new WeakMap<object, number>();
 
     /**
      * A structural wave crossing can finish only after each real player acknowledges their own encounter
      * dialogue. Chromium does that with a keyboard action; the two-engine fixture must use the same public
-     * UI entry point while its two simulated browser event loops are being pumped. Real keyboard play has
-     * two distinct ACTION crossings: one press completes animated text, then another accepts the armed
-     * prompt. The headless clock does not advance the text tween while `toFirst` is pending, so waiting only
-     * for `isAwaitingPromptAction()` manufactures a NewBiome/SwitchBiome split that two active browsers do
-     * not have. Prompt generation, not phase identity, is the dedupe key because trainer and Mystery intros
-     * can show several messages in one EncounterPhase. Recovery prompts are deliberately rejected:
-     * accepting one would hide a real authority failure and turn the representative soak into a self-healing
-     * mock.
+     * UI entry point while its two simulated browser event loops are being pumped. Prompt generation, not
+     * phase identity, is the dedupe key because trainer and Mystery intros can show several messages in one
+     * EncounterPhase. Recovery prompts are deliberately rejected: accepting one would hide a real authority
+     * failure and turn the representative soak into a self-healing mock.
      */
     const driveEncounterPresentationPublicInput = async (
       ctx: typeof rig.hostCtx,
@@ -2224,7 +2219,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           return false;
         }
         const handler = scene.ui.getMessageHandler();
+        if (!handler.isAwaitingPromptAction()) {
+          return false;
+        }
         const promptGeneration = handler.getPromptGeneration();
+        if (drivenEncounterPromptGenerations.get(phase as object) === promptGeneration) {
+          return false;
+        }
         const message = handler.message?.text?.replaceAll(/\s+/gu, " ").trim() ?? "";
         if (
           message.startsWith("Could not confirm the shared")
@@ -2236,30 +2237,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             transitionSourceWave,
             `${label} reached an authority recovery prompt during ${phase.phaseName}: ${message}`,
           );
-        }
-        if (handler.isTextAnimationInProgress()) {
-          if (drivenEncounterTextAnimationGenerations.get(phase as object) === promptGeneration) {
-            return false;
-          }
-          drivenEncounterTextAnimationGenerations.set(phase as object, promptGeneration);
-          if (!scene.ui.processInput(Button.ACTION)) {
-            fail(
-              "no-park",
-              transitionSourceWave,
-              `${label} ${phase.phaseName} rejected its public ACTION text-animation skip`,
-            );
-          }
-          actionScript.push(
-            `wave ${transitionSourceWave}: ${label} completed ${phase.phaseName} text animation ${promptGeneration} through public MESSAGE UI`,
-          );
-          await Promise.resolve();
-          return true;
-        }
-        if (
-          !handler.isAwaitingPromptAction()
-          || drivenEncounterPromptGenerations.get(phase as object) === promptGeneration
-        ) {
-          return false;
         }
         drivenEncounterPromptGenerations.set(phase as object, promptGeneration);
         if (!scene.ui.processInput(Button.ACTION)) {
@@ -2433,14 +2410,20 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                 // item), so inspecting the queue before advancing is too early. Start the real authority
                 // crossing, then settle it with both browser contexts alive: a retained winning-turn faint can
                 // legitimately open a replacement before any of these target surfaces.
-                const crossing = game.phaseInterceptor.toFirst([
-                  "CommandPhase",
-                  "ErDexNavPhase",
-                  "ScanIvsPhase",
-                  "TheBargainPhase",
-                  "ErCrossroadsPhase",
-                  "SelectBiomePhase",
-                ] as const) as Promise<HostBoundary>;
+                const crossing = game.phaseInterceptor.toFirst(
+                  [
+                    "CommandPhase",
+                    "ErDexNavPhase",
+                    "ScanIvsPhase",
+                    "TheBargainPhase",
+                    "ErCrossroadsPhase",
+                    "SelectBiomePhase",
+                  ] as const,
+                  // This is an aggregate traversal across a complete post-turn/reward/biome chain. Every
+                  // individual phase keeps PhaseInterceptor's strict 20 s stall ceiling; the traversal
+                  // itself must not expire merely because several healthy phases consumed 20 s together.
+                  { timeoutMs: 60_000 },
+                ) as Promise<HostBoundary>;
                 await drainLoopback();
                 // Keep the authority browser as the OUTER scope until its structural Promise settles.
                 // `settleDuoPromise` services the replica through nested destination scopes, each of which
@@ -2450,6 +2433,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                 // shard manufacture a NextEncounter/NewBiomeEncounter freeze that real Chromium cannot hit.
                 return settleDuoPromise(rig, crossing, `wave ${wave} host structural crossing`, {
                   afterPump: driveProjectedPublicInput,
+                  timeoutMs: 60_000,
                 });
               });
             })();

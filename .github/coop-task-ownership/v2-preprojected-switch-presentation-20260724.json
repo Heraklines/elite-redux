@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "af8bcfa6481f6973932817f42a2d08cb2f3e53be",
+  "baseSha": "9b470fc6b49575a16759eedf645d54634fa83da8",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     ".github/workflows/coop-public-ui-journey.yml",
@@ -74,6 +74,7 @@
     "test/browser/coop-public-ui/resume-scan-isolation.test.mjs",
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
     "test/browser/coop-public-ui/solo-classic.mjs",
+    "test/framework/phase-interceptor.ts",
     "test/node/authority-v2-command-frontier.test.ts",
     "test/node/authority-v2-control-open.test.ts",
     "test/node/authority-v2-cutover-replacement.test.ts",
