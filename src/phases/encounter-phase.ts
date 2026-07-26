@@ -301,19 +301,15 @@ function awaitCoopEncounterAssetsBounded(
   if (!params.enabled) {
     return assetsReady.then(() => {});
   }
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<void>(resolve => {
     let settled = false;
-    const finish = (outcome: "resolve" | "reject", error?: unknown): void => {
+    const finish = (): void => {
       if (settled) {
         return;
       }
       settled = true;
       clearTimeout(timer);
-      if (outcome === "resolve") {
-        resolve();
-      } else {
-        reject(error);
-      }
+      resolve();
     };
     const timer = setTimeout(() => {
       if (settled) {
@@ -325,11 +321,16 @@ function awaitCoopEncounterAssetsBounded(
           `authoritative encounter assets exceeded ${COOP_ENCOUNTER_ASSET_WAIT_MS}ms at wave ${params.wave}; continuing with placeholders`,
         );
       }
-      finish("resolve");
+      finish();
     }, COOP_ENCOUNTER_ASSET_WAIT_MS);
     assetsReady.then(
-      () => finish("resolve"),
-      error => finish("reject", error),
+      () => finish(),
+      error => {
+        if (params.remainsCurrent()) {
+          coopWarn("renderer", "authoritative encounter asset load failed; continuing with placeholders", error);
+        }
+        finish();
+      },
     );
   });
 }
@@ -879,7 +880,11 @@ export class EncounterPhase extends BattlePhase {
         }),
       );
     }
-    await Promise.all(loads);
+    await awaitCoopEncounterAssetsBounded(Promise.all(loads), {
+      enabled: scene.gameMode.isCoop,
+      wave,
+      remainsCurrent: stillCurrent,
+    });
     if (!stillCurrent()) {
       throw new Error("Authoritative encounter assets arrived after boundary replacement");
     }
@@ -1404,7 +1409,10 @@ export class EncounterPhase extends BattlePhase {
     }
 
     const assetsReady = awaitCoopEncounterAssetsBounded(Promise.all(loadEnemyAssets), {
-      enabled: encounterScene.gameMode.isCoop && encounterController?.netcodeMode === "authoritative",
+      // The captured scene owns this boundary. An ambient controller selector can be temporarily absent
+      // during rejoin or a two-browser realm handoff; that must never silently turn a co-op asset wait back
+      // into the solo, unbounded path.
+      enabled: encounterScene.gameMode.isCoop,
       wave: battle.waveIndex,
       remainsCurrent: encounterBoundaryIsLive,
     });

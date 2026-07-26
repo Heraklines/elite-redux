@@ -2585,12 +2585,17 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     encounterPhase,
-    /awaitCoopEncounterAssetsBounded\(Promise\.all\(loadEnemyAssets\), \{[\s\S]+enabled: encounterScene\.gameMode\.isCoop && encounterController\?\.netcodeMode === "authoritative"[\s\S]+remainsCurrent: encounterBoundaryIsLive/u,
-    "a presentation asset adapter cannot hold an authoritative co-op encounter forever",
+    /awaitCoopEncounterAssetsBounded\(Promise\.all\(loadEnemyAssets\), \{[\s\S]+enabled: encounterScene\.gameMode\.isCoop[\s\S]+remainsCurrent: encounterBoundaryIsLive/u,
+    "an ambient controller gap cannot turn a captured co-op encounter asset join back into an unbounded wait",
   );
   assert.match(
     encounterPhase,
-    /const COOP_ENCOUNTER_ASSET_WAIT_MS = 12_000;[\s\S]+setTimeout\([\s\S]+continuing with placeholders[\s\S]+finish\("resolve"\);[\s\S]+COOP_ENCOUNTER_ASSET_WAIT_MS/u,
+    /prepareCoopAuthoritativeGuestPresentationOnly[\s\S]+await awaitCoopEncounterAssetsBounded\(Promise\.all\(loads\), \{[\s\S]+enabled: scene\.gameMode\.isCoop[\s\S]+remainsCurrent: stillCurrent/u,
+    "the authoritative guest presentation-only asset join is bounded by its exact scene too",
+  );
+  assert.match(
+    encounterPhase,
+    /const COOP_ENCOUNTER_ASSET_WAIT_MS = 12_000;[\s\S]+setTimeout\([\s\S]+continuing with placeholders[\s\S]+finish\(\);[\s\S]+COOP_ENCOUNTER_ASSET_WAIT_MS/u,
     "the asset deadline preserves late cosmetic repair while releasing the mechanical phase",
   );
   assert.match(
