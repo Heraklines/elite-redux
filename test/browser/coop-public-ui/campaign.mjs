@@ -2331,7 +2331,13 @@ export function hasPassiveBattleProgressSurface(clients, cursors) {
     }
     const phaseEvent = client.evidence.findLast(START_PHASE, cursor);
     const phaseName = phaseEvent == null ? null : START_PHASE.exec(phaseEvent.text ?? "")?.[1];
-    return phaseName == null || (event.index >= phaseEvent.index && observation.phase === phaseName);
+    // A multi-battler intro legitimately starts the same phase class once per battler. The
+    // semantic observer de-duplicates an unchanged, non-actionable MESSAGE surface, so a later
+    // `Start Phase SummonPhase` can follow the last surface event while that surface remains the
+    // exact current UI. Requiring evidence-index order therefore turns a slow double/triple intro
+    // into an UNKNOWN failure. Phase-name equality still rejects a genuinely superseded surface;
+    // the address/readiness checks above retain the bounded passive-only exemption.
+    return phaseName == null || observation.phase === phaseName;
   });
 }
 

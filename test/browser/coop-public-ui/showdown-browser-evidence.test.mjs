@@ -292,6 +292,53 @@ test("presentation receipts reject malformed or unknown event identities", () =>
   );
 });
 
+test("the browser receipt parser accepts every canonical CoopBattleEvent kind", () => {
+  const unionStart = transport.indexOf("export type CoopBattleEvent =");
+  const unionEnd = transport.indexOf(
+    "\n// =============================================================================",
+    unionStart,
+  );
+  assert.ok(unionStart >= 0 && unionEnd > unionStart, "the canonical battle-event union is bounded");
+  const canonicalKinds = [
+    ...new Set([...transport.slice(unionStart, unionEnd).matchAll(/\bk:\s*"([A-Za-z]+)"/gu)].map(match => match[1])),
+  ];
+  assert.deepEqual(canonicalKinds, [
+    "message",
+    "moveUsed",
+    "hp",
+    "faint",
+    "statStage",
+    "status",
+    "showAbility",
+    "tera",
+    "commonAnim",
+    "formChange",
+    "transform",
+    "weather",
+    "terrain",
+    "switch",
+  ]);
+
+  const prefix = "[coop-browser:presentation-event] ";
+  for (const kind of canonicalKinds) {
+    const receipt = {
+      version: 1,
+      stage: "authority-recorded",
+      role: "host",
+      epoch: 9,
+      wave: 1,
+      turn: 1,
+      seq: 0,
+      event: { k: kind },
+    };
+    assert.equal(
+      presentationEventView(`${prefix}${JSON.stringify(receipt)}`)?.event.k,
+      kind,
+      `${kind} is part of the sealed presentation receipt vocabulary`,
+    );
+  }
+});
+
 test("Showdown command convergence excludes account-local state and canonicalizes both battle perspectives by seat", () => {
   assert.match(observer, /const versus = runtime\?\.controller\.isVersusSession\(\) === true/u);
   assert.match(observer, /saveDataDigest = versus \? "versus-account-local-excluded"/u);

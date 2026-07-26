@@ -810,6 +810,41 @@ test("a non-actionable NextEncounter tween is known passive progress, but an arm
   );
 });
 
+test("a repeated multi-battler SummonPhase retains its unchanged passive semantic surface", () => {
+  const authority = fakeClient("authority", ["Start Phase SummonPhase"]);
+  const renderer = fakeClient("renderer");
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      operationClass: "battle-progress",
+      phase: "SummonPhase",
+      ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true },
+    },
+  });
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    text: "Start Phase SummonPhase",
+  });
+
+  assert.equal(
+    hasPassiveBattleProgressSurface([authority, renderer], { authority: 0, renderer: 0 }),
+    true,
+    "a second battler reuses the passive message surface without becoming an unknown human-input screen",
+  );
+
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    text: "Start Phase ToggleDoublePositionPhase",
+  });
+  assert.equal(
+    hasPassiveBattleProgressSurface([authority, renderer], { authority: 0, renderer: 0 }),
+    false,
+    "a different later phase still supersedes the historical summon surface",
+  );
+});
+
 // Track R cycle 4 - the wave-3-turn-2 LevelUpPhase co-op deadlock (campaign run 29644735938,
 // 3-wave animations-on-surface). The host wins wave 3, and the FIRST level-up of the run opens
 // LevelUpPhase, which shows a level-up MESSAGE and then promptLevelUpStats - a TWO-step human-action
