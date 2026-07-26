@@ -8985,13 +8985,18 @@
       "Run Away",
       "Good as Gold",
       "Super Luck",
-      "Prankster"
+      "Prankster",
+      "Sharing Is Caring",
+      "Friend Guard",
+      "Steely Spirit"
     ],
     "formNames": [
-      "Gimmighoul (Roaming Form)"
+      "Gimmighoul (Roaming Form)",
+      "Gholdengo"
     ],
     "formSlugs": [
-      "gimmighoul_roaming_999_1"
+      "gimmighoul_roaming_999_1",
+      "gholdengo"
     ],
     "eggTier": 1,
     "cost": 4
@@ -22160,7 +22165,6 @@
       "Dragon’s Maw",
       "Ice Scales",
       "Ice Cold Hunter",
-      "Arcane Force",
       "Slush Rush",
       "Marvel Scale",
       "Draconize",
