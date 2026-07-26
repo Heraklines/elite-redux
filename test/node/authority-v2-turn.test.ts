@@ -268,14 +268,22 @@ describe("buildTurnCommitEntry - shape + digest", () => {
     ).toThrow("not bound to the resolved turn");
   });
 
-  it("accepts only the exact turn-N+1 WAVE successor for a deferred normal victory", () => {
+  it("accepts only the exact turn-N+1 replacement-or-wave successor for a deferred normal victory", () => {
     const wait = {
       kind: "AWAIT_SUCCESSOR" as const,
       afterOperationId: "turn-op-1",
       epoch: 1,
       wave: 3,
       turn: 6,
-      allowedKinds: ["WAVE_ADVANCE" as const],
+      allowedKinds: ["CONTROL_COMMIT" as const, "WAVE_ADVANCE" as const],
+      allowedControlAddresses: [
+        {
+          materialKind: "replacement-open" as const,
+          wave: 3,
+          turn: 6,
+          operationId: null,
+        },
+      ],
       allowNextWaveStart: false,
       expectedOperationId: null,
     };
@@ -301,7 +309,31 @@ describe("buildTurnCommitEntry - shape + digest", () => {
       buildCommitted({
         capture: CAPTURE_WITH_COMPANIONS,
         nextCommandFrontier: null,
-        nextSuccessorWait: { ...wait, allowedKinds: ["WAVE_ADVANCE", "TERMINAL_COMMIT"] },
+        nextSuccessorWait: { ...wait, allowedKinds: ["WAVE_ADVANCE"] },
+      }),
+    ).toThrow("not bound to the resolved turn");
+    expect(() =>
+      buildCommitted({
+        capture: CAPTURE_WITH_COMPANIONS,
+        nextCommandFrontier: null,
+        nextSuccessorWait: { ...wait, allowedControlAddresses: [] },
+      }),
+    ).toThrow("not bound to the resolved turn");
+    expect(() =>
+      buildCommitted({
+        capture: CAPTURE_WITH_COMPANIONS,
+        nextCommandFrontier: null,
+        nextSuccessorWait: {
+          ...wait,
+          allowedControlAddresses: [{ ...wait.allowedControlAddresses[0], turn: 7 }],
+        },
+      }),
+    ).toThrow("not bound to the resolved turn");
+    expect(() =>
+      buildCommitted({
+        capture: CAPTURE_WITH_COMPANIONS,
+        nextCommandFrontier: null,
+        nextSuccessorWait: { ...wait, allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] },
       }),
     ).toThrow("not bound to the resolved turn");
   });

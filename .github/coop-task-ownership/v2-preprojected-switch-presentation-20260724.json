@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "355a3ddc982222609e0347810513a9841feee34e",
+  "baseSha": "6a32f02982fa6fd3a0b828a3210ebd30f9a178b2",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     ".github/workflows/coop-public-ui-journey.yml",
@@ -68,6 +68,7 @@
     "test/node/authority-v2-log.test.ts",
     "test/node/authority-v2-recovery.test.ts",
     "test/node/authority-v2-shadow.test.ts",
+    "test/node/authority-v2-turn.test.ts",
     "test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts",
     "test/tests/elite-redux/coop/coop-battle-checksum-engine.test.ts",
     "test/tests/elite-redux/coop/coop-battle-control.test.ts",
