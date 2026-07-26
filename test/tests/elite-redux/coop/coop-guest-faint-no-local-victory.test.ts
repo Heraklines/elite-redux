@@ -251,6 +251,11 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     const shiftsAfterSuccessorStart = rec.shiftPhaseCalls;
     phase.end();
     expect(rec.shiftPhaseCalls).toBe(shiftsAfterSuccessorStart);
+
+    const ordinaryDiscard = new CoopInertPhase("MovePhase");
+    ordinaryDiscard.retire();
+    ordinaryDiscard.end();
+    expect(rec.shiftPhaseCalls).toBe(shiftsAfterSuccessorStart);
   });
 
   it("CoopFinalizeTurnPhase.finishTurn(): solo / host / lockstep keeps queueTurnEndPhases (byte-identical)", () => {

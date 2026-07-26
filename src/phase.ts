@@ -2,6 +2,9 @@ import { globalScene } from "#app/global-scene";
 import type { PhaseMap, PhaseString } from "#types/phase-types";
 
 export abstract class Phase {
+  /** A destructively replaced phase may still receive detached async callbacks, but may never shift again. */
+  private retired = false;
+
   /** Start the current phase. */
   public start(): void {}
 
@@ -13,10 +16,15 @@ export abstract class Phase {
    * simply dropping the object leaks any machine waits or detached continuations it owns. Stateful phases
    * override this hook to cancel those resources; ordinary phases have nothing to retire.
    */
-  public retire(): void {}
+  public retire(): void {
+    this.retired = true;
+  }
 
   /** End the current phase and start a new one. */
   public end(): void {
+    if (this.retired) {
+      return;
+    }
     globalScene.phaseManager.shiftPhase();
   }
 
