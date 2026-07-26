@@ -5685,8 +5685,8 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
  * supplies the live scene/controller state. The lease is structural: the sole host engine may drain any
  * action-only MESSAGE while the Mystery transaction is live and pre-battle. It deliberately does not depend
  * on the selector phase still being current, because encounter effects commonly queue an ordinary
- * `MessagePhase` after `MysteryEncounterPhase` has ended. Choice surfaces use non-MESSAGE modes and cannot
- * satisfy this predicate; the guest renderer can never receive the host-only lease.
+ * `MessagePhase` after `MysteryEncounterPhase` has ended (public campaign 30217040544). Choice surfaces use
+ * non-MESSAGE modes and cannot satisfy this predicate; the guest renderer can never receive the host-only lease.
  */
 export function coopHostEngineDialogueMessageAdvanceAllowed(ctx: {
   localRole: CoopRole;
