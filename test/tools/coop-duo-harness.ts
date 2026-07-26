@@ -2696,6 +2696,56 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
   pinClock(rig.hostScene, rig.hostCtx);
   pinClock(rig.guestScene, rig.guestCtx);
 
+  // A real browser has one globalScene and one phase tree for its entire JavaScript realm. The duo harness
+  // deliberately hosts two of those realms in one process, so a Promise continuation can resume after the
+  // ambient test window has switched to the peer. Pin every phase's public completion edge to the scene that
+  // started it: otherwise ordinary production code such as DamageAnimPhase's updateInfo().then(() => end())
+  // can shift the peer queue and leave its actual owner parked forever. This belongs at the phase-start
+  // boundary rather than in an allowlist of known async phases; new screens/animations then inherit the same
+  // independent-browser invariant automatically.
+  const pinPhaseCompletion = (scene: BattleScene, ctx: ClientCtx): void => {
+    type PhaseManagerCompletionSeam = {
+      prepareCurrentPhaseForStart: () => void;
+      getCurrentPhase: () => Phase;
+    };
+    const manager = scene.phaseManager as unknown as PhaseManagerCompletionSeam;
+    const originalPrepare = manager.prepareCurrentPhaseForStart;
+    const completions = new Map<Phase, { original: Phase["end"]; pinned: Phase["end"] }>();
+    const ownsPhaseRealm = (): boolean =>
+      activeClientCtx === ctx && globalScene === ctx.scene && getCoopRuntime() === ctx.runtime;
+    manager.prepareCurrentPhaseForStart = (): void => {
+      originalPrepare.call(scene.phaseManager);
+      const phase = manager.getCurrentPhase();
+      if (completions.has(phase)) {
+        return;
+      }
+      const original = phase.end;
+      const pinned = (): void => {
+        if (disposed) {
+          return;
+        }
+        if (ownsPhaseRealm()) {
+          original.call(phase);
+          return;
+        }
+        withClientSync(ctx, () => original.call(phase));
+      };
+      completions.set(phase, { original, pinned });
+      phase.end = pinned;
+    };
+    disposers.push(() => {
+      manager.prepareCurrentPhaseForStart = originalPrepare;
+      for (const [phase, completion] of completions) {
+        if (phase.end === completion.pinned) {
+          phase.end = completion.original;
+        }
+      }
+      completions.clear();
+    });
+  };
+  pinPhaseCompletion(rig.hostScene, rig.hostCtx);
+  pinPhaseCompletion(rig.guestScene, rig.guestCtx);
+
   // Phaser callbacks are browser-event-loop callbacks too. The headless GameWrapper executes most tween
   // completions synchronously, while a few scene/test variants defer them; either timing is allowed to land
   // during a nested peer pump. Re-enter the scheduling scene for every mechanical tween callback so guards

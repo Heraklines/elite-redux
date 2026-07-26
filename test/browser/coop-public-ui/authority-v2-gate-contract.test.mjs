@@ -2565,6 +2565,16 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     pins,
+    /const pinPhaseCompletion = \(scene: BattleScene, ctx: ClientCtx\): void => \{[\s\S]+manager\.prepareCurrentPhaseForStart = \(\): void => \{[\s\S]+const phase = manager\.getCurrentPhase\(\);[\s\S]+const original = phase\.end;[\s\S]+withClientSync\(ctx, \(\) => original\.call\(phase\)\);/u,
+    "an async phase completion must shift the phase tree belonging to the browser that started it",
+  );
+  assert.match(
+    pins,
+    /pinPhaseCompletion\(rig\.hostScene, rig\.hostCtx\);\s*pinPhaseCompletion\(rig\.guestScene, rig\.guestCtx\);/u,
+    "both simulated browser phase trees own their Promise-delayed completion edges",
+  );
+  assert.match(
+    pins,
     /const ownsHostInterceptorRealm = \(\): boolean =>\s*activeClientCtx === rig\.hostCtx\s*&& globalScene === rig\.hostScene\s*&& getCoopRuntime\(\) === rig\.hostRuntime;[\s\S]+if \(ownsHostInterceptorRealm\(\)\) \{\s*return originalRun\(phase\);/u,
     "a repeated host label cannot run an authority phase while the guest scene/runtime is installed",
   );
