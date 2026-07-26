@@ -482,6 +482,7 @@ export class PhaseManager {
     this.dynamicQueueManager.clearQueues();
     if (this.standbyPhase != null) {
       this.settleCoopMutationPhase(this.standbyPhase);
+      this.standbyPhase.retire();
     }
     this.standbyPhase = null;
   }
@@ -544,6 +545,7 @@ export class PhaseManager {
       return false;
     }
     this.settleCoopMutationPhase(this.currentPhase);
+    this.currentPhase.retire();
     this.clearAllPhases();
     this.currentPhase = phase;
     this.startCurrentPhase();
@@ -566,6 +568,7 @@ export class PhaseManager {
       return false;
     }
     this.settleCoopMutationPhase(predecessor);
+    predecessor.retire();
     this.clearAllPhases();
     this.currentPhase = successor;
     this.startCurrentPhase();

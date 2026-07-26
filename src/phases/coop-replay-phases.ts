@@ -2294,7 +2294,10 @@ export class CoopFinalizeTurnPhase extends Phase {
     this.finishTurn();
   }
 
-  public override end(): void {
+  public override retire(): void {
+    if (this.ended) {
+      return;
+    }
     this.ended = true;
     this.awaitingAuthoritySuccessor = false;
     this.authoritySuccessorReady = null;
@@ -2305,6 +2308,10 @@ export class CoopFinalizeTurnPhase extends Phase {
     this.authorityFailureUnsubscribe = null;
     this.presentationDeadlineCancel?.();
     this.presentationDeadlineCancel = null;
+  }
+
+  public override end(): void {
+    this.retire();
     super.end();
   }
 

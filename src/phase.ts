@@ -5,6 +5,16 @@ export abstract class Phase {
   /** Start the current phase. */
   public start(): void {}
 
+  /**
+   * Retire this phase without advancing the scheduler.
+   *
+   * Authoritative co-op and recovery can destructively replace a locally inferred phase tree. Calling
+   * {@linkcode end} in that situation would let the discarded phase choose another local successor, but
+   * simply dropping the object leaks any machine waits or detached continuations it owns. Stateful phases
+   * override this hook to cancel those resources; ordinary phases have nothing to retire.
+   */
+  public retire(): void {}
+
   /** End the current phase and start a new one. */
   public end(): void {
     globalScene.phaseManager.shiftPhase();

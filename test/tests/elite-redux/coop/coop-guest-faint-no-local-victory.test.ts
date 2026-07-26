@@ -30,8 +30,12 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
+import type { Phase } from "#app/phase";
+import { PhaseManager } from "#app/phase-manager";
 import { clearCoopRuntime, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopMachineWaits, coopMachineWaitLabels } from "#data/elite-redux/coop/coop-stall-probe";
 import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
+import { CoopInertPhase } from "#phases/coop-inert-phase";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -135,6 +139,7 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
   });
 
   afterEach(() => {
+    clearCoopMachineWaits();
     // Tear down any session so the next test (and the rest of the suite) starts solo / off-session.
     clearCoopRuntime();
     // Citizenship (#710): this engine-free file replaces globalScene with a reset-less stub. Restore
@@ -196,6 +201,49 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     expect(rec.turn).toBe(2);
     expect(rec.clearLastTurnOrderCalls).toBe(1);
     expect(rec.queueTurnEndCalls).toBe(0);
+  });
+
+  it("destructive Authority V2 projection retires a parked turn's machine wait without deriving progression", () => {
+    startAuthoritativeGuestSession();
+    const wait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "TURN/e1/w5/t1",
+      epoch: 1,
+      wave: 5,
+      turn: 1,
+      allowedKinds: ["INTERACTION_COMMIT" as const],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    const phase = new CoopFinalizeTurnPhase(
+      1,
+      {} as CoopBattleCheckpoint,
+      "checksum",
+      undefined,
+      undefined,
+      undefined,
+      1,
+      5,
+      16,
+      wait,
+      7,
+    );
+    callPrivate(phase, "finishTurn");
+    expect(coopMachineWaitLabels()).toEqual([expect.stringContaining("authority-v2-successor:w5:t1:r16")]);
+
+    // Reward/market/Mystery opens replace the finalizer without calling end(): end() would let the old turn
+    // derive another local phase. The scheduler must nevertheless retire its wait before starting the exact
+    // committed successor, or the stall watchdog will cancel that healthy interaction about 20 seconds later.
+    const phaseManager = new PhaseManager();
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = phase;
+    const successor = new CoopInertPhase("MovePhase");
+    expect(phaseManager.replaceWithCoopAuthoritativePhase(phase, successor)).toBe(true);
+    expect(phaseManager.getCurrentPhase()).toBe(successor);
+    expect(coopMachineWaitLabels()).toEqual([]);
+
+    // Retirement is idempotent: late detached completion cannot resurrect or re-clean the discarded turn.
+    phase.retire();
+    expect(coopMachineWaitLabels()).toEqual([]);
   });
 
   it("CoopFinalizeTurnPhase.finishTurn(): solo / host / lockstep keeps queueTurnEndPhases (byte-identical)", () => {
