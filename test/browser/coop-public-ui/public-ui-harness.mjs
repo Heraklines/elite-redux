@@ -14,7 +14,7 @@ import {
   selectOptionById,
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
-import { delay, EvidenceSink, waitForPublicInputFrames } from "./evidence.mjs";
+import { delay, EvidenceSink, waitForPublicInputFrame } from "./evidence.mjs";
 import {
   isAcceptedRendererPresentationReceipt,
   latestMoveAnimationsAttestation,
@@ -1404,19 +1404,21 @@ export class PublicUiClient {
       }
       this.evidence.record("key", { key, purpose });
       const echoCursor = this.evidence.cursor();
-      // Keep the real DOM key down across two browser frames. A fixed 100 ms Playwright tap can begin and end
-      // between Phaser updates on a CPU-dilated two-browser runner: the raw DOM counter advances, but the game
-      // handler never observes an isDown/JustDown state. Frame-bounded holding is human-equivalent, remains
-      // keyboard-only, and does not inspect or mutate private game state.
-      let crossedInputFrames = false;
+      const domKeysBefore = Math.max(
+        Number(this.evidence.findLastInputHealth()?.observation?.domKeys ?? 0),
+        Number(this.evidence.findLastInputEcho()?.observation?.domKeys ?? 0),
+      );
+      // Keep the real DOM key down until the read-only observer proves that Phaser itself updated while the
+      // key was held. Chromium compositor frames are not sufficient on a CPU-dilated runner: they can advance
+      // many times between game updates. Mutation remains exclusively Playwright's public keyboard path.
       await this.page.keyboard.down(key);
       try {
-        crossedInputFrames = await waitForPublicInputFrames(this.page);
+        await waitForPublicInputFrame(this.evidence, {
+          from: echoCursor,
+          domKeysBefore,
+        });
       } finally {
         await this.page.keyboard.up(key);
-      }
-      if (!crossedInputFrames) {
-        throw new Error(`${this.label}: focused public key target did not render two frames for ${purpose}`);
       }
       // Optimization brief R1c: per-input acknowledgment. Wait for the game's OWN
       // input-echo (uiMode/cursor/phase change observed AFTER this press) instead of a

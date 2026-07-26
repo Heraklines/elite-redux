@@ -1649,20 +1649,31 @@ let inputEchoSeq = 0;
 // window), and the Phaser loop frame counter proves whether the game loop is stepping.
 let domKeydownCount = 0;
 let lastDomKey = "";
+const heldDomKeys = new Set<string>();
 if (typeof window !== "undefined") {
   window.addEventListener(
     "keydown",
     event => {
       domKeydownCount += 1;
       lastDomKey = event.key;
+      heldDomKeys.add(event.code || event.key);
     },
     { capture: true, passive: true },
   );
+  window.addEventListener(
+    "keyup",
+    event => {
+      heldDomKeys.delete(event.code || event.key);
+    },
+    { capture: true, passive: true },
+  );
+  window.addEventListener("blur", () => heldDomKeys.clear(), { capture: true, passive: true });
 }
 
 function inputLayerSnapshot() {
   return {
     domKeys: domKeydownCount,
+    downKeys: heldDomKeys.size,
     lastKey: lastDomKey,
     frame: globalScene?.game?.loop?.frame ?? -1,
     vis: typeof document === "undefined" ? "?" : document.visibilityState,
@@ -1701,29 +1712,34 @@ setInterval(() => {
   }
 }, 25);
 
-// Input-health heartbeat: at most one line per second, and ONLY while raw DOM keydowns are
-// arriving. During a healthy walk every key also produces an input-echo; during a dead-key
-// window this line alone classifies the failure: domKeys advancing + frame frozen = Phaser
-// loop stalled (RAF/visibility); domKeys advancing + frame advancing = game-side input drop;
-// domKeys NOT advancing while the harness logs key events = CDP/dispatch-layer loss.
+// Input-health heartbeat: idle pages stay silent, while a held public key emits once on raw DOM
+// arrival and once per actual Phaser update. This makes the observer a read-only clock for the
+// keyboard driver: compositor requestAnimationFrame can run at 60 FPS while a CPU-dilated Phaser
+// loop runs at 3 FPS, so only the game loop's own frame counter proves that a key was down during
+// an update. During a dead-key window the same evidence classifies the failed layer.
 let lastHealthDomKeys = 0;
 let lastHealthFrame = -1;
+let lastHealthDownKeys = 0;
 let inputHealthSeq = 0;
 setInterval(() => {
   try {
     const snapshot = inputLayerSnapshot();
     const frameAdvancing = snapshot.frame !== lastHealthFrame;
+    const domKeysChanged = snapshot.domKeys !== lastHealthDomKeys;
+    const heldFrameAdvanced = snapshot.downKeys > 0 && frameAdvancing;
+    const holdStateChanged = snapshot.downKeys !== lastHealthDownKeys;
     lastHealthFrame = snapshot.frame;
-    if (snapshot.domKeys === lastHealthDomKeys) {
+    if (!domKeysChanged && !heldFrameAdvanced && !holdStateChanged) {
       return;
     }
     lastHealthDomKeys = snapshot.domKeys;
+    lastHealthDownKeys = snapshot.downKeys;
     inputHealthSeq += 1;
     console.info(`[coop-browser:input-health] ${JSON.stringify({ seq: inputHealthSeq, ...snapshot, frameAdvancing })}`);
   } catch {
     /* diagnostics only - never fail the observer */
   }
-}, 1000);
+}, 25);
 
 // Strictly read-only observer bridge. `ready` is a non-mutating probe; the former
 // `connect: connectCoopWithCode` seam was removed so no code path can drive pairing from

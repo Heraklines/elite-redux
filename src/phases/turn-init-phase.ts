@@ -53,15 +53,20 @@ export class TurnInitPhase extends FieldPhase {
     const currentTurn = battle.turn;
     const currentWave = battle.waveIndex;
     const pending = streamer.peekCheckpointForTurn(currentTurn, currentWave);
-    const hasBufferedReplacement =
-      pending?.reason === "replacement"
-        ? pending.epoch === controller.sessionEpoch
-          && pending.wave === currentWave
-          && pending.authoritativeState?.wave === currentWave
-          && (pending.turn === currentTurn || pending.turn === currentTurn + 1)
-        : false;
-    if (hasBufferedReplacement) {
-      return currentTurn;
+    if (pending?.reason === "replacement") {
+      let hasBufferedReplacement = true;
+      if (pending.epoch !== controller.sessionEpoch) {
+        hasBufferedReplacement = false;
+      }
+      if (pending.wave !== currentWave || pending.authoritativeState?.wave !== currentWave) {
+        hasBufferedReplacement = false;
+      }
+      if (pending.turn !== currentTurn && pending.turn !== currentTurn + 1) {
+        hasBufferedReplacement = false;
+      }
+      if (hasBufferedReplacement) {
+        return currentTurn;
+      }
     }
     // Failure-first B9 (run 30212674952): after an own-faint pick, the TURN_COMMIT's typed REPLACEMENT
     // control is already installed while the separately retained REPLACEMENT_COMMIT is deliberately lost.

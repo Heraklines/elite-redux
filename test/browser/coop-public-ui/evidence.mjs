@@ -43,31 +43,46 @@ function registerEmergencyFlushSink(sink) {
 export const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
 
 /**
- * Wait for two real browser animation frames without reading or mutating game state.
+ * Wait until the read-only browser observer proves that a public key remained down across an
+ * actual Phaser update.
  *
- * Public keyboard input must stay down long enough for Phaser's DOM keyboard plugin and its next update to
- * overlap. A fixed 100 ms tap is shorter than one frame on a heavily CPU-dilated two-Chromium runner and can
- * therefore be visible to the DOM listener yet never reach the game handler. Two browser frames preserve the
- * same human key path at both 60 FPS and 3 FPS; the wall timeout fails loudly if the focused page is not
- * rendering at all.
+ * Compositor requestAnimationFrame is not a valid proxy: Chromium may composite at 60 FPS while a CPU-dilated
+ * Phaser loop advances at 3 FPS. The observer emits an input-health sample on raw DOM arrival, then another
+ * whenever Phaser's own frame counter advances while the key is still held. The driver remains keyboard-only;
+ * this function consumes console evidence and never reads or mutates game state through the page.
  */
-export async function waitForPublicInputFrames(page, timeoutMs = 5_000) {
-  return page.evaluate(
-    timeout =>
-      new Promise(resolveFrames => {
-        let settled = false;
-        const finish = value => {
-          if (settled) {
-            return;
-          }
-          settled = true;
-          clearTimeout(timer);
-          resolveFrames(value);
-        };
-        const timer = setTimeout(() => finish(false), timeout);
-        requestAnimationFrame(() => requestAnimationFrame(() => finish(true)));
-      }),
-    timeoutMs,
+export async function waitForPublicInputFrame(evidence, { from, domKeysBefore, timeoutMs = 5_000 }) {
+  let scanned = Math.max(0, from);
+  let firstHeldFrame = null;
+  return evidence.waitForCondition(
+    sink => {
+      for (; scanned < sink.events.length; scanned += 1) {
+        const event = sink.events[scanned];
+        const observation = event?.kind === "browser-input-health" ? event.observation : null;
+        if (
+          observation == null
+          || !Number.isFinite(observation.domKeys)
+          || observation.domKeys <= domKeysBefore
+          || !Number.isFinite(observation.downKeys)
+          || !Number.isFinite(observation.frame)
+        ) {
+          continue;
+        }
+        if (observation.downKeys <= 0) {
+          firstHeldFrame = null;
+          continue;
+        }
+        if (firstHeldFrame == null) {
+          firstHeldFrame = observation.frame;
+          continue;
+        }
+        if (observation.frame > firstHeldFrame) {
+          return event;
+        }
+      }
+      return;
+    },
+    { timeoutMs, description: "held public key to cross an actual Phaser update" },
   );
 }
 
@@ -1305,7 +1320,7 @@ export class EvidenceSink {
       .find(event => event.kind === "browser-render-profile");
   }
 
-  /** Latest input-layer heartbeat (DOM keydown count / Phaser frame / visibility / focus). */
+  /** Latest input-layer heartbeat (DOM keydown/held counts, Phaser frame, visibility, and focus). */
   findLastInputHealth(from = 0) {
     return this.events
       .slice(from)

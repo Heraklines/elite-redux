@@ -4381,3 +4381,27 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Exact-SHA public campaign `30212900164` and Journey `30212894219` on `92cbd7b0` completed red after the frame-held
   keyboard change. Their artifacts still need separate triage before any release verdict; no local browser run was
   used and no staging/production deployment occurred.
+
+## 2026-07-26 - Public key holds are synchronized to Phaser, not Chromium's compositor
+
+- The `92cbd7b0` campaign artifacts resolve the remaining title navigation failure precisely. Every ArrowUp reached
+  the capture-phase DOM listener, the page stayed visible and focused, and Chromium rendered many compositor frames,
+  yet the semantic title selection remained on New Game. The prior nested `requestAnimationFrame` fix used the wrong
+  clock: Chromium may composite at roughly 60 FPS while the CPU-dilated Phaser loop advances at roughly 3 FPS, so a
+  down/two-rAF/up sequence can still fit entirely between game updates.
+- The read-only browser observer now tracks the raw keys that are currently held and emits input-health evidence on
+  DOM arrival and on each actual Phaser frame advance while a key remains down. `PublicUiClient.press()` holds the
+  same public Playwright keyboard input until two observer samples prove that a later Phaser update overlapped the
+  continuous hold. It never evaluates, inspects, or mutates private game state; idle pages remain telemetry-silent.
+- The behavior contract deliberately inserts a key-up gap and proves it cannot satisfy the wait. The source contract
+  rejects compositor `requestAnimationFrame` pacing and pins the observer/evidence/keyboard chain. This repairs the
+  harness primitive shared by solo setup, both co-op seats, Mystery, market, rewards, and battle commands rather than
+  special-casing the title menu.
+- Journey `30213355412` on `ecfb5812` never launched Chromium because the fast V2 preflight required the retained
+  replacement probe to spell out its stale epoch/wave/turn rejection. The B9 product fix used an equivalent positive
+  predicate, so the test failed on source shape rather than behavior. The probe is again written as explicit
+  fail-closed guards without changing its result, restoring that release contract for the next exact-SHA run.
+- Permitted local evidence: 76/76 Authority V2/browser contracts, 17/17 presentation-authority contracts, both public
+  driver boundary checks, targeted Biome, and `git diff --check` pass. The repository-wide TypeScript baseline remains
+  red on inherited files, with no diagnostic in this batch's changed files. Real Chromium and B9 engine qualification
+  remain GitHub-hosted under `AGENTS.md`; no local co-op Vitest/browser run or deployment occurred.
