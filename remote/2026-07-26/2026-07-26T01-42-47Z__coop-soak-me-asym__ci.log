@@ -1,0 +1,62 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: fixed
+run_mode: diagnostic
+calibration_id: me-host-guest-asym-double-faint
+target_sha: f4bb59d5d87b2104ff57f1835b1832ac29cc9756
+checked_out_sha: f4bb59d5d87b2104ff57f1835b1832ac29cc9756
+base_seed: 20260726
+campaign_seed: fixed-in-test (matrix candidate 20260726 not consumed)
+run: 30183221756 (workflow source f4bb59d5d87b2104ff57f1835b1832ac29cc9756)
+timestamp: 2026-07-26T01-42-47Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 5 (seed 828633): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "NextEncounterPhase", UI mode MESSAGE (=0), interceptor state "running".
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 5 (seed 828633): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "NextEncounterPhase", UI mode MESSAGE (=0), interceptor state "running".
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 5 (seed 828633): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "NextEncounterPhase", UI mode MESSAGE (=0), interceptor state "running".
+
+----- vitest result tail -----
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m105:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:166:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 5 (seed 828633): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "NextEncounterPhase", UI mode MESSAGE (=0), interceptor state "running".
+Original: Timed out in waitUntil!. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-26T01-42-16-845Z__seed-828633__wave-5. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1700:11[22m[39m
+    [90m1698|[39m       phaseState: phaseStateDump(rig),
+    [90m1699|[39m     });
+    [90m1700|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1701|[39m   };
+    [90m1702|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4980:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m184:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:224:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 5 (seed 828633): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "NextEncounterPhase", UI mode MESSAGE (=0), interceptor state "running".
+Original: Timed out in waitUntil!. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-26T01-42-47-185Z__seed-828633__wave-5. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1700:11[22m[39m
+    [90m1698|[39m       phaseState: phaseStateDump(rig),
+    [90m1699|[39m     });
+    [90m1700|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1701|[39m   };
+    [90m1702|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4980:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m242:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 01:40:42
+[2m   Duration [22m 125.05s[2m (transform 60.02s, setup 83.48s, import 1.01s, tests 115.72s, environment 3.12s)[22m
+
