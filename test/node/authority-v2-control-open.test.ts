@@ -11,6 +11,7 @@ import {
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
   type CoopReplacementOpenMaterialV2,
+  classifyReplacementOpenCursor,
   commandOpenControlAddressesClaim,
   commandOpenMaterialDigest,
   decodeCommandOpenEntry,
@@ -592,5 +593,21 @@ describe("authority-v2 explicit command-open boundary", () => {
         material({ authoritativeState: state({ turn: 2 }), turn: 2 }),
       ),
     ).toBe(false);
+  });
+});
+
+describe("replacement-open cursor ownership", () => {
+  it("advances only the exact same-wave TurnEnd edge and otherwise requires the signed destination shell", () => {
+    const settled = { origin: "settled-wave" as const, wave: 4, turn: 2 };
+    expect(classifyReplacementOpenCursor(settled, 4, 1)).toBe("advance-one");
+    expect(classifyReplacementOpenCursor(settled, 4, 2)).toBe("ready");
+    expect(classifyReplacementOpenCursor(settled, 4, 3)).toBe("invalid");
+    expect(classifyReplacementOpenCursor(settled, 3, 1)).toBe("invalid");
+
+    const preEncounter = { origin: "pre-encounter" as const, wave: 5, turn: 1 };
+    expect(classifyReplacementOpenCursor(preEncounter, 4, 2)).toBe("await-destination");
+    expect(classifyReplacementOpenCursor(preEncounter, 5, 1)).toBe("ready");
+    expect(classifyReplacementOpenCursor(preEncounter, 5, 2)).toBe("invalid");
+    expect(classifyReplacementOpenCursor(preEncounter, 3, 2)).toBe("invalid");
   });
 });

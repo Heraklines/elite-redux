@@ -159,6 +159,7 @@ import {
   relayGuestMeOptionIndexOnly,
   remirrorWave,
   type ShopPhaseSeam,
+  settleDuoPromise,
   startGuestMeOutcomeRace,
   startGuestMeReplay,
   startGuestMeShopOwner,
@@ -1050,8 +1051,8 @@ const hostAutoPickDrivenPhases = new WeakSet<object>();
  * mid-hold: `processInput` itself runs SYNCHRONOUSLY (before the first await), so the pick + its UI mode
  * change land before this callback returns; only the close's continuation is deferred.
  */
-function driveHostFaintPickUnderHostCtx(rig: DuoRig, benchSlot: number): void {
-  void withClient(rig.hostCtx, async () => {
+function driveHostFaintPickUnderHostCtx(rig: DuoRig, benchSlot: number): Promise<void> {
+  return withClient(rig.hostCtx, async () => {
     const handler = rig.hostScene.ui.getHandler() as PartyUiHandler;
     handler.setCursor(benchSlot);
     handler.processInput(Button.ACTION); // select the bench mon
@@ -1105,7 +1106,7 @@ export function registerHostFaintAutoPick(game: GameManager, rig: DuoRig): void 
         if (phase != null) {
           hostAutoPickDrivenPhases.add(phase);
         }
-        driveHostFaintPickUnderHostCtx(rig, benchSlot);
+        void driveHostFaintPickUnderHostCtx(rig, benchSlot);
       }
       // 🔴 #847 DOUBLE / INTERLEAVED FAINT: one turn can KO BOTH field slots, opening TWO replacement
       // SwitchPhases in a single crossing - the GUEST-owned one (watcher/relay) and this HOST-owned one -
@@ -2190,6 +2191,111 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           + `guest=${rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"})`,
       );
     };
+    const drivenGuestReplacementPhases = new WeakSet<object>();
+    /**
+     * Drive only a replacement picker that the real Authority V2 entry has already projected. The host
+     * interceptor can be waiting in SwitchPhase while the shared-process fixture has destination delivery
+     * enabled; without this reciprocal browser step, the guest's replacement-open frame remains queued and
+     * the test manufactures a timeout that two independent event loops cannot produce.
+     */
+    const driveProjectedReplacementPublicInput = async (): Promise<void> => {
+      const hostPhase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as {
+        readonly phaseName?: string;
+        readonly fieldIndex?: number;
+      };
+      if (hostPhase?.phaseName !== "SwitchPhase" || typeof hostPhase.fieldIndex !== "number") {
+        return;
+      }
+      const fieldIndex = hostPhase.fieldIndex;
+      const occupant = rig.hostScene.getPlayerField()[fieldIndex];
+      const owner =
+        occupant?.coopOwner === "host" || occupant?.coopOwner === "guest"
+          ? occupant.coopOwner
+          : coopOwnerForPartySlot(fieldIndex);
+
+      if (owner === "host") {
+        const phaseIdentity = hostPhase as object;
+        const benchSlot = firstLegalBenchSlot(rig.hostScene, "host");
+        if (
+          benchSlot >= 0
+          && !hostAutoPickDrivenPhases.has(phaseIdentity)
+          && withClientSync(rig.hostCtx, () => rig.hostScene.ui.getMode()) === UiMode.PARTY
+        ) {
+          hostAutoPickDrivenPhases.add(phaseIdentity);
+          await driveHostFaintPickUnderHostCtx(rig, benchSlot);
+          actionScript.push(
+            `wave ${transitionSourceWave}: host drove retained replacement party[${benchSlot}] through public PARTY UI`,
+          );
+        }
+        return;
+      }
+
+      const hostControlOperationId =
+        typeof (hostPhase as { coopV2ControlOperationId?: unknown }).coopV2ControlOperationId === "string"
+          ? (hostPhase as { coopV2ControlOperationId: string }).coopV2ControlOperationId
+          : null;
+      const currentGuest = rig.guestScene.phaseManager.getCurrentPhase() as unknown as {
+        readonly phaseName?: string;
+        readonly coopV2ControlOperationId?: string | null;
+        start(): void;
+      };
+      if (
+        currentGuest?.phaseName === "CoopGuestFaintSwitchPhase"
+        && (hostControlOperationId == null || currentGuest.coopV2ControlOperationId === hostControlOperationId)
+        && drivenGuestReplacementPhases.has(currentGuest as object)
+      ) {
+        return;
+      }
+      const guestReplacement = (await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "projected retained replacement", {
+          matches: phase => {
+            if (phase.phaseName !== "CoopGuestFaintSwitchPhase") {
+              return false;
+            }
+            const operationId = (phase as unknown as { coopV2ControlOperationId?: string | null })
+              .coopV2ControlOperationId;
+            return hostControlOperationId == null || operationId === hostControlOperationId;
+          },
+          perPhaseTimeoutMs: 5_000,
+        }),
+      )) as unknown as {
+        readonly phaseName: string;
+        start(): void;
+      };
+      if (drivenGuestReplacementPhases.has(guestReplacement as object)) {
+        return;
+      }
+      drivenGuestReplacementPhases.add(guestReplacement as object);
+      await withClient(rig.guestCtx, async () => {
+        guestReplacement.start();
+        await drainLoopback();
+      });
+      const guestSurface = await waitForPublicModeOrPhaseExit(
+        rig.guestCtx,
+        guestReplacement,
+        UiMode.PARTY,
+        `guest retained replacement field ${fieldIndex}`,
+      );
+      if (guestSurface === "ended") {
+        return;
+      }
+      const benchSlot = firstLegalBenchSlot(rig.guestScene, "guest");
+      if (benchSlot < 0) {
+        fail("no-park", transitionSourceWave, "guest replacement opened PARTY without a legal same-owner bench");
+      }
+      await withClient(rig.guestCtx, async () => {
+        const handler = rig.guestScene.ui.getHandler() as PartyUiHandler;
+        handler.setCursor(benchSlot);
+        handler.processInput(Button.ACTION);
+        handler.processInput(Button.ACTION);
+        for (let i = 0; i < 6; i++) {
+          await Promise.resolve();
+        }
+      });
+      actionScript.push(
+        `wave ${transitionSourceWave}: guest drove retained replacement party[${benchSlot}] through public PARTY UI`,
+      );
+    };
     // A real co-op pair owns one JS realm per client. Queue every frame for its destination while crossing
     // this multi-surface boundary so a retained biome apply, its promise continuation and the reciprocal
     // command arrival can never run under the partner's ambient scene/runtime in this two-engine fixture.
@@ -2230,20 +2336,37 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
               }
               return "CommandPhase" as const;
             })
-          : await withClient(rig.hostCtx, async () => {
-              // A reward continuation can be created DURING this crossing (ModifierRewardPhase applies the item),
-              // so inspecting the queue before advancing is too early. Stop at either structural branch, then arm
-              // Dex Nav only after it actually exists. This also guarantees no Dex Nav prompt can leak into an
-              // ordinary CommandPhase crossing.
-              return game.phaseInterceptor.toFirst([
-                "CommandPhase",
-                "ErDexNavPhase",
-                "ScanIvsPhase",
-                "TheBargainPhase",
-                "ErCrossroadsPhase",
-                "SelectBiomePhase",
-              ] as const);
-            });
+          : await (async () => {
+              type HostBoundary =
+                | "CommandPhase"
+                | "ErDexNavPhase"
+                | "ScanIvsPhase"
+                | "TheBargainPhase"
+                | "ErCrossroadsPhase"
+                | "SelectBiomePhase";
+              let crossing: Promise<HostBoundary> | null = null;
+              await withClient(rig.hostCtx, async () => {
+                // A reward continuation can be created DURING this crossing (ModifierRewardPhase applies the
+                // item), so inspecting the queue before advancing is too early. Start the real authority
+                // crossing, then settle it with both browser contexts alive: a retained winning-turn faint can
+                // legitimately open a replacement before any of these target surfaces.
+                crossing = game.phaseInterceptor.toFirst([
+                  "CommandPhase",
+                  "ErDexNavPhase",
+                  "ScanIvsPhase",
+                  "TheBargainPhase",
+                  "ErCrossroadsPhase",
+                  "SelectBiomePhase",
+                ] as const) as Promise<HostBoundary>;
+                await drainLoopback();
+              });
+              if (crossing == null) {
+                throw new Error("host structural crossing did not start");
+              }
+              return settleDuoPromise(rig, crossing, `wave ${wave} host structural crossing`, {
+                afterPump: driveProjectedReplacementPublicInput,
+              });
+            })();
         if (boundary === "ErDexNavPhase") {
           await withClient(rig.hostCtx, async () => {
             armHostDexNavAutoPicks();

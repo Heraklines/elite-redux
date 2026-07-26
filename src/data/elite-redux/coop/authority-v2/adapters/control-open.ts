@@ -99,6 +99,42 @@ export interface CoopReplacementOpenMaterialV2 {
   readonly control: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
 }
 
+/**
+ * The only cursor actions an authenticated replacement-open entry may authorize.
+ *
+ * Generic state application is deliberately cursor-neutral. A same-wave winning-turn picker is the
+ * ordered permission to reproduce exactly one TurnEnd increment after its complete material applies.
+ * A pre-encounter picker cannot manufacture the next Battle shell: it remains deferred until the signed
+ * destination flow has constructed that exact wave/turn. Every other coordinate fails closed.
+ */
+export type CoopReplacementOpenCursorAction = "ready" | "advance-one" | "await-destination" | "invalid";
+
+export function classifyReplacementOpenCursor(
+  material: Pick<CoopReplacementOpenMaterialV2, "origin" | "wave" | "turn">,
+  currentWave: number,
+  currentTurn: number,
+): CoopReplacementOpenCursorAction {
+  if (
+    !Number.isSafeInteger(material.wave)
+    || material.wave <= 0
+    || !Number.isSafeInteger(material.turn)
+    || material.turn <= 0
+    || !Number.isSafeInteger(currentWave)
+    || currentWave <= 0
+    || !Number.isSafeInteger(currentTurn)
+    || currentTurn <= 0
+  ) {
+    return "invalid";
+  }
+  if (currentWave === material.wave && currentTurn === material.turn) {
+    return "ready";
+  }
+  if (material.origin === "settled-wave") {
+    return currentWave === material.wave && currentTurn + 1 === material.turn ? "advance-one" : "invalid";
+  }
+  return currentWave + 1 === material.wave && material.turn === 1 ? "await-destination" : "invalid";
+}
+
 export type CoopControlOpenMaterialV2 =
   | CoopCommandOpenMaterialV2
   | CoopInteractionOpenMaterialV2

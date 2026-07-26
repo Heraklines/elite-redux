@@ -1241,6 +1241,28 @@ test("a won-wave faint reopens replacement only through one exact phase-owned CO
     /decodeReplacementOpenEntry[\s\S]*controlsEqual\(material\.control, entry\.nextControl\)/u,
     "replacement-open decoding binds complete material to the identical executable control",
   );
+  assert.match(
+    controlOpenAdapter,
+    /classifyReplacementOpenCursor[\s\S]*"advance-one"[\s\S]*"await-destination"/u,
+    "replacement-open owns one exact same-wave cursor edge but never manufactures a future Battle shell",
+  );
+
+  const controlApplyStart = coopRuntime.indexOf('if (entry.kind === "CONTROL_COMMIT")');
+  const controlApplyEnd = coopRuntime.indexOf(
+    'if (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT")',
+    controlApplyStart,
+  );
+  assert.notEqual(controlApplyStart, -1, "runtime exposes the CONTROL_COMMIT material branch");
+  assert.ok(controlApplyEnd > controlApplyStart, "CONTROL_COMMIT material branch has a bounded source block");
+  const controlApply = coopRuntime.slice(controlApplyStart, controlApplyEnd);
+  const applyState = controlApply.indexOf("applyCoopAuthoritativeBattleState(material.authoritativeState, true)");
+  const adoptCursor = controlApply.indexOf('replacementCursorAction === "advance-one"');
+  assert.ok(applyState >= 0 && adoptCursor > applyState, "complete DATA applies before its ordered cursor edge");
+  assert.doesNotMatch(
+    controlApply.slice(0, applyState),
+    /deferred replacement-open[\s\S]*until battle/u,
+    "same-wave DATA cannot wait for the turn that the same immutable entry authorizes",
+  );
 
   const establishStart = coopRuntime.indexOf("export function establishCoopV2ReplacementControlBoundary(");
   const establishEnd = coopRuntime.indexOf("\n/**\n * Gate an early replica faint picker", establishStart);
@@ -1254,6 +1276,11 @@ test("a won-wave faint reopens replacement only through one exact phase-owned CO
   assert.match(establish, /preEncounter && state\.enemyParty\.length > 0/u);
   assert.match(establish, /pendingHostWaveTransitions\.get\(state\.wave\)/u);
   assert.match(establish, /commitHostReplacementOpen/u);
+  assert.match(
+    coopRuntime,
+    /COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_BASE = 9_000[\s\S]*COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_SPAN = 1_000/u,
+    "winning-turn V2 choices remain encodable by the bounded faint-switch carrier",
+  );
 
   const replacementCommitStart = coopRuntime.indexOf("export function commitCoopV2ReplacementAuthority(");
   const replacementCommitEnd = coopRuntime.indexOf(

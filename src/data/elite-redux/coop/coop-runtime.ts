@@ -24,6 +24,7 @@ import {
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
   type CoopReplacementOpenMaterialV2,
+  classifyReplacementOpenCursor,
   commandOpenControlAddressesClaim,
   decodeControlOpenEntry,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
@@ -5923,17 +5924,30 @@ function buildCoopV2LiveSeams(
           if (receiverScene != null && receiverScene !== globalScene) {
             return "deferred";
           }
-          if (
-            material.kind === "replacement-open"
-            && (globalScene.currentBattle?.waveIndex !== material.wave
-              || globalScene.currentBattle?.turn !== material.turn)
-          ) {
+          const replacementCursorAction =
+            material.kind === "replacement-open" && globalScene.currentBattle != null
+              ? classifyReplacementOpenCursor(
+                  material,
+                  globalScene.currentBattle.waveIndex,
+                  globalScene.currentBattle.turn,
+                )
+              : null;
+          if (replacementCursorAction === "await-destination") {
             coopLog(
               "v2-control",
-              `deferred replacement-open rev=${entry.revision} until battle w${material.wave}/t${material.turn} `
-                + `(current=w${globalScene.currentBattle?.waveIndex ?? "none"}/t${globalScene.currentBattle?.turn ?? "none"})`,
+              `deferred pre-encounter replacement-open rev=${entry.revision} until destination `
+                + `w${material.wave}/t${material.turn} exists (current=w${globalScene.currentBattle?.waveIndex ?? "none"}`
+                + `/t${globalScene.currentBattle?.turn ?? "none"})`,
             );
             return "deferred";
+          }
+          if (material.kind === "replacement-open" && replacementCursorAction === "invalid") {
+            coopWarn(
+              "v2-control",
+              `replacement-open rev=${entry.revision} refused cursor w${globalScene.currentBattle?.waveIndex ?? "none"}`
+                + `/t${globalScene.currentBattle?.turn ?? "none"} for ${material.origin} w${material.wave}/t${material.turn}`,
+            );
+            return false;
           }
           if (material.kind === "command-open" && !hasCoopV2CommandOpenMaterialConsumer(runtime, entry)) {
             // The immutable entry remains admitted and is retried by the real address-exact CommandPhase
@@ -5962,6 +5976,32 @@ function buildCoopV2LiveSeams(
             || reapplyAcceptedCoopAuthoritativeBattleState(material.authoritativeState, true);
           if (!stateApplied) {
             return false;
+          }
+          if (material.kind === "replacement-open") {
+            // The CONTROL_COMMIT, not an ambient renderer phase, owns this cursor edge. Its complete state
+            // must apply first; only then may a same-wave winning-turn picker reproduce the one authenticated
+            // TurnEnd increment. Requiring mutable turn N+1 before applying the entry creates a circular wait.
+            if (replacementCursorAction === "advance-one") {
+              globalScene.currentBattle?.incrementTurn();
+              globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+              coopLog(
+                "v2-control",
+                `replacement-open rev=${entry.revision} adopted ordered turn cursor `
+                  + `w${material.wave}/t${material.turn - 1}->t${material.turn}`,
+              );
+            }
+            if (
+              globalScene.currentBattle?.waveIndex !== material.wave
+              || globalScene.currentBattle?.turn !== material.turn
+            ) {
+              coopWarn(
+                "v2-control",
+                `replacement-open rev=${entry.revision} failed to install cursor w${material.wave}/t${material.turn} `
+                  + `(current=w${globalScene.currentBattle?.waveIndex ?? "none"}`
+                  + `/t${globalScene.currentBattle?.turn ?? "none"})`,
+              );
+              return false;
+            }
           }
           if (!markCoopV2ControlMaterialApplied(runtime, entry)) {
             return false;
@@ -7429,7 +7469,11 @@ export type CoopV2ReplacementBoundaryResult =
   | { readonly kind: "deferred" }
   | { readonly kind: "failed" };
 
-const COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_BASE = 1_000_000_000;
+// This identity still traverses the bounded faint-switch choice carrier (0..9_999). Keep it in a reserved
+// high band: the V2 operation id remains unique by epoch/wave/turn/field, while legacy address encoding can
+// never throw after a valid human pick or timeout fallback.
+const COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_BASE = 9_000;
+const COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_SPAN = 1_000;
 
 /**
  * Bind a real SwitchPhase to its ordered replacement head. Ordinary turn faints reuse the REPLACEMENT
@@ -7510,7 +7554,8 @@ export function establishCoopV2ReplacementControlBoundary(input: {
   ) {
     return { kind: "failed" };
   }
-  const occurrence = COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_BASE + state.tick * 8 + input.fieldIndex;
+  const occurrence =
+    COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_BASE + (state.tick % COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_SPAN);
   if (!Number.isSafeInteger(occurrence)) {
     return { kind: "failed" };
   }

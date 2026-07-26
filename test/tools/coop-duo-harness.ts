@@ -2253,7 +2253,16 @@ export async function settleDuoPromise<T>(
   rig: DuoRig,
   pending: Promise<T>,
   label: string,
-  options: { timeoutMs?: number; intervalMs?: number } = {},
+  options: {
+    timeoutMs?: number;
+    intervalMs?: number;
+    /**
+     * Drive a real public-input surface exposed by the latest destination pumps. This runs only after both
+     * receiver contexts have drained, so a single-process fixture can model the human action that a second
+     * browser would take while the authority Promise remains pending. It must never inject protocol material.
+     */
+    afterPump?: () => Promise<void>;
+  } = {},
 ): Promise<T> {
   const timeoutMs = options.timeoutMs ?? 20_000;
   const intervalMs = options.intervalMs ?? 10;
@@ -2281,6 +2290,7 @@ export async function settleDuoPromise<T>(
       await drainLoopback();
       await new Promise<void>(resolve => setTimeout(resolve, 0));
     });
+    await options.afterPump?.();
     if (!settled) {
       await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
     }
