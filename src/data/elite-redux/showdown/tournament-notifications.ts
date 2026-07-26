@@ -5,15 +5,10 @@
  */
 
 // =============================================================================
-// Showdown TOURNAMENT — CHALLENGE notifications (Showdown Tournament P3 polish).
-// A concrete notification TYPE + pull SOURCE wired into the shared, type-agnostic
-// `notificationManager` (same framework as the ghost-battle inbox). It surfaces a
-// clickable page-level alert when both exact bracket opponents are online.
-// Each notification carries a DEEP-LINK target ({tournamentId, round, slot}); the
-// inbox opens the tournament BOARD on that match (A: FIGHT from there). Ids are
-// STABLE per (tournament, match, kind) so the manager dedupes to once-per-state-
-// change (no spam every poll tick). A page-lifetime heartbeat keeps presence current
-// during normal gameplay; clicking the alert saves the run and deep-links through title.
+// Showdown TOURNAMENT match notifications. Tournament alerts use the dedicated
+// matchmaking prompt instead of the shared patch-note / ghost-battle inbox. A
+// page-lifetime heartbeat keeps presence current during normal gameplay; accepting
+// the prompt saves the run and deep-links through the title flow.
 // =============================================================================
 
 import { loggedInUser } from "#app/account";
@@ -150,7 +145,7 @@ function makeNotif(
   reason?: string,
 ): ErNotification {
   return {
-    // Stable id => the manager dedupes to once per state change (not once per poll).
+    // Stable id keeps the dedicated prompt to once per state change (not once per poll).
     id: `${TOURNAMENT_NOTIF_TYPE}:${t.id}:${match.id}:${kind}`,
     type: TOURNAMENT_NOTIF_TYPE,
     timestamp: now,
@@ -210,7 +205,7 @@ export function actionableTournamentNotifications(t: TournamentView, me: string,
  * Pull source: derive the viewer's ACTIONABLE tournament matches from the live worker state.
  * Best-effort + offline-safe (never throws). Reuses the board's own poll/presence infra
  * (listTournaments + getTournamentBracket); `since` is ignored because the derivation is over
- * the CURRENT bracket state and the manager dedupes by the stable ids.
+ * the CURRENT bracket state; the dedicated prompt dedupes by the stable ids.
  */
 async function fetchTournamentNotifications(_since: number): Promise<ErNotification[]> {
   const me = loggedInUser?.username;
@@ -341,7 +336,7 @@ export function showTournamentMatchToast(notification: ErNotification): boolean 
   return true;
 }
 
-/** Poll once, heartbeat active entrants, persist inbox items, and surface a live-match alert. */
+/** Poll once, heartbeat active entrants, and surface the dedicated live-match prompt. */
 export async function pollTournamentPresenceNotifications(): Promise<void> {
   if (presencePollPending || (typeof document !== "undefined" && document.visibilityState === "hidden")) {
     return;
@@ -358,7 +353,6 @@ export async function pollTournamentPresenceNotifications(): Promise<void> {
       }
     }
     for (const notification of notifications) {
-      notificationManager.push(notification);
       if (
         (notification.data as TournamentNotifData).kind === "match-online"
         && !announcedOnlineMatches.has(notification.id)
@@ -392,35 +386,13 @@ export function stopTournamentPresenceNotifications(): void {
 }
 
 /**
- * Register the tournament notification TYPE + pull source on the shared manager. Idempotent
- * (safe to call on every title load, like {@linkcode initErNotifications}).
+ * Remove tournament notices persisted by older builds. Matchmaking prompts must never appear
+ * in the shared patch-note / ghost-battle inbox.
  */
 export function initTournamentNotifications(): void {
-  notificationManager.registerType({
-    type: TOURNAMENT_NOTIF_TYPE,
-    summary(n) {
-      const d = n.data as TournamentNotifData;
-      if (d.kind === "advanced") {
-        return `${d.tournamentName}: you advanced without playing (${d.reason ?? "auto"})`;
-      }
-      return `${d.opponent} is online - ${d.tournamentName}`;
-    },
-    detail(n) {
-      const d = n.data as TournamentNotifData;
-      if (d.kind === "advanced") {
-        return {
-          title: "Advanced without playing",
-          body:
-            `${d.reason ?? "You advanced"} — you moved on in the ${d.tournamentName} without a match `
-            + `(${d.opponent} did not play the round).\n\nOpen the bracket to see your next fight.`,
-          customView: TOURNAMENT_NOTIF_TYPE,
-        };
-      }
-      const title = "Tournament match available";
-      const body = `${d.opponent} is online for your ${d.tournamentName} match.\n\nOpen the bracket and join the match.`;
-      // customView tells the inbox UI to offer the "A: Open bracket" deep-link prompt.
-      return { title, body, customView: TOURNAMENT_NOTIF_TYPE };
-    },
-  });
-  notificationManager.registerSource(TOURNAMENT_NOTIF_TYPE, fetchTournamentNotifications);
+  for (const notification of notificationManager.list()) {
+    if (notification.type === TOURNAMENT_NOTIF_TYPE) {
+      notificationManager.remove(notification.id);
+    }
+  }
 }

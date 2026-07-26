@@ -4,14 +4,15 @@
  */
 
 // =============================================================================
-// Showdown TOURNAMENT — CHALLENGE notification derivation + deep-link (P3 polish).
-// PURE unit coverage of the notification source's actionable logic + the dedupe
-// rule + the deep-link opener singleton (no network / no GameManager).
+// Showdown TOURNAMENT notification derivation + deep-link.
+// PURE unit coverage of actionable logic, dedicated-prompt dedupe, shared-inbox
+// isolation, and the deep-link opener singleton (no network / no GameManager).
 // =============================================================================
 
 import {
   actionableTournamentNotifications,
   canOpenTournamentDeepLink,
+  initTournamentNotifications,
   openTournamentDeepLink,
   setTournamentFlowOpener,
   setTournamentGameplayOpener,
@@ -187,20 +188,32 @@ describe("tournament challenge notifications - derivation", () => {
     expect((advanced!.data as any).reason).toBe("Walkover");
   });
 
-  it("DEDUPES to once per state change (stable ids across polls)", () => {
+  it("DEDUPES the dedicated prompt to once per state change (stable ids across polls)", () => {
     const online = view();
     online.entrants[0].lastSeen = NOW;
     online.entrants[1].lastSeen = NOW;
     const first = actionableTournamentNotifications(online, "Carla", NOW);
     const second = actionableTournamentNotifications(online, "Carla", NOW + 60_000);
-    // ids are identical across the two polls
+    // The page-lifetime announcedOnlineMatches set consumes these stable ids.
     expect(second[0].id).toBe(first[0].id);
-    // pushing both polls into the manager yields ONE stored notification.
-    for (const n of [...first, ...second]) {
-      notificationManager.push(n);
-    }
-    const stored = notificationManager.list().filter(n => n.type === TOURNAMENT_NOTIF_TYPE);
-    expect(stored).toHaveLength(1);
+  });
+
+  it("keeps tournament alerts out of the shared inbox and removes legacy entries", () => {
+    const online = view();
+    online.entrants[0].lastSeen = NOW;
+    online.entrants[1].lastSeen = NOW;
+    notificationManager.push(actionableTournamentNotifications(online, "Carla", NOW)[0]);
+    notificationManager.push({
+      id: "system:patch-notes",
+      type: "system",
+      timestamp: NOW,
+      read: false,
+      data: {},
+    });
+
+    initTournamentNotifications();
+
+    expect(notificationManager.list().map(notification => notification.id)).toEqual(["system:patch-notes"]);
   });
 });
 
