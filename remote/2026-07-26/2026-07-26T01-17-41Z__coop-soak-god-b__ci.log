@@ -1,0 +1,60 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: 6a32f02982fa6fd3a0b828a3210ebd30f9a178b2
+checked_out_sha: 6a32f02982fa6fd3a0b828a3210ebd30f9a178b2
+base_seed: 20260726
+campaign_seed: 20365455
+run: 30182286218 (workflow source 6a32f02982fa6fd3a0b828a3210ebd30f9a178b2)
+timestamp: 2026-07-26T01-17-41Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365455 WAVES=200 - replay this run with:  SOAK_SEED=20365455 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=71 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1865,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1715,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":263,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":604,"hp":162,"maxHp":162,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5114,"formIndex":0,"isTerastallized":false,"teraType":12,"bossSegments":2,"bossSegmentIndex":1,"moves":[[5153,0],[37,0],[916,0],[5058,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":883,"hp":159,"maxHp":159,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":55,"formIndex":0,"isTerastallized":false,"teraType":14,"bossSegments":1,"bossSegmentIndex":0,"moves":[[5021,0],[5002,0],[834,0],[423,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1865,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1715,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":263,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":604,"hp":154,"maxHp":154,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5114,"formIndex":0,"isTerastallized":false,"teraType":12,"bossSegments":2,"bossSegmentIndex":1,"moves":[[5153,0],[37,0],[916,0],[5058,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":883,"hp":159,"maxHp":159,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":55,"formIndex":0,"isTerastallized":false,"teraType":14,"bossSegments":1,"bossSegmentIndex":0,"moves":[[5021,0],[5002,0],[834,0],[423,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=136 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":1440,"maxHp":2065,"status":0,"statStages":[0,0,2,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1501,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":263,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":202,"hp":531,"maxHp":531,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":98,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":2,"bossSegmentIndex":1,"moves":[[194,0],[227,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":326,"hp":353,"maxHp":353,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":82,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":2,"bossSegmentIndex":1,"moves":[[686,0],[5032,0],[340,0],[354,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":1440,"maxHp":2065,"status":0,"statStages":[0,0,2,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1501,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":263,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":202,"hp":531,"maxHp":531,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":98,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":2,"bossSegmentIndex":1,"moves":[[194,0],[227,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":326,"hp":335,"maxHp":335,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":82,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":2,"bossSegmentIndex":1,"moves":[[686,0],[5032,0],[340,0],[354,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 138 (seed 20365455): wave driving threw (strand/stall): PhaseInterceptor.to("SelectModifierPhase") did not reach its target (soft-lock / freeze?): stuck at phase "SwitchPhase", UI mode PARTY (=8), interceptor state "running". runTarget=false, promptTarget="SelectModifierPhase".
+
+----- vitest result tail -----
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Unhandled Errors [49m[22m[31m⎯⎯⎯⎯⎯⎯[39m
+[31m[1m
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.[22m[39m
+
+[31m⎯⎯⎯⎯[39m[1m[41m Unhandled Rejection [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mError[22m: [coop-op] invalid faint-switch occurrence=1000021416[39m
+[36m [2m❯[22m boundedAddressPart src/data/elite-redux/coop/coop-faint-switch-operation.ts:[2m228:11[22m[39m
+    [90m226|[39m   [35mconst[39m normalized [33m=[39m [33mMath[39m[33m.[39m[34mtrunc[39m(value)[33m;[39m
+    [90m227|[39m   if (!Number.isSafeInteger(normalized) || normalized < 0 || normalize…
+    [90m228|[39m     throw new Error(`[coop-op] invalid faint-switch ${label}=${value}`…
+    [90m   |[39m           [31m^[39m
+    [90m229|[39m   }
+    [90m230|[39m   [35mreturn[39m normalized[33m;[39m
+[90m [2m❯[22m coopFaintSwitchEventAddress src/data/elite-redux/coop/coop-faint-switch-operation.ts:[2m237:7[22m[39m
+[90m [2m❯[22m coopFaintSwitchOperationAddress src/data/elite-redux/coop/coop-faint-switch-operation.ts:[2m251:5[22m[39m
+[90m [2m❯[22m addressCoopFaintSwitchChoiceData src/data/elite-redux/coop/coop-faint-switch-operation.ts:[2m424:51[22m[39m
+[90m [2m❯[22m src/phases/switch-phase.ts:[2m525:20[22m[39m
+[90m [2m❯[22m PartyUiHandler.processActionButtonForOptions src/ui/handlers/party-ui-handler.ts:[2m1175:7[22m[39m
+[90m [2m❯[22m PartyUiHandler.processOptionMenuInput src/ui/handlers/party-ui-handler.ts:[2m1194:19[22m[39m
+[90m [2m❯[22m PartyUiHandler.processInput src/ui/handlers/party-ui-handler.ts:[2m1237:22[22m[39m
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m1058:13[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m751:18[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m1 error[39m[22m
+[2m   Start at [22m 01:06:22
+[2m   Duration [22m 679.14s[2m (transform 21.81s, setup 26.37s, import 333ms, tests 651.57s, environment 702ms)[22m
+
