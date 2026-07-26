@@ -2605,6 +2605,21 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     encounterPhase,
+    /globalScene\.ui\.setMode\(UiMode\.MESSAGE\)\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{/u,
+    "the nested encounter UI-mode continuation cannot escape into the peer browser realm",
+  );
+  assert.match(
+    encounterPhase,
+    /Promise\.all\(\[tutorialReady, playerPresentationReady\]\)[\s\S]+\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{/u,
+    "the player-presentation terminal join must re-enter the browser that owns the encounter phase",
+  );
+  assert.match(
+    encounterPhase,
+    /tutorialReady\.then\(wrapCoopEncounterContinuation\(\(\) => this\.completeEncounterEnd\(\)\)\)/u,
+    "the no-player-join tutorial terminal uses the same exact owner seam",
+  );
+  assert.match(
+    encounterPhase,
     /\.catch\(\s*wrapCoopEncounterContinuation\(\(error: unknown\) => \{/u,
     "failure of the encounter asset join uses the exact continuation-owner seam",
   );

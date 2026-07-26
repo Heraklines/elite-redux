@@ -1487,98 +1487,115 @@ export class EncounterPhase extends BattlePhase {
             }
           }
 
-          return globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
-            if (!encounterBoundaryIsLive()) {
-              return;
-            }
-            if (this.loaded) {
-              this.enterEncounterPresentation();
-              globalScene.resetSeed();
-            } else {
-              // Set weather and terrain before session gets saved
-              this.trySetWeatherIfNewBiome();
-              this.trySetTerrainIfNewBiome();
-              // ER relics (#439/#130): Stormglass - force the player's chosen weather for
-              // 5 turns at the start of EVERY battle. Runs AFTER the biome's ambient weather
-              // so the chosen weather wins (mirrors #486's carried-weather override). On a
-              // reload (this.loaded) the arena weather is restored from the save, so no
-              // re-apply is needed. The FIRST time a held Stormglass has no chosen weather
-              // yet, enqueue the one-time weather PICKER instead (it prompts, records the
-              // pick via setStormglassWeather, then applies it - so the choice takes effect
-              // this same battle). Path-independent: this single chokepoint fires no matter
-              // how the relic was granted, so no per-grant-site prompt is needed.
-              if (
-                hasErRelic("stormglass")
-                && getStormglassWeather() == null
-                && !(isCoopAuthoritativeGuest() && isCoopV2InteractionCutoverActive())
-              ) {
-                globalScene.phaseManager.unshiftNew("ErStormglassPickerPhase");
-              } else {
-                erStormglassApplyChosenWeather();
+          return globalScene.ui.setMode(UiMode.MESSAGE).then(
+            wrapCoopEncounterContinuation(() => {
+              if (!encounterBoundaryIsLive()) {
+                return;
               }
-              if (isCoopAuthoritativeGuest()) {
-                // The host is the sole persistence owner for a shared run. An authoritative guest deliberately
-                // has no host persistence context, so saveAll() would correctly return false; treating that as
-                // an account-save failure below resets the guest to Login/SelectGender/Title between waves.
-                // Continue the already-adopted encounter locally without writing or broadcasting a launch save.
-                globalScene.disableMenu = false;
-                this.enterEncounterPresentation();
-                globalScene.resetSeed();
-              } else if (globalScene.gameMode.isShowdown) {
-                // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it NEVER writes a session
-                // (no localStorage slot, no cloud `updateAll` push). Skip the per-wave saveAll entirely
-                // and boot the encounter directly. The guest already boots from the host's launch
-                // snapshot (the `this.loaded` branch above), so only the host reaches here.
-                this.broadcastCoopLaunchSnapshot();
-                globalScene.disableMenu = false;
+              if (this.loaded) {
                 this.enterEncounterPresentation();
                 globalScene.resetSeed();
               } else {
-                globalScene.gameData
-                  .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
-                  .then(async success => {
-                    if (!encounterBoundaryIsLive()) {
-                      coopWarn("launch", "discarding stale first-save continuation after co-op runtime replacement");
-                      return;
-                    }
-                    globalScene.disableMenu = false;
-                    if (!success) {
-                      return globalScene.reset(true);
-                    }
-                    const launchConsumption = await globalScene.gameData.consumeCommittedFreshCoopLaunchSession(
-                      battle.waveIndex,
+                // Set weather and terrain before session gets saved
+                this.trySetWeatherIfNewBiome();
+                this.trySetTerrainIfNewBiome();
+                // ER relics (#439/#130): Stormglass - force the player's chosen weather for
+                // 5 turns at the start of EVERY battle. Runs AFTER the biome's ambient weather
+                // so the chosen weather wins (mirrors #486's carried-weather override). On a
+                // reload (this.loaded) the arena weather is restored from the save, so no
+                // re-apply is needed. The FIRST time a held Stormglass has no chosen weather
+                // yet, enqueue the one-time weather PICKER instead (it prompts, records the
+                // pick via setStormglassWeather, then applies it - so the choice takes effect
+                // this same battle). Path-independent: this single chokepoint fires no matter
+                // how the relic was granted, so no per-grant-site prompt is needed.
+                if (
+                  hasErRelic("stormglass")
+                  && getStormglassWeather() == null
+                  && !(isCoopAuthoritativeGuest() && isCoopV2InteractionCutoverActive())
+                ) {
+                  globalScene.phaseManager.unshiftNew("ErStormglassPickerPhase");
+                } else {
+                  erStormglassApplyChosenWeather();
+                }
+                if (isCoopAuthoritativeGuest()) {
+                  // The host is the sole persistence owner for a shared run. An authoritative guest deliberately
+                  // has no host persistence context, so saveAll() would correctly return false; treating that as
+                  // an account-save failure below resets the guest to Login/SelectGender/Title between waves.
+                  // Continue the already-adopted encounter locally without writing or broadcasting a launch save.
+                  globalScene.disableMenu = false;
+                  this.enterEncounterPresentation();
+                  globalScene.resetSeed();
+                } else if (globalScene.gameMode.isShowdown) {
+                  // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it NEVER writes a session
+                  // (no localStorage slot, no cloud `updateAll` push). Skip the per-wave saveAll entirely
+                  // and boot the encounter directly. The guest already boots from the host's launch
+                  // snapshot (the `this.loaded` branch above), so only the host reaches here.
+                  this.broadcastCoopLaunchSnapshot();
+                  globalScene.disableMenu = false;
+                  this.enterEncounterPresentation();
+                  globalScene.resetSeed();
+                } else {
+                  globalScene.gameData
+                    .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
+                    .then(
+                      wrapCoopEncounterContinuation(success => {
+                        if (!encounterBoundaryIsLive()) {
+                          coopWarn(
+                            "launch",
+                            "discarding stale first-save continuation after co-op runtime replacement",
+                          );
+                          return;
+                        }
+                        globalScene.disableMenu = false;
+                        if (!success) {
+                          return globalScene.reset(true);
+                        }
+                        return globalScene.gameData.consumeCommittedFreshCoopLaunchSession(battle.waveIndex).then(
+                          wrapCoopEncounterContinuation(launchConsumption => {
+                            if (!encounterBoundaryIsLive()) {
+                              coopWarn(
+                                "launch",
+                                "discarding stale launch-commit continuation after co-op runtime replacement",
+                              );
+                              return;
+                            }
+                            if (launchConsumption.kind === "invalid") {
+                              globalScene.disableMenu = false;
+                              globalScene.reset(true);
+                              return;
+                            }
+                            this.broadcastCoopLaunchSnapshot(
+                              launchConsumption.kind === "committed" ? launchConsumption.sessionJson : undefined,
+                            );
+                            this.enterEncounterPresentation();
+                            globalScene.resetSeed();
+                          }),
+                        );
+                      }),
+                    )
+                    .catch(
+                      wrapCoopEncounterContinuation(error => {
+                        if (!encounterBoundaryIsLive()) {
+                          coopWarn(
+                            "launch",
+                            "discarding stale first-save failure after co-op runtime replacement",
+                            error,
+                          );
+                          return;
+                        }
+                        // Last-resort terminal path: saveAll itself emits the retained launch abort while its
+                        // exact claim is still available. Never leave the guest waiting if an unexpected
+                        // serializer/storage/API exception escapes the transaction.
+                        coopWarn("launch", "first-save transaction threw before launch release", error);
+                        globalScene.gameData.cancelPendingFreshCoopSessionSlot();
+                        globalScene.disableMenu = false;
+                        globalScene.reset(true);
+                      }),
                     );
-                    if (!encounterBoundaryIsLive()) {
-                      coopWarn("launch", "discarding stale launch-commit continuation after co-op runtime replacement");
-                      return;
-                    }
-                    if (launchConsumption.kind === "invalid") {
-                      globalScene.disableMenu = false;
-                      globalScene.reset(true);
-                      return;
-                    }
-                    this.broadcastCoopLaunchSnapshot(
-                      launchConsumption.kind === "committed" ? launchConsumption.sessionJson : undefined,
-                    );
-                    this.enterEncounterPresentation();
-                    globalScene.resetSeed();
-                  })
-                  .catch(error => {
-                    if (!encounterBoundaryIsLive()) {
-                      coopWarn("launch", "discarding stale first-save failure after co-op runtime replacement", error);
-                      return;
-                    }
-                    // Last-resort terminal path: saveAll itself emits the retained launch abort while its
-                    // exact claim is still available. Never leave the guest waiting if an unexpected
-                    // serializer/storage/API exception escapes the transaction.
-                    coopWarn("launch", "first-save transaction threw before launch release", error);
-                    globalScene.gameData.cancelPendingFreshCoopSessionSlot();
-                    globalScene.disableMenu = false;
-                    globalScene.reset(true);
-                  });
+                }
               }
-            }
-          });
+            }),
+          );
         }),
       )
       .catch(
@@ -2150,26 +2167,30 @@ export class EncounterPhase extends BattlePhase {
     }
     const tutorialReady = handleTutorial(Tutorial.ACCESS_MENU);
     if (playerPresentationReady == null) {
-      tutorialReady.then(() => this.completeEncounterEnd());
+      tutorialReady.then(wrapCoopEncounterContinuation(() => this.completeEncounterEnd()));
     } else {
       void Promise.all([tutorialReady, playerPresentationReady])
-        .then(() => {
-          if (presentationBoundaryIsLive()) {
-            this.completeEncounterEnd();
-          }
-        })
-        .catch(error => {
-          if (!presentationBoundaryIsLive()) {
-            coopWarn("renderer", "ignored superseded authoritative launch presentation failure", error);
-            return;
-          }
-          coopWarn("renderer", "authoritative player launch presentation failed closed", error);
-          failCoopSharedSession("Could not render both co-op player battlers before opening commands.", {
-            boundary: "surface",
-            reasonCode: "continuation-failed",
-            wave: presentationBattle?.waveIndex,
-          });
-        });
+        .then(
+          wrapCoopEncounterContinuation(() => {
+            if (presentationBoundaryIsLive()) {
+              this.completeEncounterEnd();
+            }
+          }),
+        )
+        .catch(
+          wrapCoopEncounterContinuation(error => {
+            if (!presentationBoundaryIsLive()) {
+              coopWarn("renderer", "ignored superseded authoritative launch presentation failure", error);
+              return;
+            }
+            coopWarn("renderer", "authoritative player launch presentation failed closed", error);
+            failCoopSharedSession("Could not render both co-op player battlers before opening commands.", {
+              boundary: "surface",
+              reasonCode: "continuation-failed",
+              wave: presentationBattle?.waveIndex,
+            });
+          }),
+        );
     }
 
     // InitEncounterPhase derives PostSummon effects. The authoritative guest rendered the adopted launch
