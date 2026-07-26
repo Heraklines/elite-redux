@@ -4343,3 +4343,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Permitted local evidence: presentation + public V2 source contracts pass 87/87, formatting is clean, and
   `git diff --check` passes. Hosted focused engine/type and exact campaign/gate proof remain required; no co-op
   Vitest, browser, soak, or campaign was run locally.
+
+## 2026-07-26 - Public keyboard input is sampled at real frame cadence
+
+- Campaign `30211958410` did not reach co-op in any profile. Every lane failed at the same title-menu Settings
+  walk: Chromium's capture listener counted each ArrowUp, focus and visibility were healthy, and Phaser's frame
+  counter advanced, but the selected option never changed. The browser was progressing at roughly three FPS
+  while `PublicUiClient.press()` held a key for at most 100 ms, allowing the entire tap to occur between game
+  updates. The former post-release input echo could diagnose this but could not make the input representative.
+- Public input now uses the identical DOM keyboard path while holding each key across two actual animation
+  frames, then releases it in `finally`. The frame wait is compositor-only and bounded at five seconds; it reads
+  no scene, handler, runtime, storage, or bridge state. A non-rendering focused page fails explicitly rather than
+  being misreported as a semantic navigation stall. Input-echo pacing remains the post-action proof.
+- A node-pure source contract rejects the old fixed sub-frame tap and pins the down/frame/up sequence. The existing
+  public-driver boundary still enforces keyboard/DOM-only mutation: the reusable wait lives in evidence alongside
+  screenshot frame settling and exposes no private game state.

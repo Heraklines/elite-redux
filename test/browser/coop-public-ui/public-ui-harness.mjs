@@ -14,7 +14,7 @@ import {
   selectOptionById,
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
-import { delay, EvidenceSink } from "./evidence.mjs";
+import { delay, EvidenceSink, waitForPublicInputFrames } from "./evidence.mjs";
 import {
   isAcceptedRendererPresentationReceipt,
   latestMoveAnimationsAttestation,
@@ -1404,7 +1404,20 @@ export class PublicUiClient {
       }
       this.evidence.record("key", { key, purpose });
       const echoCursor = this.evidence.cursor();
-      await this.page.keyboard.press(key, { delay: Math.min(this.config.actionDelayMs, 100) });
+      // Keep the real DOM key down across two browser frames. A fixed 100 ms Playwright tap can begin and end
+      // between Phaser updates on a CPU-dilated two-browser runner: the raw DOM counter advances, but the game
+      // handler never observes an isDown/JustDown state. Frame-bounded holding is human-equivalent, remains
+      // keyboard-only, and does not inspect or mutate private game state.
+      let crossedInputFrames = false;
+      await this.page.keyboard.down(key);
+      try {
+        crossedInputFrames = await waitForPublicInputFrames(this.page);
+      } finally {
+        await this.page.keyboard.up(key);
+      }
+      if (!crossedInputFrames) {
+        throw new Error(`${this.label}: focused public key target did not render two frames for ${purpose}`);
+      }
       // Optimization brief R1c: per-input acknowledgment. Wait for the game's OWN
       // input-echo (uiMode/cursor/phase change observed AFTER this press) instead of a
       // fixed sleep. A press that legitimately changes nothing (menu-edge arrow) falls

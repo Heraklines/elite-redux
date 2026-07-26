@@ -62,6 +62,23 @@ test("render profiles are explicit and the depth profile retains public Settings
   });
 });
 
+test("public keys remain down through real browser frames instead of a sub-frame fixed tap", async () => {
+  const [harness, evidence] = await Promise.all([
+    readFile(new URL("./public-ui-harness.mjs", import.meta.url), "utf8"),
+    readFile(new URL("./evidence.mjs", import.meta.url), "utf8"),
+  ]);
+  assert.match(
+    harness,
+    /keyboard\.down\(key\)[\s\S]+waitForPublicInputFrames\(this\.page\)[\s\S]+keyboard\.up\(key\)/u,
+  );
+  assert.doesNotMatch(harness, /keyboard\.press\(key, \{ delay: Math\.min\(this\.config\.actionDelayMs, 100\) \}\)/u);
+  assert.match(
+    evidence,
+    /function waitForPublicInputFrames[\s\S]+page\.evaluate\([\s\S]+requestAnimationFrame\(\(\) => requestAnimationFrame/u,
+    "the pacing seam is a bounded compositor-frame wait and never reads game state",
+  );
+});
+
 test("browser render-profile markers are validated and indexed as evidence", () => {
   const sink = new EvidenceSink("profile", ".");
   const emitConsole = attachConsoleOnly(sink);

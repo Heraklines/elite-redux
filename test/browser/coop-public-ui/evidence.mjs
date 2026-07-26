@@ -42,6 +42,35 @@ function registerEmergencyFlushSink(sink) {
 
 export const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
 
+/**
+ * Wait for two real browser animation frames without reading or mutating game state.
+ *
+ * Public keyboard input must stay down long enough for Phaser's DOM keyboard plugin and its next update to
+ * overlap. A fixed 100 ms tap is shorter than one frame on a heavily CPU-dilated two-Chromium runner and can
+ * therefore be visible to the DOM listener yet never reach the game handler. Two browser frames preserve the
+ * same human key path at both 60 FPS and 3 FPS; the wall timeout fails loudly if the focused page is not
+ * rendering at all.
+ */
+export async function waitForPublicInputFrames(page, timeoutMs = 5_000) {
+  return page.evaluate(
+    timeout =>
+      new Promise(resolveFrames => {
+        let settled = false;
+        const finish = value => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timer);
+          resolveFrames(value);
+        };
+        const timer = setTimeout(() => finish(false), timeout);
+        requestAnimationFrame(() => requestAnimationFrame(() => finish(true)));
+      }),
+    timeoutMs,
+  );
+}
+
 const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
