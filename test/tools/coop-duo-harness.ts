@@ -3488,6 +3488,12 @@ export const REPLAY_DRAIN_PHASES = new Set([
   // #788 v2: the lockstep gate self-ends when the partner's advance broadcast is already seen
   // (or after the injectable barrier) - drive it like any replay phase or wave-2 never replays.
   "CoopPartnerSyncPhase",
+  // Immutable presentation events are installed as renderer-owned replay phases. The headless engine
+  // deliberately skips their Phaser tweens, but it must still start/end the exact production phase before
+  // declaring the turn finalized. Keep this list in lockstep with the production replay switch.
+  "CoopCommonAnimReplayPhase",
+  "CoopFormChangeReplayPhase",
+  "CoopTransformReplayPhase",
   "CoopMoveAnimReplayPhase",
   "CoopHpDrainReplayPhase",
   "CoopStatStageReplayPhase",

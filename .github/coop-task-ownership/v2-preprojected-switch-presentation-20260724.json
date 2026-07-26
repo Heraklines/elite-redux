@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "9e4db305d51139fcce70ac324ce0feee46c4c0b4",
+  "baseSha": "74a4f32975c3ce9ad8e78b8dbc432ee507261ff4",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     ".github/workflows/coop-public-ui-journey.yml",
@@ -71,6 +71,7 @@
     "test/browser/coop-public-ui/presentation-ledger-policy.mjs",
     "test/browser/coop-public-ui/presentation-ledger-policy.test.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
+    "test/browser/coop-public-ui/resume-scan-isolation.test.mjs",
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
     "test/browser/coop-public-ui/solo-classic.mjs",
     "test/node/authority-v2-command-frontier.test.ts",

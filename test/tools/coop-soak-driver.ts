@@ -2192,13 +2192,74 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       );
     };
     const drivenGuestReplacementPhases = new WeakSet<object>();
+    const drivenEncounterPromptGenerations = new WeakMap<object, number>();
+
+    /**
+     * A structural wave crossing can finish only after each real player acknowledges their own encounter
+     * dialogue. Chromium does that with a keyboard action; the two-engine fixture must use the same public
+     * UI entry point while its two simulated browser event loops are being pumped. Prompt generation, not
+     * phase identity, is the dedupe key because trainer and Mystery intros can show several messages in one
+     * EncounterPhase. Recovery prompts are deliberately rejected: accepting one would hide a real authority
+     * failure and turn the representative soak into a self-healing mock.
+     */
+    const driveEncounterPresentationPublicInput = async (
+      ctx: typeof rig.hostCtx,
+      label: "host" | "guest",
+    ): Promise<boolean> =>
+      withClient(ctx, async () => {
+        const scene = ctx.scene;
+        const phase = scene.phaseManager.getCurrentPhase() as unknown as {
+          readonly phaseName?: string;
+        };
+        if (
+          phase == null
+          || (phase.phaseName !== "NextEncounterPhase" && phase.phaseName !== "NewBiomeEncounterPhase")
+          || scene.ui.getMode() !== UiMode.MESSAGE
+        ) {
+          return false;
+        }
+        const handler = scene.ui.getMessageHandler();
+        if (!handler.isAwaitingPromptAction()) {
+          return false;
+        }
+        const promptGeneration = handler.getPromptGeneration();
+        if (drivenEncounterPromptGenerations.get(phase as object) === promptGeneration) {
+          return false;
+        }
+        const message = handler.message?.text?.replaceAll(/\s+/gu, " ").trim() ?? "";
+        if (
+          message.startsWith("Could not confirm the shared")
+          || message.startsWith("Could not render the shared")
+          || message.startsWith("Could not recover your partner's battle state")
+        ) {
+          fail(
+            "no-park",
+            transitionSourceWave,
+            `${label} reached an authority recovery prompt during ${phase.phaseName}: ${message}`,
+          );
+        }
+        drivenEncounterPromptGenerations.set(phase as object, promptGeneration);
+        if (!scene.ui.processInput(Button.ACTION)) {
+          fail("no-park", transitionSourceWave, `${label} ${phase.phaseName} rejected its armed public MESSAGE action`);
+        }
+        actionScript.push(
+          `wave ${transitionSourceWave}: ${label} acknowledged ${phase.phaseName} prompt ${promptGeneration} through public MESSAGE UI`,
+        );
+        await Promise.resolve();
+        return true;
+      });
     /**
      * Drive only a replacement picker that the real Authority V2 entry has already projected. The host
      * interceptor can be waiting in SwitchPhase while the shared-process fixture has destination delivery
      * enabled; without this reciprocal browser step, the guest's replacement-open frame remains queued and
      * the test manufactures a timeout that two independent event loops cannot produce.
      */
-    const driveProjectedReplacementPublicInput = async (): Promise<void> => {
+    const driveProjectedPublicInput = async (): Promise<void> => {
+      const hostAcknowledged = await driveEncounterPresentationPublicInput(rig.hostCtx, "host");
+      const guestAcknowledged = await driveEncounterPresentationPublicInput(rig.guestCtx, "guest");
+      if (hostAcknowledged || guestAcknowledged) {
+        await pumpDuoDestinations(rig, 1);
+      }
       const hostPhase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as {
         readonly phaseName?: string;
         readonly fieldIndex?: number;
@@ -2365,7 +2426,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                 // enemy-atlas/UI continuation. Releasing this scope before settlement made every common soak
                 // shard manufacture a NextEncounter/NewBiomeEncounter freeze that real Chromium cannot hit.
                 return settleDuoPromise(rig, crossing, `wave ${wave} host structural crossing`, {
-                  afterPump: driveProjectedReplacementPublicInput,
+                  afterPump: driveProjectedPublicInput,
                 });
               });
             })();

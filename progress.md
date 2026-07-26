@@ -4229,3 +4229,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local permitted evidence: the presentation source suite is 16/16, targeted Biome and `git diff --check` pass,
   and the baseline TypeScript scan reports no diagnostics in the changed co-op/form files. Behavioral proof is
   delegated to the focused hosted shard per `AGENTS.md`.
+
+## 2026-07-26 - Representative replay drain and biome-intro input
+
+- Exact full gate `30191375428` on protocol-50 checkpoint `74a4f3297` proved the new production presentation
+  schema/build and most shards, then exposed two fixture omissions rather than new mechanical divergence. B4,
+  B8, B11, and one catch path all stopped before finalize on a production-queued common/form/Transform replay
+  phase that the headless `REPLAY_DRAIN_PHASES` allowlist had never learned to start. The production browser
+  naturally starts those phases; the fixture threw before doing so. The drain set now includes all three, and a
+  source contract derives every immutable replay phase from the production replay switch so a future event cannot
+  be added without the headless harness learning it.
+- Continuous and production-fidelity soaks reached real actionable `NextEncounterPhase` /
+  `NewBiomeEncounterPhase` MESSAGE prompts at biome crossings, but their dual-event-loop settlement callback only
+  drove replacement PARTY input. They therefore labelled a legitimate human dialogue wait as a softlock. The
+  reciprocal pump now submits `Button.ACTION` through the public UI only when the exact message handler reports an
+  armed prompt, once per prompt generation on each simulated browser. It refuses all authority recovery prompts,
+  preserving fail-closed diagnosis instead of auto-healing a genuine product failure.
+- The fast resume contract was also stale: production correctly replaced an unbounded `setMode` / mode-chain reset
+  with lifetime-fenced `setModeBoundedWhen` and `installHostLaunchDecision`, while the source test still required
+  the removed implementation. The contract now pins the safer session-fenced sequence.
+- Local permitted evidence: both source suites pass 19/19, `git diff --check` is clean, and the baseline TypeScript
+  scan reports no diagnostic in any changed file. Hosted engine/soak shards remain the required behavioral proof.

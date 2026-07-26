@@ -322,3 +322,23 @@ test("production-transition fixtures use public commands and terminal teardown c
   assert.match(mysteryJourney, /submitHostTackle:\s*true/u);
   assert.doesNotMatch(mysteryJourney, /game\.move\.select\(/u);
 });
+
+test("the headless replay pump drains every immutable presentation phase used by production", () => {
+  const harness = read("test/tools/coop-duo-harness.ts");
+  const replayPump = read("src/phases/coop-replay-turn-phase.ts");
+  const productionReplayPhases = new Set(
+    [...replayPump.matchAll(/"(Coop[A-Z][A-Za-z]+ReplayPhase)"/gu)].map(match => match[1]),
+  );
+  assert.ok(productionReplayPhases.size > 0, "the production replay pump must expose renderer phases");
+  const drainSet = harness.slice(
+    harness.indexOf("export const REPLAY_DRAIN_PHASES"),
+    harness.indexOf("interface ReplayPumpScene"),
+  );
+  for (const phaseName of productionReplayPhases) {
+    assert.match(
+      drainSet,
+      new RegExp(`"${phaseName}"`, "u"),
+      `${phaseName} must be drained before the headless harness can call a replay turn complete`,
+    );
+  }
+});
