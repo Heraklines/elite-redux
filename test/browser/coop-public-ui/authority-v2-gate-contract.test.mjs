@@ -2605,6 +2605,11 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     encounterPhase,
+    /const ownerRuntime = getCoopRuntime\(\);[\s\S]+runWhenCoopRuntimeActive\(ownerRuntime, \(\) => \{[\s\S]+result = ownerWrapped\(\.\.\.args\);/u,
+    "encounter continuations wait for the exact runtime and its scene binding, not just an ambient harness label",
+  );
+  assert.match(
+    encounterPhase,
     /globalScene\.ui\.setMode\(UiMode\.MESSAGE\)\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{/u,
     "the nested encounter UI-mode continuation cannot escape into the peer browser realm",
   );

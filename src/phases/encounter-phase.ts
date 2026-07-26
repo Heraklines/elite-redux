@@ -41,6 +41,7 @@ import {
   isCoopV2ControlCutoverActive,
   isVersusSession,
   maybeBeginReplayRecording,
+  runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { captureCoopTrainerVictoryBoundary } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
 import type {
@@ -280,7 +281,24 @@ export function setCoopEncounterContinuationWrapperForTesting(wrapper: CoopEncou
 function wrapCoopEncounterContinuation<TArgs extends unknown[], TResult>(
   callback: (...args: TArgs) => TResult,
 ): (...args: TArgs) => TResult | undefined {
-  return coopEncounterContinuationWrapperForTesting?.(callback) ?? callback;
+  const ownerRuntime = getCoopRuntime();
+  const ownerWrapped = coopEncounterContinuationWrapperForTesting?.(callback) ?? callback;
+  if (ownerRuntime == null) {
+    return ownerWrapped;
+  }
+  return (...args): TResult | undefined => {
+    let invoked = false;
+    let result: TResult | undefined;
+    // Runtime identity alone is not sufficient in the one-process fixture: runWhenCoopRuntimeActive also
+    // requires the exact scene recorded by setCoopRuntime. In production this is synchronous. During a
+    // harness peer pump or a real hot-rejoin handoff, it retains the continuation until its owning runtime
+    // and scene are installed together instead of letting an ambient peer make the lifetime predicate false.
+    runWhenCoopRuntimeActive(ownerRuntime, () => {
+      invoked = true;
+      result = ownerWrapped(...args);
+    });
+    return invoked ? result : undefined;
+  };
 }
 
 /**
