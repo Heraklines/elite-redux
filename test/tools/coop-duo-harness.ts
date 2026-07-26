@@ -2802,11 +2802,13 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
 
   const interceptor = hostGame.phaseInterceptor as unknown as { run: (phase: Phase) => Promise<void> };
   const originalRun = interceptor.run.bind(hostGame.phaseInterceptor);
+  const ownsHostInterceptorRealm = (): boolean =>
+    activeClientCtx === rig.hostCtx && globalScene === rig.hostScene && getCoopRuntime() === rig.hostRuntime;
   interceptor.run = (phase: Phase): Promise<void> => {
     if (disposed) {
       return Promise.resolve();
     }
-    if (activeClientLabel === rig.hostCtx.label) {
+    if (ownsHostInterceptorRealm()) {
       return originalRun(phase);
     }
     // A phase started from a FOREIGN-ctx interceptor tick must run its synchronous `phase.start()` head

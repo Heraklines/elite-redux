@@ -2528,6 +2528,16 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
     /clock\.preUpdate = \(time: number, delta: number\)[\s\S]+runOwned\(\(\) => originalPreUpdate\(time, delta\)\)[\s\S]+clock\.update = \(time: number, delta: number\)[\s\S]+runOwned\(\(\) => originalUpdate\(time, delta\)\)/u,
     "both halves of the headless MockClock tick must execute in their exact scheduling browser",
   );
+  assert.match(
+    pins,
+    /const ownsHostInterceptorRealm = \(\): boolean =>\s*activeClientCtx === rig\.hostCtx\s*&& globalScene === rig\.hostScene\s*&& getCoopRuntime\(\) === rig\.hostRuntime;[\s\S]+if \(ownsHostInterceptorRealm\(\)\) \{\s*return originalRun\(phase\);/u,
+    "a repeated host label cannot run an authority phase while the guest scene/runtime is installed",
+  );
+  assert.doesNotMatch(
+    pins,
+    /if \(activeClientLabel === rig\.hostCtx\.label\) \{\s*return originalRun\(phase\);/u,
+    "the interceptor may not use a label as its browser-realm identity proof",
+  );
 });
 
 test("a projected Mystery phase cannot attest through its predecessor's active handler", () => {

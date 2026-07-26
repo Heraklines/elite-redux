@@ -2410,20 +2410,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                 // item), so inspecting the queue before advancing is too early. Start the real authority
                 // crossing, then settle it with both browser contexts alive: a retained winning-turn faint can
                 // legitimately open a replacement before any of these target surfaces.
-                const crossing = game.phaseInterceptor.toFirst(
-                  [
-                    "CommandPhase",
-                    "ErDexNavPhase",
-                    "ScanIvsPhase",
-                    "TheBargainPhase",
-                    "ErCrossroadsPhase",
-                    "SelectBiomePhase",
-                  ] as const,
-                  // This is an aggregate traversal across a complete post-turn/reward/biome chain. Every
-                  // individual phase keeps PhaseInterceptor's strict 20 s stall ceiling; the traversal
-                  // itself must not expire merely because several healthy phases consumed 20 s together.
-                  { timeoutMs: 60_000 },
-                ) as Promise<HostBoundary>;
+                const crossing = game.phaseInterceptor.toFirst([
+                  "CommandPhase",
+                  "ErDexNavPhase",
+                  "ScanIvsPhase",
+                  "TheBargainPhase",
+                  "ErCrossroadsPhase",
+                  "SelectBiomePhase",
+                ] as const) as Promise<HostBoundary>;
                 await drainLoopback();
                 // Keep the authority browser as the OUTER scope until its structural Promise settles.
                 // `settleDuoPromise` services the replica through nested destination scopes, each of which
@@ -2433,7 +2427,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                 // shard manufacture a NextEncounter/NewBiomeEncounter freeze that real Chromium cannot hit.
                 return settleDuoPromise(rig, crossing, `wave ${wave} host structural crossing`, {
                   afterPump: driveProjectedPublicInput,
-                  timeoutMs: 60_000,
                 });
               });
             })();

@@ -178,7 +178,7 @@ export class PhaseInterceptor {
    * post-victory SelectModifierPhase). Requiring one guessed target at such a branch turns
    * a correct alternate route into a misleading timeout.
    */
-  public async toFirst(targets: readonly PhaseString[], options: { timeoutMs?: number } = {}): Promise<PhaseString> {
+  public async toFirst(targets: readonly PhaseString[]): Promise<PhaseString> {
     if (targets.length === 0) {
       throw new Error("PhaseInterceptor.toFirst requires at least one target phase");
     }
@@ -203,7 +203,7 @@ export class PhaseInterceptor {
           await this.run(currentPhase);
           return false;
         },
-        { interval: 0, timeout: options.timeoutMs ?? TEST_TIMEOUT },
+        { interval: 0, timeout: TEST_TIMEOUT },
       );
     } catch (err) {
       const stuckPhase = pm.getCurrentPhase()?.phaseName ?? "(none)";
