@@ -12,6 +12,7 @@
     "progress.md",
     "src/battle-scene.ts",
     "src/data/elite-redux/coop/authority-v2/adapters/control-open.ts",
+    "src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts",
     "src/data/elite-redux/coop/authority-v2/authority-ledger.ts",
     "src/data/elite-redux/coop/authority-v2/authority-log.ts",
     "src/data/elite-redux/coop/authority-v2/command-frontier.ts",
