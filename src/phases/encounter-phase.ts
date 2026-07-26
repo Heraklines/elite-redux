@@ -899,9 +899,11 @@ export class EncounterPhase extends BattlePhase {
     const loads = battle.enemyParty.map(enemy => enemy.loadAssets());
     if (battle.trainer != null) {
       loads.push(
-        battle.trainer.loadAssets().then(() => {
-          battle.trainer?.initSprite();
-        }),
+        battle.trainer.loadAssets().then(
+          wrapCoopEncounterContinuation(() => {
+            battle.trainer?.initSprite();
+          }),
+        ),
       );
     }
     await awaitCoopEncounterAssetsBounded(Promise.all(loads), {
@@ -1222,7 +1224,9 @@ export class EncounterPhase extends BattlePhase {
       // Add any special encounter animations to load
       if (mysteryEncounter.encounterAnimations && mysteryEncounter.encounterAnimations.length > 0) {
         loadEnemyAssets.push(
-          initEncounterAnims(mysteryEncounter.encounterAnimations).then(() => loadEncounterAnimAssets(true)),
+          initEncounterAnims(mysteryEncounter.encounterAnimations).then(
+            wrapCoopEncounterContinuation(() => loadEncounterAnimAssets(true)),
+          ),
         );
       }
 
@@ -1391,13 +1395,17 @@ export class EncounterPhase extends BattlePhase {
     }
 
     if (battle.battleType === BattleType.TRAINER) {
-      loadEnemyAssets.push(battle.trainer?.loadAssets().then(() => battle.trainer?.initSprite())!); // TODO: is this bang correct?
+      if (battle.trainer != null) {
+        loadEnemyAssets.push(
+          battle.trainer.loadAssets().then(wrapCoopEncounterContinuation(() => battle.trainer?.initSprite())),
+        );
+      }
     } else if (battle.isBattleMysteryEncounter()) {
       if (battle.mysteryEncounter?.introVisuals) {
         loadEnemyAssets.push(
           battle.mysteryEncounter.introVisuals
             .loadAssets()
-            .then(() => battle.mysteryEncounter!.introVisuals!.initSprite()),
+            .then(wrapCoopEncounterContinuation(() => battle.mysteryEncounter!.introVisuals!.initSprite())),
         );
       }
       if (battle.mysteryEncounter?.loadAssets && battle.mysteryEncounter.loadAssets.length > 0) {
@@ -1896,30 +1904,36 @@ export class EncounterPhase extends BattlePhase {
               }
               void globalScene.charSprite
                 .hide()
-                .then(() => {
-                  if (!isCurrent()) {
-                    return;
-                  }
-                  return globalScene.hideFieldOverlay(250);
-                })
-                .then(() => {
-                  if (finishInteractiveWait()) {
-                    doSummon();
-                  }
-                })
-                .catch(error => {
-                  if (!isCurrent()) {
-                    return;
-                  }
-                  coopWarn(
-                    "runtime",
-                    "trainer encounter overlay cleanup failed; continuing current presentation",
-                    error,
-                  );
-                  if (finishInteractiveWait()) {
-                    doSummon();
-                  }
-                });
+                .then(
+                  wrapCoopEncounterContinuation(() => {
+                    if (!isCurrent()) {
+                      return;
+                    }
+                    return globalScene.hideFieldOverlay(250);
+                  }),
+                )
+                .then(
+                  wrapCoopEncounterContinuation(() => {
+                    if (finishInteractiveWait()) {
+                      doSummon();
+                    }
+                  }),
+                )
+                .catch(
+                  wrapCoopEncounterContinuation(error => {
+                    if (!isCurrent()) {
+                      return;
+                    }
+                    coopWarn(
+                      "runtime",
+                      "trainer encounter overlay cleanup failed; continuing current presentation",
+                      error,
+                    );
+                    if (finishInteractiveWait()) {
+                      doSummon();
+                    }
+                  }),
+                );
             });
           } catch (error) {
             setInteractiveWaiting(false);
@@ -1930,27 +1944,33 @@ export class EncounterPhase extends BattlePhase {
           beginInteractiveWait();
           void globalScene
             .showFieldOverlay(500)
-            .then(() => {
-              if (!isCurrent()) {
-                return;
-              }
-              return globalScene.charSprite.showCharacter(
-                trainer.getKey()!,
-                getCharVariantFromDialogue(encounterMessages[0]),
-              );
-            })
-            .then(() => {
-              if (isCurrent()) {
+            .then(
+              wrapCoopEncounterContinuation(() => {
+                if (!isCurrent()) {
+                  return;
+                }
+                return globalScene.charSprite.showCharacter(
+                  trainer.getKey()!,
+                  getCharVariantFromDialogue(encounterMessages[0]),
+                );
+              }),
+            )
+            .then(
+              wrapCoopEncounterContinuation(() => {
+                if (isCurrent()) {
+                  showDialogueAndSummon();
+                }
+              }),
+            )
+            .catch(
+              wrapCoopEncounterContinuation(error => {
+                if (!isCurrent()) {
+                  return;
+                }
+                coopWarn("runtime", "trainer encounter character intro failed; falling back to dialogue", error);
                 showDialogueAndSummon();
-              }
-            })
-            .catch(error => {
-              if (!isCurrent()) {
-                return;
-              }
-              coopWarn("runtime", "trainer encounter character intro failed; falling back to dialogue", error);
-              showDialogueAndSummon();
-            }); // TODO: is this bang correct?
+              }),
+            ); // TODO: is this bang correct?
         } else {
           showDialogueAndSummon();
         }
@@ -2023,20 +2043,28 @@ export class EncounterPhase extends BattlePhase {
             }
             void globalScene.charSprite
               .hide()
-              .then(() => {
-                if (!isCurrent()) {
-                  return;
-                }
-                return globalScene.hideFieldOverlay(250);
-              })
-              .then(() => doEncounter())
-              .catch(error => {
-                if (!isCurrent()) {
-                  return;
-                }
-                coopWarn("runtime", "mystery encounter overlay cleanup failed; continuing current presentation", error);
-                doEncounter();
-              });
+              .then(
+                wrapCoopEncounterContinuation(() => {
+                  if (!isCurrent()) {
+                    return;
+                  }
+                  return globalScene.hideFieldOverlay(250);
+                }),
+              )
+              .then(wrapCoopEncounterContinuation(() => doEncounter()))
+              .catch(
+                wrapCoopEncounterContinuation(error => {
+                  if (!isCurrent()) {
+                    return;
+                  }
+                  coopWarn(
+                    "runtime",
+                    "mystery encounter overlay cleanup failed; continuing current presentation",
+                    error,
+                  );
+                  doEncounter();
+                }),
+              );
           });
         } catch (error) {
           setInteractiveWaiting(false);

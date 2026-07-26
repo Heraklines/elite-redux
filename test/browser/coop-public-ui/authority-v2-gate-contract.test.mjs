@@ -2620,6 +2620,26 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     encounterPhase,
+    /battle\.trainer\.loadAssets\(\)\.then\(\s*wrapCoopEncounterContinuation\(\(\) => battle\.trainer\?\.initSprite\(\)\)/u,
+    "trainer asset completion initializes the sprite only in the encounter's owning browser",
+  );
+  assert.match(
+    encounterPhase,
+    /showFieldOverlay\(500\)[\s\S]+\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{[\s\S]+showCharacter\([\s\S]+\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{[\s\S]+showDialogueAndSummon\(\);[\s\S]+\.catch\(\s*wrapCoopEncounterContinuation\(error => \{/u,
+    "every trainer character-intro promise edge re-enters the owning runtime before testing phase liveness",
+  );
+  assert.match(
+    encounterPhase,
+    /globalScene\.charSprite[\s\S]+\.hide\(\)[\s\S]+\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{[\s\S]+hideFieldOverlay\(250\)[\s\S]+\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{[\s\S]+finishInteractiveWait\(\)[\s\S]+\.catch\(\s*wrapCoopEncounterContinuation\(error => \{/u,
+    "trainer dialogue cleanup cannot consume its summon continuation against the peer scene",
+  );
+  assert.match(
+    encounterPhase,
+    /\.then\(wrapCoopEncounterContinuation\(\(\) => doEncounter\(\)\)\)[\s\S]+mystery encounter overlay cleanup failed/u,
+    "Mystery visual cleanup uses the same exact continuation ownership as trainer presentation",
+  );
+  assert.match(
+    encounterPhase,
     /Promise\.all\(\[tutorialReady, playerPresentationReady\]\)[\s\S]+\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{/u,
     "the player-presentation terminal join must re-enter the browser that owns the encounter phase",
   );
