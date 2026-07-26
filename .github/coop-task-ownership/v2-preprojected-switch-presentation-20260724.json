@@ -138,7 +138,5 @@
     "test/tools/coop-soak-driver.ts",
     "test/utils/encounter-test-utils.ts"
   ],
-  "lockedSchemaFiles": [
-    "src/data/elite-redux/coop/coop-transport.ts"
-  ]
+  "lockedSchemaFiles": []
 }
