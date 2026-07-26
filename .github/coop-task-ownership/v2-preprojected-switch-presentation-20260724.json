@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "d55733ac1000b0657259cada6c053ad6bf17f969",
+  "baseSha": "f22aaa2093c541f4f314891f2066c555e929db1a",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     ".github/workflows/coop-public-ui-journey.yml",
@@ -127,6 +127,7 @@
     "test/tests/elite-redux/coop/coop-savedata-digest.test.ts",
     "test/tests/elite-redux/coop/coop-session-controller.test.ts",
     "test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts",
+    "test/tests/elite-redux/coop/coop-soak-learn-move.test.ts",
     "test/tests/elite-redux/coop/coop-soak-me.test.ts",
     "test/tests/elite-redux/coop/coop-soak.test.ts",
     "test/tests/elite-redux/coop/coop-stormglass-operation.test.ts",

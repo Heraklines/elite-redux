@@ -22,6 +22,7 @@
 
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import { MoveId } from "#enums/move-id";
@@ -59,6 +60,9 @@ describe.skipIf(!RUN)("CO-OP SOAK learn-move leg: accept-with-forget across two 
 
   beforeEach(() => {
     accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
+    // Match the representative continuous soak. Vitest's 50 ms unit default can exhaust all rendezvous
+    // retries while the reciprocal renderer is legitimately draining a full eight-event entry prefix.
+    setCoopRendezvousWaitMs(2_000);
     setCoopWaveBarrierMs(50);
     setCoopFaintSwitchWaitMs(4000);
     game = new GameManager(phaserGame);
@@ -73,6 +77,7 @@ describe.skipIf(!RUN)("CO-OP SOAK learn-move leg: accept-with-forget across two 
   });
 
   afterEach(() => {
+    resetCoopRendezvousWaitMs();
     setCoopWaveBarrierMs(60_000);
     setCoopFaintSwitchWaitMs(60_000);
     accuracySpy?.mockRestore();
