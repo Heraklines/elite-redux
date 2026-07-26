@@ -876,6 +876,29 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(res?.events[0]).toEqual({ k: "faint", bi: 2, actor: { side: "enemy", pokemonId: 2 } });
   });
 
+  it("buffers adjacent-turn live entry effects while rejecting unowned future addresses", async () => {
+    const { host, guest } = createLoopbackPair();
+    const current = { epoch: 7, wave: 1, turn: 1 };
+    const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+    const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+
+    // A replacement can let the host start next-turn entry hazards before the guest has retired
+    // the faint turn. The cue must wait in the addressed buffer for the turn-2 replay pump.
+    hostStream.emitEvent(7, 1, 2, 0, { k: "message", text: "Bulbasaur was caught in a sticky web!" });
+    // No ordered successor can legitimately jump two turns or cross a wave through this cosmetic seam.
+    hostStream.emitEvent(7, 1, 3, 0, { k: "message", text: "unowned future" });
+    hostStream.emitEvent(7, 2, 2, 0, { k: "message", text: "unowned wave" });
+    await flushWire();
+
+    expect(guestStream.consumeLiveEvents(2, 1)).toEqual([
+      { seq: 0, event: { k: "message", text: "Bulbasaur was caught in a sticky web!" } },
+    ]);
+    expect(guestStream.consumeLiveEvents(3, 1)).toEqual([]);
+    expect(guestStream.consumeLiveEvents(2, 2)).toEqual([]);
+    hostStream.dispose();
+    guestStream.dispose();
+  });
+
   it("a turn that never arrives resolves null after the timeout (guest shows 'waiting')", async () => {
     const { host, guest } = createLoopbackPair();
     new CoopBattleStreamer(host);

@@ -1609,6 +1609,26 @@ export class CoopBattleStreamer {
     );
   }
 
+  /**
+   * Live presentation can cross the replacement boundary before the guest's ambient shell does. The
+   * authority may begin recording next-turn switch-in effects (entry hazards, abilities, weather) while
+   * the renderer is still retiring the faint turn. Retain exactly that adjacent same-wave turn; its replay
+   * pump consumes the buffer only after the ordered successor installs. Anything farther away remains an
+   * unauthorised address and is discarded.
+   */
+  private acceptsLiveEventAddress(address: CoopTurnAddress): boolean {
+    if (this.authorityContext == null) {
+      return true;
+    }
+    const current = this.currentAuthorityAddress();
+    if (current == null || address.epoch !== current.epoch || address.wave !== current.wave) {
+      return false;
+    }
+    return (
+      address.turn === current.turn || (current.turn < Number.MAX_SAFE_INTEGER && address.turn === current.turn + 1)
+    );
+  }
+
   private currentRecoveryBinding(): CoopFrameContextV1 | null {
     if (this.recoveryBinding != null) {
       try {
@@ -5490,7 +5510,7 @@ export class CoopBattleStreamer {
           || !isSafeAddressPart(msg.turn, false)
           || !isSafeAddressPart(msg.seq)
           || !isStrictCoopBattleEvent(msg.event)
-          || !this.acceptsCurrentAddress(msg)
+          || !this.acceptsLiveEventAddress(msg)
         ) {
           coopWarn(
             "replay",
