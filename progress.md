@@ -4088,3 +4088,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   A node-pure source contract prevents future refactors from releasing the host before `settleDuoPromise`.
 - No production phase or guard was weakened. Remote focused/common shards are the behavioral proof; local
   targeted Biome and the 62-test Authority V2 source-contract suite pass.
+
+## 2026-07-26 - Bounded fresh-launch decision surface
+
+- Real two-browser journey `30184226482` proved the all-empty save scan correction itself: the elected host
+  received five typed cloud-missing results, proved all five exact local keys absent, and classified the pair as
+  `no-save`. It then remained visually on `Connected! Checking for a co-op save...` and never published an
+  actionable prompt. The failure was therefore the following Phaser UI transition, not save discovery or WebRTC.
+- Every asynchronous co-op save-decision screen now crosses into `MESSAGE` through the existing bounded,
+  exact-session transition seam. A lost fade is forced after two seconds; a replaced session is superseded and
+  cannot install a stale callback. The fresh path also updates the visible lobby status and logs the transition
+  verdict before arming the human prompt. Resume and isolated-conflict prompts receive the same protection.
+- A failure-first node source contract rejects an unbounded fresh decision transition and pins the order:
+  bounded open, exact-session fence, mode-chain reset, actionable callback. The 63-test Authority V2 contract
+  suite and `git diff --check` pass locally; the real two-browser journey remains the behavioral proof.

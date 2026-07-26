@@ -1651,8 +1651,8 @@ export class TitlePhase extends Phase {
                 // The mode transition is asynchronous. Installing the callback before it settles
                 // lets the late Title -> Message switch replace the handler that owns the prompt,
                 // leaving a visible but permanently inert confirmation.
-                await globalScene.ui.setMode(UiMode.MESSAGE);
-                if (!isCurrentSession()) {
+                const transition = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, isCurrentSession);
+                if (transition === "superseded" || !isCurrentSession()) {
                   return;
                 }
                 globalScene.ui.resetModeChain();
@@ -1687,11 +1687,13 @@ export class TitlePhase extends Phase {
               // MessagePhase still owns its timer/handler. Replace that mode atomically before installing
               // the launch callback; otherwise the prompt stays visually stale and real Space presses are
               // swallowed (the two-browser campaign never observes SEND resumeStartNew).
-              await globalScene.ui.setMode(UiMode.MESSAGE);
-              if (!isCurrentSession()) {
+              const transition = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, isCurrentSession);
+              coopLog("launch", `fresh decision surface settled transition=${transition}`);
+              if (transition === "superseded" || !isCurrentSession()) {
                 return;
               }
               globalScene.ui.resetModeChain();
+              stage.setStatus("Connected! Press to start co-op.");
               globalScene.ui.showText("Connected to your partner!\nPress to start co-op.", 0, hostStartNew, null, true);
               return;
             }
@@ -1699,8 +1701,8 @@ export class TitlePhase extends Phase {
             // The offer crosses the same asynchronous MessagePhase boundary as the fresh-run prompt;
             // install it with the same atomic mode reset so Continue/New Game can never be visually
             // present while an older lobby handler still owns keyboard input.
-            await globalScene.ui.setMode(UiMode.MESSAGE);
-            if (!isCurrentSession()) {
+            const transition = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, isCurrentSession);
+            if (transition === "superseded" || !isCurrentSession()) {
               return;
             }
             globalScene.ui.resetModeChain();

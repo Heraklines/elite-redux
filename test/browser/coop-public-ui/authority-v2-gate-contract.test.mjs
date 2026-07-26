@@ -2356,6 +2356,29 @@ test("a fully missing account save set publishes no-save without a generic recon
   );
 });
 
+test("the asynchronous lobby save decision installs its human prompt through a bounded exact-session transition", () => {
+  const decisionStart = titlePhase.indexOf("const blockedMessage = coopResumeBlockMessage(discovery);");
+  const decisionEnd = titlePhase.indexOf(
+    "\n            // Offer the HOST a real RESUME / NEW GAME choice.",
+    decisionStart,
+  );
+  assert.ok(decisionStart >= 0 && decisionEnd > decisionStart, "the fresh launch decision has a bounded source block");
+  const freshDecision = titlePhase.slice(decisionStart, decisionEnd);
+  const boundedOpen = freshDecision.indexOf("setModeBoundedWhen(UiMode.MESSAGE, 2_000, isCurrentSession)");
+  const currentFence = freshDecision.indexOf('transition === "superseded" || !isCurrentSession()', boundedOpen);
+  const reset = freshDecision.indexOf("globalScene.ui.resetModeChain()", currentFence);
+  const prompt = freshDecision.indexOf('showText("Connected to your partner!', reset);
+  assert.ok(
+    boundedOpen >= 0 && currentFence > boundedOpen && reset > currentFence && prompt > reset,
+    "a lost lobby fade cannot retain the checking-saves screen or install a prompt after session replacement",
+  );
+  assert.doesNotMatch(
+    freshDecision,
+    /await globalScene\.ui\.setMode\(UiMode\.MESSAGE\)/u,
+    "the exact fresh decision may not wait forever on an unbounded Phaser transition",
+  );
+});
+
 test("the replacement harness preserves an already-installed command frontier", () => {
   const helperStart = duoHarness.indexOf("export async function materializeGuestInputAfterReplacement(");
   const helperEnd = duoHarness.indexOf("\n/**", helperStart + 1);
