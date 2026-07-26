@@ -2605,8 +2605,13 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     encounterPhase,
-    /const ownerRuntime = getCoopRuntime\(\);[\s\S]+runWhenCoopRuntimeActive\(ownerRuntime, \(\) => \{[\s\S]+result = ownerWrapped\(\.\.\.args\);/u,
+    /const ownerRuntime = getCoopRuntime\(\);[\s\S]+runWhenCoopRuntimeActive\(ownerRuntime, \(\) => \{[\s\S]+result = callback\(\.\.\.args\);/u,
     "encounter continuations wait for the exact runtime and its scene binding, not just an ambient harness label",
+  );
+  assert.match(
+    encounterPhase,
+    /if \(ownerRuntime == null\) \{\s*return coopEncounterContinuationWrapperForTesting\?\.\(callback\) \?\? callback;\s*\}/u,
+    "the harness-label fallback is available only when no exact session runtime owns the continuation",
   );
   assert.match(
     encounterPhase,

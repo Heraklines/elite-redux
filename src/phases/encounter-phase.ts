@@ -282,20 +282,21 @@ function wrapCoopEncounterContinuation<TArgs extends unknown[], TResult>(
   callback: (...args: TArgs) => TResult,
 ): (...args: TArgs) => TResult | undefined {
   const ownerRuntime = getCoopRuntime();
-  const ownerWrapped = coopEncounterContinuationWrapperForTesting?.(callback) ?? callback;
   if (ownerRuntime == null) {
-    return ownerWrapped;
+    return coopEncounterContinuationWrapperForTesting?.(callback) ?? callback;
   }
   return (...args): TResult | undefined => {
     let invoked = false;
     let result: TResult | undefined;
-    // Runtime identity alone is not sufficient in the one-process fixture: runWhenCoopRuntimeActive also
-    // requires the exact scene recorded by setCoopRuntime. In production this is synchronous. During a
-    // harness peer pump or a real hot-rejoin handoff, it retains the continuation until its owning runtime
-    // and scene are installed together instead of letting an ambient peer make the lifetime predicate false.
+    // The runtime+scene binding is the sole authority when a session exists. Do not layer the older
+    // harness-label wrapper on top: overlapping async harness scopes can temporarily retain a stale
+    // activeClientCtx label after setCoopRuntime has already installed the exact destination runtime/scene.
+    // Re-entering that stale label here makes the boundary predicate false and consumes this one-shot
+    // continuation against the peer. Production remains synchronous; the one-process fixture and hot
+    // rejoin retain the callback until the captured runtime and its scene are installed together.
     runWhenCoopRuntimeActive(ownerRuntime, () => {
       invoked = true;
-      result = ownerWrapped(...args);
+      result = callback(...args);
     });
     return invoked ? result : undefined;
   };
