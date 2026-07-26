@@ -305,6 +305,7 @@ test("the browser receipt parser accepts every canonical CoopBattleEvent kind", 
   assert.deepEqual(canonicalKinds, [
     "message",
     "moveUsed",
+    "moveAnim",
     "hp",
     "faint",
     "statStage",

@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { MoveChargeAnim } from "#data/battle-anims";
 import { erTryQuickeningGrace } from "#data/elite-redux/abilities/quickening-grace";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementChargeMove } from "#data/elite-redux/er-achievement-tracker";
 import { erTryConsumePowerHerb } from "#data/elite-redux/er-community-items";
 import type { AbilityId } from "#enums/ability-id";
@@ -58,6 +59,16 @@ export class MoveChargePhase extends PokemonPhase {
       return;
     }
 
+    recordCoopEvent({
+      k: "moveAnim",
+      bi: user.getBattlerIndex(),
+      moveId: move.id,
+      actor: { side: user.isPlayer() ? "player" : "enemy", pokemonId: user.id },
+      targets: [],
+      targetActors: [],
+      hitsSubstitute: [],
+      chargeAnim: move.chargeAnim,
+    });
     new MoveChargeAnim(move.chargeAnim, move.id, user).play(false, () => {
       move.showChargeText(user, target);
 

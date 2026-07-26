@@ -792,6 +792,9 @@ export class MovePhase extends PokemonPhase {
         bi: pokemon.getBattlerIndex(),
         actor: { side: pokemon.isPlayer() ? "player" : "enemy", pokemonId: pokemon.id },
         moveId,
+        // Protocol 51 records the exact animation only after hit resolution (or in MoveChargePhase).
+        // This boundary owns narration alone; older absent-field carriers retain the legacy replay path.
+        animate: false,
         // A later action in the same turn can still carry an engine target sentinel after an earlier
         // action fainted that target. Sentinels have no replayable field entity; omit them from the
         // presentation cue (the replay phase safely falls back to the user for a targetless animation).

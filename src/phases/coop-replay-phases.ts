@@ -30,7 +30,7 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
-import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
+import { CommonBattleAnim, MoveAnim, MoveChargeAnim } from "#data/battle-anims";
 import { SideKind } from "#data/battle-format";
 import { allAbilities } from "#data/data-lists";
 import { isTurnCommitSuccessorForSource } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
@@ -135,7 +135,7 @@ import type { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { HitResult } from "#enums/hit-result";
-import { CommonAnim } from "#enums/move-anims-common";
+import { type ChargeAnim, CommonAnim } from "#enums/move-anims-common";
 import type { MoveId } from "#enums/move-id";
 import type { PokeballType } from "#enums/pokeball";
 import { type BattleStat, Stat } from "#enums/stat";
@@ -783,12 +783,10 @@ export class CoopTeraReplayPhase extends Phase {
 }
 
 /**
- * GUEST: play the RNG-free move animation for a host `moveUsed` event (#633). Uses the
- * `MoveAnim` path (which draws NO RNG - it just renders the pre-built anim sequence), NOT a
- * MovePhase / MoveEffectPhase (those recompute outcomes + draw RNG). The "X used Y!" line
- * already rode as a `message` event ahead of this in the stream, so this phase plays the
- * animation only. Hardened: a missing user / target, a disabled-anim build, or a throwing
- * anim all fall through to `end()` so the turn never hangs.
+ * GUEST: play the authority's exact move-animation boundary (#633). Uses only `MoveAnim` or
+ * `MoveChargeAnim` (neither recomputes move outcomes or draws battle RNG). Narration is a separate
+ * `moveUsed` event. Missing actors, disabled animations, throws, and callback stalls all produce a
+ * bounded outcome so the turn cannot hang.
  */
 export class CoopMoveAnimReplayPhase extends Phase {
   public readonly phaseName = "CoopMoveAnimReplayPhase";
@@ -800,6 +798,8 @@ export class CoopMoveAnimReplayPhase extends Phase {
     private readonly actor?: CoopPresentationActorRef,
     private readonly targetActors?: CoopPresentationActorRef[],
     private readonly outcomeToken: CoopPresentationOutcomeToken = createCoopPresentationOutcomeToken(),
+    private readonly hitsSubstitute?: boolean[],
+    private readonly chargeAnim?: number,
   ) {
     super();
   }
@@ -811,8 +811,11 @@ export class CoopMoveAnimReplayPhase extends Phase {
     }
     let ended = false;
     let watchdog: CoopPresentationProgressWatchdog | undefined;
+    const targetFingerprint = this.targetActors?.map(target => `${target.side}:p${target.pokemonId}`).join(",") ?? "";
+    const targetSuffix =
+      this.chargeAnim === undefined ? (targetFingerprint ? `->${targetFingerprint}` : "") : `:charge${this.chargeAnim}`;
     const actorFingerprint =
-      this.actor == null ? `bi${this.bi}` : `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}`;
+      (this.actor == null ? `bi${this.bi}` : `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}`) + targetSuffix;
     const finish = (outcome: CoopPresentationOutcome) => {
       if (ended) {
         return;
@@ -831,7 +834,6 @@ export class CoopMoveAnimReplayPhase extends Phase {
         return;
       }
       const user = fieldMon(this.bi, this.actor);
-      const targetBi = currentBattlerIndexForActor(this.targetActors?.[0], this.targets[0] ?? this.bi);
       if (user == null) {
         if (isCoopDebug()) {
           coopLog(
@@ -842,16 +844,43 @@ export class CoopMoveAnimReplayPhase extends Phase {
         finish({ kind: "failed", reason: "move-actor-not-displayed", actorFingerprint });
         return;
       }
-      if (this.targetActors?.[0] != null && fieldMon(targetBi, this.targetActors[0]) == null) {
+      if (this.chargeAnim !== undefined) {
+        watchdog = armCoopPresentationProgressWatchdog(() =>
+          finish({ kind: "failed", reason: "move-charge-watchdog-expired", actorFingerprint }),
+        );
+        new MoveChargeAnim(this.chargeAnim as ChargeAnim, this.moveId as MoveId, user).play(false, () =>
+          finish({ kind: "rendered", actorFingerprint }),
+        );
+        return;
+      }
+      const targetBis = this.targets.length > 0 ? this.targets : [this.bi];
+      const resolvedTargets = targetBis.map((target, index) =>
+        currentBattlerIndexForActor(this.targetActors?.[index], target),
+      );
+      if (
+        resolvedTargets.some(
+          (targetBi, index) =>
+            this.targetActors?.[index] != null && fieldMon(targetBi, this.targetActors[index]) == null,
+        )
+      ) {
         finish({ kind: "failed", reason: "move-target-not-displayed", actorFingerprint });
         return;
       }
       watchdog = armCoopPresentationProgressWatchdog(() =>
         finish({ kind: "failed", reason: "move-watchdog-expired", actorFingerprint }),
       );
-      new MoveAnim(this.moveId as MoveId, user, targetBi as BattlerIndex).play(false, () =>
-        finish({ kind: "rendered", actorFingerprint }),
-      );
+      let animationsLeft = resolvedTargets.length;
+      for (const [index, resolvedTarget] of resolvedTargets.entries()) {
+        new MoveAnim(this.moveId as MoveId, user, resolvedTarget as BattlerIndex).play(
+          this.hitsSubstitute?.[index] ?? false,
+          () => {
+            animationsLeft--;
+            if (animationsLeft === 0) {
+              finish({ kind: "rendered", actorFingerprint });
+            }
+          },
+        );
+      }
     } catch {
       // A bad / un-loaded move anim must never strand the queue.
       coopWarn("replay", `present move bi=${this.bi} moveId=${this.moveId} anim threw -> finish (handled)`);

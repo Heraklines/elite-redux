@@ -1401,17 +1401,34 @@ export class CoopReplayTurnPhase extends Phase {
             // the move-anim phase. The host suppressed streaming its own (host-language) useMove message,
             // so this queueMessage is the sole source of the line. The regenerated line lands at the
             // moveUsed position (one slot after the original message position - adjacent, cosmetic).
+            coopNarrateMoveUsed(event.bi, event.moveId, event.actor);
+            if (event.animate !== false) {
+              outcomeToken = createCoopPresentationOutcomeToken();
+              this.presentationOutcomeTokens.push(outcomeToken);
+              pm.unshiftNew(
+                "CoopMoveAnimReplayPhase",
+                event.bi,
+                event.moveId,
+                [...event.targets],
+                event.actor,
+                event.targetActors == null ? undefined : [...event.targetActors],
+                outcomeToken,
+              );
+            }
+            break;
+          case "moveAnim":
             outcomeToken = createCoopPresentationOutcomeToken();
             this.presentationOutcomeTokens.push(outcomeToken);
-            coopNarrateMoveUsed(event.bi, event.moveId, event.actor);
             pm.unshiftNew(
               "CoopMoveAnimReplayPhase",
               event.bi,
               event.moveId,
               [...event.targets],
               event.actor,
-              event.targetActors == null ? undefined : [...event.targetActors],
+              [...event.targetActors],
               outcomeToken,
+              [...event.hitsSubstitute],
+              event.chargeAnim,
             );
             break;
           case "hp": {

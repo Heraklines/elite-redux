@@ -5,6 +5,7 @@
  */
 
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
+import { ChargeAnim } from "#enums/move-anims-common";
 
 /** Hard bound for the summon/on-entry cosmetic prefix retained beside one command-open state. */
 const MAX_ENTRY_PRESENTATION_EVENTS = 256;
@@ -30,6 +31,15 @@ function isActorAddressableBattlerIndex(value: unknown): value is number {
 
 function isValidPartySlot(value: unknown): value is number {
   return isSafeAddressPart(value) && value <= 5;
+}
+
+function isValidChargeAnim(value: unknown): value is ChargeAnim {
+  return (
+    isSafeAddressPart(value)
+    && value >= ChargeAnim.FLY_CHARGING
+    && value <= ChargeAnim.ELECTRO_SHOT_CHARGING
+    && ChargeAnim[value] !== undefined
+  );
 }
 
 function isPositiveSafeAddressPart(value: unknown): value is number {
@@ -87,6 +97,7 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
       return (
         isValidBattlerIndex(event.bi)
         && isSafeAddressPart(event.moveId, false)
+        && (event.animate === undefined || event.animate === false)
         && Array.isArray(event.targets)
         && event.targets.every(isValidBattlerIndex)
         && isPresentationActorRef(event.actor)
@@ -94,6 +105,26 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
         && event.targetActors.length === event.targets.length
         && event.targetActors.every(isPresentationActorRef)
       );
+    case "moveAnim": {
+      const targetCount = Array.isArray(event.targets) ? event.targets.length : -1;
+      const targetsValid =
+        Array.isArray(event.targets)
+        && event.targets.every(isValidBattlerIndex)
+        && Array.isArray(event.targetActors)
+        && event.targetActors.length === event.targets.length
+        && event.targetActors.every(isPresentationActorRef)
+        && Array.isArray(event.hitsSubstitute)
+        && event.hitsSubstitute.length === event.targets.length
+        && event.hitsSubstitute.every(flag => typeof flag === "boolean");
+      const charge = event.chargeAnim;
+      return (
+        isValidBattlerIndex(event.bi)
+        && isSafeAddressPart(event.moveId, false)
+        && isPresentationActorRef(event.actor)
+        && targetsValid
+        && (charge === undefined ? targetCount > 0 : isValidChargeAnim(charge) && targetCount === 0)
+      );
+    }
     case "hp":
       return (
         isActorAddressableBattlerIndex(event.bi)

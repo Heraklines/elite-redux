@@ -53,6 +53,7 @@ const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const PRESENTATION_EVENT_KINDS = new Set([
   "message",
   "moveUsed",
+  "moveAnim",
   "hp",
   "faint",
   "statStage",

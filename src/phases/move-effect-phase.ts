@@ -28,6 +28,7 @@ import {
   bypassesOpponentMultiHitSuppression,
   suppressesOpponentDamageBoosts,
 } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import {
   erRecordAchievementMoveDamage,
   erRecordAchievementMoveResolution,
@@ -286,16 +287,29 @@ export class MoveEffectPhase extends PokemonPhase {
     ) {
       const moveTargets = this.getTargets();
       const targetsForAnimation = moveTargets.length > 0 ? moveTargets : [user];
+      const hitsSubstitute = targetsForAnimation.map(target => move.hitsSubstitute(user, target));
+      recordCoopEvent({
+        k: "moveAnim",
+        bi: user.getBattlerIndex(),
+        moveId: move.id,
+        actor: { side: user.isPlayer() ? "player" : "enemy", pokemonId: user.id },
+        targets: targetsForAnimation.map(target => target.getBattlerIndex()),
+        targetActors: targetsForAnimation.map(target => ({
+          side: target.isPlayer() ? ("player" as const) : ("enemy" as const),
+          pokemonId: target.id,
+        })),
+        hitsSubstitute,
+      });
       let animationsLeft = targetsForAnimation.length;
 
-      for (const target of targetsForAnimation) {
+      for (const [targetIndex, target] of targetsForAnimation.entries()) {
         new MoveAnim(
           move.id as MoveId,
           user,
           target.getBattlerIndex(),
           // Some moves used in mystery encounters should be played even on an empty field
           globalScene.currentBattle?.mysteryEncounter?.hasBattleAnimationsWithoutTargets ?? false,
-        ).play(move.hitsSubstitute(user, target), () => {
+        ).play(hitsSubstitute[targetIndex] ?? false, () => {
           animationsLeft--;
           if (animationsLeft === 0) {
             this.postAnimCallback(user, targets);

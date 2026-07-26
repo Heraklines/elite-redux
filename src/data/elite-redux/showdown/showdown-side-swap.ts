@@ -160,6 +160,7 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
   });
   switch (event.k) {
     case "moveUsed":
+    case "moveAnim":
       return {
         ...event,
         bi: swapBi(event.bi, enemyBase),

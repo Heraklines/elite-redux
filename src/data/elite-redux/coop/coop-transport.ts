@@ -140,7 +140,10 @@ export type CoopRole = "host" | "guest";
 // to a transient battler index after switch/faint/reorder, so mixed builds must refuse pairing.
 // er-coop-50 adds immutable form-change/Transform presentation and completes Transform's copied passive
 // material so the renderer never infers appearance or ER ability identity from local state.
-export const COOP_PROTOCOL_VERSION = "er-coop-50";
+// er-coop-51 separates move narration from the actual animation boundary. Successful spread moves carry
+// every rendered target/substitute flag, failed moves carry no false animation, and charging turns carry
+// the exact charge animation instead of being rendered as the completed attack.
+export const COOP_PROTOCOL_VERSION = "er-coop-51";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1095,16 +1098,31 @@ export interface CoopPresentationActorRef {
 export type CoopBattleEvent =
   /** A battle-log line, ALREADY localized by the host (the guest shows it verbatim). */
   | { k: "message"; text: string }
-  /** A mon used a move (cue the "X used Y!" + move animation). */
+  /** A mon announced a move. Modern senders set `animate=false`; the exact animation is a later moveAnim. */
   | {
       k: "moveUsed";
       bi: number;
       moveId: number;
       targets: number[];
+      /** Compatibility only: absent means an older carrier whose moveUsed also owns one animation. */
+      animate?: false;
       /** Exact actor identity. Protocol 47 never derives it from the transient battler index. */
       actor: CoopPresentationActorRef;
       /** Exact identities aligned one-for-one with every materialized `targets` entry. */
       targetActors: CoopPresentationActorRef[];
+    }
+  /** One animation the authority actually played after hit resolution, or one exact charge animation. */
+  | {
+      k: "moveAnim";
+      bi: number;
+      moveId: number;
+      actor: CoopPresentationActorRef;
+      /** Normal-move targets. Charge animation carries empty aligned arrays. */
+      targets: number[];
+      targetActors: CoopPresentationActorRef[];
+      hitsSubstitute: boolean[];
+      /** Present only for a charging turn; its value is the resolved MoveChargeAnim id. */
+      chargeAnim?: number;
     }
   /** Set + tween a mon's hp to this value using the authority-resolved damage presentation, when present. */
   | {

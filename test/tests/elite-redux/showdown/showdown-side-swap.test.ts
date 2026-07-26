@@ -175,6 +175,18 @@ describe("showdown-side-swap: battle events", () => {
         { side: "enemy", pokemonId: 22 },
       ],
     },
+    {
+      k: "moveAnim",
+      bi: BattlerIndex.PLAYER,
+      moveId: 33,
+      targets: [BattlerIndex.ENEMY, BattlerIndex.ENEMY_2],
+      actor: { side: "player", pokemonId: 11 },
+      targetActors: [
+        { side: "enemy", pokemonId: 21 },
+        { side: "enemy", pokemonId: 22 },
+      ],
+      hitsSubstitute: [false, true],
+    },
     { k: "hp", bi: BattlerIndex.ENEMY, hp: 40, maxHp: 100, sp: 2, actor: { side: "enemy", pokemonId: 21 } },
     { k: "faint", bi: BattlerIndex.ENEMY_2, narrate: true, actor: { side: "enemy", pokemonId: 22 } },
     {
@@ -218,20 +230,28 @@ describe("showdown-side-swap: battle events", () => {
       { side: "player", pokemonId: 21 },
       { side: "player", pokemonId: 22 },
     ]);
-    expect((swapBattleEvent(events[2]) as Extract<CoopBattleEvent, { k: "hp" }>).bi).toBe(BattlerIndex.PLAYER);
-    expect((swapBattleEvent(events[3]) as Extract<CoopBattleEvent, { k: "faint" }>).bi).toBe(BattlerIndex.PLAYER_2);
-    expect((swapBattleEvent(events[4]) as Extract<CoopBattleEvent, { k: "statStage" }>).bi).toBe(BattlerIndex.ENEMY_2);
-    expect((swapBattleEvent(events[5]) as Extract<CoopBattleEvent, { k: "status" }>).bi).toBe(BattlerIndex.PLAYER);
-    expect((swapBattleEvent(events[6]) as Extract<CoopBattleEvent, { k: "showAbility" }>).bi).toBe(
+    const moveAnim = swapBattleEvent(events[2]) as Extract<CoopBattleEvent, { k: "moveAnim" }>;
+    expect(moveAnim.bi).toBe(BattlerIndex.ENEMY);
+    expect(moveAnim.targets).toEqual([BattlerIndex.PLAYER, BattlerIndex.PLAYER_2]);
+    expect(moveAnim.targetActors).toEqual([
+      { side: "player", pokemonId: 21 },
+      { side: "player", pokemonId: 22 },
+    ]);
+    expect(moveAnim.hitsSubstitute).toEqual([false, true]);
+    expect((swapBattleEvent(events[3]) as Extract<CoopBattleEvent, { k: "hp" }>).bi).toBe(BattlerIndex.PLAYER);
+    expect((swapBattleEvent(events[4]) as Extract<CoopBattleEvent, { k: "faint" }>).bi).toBe(BattlerIndex.PLAYER_2);
+    expect((swapBattleEvent(events[5]) as Extract<CoopBattleEvent, { k: "statStage" }>).bi).toBe(BattlerIndex.ENEMY_2);
+    expect((swapBattleEvent(events[6]) as Extract<CoopBattleEvent, { k: "status" }>).bi).toBe(BattlerIndex.PLAYER);
+    expect((swapBattleEvent(events[7]) as Extract<CoopBattleEvent, { k: "showAbility" }>).bi).toBe(
       BattlerIndex.ENEMY_2,
     );
-    expect((swapBattleEvent(events[7]) as Extract<CoopBattleEvent, { k: "switch" }>).bi).toBe(BattlerIndex.ENEMY);
+    expect((swapBattleEvent(events[8]) as Extract<CoopBattleEvent, { k: "switch" }>).bi).toBe(BattlerIndex.ENEMY);
   });
 
   it("leaves side-free members (message / weather / terrain) untouched", () => {
     expect(swapBattleEvent(events[0])).toEqual(events[0]);
-    expect(swapBattleEvent(events[8])).toEqual(events[8]);
     expect(swapBattleEvent(events[9])).toEqual(events[9]);
+    expect(swapBattleEvent(events[10])).toEqual(events[10]);
   });
 
   it("swap∘swap = identity for every event kind", () => {

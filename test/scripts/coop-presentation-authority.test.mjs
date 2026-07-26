@@ -264,14 +264,14 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(replay, /CoopSwitchReplayPhase[\s\S]+CoopReplayTurnPhase[\s\S]+this\.end\(\)/u);
 });
 
-test("protocol 50 binds every structured presentation cue to stable live actor identities", () => {
+test("protocol 51 binds every structured presentation cue to stable actors and actual animation boundaries", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-50"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-51"/u);
   assert.match(
     read("src/data/elite-redux/coop/authority-v2/adapters/control-open.ts"),
     /readonly entryPresentation: readonly CoopBattleEvent\[\]/u,
@@ -279,8 +279,18 @@ test("protocol 50 binds every structured presentation cue to stable live actor i
   assert.match(transport, /actor: CoopPresentationActorRef/u);
   assert.doesNotMatch(transport, /actor\?: CoopPresentationActorRef/u);
   assert.match(validator, /event\.targetActors\.length === event\.targets\.length/u);
+  assert.match(validator, /case "moveAnim"[\s\S]+event\.hitsSubstitute\.length === event\.targets\.length/u);
+  assert.match(validator, /charge === undefined[\s\S]+targetCount > 0[\s\S]+targetCount === 0/u);
+  assert.match(validator, /isValidChargeAnim\(charge\)/u);
   assert.match(move, /targets: targetEntries\.map\(entry => entry\.target\)/u);
   assert.match(move, /targetActors: targetEntries\.map\(entry => entry\.actor\)/u);
+  assert.match(move, /animate: false/u);
+  assert.match(read("src/phases/move-effect-phase.ts"), /k: "moveAnim"[\s\S]+hitsSubstitute/u);
+  assert.match(read("src/phases/move-charge-phase.ts"), /k: "moveAnim"[\s\S]+chargeAnim: move\.chargeAnim/u);
+  assert.match(
+    read("src/phases/coop-replay-turn-phase.ts"),
+    /case "moveUsed"[\s\S]+event\.animate !== false[\s\S]+case "moveAnim"/u,
+  );
 });
 
 test("every co-op renderer boundary triggers the production two-browser journey", () => {

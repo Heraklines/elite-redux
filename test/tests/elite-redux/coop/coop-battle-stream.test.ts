@@ -384,6 +384,47 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(malformedStream.retainedAuthorityDiagnostics().turnCommits).toBe(0);
   });
 
+  it("retains exact normal and charge animation boundaries", () => {
+    for (const event of [
+      {
+        k: "moveAnim" as const,
+        bi: 0,
+        moveId: 1,
+        actor: { side: "player" as const, pokemonId: 1 },
+        targets: [2],
+        targetActors: [{ side: "enemy" as const, pokemonId: 2 }],
+        hitsSubstitute: [true],
+      },
+      {
+        k: "moveAnim" as const,
+        bi: 0,
+        moveId: 1,
+        actor: { side: "player" as const, pokemonId: 1 },
+        targets: [],
+        targetActors: [],
+        hitsSubstitute: [],
+        chargeAnim: 1000,
+      },
+    ]) {
+      const stream = new CoopBattleStreamer(createLoopbackPair().host);
+      expect(() =>
+        stream.emitTurn(
+          7,
+          1,
+          1,
+          [event],
+          emptyCheckpoint(),
+          "deadbeefdeadbeef",
+          "{}",
+          emptyFullField(),
+          emptyAuthoritativeState(1, 1, 20),
+        ),
+      ).not.toThrow();
+      expect(stream.retainedAuthorityDiagnostics().turnCommits).toBe(1);
+      stream.dispose();
+    }
+  });
+
   it("withholds malformed host events before authority retention", () => {
     const { host } = createLoopbackPair();
     const stream = new CoopBattleStreamer(host);
@@ -417,6 +458,100 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         1,
         1,
         [{ k: "tera", bi: 0, pokemonId: 7, partySlot: -1, teraType: 2 } as never],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
+        [
+          {
+            k: "moveAnim",
+            bi: 0,
+            moveId: 1,
+            actor: { side: "player", pokemonId: 1 },
+            targets: [2, 3],
+            targetActors: [{ side: "enemy", pokemonId: 2 }],
+            hitsSubstitute: [false, true],
+          } as never,
+        ],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
+        [
+          {
+            k: "moveAnim",
+            bi: 0,
+            moveId: 1,
+            actor: { side: "player", pokemonId: 1 },
+            targets: [2],
+            targetActors: [{ side: "enemy", pokemonId: 2 }],
+            hitsSubstitute: [],
+            chargeAnim: 1000,
+          } as never,
+        ],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
+        [
+          {
+            k: "moveAnim",
+            bi: 0,
+            moveId: 1,
+            actor: { side: "player", pokemonId: 1 },
+            targets: [],
+            targetActors: [],
+            hitsSubstitute: [],
+            chargeAnim: 999,
+          } as never,
+        ],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
+        [
+          {
+            k: "moveUsed",
+            bi: 0,
+            moveId: 1,
+            actor: { side: "player", pokemonId: 1 },
+            targets: [],
+            targetActors: [],
+            animate: true,
+          } as never,
+        ],
         emptyCheckpoint(),
         "deadbeefdeadbeef",
         "{}",

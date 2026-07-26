@@ -610,7 +610,17 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       expect(committedTurn, "the public turn crossed the production V2 TURN_COMMIT adapter").toBeDefined();
       const committedEvents = (committedTurn?.capture.turnResolution ?? []) as CoopBattleEvent[];
       const committedKinds = new Set(committedEvents.map(event => event.k));
-      expect(committedKinds.has("moveUsed"), "the immutable turn carries move presentation material").toBe(true);
+      expect(committedKinds.has("moveUsed"), "the immutable turn carries move narration material").toBe(true);
+      expect(committedKinds.has("moveAnim"), "the immutable turn carries actual move animation material").toBe(true);
+      const spreadAnimation = committedEvents.find(event => event.k === "moveAnim");
+      expect(
+        spreadAnimation?.k === "moveAnim" ? spreadAnimation.targets : [],
+        "spread animation retains both targets",
+      ).toHaveLength(2);
+      expect(
+        spreadAnimation?.k === "moveAnim" ? spreadAnimation.hitsSubstitute : [],
+        "spread animation carries one resolved substitute flag per target",
+      ).toHaveLength(2);
       expect(committedKinds.has("hp"), "the immutable turn carries HP presentation material").toBe(true);
       expect(committedKinds.has("faint"), "the immutable turn carries faint presentation material").toBe(true);
       const committedFaints = committedEvents.filter(event => event.k === "faint");
