@@ -52,7 +52,7 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   assert.match(title, /Press to start a separate co-op run\. Existing saves will not be overwritten\./u);
   assert.match(
     title,
-    /stage\.setStatus\("A save conflict was isolated\. Start a separate run\?"\);[\s\S]*setModeBoundedWhen\(UiMode\.MESSAGE, 2_000, isCurrentSession\)[\s\S]*transition === "superseded" \|\| !isCurrentSession\(\)[\s\S]*installHostLaunchDecision\([\s\S]*hostStartNew/u,
+    /stage\?\.setStatus\("A save conflict was isolated\. Start a separate run\?"\);[\s\S]*setModeBoundedWhen\(UiMode\.MESSAGE, 2_000, isCurrentSession\)[\s\S]*transition === "superseded" \|\| !isCurrentSession\(\)[\s\S]*installHostLaunchDecision\([\s\S]*hostStartNew/u,
   );
   assert.match(title, /hostStartNew/u);
 

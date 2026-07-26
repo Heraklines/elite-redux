@@ -29,6 +29,7 @@ test("the browser room reaches CoopLobbyController without changing production d
   assert.match(lobby, /get\("cooproom"\)/u);
   assert.match(lobby, /const room = coopLobbyRoomFromEnv\(\)/u);
   assert.match(lobby, /options\.p33Dependencies \?\? \(room == null \? \{\} : \{ room \}\)/u);
-  assert.match(title, /new CoopLobbyController\(username, \{/u);
+  assert.match(title, /new CoopLobbyController\(\s*username,\s*\{/u);
+  assert.match(title, /netcodeMode,[\s\S]*sessionKind,[\s\S]*p33Dependencies: \{ room: tournamentConstraint\.room \}/u);
   assert.match(harness, /entryUrl\.searchParams\.set\("cooproom", this\.config\.lobbyRoom\)/u);
 });
