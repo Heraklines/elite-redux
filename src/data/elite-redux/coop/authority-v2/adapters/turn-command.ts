@@ -227,11 +227,17 @@ export function isTurnCommitSuccessorForSource(control: CoopNextControl, source:
     return false;
   }
   const exactDeferredWaveWait =
-    control.allowedKinds.includes("WAVE_ADVANCE")
-    && control.allowedControlAddresses?.some(
+    control.allowedKinds.length === 2
+    && control.allowedKinds.includes("CONTROL_COMMIT")
+    && control.allowedKinds.includes("WAVE_ADVANCE")
+    && control.allowedControlAddresses?.length === 1
+    && control.allowedControlAddresses.every(
       address =>
         address.materialKind === "replacement-open" && address.wave === source.wave && address.turn === source.turn + 1,
-    ) === true;
+    )
+    && (control.allowedInteractionAddresses == null || control.allowedInteractionAddresses.length === 0)
+    && control.allowNextWaveStart === false
+    && control.expectedOperationId == null;
   return (
     control.afterOperationId === source.operationId
     && control.epoch === source.epoch

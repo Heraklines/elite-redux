@@ -153,6 +153,20 @@ export class PokerogueSessionSavedataApi extends ApiBase {
       const urlSearchParams = this.toUrlSearchParams(params);
       const response = await this.doGet(`/savedata/session/get?${urlSearchParams}`, signal);
       if (!response.ok) {
+        // Missing is a complete machine-readable answer at the response-header boundary. Do not
+        // make a fresh co-op launch wait for an error body that carries no additional authority.
+        // Real Chromium runs have delivered all five 404 headers while response.text() remained
+        // pending indefinitely, leaving the host on "Checking for a co-op save..." and the guest
+        // behind its fail-closed launch barrier. The successful path still consumes the savedata
+        // bytes, and every other HTTP failure remains typed below.
+        if (response.status === 404) {
+          return {
+            ok: false,
+            status: response.status,
+            error: "Session not found.",
+            failureKind: "missing",
+          };
+        }
         let body = "";
         try {
           body = await response.text();
@@ -168,7 +182,7 @@ export class PokerogueSessionSavedataApi extends ApiBase {
           ok: false,
           status: response.status,
           error: body || `Co-op session read failed with HTTP ${response.status}.`,
-          failureKind: response.status === 404 ? "missing" : classifyCoopCasFailure(response.status),
+          failureKind: classifyCoopCasFailure(response.status),
         };
       }
       try {

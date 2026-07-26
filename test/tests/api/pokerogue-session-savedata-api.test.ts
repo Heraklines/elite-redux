@@ -226,15 +226,20 @@ describe("Pokerogue Session Savedata API", () => {
     });
 
     it("classifies a missing row without exposing its error body as savedata", async () => {
-      server.use(
-        http.get(`${apiBase}/savedata/session/get`, () => new HttpResponse("Session not found.", { status: 404 })),
-      );
-      await expect(sessionSavedataApi.getCoopCas(params)).resolves.toEqual({
-        ok: false,
-        status: 404,
-        error: "Session not found.",
-        failureKind: "missing",
-      });
+      const response = new Response("an error body the launch must not await", { status: 404 });
+      const bodyRead = vi.spyOn(response, "text");
+      const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+      try {
+        await expect(sessionSavedataApi.getCoopCas(params)).resolves.toEqual({
+          ok: false,
+          status: 404,
+          error: "Session not found.",
+          failureKind: "missing",
+        });
+        expect(bodyRead, "the definitive missing status completes at response headers").not.toHaveBeenCalled();
+      } finally {
+        fetch.mockRestore();
+      }
     });
 
     it("preserves a non-missing backend failure as a typed status", async () => {
