@@ -32,6 +32,7 @@
 
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { resetErAchievementRunState } from "#data/elite-redux/er-achievement-run-state";
 import { setErBiomeOverstayAnchor } from "#data/elite-redux/er-biome-structure";
@@ -65,6 +66,10 @@ describe.skipIf(!RUN)("DETERMINISM CONTRACT: identical seeded script => identica
   });
 
   beforeEach(() => {
+    // A real renderer can legitimately spend longer than Vitest's 350 ms aggregate shortcut replaying an
+    // entry's ability/move/stat presentation before it reaches the reciprocal command. Keep this bounded,
+    // but preserve the same presentation-before-rendezvous ordering as production.
+    setCoopRendezvousWaitMs(2_000);
     setCoopWaveBarrierMs(50);
     setCoopFaintSwitchWaitMs(4000);
     // Reset the shared ER module-let substrates so BOTH independent pairs start from the identical
@@ -90,6 +95,7 @@ describe.skipIf(!RUN)("DETERMINISM CONTRACT: identical seeded script => identica
   });
 
   afterEach(() => {
+    resetCoopRendezvousWaitMs();
     setCoopWaveBarrierMs(60_000);
     setCoopFaintSwitchWaitMs(60_000);
     logs.dispose();

@@ -24,6 +24,7 @@
 
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopDexSyncDelayMs } from "#data/elite-redux/coop/coop-runtime";
 import { MoveId } from "#enums/move-id";
 import { UiMode } from "#enums/ui-mode";
@@ -57,6 +58,7 @@ describe.skipIf(!RUN)("CO-OP SOAK catch leg: seeded ball throw -> capture -> dex
     // FORCE-HIT determinism knob (identical to the main soak): the framework clamps the accuracy roll to
     // its WORST case, so any sub-100 effective accuracy is a guaranteed miss; restore in afterEach.
     accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
+    setCoopRendezvousWaitMs(2_000);
     setCoopWaveBarrierMs(50);
     setCoopFaintSwitchWaitMs(4000);
     game = new GameManager(phaserGame);
@@ -79,6 +81,7 @@ describe.skipIf(!RUN)("CO-OP SOAK catch leg: seeded ball throw -> capture -> dex
   });
 
   afterEach(() => {
+    resetCoopRendezvousWaitMs();
     setCoopWaveBarrierMs(60_000);
     setCoopFaintSwitchWaitMs(60_000);
     setCoopDexSyncDelayMs(500); // the driver shortened it for the leg; restore the production default

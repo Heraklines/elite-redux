@@ -4,7 +4,7 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync as readFileRaw } from "node:fs";
+import { readdirSync, readFileSync as readFileRaw } from "node:fs";
 import { test } from "node:test";
 
 // These contracts slice product source by structural markers ("\n}\n", "\n/**\n * ...").
@@ -64,15 +64,6 @@ const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts"
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
 const biomeShopPhase = readFileSync(new URL("src/phases/biome-shop-phase.ts", root), "utf8");
 const soakDriver = readFileSync(new URL("test/tools/coop-soak-driver.ts", root), "utf8");
-const soakTest = readFileSync(new URL("test/tests/elite-redux/coop/coop-soak.test.ts", root), "utf8");
-const soakFidelityGate = readFileSync(
-  new URL("test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts", root),
-  "utf8",
-);
-const automaticVictorySeal = readFileSync(
-  new URL("test/tests/elite-redux/coop/coop-automatic-victory-seal.test.ts", root),
-  "utf8",
-);
 const hostFaintSoak = readFileSync(new URL("test/tests/elite-redux/coop/coop-soak-host-faint.test.ts", root), "utf8");
 const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "utf8");
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
@@ -2523,21 +2514,28 @@ test("the replacement harness preserves an already-installed command frontier", 
 });
 
 test("soaks budget command rendezvous for authoritative presentation and restore the test default", () => {
-  assert.match(
-    soakTest,
-    /setCoopRendezvousWaitMs\(2_000\)/u,
-    "the normal soak cannot compress a healthy entry presentation into the generic 350ms retry ceiling",
-  );
-  assert.match(soakTest, /resetCoopRendezvousWaitMs\(\)/u);
-  assert.match(soakFidelityGate, /setCoopRendezvousWaitMs\(2000\)/u);
-  assert.match(soakFidelityGate, /resetCoopRendezvousWaitMs\(\)/u);
-  assert.match(automaticVictorySeal, /setCoopRendezvousWaitMs\(2_000\)/u);
-  assert.match(automaticVictorySeal, /resetCoopRendezvousWaitMs\(\)/u);
-  assert.doesNotMatch(
-    soakFidelityGate,
-    /afterEach\([\s\S]*?setCoopRendezvousWaitMs\(60_000\)/u,
-    "cleanup must restore test-aware semantics instead of latching the live interval into later files",
-  );
+  const soakSuiteDirectory = new URL("test/tests/elite-redux/coop/", root);
+  const representativeSoaks = readdirSync(soakSuiteDirectory)
+    .filter(name => name.endsWith(".test.ts"))
+    .map(name => ({ name, source: readFileSync(new URL(name, soakSuiteDirectory), "utf8") }))
+    .filter(({ source }) => source.includes("runCoopSoak("));
+
+  assert.ok(representativeSoaks.length >= 10, "the complete representative-soak inventory is inspected");
+  for (const { name, source } of representativeSoaks) {
+    const budgets = [...source.matchAll(/setCoopRendezvousWaitMs\(([\d_]+)\)/gu)].map(match =>
+      Number(match[1].replaceAll("_", "")),
+    );
+    assert.ok(
+      budgets.some(budget => budget >= 1_000),
+      `${name} cannot compress healthy authoritative presentation into the generic 350ms retry ceiling`,
+    );
+    assert.match(source, /resetCoopRendezvousWaitMs\(\)/u, `${name} restores the test-aware rendezvous default`);
+    assert.doesNotMatch(
+      source,
+      /afterEach\([\s\S]*?setCoopRendezvousWaitMs\(60_000\)/u,
+      `${name} cleanup must not latch the live interval into later files`,
+    );
+  }
 });
 
 test("the one-process soak retains the authority browser while nested peer pumps settle a wave crossing", () => {

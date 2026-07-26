@@ -35,6 +35,7 @@
 
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
@@ -75,6 +76,7 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
     beforeEach(() => {
       // FORCE-HIT (determinism knob, not content narrowing) - mirrors coop-soak.test.ts so the level edge connects.
       accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
+      setCoopRendezvousWaitMs(2_000);
       setCoopWaveBarrierMs(50);
       setCoopFaintSwitchWaitMs(4000);
       game = new GameManager(phaserGame);
@@ -93,6 +95,7 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
     });
 
     afterEach(() => {
+      resetCoopRendezvousWaitMs();
       setCoopWaveBarrierMs(60_000);
       setCoopFaintSwitchWaitMs(60_000);
       accuracySpy?.mockRestore();
