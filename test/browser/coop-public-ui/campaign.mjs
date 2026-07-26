@@ -1866,7 +1866,7 @@ export function assertAsymmetricLearnMoveProjection(ownerObservation, watcherObs
     );
   }
   if (
-    watcherObservation?.surfaceId !== "summary"
+    watcherObservation?.surfaceId !== "learn-move:summary"
     || (watcherPhase !== "LearnMovePhase" && watcherPhase !== "CoopReplayLearnMovePhase")
     || watcherObservation.ready?.handlerActive !== true
     || watcherObservation.ready?.inputBlocked !== true

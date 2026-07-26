@@ -855,7 +855,7 @@ test("host-owned learn move allows asymmetric UI only while address and state st
     stateDigest: "same-state",
   };
   const watcher = {
-    surfaceId: "summary",
+    surfaceId: "learn-move:summary",
     phase: "LearnMovePhase",
     localSeat: 1,
     ownerSeat: null,
