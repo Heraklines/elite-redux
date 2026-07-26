@@ -1,0 +1,59 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 6
+run_mode: diagnostic
+calibration_id: god-200
+target_sha: f4bb59d5d87b2104ff57f1835b1832ac29cc9756
+checked_out_sha: f4bb59d5d87b2104ff57f1835b1832ac29cc9756
+base_seed: 20260726
+campaign_seed: 20260726
+run: 30183221756 (workflow source f4bb59d5d87b2104ff57f1835b1832ac29cc9756)
+timestamp: 2026-07-26T01-41-57Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260726 WAVES=6 - replay this run with:  SOAK_SEED=20260726 SOAK_WAVES=6 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 5 (seed 20260726): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "NextEncounterPhase", UI mode MESSAGE (=0), interceptor state "running".
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 5 (seed 206780945): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "NextEncounterPhase", UI mode MESSAGE (=0), interceptor state "running".
+
+----- vitest result tail -----
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 5 (seed 20260726): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "NextEncounterPhase", UI mode MESSAGE (=0), interceptor state "running".
+Original: Timed out in waitUntil!. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-26T01-41-28-408Z__seed-20260726__wave-5. Replay: SOAK_SEED=20260726[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1700:11[22m[39m
+    [90m1698|[39m       phaseState: phaseStateDump(rig),
+    [90m1699|[39m     });
+    [90m1700|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1701|[39m   };
+    [90m1702|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4980:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m184:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 5 (seed 206780945): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "NextEncounterPhase", UI mode MESSAGE (=0), interceptor state "running".
+Original: Timed out in waitUntil!. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-26T01-41-57-317Z__seed-206780945__wave-5. Replay: SOAK_SEED=206780945[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1700:11[22m[39m
+    [90m1698|[39m       phaseState: phaseStateDump(rig),
+    [90m1699|[39m     });
+    [90m1700|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1701|[39m   };
+    [90m1702|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4980:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m309:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m   Start at [22m 01:40:36
+[2m   Duration [22m 81.09s[2m (transform 17.12s, setup 20.78s, import 272ms, tests 59.37s, environment 547ms)[22m
+
