@@ -20,9 +20,14 @@ export abstract class Phase {
     this.retired = true;
   }
 
+  /** Whether authoritative progression has destructively discarded this phase. */
+  protected isRetired(): boolean {
+    return this.retired;
+  }
+
   /** End the current phase and start a new one. */
   public end(): void {
-    if (this.retired) {
+    if (this.isRetired()) {
       return;
     }
     globalScene.phaseManager.shiftPhase();

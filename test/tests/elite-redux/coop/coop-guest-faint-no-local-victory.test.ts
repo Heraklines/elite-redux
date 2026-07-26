@@ -37,6 +37,7 @@ import { clearCoopMachineWaits, coopMachineWaitLabels } from "#data/elite-redux/
 import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { CoopInertPhase } from "#phases/coop-inert-phase";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
+import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 // --- The recorder behind the injected stub scene: the two end-of-turn levers the fix toggles.
@@ -256,6 +257,41 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     ordinaryDiscard.retire();
     ordinaryDiscard.end();
     expect(rec.shiftPhaseCalls).toBe(shiftsAfterSuccessorStart);
+  });
+
+  it("destructive Authority V2 projection retires a replay pump without letting its late completion shift the successor", async () => {
+    startAuthoritativeGuestSession();
+    const phaseManager = new PhaseManager();
+    const replay = new CoopReplayTurnPhase(1).bindOwnerPhaseManager(phaseManager);
+    const cleanup = {
+      authority: 0,
+      retrySubscription: 0,
+      retryTimer: 0,
+      entryWait: 0,
+    };
+    Object.assign(replay as unknown as Record<string, unknown>, {
+      authorityFailureUnsubscribe: () => cleanup.authority++,
+      replacementRetryUnsubscribe: () => cleanup.retrySubscription++,
+      replacementRetryCancelTimer: () => cleanup.retryTimer++,
+      v2EntryPresentationResolver: (prefix: unknown) => {
+        expect(prefix).toBeNull();
+        cleanup.entryWait++;
+      },
+    });
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = replay;
+    const successor = new CoopInertPhase("MovePhase");
+
+    expect(phaseManager.replaceWithCoopAuthoritativePhase(replay, successor)).toBe(true);
+    expect(phaseManager.getCurrentPhase()).toBe(successor);
+    expect(cleanup).toEqual({ authority: 1, retrySubscription: 1, retryTimer: 1, entryWait: 1 });
+
+    // Model either detached pump continuation after its await resolves. Both calls must be inert, and
+    // retirement must remain idempotent rather than invoking cleanup callbacks a second time.
+    await Promise.resolve();
+    replay.end();
+    replay.retire();
+    expect(phaseManager.getCurrentPhase()).toBe(successor);
+    expect(cleanup).toEqual({ authority: 1, retrySubscription: 1, retryTimer: 1, entryWait: 1 });
   });
 
   it("CoopFinalizeTurnPhase.finishTurn(): solo / host / lockstep keeps queueTurnEndPhases (byte-identical)", () => {

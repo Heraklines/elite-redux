@@ -33,6 +33,7 @@
     "src/phase-manager.ts",
     "src/phase.ts",
     "src/phases/coop-replay-phases.ts",
+    "src/phases/coop-replay-turn-phase.ts",
     "src/phases/er-custom-trainer-install.ts",
     "src/phases/select-starter-phase.ts",
     "src/phases/showdown-result-phase.ts",

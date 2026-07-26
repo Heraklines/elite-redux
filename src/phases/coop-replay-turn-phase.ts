@@ -299,15 +299,23 @@ export class CoopReplayTurnPhase extends Phase {
     return false;
   }
 
-  public override end(): void {
-    this.ended = true;
-    this.awaitingAuthority = false;
-    this.clearReplacementRetryWake();
-    this.authorityFailureUnsubscribe?.();
-    this.authorityFailureUnsubscribe = null;
-    if (activeCoopReplayTurnPhase === this) {
-      activeCoopReplayTurnPhase = null;
+  /** Release every detached wait owned by this renderer without advancing either phase tree. */
+  public override retire(): void {
+    if (this.isRetired()) {
+      return;
     }
+    // Fence the scheduler before resolving a promise: its continuation runs in a later microtask, but the
+    // discarded phase must already be unable to shift if that continuation reaches end().
+    super.retire();
+    this.aborted = true;
+    this.settleOwnedResources();
+  }
+
+  public override end(): void {
+    if (this.isRetired()) {
+      return;
+    }
+    this.settleOwnedResources();
     (this.ownerPhaseManager ?? globalScene.phaseManager).shiftPhase();
   }
 
@@ -995,15 +1003,24 @@ export class CoopReplayTurnPhase extends Phase {
 
   /** Retire an obsolete async continuation without shifting an unrelated newer queue. */
   private retireSupersededWait(): void {
-    if (globalScene.phaseManager.getCurrentPhase() === this) {
+    const phaseManager = this.ownerPhaseManager ?? globalScene.phaseManager;
+    if (phaseManager.getCurrentPhase() === this) {
       this.end();
       return;
     }
+    this.retire();
+  }
+
+  /** Idempotently settle subscriptions, timers, and the deferred V2 entry-delivery promise. */
+  private settleOwnedResources(): void {
     this.ended = true;
     this.awaitingAuthority = false;
     this.clearReplacementRetryWake();
     this.authorityFailureUnsubscribe?.();
     this.authorityFailureUnsubscribe = null;
+    this.v2EntryPresentationResolver?.(null);
+    this.v2EntryPresentationResolver = null;
+    this.v2EntryPresentationBuffered = null;
     if (activeCoopReplayTurnPhase === this) {
       activeCoopReplayTurnPhase = null;
     }
