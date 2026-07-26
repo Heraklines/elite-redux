@@ -19,7 +19,12 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
-import { clearCoopRuntime, mergeCoopPendingWaveAdvance, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  getCoopRuntime,
+  mergeCoopPendingWaveAdvance,
+  startLocalCoopSession,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopCapturePresentation, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
@@ -28,7 +33,7 @@ import { SpeciesId } from "#enums/species-id";
 import { CoopCaptureReplayPhase } from "#phases/coop-replay-phases";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const PRES: CoopCapturePresentation = {
   pokeballType: PokeballType.POKEBALL,
@@ -163,5 +168,41 @@ describe.skipIf(!RUN)("co-op CoopCaptureReplayPhase is hardened to always end() 
     await expect(driveToEnd(bad), "a malformed capture presentation never throws").resolves.toBe(true);
     // The live field is untouched (PRESENTATION ONLY): the player's lead is still on-field.
     expect(globalScene.getPlayerField()[0].isOnField()).toBe(true);
+  });
+
+  it("a stalled capture is released by the runtime wall scheduler even when Phaser time cannot advance", () => {
+    const runtime = getCoopRuntime()!;
+    let expire!: () => void;
+    const cancelTimer = vi.fn();
+    const scheduleSpy = vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
+      expire = callback;
+      return cancelTimer;
+    });
+    const sceneTimerSpy = vi.spyOn(globalScene.time, "delayedCall");
+    const tweenSpy = vi
+      .spyOn(globalScene.tweens, "add")
+      .mockImplementation(() => ({}) as unknown as Phaser.Tweens.Tween);
+    const phase = new CoopCaptureReplayPhase(PRES);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+    const originalAnimations = globalScene.moveAnimations;
+
+    try {
+      globalScene.moveAnimations = true;
+      phase.start();
+
+      expect(scheduleSpy, "capture liveness belongs to the exact co-op runtime").toHaveBeenCalledOnce();
+      expect(sceneTimerSpy, "the liveness ceiling cannot disappear with a paused scene clock").not.toHaveBeenCalled();
+      expect(endSpy, "the deliberately stalled ball tween keeps the phase pending").not.toHaveBeenCalled();
+
+      expire();
+      expect(endSpy, "the runtime wall releases the stalled cosmetic phase").toHaveBeenCalledOnce();
+      expect(cancelTimer, "release retires the exact runtime timer").toHaveBeenCalledOnce();
+    } finally {
+      globalScene.moveAnimations = originalAnimations;
+      scheduleSpy.mockRestore();
+      sceneTimerSpy.mockRestore();
+      tweenSpy.mockRestore();
+      endSpy.mockRestore();
+    }
   });
 });

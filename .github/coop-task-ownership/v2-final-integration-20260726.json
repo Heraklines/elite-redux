@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "58952200bf6be9648f46d12622cf553cc2483a2d",
+  "baseSha": "4c31062d1e9218c4318898ec2662de89377ef540",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -109,6 +109,7 @@
     "test/tests/elite-redux/coop/coop-battle-control.test.ts",
     "test/tests/elite-redux/coop/coop-battle-events.test.ts",
     "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
+    "test/tests/elite-redux/coop/coop-capture-presentation.test.ts",
     "test/tests/elite-redux/coop/coop-determinism-contract.test.ts",
     "test/tests/elite-redux/coop/coop-guest-faint-no-local-victory.test.ts",
     "test/tests/elite-redux/coop/coop-me-host-dialogue-freeze.test.ts",

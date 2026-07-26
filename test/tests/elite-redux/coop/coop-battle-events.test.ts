@@ -278,6 +278,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
   it("a visible exact ability flyout is rendered even when its cosmetic tween remains throttled", async () => {
     const field = await startCoopGuest();
+    const runtime = getCoopRuntime()!;
     const pokemon = field[0];
     const partySlot = globalScene.getPlayerParty().indexOf(pokemon);
     const token = createCoopPresentationOutcomeToken();
@@ -287,6 +288,9 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     vi.spyOn(globalScene.abilityBar, "showAbility").mockReturnValue(throttledTween);
     vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValueOnce(false).mockReturnValue(true);
+    const cancelTimer = vi.fn();
+    const scheduleSpy = vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(() => cancelTimer);
+    const sceneTimerSpy = vi.spyOn(globalScene.time, "delayedCall");
 
     const phase = new CoopShowAbilityReplayPhase(
       pokemon.getBattlerIndex(),
@@ -299,12 +303,17 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     );
     phase.start();
 
+    expect(scheduleSpy, "ability liveness is owned by the exact co-op runtime").toHaveBeenCalledOnce();
+    expect(sceneTimerSpy, "a paused Phaser scene cannot own the ability liveness ceiling").not.toHaveBeenCalled();
     expect(coopPresentationOutcome(token)).toEqual({
       kind: "rendered",
       actorFingerprint: `player:bi${pokemon.getBattlerIndex()}:slot${partySlot}:p${pokemon.id}`,
     });
     finishTween();
     await Promise.resolve();
+    expect(cancelTimer, "the real ability completion retires its runtime watchdog").toHaveBeenCalledOnce();
+    scheduleSpy.mockRestore();
+    sceneTimerSpy.mockRestore();
   });
 
   it("an exact ability identity survives a stale post-reorder battler index", async () => {

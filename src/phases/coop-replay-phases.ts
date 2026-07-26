@@ -656,7 +656,7 @@ export class CoopShowAbilityReplayPhase extends Phase {
     };
 
     try {
-      watchdog = globalScene.time.delayedCall(COOP_PRESENTATION_STALL_MS, () =>
+      watchdog = armCoopPresentationProgressWatchdog(() =>
         finish({ kind: "failed", reason: "ability-watchdog-expired", actorFingerprint }),
       );
       const presentation = globalScene.abilityBar.showAbility(
@@ -1936,8 +1936,8 @@ export class CoopFaintReplayPhase extends PokemonPhase {
  * The message is generated LOCALLY from `speciesId` so it is correctly localized in the GUEST's
  * language (acceptable fidelity gap: this is the base SPECIES name, not a nickname / fusion name).
  *
- * Hardened like {@linkcode CoopFaintReplayPhase}: an `ended` flag + a 5s watchdog + an idempotent
- * `finish()` + the whole body and every tween onComplete in try/catch funnel to `finish()`. A bad
+ * Hardened like {@linkcode CoopFaintReplayPhase}: an `ended` flag + a runtime-owned progress watchdog +
+ * an idempotent `finish()` + the whole body and every tween onComplete in try/catch funnel to `finish()`. A bad
  * payload (null anchor, unknown pokeballType / speciesId) degrades to "ball thrown + caught message"
  * or just reaches `finish()` - it can never strand the queue.
  */
@@ -1957,7 +1957,7 @@ export class CoopCaptureReplayPhase extends Phase {
       );
     }
     let ended = false;
-    let watchdog: Phaser.Time.TimerEvent | undefined;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
     let pokeball: Phaser.GameObjects.Sprite | undefined;
     const finish = () => {
       if (ended) {
@@ -2006,7 +2006,7 @@ export class CoopCaptureReplayPhase extends Phase {
       pokeball.setOrigin(0.5, 0.625);
       globalScene.field.add(pokeball);
 
-      watchdog = globalScene.time.delayedCall(COOP_PRESENTATION_STALL_MS, finish);
+      watchdog = armCoopPresentationProgressWatchdog(finish);
       globalScene.playSound("se/pb_throw");
 
       globalScene.tweens.add({

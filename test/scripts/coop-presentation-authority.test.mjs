@@ -235,7 +235,16 @@ test("every authority event receives an ordered renderer-completion receipt in t
 
 test("presentation liveness uses an exact runtime wall scheduler rather than the ambient Phaser scene clock", () => {
   const watchdog = read("src/phases/coop-presentation-watchdog.ts");
+  const replayPhases = read("src/phases/coop-replay-phases.ts");
   const browser = read("scripts/coop-browser-entry.ts");
+  const abilityReplay = replayPhases.slice(
+    replayPhases.indexOf("export class CoopShowAbilityReplayPhase"),
+    replayPhases.indexOf("export class", replayPhases.indexOf("export class CoopShowAbilityReplayPhase") + 1),
+  );
+  const captureReplay = replayPhases.slice(
+    replayPhases.indexOf("export class CoopCaptureReplayPhase"),
+    replayPhases.indexOf("export class", replayPhases.indexOf("export class CoopCaptureReplayPhase") + 1),
+  );
 
   assert.match(watchdog, /const scene = globalScene/u);
   assert.match(watchdog, /streamer\.scheduleAuthorityRetry\(callback, ms\)/u);
@@ -245,6 +254,17 @@ test("presentation liveness uses an exact runtime wall scheduler rather than the
   assert.match(browser, /setCoopPresentationHardWallMsForTest\(CI_COOP_PRESENTATION_HARD_WALL_MS\)/u);
   assert.doesNotMatch(browser, /intentionally-skipped/u);
   assert.doesNotMatch(watchdog, /globalScene\.time\.delayedCall/u);
+  for (const [name, phase] of [
+    ["ability", abilityReplay],
+    ["capture", captureReplay],
+  ]) {
+    assert.match(phase, /armCoopPresentationProgressWatchdog/u, `${name} replay uses the runtime watchdog`);
+    assert.doesNotMatch(
+      phase,
+      /watchdog\s*=\s*globalScene\.time\.delayedCall/u,
+      `${name} replay cannot depend on a paused scene timer for liveness`,
+    );
+  }
 });
 
 test("an authoritative host turn commit cannot silently release without its immutable recording", () => {
