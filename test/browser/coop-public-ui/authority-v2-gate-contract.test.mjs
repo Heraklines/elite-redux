@@ -31,6 +31,7 @@ const operationSurfaceRegistry = readFileSync(
 const sessionController = readFileSync(new URL("src/data/elite-redux/coop/coop-session-controller.ts", root), "utf8");
 const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root), "utf8");
 const publicUiHarness = readFileSync(new URL("test/browser/coop-public-ui/public-ui-harness.mjs", root), "utf8");
+const browserEntry = readFileSync(new URL("scripts/coop-browser-entry.ts", root), "utf8");
 const soloClassic = readFileSync(new URL("test/browser/coop-public-ui/solo-classic.mjs", root), "utf8");
 const campaignDriver = readFileSync(new URL("test/browser/coop-public-ui/campaign.mjs", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
@@ -175,6 +176,20 @@ test("solo public-browser navigation uses the stable command identity", () => {
 
 test("public co-op launch waits for an actionable save decision and chooses semantically", () => {
   assert.match(publicUiHarness, /waitForActionableCoopLaunchMessage/u);
+  assert.equal(
+    [
+      ...publicUiHarness.matchAll(
+        /this\.pairRoleCursors\?\.\[this\.host\.label\] \?\? this\.host\.evidence\.cursor\(\)/gu,
+      ),
+    ].length,
+    2,
+    "fresh and resume launch scan from before pairing so an already-installed stable prompt is not missed",
+  );
+  assert.match(
+    browserEntry,
+    /phase === "TitlePhase"\s*&& uiMode === "MESSAGE"\s*&& \(runtime == null \|\| runtime\.controller\.sessionEpoch <= 0\)/u,
+    "the semantic observer suppresses only unbound title narration, not the live co-op launch handler",
+  );
   assert.match(
     publicUiHarness,
     /async startFreshRun[\s\S]*?waitForActionableCoopLaunchMessage[\s\S]*?targetId: "no"/u,

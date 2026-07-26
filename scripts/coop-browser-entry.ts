@@ -1237,9 +1237,11 @@ function observeSemanticSurface(): void {
       lastSemanticPhase = currentPhase;
       semanticPhaseInstance += 1;
     }
-    // A paired controller can exist briefly on TitlePhase before the new session epoch is bound. A title
-    // narration is not battle progress; suppress it instead of emitting an impossible co-op epoch-0 surface.
-    if (phase === "TitlePhase" && uiMode === "MESSAGE") {
+    // A paired controller can exist briefly on TitlePhase before the new session epoch is bound. Suppress
+    // only that impossible co-op epoch-0 narration. Once a positive session exists, this same public
+    // Title/MESSAGE handler is the host's actionable Resume/New Game boundary and must be observable; hiding
+    // it made the two-browser oracle wait forever after production had proved the callback was installed.
+    if (phase === "TitlePhase" && uiMode === "MESSAGE" && (runtime == null || runtime.controller.sessionEpoch <= 0)) {
       return;
     }
     // When this seat has no locally actionable battler, the real continuation is the exact replay waiter,

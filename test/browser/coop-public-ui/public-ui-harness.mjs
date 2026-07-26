@@ -3005,7 +3005,10 @@ export class DuoPublicUiRig {
     // Wait for save discovery to publish its REAL human-action callback before pressing anything.
     // A fresh account commits directly from this message. An account with a matching retained run
     // opens Resume/New Game; explicitly select New Game instead of blindly defaulting to Resume.
-    const launchDecisionCursor = this.host.evidence.cursor();
+    // Pairing can finish its fingerprint/checkpoint work after save discovery has already installed the
+    // stable launch prompt. Scan from the pre-connect role cursor so that healthy ordering is evidence, not
+    // a race that requires the observer to emit an unchanged prompt a second time.
+    const launchDecisionCursor = this.pairRoleCursors?.[this.host.label] ?? this.host.evidence.cursor();
     await this.host.waitForActionableCoopLaunchMessage(launchDecisionCursor, "fresh co-op launch decision");
     const launchCommitCursor = this.host.evidence.cursor();
     await this.host.press("Space", "host-open-fresh-run-decision");
@@ -3173,7 +3176,7 @@ export class DuoPublicUiRig {
     );
     // Resume discovery owns the same asynchronous human boundary as a fresh launch. Wait until the
     // prompt's concrete callback is installed, open it once, then choose Yes by semantic identity.
-    const resumeDecisionCursor = this.host.evidence.cursor();
+    const resumeDecisionCursor = this.pairRoleCursors?.[this.host.label] ?? this.host.evidence.cursor();
     await this.host.waitForActionableCoopLaunchMessage(resumeDecisionCursor, "resume co-op launch decision");
     const resumeConfirmCursor = this.host.evidence.cursor();
     await this.host.press("Space", "host-open-resume-decision");
