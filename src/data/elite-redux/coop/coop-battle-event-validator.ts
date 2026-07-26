@@ -44,6 +44,36 @@ function isPresentationActorRef(value: unknown): value is { side: "player" | "en
   return (actor.side === "player" || actor.side === "enemy") && isPositiveSafeAddressPart(actor.pokemonId);
 }
 
+function isStrictTransformResult(value: unknown): boolean {
+  if (value == null || typeof value !== "object") {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  return (
+    isPositiveSafeAddressPart(result.speciesId)
+    && isSafeAddressPart(result.formIndex)
+    && Array.isArray(result.moves)
+    && result.moves.length <= 4
+    && result.moves.every(
+      move =>
+        Array.isArray(move) && move.length === 2 && isPositiveSafeAddressPart(move[0]) && isSafeAddressPart(move[1]),
+    )
+    && Array.isArray(result.types)
+    && result.types.length <= 4
+    && result.types.every(type => isSafeAddressPart(type))
+    && isSafeAddressPart(result.ability)
+    && Array.isArray(result.passives)
+    && result.passives.length <= 8
+    && result.passives.every(passive => isSafeAddressPart(passive))
+    && typeof result.gender === "number"
+    && Number.isSafeInteger(result.gender)
+    && result.gender >= -1
+    && Array.isArray(result.stats)
+    && result.stats.length === 6
+    && result.stats.every(stat => isFiniteNumber(stat) && stat >= 0)
+  );
+}
+
 /** Strict closed-union validator for every authoritative battle-presentation event. */
 export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEvent {
   if (value == null || typeof value !== "object") {
@@ -125,6 +155,21 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
         && isPresentationActorRef(event.actor)
         && isActorAddressableBattlerIndex(event.targetBi)
         && isPresentationActorRef(event.targetActor)
+      );
+    case "formChange":
+      return (
+        isActorAddressableBattlerIndex(event.bi)
+        && isPresentationActorRef(event.actor)
+        && isPositiveSafeAddressPart(event.speciesId)
+        && isSafeAddressPart(event.formIndex)
+        && typeof event.animate === "boolean"
+      );
+    case "transform":
+      return (
+        isActorAddressableBattlerIndex(event.bi)
+        && isPresentationActorRef(event.actor)
+        && isStrictTransformResult(event.result)
+        && typeof event.playSound === "boolean"
       );
     case "weather":
       return (

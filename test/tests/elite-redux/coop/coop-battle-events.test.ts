@@ -72,13 +72,16 @@ import {
   CoopFaintReplayPhase,
   CoopFinalizeEntryPresentationPhase,
   CoopFinalizeTurnPhase,
+  CoopFormChangeReplayPhase,
   CoopHpDrainReplayPhase,
   CoopMoveAnimReplayPhase,
   CoopShowAbilityReplayPhase,
+  CoopTransformReplayPhase,
 } from "#phases/coop-replay-phases";
 import { CoopPresentationReceiptPhase } from "#phases/coop-replay-turn-phase";
 import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
 import { MovePhase } from "#phases/move-phase";
+import { PokemonTransformPhase } from "#phases/pokemon-transform-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { installLocalV2TurnReplicaFixture, negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import Phaser from "phaser";
@@ -504,6 +507,86 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(coopPresentationOutcome(token)).toMatchObject({ kind: "rendered" });
   });
 
+  it("an authority form event installs the exact appearance without running form mechanics", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[1];
+    expect(pokemon.species.forms.length, "the fixture needs a real alternate form").toBeGreaterThan(1);
+    expect(globalScene.field.getIndex(pokemon)).toBeGreaterThanOrEqual(0);
+    pokemon.id =
+      Math.max(pokemon.id, ...globalScene.field.list.map(candidate => Number((candidate as { id?: unknown }).id) || 0))
+      + 1;
+    globalScene.moveAnimations = false;
+    vi.spyOn(pokemon, "loadAssets").mockResolvedValue();
+    vi.spyOn(pokemon, "playAnim").mockImplementation(() => {});
+    vi.spyOn(pokemon, "updateInfo").mockResolvedValue();
+    const token = createCoopPresentationOutcomeToken();
+    const phase = new CoopFormChangeReplayPhase(
+      pokemon.getBattlerIndex(),
+      { side: "player", pokemonId: pokemon.id },
+      pokemon.species.speciesId,
+      1,
+      true,
+      token,
+    );
+    vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+    await vi.waitFor(() => expect(coopPresentationOutcome(token)).toBeDefined());
+
+    expect(pokemon.formIndex).toBe(1);
+    expect(coopPresentationOutcome(token)).toMatchObject({
+      kind: "intentionally-skipped",
+      reason: "animations-disabled",
+    });
+  });
+
+  it("an authority Transform event installs copied passives and appearance without local derivation", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[0];
+    const target = globalScene.getEnemyField()[0];
+    expect(globalScene.field.getIndex(pokemon)).toBeGreaterThanOrEqual(0);
+    pokemon.id =
+      Math.max(pokemon.id, ...globalScene.field.list.map(candidate => Number((candidate as { id?: unknown }).id) || 0))
+      + 1;
+    globalScene.moveAnimations = false;
+    vi.spyOn(pokemon, "loadAssets").mockResolvedValue();
+    vi.spyOn(pokemon, "playAnim").mockImplementation(() => {});
+    vi.spyOn(pokemon, "updateInfo").mockResolvedValue();
+    const passives = target.getPassiveAbilities().map(ability => ability?.id ?? 0);
+    const result = {
+      speciesId: target.getSpeciesForm().speciesId,
+      formIndex: target.getSpeciesForm().formIndex,
+      moves: target.getMoveset().map(move => [move.moveId, Math.min(move.getMove().pp, 5)] as [number, number]),
+      types: target.getTypes(false),
+      ability: target.getAbility().id,
+      passives,
+      gender: target.getGender(),
+      stats: [...target.summonData.stats],
+    };
+    const token = createCoopPresentationOutcomeToken();
+    const phase = new CoopTransformReplayPhase(
+      pokemon.getBattlerIndex(),
+      { side: "player", pokemonId: pokemon.id },
+      result,
+      true,
+      token,
+    );
+    vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+    await vi.waitFor(() => expect(coopPresentationOutcome(token)).toBeDefined());
+
+    expect(pokemon.summonData.speciesForm).toMatchObject({
+      speciesId: result.speciesId,
+      formIndex: result.formIndex,
+    });
+    expect(pokemon.summonData.passiveAbilities).toEqual(passives);
+    expect(coopPresentationOutcome(token)).toMatchObject({
+      kind: "intentionally-skipped",
+      reason: "animations-disabled",
+    });
+  });
+
   it("records one plain common VFX at enqueue while retaining richer environment authority", async () => {
     const field = await startCoopHost();
     endCoopRecording();
@@ -552,6 +635,37 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     environment.recordCoopPresentationAtEnqueue();
     expect(endCoopRecording().events).toEqual([]);
+  });
+
+  it("records a complete Transform result before its narration", async () => {
+    const field = await startCoopHost();
+    endCoopRecording();
+    beginCoopRecording(11, "transform-presentation");
+    const user = field[0];
+    const target = globalScene.getEnemyField()[0];
+    vi.spyOn(user, "loadAssets").mockResolvedValue();
+    vi.spyOn(user, "playAnim").mockImplementation(() => {});
+    vi.spyOn(user, "updateInfo").mockResolvedValue();
+    const phase = new PokemonTransformPhase(user.getBattlerIndex(), target.getBattlerIndex(), true);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+    await vi.waitFor(() => expect(endSpy).toHaveBeenCalledOnce());
+
+    const events = endCoopRecording().events;
+    expect(events[0]).toMatchObject({
+      k: "transform",
+      bi: user.getBattlerIndex(),
+      actor: { side: "player", pokemonId: user.id },
+      result: {
+        speciesId: target.getSpeciesForm().speciesId,
+        formIndex: target.getSpeciesForm().formIndex,
+        ability: target.getAbility().id,
+        passives: target.getPassiveAbilities().map(ability => ability?.id ?? 0),
+      },
+      playSound: true,
+    });
+    expect(events[1]).toMatchObject({ k: "message" });
   });
 
   /** Start a co-op authoritative double as the HOST and tag field ownership. */

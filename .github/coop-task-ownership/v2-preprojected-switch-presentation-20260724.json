@@ -1,9 +1,9 @@
 {
   "taskId": "v2-preprojected-switch-presentation-20260724",
-  "version": 1,
+  "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "4f9ec7a7b049f72ebf39f31bbbdd6a8179b64cce",
+  "baseSha": "9e4db305d51139fcce70ac324ce0feee46c4c0b4",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     ".github/workflows/coop-public-ui-journey.yml",
@@ -54,6 +54,8 @@
     "src/phases/faint-phase.ts",
     "src/phases/mystery-encounter-phases.ts",
     "src/phases/new-battle-phase.ts",
+    "src/phases/pokemon-transform-phase.ts",
+    "src/phases/quiet-form-change-phase.ts",
     "src/phases/select-biome-phase.ts",
     "src/phases/select-modifier-phase.ts",
     "src/phases/switch-biome-phase.ts",
@@ -134,5 +136,8 @@
     "test/tools/coop-local-peer.ts",
     "test/tools/coop-soak-driver.ts",
     "test/utils/encounter-test-utils.ts"
+  ],
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-transport.ts"
   ]
 }

@@ -120,6 +120,7 @@ import type {
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
+  CoopMonTransform,
   CoopPresentationActorRef,
   CoopSwitchPresentation,
 } from "#data/elite-redux/coop/coop-transport";
@@ -128,7 +129,9 @@ import {
   coopWaveAdvanceSanctionedTails,
   isCoopWaveAdvanceOperationEnabled,
 } from "#data/elite-redux/coop/coop-wave-operation";
+import type { Gender } from "#data/gender";
 import { doPokeballBounceAnim, getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
+import type { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { HitResult } from "#enums/hit-result";
@@ -149,7 +152,7 @@ import {
 import { PokemonPhase } from "#phases/pokemon-phase";
 import type { DamageResult } from "#types/damage-result";
 import { fixedInt } from "#utils/common";
-import { getPokemonSpecies } from "#utils/pokemon-utils";
+import { getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import i18next from "i18next";
 import { decompressFromBase64 } from "lz-string";
 
@@ -376,6 +379,164 @@ export class CoopCommonAnimReplayPhase extends Phase {
     } catch {
       finish({ kind: "failed", reason: "common-anim-presentation-threw", actorFingerprint });
     }
+  }
+}
+
+async function refreshAuthorityAppearance(pokemon: Pokemon): Promise<void> {
+  pokemon.generateName();
+  pokemon.setScale(pokemon.getSpriteScale());
+  await pokemon.loadAssets(false);
+  pokemon.playAnim();
+  await pokemon.updateInfo();
+}
+
+function installAuthorityTransformMaterial(pokemon: Pokemon, result: CoopMonTransform): boolean {
+  try {
+    const summonData = pokemon.summonData;
+    if (summonData == null) {
+      return false;
+    }
+    summonData.speciesForm = getPokemonSpeciesForm(
+      result.speciesId as unknown as Parameters<typeof getPokemonSpeciesForm>[0],
+      result.formIndex,
+    );
+    summonData.moveset = result.moves.map(([moveId, ppUsed]) => {
+      const move = new PokemonMove(moveId as MoveId);
+      move.ppUsed = ppUsed;
+      return move;
+    });
+    summonData.types = result.types.map(type => type as unknown as (typeof summonData.types)[number]);
+    summonData.ability = result.ability as AbilityId;
+    summonData.passiveAbilities = result.passives.map(ability => ability as AbilityId);
+    summonData.gender = result.gender < 0 ? undefined : (result.gender as Gender);
+    for (let index = 0; index < summonData.stats.length; index++) {
+      summonData.stats[index] = result.stats[index] ?? summonData.stats[index];
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** GUEST: install one authority-selected form and refresh only its visible sprite material. */
+export class CoopFormChangeReplayPhase extends Phase {
+  public readonly phaseName = "CoopFormChangeReplayPhase";
+
+  constructor(
+    private readonly bi: number,
+    private readonly actor: CoopPresentationActorRef,
+    private readonly speciesId: number,
+    private readonly formIndex: number,
+    private readonly animate: boolean,
+    private readonly outcomeToken: CoopPresentationOutcomeToken = createCoopPresentationOutcomeToken(),
+  ) {
+    super();
+  }
+
+  public override start(): void {
+    super.start();
+    const actorFingerprint = `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}:sp${this.speciesId}:form${this.formIndex}`;
+    const displayed = exactDisplayedActor(this.actor);
+    const pokemon = displayed ?? exactPartyActor(this.actor);
+    if (
+      pokemon == null
+      || pokemon.species.speciesId !== this.speciesId
+      || this.formIndex >= pokemon.species.forms.length
+      || (this.animate && displayed == null)
+    ) {
+      settleCoopPresentationOutcome(this.outcomeToken, {
+        kind: "failed",
+        reason: displayed == null && this.animate ? "form-change-actor-not-displayed" : "form-change-material-invalid",
+        actorFingerprint,
+      });
+      this.end();
+      return;
+    }
+
+    let ended = false;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
+    const finish = (outcome: CoopPresentationOutcome) => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      settleCoopPresentationOutcome(this.outcomeToken, outcome);
+      this.end();
+    };
+    watchdog = armCoopPresentationProgressWatchdog(() =>
+      finish({ kind: "failed", reason: "form-change-watchdog-expired", actorFingerprint }),
+    );
+    if (this.animate && globalScene.moveAnimations) {
+      globalScene.playSound("battle_anims/PRSFX- Transform");
+    }
+    pokemon.formIndex = this.formIndex;
+    void refreshAuthorityAppearance(pokemon)
+      .then(() =>
+        finish(
+          globalScene.moveAnimations
+            ? { kind: "rendered", actorFingerprint }
+            : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
+        ),
+      )
+      .catch(() => finish({ kind: "failed", reason: "form-change-presentation-threw", actorFingerprint }));
+  }
+}
+
+/** GUEST: install the complete authority-selected Transform image and refresh the exact actor. */
+export class CoopTransformReplayPhase extends Phase {
+  public readonly phaseName = "CoopTransformReplayPhase";
+
+  constructor(
+    private readonly bi: number,
+    private readonly actor: CoopPresentationActorRef,
+    private readonly result: CoopMonTransform,
+    private readonly playSound: boolean,
+    private readonly outcomeToken: CoopPresentationOutcomeToken = createCoopPresentationOutcomeToken(),
+  ) {
+    super();
+  }
+
+  public override start(): void {
+    super.start();
+    const actorFingerprint = `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}:transform-sp${this.result.speciesId}:form${this.result.formIndex}`;
+    const pokemon = exactDisplayedActor(this.actor);
+    if (pokemon == null || !installAuthorityTransformMaterial(pokemon, this.result)) {
+      settleCoopPresentationOutcome(this.outcomeToken, {
+        kind: "failed",
+        reason: pokemon == null ? "transform-actor-not-displayed" : "transform-material-invalid",
+        actorFingerprint,
+      });
+      this.end();
+      return;
+    }
+
+    let ended = false;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
+    const finish = (outcome: CoopPresentationOutcome) => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      settleCoopPresentationOutcome(this.outcomeToken, outcome);
+      this.end();
+    };
+    watchdog = armCoopPresentationProgressWatchdog(() =>
+      finish({ kind: "failed", reason: "transform-watchdog-expired", actorFingerprint }),
+    );
+    if (this.playSound && globalScene.moveAnimations) {
+      globalScene.playSound("battle_anims/PRSFX- Transform");
+    }
+    void refreshAuthorityAppearance(pokemon)
+      .then(() =>
+        finish(
+          globalScene.moveAnimations
+            ? { kind: "rendered", actorFingerprint }
+            : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
+        ),
+      )
+      .catch(() => finish({ kind: "failed", reason: "transform-presentation-threw", actorFingerprint }));
   }
 }
 

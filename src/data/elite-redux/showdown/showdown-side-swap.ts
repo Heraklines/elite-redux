@@ -187,6 +187,9 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
         targetBi: swapBi(event.targetBi, enemyBase),
         targetActor: swapActor(event.targetActor),
       };
+    case "formChange":
+    case "transform":
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "switch":
       return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     default:

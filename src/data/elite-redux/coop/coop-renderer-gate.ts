@@ -115,6 +115,8 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "CoopReplayLearnMovePhase", // learn-move render on the guest
   "CoopReplayLearnMoveBatchPhase", // queue-owned batch learn-move render on the guest
   "CoopCommonAnimReplayPhase", // exact host-authored shared VFX; no mechanics
+  "CoopFormChangeReplayPhase", // exact host-authored form appearance; no local trigger derivation
+  "CoopTransformReplayPhase", // exact host-authored Transform material and appearance
   "CoopMoveAnimReplayPhase", // move-anim replay (renders the denied MovePhase)
   "CoopHpDrainReplayPhase", // hp tween replay
   "CoopStatStageReplayPhase", // stat tween replay (renders the denied StatStageChangePhase)

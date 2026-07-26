@@ -138,7 +138,9 @@ export type CoopRole = "host" | "guest";
 // the authoritative guest instead of silently existing only on the host. Stable identity
 // aligns every materialized move target with its stable actor. A protocol-46 renderer can still fall back
 // to a transient battler index after switch/faint/reorder, so mixed builds must refuse pairing.
-export const COOP_PROTOCOL_VERSION = "er-coop-49";
+// er-coop-50 adds immutable form-change/Transform presentation and completes Transform's copied passive
+// material so the renderer never infers appearance or ER ability identity from local state.
+export const COOP_PROTOCOL_VERSION = "er-coop-50";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -676,6 +678,8 @@ export interface CoopMonTransform {
   types: number[];
   /** Copied active ability id (`AbilityId`); 0 when unreadable. */
   ability: number;
+  /** Exact copied temporary passive identities, including explicit `AbilityId.NONE` slots. */
+  passives: number[];
   /** Copied gender (`Gender` enum); -1 when unset. */
   gender: number;
   /** Copied battle stats (`summonData.stats`, indexed by `Stat`: HP,ATK,DEF,SPATK,SPDEF,SPD). */
@@ -1156,6 +1160,23 @@ export type CoopBattleEvent =
       actor: CoopPresentationActorRef;
       targetBi: number;
       targetActor: CoopPresentationActorRef;
+    }
+  /** Apply and display one authority-resolved ordinary form change without re-running its mechanics. */
+  | {
+      k: "formChange";
+      bi: number;
+      actor: CoopPresentationActorRef;
+      speciesId: number;
+      formIndex: number;
+      animate: boolean;
+    }
+  /** Apply and display one complete authority-resolved Transform/Imposter result. */
+  | {
+      k: "transform";
+      bi: number;
+      actor: CoopPresentationActorRef;
+      result: CoopMonTransform;
+      playSound: boolean;
     }
   /** Weather changed (`WeatherType` enum); `anim` is the already-resolved presentation cue. */
   | { k: "weather"; weather: number; turnsLeft: number; anim?: number }

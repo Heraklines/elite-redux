@@ -1,5 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { captureCoopMonTransform } from "#data/elite-redux/coop/coop-battle-engine";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { AbilityId } from "#enums/ability-id";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -71,6 +73,17 @@ export class PokemonTransformPhase extends PokemonPhase {
 
     // TODO: This should fallback to the target's original typing if none are left (from Burn Up, etc.)
     user.summonData.types = target.getTypes(false);
+
+    const transformResult = captureCoopMonTransform(user);
+    if (transformResult != null) {
+      recordCoopEvent({
+        k: "transform",
+        bi: user.getBattlerIndex(),
+        actor: { side: user.isPlayer() ? "player" : "enemy", pokemonId: user.id },
+        result: transformResult,
+        playSound: this.playSound,
+      });
+    }
 
     const promises = [user.updateInfo()];
 

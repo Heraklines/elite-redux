@@ -4212,3 +4212,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   same stable actor identity. Enemy indices exercise the non-zero side offset that previously disappeared.
 - Local permitted evidence: the presentation source suite is 15/15, targeted Biome is clean, and `git diff --check`
   passes. Hosted focused/type and two-browser proof remain required before integration.
+
+## 2026-07-26 - Authority-authored form and Transform presentation
+
+- The renderer's checkpoints already converged ordinary form indexes and most Transform material, but no ordered
+  event refreshed those appearances at the host's actual combat boundary. `QuietFormChangePhase` and
+  `PokemonTransformPhase` were blocked as mechanical phases, so their sound, sprite refresh, and form narration
+  could exist only on the host until a later snapshot silently changed the guest.
+- Protocol 50 adds exact stable-actor `formChange` and `transform` events. Dedicated guest replay phases install
+  only the immutable authority result, refresh the selected actor's assets/info, and own typed liveness outcomes;
+  the original mechanical phases remain forbidden on the renderer. Direct quiet-form narration now enters the
+  same ordered stream instead of bypassing the PhaseManager message tap.
+- The audit also exposed a material omission: `CoopMonTransform` did not carry Elite Redux's temporary passive
+  identities even though production Transform copies them. The full snapshot and presentation result now include
+  those exact passive IDs and apply them without running guest ability attributes or RNG.
+- Local permitted evidence: the presentation source suite is 16/16, targeted Biome and `git diff --check` pass,
+  and the baseline TypeScript scan reports no diagnostics in the changed co-op/form files. Behavioral proof is
+  delegated to the focused hosted shard per `AGENTS.md`.

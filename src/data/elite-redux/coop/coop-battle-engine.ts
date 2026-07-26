@@ -1710,7 +1710,7 @@ function readMoves(mon: Pokemon): [number, number][] {
  * from there verbatim - speciesForm id/form, the copied moveset+PP, types, active ability, gender, and
  * the copied battle stats - so the guest can re-apply exactly what the host's PokemonTransformPhase wrote.
  */
-function readTransform(mon: Pokemon): CoopMonTransform | null {
+export function captureCoopMonTransform(mon: Pokemon): CoopMonTransform | null {
   try {
     const sd = mon.summonData;
     const sf = sd?.speciesForm;
@@ -1723,6 +1723,7 @@ function readTransform(mon: Pokemon): CoopMonTransform | null {
       moves: (sd.moveset ?? []).map(m => [m?.moveId ?? 0, m?.ppUsed ?? 0] as [number, number]),
       types: [...(sd.types ?? [])].map(t => t as unknown as number),
       ability: (sd.ability as unknown as number) ?? 0,
+      passives: [...(sd.passiveAbilities ?? [])].map(ability => (ability as unknown as number | undefined) ?? 0),
       gender: sd.gender === undefined ? -1 : (sd.gender as unknown as number),
       stats: [...(sd.stats ?? [])],
     };
@@ -1886,8 +1887,8 @@ function readTeraState(mon: Pokemon): { isTerastallized: boolean; teraType: numb
 function readChecksumMon(mon: Pokemon): CoopChecksumMon {
   const tera = readTeraState(mon);
   const boss = readBossState(mon);
-  // Transform / Imposter copied identity (#836/#837): 0/0 when not transformed (readTransform -> null).
-  const transform = readTransform(mon) ?? { speciesId: 0, formIndex: 0 };
+  // Transform / Imposter copied identity (#836/#837): 0/0 when not transformed.
+  const transform = captureCoopMonTransform(mon) ?? { speciesId: 0, formIndex: 0 };
   return {
     bi: mon.getBattlerIndex(),
     partyIndex: readPartyIndex(mon),
@@ -2569,7 +2570,7 @@ function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
     heldItems: captureCoopHeldItems(mon),
     // Transform / Imposter copied identity (#836/#837): the summonData a host Transform wrote, so the
     // guest converges its sprite/species/moveset/types/ability/stats. null = not transformed (guest clears).
-    transform: readTransform(mon),
+    transform: captureCoopMonTransform(mon),
   };
 }
 
@@ -4111,6 +4112,7 @@ function applyMonTransform(mon: Pokemon, transform: CoopMonTransform | null | un
     if (transform.ability) {
       sd.ability = transform.ability as unknown as AbilityId;
     }
+    sd.passiveAbilities = transform.passives.map(ability => ability as unknown as AbilityId);
     if (transform.gender >= 0) {
       sd.gender = transform.gender as unknown as Gender;
     }

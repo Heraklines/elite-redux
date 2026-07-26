@@ -1,6 +1,7 @@
 import { applyOnLoseAbAttrs, applyPostFormChangeAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { recordCoopEvent, recordCoopMessage } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getSpeciesFormChangeMessage } from "#data/form-change-triggers";
 import type { SpeciesFormChange } from "#data/pokemon-forms";
 import { getTypeRgb } from "#data/type";
@@ -22,6 +23,8 @@ export class QuietFormChangePhase extends BattlePhase {
   /** The Pokemon's prior name before changing forms. */
   // TODO: remove? it's unused
   private preName: string;
+  private coopPresentationRecorded = false;
+  private coopPresentationEventRecorded = false;
 
   constructor(pokemon: Pokemon, formChange: SpeciesFormChange) {
     super();
@@ -49,7 +52,7 @@ export class QuietFormChangePhase extends BattlePhase {
     if (this.pokemon.isActive(true)) {
       await this.playFormChangeTween();
     } else {
-      await this.doChangeForm();
+      await this.doChangeForm(false);
       this.showFormChangeTextAndEnd();
     }
   }
@@ -62,7 +65,13 @@ export class QuietFormChangePhase extends BattlePhase {
   private showFormChangeTextAndEnd(): void {
     const { pokemon, formChange, preName } = this;
     const { ui } = globalScene;
-    ui.showText(getSpeciesFormChangeMessage(pokemon, formChange, preName), null, () => this.end(), 1500);
+    const message = getSpeciesFormChangeMessage(pokemon, formChange, preName);
+    if (this.coopPresentationEventRecorded) {
+      // QuietFormChangePhase writes directly to the UI rather than PhaseManager.queueMessage, so mirror
+      // its exact ordered narration explicitly beside the form event.
+      recordCoopMessage(message);
+    }
+    ui.showText(message, null, () => this.end(), 1500);
   }
 
   /**
@@ -76,14 +85,14 @@ export class QuietFormChangePhase extends BattlePhase {
       return;
     }
 
-    await this.doChangeForm();
+    await this.doChangeForm(false);
     this.showFormChangeTextAndEnd();
   }
 
   /**
    * Wrapper function to queue effects related to a Pokemon changing forms.
    */
-  private async doChangeForm(): Promise<void> {
+  private async doChangeForm(animate: boolean): Promise<void> {
     const { pokemon, formChange } = this;
 
     // TODO: This will have ordering issues with on lose abilities' trigger messages showing after this Phase ends
@@ -94,6 +103,18 @@ export class QuietFormChangePhase extends BattlePhase {
     applyOnLoseAbAttrs({ pokemon });
     await pokemon.changeForm(formChange);
     applyPostFormChangeAbAttrs({ pokemon });
+    if (!this.coopPresentationRecorded) {
+      this.coopPresentationRecorded = true;
+      this.coopPresentationEventRecorded =
+        recordCoopEvent({
+          k: "formChange",
+          bi: pokemon.getBattlerIndex(),
+          actor: { side: pokemon.isPlayer() ? "player" : "enemy", pokemonId: pokemon.id },
+          speciesId: pokemon.species.speciesId,
+          formIndex: pokemon.formIndex,
+          animate,
+        }) != null;
+    }
   }
 
   private async playFormChangeTween(): Promise<void> {
@@ -125,7 +146,7 @@ export class QuietFormChangePhase extends BattlePhase {
     });
 
     this.pokemon.setVisible(false);
-    await this.doChangeForm();
+    await this.doChangeForm(true);
 
     pokemonFormTintSprite.setScale(0.01);
     const spriteKey = this.pokemon.getBattleSpriteKey();

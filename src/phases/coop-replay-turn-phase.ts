@@ -1470,6 +1470,31 @@ export class CoopReplayTurnPhase extends Phase {
               outcomeToken,
             );
             break;
+          case "formChange":
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew(
+              "CoopFormChangeReplayPhase",
+              event.bi,
+              event.actor,
+              event.speciesId,
+              event.formIndex,
+              event.animate,
+              outcomeToken,
+            );
+            break;
+          case "transform":
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew(
+              "CoopTransformReplayPhase",
+              event.bi,
+              event.actor,
+              event.result,
+              event.playSound,
+              outcomeToken,
+            );
+            break;
           case "weather":
           case "terrain":
             if (event.anim !== undefined) {
