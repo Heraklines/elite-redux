@@ -1487,10 +1487,19 @@ export class PublicUiClient {
       timeoutMs: this.config.timeoutMs,
       fromCursor: this.pageCursor,
     });
-    await this.press("ArrowDown", "mode-select-coop-below-classic");
-    this.lobbySurfaceCursor = this.evidence.cursor();
+    // The mode picker is installed asynchronously. On a CPU-dilated real browser, a fixed
+    // ArrowDown/Space pair can both land before it becomes actionable and submit Classic on the
+    // next frame. Wait for the production semantic picker and select the stable co-op id exactly.
+    const modeCursor = this.evidence.cursor();
+    this.lobbySurfaceCursor = modeCursor;
     const announceCursor = this.evidence.cursor();
-    await this.press("Space", "mode-open-coop-lobby");
+    await selectOptionById(this, {
+      surfaceId: "option-select:TitlePhase",
+      targetId: "co-op",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: modeCursor,
+    });
     await this.evidence.waitFor(/start announce name=/u, {
       from: announceCursor,
       timeoutMs: this.config.timeoutMs,
