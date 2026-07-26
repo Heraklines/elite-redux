@@ -1354,6 +1354,43 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
   }, 120_000);
 
+  it("a host biome permit armed after nested guest delivery survives the resumed browser scope", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+    const sourceWave = 20;
+    const nextWave = sourceWave + 1;
+    const biome = rig.hostScene.arena.biomeId;
+    let operationId: string | null = null;
+
+    await withClient(rig.hostCtx, async () => {
+      operationId = coopAuthoritativeBiomeTransitionOperationId(sourceWave);
+      expect(operationId).not.toBeNull();
+
+      // V2 publishes/settles the guest-owned result before commitBiomeAuthoritativeResult arms the host's
+      // local Switch/NewBiome permit. That publication temporarily installs the guest browser. The resumed
+      // host scope must persist mutations made after the nested delivery, just as two separate JS realms do.
+      await withClient(rig.guestCtx, () => {});
+      expect(
+        armCoopBiomeTransitionTailPermit({
+          operationId: operationId!,
+          sessionEpoch: rig.hostRuntime.controller.sessionEpoch,
+          revision: 1,
+          wave: sourceWave,
+          sourceBiomeId: biome,
+          destinationBiomeId: biome,
+          nextWave,
+        }),
+      ).toBe(true);
+    });
+
+    await withClient(rig.hostCtx, () => {
+      expect(
+        getCoopBiomeTransitionTailPermit(),
+        "the authority retains the exact permit it armed after the peer publication returned",
+      ).toMatchObject({ operationId, wave: sourceWave, nextWave, destinationBiomeId: biome });
+    });
+  }, 120_000);
+
   it("solo SelectBiome terminal failures still propagate to the phase manager", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const phase = new SelectBiomePhase() as unknown as {

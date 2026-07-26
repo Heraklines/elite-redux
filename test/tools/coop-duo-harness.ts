@@ -595,6 +595,21 @@ function persistPreemptedClientState(outgoing: ClientCtx): void {
   outgoing.mePins = readMePins();
 }
 
+/**
+ * Whether a client window still owns the exact browser-local realm it installed.
+ *
+ * A nested destination delivery advances the biome save generation so the receiving browser can take a
+ * durable preemption snapshot. The outer browser then resumes and may legitimately mutate its World Map
+ * state after that delivery (the guest-owned BIOME_PICK terminal arms the host permit in precisely this
+ * order). Generation equality alone treats the earlier preemption snapshot as newer forever and drops the
+ * resumed mutation on outer-scope exit. In two browsers the outer realm never stopped owning its module
+ * state. Permit save-back when that exact scene/runtime/client has been restored; an actually overlapping
+ * scope still fails this identity check and remains fenced by the generation token.
+ */
+function ownsInstalledClientRealm(ctx: ClientCtx): boolean {
+  return activeClientCtx === ctx && globalScene === ctx.scene && getCoopRuntime() === ctx.runtime;
+}
+
 let meBoundaryGeneration = 0;
 
 function restoreScopedMePins(pins: MePins, capturedBoundaryGeneration: number): void {
@@ -660,7 +675,10 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
-    if (ctx.biomeState !== undefined && ctx.biomeStateSaveGeneration === biomeStateSaveGeneration) {
+    if (
+      ctx.biomeState !== undefined
+      && (ctx.biomeStateSaveGeneration === biomeStateSaveGeneration || ownsInstalledClientRealm(ctx))
+    ) {
       ctx.biomeState = snapshotBiomeModuleState();
     }
     // Symmetric with withClient: a sync window (incl. a pinned timer callback) that legitimately
@@ -755,7 +773,10 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
-    if (ctx.biomeState !== undefined && ctx.biomeStateSaveGeneration === biomeStateSaveGeneration) {
+    if (
+      ctx.biomeState !== undefined
+      && (ctx.biomeStateSaveGeneration === biomeStateSaveGeneration || ownsInstalledClientRealm(ctx))
+    ) {
       ctx.biomeState = snapshotBiomeModuleState();
     }
     if (ctx.mePinsSaveGeneration === mePinsSaveGeneration) {

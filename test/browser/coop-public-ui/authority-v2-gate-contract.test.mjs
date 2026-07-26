@@ -2099,14 +2099,19 @@ test("overlapping duo scopes cannot overwrite a newer browser-local biome permit
     /outgoing\.biomeStateSaveGeneration = \(outgoing\.biomeStateSaveGeneration \?\? 0\) \+ 1;[\s\S]*outgoing\.biomeState = snapshotBiomeModuleState\(\)/u,
     "cross-client preemption claims and persists the newest World Map snapshot",
   );
+  assert.match(
+    duoHarness,
+    /function ownsInstalledClientRealm\(ctx: ClientCtx\): boolean \{\s*return activeClientCtx === ctx && globalScene === ctx\.scene && getCoopRuntime\(\) === ctx\.runtime;\s*\}/u,
+    "a resumed client proves that the exact scene/runtime/browser realm is installed",
+  );
   assert.equal(
     [
       ...duoHarness.matchAll(
-        /ctx\.biomeState !== undefined && ctx\.biomeStateSaveGeneration === biomeStateSaveGeneration/gu,
+        /ctx\.biomeStateSaveGeneration === biomeStateSaveGeneration \|\| ownsInstalledClientRealm\(ctx\)/gu,
       ),
     ].length,
     2,
-    "both synchronous and asynchronous client windows fence stale biome-state save-back",
+    "sync and async windows retain the generation fence while saving a legitimately resumed realm",
   );
 });
 
