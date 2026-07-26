@@ -3,7 +3,7 @@
   "version": 1,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "013183da975640d4469ea6244d74ea2bc9c815ce",
+  "baseSha": "4f9ec7a7b049f72ebf39f31bbbdd6a8179b64cce",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     ".github/workflows/coop-public-ui-journey.yml",

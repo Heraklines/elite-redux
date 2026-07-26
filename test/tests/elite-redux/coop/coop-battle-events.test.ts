@@ -458,7 +458,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   });
 
   it("a common VFX replays against the exact authority-selected actors", async () => {
-    await startCoopGuest();
+    const field = await startCoopGuest();
     const displayed = globalScene.field.list.filter((candidate): candidate is Pokemon => {
       const pokemon = candidate as Pokemon;
       return (
@@ -467,10 +467,23 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
         && typeof pokemon.isEnemy === "function"
       );
     });
-    const source = displayed.find(pokemon => pokemon.isPlayer());
-    const target = displayed.find(pokemon => pokemon.isEnemy());
-    expect(source, "the renderer fixture must seat an exact player actor").toBeDefined();
-    expect(target, "the renderer fixture must seat an exact enemy actor").toBeDefined();
+    const source = field[0];
+    const target = globalScene.getEnemyField()[0];
+    expect(
+      globalScene.field.getIndex(source),
+      "the renderer fixture must seat the current player actor",
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      globalScene.field.getIndex(target),
+      "the renderer fixture must seat the current enemy actor",
+    ).toBeGreaterThanOrEqual(0);
+    // This suite intentionally reuses one Phaser game. Earlier cases can leave retired field objects in
+    // the container with deterministic test IDs, while production replaces the whole scene. Give the two
+    // current actors fixture-local unique IDs so this case tests exact replay, not the separate and correct
+    // duplicate-identity rejection path.
+    let nextActorId = Math.max(0, ...displayed.map(pokemon => pokemon.id)) + 1;
+    source.id = nextActorId++;
+    target.id = nextActorId;
     globalScene.moveAnimations = true;
     const token = createCoopPresentationOutcomeToken();
     const playSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation((_instant, onComplete) => {
@@ -478,10 +491,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     const phase = new CoopCommonAnimReplayPhase(
       CommonAnim.USE_ITEM,
-      source!.getBattlerIndex(),
-      { side: "player", pokemonId: source!.id },
-      target!.getBattlerIndex(),
-      { side: "enemy", pokemonId: target!.id },
+      source.getBattlerIndex(),
+      { side: "player", pokemonId: source.id },
+      target.getBattlerIndex(),
+      { side: "enemy", pokemonId: target.id },
       token,
     );
 
