@@ -458,9 +458,19 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   });
 
   it("a common VFX replays against the exact authority-selected actors", async () => {
-    const field = await startCoopGuest();
-    const source = field[0];
-    const target = globalScene.getEnemyField()[0];
+    await startCoopGuest();
+    const displayed = globalScene.field.list.filter((candidate): candidate is Pokemon => {
+      const pokemon = candidate as Pokemon;
+      return (
+        typeof pokemon.id === "number"
+        && typeof pokemon.isPlayer === "function"
+        && typeof pokemon.isEnemy === "function"
+      );
+    });
+    const source = displayed.find(pokemon => pokemon.isPlayer());
+    const target = displayed.find(pokemon => pokemon.isEnemy());
+    expect(source, "the renderer fixture must seat an exact player actor").toBeDefined();
+    expect(target, "the renderer fixture must seat an exact enemy actor").toBeDefined();
     globalScene.moveAnimations = true;
     const token = createCoopPresentationOutcomeToken();
     const playSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation((_instant, onComplete) => {
@@ -468,10 +478,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     const phase = new CoopCommonAnimReplayPhase(
       CommonAnim.USE_ITEM,
-      source.getBattlerIndex(),
-      { side: "player", pokemonId: source.id },
-      target.getBattlerIndex(),
-      { side: "enemy", pokemonId: target.id },
+      source!.getBattlerIndex(),
+      { side: "player", pokemonId: source!.id },
+      target!.getBattlerIndex(),
+      { side: "enemy", pokemonId: target!.id },
       token,
     );
 
