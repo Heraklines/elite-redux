@@ -179,6 +179,7 @@ let DEX = []; // [{slug,name,id,dex,types,baseStats,bst,abilities,eggTier,cost}]
 let STATS = {}; // slug → metrics (sample or real)
 let STATS_IS_SAMPLE = true;
 let RUN_COUNT = 0; // total real runs behind the feed (for the data pill)
+let STATS_META = null;
 // Win-rate color/scale band, overridden by the feed's meta. Full victories are
 // rare in a hard roguelike, so the colour/bar scale to the real data: winMid ~
 // the average pick (amber), winMax ~ the strongest well-sampled pick (green).
@@ -320,7 +321,8 @@ const COLUMNS = [
 
 // ---- Sprites ----------------------------------------------------------------
 function spriteUrl(mon) {
-  return mon.slug ? `${SPRITE_BASE}/${mon.slug}/front.png` : "";
+  const slug = mon.spriteSlug || mon.slug;
+  return slug ? `${SPRITE_BASE}/${slug}/front.png` : "";
 }
 function spriteImg(mon, cls) {
   const url = spriteUrl(mon);
@@ -351,6 +353,9 @@ function matchesQuery(mon, q) {
     return true;
   }
   if (mon.types.some(t => t && t.toLowerCase().includes(q))) {
+    return true;
+  }
+  if ((mon.formNames || []).some(name => String(name).toLowerCase().includes(q))) {
     return true;
   }
   return (mon.abilities || []).some(a => String(a).toLowerCase().includes(q));
@@ -523,6 +528,22 @@ function insightChips(list, fmt) {
     .join("")}</div>`;
 }
 
+function buildInsights(m) {
+  const groups = [
+    ["Final moves", m?.topMoves],
+    ["Selected abilities", m?.topAbilities],
+    ["Final forms", m?.topForms],
+    ["Run relics", m?.topRelics],
+    ["Showdown items", m?.topItems],
+  ].filter(([, list]) => Array.isArray(list) && list.length > 0);
+  if (groups.length === 0) {
+    return "";
+  }
+  return `<div class="build-insights">${groups
+    .map(([label, list]) => `<div class="insight-group"><div class="ititle">${label}</div>${insightChips(list, x => x.name)}</div>`)
+    .join("")}</div>`;
+}
+
 function teammatesHtml(m) {
   if (!m?.topTeammates || m.topTeammates.length === 0) {
     return '<span style="color:var(--muted);font-size:12px">no data</span>';
@@ -548,6 +569,7 @@ let DETAIL = null; // dex-detail.json once loaded
 let detailLoading = null;
 const byId = new Map(); // species id -> grid dex entry
 const slugToId = new Map(); // slug -> species id (grid + evolution-line members)
+const slugToEntity = new Map(); // slug -> {speciesId, formIndex}
 const extraById = new Map(); // species id -> {types, baseStats, bst} for NON-grid (evolved) forms (one-time game dump)
 let moveToSpecies = null; // moveId -> [grid dex entries]
 let abilityToSpecies = null; // abilityId -> [grid dex entries]
@@ -560,10 +582,12 @@ const navTo = h => {
 function buildIdIndex() {
   byId.clear();
   slugToId.clear();
+  slugToEntity.clear();
   for (const m of DEX) {
     if (typeof m.id === "number") {
       byId.set(m.id, m);
       slugToId.set(dexKey(m), m.id);
+      slugToEntity.set(dexKey(m), { speciesId: m.id, formIndex: Number(m.formIndex) || 0 });
     }
   }
 }
@@ -595,6 +619,17 @@ function ensureDetail() {
           if (n.slug && !slugToId.has(n.slug)) {
             slugToId.set(n.slug, Number(id));
           }
+          if (n.slug && !slugToEntity.has(n.slug)) {
+            slugToEntity.set(n.slug, { speciesId: Number(id), formIndex: 0 });
+          }
+        }
+        for (const [id, species] of Object.entries(d.species || {})) {
+          for (const form of species.forms || []) {
+            if (form.slug) {
+              slugToId.set(form.slug, Number(id));
+              slugToEntity.set(form.slug, { speciesId: Number(id), formIndex: Number(form.formIndex) || 0 });
+            }
+          }
         }
         // Reverse indexes over the starter-selectable roster (what players use).
         moveToSpecies = new Map();
@@ -612,10 +647,12 @@ function ensureDetail() {
           if (!sp) {
             continue;
           }
-          for (const mid of new Set([...sp.levelup.map(x => x[1]), ...sp.tm])) {
+          const forms = Array.isArray(sp.forms) && sp.forms.length > 0 ? sp.forms : [sp];
+          for (const mid of new Set(forms.flatMap(form => [...form.levelup.map(x => x[1]), ...form.tm, ...(form.egg || [])]))) {
             add(moveToSpecies, mid, mon);
           }
-          for (const ab of sp.abilities) {
+          const abilities = new Map(forms.flatMap(form => form.abilities).map(ability => [ability.id, ability]));
+          for (const ab of abilities.values()) {
             add(abilityToSpecies, ab.id, mon);
           }
         }
@@ -753,7 +790,7 @@ function moveRow(mid, srcLabel, stabTypes) {
   const cat = (mv.category || "").toLowerCase();
   const stab = stabTypes && stabTypes.includes(titleType(mv.type));
   const srcCell = srcLabel == null ? "" : `<td class="mv-src">${srcLabel}</td>`;
-  return `<tr class="mvrow${stab ? " stab" : ""}" data-move="${mid}">
+  return `<tr class="mvrow${stab ? " stab" : ""}" data-move="${mid}"${mv.description ? ` data-tip="${esc(mv.description)}" data-tip-title="${esc(mv.name)}"` : ""}>
     ${srcCell}<td class="mv-n">${esc(mv.name)}${stab ? '<span class="stab-b" title="Same-type attack bonus">STAB</span>' : ""}</td>
     <td><span class="tchip" style="background:${typeColor(mv.type)}">${esc(titleType(mv.type))}</span></td>
     <td class="mv-cat ${cat}">${esc(titleType(mv.category) || "—")}</td>
@@ -824,15 +861,22 @@ function movesTables(mon, sp) {
     .filter(mid => !lvSet.has(mid) && ok(mid))
     .map(mid => moveRow(mid, null, stab))
     .join("");
+  const eggRows = (sp.egg || [])
+    .filter(mid => !lvSet.has(mid) && ok(mid))
+    .map(mid => moveRow(mid, null, stab))
+    .join("");
   const head = withSrc =>
     `<thead><tr>${withSrc ? "<th>Lv</th>" : ""}<th>Move</th><th>Type</th><th>Cat</th><th class="num">Pw</th><th class="num">Ac</th><th class="num">PP</th></tr></thead>`;
   const lvCount = sp.levelup.length;
   const tmCount = sp.tm.filter(mid => !lvSet.has(mid)).length;
+  const eggCount = (sp.egg || []).filter(mid => !lvSet.has(mid)).length;
   return `<div class="mv2col">
     <div class="mvcol"><div class="mvcol-h">Level-up <span class="mvcol-n">${lvCount}</span></div>
       <div class="mvscroll"><table class="mvtable">${head(true)}<tbody>${lvRows || '<tr><td colspan="7" class="mv-empty">none</td></tr>'}</tbody></table></div></div>
     <div class="mvcol"><div class="mvcol-h">TM / Tutor <span class="mvcol-n">${tmCount}</span></div>
       <div class="mvscroll"><table class="mvtable">${head(false)}<tbody>${tmRows || '<tr><td colspan="6" class="mv-empty">none</td></tr>'}</tbody></table></div></div>
+    <div class="mvcol"><div class="mvcol-h">Egg moves <span class="mvcol-n">${eggCount}</span></div>
+      <div class="mvscroll"><table class="mvtable">${head(false)}<tbody>${eggRows || '<tr><td colspan="6" class="mv-empty">none</td></tr>'}</tbody></table></div></div>
   </div>`;
 }
 
@@ -906,6 +950,8 @@ function runTiles(m) {
       <span class="rk" data-tip="${esc(TIPS.wave)}" data-tip-title="Avg wave reached">Avg wave <b>${m?.avgWave ?? "—"}</b></span>
     </div>
     <div class="diff-wrap">${diffBars(m)}</div>
+    ${m?.showdown ? `<div class="showdown-line"><span>Showdown appearances <b>${m.showdown.appearances.toLocaleString()}</b></span><span>Win rate <b>${m.showdown.winPct.toFixed(1)}%</b></span></div>` : ""}
+    ${buildInsights(m)}
     <div class="mates-wrap"><div class="ititle">Common teammates</div>${teammatesHtml(m)}</div>`;
 }
 
@@ -937,23 +983,23 @@ function tabEvolution(id, sp) {
     <div class="mv-note">Arrows show the line order. The highlighted entry is the current Pokemon. Click any member to open it.</div>`;
 }
 
-function tabForms(mon) {
-  const sibs = DEX.filter(x => x.dex === mon.dex && dexKey(x) !== dexKey(mon));
-  if (sibs.length === 0) {
-    return '<div class="dt-empty">No alternate forms in the dex.</div>';
+function tabForms(forms, currentSlug) {
+  if (forms.length <= 1) {
+    return '<div class="dt-empty">No alternate forms.</div>';
   }
-  return `<div class="formgrid">${sibs
-    .map(s => {
-      const dBst = s.bst - mon.bst;
-      const chips = s.types
+  const current = forms.find(form => form.slug === currentSlug) || forms[0];
+  return `<div class="formgrid">${forms
+    .map(form => {
+      const dBst = form.bst - current.bst;
+      const chips = form.types
         .filter(Boolean)
         .map(t => `<span class="tchip" style="background:${typeColor(t)}">${esc(titleType(t))}</span>`)
         .join("");
-      return `<a class="formcard" href="#mon/${encodeURIComponent(dexKey(s))}">
-        ${spriteImg(s, "")}
-        <div class="fc-name">${esc(s.name)}</div>
+      return `<a class="formcard${form.slug === currentSlug ? " current" : ""}" href="#mon/${encodeURIComponent(form.slug)}">
+        ${spriteImg(form, "")}
+        <div class="fc-name">${esc(form.name)}</div>
         <div class="fc-types">${chips}</div>
-        <div class="fc-bst">BST ${s.bst} <span class="fc-d ${dBst >= 0 ? "pos" : "neg"}">${dBst >= 0 ? "+" : ""}${dBst}</span></div>
+        <div class="fc-bst">BST ${form.bst} <span class="fc-d ${dBst >= 0 ? "pos" : "neg"}">${dBst >= 0 ? "+" : ""}${dBst}</span></div>
       </a>`;
     })
     .join("")}</div>`;
@@ -978,75 +1024,63 @@ function hideDetail() {
 
 // Full "deck" page: every section laid out at once (no tabs), using the width.
 function renderDetail(slug) {
-  const id = slugToId.get(slug);
+  const entity = slugToEntity.get(slug);
+  const id = entity?.speciesId ?? slugToId.get(slug);
+  const formIndex = entity?.formIndex ?? 0;
   const el = $("#detail");
   if (id == null || !el) {
     return;
   }
   hideDrawer(); // the page replaces the quick drawer
-  const mon = byId.get(id) || null; // grid entry (full data) or null (evolution-only)
-  const sp = DETAIL.species[id] || { abilities: [], levelup: [], tm: [], evoFrom: [], evoTo: [] };
-  const nm = mon || (DETAIL.names || {})[id] || { name: slug, slug };
-  const m = mon ? STATS[dexKey(mon)] : null;
-  // A type/stat-bearing object: the grid entry when starter-selectable, else the
-  // evolved form's types + base stats from the one-time game dump. Lets evolved
-  // forms render base-stat bars, type matchups and STAB just like starters.
-  const extra = mon ? null : extraById.get(id);
-  const statMon =
-    mon
-    || (extra
-      ? {
-          slug: nm.slug,
-          name: nm.name,
-          dex: nm.dex ?? null,
-          types: extra.types,
-          baseStats: extra.baseStats,
-          bst: extra.bst,
-        }
-      : null);
-  view = { kind: "mon", id, slug, mon, statMon, sp };
+  const rootSpecies = DETAIL.species[id] || { abilities: [], levelup: [], tm: [], egg: [], evoFrom: [], evoTo: [], forms: [] };
+  const form = rootSpecies.forms?.[formIndex] || extraById.get(id)?.forms?.[formIndex] || null;
+  const nm = form || (DETAIL.names || {})[id] || { name: slug, slug };
+  const lineMon = byId.get(Number(form?.rootId)) || byId.get(id) || null;
+  const m = lineMon ? STATS[dexKey(lineMon)] : null;
+  const statMon = form || extraById.get(id) || lineMon;
+  const sp = form ? { ...form, evoFrom: rootSpecies.evoFrom || [], evoTo: rootSpecies.evoTo || [] } : rootSpecies;
+  view = { kind: "mon", id, formIndex, slug, mon: lineMon, statMon, sp };
   const typeChips = statMon
     ? statMon.types
         .filter(Boolean)
         .map(t => `<span class="tchip" style="background:${typeColor(t)}">${esc(titleType(t))}</span>`)
         .join("")
     : "";
-  const sub = mon
-    ? `#${mon.dex ?? "—"} · ${EGG_TIER_NAMES[mon.eggTier] ?? "Not in egg pool"} · Cost ${mon.cost}`
-    : "Evolution / form (not starter-selectable)";
+  const sub = lineMon
+    ? `#${lineMon.dex ?? "—"} · ${EGG_TIER_NAMES[lineMon.eggTier] ?? "Not in egg pool"} · Cost ${lineMon.cost}`
+    : "Not starter-selectable";
   const card = (title, inner) => `<section class="card"><h3 class="card-h">${title}</h3>${inner}</section>`;
   // Left rail: all the compact at-a-glance info. Right: the big move list. Evolved
   // forms show everything except run performance (only starters are tracked).
-  const noteCard = mon
-    ? ""
-    : statMon
-      ? '<section class="card"><div class="dt-note">This is an evolution / form, not a starter-selectable Pokemon, so it has no recorded run performance. Its base stats, type matchups, abilities and learnset are shown.</div></section>'
-      : '<section class="card"><div class="dt-note">This is an evolution / form, not a starter-selectable Pokemon, so base stats, type matchups, run data and forms are not in the dataset. Its abilities and learnset are shown below.</div></section>';
+  const noteCard = lineMon ? "" : '<section class="card"><div class="dt-note">Not starter-selectable.</div></section>';
   const statsCard = statMon ? card("Base stats", statBars(statMon) + overviewHints(statMon)) : "";
   const abilCard = card("Abilities", abilitiesChips(sp));
   const matchCard = statMon ? card("Type matchups", matchupsHtml(statMon, sp)) : "";
   const runCard =
-    mon && !STATS_IS_SAMPLE
+    lineMon && !STATS_IS_SAMPLE
       ? card(`Run performance${m?.sample ? ` · ${m.sample.toLocaleString()} runs` : ""}`, runTiles(m))
       : "";
-  const evoCard = card("Evolution", tabEvolution(id, sp));
-  const hasForms = mon && DEX.some(x => x.dex === mon.dex && dexKey(x) !== dexKey(mon));
-  const formsCard = hasForms ? card("Forms", tabForms(mon)) : "";
+  const evoCard = card("Evolution", tabEvolution(id, rootSpecies));
+  const lineForms = Object.values(DETAIL.species || {})
+    .flatMap(species => species.forms || [])
+    .filter(candidate => Number(candidate.rootId) === Number(lineMon?.id ?? form?.rootId ?? rootSpecies.rootId));
+  const hasForms = lineForms.length > 1;
+  const formsCard = hasForms ? card("Forms", tabForms(lineForms, nm.slug)) : "";
   const movesCard = `<section class="card moves-card">
       <div class="moves-h"><h3 class="card-h">Moves</h3>
         <input id="mv-q" class="mv-search" type="search" placeholder="Filter…" value="${esc(mvState.q)}" autocomplete="off" /></div>
       <div id="mv-tables">${movesTables(statMon, sp)}</div>
-      <div class="mv-note">Level-up + TM/tutor from the editor. Egg moves and move descriptions are not exported.</div>
+      <div class="mv-note">Level-up, TM/tutor, and egg moves.</div>
     </section>`;
   el.innerHTML = `
     <div class="dt-top">
       <button class="dt-back" data-close>← Back</button>
       <div class="dt-id">
-        ${spriteImg({ slug: nm.slug, name: nm.name }, "dt-spr")}
+        ${spriteImg({ slug: nm.slug, spriteSlug: nm.spriteSlug, name: nm.name }, "dt-spr")}
         <div class="dt-meta">
           <div class="dt-name">${esc(nm.name)}</div>
           <div class="dt-sub">${esc(sub)}</div>
-          <div class="dt-row">${mon ? tierBadge(m) : ""} ${typeChips}</div>
+          <div class="dt-row">${lineMon ? tierBadge(m) : ""} ${typeChips}</div>
         </div>
       </div>
     </div>
@@ -1094,6 +1128,7 @@ function openMove(mid) {
         <button class="dt-back" data-close>← Back</button>
         <div class="dt-id"><div class="dt-meta">
           <div class="dt-name">${esc(mv.name)}</div>
+          ${mv.description ? `<div class="dt-sub">${esc(mv.description)}</div>` : ""}
           <div class="dt-row"><span class="tchip" style="background:${typeColor(mv.type)}">${esc(titleType(mv.type))}</span>
             <span class="mv-cat ${(mv.category || "").toLowerCase()}">${esc(titleType(mv.category) || "—")}</span>
             <span class="kv">Pow ${mv.power || "—"}</span><span class="kv">Acc ${mv.accuracy ? `${mv.accuracy}%` : "—"}</span><span class="kv">PP ${mv.pp || "—"}</span></div>
@@ -1207,6 +1242,52 @@ function renderIndex() {
   document.body.classList.add("detail-open");
 }
 
+function renderOverview() {
+  const el = $("#detail");
+  if (!el || !STATS_META) {
+    return;
+  }
+  hideDrawer();
+  const runData = STATS_META.aggregates?.runs || {};
+  const showdown = STATS_META.aggregates?.showdown || {};
+  const rateRows = rows => (rows || [])
+    .map(row => `<tr><td>${esc(row.name)}</td><td class="num">${Number(row.runs || row.sample || 0).toLocaleString()}</td><td class="num">${row.winPct == null ? "—" : `${Number(row.winPct).toFixed(1)}%`}</td></tr>`)
+    .join("");
+  const countRows = rows => (rows || [])
+    .map(row => `<tr><td>${esc(row.name)}</td><td class="num">${Number(row.sample || 0).toLocaleString()}</td><td class="num">${row.pct == null ? "—" : `${Number(row.pct).toFixed(1)}%`}</td></tr>`)
+    .join("");
+  const showdownRows = (showdown.species || [])
+    .map(row => `<tr><td><a href="#mon/${encodeURIComponent(row.slug)}">${esc(row.name)}</a></td><td class="num">${Number(row.appearances).toLocaleString()}</td><td class="num">${Number(row.winPct).toFixed(1)}%</td></tr>`)
+    .join("");
+  const ghostRows = (runData.ghostThreats || [])
+    .map(row => `<tr><td><a href="#mon/${encodeURIComponent(row.slug)}">${esc(row.name)}</a></td><td class="num">${Number(row.sample).toLocaleString()}</td></tr>`)
+    .join("");
+  const section = (title, head, body) => `<section class="overview-section"><h3>${title}</h3><div class="overview-scroll"><table class="overview-table"><thead>${head}</thead><tbody>${body || '<tr><td colspan="3">No data</td></tr>'}</tbody></table></div></section>`;
+  view = { kind: "overview" };
+  el.innerHTML = `
+    <div class="dt-top"><button class="dt-back" data-close>← Back</button><div class="dt-name">Statistics</div></div>
+    <div class="overview-kpis">
+      <div><span>Runs</span><b>${Number(STATS_META.totalRuns || 0).toLocaleString()}</b></div>
+      <div><span>Distinct players</span><b>${Number(STATS_META.players || 0).toLocaleString()}</b></div>
+      <div><span>Run victories</span><b>${Number(STATS_META.totalWins || 0).toLocaleString()}</b></div>
+      <div><span>Showdown matches</span><b>${Number(showdown.matches || 0).toLocaleString()}</b></div>
+      <div><span>Showdown turns</span><b>${Number(showdown.averageTurns || 0).toFixed(1)}</b></div>
+      <div><span>Showdown duration</span><b>${Number(showdown.averageDurationSeconds || 0).toFixed(1)}s</b></div>
+    </div>
+    <div class="overview-grid">
+      ${section("Run modes", "<tr><th>Mode</th><th>Runs</th><th>Win</th></tr>", rateRows(runData.modes))}
+      ${section("Difficulties", "<tr><th>Difficulty</th><th>Runs</th><th>Win</th></tr>", rateRows(runData.difficulties))}
+      ${section("Challenges", "<tr><th>Challenge</th><th>Runs</th><th>Share</th></tr>", countRows(runData.challenges))}
+      ${section("Relics", "<tr><th>Relic</th><th>Runs</th><th>Share</th></tr>", countRows(runData.relics))}
+      ${section("Showdown species", "<tr><th>Pokemon</th><th>Appearances</th><th>Win</th></tr>", showdownRows)}
+      ${section("Ghost battle threats", "<tr><th>Pokemon</th><th>Defeats</th></tr>", ghostRows)}
+    </div>`;
+  el.hidden = false;
+  el.setAttribute("aria-hidden", "false");
+  el.scrollTop = 0;
+  document.body.classList.add("detail-open");
+}
+
 function closeDetail() {
   const el = $("#detail");
   if (el) {
@@ -1243,6 +1324,8 @@ function syncFromHash() {
     openIndex("moves");
   } else if (kind === "abilities") {
     openIndex("abilities");
+  } else if (kind === "overview") {
+    renderOverview();
   } else if (bySlugKey.has(raw)) {
     openDrawer(raw); // quick side panel
   } else {
@@ -1327,7 +1410,8 @@ function closeDrawer() {
 // Where the real er-assets feed has a line for a species' pokerogue id, prefer
 // its real usagePct (→ tier) and lift over the sample. Mark those as real.
 function applyRealUsage() {
-  if (!usage.loaded) {
+  const usageAge = Date.now() - Date.parse(usage.generatedAt || "");
+  if (!usage.loaded || !Number.isFinite(usageAge) || usageAge > 48 * 60 * 60 * 1000) {
     return;
   }
   // Tier comes from the live feed via the M5cap PERFORMANCE model (the same one the
@@ -1354,9 +1438,15 @@ function applyRealUsage() {
 function refreshSamplePill() {
   const pill = $("#sample-pill");
   if (!STATS_IS_SAMPLE) {
-    pill.classList.add("real");
-    pill.textContent = "Live run data";
-    pill.title = `Win / pick / usage / lift / wave / teammates from ${RUN_COUNT.toLocaleString()} real runs. Tiers from the nightly usage feed.`;
+    const generated = Date.parse(STATS_META?.generatedAt || "");
+    const age = Date.now() - generated;
+    const fresh = Number.isFinite(age) && age <= 48 * 60 * 60 * 1000;
+    pill.classList.toggle("real", fresh);
+    pill.classList.toggle("stale", !fresh);
+    pill.textContent = Number.isFinite(generated)
+      ? `${fresh ? "Updated" : "Data from"} ${new Date(generated).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+      : "Run data";
+    pill.title = `${RUN_COUNT.toLocaleString()} anonymized runs over ${STATS_META?.window?.days ?? 30} days.`;
     return;
   }
   const anyReal = DEX.some(mon => STATS[dexKey(mon)]?.tierIsReal);
@@ -1609,6 +1699,7 @@ async function init() {
     DEX = Array.isArray(dex) ? dex : [];
     // stats.sample.json wraps the per-slug map under `species`; tolerate a bare map too.
     STATS = stats && stats.species ? stats.species : stats || {};
+    STATS_META = stats && stats.species ? stats : null;
     STATS_IS_SAMPLE = !stats || stats._sample !== false; // sample unless a real feed says otherwise
     RUN_COUNT = stats && typeof stats.totalRuns === "number" ? stats.totalRuns : 0;
     if (stats && stats.meta) {
@@ -1644,6 +1735,7 @@ async function init() {
       if (data && typeof data === "object" && data.lines) {
         usage.lines = data.lines;
         usage.baseWinPct = data.baseWinPct;
+        usage.generatedAt = data.generatedAt;
         usage.loaded = true;
         applyRealUsage();
         renderRows();
