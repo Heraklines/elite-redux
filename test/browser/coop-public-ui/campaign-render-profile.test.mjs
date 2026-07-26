@@ -79,19 +79,39 @@ test("public keys remain down through an actual Phaser update instead of composi
   );
   assert.match(inputFrameWait, /browser-input-health[\s\S]+downKeys/u);
   assert.doesNotMatch(inputFrameWait, /page\.evaluate|requestAnimationFrame/u);
-  assert.match(observer, /heldDomKeys[\s\S]+downKeys: heldDomKeys\.size/u);
+  assert.match(
+    observer,
+    /lastDomKeydownFrame = globalScene\?\.game\?\.loop\?\.frame[\s\S]+downKeys: heldDomKeys\.size/u,
+  );
   assert.match(observer, /heldFrameAdvanced = snapshot\.downKeys > 0 && frameAdvancing/u);
 });
 
-test("public input pacing requires a later Phaser frame while the DOM key remains held", async () => {
+test("public input pacing requires a post-keydown Phaser frame while that key remains held", async () => {
   const sink = new EvidenceSink("input-frame", ".");
   const waiting = waitForPublicInputFrame(sink, { from: 0, domKeysBefore: 7, timeoutMs: 1_000 });
-  sink.record("browser-input-health", { observation: { domKeys: 8, downKeys: 1, frame: 100 } });
-  sink.record("browser-input-health", { observation: { domKeys: 8, downKeys: 0, frame: 101 } });
-  sink.record("browser-input-health", { observation: { domKeys: 8, downKeys: 1, frame: 102 } });
-  sink.record("browser-input-health", { observation: { domKeys: 8, downKeys: 1, frame: 103 } });
+  sink.record("browser-input-health", {
+    observation: { domKeys: 8, downKeys: 1, keydownFrame: 100, frame: 100 },
+  });
+  sink.record("browser-input-health", {
+    observation: { domKeys: 8, downKeys: 1, keydownFrame: 100, frame: 101 },
+  });
   const proof = await waiting;
-  assert.equal(proof.observation.frame, 103);
+  assert.equal(proof.observation.frame, 101);
+});
+
+test("public input pacing cannot accept a frame after the target key was released", async () => {
+  const sink = new EvidenceSink("input-release", ".");
+  const waiting = waitForPublicInputFrame(sink, { from: 0, domKeysBefore: 7, timeoutMs: 30 });
+  sink.record("browser-input-health", {
+    observation: { domKeys: 8, downKeys: 1, keydownFrame: 100, frame: 100 },
+  });
+  sink.record("browser-input-health", {
+    observation: { domKeys: 8, downKeys: 0, keydownFrame: 100, frame: 101 },
+  });
+  sink.record("browser-input-health", {
+    observation: { domKeys: 8, downKeys: 1, keydownFrame: 100, frame: 102 },
+  });
+  await assert.rejects(waiting, /held public key to cross an actual Phaser update/u);
 });
 
 test("browser render-profile markers are validated and indexed as evidence", () => {

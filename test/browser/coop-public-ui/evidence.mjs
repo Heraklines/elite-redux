@@ -47,13 +47,14 @@ export const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, 
  * actual Phaser update.
  *
  * Compositor requestAnimationFrame is not a valid proxy: Chromium may composite at 60 FPS while a CPU-dilated
- * Phaser loop advances at 3 FPS. The observer emits an input-health sample on raw DOM arrival, then another
- * whenever Phaser's own frame counter advances while the key is still held. The driver remains keyboard-only;
- * this function consumes console evidence and never reads or mutates game state through the page.
+ * Phaser loop advances at 3 FPS. The observer captures Phaser's frame at raw DOM keydown, then emits another
+ * input-health sample whenever Phaser's frame advances while the key is still held. The driver remains
+ * keyboard-only; this function consumes console evidence and never reads or mutates game state through the page.
  */
 export async function waitForPublicInputFrame(evidence, { from, domKeysBefore, timeoutMs = 5_000 }) {
   let scanned = Math.max(0, from);
-  let firstHeldFrame = null;
+  let released = false;
+  const expectedDomKeys = domKeysBefore + 1;
   return evidence.waitForCondition(
     sink => {
       for (; scanned < sink.events.length; scanned += 1) {
@@ -62,21 +63,18 @@ export async function waitForPublicInputFrame(evidence, { from, domKeysBefore, t
         if (
           observation == null
           || !Number.isFinite(observation.domKeys)
-          || observation.domKeys <= domKeysBefore
+          || observation.domKeys !== expectedDomKeys
           || !Number.isFinite(observation.downKeys)
           || !Number.isFinite(observation.frame)
+          || !Number.isFinite(observation.keydownFrame)
         ) {
           continue;
         }
         if (observation.downKeys <= 0) {
-          firstHeldFrame = null;
+          released = true;
           continue;
         }
-        if (firstHeldFrame == null) {
-          firstHeldFrame = observation.frame;
-          continue;
-        }
-        if (observation.frame > firstHeldFrame) {
+        if (!released && observation.frame > observation.keydownFrame) {
           return event;
         }
       }

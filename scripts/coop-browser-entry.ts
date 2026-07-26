@@ -1649,6 +1649,7 @@ let inputEchoSeq = 0;
 // window), and the Phaser loop frame counter proves whether the game loop is stepping.
 let domKeydownCount = 0;
 let lastDomKey = "";
+let lastDomKeydownFrame = -1;
 const heldDomKeys = new Set<string>();
 if (typeof window !== "undefined") {
   window.addEventListener(
@@ -1656,6 +1657,7 @@ if (typeof window !== "undefined") {
     event => {
       domKeydownCount += 1;
       lastDomKey = event.key;
+      lastDomKeydownFrame = globalScene?.game?.loop?.frame ?? -1;
       heldDomKeys.add(event.code || event.key);
     },
     { capture: true, passive: true },
@@ -1674,6 +1676,7 @@ function inputLayerSnapshot() {
   return {
     domKeys: domKeydownCount,
     downKeys: heldDomKeys.size,
+    keydownFrame: lastDomKeydownFrame,
     lastKey: lastDomKey,
     frame: globalScene?.game?.loop?.frame ?? -1,
     vis: typeof document === "undefined" ? "?" : document.visibilityState,

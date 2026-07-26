@@ -4389,10 +4389,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   yet the semantic title selection remained on New Game. The prior nested `requestAnimationFrame` fix used the wrong
   clock: Chromium may composite at roughly 60 FPS while the CPU-dilated Phaser loop advances at roughly 3 FPS, so a
   down/two-rAF/up sequence can still fit entirely between game updates.
-- The read-only browser observer now tracks the raw keys that are currently held and emits input-health evidence on
-  DOM arrival and on each actual Phaser frame advance while a key remains down. `PublicUiClient.press()` holds the
-  same public Playwright keyboard input until two observer samples prove that a later Phaser update overlapped the
-  continuous hold. It never evaluates, inspects, or mutates private game state; idle pages remain telemetry-silent.
+- The read-only browser observer now tracks the raw keys that are currently held, records Phaser's exact frame at DOM
+  keydown, and emits input-health evidence on each actual Phaser frame advance while a key remains down.
+  `PublicUiClient.press()` holds the same public Playwright keyboard input until a later Phaser frame overlaps that
+  exact keydown. It never evaluates, inspects, or mutates private game state; idle pages remain telemetry-silent.
 - The behavior contract deliberately inserts a key-up gap and proves it cannot satisfy the wait. The source contract
   rejects compositor `requestAnimationFrame` pacing and pins the observer/evidence/keyboard chain. This repairs the
   harness primitive shared by solo setup, both co-op seats, Mystery, market, rewards, and battle commands rather than
@@ -4405,3 +4405,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   driver boundary checks, targeted Biome, and `git diff --check` pass. The repository-wide TypeScript baseline remains
   red on inherited files, with no diagnostic in this batch's changed files. Real Chromium and B9 engine qualification
   remain GitHub-hosted under `AGENTS.md`; no local co-op Vitest/browser run or deployment occurred.
+
+## 2026-07-26 - Input proof follows the exact keydown frame through asynchronous UI transitions
+
+- Journey `30214133225` proved that the Phaser-clock direction was correct but its first implementation was stricter
+  than a human input. Both registration Enter presses were accepted, both UIs changed to Loading, and both account
+  APIs returned 200. The driver still failed because it demanded a second held-key health sample after the first
+  accepted frame; the asynchronous login transition delayed that sample until after release. This was a false red
+  after successful public input, not a product or registration failure.
+- The capture listener now records Phaser's frame on the exact raw DOM keydown. A press releases after one strictly
+  later Phaser frame is observed while that same keydown count remains held. A same-frame sample cannot pass, a later
+  keydown cannot substitute, and an observed key-up permanently invalidates the proof. This is the minimal exact
+  overlap invariant and remains entirely on the public keyboard plus read-only console-evidence boundary.
+- Permitted local evidence: 77/77 V2/browser contracts, both public driver boundary checks, targeted Biome, changed-file
+  TypeScript filtering, and `git diff --check` pass. The correction still requires exact-SHA hosted Chromium evidence.
