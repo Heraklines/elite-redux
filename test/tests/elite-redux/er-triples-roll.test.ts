@@ -98,7 +98,10 @@ const GHOST_SNAPSHOT: GhostTeamSnapshot = {
   id: "ghost-triples-roll-1",
   trainerName: "Uploader",
   difficulty: "hell",
-  waveReached: 140,
+  // Keep the injected team inside the production +20/+40 wave band for the
+  // wave-5 challenge encounter. A deep endgame team is intentionally ineligible
+  // here, even when it is injected through the test hook.
+  waveReached: 25,
   isVictory: true,
   timestamp: 1,
   party: [member(SpeciesId.SNORLAX), member(SpeciesId.DRAGONITE), member(SpeciesId.SALAMENCE)],
@@ -176,6 +179,7 @@ describe.skipIf(!RUN)("ER triples roll - observed rates + rolled-path constructi
   it("ghost battles roll a triple ~20% of the time (1-in-5)", async () => {
     // Field a REAL ghost trainer through the live GHOST_TRAINERS pipeline, then measure the
     // roll against that trainer instance (it carries the ghost override + a >=3-mon roster).
+    setErDifficulty("hell");
     setPrefetchedGhostTeamsForTests([GHOST_SNAPSHOT]);
     game.override.startingWave(5); // wave 5 is a trainer wave => the GHOST_TRAINERS ghost is fielded
     game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
@@ -196,6 +200,7 @@ describe.skipIf(!RUN)("ER triples roll - observed rates + rolled-path constructi
   });
 
   it("a ghost with a < 3-mon roster never rolls a triple (graceful fallback)", async () => {
+    setErDifficulty("hell");
     setPrefetchedGhostTeamsForTests([{ ...GHOST_SNAPSHOT, id: "ghost-short", party: [member(SpeciesId.SNORLAX)] }]);
     game.override.startingWave(5); // wave 5 is a trainer wave => the GHOST_TRAINERS ghost is fielded
     game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);

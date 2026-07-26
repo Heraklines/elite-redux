@@ -3,7 +3,7 @@
   "version": 1,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "1ed166e1b9b0019412df7518c855be74b07e8f6d",
+  "baseSha": "57154a3f60a31ca8d9c4942c5a466a06588f9ccf",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -115,6 +115,7 @@
     "test/tests/elite-redux/er-gimmighoul-family-unlocks.test.ts",
     "test/tests/elite-redux/er-player-ui-regressions.test.ts",
     "test/tests/elite-redux/er-trainer-intro-trays.test.ts",
+    "test/tests/elite-redux/er-triples-roll.test.ts",
     "test/tests/elite-redux/integration/er-inversion-ability.test.ts",
     "test/tests/elite-redux/showdown/showdown-matchmaking.test.ts",
     "test/tests/elite-redux/showdown/showdown-side-swap.test.ts",
