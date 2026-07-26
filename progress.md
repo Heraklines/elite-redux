@@ -4207,5 +4207,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Source and target now resolve through the canonical flat field used by `PokemonPhase`. This is presentation-only:
   it changes no move, damage, RNG, or checkpoint material. The node-pure presentation contract pins the flat-index
   lookup so future doubles/triples refactors cannot reintroduce the side-local interpretation.
+- The hosted engine fixture no longer blesses the obsolete opposite-side target. It records both player and enemy
+  self-effects twice, requires exactly one event per queued phase, and proves each source/target pair retains the
+  same stable actor identity. Enemy indices exercise the non-zero side offset that previously disappeared.
 - Local permitted evidence: the presentation source suite is 15/15, targeted Biome is clean, and `git diff --check`
   passes. Hosted focused/type and two-browser proof remain required before integration.

@@ -485,20 +485,37 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const field = await startCoopHost();
     endCoopRecording();
     beginCoopRecording(9, "common-vfx");
-    const plain = new CommonAnimPhase(field[0].getBattlerIndex(), 0, CommonAnim.USE_ITEM);
+    const player = field[0];
+    const enemy = globalScene.getEnemyField()[0];
+    const playerSelfEffect = new CommonAnimPhase(
+      player.getBattlerIndex(),
+      player.getBattlerIndex(),
+      CommonAnim.USE_ITEM,
+    );
+    const enemySelfEffect = new CommonAnimPhase(enemy.getBattlerIndex(), enemy.getBattlerIndex(), CommonAnim.USE_ITEM);
 
-    plain.recordCoopPresentationAtEnqueue();
-    plain.recordCoopPresentationAtEnqueue();
+    playerSelfEffect.recordCoopPresentationAtEnqueue();
+    playerSelfEffect.recordCoopPresentationAtEnqueue();
+    enemySelfEffect.recordCoopPresentationAtEnqueue();
+    enemySelfEffect.recordCoopPresentationAtEnqueue();
 
     const recording = endCoopRecording();
     expect(recording.events).toEqual([
       {
         k: "commonAnim",
         anim: CommonAnim.USE_ITEM,
-        bi: field[0].getBattlerIndex(),
-        actor: { side: "player", pokemonId: field[0].id },
-        targetBi: globalScene.getEnemyField()[0].getBattlerIndex(),
-        targetActor: { side: "enemy", pokemonId: globalScene.getEnemyField()[0].id },
+        bi: player.getBattlerIndex(),
+        actor: { side: "player", pokemonId: player.id },
+        targetBi: player.getBattlerIndex(),
+        targetActor: { side: "player", pokemonId: player.id },
+      },
+      {
+        k: "commonAnim",
+        anim: CommonAnim.USE_ITEM,
+        bi: enemy.getBattlerIndex(),
+        actor: { side: "enemy", pokemonId: enemy.id },
+        targetBi: enemy.getBattlerIndex(),
+        targetActor: { side: "enemy", pokemonId: enemy.id },
       },
     ]);
 
