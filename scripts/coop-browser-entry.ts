@@ -1301,6 +1301,12 @@ function observeSemanticSurface(): void {
     if (semantic == null) {
       const membership = runtime?.membership.snapshot();
       if (runtime == null || membership?.state !== "active") {
+        // A local modal such as Settings can temporarily replace a semantic menu without changing
+        // either its phase object or its eventual payload. Retaining the old canonical observation
+        // across that gap makes the reopened menu look like a duplicate, so a public driver can see
+        // the real Back input reach production and still wait forever for a "fresh" actionable menu.
+        // Mark the semantic surface closed; returning to the byte-identical menu must emit once again.
+        lastSemanticObservation = "";
         return;
       }
       const { wave, turn } = semanticBattleAddress(battle);

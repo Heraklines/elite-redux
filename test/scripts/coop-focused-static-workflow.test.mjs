@@ -67,6 +67,17 @@ test("focused static accepts ignored-only metadata after the non-vacuous type ra
   assert.match(staticGate, /"--max-diagnostics=none"/u);
 });
 
+test("focused co-op static does not inherit unchanged Showdown and tournament debt", () => {
+  assert.doesNotMatch(staticGate, /file\.startsWith\("src\/data\/elite-redux\/showdown\/"\)/u);
+  assert.doesNotMatch(staticGate, /file\.startsWith\("src\/phases\/showdown-"\)/u);
+  assert.doesNotMatch(staticGate, /file\.startsWith\("test\/tests\/elite-redux\/showdown\/"\)/u);
+  assert.match(
+    staticGate,
+    /diagnostic => changed\.has\(diagnostic\.file\) \|\| isCoopStaticScope\(diagnostic\.file\)/u,
+    "a Showdown file still fails when this checkpoint actually changes it",
+  );
+});
+
 test("full static checks only the exact candidate delta, never every change since the last all-green gate", () => {
   const start = fullWorkflow.indexOf("\n  static:\n");
   const end = fullWorkflow.indexOf("\n  public-ui-contracts:", start + 1);

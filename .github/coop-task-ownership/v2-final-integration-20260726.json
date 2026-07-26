@@ -3,7 +3,7 @@
   "version": 1,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "7539979236ba846efe087771f857c9ae8ca15ecf",
+  "baseSha": "f8af3dbb994d3e951ecad2b27c75d2884179a5c0",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -15,6 +15,7 @@
     "progress.md",
     "scripts/coop-browser-entry.ts",
     "scripts/run-coop-gate.mjs",
+    "scripts/run-coop-static-gate.mjs",
     "src/data/arena-tag.ts",
     "src/data/elite-redux/coop/authority-v2/adapters/control-open.ts",
     "src/data/elite-redux/coop/authority-v2/next-control.ts",

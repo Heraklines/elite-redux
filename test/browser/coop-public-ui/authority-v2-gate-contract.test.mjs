@@ -2627,6 +2627,18 @@ test("campaign speed setup follows semantic title identities across a late title
   );
 });
 
+test("the browser observer republishes an unchanged menu after a non-semantic modal closes", () => {
+  const classify = browserEntry.indexOf("const semantic = classifySemanticSurface(phase, uiMode);");
+  const selection = browserEntry.indexOf("const selection = readSelection(handler, uiMode);", classify);
+  assert.ok(classify >= 0 && selection > classify, "the semantic classification block is bounded");
+  const classification = browserEntry.slice(classify, selection);
+  assert.match(
+    classification,
+    /if \(semantic == null\) \{[\s\S]*if \(runtime == null \|\| membership\?\.state !== "active"\) \{[\s\S]*lastSemanticObservation = "";[\s\S]*return;/u,
+    "a local Settings/modal gap must invalidate deduplication so the reopened title menu is fresh",
+  );
+});
+
 test("the one-process soak retains the authority browser while nested peer pumps settle a wave crossing", () => {
   const crossingStart = soakDriver.indexOf("  const crossCommandBoundaryWithReplayGuest = async (");
   const crossingEnd = soakDriver.indexOf(
