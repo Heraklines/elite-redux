@@ -95,6 +95,10 @@ const proposalAdmission = readFileSync(
 );
 const interactionRelay = readFileSync(new URL("src/data/elite-redux/coop/coop-interaction-relay.ts", root), "utf8");
 const rewardOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-reward-operation.ts", root), "utf8");
+const authorityStateHooks = readFileSync(
+  new URL("src/data/elite-redux/coop/coop-authority-state-hooks.ts", root),
+  "utf8",
+);
 const biomeOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-biome-operation.ts", root), "utf8");
 const selectModifierPhase = readFileSync(new URL("src/phases/select-modifier-phase.ts", root), "utf8");
 const theBargainPhase = readFileSync(new URL("src/phases/the-bargain-phase.ts", root), "utf8");
@@ -166,6 +170,26 @@ test("the stall watchdog preserves an exact V2 human-input lease", () => {
   const watchdogEnd = coopRuntime.indexOf("function wireCoopDisconnectReaction", watchdogStart);
   assert.ok(watchdogStart >= 0 && watchdogEnd > watchdogStart, "the complete stall watchdog source exists");
   assert.match(coopRuntime.slice(watchdogStart, watchdogEnd), /hasCoopV2HumanDeliberationLease\(runtime\)/u);
+});
+
+test("operation state transactions cross one engine-free composition seam", () => {
+  assert.doesNotMatch(rewardOperation, /from "#data\/elite-redux\/coop\/coop-battle-engine"/u);
+  assert.match(rewardOperation, /captureCoopOperationAuthorityState/u);
+  assert.match(authorityStateHooks, /let installedHooks: CoopAuthorityStateHooks \| null = null/u);
+  assert.match(coopRuntime, /setCoopAuthorityStateHooks\(\{/u);
+  assert.match(coopRuntime, /apply: state => applyCoopAuthoritativeBattleState\(state, true\)/u);
+  assert.match(coopRuntime, /reapply: state => reapplyAcceptedCoopAuthoritativeBattleState\(state, true\)/u);
+});
+
+test("an N+1 replacement command resets every turn-local presentation watermark", () => {
+  const pivotStart = replayTurnPhase.indexOf("const commandTurn = globalScene.currentBattle.turn;");
+  const pivotEnd = replayTurnPhase.indexOf("if (!hasLocalCommandSlot)", pivotStart);
+  assert.ok(pivotStart >= 0 && pivotEnd > pivotStart, "the replacement-to-command replay pivot exists");
+  const pivot = replayTurnPhase.slice(pivotStart, pivotEnd);
+  assert.match(pivot, /const continuesSameTurn = commandTurn === this\.turn/u);
+  assert.match(pivot, /continuesSameTurn \? this\.rendered : 0/u);
+  assert.match(pivot, /continuesSameTurn \? \[\.\.\.this\.fromHpByBi\.entries\(\)\] : undefined/u);
+  assert.match(pivot, /continuesSameTurn \? this\.presentationOutcomeTokens : undefined/u);
 });
 
 test("every release soak and focused replay executes the complete Authority V2 graph", () => {

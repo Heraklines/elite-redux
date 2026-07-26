@@ -22,6 +22,7 @@
     "src/data/elite-redux/coop/authority-v2/next-control.ts",
     "src/data/elite-redux/coop/coop-ability-operation.ts",
     "src/data/elite-redux/coop/coop-ability-picker-relay.ts",
+    "src/data/elite-redux/coop/coop-authority-state-hooks.ts",
     "src/data/elite-redux/coop/coop-battle-event-validator.ts",
     "src/data/elite-redux/coop/coop-battle-stream.ts",
     "src/data/elite-redux/coop/coop-learn-move-operation.ts",

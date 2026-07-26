@@ -21,12 +21,12 @@
 // =============================================================================
 
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
-import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import {
-  applyCoopAuthoritativeBattleState,
-  captureCoopAuthoritativeBattleState,
-  reapplyAcceptedCoopAuthoritativeBattleState,
-} from "#data/elite-redux/coop/coop-battle-engine";
+  applyCoopOperationAuthorityState,
+  captureCoopOperationAuthorityState,
+  reapplyCoopOperationAuthorityState,
+} from "#data/elite-redux/coop/coop-authority-state-hooks";
+import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
@@ -133,9 +133,9 @@ export interface CoopRewardAuthorityStateHooks {
 }
 
 const productionAuthorityStateHooks: CoopRewardAuthorityStateHooks = {
-  capture: turn => captureCoopAuthoritativeBattleState(turn),
-  apply: state => applyCoopAuthoritativeBattleState(state, true),
-  reapply: state => reapplyAcceptedCoopAuthoritativeBattleState(state, true),
+  capture: turn => captureCoopOperationAuthorityState(turn),
+  apply: state => applyCoopOperationAuthorityState(state),
+  reapply: state => reapplyCoopOperationAuthorityState(state),
 };
 
 let authorityStateHooks: CoopRewardAuthorityStateHooks = productionAuthorityStateHooks;

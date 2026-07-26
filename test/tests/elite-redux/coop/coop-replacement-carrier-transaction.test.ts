@@ -276,7 +276,7 @@ describe("production replacement carrier transaction", () => {
     // The replay was waiting for turn N=1 while the host opened turn N+1=2 to capture the replacement
     // that makes the guest-owned slot commandable. Applying that exact replacement adopts N+1 before
     // the new command opens; its continuation must therefore carry turn 2, not resurrect turn 1.
-    phase = new CoopReplayTurnPhase(1);
+    phase = new CoopReplayTurnPhase(1, 29, [["player:p101", 7]], 4);
     phase.start();
     runtime.partnerTransport?.send({
       t: "battleCheckpoint",
@@ -311,6 +311,10 @@ describe("production replacement carrier transaction", () => {
       unshiftNew.mock.calls.some(([name, turn]) => name === "CoopReplayTurnPhase" && turn === 2),
       "the replacement-owned command continues at the adopted turn N+1 address",
     ).toBe(true);
+    expect(
+      unshiftNew.mock.calls.find(([name, turn]) => name === "CoopReplayTurnPhase" && turn === 2)?.slice(2),
+      "the N+1 renderer must not inherit turn N's presentation watermark or HP animation chain",
+    ).toEqual([0, undefined, 4, false, undefined]);
     expect(
       unshiftNew.mock.calls.some(([name, turn]) => name === "CoopReplayTurnPhase" && turn === 1),
       "the finalized turn-N replay cannot reopen behind the replacement-owned command",

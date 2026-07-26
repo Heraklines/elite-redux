@@ -766,6 +766,7 @@ export class CoopReplayTurnPhase extends Phase {
               // forever (real dirty-lane wave-3 trace). Capture once so async phase progression cannot retarget
               // the continuation after this immutable checkpoint decision.
               const commandTurn = globalScene.currentBattle.turn;
+              const continuesSameTurn = commandTurn === this.turn;
               if (
                 !streamer.registerReplacementContinuation(envelope, {
                   kind: "command",
@@ -797,11 +798,14 @@ export class CoopReplayTurnPhase extends Phase {
               globalScene.phaseManager.unshiftNew(
                 "CoopReplayTurnPhase",
                 commandTurn,
-                this.rendered,
-                [...this.fromHpByBi.entries()],
+                // These three fields are turn-local. Carrying turn N's watermark into N+1 made the renderer
+                // classify every new event (including ability flyouts) as already presented and jump straight
+                // to the checkpoint. Preserve them only when this is genuinely a same-turn continuation.
+                continuesSameTurn ? this.rendered : 0,
+                continuesSameTurn ? [...this.fromHpByBi.entries()] : undefined,
                 this.sourceWave,
-                this.entryPresentationOnly,
-                this.presentationOutcomeTokens,
+                continuesSameTurn && this.entryPresentationOnly,
+                continuesSameTurn ? this.presentationOutcomeTokens : undefined,
               );
               this.end();
               return;

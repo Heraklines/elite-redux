@@ -151,6 +151,7 @@ import {
   setShowdownGuestFlipPredicate,
   setShowdownSeatAuthorityResolver,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { setCoopAuthorityStateHooks } from "#data/elite-redux/coop/coop-authority-state-hooks";
 import {
   armCoopBargainJournalMaterialization,
   COOP_BARGAIN_PRESENT_KIND,
@@ -12018,8 +12019,14 @@ export function assembleCoopRuntime(
     },
   });
   const membership = new CoopMembershipController(() => controller.role);
-  // Operation adapters stay engine-free. Install their one narrow DATA capture seam only when a real
-  // co-op runtime is assembled, so every V2 interaction commit carries the complete immutable state.
+  // Operation adapters stay engine-free. Install their narrow DATA transaction seam only when a real
+  // co-op runtime is assembled, so every V2 interaction commit carries and atomically applies the
+  // complete immutable state without importing the engine back through an operation module.
+  setCoopAuthorityStateHooks({
+    capture: turn => captureCoopAuthoritativeBattleState(turn),
+    apply: state => applyCoopAuthoritativeBattleState(state, true),
+    reapply: state => reapplyAcceptedCoopAuthoritativeBattleState(state, true),
+  });
   setCoopOperationAuthorityStateProvider(turn => captureCoopAuthoritativeBattleState(turn));
   opState = createCoopRuntimeOpState(controller.role);
   // W2b/W2e (§4/§5): the application-level durability engine, flag-gated. Wave-2e plugs the operation
