@@ -246,21 +246,73 @@ export interface CoopV2LocalPresentationInputProof {
   readonly messageHandlerActionable: boolean;
 }
 
+export interface CoopV2SharedInteractionPresentationInputProof extends CoopV2LocalPresentationInputProof {
+  readonly localSeatId: number;
+  readonly operationId: string | null;
+}
+
+/**
+ * Whether an installed shared control grants its owner the exact action-only presentation needed to open
+ * that control's registered picker. The bridge is a closed mapping: adding another pre-picker narrative
+ * requires naming its operation and concrete phase here, with an engine-free failure-first contract.
+ */
+export function sharedInteractionAllowsLocalPresentationInput(
+  control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
+  proof: CoopV2SharedInteractionPresentationInputProof,
+): boolean {
+  if (
+    control.ownerSeatId !== proof.localSeatId
+    || control.epoch !== proof.sessionEpoch
+    || control.wave !== proof.wave
+    || control.turn !== proof.turn
+    || control.operationId !== proof.operationId
+    || !proof.messageHandlerActionable
+  ) {
+    return false;
+  }
+  return (
+    control.surfaceClass === "op:learnMove"
+    && control.operationKind === "LEARN_MOVE"
+    && proof.phaseName === "LearnMovePhase"
+  );
+}
+
 /**
  * Whether an ordered wait explicitly grants a non-mechanical action-only presentation its local input lease.
  *
  * A terminal reward may first show the same-address LevelUpPhase produced by its already-committed Rare
- * Candy result, then show the N+1/t1 NextEncounterPhase intro before CONTROL_COMMIT can exist. Freezing
- * either action-only message creates a cycle: the presentation waits for V2 control while V2 control waits
- * for the presentation to reach the next ordered boundary. `allowNextWaveStart` is the authority's explicit
- * permission to leave the terminal interaction and grants only those two exact bridges. No arbitrary
- * same-wave message, choice handler, or wait without that permission is admitted.
+ * Candy result, then show the N+1/t1 NextEncounterPhase intro before CONTROL_COMMIT can exist. A Mystery
+ * terminal whose immutable destination is a battle similarly names one exact same-address command-open,
+ * but the host must dismiss MysteryEncounterBattlePhase's intro before that control can be authored.
+ * Freezing any of those action-only messages creates a cycle: the presentation waits for V2 control while
+ * V2 control waits for the presentation to reach the next ordered boundary. `allowNextWaveStart` grants the
+ * first two bridges; the exact same-address command-open target grants only the ME battle intro bridge. No
+ * arbitrary same-wave message, choice handler, or broad wait is admitted.
  */
 export function successorWaitAllowsLocalPresentationInput(
   wait: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>,
   proof: CoopV2LocalPresentationInputProof,
 ): boolean {
-  if (!wait.allowNextWaveStart || proof.sessionEpoch !== wait.epoch || !proof.messageHandlerActionable) {
+  if (proof.sessionEpoch !== wait.epoch || !proof.messageHandlerActionable) {
+    return false;
+  }
+  const exactBattleCommandTarget = wait.allowedControlAddresses?.some(
+    target =>
+      target.materialKind === "command-open"
+      && target.wave === proof.wave
+      && target.turn === proof.turn
+      && target.operationId == null,
+  );
+  const mysteryBattleIntro =
+    proof.wave === wait.wave
+    && proof.turn === wait.turn
+    && proof.phaseName === "MysteryEncounterBattlePhase"
+    && wait.allowedKinds.includes("CONTROL_COMMIT")
+    && exactBattleCommandTarget === true;
+  if (mysteryBattleIntro) {
+    return true;
+  }
+  if (!wait.allowNextWaveStart) {
     return false;
   }
   const sameAddressLevelUp = proof.wave === wait.wave && proof.turn === wait.turn && proof.phaseName === "LevelUpPhase";

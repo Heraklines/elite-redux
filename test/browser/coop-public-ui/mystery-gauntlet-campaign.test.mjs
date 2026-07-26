@@ -311,6 +311,12 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /if \(await advanceMysteryNarration\(\)\) \{/u);
   assert.match(observer, /uiMode === "MYSTERY_ENCOUNTER"/u);
   assert.match(observer, /mystery-option:\$\{index\}:\$\{disabled \? "disabled" : "enabled"\}/u);
+  // Run 30205274431: after a guest-owned Mystery option launched a trainer battle, both engines reached
+  // the battle handoff, but the observer kept classifying the host's actionable battle intro as an
+  // interaction-owned Mystery prompt. The ordinary battle prompt driver therefore could not reproduce the
+  // public host input needed to reach the exact command-open successor. Once the handoff starts, this phase
+  // is local battle presentation, not part of the alternating Mystery interaction.
+  assert.match(observer, /phase\.startsWith\("MysteryEncounter"\) && phase !== "MysteryEncounterBattlePhase"/u);
   assert.match(campaign, /await driveMysteryEncounterChoice\(rig, client, cursors\)/u);
 
   // Track R cycle-11 mystery lane (run 29654429335): a guest-owned PART_TIMER opened a PARTY

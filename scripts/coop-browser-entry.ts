@@ -460,7 +460,7 @@ interface SemanticSurface {
 /** Map (phase, uiMode) to a stable semantic surfaceId + operation class + ownership model. */
 function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface | null {
   const inMe =
-    phase.startsWith("MysteryEncounter")
+    (phase.startsWith("MysteryEncounter") && phase !== "MysteryEncounterBattlePhase")
     || phase === "PostMysteryEncounterPhase"
     || phase === "CoopReplayMePhase"
     || phase === "TheBargainPhase";

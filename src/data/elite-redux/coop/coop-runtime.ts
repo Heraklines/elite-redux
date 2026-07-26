@@ -106,6 +106,7 @@ import {
   controlsEqual,
   type ProjectableControl,
   replacementControlTargetId,
+  sharedInteractionAllowsLocalPresentationInput,
   successorWaitAllowsLocalPresentationInput,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
@@ -5570,6 +5571,43 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
     return false;
   }
   projectCoopV2InteractionControl(runtime, pending);
+  if (pending.kind === "SHARED_INTERACTION") {
+    const battle = globalScene.currentBattle;
+    const phase = globalScene.phaseManager?.getCurrentPhase();
+    const handler = globalScene.ui?.getHandler() as
+      | {
+          active?: boolean;
+          isCoopV2InputActionable?: () => boolean;
+        }
+      | undefined;
+    const messageHandlerActionable =
+      globalScene.ui?.getMode() === UiMode.MESSAGE
+      && handler?.active === true
+      && typeof handler.isCoopV2InputActionable === "function"
+      && handler.isCoopV2InputActionable();
+    if (
+      // This is deliberately a PRE-install bridge: the exact registered picker cannot become the active
+      // executable control until its own introductory ACTION message has been dismissed. The authenticated
+      // latest claim + material proof + closed pure mapping below are the lease; no queued/local guess is.
+      ledger.isMaterialApplied(pending)
+      && battle != null
+      && phase != null
+      && sharedInteractionAllowsLocalPresentationInput(pending, {
+        localSeatId: runtime.controller.localSeatId,
+        operationId:
+          typeof (phase as { coopV2ControlOperationId?: unknown }).coopV2ControlOperationId === "string"
+            ? (phase as unknown as { coopV2ControlOperationId: string }).coopV2ControlOperationId
+            : null,
+        sessionEpoch: runtime.controller.sessionEpoch,
+        wave: battle.waveIndex,
+        turn: battle.turn,
+        phaseName: phase.phaseName,
+        messageHandlerActionable,
+      })
+    ) {
+      return false;
+    }
+  }
   if (pending.kind === "AWAIT_SUCCESSOR") {
     const activeControl = ledger.activeControl;
     const battle = globalScene.currentBattle;

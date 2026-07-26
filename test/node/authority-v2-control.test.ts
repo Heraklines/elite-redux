@@ -34,6 +34,7 @@ import {
   controlsEqual,
   isValidNextControl,
   sameControlAddress,
+  sharedInteractionAllowsLocalPresentationInput,
   successorWaitAllows,
   successorWaitAllowsLocalPresentationInput,
   validateNextControl,
@@ -130,6 +131,13 @@ describe("ordered-wait local presentation lease", () => {
     phaseName: "LevelUpPhase",
     messageHandlerActionable: true,
   };
+  const exactMysteryBattleIntro = {
+    sessionEpoch: 1,
+    wave: 3,
+    turn: 7,
+    phaseName: "MysteryEncounterBattlePhase",
+    messageHandlerActionable: true,
+  };
 
   it("admits only the explicit terminal-result LevelUp and N+1/t1 NextEncounter action prompts", () => {
     expect(successorWaitAllowsLocalPresentationInput(successorWait(), exactNextEncounter)).toBe(true);
@@ -165,6 +173,99 @@ describe("ordered-wait local presentation lease", () => {
         ...exactNextEncounter,
         messageHandlerActionable: false,
       }),
+    ).toBe(false);
+  });
+
+  it("admits a Mystery battle intro only when the wait names its exact same-address command frontier", () => {
+    const exactBattleWait = successorWait({
+      allowNextWaveStart: false,
+      allowedControlAddresses: [{ materialKind: "command-open", wave: 3, turn: 7, operationId: null }],
+    });
+    expect(successorWaitAllowsLocalPresentationInput(exactBattleWait, exactMysteryBattleIntro)).toBe(true);
+    expect(
+      successorWaitAllowsLocalPresentationInput(successorWait({ allowNextWaveStart: false }), exactMysteryBattleIntro),
+    ).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(
+        {
+          ...exactBattleWait,
+          allowedControlAddresses: [{ materialKind: "command-open", wave: 3, turn: 8, operationId: null }],
+        },
+        exactMysteryBattleIntro,
+      ),
+    ).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(
+        { ...exactBattleWait, allowedKinds: ["INTERACTION_COMMIT"] },
+        exactMysteryBattleIntro,
+      ),
+    ).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(exactBattleWait, {
+        ...exactMysteryBattleIntro,
+        phaseName: "MysteryEncounterPhase",
+      }),
+    ).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(exactBattleWait, {
+        ...exactMysteryBattleIntro,
+        messageHandlerActionable: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("shared-control local presentation lease", () => {
+  const exactLearnMoveMessage = {
+    localSeatId: 0,
+    operationId: "1:0:LEARN_MOVE:1",
+    sessionEpoch: 1,
+    wave: 3,
+    turn: 2,
+    phaseName: "LearnMovePhase",
+    messageHandlerActionable: true,
+  };
+  const learnMoveControl = rewardControl({
+    surfaceClass: "op:learnMove",
+    operationKind: "LEARN_MOVE",
+    operationId: "1:0:LEARN_MOVE:1",
+    ownerSeatId: 0,
+    wave: 3,
+    turn: 2,
+    successor: { operationKinds: ["LEARN_MOVE"], operationIds: ["1:0:LEARN_MOVE:2"] },
+  });
+
+  it("admits only the exact owner's actionable LearnMovePhase message bridge", () => {
+    expect(sharedInteractionAllowsLocalPresentationInput(learnMoveControl, exactLearnMoveMessage)).toBe(true);
+    expect(
+      sharedInteractionAllowsLocalPresentationInput(learnMoveControl, { ...exactLearnMoveMessage, localSeatId: 1 }),
+    ).toBe(false);
+    expect(
+      sharedInteractionAllowsLocalPresentationInput(learnMoveControl, {
+        ...exactLearnMoveMessage,
+        operationId: "1:0:LEARN_MOVE:other",
+      }),
+    ).toBe(false);
+    expect(sharedInteractionAllowsLocalPresentationInput(learnMoveControl, { ...exactLearnMoveMessage, turn: 3 })).toBe(
+      false,
+    );
+    expect(
+      sharedInteractionAllowsLocalPresentationInput(learnMoveControl, {
+        ...exactLearnMoveMessage,
+        phaseName: "CoopReplayLearnMovePhase",
+      }),
+    ).toBe(false);
+    expect(
+      sharedInteractionAllowsLocalPresentationInput(learnMoveControl, {
+        ...exactLearnMoveMessage,
+        messageHandlerActionable: false,
+      }),
+    ).toBe(false);
+    expect(
+      sharedInteractionAllowsLocalPresentationInput(
+        { ...learnMoveControl, operationKind: "LEARN_MOVE_BATCH" },
+        exactLearnMoveMessage,
+      ),
     ).toBe(false);
   });
 });

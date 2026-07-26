@@ -1627,6 +1627,33 @@ test("the learn-move soak proves the real guest UI-to-relay terminal before rebu
   );
 });
 
+test("a host-owned learn-move prompt has one exact pre-picker presentation lease", () => {
+  assert.match(
+    nextControl,
+    /export function sharedInteractionAllowsLocalPresentationInput\([\s\S]*control\.ownerSeatId !== proof\.localSeatId[\s\S]*control\.operationId !== proof\.operationId[\s\S]*control\.surfaceClass === "op:learnMove"[\s\S]*control\.operationKind === "LEARN_MOVE"[\s\S]*proof\.phaseName === "LearnMovePhase"/u,
+    "the pure control model admits only the addressed owner and closed LearnMove operation/phase pair",
+  );
+  const gateStart = coopRuntime.indexOf("export function isCoopV2InteractionHumanInputFrozen(");
+  const gateEnd = coopRuntime.indexOf("\n/**", gateStart + 1);
+  assert.notEqual(gateStart, -1, "the production physical-input gate exists");
+  assert.ok(gateEnd > gateStart, "the production physical-input gate has a bounded source block");
+  const inputGate = coopRuntime.slice(gateStart, gateEnd);
+  assert.match(inputGate, /if \(pending\.kind === "SHARED_INTERACTION"\)/u);
+  assert.match(inputGate, /ledger\.isMaterialApplied\(pending\)/u);
+  assert.match(inputGate, /sharedInteractionAllowsLocalPresentationInput\(pending,/u);
+  assert.match(inputGate, /localSeatId: runtime\.controller\.localSeatId/u);
+  assert.match(inputGate, /coopV2ControlOperationId/u);
+  assert.match(inputGate, /messageHandlerActionable,/u);
+  assert.doesNotMatch(
+    inputGate.slice(
+      inputGate.indexOf('if (pending.kind === "SHARED_INTERACTION")'),
+      inputGate.indexOf('if (pending.kind === "AWAIT_SUCCESSOR")'),
+    ),
+    /activeControl/u,
+    "the pre-picker bridge cannot require a control that is installable only after the prompt is dismissed",
+  );
+});
+
 test("the duo Mystery split cannot inject a choice before public V2 input is actionable", () => {
   const helperStart = duoHarness.indexOf("export function relayGuestMeOptionIndexOnly(");
   const helperEnd = duoHarness.indexOf("\n/**", helperStart + 1);
