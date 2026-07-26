@@ -167,12 +167,15 @@ function coopCheckOpName(op: number): string {
 // owner-only mutation flips the hash -> resync storm. The NON-hashed residuals (`coopOwner` from
 // GIVE, `pauseEvolutions`, `nickname`) heal via the ME-terminal `applyCoopMeMonFields` path + the
 // future B4 bench snapshot, but are relayed too so the common path never even diverges.
-/** How long the WATCHER waits for the owner's next reward pick before leaving (never hangs).
- *  20min: "wait for the human" - a slow shopper must never trip the watcher's premature leave
- *  (which would land the watcher in the next wave while the owner is still shopping = desync). */
+/** How long the WATCHER waits before re-requesting the exact retained reward control.
+ *  20min: "wait for the human". Under Authority V2 a timeout is recovery, never an inferred LEAVE;
+ *  only an immutable INTERACTION_COMMIT (or the shared terminal supervisor) may close the shop. */
 const COOP_REWARD_WAIT_MS = 1_200_000;
 
-type CoopRewardWaitDisposition = "continue" | "end";
+type CoopRewardWaitDisposition = "continue" | "recover" | "end";
+
+/** Prevent an immediately-refused recovery-fence wait from becoming a hot re-arm loop. */
+const COOP_REWARD_RECOVERY_REARM_MS = 250;
 
 /**
  * Co-op (#633 / #828): inside an AUTHORITATIVE mystery encounter the embedded reward shop's two
@@ -2528,6 +2531,14 @@ export class SelectModifierPhase extends BattlePhase {
       return "end";
     }
     if (action == null) {
+      if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
+        coopWarn(
+          "reward",
+          "WATCHER received no exact V2 reward result; retaining the shop and requesting the committed tail",
+        );
+        getCoopRuntime()?.durability?.reconnect();
+        return "recover";
+      }
       coopLog("reward", "WATCHER timed out waiting for partner -> leaving reward screen");
       this.coopEndMirror();
       void globalScene.ui.setMode(UiMode.MESSAGE);
@@ -2649,6 +2660,16 @@ export class SelectModifierPhase extends BattlePhase {
       const disposition = await this.coopResumeOnOwningRuntimeAsync(() =>
         this.coopApplyWatcherAction(seq, controller.role, action),
       );
+      if (disposition === "recover") {
+        await new Promise<void>(resolve => setTimeout(resolve, COOP_REWARD_RECOVERY_REARM_MS));
+        const stillLive = await this.coopResumeOnOwningRuntimeAsync(() =>
+          this.coopShopSceneAlive("watcher V2 result re-arm"),
+        );
+        if (stillLive !== true) {
+          return;
+        }
+        continue;
+      }
       if (disposition !== "continue") {
         return;
       }

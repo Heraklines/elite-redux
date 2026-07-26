@@ -70,6 +70,7 @@ const soakFidelityGate = readFileSync(
 const hostFaintSoak = readFileSync(new URL("test/tests/elite-redux/coop/coop-soak-host-faint.test.ts", root), "utf8");
 const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "utf8");
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
+const gameData = readFileSync(new URL("src/system/game-data.ts", root), "utf8");
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
 const waveAdapter = readFileSync(
   new URL("src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts", root),
@@ -2284,6 +2285,74 @@ test("a V2 biome receipt is consumed without consulting the retired operation re
   assert.ok(
     legacyDuplicate > v2Receipt,
     "the legacy operation ledger is only a post-receipt duplicate detector, never a V2 application permit",
+  );
+});
+
+test("a missing V2 reward result retains control instead of inventing a local leave", () => {
+  const applyStart = selectModifierPhase.indexOf("  private coopApplyWatcherAction(");
+  const applyEnd = selectModifierPhase.indexOf("\n  /** WATCHER: open the SAME reward screen", applyStart);
+  assert.notEqual(applyStart, -1, "the reward watcher exposes one bounded result-apply boundary");
+  assert.ok(applyEnd > applyStart, "the reward watcher result boundary is structurally bounded");
+  const apply = selectModifierPhase.slice(applyStart, applyEnd);
+  const missingStart = apply.indexOf("if (action == null)");
+  const operationGate = apply.indexOf("isCoopV2InteractionCutoverActive", missingStart);
+  const reconnect = apply.indexOf("getCoopRuntime()?.durability?.reconnect()", operationGate);
+  const recover = apply.indexOf('return "recover"', reconnect);
+  const legacyEnd = apply.indexOf("super.end()", recover);
+  const legacyAdvance = apply.indexOf("this.coopAdvanceInteraction()", legacyEnd);
+  assert.ok(
+    missingStart >= 0
+      && operationGate > missingStart
+      && reconnect > operationGate
+      && recover > reconnect
+      && legacyEnd > recover
+      && legacyAdvance > legacyEnd,
+    "V2 null re-requests the retained tail before the legacy-only leave/advance branch",
+  );
+
+  const watchStart = selectModifierPhase.indexOf("  private async startCoopWatch(): Promise<void>");
+  const watchEnd = selectModifierPhase.indexOf(
+    "\n  /**\n   * WATCHER: apply one relayed reward-screen action",
+    watchStart,
+  );
+  assert.ok(watchStart >= 0 && watchEnd > watchStart, "the watcher pump has a bounded source block");
+  const watch = selectModifierPhase.slice(watchStart, watchEnd);
+  const recoveryBranch = watch.indexOf('if (disposition === "recover")');
+  const backoff = watch.indexOf("COOP_REWARD_RECOVERY_REARM_MS", recoveryBranch);
+  const liveness = watch.indexOf('this.coopShopSceneAlive("watcher V2 result re-arm")', backoff);
+  const retry = watch.indexOf("continue;", liveness);
+  assert.ok(
+    recoveryBranch >= 0 && backoff > recoveryBranch && liveness > backoff && retry > liveness,
+    "an immediately refused wait is re-armed with bounded backoff only while the exact shop remains live",
+  );
+});
+
+test("a fully missing account save set publishes no-save without a generic reconciliation tail", () => {
+  const snapshotStart = gameData.indexOf("  async getCoopResumeLobbySnapshot(): Promise<CoopResumeLobbySnapshot>");
+  const snapshotEnd = gameData.indexOf("\n  /**\n   * Strict programmatic scan", snapshotStart);
+  assert.ok(snapshotStart >= 0 && snapshotEnd > snapshotStart, "the resume snapshot has a bounded source block");
+  const snapshot = gameData.slice(snapshotStart, snapshotEnd);
+  const cloudScan = snapshot.indexOf("this.scanCoopCloudReplicas(accountIdentity!, true)");
+  const cloudProof = snapshot.indexOf("const everyCloudSlotMissing", cloudScan);
+  const localProof = snapshot.indexOf("const everyLocalSlotMissing", cloudProof);
+  const terminal = snapshot.indexOf("if (everyCloudSlotMissing && everyLocalSlotMissing)", localProof);
+  const populate = snapshot.indexOf("sessions.set(slot, undefined)", terminal);
+  const publish = snapshot.indexOf("return { sessions, failures }", populate);
+  const genericReconcile = snapshot.indexOf("this.reconcileCoopResumeSlot", publish);
+  assert.ok(
+    cloudScan >= 0
+      && cloudProof > cloudScan
+      && localProof > cloudProof
+      && terminal > localProof
+      && populate > terminal
+      && publish > populate
+      && genericReconcile > publish,
+    "five typed cloud-missing results plus five exact local absences publish no-save before generic reconciliation",
+  );
+  assert.doesNotMatch(
+    snapshot.slice(terminal, publish),
+    /deleteSession|removeItem|setItem|updateCoopCas/u,
+    "the fresh all-empty completion is observation-only",
   );
 });
 

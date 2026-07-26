@@ -2261,6 +2261,24 @@ export class GameData {
     // whole launch; the fresh-slot scan (3559) keeps the default no-retry contract (it fails soft to
     // null and its gating test pins exactly 5 reads).
     const cloud = await this.scanCoopCloudReplicas(accountIdentity!, true);
+    const everyCloudSlotMissing = [0, 1, 2, 3, 4].every(slot => cloud.get(slot) == null);
+    const everyLocalSlotMissing = [0, 1, 2, 3, 4].every(
+      slot => localStorage.getItem(this.sessionStorageKeyForAccount(slot, accountIdentity)) == null,
+    );
+    if (everyCloudSlotMissing && everyLocalSlotMissing) {
+      // The common fresh-account result is already complete: every authoritative cloud read said
+      // "missing" and the exact account-scoped local keys are absent. Do not send that terminal
+      // answer through five generic reconciliation continuations. Real Chromium proved all five
+      // headers/body completions while the old continuation chain nevertheless failed to republish
+      // the no-save launch decision, leaving both players behind the lobby barrier. This shortcut
+      // contains no inference and performs no mutation; it merely materializes the already-proven
+      // empty snapshot synchronously so TitlePhase can install the public Start surface.
+      for (let slot = 0; slot < 5; slot++) {
+        sessions.set(slot, undefined);
+      }
+      coopLog("launch", "resume discovery proved all five local/cloud slots empty -> no-save");
+      return { sessions, failures };
+    }
     for (let slot = 0; slot < 5; slot++) {
       try {
         sessions.set(slot, await this.reconcileCoopResumeSlot(slot, accountIdentity!, cloud.get(slot) ?? null));
@@ -3073,7 +3091,14 @@ export class GameData {
         retryTransientReads ? this.readCoopCasWithTransientRetry(slot) : this.readCoopCas(slot),
       ),
     );
+    coopLog(
+      "launch",
+      `cloud scan settled [${reads
+        .map((read, slot) => `${slot}:${read.ok ? "present" : read.failureKind}`)
+        .join(" ")}] retryTransient=${retryTransientReads}`,
+    );
     if (!scanContextIsCurrent()) {
+      coopWarn("launch", "cloud scan completed after its account/runtime fence changed");
       throw new CoopResumeReplicaUnavailableError("account/runtime changed during co-op cloud scan");
     }
     const replicas = new Map<number, CoopClassifiedReplica | null>();

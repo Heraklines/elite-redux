@@ -21,14 +21,25 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  type CoopV2InteractionCutover,
+  clearActiveCoopV2InteractionCutover,
+  setActiveCoopV2InteractionCutover,
+} from "#data/elite-redux/coop/authority-v2/cutover-interaction";
+import {
+  CoopInteractionRelay,
+  setCoopFaintSwitchWaitMs,
+  setCoopWaveBarrierMs,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -43,7 +54,7 @@ import {
 } from "#test/tools/coop-duo-harness";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 const V2_REPLACEMENT_CUTOVER = process.env.COOP_AUTHORITY_V2_REPLACEMENT === "on";
@@ -54,6 +65,51 @@ const GUEST_PICK_SLOT = 3;
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
+
+describe("co-op Authority V2 reward watcher liveness", () => {
+  afterEach(() => {
+    clearActiveCoopV2InteractionCutover();
+    vi.useRealTimers();
+  });
+
+  it("does not turn an elapsed remote-owner wait into a local shop leave or counter advance", async () => {
+    vi.useFakeTimers();
+    const pair = createLoopbackPair();
+    const relay = new CoopInteractionRelay(pair.host);
+    const elapsed = relay.awaitInteractionChoice(0, 1_200_000, COOP_REWARD_CHOICE_KINDS);
+    await vi.advanceTimersByTimeAsync(1_200_000);
+    const action = await elapsed;
+    expect(action, "the real relay reports an elapsed owner wait as missing input, never as LEAVE").toBeNull();
+
+    // This seam only asks whether cutover is installed; the production cutover object is otherwise unused
+    // by result application. A structural stub keeps this regression focused on the phase's null policy.
+    setActiveCoopV2InteractionCutover({} as CoopV2InteractionCutover);
+    let mirrorEnded = 0;
+    let counterAdvanced = 0;
+    const phase = new SelectModifierPhase() as unknown as {
+      coopShopSceneAlive(reason: string): boolean;
+      coopEndMirror(): void;
+      coopAdvanceInteraction(): void;
+      coopApplyWatcherAction(
+        seq: number,
+        role: "host" | "guest",
+        result: Awaited<typeof elapsed>,
+      ): "continue" | "recover" | "end";
+    };
+    phase.coopShopSceneAlive = () => true;
+    phase.coopEndMirror = () => {
+      mirrorEnded++;
+    };
+    phase.coopAdvanceInteraction = () => {
+      counterAdvanced++;
+    };
+
+    expect(phase.coopApplyWatcherAction(0, "host", action)).toBe("recover");
+    expect(mirrorEnded, "the exact human-input surface remains installed").toBe(0);
+    expect(counterAdvanced, "absence of input is never an authoritative interaction result").toBe(0);
+    relay.dispose();
+  });
+});
 
 describe.skipIf(!RUN)(
   "co-op DUO next-command-barrier / turn-commit deadlock: guest commands its post-replacement own slot (Track R)",

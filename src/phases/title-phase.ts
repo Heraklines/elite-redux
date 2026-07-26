@@ -9,6 +9,7 @@ import { Phase } from "#app/phase";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
 import {
   type CoopResumeCandidate,
@@ -1618,6 +1619,10 @@ export class TitlePhase extends Phase {
             // Keep failures attached to their slots. A corrupt/ambiguous slot must not hide a valid
             // candidate elsewhere or tear down an otherwise healthy paired transport.
             const resumeSnapshot = await globalScene.gameData.getCoopResumeLobbySnapshot();
+            coopLog(
+              "launch",
+              `resume snapshot settled sessions=${resumeSnapshot.sessions.size} failures=${resumeSnapshot.failures.size}`,
+            );
             const discovery = await findCoopResumeCandidate(
               controller.localName(),
               partner,
@@ -1630,7 +1635,9 @@ export class TitlePhase extends Phase {
                 return resumeSnapshot.sessions.get(slot);
               },
             );
+            coopLog("launch", `resume discovery settled kind=${discovery.kind}`);
             if (!isCurrentSession()) {
+              coopWarn("launch", `discarding ${discovery.kind} resume decision after the exact lobby session changed`);
               return;
             }
             const blockedMessage = coopResumeBlockMessage(discovery);

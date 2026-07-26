@@ -4062,3 +4062,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Migrated the public faint-replacement evidence oracle from its stale `const` local faint address to the V2
   contract: the real SwitchPhase must establish, fail/defer safely, and then rebind to the immutable committed
   replacement address before any owner/watcher relay may use it.
+
+## 2026-07-26 - Retained reward authority and fresh no-save launch completion
+
+- Closed the valid reward-liveness finding from the latest external audit: an elapsed watcher wait under
+  Authority V2 now requests durability recovery and re-arms the same live shop with bounded backoff. It never
+  invents `LEAVE`, closes the mirror, or advances the interaction counter without an immutable commit. The
+  legacy fallback remains unchanged while cutover is inactive.
+- Two-browser run `30183490216` proved transport, negotiation, and cross-language compatibility healthy, then
+  showed the host receive five typed missing cloud-save responses without ever publishing the fresh no-save
+  decision. The observation-complete path now returns an empty snapshot immediately when all five authoritative
+  cloud reads and all five exact account-scoped local keys are absent. It performs no save mutation or inference.
+- Added launch milestones around the cloud scan, snapshot, and discovery result so any remaining lobby stall has
+  an exact boundary. Local static qualification is clean: targeted Biome, `git diff --check`, and all 232
+  public node contracts pass. Behavioral proof remains remote-only per `AGENTS.md` and is the next exact-SHA run.
