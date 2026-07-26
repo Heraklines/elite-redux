@@ -1678,6 +1678,20 @@ test("an ME battle handoff leases its whole exact-address action-only pre-comman
   );
 });
 
+test("pre-battle Mystery engine narration cannot depend on the selector phase still being current", () => {
+  const helperStart = coopRuntime.indexOf("export function coopHostEngineDialogueMessageAdvanceAllowed(");
+  const helperEnd = coopRuntime.indexOf("\n/** Retry the exact retained interaction claim", helperStart);
+  assert.notEqual(helperStart, -1, "the authoritative host narration lease exists");
+  assert.ok(helperEnd > helperStart, "the host narration lease has a bounded source block");
+  const helper = coopRuntime.slice(helperStart, helperEnd);
+  assert.match(helper, /ctx\.localRole === "host"/u, "only the sole authoritative engine receives the lease");
+  assert.doesNotMatch(
+    helper,
+    /ctx\.meInteractiveSurfaceActive/u,
+    "an ordinary MessagePhase remains part of the live Mystery narration after its selector phase ends",
+  );
+});
+
 test("a host-owned V2 learn-move prompt retains the guest at the same wave until its exact result", () => {
   assert.match(
     learnMovePhase,

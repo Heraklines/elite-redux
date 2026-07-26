@@ -33,13 +33,12 @@ import { describe, expect, it } from "vitest";
 
 /** The exact mystery-lane state: authoritative host, MESSAGE dialogue, guest-owned in-progress ME. */
 const HOST_ENGINE_DIALOGUE = {
+  localRole: "host",
   isMessageMode: true,
   netcodeMode: "authoritative",
   meInProgress: true,
   meHandoffBattleStarted: false,
   meBespokeHostDrives: false,
-  localSeatOwnsMe: false,
-  meInteractiveSurfaceActive: true,
 } as const;
 
 describe("Authority-V2 host engine-dialogue carve-out (campaign 29933294323 mystery park)", () => {
@@ -52,8 +51,14 @@ describe("Authority-V2 host engine-dialogue carve-out (campaign 29933294323 myst
     expect(coopHostEngineDialogueMessageAdvanceAllowed({ ...HOST_ENGINE_DIALOGUE, isMessageMode: false })).toBe(false);
   });
 
-  it("BLOCKS the host-OWNED ME (the host drives its own selector off local input; nothing to bypass)", () => {
-    expect(coopHostEngineDialogueMessageAdvanceAllowed({ ...HOST_ENGINE_DIALOGUE, localSeatOwnsMe: true })).toBe(false);
+  it("ALLOWS a standalone MessagePhase after the selector phase has ended", () => {
+    // Campaign 30217040544 reached exactly this state: the first selected-option line advanced while
+    // MysteryEncounterPhase was current, then an ordinary MessagePhase became actionable and V2 froze it.
+    expect(coopHostEngineDialogueMessageAdvanceAllowed({ ...HOST_ENGINE_DIALOGUE })).toBe(true);
+  });
+
+  it("BLOCKS the guest renderer even when it owns the Mystery choice", () => {
+    expect(coopHostEngineDialogueMessageAdvanceAllowed({ ...HOST_ENGINE_DIALOGUE, localRole: "guest" })).toBe(false);
   });
 
   it("BLOCKS off the authoritative netcode (lockstep never freezes host input this way)", () => {
@@ -72,12 +77,6 @@ describe("Authority-V2 host engine-dialogue carve-out (campaign 29933294323 myst
     expect(coopHostEngineDialogueMessageAdvanceAllowed({ ...HOST_ENGINE_DIALOGUE, meBespokeHostDrives: true })).toBe(
       false,
     );
-  });
-
-  it("BLOCKS when no ME-interactive pump surface is live (embedded battle / end-of-ME shop own their input)", () => {
-    expect(
-      coopHostEngineDialogueMessageAdvanceAllowed({ ...HOST_ENGINE_DIALOGUE, meInteractiveSurfaceActive: false }),
-    ).toBe(false);
   });
 
   it("BLOCKS outside any live ME (coopMeInProgress false)", () => {

@@ -397,15 +397,15 @@ export class UI extends Phaser.GameObjects.Container {
       // the authoritative host must still advance its OWN engine MESSAGE dialogue on a guest-owned ME (pure
       // text-advance) - else the post-pick narration parks forever and the guest never reaches the next round.
       // The bypass mirrors the #816 branch below exactly, so only that case slips the freeze; every CHOICE
-      // surface (never MESSAGE) and the host-OWNED ME stay frozen.
+      // surface (never MESSAGE) stays frozen. It also covers ordinary MessagePhase effects after the
+      // Mystery selector phase has ended; those are still presentation owned by the sole host engine.
       const hostEngineDialogueAdvance = coopHostEngineDialogueMessageAdvanceAllowed({
+        localRole: getCoopController()?.role ?? "guest",
         isMessageMode: this.getMode() === UiMode.MESSAGE,
         netcodeMode: getCoopNetcodeMode(),
         meInProgress: coopMeInProgress(),
         meHandoffBattleStarted: coopMeHandoffBattleStarted(),
         meBespokeHostDrives: coopMeBespokeHostDrives(),
-        localSeatOwnsMe: getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? true,
-        meInteractiveSurfaceActive,
       });
       if (isCoopV2InteractionHumanInputFrozen() && !hostEngineDialogueAdvance) {
         return false;
