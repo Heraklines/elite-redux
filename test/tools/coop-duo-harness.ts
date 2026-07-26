@@ -2720,17 +2720,25 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
       return wrapped;
     };
     const originalAdd = manager.add.bind(scene.tweens);
-    const pinnedAdd = (config: unknown): unknown => originalAdd(wrapConfig(config));
+    // A Vitest spy can be installed after this pin. Our afterEach then sees the spy rather than
+    // `pinnedAdd`, and Vitest subsequently restores the value it observed when the spy was created:
+    // this retired wrapper. New tweens from the next reused-scene test must pass through unchanged;
+    // only callbacks that were actually wrapped while this rig was live retain the disposed fence.
+    const pinnedAdd = (config: unknown): unknown => originalAdd(disposed ? config : wrapConfig(config));
     manager.add = pinnedAdd;
     const originalAddCounter = manager.addCounter?.bind(scene.tweens);
     const pinnedAddCounter =
-      originalAddCounter == null ? undefined : (config: unknown): unknown => originalAddCounter(wrapConfig(config));
+      originalAddCounter == null
+        ? undefined
+        : (config: unknown): unknown => originalAddCounter(disposed ? config : wrapConfig(config));
     if (pinnedAddCounter != null) {
       manager.addCounter = pinnedAddCounter;
     }
     const originalChain = manager.chain?.bind(scene.tweens);
     const pinnedChain =
-      originalChain == null ? undefined : (config: unknown): unknown => originalChain(wrapConfig(config));
+      originalChain == null
+        ? undefined
+        : (config: unknown): unknown => originalChain(disposed ? config : wrapConfig(config));
     if (pinnedChain != null) {
       manager.chain = pinnedChain;
     }

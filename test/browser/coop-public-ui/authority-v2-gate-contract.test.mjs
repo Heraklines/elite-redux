@@ -2453,10 +2453,11 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   const pins = duoHarness.slice(pinsStart, pinsEnd);
   const helper = pins.indexOf("const pinTweenCallbacks = (scene: BattleScene, ctx: ClientCtx): void =>");
   const wrap = pins.indexOf("withClientSync(ctx, () => callback.apply(this, callbackArgs))", helper);
+  const retiredPassThrough = pins.indexOf("originalAdd(disposed ? config : wrapConfig(config))", wrap);
   const host = pins.indexOf("pinTweenCallbacks(rig.hostScene, rig.hostCtx)", wrap);
   const guest = pins.indexOf("pinTweenCallbacks(rig.guestScene, rig.guestCtx)", host);
   assert.ok(
-    helper >= 0 && wrap > helper && host > wrap && guest > host,
+    helper >= 0 && wrap > helper && retiredPassThrough > wrap && host > retiredPassThrough && guest > host,
     "a synchronous or delayed tween completion may not read the other browser's global scene/phase/runtime",
   );
 });

@@ -4129,3 +4129,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The source contract now pins clear, reopen, prompt publication, actionability proof, and fail-closed terminal
   ordering. This is a production input-liveness correction; the browser driver remains keyboard-only and does
   not infer readiness from localized text or timing.
+
+## 2026-07-26 - Retired tween-pin pass-through
+
+- Focused P2 run `30185398599` passed static, A1, and B6 but timed out 12 later tests in the same reused
+  Phaser scene after its first duo test passed. That first test spies on the pinned tween method; teardown
+  therefore cannot replace the spy, and Vitest later restores the retired wrapper it originally observed.
+- A retired wrapper now passes every newly scheduled tween config directly to the original manager. Callback
+  objects wrapped while the duo rig was live still retain their disposed lifetime fence, so late old-rig
+  completions remain inert while the next solo/duo test cannot lose its own tween completions.
+- The node-pure source contract pins this distinction. Behavioral requalification remains remote-only.
