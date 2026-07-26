@@ -263,6 +263,7 @@ export class CoopReplayTurnPhase extends Phase {
     const prefix: CoopEntryPresentationPrefix = {
       events: structuredClone(material.entryPresentation),
       stateTick: material.stateTick,
+      controlOperationId: successor.operationId,
     };
     const resolve = this.v2EntryPresentationResolver;
     if (resolve == null) {
@@ -981,6 +982,7 @@ export class CoopReplayTurnPhase extends Phase {
         events.length,
         this.presentationOutcomeTokens,
         streamer,
+        prefix.controlOperationId,
       );
       this.end();
     } catch {

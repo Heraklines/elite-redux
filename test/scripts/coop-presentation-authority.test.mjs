@@ -134,13 +134,15 @@ test("form changes and Transform carry complete authority material into dedicate
   assert.match(replayPump, /case "transform":[\s\S]+"CoopTransformReplayPhase"/u);
 });
 
-test("ordinary co-op and Showdown both replay retained entry presentation before command input", () => {
+test("ordinary co-op and Showdown replay every retained pre-command presentation before input", () => {
   const summon = read("src/phases/summon-phase.ts");
   const initEncounter = read("src/phases/init-encounter-phase.ts");
   const command = read("src/phases/command-phase.ts");
   const turnInit = read("src/phases/turn-init-phase.ts");
   const replay = read("src/phases/coop-replay-turn-phase.ts");
   const replayPhases = read("src/phases/coop-replay-phases.ts");
+  const stream = read("src/data/elite-redux/coop/coop-battle-stream.ts");
+  const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
 
   assert.match(
     summon,
@@ -153,11 +155,13 @@ test("ordinary co-op and Showdown both replay retained entry presentation before
   );
   assert.match(
     command,
-    /const entryPresentation = sealCoopEntryPresentation\(\);[\s\S]+rebroadcastCoopWaveStartAuthorityAfterEntryEffects\(entryPresentation\)/u,
+    /else if \(controller\.role === "host"\)[\s\S]+sealCoopEntryPresentation\(\)[\s\S]+preparedCoopEntryPresentation = entryPresentation \?\? \[\][\s\S]+if \(turn !== 1\)[\s\S]+rebroadcastCoopWaveStartAuthorityAfterEntryEffects/u,
+    "every command frontier seals a prefix; only turn one also publishes the legacy wave carrier",
   );
   assert.match(
     turnInit,
-    /if \(\s*globalScene\.currentBattle\.turn === 1[\s\S]+hasConsumedEntryPresentationThroughWave[\s\S]+"CoopReplayTurnPhase"[\s\S]+globalScene\.currentBattle\.waveIndex,[\s\S]+true,/u,
+    /currentCoopV2CommandPresentationOperationId\(wave, turn\)[\s\S]+hasConsumedCommandPresentation\(currentCommandOperationId\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+wave,[\s\S]+true,/u,
+    "V2 queues an exact command-prefix consumer for every unconsumed operation, not only turn one",
   );
   assert.doesNotMatch(turnInit, /isShowdownGuestFlipGated\(\) && globalScene\.currentBattle\.turn === 1/u);
   const entryPump = replay.slice(
@@ -172,8 +176,15 @@ test("ordinary co-op and Showdown both replay retained entry presentation before
   );
   assert.match(
     replayPhases,
-    /class CoopFinalizeEntryPresentationPhase[\s\S]+inspectCoopPresentationOutcomes[\s\S]+noteRenderedThrough[\s\S]+this\.end\(\)/u,
+    /class CoopFinalizeEntryPresentationPhase[\s\S]+inspectCoopPresentationOutcomes[\s\S]+noteRenderedThrough[\s\S]+noteConsumedCommandPresentation[\s\S]+this\.end\(\)/u,
     "the last queued phase must prove every outcome before command control can open",
+  );
+  assert.match(replay, /controlOperationId: successor\.operationId/u);
+  assert.match(stream, /consumedCommandPresentationOperations = new Set<string>/u);
+  assert.match(
+    runtime,
+    /currentCoopV2CommandPresentationOperationId[\s\S]+sourceEntryOf\(control\)[\s\S]+source\.operationId/u,
+    "same numeric wave/turn reuse is deduped by the global CONTROL_COMMIT identity",
   );
 });
 

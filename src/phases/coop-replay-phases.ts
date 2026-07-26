@@ -2099,7 +2099,7 @@ export interface CoopV2ControlSuccessorClaim {
 }
 
 /**
- * Final proof fence for the retained turn-one presentation prefix.
+ * Final proof fence for the retained pre-command presentation prefix.
  *
  * The entry replay queues ability, weather, terrain, stat, switch, and other presentation phases before the
  * first CommandPhase. Merely queueing those phases is not evidence that they rendered: each concrete phase
@@ -2118,6 +2118,7 @@ export class CoopFinalizeEntryPresentationPhase extends Phase {
     private readonly throughCount: number,
     private readonly presentationOutcomeTokens: readonly CoopPresentationOutcomeToken[],
     private readonly streamer: CoopBattleStreamer,
+    private readonly controlOperationId?: string,
   ) {
     super();
   }
@@ -2167,9 +2168,12 @@ export class CoopFinalizeEntryPresentationPhase extends Phase {
       return;
     }
     this.streamer.noteRenderedThrough(this.turn, this.throughCount, this.sourceWave);
+    if (this.controlOperationId != null) {
+      this.streamer.noteConsumedCommandPresentation(this.controlOperationId);
+    }
     coopLog(
       "replay",
-      `guest entry presentation PROVED wave=${this.sourceWave} turn=${this.turn} events=${this.throughCount}`,
+      `guest pre-command presentation PROVED wave=${this.sourceWave} turn=${this.turn} events=${this.throughCount}`,
     );
     this.end();
   }

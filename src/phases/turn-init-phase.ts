@@ -6,7 +6,12 @@ import {
   isShowdownGuestFlipGated,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import {
+  currentCoopV2CommandPresentationOperationId,
+  getCoopBattleStreamer,
+  getCoopController,
+  isCoopV2CommandEntryPresentationActive,
+} from "#data/elite-redux/coop/coop-runtime";
 import { erRecordAchievementTurnStart } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { BattleType } from "#enums/battle-type";
@@ -102,25 +107,19 @@ export class TurnInitPhase extends FieldPhase {
       return true;
     }
     const deferCommand = this.shouldDeferVersusGuestCommandForEnemyReplacement();
-    if (
-      globalScene.currentBattle.turn === 1
-      && !getCoopBattleStreamer()?.hasConsumedEntryPresentationThroughWave(globalScene.currentBattle.waveIndex)
-    ) {
-      // Entry abilities/environment cues are host-authored during Summon/PostSummon in both shared co-op
-      // and Showdown. Consume their complete retained prefix before either real command opens; the shared
-      // event watermark prevents best-effort live copies and the ordinary turn batch from showing twice.
-      // The stream watermark is essential here: a turn-one faint replacement can legitimately re-enter
-      // TurnInit while the local battle cursor is still one. Replaying solely from that numeric cursor would
-      // create a second entry-only phase whose CONTROL_COMMIT was already retired, permanently fencing the
-      // following REPLACEMENT_COMMIT and command frontier.
-      globalScene.phaseManager.pushNew(
-        "CoopReplayTurnPhase",
-        globalScene.currentBattle.turn,
-        0,
-        undefined,
-        globalScene.currentBattle.waveIndex,
-        true,
-      );
+    const streamer = getCoopBattleStreamer();
+    const wave = globalScene.currentBattle.waveIndex;
+    const turn = globalScene.currentBattle.turn;
+    const currentCommandOperationId = currentCoopV2CommandPresentationOperationId(wave, turn);
+    const needsCommandPresentation = isCoopV2CommandEntryPresentationActive()
+      ? currentCommandOperationId == null || !streamer?.hasConsumedCommandPresentation(currentCommandOperationId)
+      : turn === 1 && !streamer?.hasConsumedEntryPresentationThroughWave(wave);
+    if (needsCommandPresentation) {
+      // V2 command control carries every cue recorded before its exact frontier, including later-turn
+      // replacement hazards/abilities. Consume and prove that complete prefix before either real command
+      // opens. The stream watermark prevents both live packets and a same-turn TurnInit re-entry from
+      // displaying it twice. Legacy authoritative sessions retain the old wave-start-only behavior.
+      globalScene.phaseManager.pushNew("CoopReplayTurnPhase", turn, 0, undefined, wave, true);
     }
     globalScene.getField().forEach((pokemon, fieldIndex) => {
       if (pokemon?.isPlayer() && pokemon.isActive()) {

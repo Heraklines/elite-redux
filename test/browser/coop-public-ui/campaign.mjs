@@ -202,14 +202,18 @@ class CampaignProgress {
 }
 
 /** Bounded per-step observation window for the state-aware Settings walk. */
-const SPEED_STEP_OBSERVATION_TIMEOUT_MS = 1500;
+// The two software-WebGL browsers can take ~2.8s to publish one real menu reaction while
+// their initial asset/background-account work is still draining. A 1.5s step timeout queued
+// another key before the first one reacted, then misreported the delayed cursor as a dropped
+// input. Four seconds matches the semantic navigator's proven reaction budget and returns
+// immediately on healthy runners.
+const SPEED_STEP_OBSERVATION_TIMEOUT_MS = 4_000;
 
 /**
- * How long a SINGLE-sided command frontier must survive (no reward / wipe / faint / two-sided
- * frontier superseding it) before it is trusted as the next turn. The renderer seat's wave-end
- * transient CommandPhase was superseded ~13s later under CI's ~3fps starvation (run
- * 29551213918); the window must comfortably outlast that gap while staying far below the
- * per-turn budget.
+ * How long a SINGLE-sided actionable command frontier must survive (no reward / wipe / faint /
+ * two-sided frontier superseding it) before it is trusted as the next turn. This does not bound a
+ * passive command watcher: that surface has no input handler and stays provisional under the immutable
+ * between-wave deadline while real presentation continues.
  */
 const SINGLE_SIDED_COMMAND_CONFIRM_MS = 20_000;
 
@@ -274,11 +278,6 @@ async function pressUntilObserved(
   );
 }
 
-/** Latest observed Title-menu selection (semanticId) at/after `from`. */
-function titleSelection(sink, from) {
-  return sink.findLastSemanticSurface(from, "title-menu")?.observation.selectedOptionId;
-}
-
 /** Latest observed Settings Game Speed value at/after `from` (present only while Settings is open). */
 function observedGameSpeed(sink, from) {
   return sink.findLastRenderProfileObservation(from)?.observation.gameSpeed;
@@ -314,30 +313,43 @@ async function raiseGameSpeed(rig, policy, progress) {
       await client.sequence(keys, "raise-game-speed-to-10x");
       await delay(client.config.settleDelayMs);
     } else {
-      // 1) Title menu -> the Settings row, selection-verified per press.
-      await pressUntilObserved(client, "ArrowDown", "speed-walk-title-to-settings", titleSelection, "settings");
-      // 2) Open Settings: ANY render-profile observation proves the General menu is open.
+      // 1+2) Navigate by the title menu's stable option ids and submit Settings. The generic
+      // semantic navigator survives a late post-login TitlePhase rebuild (which can reset the
+      // cursor to Continue while initial account migration drains) and verifies every public
+      // arrow reaction. A fixed eight-key loop failed one option before Settings in that race.
       const openCursor = client.evidence.cursor();
-      await pressUntilObserved(
-        client,
-        "Space",
-        "speed-walk-open-settings",
-        (sink, from) =>
-          sink.findLastRenderProfileObservation(Math.max(from, openCursor)) == null ? undefined : "open",
-        "open",
-        { attempts: 3 },
-      );
+      await selectOptionById(client, {
+        surfaceId: "title-menu",
+        targetId: "settings",
+        navKeys: ["ArrowDown", "ArrowUp"],
+        submitKey: "Space",
+        timeoutMs: client.config.timeoutMs,
+      });
+      await client.evidence.waitForCondition(sink => sink.findLastRenderProfileObservation(openCursor), {
+        timeoutMs: client.config.timeoutMs,
+        description: "visible Settings menu after semantic title selection",
+      });
       // 3) Game Speed is the first row; step RIGHT until the observer attests 10x. The row
       //    WRAPS ([2,3,4,5,7,10] -> 2), so allow a full second lap if a double-step overshoots.
       await pressUntilObserved(client, "ArrowRight", "speed-walk-raise-to-10x", observedGameSpeed, 10, {
         attempts: 12,
       });
-      // 4) Close Settings and park the Title cursor back on New Game for pairing. If the
-      //    Backspace was swallowed the ArrowUps move the (still open) Settings cursor and
-      //    the Title selection never changes - the midpoint recovery Backspace re-closes.
+      // 4) Close Settings once, wait for a FRESH title surface, then semantically select New
+      //    Game without submitting it. Waiting for the fresh surface prevents Settings-row
+      //    arrows from being mistaken for title navigation on a heavily dilated runner.
+      const closeCursor = client.evidence.cursor();
       await client.press("Backspace", "speed-walk-close-settings");
-      await pressUntilObserved(client, "ArrowUp", "speed-walk-title-to-new-game", titleSelection, "new-game", {
-        recoveryKey: "Backspace",
+      await client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(closeCursor, "title-menu"), {
+        timeoutMs: client.config.timeoutMs,
+        description: "fresh Title menu after closing Settings",
+      });
+      await selectOptionById(client, {
+        surfaceId: "title-menu",
+        targetId: "new-game",
+        navKeys: ["ArrowUp", "ArrowDown"],
+        submit: false,
+        timeoutMs: client.config.timeoutMs,
+        fromCursor: closeCursor,
       });
     }
     const attestation = await client.evidence.waitForCondition(sink => sink.findGameSpeed(10, speedCursor), {
@@ -2418,24 +2430,25 @@ function phaseProgressSignature(clients) {
 }
 
 /**
- * An embedded Mystery battle can park the replay browser on its addressed command watcher a few
- * seconds before the authoritative browser finishes the corresponding summon intro. That watcher
- * is positive evidence of the ordered handoff, not an unknown UI, but only for the same bounded
- * single-sided frontier window used elsewhere. A genuinely orphaned watcher still becomes loud.
+ * An embedded Mystery battle can park the replay browser on its addressed command watcher while the
+ * authoritative browser finishes its summon or replacement presentation. On a ~3fps hosted runner this
+ * took 56s in campaign 30209490237, so the 20s actionable-frontier confirmation window is not its clock.
+ * The watcher has no public input handler and remains known passive progress only while it is the CURRENT
+ * semantic surface. A newer surface supersedes it immediately; a genuinely orphaned watcher still fails at
+ * the immutable between-wave deadline with exact diagnostics.
  */
-export function hasProvisionalCommandWatcherSurface(clients, cursors, nowMs = Date.now()) {
+export function hasProvisionalCommandWatcherSurface(clients, cursors) {
   return clients.some(client => {
     const cursor = cursors[client.label] ?? 0;
     const event = client.evidence.findLastSemanticSurface(cursor, "command:watcher");
+    const latest = client.evidence.findLastSemanticSurface(cursor);
     const observation = event?.observation;
-    const observedAt = Date.parse(event?.at ?? "");
     return (
-      observation?.phase === "CoopReplayTurnPhase"
-      && observation.ready?.handlerActive === true
+      event?.index === latest?.index
+      && observation?.phase === "CoopReplayTurnPhase"
+      && observation.ready?.handlerActive === false
+      && observation.ready?.awaitingActionInput === false
       && observation.ready?.inputBlocked === true
-      && Number.isFinite(observedAt)
-      && nowMs - observedAt >= 0
-      && nowMs - observedAt <= SINGLE_SIDED_COMMAND_CONFIRM_MS
     );
   });
 }

@@ -139,8 +139,26 @@ describe("ordered-wait local presentation lease", () => {
     messageHandlerActionable: true,
   };
 
-  it("admits only the explicit terminal-result LevelUp and N+1/t1 NextEncounter action prompts", () => {
+  it("admits the explicit terminal-result LevelUp and every exact N+1/t1 action-only MESSAGE prompt", () => {
     expect(successorWaitAllowsLocalPresentationInput(successorWait(), exactNextEncounter)).toBe(true);
+    expect(
+      successorWaitAllowsLocalPresentationInput(successorWait(), {
+        ...exactNextEncounter,
+        phaseName: "MessagePhase",
+      }),
+    ).toBe(true);
+    expect(
+      successorWaitAllowsLocalPresentationInput(successorWait(), {
+        ...exactNextEncounter,
+        phaseName: "ShowAbilityPhase",
+      }),
+    ).toBe(true);
+    expect(
+      successorWaitAllowsLocalPresentationInput(successorWait(), {
+        ...exactNextEncounter,
+        phaseName: "FaintPhase",
+      }),
+    ).toBe(true);
     expect(successorWaitAllowsLocalPresentationInput(successorWait(), exactSameAddressLevelUp)).toBe(true);
     expect(
       successorWaitAllowsLocalPresentationInput(successorWait({ allowNextWaveStart: false }), exactNextEncounter),
@@ -165,13 +183,14 @@ describe("ordered-wait local presentation lease", () => {
     expect(
       successorWaitAllowsLocalPresentationInput(successorWait(), {
         ...exactNextEncounter,
-        phaseName: "MysteryEncounterPhase",
+        messageHandlerActionable: false,
       }),
     ).toBe(false);
     expect(
       successorWaitAllowsLocalPresentationInput(successorWait(), {
         ...exactNextEncounter,
-        messageHandlerActionable: false,
+        turn: 2,
+        phaseName: "MessagePhase",
       }),
     ).toBe(false);
   });

@@ -273,8 +273,9 @@ describe("production replacement carrier transaction", () => {
     vi.spyOn(coopEngine, "drainCoopApplyFailures").mockReturnValue([]);
     vi.spyOn(coopEngine, "captureCoopChecksum").mockReturnValue(checksum);
 
-    // The replay is still waiting for turn N=1 while the host has already opened turn N+1=2 to capture
-    // the replacement that makes the guest-owned slot commandable.
+    // The replay was waiting for turn N=1 while the host opened turn N+1=2 to capture the replacement
+    // that makes the guest-owned slot commandable. Applying that exact replacement adopts N+1 before
+    // the new command opens; its continuation must therefore carry turn 2, not resurrect turn 1.
     phase = new CoopReplayTurnPhase(1);
     phase.start();
     runtime.partnerTransport?.send({
@@ -307,9 +308,13 @@ describe("production replacement carrier transaction", () => {
     ).toBe(true);
     expect(unshiftNew.mock.calls.some(([name, slot]) => name === "CommandPhase" && slot === 1)).toBe(true);
     expect(
-      unshiftNew.mock.calls.some(([name, turn]) => name === "CoopReplayTurnPhase" && turn === 1),
-      "the delayed turn-N resolution remains the continuation after the replacement UI",
+      unshiftNew.mock.calls.some(([name, turn]) => name === "CoopReplayTurnPhase" && turn === 2),
+      "the replacement-owned command continues at the adopted turn N+1 address",
     ).toBe(true);
+    expect(
+      unshiftNew.mock.calls.some(([name, turn]) => name === "CoopReplayTurnPhase" && turn === 1),
+      "the finalized turn-N replay cannot reopen behind the replacement-owned command",
+    ).toBe(false);
     expect(unshiftNew.mock.calls.some(([name]) => name === "CoopFinalizeTurnPhase")).toBe(false);
   });
 

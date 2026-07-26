@@ -2613,6 +2613,20 @@ test("the animations-on campaign extends a live between-wave renderer without we
   );
 });
 
+test("campaign speed setup follows semantic title identities across a late title rebuild", () => {
+  assert.match(campaignDriver, /const SPEED_STEP_OBSERVATION_TIMEOUT_MS = 4_000/u);
+  assert.match(
+    campaignDriver,
+    /selectOptionById\(client, \{[\s\S]*surfaceId: "title-menu",[\s\S]*targetId: "settings",[\s\S]*submitKey: "Space",[\s\S]*timeoutMs: client\.config\.timeoutMs,[\s\S]*findLastRenderProfileObservation\(openCursor\)/u,
+    "Settings navigation must tolerate the post-login TitlePhase rebuilding and resetting its cursor",
+  );
+  assert.match(
+    campaignDriver,
+    /const closeCursor = client\.evidence\.cursor\(\);[\s\S]*press\("Backspace", "speed-walk-close-settings"\)[\s\S]*findLastSemanticSurface\(closeCursor, "title-menu"\)[\s\S]*targetId: "new-game",[\s\S]*submit: false,[\s\S]*fromCursor: closeCursor/u,
+    "the harness must observe the newly reopened title before parking on New Game",
+  );
+});
+
 test("the one-process soak retains the authority browser while nested peer pumps settle a wave crossing", () => {
   const crossingStart = soakDriver.indexOf("  const crossCommandBoundaryWithReplayGuest = async (");
   const crossingEnd = soakDriver.indexOf(

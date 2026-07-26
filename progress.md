@@ -4278,3 +4278,42 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   phase starts it becomes the sole same-wave watcher. Level-up learns, which intentionally have no guest
   `LearnMovePhase`, still use `CoopReplayLearnMovePhase`. This prevents a replay phase from consuming the result
   first and leaving a later reward-continuation copy waiting on an already-settled operation.
+
+## 2026-07-26 - Exact protocol-51 requalification and campaign frontier closure
+
+- The supplied audit targeted the older `ci/coop/v2-showdown-command-coordinate-20260720` line. Its reward-timeout
+  P1 is already closed on this line: V2 reward watchers return `recover`, reconnect, and preserve their exact
+  surface/counter; the focused barrier contract includes a 20-minute elapsed timeout proof. Its mutation-ledger
+  P1 is likewise stale: `PhaseManager` owns the exact scene-bound ledger and authoritative lookup fails closed.
+  The audit's promotion-manifest and asset-integrity points remain useful process hardening, but are not evidence
+  of a live gameplay defect and no staging or production deploy is part of this checkpoint.
+- Exact SHA `ab4dc045d4a82f7f27d70f94f77078d9dafde01e` focused run `30209480381` proved B2. Full gate
+  `30209489051` completed 39 jobs green; its Lane-A red was an obsolete fixture expecting a replacement
+  continuation to reuse turn 1 after the checkpoint had authoritatively advanced to turn 2. The fixture now
+  requires the live turn-2 continuation and rejects the stale address. Remaining static and T4 reds are inherited
+  Showdown/Tournament diagnostics outside this co-op-only workstream.
+- Journey `30209503511` proved the primary real two-browser fresh/resume path. Its optional reverse fan-out was
+  manually enabled without alternate-account secrets, so that dispatch error is not a product verdict; the final
+  journey must run with reverse fan-out disabled.
+- Campaign `30209490237` split four reds into exact mechanisms. Dirty setup raced a delayed title rebuild while
+  walking to Settings; the driver now selects Settings/New Game by semantic option ID, waits for a fresh title
+  surface after close, and uses the already-proven four-second per-reaction budget. Mystery reached its embedded
+  command after 56 seconds, but the harness recognized the real inactive `CoopReplayTurnPhase` watcher for only
+  20 seconds. A watcher is now passive only while it remains the client's current semantic surface and the
+  immutable outer deadline diagnoses a genuinely orphaned one.
+- Depth exposed a production presentation-ordering hole. On wave 3 turn 2 the authority recorded Sticky Web
+  switch-in/stat narration during two replacement phases, then opened command input before the renderer had any
+  ordered consumer for those later-turn events. Every `CONTROL_COMMIT` now carries the complete pre-command
+  prefix (empty on an ordinary turn); the renderer consumes it before command, proves every typed outcome, and
+  deduplicates by the exact control operation ID rather than the collision-prone wave/turn pair. The existing
+  turn stream shares the same render watermark, so it cannot display the prefix twice.
+- The animations-on surface lane exposed the companion V2 lease cycle. A terminal reward installed
+  `AWAIT_SUCCESSOR`; the next wave's priority enemy move fainted a lead before the first command, and the exact
+  actionable `MessagePhase` was frozen because the bridge named only `NextEncounterPhase`. `allowNextWaveStart`
+  now leases every action-only MESSAGE handler at exact N+1/turn-1 until the command entry can be authored. It
+  still rejects non-actionable handlers, choice UI modes, wrong epochs/waves, and later turns. The newly sealed
+  command prefix then makes the renderer finish those abilities, attacks, damage, and faint cues before input.
+- Permitted local evidence for the pre-command/mystery/dirty batch: 121/121 source/browser Node contracts green,
+  targeted Biome clean, `git diff --check` clean, and the repository TypeScript baseline is 216 diagnostics with
+  zero in the changed files. The pure V2 lease contract was added to the remote Node suite and must be proven by
+  the hosted focused shard; no co-op Vitest, browser, soak, or campaign was run locally.

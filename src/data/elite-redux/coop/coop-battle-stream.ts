@@ -141,6 +141,8 @@ export interface CoopTurnBoundaryIdentity {
 export interface CoopEntryPresentationPrefix {
   readonly events: readonly CoopBattleEvent[];
   readonly stateTick: number;
+  /** Exact Authority V2 CONTROL_COMMIT that owns this prefix; absent on the legacy wave carrier. */
+  readonly controlOperationId?: string;
 }
 
 /** An out-of-turn authoritative checkpoint + the host's matching full-state checksum. */
@@ -1297,6 +1299,8 @@ export class CoopBattleStreamer {
     // at turn 1, and (without an authority context to fold the wave into the key) the `t:1` key would
     // otherwise collide with the finished wave's turn 1 and wrongly suppress its first legitimate render.
     this.renderedThrough.clear();
+    // Command-prefix turns are monotonic only inside one wave. A fresh wave restarts at turn one.
+    this.consumedCommandPresentationOperations.clear();
   }
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
@@ -1315,6 +1319,8 @@ export class CoopBattleStreamer {
   private readonly entryPresentationWaiters = new Map<number, (prefix: CoopEntryPresentationPrefix | null) => void>();
   /** Monotonic run-local exact-once watermark; avoids an unbounded per-wave tombstone set. */
   private consumedEntryPresentationThroughWave = 0;
+  /** Exact Authority V2 CONTROL_COMMIT ids whose pre-command presentation reached its proof fence. */
+  private readonly consumedCommandPresentationOperations = new Set<string>();
   /** ME-battle key -> resolver for an in-flight {@linkcode awaitMeBattleEnemyParty} (#633 ME handoff). */
   private readonly meBattlePartyWaiters = new Map<string, (res: CoopSerializedEnemy[] | null) => void>();
   /** ME-battle key -> a party that arrived before its waiter (race buffer, #633 ME handoff). */
@@ -2519,6 +2525,19 @@ export class CoopBattleStreamer {
    */
   hasConsumedEntryPresentationThroughWave(wave: number): boolean {
     return Number.isSafeInteger(wave) && wave >= 0 && wave <= this.consumedEntryPresentationThroughWave;
+  }
+
+  /** Record one exact Authority V2 pre-command prefix only after all of its renderer outcomes settled. */
+  noteConsumedCommandPresentation(operationId: string): void {
+    if (operationId.length === 0) {
+      return;
+    }
+    rememberBoundedValue(this.consumedCommandPresentationOperations, operationId);
+  }
+
+  /** Whether this exact globally ordered command prefix already crossed its concrete presentation fence. */
+  hasConsumedCommandPresentation(operationId: string): boolean {
+    return operationId.length > 0 && this.consumedCommandPresentationOperations.has(operationId);
   }
 
   /**
@@ -4936,6 +4955,7 @@ export class CoopBattleStreamer {
     this.lastEnemyParty = null;
     this.entryPresentationByWave.clear();
     this.consumedEntryPresentationThroughWave = 0;
+    this.consumedCommandPresentationOperations.clear();
     this.enemyPartyStateByWave.clear();
     this.enemyPartyEncounterByWave.clear();
     this.enemyPartyAuthorityFloorByWave.clear();
@@ -5057,6 +5077,7 @@ export class CoopBattleStreamer {
     this.lastEnemyParty = null;
     this.entryPresentationByWave.clear();
     this.consumedEntryPresentationThroughWave = 0;
+    this.consumedCommandPresentationOperations.clear();
     this.sentEnemyParties.clear();
     this.enemyPartyStateByWave.clear();
     this.enemyPartyEncounterByWave.clear();

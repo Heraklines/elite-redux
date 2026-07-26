@@ -8263,6 +8263,26 @@ export function isCoopV2CommandEntryPresentationActive(runtime: CoopRuntime | nu
   return isCoopV2ControlCutoverActive(runtime);
 }
 
+/**
+ * Resolve the exact retained CONTROL_COMMIT that owns the current command address.
+ *
+ * A wave/turn pair is not an identity: an embedded Mystery battle or a replacement can reuse the numeric
+ * cursor with a newer state tick. TurnInit uses this operation id to suppress only a genuinely consumed
+ * pre-command prefix, never a later command boundary that happens to share its coordinates.
+ */
+export function currentCoopV2CommandPresentationOperationId(
+  wave: number,
+  turn: number,
+  runtime: CoopRuntime | null = active,
+): string | null {
+  const control = runtime?.v2ControlLedger.latestControl;
+  if (control?.kind !== "COMMAND_FRONTIER" || control.wave !== wave || control.turn !== turn) {
+    return null;
+  }
+  const source = runtime?.v2ControlLedger.sourceEntryOf(control);
+  return source?.kind === "CONTROL_COMMIT" && controlsEqual(source.nextControl, control) ? source.operationId : null;
+}
+
 /** Release only CommandPhase starts addressed by the applied immutable command frontier. */
 function releaseCoopV2DeferredCommandStarts(
   runtime: CoopRuntime,

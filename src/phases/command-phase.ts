@@ -116,7 +116,7 @@ export class CommandPhase extends FieldPhase {
    */
   private parkedReplacementUnsub: (() => void) | null = null;
 
-  /** Authority-only immutable prefix threaded into the exact V2 command-open entry. */
+  /** Authority-only immutable pre-command prefix threaded into the exact V2 command-open entry. */
   private preparedCoopEntryPresentation: CoopBattleEvent[] | undefined;
 
   constructor(fieldIndex: number) {
@@ -708,7 +708,22 @@ export class CommandPhase extends FieldPhase {
       // Applying an encounter descriptor may reconstruct local trainer presentation. Reassert the pure
       // renderer contract after the complete carrier has landed and before any public command input opens.
       ensureCoopAuthoritativeCommandPresentation();
-    } else if (controller.role === "host" && turn === 1) {
+    } else if (controller.role === "host") {
+      // Every authoritative command frontier seals the presentation recorded before input. Turn one owns
+      // Summon/PostSummon effects; later turns can own replacement switch-in abilities, hazards, weather,
+      // and narration. A normal later turn has no open pre-command recording and therefore seals an empty
+      // prefix. The same immutable CONTROL_COMMIT carries either case, so command input can never overtake
+      // a real recorded cue merely because it happened after turn one.
+      const entryPresentation = sealCoopEntryPresentation();
+      if (turn === 1 && entryPresentation == null) {
+        failCoopSharedSession(`Wave ${waveIndex} could not seal its complete entry presentation.`);
+        return false;
+      }
+      this.preparedCoopEntryPresentation = entryPresentation ?? [];
+
+      if (turn !== 1) {
+        return true;
+      }
       // Co-op HOST (#920): the entry-ability chain (PostSummonPhase) has now settled - terrain, weather,
       // entry-hazard arena tags and entry form changes are on the arena/field, but the wave-start
       // enemyPartySync captured its authoritative state BEFORE PostSummon (pre-summon boundary). Re-broadcast
@@ -718,13 +733,9 @@ export class CommandPhase extends FieldPhase {
       // Summon-time flyouts/environment cues are part of turn 1's ordered event stream in every
       // authoritative battle. The renderer must finish that retained prefix before it exposes command
       // input. Seal it only after the complete PostSummon chain and post-entry state recapture settled.
-      const entryPresentation = sealCoopEntryPresentation();
-      if (entryPresentation == null) {
-        failCoopSharedSession(`Wave ${waveIndex} could not seal its complete entry presentation.`);
-        return false;
-      }
-      this.preparedCoopEntryPresentation = entryPresentation;
-      const compatibilityPublished = rebroadcastCoopWaveStartAuthorityAfterEntryEffects(entryPresentation);
+      const compatibilityPublished = rebroadcastCoopWaveStartAuthorityAfterEntryEffects(
+        this.preparedCoopEntryPresentation,
+      );
       if (!compatibilityPublished && !isCoopV2CommandEntryPresentationActive()) {
         failCoopSharedSession(`Wave ${waveIndex} could not publish its complete entry presentation.`);
         return false;

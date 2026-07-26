@@ -33,8 +33,9 @@ export interface CoopCommandOpenMaterialV2 {
   readonly authoritativeState: CoopAuthoritativeBattleStateV1;
   /**
    * Complete ordered presentation produced before this command frontier. Turn one carries the sealed
-   * Summon/PostSummon prefix; later turns carry an empty array. Keeping it inside the globally ordered entry
-   * avoids a second wave-keyed presentation authority and gives embedded Mystery battles a collision-free
+   * Summon/PostSummon prefix; a later replacement turn can carry its switch-in hazards, abilities, weather,
+   * and narration; an ordinary later turn carries an empty array. Keeping it inside the globally ordered
+   * entry avoids a second presentation authority and gives embedded Mystery battles a collision-free
    * pre-command boundary.
    */
   readonly entryPresentation: readonly CoopBattleEvent[];

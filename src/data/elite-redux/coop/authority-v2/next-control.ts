@@ -281,13 +281,19 @@ export function sharedInteractionAllowsLocalPresentationInput(
  * Whether an ordered wait explicitly grants a non-mechanical action-only presentation its local input lease.
  *
  * A terminal reward may first show the same-address LevelUpPhase produced by its already-committed Rare
- * Candy result, then show the N+1/t1 NextEncounterPhase intro before CONTROL_COMMIT can exist. A Mystery
- * terminal whose immutable destination is a battle similarly names one exact same-address command-open,
- * but the host must dismiss MysteryEncounterBattlePhase's intro before that control can be authored.
- * Freezing any of those action-only messages creates a cycle: the presentation waits for V2 control while
- * V2 control waits for the presentation to reach the next ordered boundary. `allowNextWaveStart` grants the
- * first two bridges; the exact same-address command-open target grants only the ME battle intro bridge. No
- * arbitrary same-wave message, choice handler, or broad wait is admitted.
+ * Candy result, then enter N+1/t1 before CONTROL_COMMIT can exist. That next-wave prefix is not limited to
+ * NextEncounterPhase: entry abilities and priority moves can produce ShowAbility/Message/Faint narration
+ * before the first command frontier (animations-on campaign 30209490237). Freezing a later actionable
+ * MESSAGE creates a cycle: the authority cannot reach and author CONTROL_COMMIT, while the presentation is
+ * waiting for that commit. `allowNextWaveStart` therefore grants every ACTION-only MESSAGE handler at the
+ * exact N+1/t1 address. This is structural rather than a phase-name allowlist: future entry abilities may
+ * add presentation phases, while their choice handlers still use non-MESSAGE UI modes and never satisfy
+ * `messageHandlerActionable`.
+ *
+ * A Mystery terminal whose immutable destination is a battle similarly names one exact same-address
+ * command-open, but the host must dismiss MysteryEncounterBattlePhase's intro before that control can be
+ * authored. The exact same-address command-open target grants only that ME battle intro bridge. No arbitrary
+ * same-wave message, non-actionable handler, later turn, or choice handler is admitted.
  */
 export function successorWaitAllowsLocalPresentationInput(
   wait: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>,
@@ -316,8 +322,8 @@ export function successorWaitAllowsLocalPresentationInput(
     return false;
   }
   const sameAddressLevelUp = proof.wave === wait.wave && proof.turn === wait.turn && proof.phaseName === "LevelUpPhase";
-  const nextWaveIntro = proof.wave === wait.wave + 1 && proof.turn === 1 && proof.phaseName === "NextEncounterPhase";
-  return sameAddressLevelUp || nextWaveIntro;
+  const nextWaveEntryPresentation = proof.wave === wait.wave + 1 && proof.turn === 1;
+  return sameAddressLevelUp || nextWaveEntryPresentation;
 }
 
 interface MechanicalAddress {

@@ -812,37 +812,34 @@ test("a non-actionable NextEncounter tween is known passive progress, but an arm
   );
 });
 
-test("an embedded-battle command watcher is provisional only inside the bounded peer-intro window", () => {
+test("an embedded-battle command watcher stays passive while current and is superseded by newer UI", () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
-  const observedAt = "2026-07-26T15:13:07.000Z";
   renderer.evidence.events.push({
     index: renderer.evidence.events.length,
-    at: observedAt,
     kind: "browser-surface2",
     observation: {
       surfaceId: "command:watcher",
       phase: "CoopReplayTurnPhase",
-      ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true },
+      ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
     },
   });
 
+  assert.equal(hasProvisionalCommandWatcherSurface([authority, renderer], { authority: 0, renderer: 0 }), true);
+
+  renderer.evidence.events.push({
+    index: renderer.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "mystery-encounter:message",
+      phase: "CoopReplayMePhase",
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
   assert.equal(
-    hasProvisionalCommandWatcherSurface(
-      [authority, renderer],
-      { authority: 0, renderer: 0 },
-      Date.parse(observedAt) + 15_000,
-    ),
-    true,
-  );
-  assert.equal(
-    hasProvisionalCommandWatcherSurface(
-      [authority, renderer],
-      { authority: 0, renderer: 0 },
-      Date.parse(observedAt) + 21_000,
-    ),
+    hasProvisionalCommandWatcherSurface([authority, renderer], { authority: 0, renderer: 0 }),
     false,
-    "an orphaned watcher must become a loud stall instead of hiding under the outer campaign deadline",
+    "historical watcher evidence cannot hide a newer unknown/actionable surface",
   );
 });
 
