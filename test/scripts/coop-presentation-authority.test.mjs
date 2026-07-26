@@ -94,6 +94,11 @@ test("plain common battle animations are authority-authored at enqueue and repla
     /phase instanceof CommonAnimPhase && phase\.phaseName === "CommonAnimPhase"[\s\S]+recordCoopPresentationAtEnqueue\(\)/u,
   );
   assert.match(common, /recordCoopEvent\(\{\s*k: "commonAnim"[\s\S]+targetActor:/u);
+  assert.match(
+    common,
+    /this\.targetIndex === undefined \? source : globalScene\.getField\(\)\[this\.targetIndex\]/u,
+    "common VFX target identity must use the canonical flat battler index (including enemy/triple self-effects)",
+  );
   assert.match(common, /this\.coopPresentation != null[\s\S]+return;/u, "weather and terrain keep one richer event");
   assert.match(transport, /k: "commonAnim";[\s\S]+targetActor: CoopPresentationActorRef;/u);
   assert.match(validator, /case "commonAnim":[\s\S]+isPresentationActorRef\(event\.targetActor\)/u);

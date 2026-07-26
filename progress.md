@@ -4197,3 +4197,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The public continuation proof accepts either the turn's own exact terminal receipt or an exact N+1 receipt whose
   authority verdict names N in `subsumed=[...]`. It still fails closed on an unrelated later entry, missing
   supersession, or a non-adjacent revision, eliminating the false red without weakening retention coverage.
+
+## 2026-07-26 - Common VFX targets use canonical battler coordinates
+
+- Review of the protocol-49 common-animation slice found that `CommonAnimPhase` callers provide global
+  `BattlerIndex` values, while the phase had interpreted an explicit target as an index into the opposite side's
+  compact field. A player self-effect could therefore bind its authority event to an enemy, and enemy/triple
+  self-effects could resolve no target and disappear from both host presentation and the co-op stream.
+- Source and target now resolve through the canonical flat field used by `PokemonPhase`. This is presentation-only:
+  it changes no move, damage, RNG, or checkpoint material. The node-pure presentation contract pins the flat-index
+  lookup so future doubles/triples refactors cannot reintroduce the side-local interpretation.
+- Local permitted evidence: the presentation source suite is 15/15, targeted Biome is clean, and `git diff --check`
+  passes. Hosted focused/type and two-browser proof remain required before integration.

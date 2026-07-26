@@ -59,10 +59,11 @@ export class CommonAnimPhase extends PokemonPhase {
   /** Resolve the same concrete actors used by {@linkcode start}; never infer them again on the renderer. */
   private resolveAnimationParticipants(): { source: Pokemon; target: Pokemon } | null {
     const source = this.getPokemon();
-    const target =
-      this.targetIndex === undefined
-        ? source
-        : (this.player ? globalScene.getEnemyField() : globalScene.getPlayerField())[this.targetIndex];
+    // CommonAnimPhase callers pass BattlerIndex values, not side-local positions. In doubles an enemy
+    // self-effect is index 2/3, and in triples it can be 3/4/5; indexing the opposite side's compact field
+    // array therefore selected the wrong actor for player effects and returned undefined for enemy/triple
+    // effects. Resolve through the canonical flat field, exactly like PokemonPhase.getPokemon().
+    const target = this.targetIndex === undefined ? source : globalScene.getField()[this.targetIndex];
     return source == null || target == null ? null : { source, target };
   }
 
