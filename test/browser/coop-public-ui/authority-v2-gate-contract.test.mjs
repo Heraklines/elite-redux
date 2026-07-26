@@ -2386,6 +2386,29 @@ test("soaks budget command rendezvous for authoritative presentation and restore
   );
 });
 
+test("the one-process soak retains the authority browser while nested peer pumps settle a wave crossing", () => {
+  const crossingStart = soakDriver.indexOf("  const crossCommandBoundaryWithReplayGuest = async (");
+  const crossingEnd = soakDriver.indexOf(
+    "\n  // ---------------------------------------------------------------------------",
+    crossingStart,
+  );
+  assert.ok(crossingStart >= 0 && crossingEnd > crossingStart, "the command crossing has a bounded source block");
+  const crossing = soakDriver.slice(crossingStart, crossingEnd);
+  const authorityScope = crossing.indexOf("return withClient(rig.hostCtx, async () => {");
+  const pending = crossing.indexOf("const crossing = game.phaseInterceptor.toFirst", authorityScope);
+  const settle = crossing.indexOf("return settleDuoPromise(rig, crossing", pending);
+  const scopeClose = crossing.indexOf("\n              });", settle);
+  assert.ok(
+    authorityScope >= 0 && pending > authorityScope && settle > pending && scopeClose > settle,
+    "the authority Promise settles inside its outer host scope while peer servicing remains nested",
+  );
+  assert.doesNotMatch(
+    crossing.slice(pending, settle),
+    /await withClient\(rig\.hostCtx[\s\S]*\}\);[\s\S]*settleDuoPromise/u,
+    "the soak must not release the host scope before settling its structural continuation",
+  );
+});
+
 test("a projected Mystery phase cannot attest through its predecessor's active handler", () => {
   assert.match(
     replayMePhase,

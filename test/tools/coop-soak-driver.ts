@@ -2344,13 +2344,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                 | "TheBargainPhase"
                 | "ErCrossroadsPhase"
                 | "SelectBiomePhase";
-              let crossing: Promise<HostBoundary> | null = null;
-              await withClient(rig.hostCtx, async () => {
+              return withClient(rig.hostCtx, async () => {
                 // A reward continuation can be created DURING this crossing (ModifierRewardPhase applies the
                 // item), so inspecting the queue before advancing is too early. Start the real authority
                 // crossing, then settle it with both browser contexts alive: a retained winning-turn faint can
                 // legitimately open a replacement before any of these target surfaces.
-                crossing = game.phaseInterceptor.toFirst([
+                const crossing = game.phaseInterceptor.toFirst([
                   "CommandPhase",
                   "ErDexNavPhase",
                   "ScanIvsPhase",
@@ -2359,12 +2358,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                   "SelectBiomePhase",
                 ] as const) as Promise<HostBoundary>;
                 await drainLoopback();
-              });
-              if (crossing == null) {
-                throw new Error("host structural crossing did not start");
-              }
-              return settleDuoPromise(rig, crossing, `wave ${wave} host structural crossing`, {
-                afterPump: driveProjectedReplacementPublicInput,
+                // Keep the authority browser as the OUTER scope until its structural Promise settles.
+                // `settleDuoPromise` services the replica through nested destination scopes, each of which
+                // restores this host scope before returning. That is how two independent browser realms act:
+                // a guest transport/event-loop turn cannot become the ambient global for the host's pending
+                // enemy-atlas/UI continuation. Releasing this scope before settlement made every common soak
+                // shard manufacture a NextEncounter/NewBiomeEncounter freeze that real Chromium cannot hit.
+                return settleDuoPromise(rig, crossing, `wave ${wave} host structural crossing`, {
+                  afterPump: driveProjectedReplacementPublicInput,
+                });
               });
             })();
         if (boundary === "ErDexNavPhase") {

@@ -4076,3 +4076,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Added launch milestones around the cloud scan, snapshot, and discovery result so any remaining lobby stall has
   an exact boundary. Local static qualification is clean: targeted Biome, `git diff --check`, and all 232
   public node contracts pass. Behavioral proof remains remote-only per `AGENTS.md` and is the next exact-SHA run.
+
+## 2026-07-26 - One-process wave-transition realm fidelity
+
+- Full gate `30183504627` put every common soak shard on the same synthetic freeze: the host was left in
+  `NextEncounterPhase` or `NewBiomeEncounterPhase` after the driver restored ambient globals before the host's
+  enemy-asset/UI Promise continuation settled. The production lifetime guard correctly rejected that
+  continuation when it observed the guest realm; two separate Chromium realms cannot create this state.
+- The soak now retains the host as the outer client scope for the whole structural crossing. Replica service
+  remains live through nested destination pumps, which always restore the authority scope before returning.
+  A node-pure source contract prevents future refactors from releasing the host before `settleDuoPromise`.
+- No production phase or guard was weakened. Remote focused/common shards are the behavioral proof; local
+  targeted Biome and the 62-test Authority V2 source-contract suite pass.
