@@ -235,10 +235,15 @@ test("every authority event receives an ordered renderer-completion receipt in t
 
 test("presentation liveness uses an exact runtime wall scheduler rather than the ambient Phaser scene clock", () => {
   const watchdog = read("src/phases/coop-presentation-watchdog.ts");
+  const browser = read("scripts/coop-browser-entry.ts");
 
   assert.match(watchdog, /const scene = globalScene/u);
   assert.match(watchdog, /streamer\.scheduleAuthorityRetry\(callback, ms\)/u);
   assert.match(watchdog, /generation !== coopSessionGeneration\(\) \|\| getCoopBattleStreamer\(\) !== streamer/u);
+  assert.match(watchdog, /DEFAULT_COOP_PRESENTATION_HARD_WALL_MS = 120_000/u);
+  assert.match(browser, /CI_COOP_PRESENTATION_HARD_WALL_MS = 18_000 \* 32/u);
+  assert.match(browser, /setCoopPresentationHardWallMsForTest\(CI_COOP_PRESENTATION_HARD_WALL_MS\)/u);
+  assert.doesNotMatch(browser, /intentionally-skipped/u);
   assert.doesNotMatch(watchdog, /globalScene\.time\.delayedCall/u);
 });
 

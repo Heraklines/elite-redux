@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "26557c9c2b7bf5a8fb1956808b8aae360944ab4e",
+  "baseSha": "58952200bf6be9648f46d12622cf553cc2483a2d",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -54,6 +54,7 @@
     "src/phase-manager.ts",
     "src/phase.ts",
     "src/phases/command-phase.ts",
+    "src/phases/coop-presentation-watchdog.ts",
     "src/phases/coop-replay-phases.ts",
     "src/phases/coop-replay-turn-phase.ts",
     "src/phases/er-ability-capsule-phase.ts",

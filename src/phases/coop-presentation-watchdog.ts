@@ -10,7 +10,25 @@ import { coopSessionGeneration, getCoopBattleStreamer } from "#data/elite-redux/
 /** A renderer that makes no frame progress for this long has stalled its current presentation. */
 export const COOP_PRESENTATION_STALL_MS = 5000;
 /** Advancing frames may be slow, but a broken animation callback still cannot hold control forever. */
-const COOP_PRESENTATION_HARD_WALL_MS = 120_000;
+const DEFAULT_COOP_PRESENTATION_HARD_WALL_MS = 120_000;
+let configuredCoopPresentationHardWallMs = DEFAULT_COOP_PRESENTATION_HARD_WALL_MS;
+
+/**
+ * Override the advancing-renderer ceiling for an exact test runtime. The production bundle never calls this:
+ * it retains the 120-second fail-closed wall. The two-browser CI entry needs a larger ceiling because its
+ * software WebGL renderer can make genuine frame progress for several minutes before invoking an animation's
+ * real completion callback. This changes patience only; it cannot manufacture presentation completion.
+ */
+export function setCoopPresentationHardWallMsForTest(ms: number | null): void {
+  if (ms === null) {
+    configuredCoopPresentationHardWallMs = DEFAULT_COOP_PRESENTATION_HARD_WALL_MS;
+    return;
+  }
+  if (!Number.isFinite(ms) || ms <= 0) {
+    throw new Error(`invalid co-op presentation hard wall: ${ms}`);
+  }
+  configuredCoopPresentationHardWallMs = ms;
+}
 
 export interface CoopPresentationProgressWatchdog {
   remove(): void;
@@ -43,6 +61,7 @@ export function armCoopPresentationProgressWatchdog(
       ? scheduleWallClock
       : (callback: () => void, ms: number) => streamer.scheduleAuthorityRetry(callback, ms);
   const startedAt = now();
+  const hardWallMs = configuredCoopPresentationHardWallMs;
   let lastFrame = scene.game.loop.frame;
   let removed = false;
   let cancelTimer: (() => void) | undefined;
@@ -62,7 +81,7 @@ export function armCoopPresentationProgressWatchdog(
       return;
     }
     const frame = scene.game.loop.frame;
-    if (frame > lastFrame && now() - startedAt < COOP_PRESENTATION_HARD_WALL_MS) {
+    if (frame > lastFrame && now() - startedAt < hardWallMs) {
       lastFrame = frame;
       cancelTimer = schedule(check, stallMs);
       return;

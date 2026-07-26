@@ -67,6 +67,7 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
+import { setCoopPresentationHardWallMsForTest } from "#phases/coop-presentation-watchdog";
 import {
   CoopCommonAnimReplayPhase,
   CoopFaintReplayPhase,
@@ -149,6 +150,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
   afterEach(() => {
     setCoopPresentationObserver(null);
+    setCoopPresentationHardWallMsForTest(null);
     clearCoopRuntime();
   });
 
@@ -1647,7 +1649,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     endSpy.mockRestore();
   });
 
-  it("(Step 2) a slow but advancing renderer renews the presentation watchdog before the hard bound", async () => {
+  it("(Step 2) the CI hard wall still requires progress and an exact completion callback", async () => {
     const field = await startCoopGuest();
     const pokemon = field[COOP_HOST_FIELD_INDEX];
     const maxHp = pokemon.getMaxHp();
@@ -1659,6 +1661,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const animSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation(() => {});
     const updateSpy = vi.spyOn(pokemon, "updateInfo").mockReturnValue(new Promise(() => {}));
     const runtime = getCoopRuntime()!;
+    let authorityNowMs = 0;
+    const nowSpy = vi.spyOn(runtime.battleStream, "authorityNow").mockImplementation(() => authorityNowMs);
     const watchdogCallbacks: Array<() => void> = [];
     const cancelTimers = Array.from({ length: 2 }, () => vi.fn());
     const timerSpy = vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
@@ -1672,12 +1676,17 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const originalFrame = loop.frame;
 
     try {
+      setCoopPresentationHardWallMsForTest(18_000 * 32);
       phase.start();
       expect(watchdogCallbacks, "the presentation arms its first progress observation").toHaveLength(1);
 
       loop.frame = originalFrame + 1;
+      authorityNowMs = 130_000;
       watchdogCallbacks[0]();
-      expect(endSpy, "a newly rendered frame is progress, not a presentation failure").not.toHaveBeenCalled();
+      expect(
+        endSpy,
+        "the CI-only ceiling permits real progress beyond production's unchanged 120-second wall",
+      ).not.toHaveBeenCalled();
       expect(watchdogCallbacks, "progress renews one bounded observation").toHaveLength(2);
 
       watchdogCallbacks[1]();
@@ -1687,6 +1696,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       loop.frame = originalFrame;
       animSpy.mockRestore();
       updateSpy.mockRestore();
+      nowSpy.mockRestore();
       timerSpy.mockRestore();
       endSpy.mockRestore();
     }

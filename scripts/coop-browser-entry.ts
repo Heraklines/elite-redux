@@ -19,6 +19,7 @@ const [
   { canonicalize, fnv1a64 },
   { getCoopRuntime, isCoopV2InteractionHumanInputFrozen },
   { setCoopPresentationObserver },
+  { setCoopPresentationHardWallMsForTest },
   { BattlerTagType },
   { BattleType },
   { Command },
@@ -35,6 +36,7 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
   import("../src/data/elite-redux/coop/coop-turn-recorder"),
+  import("../src/phases/coop-presentation-watchdog"),
   import("../src/enums/battler-tag-type"),
   import("../src/enums/battle-type"),
   import("../src/enums/command"),
@@ -74,6 +76,13 @@ const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const PRESENTATION_PREFIX = "[coop-browser:presentation] ";
 const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
+
+// The exact-browser job runs two software-WebGL clients on one GitHub runner. Its measured animations-on
+// envelope is 18 seconds per authority event with at most 32 events in one turn. Keep production's 120-second
+// fail-closed wall unchanged, but let this CI-only bundle wait for the real callback throughout that envelope.
+// The renderer receipt remains mandatory: this does not skip, synthesize, or mark any event complete.
+const CI_COOP_PRESENTATION_HARD_WALL_MS = 18_000 * 32;
+setCoopPresentationHardWallMsForTest(CI_COOP_PRESENTATION_HARD_WALL_MS);
 
 // Exact ordered presentation ledger. The authority callback runs synchronously after assigning the
 // event's immutable per-turn sequence; the renderer callback runs only when the matching presentation
