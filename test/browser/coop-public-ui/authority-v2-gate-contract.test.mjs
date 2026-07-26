@@ -2580,8 +2580,8 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     pins,
-    /setCoopEncounterContinuationWrapperForTesting\(callback => \{[\s\S]+const owner = activeClientCtx;[\s\S]+activeClientCtx === owner[\s\S]+globalScene === owner\.scene[\s\S]+getCoopRuntime\(\) === owner\.runtime[\s\S]+withClientSync\(owner, \(\) => callback\(\.\.\.args\)\)/u,
-    "the variable-depth encounter asset continuation must re-enter its exact registering browser",
+    /setCoopEncounterContinuationWrapperForTesting\(\(callback, ownerRuntime\) => \{[\s\S]+ownerRuntime === rig\.hostRuntime[\s\S]+ownerRuntime === rig\.guestRuntime[\s\S]+activeClientCtx === owner[\s\S]+globalScene === owner\.scene[\s\S]+getCoopRuntime\(\) === owner\.runtime[\s\S]+withClientSync\(owner, \(\) => callback\(\.\.\.args\)\)/u,
+    "the variable-depth encounter continuation must re-enter the browser selected by its exact runtime",
   );
   assert.match(
     encounterPhase,
@@ -2610,8 +2610,8 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     encounterPhase,
-    /if \(ownerRuntime == null\) \{\s*return coopEncounterContinuationWrapperForTesting\?\.\(callback\) \?\? callback;\s*\}/u,
-    "the harness-label fallback is available only when no exact session runtime owns the continuation",
+    /coopEncounterContinuationWrapperForTesting\?\.\(callback, ownerRuntime\)/u,
+    "the independent-browser executor receives the exact production-captured runtime identity",
   );
   assert.match(
     encounterPhase,

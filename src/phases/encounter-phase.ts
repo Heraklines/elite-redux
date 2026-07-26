@@ -270,6 +270,7 @@ const COOP_ENCOUNTER_ASSET_WAIT_MS = 12_000;
  */
 export type CoopEncounterContinuationWrapper = <TArgs extends unknown[], TResult>(
   callback: (...args: TArgs) => TResult,
+  ownerRuntime: NonNullable<ReturnType<typeof getCoopRuntime>>,
 ) => (...args: TArgs) => TResult | undefined;
 
 let coopEncounterContinuationWrapperForTesting: CoopEncounterContinuationWrapper | null = null;
@@ -283,17 +284,21 @@ function wrapCoopEncounterContinuation<TArgs extends unknown[], TResult>(
 ): (...args: TArgs) => TResult | undefined {
   const ownerRuntime = getCoopRuntime();
   if (ownerRuntime == null) {
-    return coopEncounterContinuationWrapperForTesting?.(callback) ?? callback;
+    return callback;
+  }
+  // The two-engine fixture must model independent browser event loops, where this continuation executes in
+  // its own browser even while the peer is being driven. Give that seam the exact runtime identity instead
+  // of letting it guess from an overlapping async scope's ambient client label. Production has no wrapper.
+  const exactTestWrapper = coopEncounterContinuationWrapperForTesting?.(callback, ownerRuntime);
+  if (exactTestWrapper != null) {
+    return exactTestWrapper;
   }
   return (...args): TResult | undefined => {
     let invoked = false;
     let result: TResult | undefined;
-    // The runtime+scene binding is the sole authority when a session exists. Do not layer the older
-    // harness-label wrapper on top: overlapping async harness scopes can temporarily retain a stale
-    // activeClientCtx label after setCoopRuntime has already installed the exact destination runtime/scene.
-    // Re-entering that stale label here makes the boundary predicate false and consumes this one-shot
-    // continuation against the peer. Production remains synchronous; the one-process fixture and hot
-    // rejoin retain the callback until the captured runtime and its scene are installed together.
+    // Production remains synchronous while its runtime is active. A hot-rejoin boundary can temporarily
+    // uninstall it, in which case retain the callback until the captured runtime and scene are installed
+    // together. The test-only independent-browser executor returned above is deliberately not layered here.
     runWhenCoopRuntimeActive(ownerRuntime, () => {
       invoked = true;
       result = callback(...args);

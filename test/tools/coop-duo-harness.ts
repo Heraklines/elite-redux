@@ -2838,13 +2838,14 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
   disposers.push(() => setCoopDurabilityScheduleWrapperForTesting(null));
 
   // EncounterPhase joins a variable-depth trainer/Pokemon asset promise graph before it installs the
-  // presentation surface. In two browsers that continuation can only see its own scene/runtime. Capture
-  // the registering client and provide the same invariant here without holding a broad process-global
-  // realm across unrelated macrotasks.
-  setCoopEncounterContinuationWrapperForTesting(callback => {
-    const owner = activeClientCtx;
+  // presentation surface. In two browsers that continuation executes in its own event loop regardless of
+  // which peer is being driven. Resolve the owner from the production-captured runtime, never from the
+  // process-global activeClientCtx label: overlapping async scopes can make that label stale at registration.
+  setCoopEncounterContinuationWrapperForTesting((callback, ownerRuntime) => {
+    const owner =
+      ownerRuntime === rig.hostRuntime ? rig.hostCtx : ownerRuntime === rig.guestRuntime ? rig.guestCtx : null;
     if (owner == null) {
-      return callback;
+      throw new Error("encounter continuation was registered for a runtime outside its duo fixture");
     }
     return (...args) => {
       if (disposed) {
