@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { loadCampaignPolicy } from "./campaign-policy.mjs";
-import { EvidenceSink, waitForPublicInputFrame } from "./evidence.mjs";
+import { EvidenceSink, waitForPublicInputOpportunity } from "./evidence.mjs";
 
 function withRenderProfile(value, callback) {
   const previous = process.env.COOP_UI_RENDER_PROFILE;
@@ -70,11 +70,11 @@ test("public keys remain down through an actual Phaser update instead of composi
   ]);
   assert.match(
     harness,
-    /keyboard\.down\(key\)[\s\S]+waitForPublicInputFrame\(this\.evidence[\s\S]+keyboard\.up\(key\)/u,
+    /keyboard\.down\(key\)[\s\S]+waitForPublicInputOpportunity\(this\.evidence[\s\S]+keyboard\.up\(key\)/u,
   );
   assert.doesNotMatch(harness, /keyboard\.press\(key, \{ delay: Math\.min\(this\.config\.actionDelayMs, 100\) \}\)/u);
   const inputFrameWait = evidence.slice(
-    evidence.indexOf("export async function waitForPublicInputFrame"),
+    evidence.indexOf("export async function waitForPublicInputOpportunity"),
     evidence.indexOf("const SURFACE_PREFIX"),
   );
   assert.match(inputFrameWait, /browser-input-health[\s\S]+downKeys/u);
@@ -83,12 +83,13 @@ test("public keys remain down through an actual Phaser update instead of composi
     observer,
     /lastDomKeydownFrame = globalScene\?\.game\?\.loop\?\.frame[\s\S]+downKeys: heldDomKeys\.size/u,
   );
+  assert.match(observer, /addEventListener\("blur", \(\) => heldDomKeys\.clear\(\), \{ passive: true \}\)/u);
   assert.match(observer, /heldFrameAdvanced = snapshot\.downKeys > 0 && frameAdvancing/u);
 });
 
 test("public input pacing requires a post-keydown Phaser frame while that key remains held", async () => {
   const sink = new EvidenceSink("input-frame", ".");
-  const waiting = waitForPublicInputFrame(sink, { from: 0, domKeysBefore: 7, timeoutMs: 1_000 });
+  const waiting = waitForPublicInputOpportunity(sink, { from: 0, domKeysBefore: 7, timeoutMs: 1_000 });
   sink.record("browser-input-health", {
     observation: { domKeys: 8, downKeys: 1, keydownFrame: 100, frame: 100 },
   });
@@ -99,9 +100,19 @@ test("public input pacing requires a post-keydown Phaser frame while that key re
   assert.equal(proof.observation.frame, 101);
 });
 
+test("public input pacing accepts a direct game-side echo in the keydown frame", async () => {
+  const sink = new EvidenceSink("input-echo", ".");
+  const waiting = waitForPublicInputOpportunity(sink, { from: 0, domKeysBefore: 7, timeoutMs: 1_000 });
+  sink.record("browser-input-echo", {
+    observation: { domKeys: 8, downKeys: 1, keydownFrame: 100, frame: 100, active: true, uiMode: "LOADING" },
+  });
+  const proof = await waiting;
+  assert.equal(proof.kind, "browser-input-echo");
+});
+
 test("public input pacing cannot accept a frame after the target key was released", async () => {
   const sink = new EvidenceSink("input-release", ".");
-  const waiting = waitForPublicInputFrame(sink, { from: 0, domKeysBefore: 7, timeoutMs: 30 });
+  const waiting = waitForPublicInputOpportunity(sink, { from: 0, domKeysBefore: 7, timeoutMs: 30 });
   sink.record("browser-input-health", {
     observation: { domKeys: 8, downKeys: 1, keydownFrame: 100, frame: 100 },
   });
@@ -111,7 +122,7 @@ test("public input pacing cannot accept a frame after the target key was release
   sink.record("browser-input-health", {
     observation: { domKeys: 8, downKeys: 1, keydownFrame: 100, frame: 102 },
   });
-  await assert.rejects(waiting, /held public key to cross an actual Phaser update/u);
+  await assert.rejects(waiting, /held public key to reach a game input opportunity/u);
 });
 
 test("browser render-profile markers are validated and indexed as evidence", () => {

@@ -1669,7 +1669,9 @@ if (typeof window !== "undefined") {
     },
     { capture: true, passive: true },
   );
-  window.addEventListener("blur", () => heldDomKeys.clear(), { capture: true, passive: true });
+  // Do not capture descendant blur events: submitting a registration <input> blurs that element while the
+  // physical Enter key is still down. Only a real window-focus loss invalidates the held-key observation.
+  window.addEventListener("blur", () => heldDomKeys.clear(), { passive: true });
 }
 
 function inputLayerSnapshot() {

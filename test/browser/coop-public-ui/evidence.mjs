@@ -43,15 +43,15 @@ function registerEmergencyFlushSink(sink) {
 export const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
 
 /**
- * Wait until the read-only browser observer proves that a public key remained down across an
- * actual Phaser update.
+ * Wait until the read-only browser observer proves that a public key reached a game input opportunity.
  *
  * Compositor requestAnimationFrame is not a valid proxy: Chromium may composite at 60 FPS while a CPU-dilated
- * Phaser loop advances at 3 FPS. The observer captures Phaser's frame at raw DOM keydown, then emits another
- * input-health sample whenever Phaser's frame advances while the key is still held. The driver remains
- * keyboard-only; this function consumes console evidence and never reads or mutates game state through the page.
+ * Phaser loop advances at 3 FPS. The observer captures Phaser's frame at raw DOM keydown, then proves either a
+ * direct game-side UI echo while held (some handlers consume DOM keyboard callbacks synchronously) or a later
+ * Phaser frame while held (polling handlers). The driver remains keyboard-only; this function consumes console
+ * evidence and never reads or mutates game state through the page.
  */
-export async function waitForPublicInputFrame(evidence, { from, domKeysBefore, timeoutMs = 5_000 }) {
+export async function waitForPublicInputOpportunity(evidence, { from, domKeysBefore, timeoutMs = 5_000 }) {
   let scanned = Math.max(0, from);
   let released = false;
   const expectedDomKeys = domKeysBefore + 1;
@@ -59,7 +59,8 @@ export async function waitForPublicInputFrame(evidence, { from, domKeysBefore, t
     sink => {
       for (; scanned < sink.events.length; scanned += 1) {
         const event = sink.events[scanned];
-        const observation = event?.kind === "browser-input-health" ? event.observation : null;
+        const inputObservation = event?.kind === "browser-input-health" || event?.kind === "browser-input-echo";
+        const observation = inputObservation ? event.observation : null;
         if (
           observation == null
           || !Number.isFinite(observation.domKeys)
@@ -74,13 +75,13 @@ export async function waitForPublicInputFrame(evidence, { from, domKeysBefore, t
           released = true;
           continue;
         }
-        if (!released && observation.frame > observation.keydownFrame) {
+        if (!released && (event.kind === "browser-input-echo" || observation.frame > observation.keydownFrame)) {
           return event;
         }
       }
       return;
     },
-    { timeoutMs, description: "held public key to cross an actual Phaser update" },
+    { timeoutMs, description: "held public key to reach a game input opportunity" },
   );
 }
 

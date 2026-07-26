@@ -14,7 +14,7 @@ import {
   selectOptionById,
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
-import { delay, EvidenceSink, waitForPublicInputFrame } from "./evidence.mjs";
+import { delay, EvidenceSink, waitForPublicInputOpportunity } from "./evidence.mjs";
 import {
   isAcceptedRendererPresentationReceipt,
   latestMoveAnimationsAttestation,
@@ -1408,12 +1408,12 @@ export class PublicUiClient {
         Number(this.evidence.findLastInputHealth()?.observation?.domKeys ?? 0),
         Number(this.evidence.findLastInputEcho()?.observation?.domKeys ?? 0),
       );
-      // Keep the real DOM key down until the read-only observer proves that Phaser itself updated while the
-      // key was held. Chromium compositor frames are not sufficient on a CPU-dilated runner: they can advance
-      // many times between game updates. Mutation remains exclusively Playwright's public keyboard path.
+      // Keep the real DOM key down until the read-only observer proves either a direct game-side UI reaction
+      // or a later Phaser frame while held. That covers synchronous DOM-key handlers and polled handlers without
+      // mistaking Chromium compositor frames for game input. Mutation remains Playwright's public keyboard path.
       await this.page.keyboard.down(key);
       try {
-        await waitForPublicInputFrame(this.evidence, {
+        await waitForPublicInputOpportunity(this.evidence, {
           from: echoCursor,
           domKeysBefore,
         });

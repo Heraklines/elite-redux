@@ -4419,3 +4419,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   overlap invariant and remains entirely on the public keyboard plus read-only console-evidence boundary.
 - Permitted local evidence: 77/77 V2/browser contracts, both public driver boundary checks, targeted Biome, changed-file
   TypeScript filtering, and `git diff --check` pass. The correction still requires exact-SHA hosted Chromium evidence.
+
+## 2026-07-26 - Public input proof handles synchronous handlers and descendant focus changes
+
+- Campaign `30214547132` exposed the final observer mistake in the registration path. The capture listener attached a
+  `blur` handler to `window`, so the descendant registration input blurring on submit cleared `heldDomKeys` even though
+  the physical Enter key was still down. The trace showed the exact impossible-looking combination: keydown frame 409,
+  game-side Loading echo at frame 411, but `downKeys: 0`. The listener now observes only a real window blur.
+- Input consumers are not uniform. Menu navigation polls Phaser state on a later frame, while forms and some UI handlers
+  react synchronously to the DOM keyboard callback in the keydown frame. The public driver now accepts either proof:
+  a changed game-side input echo while the exact key remains down, or a strictly later Phaser frame while it remains
+  down. Compositor frames, released keys, later keydowns, and descendant element blur cannot satisfy the wait.
+- Permitted local evidence: 78/78 V2/browser contracts, both public driver boundaries, targeted Biome, changed-file
+  TypeScript filtering, and `git diff --check` pass. Exact browser proof remains GitHub-hosted.
