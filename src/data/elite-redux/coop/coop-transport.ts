@@ -132,11 +132,13 @@ export type CoopRole = "host" | "guest";
 // er-coop-46 carries authority-resolved damage result/critical cues and Terastallization presentation.
 // A protocol-45 renderer would turn strong/weak/critical/OHKO/indirect hits into the generic hit cue and
 // silently omit Tera, so mixed builds must refuse pairing instead of presenting a different battle.
-// er-coop-48 binds the complete pre-command presentation prefix into the globally ordered CONTROL_COMMIT.
-// Stable actor identity remains mandatory for every identity-bearing presentation event and
+// er-coop-48 binds the complete pre-command presentation prefix into the globally ordered CONTROL_COMMIT
+// and makes stable actor identity mandatory for every identity-bearing presentation event.
+// er-coop-49 adds stable-actor common battle-animation events so every ordinary VFX cue is rendered by
+// the authoritative guest instead of silently existing only on the host. Stable identity
 // aligns every materialized move target with its stable actor. A protocol-46 renderer can still fall back
 // to a transient battler index after switch/faint/reorder, so mixed builds must refuse pairing.
-export const COOP_PROTOCOL_VERSION = "er-coop-48";
+export const COOP_PROTOCOL_VERSION = "er-coop-49";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1145,6 +1147,15 @@ export type CoopBattleEvent =
       partySlot: number;
       teraType: number;
       actor: CoopPresentationActorRef;
+    }
+  /** Play one authority-selected common battle VFX against exact displayed actors. */
+  | {
+      k: "commonAnim";
+      anim: number;
+      bi: number;
+      actor: CoopPresentationActorRef;
+      targetBi: number;
+      targetActor: CoopPresentationActorRef;
     }
   /** Weather changed (`WeatherType` enum); `anim` is the already-resolved presentation cue. */
   | { k: "weather"; weather: number; turnsLeft: number; anim?: number }

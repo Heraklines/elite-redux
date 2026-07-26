@@ -20,7 +20,7 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 function isValidBattlerIndex(value: unknown): value is number {
-  // Protocol 48 supports the current single/double/triple topology and leaves room for six seats per side.
+  // Protocol 49 supports the current single/double/triple topology and leaves room for six seats per side.
   return isSafeAddressPart(value) && value <= 11;
 }
 
@@ -117,6 +117,14 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
         && isSafeAddressPart(event.teraType)
         && isPresentationActorRef(event.actor)
         && event.actor.pokemonId === event.pokemonId
+      );
+    case "commonAnim":
+      return (
+        isSafeAddressPart(event.anim)
+        && isActorAddressableBattlerIndex(event.bi)
+        && isPresentationActorRef(event.actor)
+        && isActorAddressableBattlerIndex(event.targetBi)
+        && isPresentationActorRef(event.targetActor)
       );
     case "weather":
       return (

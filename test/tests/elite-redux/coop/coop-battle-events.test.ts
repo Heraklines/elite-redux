@@ -68,6 +68,7 @@ import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
 import {
+  CoopCommonAnimReplayPhase,
   CoopFaintReplayPhase,
   CoopFinalizeEntryPresentationPhase,
   CoopFinalizeTurnPhase,
@@ -454,6 +455,61 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     expect(playSpy, "the mechanical engine lane never claims an environment animation ran").not.toHaveBeenCalled();
     expect(endSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a common VFX replays against the exact authority-selected actors", async () => {
+    const field = await startCoopGuest();
+    const source = field[0];
+    const target = globalScene.getEnemyField()[0];
+    globalScene.moveAnimations = true;
+    const token = createCoopPresentationOutcomeToken();
+    const playSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation((_instant, onComplete) => {
+      onComplete?.();
+    });
+    const phase = new CoopCommonAnimReplayPhase(
+      CommonAnim.USE_ITEM,
+      source.getBattlerIndex(),
+      { side: "player", pokemonId: source.id },
+      target.getBattlerIndex(),
+      { side: "enemy", pokemonId: target.id },
+      token,
+    );
+
+    phase.start();
+
+    expect(playSpy).toHaveBeenCalledOnce();
+    expect(coopPresentationOutcome(token)).toMatchObject({ kind: "rendered" });
+  });
+
+  it("records one plain common VFX at enqueue while retaining richer environment authority", async () => {
+    const field = await startCoopHost();
+    endCoopRecording();
+    beginCoopRecording(9, "common-vfx");
+    const plain = new CommonAnimPhase(field[0].getBattlerIndex(), 0, CommonAnim.USE_ITEM);
+
+    plain.recordCoopPresentationAtEnqueue();
+    plain.recordCoopPresentationAtEnqueue();
+
+    const recording = endCoopRecording();
+    expect(recording.events).toEqual([
+      {
+        k: "commonAnim",
+        anim: CommonAnim.USE_ITEM,
+        bi: field[0].getBattlerIndex(),
+        actor: { side: "player", pokemonId: field[0].id },
+        targetBi: globalScene.getEnemyField()[0].getBattlerIndex(),
+        targetActor: { side: "enemy", pokemonId: globalScene.getEnemyField()[0].id },
+      },
+    ]);
+
+    beginCoopRecording(10, "environment-vfx");
+    const environment = new CommonAnimPhase(undefined, undefined, CommonAnim.RAIN, {
+      source: "environment",
+      kind: "weather",
+      value: WeatherType.RAIN,
+    });
+    environment.recordCoopPresentationAtEnqueue();
+    expect(endCoopRecording().events).toEqual([]);
   });
 
   /** Start a co-op authoritative double as the HOST and tag field ownership. */

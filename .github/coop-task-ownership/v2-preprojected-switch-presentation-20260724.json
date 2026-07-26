@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "48fbbbc2d49a11cc58aa65ac3734ad3c4dc1d8cb",
+  "baseSha": "02a3dd536a2883db80fd9dc5cf3d2a710fb987fb",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     ".github/workflows/coop-public-ui-journey.yml",
@@ -27,18 +27,23 @@
     "src/data/elite-redux/coop/authority-v2/recovery.ts",
     "src/data/elite-redux/coop/authority-v2/shadow.ts",
     "src/data/elite-redux/coop/coop-battle-engine.ts",
+    "src/data/elite-redux/coop/coop-battle-event-validator.ts",
     "src/data/elite-redux/coop/coop-battle-stream.ts",
     "src/data/elite-redux/coop/coop-enemy-builder.ts",
     "src/data/elite-redux/coop/coop-interaction-relay.ts",
     "src/data/elite-redux/coop/coop-lobby.ts",
     "src/data/elite-redux/coop/coop-mutation-ledger.ts",
     "src/data/elite-redux/coop/coop-operation-journal.ts",
+    "src/data/elite-redux/coop/coop-renderer-gate.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/data/elite-redux/coop/coop-transport.ts",
     "src/data/elite-redux/coop/coop-turn-recorder.ts",
     "src/data/elite-redux/coop/coop-webrtc-connect.ts",
+    "src/data/elite-redux/showdown/showdown-side-swap.ts",
     "src/phase-manager.ts",
     "src/phases/biome-shop-phase.ts",
     "src/phases/command-phase.ts",
+    "src/phases/common-anim-phase.ts",
     "src/phases/coop-guest-faint-switch-phase.ts",
     "src/phases/coop-guest-revival-phase.ts",
     "src/phases/coop-replay-me-phase.ts",
@@ -117,6 +122,7 @@
     "test/tests/elite-redux/coop/coop-replacement-carrier-transaction.test.ts",
     "test/tests/elite-redux/coop/coop-replay-fast-forward.test.ts",
     "test/tests/elite-redux/coop/coop-savedata-digest.test.ts",
+    "test/tests/elite-redux/coop/coop-session-controller.test.ts",
     "test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts",
     "test/tests/elite-redux/coop/coop-soak-me.test.ts",
     "test/tests/elite-redux/coop/coop-soak.test.ts",
@@ -129,5 +135,7 @@
     "test/tools/coop-soak-driver.ts",
     "test/utils/encounter-test-utils.ts"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ]
 }

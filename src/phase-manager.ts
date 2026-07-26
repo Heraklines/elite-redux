@@ -43,6 +43,7 @@ import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
 import {
   CoopApplyResyncPhase,
   CoopCaptureReplayPhase,
+  CoopCommonAnimReplayPhase,
   CoopFaintReplayPhase,
   CoopFinalizeEntryPresentationPhase,
   CoopFinalizeTurnPhase,
@@ -218,6 +219,7 @@ const PHASES = Object.freeze({
   CoopTurnCommitPhase,
   CoopApplyResyncPhase,
   CoopCaptureReplayPhase,
+  CoopCommonAnimReplayPhase,
   CoopFinalizeEntryPresentationPhase,
   CoopFinalizeTurnPhase,
   CoopFaintReplayPhase,
@@ -420,6 +422,9 @@ export class PhaseManager {
    */
   public pushPhase(...phases: NonEmptyTuple<Phase>): void {
     for (const phase of phases) {
+      if (phase instanceof CommonAnimPhase && phase.phaseName === "CommonAnimPhase") {
+        phase.recordCoopPresentationAtEnqueue();
+      }
       this.phaseQueue.pushPhase(this.checkDynamic(phase));
     }
   }
@@ -435,6 +440,9 @@ export class PhaseManager {
   // flip the hell out with `Parameters`...
   public unshiftPhase(...phases: NonEmptyTuple<Phase>): void {
     for (const phase of phases) {
+      if (phase instanceof CommonAnimPhase && phase.phaseName === "CommonAnimPhase") {
+        phase.recordCoopPresentationAtEnqueue();
+      }
       const toAdd = this.checkDynamic(phase);
       if (phase.is("MovePhase")) {
         this.phaseQueue.addAfter(toAdd, "MoveEndPhase");

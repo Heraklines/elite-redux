@@ -81,6 +81,32 @@ test("Terastallization is authority-authored and replayed without renderer mecha
   assert.match(replayPump, /case "tera":[\s\S]+"CoopTeraReplayPhase"/u);
 });
 
+test("plain common battle animations are authority-authored at enqueue and replayed by exact actor identity", () => {
+  const manager = read("src/phase-manager.ts");
+  const common = read("src/phases/common-anim-phase.ts");
+  const transport = read("src/data/elite-redux/coop/coop-transport.ts");
+  const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
+  const replay = read("src/phases/coop-replay-phases.ts");
+  const replayPump = read("src/phases/coop-replay-turn-phase.ts");
+
+  assert.match(
+    manager,
+    /phase instanceof CommonAnimPhase && phase\.phaseName === "CommonAnimPhase"[\s\S]+recordCoopPresentationAtEnqueue\(\)/u,
+  );
+  assert.match(common, /recordCoopEvent\(\{\s*k: "commonAnim"[\s\S]+targetActor:/u);
+  assert.match(common, /this\.coopPresentation != null[\s\S]+return;/u, "weather and terrain keep one richer event");
+  assert.match(transport, /k: "commonAnim";[\s\S]+targetActor: CoopPresentationActorRef;/u);
+  assert.match(validator, /case "commonAnim":[\s\S]+isPresentationActorRef\(event\.targetActor\)/u);
+  const commonReplay = replay.slice(
+    replay.indexOf("export class CoopCommonAnimReplayPhase"),
+    replay.indexOf("export class", replay.indexOf("export class CoopCommonAnimReplayPhase") + 1),
+  );
+  assert.match(commonReplay, /exactDisplayedActor\(this\.actor\)/u);
+  assert.match(commonReplay, /exactDisplayedActor\(this\.targetActor\)/u);
+  assert.match(commonReplay, /new CommonBattleAnim\(this\.anim as CommonAnim, source, target\)/u);
+  assert.match(replayPump, /case "commonAnim":[\s\S]+"CoopCommonAnimReplayPhase"/u);
+});
+
 test("ordinary co-op and Showdown both replay retained entry presentation before command input", () => {
   const summon = read("src/phases/summon-phase.ts");
   const initEncounter = read("src/phases/init-encounter-phase.ts");
@@ -211,14 +237,14 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(replay, /CoopSwitchReplayPhase[\s\S]+CoopReplayTurnPhase[\s\S]+this\.end\(\)/u);
 });
 
-test("protocol 48 binds pre-command presentation and requires stable live actor identities", () => {
+test("protocol 49 binds every structured presentation cue to stable live actor identities", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-48"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-49"/u);
   assert.match(
     read("src/data/elite-redux/coop/authority-v2/adapters/control-open.ts"),
     /readonly entryPresentation: readonly CoopBattleEvent\[\]/u,

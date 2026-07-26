@@ -4169,3 +4169,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Real two-browser journey `30186100483` paired, created a fresh run, submitted both public commands, and rendered the complete authoritative turn on both clients through matching status, HP, and faint event receipts. It then timed out with the host visibly parked on the actionable `Chikorita fainted!` MessagePhase while the guest correctly waited in `CoopReplayTurnPhase`.
 - This was a browser-oracle omission, not a production desync: TurnEnd had advanced the public address to turn 2 before FaintPhase opened the turn-1 faint narration, while the prompt advancer admitted only the submitted turn-1 address (and the separately proven BattleEnd cleanup exception). No keyboard input was sent despite the semantic surface proving `handlerActive` and `awaitingActionInput`.
 - The prompt driver now admits that exact N+1 MessagePhase only when the same browser observed a structural FaintPhase since the scan floor. Epoch and wave must match and the turn must be exactly one ahead; arbitrary future messages remain fail-closed. A failure-first node contract proves both rejection without FaintPhase and one-action consumption after it.
+
+## 2026-07-26 - Stable-actor common battle VFX presentation
+
+- The structured stream already covered move, HP, faint, stat/status, ability, Tera, weather/terrain, and switch
+  presentation, but plain `CommonAnimPhase` cues remained authority-only. Berry use, confusion, attract, powder,
+  curse, trapping, salt cure, pledge residuals, and ability-triggered item VFX could therefore be visibly absent on
+  the renderer even while mechanics and checksums stayed exact.
+- Exact plain common phases now author one `commonAnim` event at queue insertion, before their associated state
+  mutations can overtake the cue. Source and target carry stable side/Pokemon identities as well as coordinates;
+  the renderer resolves only those displayed identities and reports a typed rendered/skipped/failed outcome.
+  Environment phases retain their richer weather/terrain event, and `PokemonHealPhase` retains the existing HP/heal
+  cue, so neither path double-renders.
+- Protocol advances to `er-coop-49`; older builds fail pairing rather than silently omitting the new presentation.
+  Source contracts cover the central enqueue seam, strict validator, exhaustive replay switch, and stable identities;
+  the focused hosted shard owns behavioral/type proof before this checkpoint can advance.

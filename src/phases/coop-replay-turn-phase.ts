@@ -1457,6 +1457,19 @@ export class CoopReplayTurnPhase extends Phase {
               event.actor,
             );
             break;
+          case "commonAnim":
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew(
+              "CoopCommonAnimReplayPhase",
+              event.anim,
+              event.bi,
+              event.actor,
+              event.targetBi,
+              event.targetActor,
+              outcomeToken,
+            );
+            break;
           case "weather":
           case "terrain":
             if (event.anim !== undefined) {

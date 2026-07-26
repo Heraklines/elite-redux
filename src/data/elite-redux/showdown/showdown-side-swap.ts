@@ -179,6 +179,14 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
       return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "tera":
       return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+    case "commonAnim":
+      return {
+        ...event,
+        bi: swapBi(event.bi, enemyBase),
+        actor: swapActor(event.actor),
+        targetBi: swapBi(event.targetBi, enemyBase),
+        targetActor: swapActor(event.targetActor),
+      };
     case "switch":
       return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     default:

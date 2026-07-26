@@ -19,10 +19,10 @@
 //   - CoopTurnCommitPhase runs after TurnEndPhase's delayed child mutations, calls
 //     `endCoopRecording()`, and streams the settled carrier via the battle streamer.
 //
-// MVP scope: only `message` events are recorded (narration). Correctness ("same moves,
-// same damage, same mon faints") comes from the streamed CHECKPOINT, not per-move events;
-// the richer per-move/hp/faint animation events are a clean follow-on that populates the
-// already-declared CoopBattleEvent kinds without changing this model.
+// The event stream now covers narration, move/HP/faint/stat/status/ability/Tera/switch,
+// weather/terrain, and ordinary shared VFX presentation. Correctness still comes from the
+// globally ordered authoritative state image; these events are immutable presentation cues
+// and their exact renderer outcomes are proved separately by the two-browser oracle.
 // =============================================================================
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";

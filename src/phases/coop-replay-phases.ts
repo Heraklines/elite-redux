@@ -8,10 +8,9 @@
 // Co-op GUEST animation-replay phases (#633, TRACK-2 Phase B - animation layer).
 //
 // The authoritative guest is a PURE RENDERER: it computes nothing and draws no RNG.
-// Today it only narrates the host's `message` lines and SNAPS to the end-of-turn
-// checkpoint - the battle reads as a silent summary. These small PRESENTATION-ONLY
-// phases let the guest WATCH the fight: each move plays its (RNG-free) animation, the
-// HP bar drains, stat changes / status / faints animate, IN ORDER, at real pace.
+// These PRESENTATION-ONLY phases let the guest WATCH the authority's complete structured
+// stream: move and common VFX, HP, stat/status, ability/Tera, switch, and faint cues play
+// IN ORDER at real pace before the authoritative state image is adopted.
 //
 // CORE SAFETY INVARIANT: these are PRESENTATION ONLY, driven by the host's pre-computed
 // values streamed in the turn's `events`. The guest recomputes NOTHING. The end-of-turn
@@ -308,6 +307,75 @@ export function coopNarrateFaint(bi: number, actor?: CoopPresentationActorRef): 
   } catch {
     // A bad bi must never throw into the replay pump - skip the cosmetic line.
     coopWarn("replay", `narrate faint bi=${bi} threw (handled, line skipped)`);
+  }
+}
+
+/**
+ * GUEST: play one plain CommonAnimPhase selected by the authority. The event carries both exact actors,
+ * so a switch/reorder can never retarget the cue by transient battler index. This phase owns no mechanics.
+ */
+export class CoopCommonAnimReplayPhase extends Phase {
+  public readonly phaseName = "CoopCommonAnimReplayPhase";
+  private readonly outcomeToken: CoopPresentationOutcomeToken;
+
+  constructor(
+    private readonly anim: number,
+    private readonly bi: number,
+    private readonly actor: CoopPresentationActorRef,
+    private readonly targetBi: number,
+    private readonly targetActor: CoopPresentationActorRef,
+    outcomeToken?: CoopPresentationOutcomeToken,
+  ) {
+    super();
+    this.outcomeToken = outcomeToken ?? createCoopPresentationOutcomeToken();
+  }
+
+  public override start(): void {
+    super.start();
+    const actorFingerprint = `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}->${this.targetActor.side}:bi${this.targetBi}:p${this.targetActor.pokemonId}:anim${this.anim}`;
+    if (!globalScene.moveAnimations) {
+      settleCoopPresentationOutcome(this.outcomeToken, {
+        kind: "intentionally-skipped",
+        reason: "animations-disabled",
+        actorFingerprint,
+      });
+      this.end();
+      return;
+    }
+
+    const source = exactDisplayedActor(this.actor);
+    const target = exactDisplayedActor(this.targetActor);
+    if (source == null || target == null) {
+      settleCoopPresentationOutcome(this.outcomeToken, {
+        kind: "failed",
+        reason: source == null ? "common-anim-actor-not-displayed" : "common-anim-target-not-displayed",
+        actorFingerprint,
+      });
+      this.end();
+      return;
+    }
+
+    let ended = false;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
+    const finish = (outcome: CoopPresentationOutcome) => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      settleCoopPresentationOutcome(this.outcomeToken, outcome);
+      this.end();
+    };
+    try {
+      watchdog = armCoopPresentationProgressWatchdog(() =>
+        finish({ kind: "failed", reason: "common-anim-watchdog-expired", actorFingerprint }),
+      );
+      new CommonBattleAnim(this.anim as CommonAnim, source, target).play(false, () =>
+        finish({ kind: "rendered", actorFingerprint }),
+      );
+    } catch {
+      finish({ kind: "failed", reason: "common-anim-presentation-threw", actorFingerprint });
+    }
   }
 }
 
