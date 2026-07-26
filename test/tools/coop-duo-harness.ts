@@ -225,7 +225,7 @@ import {
   setActiveCoopReplayMePhaseForHarness,
   setCoopMeHostPresentation,
 } from "#phases/coop-replay-me-phase";
-import { captureCoopEncounterAuthority } from "#phases/encounter-phase";
+import { captureCoopEncounterAuthority, setCoopEncounterContinuationWrapperForTesting } from "#phases/encounter-phase";
 import { coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { ModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
@@ -2820,19 +2820,16 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
     // that microtask drains after a synchronous `withClientSync` restore, it shifts the GUEST queue and
     // orphans the host phase - the interceptor state never leaves "running", so `to(...)` soft-locks at
     // ShowAbilityPhase/HideAbilityPhase (the showdown-versus-faint + double-faint summon-path stalls).
-    // Hold the host ctx through the current event-loop turn so every promise continuation spawned by
-    // `phase.start()` lands on the HOST phase manager. Four fixed microtask hops were not a semantic
-    // boundary: trainer encounters add trainer + Pokemon asset promises beneath Promise.all, so their
-    // final `enterEncounterPresentation()` continuation can be deeper than a wild encounter's. Releasing
-    // the host realm after an arbitrary depth made that continuation observe the guest globals, reject its
-    // exact encounter boundary, and strand NextEncounterPhase/NewBiomeEncounterPhase only in this
-    // one-process harness. A zero-delay task is the real boundary: JavaScript drains the complete current
-    // microtask queue (including recursively queued promise jobs) before it. The awaited POLL tail remains
-    // passive and returns under ambient ctx, so later macrotask guest pumps still interleave normally.
+    // Hold the host ctx across the immediate phase-start microtasks so `end()` lands on the HOST phase
+    // manager. Do not retain it across a macrotask: that lets unrelated control timers overtake the peer
+    // pump and makes double-KO/replacement ordering unlike two browsers. Longer semantic promise chains
+    // (notably EncounterPhase's asset join) have their own exact continuation-owner seam below.
     let poll: Promise<void> | undefined;
     return withClient(rig.hostCtx, async () => {
       poll = originalRun(phase);
-      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      for (let i = 0; i < 4; i++) {
+        await Promise.resolve();
+      }
     }).then(() => poll ?? Promise.resolve());
   };
   disposers.push(() => {
@@ -2858,6 +2855,27 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
     };
   });
   disposers.push(() => setCoopDurabilityScheduleWrapperForTesting(null));
+
+  // EncounterPhase joins a variable-depth trainer/Pokemon asset promise graph before it installs the
+  // presentation surface. In two browsers that continuation can only see its own scene/runtime. Capture
+  // the registering client and provide the same invariant here without holding a broad process-global
+  // realm across unrelated macrotasks.
+  setCoopEncounterContinuationWrapperForTesting(callback => {
+    const owner = activeClientCtx;
+    if (owner == null) {
+      return callback;
+    }
+    return (...args) => {
+      if (disposed) {
+        return;
+      }
+      if (activeClientCtx === owner && globalScene === owner.scene && getCoopRuntime() === owner.runtime) {
+        return callback(...args);
+      }
+      return withClientSync(owner, () => callback(...args));
+    };
+  });
+  disposers.push(() => setCoopEncounterContinuationWrapperForTesting(null));
 
   // RAW setTimeout ownership: engine code also schedules continuation timers directly (e.g.
   // setModeBoundedWhen's bounded verdict timer evaluates boundaryStillLive - which reads the ACTIVE

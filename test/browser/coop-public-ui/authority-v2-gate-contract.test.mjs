@@ -2540,13 +2540,23 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     pins,
-    /poll = originalRun\(phase\);\s*await new Promise<void>\(resolve => setTimeout\(resolve, 0\)\);/u,
-    "the phase-start realm must survive the whole promise microtask turn rather than a guessed chain depth",
+    /poll = originalRun\(phase\);\s*for \(let i = 0; i < 4; i\+\+\) \{\s*await Promise\.resolve\(\);/u,
+    "the phase-start realm retains only its immediate microtask tail and cannot delay peer macrotasks",
   );
-  assert.doesNotMatch(
+  assert.match(
     pins,
-    /for \(let i = 0; i < 4; i\+\+\) \{\s*await Promise\.resolve\(\);/u,
-    "trainer and presentation promise chains may be deeper than four microtasks",
+    /setCoopEncounterContinuationWrapperForTesting\(callback => \{[\s\S]+const owner = activeClientCtx;[\s\S]+activeClientCtx === owner[\s\S]+globalScene === owner\.scene[\s\S]+getCoopRuntime\(\) === owner\.runtime[\s\S]+withClientSync\(owner, \(\) => callback\(\.\.\.args\)\)/u,
+    "the variable-depth encounter asset continuation must re-enter its exact registering browser",
+  );
+  assert.match(
+    encounterPhase,
+    /Promise\.all\(loadEnemyAssets\)[\s\S]+\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{/u,
+    "success of the encounter asset join uses the exact continuation-owner seam",
+  );
+  assert.match(
+    encounterPhase,
+    /\.catch\(\s*wrapCoopEncounterContinuation\(\(error: unknown\) => \{/u,
+    "failure of the encounter asset join uses the exact continuation-owner seam",
   );
   const exactScheduledRealm =
     /activeClientCtx === owner\s*&& globalScene === owner\.scene\s*&& getCoopRuntime\(\) === owner\.runtime/g;

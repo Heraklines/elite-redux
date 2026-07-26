@@ -256,6 +256,30 @@ const COOP_ENEMY_PARTY_CONFIRM_WAIT_MS = 180_000;
  */
 const COOP_ENEMY_PARTY_CONFIRM_RETRIES = 1;
 
+/**
+ * Test-only owner-realm seam for asynchronous encounter continuations.
+ *
+ * Production browsers have independent globals, so the default is a strict no-op. The one-process duo
+ * harness installs a wrapper that re-enters the browser which registered the continuation before it reads
+ * `globalScene` or the active co-op runtime. This is deliberately scoped to this semantic boundary instead
+ * of extending a client realm for an arbitrary number of microtasks or a whole event-loop turn.
+ */
+export type CoopEncounterContinuationWrapper = <TArgs extends unknown[], TResult>(
+  callback: (...args: TArgs) => TResult,
+) => (...args: TArgs) => TResult | undefined;
+
+let coopEncounterContinuationWrapperForTesting: CoopEncounterContinuationWrapper | null = null;
+
+export function setCoopEncounterContinuationWrapperForTesting(wrapper: CoopEncounterContinuationWrapper | null): void {
+  coopEncounterContinuationWrapperForTesting = wrapper;
+}
+
+function wrapCoopEncounterContinuation<TArgs extends unknown[], TResult>(
+  callback: (...args: TArgs) => TResult,
+): (...args: TArgs) => TResult | undefined {
+  return coopEncounterContinuationWrapperForTesting?.(callback) ?? callback;
+}
+
 function captureCoopTrainer(trainer: Trainer): CoopSerializedTrainer {
   return {
     trainerType: trainer.config.trainerType,
@@ -1326,187 +1350,191 @@ export class EncounterPhase extends BattlePhase {
     }
 
     void Promise.all(loadEnemyAssets)
-      .then(() => {
-        if (!encounterBoundaryIsLive()) {
-          return;
-        }
-        battle.enemyParty.every((enemyPokemon, e) => {
-          if (battle.isBattleMysteryEncounter()) {
-            return false;
-          }
-          if (e < battle.arrangement.enemyCapacity) {
-            if (battle.battleType === BattleType.WILD) {
-              for (const pokemon of globalScene.getField()) {
-                applyAbAttrs("PreSummonAbAttr", { pokemon });
-              }
-              globalScene.field.add(enemyPokemon);
-              battle.seenEnemyPartyMemberIds.add(enemyPokemon.id);
-              const playerPokemon = globalScene.getPlayerPokemon();
-              if (playerPokemon?.isOnField()) {
-                globalScene.field.moveBelow(enemyPokemon as Pokemon, playerPokemon);
-              }
-              enemyPokemon.tint(0, 0.5);
-            } else if (battle.battleType === BattleType.TRAINER) {
-              enemyPokemon.setVisible(false);
-              globalScene.currentBattle.trainer?.tint(0, 0.5);
-            }
-            // Multi-format: position each on-field enemy by slot (LEFT/CENTER/RIGHT for 3).
-            if (battle.arrangement.enemyCapacity > 1) {
-              enemyPokemon.setFieldPosition(fieldPositionForSlot(e, battle.arrangement.enemyCapacity));
-            }
-          }
-          return true;
-        });
-
-        // Co-op GUEST (#633): when we adopted the host's enemy party verbatim, its held items
-        // were already reconstructed from the host's stream (buildCoopEnemy). Rolling our own
-        // here would DOUBLE / diverge them (a fresh seeded modifier roll on top of the adopted
-        // set), so skip the whole generation block. Solo / host / non-adopt runs are unchanged.
-        if (!this.loaded && battle.battleType !== BattleType.MYSTERY_ENCOUNTER && !this.coopAdoptedEnemyParty) {
-          // generate modifiers for MEs, overriding prior ones as applicable
-          regenerateModifierPoolThresholds(
-            globalScene.getEnemyField(),
-            battle.battleType === BattleType.TRAINER ? ModifierPoolType.TRAINER : ModifierPoolType.WILD,
-          );
-          globalScene.generateEnemyModifiers();
-          overrideModifiers(false);
-
-          for (const enemy of globalScene.getEnemyField()) {
-            overrideHeldItems(enemy, false);
-          }
-        }
-
-        if (battle.battleType === BattleType.TRAINER && globalScene.currentBattle.trainer) {
-          globalScene.currentBattle.trainer.genAI(globalScene.getEnemyParty());
-        }
-
-        if (!battle.isBattleMysteryEncounter()) {
-          // ER relics (#439): Lookout - queue a scout report of the lead enemy's
-          // types before the fight (message-only, no-op unless the relic is held).
-          erLookoutPreviewEnemy();
-          // Quartermaster - on every 10th wave (skipped on a mid-wave reload so it
-          // can't re-copy), the slot 5 mon copies one held item from slot 4 or 6.
-          if (!this.loaded) {
-            erQuartermasterTick();
-            // Covenant of Rest - full team heal every 7th wave (skips the 10-wave
-            // cadence so it never double-fires with the normal biome heal).
-            erApplyCovenantHeal();
-          }
-        }
-
-        return globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+      .then(
+        wrapCoopEncounterContinuation(() => {
           if (!encounterBoundaryIsLive()) {
             return;
           }
-          if (this.loaded) {
-            this.enterEncounterPresentation();
-            globalScene.resetSeed();
-          } else {
-            // Set weather and terrain before session gets saved
-            this.trySetWeatherIfNewBiome();
-            this.trySetTerrainIfNewBiome();
-            // ER relics (#439/#130): Stormglass - force the player's chosen weather for
-            // 5 turns at the start of EVERY battle. Runs AFTER the biome's ambient weather
-            // so the chosen weather wins (mirrors #486's carried-weather override). On a
-            // reload (this.loaded) the arena weather is restored from the save, so no
-            // re-apply is needed. The FIRST time a held Stormglass has no chosen weather
-            // yet, enqueue the one-time weather PICKER instead (it prompts, records the
-            // pick via setStormglassWeather, then applies it - so the choice takes effect
-            // this same battle). Path-independent: this single chokepoint fires no matter
-            // how the relic was granted, so no per-grant-site prompt is needed.
-            if (
-              hasErRelic("stormglass")
-              && getStormglassWeather() == null
-              && !(isCoopAuthoritativeGuest() && isCoopV2InteractionCutoverActive())
-            ) {
-              globalScene.phaseManager.unshiftNew("ErStormglassPickerPhase");
-            } else {
-              erStormglassApplyChosenWeather();
+          battle.enemyParty.every((enemyPokemon, e) => {
+            if (battle.isBattleMysteryEncounter()) {
+              return false;
             }
-            if (isCoopAuthoritativeGuest()) {
-              // The host is the sole persistence owner for a shared run. An authoritative guest deliberately
-              // has no host persistence context, so saveAll() would correctly return false; treating that as
-              // an account-save failure below resets the guest to Login/SelectGender/Title between waves.
-              // Continue the already-adopted encounter locally without writing or broadcasting a launch save.
-              globalScene.disableMenu = false;
-              this.enterEncounterPresentation();
-              globalScene.resetSeed();
-            } else if (globalScene.gameMode.isShowdown) {
-              // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it NEVER writes a session
-              // (no localStorage slot, no cloud `updateAll` push). Skip the per-wave saveAll entirely
-              // and boot the encounter directly. The guest already boots from the host's launch
-              // snapshot (the `this.loaded` branch above), so only the host reaches here.
-              this.broadcastCoopLaunchSnapshot();
-              globalScene.disableMenu = false;
-              this.enterEncounterPresentation();
-              globalScene.resetSeed();
-            } else {
-              globalScene.gameData
-                .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
-                .then(async success => {
-                  if (!encounterBoundaryIsLive()) {
-                    coopWarn("launch", "discarding stale first-save continuation after co-op runtime replacement");
-                    return;
-                  }
-                  globalScene.disableMenu = false;
-                  if (!success) {
-                    return globalScene.reset(true);
-                  }
-                  const launchConsumption = await globalScene.gameData.consumeCommittedFreshCoopLaunchSession(
-                    battle.waveIndex,
-                  );
-                  if (!encounterBoundaryIsLive()) {
-                    coopWarn("launch", "discarding stale launch-commit continuation after co-op runtime replacement");
-                    return;
-                  }
-                  if (launchConsumption.kind === "invalid") {
-                    globalScene.disableMenu = false;
-                    globalScene.reset(true);
-                    return;
-                  }
-                  this.broadcastCoopLaunchSnapshot(
-                    launchConsumption.kind === "committed" ? launchConsumption.sessionJson : undefined,
-                  );
-                  this.enterEncounterPresentation();
-                  globalScene.resetSeed();
-                })
-                .catch(error => {
-                  if (!encounterBoundaryIsLive()) {
-                    coopWarn("launch", "discarding stale first-save failure after co-op runtime replacement", error);
-                    return;
-                  }
-                  // Last-resort terminal path: saveAll itself emits the retained launch abort while its
-                  // exact claim is still available. Never leave the guest waiting if an unexpected
-                  // serializer/storage/API exception escapes the transaction.
-                  coopWarn("launch", "first-save transaction threw before launch release", error);
-                  globalScene.gameData.cancelPendingFreshCoopSessionSlot();
-                  globalScene.disableMenu = false;
-                  globalScene.reset(true);
-                });
+            if (e < battle.arrangement.enemyCapacity) {
+              if (battle.battleType === BattleType.WILD) {
+                for (const pokemon of globalScene.getField()) {
+                  applyAbAttrs("PreSummonAbAttr", { pokemon });
+                }
+                globalScene.field.add(enemyPokemon);
+                battle.seenEnemyPartyMemberIds.add(enemyPokemon.id);
+                const playerPokemon = globalScene.getPlayerPokemon();
+                if (playerPokemon?.isOnField()) {
+                  globalScene.field.moveBelow(enemyPokemon as Pokemon, playerPokemon);
+                }
+                enemyPokemon.tint(0, 0.5);
+              } else if (battle.battleType === BattleType.TRAINER) {
+                enemyPokemon.setVisible(false);
+                globalScene.currentBattle.trainer?.tint(0, 0.5);
+              }
+              // Multi-format: position each on-field enemy by slot (LEFT/CENTER/RIGHT for 3).
+              if (battle.arrangement.enemyCapacity > 1) {
+                enemyPokemon.setFieldPosition(fieldPositionForSlot(e, battle.arrangement.enemyCapacity));
+              }
+            }
+            return true;
+          });
+
+          // Co-op GUEST (#633): when we adopted the host's enemy party verbatim, its held items
+          // were already reconstructed from the host's stream (buildCoopEnemy). Rolling our own
+          // here would DOUBLE / diverge them (a fresh seeded modifier roll on top of the adopted
+          // set), so skip the whole generation block. Solo / host / non-adopt runs are unchanged.
+          if (!this.loaded && battle.battleType !== BattleType.MYSTERY_ENCOUNTER && !this.coopAdoptedEnemyParty) {
+            // generate modifiers for MEs, overriding prior ones as applicable
+            regenerateModifierPoolThresholds(
+              globalScene.getEnemyField(),
+              battle.battleType === BattleType.TRAINER ? ModifierPoolType.TRAINER : ModifierPoolType.WILD,
+            );
+            globalScene.generateEnemyModifiers();
+            overrideModifiers(false);
+
+            for (const enemy of globalScene.getEnemyField()) {
+              overrideHeldItems(enemy, false);
             }
           }
-        });
-      })
-      .catch(error => {
-        if (!encounterBoundaryIsLive()) {
-          coopWarn("runtime", "discarding stale encounter asset/UI failure after boundary replacement", error);
-          return;
-        }
-        globalScene.disableMenu = false;
-        if (encounterRuntime != null && encounterController?.netcodeMode === "authoritative") {
-          coopWarn("runtime", "authoritative encounter asset/UI continuation failed closed", error);
-          failCoopSharedSession(`Could not finish the authoritative encounter launch at wave ${battle.waveIndex}.`, {
-            boundary: "surface",
-            reasonCode: "continuation-failed",
-            wave: battle.waveIndex,
+
+          if (battle.battleType === BattleType.TRAINER && globalScene.currentBattle.trainer) {
+            globalScene.currentBattle.trainer.genAI(globalScene.getEnemyParty());
+          }
+
+          if (!battle.isBattleMysteryEncounter()) {
+            // ER relics (#439): Lookout - queue a scout report of the lead enemy's
+            // types before the fight (message-only, no-op unless the relic is held).
+            erLookoutPreviewEnemy();
+            // Quartermaster - on every 10th wave (skipped on a mid-wave reload so it
+            // can't re-copy), the slot 5 mon copies one held item from slot 4 or 6.
+            if (!this.loaded) {
+              erQuartermasterTick();
+              // Covenant of Rest - full team heal every 7th wave (skips the 10-wave
+              // cadence so it never double-fires with the normal biome heal).
+              erApplyCovenantHeal();
+            }
+          }
+
+          return globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+            if (!encounterBoundaryIsLive()) {
+              return;
+            }
+            if (this.loaded) {
+              this.enterEncounterPresentation();
+              globalScene.resetSeed();
+            } else {
+              // Set weather and terrain before session gets saved
+              this.trySetWeatherIfNewBiome();
+              this.trySetTerrainIfNewBiome();
+              // ER relics (#439/#130): Stormglass - force the player's chosen weather for
+              // 5 turns at the start of EVERY battle. Runs AFTER the biome's ambient weather
+              // so the chosen weather wins (mirrors #486's carried-weather override). On a
+              // reload (this.loaded) the arena weather is restored from the save, so no
+              // re-apply is needed. The FIRST time a held Stormglass has no chosen weather
+              // yet, enqueue the one-time weather PICKER instead (it prompts, records the
+              // pick via setStormglassWeather, then applies it - so the choice takes effect
+              // this same battle). Path-independent: this single chokepoint fires no matter
+              // how the relic was granted, so no per-grant-site prompt is needed.
+              if (
+                hasErRelic("stormglass")
+                && getStormglassWeather() == null
+                && !(isCoopAuthoritativeGuest() && isCoopV2InteractionCutoverActive())
+              ) {
+                globalScene.phaseManager.unshiftNew("ErStormglassPickerPhase");
+              } else {
+                erStormglassApplyChosenWeather();
+              }
+              if (isCoopAuthoritativeGuest()) {
+                // The host is the sole persistence owner for a shared run. An authoritative guest deliberately
+                // has no host persistence context, so saveAll() would correctly return false; treating that as
+                // an account-save failure below resets the guest to Login/SelectGender/Title between waves.
+                // Continue the already-adopted encounter locally without writing or broadcasting a launch save.
+                globalScene.disableMenu = false;
+                this.enterEncounterPresentation();
+                globalScene.resetSeed();
+              } else if (globalScene.gameMode.isShowdown) {
+                // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it NEVER writes a session
+                // (no localStorage slot, no cloud `updateAll` push). Skip the per-wave saveAll entirely
+                // and boot the encounter directly. The guest already boots from the host's launch
+                // snapshot (the `this.loaded` branch above), so only the host reaches here.
+                this.broadcastCoopLaunchSnapshot();
+                globalScene.disableMenu = false;
+                this.enterEncounterPresentation();
+                globalScene.resetSeed();
+              } else {
+                globalScene.gameData
+                  .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
+                  .then(async success => {
+                    if (!encounterBoundaryIsLive()) {
+                      coopWarn("launch", "discarding stale first-save continuation after co-op runtime replacement");
+                      return;
+                    }
+                    globalScene.disableMenu = false;
+                    if (!success) {
+                      return globalScene.reset(true);
+                    }
+                    const launchConsumption = await globalScene.gameData.consumeCommittedFreshCoopLaunchSession(
+                      battle.waveIndex,
+                    );
+                    if (!encounterBoundaryIsLive()) {
+                      coopWarn("launch", "discarding stale launch-commit continuation after co-op runtime replacement");
+                      return;
+                    }
+                    if (launchConsumption.kind === "invalid") {
+                      globalScene.disableMenu = false;
+                      globalScene.reset(true);
+                      return;
+                    }
+                    this.broadcastCoopLaunchSnapshot(
+                      launchConsumption.kind === "committed" ? launchConsumption.sessionJson : undefined,
+                    );
+                    this.enterEncounterPresentation();
+                    globalScene.resetSeed();
+                  })
+                  .catch(error => {
+                    if (!encounterBoundaryIsLive()) {
+                      coopWarn("launch", "discarding stale first-save failure after co-op runtime replacement", error);
+                      return;
+                    }
+                    // Last-resort terminal path: saveAll itself emits the retained launch abort while its
+                    // exact claim is still available. Never leave the guest waiting if an unexpected
+                    // serializer/storage/API exception escapes the transaction.
+                    coopWarn("launch", "first-save transaction threw before launch release", error);
+                    globalScene.gameData.cancelPendingFreshCoopSessionSlot();
+                    globalScene.disableMenu = false;
+                    globalScene.reset(true);
+                  });
+              }
+            }
           });
-          return;
-        }
-        // The old chain rejected without a handler and permanently stranded the phase. Solo retains its
-        // existing reset-to-title recovery semantics, but the rejection is now contained.
-        coopWarn("runtime", "encounter asset/UI continuation failed; resetting the local run", error);
-        globalScene.reset(true);
-      });
+        }),
+      )
+      .catch(
+        wrapCoopEncounterContinuation((error: unknown) => {
+          if (!encounterBoundaryIsLive()) {
+            coopWarn("runtime", "discarding stale encounter asset/UI failure after boundary replacement", error);
+            return;
+          }
+          globalScene.disableMenu = false;
+          if (encounterRuntime != null && encounterController?.netcodeMode === "authoritative") {
+            coopWarn("runtime", "authoritative encounter asset/UI continuation failed closed", error);
+            failCoopSharedSession(`Could not finish the authoritative encounter launch at wave ${battle.waveIndex}.`, {
+              boundary: "surface",
+              reasonCode: "continuation-failed",
+              wave: battle.waveIndex,
+            });
+            return;
+          }
+          // The old chain rejected without a handler and permanently stranded the phase. Solo retains its
+          // existing reset-to-title recovery semantics, but the rejection is now contained.
+          coopWarn("runtime", "encounter asset/UI continuation failed; resetting the local run", error);
+          globalScene.reset(true);
+        }),
+      );
   }
 
   private incrementMysteryEncounterChance(): void {
