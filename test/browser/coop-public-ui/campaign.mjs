@@ -36,6 +36,7 @@ const AUTHORITY_MOVE_EFFECT = /Start Phase MoveEffectPhase/u;
 const RENDERER_MOVE_REPLAY = /Start Phase CoopMoveAnimReplayPhase/u;
 const RENDERER_MOVE_SKIPPED = /present move .* NO-OP end \(user=.* anims=false\)/u;
 const BATTLE_END_PHASE = /Start Phase BattleEndPhase/u;
+const FAINT_PHASE = /Start Phase FaintPhase/u;
 const POST_MYSTERY_PHASE = /Start Phase PostMysteryEncounterPhase/u;
 const BARGAIN_OWNER_TERMINAL = /bargain OWNER terminal: outcome blob sent/u;
 const BARGAIN_WATCHER_TERMINAL = /bargain WATCHER: outcome blob received -> converging/u;
@@ -548,14 +549,16 @@ function currentSharedCommandAddress(clients, purpose) {
 }
 
 /**
- * Admit the submitted turn's exact prompt address, plus one production post-battle exception.
+ * Admit the submitted turn's exact prompt address, plus exact structural successor narrations.
  *
  * BattleEndPhase increments the public turn before its money/cleanup MessagePhase is displayed. That
  * visible prompt therefore carries turn N+1 even though it is the terminal narration for submitted
  * turn N (run 29676344808: "You picked up ₽30!"). Requiring the old address strands a real actionable
- * human prompt. The exception remains fail-closed: same epoch and wave, exactly the next turn, a
- * MessagePhase prompt, and this browser must have observed BattleEndPhase between the scan floor and
- * the prompt. Arbitrary future-turn battle messages still cannot authorize input.
+ * human prompt. FaintPhase likewise runs after TurnEnd advances the public address, so its later
+ * faint narration is stamped N+1 (public journey 30186100483). The exception remains fail-closed:
+ * same epoch and wave, exactly the next turn, a MessagePhase prompt, and this browser must have
+ * observed BattleEndPhase or FaintPhase between the scan floor and the prompt. Arbitrary future-turn
+ * battle messages still cannot authorize input.
  */
 function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
   const observation = event.observation;
@@ -588,7 +591,7 @@ function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
   }
   return client.evidence.events
     .slice(scanFloor, event.index + 1)
-    .some(candidate => BATTLE_END_PHASE.test(candidate.text ?? ""));
+    .some(candidate => BATTLE_END_PHASE.test(candidate.text ?? "") || FAINT_PHASE.test(candidate.text ?? ""));
 }
 
 /**

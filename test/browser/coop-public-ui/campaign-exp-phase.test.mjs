@@ -683,6 +683,38 @@ test("only ready active local battle narration and EXP instances advance once on
   );
 });
 
+test("successor-address faint narration advances only after the browser observes its structural FaintPhase", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+  authority.evidence.pushCommandSurface();
+  renderer.evidence.pushCommandSurface();
+  const advance = createBattlePromptAdvancer(rig, from, {}, "post-turn-faint", {
+    expectedCommandAddress: "7:1:1",
+  });
+
+  authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 20, true, {
+    epoch: 7,
+    wave: 1,
+    turn: 2,
+  });
+  assert.equal(await advance(), false, "an unexplained future-turn message must stay fail-closed");
+
+  authority.evidence.pushConsole("Start Phase FaintPhase");
+  authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 21, true, {
+    epoch: 7,
+    wave: 1,
+    turn: 2,
+  });
+  assert.equal(await advance(), true, "the exact structural faint narration is human-actionable");
+  assert.deepEqual(
+    authority.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.equal(await advance(), false, "one faint prompt generation receives exactly one action");
+});
+
 test("battle prompt consumption survives helper recreation and stale ready surfaces never spend input", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
