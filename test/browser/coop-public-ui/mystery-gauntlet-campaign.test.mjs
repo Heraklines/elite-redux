@@ -740,6 +740,25 @@ test("representative starter selection is deterministic and stays within the co-
   ]);
 });
 
+test("paired starter selection diversifies the two visible seat rosters", () => {
+  const observation = {
+    starterGridCandidates: [
+      { index: 3, speciesId: 152, cost: 2 }, // Chikorita
+      { index: 7, speciesId: 155, cost: 3 }, // Cyndaquil
+      { index: 8, speciesId: 158, cost: 3 }, // Totodile
+      { index: 11, speciesId: 728, cost: 4 },
+    ],
+  };
+  assert.deepEqual(chooseAffordableStarterPair(observation, 5, 0), [
+    { index: 3, speciesId: 152, cost: 2 },
+    { index: 7, speciesId: 155, cost: 3 },
+  ]);
+  assert.deepEqual(chooseAffordableStarterPair(observation, 5, 1), [
+    { index: 3, speciesId: 152, cost: 2 },
+    { index: 8, speciesId: 158, cost: 3 },
+  ]);
+});
+
 test("paired Chromium runs headful at an explicit player-sized viewport", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
   const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");

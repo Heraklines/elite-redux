@@ -388,6 +388,37 @@ const MIN_STARTERS_PER_SEAT = 2;
 const COOP_STARTER_BUDGET = 5;
 const STARTER_GRID_COLUMNS = 9;
 
+// Stable species ids are part of the public starter-grid projection. Use that visible identity
+// only to prevent both seats from independently choosing the same mono-type pair. This remains
+// ordinary human selection through the production grid; it grants no fixture-only Pokemon.
+const STARTER_FAMILY_BY_SPECIES = new Map([
+  ...[1, 152, 252, 387, 495, 650, 722, 810, 906].map(speciesId => [speciesId, "grass"]),
+  ...[4, 155, 255, 390, 498, 653, 725, 813, 909].map(speciesId => [speciesId, "fire"]),
+  ...[7, 158, 258, 393, 501, 656, 728, 816, 912].map(speciesId => [speciesId, "water"]),
+]);
+
+function starterPairScore(pair, preferredSupportFamily) {
+  const families = pair.map(candidate => STARTER_FAMILY_BY_SPECIES.get(candidate.speciesId)).filter(Boolean);
+  return [
+    pair[0].cost + pair[1].cost,
+    families.includes(preferredSupportFamily) ? 1 : 0,
+    new Set(families).size,
+    -Math.max(pair[0].index, pair[1].index),
+  ];
+}
+
+function starterScoreOutranks(score, incumbent) {
+  if (incumbent == null) {
+    return true;
+  }
+  for (let index = 0; index < score.length; index++) {
+    if (score[index] !== incumbent[index]) {
+      return score[index] > incumbent[index];
+    }
+  }
+  return false;
+}
+
 /** The party size the visible starter bar last showed in this evidence sink (observer-read). */
 function visibleTeamSize(sink, fromCursor) {
   const team = sink.findLastSemanticSurface(fromCursor, "starter-select")?.observation.teamSpeciesIds;
@@ -421,8 +452,8 @@ async function waitForVisibleTeamGrowth(client, fromCursor, fielded, timeoutMs) 
     );
 }
 
-/** Pick the strongest affordable pair from the observer's read-only visible/caught grid projection. */
-export function chooseAffordableStarterPair(observation, budget = COOP_STARTER_BUDGET) {
+/** Pick an affordable, seat-diverse pair from the observer's read-only visible/caught grid projection. */
+export function chooseAffordableStarterPair(observation, budget = COOP_STARTER_BUDGET, publicSeat = 0) {
   const candidates = Array.isArray(observation?.starterGridCandidates)
     ? observation.starterGridCandidates.filter(
         candidate =>
@@ -432,6 +463,8 @@ export function chooseAffordableStarterPair(observation, budget = COOP_STARTER_B
           && candidate.cost > 0,
       )
     : [];
+  const preferredSupportFamily =
+    Math.abs(Number.isSafeInteger(publicSeat) ? publicSeat : 0) % 2 === 0 ? "fire" : "water";
   let best = null;
   for (let left = 0; left < candidates.length; left++) {
     for (let right = left + 1; right < candidates.length; right++) {
@@ -440,8 +473,8 @@ export function chooseAffordableStarterPair(observation, budget = COOP_STARTER_B
       if (total > budget) {
         continue;
       }
-      const score = [total, -Math.max(pair[0].index, pair[1].index)];
-      if (best == null || score[0] > best.score[0] || (score[0] === best.score[0] && score[1] > best.score[1])) {
+      const score = starterPairScore(pair, preferredSupportFamily);
+      if (starterScoreOutranks(score, best?.score)) {
         best = { pair, score };
       }
     }
@@ -532,7 +565,7 @@ async function addStarterGridCandidate(client, target, fielded, timeoutMs) {
  */
 export async function confirmDefaultStarterTeam(client, { fromCursor = client.pageCursor, timeoutMs = 15_000 } = {}) {
   const starterSurface = await waitForActionableSemanticSurface(client, "starter-select", { fromCursor, timeoutMs });
-  const targets = chooseAffordableStarterPair(starterSurface.observation);
+  const targets = chooseAffordableStarterPair(starterSurface.observation, COOP_STARTER_BUDGET, client.publicSeat);
   if (targets == null) {
     throw new Error(
       `${client.label}: visible starter grid exposed no two-mon team within the ${COOP_STARTER_BUDGET}-point budget`,
