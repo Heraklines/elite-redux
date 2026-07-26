@@ -5687,6 +5687,7 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
  * on the selector phase still being current, because encounter effects commonly queue an ordinary
  * `MessagePhase` after `MysteryEncounterPhase` has ended (public campaign 30217040544). Choice surfaces use
  * non-MESSAGE modes and cannot satisfy this predicate; the guest renderer can never receive the host-only lease.
+ * This engine-presentation lease is deliberately independent of the legacy Mystery input-pump phase list.
  */
 export function coopHostEngineDialogueMessageAdvanceAllowed(ctx: {
   localRole: CoopRole;
