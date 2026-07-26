@@ -1615,6 +1615,33 @@ export class TitlePhase extends Phase {
                 });
             };
 
+            /**
+             * Save discovery settles asynchronously while the lobby's previous MESSAGE handler can still
+             * own a timer or can have been cleared by an adjacent title transition. Re-selecting the same
+             * UiMode is not sufficient proof: `setModeInternal` deliberately treats an already-active mode
+             * as complete. Rebuild the concrete handler generation before publishing the callback, then
+             * fail closed unless ordinary physical ACTION input is synchronously consumable.
+             */
+            const installHostLaunchDecision = (message: string, callback: () => void): boolean => {
+              if (!isCurrentSession()) {
+                return false;
+              }
+              const handler = globalScene.ui.getHandler();
+              handler.clear();
+              handler.show([]);
+              globalScene.ui.resetModeChain();
+              globalScene.ui.showText(message, 0, callback, null, true);
+              const actionable = handler.active && handler.isCoopV2InputActionable();
+              coopLog(
+                "launch",
+                `host decision installed mode=${UiMode[globalScene.ui.getMode()]} active=${handler.active} actionable=${actionable}`,
+              );
+              if (!actionable) {
+                terminalFailure("The co-op launch decision could not be opened. Reconnect and try again.");
+              }
+              return actionable;
+            };
+
             // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
             // Keep failures attached to their slots. A corrupt/ambiguous slot must not hide a valid
             // candidate elsewhere or tear down an otherwise healthy paired transport.
@@ -1655,17 +1682,9 @@ export class TitlePhase extends Phase {
                 if (transition === "superseded" || !isCurrentSession()) {
                   return;
                 }
-                globalScene.ui.resetModeChain();
-                globalScene.ui.showText(
+                installHostLaunchDecision(
                   `${blockedMessage}\n\nPress to start a separate co-op run. Existing saves will not be overwritten.`,
-                  // The reconciliation scan is asynchronous and can finish while an older lobby message
-                  // still owns a Phaser text timer. Publish this safety-critical confirmation atomically:
-                  // delay=0 installs awaitingActionInput + its exact callback in the same call, so a late
-                  // timer can never leave a visible prompt whose real keyboard input is ignored.
-                  0,
                   hostStartNew,
-                  null,
-                  true,
                 );
                 return;
               }
@@ -1692,9 +1711,8 @@ export class TitlePhase extends Phase {
               if (transition === "superseded" || !isCurrentSession()) {
                 return;
               }
-              globalScene.ui.resetModeChain();
               stage.setStatus("Connected! Press to start co-op.");
-              globalScene.ui.showText("Connected to your partner!\nPress to start co-op.", 0, hostStartNew, null, true);
+              installHostLaunchDecision("Connected to your partner!\nPress to start co-op.", hostStartNew);
               return;
             }
             // Offer the HOST a real RESUME / NEW GAME choice.
@@ -1705,10 +1723,8 @@ export class TitlePhase extends Phase {
             if (transition === "superseded" || !isCurrentSession()) {
               return;
             }
-            globalScene.ui.resetModeChain();
-            globalScene.ui.showText(
+            installHostLaunchDecision(
               `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
-              0,
               () => {
                 if (!isCurrentSession()) {
                   return;
@@ -1752,8 +1768,6 @@ export class TitlePhase extends Phase {
                   hostStartNew,
                 );
               },
-              null,
-              true,
             );
           })
           .catch(error => {

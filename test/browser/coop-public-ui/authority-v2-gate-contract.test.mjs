@@ -2356,7 +2356,22 @@ test("a fully missing account save set publishes no-save without a generic recon
   );
 });
 
-test("the asynchronous lobby save decision installs its human prompt through a bounded exact-session transition", () => {
+test("the asynchronous lobby save decision rebuilds one actionable handler after a bounded exact-session transition", () => {
+  const installerStart = titlePhase.indexOf("const installHostLaunchDecision = (");
+  const installerEnd = titlePhase.indexOf("\n\n            // HOST: is there a saved run", installerStart);
+  assert.ok(installerStart >= 0 && installerEnd > installerStart, "the host decision installer has a bounded block");
+  const installer = titlePhase.slice(installerStart, installerEnd);
+  const clear = installer.indexOf("handler.clear()");
+  const reopen = installer.indexOf("handler.show([])", clear);
+  const reset = installer.indexOf("globalScene.ui.resetModeChain()", reopen);
+  const prompt = installer.indexOf("globalScene.ui.showText(message, 0, callback, null, true)", reset);
+  const proof = installer.indexOf("handler.active && handler.isCoopV2InputActionable()", prompt);
+  const terminal = installer.indexOf("terminalFailure(", proof);
+  assert.ok(
+    clear >= 0 && reopen > clear && reset > reopen && prompt > reset && proof > prompt && terminal > proof,
+    "the same-mode lobby handler is cleared, reopened, prompted, and proved actionable or terminalized",
+  );
+
   const decisionStart = titlePhase.indexOf("const blockedMessage = coopResumeBlockMessage(discovery);");
   const decisionEnd = titlePhase.indexOf(
     "\n            // Offer the HOST a real RESUME / NEW GAME choice.",
@@ -2366,10 +2381,9 @@ test("the asynchronous lobby save decision installs its human prompt through a b
   const freshDecision = titlePhase.slice(decisionStart, decisionEnd);
   const boundedOpen = freshDecision.indexOf("setModeBoundedWhen(UiMode.MESSAGE, 2_000, isCurrentSession)");
   const currentFence = freshDecision.indexOf('transition === "superseded" || !isCurrentSession()', boundedOpen);
-  const reset = freshDecision.indexOf("globalScene.ui.resetModeChain()", currentFence);
-  const prompt = freshDecision.indexOf('showText("Connected to your partner!', reset);
+  const install = freshDecision.indexOf('installHostLaunchDecision("Connected to your partner!', currentFence);
   assert.ok(
-    boundedOpen >= 0 && currentFence > boundedOpen && reset > currentFence && prompt > reset,
+    boundedOpen >= 0 && currentFence > boundedOpen && install > currentFence,
     "a lost lobby fade cannot retain the checking-saves screen or install a prompt after session replacement",
   );
   assert.doesNotMatch(

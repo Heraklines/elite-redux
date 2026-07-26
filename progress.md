@@ -4115,3 +4115,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A failure-first node contract pins both authority and replica managers plus the exact `withClientSync` dispatch.
   The 64-test Authority V2 source-contract suite and targeted staged Biome checks pass locally. Remote B11 and
   common-soak shards remain the behavioral proof of the harness correction.
+
+## 2026-07-26 - Exact fresh-launch handler generation
+
+- Real two-browser journey `30184824386` proved the bounded transition and all-empty scan, but the elected host
+  still never exposed an actionable semantic message. The lobby status changed to `Press to start co-op` while
+  the underlying `MESSAGE` handler retained its prior generation, so the driver correctly refused to press.
+- Host save decisions now rebuild the concrete same-mode handler after the bounded exact-session transition,
+  install the callback synchronously, and prove that ordinary physical ACTION input is consumable. Failure to
+  establish that proof terminates the shared launch instead of displaying an inert prompt. Fresh, resume, and
+  isolated-conflict decisions all use the same seam.
+- The source contract now pins clear, reopen, prompt publication, actionability proof, and fail-closed terminal
+  ordering. This is a production input-liveness correction; the browser driver remains keyboard-only and does
+  not infer readiness from localized text or timing.
