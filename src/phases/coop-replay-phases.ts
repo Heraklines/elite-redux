@@ -2311,6 +2311,9 @@ export class CoopFinalizeTurnPhase extends Phase {
   }
 
   public override end(): void {
+    if (this.ended) {
+      return;
+    }
     this.retire();
     super.end();
   }

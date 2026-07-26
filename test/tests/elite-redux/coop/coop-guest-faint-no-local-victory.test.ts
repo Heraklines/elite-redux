@@ -44,6 +44,7 @@ const rec = {
   incrementTurnCalls: 0,
   queueTurnEndCalls: 0,
   clearLastTurnOrderCalls: 0,
+  shiftPhaseCalls: 0,
   pushedPhases: [] as string[],
   turn: 1,
 };
@@ -63,7 +64,9 @@ function makeStubScene(): BattleScene {
     },
     phaseManager: {
       // Phase.end() shifts to the next phase; a no-op here keeps the private methods from throwing.
-      shiftPhase() {},
+      shiftPhase() {
+        rec.shiftPhaseCalls++;
+      },
       queueTurnEndPhases() {
         rec.queueTurnEndCalls++;
         // The real queueTurnEndPhases pushes WeatherEffect / TurnEnd / Faint / Victory phases; model
@@ -133,6 +136,7 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     rec.incrementTurnCalls = 0;
     rec.queueTurnEndCalls = 0;
     rec.clearLastTurnOrderCalls = 0;
+    rec.shiftPhaseCalls = 0;
     rec.pushedPhases = [];
     rec.turn = 1;
     initGlobalScene(makeStubScene());
@@ -244,6 +248,9 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     // Retirement is idempotent: late detached completion cannot resurrect or re-clean the discarded turn.
     phase.retire();
     expect(coopMachineWaitLabels()).toEqual([]);
+    const shiftsAfterSuccessorStart = rec.shiftPhaseCalls;
+    phase.end();
+    expect(rec.shiftPhaseCalls).toBe(shiftsAfterSuccessorStart);
   });
 
   it("CoopFinalizeTurnPhase.finishTurn(): solo / host / lockstep keeps queueTurnEndPhases (byte-identical)", () => {
