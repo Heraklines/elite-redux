@@ -1354,7 +1354,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
   }, 120_000);
 
-  it("a host biome permit armed after nested guest delivery survives the resumed browser scope", async () => {
+  it("a host biome permit armed before publication survives same-browser ACK re-entry and guest delivery", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
     const sourceWave = 20;
@@ -1366,10 +1366,9 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       operationId = coopAuthoritativeBiomeTransitionOperationId(sourceWave);
       expect(operationId).not.toBeNull();
 
-      // V2 publishes/settles the guest-owned result before commitBiomeAuthoritativeResult arms the host's
-      // local Switch/NewBiome permit. That publication temporarily installs the guest browser. The resumed
-      // host scope must persist mutations made after the nested delivery, just as two separate JS realms do.
-      await withClient(rig.guestCtx, () => {});
+      // commitBiomeAuthoritativeResult installs the local permit BEFORE retainEnvelope publishes the result.
+      // Publication can synchronously deliver an ACK back into the already-installed host browser and can
+      // install the guest browser. Neither callback window may reload an older host ctx over this permit.
       expect(
         armCoopBiomeTransitionTailPermit({
           operationId: operationId!,
@@ -1381,6 +1380,8 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
           nextWave,
         }),
       ).toBe(true);
+      withClientSync(rig.hostCtx, () => {});
+      await withClient(rig.guestCtx, () => {});
     });
 
     await withClient(rig.hostCtx, () => {

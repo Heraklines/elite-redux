@@ -633,7 +633,12 @@ function restoreScopedMePins(pins: MePins, capturedBoundaryGeneration: number): 
  * after the restore); use {@linkcode withClient} for that.
  */
 export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
-  if (activeClientCtx != null && activeClientCtx !== ctx) {
+  if (activeClientCtx != null) {
+    // A callback re-entering the browser that is already installed must inherit that browser's LIVE realm,
+    // not the ctx snapshot from its last completed outer window. Authority publication commonly arms a
+    // one-shot permit and then synchronously receives an ACK in the same browser; restoring the older ctx at
+    // this seam erased the permit only in the one-process harness. Persist both same-client and cross-client
+    // preemption before installing the callback window, exactly as two independent browser realms behave.
     persistPreemptedClientState(activeClientCtx);
   }
   const mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;
@@ -723,7 +728,9 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
 }
 
 export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
-  if (activeClientCtx != null && activeClientCtx !== ctx) {
+  if (activeClientCtx != null) {
+    // See withClientSync: async same-browser re-entry is still one live JS realm in production and must not
+    // reload an older exit-time snapshot over mutations performed by the currently installed outer window.
     persistPreemptedClientState(activeClientCtx);
   }
   // Async scopes may overlap and finish out of entry order. Claim ME-pin save ownership before installing

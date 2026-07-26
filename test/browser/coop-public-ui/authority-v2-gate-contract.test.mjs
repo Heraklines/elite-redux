@@ -2128,6 +2128,20 @@ test("overlapping duo scopes cannot overwrite a newer browser-local biome permit
     2,
     "sync and async windows retain the generation fence while saving a legitimately resumed realm",
   );
+  assert.equal(
+    [
+      ...duoHarness.matchAll(
+        /if \(activeClientCtx != null\) \{\s*\/\/[\s\S]*?persistPreemptedClientState\(activeClientCtx\);/gu,
+      ),
+    ].length,
+    2,
+    "sync and async same-browser re-entry persist the live realm before loading the callback window",
+  );
+  assert.doesNotMatch(
+    duoHarness,
+    /activeClientCtx != null && activeClientCtx !== ctx/u,
+    "same-browser ACK callbacks cannot bypass live realm persistence",
+  );
 });
 
 test("superseded control addresses can reopen without weakening live-address conflicts", () => {
