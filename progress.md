@@ -4317,3 +4317,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   targeted Biome clean, `git diff --check` clean, and the repository TypeScript baseline is 216 diagnostics with
   zero in the changed files. The pure V2 lease contract was added to the remote Node suite and must be proven by
   the hosted focused shard; no co-op Vitest, browser, soak, or campaign was run locally.
+- The first hosted push correctly refused focused execution because this cross-cutting batch mapped to six engine
+  shards, exceeding the five-shard safety cap, so complete gate `30211957153` owns engine qualification. Its fast
+  browser contracts exposed one mechanical test migration: the source now proves every *pre-command* prefix, but
+  `showdown-browser-evidence` still matched the retired `entry presentation PROVED` log text. The assertion now
+  names the generalized fence; no Showdown/Tournament gameplay code changed. Static remains red only on the two
+  inherited Showdown/Tournament TypeScript diagnostics that are explicitly outside this co-op-only workstream.
