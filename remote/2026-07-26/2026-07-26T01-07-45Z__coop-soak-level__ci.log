@@ -1,0 +1,59 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run_mode: calibrated-release
+calibration_id: level-55-faint
+target_sha: 6a32f02982fa6fd3a0b828a3210ebd30f9a178b2
+checked_out_sha: 6a32f02982fa6fd3a0b828a3210ebd30f9a178b2
+base_seed: 20260726
+campaign_seed: 20260726
+run: 30182286218 (workflow source 6a32f02982fa6fd3a0b828a3210ebd30f9a178b2)
+timestamp: 2026-07-26T01-07-45Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260726 WAVES=55 - replay this run with:  SOAK_SEED=20260726 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 3 (seed 20260726): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "SwitchPhase", UI mode MESSAGE (=0), interceptor state "running".
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 4 (seed 206780945): wave crossing threw (strand/stall): PhaseInterceptor.toFirst([CommandPhase, ErDexNavPhase, ScanIvsPhase, TheBargainPhase, ErCrossroadsPhase, SelectBiomePhase]) did not reach a target (soft-lock / freeze?): stuck at phase "SwitchPhase", UI mode PARTY (=8), interceptor state "running".
+
+----- vitest result tail -----
+[90m [2m❯[22m src/phases/switch-phase.ts:[2m259:13[22m[39m
+[90m [2m❯[22m processTicksAndRejections node:internal/process/task_queues:[2m105:5[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+
+[31m⎯⎯⎯⎯[39m[1m[41m Unhandled Rejection [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mError[22m: [coop-op] invalid faint-switch occurrence=1000000424[39m
+[36m [2m❯[22m boundedAddressPart src/data/elite-redux/coop/coop-faint-switch-operation.ts:[2m228:11[22m[39m
+    [90m226|[39m   [35mconst[39m normalized [33m=[39m [33mMath[39m[33m.[39m[34mtrunc[39m(value)[33m;[39m
+    [90m227|[39m   if (!Number.isSafeInteger(normalized) || normalized < 0 || normalize…
+    [90m228|[39m     throw new Error(`[coop-op] invalid faint-switch ${label}=${value}`…
+    [90m   |[39m           [31m^[39m
+    [90m229|[39m   }
+    [90m230|[39m   [35mreturn[39m normalized[33m;[39m
+[90m [2m❯[22m coopFaintSwitchEventAddress src/data/elite-redux/coop/coop-faint-switch-operation.ts:[2m237:7[22m[39m
+[90m [2m❯[22m coopFaintSwitchOperationAddress src/data/elite-redux/coop/coop-faint-switch-operation.ts:[2m251:5[22m[39m
+[90m [2m❯[22m addressCoopFaintSwitchChoiceData src/data/elite-redux/coop/coop-faint-switch-operation.ts:[2m424:51[22m[39m
+[90m [2m❯[22m src/phases/switch-phase.ts:[2m525:20[22m[39m
+[90m [2m❯[22m PartyUiHandler.processActionButtonForOptions src/ui/handlers/party-ui-handler.ts:[2m1175:7[22m[39m
+[90m [2m❯[22m PartyUiHandler.processOptionMenuInput src/ui/handlers/party-ui-handler.ts:[2m1194:19[22m[39m
+[90m [2m❯[22m PartyUiHandler.processInput src/ui/handlers/party-ui-handler.ts:[2m1237:22[22m[39m
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m1058:13[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m751:18[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m2 errors[39m[22m
+[2m   Start at [22m 01:06:23
+[2m   Duration [22m 80.89s[2m (transform 21.11s, setup 25.52s, import 317ms, tests 54.20s, environment 692ms)[22m
+
