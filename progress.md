@@ -4102,3 +4102,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A failure-first node source contract rejects an unbounded fresh decision transition and pins the order:
   bounded open, exact-session fence, mode-chain reset, actionable callback. The 63-test Authority V2 contract
   suite and `git diff --check` pass locally; the real two-browser journey remains the behavioral proof.
+
+## 2026-07-26 - One-process Phaser callback ownership
+
+- Exact full gate `30184390240` reduced B11, C3, C5, and P1 to the same synthetic freeze across unrelated
+  profiles and waves: the authority entered `NextEncounterPhase`, the replica entered `NewBattlePhase`, and
+  the authority's tween completion evaluated an exact battle/phase guard while the replica's process-global
+  scene was installed. The guard correctly returned; in two browsers the other scene cannot occupy that global.
+- The duo harness now binds every Phaser tween callback family (`add`, `addCounter`, and nested `chain`
+  configurations) to the browser context that scheduled it. This covers synchronous GameWrapper callbacks and
+  deferred scene variants, restores wrappers during rig teardown, and does not weaken production phase guards.
+- A failure-first node contract pins both authority and replica managers plus the exact `withClientSync` dispatch.
+  The 64-test Authority V2 source-contract suite and targeted staged Biome checks pass locally. Remote B11 and
+  common-soak shards remain the behavioral proof of the harness correction.

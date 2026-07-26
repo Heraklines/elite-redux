@@ -2672,6 +2672,83 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
   pinClock(rig.hostScene, rig.hostCtx);
   pinClock(rig.guestScene, rig.guestCtx);
 
+  // Phaser callbacks are browser-event-loop callbacks too. The headless GameWrapper executes most tween
+  // completions synchronously, while a few scene/test variants defer them; either timing is allowed to land
+  // during a nested peer pump. Re-enter the scheduling scene for every mechanical tween callback so guards
+  // such as NextEncounterPhase's exact battle+phase check observe their own browser, just as they do in two
+  // real Chromium processes. Wrapping the complete callback family also keeps presentation and phase tails
+  // faithful instead of fixing only the currently observed onComplete shape.
+  const pinTweenCallbacks = (scene: BattleScene, ctx: ClientCtx): void => {
+    type TweenManagerSeam = {
+      add: (config: unknown) => unknown;
+      addCounter?: (config: unknown) => unknown;
+      chain?: (config: unknown) => unknown;
+    };
+    const manager = scene.tweens as unknown as TweenManagerSeam;
+    const callbackKeys = [
+      "onActive",
+      "onStart",
+      "onLoop",
+      "onComplete",
+      "onStop",
+      "onPause",
+      "onResume",
+      "onRepeat",
+      "onYoyo",
+      "onUpdate",
+    ] as const;
+    const wrapConfig = (config: unknown): unknown => {
+      if (config == null || typeof config !== "object") {
+        return config;
+      }
+      const wrapped = { ...(config as Record<string, unknown>) };
+      for (const key of callbackKeys) {
+        const callback = wrapped[key];
+        if (typeof callback !== "function") {
+          continue;
+        }
+        wrapped[key] = function (this: unknown, ...callbackArgs: unknown[]): unknown {
+          if (disposed) {
+            return;
+          }
+          return withClientSync(ctx, () => callback.apply(this, callbackArgs));
+        };
+      }
+      if (Array.isArray(wrapped.tweens)) {
+        wrapped.tweens = wrapped.tweens.map(wrapConfig);
+      }
+      return wrapped;
+    };
+    const originalAdd = manager.add.bind(scene.tweens);
+    const pinnedAdd = (config: unknown): unknown => originalAdd(wrapConfig(config));
+    manager.add = pinnedAdd;
+    const originalAddCounter = manager.addCounter?.bind(scene.tweens);
+    const pinnedAddCounter =
+      originalAddCounter == null ? undefined : (config: unknown): unknown => originalAddCounter(wrapConfig(config));
+    if (pinnedAddCounter != null) {
+      manager.addCounter = pinnedAddCounter;
+    }
+    const originalChain = manager.chain?.bind(scene.tweens);
+    const pinnedChain =
+      originalChain == null ? undefined : (config: unknown): unknown => originalChain(wrapConfig(config));
+    if (pinnedChain != null) {
+      manager.chain = pinnedChain;
+    }
+    disposers.push(() => {
+      if (manager.add === pinnedAdd) {
+        manager.add = originalAdd;
+      }
+      if (pinnedAddCounter != null && manager.addCounter === pinnedAddCounter) {
+        manager.addCounter = originalAddCounter;
+      }
+      if (pinnedChain != null && manager.chain === pinnedChain) {
+        manager.chain = originalChain;
+      }
+    });
+  };
+  pinTweenCallbacks(rig.hostScene, rig.hostCtx);
+  pinTweenCallbacks(rig.guestScene, rig.guestCtx);
+
   const interceptor = hostGame.phaseInterceptor as unknown as { run: (phase: Phase) => Promise<void> };
   const originalRun = interceptor.run.bind(hostGame.phaseInterceptor);
   interceptor.run = (phase: Phase): Promise<void> => {

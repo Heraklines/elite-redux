@@ -2432,6 +2432,21 @@ test("the one-process soak retains the authority browser while nested peer pumps
   );
 });
 
+test("the one-process duo pins Phaser tween callbacks to the browser that scheduled them", () => {
+  const pinsStart = duoHarness.indexOf("function installDuoCtxOwnershipPins(");
+  const pinsEnd = duoHarness.indexOf("\n/**\n * Dispose both independently assembled runtimes", pinsStart);
+  assert.ok(pinsStart >= 0 && pinsEnd > pinsStart, "the client ownership pins have a bounded source block");
+  const pins = duoHarness.slice(pinsStart, pinsEnd);
+  const helper = pins.indexOf("const pinTweenCallbacks = (scene: BattleScene, ctx: ClientCtx): void =>");
+  const wrap = pins.indexOf("withClientSync(ctx, () => callback.apply(thisArg, callbackArgs))", helper);
+  const host = pins.indexOf("pinTweenCallbacks(rig.hostScene, rig.hostCtx)", wrap);
+  const guest = pins.indexOf("pinTweenCallbacks(rig.guestScene, rig.guestCtx)", host);
+  assert.ok(
+    helper >= 0 && wrap > helper && host > wrap && guest > host,
+    "a synchronous or delayed tween completion may not read the other browser's global scene/phase/runtime",
+  );
+});
+
 test("a projected Mystery phase cannot attest through its predecessor's active handler", () => {
   assert.match(
     replayMePhase,
