@@ -59,6 +59,7 @@ import {
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
+import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
 import { BerryType } from "#enums/berry-type";
 import { BiomeId } from "#enums/biome-id";
@@ -637,10 +638,10 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   }, 300_000);
 
   it("TRANSFORM (#836): a host Ditto/Imposter transform converges on the pure-renderer guest through the field-snapshot heal", async () => {
-    // Re-state this scenario's required moves at its launch boundary. Grouped external shards deliberately
-    // reuse one controller, and another scenario can leave a Splash-only override behind despite module
-    // isolation; this proof must never depend on file order to give Ditto Transform.
-    game.override.moveset([MoveId.TRANSFORM, MoveId.TACKLE, MoveId.SPLASH]);
+    // Re-state this scenario's required moves and pin Limber at its launch boundary. A generated Ditto may
+    // otherwise roll Imposter, transform on entry, and correctly expose the copied Splash-only moveset before
+    // this move-driven Transform proof begins. That made the grouped shard depend on starter ability RNG.
+    game.override.ability(AbilityId.LIMBER).moveset([MoveId.TRANSFORM, MoveId.TACKLE, MoveId.SPLASH]);
     await game.classicMode.startBattle(SpeciesId.DITTO, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildSavedataDuo(pair);
@@ -686,6 +687,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // A focused single-engine proof that the snapshot carry+restore is exact: transform a mon, capture the
     // field snapshot, CLEAR the summonData transform (simulate a not-yet-transformed guest), re-apply, and
     // assert the copied identity is restored byte-for-byte through the same production readFullMon/applyFullMon.
+    game.override.ability(AbilityId.LIMBER).moveset([MoveId.TRANSFORM]);
     await game.classicMode.startBattle(SpeciesId.DITTO);
     game.move.select(MoveId.TRANSFORM, 0, BattlerIndex.ENEMY);
     await game.phaseInterceptor.to("TurnEndPhase");
