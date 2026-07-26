@@ -53,6 +53,25 @@ describe.skipIf(!RUN)("ER achievement rewards — grant on unlock", () => {
     expect(gd.eggs.length).toBe(eggsBefore + 2);
   });
 
+  it("candyTeam rewards include teammates temporarily stored by the Expert Breeder", async () => {
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR, SpeciesId.CHARMANDER, SpeciesId.SQUIRTLE);
+    const gd = game.scene.gameData;
+    const fullParty = [...game.scene.getPlayerParty()];
+    const roots = fullParty.map(mon => mon.species.getRootSpeciesId());
+    const candyBefore = roots.map(root => gd.starterData[root]?.candyCount ?? 0);
+
+    game.scene.currentBattle.mysteryEncounter = {
+      misc: { originalParty: fullParty.slice(1) },
+    } as never;
+    game.scene["party"] = [fullParty[0]];
+
+    grantErAchievementReward("BACK_IN_BLOOD");
+
+    roots.forEach((root, index) => {
+      expect(gd.starterData[root]?.candyCount ?? 0).toBeGreaterThan(candyBefore[index]);
+    });
+  });
+
   it("an unmapped achievement id is a no-op (no throw, no grant)", async () => {
     await game.classicMode.startBattle(SpeciesId.BULBASAUR);
     const gd = game.scene.gameData;

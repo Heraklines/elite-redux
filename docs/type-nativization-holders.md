@@ -12,6 +12,12 @@ built in this project.
 
 Counts: 63 type-grant holders swept across 11 categories; 25 NEEDS-MAINTAINER; 2 small-change swaps.
 
+Evolution inheritance: a nativized line type now propagates through every
+reachable evolution and its forms without changing the evolution's independently
+assigned abilities. This covers previously missed descendants such as Drapion
+(Ground from Skorupi) and Charizard (Dragon from Charmander/Charmeleon), and is
+enforced exhaustively against the live evolution graph.
+
 
 ## Aquatic  (grant `AQUATIC` -> native `WATER`)
 

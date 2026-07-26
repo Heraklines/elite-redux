@@ -36,6 +36,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { speciesStarterCosts } from "#balance/starters";
+import type { PlayerPokemon } from "#field/pokemon";
 import { Egg } from "#data/egg";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { grantErShinyLabEffectAvailability } from "#data/elite-redux/er-shiny-lab-config";
@@ -820,6 +821,27 @@ interface GrantedReward {
 }
 
 /**
+ * Reconstruct the player's full reward team while an encounter temporarily
+ * removes party members from the live battle party. The Expert Breeder stores
+ * those members in `misc.originalParty`; merge by object identity so the same
+ * members are not paid twice after the encounter restores them.
+ */
+export function resolveAchievementRewardTeam(
+  activeParty: readonly PlayerPokemon[],
+  storedParty: unknown,
+): PlayerPokemon[] {
+  const stored = Array.isArray(storedParty) ? storedParty : [];
+  return [...new Set([...activeParty, ...stored])] as PlayerPokemon[];
+}
+
+function getAchievementRewardTeam(): PlayerPokemon[] {
+  return resolveAchievementRewardTeam(
+    globalScene.getPlayerParty(),
+    globalScene.currentBattle?.mysteryEncounter?.misc?.originalParty,
+  );
+}
+
+/**
  * Grant the reward(s) for a freshly-unlocked achievement and announce them.
  * FAIL-OPEN: any error is swallowed so a reward bug can NEVER break the
  * achievement unlock, the voucher cascade, or the run. Call only from the
@@ -935,7 +957,7 @@ function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
     case "candyTeam": {
       const mult = REWARD_DIFFICULTY_CANDY_MULT[getErDifficulty()] ?? 1;
       const amount = Math.round(spec.perMon * mult);
-      const party = globalScene.getPlayerParty();
+      const party = getAchievementRewardTeam();
       for (const mon of party) {
         grantCandy(mon.species.speciesId, amount);
       }

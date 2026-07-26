@@ -31,6 +31,7 @@
 // bundled rider) — see the holder report's "Out of sweep scope" section.
 // =============================================================================
 
+import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allSpecies } from "#data/data-lists";
 import {
   ER_ALLURING_SKULL_ABILITY_ID,
@@ -262,9 +263,48 @@ export const ER_TYPE_GRANT_ABILITY_IDS: readonly number[] = [
 ];
 
 /** Add a native extra type to a species/form (dedup-safe). */
-function addNativeType(target: PokemonSpeciesForm, type: PokemonType): void {
+function addNativeType(target: PokemonSpeciesForm, type: PokemonType): boolean {
+  if (target.isOfType(type)) {
+    return false;
+  }
   const existing = target.getExtraTypes();
   target.setExtraTypes([...existing, type]);
+  return true;
+}
+
+/** Every reachable evolution inherits a type that was made native on its line. */
+function addNativeTypeToEvolutionLine(sourceId: number, type: PokemonType): number {
+  const visited = new Set<number>([sourceId]);
+  const queue = [sourceId];
+  let applied = 0;
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const evolution of pokemonEvolutions[current as SpeciesId] ?? []) {
+      const evolvedId = evolution.speciesId as number;
+      if (visited.has(evolvedId)) {
+        continue;
+      }
+      visited.add(evolvedId);
+      queue.push(evolvedId);
+
+      const evolved = allSpecies.find(species => species.speciesId === evolvedId);
+      if (!evolved) {
+        continue;
+      }
+      const targets: PokemonSpeciesForm[] = [
+        evolved as unknown as PokemonSpeciesForm,
+        ...(evolved.forms as PokemonSpeciesForm[]),
+      ];
+      for (const target of targets) {
+        if (addNativeType(target, type)) {
+          applied++;
+        }
+      }
+    }
+  }
+
+  return applied;
 }
 
 /** Add a speciesConst's live species object AND all of its forms to `targets`. */
@@ -329,8 +369,9 @@ export function applyErTypeNativization(): TypeNativizationResult {
       if (!holderHasAbility(target, entry.grant)) {
         continue;
       }
-      addNativeType(target, entry.grantedType);
-      result.extraTypesSet++;
+      if (addNativeType(target, entry.grantedType)) {
+        result.extraTypesSet++;
+      }
       if (swapAbility(target, entry.grant, entry.replacement)) {
         result.abilitiesSwapped++;
         anySwapped = true;
@@ -341,6 +382,20 @@ export function applyErTypeNativization(): TypeNativizationResult {
     }
     if (!anySwapped) {
       result.notFound.push(entry.species);
+    }
+  }
+
+  // A native line type must survive evolution even when only the earlier stage
+  // carried the old type-granting innate (for example Skorupi -> Drapion and
+  // Charmander -> Charizard). Run after the grant-gated swaps so no abilities on
+  // descendants are changed; only their static species/form typing is extended.
+  for (const entry of ER_TYPE_NATIVIZATION) {
+    if (entry.isMega) {
+      continue;
+    }
+    const sourceId = resolveSpeciesId(entry.species);
+    if (sourceId !== undefined) {
+      result.extraTypesSet += addNativeTypeToEvolutionLine(sourceId, entry.grantedType);
     }
   }
 

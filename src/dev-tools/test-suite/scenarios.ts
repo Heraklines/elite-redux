@@ -83,6 +83,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
+import { PokeballType } from "#enums/pokeball";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { type BattleStat, Stat } from "#enums/stat";
@@ -2664,6 +2665,126 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }),
         makeStarter(erSpecies(ErSpeciesId.SELENUMBRA), {
           moveset: [MoveId.MOONBLAST, MoveId.DARK_PULSE, MoveId.PSYCHIC, MoveId.CALM_MIND],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Type line: Drapion keeps Skorupi's native Ground",
+    description:
+      "REGRESSION: when a type-granting innate was replaced by a native type, only the listed\n"
+      + "holder received that type. Its evolutions lost it. Skorupi was Ground natively but\n"
+      + "Drapion was not. DO: use Thunderbolt on Drapion. EXPECT: it deals NO DAMAGE and the\n"
+      + "battle says it does not affect Drapion, proving evolved forms inherit native Ground.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 60,
+        DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.DRAPION,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BATTLE_ARMOR,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MAGNEZONE, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.FLASH_CANNON, MoveId.VOLT_SWITCH, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Type line: Charizard keeps Charmander's native Dragon",
+    description:
+      "REGRESSION: Charmander and Charmeleon received native Dragon when their old type-grant\n"
+      + "innate was replaced, but Charizard lost it on evolution. DO: use Dragon Claw. EXPECT:\n"
+      + "the hit is SUPER EFFECTIVE, proving Charizard now inherits native Dragon while keeping\n"
+      + "its existing Fire/Flying typing and its independently assigned abilities.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 60,
+        DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHARIZARD,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BATTLE_ARMOR,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.DRAGON_CLAW, MoveId.EARTHQUAKE, MoveId.ROCK_SLIDE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Catch: Rogue Ball Giratina registers as a starter",
+    description:
+      "PLAYER REPORT: a wild Giratina caught in Classic with a Rogue Ball did not appear in\n"
+      + "starter select on a later run. This launches the same catch path. Giratina starts at\n"
+      + "1 HP and is made non-boss/catchable. DO: throw the supplied Rogue Ball. EXPECT: the\n"
+      + "catch succeeds and Giratina is registered in the dex/starter data for later runs.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_BIOME_OVERRIDE: BiomeId.GRAVEYARD,
+        DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GIRATINA,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BATTLE_ARMOR,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MAGIKARP, {
+          moveset: [MoveId.SPLASH, MoveId.TACKLE, MoveId.FLAIL, MoveId.BOUNCE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const giratina = globalScene.getEnemyPokemon();
+      if (giratina) {
+        giratina.setBoss(false);
+        giratina.hp = 1;
+      }
+      globalScene.pokeballCounts[PokeballType.ROGUE_BALL] = 1;
+    },
+  },
+  {
+    label: "Expert Breeder: achievement candy reaches full team",
+    description:
+      "PLAYER REPORT: an achievement unlocked during the Expert Pokemon Breeder's one-mon\n"
+      + "battle awarded candy only to the chosen battler because the other teammates were\n"
+      + "temporarily outside the live party. DO: choose Houndoom (the first option) and win.\n"
+      + "Its forced Predator ability unlocks Back in Blood. EXPECT: after the encounter restores\n"
+      + "the team, all four species received the achievement's team-candy reward, not only Houndoom.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 26,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 100,
+        ABILITY_OVERRIDE: ErAbilityId.PREDATOR as unknown as AbilityId,
+      });
+      return [
+        makeStarter(SpeciesId.HOUNDOOM, {
+          moveset: [MoveId.DARK_PULSE, MoveId.FLAMETHROWER, MoveId.SLUDGE_BOMB, MoveId.NASTY_PLOT],
+        }),
+        makeStarter(SpeciesId.VENUSAUR, {
+          moveset: [MoveId.GIGA_DRAIN, MoveId.SLUDGE_BOMB, MoveId.EARTH_POWER, MoveId.SLEEP_POWDER],
+        }),
+        makeStarter(SpeciesId.BLASTOISE, {
+          moveset: [MoveId.SCALD, MoveId.ICE_BEAM, MoveId.AURA_SPHERE, MoveId.SHELL_SMASH],
+        }),
+        makeStarter(SpeciesId.PIDGEOT, {
+          moveset: [MoveId.HURRICANE, MoveId.HEAT_WAVE, MoveId.ROOST, MoveId.U_TURN],
         }),
       ];
     },

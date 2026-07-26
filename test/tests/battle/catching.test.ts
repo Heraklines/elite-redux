@@ -7,6 +7,7 @@ import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
+import { GameData } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
 import { mockI18next } from "#test/utils/test-utils";
 import i18next from "i18next";
@@ -89,6 +90,40 @@ describe("Throwing balls in classic", () => {
     game.override.startingWave(21).startingBiome(BiomeId.TOWN);
     game.override.battleStyle("double");
     await runPokeballTest(game, PokeballType.MASTER_BALL, "battle:noPokeballMulti");
+  });
+
+  it("registers a wild Giratina caught with a Rogue Ball as a starter", async () => {
+    game.override
+      .startingWave(146)
+      .startingBiome(BiomeId.GRAVEYARD)
+      .enemySpecies(SpeciesId.GIRATINA)
+      .enemyMoveset([MoveId.SPLASH]);
+
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+
+    const giratinaDex = game.scene.gameData.dexData[SpeciesId.GIRATINA];
+    expect(giratinaDex.caughtAttr).toBe(0n);
+
+    const enemy = game.scene.getEnemyPokemon()!;
+    enemy.setBoss(false);
+    enemy.hp = 1;
+    vi.spyOn(enemy, "randBattleSeedInt").mockReturnValue(0);
+    vi.spyOn(game.scene.ui, "showText").mockImplementation((_text, _delay, callback) => callback?.());
+    game.scene.pokeballCounts[PokeballType.ROGUE_BALL] = 1;
+
+    game.doThrowPokeball(PokeballType.ROGUE_BALL);
+    await game.toEndOfTurn();
+
+    expect(game.scene.getPlayerParty().some(mon => mon.species.speciesId === SpeciesId.GIRATINA)).toBe(true);
+    expect(giratinaDex.caughtAttr).not.toBe(0n);
+    expect(game.scene.gameData.starterData[SpeciesId.GIRATINA]?.abilityAttr ?? 0).not.toBe(0);
+
+    const persisted = JSON.stringify(game.scene.gameData.getSystemSaveData(), (_key, value) =>
+      typeof value === "bigint" ? value.toString() : value,
+    );
+    const reloaded = GameData.fromRawSystem(persisted);
+    expect(reloaded.dexData[SpeciesId.GIRATINA].caughtAttr).not.toBe(0n);
+    expect(reloaded.starterData[SpeciesId.GIRATINA]?.abilityAttr ?? 0).not.toBe(0);
   });
 
   it("throwing ball in end biome", async () => {
