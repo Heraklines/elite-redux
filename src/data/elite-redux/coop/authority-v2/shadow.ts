@@ -45,8 +45,10 @@ import type { BattleScene } from "#app/battle-scene";
 import {
   buildCommandOpenEntry,
   buildInteractionOpenEntry,
+  buildReplacementOpenEntry,
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
+  type CoopReplacementOpenMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import {
   buildReplacementCommitEntry,
@@ -789,6 +791,28 @@ export class CoopAuthorityV2Shadow {
         }),
       );
       this.logParity("CONTROL_COMMIT", entry.revision, true, "materialDigest", "surface=interaction-open");
+      return entry;
+    });
+  }
+
+  /** Commit a winning-turn replacement boundary from its real SwitchPhase chokepoint. */
+  tapReplacementOpen(input: {
+    readonly operationId: string;
+    readonly material: CoopReplacementOpenMaterialV2;
+    readonly subsumes?: readonly number[];
+  }): CoopAuthorityEntry | null {
+    this.lastObservedWave = input.material.wave;
+    this.lastObservedTurn = input.material.turn;
+    return this.runTap("CONTROL_COMMIT", () => {
+      const entry = this.commit(
+        buildReplacementOpenEntry({
+          context: this.frameContext,
+          operationId: input.operationId,
+          material: input.material,
+          ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
+        }),
+      );
+      this.logParity("CONTROL_COMMIT", entry.revision, true, "materialDigest", "surface=replacement-open");
       return entry;
     });
   }

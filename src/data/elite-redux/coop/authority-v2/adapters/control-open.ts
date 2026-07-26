@@ -81,7 +81,28 @@ export interface CoopInteractionOpenMaterialV2 {
   readonly projection: CoopInteractionControlProjectionV2;
 }
 
-export type CoopControlOpenMaterialV2 = CoopCommandOpenMaterialV2 | CoopInteractionOpenMaterialV2;
+/**
+ * Complete replacement boundary for a player faint on a winning turn. Some engine paths run the real
+ * SwitchPhase during same-wave settlement; others retain it across rewards and run it before the next
+ * encounter. The turn result authorizes these alternatives but never invents a picker. This capsule is
+ * authored only when the real phase reaches either exact address.
+ */
+export interface CoopReplacementOpenMaterialV2 {
+  readonly kind: "replacement-open";
+  /** Why the ordinary TURN/REPLACEMENT head could not state this picker before its real phase existed. */
+  readonly origin: "settled-wave" | "pre-encounter";
+  readonly wave: number;
+  readonly turn: number;
+  /** Complete state at the exact pre-picker boundary (the next enemy party may not exist yet). */
+  readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+  /** The exact executable replacement head opened by this entry. */
+  readonly control: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
+}
+
+export type CoopControlOpenMaterialV2 =
+  | CoopCommandOpenMaterialV2
+  | CoopInteractionOpenMaterialV2
+  | CoopReplacementOpenMaterialV2;
 
 /**
  * Address claimed by one real local CommandPhase while it is parked behind the
@@ -134,6 +155,13 @@ export interface BuildInteractionOpenEntryInput {
   readonly context: CoopFrameContextV2;
   readonly operationId: string;
   readonly material: CoopInteractionOpenMaterialV2;
+  readonly subsumes?: readonly number[];
+}
+
+export interface BuildReplacementOpenEntryInput {
+  readonly context: CoopFrameContextV2;
+  readonly operationId: string;
+  readonly material: CoopReplacementOpenMaterialV2;
   readonly subsumes?: readonly number[];
 }
 
@@ -225,12 +253,36 @@ export function isCompleteInteractionOpenMaterial(value: unknown): value is Coop
   );
 }
 
+/** Validate a complete phase-owned replacement control-open image without consulting mutable phase state. */
+export function isCompleteReplacementOpenMaterial(value: unknown): value is CoopReplacementOpenMaterialV2 {
+  if (!isPlainObject(value) || !isPlainObject(value.control)) {
+    return false;
+  }
+  const control = value.control as unknown as Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
+  return (
+    value.kind === "replacement-open"
+    && (value.origin === "settled-wave" || value.origin === "pre-encounter")
+    && isPositiveSafeInt(value.wave)
+    && isPositiveSafeInt(value.turn)
+    && isCompleteCommandOpenState(value.authoritativeState, value.wave, value.turn)
+    && control.kind === "REPLACEMENT"
+    && isPositiveSafeInt(control.epoch)
+    && control.wave === value.wave
+    && control.turn === value.turn
+    && validateNextControl(control).ok
+  );
+}
+
 export function commandOpenMaterialDigest(material: CoopCommandOpenMaterialV2): string {
   return `command-open:${fnv1a32(canonicalJson(material))}`;
 }
 
 export function interactionOpenMaterialDigest(material: CoopInteractionOpenMaterialV2): string {
   return `interaction-open:${fnv1a32(canonicalJson(material))}`;
+}
+
+export function replacementOpenMaterialDigest(material: CoopReplacementOpenMaterialV2): string {
+  return `replacement-open:${fnv1a32(canonicalJson(material))}`;
 }
 
 export function buildCommandOpenEntry(input: BuildCommandOpenEntryInput): Omit<CoopAuthorityEntry, "revision"> {
@@ -321,9 +373,48 @@ export function decodeInteractionOpenEntry(entry: CoopAuthorityEntry): CoopInter
   return material;
 }
 
+/** Build the ordered control boundary for one real winning-turn replacement picker. */
+export function buildReplacementOpenEntry(input: BuildReplacementOpenEntryInput): Omit<CoopAuthorityEntry, "revision"> {
+  if (typeof input.operationId !== "string" || input.operationId.length === 0) {
+    throw new Error("replacement CONTROL_COMMIT operationId must be a non-empty string");
+  }
+  if (!isCompleteReplacementOpenMaterial(input.material)) {
+    throw new Error("replacement CONTROL_COMMIT requires a complete state and exact replacement control");
+  }
+  if (input.material.control.epoch !== input.context.sessionEpoch) {
+    throw new Error("replacement CONTROL_COMMIT control does not match its authenticated epoch");
+  }
+  return {
+    context: input.context,
+    operationId: input.operationId,
+    kind: "CONTROL_COMMIT",
+    material: {
+      digest: replacementOpenMaterialDigest(input.material),
+      payload: structuredClone(input.material),
+    },
+    nextControl: structuredClone(input.material.control),
+    subsumes: normalizeSubsumes(input.subsumes),
+  };
+}
+
+export function decodeReplacementOpenEntry(entry: CoopAuthorityEntry): CoopReplacementOpenMaterialV2 | null {
+  if (entry.kind !== "CONTROL_COMMIT" || !isCompleteReplacementOpenMaterial(entry.material.payload)) {
+    return null;
+  }
+  const material = entry.material.payload;
+  if (
+    replacementOpenMaterialDigest(material) !== entry.material.digest
+    || entry.context.sessionEpoch !== material.control.epoch
+    || !controlsEqual(material.control, entry.nextControl)
+  ) {
+    return null;
+  }
+  return material;
+}
+
 /** Decode either closed CONTROL_COMMIT material kind without guessing from its successor. */
 export function decodeControlOpenEntry(entry: CoopAuthorityEntry): CoopControlOpenMaterialV2 | null {
-  return decodeCommandOpenEntry(entry) ?? decodeInteractionOpenEntry(entry);
+  return decodeCommandOpenEntry(entry) ?? decodeInteractionOpenEntry(entry) ?? decodeReplacementOpenEntry(entry);
 }
 
 function normalizeSubsumes(values: readonly number[] | undefined): readonly number[] {

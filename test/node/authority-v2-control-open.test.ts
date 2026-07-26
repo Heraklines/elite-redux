@@ -7,13 +7,17 @@
 import {
   buildCommandOpenEntry,
   buildInteractionOpenEntry,
+  buildReplacementOpenEntry,
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
+  type CoopReplacementOpenMaterialV2,
   commandOpenControlAddressesClaim,
   commandOpenMaterialDigest,
   decodeCommandOpenEntry,
   decodeInteractionOpenEntry,
+  decodeReplacementOpenEntry,
   interactionOpenMaterialDigest,
+  replacementOpenMaterialDigest,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import { isValidAuthorityEntry } from "#data/elite-redux/coop/authority-v2/authority-entry";
 import type {
@@ -21,7 +25,7 @@ import type {
   CoopFrameContextV2,
   CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
-import { controlAllowsSuccessorEntry } from "#data/elite-redux/coop/authority-v2/next-control";
+import { controlAllowsSuccessorEntry, successorWaitAllows } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
 
@@ -112,6 +116,35 @@ function interactionMaterial(overrides: Partial<CoopInteractionOpenMaterialV2> =
     authoritativeState: state(),
     control: crossroadsControl(),
     projection: { kind: "crossroads", sourceWave: 4 },
+    ...overrides,
+  };
+}
+
+function replacementControl(
+  overrides: Partial<Extract<CoopNextControl, { kind: "REPLACEMENT" }>> = {},
+): Extract<CoopNextControl, { kind: "REPLACEMENT" }> {
+  return {
+    kind: "REPLACEMENT",
+    operationId: "RC/e3/w4/t1/o1000000137/f1/s1",
+    ownerSeatId: 1,
+    epoch: 3,
+    wave: 4,
+    turn: 1,
+    occurrence: 1_000_000_137,
+    fieldIndex: 1,
+    remaining: [],
+    ...overrides,
+  };
+}
+
+function replacementMaterial(overrides: Partial<CoopReplacementOpenMaterialV2> = {}): CoopReplacementOpenMaterialV2 {
+  return {
+    kind: "replacement-open",
+    origin: "pre-encounter",
+    wave: 4,
+    turn: 1,
+    authoritativeState: state(),
+    control: replacementControl(),
     ...overrides,
   };
 }
@@ -371,5 +404,193 @@ describe("authority-v2 explicit command-open boundary", () => {
         }),
       }),
     ).toThrow(/complete state and recoverable projection/u);
+  });
+
+  it("opens one exact delayed replacement at the next-wave pre-encounter boundary", () => {
+    const open = replacementMaterial();
+    const committed = {
+      ...buildReplacementOpenEntry({
+        context,
+        operationId: `V2/CONTROL/REPLACEMENT/${open.control.operationId}`,
+        material: open,
+      }),
+      revision: 7,
+    } satisfies CoopAuthorityEntry;
+    const predecessor = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "wave-3-reward-terminal",
+      epoch: context.sessionEpoch,
+      wave: 3,
+      turn: 2,
+      allowedKinds: ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] as const,
+      allowNextWaveStart: true,
+      expectedOperationId: null,
+    };
+
+    expect(committed.material.digest).toBe(replacementOpenMaterialDigest(open));
+    expect(committed.nextControl).toEqual(open.control);
+    expect(isValidAuthorityEntry(committed)).toBe(true);
+    expect(controlAllowsSuccessorEntry(predecessor, predecessor.afterOperationId, committed)).toBe(true);
+    expect(decodeReplacementOpenEntry(committed)).toEqual(open);
+  });
+
+  it("keeps a pre-encounter replacement open to either the real battle or a Mystery presentation", () => {
+    const wait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "RC/e3/w4/t1/o1000000137/f1/s1",
+      epoch: context.sessionEpoch,
+      wave: 4,
+      turn: 1,
+      allowedKinds: ["INTERACTION_COMMIT", "CONTROL_COMMIT"] as const,
+      allowedInteractionAddresses: [
+        { surfaceClass: "op:me" as const, operationKind: "ME_PRESENT" as const, wave: 4, turn: 0 },
+      ],
+      allowedControlAddresses: [
+        { materialKind: "replacement-open" as const, wave: 4, turn: 1, operationId: null },
+        { materialKind: "command-open" as const, wave: 4, turn: 1, operationId: null },
+      ],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    const mysteryPresentation = {
+      kind: "OPERATION_ENVELOPE_V1",
+      surfaceClass: "op:me",
+      envelope: {
+        sessionEpoch: context.sessionEpoch,
+        wave: 4,
+        turn: 0,
+        pendingOperation: { kind: "ME_PRESENT" },
+      },
+    };
+
+    expect(
+      successorWaitAllows(
+        wait,
+        wait.afterOperationId,
+        "INTERACTION_COMMIT",
+        "3:4:ME_PRESENT:1",
+        context.sessionEpoch,
+        mysteryPresentation,
+      ),
+    ).toBe(true);
+    expect(
+      successorWaitAllows(
+        wait,
+        wait.afterOperationId,
+        "INTERACTION_COMMIT",
+        "3:4:ME_TERMINAL:1",
+        context.sessionEpoch,
+        {
+          ...mysteryPresentation,
+          envelope: { ...mysteryPresentation.envelope, pendingOperation: { kind: "ME_TERMINAL" } },
+        },
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects replacement-open material whose control drifts from its complete state address", () => {
+    expect(() =>
+      buildReplacementOpenEntry({
+        context,
+        operationId: "wrong-replacement-wave",
+        material: replacementMaterial({ control: replacementControl({ wave: 5 }) }),
+      }),
+    ).toThrow(/complete state and exact replacement control/u);
+
+    const built = buildReplacementOpenEntry({
+      context,
+      operationId: "tampered-replacement",
+      material: replacementMaterial(),
+    });
+    const tampered = {
+      ...built,
+      revision: 8,
+      material: { ...built.material, payload: replacementMaterial({ authoritativeState: state({ money: 999 }) }) },
+    } satisfies CoopAuthorityEntry;
+    expect(decodeReplacementOpenEntry(tampered)).toBeNull();
+  });
+
+  it("admits the real same-wave picker only when a staged wave wait names that exact alternative", () => {
+    const open = replacementMaterial({
+      origin: "settled-wave",
+      turn: 2,
+      authoritativeState: state({ turn: 2 }),
+      control: replacementControl({
+        turn: 2,
+        operationId: "RC/e3/w4/t2/o1000000137/f1/s1",
+      }),
+    });
+    const committed = {
+      ...buildReplacementOpenEntry({
+        context,
+        operationId: `V2/CONTROL/REPLACEMENT/${open.control.operationId}`,
+        material: open,
+      }),
+      revision: 9,
+    } satisfies CoopAuthorityEntry;
+    const stagedWaveWait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "TURN/e3/w4/t1",
+      epoch: context.sessionEpoch,
+      wave: 4,
+      turn: 2,
+      allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE"] as const,
+      allowedControlAddresses: [{ materialKind: "replacement-open" as const, wave: 4, turn: 2, operationId: null }],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    const wrongAddressWait = {
+      ...stagedWaveWait,
+      allowedControlAddresses: [{ materialKind: "replacement-open" as const, wave: 4, turn: 1, operationId: null }],
+    };
+
+    expect(controlAllowsSuccessorEntry(stagedWaveWait, stagedWaveWait.afterOperationId, committed)).toBe(true);
+    expect(controlAllowsSuccessorEntry(wrongAddressWait, wrongAddressWait.afterOperationId, committed)).toBe(false);
+  });
+
+  it("keeps a settled-wave replacement chain open only to its next picker or wave commit", () => {
+    const wait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "RC/e3/w4/t2/o1000000137/f1/s1",
+      epoch: context.sessionEpoch,
+      wave: 4,
+      turn: 2,
+      allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE"] as const,
+      allowedControlAddresses: [{ materialKind: "replacement-open" as const, wave: 4, turn: 2, operationId: null }],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    const nextPicker = replacementMaterial({
+      origin: "settled-wave",
+      turn: 2,
+      authoritativeState: state({ turn: 2 }),
+      control: replacementControl({
+        ownerSeatId: 0,
+        fieldIndex: 0,
+        turn: 2,
+        occurrence: 1_000_000_136,
+        operationId: "RC/e3/w4/t2/o1000000136/f0/s0",
+      }),
+    });
+    const nextPickerEntry = {
+      ...buildReplacementOpenEntry({
+        context,
+        operationId: `V2/CONTROL/REPLACEMENT/${nextPicker.control.operationId}`,
+        material: nextPicker,
+      }),
+      revision: 10,
+    } satisfies CoopAuthorityEntry;
+
+    expect(controlAllowsSuccessorEntry(wait, wait.afterOperationId, nextPickerEntry)).toBe(true);
+    expect(
+      successorWaitAllows(
+        wait,
+        wait.afterOperationId,
+        "CONTROL_COMMIT",
+        "wrong-command",
+        context.sessionEpoch,
+        material({ authoritativeState: state({ turn: 2 }), turn: 2 }),
+      ),
+    ).toBe(false);
   });
 });

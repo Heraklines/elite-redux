@@ -23,6 +23,7 @@ import {
 import {
   coopOwnerOfPlayerFieldSlot,
   coopSessionGeneration,
+  establishCoopV2ReplacementControlBoundary,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
@@ -170,7 +171,7 @@ export class SwitchPhase extends BattlePhase {
       if (operationBinding === undefined) {
         return;
       }
-      const operationSourceAddress = this.faintSourceAddress ?? {
+      let operationSourceAddress = this.faintSourceAddress ?? {
         wave: scene.currentBattle.waveIndex,
         turn: scene.currentBattle.turn ?? 0,
         occurrence: 0,
@@ -178,14 +179,28 @@ export class SwitchPhase extends BattlePhase {
       const ownerRole = coopOwnerOfPlayerFieldSlot(this.fieldIndex);
       const ownerSeatId = ownerRole === "host" ? 0 : 1;
       if (authoritative && isCoopV2ReplacementCutoverActive()) {
-        this.coopV2ControlOperationId = replacementOperationId(
-          {
-            epoch: coopController.sessionEpoch,
-            ...operationSourceAddress,
-            fieldIndex: this.fieldIndex,
-          },
+        const controlBoundary = establishCoopV2ReplacementControlBoundary({
           ownerSeatId,
-        );
+          fieldIndex: this.fieldIndex,
+          sourceAddress: operationSourceAddress,
+        });
+        if (controlBoundary.kind === "failed") {
+          failCoopSharedSession("The replacement picker could not establish its exact Authority V2 control.");
+          return;
+        }
+        if (controlBoundary.kind === "deferred") {
+          // A renderer can retain the old defeated-wave SwitchPhase before the authority reaches the new
+          // wave's real picker. Retire that locally-derived generation; the replacement-open projector
+          // reconstructs the exact addressed CoopGuestFaintSwitchPhase when its immutable entry applies.
+          super.end();
+          return;
+        }
+        operationSourceAddress = {
+          wave: controlBoundary.control.wave,
+          turn: controlBoundary.control.turn,
+          occurrence: controlBoundary.control.occurrence,
+        };
+        this.coopV2ControlOperationId = controlBoundary.control.operationId;
       }
       const seq = (globalScene.currentBattle.turn ?? 0) * 4 + this.fieldIndex;
       if (coopOwnerOfPlayerFieldSlot(this.fieldIndex) !== coopController.role) {

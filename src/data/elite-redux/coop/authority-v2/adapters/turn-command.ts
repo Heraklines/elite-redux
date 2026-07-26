@@ -226,7 +226,12 @@ export function isTurnCommitSuccessorForSource(control: CoopNextControl, source:
   if (control.kind !== "AWAIT_SUCCESSOR") {
     return false;
   }
-  const exactDeferredWaveWait = control.allowedKinds.length === 1 && control.allowedKinds[0] === "WAVE_ADVANCE";
+  const exactDeferredWaveWait =
+    control.allowedKinds.includes("WAVE_ADVANCE")
+    && control.allowedControlAddresses?.some(
+      address =>
+        address.materialKind === "replacement-open" && address.wave === source.wave && address.turn === source.turn + 1,
+    ) === true;
   return (
     control.afterOperationId === source.operationId
     && control.epoch === source.epoch

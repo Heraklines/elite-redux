@@ -473,8 +473,9 @@ export function hasCoopV2ImmediateCommandSuccessor(state: CoopAuthoritativeBattl
   // BOTH the party-defeated check (length-0 guard below) and the fainted-field-seat check, wrongly stating a
   // COMMAND_FRONTIER successor; the log then refuses the victory's WAVE_ADVANCE (fail-closed) and terminates
   // the shared session. The retained "pre-encounter replacement" image (empty enemyParty + player-only field,
-  // applied at the next wave's NewBattlePhase) is this SAME carrier and equally wants a terminal successor -
-  // the following wave's TURN_COMMIT is authorized by that wave's own control, not by this replacement.
+  // applied at the next wave's NewBattlePhase) is this SAME carrier and equally cannot guess a command.
+  // Its replacement result explicitly authorizes same-address command-open after Encounter creates the
+  // enemy party.
   // (A NON-empty enemy party whose mons lack PokemonData HP is a legacy/unknown shape and still fails OPEN.)
   if (state.enemyParty.length === 0) {
     return false;
@@ -492,7 +493,11 @@ export function hasCoopV2ImmediateCommandSuccessor(state: CoopAuthoritativeBattl
   });
 }
 
-/** Exact ordered successor for a normal wave transition staged before its material turn commit. */
+/**
+ * Closed successors for a normal wave transition staged before its material turn commit. The engine may
+ * either cross directly into WAVE_ADVANCE or run a real same-wave SwitchPhase first; only that exact phase
+ * may author the replacement-open alternative. The turn result itself never guesses that the picker exists.
+ */
 export function deferredCoopV2WaveSuccessorWait(
   operationId: string,
   epoch: number,
@@ -513,7 +518,15 @@ export function deferredCoopV2WaveSuccessorWait(
     wave,
     // BattleEnd freezes the automatic-victory settlement at exactly the resolving turn + 1.
     turn: turn + 1,
-    allowedKinds: ["WAVE_ADVANCE"],
+    allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE"],
+    allowedControlAddresses: [
+      {
+        materialKind: "replacement-open",
+        wave,
+        turn: turn + 1,
+        operationId: null,
+      },
+    ],
     allowNextWaveStart: false,
     expectedOperationId: null,
   };
@@ -522,11 +535,11 @@ export function deferredCoopV2WaveSuccessorWait(
 /**
  * Exact replacement successor for a settled turn.
  *
- * A runtime-staged win/capture/flee is stronger than a faint in the captured field image: the real host
- * engine has already selected BattleEnd and does not open a player replacement picker for the defeated wave.
- * Letting that obsolete picker outrank the staged transition reserves a control the host will never install,
- * then correctly causes the following WAVE_ADVANCE to fail closed. Surviving battles retain the ordinary
- * exact replacement chain.
+ * A runtime-staged win/capture/flee is stronger than a faint in the captured field image: turn capture cannot
+ * truthfully know whether the engine will cross directly to BattleEnd or run/retain a real SwitchPhase.
+ * Therefore the TURN_COMMIT states neither an invented replacement nor an unconditional wave edge; its exact
+ * successor wait authorizes the real phase-owned replacement-open alongside WAVE_ADVANCE. Surviving battles
+ * retain the ordinary exact replacement chain directly in the turn result.
  */
 export function resolveCoopV2PostTurnReplacementControl(
   epoch: number,

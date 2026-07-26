@@ -288,8 +288,11 @@ export interface CoopRecordedFaintAddress {
  */
 export function consumeCoopRecordedFaintAddress(battlerIndex: number): CoopRecordedFaintAddress | null {
   const activeRecording = recording;
+  if (activeRecording == null) {
+    return null;
+  }
   const normalizedBattlerIndex = Math.trunc(battlerIndex);
-  const occurrences = activeRecording?.faintOccurrences.get(normalizedBattlerIndex);
+  const occurrences = activeRecording.faintOccurrences.get(normalizedBattlerIndex);
   if (occurrences == null || occurrences.length === 0) {
     return null;
   }

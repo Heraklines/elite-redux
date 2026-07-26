@@ -4037,3 +4037,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   every renderer receipt to the strict policy. The policy's separate executable tests retain animation-on
   completion-only behavior and permit only the exact `renderer-skipped/animations-disabled` exception when
   both real browsers independently attest animations off. No production Showdown/Tournament code changed.
+
+## 2026-07-26 - Typed winning-turn replacement-open control
+
+- Gate B9 and all-V2 level artifact `30149955471` exposed both legal timings of final-turn faint ownership.
+  The turn-level result must not invent a replacement and block the won wave, but the real engine can run
+  its SwitchPhase either during same-wave settlement or retain it through rewards and execute it at the next
+  wave before Encounter. With no typed successor for either real picker, the host timed out a guest choice
+  and the post-summon carrier correctly aborted because no active replacement head authorized it.
+- `CONTROL_COMMIT` now has a third complete capsule, `replacement-open`, alongside command-open and
+  interaction-open. Only the authority's real SwitchPhase may author it at one of those two closed timings
+  from an ordered wait that explicitly permits CONTROL_COMMIT. It carries complete state plus the exact
+  replacement control; replicas defer material until the stated battle address exists and project the owner
+  picker from the immutable entry. Every unrelated missing replacement head remains fail-closed.
+- A pre-encounter replacement result states exact alternatives: another replacement-open for a second
+  fainted slot, command-open after Encounter, or ME_PRESENT at turn zero when the destination is a Mystery
+  wave. This preserves multi-faint serialization without local queue derivation and keeps the empty-enemy
+  carrier valid. Adapter Vitest covers build, digest,
+  same/cross-wave admission, decode, address drift, and tamper rejection; the node-pure source contract pins
+  the phase-owned runtime wiring. Real-engine proof stays on the remote B9 and browser campaign shards.
+- A same-wave replacement result likewise states a closed tail: another replacement-open at the identical
+  settlement address or WAVE_ADVANCE. This prevents the first simultaneous faint from consuming the only
+  permit and leaving a second real SwitchPhase unaddressable in doubles/triples.

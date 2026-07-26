@@ -158,8 +158,18 @@ describe.skipIf(!RUN)(
         "the guest-owned field slot was vacated by the faint on the host",
       ).toBe(true);
 
-      // GUEST renders turn 1: the faint opens the guest's OWN picker (CoopGuestFaintSwitchPhase). Stub the
-      // ONE PARTY open to pick CHARIZARD (slot 3); the relay send + seq keying stay fully real.
+      // Resume the real authority concurrently. Its actual SwitchPhase is the chokepoint that commits the
+      // typed replacement-open alternative; the renderer must not invent a picker solely from its faint
+      // animation while the authority is artificially paused at CoopTurnCommitPhase.
+      let hostAdvance: Promise<void> | undefined;
+      await withClient(rig.hostCtx, async () => {
+        hostAdvance = game.phaseInterceptor.to("SelectModifierPhase", false);
+        await drainLoopback();
+      });
+
+      // GUEST renders turn 1 while the host is parked on its real SwitchPhase. The host-authored
+      // replacement-open reconstructs the guest's OWN picker (CoopGuestFaintSwitchPhase). Stub the ONE PARTY
+      // open to pick CHARIZARD (slot 3); the relay send + seq keying stay fully real.
       await withClient(rig.guestCtx, async () => {
         const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
         const realSetMode = ui.setMode.bind(ui);
@@ -195,11 +205,6 @@ describe.skipIf(!RUN)(
       // then WIN - run THROUGH BattleEndPhase (which commits + sends the retained WAVE_ADVANCE(win) op) and
       // stop at the post-battle reward shop. Stopping only at BattleEndPhase left the op uncommitted, so the
       // guest (which correctly ignores the raw waveResolved and awaits the retained transaction) never got it.
-      let hostAdvance: Promise<void> | undefined;
-      await withClient(rig.hostCtx, async () => {
-        hostAdvance = game.phaseInterceptor.to("SelectModifierPhase", false);
-        await drainLoopback();
-      });
       expect(hostAdvance, "the host win crossing was started").toBeDefined();
       await settleDuoPromise(rig, hostAdvance!, "won-wave replacement host crossing");
       await withClient(rig.hostCtx, () => drainLoopback());
@@ -293,6 +298,12 @@ describe.skipIf(!RUN)(
           await game.phaseInterceptor.to("CoopTurnCommitPhase");
         });
 
+        let hostAdvance: Promise<void> | undefined;
+        await withClient(rig.hostCtx, async () => {
+          hostAdvance = game.phaseInterceptor.to("SelectModifierPhase", false);
+          await drainLoopback();
+        });
+
         await withClient(rig.guestCtx, async () => {
           const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
           const realSetMode = ui.setMode.bind(ui);
@@ -320,11 +331,7 @@ describe.skipIf(!RUN)(
           }
         });
 
-        let hostAdvance: Promise<void> | undefined;
-        await withClient(rig.hostCtx, async () => {
-          hostAdvance = game.phaseInterceptor.to("SelectModifierPhase", false);
-          await drainLoopback();
-        });
+        expect(hostAdvance, "the host win crossing was started").toBeDefined();
         await settleDuoPromise(rig, hostAdvance!, "chokepoint won-wave host crossing");
         await withClient(rig.hostCtx, () => drainLoopback());
 

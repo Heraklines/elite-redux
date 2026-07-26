@@ -23,12 +23,14 @@ import type { Phase } from "#app/phase";
 import {
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
+  type CoopReplacementOpenMaterialV2,
   commandOpenControlAddressesClaim,
   decodeControlOpenEntry,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import {
   decodeReplacementCommitMaterial,
   type ReplacementAuthorityCarrier,
+  replacementOperationId,
 } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import {
@@ -5921,6 +5923,18 @@ function buildCoopV2LiveSeams(
           if (receiverScene != null && receiverScene !== globalScene) {
             return "deferred";
           }
+          if (
+            material.kind === "replacement-open"
+            && (globalScene.currentBattle?.waveIndex !== material.wave
+              || globalScene.currentBattle?.turn !== material.turn)
+          ) {
+            coopLog(
+              "v2-control",
+              `deferred replacement-open rev=${entry.revision} until battle w${material.wave}/t${material.turn} `
+                + `(current=w${globalScene.currentBattle?.waveIndex ?? "none"}/t${globalScene.currentBattle?.turn ?? "none"})`,
+            );
+            return "deferred";
+          }
           if (material.kind === "command-open" && !hasCoopV2CommandOpenMaterialConsumer(runtime, entry)) {
             // The immutable entry remains admitted and is retried by the real address-exact CommandPhase
             // claim (or the exact settled-turn finalizer). No transition screen is allowed to opt itself
@@ -5961,6 +5975,12 @@ function buildCoopV2LiveSeams(
             // CoopFinalizeTurnPhase retains the authenticated edge until then.
             if (releaseCoopV2DeferredInteractionStarts(runtime, entry.nextControl)) {
               releaseCoopV2ParkedTurnBoundary(runtime, entry);
+            }
+            return true;
+          }
+          if (material.kind === "replacement-open") {
+            if (entry.nextControl.kind !== "REPLACEMENT") {
+              return false;
             }
             return true;
           }
@@ -6390,6 +6410,14 @@ function prepareCoopV2OrdinaryReplacementControlSurface(
   }
   const projectsBehindTurnFinalizer = current.is("CoopFinalizeTurnPhase");
   const projectsBehindReplacementReplay = current.is("CoopReplayTurnPhase");
+  const replacementOpenMaterial = decodeControlOpenEntry(sourceEntry);
+  const projectsFromReplacementOpen =
+    replacementOpenMaterial?.kind === "replacement-open"
+    && globalScene.currentBattle?.waveIndex === replacementOpenMaterial.wave
+    && globalScene.currentBattle?.turn === replacementOpenMaterial.turn
+    && ["NewBattlePhase", "NextEncounterPhase", "CoopPartnerSyncPhase", "CoopInertPhase", "EncounterPhase"].includes(
+      current.phaseName,
+    );
   const parkedCommand =
     current.is("CommandPhase")
     && typeof (current as { dissolveForCoopV2ReplacementProjection?: unknown }).dissolveForCoopV2ReplacementProjection
@@ -6398,7 +6426,12 @@ function prepareCoopV2OrdinaryReplacementControlSurface(
           dissolveForCoopV2ReplacementProjection: (project: () => void) => boolean;
         })
       : null;
-  if (!projectsBehindTurnFinalizer && !projectsBehindReplacementReplay && parkedCommand == null) {
+  if (
+    !projectsBehindTurnFinalizer
+    && !projectsBehindReplacementReplay
+    && !projectsFromReplacementOpen
+    && parkedCommand == null
+  ) {
     return false;
   }
   const projectReplacement = (): void => {
@@ -7276,33 +7309,93 @@ export function commitCoopV2ReplacementAuthority(
   const playerSurvived = state.playerParty.some(
     mon => typeof mon.hp === "number" && Number.isFinite(mon.hp) && mon.hp > 0,
   );
+  const activeControlSource = runtime.v2ControlLedger.sourceEntryOf(activeControl);
+  const activeReplacementOpen = activeControlSource == null ? null : decodeControlOpenEntry(activeControlSource);
+  const preEncounterReplacement =
+    activeReplacementOpen?.kind === "replacement-open"
+    && activeReplacementOpen.origin === "pre-encounter"
+    && state.enemyParty.length === 0;
+  const settledWaveReplacement =
+    activeReplacementOpen?.kind === "replacement-open" && activeReplacementOpen.origin === "settled-wave";
   // A simultaneous player faint can make the final mechanical result REPLACEMENT_COMMIT instead of the
   // TURN_COMMIT that normally owns this edge. Mystery settlement is nevertheless authored at turn 0, so a
   // generic source-turn replacement wait would correctly reject it. Require all three independent facts:
   // the phase identifies an actual Mystery battle, the retained ME transaction identifies this handoff wave,
   // and the immutable post-summon image proves victory rather than game-over. Nothing else receives the t0 edge.
   const nextSuccessorWait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null =
-    activeControl.remaining.length === 0
-    && !hasImmediateCommand
-    && boundary.mysteryBattle
-    && mysteryControl?.terminal === "battle"
-    && mysteryControl.handoffWave === state.wave
-    && enemyDefeated
-    && playerSurvived
+    activeControl.remaining.length === 0 && preEncounterReplacement
       ? {
           kind: "AWAIT_SUCCESSOR",
           afterOperationId: activeControl.operationId,
           epoch: activeControl.epoch,
           wave: activeControl.wave,
           turn: activeControl.turn,
-          allowedKinds: ["INTERACTION_COMMIT"],
+          allowedKinds: ["INTERACTION_COMMIT", "CONTROL_COMMIT"],
           allowedInteractionAddresses: [
-            { surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: activeControl.wave, turn: 0 },
+            {
+              surfaceClass: "op:me",
+              operationKind: "ME_PRESENT",
+              wave: activeControl.wave,
+              turn: 0,
+            },
+          ],
+          allowedControlAddresses: [
+            {
+              materialKind: "replacement-open",
+              wave: activeControl.wave,
+              turn: activeControl.turn,
+              operationId: null,
+            },
+            {
+              materialKind: "command-open",
+              wave: activeControl.wave,
+              turn: activeControl.turn,
+              operationId: null,
+            },
           ],
           allowNextWaveStart: false,
           expectedOperationId: null,
         }
-      : null;
+      : activeControl.remaining.length === 0 && settledWaveReplacement
+        ? {
+            kind: "AWAIT_SUCCESSOR",
+            afterOperationId: activeControl.operationId,
+            epoch: activeControl.epoch,
+            wave: activeControl.wave,
+            turn: activeControl.turn,
+            allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE"],
+            allowedControlAddresses: [
+              {
+                materialKind: "replacement-open",
+                wave: activeControl.wave,
+                turn: activeControl.turn,
+                operationId: null,
+              },
+            ],
+            allowNextWaveStart: false,
+            expectedOperationId: null,
+          }
+        : activeControl.remaining.length === 0
+            && !hasImmediateCommand
+            && boundary.mysteryBattle
+            && mysteryControl?.terminal === "battle"
+            && mysteryControl.handoffWave === state.wave
+            && enemyDefeated
+            && playerSurvived
+          ? {
+              kind: "AWAIT_SUCCESSOR",
+              afterOperationId: activeControl.operationId,
+              epoch: activeControl.epoch,
+              wave: activeControl.wave,
+              turn: activeControl.turn,
+              allowedKinds: ["INTERACTION_COMMIT"],
+              allowedInteractionAddresses: [
+                { surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: activeControl.wave, turn: 0 },
+              ],
+              allowNextWaveStart: false,
+              expectedOperationId: null,
+            }
+          : null;
   const replacementSide =
     runtime.controller.isVersusSession() && activeControl.ownerSeatId !== runtime.controller.authoritySeatId
       ? "enemy"
@@ -7327,6 +7420,127 @@ export function commitCoopV2ReplacementAuthority(
 
 export type CoopV2CommandBoundaryVerdict = "ready" | "deferred" | "failed" | "dissolved";
 export type CoopV2InteractionBoundaryVerdict = "ready" | "deferred" | "failed";
+
+export type CoopV2ReplacementBoundaryResult =
+  | {
+      readonly kind: "ready";
+      readonly control: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
+    }
+  | { readonly kind: "deferred" }
+  | { readonly kind: "failed" };
+
+const COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_BASE = 1_000_000_000;
+
+/**
+ * Bind a real SwitchPhase to its ordered replacement head. Ordinary turn faints reuse the REPLACEMENT
+ * already stated by TURN/REPLACEMENT_COMMIT. A winning-turn switch that cannot be known at turn capture
+ * instead authors a complete replacement-open CONTROL_COMMIT at its real same-wave or pre-encounter phase.
+ */
+export function establishCoopV2ReplacementControlBoundary(input: {
+  readonly ownerSeatId: number;
+  readonly fieldIndex: number;
+  readonly sourceAddress: { readonly wave: number; readonly turn: number; readonly occurrence: number };
+}): CoopV2ReplacementBoundaryResult {
+  const runtime = active;
+  const battle = globalScene.currentBattle;
+  if (runtime == null || battle == null || !coopV2ReplacementCutovers.has(runtime)) {
+    return { kind: "failed" };
+  }
+  const controlCutover = coopV2ControlCutovers.get(runtime);
+  const current =
+    runtime.controller.authorityRole === "authority"
+      ? (controlCutover?.authorityFrontier()?.nextControl ?? null)
+      : runtime.v2ControlLedger.latestControl;
+  if (
+    current?.kind === "REPLACEMENT"
+    && current.ownerSeatId === input.ownerSeatId
+    && current.fieldIndex === input.fieldIndex
+    && current.epoch === runtime.controller.sessionEpoch
+    && ((current.wave === input.sourceAddress.wave
+      && current.turn === input.sourceAddress.turn
+      && current.occurrence === input.sourceAddress.occurrence)
+      || (current.wave === battle.waveIndex && current.turn === battle.turn))
+  ) {
+    return { kind: "ready", control: current };
+  }
+  if (runtime.controller.authorityRole !== "authority") {
+    return current?.kind === "TERMINAL" ? { kind: "failed" } : { kind: "deferred" };
+  }
+  const sameWaveSettlement =
+    input.sourceAddress.wave === battle.waveIndex && input.sourceAddress.turn + 1 === battle.turn;
+  const preEncounter = input.sourceAddress.wave + 1 === battle.waveIndex && battle.turn === 1;
+  const exactReplacementPermit =
+    current?.kind === "AWAIT_SUCCESSOR"
+    && current.allowedControlAddresses?.some(
+      permit =>
+        permit.materialKind === "replacement-open" && permit.wave === battle.waveIndex && permit.turn === battle.turn,
+    ) === true;
+  // A staged won-wave turn explicitly lists same-turn replacement-open beside WAVE_ADVANCE: whichever real
+  // engine phase occurs first consumes the edge. A next-wave retained switch may use a broad CONTROL wait,
+  // unless that predecessor declared an exact closed control-address list (which must name replacement-open).
+  // Every other same-wave missing head is a lost TURN/REPLACEMENT entry and remains fail-closed.
+  if (
+    current?.kind !== "AWAIT_SUCCESSOR"
+    || !current.allowedKinds.includes("CONTROL_COMMIT")
+    || (!sameWaveSettlement && !preEncounter)
+    || (sameWaveSettlement && !exactReplacementPermit)
+    || (preEncounter
+      && !(
+        (current.wave === battle.waveIndex && current.turn === battle.turn)
+        || (current.allowNextWaveStart && current.wave + 1 === battle.waveIndex)
+      ))
+    || (preEncounter && current.allowedControlAddresses != null && !exactReplacementPermit)
+  ) {
+    coopWarn(
+      "v2-control",
+      `replacement-open refused source=w${input.sourceAddress.wave}/t${input.sourceAddress.turn} `
+        + `current=w${battle.waveIndex}/t${battle.turn} predecessor=${current?.kind ?? "none"}`,
+    );
+    return { kind: "failed" };
+  }
+  const state = captureCoopAuthoritativeBattleState(battle.turn);
+  const stagedWaveTransition = state == null ? null : pendingHostWaveTransitions.get(state.wave);
+  if (
+    state == null
+    || state.wave !== battle.waveIndex
+    || state.turn !== battle.turn
+    || (preEncounter && state.enemyParty.length > 0)
+    || (sameWaveSettlement && (stagedWaveTransition == null || stagedWaveTransition.outcome === "gameOver"))
+    || controlCutover == null
+  ) {
+    return { kind: "failed" };
+  }
+  const occurrence = COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_BASE + state.tick * 8 + input.fieldIndex;
+  if (!Number.isSafeInteger(occurrence)) {
+    return { kind: "failed" };
+  }
+  const address = {
+    epoch: runtime.controller.sessionEpoch,
+    wave: state.wave,
+    turn: state.turn,
+    occurrence,
+    fieldIndex: input.fieldIndex,
+  };
+  const control: Extract<CoopNextControl, { kind: "REPLACEMENT" }> = {
+    kind: "REPLACEMENT",
+    operationId: replacementOperationId(address, input.ownerSeatId),
+    ownerSeatId: input.ownerSeatId,
+    ...address,
+    remaining: [],
+  };
+  const material: CoopReplacementOpenMaterialV2 = {
+    kind: "replacement-open",
+    origin: preEncounter ? "pre-encounter" : "settled-wave",
+    wave: state.wave,
+    turn: state.turn,
+    authoritativeState: state,
+    control,
+  };
+  const operationId = `V2/CONTROL/REPLACEMENT/${control.operationId}`;
+  return controlCutover.commitHostReplacementOpen({ operationId, material }) == null
+    ? { kind: "failed" }
+    : { kind: "ready", control };
+}
 
 /**
  * Gate an early replica faint picker behind the settled TURN_COMMIT that owns its exact replacement

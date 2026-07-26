@@ -1230,6 +1230,74 @@ test("ordinary replacement projection has an immutable fallback when cosmetic fa
   assert.match(project, /prepareCoopV2OrdinaryReplacementControlSurface\(runtime, control\)/u);
 });
 
+test("a won-wave faint reopens replacement only through one exact phase-owned CONTROL_COMMIT", () => {
+  assert.match(
+    controlOpenAdapter,
+    /interface CoopReplacementOpenMaterialV2[\s\S]*origin: "settled-wave" \| "pre-encounter"[\s\S]*authoritativeState:[\s\S]*control:/u,
+  );
+  assert.match(controlOpenAdapter, /buildReplacementOpenEntry[\s\S]*replacementOpenMaterialDigest/u);
+  assert.match(
+    controlOpenAdapter,
+    /decodeReplacementOpenEntry[\s\S]*controlsEqual\(material\.control, entry\.nextControl\)/u,
+    "replacement-open decoding binds complete material to the identical executable control",
+  );
+
+  const establishStart = coopRuntime.indexOf("export function establishCoopV2ReplacementControlBoundary(");
+  const establishEnd = coopRuntime.indexOf("\n/**\n * Gate an early replica faint picker", establishStart);
+  assert.notEqual(establishStart, -1, "runtime exposes the delayed replacement control boundary");
+  assert.ok(establishEnd > establishStart, "the delayed replacement boundary has a bounded source block");
+  const establish = coopRuntime.slice(establishStart, establishEnd);
+  assert.match(establish, /const sameWaveSettlement =/u);
+  assert.match(establish, /const preEncounter =/u);
+  assert.match(establish, /exactReplacementPermit/u);
+  assert.match(establish, /current\.allowedKinds\.includes\("CONTROL_COMMIT"\)/u);
+  assert.match(establish, /preEncounter && state\.enemyParty\.length > 0/u);
+  assert.match(establish, /pendingHostWaveTransitions\.get\(state\.wave\)/u);
+  assert.match(establish, /commitHostReplacementOpen/u);
+
+  const replacementCommitStart = coopRuntime.indexOf("export function commitCoopV2ReplacementAuthority(");
+  const replacementCommitEnd = coopRuntime.indexOf(
+    "\nexport type CoopV2CommandBoundaryVerdict",
+    replacementCommitStart,
+  );
+  assert.notEqual(replacementCommitStart, -1, "runtime exposes the authoritative replacement result commit");
+  assert.ok(replacementCommitEnd > replacementCommitStart, "the replacement result commit has a bounded source block");
+  const replacementCommit = coopRuntime.slice(replacementCommitStart, replacementCommitEnd);
+  assert.match(replacementCommit, /activeReplacementOpen\.origin === "pre-encounter"/u);
+  assert.match(replacementCommit, /activeReplacementOpen\.origin === "settled-wave"/u);
+  assert.match(replacementCommit, /allowedKinds: \["INTERACTION_COMMIT", "CONTROL_COMMIT"\]/u);
+  assert.match(replacementCommit, /operationKind: "ME_PRESENT"[\s\S]*turn: 0/u);
+  assert.match(replacementCommit, /materialKind: "replacement-open"[\s\S]*materialKind: "command-open"/u);
+  assert.match(
+    replacementCommit,
+    /settledWaveReplacement[\s\S]*allowedKinds: \["CONTROL_COMMIT", "WAVE_ADVANCE"\][\s\S]*materialKind: "replacement-open"/u,
+  );
+
+  const stagedWaitStart = battleStream.indexOf("export function deferredCoopV2WaveSuccessorWait(");
+  const stagedWaitEnd = battleStream.indexOf("\n/**\n * Exact replacement successor", stagedWaitStart);
+  assert.notEqual(stagedWaitStart, -1, "turn capture exposes the staged won-wave successor builder");
+  assert.ok(stagedWaitEnd > stagedWaitStart, "the staged won-wave successor builder has a bounded source block");
+  const stagedWait = battleStream.slice(stagedWaitStart, stagedWaitEnd);
+  assert.match(stagedWait, /allowedKinds: \["CONTROL_COMMIT", "WAVE_ADVANCE"\]/u);
+  assert.match(stagedWait, /materialKind: "replacement-open"[\s\S]*turn: turn \+ 1/u);
+  assert.match(stagedWait, /allowNextWaveStart: false/u);
+
+  const switchStart = switchPhase.indexOf("const controlBoundary = establishCoopV2ReplacementControlBoundary(");
+  const switchFailure = switchPhase.indexOf('controlBoundary.kind === "failed"', switchStart);
+  const switchDeferred = switchPhase.indexOf('controlBoundary.kind === "deferred"', switchFailure);
+  const bindsCommittedId = switchPhase.indexOf(
+    "this.coopV2ControlOperationId = controlBoundary.control.operationId",
+    switchDeferred,
+  );
+  assert.ok(
+    switchStart >= 0
+      && switchFailure > switchStart
+      && switchDeferred > switchFailure
+      && bindsCommittedId > switchDeferred,
+    "SwitchPhase fails closed or binds only the globally committed delayed replacement address",
+  );
+});
+
 test("a cut-over turn cannot fall back to a raw legacy mechanical carrier", () => {
   assert.match(turnCutover, /export function suppressesLegacyTurnApplication[\s\S]*return mode === "v2"/u);
   assert.match(battleStream, /if \(!v2Committed\)[\s\S]*beginAuthorityTerminal[\s\S]*return false/u);

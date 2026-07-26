@@ -162,7 +162,15 @@ describe("Authority V2 turn successor classification", () => {
       epoch: 7,
       wave: 4,
       turn: 2,
-      allowedKinds: ["WAVE_ADVANCE"],
+      allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE"],
+      allowedControlAddresses: [
+        {
+          materialKind: "replacement-open",
+          wave: 4,
+          turn: 2,
+          operationId: null,
+        },
+      ],
       allowNextWaveStart: false,
       expectedOperationId: null,
     } as const;
