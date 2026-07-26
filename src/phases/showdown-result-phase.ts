@@ -21,6 +21,10 @@ import {
   syncShowdownPendingSettlements,
 } from "#data/elite-redux/showdown/showdown-escrow-client";
 import {
+  completeQueuedShowdownMatch,
+  isQueuedShowdownMatchInProgress,
+} from "#data/elite-redux/showdown/showdown-matchmaking";
+import {
   type ShowdownResultReason,
   type ShowdownVoidReason,
   selectShowdownResultLine,
@@ -135,21 +139,33 @@ export class ShowdownResultPhase extends BattlePhase {
     }
 
     // TOURNAMENT match (prize-only, escrow matchId always null): report the decisive outcome to the
-    // tournament worker via dual attestation so it advances the bracket server-side. BOTH clients
-    // report (the winner USERNAME); a void never advances a bracket. Fire-and-forget + fully guarded —
-    // the round trip must never block or strand the return to title. Context is cleared afterward so it
-    // can't leak into the next plain match.
+    // tournament worker via dual attestation so it advances the bracket server-side. BOTH clients,
+    // including peer-routed silent results, report the winner username. The bounded report completes
+    // before result teardown clears the context; a void never advances a bracket. Failed requests are
+    // retained locally for background retry.
     const tournamentCtx = getTournamentMatchContext();
-    if (tournamentCtx != null && !this.silent) {
+    let tournamentReport: Promise<void> | null = null;
+    if (tournamentCtx != null) {
       if (!this.voided) {
         const localName = getCoopRuntime()?.controller.localName() ?? "";
         const partnerName = getCoopRuntime()?.controller.partnerName ?? "";
         const winnerName = this.localWon ? localName : partnerName;
         if (winnerName) {
-          void reportTournamentResult(tournamentCtx.tournamentId, tournamentCtx.matchId, winnerName).catch(() => {});
+          tournamentReport = reportTournamentResult(tournamentCtx.tournamentId, tournamentCtx.matchId, winnerName)
+            .then(result => {
+              if (!result.ok) {
+                console.warn(`[tournament-result] report retained for retry: ${result.error}`);
+              }
+            })
+            .catch(error => {
+              console.warn("[tournament-result] report retained for retry", error);
+            })
+            .finally(() => clearTournamentMatchContext());
         }
       }
-      clearTournamentMatchContext();
+      if (tournamentReport == null) {
+        clearTournamentMatchContext();
+      }
     }
 
     // RANKED (dual attestation): report the decisive outcome to /showdown/rank/result so the server
@@ -173,6 +189,17 @@ export class ShowdownResultPhase extends BattlePhase {
       reason: this.reason,
       voided: this.voided,
     });
+
+    // A lobbyless queue match returns to waiting after every result. End the authenticated
+    // signaling run before clearing the runtime so the account can announce a fresh queue presence.
+    if (isQueuedShowdownMatchInProgress()) {
+      try {
+        void runtime?.p33Signaling?.end().catch(() => {});
+      } catch {
+        // The next queue announce also reconciles a stale terminal run.
+      }
+      completeQueuedShowdownMatch();
+    }
 
     // Ephemeral match: drop the showdown + co-op runtime state. NEVER persisted (no saveAll).
     endShowdownBattle();
@@ -261,16 +288,28 @@ export class ShowdownResultPhase extends BattlePhase {
         scene.ui.showText(opponentLine, null, showResult, null, true);
       }
     };
+    const beginResultText = () => {
+      if (tournamentReport == null) {
+        runResultText();
+        return;
+      }
+      scene.ui.showText("Finalizing tournament result...", null);
+      void tournamentReport.then(() => {
+        if (ownsScenePhase()) {
+          runResultText();
+        }
+      });
+    };
     // This phase can be routed from ANY prior UI mode: a mid-battle victory/forfeit already sits on the
     // MESSAGE handler, but a PRE-BATTLE abandon (a drop during the wager window) enters with the WAGER
     // screen still up. Ensure the MESSAGE handler is active first, or the result text can't render/advance
     // and the return to title strands. When already on MESSAGE we keep the exact synchronous path.
     if (scene.ui.getMode() === UiMode.MESSAGE) {
-      runResultText();
+      beginResultText();
     } else {
       void scene.ui.setMode(UiMode.MESSAGE).then(() => {
         if (ownsScenePhase()) {
-          runResultText();
+          beginResultText();
         }
       });
     }

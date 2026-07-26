@@ -2504,6 +2504,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Volo appears in the Custom Trainers picker",
+    description:
+      "CATALOG fix - Volo's Elite and Hell records were committed and deployed, but both used the\n"
+      + "display label WIELDER as trainerClass. Because WIELDER is not a real TrainerType, runtime\n"
+      + "validation silently dropped both records before the picker or organic spawn selection.\n"
+      + "DO: Title -> Dev Scenarios -> Custom Trainers and scroll near the bottom.\n"
+      + "EXPECT: Volo #70022 and Volo #70023 both appear and can launch. The Volo sprite remains\n"
+      + "selected; CYNTHIA is only the valid internal base class. The editor now rejects unknown\n"
+      + "typed class labels before saving. Headless catalog coverage lives in\n"
+      + "test/tests/elite-redux/er-custom-trainer-catalog.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Held-item icons align in the summary items row (vanilla + ER)",
     description:
       "UI ALIGNMENT fix (not a battle behavior) - the ER-custom held items (tactical / reactive /\n"
@@ -11211,6 +11232,29 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Xatu Inversion clarity",
+    description:
+      "Xatu can have Inversion, which sets Inverse Room on entry for 3 turns.\n"
+      + "Use Knock Off. Dark is normally super-effective against Xatu, but Inverse\n"
+      + "Room reverses the matchup, so the hit is not very effective.\n"
+      + "EXPECT: explicit text says type matchups were reversed; after 3 turns, text\n"
+      + "says they returned to normal. This is Xatu's intended ability, not a type bug.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.XATU,
+        ENEMY_ABILITY_OVERRIDE: erAbility(ErAbilityId.INVERSION),
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.WEAVILE, {
+          moveset: [MoveId.KNOCK_OFF, MoveId.SPLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Restraining Order / Gooschase (#452)",
     description:
       "#452 - Restraining Order (Gooschase line): 'Forces the ATTACKER out when hit,\n"
@@ -19800,7 +19844,54 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
-  // Move: Fling (543) — base power comes from the flung item's Fling table BP
+  // Move: Beat Up (251) - only conscious, status-free allies contribute
+  // ===========================================================================
+  {
+    label: "Move: Beat Up uses eligible allies once",
+    description:
+      "Beat Up now follows its mainline contributor rules. The user always attacks; each\n"
+      + "ALLY contributes exactly once only if it is conscious and has no status condition.\n"
+      + "Each hit uses 5 + floor(that contributor's base Attack / 10) power.\n"
+      + "SETUP: Bulbasaur is burned and Squirtle is fainted; only Magikarp and Charmander\n"
+      + "are eligible. DO: use Beat Up on Snorlax.\n"
+      + "EXPECT: exactly TWO hits, not four. The burned and fainted allies do not attack,\n"
+      + "and no healthy contributor is repeated or skipped.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MAGIKARP, {
+          moveset: [MoveId.BEAT_UP, MoveId.SPLASH, MoveId.TACKLE, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.BULBASAUR, {
+          moveset: [MoveId.TACKLE, MoveId.VINE_WHIP, MoveId.GROWL, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.CHARMANDER, {
+          moveset: [MoveId.TACKLE, MoveId.EMBER, MoveId.GROWL, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.SQUIRTLE, {
+          moveset: [MoveId.TACKLE, MoveId.WATER_GUN, MoveId.TAIL_WHIP, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onPartyReady: () => {
+      const party = globalScene.getPlayerParty();
+      party[1]?.doSetStatus(StatusEffect.BURN);
+      if (party[3]) {
+        party[3].hp = 0;
+      }
+    },
+  },
+  // ===========================================================================
+  // Move: Fling (543) - base power comes from the flung item's Fling table BP
   // ===========================================================================
   {
     label: "Move: Fling uses the item's Fling BP",
@@ -20591,6 +20682,43 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }),
         makeStarter(SpeciesId.METAGROSS, {
           moveset: [MoveId.METEOR_MASH, MoveId.ZEN_HEADBUTT, MoveId.BULLET_PUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Gimmighoul/Gholdengo shared progression",
+    description:
+      "Gholdengo shares Gimmighoul's single candy bucket and all three innate\n"
+      + "unlock slots. CHECK: give Gimmighoul candy and unlock each innate, then\n"
+      + "evolve it or inspect Gholdengo in the Pokedex. EXPECT: the candy count is\n"
+      + "unchanged and all three corresponding Gholdengo innates are unlocked and\n"
+      + "active. A pre-fix save with progress stored directly on Gholdengo is merged\n"
+      + "back into Gimmighoul on load without losing candy or unlocks. Headless\n"
+      + "coverage: er-gimmighoul-family-unlocks.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.GIMMIGHOUL, {
+          moveset: [MoveId.ASTONISH, MoveId.TACKLE, MoveId.PROTECT, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Trainer intro closes both party trays",
+    description:
+      "The player's party-indicator tray no longer remains over the HUD when a\n"
+      + "healthy Pokemon persists from a wild wave into the next trainer battle.\n"
+      + "CHECK: finish a wild wave without switching or fainting, then enter a\n"
+      + "trainer wave. EXPECT: when the trainer sends out the first foe, both the\n"
+      + "player and enemy party trays slide away and stay hidden. Headless coverage:\n"
+      + "er-trainer-intro-trays.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.MUDKIP, {
+          moveset: [MoveId.TACKLE, MoveId.WATER_GUN, MoveId.PROTECT, MoveId.REST],
         }),
       ];
     },

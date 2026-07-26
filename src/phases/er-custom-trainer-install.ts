@@ -10,7 +10,6 @@ import {
   resolveErCustomTrainerMoveIds,
   resolveErCustomTrainerParty,
   selectErCustomTrainerForWave,
-  setErCustomTrainerBstBypass,
 } from "#data/elite-redux/er-custom-trainers";
 import { BattleType } from "#enums/battle-type";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -27,8 +26,8 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
  * Elite Redux: if a staff-authored custom trainer (er-custom-trainers.json) is
  * eligible for the CURRENT wave, install it — convert the wave into a trainer
  * battle with the authored sprite/name and field the EXACT authored party
- * (species/form/level/moveset/ability/fusion + held items), bypassing the #419
- * elite BST cap. Gated by the active difficulty, floor range/endless and
+ * (species/form/level/moveset/ability/fusion + held items), subject to the same
+ * universal BST cap as every other PvE trainer. Gated by the active difficulty, floor range/endless and
  * challenge-exclusivity in {@linkcode selectErCustomTrainerForWave}.
  *
  * Runs after `newBattle()` has built the wave but before EncounterPhase's
@@ -44,13 +43,10 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
  * co-op run needs the host-authoritative selection/relay seam and must not touch
  * `src/data/elite-redux/coop/**`. That is a documented future seam.
  *
- * The bypass flag is always reset here first, so a wave WITHOUT a custom trainer
- * never leaks a previous wave's bypass. A successful DEV-FORCED install clears the
- * force override (one-shot), so subsequent battles in the run are normal.
+ * A successful DEV-FORCED install clears the force override (one-shot), so
+ * subsequent battles in the run are normal.
  */
 export function installErCustomTrainerForCurrentWave(): void {
-  // Clear any prior wave's BST-cap bypass before deciding this wave.
-  setErCustomTrainerBstBypass(false);
   const battle = globalScene.currentBattle;
   if (!battle) {
     return;
@@ -165,8 +161,8 @@ export function installErCustomTrainerForCurrentWave(): void {
     const template = trainer.getPartyTemplate();
     template.size = fielded.length;
 
-    // Field the exact authored party. The BST-cap bypass is on for the whole
-    // battle (set below) so the EnemyPokemon constructor won't devolve them.
+    // Field the authored party. The EnemyPokemon constructor applies the same
+    // universal PvE BST cap used by vanilla and ghost trainers.
     trainer.config.partyMemberFuncs = {};
     fielded.forEach((f, idx) => {
       trainer.config.partyMemberFuncs[idx] = (level, _strength) => {
@@ -204,8 +200,6 @@ export function installErCustomTrainerForCurrentWave(): void {
       return out;
     };
 
-    // Staff intent wins: exempt this whole battle from the #419 BST cap.
-    setErCustomTrainerBstBypass(true);
     markErCustomTrainerUsed(resolved.key);
     // A DEV-FORCED pick is one-shot: clear the force now that it has installed so
     // the rest of the run fields normal (density-driven) battles, not this trainer.
@@ -221,6 +215,5 @@ export function installErCustomTrainerForCurrentWave(): void {
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.warn(`[er-custom-trainers] install failed wave=${wave} reason=${reason}`);
-    setErCustomTrainerBstBypass(false);
   }
 }

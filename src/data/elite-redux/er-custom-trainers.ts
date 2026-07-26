@@ -89,9 +89,8 @@
 //
 // Ids live in the RESERVED 70000-79999 band (above the editor mons at
 // 60000-69999). Every entry is validated at load; an invalid entry is SKIPPED
-// with a warning (it can never break a build). Staff intent WINS: the resolved
-// party is fielded EXACTLY as authored and BYPASSES the #419 elite BST cap (see
-// `isErCustomTrainerBstBypassActive`).
+// with a warning (it can never break a build). Authored teams pass through the
+// same universal PvE BST cap as vanilla and ghost trainers.
 //
 // SOLO PATH ONLY. Co-op runs skip custom-trainer selection entirely (the seam
 // is documented in `new-battle-phase.ts`); adopting them into a co-op session
@@ -1470,10 +1469,6 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
   return pool[idx];
 }
 
-// The #419 BST-cap bypass flag lives in a zero-import leaf module so the central
-// runtime hook can read it without an import cycle; re-exported here so callers
-// have a single custom-trainer entry point.
-export { isErCustomTrainerBstBypassActive, setErCustomTrainerBstBypass } from "#data/elite-redux/er-custom-trainer-bst-flag";
 export { markErCustomTrainerUsed, resetErCustomTrainerTracking };
 
 // -----------------------------------------------------------------------------
@@ -1510,8 +1505,10 @@ export function applyErCustomTrainerFusion(
 }
 
 /**
- * Build one authored team member as an {@linkcode EnemyPokemon}, EXACTLY as
- * specified: species/form, level (explicit or the wave-scaled fallback),
+ * Build one authored team member as an {@linkcode EnemyPokemon}. When the
+ * authored species survives the universal BST gate, field its exact form,
+ * level, ability, moveset, and fusion. If the constructor capped it to another
+ * species, preserve that replacement's own legal battle data.
  * ability slot, moveset and optional fusion. Held items are applied separately
  * (see {@linkcode erCustomTrainerHeldModifierConfigs}). Returns `null` when the
  * species can't be resolved.
@@ -1530,10 +1527,13 @@ export function buildErCustomTrainerMember(
   const level = member.level ?? scaledLevel;
   const trainerSlot = !isDouble || index % 2 === 0 ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
   const enemy = globalScene.addEnemyPokemon(species, level, trainerSlot);
-  if (member.formIndex) {
-    enemy.formIndex = member.formIndex;
+  const authoredSpeciesSurvivedCap = enemy.species.speciesId === member.speciesId;
+  if (authoredSpeciesSurvivedCap) {
+    if (member.formIndex) {
+      enemy.formIndex = member.formIndex;
+    }
+    enemy.abilityIndex = member.abilitySlot;
   }
-  enemy.abilityIndex = member.abilitySlot;
   // Shiny Lab visual effect the mon fields with. Mirrors the ghost-adoption path
   // (er-ghost-teams.ts): force shiny + variant 0 (the palette rebase base), suppress
   // the local per-run roll, and stamp the serialized look + name-prefix so the
@@ -1545,13 +1545,13 @@ export function buildErCustomTrainerMember(
     enemy.customPokemonData.erShinyLab = member.shinyLook;
     enemy.customPokemonData.erShinyLabName = member.shinyName || undefined;
   }
-  if (member.fusion) {
+  if (authoredSpeciesSurvivedCap && member.fusion) {
     applyErCustomTrainerFusion(enemy, member.fusion);
   }
   // Insanity substitutions use the same per-Pokemon storage as the Ability
   // Randomizer. Apply after form/fusion setup so slot ownership is correct.
   // This touches only this EnemyPokemon's CustomPokemonData, never species data.
-  if (member.insanity) {
+  if (authoredSpeciesSurvivedCap && member.insanity) {
     const overrides = [member.insanity.ability, ...member.insanity.innates] as const;
     overrides.forEach((abilityId, slot) => {
       if (abilityId != null && allAbilities[abilityId]) {
@@ -1559,7 +1559,7 @@ export function buildErCustomTrainerMember(
       }
     });
   }
-  if (moveIds.length > 0) {
+  if (authoredSpeciesSurvivedCap && moveIds.length > 0) {
     const moves = moveIds.map(id => new PokemonMove(id));
     enemy.moveset = moves;
     enemy.summonData.moveset = moves.slice();

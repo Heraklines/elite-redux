@@ -438,8 +438,7 @@ export class SelectStarterPhase extends Phase {
     setPendingShowdownSession(session);
     setPendingShowdownRelay(relay);
     // Team Menu (Phase D): teams are now built + selected BEFORE pairing. Entering the lobby ALWAYS
-    // stashes the chosen preset's reconstructed starters (title-phase `onEnterLobby` is the sole versus
-    // lobby entry - the announcer AND the accepter both go through it), so BOTH clients arrive with a
+    // stashes the queued preset's reconstructed starters before the lobbyless launch, so BOTH clients arrive with a
     // pending team and pairing leads near-immediately to the wager (no 10-minute in-lobby pick wait).
     const presetStarters = consumePendingShowdownPresetStarters();
     if (presetStarters != null) {
@@ -453,7 +452,7 @@ export class SelectStarterPhase extends Phase {
     // disposes the just-built session/relay so nothing strands), never the grid. Both clients build
     // their team in the Team Menu now, so this branch is only ever a fault condition.
     console.warn("[showdown] startShowdownSelect: no pending preset - aborting (team must be picked in the Team Menu)");
-    this.abortShowdown("No team was carried into this match. Pick a team in the Showdown menu, then enter the lobby.");
+    this.abortShowdown("No team was carried into this match. Pick a team in the Showdown menu, then queue again.");
   }
 
   /**
@@ -852,6 +851,13 @@ export class SelectStarterPhase extends Phase {
         }
       }
       const chalApplied = applyChallenges(ChallengeType.STARTER_MODIFY, starterPokemon);
+      // Challenge modifiers run after the initial Black kit application. Full
+      // Reset deliberately clears ordinary shiny state, but a selected Black
+      // starter must remain a coherent t4 instance in every mode.
+      if (starter.erBlackShiny) {
+        applyErBlackShinyKit(starterPokemon);
+        starterPokemon.luck = ER_BLACK_SHINY_LUCK;
+      }
       party.push(starterPokemon);
       if (chalApplied) {
         // If any challenges modified the starter, it should update

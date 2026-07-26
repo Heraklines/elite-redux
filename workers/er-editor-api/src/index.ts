@@ -46,6 +46,7 @@ import {
   mergeCustomTrainersDelta,
   stableStringify,
 } from "./custom-trainers-merge";
+import { isValidTrainerClassName } from "./trainer-class-validation";
 
 interface Env {
   GITHUB_TOKEN: string;
@@ -634,7 +635,7 @@ function validateCustomTrainersConfigDelta(delta: unknown): ValidationResult {
 }
 
 /** trainerKey -> editor-created custom-trainer entry (null deletes the trainer). */
-function validateCustomTrainersDelta(delta: unknown): ValidationResult {
+export function validateCustomTrainersDelta(delta: unknown): ValidationResult {
   if (!isPlainObject(delta)) {
     return { ok: false, error: "delta must be an object" };
   }
@@ -689,7 +690,7 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     if (typeof t.name !== "string" || t.name.trim().length === 0 || t.name.length > 24) {
       return { ok: false, error: `${key}: name must be 1-24 chars` };
     }
-    if (!isName(t.trainerClass)) {
+    if (!isValidTrainerClassName(t.trainerClass)) {
       return { ok: false, error: `${key}: trainerClass must be a TrainerType NAME` };
     }
     if (

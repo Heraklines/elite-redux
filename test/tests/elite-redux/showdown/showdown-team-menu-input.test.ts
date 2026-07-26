@@ -151,19 +151,19 @@ describe.runIf(RUN)("showdown team menu - cursor model + routing", () => {
     expect(onCreate).toHaveBeenCalledOnce();
   });
 
-  it("CONFIRM on a valid team calls onEnterLobby with its index", async () => {
-    const onEnterLobby = vi.fn();
-    const { internals } = buildMenu(game, { onEnterLobby });
+  it("CONFIRM on a valid team calls onQueue with its index", async () => {
+    const onQueue = vi.fn();
+    const { internals } = buildMenu(game, { onQueue });
     internals.processInput(Button.ACTION); // team 0 is valid
     await flush();
-    expect(onEnterLobby).toHaveBeenCalledWith(0);
+    expect(onQueue).toHaveBeenCalledWith(0);
   });
 
   it("CONFIRM on an INVALID team explains and never enters the lobby", () => {
-    const onEnterLobby = vi.fn();
-    const { internals } = buildMenu(game, { initialTeam: 2, onEnterLobby }); // Legacy Squad = invalid
+    const onQueue = vi.fn();
+    const { internals } = buildMenu(game, { initialTeam: 2, onQueue }); // Legacy Squad = invalid
     internals.processInput(Button.ACTION);
-    expect(onEnterLobby).not.toHaveBeenCalled();
+    expect(onQueue).not.toHaveBeenCalled();
     expect(internals.notice).not.toBeNull();
   });
 

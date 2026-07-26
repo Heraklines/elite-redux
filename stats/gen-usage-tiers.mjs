@@ -12,7 +12,8 @@ const USAGE_TIER_CHALLENGE_ID = 12;
 const K = 20;
 const MIN_PLAYERS = Number(process.env.ER_USAGE_TIER_MIN_PLAYERS ?? 500);
 const MIN_RUNS = Number(process.env.ER_USAGE_TIER_MIN_RUNS ?? 5000);
-const runsRaw = JSON.parse(fs.readFileSync(new URL("data/_runs.json", import.meta.url), "utf8"))[0].results;
+const dump = JSON.parse(fs.readFileSync(new URL("data/_runs.json", import.meta.url), "utf8"));
+const runsRaw = Array.isArray(dump.rows) ? dump.rows : [];
 
 const runs = [];
 for (const row of runsRaw) {
@@ -32,7 +33,7 @@ for (const row of runsRaw) {
     continue;
   }
   runs.push({
-    uid: row.user_id,
+    uid: row.playerKey,
     lines,
     inUsageTier: challenges.some(([cid, v]) => cid === USAGE_TIER_CHALLENGE_ID && v > 0),
     win: row.outcome === "victory" ? 1 : 0,
@@ -107,8 +108,8 @@ for (const [line, o] of agg) {
   };
 }
 const payload = {
-  generatedAt: new Date().toISOString(),
-  windowDays: 30,
+  generatedAt: dump.generatedAt || new Date().toISOString(),
+  windowDays: Number(dump.windowDays) || 30,
   players: players.size,
   runs: runs.length,
   source: {

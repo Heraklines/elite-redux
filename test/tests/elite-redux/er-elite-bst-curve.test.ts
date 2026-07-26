@@ -16,7 +16,7 @@
 import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
+import { enforceErEliteBstCurve, enforceErEliteBstCurveForParty } from "#data/elite-redux/er-trainer-runtime-hook";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesFormKey } from "#enums/species-form-key";
@@ -61,13 +61,14 @@ describe.skipIf(!RUN)("ER Elite BST curve enforcement (#419)", () => {
     return enemy;
   };
 
-  const findEarlyMegaCandidate = () => {
+  const findEarlyMegaCandidate = (overCap = 460) => {
     const megaKeys = new Set([SpeciesFormKey.MEGA, SpeciesFormKey.MEGA_X, SpeciesFormKey.MEGA_Y]);
     for (const species of allSpecies) {
       const baseBst = (species.forms?.[0] ?? species).getBaseStatTotal();
       const formIndex =
         species.forms?.findIndex(
-          (form, index) => index > 0 && megaKeys.has(form.formKey as SpeciesFormKey) && form.getBaseStatTotal() > 460,
+          (form, index) =>
+            index > 0 && megaKeys.has(form.formKey as SpeciesFormKey) && form.getBaseStatTotal() > overCap,
         ) ?? -1;
       if (baseBst <= 460 && formIndex > 0) {
         return { species, formIndex, baseBst };
@@ -120,6 +121,25 @@ describe.skipIf(!RUN)("ER Elite BST curve enforcement (#419)", () => {
     expect(enemy.species.speciesId).toBe(candidate.species.speciesId);
     expect(enemy.formIndex).toBe(0);
     expect(enemy.getSpeciesForm().getBaseStatTotal()).toBe(candidate.baseBst);
+  });
+
+  it("rechecks a legal base after a held-item mutation makes it an over-cap mega", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    setErDifficulty("hell");
+    const candidate = findEarlyMegaCandidate(520);
+    const enemy = retarget(candidate.species.speciesId as SpeciesId, 35);
+    expect(enemy.getSpeciesForm().getBaseStatTotal()).toBeLessThanOrEqual(520);
+
+    // Mirrors the held-mega-stone ordering: the base passed the first gate,
+    // then the item changed the final fielded form.
+    enforceErEliteBstCurve(enemy);
+    enemy.formIndex = candidate.formIndex;
+    expect(enemy.getSpeciesForm().getBaseStatTotal()).toBeGreaterThan(520);
+
+    enforceErEliteBstCurveForParty([enemy]);
+
+    expect(enemy.formIndex).toBe(0);
+    expect(enemy.getSpeciesForm().getBaseStatTotal()).toBeLessThanOrEqual(520);
   });
 
   it("clamps standalone ER mega species such as Mega Typhlosion", async () => {

@@ -624,6 +624,17 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect(ct.buildDeltas().bad.some(message => message.includes("unknown Insanity ability"))).toBe(true);
   });
 
+  it("rejects a typed trainer label that is not a real TrainerType", () => {
+    const key = newTrainer("Invalid Class");
+    setSpecies(0, "SPECIES_SNORLAX");
+    ct.ctr.current[key].trainerClass = "WIELDER";
+
+    const { deltas, bad } = ct.buildDeltas();
+
+    expect(bad).toContain('Invalid Class: unknown trainer class "WIELDER"');
+    expect((deltas["custom-trainers"] as Record<string, unknown> | undefined)?.[key]).toBeUndefined();
+  });
+
   it("move legality: numeric learnset -> enum keys (learned move passes); two-word input normalizes; nonsense flagged; RLA/RLNA exempt", () => {
     // moves-rich ships DISPLAY names keyed by numeric move id; learnsets/tm are
     // numeric-id keyed. The bug: legalMovesFor held the DISPLAY names, so NOTHING

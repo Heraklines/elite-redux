@@ -188,11 +188,10 @@ export function initEliteReduxEvolutions(): InitEliteReduxEvolutionsResult {
     }
   }
 
-  // Rebuild prevolutions + starters tables so post-ER lookups (Dex,
-  // breeding, starter eligibility) see the patched edges. Both helpers are
-  // idempotent — they clear and re-derive from `pokemonEvolutions`.
+  // Rebuild prevolutions so post-ER lookups (Dex, breeding and starter
+  // eligibility) see the patched edges. Starter roots are rebuilt below only
+  // after ambiguous multi-source evolution targets have canonical owners.
   initPokemonPrevolutions();
-  initPokemonStarters();
 
   // #626: Basculin <-> Basculegion candy sharing. ER imports White-Striped
   // Basculin as its OWN custom species, so the white-striped -> Basculegion
@@ -202,6 +201,14 @@ export function initEliteReduxEvolutions(): InitEliteReduxEvolutionsResult {
   // line shares a candy bucket again. The forward white-striped -> Basculegion
   // evolution in `pokemonEvolutions` is untouched, so evolving still works.
   pokemonPrevolutions[SpeciesId.BASCULEGION] = SpeciesId.BASCULIN;
+
+  // Gimmighoul candy + all three innate unlocks belong to the vanilla family.
+  // ER also imports Roaming Gimmighoul as a standalone custom species and that
+  // later edge otherwise wins the one-prevolution-per-target rebuild.
+  pokemonPrevolutions[SpeciesId.GHOLDENGO] = SpeciesId.GIMMIGHOUL;
+
+  // Build starter roots only after canonical multi-source edges are resolved.
+  initPokemonStarters();
 
   return result;
 }

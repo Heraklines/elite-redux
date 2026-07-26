@@ -12,6 +12,7 @@ import {
 import {
   initTournamentNotifications,
   openTournamentDeepLink,
+  startTournamentPresenceNotifications,
   tournamentDeepLinkOf,
 } from "#data/elite-redux/showdown/tournament-notifications";
 import { getSplashMessages } from "#data/splash-messages";
@@ -423,7 +424,12 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       panel.add(bodyText);
     }
 
-    const footer = isTournament ? "A: Open bracket    B: Back" : "B: Back";
+    const tournamentLink = tournamentDeepLinkOf(n);
+    const footer = isTournament
+      ? tournamentLink?.autoJoin
+        ? "A: Join match    B: Back"
+        : "A: Open bracket    B: Back"
+      : "B: Back";
     panel.add(addTextObject(0, h / 2 - 9, footer, TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0.5, 0));
     this.titleContainer.add(panel);
     this.titleContainer.bringToTop(panel);
@@ -568,6 +574,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     // they land in this user's bucket, then refresh the badge.
     initErNotifications();
     initTournamentNotifications();
+    startTournamentPresenceNotifications();
     this.closeRichInboxDetail();
     this.closeInboxDetail();
     this.setInboxFocused(false);
@@ -617,9 +624,8 @@ export class TitleUiHandler extends OptionSelectUiHandler {
 
     this.titleStatsTimer = setInterval(() => {
       this.updateTitleStats();
-      // Bounded background poll (title/menu-scoped, 60s): re-pull notification sources so a
-      // tournament CHALLENGE (bracket advanced / opponent now present) surfaces while the
-      // player idles at the title, without navigating. Never runs mid-battle (title-only).
+      // Title inbox refresh. Tournament online-presence alerts also have a page-lifetime 20s
+      // heartbeat, so they continue during normal gameplay after this title handler is cleared.
       this.refreshInbox();
     }, 60000);
 

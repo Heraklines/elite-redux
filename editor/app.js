@@ -5081,6 +5081,10 @@ function buildDeltas() {
       bad.push(`${key}: trainer needs a sprite/class`);
       continue;
     }
+    if (!trainerClassByName.has(t.trainerClass.trim().toUpperCase())) {
+      bad.push(`${t.name}: unknown trainer class "${t.trainerClass}"`);
+      continue;
+    }
     if (!Array.isArray(t.team) || t.team.length === 0 || t.team.length > 6) {
       bad.push(`${t.name}: team must have 1-6 members`);
       continue;

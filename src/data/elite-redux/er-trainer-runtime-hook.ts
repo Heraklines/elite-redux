@@ -43,7 +43,6 @@ import {
 import { erRivalWaveOrdinal, erRivalWaveSequence } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
 import { erBalanceMap, erBalanceNum, erBalancePairs } from "#data/elite-redux/er-balance-tuning";
-import { isErCustomTrainerBstBypassActive } from "#data/elite-redux/er-custom-trainer-bst-flag";
 import { modifierTypes } from "#data/data-lists";
 import { getErBiomeItemFlavor } from "#data/elite-redux/er-biome-item-flavor";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
@@ -868,6 +867,10 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
       globalScene.addEnemyModifier(modifier, true, true);
     }
   }
+  // Held mega stones mutate the active form after the first BST check above.
+  // Re-run the universal gate against the final fielded form so an otherwise
+  // legal base species cannot become an over-cap mega after validation.
+  enforceErEliteBstCurveForParty(party);
   // ER (anti-stack): every trainer's apex mon mirrors the player's vitamin
   // investment. Runs before the Hell boss buff so a promoted boss bar already
   // reflects the vitamin-boosted stats.
@@ -1106,6 +1109,13 @@ export function setErColosseumBattleActive(active: boolean): void {
   erColosseumBattleActive = active;
 }
 
+/** Apply the universal power gate to every final fielded form in a party. */
+export function enforceErEliteBstCurveForParty(party: readonly EnemyPokemon[]): void {
+  for (const enemy of party) {
+    enforceErEliteBstCurve(enemy);
+  }
+}
+
 export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
   try {
     // ER (#441): THE universal power gate. This used to be Elite-only and
@@ -1133,9 +1143,8 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     // to be fielded EXACTLY as built - the wave-1 BST ladder would swap/devolve it. Exempt it
     // like the other curated-content paths (daily / colosseum / ME). Showdown-only -> no other
     // mode's curve is touched.
-    // Staff-authored custom trainers (er-custom-trainers.json) are curated
-    // content fielded EXACTLY as authored - the wave-ladder cap must never
-    // devolve/swap their mons (maintainer directive: staff intent wins).
+    // Staff-authored custom trainers are intentionally NOT exempt. They share
+    // the same PvE wave cap as vanilla and ghost trainers.
     // Cross-player ghosts are intentionally NOT exempt. Their selection window
     // cannot prevent an early saved legendary/mega from overshooting the receiving
     // player's curve, so every fielded ghost member must pass this same gate.
@@ -1143,7 +1152,6 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
       globalScene.gameMode?.isDaily ||
       globalScene.gameMode?.isShowdown ||
       erColosseumBattleActive ||
-      isErCustomTrainerBstBypassActive() ||
       (globalScene.currentBattle?.isBattleMysteryEncounter?.() ?? false)
     ) {
       return;

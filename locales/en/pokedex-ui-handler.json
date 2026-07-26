@@ -25,6 +25,7 @@
   "showEvolutions": "Show its evolutions and battle forms.",
   "noEvolutions": "This Pokémon has no evolutions or battle forms.",
   "noBiomes": "This Pokémon is not found in the wild.",
+  "noLevelMoves": "No level-up moves are available for this Pokémon.",
   "noEggMoves": "No Egg Moves are available for this Pokémon.",
   "noTmMoves": "This Pokémon can’t learn any TM.",
   "noRibbons": "This Pokémon doesn’t have any ribbons.",

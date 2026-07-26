@@ -12,6 +12,20 @@
       "fairy"
     ]
   },
+  "jacinthe_1": {
+    "author": "Jext",
+    "genders": false,
+    "kind": "villain",
+    "label": "SBC Leader",
+    "license": "cc-by",
+    "sourceUrl": "https://pokengine.org/trainers/01x519ro/Jacinthe",
+    "spriteKey": "jacinthe_1",
+    "tags": [
+      "kalos",
+      "leader",
+      "evil"
+    ]
+  },
   "model_1": {
     "author": "Kyle Dove",
     "genders": false,

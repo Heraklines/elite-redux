@@ -4,16 +4,18 @@
  */
 
 // =============================================================================
-// Showdown TOURNAMENT — CHALLENGE notification derivation + deep-link (P3 polish).
-// PURE unit coverage of the notification source's actionable logic + the dedupe
-// rule + the deep-link opener singleton (no network / no GameManager).
+// Showdown TOURNAMENT notification derivation + deep-link.
+// PURE unit coverage of actionable logic, dedicated-prompt dedupe, shared-inbox
+// isolation, and the deep-link opener singleton (no network / no GameManager).
 // =============================================================================
 
 import {
   actionableTournamentNotifications,
   canOpenTournamentDeepLink,
+  initTournamentNotifications,
   openTournamentDeepLink,
   setTournamentFlowOpener,
+  setTournamentGameplayOpener,
   TOURNAMENT_NOTIF_TYPE,
   type TournamentDeepLink,
   tournamentDeepLinkOf,
@@ -95,6 +97,7 @@ describe("tournament challenge notifications - derivation", () => {
   afterEach(() => {
     notificationManager.clear();
     setTournamentFlowOpener(null);
+    setTournamentGameplayOpener(null);
   });
 
   it("does not notify merely because a pairing exists", () => {
@@ -109,17 +112,16 @@ describe("tournament challenge notifications - derivation", () => {
     expect(isTournamentPairingCurrent(t, "Carla", "r0m0", "AshK")).toBe(false);
   });
 
-  it("notifies and deep-links when the exact opponent explicitly readies", () => {
+  it("notifies and deep-links when both exact bracket opponents are online", () => {
     const t = view();
-    t.entrants[1].readyMatchId = "r0m0";
-    t.entrants[1].readyOpponent = "Carla";
-    t.entrants[1].readyAt = NOW - 10_000;
+    t.entrants[0].lastSeen = NOW - 5_000;
+    t.entrants[1].lastSeen = NOW - 10_000;
     const out = actionableTournamentNotifications(t, "Carla", NOW);
     expect(out).toHaveLength(1);
     expect(out[0].type).toBe(TOURNAMENT_NOTIF_TYPE);
-    expect((out[0].data as any).kind).toBe("opponent-ready");
+    expect((out[0].data as any).kind).toBe("match-online");
     expect((out[0].data as any).opponent).toBe("AshK");
-    expect(tournamentDeepLinkOf(out[0])).toEqual({ tournamentId: "cup", round: 0, slot: 0 });
+    expect(tournamentDeepLinkOf(out[0])).toEqual({ tournamentId: "cup", round: 0, slot: 0, autoJoin: true });
   });
 
   it("red-proof: nothing for a non-entrant / registration / decided / bye", () => {
@@ -137,11 +139,11 @@ describe("tournament challenge notifications - derivation", () => {
     expect(actionableTournamentNotifications(bye, "Carla", NOW)).toHaveLength(0);
   });
 
-  it("does not treat online presence or stale-pair readiness as matchmaking intent", () => {
+  it("does not notify unless both exact opponents have fresh presence", () => {
     const t = view();
     t.entrants[1].lastSeen = NOW - 10_000;
-    t.entrants[1].readyMatchId = "r0m0";
-    t.entrants[1].readyOpponent = "SomebodyElse";
+    expect(actionableTournamentNotifications(t, "Carla", NOW)).toHaveLength(0);
+    t.entrants[0].lastSeen = NOW - 100_000;
     expect(actionableTournamentNotifications(t, "Carla", NOW)).toHaveLength(0);
   });
 
@@ -186,26 +188,40 @@ describe("tournament challenge notifications - derivation", () => {
     expect((advanced!.data as any).reason).toBe("Walkover");
   });
 
-  it("DEDUPES to once per state change (stable ids across polls)", () => {
-    const ready = view();
-    ready.entrants[1].readyMatchId = "r0m0";
-    ready.entrants[1].readyOpponent = "Carla";
-    ready.entrants[1].readyAt = NOW - 1_000;
-    const first = actionableTournamentNotifications(ready, "Carla", NOW);
-    const second = actionableTournamentNotifications(ready, "Carla", NOW + 60_000);
-    // ids are identical across the two polls
+  it("DEDUPES the dedicated prompt to once per state change (stable ids across polls)", () => {
+    const online = view();
+    online.entrants[0].lastSeen = NOW;
+    online.entrants[1].lastSeen = NOW;
+    const first = actionableTournamentNotifications(online, "Carla", NOW);
+    const second = actionableTournamentNotifications(online, "Carla", NOW + 60_000);
+    // The page-lifetime announcedOnlineMatches set consumes these stable ids.
     expect(second[0].id).toBe(first[0].id);
-    // pushing both polls into the manager yields ONE stored notification.
-    for (const n of [...first, ...second]) {
-      notificationManager.push(n);
-    }
-    const stored = notificationManager.list().filter(n => n.type === TOURNAMENT_NOTIF_TYPE);
-    expect(stored).toHaveLength(1);
+  });
+
+  it("keeps tournament alerts out of the shared inbox and removes legacy entries", () => {
+    const online = view();
+    online.entrants[0].lastSeen = NOW;
+    online.entrants[1].lastSeen = NOW;
+    notificationManager.push(actionableTournamentNotifications(online, "Carla", NOW)[0]);
+    notificationManager.push({
+      id: "system:patch-notes",
+      type: "system",
+      timestamp: NOW,
+      read: false,
+      data: {},
+    });
+
+    initTournamentNotifications();
+
+    expect(notificationManager.list().map(notification => notification.id)).toEqual(["system:patch-notes"]);
   });
 });
 
 describe("tournament challenge notifications - deep-link", () => {
-  afterEach(() => setTournamentFlowOpener(null));
+  afterEach(() => {
+    setTournamentFlowOpener(null);
+    setTournamentGameplayOpener(null);
+  });
 
   it("tournamentDeepLinkOf ignores non-tournament notifications", () => {
     const other: ErNotification = { id: "x", type: "system", timestamp: NOW, read: false, data: {} };
@@ -224,5 +240,18 @@ describe("tournament challenge notifications - deep-link", () => {
     expect(canOpenTournamentDeepLink()).toBe(true);
     expect(openTournamentDeepLink({ tournamentId: "cup", round: 1, slot: 0 })).toBe(true);
     expect(got).toEqual({ tournamentId: "cup", round: 1, slot: 0 });
+  });
+
+  it("queues a gameplay alert target and consumes it when the title flow returns", async () => {
+    const target = { tournamentId: "cup", round: 0, slot: 0 };
+    setTournamentGameplayOpener(() => true);
+    expect(openTournamentDeepLink(target)).toBe(true);
+
+    let got: TournamentDeepLink | null = null;
+    setTournamentFlowOpener(link => {
+      got = link;
+    });
+    await Promise.resolve();
+    expect(got).toEqual(target);
   });
 });

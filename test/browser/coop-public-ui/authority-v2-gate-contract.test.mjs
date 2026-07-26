@@ -239,7 +239,8 @@ test("public-browser campaign and staging bundle qualify the same V2 cutover", (
 
 test("Showdown cannot skip the shared epoch/run/binding boundary when it skips save discovery", () => {
   const branchStart = titlePhase.indexOf('if (sessionKind === "versus") {');
-  const branchEnd = titlePhase.indexOf("\n        void controller", branchStart + 1);
+  const firstCompatibility = titlePhase.indexOf(".awaitPartnerCompatibility()", branchStart);
+  const branchEnd = titlePhase.indexOf(".awaitPartnerCompatibility()", firstCompatibility + 1);
   assert.notEqual(branchStart, -1, "title phase owns an explicit versus launch path");
   assert.ok(branchEnd > branchStart, "the versus branch ends before ordinary co-op save discovery");
   const versus = titlePhase.slice(branchStart, branchEnd);
@@ -2449,7 +2450,7 @@ test("a fully missing account save set publishes no-save without a generic recon
 
 test("the asynchronous lobby save decision rebuilds one actionable handler after a bounded exact-session transition", () => {
   const installerStart = titlePhase.indexOf("const installHostLaunchDecision = (");
-  const installerEnd = titlePhase.indexOf("\n\n            // HOST: is there a saved run", installerStart);
+  const installerEnd = titlePhase.indexOf("// HOST: is there a saved run", installerStart);
   assert.ok(installerStart >= 0 && installerEnd > installerStart, "the host decision installer has a bounded block");
   const installer = titlePhase.slice(installerStart, installerEnd);
   const clear = installer.indexOf("handler.clear()");
@@ -2464,10 +2465,7 @@ test("the asynchronous lobby save decision rebuilds one actionable handler after
   );
 
   const decisionStart = titlePhase.indexOf("const blockedMessage = coopResumeBlockMessage(discovery);");
-  const decisionEnd = titlePhase.indexOf(
-    "\n            // Offer the HOST a real RESUME / NEW GAME choice.",
-    decisionStart,
-  );
+  const decisionEnd = titlePhase.indexOf("// Offer the HOST a real RESUME / NEW GAME choice.", decisionStart);
   assert.ok(decisionStart >= 0 && decisionEnd > decisionStart, "the fresh launch decision has a bounded source block");
   const freshDecision = titlePhase.slice(decisionStart, decisionEnd);
   const boundedOpen = freshDecision.indexOf("setModeBoundedWhen(UiMode.MESSAGE, 2_000, isCurrentSession)");

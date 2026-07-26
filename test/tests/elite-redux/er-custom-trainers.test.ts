@@ -56,13 +56,11 @@ import {
   rollErCustomTrainerSlotFill,
   rollErCustomTrainerWindow,
   selectErCustomTrainerForWave,
-  setErCustomTrainerBstBypass,
   setErCustomTrainerDevForce,
   setErCustomTrainerSpawnConfigForTesting,
   setErCustomTrainersForTesting,
 } from "#data/elite-redux/er-custom-trainers";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
 import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
@@ -198,7 +196,6 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // tests override the config to exercise the density roll itself.
     setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
     resetErCustomTrainerTracking();
-    setErCustomTrainerBstBypass(false);
     setErCustomTrainerDevForce(null);
     // NB: do NOT set an enemySpecies/enemyLevel override — either forces every
     // addEnemyPokemon (incl. buildErCustomTrainerMember) to that species/level,
@@ -212,7 +209,6 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     setErCustomTrainerSpawnConfigForTesting(undefined);
     setErCustomTrainerDevForce(null);
     resetErCustomTrainerTracking();
-    setErCustomTrainerBstBypass(false);
     resetErDifficulty();
   });
 
@@ -845,7 +841,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
 
   it("builds the EXACT authored party (species / level / moveset / ability / fusion)", () => {
     setErDifficulty("ace");
-    setErCustomTrainerBstBypass(true); // keep the authored species (Garchomp) intact
+    globalScene.currentBattle.waveIndex = 120;
     const member = getErCustomTrainers().find(t => t.key === "ACE_RICO")!.members[0];
     const enemy = buildErCustomTrainerMember(member, 0, 55, false);
     expect(enemy).not.toBeNull();
@@ -859,6 +855,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
   });
 
   it("applies Insanity abilities only to the spawned enemy instance", () => {
+    globalScene.currentBattle.waveIndex = 120;
     setErCustomTrainersForTesting({
       INSANITY_TEST: {
         id: 70007,
@@ -959,7 +956,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(byKey.get("NO_BGM")!.battleBgm).toBe("");
   });
 
-  it("#419 BST cap is BYPASSED for staff trainers (fielded as authored, not devolved)", () => {
+  it("#419 BST cap applies to staff trainers and preserves replacement battle data", () => {
     setErDifficulty("elite");
     globalScene.currentBattle.waveIndex = 5; // low wave -> BST cap ~420 would devolve Garchomp (600)
     const highBst: ErCustomTrainerMemberResolved = {
@@ -976,17 +973,10 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
       shinyName: "",
     };
 
-    // Bypass ON: constructor + explicit curve pass both leave Garchomp intact.
-    setErCustomTrainerBstBypass(true);
-    const kept = buildErCustomTrainerMember(highBst, 0, 60, false);
-    enforceErEliteBstCurve(kept!);
-    expect(kept!.species.speciesId).toBe(SpeciesId.GARCHOMP);
-
-    // Bypass OFF: the same over-cap mon is devolved by the curve (proving the
-    // cap normally fires and the bypass is what protects staff teams).
-    setErCustomTrainerBstBypass(false);
     const devolved = buildErCustomTrainerMember(highBst, 0, 60, false);
     expect(devolved!.species.speciesId).not.toBe(SpeciesId.GARCHOMP);
+    expect(devolved!.getSpeciesForm().getBaseStatTotal()).toBeLessThanOrEqual(420);
+    expect(devolved!.isFusion()).toBe(false);
   });
 
   // ---- ROUND 5 / FEATURE 1: trainer sprite gender ---------------------------
@@ -1195,7 +1185,6 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
 
     // Built enemy carries the effect: shiny flag, variant 0, the serialized look
     // + name stamped onto customPokemonData (mirrors the ghost-adoption path).
-    setErCustomTrainerBstBypass(true);
     const enemy = buildErCustomTrainerMember(shinyMember, 0, 50, false);
     expect(enemy).not.toBeNull();
     expect(enemy!.shiny).toBe(true);

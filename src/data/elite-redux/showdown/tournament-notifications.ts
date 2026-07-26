@@ -5,25 +5,26 @@
  */
 
 // =============================================================================
-// Showdown TOURNAMENT — CHALLENGE notifications (Showdown Tournament P3 polish).
-// A concrete notification TYPE + pull SOURCE wired into the shared, type-agnostic
-// `notificationManager` (same framework as the ghost-battle inbox). It surfaces a
-// title-screen alert when an opponent explicitly marks the exact pairing ready.
-// Each notification carries a DEEP-LINK target ({tournamentId, round, slot}); the
-// inbox opens the tournament BOARD on that match (A: FIGHT from there). Ids are
-// STABLE per (tournament, match, kind) so the manager dedupes to once-per-state-
-// change (no spam every poll tick). Never fires mid-battle: the source only runs
-// during the inbox refresh, which is title/menu-scoped.
+// Showdown TOURNAMENT match notifications. Tournament alerts use the dedicated
+// matchmaking prompt instead of the shared patch-note / ghost-battle inbox. A
+// page-lifetime heartbeat keeps presence current during normal gameplay; accepting
+// the prompt saves the run and deep-links through the title flow.
 // =============================================================================
 
 import { loggedInUser } from "#app/account";
 import { SESSION_ID_COOKIE_NAME } from "#app/constants";
-import { getTournamentBracket, listTournaments } from "#data/elite-redux/showdown/tournament-client";
+import {
+  dropOutOfTournament,
+  getTournamentBracket,
+  listTournaments,
+  pingTournamentPresence,
+  syncPendingTournamentResults,
+} from "#data/elite-redux/showdown/tournament-client";
 import {
   autoResolutionLabel,
   type BracketMatchView,
   type BracketView,
-  isEntrantReadyForMatch,
+  isPresent,
   nextMatchFor,
   opponentOf,
   type TournamentView,
@@ -38,17 +39,17 @@ export interface TournamentDeepLink {
   tournamentId: string;
   round: number;
   slot: number;
+  /** Exact online-pair alerts enter the validated match lobby directly; other notices open the board. */
+  autoJoin?: boolean;
 }
 
 interface TournamentNotifData extends TournamentDeepLink {
-  kind: "opponent-ready" | "advanced";
+  kind: "match-online" | "advanced";
   tournamentName: string;
   opponent: string;
   matchId: string;
   /** For an "advanced" notif: how you advanced without playing (e.g. "Activity win", "Walkover"). */
   reason?: string;
-  /** Readiness timestamp; changes only when the opponent explicitly readies again. */
-  readyAt?: number;
 }
 
 /** The P2 auto-resolution kinds that advance a player WITHOUT them playing (drives the "advanced" notif). */
@@ -76,22 +77,43 @@ function latestAutoAdvance(bracket: BracketView, me: string): BracketMatchView |
 
 // --- deep-link opener singleton (registered by the title phase) --------------
 type Opener = (target: TournamentDeepLink) => void;
+type GameplayOpener = (target: TournamentDeepLink) => boolean;
 let flowOpener: Opener | null = null;
+let gameplayOpener: GameplayOpener | null = null;
+let pendingDeepLink: TournamentDeepLink | null = null;
 
 /** The title phase registers how to open the tournament board (set null on teardown). */
 export function setTournamentFlowOpener(fn: Opener | null): void {
   flowOpener = fn;
+  if (fn != null && pendingDeepLink != null) {
+    const target = pendingDeepLink;
+    pendingDeepLink = null;
+    queueMicrotask(() => {
+      if (flowOpener === fn) {
+        fn(target);
+      }
+    });
+  }
+}
+
+/** Register the save-and-return bridge used when a match alert is clicked during a normal run. */
+export function setTournamentGameplayOpener(fn: GameplayOpener | null): void {
+  gameplayOpener = fn;
 }
 
 /** True if a deep-link opener is currently available (we are somewhere safe, e.g. title). */
 export function canOpenTournamentDeepLink(): boolean {
-  return flowOpener != null;
+  return flowOpener != null || gameplayOpener != null;
 }
 
 /** Open the tournament board on the notification's match. Returns false if not available. */
 export function openTournamentDeepLink(target: TournamentDeepLink): boolean {
   if (flowOpener == null) {
-    return false;
+    if (gameplayOpener == null || !gameplayOpener(target)) {
+      return false;
+    }
+    pendingDeepLink = target;
+    return true;
   }
   flowOpener(target);
   return true;
@@ -106,21 +128,25 @@ export function tournamentDeepLinkOf(n: ErNotification): TournamentDeepLink | nu
   if (d == null || typeof d.tournamentId !== "string") {
     return null;
   }
-  return { tournamentId: d.tournamentId, round: d.round ?? 0, slot: d.slot ?? 0 };
+  return {
+    tournamentId: d.tournamentId,
+    round: d.round ?? 0,
+    slot: d.slot ?? 0,
+    ...(d.kind === "match-online" ? { autoJoin: true } : {}),
+  };
 }
 
 function makeNotif(
   t: TournamentView,
   match: BracketMatchView,
   opponent: string,
-  kind: "opponent-ready" | "advanced",
+  kind: "match-online" | "advanced",
   now: number,
   reason?: string,
-  readyAt?: number,
 ): ErNotification {
   return {
-    // Stable id => the manager dedupes to once per state change (not once per poll).
-    id: `${TOURNAMENT_NOTIF_TYPE}:${t.id}:${match.id}:${kind}${readyAt == null ? "" : `:${readyAt}`}`,
+    // Stable id keeps the dedicated prompt to once per state change (not once per poll).
+    id: `${TOURNAMENT_NOTIF_TYPE}:${t.id}:${match.id}:${kind}`,
     type: TOURNAMENT_NOTIF_TYPE,
     timestamp: now,
     read: false,
@@ -133,7 +159,6 @@ function makeNotif(
       opponent,
       matchId: match.id,
       ...(reason ? { reason } : {}),
-      ...(readyAt == null ? {} : { readyAt }),
     } satisfies TournamentNotifData,
   };
 }
@@ -141,8 +166,8 @@ function makeNotif(
 /**
  * PURE derivation: the viewer's ACTIONABLE notifications for a single fetched tournament view.
  * Returns [] unless the viewer is an entrant of an in-progress tournament with a set, undecided
- * next pairing. It emits only after the opponent explicitly readies for this exact match + opponent;
- * ordinary board presence is not matchmaking intent. Exported for unit tests.
+ * next pairing. Entrants are always match-ready; the alert becomes actionable once both exact bracket
+ * opponents have fresh online-presence heartbeats. Exported for unit tests.
  */
 export function actionableTournamentNotifications(t: TournamentView, me: string, now: number): ErNotification[] {
   if (t.state !== "in_progress" || t.bracket == null) {
@@ -153,14 +178,15 @@ export function actionableTournamentNotifications(t: TournamentView, me: string,
   }
   const out: ErNotification[] = [];
 
-  // Your next pairing is actionable only after the opponent explicitly readies this exact pairing.
+  // Your next pairing is actionable when both exact opponents are currently online.
   const match = nextMatchFor(t.bracket, me);
   if (match != null && match.a != null && match.b != null && match.winner == null) {
     const opponent = opponentOf(match, me);
     if (opponent != null) {
+      const ownEnt = t.entrants.find(e => e.participant === me);
       const oppEnt = t.entrants.find(e => e.participant === opponent);
-      if (isEntrantReadyForMatch(oppEnt, match.id, me)) {
-        out.push(makeNotif(t, match, opponent, "opponent-ready", now, undefined, oppEnt?.readyAt ?? undefined));
+      if (isPresent(ownEnt?.lastSeen, now) && isPresent(oppEnt?.lastSeen, now)) {
+        out.push(makeNotif(t, match, opponent, "match-online", now));
       }
     }
   }
@@ -179,7 +205,7 @@ export function actionableTournamentNotifications(t: TournamentView, me: string,
  * Pull source: derive the viewer's ACTIONABLE tournament matches from the live worker state.
  * Best-effort + offline-safe (never throws). Reuses the board's own poll/presence infra
  * (listTournaments + getTournamentBracket); `since` is ignored because the derivation is over
- * the CURRENT bracket state and the manager dedupes by the stable ids.
+ * the CURRENT bracket state; the dedicated prompt dedupes by the stable ids.
  */
 async function fetchTournamentNotifications(_since: number): Promise<ErNotification[]> {
   const me = loggedInUser?.username;
@@ -187,6 +213,7 @@ async function fetchTournamentNotifications(_since: number): Promise<ErNotificat
   if (!me || !token || typeof fetch !== "function") {
     return [];
   }
+  await syncPendingTournamentResults();
   const list = await listTournaments();
   if (!list.ok) {
     return [];
@@ -198,6 +225,9 @@ async function fetchTournamentNotifications(_since: number): Promise<ErNotificat
     if (summary.state !== "in_progress" || !summary.entrants.some(e => e.participant === me)) {
       continue;
     }
+    // Entering a tournament means always ready. Heartbeat from title or normal gameplay so the exact
+    // opponent can see when this client is genuinely available for the scheduled match.
+    await pingTournamentPresence(summary.id);
     const res = await getTournamentBracket(summary.id);
     if (!res.ok) {
       continue;
@@ -207,36 +237,162 @@ async function fetchTournamentNotifications(_since: number): Promise<ErNotificat
   return out;
 }
 
+const PRESENCE_POLL_MS = 20_000;
+let presencePollTimer: ReturnType<typeof setInterval> | null = null;
+let presencePollPending = false;
+let activeToast: HTMLDivElement | null = null;
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+let toastCountdownTimer: ReturnType<typeof setInterval> | null = null;
+const MATCH_ACCEPT_MS = 60_000;
+const announcedOnlineMatches = new Set<string>();
+
+function dismissTournamentToast(): void {
+  if (toastTimer != null) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  if (toastCountdownTimer != null) {
+    clearInterval(toastCountdownTimer);
+    toastCountdownTimer = null;
+  }
+  activeToast?.remove();
+  activeToast = null;
+}
+
+export function showTournamentMatchToast(notification: ErNotification): boolean {
+  if (typeof document === "undefined" || activeToast != null) {
+    return false;
+  }
+  const data = notification.data as TournamentNotifData;
+  const toast = document.createElement("div");
+  toast.className = "er-tournament-match-toast";
+  toast.setAttribute("role", "alert");
+
+  const copy = document.createElement("div");
+  copy.className = "er-tournament-match-toast-copy";
+  const title = document.createElement("strong");
+  title.textContent = "Tournament match ready";
+  const body = document.createElement("span");
+  body.textContent = `${data.opponent} is online in ${data.tournamentName}.`;
+  copy.append(title, body);
+
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "er-tournament-match-toast-open";
+  const deadline = Date.now() + MATCH_ACCEPT_MS;
+  const updateCountdown = () => {
+    const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1_000));
+    open.textContent = `Accept (${seconds}s)`;
+  };
+  updateCountdown();
+  open.addEventListener("click", () => {
+    const target = tournamentDeepLinkOf(notification);
+    if (target != null && openTournamentDeepLink(target)) {
+      dismissTournamentToast();
+    }
+  });
+
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "er-tournament-match-toast-close";
+  close.setAttribute("aria-label", "Forfeit tournament match");
+  close.textContent = "X";
+  const forfeit = (message: string, expired = false) => {
+    open.disabled = true;
+    close.disabled = true;
+    body.textContent = message;
+    dropOutOfTournament(data.tournamentId)
+      .then(result => {
+        if (result.ok) {
+          dismissTournamentToast();
+          return;
+        }
+        open.disabled = expired;
+        close.disabled = false;
+        body.textContent = `Could not forfeit: ${result.error}`;
+      })
+      .catch(() => {
+        open.disabled = expired;
+        close.disabled = false;
+        body.textContent = "Could not reach the tournament server. Try again.";
+      });
+  };
+  close.addEventListener("click", () => {
+    const confirmed =
+      typeof globalThis.confirm === "function" && globalThis.confirm("Are you sure you want to forfeit the match?");
+    if (!confirmed) {
+      return;
+    }
+    forfeit("Forfeiting this tournament match...");
+  });
+
+  toast.append(copy, open, close);
+  document.body.append(toast);
+  activeToast = toast;
+  toastCountdownTimer = setInterval(updateCountdown, 1_000);
+  toastTimer = setTimeout(() => {
+    forfeit("Match acceptance expired. Forfeiting...", true);
+  }, MATCH_ACCEPT_MS);
+  return true;
+}
+
+/** Poll once, heartbeat active entrants, and surface the dedicated live-match prompt. */
+export async function pollTournamentPresenceNotifications(): Promise<void> {
+  if (presencePollPending || (typeof document !== "undefined" && document.visibilityState === "hidden")) {
+    return;
+  }
+  presencePollPending = true;
+  try {
+    const notifications = await fetchTournamentNotifications(0);
+    const onlineNow = new Set(
+      notifications.filter(n => (n.data as TournamentNotifData).kind === "match-online").map(n => n.id),
+    );
+    for (const id of announcedOnlineMatches) {
+      if (!onlineNow.has(id)) {
+        announcedOnlineMatches.delete(id);
+      }
+    }
+    for (const notification of notifications) {
+      if (
+        (notification.data as TournamentNotifData).kind === "match-online"
+        && !announcedOnlineMatches.has(notification.id)
+        && showTournamentMatchToast(notification)
+      ) {
+        announcedOnlineMatches.add(notification.id);
+      }
+    }
+  } finally {
+    presencePollPending = false;
+  }
+}
+
+/** Start the page-lifetime tournament heartbeat; idempotent across title-screen reloads. */
+export function startTournamentPresenceNotifications(): void {
+  if (presencePollTimer != null || import.meta.env.MODE === "test") {
+    return;
+  }
+  void pollTournamentPresenceNotifications();
+  presencePollTimer = setInterval(() => void pollTournamentPresenceNotifications(), PRESENCE_POLL_MS);
+}
+
+/** Test/logout cleanup for the page-lifetime heartbeat. */
+export function stopTournamentPresenceNotifications(): void {
+  if (presencePollTimer != null) {
+    clearInterval(presencePollTimer);
+    presencePollTimer = null;
+  }
+  dismissTournamentToast();
+  announcedOnlineMatches.clear();
+}
+
 /**
- * Register the tournament notification TYPE + pull source on the shared manager. Idempotent
- * (safe to call on every title load, like {@linkcode initErNotifications}).
+ * Remove tournament notices persisted by older builds. Matchmaking prompts must never appear
+ * in the shared patch-note / ghost-battle inbox.
  */
 export function initTournamentNotifications(): void {
-  notificationManager.registerType({
-    type: TOURNAMENT_NOTIF_TYPE,
-    summary(n) {
-      const d = n.data as TournamentNotifData;
-      if (d.kind === "advanced") {
-        return `${d.tournamentName}: you advanced without playing (${d.reason ?? "auto"})`;
-      }
-      return `${d.opponent} is ready - ${d.tournamentName}`;
-    },
-    detail(n) {
-      const d = n.data as TournamentNotifData;
-      if (d.kind === "advanced") {
-        return {
-          title: "Advanced without playing",
-          body:
-            `${d.reason ?? "You advanced"} — you moved on in the ${d.tournamentName} without a match `
-            + `(${d.opponent} did not play the round).\n\nOpen the bracket to see your next fight.`,
-          customView: TOURNAMENT_NOTIF_TYPE,
-        };
-      }
-      const title = "Opponent is ready";
-      const body = `${d.opponent} marked your ${d.tournamentName} match ready.\n\nOpen the bracket, mark yourself ready, and join the match.`;
-      // customView tells the inbox UI to offer the "A: Open bracket" deep-link prompt.
-      return { title, body, customView: TOURNAMENT_NOTIF_TYPE };
-    },
-  });
-  notificationManager.registerSource(TOURNAMENT_NOTIF_TYPE, fetchTournamentNotifications);
+  for (const notification of notificationManager.list()) {
+    if (notification.type === TOURNAMENT_NOTIF_TYPE) {
+      notificationManager.remove(notification.id);
+    }
+  }
 }
