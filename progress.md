@@ -4358,3 +4358,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A node-pure source contract rejects the old fixed sub-frame tap and pins the down/frame/up sequence. The existing
   public-driver boundary still enforces keyboard/DOM-only mutation: the reusable wait lives in evidence alongside
   screenshot frame settling and exposes no private game state.
+
+## 2026-07-26 - Replacement control cannot become a command-presentation wait
+
+- Full product gate `30212674952` on `3cbd74af0` proved the source-aware command-presentation fix across all five
+  campaign shards, both production-fidelity shards, WebRTC/rejoin, mutation assurance, and 31/33 gameplay shards.
+  Its sole co-op Lane-B failure was `coop-duo-barrier-deadlock`: after a guest-owned faint replacement, the guest
+  remained in `CoopReplayTurnPhase` with its real `CommandPhase` queued behind it. Static remains the inherited
+  Showdown/Tournament diagnostics outside this co-op-only workstream; T4 is being classified separately.
+- Exact logs showed the remaining race. The settled `TURN_COMMIT` had installed a typed `REPLACEMENT` control, the
+  test deliberately dropped the first `REPLACEMENT_COMMIT`, and `TurnInitPhase` treated the absence of a command
+  frontier as absence of a command *source*. It therefore queued an entry-presentation-only replay at turn N. That
+  phase cannot consume a replacement checkpoint, and the replacement successor authorizes turn N+1, so no legal
+  entry could release the mismatched wait.
+- Command-presentation inspection now returns a closed `awaiting-replacement-carrier` state for an exact live
+  replacement control. `TurnInitPhase` routes that state through the ordinary checkpoint-consuming replay before
+  any command phase is created, just as it already did when the carrier happened to be buffered. This covers both
+  carrier race orders without a timer, guessed command, or local successor derivation.
+- The source contract pins both halves: a typed replacement can never degrade to `awaiting-source`, and an in-flight
+  replacement is routed through the non-entry replay transaction. Permitted local evidence is 17/17 presentation
+  contracts, targeted Biome, and `git diff --check`; the exact B9 engine proof remains GitHub-hosted per policy.
+- Exact-SHA public campaign `30212900164` and Journey `30212894219` on `92cbd7b0` completed red after the frame-held
+  keyboard change. Their artifacts still need separate triage before any release verdict; no local browser run was
+  used and no staging/production deployment occurred.

@@ -8268,6 +8268,7 @@ export function isCoopV2CommandEntryPresentationActive(runtime: CoopRuntime | nu
 
 export type CoopV2CommandPresentationRequirement =
   | { readonly kind: "awaiting-source" }
+  | { readonly kind: "awaiting-replacement-carrier"; readonly operationId: string }
   | { readonly kind: "presentation"; readonly operationId: string }
   | { readonly kind: "covered-by-source"; readonly operationId: string };
 
@@ -8291,6 +8292,14 @@ export function inspectCoopV2CommandPresentationRequirement(
   runtime: CoopRuntime | null = active,
 ): CoopV2CommandPresentationRequirement {
   const control = runtime?.v2ControlLedger.latestControl;
+  if (control?.kind === "REPLACEMENT" && control.wave === wave && control.turn === turn) {
+    // A settled turn can make Phaser construct TurnInit while the separately ordered replacement result is
+    // still in flight. That is not a missing command-open: the typed REPLACEMENT control explicitly forbids
+    // command input until its checkpoint carrier materializes the chosen actor. Keep this state distinct so
+    // TurnInit routes through the ordinary replacement replay transaction, which alone can consume and prove
+    // that carrier, instead of parking an entry-presentation waiter that no replacement entry can release.
+    return { kind: "awaiting-replacement-carrier", operationId: control.operationId };
+  }
   if (control?.kind !== "COMMAND_FRONTIER" || control.wave !== wave || control.turn !== turn) {
     return { kind: "awaiting-source" };
   }

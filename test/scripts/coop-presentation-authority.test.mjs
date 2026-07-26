@@ -163,6 +163,11 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
     /inspectCoopV2CommandPresentationRequirement\(wave, turn\)[\s\S]+commandPresentation\.kind === "awaiting-source"[\s\S]+commandPresentation\.kind === "presentation"[\s\S]+hasConsumedCommandPresentation\(commandPresentation\.operationId\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+wave,[\s\S]+true,/u,
     "V2 queues a prefix consumer only while a command source is absent or its CONTROL prefix is unconsumed",
   );
+  assert.match(
+    turnInit,
+    /pendingAuthoritativeReplacementTurn[\s\S]+inspectCoopV2CommandPresentationRequirement\(currentWave, currentTurn\)\.kind[\s\S]+=== "awaiting-replacement-carrier"[\s\S]+"CoopReplayTurnPhase"[\s\S]+replacementReplayTurn,[\s\S]+0,/u,
+    "a known replacement frontier uses the checkpoint-consuming replay even before its carrier is buffered",
+  );
   assert.doesNotMatch(turnInit, /isShowdownGuestFlipGated\(\) && globalScene\.currentBattle\.turn === 1/u);
   const entryPump = replay.slice(
     replay.indexOf("private async pumpEntryPresentation"),
@@ -190,6 +195,11 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
     runtime,
     /inspectCoopV2CommandPresentationRequirement[\s\S]+sourceEntryOf\(control\)[\s\S]+source\.kind === "CONTROL_COMMIT"[\s\S]+decodeControlOpenEntry\(source\)[\s\S]+kind: "covered-by-source"/u,
     "the command source distinguishes a replayable CONTROL prefix from an already-presented TURN successor",
+  );
+  assert.match(
+    runtime,
+    /control\?\.kind === "REPLACEMENT"[\s\S]+control\.wave === wave[\s\S]+control\.turn === turn[\s\S]+kind: "awaiting-replacement-carrier"/u,
+    "a typed replacement frontier is never downgraded to a missing command source",
   );
   assert.match(
     runtime,

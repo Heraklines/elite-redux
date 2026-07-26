@@ -53,16 +53,24 @@ export class TurnInitPhase extends FieldPhase {
     const currentTurn = battle.turn;
     const currentWave = battle.waveIndex;
     const pending = streamer.peekCheckpointForTurn(currentTurn, currentWave);
-    if (
-      pending?.reason !== "replacement"
-      || pending.epoch !== controller.sessionEpoch
-      || pending.wave !== currentWave
-      || pending.authoritativeState?.wave !== currentWave
-      || (pending.turn !== currentTurn && pending.turn !== currentTurn + 1)
-    ) {
-      return null;
+    const hasBufferedReplacement =
+      pending?.reason === "replacement"
+        ? pending.epoch === controller.sessionEpoch
+          && pending.wave === currentWave
+          && pending.authoritativeState?.wave === currentWave
+          && (pending.turn === currentTurn || pending.turn === currentTurn + 1)
+        : false;
+    if (hasBufferedReplacement) {
+      return currentTurn;
     }
-    return currentTurn;
+    // Failure-first B9 (run 30212674952): after an own-faint pick, the TURN_COMMIT's typed REPLACEMENT
+    // control is already installed while the separately retained REPLACEMENT_COMMIT is deliberately lost.
+    // TurnInit must enter the ordinary checkpoint-consuming replay even before that carrier is buffered.
+    // Treating this as a missing command source creates an entry-presentation-only wait at turn N; the
+    // replacement result authorizes command turn N+1 and can never release that mismatched waiter.
+    return inspectCoopV2CommandPresentationRequirement(currentWave, currentTurn).kind === "awaiting-replacement-carrier"
+      ? currentTurn
+      : null;
   }
 
   /**
