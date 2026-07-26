@@ -500,6 +500,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     enemySelfEffect.recordCoopPresentationAtEnqueue();
 
     const recording = endCoopRecording();
+    expect(player.id).not.toBe(enemy.id);
+    expect(recording.events).toHaveLength(2);
     expect(recording.events).toEqual([
       {
         k: "commonAnim",

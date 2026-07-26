@@ -1,9 +1,9 @@
 {
   "taskId": "v2-preprojected-switch-presentation-20260724",
-  "version": 2,
+  "version": 1,
   "branch": "ci/coop/v2-preprojected-switch-presentation-20260724",
   "trainRef": "ci/coop/v2-preprojected-switch-presentation-20260724",
-  "baseSha": "02a3dd536a2883db80fd9dc5cf3d2a710fb987fb",
+  "baseSha": "b685efd2d8a3a785e9e4c6c4c90797e2f5a5178d",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-preprojected-switch-presentation-20260724.json",
     ".github/workflows/coop-public-ui-journey.yml",
@@ -134,8 +134,5 @@
     "test/tools/coop-local-peer.ts",
     "test/tools/coop-soak-driver.ts",
     "test/utils/encounter-test-utils.ts"
-  ],
-  "lockedSchemaFiles": [
-    "src/data/elite-redux/coop/coop-transport.ts"
   ]
 }
