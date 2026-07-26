@@ -2565,6 +2565,20 @@ test("soaks budget command rendezvous for authoritative presentation and restore
   }
 });
 
+test("the animations-on campaign extends a live between-wave renderer without weakening other profiles", () => {
+  assert.match(campaignDriver, /const betweenWaveTimeoutMs = rig\.config\.timeoutMs \* 3/u);
+  assert.match(
+    campaignDriver,
+    /const betweenWaveBudget = policy\.moveAnimationsExpected[\s\S]*createAnimationProgressBudget\(rig, commandCursors, betweenWaveTimeoutMs,[\s\S]*hardCeilingMs: betweenWaveTimeoutMs \+ ANIMATION_PROGRESS_ALLOWANCE_MS/u,
+  );
+  assert.match(campaignDriver, /betweenWaveBudget\?\.observe\(\) \?\? fixedDeadline/u);
+  assert.doesNotMatch(
+    campaignDriver,
+    /const betweenWaveBudget = true/u,
+    "animations-skipped depth and mystery profiles retain the original fixed deadline",
+  );
+});
+
 test("the one-process soak retains the authority browser while nested peer pumps settle a wave crossing", () => {
   const crossingStart = soakDriver.indexOf("  const crossCommandBoundaryWithReplayGuest = async (");
   const crossingEnd = soakDriver.indexOf(

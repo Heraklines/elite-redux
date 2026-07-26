@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createBattlePromptAdvancer, driveConfirmedLeave } from "./campaign.mjs";
+import { createAnimationProgressBudget, createBattlePromptAdvancer, driveConfirmedLeave } from "./campaign.mjs";
 import { findOwnedActionableTargetSurface } from "./campaign-nav.mjs";
 import { marketObservationView } from "./evidence.mjs";
 import { assertMarketPurchaseConverged, planMarketGridKeys } from "./market-journey.mjs";
@@ -199,6 +199,36 @@ test("campaign reward leave cannot send confirm before both semantic confirmatio
 function at(ms) {
   return new Date(ms).toISOString();
 }
+
+test("animation progress may extend a wait but cannot cross its absolute presentation ceiling", () => {
+  let nowMs = 1_000;
+  const authority = { label: "authority", evidence: new FakeEvidence("authority") };
+  const renderer = { label: "renderer", evidence: new FakeEvidence("renderer") };
+  const rig = { clients: { authority, renderer } };
+  const budget = createAnimationProgressBudget(rig, { authority: 0, renderer: 0 }, 300, {
+    now: () => nowMs,
+    animationAllowanceMs: 90,
+    hardCeilingMs: 390,
+  });
+
+  assert.equal(budget.deadline(), 1_300);
+  nowMs = 1_290;
+  authority.evidence.push({ at: at(nowMs), kind: "console", text: "Start Phase CommonAnimPhase" });
+  assert.equal(budget.observe(), 1_380, "a real late animation phase keeps the representative browser run alive");
+
+  nowMs = 1_375;
+  renderer.evidence.push({
+    at: at(nowMs),
+    kind: "console",
+    text: "[coop:replay] guest replay turn=1: live increment seq=12..12",
+  });
+  assert.equal(budget.observe(), 1_390, "further causal progress is capped by one immutable circuit breaker");
+
+  nowMs = 1_385;
+  authority.evidence.push({ at: at(nowMs), kind: "console", text: "[coop:health] heartbeat" });
+  assert.equal(budget.observe(), 1_390, "keepalives cannot manufacture more time");
+  assert.equal(budget.hardDeadline(), 1_390);
+});
 
 test("Commander post-turn prompts use its proven address without inventing a hidden-owner command surface", async () => {
   const address = { epoch: 73, wave: 1, turn: 2 };
