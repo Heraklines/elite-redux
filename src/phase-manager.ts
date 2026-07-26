@@ -12,7 +12,7 @@ import { DynamicQueueManager } from "#app/dynamic-queue-manager";
 import { globalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { PhaseTree } from "#app/phase-tree";
-import { beginActiveCoopMutation, type CoopMutationToken } from "#data/elite-redux/coop/coop-mutation-ledger";
+import type { CoopMutationLedger, CoopMutationToken } from "#data/elite-redux/coop/coop-mutation-ledger";
 import { coopRendererGateNeutralizes } from "#data/elite-redux/coop/coop-renderer-gate";
 import { isCoopRecording, recordCoopMessage } from "#data/elite-redux/coop/coop-turn-recorder";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
@@ -360,6 +360,10 @@ export class PhaseManager {
    * when that object actually leaves the scheduler (never merely because its synchronous start head returned).
    */
   private readonly coopMutationTokens = new WeakMap<Phase, CoopMutationToken>();
+  /** The exact runtime ledger bound to this scene; never inferred from an ambient process selector. */
+  private coopMutationLedger: CoopMutationLedger | null = null;
+  /** An authoritative runtime must never run a phase while its scene/ledger binding is absent. */
+  private coopMutationLedgerRequired = false;
   /**
    * Terminal fence for a co-op runtime that is retaining its peer-ACKed shutdown transaction. The current
    * phase may receive late async completions while that handshake runs; blocking `shiftPhase` prevents
@@ -490,6 +494,15 @@ export class PhaseManager {
   public setCoopRecoveryProgressionFence(predicate: (() => boolean) | null): void {
     this.coopRecoveryProgressionFrozen = predicate ?? (() => false);
     this.coopRecoveryControlShiftPermitted = false;
+  }
+
+  /** Bind this scene directly to its runtime-owned mutation ledger. Null is valid only outside authority. */
+  public setCoopMutationLedger(ledger: CoopMutationLedger | null, required = false): void {
+    if (required && ledger == null) {
+      throw new Error("authoritative co-op requires a scene-bound mutation ledger");
+    }
+    this.coopMutationLedger = ledger;
+    this.coopMutationLedgerRequired = required;
   }
 
   /**
@@ -633,10 +646,14 @@ export class PhaseManager {
     if (phase == null || phase.is("CoopTurnCommitPhase") || this.coopMutationTokens.has(phase)) {
       return;
     }
-    const token = beginActiveCoopMutation(`phase:${phase.phaseName}`);
-    if (token != null) {
-      this.coopMutationTokens.set(phase, token);
+    const ledger = this.coopMutationLedger;
+    if (ledger == null) {
+      if (this.coopMutationLedgerRequired) {
+        throw new Error(`authoritative co-op phase ${phase.phaseName} has no scene-bound mutation ledger`);
+      }
+      return;
     }
+    this.coopMutationTokens.set(phase, ledger.begin(`phase:${phase.phaseName}`));
   }
 
   private settleCoopMutationPhase(phase: Phase | null | undefined): void {

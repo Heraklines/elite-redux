@@ -2494,6 +2494,16 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
     helper >= 0 && wrap > helper && retiredPassThrough > wrap && host > retiredPassThrough && guest > host,
     "a synchronous or delayed tween completion may not read the other browser's global scene/phase/runtime",
   );
+  assert.match(
+    pins,
+    /const ownsClockRealm = \(\): boolean =>[\s\S]+activeClientCtx === ctx[\s\S]+globalScene === ctx\.scene[\s\S]+getCoopRuntime\(\) === ctx\.runtime/u,
+    "a repeated host/guest label is not sufficient evidence that a Phaser clock owns the installed realm",
+  );
+  assert.match(
+    pins,
+    /clock\.preUpdate = \(time: number, delta: number\)[\s\S]+runOwned\(\(\) => originalPreUpdate\(time, delta\)\)[\s\S]+clock\.update = \(time: number, delta: number\)[\s\S]+runOwned\(\(\) => originalUpdate\(time, delta\)\)/u,
+    "both halves of the headless MockClock tick must execute in their exact scheduling browser",
+  );
 });
 
 test("a projected Mystery phase cannot attest through its predecessor's active handler", () => {

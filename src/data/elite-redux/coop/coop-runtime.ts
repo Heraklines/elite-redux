@@ -8455,6 +8455,10 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   setActiveCoopMutationLedger(runtime.mutationLedger);
   activateCoopV2Runtime(runtime);
   runtimeSceneBindings.set(runtime, globalScene);
+  globalScene?.phaseManager?.setCoopMutationLedger?.(
+    runtime.mutationLedger,
+    runtime.controller.netcodeMode === "authoritative",
+  );
   globalScene?.phaseManager?.setCoopRecoveryProgressionFence?.(
     () => coopV2RecoveryFencePredicates(runtime)?.isProgressionFrozen() === true,
   );
@@ -12180,6 +12184,7 @@ export function clearCoopRuntime(): void {
   resetCoopUiRelayTrace();
   if (active == null) {
     setActiveCoopMutationLedger(null);
+    globalScene?.phaseManager?.setCoopMutationLedger?.(null);
     // A prior terminal path may have already nulled the runtime before the ordinary title teardown arrives.
     // Cycle-free predicates are process-global, so clear them even on that idempotent second teardown; a
     // later solo run must never inherit Showdown side ownership or renderer gating from the dead session.
@@ -12199,6 +12204,8 @@ export function clearCoopRuntime(): void {
     }
     return;
   }
+  const activeRuntime = active;
+  const runtimeScene = runtimeSceneBindings.get(activeRuntime) as typeof globalScene | undefined;
   try {
     globalScene?.phaseManager?.setCoopRecoveryProgressionFence?.(null);
   } catch {
@@ -12242,6 +12249,8 @@ export function clearCoopRuntime(): void {
   active.showdownSpoof?.dispose();
   active.mutationLedger.reset();
   setActiveCoopMutationLedger(null);
+  runtimeScene?.phaseManager?.setCoopMutationLedger?.(null);
+  runtimeSceneBindings.delete(activeRuntime);
   // Drop the persistent move-learn forward listener + its in-flight slot set (#633 BUG3+5) so a
   // subsequent solo / lockstep run has no listener and spawns no CoopReplayLearnMovePhase.
   offLearnMoveForward?.();

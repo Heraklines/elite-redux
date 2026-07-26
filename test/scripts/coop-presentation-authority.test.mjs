@@ -104,7 +104,7 @@ test("ordinary co-op and Showdown both replay retained entry presentation before
   );
   assert.match(
     turnInit,
-    /if \(globalScene\.currentBattle\.turn === 1\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+globalScene\.currentBattle\.waveIndex,[\s\S]+true,/u,
+    /if \(\s*globalScene\.currentBattle\.turn === 1[\s\S]+hasConsumedEntryPresentationThroughWave[\s\S]+"CoopReplayTurnPhase"[\s\S]+globalScene\.currentBattle\.waveIndex,[\s\S]+true,/u,
   );
   assert.doesNotMatch(turnInit, /isShowdownGuestFlipGated\(\) && globalScene\.currentBattle\.turn === 1/u);
   const entryPump = replay.slice(
@@ -177,9 +177,22 @@ test("the production turn boundary is owned by a runtime mutation ledger, not a 
   const ledger = read("src/data/elite-redux/coop/coop-mutation-ledger.ts");
   const commit = read("src/phases/coop-turn-commit-phase.ts");
 
-  assert.match(manager, /prepareCurrentPhaseForStart\(\)[\s\S]+beginActiveCoopMutation/u);
+  assert.match(manager, /setCoopMutationLedger\(ledger: CoopMutationLedger \| null, required = false\)/u);
+  assert.match(manager, /prepareCurrentPhaseForStart\(\)[\s\S]+ledger\.begin\(`phase:\$\{phase\.phaseName\}`\)/u);
+  assert.match(
+    manager,
+    /if \(this\.coopMutationLedgerRequired\) \{[\s\S]+authoritative co-op phase \$\{phase\.phaseName\} has no scene-bound mutation ledger/u,
+  );
   assert.match(manager, /shiftPhase\(\)[\s\S]+settleCoopMutationPhase\(this\.currentPhase\)/u);
   assert.match(runtime, /mutationLedger:\s*new CoopMutationLedger\(\)/u);
+  assert.match(
+    runtime,
+    /phaseManager\?\.setCoopMutationLedger\?\.\([\s\S]+runtime\.mutationLedger,[\s\S]+runtime\.controller\.netcodeMode === "authoritative"/u,
+  );
+  assert.match(
+    runtime,
+    /const runtimeScene = runtimeSceneBindings\.get\(activeRuntime\)[\s\S]+runtimeScene\?\.phaseManager\?\.setCoopMutationLedger\?\.\(null\)[\s\S]+runtimeSceneBindings\.delete\(activeRuntime\)/u,
+  );
   assert.match(ledger, /begin\(label: string\)[\s\S]+activeTokens\.set/u);
   assert.match(ledger, /settle:[\s\S]+activeTokens\.delete/u);
   assert.match(commit, /const mutationBefore = runtime\.mutationLedger\.snapshot\(\)/u);
@@ -201,7 +214,7 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
 test("protocol 48 binds pre-command presentation and requires stable live actor identities", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
-  const stream = read("src/data/elite-redux/coop/coop-battle-stream.ts");
+  const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
@@ -212,7 +225,7 @@ test("protocol 48 binds pre-command presentation and requires stable live actor 
   );
   assert.match(transport, /actor: CoopPresentationActorRef/u);
   assert.doesNotMatch(transport, /actor\?: CoopPresentationActorRef/u);
-  assert.match(stream, /event\.targetActors\.length === event\.targets\.length/u);
+  assert.match(validator, /event\.targetActors\.length === event\.targets\.length/u);
   assert.match(move, /targets: targetEntries\.map\(entry => entry\.target\)/u);
   assert.match(move, /targetActors: targetEntries\.map\(entry => entry\.actor\)/u);
 });
@@ -237,7 +250,12 @@ test("production-transition fixtures use public commands and terminal teardown c
   const mysteryJourney = read("test/tests/elite-redux/coop/coop-transition-t2-mystery.test.ts");
 
   assert.match(harness, /options\.submitHostTackle[\s\S]+host selects Fight through COMMAND UI/u);
-  assert.match(harness, /prev\.runtime\.localTransport\.state !== "closed"/u);
+  assert.equal(
+    [...harness.matchAll(/restoredRuntime != null && restoredRuntime\.localTransport\.state !== "closed"/gu)].length,
+    2,
+    "sync and async scope teardown restore only the newest still-live browser runtime",
+  );
+  assert.doesNotMatch(harness, /prev\.runtime\.localTransport\.state !== "closed"/u);
   assert.match(
     harness,
     /startGuestMeShopOwner[\s\S]+peerContextByScene\.get\(guestScene\)[\s\S]+withClient\(peerCtx, \(\) => drainLoopback\(\)\)/u,

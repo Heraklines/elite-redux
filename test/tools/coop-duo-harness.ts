@@ -2676,24 +2676,39 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
   });
   const pinClock = (scene: BattleScene, ctx: ClientCtx): void => {
     const clock = scene.time as unknown as {
+      preUpdate: (time: number, delta: number) => void;
       update: (time: number, delta: number) => void;
-      _active?: unknown[];
       removeAllEvents?: () => void;
     };
+    const originalPreUpdate = clock.preUpdate.bind(scene.time);
     const originalUpdate = clock.update.bind(scene.time);
-    clock.update = (time: number, delta: number): void => {
+    const ownsClockRealm = (): boolean =>
+      activeClientCtx === ctx && globalScene === ctx.scene && getCoopRuntime() === ctx.runtime;
+    const runOwned = (callback: () => void): void => {
       if (disposed) {
         return;
       }
-      // Only a tick that can FIRE callbacks needs the swap; an idle clock stays a cheap direct call.
-      if ((clock._active?.length ?? 0) === 0 || activeClientLabel === ctx.label) {
-        originalUpdate(time, delta);
+      if (ownsClockRealm()) {
+        callback();
         return;
       }
-      withClientSync(ctx, () => originalUpdate(time, delta));
+      withClientSync(ctx, callback);
+    };
+    // MockClock performs these as two separate calls from a process-global setInterval. Pin both halves:
+    // preUpdate promotes pending TimerEvents into the live set, while update can execute their callbacks.
+    // A matching "host" label is not an ownership proof because nested async scopes can still have another
+    // scene/runtime installed; exact identity is the same boundary independent browser realms provide.
+    clock.preUpdate = (time: number, delta: number): void => {
+      runOwned(() => originalPreUpdate(time, delta));
+    };
+    clock.update = (time: number, delta: number): void => {
+      // An idle update is state-only, but it must still follow its preUpdate realm: a callback can be moved
+      // from pending to active immediately before this call even when the old active set was empty.
+      runOwned(() => originalUpdate(time, delta));
     };
     disposers.push(() => {
       clock.removeAllEvents?.();
+      clock.preUpdate = originalPreUpdate;
       clock.update = originalUpdate;
     });
   };
