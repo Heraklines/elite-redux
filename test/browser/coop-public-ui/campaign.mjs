@@ -1801,6 +1801,109 @@ async function checkpointAsymmetricBargainSurface(rig, cursors, stats, owner) {
 }
 
 /**
+ * Validate the intentionally asymmetric host-owned learn-move presentation. The owner is on the
+ * actionable CONFIRM while the partner watches the move list read-only, but both clients must still
+ * be on the same authoritative wave/turn and state image. A watcher that has already crossed into
+ * NextEncounterPhase is a product ordering failure, not a harmless presentation difference.
+ */
+export function assertAsymmetricLearnMoveProjection(ownerObservation, watcherObservation) {
+  const watcherPhase = watcherObservation?.phase;
+  if (
+    ownerObservation?.surfaceId !== "learn-move:confirm"
+    || ownerObservation.ownerSeat !== ownerObservation.localSeat
+    || !isActionableSemanticObservation(ownerObservation)
+  ) {
+    throw new Error(
+      `[campaign-learn-move] owner confirmation was not exclusively actionable: ${JSON.stringify(ownerObservation)}`,
+    );
+  }
+  if (
+    watcherObservation?.surfaceId !== "summary"
+    || (watcherPhase !== "LearnMovePhase" && watcherPhase !== "CoopReplayLearnMovePhase")
+    || watcherObservation.ready?.handlerActive !== true
+    || watcherObservation.ready?.inputBlocked !== true
+    || watcherObservation.localSeat === ownerObservation.localSeat
+  ) {
+    throw new Error(
+      `[campaign-learn-move] partner did not expose the read-only move watcher: ${JSON.stringify(watcherObservation)}`,
+    );
+  }
+  if (
+    JSON.stringify(watcherObservation.address) !== JSON.stringify(ownerObservation.address)
+    || ownerObservation.stateDigest == null
+    || watcherObservation.stateDigest !== ownerObservation.stateDigest
+  ) {
+    throw new Error(
+      `[campaign-learn-move] owner/watcher crossed different authoritative states: ${JSON.stringify({
+        ownerObservation,
+        watcherObservation,
+      })}`,
+    );
+  }
+}
+
+async function checkpointAsymmetricLearnMoveSurface(rig, cursors, owner) {
+  const ownerEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[owner.label] ?? 0, "learn-move:confirm");
+      return candidate != null && isActionableSemanticObservation(candidate.observation) ? candidate : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "actionable learn-move confirmation owner" },
+  );
+  const watcher = Object.values(rig.clients).find(client => client !== owner);
+  if (watcher == null) {
+    throw new Error("[campaign-learn-move] host-owned prompt has no partner watcher");
+  }
+  const watcherEvent = await watcher.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[watcher.label] ?? 0);
+      if (candidate == null) {
+        return null;
+      }
+      try {
+        assertAsymmetricLearnMoveProjection(ownerEvent.observation, candidate.observation);
+        return candidate;
+      } catch {
+        return null;
+      }
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "same-state read-only learn-move watcher" },
+  );
+  const proof = {
+    surfaceId: "learn-move:confirm",
+    watcherSurfaceId: watcherEvent.observation.surfaceId,
+    address: ownerEvent.observation.address,
+    stateDigest: ownerEvent.observation.stateDigest,
+    ownerSeat: owner.publicSeat,
+    watcherSeat: watcher.publicSeat,
+  };
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-semantic-convergence", proof);
+  }
+  return { authority: ownerEvent.observation, ownerEvent, peerEvents: [watcherEvent] };
+}
+
+/** Decline a learn cleanly: decline replacement, then confirm that teaching should stop. */
+async function driveLearnMoveDecline(rig, owner, boundary) {
+  const firstIdentity = semanticAppearanceIdentity(boundary.ownerEvent);
+  const from = boundary.ownerEvent.index + 1;
+  await owner.press("Backspace", "campaign-learn-move-decline-replacement");
+  const stopConfirmation = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(from, "learn-move:confirm");
+      return candidate != null
+        && semanticAppearanceIdentity(candidate) !== firstIdentity
+        && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
+        && isActionableSemanticObservation(candidate.observation)
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "learn-move stop-teaching confirmation" },
+  );
+  await owner.press("Space", `campaign-learn-move-stop:${stopConfirmation.index}`);
+}
+
+/**
  * Every symmetric registered interface is also a mechanical convergence boundary. This turns the
  * semantic observer into a generic future-screen contract: adding a driver without matching the
  * authority address and state digest on both real browsers cannot silently green the campaign.
@@ -2245,6 +2348,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       }
     } else if (driver.name === "reward-target") {
       mechanicalBoundary = await checkpointRewardPartyTarget(rig, cursors, client);
+    } else if (driver.name === "learn-move-confirm") {
+      mechanicalBoundary = await checkpointAsymmetricLearnMoveSurface(rig, cursors, client);
     } else if (driver.v2SurfaceId) {
       mechanicalBoundary = await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
     }
@@ -2255,6 +2360,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
     } else if (driver.name === "mystery-encounter") {
       await driveMysteryEncounterChoice(rig, client, cursors);
+    } else if (driver.name === "learn-move-confirm" && mechanicalBoundary != null) {
+      await driveLearnMoveDecline(rig, client, mechanicalBoundary);
     } else if (driver.mysteryParty) {
       await driveMysteryPartyPicker(rig, client, cursors, stats);
     } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
@@ -2308,6 +2415,29 @@ function latestStartPhase(clients) {
  */
 function phaseProgressSignature(clients) {
   return clients.map(client => client.evidence.findLast(START_PHASE)?.index ?? -1).join(",");
+}
+
+/**
+ * An embedded Mystery battle can park the replay browser on its addressed command watcher a few
+ * seconds before the authoritative browser finishes the corresponding summon intro. That watcher
+ * is positive evidence of the ordered handoff, not an unknown UI, but only for the same bounded
+ * single-sided frontier window used elsewhere. A genuinely orphaned watcher still becomes loud.
+ */
+export function hasProvisionalCommandWatcherSurface(clients, cursors, nowMs = Date.now()) {
+  return clients.some(client => {
+    const cursor = cursors[client.label] ?? 0;
+    const event = client.evidence.findLastSemanticSurface(cursor, "command:watcher");
+    const observation = event?.observation;
+    const observedAt = Date.parse(event?.at ?? "");
+    return (
+      observation?.phase === "CoopReplayTurnPhase"
+      && observation.ready?.handlerActive === true
+      && observation.ready?.inputBlocked === true
+      && Number.isFinite(observedAt)
+      && nowMs - observedAt >= 0
+      && nowMs - observedAt <= SINGLE_SIDED_COMMAND_CONFIRM_MS
+    );
+  });
 }
 
 /**
@@ -2507,7 +2637,10 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
       continue;
     }
 
-    if (hasPassiveBattleProgressSurface(clients, commandCursors)) {
+    if (
+      hasPassiveBattleProgressSurface(clients, commandCursors)
+      || hasProvisionalCommandWatcherSurface(clients, commandCursors)
+    ) {
       lastRegisteredSurface = "passive-battle-progress";
       stallSince = 0;
       await delay(150);

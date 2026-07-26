@@ -3969,6 +3969,30 @@ function wireCoopLearnMoveForward(relay: CoopInteractionRelay): void {
       );
       return;
     }
+    // Reward interactions queue a real LearnMovePhase on both clients before the ordered learn-move
+    // prompt that follows them. If the guest is slow, this prompt can arrive while that exact phase is
+    // queued but not current. Bind the immutable presentation to the queued continuation instead of
+    // inserting a replay phase ahead of it: otherwise the replay consumes the result, then the queued
+    // copy starts later and waits forever for an already-settled operation. Level-up learns have no
+    // guest LearnMovePhase, so they deliberately fall through to CoopReplayLearnMovePhase below.
+    let stagedOnQueuedContinuation = false;
+    if (!ownerIsGuest && operationId != null) {
+      globalScene.phaseManager?.hasPhaseOfType("LearnMovePhase", phase => {
+        stagedOnQueuedContinuation = phase.stageCoopV2HostOwnedLearnMovePresentation(
+          operationId,
+          partySlot,
+          moveId,
+          maxMoveCount,
+          ownerIsGuest,
+        );
+        return stagedOnQueuedContinuation;
+      });
+    }
+    if (stagedOnQueuedContinuation) {
+      learnMoveForwardInFlight.add(partySlot);
+      coopLog("learnmove", `recv learnMoveForward slot=${partySlot} staged on the matching queued LearnMovePhase`);
+      return;
+    }
     // Depth-lane deadlock (run 29933294323): the guest renderer speculatively advances to the NEXT wave's
     // NextEncounterPhase and PARKS inside `adoptCoopHostEnemyParty` -> `awaitEnemyParty`, awaiting cross-wave
     // enemy material the host cannot build until this very forget-pick relays. A queue-owned CoopReplayLearnMovePhase

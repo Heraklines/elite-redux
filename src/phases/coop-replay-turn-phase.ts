@@ -749,12 +749,20 @@ export class CoopReplayTurnPhase extends Phase {
               || coopWaveAdvanceSignaledFor(this.sourceWave)
               || (enemyParty.length > 0 && enemyParty.every(mon => mon == null || mon.isFainted()));
             if (ownSlot >= 0 && ownMon?.isActive() === true && !waveWon) {
+              // The checkpoint may be the N+1 replacement consumed by a replay that originally parked on N.
+              // Cursor adoption above is the authoritative crossing; the command we open now and the replay
+              // that follows it must use that LIVE cursor. Re-queuing `this.turn` leaves an already-finalized
+              // N replay behind the command. It immediately bails as stale, lets TurnInit manufacture a second
+              // command for N+1, and that duplicate target picker can then block TURN/REPLACEMENT material
+              // forever (real dirty-lane wave-3 trace). Capture once so async phase progression cannot retarget
+              // the continuation after this immutable checkpoint decision.
+              const commandTurn = globalScene.currentBattle.turn;
               if (
                 !streamer.registerReplacementContinuation(envelope, {
                   kind: "command",
                   epoch: envelope.epoch,
                   wave: envelope.wave,
-                  turn: envelope.turn,
+                  turn: commandTurn,
                 })
               ) {
                 return;
@@ -779,7 +787,7 @@ export class CoopReplayTurnPhase extends Phase {
               globalScene.phaseManager.unshiftNew("CommandPhase", ownSlot);
               globalScene.phaseManager.unshiftNew(
                 "CoopReplayTurnPhase",
-                this.turn,
+                commandTurn,
                 this.rendered,
                 [...this.fromHpByBi.entries()],
                 this.sourceWave,

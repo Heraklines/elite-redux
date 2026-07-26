@@ -4250,3 +4250,31 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the removed implementation. The contract now pins the safer session-fenced sequence.
 - Local permitted evidence: both source suites pass 19/19, `git diff --check` is clean, and the baseline TypeScript
   scan reports no diagnostic in any changed file. Hosted engine/soak shards remain the required behavioral proof.
+
+## 2026-07-26 - Exact campaign frontier triage after protocol 51
+
+- Exact-SHA public Journey `30206941316` and animations-on campaign surface passed. The remaining campaign reds
+  separated into three mechanisms instead of one generic stall.
+- Depth exposed a real ordering gap at host-owned learn-move: the replica entered the next wave before the exact
+  result and overlaid a replay summary there. Host-owned V2 learn-move now retains the real same-wave watcher,
+  waits for the exact result, settles it, and only then releases progression. The public driver now proves the
+  intentionally asymmetric owner-confirm/watcher-summary surface and drives the owner's two-step decline flow.
+- Mystery was a harness false red: the replica had reached the addressed embedded-battle command watcher while
+  the authority was still completing the Mystery intro. That exact watcher is now provisional for the existing
+  bounded 20-second command-frontier window; it becomes loud again if orphaned beyond the budget.
+- Dirty wave 3 revealed a real N/N+1 replay-address bug. A replacement checkpoint advanced the replica cursor
+  from turn 2 to turn 3 and opened the correct turn-3 command, but queued its follow-up replay with stale
+  `this.turn` (2). After the human submitted the command, that stale finalized replay ended and TurnInit opened a
+  duplicate turn-3 command. The duplicate target picker then blocked TURN_COMMIT 18 and REPLACEMENT_COMMIT 19
+  forever while the authority advanced to turn 4. The pivot now captures the post-checkpoint live command turn
+  and uses it for both the replacement continuation and follow-up replay. A source contract rejects the stale
+  pre-checkpoint address.
+- Local permitted evidence: 103/103 public Node contracts pass, targeted Biome is clean, and `git diff --check`
+  passes. The dirty/depth/Mystery browser behavior still requires exact-SHA hosted requalification; no local co-op
+  Vitest or browser campaign was run under the repository policy.
+- A second depth-ordering review closed the opposite prompt timing too. A reward result may have queued the
+  guest's real `LearnMovePhase` before its V2 prompt is projected, without that phase having become current yet.
+  The prompt projector now binds its immutable operation address directly to that exact queued phase. When the
+  phase starts it becomes the sole same-wave watcher. Level-up learns, which intentionally have no guest
+  `LearnMovePhase`, still use `CoopReplayLearnMovePhase`. This prevents a replay phase from consuming the result
+  first and leaving a later reward-continuation copy waiting on an already-settled operation.

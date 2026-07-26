@@ -39,6 +39,7 @@ const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8")
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
+const learnMovePhase = readFileSync(new URL("src/phases/learn-move-phase.ts", root), "utf8");
 const encounterPhase = readFileSync(new URL("src/phases/encounter-phase.ts", root), "utf8");
 const battleScene = readFileSync(new URL("src/battle-scene.ts", root), "utf8");
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
@@ -1654,6 +1655,29 @@ test("a host-owned learn-move prompt has one exact pre-picker presentation lease
   );
 });
 
+test("a host-owned V2 learn-move prompt retains the guest at the same wave until its exact result", () => {
+  assert.match(
+    learnMovePhase,
+    /monOwner === "host"[\s\S]*movesetFull[\s\S]*isCoopLearnMoveAuthorityV2Active\(this\.coopOperationBinding\)[\s\S]*markCoopLearnMoveForwardInFlight\(this\.partyMemberIndex\)[\s\S]*this\.coopAwaitingHostOwnedPresentation = true[\s\S]*return;/u,
+    "the guest must claim and retain its real LearnMovePhase instead of entering NextEncounter early",
+  );
+  assert.match(
+    learnMovePhase,
+    /coopWatchHostOwnedV2Decision[\s\S]*awaitInteractionChoice\(seq, COOP_LEARN_MOVE_FWD_WAIT_MS, COOP_LEARN_MOVE_CHOICE_KINDS\)[\s\S]*settleCoopV2InteractionOperation\(expectedOperationId, this\.coopOwningRuntime\)[\s\S]*tryRemovePhase\("SelectModifierPhase"\)[\s\S]*this\.end\(\)/u,
+    "only the exact immutable decision may release the retained phase and reward continuation",
+  );
+  assert.match(
+    coopRuntime,
+    /hasPhaseOfType\("LearnMovePhase", phase => \{[\s\S]*stageCoopV2HostOwnedLearnMovePresentation\([\s\S]*learnMoveForwardInFlight\.add\(partySlot\)[\s\S]*return;/u,
+    "a prompt-first delivery must bind the already-queued reward continuation instead of spawning a duplicate replay",
+  );
+  assert.match(
+    learnMovePhase,
+    /stageCoopV2HostOwnedLearnMovePresentation[\s\S]*this\.coopV2ControlOperationId = operationId;[\s\S]*this\.coopAwaitingHostOwnedPresentation = true;[\s\S]*const presentationWasStaged = this\.coopV2ControlOperationId != null;[\s\S]*coopWatchHostOwnedV2Decision\(move, pokemon\)/u,
+    "the queued phase must retain the exact operation address and start the watcher from that address",
+  );
+});
+
 test("the duo Mystery split cannot inject a choice before public V2 input is actionable", () => {
   const helperStart = duoHarness.indexOf("export function relayGuestMeOptionIndexOnly(");
   const helperEnd = duoHarness.indexOf("\n/**", helperStart + 1);
@@ -2019,6 +2043,16 @@ test("a retained V2 replacement is consumed before the next replica command can 
     replacementCommand,
     /turnCommands\[ownSlot\] = null;[\s\S]*?ownMon\.resetTurnData\(\);[\s\S]*?unshiftNew\("CommandPhase", ownSlot\)/u,
     "the addressed replacement actor's stale input ephemera is cleared before its exact public command opens",
+  );
+  assert.match(
+    replacementCommand,
+    /const commandTurn = globalScene\.currentBattle\.turn;[\s\S]*?registerReplacementContinuation\(envelope, \{[\s\S]*?turn: commandTurn,[\s\S]*?unshiftNew\([\s\S]*?"CoopReplayTurnPhase",[\s\S]*?commandTurn,/u,
+    "an N+1 replacement replays the authoritative command turn instead of reopening a stale duplicate command",
+  );
+  assert.doesNotMatch(
+    replacementCommand,
+    /"CoopReplayTurnPhase",\s*this\.turn,/u,
+    "the replacement-to-command pivot cannot retain its pre-checkpoint replay address",
   );
 });
 

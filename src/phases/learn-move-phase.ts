@@ -82,6 +82,13 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private coopInteractionCounter: (() => number) | null = null;
   private coopRuntimeBound = false;
   private readonly coopOwningRuntime = getCoopRuntime();
+  /**
+   * A host-owned full-moveset prompt must keep the guest's real LearnMovePhase at the same
+   * wave/turn until the exact V2 result arrives. Ending this phase early lets NewBattlePhase
+   * mutate the guest to the next wave while the host is still asking the human what to do.
+   */
+  private coopAwaitingHostOwnedPresentation = false;
+  private coopHostOwnedWatcherStarted = false;
   /** One result staged at human intent and published only after its mutation reaches the phase terminal. */
   private coopPendingV2Decision: {
     readonly operationId: string;
@@ -195,8 +202,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     ownerIsGuest: boolean,
   ): boolean {
     const pokemon = this.getPokemon();
+    const monOwner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    const acceptsHostOwnedWatcher = !ownerIsGuest && this.coopAwaitingHostOwnedPresentation && monOwner === "host";
     const valid =
-      ownerIsGuest
+      (ownerIsGuest || acceptsHostOwnedWatcher)
       && partySlot === this.partyMemberIndex
       && moveId === this.moveId
       && maxMoveCount === pokemon.getMaxMoveCount()
@@ -208,7 +217,46 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       return false;
     }
     this.coopV2ControlOperationId = operationId;
+    if (acceptsHostOwnedWatcher && !this.coopHostOwnedWatcherStarted) {
+      this.coopHostOwnedWatcherStarted = true;
+      void this.coopWatchHostOwnedV2Decision(allMoves[this.moveId], pokemon);
+    }
     notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    return true;
+  }
+
+  /**
+   * Bind a host-owned V2 presentation to this exact phase while it is still queued.
+   *
+   * A reward commit queues the same LearnMovePhase on both clients before the following
+   * learn-move prompt enters the ordered log. On a slow guest that prompt can be projected
+   * while the phase is queued, rather than current. Staging the address here lets the real
+   * reward-continuation phase become the sole watcher when it starts; spawning a replay phase
+   * in front of it would consume the result and then leave this copy to reopen a dead picker.
+   */
+  public stageCoopV2HostOwnedLearnMovePresentation(
+    operationId: string,
+    partySlot: number,
+    moveId: number,
+    maxMoveCount: number,
+    ownerIsGuest: boolean,
+  ): boolean {
+    const pokemon = this.getPokemon();
+    const monOwner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    if (
+      this.coopRuntimeBound
+      || ownerIsGuest
+      || monOwner !== "host"
+      || partySlot !== this.partyMemberIndex
+      || moveId !== this.moveId
+      || maxMoveCount !== pokemon.getMaxMoveCount()
+      || operationId.length === 0
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.coopV2ControlOperationId = operationId;
+    this.coopAwaitingHostOwnedPresentation = true;
     return true;
   }
 
@@ -543,6 +591,34 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         this.learnMove(currentMoveset.length, move, pokemon);
         return;
       }
+      // Authority V2 host-owned full-moveset prompt: retain THIS real guest phase until the
+      // host's immutable decision arrives. The old no-op path ended here, immediately released
+      // the reward continuation and let NewBattlePhase / NextEncounterPhase advance the guest to
+      // wave N+1 while the host was still on wave N's learn-move CONFIRM. The later replay picker
+      // could visually override that parked next-wave phase, but its enemy-party timeout kept
+      // running underneath and the two state digests were already different. Claiming the forward
+      // slot before the retained prompt arrives makes wireCoopLearnMoveForward install that exact
+      // operation onto this phase instead of spawning a second replay phase.
+      if (monOwner === "host" && movesetFull && isCoopLearnMoveAuthorityV2Active(this.coopOperationBinding)) {
+        const presentationWasStaged = this.coopV2ControlOperationId != null;
+        if (!presentationWasStaged && !markCoopLearnMoveForwardInFlight(this.partyMemberIndex)) {
+          failCoopSharedSession(
+            `Host-owned learn-move watcher for slot ${this.partyMemberIndex} collided with another live picker`,
+          );
+          return;
+        }
+        this.coopAwaitingHostOwnedPresentation = true;
+        coopLog("learnmove", "guest retains wave-local LearnMovePhase for host-owned V2 decision", {
+          slot: this.partyMemberIndex,
+          moveId: this.moveId,
+          presentationWasStaged,
+        });
+        if (presentationWasStaged && !this.coopHostOwnedWatcherStarted) {
+          this.coopHostOwnedWatcherStarted = true;
+          void this.coopWatchHostOwnedV2Decision(move, pokemon);
+        }
+        return;
+      }
       // #698 stale-shop softlock: a TM Case / Memory-Mushroom (cost=-1) reward queues a back-out
       // "continuation" SelectModifierPhase copy alongside this LearnMovePhase (see
       // SelectModifierPhase.applyModifier queuesContinuation). On the HOST the real learnMove() deletes
@@ -591,6 +667,55 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       return;
     }
     this.replaceMoveCheck(move, pokemon);
+  }
+
+  /**
+   * Guest-side watcher for a host-owned Authority V2 prompt.
+   *
+   * Unlike the detached replay fallback, this runs inside the guest's already-queued
+   * LearnMovePhase. Keeping that phase current preserves the authoritative wave/turn while
+   * the host human decides, and defers the reward continuation until the exact result has
+   * applied. The immutable result mutates the guest copy before its cosmetic relay carrier
+   * is materialized; this method only proves the matching result and releases the phase.
+   */
+  private async coopWatchHostOwnedV2Decision(move: Move, pokemon: Pokemon): Promise<void> {
+    const relay = this.coopRelay;
+    const binding = this.coopOperationBinding;
+    const presentationOperationId = this.coopV2ControlOperationId;
+    if (relay == null || binding == null || presentationOperationId == null) {
+      clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
+      failCoopSharedSession(`Host-owned learn-move watcher for slot ${this.partyMemberIndex} lost its V2 binding`);
+      return;
+    }
+
+    await globalScene.ui.setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, () => {
+      /* watcher: the immutable V2 result is the sole close authority */
+    });
+    getCoopUiMirror()?.beginSession("watcher", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+    notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+
+    const seq = COOP_LEARN_MOVE_FWD_SEQ_BASE + this.partyMemberIndex;
+    const result = await relay.awaitInteractionChoice(seq, COOP_LEARN_MOVE_FWD_WAIT_MS, COOP_LEARN_MOVE_CHOICE_KINDS);
+    getCoopUiMirror()?.endSession();
+    const expectedOperationId = coopLearnMoveDecisionOperationId(presentationOperationId);
+    if (
+      expectedOperationId == null
+      || result?.operationId !== expectedOperationId
+      || !settleCoopV2InteractionOperation(expectedOperationId, this.coopOwningRuntime)
+    ) {
+      clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
+      failCoopSharedSession(`Host-owned learn-move watcher for slot ${this.partyMemberIndex} lost its exact V2 result`);
+      return;
+    }
+
+    clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
+    if (
+      (this.learnMoveType === LearnMoveType.TM || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1))
+      && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")
+    ) {
+      advanceCoopInteractionForContinuation(this.coopInteractionCounter?.() ?? -1);
+    }
+    void globalScene.ui.setMode(this.messageMode).then(() => this.end());
   }
 
   /**

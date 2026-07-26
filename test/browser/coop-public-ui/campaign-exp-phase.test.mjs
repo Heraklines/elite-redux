@@ -8,12 +8,14 @@ import test from "node:test";
 import {
   allClientsAtCurrentCommandFrontier,
   allClientsAtOwnedCommandFrontier,
+  assertAsymmetricLearnMoveProjection,
   clientsAwaitingTurnProgress,
   createAnimationProgressBudget,
   createBattlePromptAdvancer,
   driveBattleFallback,
   findRegisteredSurface,
   hasPassiveBattleProgressSurface,
+  hasProvisionalCommandWatcherSurface,
   resolveSurfaceOwner,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
@@ -807,6 +809,74 @@ test("a non-actionable NextEncounter tween is known passive progress, but an arm
     hasPassiveBattleProgressSurface([authority, renderer], { authority: 0, renderer: 0 }),
     false,
     "an armed-but-frozen prompt is a real product failure, not passive animation",
+  );
+});
+
+test("an embedded-battle command watcher is provisional only inside the bounded peer-intro window", () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const observedAt = "2026-07-26T15:13:07.000Z";
+  renderer.evidence.events.push({
+    index: renderer.evidence.events.length,
+    at: observedAt,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:watcher",
+      phase: "CoopReplayTurnPhase",
+      ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true },
+    },
+  });
+
+  assert.equal(
+    hasProvisionalCommandWatcherSurface(
+      [authority, renderer],
+      { authority: 0, renderer: 0 },
+      Date.parse(observedAt) + 15_000,
+    ),
+    true,
+  );
+  assert.equal(
+    hasProvisionalCommandWatcherSurface(
+      [authority, renderer],
+      { authority: 0, renderer: 0 },
+      Date.parse(observedAt) + 21_000,
+    ),
+    false,
+    "an orphaned watcher must become a loud stall instead of hiding under the outer campaign deadline",
+  );
+});
+
+test("host-owned learn move allows asymmetric UI only while address and state stay exact", () => {
+  const address = { epoch: 17, wave: 1, turn: 3 };
+  const owner = {
+    surfaceId: "learn-move:confirm",
+    localSeat: 0,
+    ownerSeat: 0,
+    seatsWithInput: [0],
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
+    address,
+    stateDigest: "same-state",
+  };
+  const watcher = {
+    surfaceId: "summary",
+    phase: "LearnMovePhase",
+    localSeat: 1,
+    ownerSeat: null,
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: true },
+    address,
+    stateDigest: "same-state",
+  };
+
+  assert.doesNotThrow(() => assertAsymmetricLearnMoveProjection(owner, watcher));
+  assert.throws(
+    () =>
+      assertAsymmetricLearnMoveProjection(owner, {
+        ...watcher,
+        address: { epoch: 17, wave: 2, turn: 1 },
+        stateDigest: "speculative-next-wave",
+      }),
+    /different authoritative states/u,
+    "the pre-fix wave-2 watcher / wave-1 owner split must fail",
   );
 });
 
