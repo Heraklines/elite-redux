@@ -2438,7 +2438,7 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   assert.ok(pinsStart >= 0 && pinsEnd > pinsStart, "the client ownership pins have a bounded source block");
   const pins = duoHarness.slice(pinsStart, pinsEnd);
   const helper = pins.indexOf("const pinTweenCallbacks = (scene: BattleScene, ctx: ClientCtx): void =>");
-  const wrap = pins.indexOf("withClientSync(ctx, () => callback.apply(thisArg, callbackArgs))", helper);
+  const wrap = pins.indexOf("withClientSync(ctx, () => callback.apply(this, callbackArgs))", helper);
   const host = pins.indexOf("pinTweenCallbacks(rig.hostScene, rig.hostCtx)", wrap);
   const guest = pins.indexOf("pinTweenCallbacks(rig.guestScene, rig.guestCtx)", host);
   assert.ok(
