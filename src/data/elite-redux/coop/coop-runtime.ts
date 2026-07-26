@@ -5447,8 +5447,11 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
     // A replacement/wave/turn result can itself state the next command frontier. The real CommandPhase may
     // reach its admission gate while that result is still material-deferred (notably while a replacement
     // checkpoint is being applied). Once this exact ledger entry becomes materially complete, wake only
-    // phases addressed by its immutable frontier. Waiting for another CONTROL_COMMIT is impossible because
-    // this entry already owns command control; that missing wake was the post-replacement Showdown softlock.
+    // phases addressed by its immutable frontier. An early TurnInit may instead be parked in the entry-only
+    // presentation fence while this source is in flight; release that exact-address fence with an empty
+    // prefix first because this entry's ordinary renderer already owns its presentation. Waiting for another
+    // CONTROL_COMMIT is impossible because this entry already owns command control.
+    releaseCoopV2ParkedTurnBoundary(runtime, entry);
     releaseCoopV2DeferredCommandStarts(runtime, entry.nextControl);
   }
   if (
@@ -8263,24 +8266,41 @@ export function isCoopV2CommandEntryPresentationActive(runtime: CoopRuntime | nu
   return isCoopV2ControlCutoverActive(runtime);
 }
 
+export type CoopV2CommandPresentationRequirement =
+  | { readonly kind: "awaiting-source" }
+  | { readonly kind: "presentation"; readonly operationId: string }
+  | { readonly kind: "covered-by-source"; readonly operationId: string };
+
 /**
- * Resolve the exact retained CONTROL_COMMIT that owns the current command address.
+ * Inspect the exact retained entry that owns the current command address.
  *
  * A wave/turn pair is not an identity: an embedded Mystery battle or a replacement can reuse the numeric
- * cursor with a newer state tick. TurnInit uses this operation id to suppress only a genuinely consumed
- * pre-command prefix, never a later command boundary that happens to share its coordinates.
+ * cursor with a newer state tick. More importantly, a command frontier has two different legal sources:
+ *
+ * - a CONTROL_COMMIT owns a distinct sealed pre-command prefix which TurnInit must replay exactly once;
+ * - TURN/REPLACEMENT/etc. can state COMMAND_FRONTIER directly, after their own ordered renderer/finalizer
+ *   already crossed every presentation event owned by that entry.
+ *
+ * Treating the second case as "CONTROL_COMMIT has not arrived yet" creates an impossible wait. Keep the
+ * distinction closed here so callers can wait only when the source is genuinely absent, replay only a
+ * command-open carrier, and otherwise trust the already-crossed source-entry fence.
  */
-export function currentCoopV2CommandPresentationOperationId(
+export function inspectCoopV2CommandPresentationRequirement(
   wave: number,
   turn: number,
   runtime: CoopRuntime | null = active,
-): string | null {
+): CoopV2CommandPresentationRequirement {
   const control = runtime?.v2ControlLedger.latestControl;
   if (control?.kind !== "COMMAND_FRONTIER" || control.wave !== wave || control.turn !== turn) {
-    return null;
+    return { kind: "awaiting-source" };
   }
   const source = runtime?.v2ControlLedger.sourceEntryOf(control);
-  return source?.kind === "CONTROL_COMMIT" && controlsEqual(source.nextControl, control) ? source.operationId : null;
+  if (source == null || !controlsEqual(source.nextControl, control)) {
+    return { kind: "awaiting-source" };
+  }
+  return source.kind === "CONTROL_COMMIT" && decodeControlOpenEntry(source)?.kind === "command-open"
+    ? { kind: "presentation", operationId: source.operationId }
+    : { kind: "covered-by-source", operationId: source.operationId };
 }
 
 /** Release only CommandPhase starts addressed by the applied immutable command frontier. */

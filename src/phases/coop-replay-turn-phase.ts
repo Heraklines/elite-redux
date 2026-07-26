@@ -237,34 +237,42 @@ export class CoopReplayTurnPhase extends Phase {
     return true;
   }
 
-  /** The turn-one replay phase is an exact pre-command material consumer for CONTROL_COMMIT. */
+  /** The entry-only replay is an exact consumer for whichever retained entry owns this command frontier. */
   public canReleaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
     const material = successor.commandOpenMaterial;
     return (
       this.entryPresentationOnly
       && !this.aborted
       && !this.ended
-      && successor.kind === "CONTROL_COMMIT"
       && successor.nextControl.kind === "COMMAND_FRONTIER"
-      && material != null
-      && material.wave === this.sourceWave
-      && material.turn === this.turn
       && successor.nextControl.wave === this.sourceWave
       && successor.nextControl.turn === this.turn
+      && (successor.kind !== "CONTROL_COMMIT"
+        || (material != null && material.wave === this.sourceWave && material.turn === this.turn))
     );
   }
 
-  /** Deliver the immutable prefix only after its CONTROL_COMMIT state image has been applied. */
+  /** Deliver a CONTROL prefix, or close a speculative wait whose non-control source already presented it. */
   public releaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
     if (!this.canReleaseForCoopV2Control(successor)) {
       return false;
     }
-    const material = successor.commandOpenMaterial!;
-    const prefix: CoopEntryPresentationPrefix = {
-      events: structuredClone(material.entryPresentation),
-      stateTick: material.stateTick,
-      controlOperationId: successor.operationId,
-    };
+    const material = successor.commandOpenMaterial;
+    const prefix: CoopEntryPresentationPrefix =
+      material == null
+        ? {
+            // TURN/REPLACEMENT/etc. own and prove their presentation in their ordinary renderer before they
+            // state COMMAND_FRONTIER. This empty exact-address release closes only a speculative TurnInit wait;
+            // it does not invent or replay a second presentation stream.
+            events: [],
+            stateTick: coopAppliedStateTick(),
+            controlOperationId: successor.operationId,
+          }
+        : {
+            events: structuredClone(material.entryPresentation),
+            stateTick: material.stateTick,
+            controlOperationId: successor.operationId,
+          };
     const resolve = this.v2EntryPresentationResolver;
     if (resolve == null) {
       this.v2EntryPresentationBuffered = prefix;

@@ -4323,3 +4323,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `showdown-browser-evidence` still matched the retired `entry presentation PROVED` log text. The assertion now
   names the generalized fence; no Showdown/Tournament gameplay code changed. Static remains red only on the two
   inherited Showdown/Tournament TypeScript diagnostics that are explicitly outside this co-op-only workstream.
+
+## 2026-07-26 - Command presentation fence follows its actual V2 source entry
+
+- Exact full gate `30211957153` exposed one common product hang across B6, B9, every continuous soak, and P1. The
+  replica applied a `TURN_COMMIT` whose typed successor was the next `COMMAND_FRONTIER`, then `TurnInit` queued an
+  entry-only replay waiting for a separate `CONTROL_COMMIT`. That second entry is forbidden: the turn entry already
+  owns the command. Logs showed revision 2 materially applied with the exact turn-2 control while
+  `CoopReplayTurnPhase` remained on `awaiting retained entry presentation` forever.
+- Command presentation inspection is now a closed three-way result. A genuine command-open `CONTROL_COMMIT`
+  requires its immutable prefix and exact operation watermark; a TURN/REPLACEMENT/interaction result that directly
+  states command is `covered-by-source` because its own ordered renderer/finalizer already drained its presentation;
+  only a genuinely absent source creates a speculative wait. This removes the impossible carrier assumption without
+  weakening presentation proof or using a timeout.
+- Both delivery races are closed. When the source is already retained, `TurnInit` does not manufacture the second
+  fence. When an early `TurnInit` is already parked as the non-control entry applies, material completion releases
+  that exact wave/turn fence with an empty address-bound prefix before waking deferred CommandPhases. A real
+  `CONTROL_COMMIT` still cannot release without complete command-open material and every concrete outcome proof.
+- Permitted local evidence: presentation + public V2 source contracts pass 87/87, formatting is clean, and
+  `git diff --check` passes. Hosted focused engine/type and exact campaign/gate proof remain required; no co-op
+  Vitest, browser, soak, or campaign was run locally.

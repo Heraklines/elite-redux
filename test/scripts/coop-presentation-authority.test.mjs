@@ -160,8 +160,8 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
   );
   assert.match(
     turnInit,
-    /currentCoopV2CommandPresentationOperationId\(wave, turn\)[\s\S]+hasConsumedCommandPresentation\(currentCommandOperationId\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+wave,[\s\S]+true,/u,
-    "V2 queues an exact command-prefix consumer for every unconsumed operation, not only turn one",
+    /inspectCoopV2CommandPresentationRequirement\(wave, turn\)[\s\S]+commandPresentation\.kind === "awaiting-source"[\s\S]+commandPresentation\.kind === "presentation"[\s\S]+hasConsumedCommandPresentation\(commandPresentation\.operationId\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+wave,[\s\S]+true,/u,
+    "V2 queues a prefix consumer only while a command source is absent or its CONTROL prefix is unconsumed",
   );
   assert.doesNotMatch(turnInit, /isShowdownGuestFlipGated\(\) && globalScene\.currentBattle\.turn === 1/u);
   const entryPump = replay.slice(
@@ -180,11 +180,21 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
     "the last queued phase must prove every outcome before command control can open",
   );
   assert.match(replay, /controlOperationId: successor\.operationId/u);
+  assert.match(
+    replay,
+    /successor\.kind !== "CONTROL_COMMIT"[\s\S]+material == null[\s\S]+events: \[\][\s\S]+stateTick: coopAppliedStateTick\(\)/u,
+    "an in-flight non-CONTROL command source closes a speculative prefix wait without inventing events",
+  );
   assert.match(stream, /consumedCommandPresentationOperations = new Set<string>/u);
   assert.match(
     runtime,
-    /currentCoopV2CommandPresentationOperationId[\s\S]+sourceEntryOf\(control\)[\s\S]+source\.operationId/u,
-    "same numeric wave/turn reuse is deduped by the global CONTROL_COMMIT identity",
+    /inspectCoopV2CommandPresentationRequirement[\s\S]+sourceEntryOf\(control\)[\s\S]+source\.kind === "CONTROL_COMMIT"[\s\S]+decodeControlOpenEntry\(source\)[\s\S]+kind: "covered-by-source"/u,
+    "the command source distinguishes a replayable CONTROL prefix from an already-presented TURN successor",
+  );
+  assert.match(
+    runtime,
+    /entry\.kind !== "CONTROL_COMMIT" && entry\.nextControl\.kind === "COMMAND_FRONTIER"[\s\S]+releaseCoopV2ParkedTurnBoundary\(runtime, entry\)[\s\S]+releaseCoopV2DeferredCommandStarts\(runtime, entry\.nextControl\)/u,
+    "a non-CONTROL command successor releases either exact wait shape after its material applies",
   );
 });
 

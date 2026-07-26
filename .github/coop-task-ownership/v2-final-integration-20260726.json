@@ -3,7 +3,7 @@
   "version": 1,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "9e665d50892133cc19d7506eae9d6e51cb1293c0",
+  "baseSha": "6badb81cb0f867f13d07002b8a755dd569d3534f",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/stats-nightly.yml",

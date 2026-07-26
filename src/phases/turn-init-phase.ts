@@ -7,9 +7,9 @@ import {
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
-  currentCoopV2CommandPresentationOperationId,
   getCoopBattleStreamer,
   getCoopController,
+  inspectCoopV2CommandPresentationRequirement,
   isCoopV2CommandEntryPresentationActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { erRecordAchievementTurnStart } from "#data/elite-redux/er-achievement-tracker";
@@ -110,15 +110,18 @@ export class TurnInitPhase extends FieldPhase {
     const streamer = getCoopBattleStreamer();
     const wave = globalScene.currentBattle.waveIndex;
     const turn = globalScene.currentBattle.turn;
-    const currentCommandOperationId = currentCoopV2CommandPresentationOperationId(wave, turn);
+    const commandPresentation = inspectCoopV2CommandPresentationRequirement(wave, turn);
     const needsCommandPresentation = isCoopV2CommandEntryPresentationActive()
-      ? currentCommandOperationId == null || !streamer?.hasConsumedCommandPresentation(currentCommandOperationId)
+      ? commandPresentation.kind === "awaiting-source"
+        || (commandPresentation.kind === "presentation"
+          && !streamer?.hasConsumedCommandPresentation(commandPresentation.operationId))
       : turn === 1 && !streamer?.hasConsumedEntryPresentationThroughWave(wave);
     if (needsCommandPresentation) {
-      // V2 command control carries every cue recorded before its exact frontier, including later-turn
-      // replacement hazards/abilities. Consume and prove that complete prefix before either real command
-      // opens. The stream watermark prevents both live packets and a same-turn TurnInit re-entry from
-      // displaying it twice. Legacy authoritative sessions retain the old wave-start-only behavior.
+      // A standalone V2 command-open carries every cue recorded before its exact frontier, including
+      // later-turn replacement hazards/abilities. Consume and prove that complete prefix before either real
+      // command opens. A TURN_COMMIT that directly states N+1 already crossed its own ordered renderer and
+      // must not wait for a second CONTROL_COMMIT that can never exist. The operation watermark prevents both
+      // live packets and a same-turn TurnInit re-entry from displaying a real prefix twice.
       globalScene.phaseManager.pushNew("CoopReplayTurnPhase", turn, 0, undefined, wave, true);
     }
     globalScene.getField().forEach((pokemon, fieldIndex) => {
