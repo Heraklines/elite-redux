@@ -2565,7 +2565,7 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     pins,
-    /const pinPhaseCompletion = \(scene: BattleScene, ctx: ClientCtx\): void => \{[\s\S]+manager\.prepareCurrentPhaseForStart = \(\): void => \{[\s\S]+const phase = manager\.getCurrentPhase\(\);[\s\S]+const original = phase\.end;[\s\S]+withClientSync\(ctx, \(\) => original\.call\(phase\)\);/u,
+    /const pinPhaseCompletion = \(scene: BattleScene, ctx: ClientCtx\): void => \{[\s\S]+const pinnedPrepare = \(\): void => \{[\s\S]+const phase = manager\.getCurrentPhase\(\);[\s\S]+const original = phase\.end;[\s\S]+withClientSync\(ctx, \(\) => original\.call\(phase\)\);[\s\S]+manager\.prepareCurrentPhaseForStart = pinnedPrepare;/u,
     "an async phase completion must shift the phase tree belonging to the browser that started it",
   );
   assert.match(

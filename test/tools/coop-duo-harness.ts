@@ -2713,7 +2713,7 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
     const completions = new Map<Phase, { original: Phase["end"]; pinned: Phase["end"] }>();
     const ownsPhaseRealm = (): boolean =>
       activeClientCtx === ctx && globalScene === ctx.scene && getCoopRuntime() === ctx.runtime;
-    manager.prepareCurrentPhaseForStart = (): void => {
+    const pinnedPrepare = (): void => {
       originalPrepare.call(scene.phaseManager);
       const phase = manager.getCurrentPhase();
       if (completions.has(phase)) {
@@ -2733,8 +2733,11 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
       completions.set(phase, { original, pinned });
       phase.end = pinned;
     };
+    manager.prepareCurrentPhaseForStart = pinnedPrepare;
     disposers.push(() => {
-      manager.prepareCurrentPhaseForStart = originalPrepare;
+      if (manager.prepareCurrentPhaseForStart === pinnedPrepare) {
+        manager.prepareCurrentPhaseForStart = originalPrepare;
+      }
       for (const [phase, completion] of completions) {
         if (phase.end === completion.pinned) {
           phase.end = completion.original;
