@@ -109,26 +109,32 @@ test("focused engine shards qualify the complete Authority V2 graph", () => {
   }
 });
 
-test("focused planner fails closed when more than five affected shards require coverage", () => {
+test("focused planner runs every six-lane representative and fails closed beyond six shards", () => {
   const impacted = [...impactLanes(["scripts/run-coop-gate.mjs"])].sort();
   assert.deepEqual(impacted, ["A", "B", "C", "P", "S", "T"]);
+  assert.deepEqual(
+    assertFocusedCandidateLimit(
+      impacted.map(lane => `${lane}:1/1`),
+      6,
+    ),
+    impacted.map(lane => `${lane}:1/1`).sort(),
+    "a shared harness or planner change must use all six available representative runners",
+  );
   assert.throws(
-    () =>
-      assertFocusedCandidateLimit(
-        impacted.map(lane => `${lane}:1/1`),
-        5,
-      ),
+    () => assertFocusedCandidateLimit([...impacted.map(lane => `${lane}:1/1`), "B:2/2"], 6),
     error =>
       error instanceof Error
       && impacted.every(lane => error.message.includes(`${lane}:1/1`))
+      && error.message.includes("B:2/2")
       && /refusing to silently omit coverage/u.test(error.message),
   );
   assert.deepEqual(
-    assertFocusedCandidateLimit(["B:2/4", "A:1/3", "B:2/4", "P:1/2"], 5),
+    assertFocusedCandidateLimit(["B:2/4", "A:1/3", "B:2/4", "P:1/2"], 6),
     ["A:1/3", "B:2/4", "P:1/2"],
     "every unique candidate is preserved when the cap is not exceeded",
   );
   assert.match(planner, /assertFocusedCandidateLimit\(chosen\.keys\(\), maxShards\)/u);
+  assert.match(workflow, /--max-shards 6/u);
   assert.match(planner, /Run the complete sharded co-op gate; refusing to silently omit coverage\./u);
   assert.doesNotMatch(planner, /\.slice\(0, maxShards\)/u);
 });

@@ -161,7 +161,7 @@ jobs:
             --train-tip "$COOP_TRAIN_TIP" \
             --output coop-task-ownership-evidence.json
 
-      - name: Select one to five affected shards deterministically
+      - name: Select one to six affected shards deterministically
         id: plan
         env:
           COOP_CI_PLAN_MANIFEST: coop-ci-focused-plan.json
@@ -171,7 +171,7 @@ jobs:
           set +e
           set -o pipefail
           # A push can contain several commits. HEAD^ covers only the final commit and can crowd earlier
-          # directly-changed tests out of the five-shard cap. Rank the complete pushed delta instead.
+          # directly-changed tests out of the six-shard cap. Rank the complete pushed delta instead.
           if [[ -n "$COOP_PUSH_BASE" && ! "$COOP_PUSH_BASE" =~ ^0+$ ]]; then
             git fetch --no-tags --depth=1 origin "$COOP_PUSH_BASE"
             priority_base="$COOP_PUSH_BASE"
@@ -179,7 +179,7 @@ jobs:
             priority_base="HEAD^"
           fi
           node scripts/run-coop-gate.mjs --focused-matrix \
-            --base "${{ steps.ownership.outputs.base_sha }}" --priority-base "$priority_base" --max-shards 5 \
+            --base "${{ steps.ownership.outputs.base_sha }}" --priority-base "$priority_base" --max-shards 6 \
             2>&1 | tee coop-ci-focused-plan.log
           status=${PIPESTATUS[0]}
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"

@@ -506,11 +506,11 @@ export function assertFocusedCandidateLimit(candidateKeys, maxShards) {
   return candidates;
 }
 
-/** Select 1-5 directly affected or deterministic representative shards against an explicit integration base. */
+/** Select 1-6 directly affected or deterministic representative shards against an explicit integration base. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: bounded planner keeps selection/proof in one auditable function.
-export function createFocusedMatrix(base, maxShards = 5, lanes = categorize(), priorityBase = null) {
-  if (!Number.isSafeInteger(maxShards) || maxShards < 1 || maxShards > 5) {
-    throw new Error("focused max-shards must be between 1 and 5");
+export function createFocusedMatrix(base, maxShards = 6, lanes = categorize(), priorityBase = null) {
+  if (!Number.isSafeInteger(maxShards) || maxShards < 1 || maxShards > 6) {
+    throw new Error("focused max-shards must be between 1 and 6");
   }
   // The workflow intentionally uses shallow checkouts. Comparing the two explicit endpoints does not require
   // their merge base to be present locally, unlike three-dot diff, and still answers "what differs from the
@@ -654,7 +654,7 @@ function main() {
     if (!base) {
       throw new Error("--focused-matrix requires --base <integration-sha>");
     }
-    const maxShards = Number(argValue(args, "--max-shards") ?? 5);
+    const maxShards = Number(argValue(args, "--max-shards") ?? 6);
     const priorityBase = argValue(args, "--priority-base");
     const focused = createFocusedMatrix(base, maxShards, lanes, priorityBase);
     emitPlannerResult(focused, { kind: "focused", ...focused });
