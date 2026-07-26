@@ -2538,6 +2538,27 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
     /if \(activeClientLabel === rig\.hostCtx\.label\) \{\s*return originalRun\(phase\);/u,
     "the interceptor may not use a label as its browser-realm identity proof",
   );
+  assert.match(
+    pins,
+    /poll = originalRun\(phase\);\s*await new Promise<void>\(resolve => setTimeout\(resolve, 0\)\);/u,
+    "the phase-start realm must survive the whole promise microtask turn rather than a guessed chain depth",
+  );
+  assert.doesNotMatch(
+    pins,
+    /for \(let i = 0; i < 4; i\+\+\) \{\s*await Promise\.resolve\(\);/u,
+    "trainer and presentation promise chains may be deeper than four microtasks",
+  );
+  const exactScheduledRealm =
+    /activeClientCtx === owner\s*&& globalScene === owner\.scene\s*&& getCoopRuntime\(\) === owner\.runtime/g;
+  assert.ok(
+    [...pins.matchAll(exactScheduledRealm)].length >= 2,
+    "durability callbacks and raw timers both require exact client, scene, and runtime ownership",
+  );
+  assert.doesNotMatch(
+    pins,
+    /if \(activeClientLabel === owner\.label\)/u,
+    "a repeated client label may not authorize any scheduled callback realm",
+  );
 });
 
 test("a projected Mystery phase cannot attest through its predecessor's active handler", () => {

@@ -2820,16 +2820,19 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
     // that microtask drains after a synchronous `withClientSync` restore, it shifts the GUEST queue and
     // orphans the host phase - the interceptor state never leaves "running", so `to(...)` soft-locks at
     // ShowAbilityPhase/HideAbilityPhase (the showdown-versus-faint + double-faint summon-path stalls).
-    // Hold the host ctx across a few microtask hops so `end()` lands on the HOST phase manager; the awaited
-    // POLL tail is a passive state poll and returns under ambient ctx, so macrotask guest pumps still
-    // interleave there (a genuinely guest-dependent phase completes via the clock/loopback pins, not here -
-    // no deadlock, since only MICROTASKS are held and the guest pump is a macrotask).
+    // Hold the host ctx through the current event-loop turn so every promise continuation spawned by
+    // `phase.start()` lands on the HOST phase manager. Four fixed microtask hops were not a semantic
+    // boundary: trainer encounters add trainer + Pokemon asset promises beneath Promise.all, so their
+    // final `enterEncounterPresentation()` continuation can be deeper than a wild encounter's. Releasing
+    // the host realm after an arbitrary depth made that continuation observe the guest globals, reject its
+    // exact encounter boundary, and strand NextEncounterPhase/NewBiomeEncounterPhase only in this
+    // one-process harness. A zero-delay task is the real boundary: JavaScript drains the complete current
+    // microtask queue (including recursively queued promise jobs) before it. The awaited POLL tail remains
+    // passive and returns under ambient ctx, so later macrotask guest pumps still interleave normally.
     let poll: Promise<void> | undefined;
     return withClient(rig.hostCtx, async () => {
       poll = originalRun(phase);
-      for (let i = 0; i < 4; i++) {
-        await Promise.resolve();
-      }
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
     }).then(() => poll ?? Promise.resolve());
   };
   disposers.push(() => {
@@ -2847,7 +2850,7 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
       if (disposed) {
         return;
       }
-      if (activeClientLabel === owner.label) {
+      if (activeClientCtx === owner && globalScene === owner.scene && getCoopRuntime() === owner.runtime) {
         callback();
         return;
       }
@@ -2874,7 +2877,7 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
         if (disposed) {
           return;
         }
-        if (activeClientLabel === owner.label) {
+        if (activeClientCtx === owner && globalScene === owner.scene && getCoopRuntime() === owner.runtime) {
           fn(...cbArgs);
           return;
         }
