@@ -14,7 +14,7 @@ import {
   selectOptionById,
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
-import { delay, EvidenceSink, waitForPublicInputOpportunity } from "./evidence.mjs";
+import { delay, EvidenceSink, waitForPublicInputDispatch } from "./evidence.mjs";
 import {
   isAcceptedRendererPresentationReceipt,
   latestMoveAnimationsAttestation,
@@ -1407,19 +1407,27 @@ export class PublicUiClient {
       const domKeysBefore = Math.max(
         Number(this.evidence.findLastInputHealth()?.observation?.domKeys ?? 0),
         Number(this.evidence.findLastInputEcho()?.observation?.domKeys ?? 0),
+        Number(this.evidence.findLastInputDispatch()?.observation?.domKeys ?? 0),
       );
-      // Keep the real DOM key down until the read-only observer proves either a direct game-side UI reaction
-      // or a later Phaser frame while held. That covers synchronous DOM-key handlers and polled handlers without
-      // mistaking Chromium compositor frames for game input. Mutation remains Playwright's public keyboard path.
-      await this.page.keyboard.down(key);
+      // Dispatch one real public key tap, then demand the read-only receipt from InputsController's exact
+      // production input_down event. Releasing before awaiting the receipt keeps the game's 250 ms hold-repeat
+      // timer from turning one ACTION into two on a CPU-dilated runner. CDP preserves down/up event ordering;
+      // the receipt proves that the down event was mapped and consumed rather than merely queued in Chromium.
+      let keyIsDown = false;
       try {
-        await waitForPublicInputOpportunity(this.evidence, {
-          from: echoCursor,
-          domKeysBefore,
-        });
-      } finally {
+        await this.page.keyboard.down(key);
+        keyIsDown = true;
         await this.page.keyboard.up(key);
+        keyIsDown = false;
+      } finally {
+        if (keyIsDown) {
+          await this.page.keyboard.up(key);
+        }
       }
+      await waitForPublicInputDispatch(this.evidence, {
+        from: echoCursor,
+        domKeysBefore,
+      });
       // Optimization brief R1c: per-input acknowledgment. Wait for the game's OWN
       // input-echo (uiMode/cursor/phase change observed AFTER this press) instead of a
       // fixed sleep. A press that legitimately changes nothing (menu-edge arrow) falls

@@ -42,46 +42,28 @@ function registerEmergencyFlushSink(sink) {
 
 export const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
 
-/**
- * Wait until the read-only browser observer proves that a public key reached a game input opportunity.
- *
- * Compositor requestAnimationFrame is not a valid proxy: Chromium may composite at 60 FPS while a CPU-dilated
- * Phaser loop advances at 3 FPS. The observer captures Phaser's frame at raw DOM keydown, then proves either a
- * direct game-side UI echo while held (some handlers consume DOM keyboard callbacks synchronously) or a later
- * Phaser frame while held (polling handlers). The driver remains keyboard-only; this function consumes console
- * evidence and never reads or mutates game state through the page.
- */
-export async function waitForPublicInputOpportunity(evidence, { from, domKeysBefore, timeoutMs = 5_000 }) {
+/** Wait until InputsController proves that one raw public key became one production game Button dispatch. */
+export async function waitForPublicInputDispatch(evidence, { from, domKeysBefore, timeoutMs = 5_000 }) {
   let scanned = Math.max(0, from);
-  let released = false;
   const expectedDomKeys = domKeysBefore + 1;
   return evidence.waitForCondition(
     sink => {
       for (; scanned < sink.events.length; scanned += 1) {
         const event = sink.events[scanned];
-        const inputObservation = event?.kind === "browser-input-health" || event?.kind === "browser-input-echo";
-        const observation = inputObservation ? event.observation : null;
+        const observation = event?.kind === "browser-input-dispatch" ? event.observation : null;
         if (
           observation == null
           || !Number.isFinite(observation.domKeys)
           || observation.domKeys !== expectedDomKeys
-          || !Number.isFinite(observation.downKeys)
-          || !Number.isFinite(observation.frame)
-          || !Number.isFinite(observation.keydownFrame)
+          || observation.controllerType !== "keyboard"
         ) {
           continue;
         }
-        if (observation.downKeys <= 0) {
-          released = true;
-          continue;
-        }
-        if (!released && (event.kind === "browser-input-echo" || observation.frame > observation.keydownFrame)) {
-          return event;
-        }
+        return event;
       }
       return;
     },
-    { timeoutMs, description: "held public key to reach a game input opportunity" },
+    { timeoutMs, description: "public keyboard key to produce one game input dispatch" },
   );
 }
 
@@ -837,6 +819,7 @@ export function commanderObservationView(text) {
 
 const INPUT_ECHO_PREFIX = "[coop-browser:input-echo] ";
 const INPUT_HEALTH_PREFIX = "[coop-browser:input-health] ";
+const INPUT_DISPATCH_PREFIX = "[coop-browser:input-dispatch] ";
 
 /** Parse the exact host-recorded/guest-completed presentation receipt contract. */
 export function presentationEventView(text) {
@@ -880,6 +863,15 @@ function recordBrowserObservations(sink, text) {
   const presentationEvent = presentationEventView(text);
   if (presentationEvent != null) {
     sink.record("browser-presentation-event", { observation: presentationEvent });
+  }
+  // Exact read-only receipt from InputsController's production input_down event.
+  if (text.startsWith(INPUT_DISPATCH_PREFIX)) {
+    try {
+      sink.record("browser-input-dispatch", { observation: JSON.parse(text.slice(INPUT_DISPATCH_PREFIX.length)) });
+    } catch {
+      /* malformed dispatch lines remain a loud pacing timeout */
+    }
+    return;
   }
   // Optimization brief R1c: the game's own input acknowledgment (uiMode/cursor/phase
   // change). Pacing signal only - never a proof surface.
@@ -1333,6 +1325,14 @@ export class EvidenceSink {
       .slice(from)
       .toReversed()
       .find(event => event.kind === "browser-input-echo");
+  }
+
+  /** Latest exact InputsController input_down dispatch. */
+  findLastInputDispatch(from = 0) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => event.kind === "browser-input-dispatch");
   }
 
   /** Latest strict market projection, optionally filtered by a predicate. */

@@ -1642,6 +1642,41 @@ setInterval(() => {
 let lastInputEchoKey = "";
 let inputEchoSeq = 0;
 
+// Exact production input dispatch. InputsController emits input_down synchronously from the
+// real Phaser keyboard listener, after the DOM keydown has been mapped to a game Button and
+// before its 250 ms auto-repeat timer can fire. Observing that public event lets the browser
+// driver release one physical key immediately instead of holding ACTION across slow Phaser
+// frames and accidentally selecting the same UI twice.
+interface BrowserInputEventSource {
+  on(event: string, listener: (event: unknown) => void): unknown;
+  off(event: string, listener: (event: unknown) => void): unknown;
+}
+
+let observedInputEventSource: BrowserInputEventSource | null = null;
+let inputDispatchSeq = 0;
+const observeInputDown = (event: unknown) => {
+  const input = event as { controller_type?: unknown; button?: unknown } | null;
+  inputDispatchSeq += 1;
+  console.info(
+    `[coop-browser:input-dispatch] ${JSON.stringify({
+      seq: inputDispatchSeq,
+      controllerType: typeof input?.controller_type === "string" ? input.controller_type : "unknown",
+      button: typeof input?.button === "number" ? input.button : null,
+      ...inputLayerSnapshot(),
+    })}`,
+  );
+};
+
+function observeInputDispatchSource() {
+  const source = globalScene?.inputController?.events as unknown as BrowserInputEventSource | undefined;
+  if (source == null || source === observedInputEventSource) {
+    return;
+  }
+  observedInputEventSource?.off("input_down", observeInputDown);
+  source.on("input_down", observeInputDown);
+  observedInputEventSource = source;
+}
+
 // Input-LAYER diagnostics (read-only). The Game Speed attestation failure (run 29548390234)
 // showed 12 dispatched keys with ZERO observed game reaction and could not tell WHICH layer
 // dropped them: CDP -> DOM, DOM -> Phaser (paused/stalled loop), or Phaser -> game handler.
@@ -1688,6 +1723,7 @@ function inputLayerSnapshot() {
 
 setInterval(() => {
   try {
+    observeInputDispatchSource();
     const ui = globalScene?.ui;
     if (ui == null) {
       return;
