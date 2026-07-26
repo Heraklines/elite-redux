@@ -256,7 +256,7 @@ describe("production replacement carrier transaction", () => {
     expect(unshiftNew.mock.calls.some(([name, slot]) => name === "CommandPhase" && slot === 1)).toBe(true);
   });
 
-  it("applies and ACKs the exact turn-N+1 replacement while turn N remains delayed, then opens its owner UI", async () => {
+  it("applies the exact turn-N+1 replacement and opens owner UI with a fresh presentation watermark", async () => {
     const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
     runtime.controller.role = "guest";
     const outbound: CoopMessage[] = [];

@@ -2703,12 +2703,24 @@ test("the animations-on campaign extends a live between-wave renderer without we
     campaignDriver,
     /const betweenWaveBudget = policy\.moveAnimationsExpected[\s\S]*createAnimationProgressBudget\(rig, commandCursors, betweenWaveTimeoutMs,[\s\S]*hardCeilingMs: betweenWaveTimeoutMs \+ ANIMATION_PROGRESS_ALLOWANCE_MS/u,
   );
-  assert.match(campaignDriver, /betweenWaveBudget\?\.observe\(\) \?\? fixedDeadline/u);
+  assert.match(
+    campaignDriver,
+    /betweenWaveBudget\?\.observe\(\) \?\? mysteryProgressBudget\?\.deadline\(\) \?\? fixedDeadline/u,
+  );
   assert.doesNotMatch(
     campaignDriver,
     /const betweenWaveBudget = true/u,
-    "animations-skipped depth and mystery profiles retain the original fixed deadline",
+    "the animation budget remains scoped to the animations-on profile",
   );
+});
+
+test("the Mystery gauntlet uses progress-proven rolling surface windows under an immutable ceiling", () => {
+  assert.match(campaignDriver, /export function createRegisteredSurfaceProgressBudget\(/u);
+  assert.match(campaignDriver, /const mysteryProgressBudget = policy\.mysteryGauntlet\.required/u);
+  assert.match(campaignDriver, /policy\.mysteryGauntlet\.minSurfaces/u);
+  assert.match(campaignDriver, /recordMysteryProgress\(`surface:\$\{drove\}`\)/u);
+  assert.match(campaignDriver, /recordMysteryProgress\("mystery-narration"\)/u);
+  assert.match(campaignDriver, /mysteryProgressBudget\?\.deadline\(\)/u);
 });
 
 test("campaign speed setup follows semantic title identities across a late title rebuild", () => {

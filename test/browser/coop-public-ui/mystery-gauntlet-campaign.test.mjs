@@ -11,6 +11,7 @@ import {
   assertAsymmetricMysteryPromptProjection,
   chooseRewardPartyTargetSlot,
   createMysteryNarrationAdvancer,
+  createRegisteredSurfaceProgressBudget,
   driveMysteryEncounterChoice,
 } from "./campaign.mjs";
 import {
@@ -98,6 +99,31 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
       );
     },
   );
+});
+
+test("a chained Mystery gauntlet refreshes only from proven surface progress and remains hard-bounded", () => {
+  let now = 1_000;
+  const budget = createRegisteredSurfaceProgressBudget(9_000, 3_000, 2, { now: () => now });
+  assert.equal(budget.deadline(), 10_000);
+  assert.equal(budget.hardDeadline(), 16_000);
+
+  // Early progress cannot shrink or gratuitously inflate the existing base window.
+  now = 4_000;
+  assert.equal(budget.noteProgress().extensionApplied, false);
+  assert.equal(budget.deadline(), 10_000);
+
+  // A real public action near the boundary grants one normal surface allowance.
+  now = 9_000;
+  assert.equal(budget.noteProgress().extensionApplied, true);
+  assert.equal(budget.deadline(), 12_000);
+
+  // Repeated progress can never cross the immutable coverage-derived ceiling.
+  now = 15_000;
+  const capped = budget.noteProgress();
+  assert.equal(capped.deadlineMs, 16_000);
+  assert.equal(capped.hardCeilingReached, true);
+  now = 30_000;
+  assert.equal(budget.noteProgress().deadlineMs, 16_000);
 });
 
 test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wave profile", async () => {

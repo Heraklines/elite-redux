@@ -906,6 +906,42 @@ export function createAnimationProgressBudget(
   });
 }
 
+/**
+ * A Mystery-difficulty run can cross several complete, human-driven encounters before another battle
+ * command exists. A single fixed between-wave deadline therefore measures the whole gauntlet as though it
+ * were one stalled screen. Refresh one normal surface allowance after each proven public input, while an
+ * immutable ceiling derived from the required gauntlet coverage still makes loops fail loudly.
+ */
+export function createRegisteredSurfaceProgressBudget(
+  baseTimeoutMs,
+  progressAllowanceMs,
+  maxExtensionWindows,
+  { now = () => Date.now() } = {},
+) {
+  const startedAtMs = now();
+  const hardDeadlineMs =
+    startedAtMs + Math.max(0, baseTimeoutMs) + Math.max(0, progressAllowanceMs) * Math.max(0, maxExtensionWindows);
+  let deadlineMs = Math.min(startedAtMs + Math.max(0, baseTimeoutMs), hardDeadlineMs);
+
+  const noteProgress = () => {
+    const previousDeadlineMs = deadlineMs;
+    deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, now() + Math.max(0, progressAllowanceMs)));
+    return Object.freeze({
+      previousDeadlineMs,
+      deadlineMs,
+      hardDeadlineMs,
+      extensionApplied: deadlineMs > previousDeadlineMs,
+      hardCeilingReached: deadlineMs === hardDeadlineMs,
+    });
+  };
+
+  return Object.freeze({
+    noteProgress,
+    deadline: () => deadlineMs,
+    hardDeadline: () => hardDeadlineMs,
+  });
+}
+
 /** Poll the post-turn outcome markers for a bounded window; null on timeout (no throw). */
 export async function waitForOutcomeBounded(
   rig,
@@ -2556,12 +2592,31 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
         hardCeilingMs: betweenWaveTimeoutMs + ANIMATION_PROGRESS_ALLOWANCE_MS,
       })
     : null;
+  // Mystery difficulty deliberately chains encounters without opening a battle command between them.
+  // Give each observer-proven public action one ordinary surface allowance; never refresh from keepalives,
+  // phase names, or time alone. The immutable ceiling is derived from the profile's required surface count.
+  const mysteryProgressBudget = policy.mysteryGauntlet.required
+    ? createRegisteredSurfaceProgressBudget(
+        betweenWaveTimeoutMs,
+        rig.config.timeoutMs,
+        policy.mysteryGauntlet.minSurfaces,
+      )
+    : null;
+  const recordMysteryProgress = kind => {
+    if (mysteryProgressBudget == null) {
+      return;
+    }
+    const proof = mysteryProgressBudget.noteProgress();
+    for (const client of clients) {
+      client.evidence.record("campaign-mystery-progress-budget", { kind, ...proof });
+    }
+  };
   let stallSince = 0;
   let lastPhaseProgress = phaseProgressSignature(clients);
   let lastRegisteredSurface = null;
   let drivenSurfacePhaseSignature = null;
 
-  while (Date.now() < (betweenWaveBudget?.observe() ?? fixedDeadline)) {
+  while (Date.now() < (betweenWaveBudget?.observe() ?? mysteryProgressBudget?.deadline() ?? fixedDeadline)) {
     if (
       clients.some(
         client =>
@@ -2603,6 +2658,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
       return { status: "continue", boundary: stats.targetBoundary };
     }
     if (drove) {
+      recordMysteryProgress(`surface:${drove}`);
       stallSince = 0;
       lastRegisteredSurface = drove;
       lastPhaseProgress = phaseProgressSignature(clients);
@@ -2611,6 +2667,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     }
 
     if (await advanceBattlePrompt()) {
+      recordMysteryProgress("battle-prompt");
       stallSince = 0;
       lastRegisteredSurface = null;
       lastPhaseProgress = phaseProgressSignature(clients);
@@ -2619,6 +2676,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     }
 
     if (await advanceMysteryNarration()) {
+      recordMysteryProgress("mystery-narration");
       stallSince = 0;
       lastRegisteredSurface = null;
       lastPhaseProgress = phaseProgressSignature(clients);
