@@ -3919,8 +3919,20 @@ function wireCoopDexSync(relay: CoopInteractionRelay, runtime: CoopRuntime): voi
     if (runtime.controller.role !== "guest" || runtime.controller.netcodeMode !== "authoritative") {
       return;
     }
-    coopLog("runtime", "recv dexSync -> merging partner acquisition credit onto local account");
-    applyCoopDexDelta(dex);
+    const applyToReceiver = (): void => {
+      const receiverScene = runtimeSceneBindings.get(runtime) as typeof globalScene | undefined;
+      if (receiverScene == null) {
+        coopWarn("runtime", "recv dexSync had no receiver-scene binding; retaining local account unchanged");
+        return;
+      }
+      coopLog("runtime", "recv dexSync -> merging partner acquisition credit onto local account");
+      applyCoopDexDelta(dex, receiverScene);
+    };
+    if (!runtimeSceneBindings.has(runtime)) {
+      runWhenCoopRuntimeActive(runtime, applyToReceiver);
+      return;
+    }
+    applyToReceiver();
   };
 }
 

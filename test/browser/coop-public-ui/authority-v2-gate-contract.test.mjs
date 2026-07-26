@@ -21,6 +21,7 @@ const focusedSoakWorkflow = readFileSync(new URL(".github/workflows/coop-soak-fo
 const nightlySoakWorkflow = readFileSync(new URL(".github/workflows/nightly-coop-soak.yml", root), "utf8");
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
+const coopBattleEngine = readFileSync(new URL("src/data/elite-redux/coop/coop-battle-engine.ts", root), "utf8");
 const battleStream = readFileSync(new URL("src/data/elite-redux/coop/coop-battle-stream.ts", root), "utf8");
 const turnCutover = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/cutover-turn.ts", root), "utf8");
 const meOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-operation.ts", root), "utf8");
@@ -2132,7 +2133,7 @@ test("Crossroads and World Map interpret every asynchronous surface completion o
   }
 });
 
-test("overlapping duo scopes cannot overwrite a newer browser-local biome permit snapshot", () => {
+test("overlapping duo scopes cannot overwrite a newer browser-local World Map snapshot", () => {
   assert.match(
     duoHarness,
     /outgoing\.biomeStateSaveGeneration = \(outgoing\.biomeStateSaveGeneration \?\? 0\) \+ 1;[\s\S]*outgoing\.biomeState = snapshotBiomeModuleState\(\)/u,
@@ -2165,6 +2166,34 @@ test("overlapping duo scopes cannot overwrite a newer browser-local biome permit
     duoHarness,
     /activeClientCtx != null && activeClientCtx !== ctx/u,
     "same-browser ACK callbacks cannot bypass live realm persistence",
+  );
+});
+
+test("biome permits and dex acquisition state belong to exact receiver scenes", () => {
+  assert.match(
+    rendererGate,
+    /const biomeTransitionTailPermits = new WeakMap<object, CoopBiomeTransitionTailPermit>\(\);[\s\S]+function biomeTransitionTailPermitKey\(\): object \{\s*return globalScene \?\? biomeTransitionTailPermitBeforeScene;/u,
+    "each browser scene owns an independent one-shot biome transition permit",
+  );
+  assert.doesNotMatch(
+    duoHarness,
+    /(?:snapshot|restore)CoopBiomeTransitionTailPermit/u,
+    "the one-process harness no longer serializes one client's scene-owned permit through ambient module state",
+  );
+  assert.match(
+    coopBattleEngine,
+    /const coopDexBaselines = new WeakMap<typeof globalScene, CoopDexBaseline>\(\);/u,
+    "each account scene owns its own run-scoped dex acquisition baseline",
+  );
+  assert.match(
+    coopBattleEngine,
+    /export function applyCoopDexDelta\(blob: string, receiverScene: typeof globalScene = globalScene\): void \{[\s\S]+receiverScene\.gameData\.dexData[\s\S]+receiverScene\.gameData\.starterData/u,
+    "a received dex carrier applies to its explicit account scene instead of the ambient browser",
+  );
+  assert.match(
+    coopRuntime,
+    /const receiverScene = runtimeSceneBindings\.get\(runtime\) as typeof globalScene \| undefined;[\s\S]+applyCoopDexDelta\(dex, receiverScene\)/u,
+    "the relay binds dex material to the authenticated receiver runtime's scene",
   );
 });
 

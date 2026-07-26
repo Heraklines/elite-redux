@@ -5040,8 +5040,13 @@ export function applyCoopFieldSnapshot(field: CoopFullMonSnapshot[] | undefined,
  * dex onto the guest's account). No baseline captured -> EMPTY blob (share nothing, never
  * overshare); the next run start re-arms it.
  */
-let coopDexBaseline: Map<number, string> | null = null;
-let coopStarterBaseline: Map<number, string> | null = null;
+interface CoopDexBaseline {
+  readonly dex: Map<number, string>;
+  readonly starter: Map<number, string>;
+}
+
+/** Account acquisition baselines are browser-scene owned; two clients must never share one cursor. */
+const coopDexBaselines = new WeakMap<typeof globalScene, CoopDexBaseline>();
 
 /** Fingerprint one dex entry (cheap string compare basis). */
 function dexEntryFingerprint(e: {
@@ -5066,26 +5071,24 @@ export function captureCoopDexBaseline(): void {
     for (const [id, e] of Object.entries(globalScene.gameData.starterData)) {
       starter.set(Number(id), JSON.stringify(e));
     }
-    coopDexBaseline = dex;
-    coopStarterBaseline = starter;
+    coopDexBaselines.set(globalScene, { dex, starter });
     coopLog("shop", `dex baseline captured (species=${dex.size} starters=${starter.size}) - deltas are run-scoped`);
   } catch {
-    coopDexBaseline = null;
-    coopStarterBaseline = null;
+    coopDexBaselines.delete(globalScene);
   }
 }
 
 /** Test/teardown hook: drop the baseline (a delta request then shares NOTHING). */
 export function clearCoopDexBaseline(): void {
-  coopDexBaseline = null;
-  coopStarterBaseline = null;
+  coopDexBaselines.delete(globalScene);
 }
 
 export function captureCoopDexDelta(): string {
   try {
     // #801: without a run-start baseline, share NOTHING (an un-scoped blob would clone the
     // host's whole account dex onto the partner - the live "all of my pokemon" report).
-    if (coopDexBaseline == null || coopStarterBaseline == null) {
+    const baseline = coopDexBaselines.get(globalScene);
+    if (baseline == null) {
       return "";
     }
     const dex: Record<
@@ -5101,7 +5104,7 @@ export function captureCoopDexDelta(): string {
       }
     > = {};
     for (const [id, e] of Object.entries(globalScene.gameData.dexData)) {
-      if (coopDexBaseline.get(Number(id)) === dexEntryFingerprint(e)) {
+      if (baseline.dex.get(Number(id)) === dexEntryFingerprint(e)) {
         continue; // unchanged since run start - not a run acquisition, never shared
       }
       dex[Number(id)] = {
@@ -5118,7 +5121,7 @@ export function captureCoopDexDelta(): string {
     // (run shiny/black unlocks, candy from run catches), never the whole account table.
     const starter: Record<number, unknown> = {};
     for (const [id, e] of Object.entries(globalScene.gameData.starterData)) {
-      if (coopStarterBaseline.get(Number(id)) !== JSON.stringify(e)) {
+      if (baseline.starter.get(Number(id)) !== JSON.stringify(e)) {
         starter[Number(id)] = e;
       }
     }
@@ -5135,7 +5138,7 @@ export function captureCoopDexDelta(): string {
  * sets the numeric counts, and merges `starterData`. Fully guarded so a malformed / empty blob
  * is a no-op (the per-turn checksum + the next ME terminal re-sync any residual drift).
  */
-export function applyCoopDexDelta(blob: string): void {
+export function applyCoopDexDelta(blob: string, receiverScene: typeof globalScene = globalScene): void {
   if (typeof blob !== "string" || blob.length === 0) {
     return;
   }
@@ -5164,7 +5167,7 @@ export function applyCoopDexDelta(blob: string): void {
     // the partner's own attrs, candy counts, and unlocks were REPLACED (destroyed) by whatever
     // the host had. The apply is now a strict GAIN-ONLY UNION: bitmasks OR, counts max, objects
     // gain new keys only. The receiving account can never lose anything from a co-op session.
-    const dexData = globalScene.gameData.dexData;
+    const dexData = receiverScene.gameData.dexData;
     for (const [id, e] of Object.entries(parsed.dex ?? {})) {
       const entry = dexData[Number(id)];
       if (entry == null) {
@@ -5183,7 +5186,7 @@ export function applyCoopDexDelta(blob: string): void {
       }
     }
     const BITMASK_STARTER_FIELDS = new Set(["eggMoves", "abilityAttr", "passiveAttr"]);
-    const starterData = globalScene.gameData.starterData;
+    const starterData = receiverScene.gameData.starterData;
     for (const [id, sIn] of Object.entries(parsed.starter ?? {})) {
       if (sIn == null || typeof sIn !== "object") {
         continue;

@@ -104,11 +104,6 @@ import {
   restoreCoopMeInteractionStartForHarness,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
-  type CoopBiomeTransitionTailPermit,
-  restoreCoopBiomeTransitionTailPermit,
-  snapshotCoopBiomeTransitionTailPermit,
-} from "#data/elite-redux/coop/coop-renderer-gate";
-import {
   assembleCoopRuntime,
   type CoopRuntime,
   clearCoopRuntime,
@@ -324,15 +319,11 @@ export interface ClientCtx {
    */
   moduleLets?: CoopModuleLetSnapshot;
   /**
-   * The complete World-Map / biome-transition substrate for this browser process. Unlike the older
-   * money/relic module-let model, this is always isolated: a committed BIOME_PICK permit is one-shot and
-   * letting the host and guest share it lets the first client consume/clear the other client's authority.
+   * The remaining process-global World-Map substrate for this browser. It is always isolated; the exact
+   * BIOME_PICK permit itself is production-owned by the BattleScene and therefore needs no harness swap.
    */
   biomeState?: CoopBiomeModuleSnapshot;
-  /**
-   * Monotonic save ownership for the World-Map substrate. Async client windows can finish out of entry
-   * order; an older window must never overwrite a newer scope's one-shot committed transition permit.
-   */
+  /** Monotonic save ownership for the remaining process-global World-Map substrate. */
   biomeStateSaveGeneration?: number;
   /**
    * The 3 mystery-encounter pins for THIS client (save/restore around the swap; idle off-ME).
@@ -390,8 +381,6 @@ interface CoopModuleLetSnapshot {
   pendingNodesReady: boolean;
   /** Deferred Crossroads Leave -> SelectBiome interaction pin, or -1 when idle. */
   biomeInteractionStart: number;
-  /** Exact committed Switch/NewBiome permit, including this client's independent stage progress. */
-  biomeTailPermit: CoopBiomeTransitionTailPermit | null;
   authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null;
 }
 
@@ -403,8 +392,6 @@ interface CoopBiomeModuleSnapshot {
   pendingNodesReady: boolean;
   /** Deferred Crossroads Leave -> SelectBiome interaction pin, or -1 when idle. */
   biomeInteractionStart: number;
-  /** Exact committed Switch/NewBiome permit, including this client's independent stage progress. */
-  biomeTailPermit: CoopBiomeTransitionTailPermit | null;
   authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null;
   overstayAnchor: number | null;
   biomeLength: number | null;
@@ -417,7 +404,6 @@ function snapshotBiomeModuleState(): CoopBiomeModuleSnapshot {
     pendingNodes: getErPendingNodes().map(node => ({ ...node })),
     pendingNodesReady: erPendingNodesReady(),
     biomeInteractionStart: coopBiomeInteractionInProgress() ? coopBiomeInteractionStartValue() : -1,
-    biomeTailPermit: snapshotCoopBiomeTransitionTailPermit(),
     authoritativeTravelClassification: snapshotAuthoritativeMapTravelClassification(),
     overstayAnchor: erBiomeOverstayAnchor(),
     biomeLength: getErBiomeLength(),
@@ -439,9 +425,6 @@ function restoreBiomeModuleState(s: CoopBiomeModuleSnapshot): void {
   } else {
     clearCoopBiomeInteractionStart();
   }
-  if (!restoreCoopBiomeTransitionTailPermit(s.biomeTailPermit)) {
-    throw new Error("Invalid isolated co-op biome-tail permit snapshot");
-  }
   restoreAuthoritativeMapTravelClassification(s.authoritativeTravelClassification);
 }
 
@@ -457,7 +440,6 @@ function snapshotModuleLets(): CoopModuleLetSnapshot {
     pendingNodes: getErPendingNodes().map(node => ({ ...node })),
     pendingNodesReady: erPendingNodesReady(),
     biomeInteractionStart: coopBiomeInteractionInProgress() ? coopBiomeInteractionStartValue() : -1,
-    biomeTailPermit: snapshotCoopBiomeTransitionTailPermit(),
     authoritativeTravelClassification: snapshotAuthoritativeMapTravelClassification(),
   };
 }
@@ -471,7 +453,6 @@ function restoreModuleLets(s: CoopModuleLetSnapshot): void {
     pendingNodes: s.pendingNodes,
     pendingNodesReady: s.pendingNodesReady,
     biomeInteractionStart: s.biomeInteractionStart,
-    biomeTailPermit: s.biomeTailPermit,
     authoritativeTravelClassification: s.authoritativeTravelClassification,
     overstayAnchor: s.overstayAnchor,
     biomeLength: s.biomeLength,

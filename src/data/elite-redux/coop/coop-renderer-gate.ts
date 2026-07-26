@@ -49,6 +49,7 @@
 // per-entry justification + the four adjudicated REVIEW rows.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
@@ -370,7 +371,31 @@ export interface CoopBiomeTransitionTailPermit {
   readonly encounterAdopted: boolean;
 }
 
-let biomeTransitionTailPermit: CoopBiomeTransitionTailPermit | null = null;
+/**
+ * The transition permit belongs to one browser scene, not to the JS module. Production currently owns one
+ * scene per browser, while the representative duo harness hosts two independent browser scenes in one
+ * process. A module-global permit let one client's nested transport/timer continuation consume or restore
+ * the other client's one-shot boundary authority. Scene ownership makes that impossible by construction.
+ */
+const biomeTransitionTailPermits = new WeakMap<object, CoopBiomeTransitionTailPermit>();
+const biomeTransitionTailPermitBeforeScene = {};
+
+function biomeTransitionTailPermitKey(): object {
+  return globalScene ?? biomeTransitionTailPermitBeforeScene;
+}
+
+function readBiomeTransitionTailPermit(): CoopBiomeTransitionTailPermit | null {
+  return biomeTransitionTailPermits.get(biomeTransitionTailPermitKey()) ?? null;
+}
+
+function writeBiomeTransitionTailPermit(permit: CoopBiomeTransitionTailPermit | null): void {
+  const key = biomeTransitionTailPermitKey();
+  if (permit == null) {
+    biomeTransitionTailPermits.delete(key);
+  } else {
+    biomeTransitionTailPermits.set(key, permit);
+  }
+}
 
 type CoopBiomeTransitionTailPermitSeed = Omit<
   CoopBiomeTransitionTailPermit,
@@ -416,17 +441,18 @@ export function canArmCoopBiomeTransitionTailPermit(permit: CoopBiomeTransitionT
   if (!isValidBiomeTransitionTailPermitSeed(permit)) {
     return false;
   }
-  if (biomeTransitionTailPermit == null) {
+  const activePermit = readBiomeTransitionTailPermit();
+  if (activePermit == null) {
     return true;
   }
   const exactRetry =
-    biomeTransitionTailPermit.operationId === permit.operationId
-    && biomeTransitionTailPermit.sessionEpoch === permit.sessionEpoch
-    && biomeTransitionTailPermit.revision === permit.revision
-    && biomeTransitionTailPermit.wave === permit.wave
-    && biomeTransitionTailPermit.sourceBiomeId === permit.sourceBiomeId
-    && biomeTransitionTailPermit.destinationBiomeId === permit.destinationBiomeId
-    && biomeTransitionTailPermit.nextWave === permit.nextWave;
+    activePermit.operationId === permit.operationId
+    && activePermit.sessionEpoch === permit.sessionEpoch
+    && activePermit.revision === permit.revision
+    && activePermit.wave === permit.wave
+    && activePermit.sourceBiomeId === permit.sourceBiomeId
+    && activePermit.destinationBiomeId === permit.destinationBiomeId
+    && activePermit.nextWave === permit.nextWave;
   if (exactRetry) {
     return true;
   }
@@ -437,10 +463,10 @@ export function canArmCoopBiomeTransitionTailPermit(permit: CoopBiomeTransitionT
   // next dense, host-committed BIOME_PICK forever. A replacement is admitted only when every ordering fact
   // proves it is later in the same session; an unconsumed Switch/NewBiome permit still fails closed.
   return (
-    biomeTransitionTailPermit.encounterAdopted
-    && biomeTransitionTailPermit.sessionEpoch === permit.sessionEpoch
-    && permit.revision > biomeTransitionTailPermit.revision
-    && permit.wave >= biomeTransitionTailPermit.nextWave
+    activePermit.encounterAdopted
+    && activePermit.sessionEpoch === permit.sessionEpoch
+    && permit.revision > activePermit.revision
+    && permit.wave >= activePermit.nextWave
   );
 }
 
@@ -449,33 +475,34 @@ export function armCoopBiomeTransitionTailPermit(permit: CoopBiomeTransitionTail
   if (!canArmCoopBiomeTransitionTailPermit(permit)) {
     return false;
   }
-  if (biomeTransitionTailPermit?.operationId === permit.operationId) {
+  if (readBiomeTransitionTailPermit()?.operationId === permit.operationId) {
     return true;
   }
-  biomeTransitionTailPermit = {
+  writeBiomeTransitionTailPermit({
     ...permit,
     switchAdopted: false,
     historyRecorded: false,
     switchPrepared: false,
     encounterAdopted: false,
-  };
+  });
   return true;
 }
 
 /** Read-only diagnostic/test view of the current exact biome-tail permit. */
 export function getCoopBiomeTransitionTailPermit(): CoopBiomeTransitionTailPermit | null {
-  return biomeTransitionTailPermit == null ? null : { ...biomeTransitionTailPermit };
+  const permit = readBiomeTransitionTailPermit();
+  return permit == null ? null : { ...permit };
 }
 
-/** Capture the complete staged permit for a production-process/test-harness context swap. */
+/** Capture the current scene's complete staged permit for diagnostics and focused state tests. */
 export function snapshotCoopBiomeTransitionTailPermit(): CoopBiomeTransitionTailPermit | null {
   return getCoopBiomeTransitionTailPermit();
 }
 
-/** Restore one process's exact permit stages without replaying or collapsing another client's progress. */
+/** Restore the current scene's exact permit stages without replaying or collapsing its progress. */
 export function restoreCoopBiomeTransitionTailPermit(snapshot: CoopBiomeTransitionTailPermit | null): boolean {
   if (snapshot == null) {
-    biomeTransitionTailPermit = null;
+    writeBiomeTransitionTailPermit(null);
     return true;
   }
   if (
@@ -486,7 +513,7 @@ export function restoreCoopBiomeTransitionTailPermit(snapshot: CoopBiomeTransiti
   ) {
     return false;
   }
-  biomeTransitionTailPermit = { ...snapshot };
+  writeBiomeTransitionTailPermit({ ...snapshot });
   return true;
 }
 
@@ -499,7 +526,7 @@ export function adoptCoopBiomeTransitionSwitchPermit(params: {
   readonly sourceBiomeId: number;
   readonly wave: number;
 }): CoopBiomeTransitionTailPermit | null {
-  const permit = biomeTransitionTailPermit;
+  const permit = readBiomeTransitionTailPermit();
   // Applying the immutable BIOME_PICK result can install its complete authoritative state before the queued
   // SwitchBiome presentation tail starts. In that valid ordering the live arena already names the committed
   // destination even though this local tail has not adopted its permit yet. The exact permit identity,
@@ -523,29 +550,29 @@ export function adoptCoopBiomeTransitionSwitchPermit(params: {
     return null;
   }
   const adopted = permit.switchAdopted ? permit : { ...permit, switchAdopted: true };
-  biomeTransitionTailPermit = adopted;
+  writeBiomeTransitionTailPermit(adopted);
   return { ...adopted };
 }
 
 /** Mark the exact history append complete so a retry cannot duplicate recent-biome history. */
 export function markCoopBiomeTransitionHistoryRecorded(operationId: string): CoopBiomeTransitionTailPermit | null {
-  const permit = biomeTransitionTailPermit;
+  const permit = readBiomeTransitionTailPermit();
   if (permit == null || !permit.switchAdopted || permit.operationId !== operationId) {
     return null;
   }
   const prepared = permit.historyRecorded ? permit : { ...permit, historyRecorded: true };
-  biomeTransitionTailPermit = prepared;
+  writeBiomeTransitionTailPermit(prepared);
   return { ...prepared };
 }
 
 /** Mark guest route/structure preparation complete only after every deterministic write succeeded. */
 export function markCoopBiomeTransitionSwitchPrepared(operationId: string): CoopBiomeTransitionTailPermit | null {
-  const permit = biomeTransitionTailPermit;
+  const permit = readBiomeTransitionTailPermit();
   if (permit == null || !permit.switchAdopted || !permit.historyRecorded || permit.operationId !== operationId) {
     return null;
   }
   const prepared = permit.switchPrepared ? permit : { ...permit, switchPrepared: true };
-  biomeTransitionTailPermit = prepared;
+  writeBiomeTransitionTailPermit(prepared);
   return { ...prepared };
 }
 
@@ -557,7 +584,7 @@ export function consumeCoopBiomeTransitionEncounterPermit(params: {
   readonly destinationBiomeId: number;
   readonly nextWave: number;
 }): CoopBiomeTransitionTailPermit | null {
-  const permit = biomeTransitionTailPermit;
+  const permit = readBiomeTransitionTailPermit();
   if (
     permit == null
     || !permit.switchAdopted
@@ -568,7 +595,7 @@ export function consumeCoopBiomeTransitionEncounterPermit(params: {
     return null;
   }
   const adopted = permit.encounterAdopted ? permit : { ...permit, encounterAdopted: true };
-  biomeTransitionTailPermit = adopted;
+  writeBiomeTransitionTailPermit(adopted);
   return { ...adopted };
 }
 
@@ -578,7 +605,7 @@ export function canFinalizeCoopBiomeTransitionEncounterPermit(params: {
   readonly destinationBiomeId: number;
   readonly nextWave: number;
 }): boolean {
-  const permit = biomeTransitionTailPermit;
+  const permit = readBiomeTransitionTailPermit();
   return (
     permit != null
     && permit.switchAdopted
@@ -598,8 +625,8 @@ export function finalizeCoopBiomeTransitionEncounterPermit(params: {
   if (!canFinalizeCoopBiomeTransitionEncounterPermit(params)) {
     return null;
   }
-  const permit = biomeTransitionTailPermit!;
-  biomeTransitionTailPermit = null;
+  const permit = readBiomeTransitionTailPermit()!;
+  writeBiomeTransitionTailPermit(null);
   return { ...permit };
 }
 
@@ -614,7 +641,7 @@ export function finalizeCoopBiomeTransitionAfterRetainedBattlePermit(params: {
   readonly destinationBiomeId: number;
   readonly nextWave: number;
 }): CoopBiomeTransitionTailPermit | null {
-  const permit = biomeTransitionTailPermit;
+  const permit = readBiomeTransitionTailPermit();
   if (
     permit == null
     || !permit.switchAdopted
@@ -627,17 +654,17 @@ export function finalizeCoopBiomeTransitionAfterRetainedBattlePermit(params: {
   ) {
     return null;
   }
-  biomeTransitionTailPermit = null;
+  writeBiomeTransitionTailPermit(null);
   return { ...permit };
 }
 
 /** Clear a stale permit on teardown/recovery. */
 export function clearCoopBiomeTransitionTailPermit(): void {
-  biomeTransitionTailPermit = null;
+  writeBiomeTransitionTailPermit(null);
 }
 
 function biomePermitSanctions(phaseName: string, constructorArgs: readonly unknown[]): boolean {
-  const permit = biomeTransitionTailPermit;
+  const permit = readBiomeTransitionTailPermit();
   if (permit == null) {
     return false;
   }
