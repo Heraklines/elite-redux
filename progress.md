@@ -4059,3 +4059,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A same-wave replacement result likewise states a closed tail: another replacement-open at the identical
   settlement address or WAVE_ADVANCE. This prevents the first simultaneous faint from consuming the only
   permit and leaving a second real SwitchPhase unaddressable in doubles/triples.
+- Migrated the public faint-replacement evidence oracle from its stale `const` local faint address to the V2
+  contract: the real SwitchPhase must establish, fail/defer safely, and then rebind to the immutable committed
+  replacement address before any owner/watcher relay may use it.

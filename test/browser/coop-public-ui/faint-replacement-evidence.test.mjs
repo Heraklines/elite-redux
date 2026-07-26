@@ -46,7 +46,16 @@ test("faint replacement waits for the owned actionable party surface before pres
   assert.match(stream, /peekCheckpointForTurn\(turn: number, sourceWave\?: number\)/u);
   assert.match(replayTurn, /peekCheckpointForTurn\(this\.turn, this\.sourceWave\)/u);
   assert.match(replayTurn, /consumeCheckpointForTurn\(this\.turn, this\.sourceWave\)/u);
-  assert.match(hostSwitch, /const operationSourceAddress = this\.faintSourceAddress \?\? \{[\s\S]*wave:[\s\S]*turn:/u);
+  assert.match(hostSwitch, /let operationSourceAddress = this\.faintSourceAddress \?\? \{[\s\S]*wave:[\s\S]*turn:/u);
+  assert.match(
+    hostSwitch,
+    /establishCoopV2ReplacementControlBoundary\(\{[\s\S]*sourceAddress: operationSourceAddress[\s\S]*controlBoundary\.kind === "failed"[\s\S]*controlBoundary\.kind === "deferred"[\s\S]*super\.end\(\)/u,
+  );
+  assert.match(
+    hostSwitch,
+    /operationSourceAddress = \{[\s\S]*wave: controlBoundary\.control\.wave[\s\S]*turn: controlBoundary\.control\.turn[\s\S]*occurrence: controlBoundary\.control\.occurrence/u,
+  );
+  assert.match(hostSwitch, /this\.coopV2ControlOperationId = controlBoundary\.control\.operationId/u);
   assert.match(hostSwitch, /const sourceAddress = operationSourceAddress/u);
   assert.match(hostSwitch, /waitForOperationMaterialApplied\(operationId\)[\s\S]*releaseAfterPeerMaterial\(\)/u);
   // Run 29737686349 mystery lane: PartyUiHandler inherits MessageUiHandler for incidental text, so the
