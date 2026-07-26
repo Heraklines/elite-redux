@@ -9,7 +9,11 @@ import {
   COOP_INTERACTION_REROLL,
   type CoopInteractionChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
-import type { CoopRewardPresentationPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import type {
+  CoopInteractionSuccessorRef,
+  CoopNestedInteractionReturnPlan,
+  CoopRewardPresentationPayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
@@ -268,6 +272,8 @@ export class SelectModifierPhase extends BattlePhase {
    * redeclaring a same-name private (TS2415) - it is the SAME runtime slot the base reads via
    * applyModifier -> coopCommitPendingAuthorityResult, so sharing it is behavior-identical. */
   protected coopPendingAuthorityOperationId: string | null = null;
+  /** Exact nested picker opened by the pending result; cleared at every new intent and successful commit. */
+  private coopPendingAuthorityNextInteraction: CoopInteractionSuccessorRef | undefined;
   /** Runtime captured while this phase is installed; survives async UI callbacks without ambient rebinding. */
   protected coopRewardOperationBinding: CoopRewardOperationBinding | null = null;
   /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
@@ -1061,6 +1067,38 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   /**
+   * Resolve the interaction child synchronously queued by this concrete modifier result. A move-learn
+   * operation exists only for a full moveset; empty-slot learns are deterministic material and therefore
+   * proceed directly to the ordinary reward/Mystery successor without manufacturing an input surface.
+   */
+  private coopModifierFollowUp(modifier: Modifier): CoopInteractionSuccessorRef | undefined {
+    const wave = this.coopRewardWave();
+    const turn = this.coopRewardTurn();
+    const modifierType = modifier.type;
+    if (
+      modifierType instanceof ErAbilityCapsuleModifierType
+      || modifierType instanceof ErGreaterAbilityCapsuleModifierType
+      || modifierType instanceof ErGreaterAbilityRandomizerModifierType
+    ) {
+      return { kind: "ability", wave, turn };
+    }
+    if (
+      !(modifierType instanceof RememberMoveModifierType)
+      && !(modifierType instanceof TmModifierType)
+      && !(modifierType instanceof ErLearnersShroomModifierType)
+      && !(modifierType instanceof ErTmCaseModifierType)
+    ) {
+      return;
+    }
+    const pokemonId = "pokemonId" in modifier && typeof modifier.pokemonId === "number" ? modifier.pokemonId : null;
+    const target = pokemonId == null ? null : globalScene.getPlayerParty().find(pokemon => pokemon.id === pokemonId);
+    if (target == null || target.getMoveset().length < target.getMaxMoveCount()) {
+      return;
+    }
+    return { kind: "learn-move", wave, turn };
+  }
+
+  /**
    * Renderer-only counterpart of the modifier's queued phase effect. The complete host result has already
    * installed every gameplay mutation before this runs, so the guest must never call addModifier/apply a
    * second time. It recreates only the follow-up surface that the authoritative modifier queued.
@@ -1151,6 +1189,7 @@ export class SelectModifierPhase extends BattlePhase {
    */
   protected applyModifier(modifier: Modifier, cost = -1, playSound = false): boolean {
     const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
+    this.coopPendingAuthorityNextInteraction = result ? this.coopModifierFollowUp(modifier) : undefined;
     // Causal reward trace: record the exact generated identity + resolved holder and whether the engine
     // accepted it on EACH side. A type-id-only log cannot distinguish two BERRY variants, and the live
     // wave-15 divergence was exactly one host-only berry hidden behind shifted sorted modifier arrays.
@@ -1591,6 +1630,29 @@ export class SelectModifierPhase extends BattlePhase {
     return ctx;
   }
 
+  /**
+   * Capture the exact exits owned by a queued back-out copy before its nested picker opens. This is read
+   * synchronously by the child and then serialized into its immutable presentation; the child never asks
+   * local Mystery state what should run after the human decision.
+   */
+  public coopNestedInteractionReturnPlan(): {
+    readonly pinned: number;
+    readonly plan: CoopNestedInteractionReturnPlan;
+  } | null {
+    if (!this.isCopy || this.coopInteractionStart < 0 || getCoopController() == null) {
+      return null;
+    }
+    const wave = this.coopRewardWave();
+    const turn = this.coopRewardTurn();
+    return {
+      pinned: this.coopInteractionStart,
+      plan: {
+        onCancel: { kind: "reward", wave, turn },
+        ...(this.coopRewardSurface == null ? {} : { onCommit: { kind: "mystery-terminal", wave, turn: 0 } as const }),
+      },
+    };
+  }
+
   copy(): SelectModifierPhase {
     const copied = globalScene.phaseManager.create(
       "SelectModifierPhase",
@@ -1701,6 +1763,7 @@ export class SelectModifierPhase extends BattlePhase {
     if (controller == null || !controller.isLocalOwnerAtCounter(this.coopInteractionStart)) {
       return false;
     }
+    this.coopPendingAuthorityNextInteraction = undefined;
     // Past the co-op + pinned-owner fence: this client OWNS this shop interaction and is the
     // relay source. Log the exact preparation (seq + label + choice + payload) so a retained result or
     // compatibility carrier can be matched against it in the captured log. Hot-ish (per reward action) -
@@ -1894,6 +1957,7 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
     const committed = commitRewardAuthoritativeResult(operationId, undefined, this.coopRewardOperationBinding, {
+      nextInteraction: this.coopPendingAuthorityNextInteraction,
       continuation: {
         surface: "reward",
         pinned: this.coopInteractionStart,
@@ -1910,6 +1974,7 @@ export class SelectModifierPhase extends BattlePhase {
     if (this.coopPendingAuthorityOperationId === operationId) {
       this.coopPendingAuthorityOperationId = null;
     }
+    this.coopPendingAuthorityNextInteraction = undefined;
     return true;
   }
 

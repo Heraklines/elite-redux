@@ -36,12 +36,14 @@ import {
   COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
   COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopAuthoritativeEnvelopeV1,
+  type CoopInteractionSuccessorRef,
   type CoopMarketProjectionKind,
   type CoopOperationKind,
   type CoopPendingOperation,
   type CoopRewardActionPayload,
   type CoopRewardPresentationPayload,
   type CoopShopBuyPayload,
+  isCoopInteractionSuccessorRef,
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
@@ -735,6 +737,8 @@ export interface CoopRewardOwnerCommitResult {
 /** Phase-local mechanical state not represented by the shared battle snapshot. */
 export interface CoopRewardSurfaceResultState {
   readonly remainingStock?: readonly number[];
+  /** Exact nested interaction synchronously queued by this result, when one exists. */
+  readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
   /**
    * Exact phase-local surface that remains executable after this result. Required for non-terminal
    * retained actions and deliberately absent for terminal results.
@@ -986,6 +990,16 @@ function buildCompleteRewardResultPayload(
   surfaceResult: CoopRewardSurfaceResultState | undefined,
 ): CoopRewardActionPayload | null {
   const action = payload as CoopRewardActionPayload;
+  const nextInteraction = surfaceResult?.nextInteraction;
+  if (
+    nextInteraction !== undefined
+    && (!isCoopInteractionSuccessorRef(nextInteraction)
+      || nextInteraction.wave !== prepared.wave
+      || nextInteraction.turn !== prepared.turn
+      || (nextInteraction.kind !== "learn-move" && nextInteraction.kind !== "ability"))
+  ) {
+    return null;
+  }
   const continuation = action.terminal
     ? undefined
     : completeRewardContinuation(surfaceResult?.continuation, prepared, "reward");
@@ -996,6 +1010,7 @@ function buildCompleteRewardResultPayload(
     ...action,
     result: {
       lockModifierTiers,
+      ...(nextInteraction === undefined ? {} : { nextInteraction: structuredClone(nextInteraction) }),
       ...(continuation == null
         ? {}
         : {

@@ -14,6 +14,8 @@ import {
   type CoopLearnMovePayload,
   type CoopOperationKind,
   type CoopPendingOperation,
+  isCoopInteractionSuccessorRef,
+  isCoopNestedInteractionReturnPlan,
   makeCoopOperationId,
   parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -436,7 +438,15 @@ function valid(value: unknown, kind: CoopOperationKind): value is LearnPayload {
   }
   if (kind === "LEARN_MOVE") {
     const m = p as CoopLearnMovePayload;
-    return Number.isSafeInteger(m.moveId) && m.moveId > 0 && Number.isSafeInteger(m.maxMoveCount);
+    return (
+      Number.isSafeInteger(m.moveId)
+      && m.moveId > 0
+      && Number.isSafeInteger(m.maxMoveCount)
+      && (m.type === "prompt"
+        ? m.returnPlan === undefined || isCoopNestedInteractionReturnPlan(m.returnPlan)
+        : m.type === "decision"
+          && (m.nextInteraction === undefined || isCoopInteractionSuccessorRef(m.nextInteraction)))
+    );
   }
   const b = p as CoopLearnMoveBatchPayload;
   return b.type === "prompt"

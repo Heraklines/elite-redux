@@ -627,6 +627,71 @@ describe("Authority V2 interaction cutover", () => {
   });
 
   it.each([
+    ["learn-move", "op:learnMove", "LEARN_MOVE"],
+    ["ability", "op:ability", "ABILITY_PRESENT"],
+  ] as const)("states only the exact %s follow-up selected by a nested Mystery reward", (kind, surfaceClass, operationKind) => {
+    const successor = successorOfCoopV2InteractionEnvelope(
+      "op:reward",
+      envelope(
+        "REWARD",
+        {
+          rewardSurface: { surfaceId: "modifier:me:6:0", ordinal: 0 },
+          label: "reward",
+          choice: 0,
+          data: [0, 0, 0],
+          terminal: true,
+          result: { lockModifierTiers: false, nextInteraction: { kind, wave: 1, turn: 1 } },
+        },
+        "REWARD_SELECT",
+      ),
+    );
+    expect(successor).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      allowedInteractionAddresses: [{ surfaceClass, operationKind, wave: 1, turn: 1 }],
+    });
+  });
+
+  it.each([
+    [
+      "LEARN_MOVE",
+      {
+        type: "decision",
+        partySlot: 0,
+        moveId: 33,
+        forgetSlot: 0,
+        maxMoveCount: 4,
+        nextInteraction: { kind: "mystery-terminal", wave: 1, turn: 0 },
+      },
+      "op:learnMove",
+      "op:me",
+      "ME_TERMINAL",
+      0,
+    ],
+    [
+      "ABILITY_PICK",
+      { data: [11], nextInteraction: { kind: "mystery-terminal", wave: 1, turn: 0 } },
+      "op:ability",
+      "op:me",
+      "ME_TERMINAL",
+      0,
+    ],
+    [
+      "ABILITY_PICK",
+      { data: [10], nextInteraction: { kind: "reward", wave: 1, turn: 1 } },
+      "op:ability",
+      "op:reward",
+      "REWARD_PRESENT",
+      1,
+    ],
+  ] as const)("%s publishes its concrete nested-return edge instead of deriving it from local phase state", (kind, payload, sourceSurface, targetSurface, targetKind, turn) => {
+    const successor = successorOfCoopV2InteractionEnvelope(sourceSurface, envelope(kind, payload, "TURN_RESOLVE"));
+    expect(successor).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      allowedInteractionAddresses: [{ surfaceClass: targetSurface, operationKind: targetKind, wave: 1, turn }],
+    });
+  });
+
+  it.each([
     ["REVIVAL", { type: "decision", fieldIndex: 0, partySlot: 1, speciesId: 25 }, "op:revival"],
     ["CATCH_FULL", { type: "decision", partySlot: 1 }, "op:catchFull"],
     ["LEARN_MOVE", { type: "decision", partySlot: 0, moveId: 33, forgetSlot: 0, maxMoveCount: 4 }, "op:learnMove"],

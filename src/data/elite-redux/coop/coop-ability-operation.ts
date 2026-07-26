@@ -13,6 +13,8 @@ import {
   type CoopAbilityPresentationPayload,
   type CoopAuthoritativeEnvelopeV1,
   type CoopPendingOperation,
+  isCoopInteractionSuccessorRef,
+  isCoopNestedInteractionReturnPlan,
   makeCoopOperationId,
   parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -64,6 +66,8 @@ interface AbilityOpState {
   readonly stateAppliedOperations: Set<string>;
   /** Results whose exact local ability phase consumed the outcome and reached its terminal. */
   readonly settledOperations: Set<string>;
+  /** Frozen result-dependent exits from each retained ability presentation. */
+  readonly returnPlansByPinned: Map<number, NonNullable<CoopAbilityPresentationPayload["returnPlan"]>>;
 }
 
 registerCoopOpSurfaceState(
@@ -81,6 +85,7 @@ registerCoopOpSurfaceState(
     pendingMaterializations: new Set(),
     stateAppliedOperations: new Set(),
     settledOperations: new Set(),
+    returnPlansByPinned: new Map(),
   }),
 );
 
@@ -169,6 +174,7 @@ export function resetCoopAbilityOperationState(): void {
   s.pendingMaterializations.clear();
   s.stateAppliedOperations.clear();
   s.settledOperations.clear();
+  s.returnPlansByPinned.clear();
   s.authorityHost = null;
   s.receiverGuest = null;
   s.authorityOrdinalPin = -1;
@@ -255,6 +261,7 @@ export function commitCoopAbilityPresentation(
     readonly partyIndex: number;
     readonly workflow: CoopAbilityPresentationPayload["workflow"];
     readonly rolledAbilityIds?: readonly number[] | undefined;
+    readonly returnPlan?: CoopAbilityPresentationPayload["returnPlan"];
     readonly localRole: CoopRole;
     readonly wave: number;
     readonly turn: number;
@@ -276,6 +283,7 @@ export function commitCoopAbilityPresentation(
         || !params.rolledAbilityIds.every(id => Number.isSafeInteger(id) && id > 0)
         || new Set(params.rolledAbilityIds).size !== params.rolledAbilityIds.length
       : params.rolledAbilityIds !== undefined)
+    || (params.returnPlan !== undefined && !isCoopNestedInteractionReturnPlan(params.returnPlan))
   ) {
     return null;
   }
@@ -293,6 +301,7 @@ export function commitCoopAbilityPresentation(
         partyIndex: params.partyIndex,
         workflow: params.workflow,
         ...(randomizer ? { rolledAbilityIds: [...(params.rolledAbilityIds ?? [])] } : {}),
+        ...(params.returnPlan == null ? {} : { returnPlan: structuredClone(params.returnPlan) }),
       } satisfies CoopAbilityPresentationPayload,
     };
     const result = host(binding).submit(operation, context(params.wave, params.turn), intent =>
@@ -307,6 +316,11 @@ export function commitCoopAbilityPresentation(
       || !retainEnvelope(result.envelope, binding)
     ) {
       return null;
+    }
+    if (params.returnPlan == null) {
+      s.returnPlansByPinned.delete(params.pinned);
+    } else {
+      s.returnPlansByPinned.set(params.pinned, structuredClone(params.returnPlan));
     }
     return operationId;
   } catch (error) {
@@ -325,6 +339,7 @@ function commit(
   turn: number,
   binding?: CoopAbilityOperationBinding | null,
   expectedOperationId?: string,
+  committed = true,
 ): boolean {
   const s = state(binding);
   const owner = coopInteractionOwnerSeat(pinned);
@@ -334,7 +349,14 @@ function commit(
     kind: "ABILITY_PICK",
     owner,
     status: "proposed",
-    payload: { data: [...data] } satisfies CoopAbilityPickPayload,
+    payload: {
+      data: [...data],
+      ...(() => {
+        const plan = s.returnPlansByPinned.get(pinned);
+        const nextInteraction = committed ? plan?.onCommit : plan?.onCancel;
+        return nextInteraction == null ? {} : { nextInteraction: structuredClone(nextInteraction) };
+      })(),
+    } satisfies CoopAbilityPickPayload,
   };
   if (expectedOperationId != null && operation.id !== expectedOperationId) {
     return false;
@@ -367,6 +389,7 @@ export function commitAbilityOwnerOutcome(
     localRole: CoopRole;
     wave: number;
     turn?: number;
+    committed?: boolean;
   },
   binding?: CoopAbilityOperationBinding | null,
 ): boolean {
@@ -374,7 +397,9 @@ export function commitAbilityOwnerOutcome(
     return true;
   }
   try {
-    if (!commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding)) {
+    if (
+      !commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding, undefined, params.committed ?? true)
+    ) {
       coopWarn("ability", "ability owner result could not be retained");
       return false;
     }
@@ -418,6 +443,7 @@ export function adoptAbilityWatcherOutcome(
     localRole: CoopRole;
     wave: number;
     turn?: number;
+    committed?: boolean;
   },
   binding?: CoopAbilityOperationBinding | null,
 ): CoopAbilityWatcherAdoption {
@@ -447,7 +473,7 @@ export function adoptAbilityWatcherOutcome(
         operationId: id,
       };
     }
-    return commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding, id)
+    return commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding, id, params.committed ?? true)
       ? {
           accepted: true,
           projectionApplied: false,
@@ -510,6 +536,7 @@ export function commitAbilityWatcherOutcome(
     readonly data: number[];
     readonly wave: number;
     readonly turn?: number;
+    readonly committed?: boolean;
   },
   binding?: CoopAbilityOperationBinding | null,
 ): boolean {
@@ -517,7 +544,15 @@ export function commitAbilityWatcherOutcome(
     return false;
   }
   try {
-    return commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding, operationId);
+    return commit(
+      params.pinned,
+      params.data,
+      params.wave,
+      params.turn ?? 0,
+      binding,
+      operationId,
+      params.committed ?? true,
+    );
   } catch (error) {
     if (isCoopOpRuntimeError(error)) {
       throw error;
@@ -636,7 +671,12 @@ function applyJournaledAbilityEnvelope(
   }
   if (operation.kind === "ABILITY_PICK") {
     const payload = operation.payload as CoopAbilityPickPayload | undefined;
-    if (payload == null || !Array.isArray(payload.data) || !payload.data.every(Number.isFinite)) {
+    if (
+      payload == null
+      || !Array.isArray(payload.data)
+      || !payload.data.every(Number.isFinite)
+      || (payload.nextInteraction !== undefined && !isCoopInteractionSuccessorRef(payload.nextInteraction))
+    ) {
       return "rejected";
     }
   } else {
@@ -657,6 +697,7 @@ function applyJournaledAbilityEnvelope(
           || !payload.rolledAbilityIds.every(id => Number.isSafeInteger(id) && id > 0)
           || new Set(payload.rolledAbilityIds).size !== payload.rolledAbilityIds.length
         : payload.rolledAbilityIds !== undefined)
+      || (payload.returnPlan !== undefined && !isCoopNestedInteractionReturnPlan(payload.returnPlan))
     ) {
       return "rejected";
     }
@@ -679,6 +720,14 @@ function applyJournaledAbilityEnvelope(
     return result;
   }
   const parsed = parseCoopOperationId(operation.id);
+  if (operation.kind === "ABILITY_PRESENT") {
+    const payload = operation.payload as CoopAbilityPresentationPayload;
+    if (payload.returnPlan == null) {
+      s.returnPlansByPinned.delete(payload.pinned);
+    } else {
+      s.returnPlansByPinned.set(payload.pinned, structuredClone(payload.returnPlan));
+    }
+  }
   if (operation.kind === "ABILITY_PICK" && parsed != null) {
     const payload = operation.payload as CoopAbilityPickPayload;
     const pinned = Math.floor(parsed.pinnedSeq / COOP_ABILITY_ACTION_STRIDE);

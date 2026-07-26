@@ -126,7 +126,11 @@ export function sendCoopAbilityPickerOutcome(
   proposalOperationId?: string,
 ): boolean {
   const committed =
-    context == null || commitAbilityOwnerOutcome({ pinned: shopSeq, data, ...context }, operationBinding);
+    context == null
+    || commitAbilityOwnerOutcome(
+      { pinned: shopSeq, data, committed: data[0] !== COOP_ABILITY_OP.CANCEL, ...context },
+      operationBinding,
+    );
   if (!committed) {
     return false;
   }

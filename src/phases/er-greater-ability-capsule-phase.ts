@@ -44,6 +44,7 @@ import {
   sendCoopAbilityPickerOutcome,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { captureCoopNestedInteractionReturnPlan } from "#data/elite-redux/coop/coop-nested-interaction";
 import type { CoopAbilityPresentationPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   advanceCoopInteractionForContinuation,
@@ -117,6 +118,7 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
           pinned: this.coopSeq,
           partyIndex: this.partyIndex,
           workflow: "greater-capsule",
+          returnPlan: captureCoopNestedInteractionReturnPlan(this.coopSeq),
           localRole: "host",
           wave: globalScene.currentBattle?.waveIndex ?? 0,
           turn: globalScene.currentBattle?.turn ?? 0,
@@ -406,6 +408,7 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
             {
               pinned: this.coopSeq,
               data: relayedData,
+              committed: relayedData != null && relayedData[0] !== COOP_ABILITY_OP.CANCEL,
               localRole: controller.role,
               wave: globalScene.currentBattle?.waveIndex ?? 0,
               turn: globalScene.currentBattle?.turn ?? 0,
@@ -450,6 +453,7 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
         {
           pinned: this.coopSeq,
           data,
+          committed: op !== COOP_ABILITY_OP.CANCEL,
           wave: globalScene.currentBattle?.waveIndex ?? 0,
           turn: globalScene.currentBattle?.turn ?? 0,
         },

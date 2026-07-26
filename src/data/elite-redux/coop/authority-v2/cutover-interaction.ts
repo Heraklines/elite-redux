@@ -43,12 +43,15 @@ import {
 } from "#data/elite-redux/coop/coop-me-terminal-validator";
 import type {
   CoopAuthoritativeEnvelopeV1,
+  CoopInteractionSuccessorRef,
   CoopLogicalPhase,
   CoopOperationKind,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
   COOP_ME_REWARD_SURFACE_LIMIT,
+  isCoopInteractionSuccessorRef,
+  isCoopNestedInteractionReturnPlan,
   makeCoopOperationId,
   parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -173,6 +176,7 @@ function rewardPayload(value: unknown): boolean {
     && terminalMatchesAction
     && isPlainObject(value.result)
     && typeof value.result.lockModifierTiers === "boolean"
+    && (value.result.nextInteraction === undefined || isCoopInteractionSuccessorRef(value.result.nextInteraction))
     && (!continuing || rewardPresentationPayload(value.result.continuation, "reward"))
   );
 }
@@ -274,12 +278,16 @@ export const COOP_V2_INTERACTION_REGISTRY = {
           && value.rolledAbilityIds.length === 4
           && value.rolledAbilityIds.every(id => id > 0)
           && new Set(value.rolledAbilityIds).size === value.rolledAbilityIds.length
-        : value.rolledAbilityIds === undefined),
+        : value.rolledAbilityIds === undefined)
+      && (value.returnPlan === undefined || isCoopNestedInteractionReturnPlan(value.returnPlan)),
   },
   ABILITY_PICK: {
     surfaceClass: "op:ability",
     logicalPhases: ["INTERACTION"],
-    validatePayload: value => isPlainObject(value) && finiteArray(value.data),
+    validatePayload: value =>
+      isPlainObject(value)
+      && finiteArray(value.data)
+      && (value.nextInteraction === undefined || isCoopInteractionSuccessorRef(value.nextInteraction)),
   },
   BARGAIN_PRESENT: {
     surfaceClass: "op:bargain",
@@ -339,12 +347,17 @@ export const COOP_V2_INTERACTION_REGISTRY = {
     validatePayload: value =>
       promptOrDecision(
         value,
-        payload => integer(payload.partySlot) && integer(payload.moveId) && integer(payload.maxMoveCount),
+        payload =>
+          integer(payload.partySlot)
+          && integer(payload.moveId)
+          && integer(payload.maxMoveCount)
+          && (payload.returnPlan === undefined || isCoopNestedInteractionReturnPlan(payload.returnPlan)),
         payload =>
           integer(payload.partySlot)
           && integer(payload.moveId)
           && integer(payload.forgetSlot)
-          && integer(payload.maxMoveCount),
+          && integer(payload.maxMoveCount)
+          && (payload.nextInteraction === undefined || isCoopInteractionSuccessorRef(payload.nextInteraction)),
       ),
   },
   LEARN_MOVE_BATCH: {
@@ -692,6 +705,26 @@ function operationIdsAfterPrompt(
     : offsets.map(offset => makeCoopOperationId(parsed.epoch, parsed.owner, parsed.pinnedSeq + offset, operationKind));
 }
 
+function interactionAddressOf(
+  successor: CoopInteractionSuccessorRef,
+): NonNullable<Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedInteractionAddresses"]>[number] {
+  switch (successor.kind) {
+    case "reward":
+      return { surfaceClass: "op:reward", operationKind: "REWARD_PRESENT", wave: successor.wave, turn: successor.turn };
+    case "learn-move":
+      return { surfaceClass: "op:learnMove", operationKind: "LEARN_MOVE", wave: successor.wave, turn: successor.turn };
+    case "ability":
+      return {
+        surfaceClass: "op:ability",
+        operationKind: "ABILITY_PRESENT",
+        wave: successor.wave,
+        turn: successor.turn,
+      };
+    case "mystery-terminal":
+      return { surfaceClass: "op:me", operationKind: "ME_TERMINAL", wave: successor.wave, turn: 0 };
+  }
+}
+
 /**
  * Total legacy-envelope -> typed successor registry. It is deliberately closed over every interaction kind:
  * adding a kind to V2_INTERACTION_KINDS without a successor arm fails the entry build instead of publishing
@@ -774,6 +807,13 @@ export function successorOfCoopV2InteractionEnvelope(
       // Lock/check/transfer and paid shop rows complete one immutable mutation but deliberately keep the
       // same reward phase actionable. The result entry itself re-authorizes that exact phase generation;
       // reward picks, rerolls, and terminal skips close it and must await a separately-authored successor.
+      if (isPlainObject(payload?.result) && isCoopInteractionSuccessorRef(payload.result.nextInteraction)) {
+        return wait(
+          ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+          payload?.terminal === true,
+          [interactionAddressOf(payload.result.nextInteraction)],
+        );
+      }
       return payload?.terminal !== true
         && (payload?.label === "shop"
           || payload?.label === "check"
@@ -854,7 +894,13 @@ export function successorOfCoopV2InteractionEnvelope(
     case "LEARN_MOVE":
     case "LEARN_MOVE_BATCH": {
       if (payload?.type !== "prompt") {
-        return wait(["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
+        return wait(
+          ["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+          false,
+          isCoopInteractionSuccessorRef(payload?.nextInteraction)
+            ? [interactionAddressOf(payload.nextInteraction)]
+            : undefined,
+        );
       }
       const resultOperationIds = operationIdsAfterPrompt(operation.id, operation.kind, [1]);
       return resultOperationIds == null
@@ -959,6 +1005,13 @@ export function successorOfCoopV2InteractionEnvelope(
         : shared("op:colosseum", "COLO_PICK", operation.id, operation.owner, ["COLO_PICK"], resultOperationIds);
     }
     case "ABILITY_PICK":
+      return wait(
+        ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+        false,
+        isCoopInteractionSuccessorRef(payload?.nextInteraction)
+          ? [interactionAddressOf(payload.nextInteraction)]
+          : undefined,
+      );
     case "BARGAIN":
     case "STORMGLASS":
       return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);

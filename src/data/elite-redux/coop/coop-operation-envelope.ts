@@ -35,6 +35,53 @@ export type CoopPlayerId = number;
 /** The monotonic session identity. Bumps ONLY on a hard control-plane reset (§1.4). */
 export type CoopSessionEpoch = number;
 
+/**
+ * Exact interaction destination authored by a completed interaction result. These domain-level
+ * references deliberately avoid importing Authority V2's control contract into the operation envelope;
+ * the V2 adapter maps each closed kind to one concrete surface/kind/wave/turn address.
+ */
+export type CoopInteractionSuccessorRef =
+  | { readonly kind: "reward"; readonly wave: number; readonly turn: number }
+  | { readonly kind: "learn-move"; readonly wave: number; readonly turn: number }
+  | { readonly kind: "ability"; readonly wave: number; readonly turn: number }
+  | { readonly kind: "mystery-terminal"; readonly wave: number; readonly turn: 0 };
+
+/** Exact result-dependent exits for a nested reward picker. Missing branches mean ordered non-interaction flow. */
+export interface CoopNestedInteractionReturnPlan {
+  readonly onCommit?: CoopInteractionSuccessorRef | undefined;
+  readonly onCancel?: CoopInteractionSuccessorRef | undefined;
+}
+
+export function isCoopInteractionSuccessorRef(value: unknown): value is CoopInteractionSuccessorRef {
+  if (value == null || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<CoopInteractionSuccessorRef>;
+  return (
+    ((candidate.kind === "reward" || candidate.kind === "learn-move" || candidate.kind === "ability")
+      && Number.isSafeInteger(candidate.wave)
+      && Number.isSafeInteger(candidate.turn)
+      && (candidate.wave ?? -1) >= 0
+      && (candidate.turn ?? -1) >= 0)
+    || (candidate.kind === "mystery-terminal"
+      && Number.isSafeInteger(candidate.wave)
+      && (candidate.wave ?? -1) >= 0
+      && candidate.turn === 0)
+  );
+}
+
+export function isCoopNestedInteractionReturnPlan(value: unknown): value is CoopNestedInteractionReturnPlan {
+  if (value == null || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<CoopNestedInteractionReturnPlan>;
+  return (
+    (candidate.onCommit === undefined || isCoopInteractionSuccessorRef(candidate.onCommit))
+    && (candidate.onCancel === undefined || isCoopInteractionSuccessorRef(candidate.onCancel))
+    && (candidate.onCommit !== undefined || candidate.onCancel !== undefined)
+  );
+}
+
 /** Per-committed-operation monotonic revision within an epoch (§1.5). Never resets except on epoch bump. */
 export type CoopRevision = number;
 
@@ -187,6 +234,8 @@ export interface CoopRewardActionPayload {
   /** Complete reward-surface state after this action; proposals omit it, committed results require it. */
   readonly result?: {
     readonly lockModifierTiers: boolean;
+    /** Exact nested picker opened by this result, when one exists. */
+    readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
     /**
      * Complete executable continuation after a non-terminal action. Recovery cannot recreate a reward
      * phase from the battle snapshot alone: the option pool, reroll generation, and ordered Mystery
@@ -266,6 +315,8 @@ export type CoopColosseumPayload =
 /** ABILITY_PICK outcome: literal operation code and resolved slots/ability id. */
 export interface CoopAbilityPickPayload {
   readonly data: number[];
+  /** Exact interaction resumed after this concrete committed/cancelled outcome. */
+  readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
 }
 
 /** Whole ability-picker workflow presentation; random choices are literal host-authored ids. */
@@ -274,6 +325,8 @@ export interface CoopAbilityPresentationPayload {
   readonly partyIndex: number;
   readonly workflow: "capsule" | "greater-capsule" | "greater-randomizer";
   readonly rolledAbilityIds?: readonly number[] | undefined;
+  /** Frozen exits captured from the enclosing reward continuation before input opens. */
+  readonly returnPlan?: CoopNestedInteractionReturnPlan | undefined;
 }
 
 /** FAINT_SWITCH intent: exact owner-selected party slot plus legacy baton/species identity metadata. */
@@ -313,13 +366,22 @@ export interface CoopStormglassPresentationPayload {
 }
 
 export type CoopLearnMovePayload =
-  | { readonly type: "prompt"; readonly partySlot: number; readonly moveId: number; readonly maxMoveCount: number }
+  | {
+      readonly type: "prompt";
+      readonly partySlot: number;
+      readonly moveId: number;
+      readonly maxMoveCount: number;
+      /** Frozen exits captured from the enclosing reward continuation before input opens. */
+      readonly returnPlan?: CoopNestedInteractionReturnPlan | undefined;
+    }
   | {
       readonly type: "decision";
       readonly partySlot: number;
       readonly moveId: number;
       readonly forgetSlot: number;
       readonly maxMoveCount: number;
+      /** Exact interaction resumed after this concrete accept/decline result. */
+      readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
     };
 
 export type CoopLearnMoveBatchPayload =

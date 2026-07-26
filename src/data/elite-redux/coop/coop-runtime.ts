@@ -3051,6 +3051,25 @@ export function isCoopActiveMysteryWaitSeq(seq: number): boolean {
   return pinned >= 0 && (seq === COOP_ME_PUMP_SEQ_BASE + pinned || seq === COOP_ME_TERM_SEQ_BASE + pinned);
 }
 
+/**
+ * A watchdog may recover machine waits, but it may never revoke either side of an address-exact V2 human
+ * deliberation lease. The owner must still prove its live input gate; the peer must still prove its exact
+ * watcher/proposal-ingress generation. A bare control claim or keepalive is deliberately insufficient.
+ */
+function hasCoopV2HumanDeliberationLease(runtime: CoopRuntime): boolean {
+  const control = runtime.v2ControlLedger?.activeControl;
+  if (control?.kind !== "SHARED_INTERACTION" || !coopV2ShadowHarnesses.has(runtime)) {
+    return false;
+  }
+  if (control.ownerSeatId === runtime.controller.localSeatId) {
+    // Re-proves the exact live phase/handler generation, including same-phase CONFIRM/SUMMARY transitions.
+    return !isCoopV2InteractionHumanInputFrozen(runtime);
+  }
+  // On the non-owner, re-prove the passive watcher or the authority's exact live proposal relay waiter.
+  const projection = projectCoopV2InteractionControl(runtime, control);
+  return projection.kind === "installed" || projection.kind === "already-installed";
+}
+
 export function wireCoopStallWatchdog(
   transport: CoopTransport,
   relay: CoopInteractionRelay,
@@ -3118,7 +3137,11 @@ export function wireCoopStallWatchdog(
       // look asymmetric after 20s and launched recovery in the middle of a real human pick. The globally
       // installed V2 control is the stronger proof and must grant the same deliberation lease on both seats.
       const activeV2Control = runtime.v2ControlLedger?.activeControl;
-      if (isCoopFaintSwitchWindowOpen() || activeV2Control?.kind === "REPLACEMENT") {
+      if (
+        isCoopFaintSwitchWindowOpen()
+        || activeV2Control?.kind === "REPLACEMENT"
+        || hasCoopV2HumanDeliberationLease(runtime)
+      ) {
         return;
       }
       if (localMs >= COOP_STALL_REPORT_MS) {

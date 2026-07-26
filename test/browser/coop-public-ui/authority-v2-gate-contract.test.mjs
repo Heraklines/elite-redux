@@ -131,6 +131,43 @@ test("every real-engine shard qualifies Authority V2 instead of hiding behind le
   );
 });
 
+test("nested reward successors consume exact immutable modifier follow-up metadata", () => {
+  const rewardCaseStart = interactionCutover.indexOf('case "REWARD":');
+  const rewardCaseEnd = interactionCutover.indexOf('case "SHOP_BUY":', rewardCaseStart);
+  assert.ok(rewardCaseStart >= 0 && rewardCaseEnd > rewardCaseStart, "the closed reward successor arm exists");
+  const rewardCase = interactionCutover.slice(rewardCaseStart, rewardCaseEnd);
+  assert.match(rewardCase, /payload\.result\.nextInteraction/u);
+  assert.match(rewardCase, /interactionAddressOf\(payload\.result\.nextInteraction\)/u);
+  assert.match(
+    interactionCutover,
+    /case "learn-move":\s*return \{[\s\S]*?surfaceClass: "op:learnMove",[\s\S]*?operationKind: "LEARN_MOVE"/u,
+  );
+  assert.match(
+    interactionCutover,
+    /case "ability":\s*return \{[\s\S]*?surfaceClass: "op:ability",[\s\S]*?operationKind: "ABILITY_PRESENT"/u,
+  );
+  assert.match(
+    interactionCutover,
+    /case "mystery-terminal":\s*return \{[\s\S]*?surfaceClass: "op:me",[\s\S]*?operationKind: "ME_TERMINAL"/u,
+  );
+});
+
+test("the stall watchdog preserves an exact V2 human-input lease", () => {
+  assert.match(coopRuntime, /function hasCoopV2HumanDeliberationLease\(runtime: CoopRuntime\): boolean/u);
+  assert.match(
+    coopRuntime,
+    /control\.ownerSeatId === runtime\.controller\.localSeatId[\s\S]*!isCoopV2InteractionHumanInputFrozen\(runtime\)/u,
+  );
+  assert.match(
+    coopRuntime,
+    /const projection = projectCoopV2InteractionControl\(runtime, control\);[\s\S]*projection\.kind === "installed" \|\| projection\.kind === "already-installed"/u,
+  );
+  const watchdogStart = coopRuntime.indexOf("export function wireCoopStallWatchdog");
+  const watchdogEnd = coopRuntime.indexOf("function wireCoopDisconnectReaction", watchdogStart);
+  assert.ok(watchdogStart >= 0 && watchdogEnd > watchdogStart, "the complete stall watchdog source exists");
+  assert.match(coopRuntime.slice(watchdogStart, watchdogEnd), /hasCoopV2HumanDeliberationLease\(runtime\)/u);
+});
+
 test("every release soak and focused replay executes the complete Authority V2 graph", () => {
   const nightlySoak = jobBlock(nightlySoakWorkflow, "soak");
   const focusedSoak = jobBlock(focusedSoakWorkflow, "replay");

@@ -15,6 +15,11 @@ import {
   isCoopLearnMoveAuthorityV2Active,
   sendCoopLearnMovePromptWithOperationId,
 } from "#data/elite-redux/coop/coop-learn-move-operation";
+import { captureCoopNestedInteractionReturnPlan } from "#data/elite-redux/coop/coop-nested-interaction";
+import type {
+  CoopInteractionSuccessorRef,
+  CoopNestedInteractionReturnPlan,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   advanceCoopInteractionForContinuation,
   clearCoopLearnMoveForwardInFlight,
@@ -89,6 +94,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    */
   private coopAwaitingHostOwnedPresentation = false;
   private coopHostOwnedWatcherStarted = false;
+  /** Result-dependent exits captured from the queued reward continuation before the prompt is committed. */
+  private coopNestedReturnPlan: CoopNestedInteractionReturnPlan | undefined;
   /** One result staged at human intent and published only after its mutation reaches the phase terminal. */
   private coopPendingV2Decision: {
     readonly operationId: string;
@@ -97,6 +104,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     readonly maxMoveCount: number;
     readonly wave: number;
     readonly turn: number;
+    readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
   } | null = null;
 
   constructor(
@@ -269,12 +277,14 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     if (this.coopV2ControlOperationId != null) {
       return true;
     }
+    this.coopNestedReturnPlan ??= captureCoopNestedInteractionReturnPlan(this.coopInteractionCounter?.());
     const operationId = commitCoopLearnMovePrompt(
       {
         type: "prompt",
         partySlot: this.partyMemberIndex,
         moveId: this.moveId,
         maxMoveCount: pokemon.getMaxMoveCount(),
+        ...(this.coopNestedReturnPlan == null ? {} : { returnPlan: structuredClone(this.coopNestedReturnPlan) }),
       },
       {
         ownerRole: "host",
@@ -307,6 +317,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       return false;
     }
     const maxMoveCount = this.getPokemon().getMaxMoveCount();
+    const nextInteraction =
+      forgetSlot >= 0 && forgetSlot < maxMoveCount
+        ? this.coopNestedReturnPlan?.onCommit
+        : this.coopNestedReturnPlan?.onCancel;
     const pending = this.coopPendingV2Decision;
     if (pending != null) {
       return (
@@ -314,6 +328,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         && pending.ownerRole === ownerRole
         && pending.forgetSlot === forgetSlot
         && pending.maxMoveCount === maxMoveCount
+        && JSON.stringify(pending.nextInteraction ?? null) === JSON.stringify(nextInteraction ?? null)
       );
     }
     this.coopPendingV2Decision = {
@@ -323,6 +338,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       maxMoveCount,
       wave: globalScene.currentBattle?.waveIndex ?? 0,
       turn: globalScene.currentBattle?.turn ?? 0,
+      ...(nextInteraction == null ? {} : { nextInteraction: structuredClone(nextInteraction) }),
     };
     return true;
   }
@@ -350,6 +366,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
             moveId: this.moveId,
             forgetSlot: pending.forgetSlot,
             maxMoveCount: pending.maxMoveCount,
+            ...(pending.nextInteraction == null ? {} : { nextInteraction: structuredClone(pending.nextInteraction) }),
           },
           ownerRole: pending.ownerRole,
           localRole: "host",
@@ -745,6 +762,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
     const turn = globalScene.currentBattle?.turn ?? 0;
     const operationBinding = this.coopOperationBinding;
+    this.coopNestedReturnPlan ??= captureCoopNestedInteractionReturnPlan(this.coopInteractionCounter?.());
     const presentationOperationId =
       operationBinding == null
         ? null
@@ -755,6 +773,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
               partySlot: slot,
               moveId: this.moveId,
               maxMoveCount,
+              ...(this.coopNestedReturnPlan == null ? {} : { returnPlan: structuredClone(this.coopNestedReturnPlan) }),
             },
             { localRole: "host", wave, turn },
             operationBinding,
