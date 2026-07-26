@@ -3443,8 +3443,13 @@ export class CoopApplyResyncPhase extends Phase {
     this.recoveryTickFloor = Math.max(snapshot.tick ?? -1, snapshot.authoritativeState?.tick ?? -1);
   }
 
-  public override end(): void {
+  /** Cancel every wait owned by this recovery boundary exactly once. */
+  private settlePhaseResources(): boolean {
+    if (this.ended) {
+      return false;
+    }
     this.ended = true;
+    this.presentationPending = false;
     this.endHoldMachineWait?.();
     this.endHoldMachineWait = undefined;
     this.stopCheckpointWake?.();
@@ -3455,6 +3460,21 @@ export class CoopApplyResyncPhase extends Phase {
     this.stopAuthorityFailure = undefined;
     this.stopPresentationDeadline?.();
     this.stopPresentationDeadline = undefined;
+    return true;
+  }
+
+  public override retire(): void {
+    if (this.isRetired()) {
+      return;
+    }
+    super.retire();
+    this.settlePhaseResources();
+  }
+
+  public override end(): void {
+    if (!this.settlePhaseResources()) {
+      return;
+    }
     super.end();
   }
 

@@ -68,6 +68,7 @@
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
     "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
     "test/tests/elite-redux/coop/coop-guest-faint-no-local-victory.test.ts",
+    "test/tests/elite-redux/coop/coop-resync-checkpoint-wake.test.ts",
     "test/tests/elite-redux/coop/coop-savedata-digest.test.ts",
     "test/tests/elite-redux/editor/custom-trainer-worker-validation.test.ts",
     "test/tests/elite-redux/editor/custom-trainers-editor.smoke.test.ts",

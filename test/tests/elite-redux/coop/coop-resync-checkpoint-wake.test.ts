@@ -108,9 +108,11 @@ function recoveryAdmission(epoch: number): CoopRecoveryAdmissionV1 {
 describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
   let priorScene: BattleScene;
   let currentPhase: CoopApplyResyncPhase;
+  let phaseShifts: number;
 
   beforeEach(() => {
     priorScene = globalScene;
+    phaseShifts = 0;
     coopEngine.resetCoopStateTicks();
     vi.spyOn(coopPresentation, "settleCoopAuthoritativeProjection").mockResolvedValue(true);
     initGlobalScene({
@@ -121,7 +123,7 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
       ],
       phaseManager: {
         getCurrentPhase: () => currentPhase,
-        shiftPhase: () => {},
+        shiftPhase: () => phaseShifts++,
       },
       ui: {
         clearText: () => {},
@@ -260,5 +262,53 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
 
     expect(applied).not.toHaveBeenCalled();
     expect(getCoopBattleStreamer()?.peekCheckpoint()).toBeNull();
+  });
+
+  it("destructive retirement cancels every held recovery wait without shifting a later authority successor", () => {
+    currentPhase = new CoopApplyResyncPhase(
+      { tick: 17, authoritativeState: state(18), sessionEpoch: 1 } as CoopFullBattleSnapshot,
+      1,
+      "old-checksum",
+      undefined,
+      { kind: "legacy", ticket: recoveryAdmission(1) },
+    );
+    const cleanup = {
+      machineWait: 0,
+      checkpointWake: 0,
+      checkpointRetry: 0,
+      authorityFailure: 0,
+      presentationDeadline: 0,
+    };
+    Object.assign(currentPhase as unknown as Record<string, unknown>, {
+      presentationPending: true,
+      endHoldMachineWait: () => cleanup.machineWait++,
+      stopCheckpointWake: () => cleanup.checkpointWake++,
+      stopCheckpointRetry: () => cleanup.checkpointRetry++,
+      stopAuthorityFailure: () => cleanup.authorityFailure++,
+      stopPresentationDeadline: () => cleanup.presentationDeadline++,
+    });
+
+    currentPhase.retire();
+    expect(cleanup).toEqual({
+      machineWait: 1,
+      checkpointWake: 1,
+      checkpointRetry: 1,
+      authorityFailure: 1,
+      presentationDeadline: 1,
+    });
+    expect((currentPhase as unknown as { presentationPending: boolean }).presentationPending).toBe(false);
+
+    // Detached recovery projection/deadline continuations can still call end/retire after replacement.
+    // They must neither shift the authoritative successor nor invoke cleanup a second time.
+    currentPhase.end();
+    currentPhase.retire();
+    expect(phaseShifts).toBe(0);
+    expect(cleanup).toEqual({
+      machineWait: 1,
+      checkpointWake: 1,
+      checkpointRetry: 1,
+      authorityFailure: 1,
+      presentationDeadline: 1,
+    });
   });
 });
