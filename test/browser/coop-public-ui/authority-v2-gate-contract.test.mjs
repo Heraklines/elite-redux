@@ -69,6 +69,10 @@ const soakFidelityGate = readFileSync(
   new URL("test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts", root),
   "utf8",
 );
+const automaticVictorySeal = readFileSync(
+  new URL("test/tests/elite-redux/coop/coop-automatic-victory-seal.test.ts", root),
+  "utf8",
+);
 const hostFaintSoak = readFileSync(new URL("test/tests/elite-redux/coop/coop-soak-host-faint.test.ts", root), "utf8");
 const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "utf8");
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
@@ -2503,6 +2507,8 @@ test("soaks budget command rendezvous for authoritative presentation and restore
   assert.match(soakTest, /resetCoopRendezvousWaitMs\(\)/u);
   assert.match(soakFidelityGate, /setCoopRendezvousWaitMs\(2000\)/u);
   assert.match(soakFidelityGate, /resetCoopRendezvousWaitMs\(\)/u);
+  assert.match(automaticVictorySeal, /setCoopRendezvousWaitMs\(2_000\)/u);
+  assert.match(automaticVictorySeal, /resetCoopRendezvousWaitMs\(\)/u);
   assert.doesNotMatch(
     soakFidelityGate,
     /afterEach\([\s\S]*?setCoopRendezvousWaitMs\(60_000\)/u,

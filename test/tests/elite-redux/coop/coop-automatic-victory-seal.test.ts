@@ -11,6 +11,7 @@
 import { initGlobalScene } from "#app/global-scene";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { BattleType } from "#enums/battle-type";
 import { TrainerType } from "#enums/trainer-type";
@@ -38,6 +39,9 @@ describe.skipIf(!RUN)("co-op automatic post-victory retained seal", () => {
   beforeEach(() => {
     accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
     setCoopWaveBarrierMs(50);
+    // Seven 50ms generic-Vitest retries are shorter than a healthy multi-ability entry replay. Keep the
+    // production-shaped command boundary bounded, but give the renderer enough time to become actionable.
+    setCoopRendezvousWaitMs(2_000);
     setCoopFaintSwitchWaitMs(4_000);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`automatic-victory-seal-${Date.now()}`);
@@ -54,6 +58,7 @@ describe.skipIf(!RUN)("co-op automatic post-victory retained seal", () => {
 
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
+    resetCoopRendezvousWaitMs();
     setCoopFaintSwitchWaitMs(60_000);
     accuracySpy?.mockRestore();
     recoverySpy?.mockRestore();
