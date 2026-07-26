@@ -154,6 +154,20 @@ test("campaign fight policy prefers a usable damaging move and follows the visib
   });
 });
 
+test("title navigation never shortcuts upward into the notification inbox", () => {
+  const title = {
+    surfaceId: "title-menu",
+    selectedOptionId: "new-game",
+    optionIds: ["new-game", "load-game", "profile", "settings", "slot:4"],
+  };
+
+  assert.equal(chooseNavigationKey(title, "settings", ["ArrowDown", "ArrowUp"], 0), "ArrowDown");
+  assert.equal(
+    chooseNavigationKey({ ...title, selectedOptionId: "settings" }, "new-game", ["ArrowUp", "ArrowDown"], 1),
+    "ArrowDown",
+  );
+});
+
 test("reward targeting chooses a legal visible party slot instead of blindly selecting slot zero", () => {
   const partySlots = [
     { slot: 0, fainted: false, hp: 20, maxHp: 20, allowedInBattle: true },

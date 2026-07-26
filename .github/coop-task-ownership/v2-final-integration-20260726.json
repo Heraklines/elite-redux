@@ -3,7 +3,7 @@
   "version": 1,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "06a2d99e3632b38766cfb4871e589d85938823e1",
+  "baseSha": "1c7a342e5278e641cea8be062e09579671483718",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/stats-nightly.yml",
@@ -75,6 +75,7 @@
     "stats/validate-stats-data.mjs",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
     "test/browser/coop-public-ui/campaign-exp-phase.test.mjs",
+    "test/browser/coop-public-ui/campaign-nav.mjs",
     "test/browser/coop-public-ui/campaign-render-profile.test.mjs",
     "test/browser/coop-public-ui/campaign.mjs",
     "test/browser/coop-public-ui/evidence.mjs",

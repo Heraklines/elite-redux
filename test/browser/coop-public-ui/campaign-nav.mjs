@@ -202,6 +202,15 @@ function orderedAxisKeys(navKeys) {
   return null;
 }
 
+function navigationKeysForSurface(observation, navKeys) {
+  // The title is not a cyclic list: UP from its first menu row transfers focus to the
+  // notification inbox, where further UP presses are intentionally swallowed. The semantic
+  // menu projection contains only the visible option rows, so shortest-path list arithmetic
+  // would strand the public driver on that unprojected focus target. DOWN always walks and
+  // wraps through every title option using the same path available to a human player.
+  return observation?.surfaceId === "title-menu" && navKeys.includes("ArrowDown") ? ["ArrowDown"] : navKeys;
+}
+
 /**
  * Prefer a directed step when the semantic surface exposes a one-dimensional ordered list.
  * Alternating Up/Down from the first item only visits the two wrap-around endpoints and can
@@ -210,6 +219,7 @@ function orderedAxisKeys(navKeys) {
  * describe their geometry.
  */
 export function chooseNavigationKey(observation, targetId, navKeys, step) {
+  const surfaceNavKeys = navigationKeysForSurface(observation, navKeys);
   const options = observation?.optionIds;
   const current = Array.isArray(options) ? options.indexOf(observation.selectedOptionId) : -1;
   const target = Array.isArray(options) ? options.indexOf(targetId) : -1;
@@ -220,10 +230,10 @@ export function chooseNavigationKey(observation, targetId, navKeys, step) {
     observation?.surfaceId === "command:fight"
     && current >= 0
     && target >= 0
-    && navKeys.includes("ArrowUp")
-    && navKeys.includes("ArrowDown")
-    && navKeys.includes("ArrowLeft")
-    && navKeys.includes("ArrowRight")
+    && surfaceNavKeys.includes("ArrowUp")
+    && surfaceNavKeys.includes("ArrowDown")
+    && surfaceNavKeys.includes("ArrowLeft")
+    && surfaceNavKeys.includes("ArrowRight")
   ) {
     const currentRow = Math.floor(current / 2);
     const targetRow = Math.floor(target / 2);
@@ -235,13 +245,13 @@ export function chooseNavigationKey(observation, targetId, navKeys, step) {
     }
     return current < target ? "ArrowRight" : "ArrowLeft";
   }
-  const axis = orderedAxisKeys(navKeys);
+  const axis = orderedAxisKeys(surfaceNavKeys);
   if (axis != null && current >= 0 && target >= 0 && options.length > 1) {
     const forward = (target - current + options.length) % options.length;
     const backward = (current - target + options.length) % options.length;
     return forward <= backward ? axis.forward : axis.backward;
   }
-  return navKeys[step % navKeys.length];
+  return surfaceNavKeys[step % surfaceNavKeys.length];
 }
 
 /**
