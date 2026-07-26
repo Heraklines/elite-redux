@@ -300,6 +300,55 @@ describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the determinist
     }
   });
 
+  it("Authority V2 retires accepted ME proposal retries from the next immutable result", async () => {
+    vi.useFakeTimers();
+    setCoopMeOperationEnabled(true);
+    resetCoopMeOperationState();
+    setCoopMeOperationEpoch(EPOCH);
+    const resendPick = vi.fn();
+    const resendSub = vi.fn();
+    try {
+      commitMeOwnerIntent({
+        kind: "ME_PICK",
+        seq: 8_000_003,
+        pinned: 3,
+        step: 0,
+        payload: { optionIndex: 1 },
+        localRole: "guest",
+        wave: 12,
+        turn: 0,
+        resend: resendPick,
+      });
+      commitMeOwnerIntent({
+        kind: "ME_SUB",
+        seq: 8_000_003,
+        pinned: 3,
+        step: 0,
+        payload: { value: 0 },
+        localRole: "guest",
+        wave: 12,
+        turn: 0,
+        resend: resendSub,
+      });
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(resendPick).toHaveBeenCalledOnce();
+      expect(resendSub).toHaveBeenCalledOnce();
+
+      // ME_PICK / ME_SUB stay proposal telemetry in V2. Their following authoritative presentation is the
+      // immutable mechanical result and therefore the only valid receipt that can supersede these timers.
+      settleCoopMeOwnerIntentRetries("authoritative-result");
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(resendPick, "a causally-later presentation must stop the accepted pick retry").toHaveBeenCalledOnce();
+      expect(resendSub, "a causally-later presentation must stop the accepted sub-pick retry").toHaveBeenCalledOnce();
+    } finally {
+      resetCoopMeOperationFlag();
+      resetCoopMeOperationState();
+      vi.useRealTimers();
+    }
+  });
+
   // I5a - the core recovery: a lost intent, re-sent by the owner, commits exactly once; the late original reacks.
   it("I5a: a lost pre-commit intent recovered by owner re-send commits EXACTLY ONCE (the late original reacks)", () => {
     const host = new CoopOperationHost({ epoch: EPOCH });

@@ -1102,6 +1102,32 @@ test("repeated Mystery rounds bind the new log address only when their fresh pre
     /installCoopV2MePresentation/u,
     "ordinary projection never binds the new Mystery address before the FIFO consumer renders it",
   );
+
+  const journalApplyStart = meOperation.indexOf("function applyJournaledMeEnvelope(");
+  const journalApplyEnd = meOperation.indexOf("registerCoopOperationApplier", journalApplyStart);
+  const journalApply = meOperation.slice(journalApplyStart, journalApplyEnd);
+  const materialApplied = journalApply.indexOf('applyCoopOperationEnvelope(g, "op:me", envelope, applyContext)');
+  const resultReceipt = journalApply.indexOf('settleCoopMeOwnerIntentRetries("authoritative-result")');
+  assert.ok(
+    materialApplied >= 0 && resultReceipt > materialApplied,
+    "a later immutable ME_PRESENT retires proposal retries only after its material result applies",
+  );
+  assert.match(
+    journalApply.slice(materialApplied, resultReceipt),
+    /op\.kind === "ME_PRESENT"/u,
+    "proposal retries are not retired by an unrelated or merely admitted V2 entry",
+  );
+
+  assert.match(
+    browserEntry,
+    /phaseAuthorityOperationId[\s\S]*authorityAddress[\s\S]*phase === "CoopReplayMePhase"[\s\S]*\(authorityAddress % 1_000\) \+ 1/u,
+    "the keyboard-only observer exposes each ordered repeated presentation as a fresh positive generation",
+  );
+  assert.match(
+    campaignDriver,
+    /observation\.phaseInstance,[\s\S]*observation\.surfaceGeneration/u,
+    "the campaign's appearance identity consumes the ordered presentation generation",
+  );
 });
 
 test("biome-market readiness proves the exact actionable owner or fully armed watcher surface", () => {

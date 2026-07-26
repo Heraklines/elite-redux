@@ -466,7 +466,7 @@ function cancelOwnerIntentRetry(operationId: string): void {
  * this encounter. Keeping an earlier proposal armed after that point can only inject stale `me`/`meSub`
  * frames into a later encounter; there is never more than one live ME per client.
  */
-export function settleCoopMeOwnerIntentRetries(): void {
+export function settleCoopMeOwnerIntentRetries(cause: "authoritative-result" | "terminal" = "terminal"): void {
   const pendingOwnerIntentRetries = state().pendingOwnerIntentRetries;
   if (pendingOwnerIntentRetries.size === 0) {
     return;
@@ -474,7 +474,7 @@ export function settleCoopMeOwnerIntentRetries(): void {
   for (const timer of pendingOwnerIntentRetries.values()) {
     clearTimeout(timer);
   }
-  coopLog("me", `ME terminal retires ${pendingOwnerIntentRetries.size} completed owner-intent retry timer(s)`);
+  coopLog("me", `ME ${cause} retires ${pendingOwnerIntentRetries.size} completed owner-intent retry timer(s)`);
   pendingOwnerIntentRetries.clear();
 }
 
@@ -1417,6 +1417,15 @@ function applyJournaledMeEnvelope(
   const meApply = applyCoopOperationEnvelope(g, "op:me", envelope, applyContext);
   if (meApply !== "applied") {
     return meApply; // transient non-applicable (retriable/deferred); never a permanent condition (that is a duplicate above).
+  }
+  if (op.kind === "ME_PRESENT") {
+    // ME_PICK / ME_SUB / QUIZ_ANSWER are proposals, not settled mechanical results, so Authority V2
+    // deliberately keeps them out of the global revision stream. The next immutable host presentation is
+    // their causal receipt: it cannot exist until the sole ME engine consumed every proposal required to
+    // reach that screen. Retire the owner's at-least-once resend ledger here, at material application of
+    // that ordered result. Waiting for a shadow op:me envelope is impossible after V2 cutover and previously
+    // left the accepted step-0 pick/sub timers retransmitting forever through every repeated Delve round.
+    settleCoopMeOwnerIntentRetries("authoritative-result");
   }
   adoptCoopMeCommittedOwnerOrdinal(op);
   // Track R: the GUEST-OWNED (owner seat 1) top-level pick just materially applied. Poke the retained

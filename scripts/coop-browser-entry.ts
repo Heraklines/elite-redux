@@ -1456,7 +1456,23 @@ function observeSemanticSurface(): void {
     // as cursor geometry.
     const v2InputFrozen = runtime == null ? false : isCoopV2InteractionHumanInputFrozen(runtime);
     const inputBlocked = v2InputFrozen || handlerInputBlocked === true ? true : handlerInputBlocked;
-    const surfaceGeneration = typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : null;
+    const phaseAuthorityOperationId = (currentPhase as unknown as { coopV2ControlOperationId?: unknown })
+      .coopV2ControlOperationId;
+    const authorityAddress =
+      typeof phaseAuthorityOperationId === "string"
+        ? Number(phaseAuthorityOperationId.slice(phaseAuthorityOperationId.lastIndexOf(":") + 1))
+        : Number.NaN;
+    // A repeated Mystery selector intentionally reuses one CoopReplayMePhase, one battle address, and often
+    // byte-identical options. Its ordered ME_PRESENT operation is the only generation boundary that changes.
+    // Expose the encoded presentation step (+1 keeps the public contract positive) so the keyboard-only
+    // campaign treats "Surge again / Stabilize" round N+1 as fresh input instead of suppressing it as the
+    // already-driven round N. This CI-only observer reads authority state; it never mutates or drives it.
+    const authoritySurfaceGeneration =
+      phase === "CoopReplayMePhase" && Number.isSafeInteger(authorityAddress) && authorityAddress >= 0
+        ? (authorityAddress % 1_000) + 1
+        : null;
+    const surfaceGeneration =
+      typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : authoritySurfaceGeneration;
     const semanticSurfaceInstance =
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
         ? (promptGeneration as number)
