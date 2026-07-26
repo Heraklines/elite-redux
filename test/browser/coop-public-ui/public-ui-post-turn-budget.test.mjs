@@ -581,6 +581,55 @@ test("sequential command driver submits the first owner before waiting for the p
   assert.equal(result.expectedCommandAddress, "73:1:2");
 });
 
+test("sequential command presentation proof retains receipts before an intervening replacement", async () => {
+  const order = [];
+  const firstEvidence = new FakeEvidence("first");
+  const secondEvidence = new FakeEvidence("second");
+  firstEvidence.push(ownedCommand(0));
+  secondEvidence.push({
+    kind: "renderer-presentation-receipt",
+    sequence: 5,
+    status: "renderer-completed",
+  });
+  secondEvidence.push(replacementPicker(1));
+  const from = { first: 0, second: 0 };
+  const first = {
+    label: "first",
+    publicSeat: 0,
+    evidence: firstEvidence,
+    checkpoint: async () => {},
+    sequence: async () => order.push("first-command"),
+  };
+  const second = {
+    label: "second",
+    publicSeat: 1,
+    evidence: secondEvidence,
+    checkpoint: async () => {},
+    sequence: async () => order.push("second-command"),
+  };
+  const rig = {
+    clients: { first, second },
+    config: { timeoutMs: 1_000 },
+    committedReplacementPickers: new Set(),
+    driveOwnedReplacementPicker: async (owner, cursors) => {
+      assert.equal(owner, second);
+      assert.equal(cursors.second, 0);
+      order.push("second-replacement");
+      secondEvidence.push(ownedCommand(1));
+    },
+    assertPresentationLedgerAtSharedCommand: async (proofFrom, expectedAddress) => {
+      assert.equal(expectedAddress, "73:1:2");
+      assert.deepEqual(proofFrom, { first: 0, second: 0 });
+      assert.equal(from.second, 2, "the replacement control scan floor advanced past its picker");
+      order.push("presentation-proof");
+    },
+  };
+
+  await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(rig, from, ["Space"], "replacement-turn");
+
+  assert.deepEqual(order, ["second-replacement", "first-command", "presentation-proof", "second-command"]);
+});
+
 test("sequential command driver never resurrects a command surface superseded by presentation", async () => {
   const order = [];
   const firstEvidence = new FakeEvidence("first");

@@ -3627,6 +3627,12 @@ export class DuoPublicUiRig {
    */
   async driveSequentialCommandRound(from, keys, purpose, { driveCommand = null } = {}) {
     const clients = Object.values(this.clients);
+    // Keep the ordered-presentation proof window anchored at round admission. The mutable
+    // `from` cursors are control-surface scan floors and may advance past a replacement picker
+    // before the reciprocal command opens. Renderer receipts emitted before/during that picker
+    // still belong to the preceding authoritative turn and must remain visible to the parity
+    // proof at the final command frontier.
+    const presentationProofCursors = Object.fromEntries(clients.map(client => [client.label, from[client.label] ?? 0]));
     const pending = new Set(clients.map(client => client.label));
     const outcomeCursors = {};
     const commandEvents = {};
@@ -3768,7 +3774,7 @@ export class DuoPublicUiRig {
         }
         if (pending.size === 1 && submittedCommandAddress != null) {
           await this.assertPresentationLedgerAtSharedCommand(
-            from,
+            presentationProofCursors,
             `${submittedCommandAddress.epoch}:${submittedCommandAddress.wave}:${submittedCommandAddress.turn}`,
             `${purpose}-presentation-before-final-command`,
           );
