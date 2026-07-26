@@ -17,6 +17,7 @@ import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-st
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { wireCoopStallWatchdog } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { clearCoopMachineWaits } from "#data/elite-redux/coop/coop-stall-probe";
 import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -50,10 +51,14 @@ const idleStream = { oldestNetworkWaitMs: () => -1 } as unknown as CoopBattleStr
 describe("#806 stall watchdog end-to-end (keepalive + mutual-wait detection + recovery)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.clearAllTimers();
+    clearCoopMachineWaits();
     resetCoopCausalTrace();
   });
   afterEach(() => {
     setCoopMeInteractionStart(-1);
+    vi.clearAllTimers();
+    clearCoopMachineWaits();
     vi.useRealTimers();
     resetCoopCausalTrace();
   });

@@ -1255,6 +1255,19 @@ export class EvidenceSink {
       .find(event => event.kind === "browser-render-profile" && event.observation.gameSpeed === gameSpeed);
   }
 
+  /** Find canonical host/renderer presentation evidence without depending on debug-log wording. */
+  findPresentationEvent({ stage = null, eventKind = null, reason = null, from = 0 } = {}) {
+    return this.events
+      .slice(from)
+      .find(
+        event =>
+          event.kind === "browser-presentation-event"
+          && (stage == null || event.observation.stage === stage)
+          && (eventKind == null || event.observation.event.k === eventKind)
+          && (reason == null || event.observation.reason === reason),
+      );
+  }
+
   /** Latest render-profile observation regardless of value (proves the Settings menu is open). */
   findLastRenderProfileObservation(from = 0) {
     return this.events

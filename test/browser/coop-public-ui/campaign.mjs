@@ -32,9 +32,6 @@ const OUTCOME_PROGRESS_AUTHORITY = /\[coop:turn\] host recorder: append turn=\d+
 const OUTCOME_PROGRESS_RENDERER = /\[coop:replay\] guest replay turn=\d+: live increment seq=\d+\.\.\d+/u;
 const OUTCOME_PROGRESS_RESOLUTION = /\[coop:replay\] guest (?:RECV turnResolution|awaitTurn turn=\d+ RESOLVE)/u;
 const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
-const AUTHORITY_MOVE_EFFECT = /Start Phase MoveEffectPhase/u;
-const RENDERER_MOVE_REPLAY = /Start Phase CoopMoveAnimReplayPhase/u;
-const RENDERER_MOVE_SKIPPED = /present move .* NO-OP end \(user=.* anims=false\)/u;
 const BATTLE_END_PHASE = /Start Phase BattleEndPhase/u;
 const FAINT_PHASE = /Start Phase FaintPhase/u;
 const POST_MYSTERY_PHASE = /Start Phase PostMysteryEncounterPhase/u;
@@ -405,18 +402,25 @@ async function configureRenderProfile(rig, policy, progress) {
 
 /** Prove the selected profile actually governed at least one authoritative/replayed move. */
 async function assertRenderProfileExecution(rig, policy, progress) {
-  const authorityMove = rig.host.evidence.find(AUTHORITY_MOVE_EFFECT);
+  const authorityMove = rig.host.evidence.findPresentationEvent({
+    stage: "authority-recorded",
+    eventKind: "moveAnim",
+  });
   if (!authorityMove) {
-    throw new Error(`${policy.renderProfile}: no authoritative MoveEffectPhase was observed`);
+    throw new Error(`${policy.renderProfile}: no authoritative move-animation boundary was recorded`);
   }
   const rendererEvidence = policy.moveAnimationsExpected
-    ? rig.guest.evidence.find(RENDERER_MOVE_REPLAY)
-    : rig.guest.evidence.find(RENDERER_MOVE_SKIPPED);
+    ? rig.guest.evidence.findPresentationEvent({ stage: "renderer-completed", eventKind: "moveAnim" })
+    : rig.guest.evidence.findPresentationEvent({
+        stage: "renderer-skipped",
+        eventKind: "moveAnim",
+        reason: "animations-disabled",
+      });
   if (!rendererEvidence) {
     throw new Error(
       policy.moveAnimationsExpected
-        ? "animations-on-surface: renderer never ran a CoopMoveAnimReplayPhase"
-        : "animations-skipped-depth: renderer never attested a move-animation NO-OP with anims=false",
+        ? "animations-on-surface: renderer never completed an authoritative move animation"
+        : "animations-skipped-depth: renderer never issued a structured animations-disabled receipt",
     );
   }
   const proof = {

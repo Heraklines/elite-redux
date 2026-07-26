@@ -612,15 +612,28 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       const committedKinds = new Set(committedEvents.map(event => event.k));
       expect(committedKinds.has("moveUsed"), "the immutable turn carries move narration material").toBe(true);
       expect(committedKinds.has("moveAnim"), "the immutable turn carries actual move animation material").toBe(true);
-      const spreadAnimation = committedEvents.find(event => event.k === "moveAnim");
+      const tackleAnimations = committedEvents.filter(
+        (event): event is Extract<CoopBattleEvent, { k: "moveAnim" }> =>
+          event.k === "moveAnim" && event.moveId === MoveId.TACKLE,
+      );
       expect(
-        spreadAnimation?.k === "moveAnim" ? spreadAnimation.targets : [],
-        "spread animation retains both targets",
+        tackleAnimations,
+        "both public single-target attacks retain their exact animation boundaries",
       ).toHaveLength(2);
       expect(
-        spreadAnimation?.k === "moveAnim" ? spreadAnimation.hitsSubstitute : [],
-        "spread animation carries one resolved substitute flag per target",
-      ).toHaveLength(2);
+        tackleAnimations.map(event => event.bi).sort((left, right) => left - right),
+        "the animation material identifies both player actors",
+      ).toEqual([COOP_HOST_FIELD_INDEX, COOP_GUEST_FIELD_INDEX]);
+      expect(
+        tackleAnimations.flatMap(event => event.targets).sort((left, right) => left - right),
+        "the animation material retains both selected enemy targets",
+      ).toEqual([BattlerIndex.ENEMY, BattlerIndex.ENEMY_2]);
+      expect(
+        tackleAnimations.every(
+          event => event.targets.length === 1 && event.targetActors.length === 1 && event.hitsSubstitute.length === 1,
+        ),
+        "each single-target animation carries one resolved target identity and substitute flag",
+      ).toBe(true);
       expect(committedKinds.has("hp"), "the immutable turn carries HP presentation material").toBe(true);
       expect(committedKinds.has("faint"), "the immutable turn carries faint presentation material").toBe(true);
       const committedFaints = committedEvents.filter(event => event.k === "faint");

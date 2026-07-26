@@ -84,6 +84,59 @@ test("browser render-profile markers are validated and indexed as evidence", () 
   assert.equal(sink.failures.at(-1)?.kind, "browser-surface-invalid");
 });
 
+test("render-profile execution proof uses canonical presentation outcomes, not debug strings", () => {
+  const sink = new EvidenceSink("profile", ".");
+  const emitConsole = attachConsoleOnly(sink);
+  const event = {
+    k: "moveAnim",
+    bi: 0,
+    moveId: 33,
+    actor: { side: "player", pokemonId: 7 },
+    targets: [2],
+    targetActors: [{ side: "enemy", pokemonId: 8 }],
+    hitsSubstitute: [false],
+  };
+  emitConsole(
+    `[coop-browser:presentation-event] ${JSON.stringify({
+      version: 1,
+      stage: "authority-recorded",
+      role: "host",
+      epoch: 1,
+      wave: 1,
+      turn: 1,
+      seq: 0,
+      event,
+    })}`,
+  );
+  emitConsole(
+    `[coop-browser:presentation-event] ${JSON.stringify({
+      version: 1,
+      stage: "renderer-skipped",
+      role: "guest",
+      epoch: 1,
+      wave: 1,
+      turn: 1,
+      seq: 0,
+      event,
+      reason: "animations-disabled",
+    })}`,
+  );
+
+  assert.equal(
+    sink.findPresentationEvent({ stage: "authority-recorded", eventKind: "moveAnim" })?.observation.role,
+    "host",
+  );
+  assert.equal(
+    sink.findPresentationEvent({
+      stage: "renderer-skipped",
+      eventKind: "moveAnim",
+      reason: "animations-disabled",
+    })?.observation.role,
+    "guest",
+  );
+  assert.equal(sink.findPresentationEvent({ stage: "renderer-completed", eventKind: "moveAnim" }), undefined);
+});
+
 test("the animations-on turn budget is a per-event-derived ceiling scoped to the animations-on profile only", async () => {
   const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
   // Track R cycle 13: the animations-on-surface lane spent ~440s on a dense 24-event turn (~18s/event)
