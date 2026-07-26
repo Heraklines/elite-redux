@@ -1655,6 +1655,29 @@ test("a host-owned learn-move prompt has one exact pre-picker presentation lease
   );
 });
 
+test("an ME battle handoff leases its whole exact-address action-only pre-command prefix", () => {
+  const start = nextControl.indexOf("export function successorWaitAllowsLocalPresentationInput(");
+  const end = nextControl.indexOf("\ninterface MechanicalAddress", start);
+  assert.notEqual(start, -1, "the ordered-wait presentation lease exists");
+  assert.ok(end > start, "the ordered-wait presentation lease has a bounded source block");
+  const lease = nextControl.slice(start, end);
+  assert.match(
+    lease,
+    /const exactBattleCommandTarget =[\s\S]*target\.materialKind === "command-open"[\s\S]*target\.wave === proof\.wave[\s\S]*target\.turn === proof\.turn[\s\S]*target\.operationId == null/u,
+    "the lease is pinned to the terminal's exact command-open address",
+  );
+  assert.match(
+    lease,
+    /if \(exactBattleCommandTarget === true\) \{\s*return wait\.allowedKinds\.includes\("CONTROL_COMMIT"\);\s*\}/u,
+    "every ACTION-only presentation prefix at that exact address can drain before CONTROL_COMMIT",
+  );
+  assert.doesNotMatch(
+    lease,
+    /proof\.phaseName === "MysteryEncounterBattlePhase"/u,
+    "the lease cannot strand entry abilities by recognizing only the first intro phase",
+  );
+});
+
 test("a host-owned V2 learn-move prompt retains the guest at the same wave until its exact result", () => {
   assert.match(
     learnMovePhase,

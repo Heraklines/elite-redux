@@ -291,9 +291,11 @@ export function sharedInteractionAllowsLocalPresentationInput(
  * `messageHandlerActionable`.
  *
  * A Mystery terminal whose immutable destination is a battle similarly names one exact same-address
- * command-open, but the host must dismiss MysteryEncounterBattlePhase's intro before that control can be
- * authored. The exact same-address command-open target grants only that ME battle intro bridge. No arbitrary
- * same-wave message, non-actionable handler, later turn, or choice handler is admitted.
+ * command-open, but the host must drain the battle's complete presentation prefix before that control can be
+ * authored. That prefix is not just MysteryEncounterBattlePhase: entry abilities immediately enqueue
+ * ShowAbility/Message narration at the same address. The exact command-open target therefore grants every
+ * ACTION-only MESSAGE handler at that address. Wrong-address, non-actionable, and choice handlers remain
+ * excluded by the target and proof checks.
  */
 export function successorWaitAllowsLocalPresentationInput(
   wait: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>,
@@ -309,14 +311,8 @@ export function successorWaitAllowsLocalPresentationInput(
       && target.turn === proof.turn
       && target.operationId == null,
   );
-  const mysteryBattleIntro =
-    proof.wave === wait.wave
-    && proof.turn === wait.turn
-    && proof.phaseName === "MysteryEncounterBattlePhase"
-    && wait.allowedKinds.includes("CONTROL_COMMIT")
-    && exactBattleCommandTarget === true;
-  if (mysteryBattleIntro) {
-    return true;
+  if (exactBattleCommandTarget === true) {
+    return wait.allowedKinds.includes("CONTROL_COMMIT");
   }
   if (!wait.allowNextWaveStart) {
     return false;

@@ -195,12 +195,24 @@ describe("ordered-wait local presentation lease", () => {
     ).toBe(false);
   });
 
-  it("admits a Mystery battle intro only when the wait names its exact same-address command frontier", () => {
+  it("admits the complete Mystery battle pre-command presentation only at its exact command frontier", () => {
     const exactBattleWait = successorWait({
       allowNextWaveStart: false,
       allowedControlAddresses: [{ materialKind: "command-open", wave: 3, turn: 7, operationId: null }],
     });
     expect(successorWaitAllowsLocalPresentationInput(exactBattleWait, exactMysteryBattleIntro)).toBe(true);
+    expect(
+      successorWaitAllowsLocalPresentationInput(exactBattleWait, {
+        ...exactMysteryBattleIntro,
+        phaseName: "MessagePhase",
+      }),
+    ).toBe(true);
+    expect(
+      successorWaitAllowsLocalPresentationInput(exactBattleWait, {
+        ...exactMysteryBattleIntro,
+        phaseName: "ShowAbilityPhase",
+      }),
+    ).toBe(true);
     expect(
       successorWaitAllowsLocalPresentationInput(successorWait({ allowNextWaveStart: false }), exactMysteryBattleIntro),
     ).toBe(false);
@@ -218,12 +230,6 @@ describe("ordered-wait local presentation lease", () => {
         { ...exactBattleWait, allowedKinds: ["INTERACTION_COMMIT"] },
         exactMysteryBattleIntro,
       ),
-    ).toBe(false);
-    expect(
-      successorWaitAllowsLocalPresentationInput(exactBattleWait, {
-        ...exactMysteryBattleIntro,
-        phaseName: "MysteryEncounterPhase",
-      }),
     ).toBe(false);
     expect(
       successorWaitAllowsLocalPresentationInput(exactBattleWait, {
