@@ -27,8 +27,8 @@ import {
   resolveErSpeciesConstId,
 } from "#data/elite-redux/er-type-nativization";
 import type { PokemonSpecies, PokemonSpeciesForm } from "#data/pokemon-species";
-import type { PokemonType } from "#enums/pokemon-type";
-import type { SpeciesId } from "#enums/species-id";
+import { PokemonType } from "#enums/pokemon-type";
+import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -91,7 +91,7 @@ function evolutionTypeFailures(speciesConst: string, sourceId: number, grantedTy
     }
     const targets: PokemonSpeciesForm[] = [
       evolved as unknown as PokemonSpeciesForm,
-      ...(evolved.forms as PokemonSpeciesForm[]),
+      ...(evolved.forms as PokemonSpeciesForm[]).filter(form => form.formKey !== "redux"),
     ];
     for (const target of targets) {
       const types = [target.type1, target.type2, ...target.getExtraTypes()];
@@ -165,6 +165,22 @@ describe.skipIf(!RUN)("ER type-nativization sweep (Pass A)", () => {
     }
 
     expect(missing, missing.join("\n")).toEqual([]);
+  });
+
+  it("does not leak a vanilla line's inherited type into its Redux form", () => {
+    const cases = [
+      [SpeciesId.DODRIO, PokemonType.GROUND],
+      [SpeciesId.GROTLE, PokemonType.GROUND],
+      [SpeciesId.TORTERRA, PokemonType.GROUND],
+    ] as const;
+
+    for (const [speciesId, leakedType] of cases) {
+      const redux = speciesById(speciesId)?.forms.find(form => form.formKey === "redux");
+      expect(redux, `missing Redux form for species ${speciesId}`).toBeDefined();
+      expect(redux!.isOfType(leakedType), `${redux!.name} incorrectly inherited ${PokemonType[leakedType]}`).toBe(
+        false,
+      );
+    }
   });
 
   it("SWEEP INTEGRITY: no species/form retains a type-grant ability (except intentional replacements)", () => {

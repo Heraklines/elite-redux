@@ -2722,6 +2722,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Type line: Redux forms stay independent",
+    description:
+      "REGRESSION: evolution type propagation applied a vanilla line's inherited type to every\n"
+      + "alternate form, making Dodrio Redux Dark/Poison/Dragon/Ground. DO: use Thunderbolt on\n"
+      + "Dodrio Redux. EXPECT: it TAKES DAMAGE, proving the Redux form did not inherit Ground.\n"
+      + "The same exclusion is regression-tested for Grotle Redux and Torterra Redux.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 60,
+        DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.DODRIO,
+        ENEMY_FORM_OVERRIDES: { [SpeciesId.DODRIO]: formIndexByKey(SpeciesId.DODRIO, "redux") },
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.EARLY_BIRD,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MAGNEZONE, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.FLASH_CANNON, MoveId.VOLT_SWITCH, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
+  {
     label: "Catch: Rogue Ball Giratina registers as a starter",
     description:
       "PLAYER REPORT: a wild Giratina caught in Classic with a Rogue Ball did not appear in\n"
