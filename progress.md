@@ -4113,8 +4113,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   configurations) to the browser context that scheduled it. This covers synchronous GameWrapper callbacks and
   deferred scene variants, restores wrappers during rig teardown, and does not weaken production phase guards.
 - A failure-first node contract pins both authority and replica managers plus the exact `withClientSync` dispatch.
-  The 64-test Authority V2 source-contract suite and targeted staged Biome checks pass locally. Remote B11 and
-  common-soak shards remain the behavioral proof of the harness correction.
+  The 64-test Authority V2 source-contract suite and targeted staged Biome checks pass locally. The first remote
+  static pass then caught exact-optional restoration assignments; teardown now narrows the originally present
+  optional Phaser methods before restoring them. Remote B11 and common-soak shards remain the behavioral proof.
 
 ## 2026-07-26 - Exact fresh-launch handler generation
 

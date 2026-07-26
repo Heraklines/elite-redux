@@ -2738,10 +2738,10 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
       if (manager.add === pinnedAdd) {
         manager.add = originalAdd;
       }
-      if (pinnedAddCounter != null && manager.addCounter === pinnedAddCounter) {
+      if (originalAddCounter != null && pinnedAddCounter != null && manager.addCounter === pinnedAddCounter) {
         manager.addCounter = originalAddCounter;
       }
-      if (pinnedChain != null && manager.chain === pinnedChain) {
+      if (originalChain != null && pinnedChain != null && manager.chain === pinnedChain) {
         manager.chain = originalChain;
       }
     });
