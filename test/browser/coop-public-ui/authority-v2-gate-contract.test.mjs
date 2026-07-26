@@ -73,6 +73,7 @@ const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "u
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
 const gameData = readFileSync(new URL("src/system/game-data.ts", root), "utf8");
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
+const authorityLog = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/authority-log.ts", root), "utf8");
 const waveAdapter = readFileSync(
   new URL("src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts", root),
   "utf8",
@@ -1202,6 +1203,29 @@ test("a committed replacement wake cannot be stranded behind its own turn finali
     marksParked >= 0 && consumesEarlyWake > marksParked,
     "a wake installed during receipt completion is consumed at the exact park decision",
   );
+});
+
+test("the public continuation oracle proves exact V2 retirement or authenticated log subsumption", () => {
+  assert.match(
+    authorityLog,
+    /subsumedRevisions\.push\(subsumed\)/u,
+    "the authority verdict identifies only revisions its own retained window actually retired",
+  );
+  assert.match(
+    shadow,
+    /subsumed=\[\$\{verdict\.subsumedRevisions\?\.join\(","\) \?\? ""\}\]/u,
+    "the public trace exposes exact supersession evidence instead of hiding it behind the successor receipt",
+  );
+  const proofStart = publicUiHarness.indexOf("async assertRetainedContinuation(");
+  const proofEnd = publicUiHarness.indexOf("\n  async assertRetainedRewardTerminal(", proofStart);
+  assert.notEqual(proofStart, -1, "the public journey owns one retained-continuation proof");
+  assert.ok(proofEnd > proofStart, "the retained-continuation proof has a bounded source block");
+  const proof = publicUiHarness.slice(proofStart, proofEnd);
+  assert.match(proof, /const exactOwnRetirement = new RegExp/u);
+  assert.match(proof, /const exactSubsumption = new RegExp/u);
+  assert.match(proof, /rev=\$\{authorityRevision \+ 1\}/u, "only the exact next ordered revision may subsume the turn");
+  assert.match(proof, /subsumed=.*\$\{authorityRevision\}/u, "the proof names the exact predecessor revision");
+  assert.match(proof, /"v2-subsumption" : "v2-retirement"/u);
 });
 
 test("a materially complete non-control entry wakes the exact command frontier it already owns", () => {

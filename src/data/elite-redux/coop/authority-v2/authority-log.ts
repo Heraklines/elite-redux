@@ -265,6 +265,8 @@ export type AuthorityReceiptVerdict =
       readonly kind: "advanced";
       readonly retired: boolean;
       readonly waitingForSeatIds: readonly number[];
+      /** Exact older revisions retired by this receipt's authenticated supersession quorum. */
+      readonly subsumedRevisions?: readonly number[];
     };
 
 /**
@@ -665,10 +667,13 @@ export class AuthorityLog implements CoopAuthorityLog {
     peerStage.stage = stageIdx;
 
     // Supersession is a quorum fact. One fast peer may never discard material a slower required peer still needs.
+    const subsumedRevisions: number[] = [];
     if (!lease.subsumptionDone && allPeersReached(lease, STAGE_ORDER.admitted)) {
       lease.subsumptionDone = true;
       for (const subsumed of lease.entry.subsumes) {
-        this.retire(subsumed);
+        if (this.retire(subsumed)) {
+          subsumedRevisions.push(subsumed);
+        }
       }
     }
     // Retirement rule: admitted + materialApplied + controlInstalled. AWAIT_SUCCESSOR is a real, addressed
@@ -686,12 +691,14 @@ export class AuthorityLog implements CoopAuthorityLog {
         kind: "advanced",
         retired,
         waitingForSeatIds: [],
+        ...(subsumedRevisions.length === 0 ? {} : { subsumedRevisions }),
       };
     }
     return {
       kind: "advanced",
       retired: false,
       waitingForSeatIds: [...lease.peerStages].filter(([, stage]) => stage.stage < required).map(([seatId]) => seatId),
+      ...(subsumedRevisions.length === 0 ? {} : { subsumedRevisions }),
     };
   }
 

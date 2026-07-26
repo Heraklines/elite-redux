@@ -2903,19 +2903,47 @@ export class DuoPublicUiRig {
     const retainedAddress = guestMatch.slice(1).join(":");
     const [epoch, wave, turn] = guestMatch.slice(1, 4);
     const v2TurnCutover = this.host.evidence.events.some(event => V2_TURN_AUTHORITY_CUTOVER.test(event.text ?? ""));
+    let v2ContinuationProof = "legacy-release";
     if (v2TurnCutover) {
       const operationId = `TURN/e${epoch}/w${wave}/t${turn}`;
-      const exactV2Retirement = new RegExp(
-        `\\[coop:v2-authority\\] receipt rev=\\d+ op=${escapeRegExp(operationId)} `
+      const exactTurnReceipt = new RegExp(
+        `\\[coop:v2-authority\\] receipt rev=(\\d+) op=${escapeRegExp(operationId)} `
+          + "stage=(?:admitted|materialApplied|controlInstalled)\\b",
+        "u",
+      );
+      const turnReceipt = await this.host.evidence.waitFor(exactTurnReceipt, {
+        from: cursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: `${proofName} exact Authority V2 turn revision`,
+      });
+      const turnReceiptMatch = exactTurnReceipt.exec(turnReceipt.text);
+      const authorityRevision = Number(turnReceiptMatch?.[1]);
+      if (!Number.isSafeInteger(authorityRevision) || authorityRevision <= 0) {
+        throw new Error(`${proofName}: malformed Authority V2 turn revision evidence`);
+      }
+      const exactOwnRetirement = new RegExp(
+        `\\[coop:v2-authority\\] receipt rev=${authorityRevision} op=${escapeRegExp(operationId)} `
           + "stage=(?:materialApplied|controlInstalled) sender=\\d+ generation=\\d+ "
           + "advanced retired=true waiting=\\[\\]",
         "u",
       );
-      await this.host.evidence.waitFor(exactV2Retirement, {
+      const exactSubsumption = new RegExp(
+        `\\[coop:v2-authority\\] receipt rev=${authorityRevision + 1} op=[^ ]+ `
+          + "stage=(?:admitted|materialApplied|controlInstalled) sender=\\d+ generation=\\d+ "
+          + "advanced retired=(?:true|false) waiting=\\[[^\\]]*\\] "
+          + `subsumed=\\[(?:\\d+,)*${authorityRevision}(?:,\\d+)*\\]`,
+        "u",
+      );
+      const exactMechanicalRetirement = new RegExp(
+        `(?:${exactOwnRetirement.source})|(?:${exactSubsumption.source})`,
+        "u",
+      );
+      const retirement = await this.host.evidence.waitFor(exactMechanicalRetirement, {
         from: cursors[this.host.label],
         timeoutMs: this.config.timeoutMs,
-        description: `${proofName} exact Authority V2 retirement`,
+        description: `${proofName} exact Authority V2 retirement or supersession`,
       });
+      v2ContinuationProof = exactSubsumption.test(retirement.text) ? "v2-subsumption" : "v2-retirement";
     } else {
       const exactRelease = new RegExp(`host RELEASE retained turn after continuationReady key=${retainedAddress}`, "u");
       await this.host.evidence.waitFor(exactRelease, {
@@ -2928,7 +2956,7 @@ export class DuoPublicUiRig {
     this.host.evidence.record("retained-continuation-proof", {
       proofName,
       retainedAddress,
-      side: v2TurnCutover ? "v2-retirement" : "legacy-release",
+      side: v2ContinuationProof,
     });
     return retainedAddress;
   }

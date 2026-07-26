@@ -1241,7 +1241,8 @@ export class CoopAuthorityV2Shadow {
               ? `rejected reason=${verdict.reason}`
               : verdict.kind === "duplicate"
                 ? `duplicate highestStage=${verdict.highestStage}`
-                : `advanced retired=${verdict.retired} waiting=[${verdict.waitingForSeatIds.join(",")}]`;
+                : `advanced retired=${verdict.retired} waiting=[${verdict.waitingForSeatIds.join(",")}] `
+                  + `subsumed=[${verdict.subsumedRevisions?.join(",") ?? ""}]`;
           coopLog(
             "v2-authority",
             `receipt rev=${receipt.revision} op=${receipt.operationId} stage=${receipt.stage} `

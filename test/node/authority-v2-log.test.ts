@@ -760,10 +760,15 @@ describe("authority-v2 log", () => {
     expect(scheduler.ownerCount("authority-v2:session-A:seat0:deliver:1")).toBe(1);
 
     // b admitted -> supersession retires revision 1 (subsumed) and cancels its lease timers.
-    log.acceptReceipt(receipt(b, "admitted"));
+    expect(log.acceptReceiptDetailed(receipt(b, "admitted"))).toEqual({
+      kind: "advanced",
+      retired: false,
+      waitingForSeatIds: [1],
+      subsumedRevisions: [1],
+    });
     expect(log.retained().map(e => e.revision)).toEqual([2]);
     expect(scheduler.ownerCount("authority-v2:session-A:seat0:deliver:1")).toBe(0);
-    // b itself is only admitted (required = materialApplied since no nextControl), so its retry remains live.
+    // b itself is only admitted, so its own command-control proof and retry remain live.
     expect(log.diagnostics().activeDeliveryTimers).toBe(1);
   });
 

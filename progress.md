@@ -4184,3 +4184,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Protocol advances to `er-coop-49`; older builds fail pairing rather than silently omitting the new presentation.
   Source contracts cover the central enqueue seam, strict validator, exhaustive replay switch, and stable identities;
   the focused hosted shard owns behavioral/type proof before this checkpoint can advance.
+
+## 2026-07-26 - Public journey recognizes explicit V2 supersession retirement
+
+- Exact two-browser journey `30187298248` completed three command rounds, two public faint replacements, matching
+  mechanical digests, and reached the same actionable reward shop on both seats. Its red verdict was narrower: the
+  oracle waited for turn revision 6 to retire through its own `controlInstalled` receipt even though ordered
+  `WAVE_ADVANCE` revision 7 explicitly subsumed it after the replica admitted the complete successor image.
+- Authority-log supersession was already the intended mechanical behavior: every required peer admitting the exact
+  successor retires each listed predecessor and cancels its lease. The receipt verdict/trace now exposes precisely
+  which retained revisions that authenticated quorum retired.
+- The public continuation proof accepts either the turn's own exact terminal receipt or an exact N+1 receipt whose
+  authority verdict names N in `subsumed=[...]`. It still fails closed on an unrelated later entry, missing
+  supersession, or a non-adjacent revision, eliminating the false red without weakening retention coverage.
