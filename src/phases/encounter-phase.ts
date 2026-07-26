@@ -256,6 +256,9 @@ const COOP_ENEMY_PARTY_CONFIRM_WAIT_MS = 180_000;
  */
 const COOP_ENEMY_PARTY_CONFIRM_RETRIES = 1;
 
+/** Presentation assets may improve after this point, but they may never hold shared mechanics forever. */
+const COOP_ENCOUNTER_ASSET_WAIT_MS = 12_000;
+
 /**
  * Test-only owner-realm seam for asynchronous encounter continuations.
  *
@@ -278,6 +281,57 @@ function wrapCoopEncounterContinuation<TArgs extends unknown[], TResult>(
   callback: (...args: TArgs) => TResult,
 ): (...args: TArgs) => TResult | undefined {
   return coopEncounterContinuationWrapperForTesting?.(callback) ?? callback;
+}
+
+/**
+ * Bound the co-op encounter's presentation-only asset join. Individual atlas loaders already have their
+ * own recovery, but the aggregate also includes move, trainer, and encounter adapters; one forgotten or
+ * orphaned promise used to strand `NextEncounterPhase`/`NewBiomeEncounterPhase` forever before either
+ * phase could arm its normal presentation watchdog. A late asset may still populate its cache and repair
+ * the sprite. Mechanics continue with the existing placeholder substrate after this deadline.
+ */
+function awaitCoopEncounterAssetsBounded(
+  assetsReady: Promise<unknown>,
+  params: {
+    readonly enabled: boolean;
+    readonly wave: number;
+    readonly remainsCurrent: () => boolean;
+  },
+): Promise<void> {
+  if (!params.enabled) {
+    return assetsReady.then(() => {});
+  }
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (outcome: "resolve" | "reject", error?: unknown): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      if (outcome === "resolve") {
+        resolve();
+      } else {
+        reject(error);
+      }
+    };
+    const timer = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      if (params.remainsCurrent()) {
+        coopWarn(
+          "renderer",
+          `authoritative encounter assets exceeded ${COOP_ENCOUNTER_ASSET_WAIT_MS}ms at wave ${params.wave}; continuing with placeholders`,
+        );
+      }
+      finish("resolve");
+    }, COOP_ENCOUNTER_ASSET_WAIT_MS);
+    assetsReady.then(
+      () => finish("resolve"),
+      error => finish("reject", error),
+    );
+  });
 }
 
 function captureCoopTrainer(trainer: Trainer): CoopSerializedTrainer {
@@ -1349,7 +1403,13 @@ export class EncounterPhase extends BattlePhase {
       }
     }
 
-    void Promise.all(loadEnemyAssets)
+    const assetsReady = awaitCoopEncounterAssetsBounded(Promise.all(loadEnemyAssets), {
+      enabled: encounterScene.gameMode.isCoop && encounterController?.netcodeMode === "authoritative",
+      wave: battle.waveIndex,
+      remainsCurrent: encounterBoundaryIsLive,
+    });
+
+    void assetsReady
       .then(
         wrapCoopEncounterContinuation(() => {
           if (!encounterBoundaryIsLive()) {

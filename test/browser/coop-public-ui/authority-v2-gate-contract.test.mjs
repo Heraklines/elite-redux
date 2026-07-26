@@ -2550,7 +2550,17 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     encounterPhase,
-    /Promise\.all\(loadEnemyAssets\)[\s\S]+\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{/u,
+    /awaitCoopEncounterAssetsBounded\(Promise\.all\(loadEnemyAssets\), \{[\s\S]+enabled: encounterScene\.gameMode\.isCoop && encounterController\?\.netcodeMode === "authoritative"[\s\S]+remainsCurrent: encounterBoundaryIsLive/u,
+    "a presentation asset adapter cannot hold an authoritative co-op encounter forever",
+  );
+  assert.match(
+    encounterPhase,
+    /const COOP_ENCOUNTER_ASSET_WAIT_MS = 12_000;[\s\S]+setTimeout\([\s\S]+continuing with placeholders[\s\S]+finish\("resolve"\);[\s\S]+COOP_ENCOUNTER_ASSET_WAIT_MS/u,
+    "the asset deadline preserves late cosmetic repair while releasing the mechanical phase",
+  );
+  assert.match(
+    encounterPhase,
+    /void assetsReady[\s\S]+\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{/u,
     "success of the encounter asset join uses the exact continuation-owner seam",
   );
   assert.match(
