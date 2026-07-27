@@ -3,11 +3,17 @@
     "cost": 2,
     "eggTier": 1
   },
+  "SPECIES_CHI_YU": {
+    "eggTier": 3
+  },
   "SPECIES_FEEBAS": {
     "cost": 3
   },
   "SPECIES_GALAR_STUNFISK": {
     "eggTier": 0
+  },
+  "SPECIES_HEATRAN": {
+    "eggTier": 3
   },
   "SPECIES_KARTANA": {
     "cost": 7
@@ -15,13 +21,34 @@
   "SPECIES_KARTANA_FALLEN": {
     "cost": 12
   },
+  "SPECIES_KECLEON": {
+    "eggTier": 1
+  },
+  "SPECIES_MINCCINO_REDUX": {
+    "eggTier": 2
+  },
+  "SPECIES_OGERPON": {
+    "eggTier": 3
+  },
+  "SPECIES_SABLEYE_REDUX": {
+    "eggTier": 1
+  },
   "SPECIES_SCYTHER": {
     "cost": 4,
     "eggTier": 0
   },
   "SPECIES_SCYTHER_REDUX": {
     "cost": 4,
-    "eggTier": 0
+    "eggTier": 2
+  },
+  "SPECIES_SEEL_REDUX": {
+    "eggTier": 1
+  },
+  "SPECIES_SKARMORY_REDUX": {
+    "eggTier": 2
+  },
+  "SPECIES_TRAPINCH_REDUX": {
+    "eggTier": 1
   },
   "SPECIES_VOLCANION": {
     "cost": 6
