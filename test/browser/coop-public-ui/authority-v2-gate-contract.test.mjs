@@ -2572,25 +2572,43 @@ test("a committed guest picker settles and buffers its V2 carrier before yieldin
   );
 });
 
-test("an ordered no-choice replacement dissolves without exposing an impossible PARTY modal", () => {
+test("an ordered no-choice replacement parks until its immutable result without exposing PARTY", () => {
   const noChoiceStart = guestFaintSwitchPhase.indexOf("private dissolveNoChoiceReplacement(");
   const boundaryStart = guestFaintSwitchPhase.indexOf("public override start(): void", noChoiceStart);
   assert.ok(noChoiceStart >= 0 && boundaryStart > noChoiceStart, "the no-choice replacement boundary is bounded");
-  const orderedOpen = guestFaintSwitchPhase.slice(noChoiceStart, boundaryStart);
+  const releaseStart = guestFaintSwitchPhase.indexOf("public releaseForCoopV2Control(", noChoiceStart);
+  assert.ok(releaseStart >= 0 && releaseStart < boundaryStart, "the passive replacement release is present");
+  const orderedOpen = guestFaintSwitchPhase.slice(noChoiceStart, releaseStart);
   assert.match(orderedOpen, /const hasLegalOwnerBench =/u);
   assert.match(
     orderedOpen,
-    /if \(hasLegalOwnerBench\) \{[\s\S]*return false;[\s\S]*isCoopFaintSwitchPickerSettled\([\s\S]*sendCoopFaintSwitchChoice\([\s\S]*scene\.phaseManager\.shiftPhase\(\);/u,
-    "a wiped owner half publishes at most one exact NONE result and yields before opening PARTY",
+    /if \(hasLegalOwnerBench\) \{[\s\S]*return false;[\s\S]*isCoopFaintSwitchPickerSettled\([\s\S]*sendCoopFaintSwitchChoice\([\s\S]*this\.noChoiceCommitWait = \{ generation, sessionEpoch, operationId \};/u,
+    "a wiped owner half publishes at most one exact NONE result and retains the addressed ordered wait",
   );
-  const call = guestFaintSwitchPhase.indexOf(
-    "this.dissolveNoChoiceReplacement(sourceWave, sourceTurn, occurrence, operationBinding)",
-    boundaryStart,
+  assert.doesNotMatch(
+    orderedOpen,
+    /phaseManager\.shiftPhase\(\)|this\.end\(\)/u,
+    "a NONE observation is never mistaken for permission to infer TurnInit locally",
   );
+  const call = guestFaintSwitchPhase.indexOf("this.dissolveNoChoiceReplacement(", boundaryStart);
   const openStart = guestFaintSwitchPhase.indexOf("beginCoopFaintSwitchWindow()", boundaryStart);
   assert.ok(
     call >= boundaryStart && openStart > call,
     "the no-choice branch runs before the human-input lease can open",
+  );
+
+  const releaseEnd = guestFaintSwitchPhase.indexOf("\n  public override start(): void", releaseStart);
+  assert.ok(releaseStart >= 0 && releaseEnd > releaseStart, "the passive replacement release is bounded");
+  const release = guestFaintSwitchPhase.slice(releaseStart, releaseEnd);
+  assert.match(
+    release,
+    /successor\.sessionEpoch !== wait\.sessionEpoch[\s\S]*successor\.kind !== "REPLACEMENT_COMMIT"[\s\S]*successor\.operationId !== wait\.operationId[\s\S]*getCurrentPhase\(\) !== this/u,
+    "only the exact session, operation and current phase accept the immutable result",
+  );
+  assert.match(
+    release,
+    /this\.noChoiceCommitWait = null;[\s\S]*this\.end\(\);[\s\S]*return true;/u,
+    "only that immutable result releases the passive wait to consume its retained carrier",
   );
 });
 

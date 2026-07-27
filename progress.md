@@ -4733,3 +4733,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   operation registry, preserving the coverage requirement without demanding a retired legacy carrier.
 - Policy-safe local evidence is the 94/94 Authority V2 source contract plus formatting/static/type checks. The real
   level/god-a reproductions and complete focused gate remain GitHub-hosted; no deployment occurred.
+
+## 2026-07-27 - A no-choice replacement remains parked until its immutable result
+
+- The animations-off depth campaign reached wave 3, committed turn 1, and opened guest-owned replacement control for
+  a fainted field slot whose owner had no legal bench. The replica correctly published one addressed `NONE`
+  observation, but `CoopGuestFaintSwitchPhase` then shifted locally. Its empty queue inferred `TurnInitPhase`, which
+  recursively opened a stale turn-1 replay until the browser stack overflowed and the shared session terminated.
+- A `NONE` proposal is now only an observation for the authority. The no-choice phase exposes no PARTY surface and
+  remains as a passive, scene-current structural wait. It accepts only the same-generation, same-epoch, exact-operation
+  `REPLACEMENT_COMMIT`; the runtime has already retained that entry's complete replacement carrier before this release,
+  so the following TurnInit consumes DATA instead of deriving progression.
+- The source contract now rejects any local shift/end in the no-choice observation branch and proves that only the
+  exact immutable result can release it. Local policy-safe evidence is 94/94 Authority V2 contracts, Biome clean,
+  `git diff --check` clean, and no changed-file TypeScript diagnostics. Browser/engine qualification remains remote.

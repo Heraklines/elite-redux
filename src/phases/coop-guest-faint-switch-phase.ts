@@ -38,6 +38,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import { UiMode } from "#enums/ui-mode";
+import type { CoopV2ControlSuccessorClaim } from "#phases/coop-replay-phases";
 import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
 
 /**
@@ -61,6 +62,16 @@ export class CoopGuestFaintSwitchPhase extends Phase {
   private readonly faintSourceAddress: CoopFaintSourceAddress | undefined;
   /** Re-entrant guard: a drive loop may call start() again while the picker is open. */
   private opened = false;
+  /**
+   * An ordered replacement can legitimately have no local human choice. Publishing NONE is only an
+   * observation for the host; it is not permission for this renderer to derive TurnInit. Keep this exact
+   * structural wait current until the consecutive immutable REPLACEMENT_COMMIT installs its carrier.
+   */
+  private noChoiceCommitWait: {
+    readonly generation: number;
+    readonly sessionEpoch: number;
+    readonly operationId: string;
+  } | null = null;
 
   constructor(fieldIndex: number, faintSourceAddress?: CoopFaintSourceAddress) {
     super();
@@ -74,6 +85,9 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     sourceTurn: number,
     occurrence: number,
     operationBinding: ReturnType<typeof captureCoopFaintSwitchOperationBinding>,
+    generation: number,
+    sessionEpoch: number,
+    operationId: string,
   ): boolean {
     const controller = getCoopController();
     const relay = getCoopInteractionRelay();
@@ -96,8 +110,8 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     }
     // The ordered replacement control can arrive after live faint presentation already proved that this
     // owner half has no legal reserve. It still authorizes an exact NONE result, but it must never create
-    // an impossible PARTY modal. If the live path already published that result, merely dissolve this
-    // reconstructed phase; otherwise publish the same addressed observation exactly once here.
+    // an impossible PARTY modal. If the live path already published that result, merely retain this exact
+    // reconstructed wait; otherwise publish the same addressed observation exactly once here.
     const alreadySettled = isCoopFaintSwitchPickerSettled(
       sourceWave,
       sourceTurn,
@@ -123,9 +137,35 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     }
     coopLog(
       "replay",
-      `guest own-faint picker SKIP slot=${this.fieldIndex}: no legal owner bench under ordered control`,
+      `guest own-faint picker PARK slot=${this.fieldIndex}: no legal owner bench; awaiting immutable result`,
     );
-    scene.phaseManager.shiftPhase();
+    this.noChoiceCommitWait = { generation, sessionEpoch, operationId };
+    return true;
+  }
+
+  /**
+   * Release a passive no-choice replacement only after its exact globally ordered result retained DATA.
+   * The runtime invokes this after ingesting the replacement checkpoint, so the following TurnInit can
+   * consume that carrier instead of recursively manufacturing a stale replay of the settled turn.
+   */
+  public releaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
+    const wait = this.noChoiceCommitWait;
+    if (
+      wait == null
+      || wait.generation !== coopSessionGeneration()
+      || successor.sessionEpoch !== wait.sessionEpoch
+      || successor.kind !== "REPLACEMENT_COMMIT"
+      || successor.operationId !== wait.operationId
+      || globalScene.phaseManager.getCurrentPhase() !== this
+    ) {
+      return false;
+    }
+    this.noChoiceCommitWait = null;
+    coopLog(
+      "replay",
+      `guest own-faint picker RELEASE slot=${this.fieldIndex} from ${successor.kind} rev=${successor.revision}`,
+    );
+    this.end();
     return true;
   }
 
@@ -207,7 +247,17 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       return;
     }
     this.opened = true;
-    if (this.dissolveNoChoiceReplacement(sourceWave, sourceTurn, occurrence, operationBinding)) {
+    if (
+      this.dissolveNoChoiceReplacement(
+        sourceWave,
+        sourceTurn,
+        occurrence,
+        operationBinding,
+        sourceGeneration,
+        controller.sessionEpoch,
+        controlOperationId,
+      )
+    ) {
       return;
     }
     const materialBoundaryStillPresent = (): boolean =>
