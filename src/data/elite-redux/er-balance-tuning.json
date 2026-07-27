@@ -1,4 +1,12 @@
 {
   "er.ai.enabled": 1,
-  "er.ai.experimentalHell": 1
+  "er.ai.experimentalHell": 1,
+  "er.items.resistBerryPct": {
+    "hell": 15
+  },
+  "vanilla.catch.ballMult": {
+    "rogueBall": 4,
+    "ultraBall": 2.5
+  },
+  "vanilla.pokerusCount": 8
 }
