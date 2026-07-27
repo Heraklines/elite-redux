@@ -2,6 +2,9 @@
   "ABILITY_RANDOMIZER": {
     "tier": "ULTRA"
   },
+  "AMULET_COIN": {
+    "weight": 2
+  },
   "BERRY_POUCH": {
     "tier": "ULTRA"
   },
@@ -9,7 +12,8 @@
     "tier": "GREAT"
   },
   "DNA_SPLICERS": {
-    "tier": "ULTRA"
+    "tier": "ULTRA",
+    "weight": 2
   },
   "ER_ABILITY_SHIELD": {
     "weight": 1
@@ -74,10 +78,16 @@
   "ER_ZOOM_LENS": {
     "weight": 1
   },
+  "FORM_CHANGE_ITEM": {
+    "weight": 5
+  },
   "MULTI_LENS": {
     "tier": "MASTER"
   },
   "NUGGET": {
     "tier": "COMMON"
+  },
+  "RARE_EVOLUTION_ITEM": {
+    "weight": 5
   }
 }
