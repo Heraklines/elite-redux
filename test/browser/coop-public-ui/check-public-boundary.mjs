@@ -338,7 +338,9 @@ if (
   || !campaignNav?.includes("function chooseBestCampaignMove(")
   || !campaignNav.includes("function driveBestCampaignMove(")
   || !campaignNav.includes('surfaceId: "command:fight"')
+  || !campaignNav.includes("candidates[normalizedCycle % candidates.length]")
   || !campaign.includes("driveBestCampaignMove(client, commandPurpose")
+  || !campaign.includes("cycleIndex: turn - 1")
   || !campaign.includes("policy.keys.battleKeysFromEnv")
   || !harness.includes("driveCommand(client, `${purpose}-${client.label}`, event)")
 ) {

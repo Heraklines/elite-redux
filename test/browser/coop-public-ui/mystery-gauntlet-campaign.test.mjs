@@ -157,6 +157,16 @@ test("campaign fight policy prefers a usable damaging move and follows the visib
   const best = chooseBestCampaignMove(observation);
   assert.equal(best?.optionId, "move:22:slot:3");
   assert.equal(
+    chooseBestCampaignMove(observation, 1)?.optionId,
+    "move:33:slot:1",
+    "later rounds try the next observer-proven damaging move instead of repeating an immunity forever",
+  );
+  assert.equal(
+    chooseBestCampaignMove(observation, 2)?.optionId,
+    "move:22:slot:3",
+    "the damaging-move policy cycles deterministically",
+  );
+  assert.equal(
     chooseNavigationKey(observation, best.optionId, ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"], 0),
     "ArrowDown",
   );

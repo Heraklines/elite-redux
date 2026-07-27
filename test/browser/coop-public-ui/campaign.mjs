@@ -1112,7 +1112,10 @@ async function driveBattleWave(rig, policy, stats) {
         driveCommand: policy.keys.battleKeysFromEnv
           ? null
           : (client, commandPurpose) =>
-              driveBestCampaignMove(client, commandPurpose, { timeoutMs: rig.config.timeoutMs }),
+              driveBestCampaignMove(client, commandPurpose, {
+                timeoutMs: rig.config.timeoutMs,
+                cycleIndex: turn - 1,
+              }),
       },
     );
     if (pendingCommandProof != null) {

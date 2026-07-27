@@ -257,10 +257,12 @@ export function chooseNavigationKey(observation, targetId, navKeys, step) {
 /**
  * Choose a real, currently selectable move from the read-only FIGHT projection.
  * Damaging moves beat status moves; higher visible power wins; stable slot order
- * breaks ties. Fixed-damage attacks can report non-positive power, so category is
- * also considered instead of assuming `power > 0` is the complete damage model.
+ * breaks ties. Later rounds cycle through those damaging candidates so one hidden
+ * immunity cannot trap the representative campaign in a permanent no-progress loop.
+ * Fixed-damage attacks can report non-positive power, so category is also considered
+ * instead of assuming `power > 0` is the complete damage model.
  */
-export function chooseBestCampaignMove(observation) {
+export function chooseBestCampaignMove(observation, cycleIndex = 0) {
   if (
     observation?.surfaceId !== "command:fight"
     || !Array.isArray(observation.optionIds)
@@ -285,7 +287,10 @@ export function chooseBestCampaignMove(observation) {
       || left.index - right.index
     );
   });
-  return selectable[0] ?? null;
+  const damaging = selectable.filter(slot => slot.category !== "STATUS");
+  const candidates = damaging.length > 0 ? damaging : selectable;
+  const normalizedCycle = Number.isSafeInteger(cycleIndex) ? Math.max(0, cycleIndex) : 0;
+  return candidates[normalizedCycle % candidates.length] ?? null;
 }
 
 /**
@@ -294,14 +299,14 @@ export function chooseBestCampaignMove(observation) {
  * Space/arrow key presses. Target selection remains owned by the harness's addressed
  * command-target driver.
  */
-export async function driveBestCampaignMove(client, purpose, { timeoutMs = 15_000 } = {}) {
+export async function driveBestCampaignMove(client, purpose, { timeoutMs = 15_000, cycleIndex = 0 } = {}) {
   const fightCursor = client.evidence.cursor();
   await client.press("Space", `${purpose}-open-fight`);
   const fight = await waitForActionableSemanticSurface(client, "command:fight", {
     fromCursor: fightCursor,
     timeoutMs,
   });
-  const move = chooseBestCampaignMove(fight.observation);
+  const move = chooseBestCampaignMove(fight.observation, cycleIndex);
   if (move == null) {
     throw new Error(
       `${client.label}: ${purpose} exposed no observer-proven usable move: `
@@ -323,6 +328,7 @@ export async function driveBestCampaignMove(client, purpose, { timeoutMs = 15_00
     power: move.power,
     category: move.category,
     optionId: move.optionId,
+    cycleIndex,
   });
   return move;
 }
