@@ -11,9 +11,8 @@
 // alternating OWNER picks the reward, but the WATCHER applies the SAME consumable to keep the shop in
 // lockstep - so pre-fix BOTH clients unshifted ErDexNavPhase and BOTH opened the (drivable) picker,
 // giving the watcher an unexpected screen AND free dex entries from the owner's item. The dex is
-// per-account (NOT run-checksummed), so no relay/adopt is needed: the item USER (the reward owner)
-// drives the picker and the watcher simply SKIPS it (er-dex-nav-phase.ts threads the shop's watcher
-// flag, mirroring the ER ability-picker owner-gate).
+// per-account (NOT run-checksummed), so the item USER performs the writes while the watcher consumes
+// the exact Authority V2 presentation/result and closes the same reward continuation without writing dex.
 //
 // This is a fails-before/passes-after guard: pre-fix ErDexNavPhase had no watcher flag and always
 // read the pool + opened the picker; now a watcher-constructed phase ends WITHOUT touching the picker.
@@ -51,8 +50,8 @@ describe.skipIf(!RUN)("co-op Dex Nav owner-gate (wiring audit)", () => {
     // best-effort
   });
 
-  it("WATCHER: ErDexNavPhase SKIPS the picker - it ends without reading the dex pool or opening a screen", () => {
-    const phase = new ErDexNavPhase(/* coopIsWatcher */ true);
+  it("WATCHER: ErDexNavPhase never reads the dex pool or opens owner input", () => {
+    const phase = new ErDexNavPhase(0, -1, true);
     // Stub end() so calling it out-of-queue doesn't shift the real phase queue.
     const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
     const poolSpy = vi.spyOn(globalScene.arena, "getErDexNavSpeciesPool");
@@ -60,8 +59,8 @@ describe.skipIf(!RUN)("co-op Dex Nav owner-gate (wiring audit)", () => {
 
     phase.start();
 
-    // The watcher ended immediately, never read the dex pool, and never opened the species OPTION_SELECT.
-    expect(endSpy, "watcher ends the phase immediately").toHaveBeenCalled();
+    // The watcher is passive: no local pool derivation and no owner OPTION_SELECT.
+    expect(endSpy, "watcher remains parked for an authoritative result").not.toHaveBeenCalled();
     expect(poolSpy, "watcher never reads the dex pool (picker skipped)").not.toHaveBeenCalled();
     expect(
       setModeSpy.mock.calls.some(([mode]) => mode === UiMode.OPTION_SELECT),
@@ -70,7 +69,7 @@ describe.skipIf(!RUN)("co-op Dex Nav owner-gate (wiring audit)", () => {
   });
 
   it("OWNER (default / solo): ErDexNavPhase opens the picker - it reads the dex pool", () => {
-    const phase = new ErDexNavPhase(/* coopIsWatcher */ false);
+    const phase = new ErDexNavPhase(0, -1, false);
     vi.spyOn(phase, "end").mockImplementation(() => {});
     // Deterministic non-empty pool so the owner path proceeds into the picker.
     const poolSpy = vi

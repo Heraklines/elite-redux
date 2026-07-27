@@ -2614,14 +2614,17 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
   );
   const betweenWaveTimeoutMs = rig.config.timeoutMs * 3;
   const fixedDeadline = Date.now() + betweenWaveTimeoutMs;
-  // Run 30205274431 reached the original 15-minute boundary while both real browsers were still
-  // advancing CommonAnimPhase, then proved the next shared command only 44 seconds later during failure
-  // capture. That is a harness false red, not permission to wait indefinitely: animations-on alone may
-  // refresh the deadline from observed phase/authority/renderer progress, and the absolute extension is
-  // capped at one calibrated presentation allowance. All faster profiles retain the exact fixed deadline.
+  // Runs 30205274431 and 30241841635 reached the old ceiling while both real browsers were still
+  // advancing ordered presentation, then proved the next shared command 44s and 22s later. That is a
+  // harness false red, not permission to wait indefinitely: animations-on alone may refresh the deadline
+  // from observed phase/authority/renderer progress, and the absolute ceiling is the same measured
+  // per-event software-WebGL budget used for one dense turn. All faster profiles retain the fixed deadline.
   const betweenWaveBudget = policy.moveAnimationsExpected
     ? createAnimationProgressBudget(rig, commandCursors, betweenWaveTimeoutMs, {
-        hardCeilingMs: betweenWaveTimeoutMs + ANIMATION_PROGRESS_ALLOWANCE_MS,
+        hardCeilingMs: Math.max(
+          betweenWaveTimeoutMs + ANIMATION_PROGRESS_ALLOWANCE_MS,
+          ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS,
+        ),
       })
     : null;
   // Mystery difficulty deliberately chains encounters without opening a battle command between them.

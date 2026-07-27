@@ -209,6 +209,13 @@ describe("Authority V2 interaction cutover", () => {
       "op:ability",
       "SHARED_INTERACTION",
     ],
+    [
+      "ABILITY_PRESENT",
+      { pinned: 1, partyIndex: 0, workflow: "dex-nav", candidateSpeciesIds: [16, 19, 25] },
+      "INTERACTION",
+      "op:ability",
+      "SHARED_INTERACTION",
+    ],
     ["ABILITY_PICK", { data: [0, 1] }, "INTERACTION", "op:ability", "AWAIT_SUCCESSOR"],
     ["BARGAIN", { outcome: RESYNC }, "INTERACTION", "op:bargain", "AWAIT_SUCCESSOR"],
     ["STORMGLASS", { weatherIndex: 0, weather: 1 }, "INTERACTION", "op:stormglass", "AWAIT_SUCCESSOR"],
@@ -827,6 +834,10 @@ describe("Authority V2 interaction cutover", () => {
       }),
     ).toBeNull();
     expect(build({ pinned: 1, partyIndex: 0, workflow: "capsule", rolledAbilityIds: [11, 12, 13, 14] })).toBeNull();
+    expect(build({ pinned: 1, partyIndex: 0, workflow: "dex-nav" })).toBeNull();
+    expect(build({ pinned: 1, partyIndex: 0, workflow: "dex-nav", candidateSpeciesIds: [16, 16] })).toBeNull();
+    expect(build({ pinned: 1, partyIndex: 0, workflow: "dex-nav", candidateSpeciesIds: [16, 19] })).not.toBeNull();
+    expect(build({ pinned: 1, partyIndex: 0, workflow: "capsule", candidateSpeciesIds: [16, 19] })).toBeNull();
   });
 
   it("rejects incomplete result payloads before they can consume a mechanical revision", () => {

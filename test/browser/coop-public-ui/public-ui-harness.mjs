@@ -467,7 +467,7 @@ function findAddressedRewardWatcher(client, from, ownerSeat, expectedAddress) {
     && semantic.observation.seatsWithInput?.includes(ownerSeat)
     && !semantic.observation.seatsWithInput?.includes(client.publicSeat)
     && semantic.observation.ready?.handlerActive === true
-    && semantic.observation.ready.awaitingActionInput === false
+    && semantic.observation.ready.inputBlocked === true
     && sameAddress(semantic.observation.address, expectedAddress)
     ? semantic
     : null;
@@ -3685,8 +3685,14 @@ export class DuoPublicUiRig {
    * mutated; the returned cursors exclude these command surfaces so the post-turn outcome cannot
    * mistake the just-submitted round for the next one.
    */
-  async driveSequentialCommandRound(from, keys, purpose, { driveCommand = null } = {}) {
+  async driveSequentialCommandRound(initialFrom, keys, purpose, { driveCommand = null } = {}) {
     const clients = Object.values(this.clients);
+    // Cursor floors are input evidence owned by the caller. In particular, the campaign retains
+    // the same snapshot as its pending shared-frontier proof. Replacement handling below advances
+    // its private scan floor; mutating the caller's object erased already-published reciprocal
+    // command observations before assertSharedCommandFrontier could consume them (market run
+    // 30241841701). Keep the driver's control scan private and return explicit outcome cursors.
+    const from = { ...initialFrom };
     // Keep the ordered-presentation proof window anchored at round admission. The mutable
     // `from` cursors are control-surface scan floors and may advance past a replacement picker
     // before the reciprocal command opens. Renderer receipts emitted before/during that picker

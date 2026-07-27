@@ -309,3 +309,43 @@ test("shared teardown remains fatal before the exact GameOver latch is armed", a
     assert.equal(sink.failures[0].reason, "shared session terminated");
   });
 });
+
+test("paired GameOver licenses one bounded heartbeat plus leave refusal during teardown", async () => {
+  await withSink(async ({ page, sink }) => {
+    const refusal = "Failed to load resource: the server responded with a status of 401 ()";
+    page.emit("console", consoleMessage("Start Phase GameOverPhase", "log"));
+    const gameOver = sink.events.find(event => /Start Phase GameOverPhase/u.test(event.text ?? ""));
+    sink.expectSharedTerminalAfterPairedGameOver(gameOver.index);
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/heartbeat"));
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/leave"));
+
+    assert.equal(sink.failures.length, 2, "generic browser resource errors stay recorded until final classification");
+    assert.doesNotThrow(() => sink.assertClean());
+  });
+});
+
+test("a signaling refusal before the exact GameOver latch remains fatal", async () => {
+  await withSink(async ({ page, sink }) => {
+    const refusal = "Failed to load resource: the server responded with a status of 401 ()";
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/heartbeat"));
+    page.emit("console", consoleMessage("Start Phase GameOverPhase", "log"));
+    const gameOver = sink.events.find(event => /Start Phase GameOverPhase/u.test(event.text ?? ""));
+    sink.expectSharedTerminalAfterPairedGameOver(gameOver.index);
+
+    assert.throws(() => sink.assertClean(), /1 fatal browser event\(s\)/u);
+  });
+});
+
+test("a third post-GameOver signaling refusal remains fatal", async () => {
+  await withSink(async ({ page, sink }) => {
+    const refusal = "Failed to load resource: the server responded with a status of 401 ()";
+    page.emit("console", consoleMessage("Start Phase GameOverPhase", "log"));
+    const gameOver = sink.events.find(event => /Start Phase GameOverPhase/u.test(event.text ?? ""));
+    sink.expectSharedTerminalAfterPairedGameOver(gameOver.index);
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/heartbeat"));
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/leave"));
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/heartbeat"));
+
+    assert.throws(() => sink.assertClean(), /1 fatal browser event\(s\)/u);
+  });
+});

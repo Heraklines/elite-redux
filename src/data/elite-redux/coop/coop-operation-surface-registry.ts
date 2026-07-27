@@ -46,7 +46,12 @@ export type CoopV2InteractionOperationKind = Exclude<CoopOperationKind, "FAINT_S
 const COOP_V2_INTERACTION_UI_PROOFS = {
   ABILITY_PRESENT: {
     uiModes: [UiMode.OPTION_SELECT, UiMode.PARTY, UiMode.ER_BARGAIN, UiMode.MESSAGE],
-    phaseNames: ["ErAbilityCapsulePhase", "ErGreaterAbilityCapsulePhase", "ErGreaterAbilityRandomizerPhase"],
+    phaseNames: [
+      "ErAbilityCapsulePhase",
+      "ErGreaterAbilityCapsulePhase",
+      "ErGreaterAbilityRandomizerPhase",
+      "ErDexNavPhase",
+    ],
   },
   ABILITY_PICK: {
     uiModes: [UiMode.OPTION_SELECT, UiMode.PARTY, UiMode.ER_BARGAIN],
@@ -54,6 +59,7 @@ const COOP_V2_INTERACTION_UI_PROOFS = {
       "ErAbilityCapsulePhase",
       "ErGreaterAbilityCapsulePhase",
       "ErGreaterAbilityRandomizerPhase",
+      "ErDexNavPhase",
       "SelectModifierPhase",
       "BiomeShopPhase",
       "TheBargainPhase",

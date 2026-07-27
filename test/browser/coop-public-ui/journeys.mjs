@@ -62,10 +62,9 @@ async function waitForReadyYesConfirmation(client, surfaceId, from) {
   return ready;
 }
 
-function isActionableLocalSoloSurface(observation) {
+export function isActionableLocalSoloSurface(observation) {
   return (
     observation?.coop === false
-    && observation.ownerModel === "local"
     && observation.seatsWithInput?.includes(0)
     && observation.ready?.handlerActive === true
     && observation.ready.inputBlocked !== true

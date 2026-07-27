@@ -98,6 +98,7 @@ const HEARTBEAT_OWNERSHIP_LOSS = /P33 heartbeat lost authenticated ownership sta
 /** The browser's automatic resource-error twin of that same handled beat. */
 const HEARTBEAT_RESOURCE_ERROR = /Failed to load resource:.*(?:401|403)/u;
 const HEARTBEAT_PATHNAME = /\/coop\/v3\/heartbeat$/u;
+const SESSION_LEAVE_PATHNAME = /\/coop\/v3\/leave$/u;
 const COMPATIBLE_PRESENTATION_MISMATCH =
   /^\[coop:checksum\] PRESENTATION MISMATCH sections=[^\n]+ - simulation compatible - /u;
 const STATE_SYNC_START =
@@ -1869,17 +1870,22 @@ export class EvidenceSink {
     // resource-error console line for that handled request is not a run failure. Excused ONLY
     // when the client's own ownership-loss handling line was observed in this same trace, and
     // bounded (a repeating 401 means the stop did NOT hold - that stays fatal).
-    let excusableHeartbeatErrors = this.heartbeatOwnershipLossObserved ? 2 : 0;
+    let excusableSignalingErrors =
+      this.heartbeatOwnershipLossObserved || this.expectedSharedTerminalAfterGameOver != null ? 2 : 0;
     const remaining = this.failures.filter(event => {
-      const isHandledHeartbeatRefusal =
+      const isSignalingRefusal =
         event?.kind === "console"
         && HEARTBEAT_RESOURCE_ERROR.test(event.text ?? "")
-        && HEARTBEAT_PATHNAME.test(event.source ?? "");
-      if (isHandledHeartbeatRefusal && excusableHeartbeatErrors > 0) {
-        excusableHeartbeatErrors -= 1;
+        && (HEARTBEAT_PATHNAME.test(event.source ?? "") || SESSION_LEAVE_PATHNAME.test(event.source ?? ""));
+      const licensedByTerminal =
+        this.expectedSharedTerminalAfterGameOver != null && event.index > this.expectedSharedTerminalAfterGameOver;
+      const licensedByOwnershipLoss =
+        this.heartbeatOwnershipLossObserved && HEARTBEAT_PATHNAME.test(event.source ?? "");
+      if (isSignalingRefusal && (licensedByTerminal || licensedByOwnershipLoss) && excusableSignalingErrors > 0) {
+        excusableSignalingErrors -= 1;
         this.record("console-error-expected", {
           source: event.source,
-          reason: "post-terminal signaling heartbeat refusal handled by the fail-closed ownership-loss path",
+          reason: "bounded post-terminal signaling refusal after exact paired GameOver/ownership loss",
         });
         return false;
       }

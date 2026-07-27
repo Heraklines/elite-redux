@@ -1889,6 +1889,11 @@ test("pre-battle Mystery engine narration cannot depend on the selector phase st
     /clearCoopGuestMeNarrationLease[\s\S]*this\.offMeMessage = \(\) => \{[\s\S]*clearCoopGuestMeNarrationLease\(this\.boundRuntime\)/u,
     "every replay teardown retires its retained acknowledgement timer through the narration unsubscribe",
   );
+  assert.match(
+    coopRuntime,
+    /if \(receive !== "executed" && receive !== "duplicate"\) \{[\s\S]*return false;[\s\S]*clearCoopGuestMeNarrationLease\(runtime\);[\s\S]*settleCoopV2InteractionOperation\(op\.id, runtime\)/u,
+    "the exact ordered Mystery terminal retires an old guest narration ACK even while its primary pin survives",
+  );
   assert.match(battleStream, /meMessageHandler:[\s\S]*=> boolean/u, "the replay handler reports exact acceptance");
   const narrationDeliveryStart = battleStream.indexOf("private deliverMeMessage(");
   const narrationDeliveryEnd = battleStream.indexOf("\n  /**", narrationDeliveryStart + 1);
@@ -2891,7 +2896,7 @@ test("the animations-on campaign extends a live between-wave renderer without we
   assert.match(campaignDriver, /const betweenWaveTimeoutMs = rig\.config\.timeoutMs \* 3/u);
   assert.match(
     campaignDriver,
-    /const betweenWaveBudget = policy\.moveAnimationsExpected[\s\S]*createAnimationProgressBudget\(rig, commandCursors, betweenWaveTimeoutMs,[\s\S]*hardCeilingMs: betweenWaveTimeoutMs \+ ANIMATION_PROGRESS_ALLOWANCE_MS/u,
+    /const betweenWaveBudget = policy\.moveAnimationsExpected[\s\S]*createAnimationProgressBudget\(rig, commandCursors, betweenWaveTimeoutMs,[\s\S]*hardCeilingMs: Math\.max\([\s\S]*betweenWaveTimeoutMs \+ ANIMATION_PROGRESS_ALLOWANCE_MS,[\s\S]*ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS/u,
   );
   assert.match(
     campaignDriver,

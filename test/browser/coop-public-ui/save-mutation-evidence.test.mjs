@@ -7,6 +7,19 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { coopRunStatusView, exactCoopDeleteRequestView } from "./evidence.mjs";
+import { isActionableLocalSoloSurface } from "./journeys.mjs";
+
+test("solo check-switch remains actionable when its semantic owner model is interaction", () => {
+  assert.equal(
+    isActionableLocalSoloSurface({
+      coop: false,
+      ownerModel: "interaction",
+      seatsWithInput: [0],
+      ready: { handlerActive: true, inputBlocked: false },
+    }),
+    true,
+  );
+});
 
 test("accepts only a complete exact tombstone proof", () => {
   const valid = {

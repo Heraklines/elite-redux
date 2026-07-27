@@ -650,7 +650,7 @@ test("sequential command presentation proof retains receipts before an interveni
     assertPresentationLedgerAtSharedCommand: async (proofFrom, expectedAddress) => {
       assert.equal(expectedAddress, "73:1:2");
       assert.deepEqual(proofFrom, { first: 0, second: 0 });
-      assert.equal(from.second, 2, "the replacement control scan floor advanced past its picker");
+      assert.deepEqual(from, { first: 0, second: 0 }, "the caller's retained frontier cursors remain immutable");
       order.push("presentation-proof");
     },
   };
@@ -658,6 +658,7 @@ test("sequential command presentation proof retains receipts before an interveni
   await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(rig, from, ["Space"], "replacement-turn");
 
   assert.deepEqual(order, ["second-replacement", "first-command", "presentation-proof", "second-command"]);
+  assert.deepEqual(from, { first: 0, second: 0 });
 });
 
 test("sequential command driver never resurrects a command surface superseded by presentation", async () => {
@@ -1107,7 +1108,8 @@ test("reward leave waits for the exact owned actionable semantic shop surface", 
     localSeat: 0,
     ownerSeat: 0,
     seatsWithInput: [0],
-    ready: { handlerActive: true, awaitingActionInput: false },
+    // The empty reward watcher uses the generic message readiness bit but is explicitly blocked.
+    ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: true },
   };
   evidence.push({ kind: "browser-surface2", observation: rewardObservation });
   evidence.push({

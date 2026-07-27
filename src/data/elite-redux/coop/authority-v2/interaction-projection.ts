@@ -46,7 +46,11 @@ export type CoopV2InteractionProjectionPlan =
   | {
       readonly kind: "ability";
       readonly operationId: string;
-      readonly phaseName: "ErAbilityCapsulePhase" | "ErGreaterAbilityCapsulePhase" | "ErGreaterAbilityRandomizerPhase";
+      readonly phaseName:
+        | "ErAbilityCapsulePhase"
+        | "ErGreaterAbilityCapsulePhase"
+        | "ErGreaterAbilityRandomizerPhase"
+        | "ErDexNavPhase";
       readonly presentation: CoopAbilityPresentationPayload;
     }
   | {
@@ -206,7 +210,9 @@ export function projectionPlanOfCoopV2InteractionEntry(
             ? "ErGreaterAbilityCapsulePhase"
             : presentation.workflow === "greater-randomizer"
               ? "ErGreaterAbilityRandomizerPhase"
-              : null;
+              : presentation.workflow === "dex-nav"
+                ? "ErDexNavPhase"
+                : null;
       return phaseName == null || presentation.pinned !== parsed.pinnedSeq / COOP_ABILITY_ACTION_STRIDE
         ? null
         : { kind: "ability", operationId: control.operationId, phaseName, presentation };

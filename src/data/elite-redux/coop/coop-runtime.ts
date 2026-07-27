@@ -10322,7 +10322,9 @@ function materializeCoopAbilityOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
           ? "ErGreaterAbilityCapsulePhase"
           : presentation?.workflow === "greater-randomizer"
             ? "ErGreaterAbilityRandomizerPhase"
-            : null;
+            : presentation?.workflow === "dex-nav"
+              ? "ErDexNavPhase"
+              : null;
     if (
       parsed == null
       || presentation == null
@@ -10356,6 +10358,7 @@ function materializeCoopAbilityOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
       current?.phaseName === "ErAbilityCapsulePhase"
       || current?.phaseName === "ErGreaterAbilityCapsulePhase"
       || current?.phaseName === "ErGreaterAbilityRandomizerPhase"
+      || current?.phaseName === "ErDexNavPhase"
     ) {
       // A different live ability generation cannot inherit this address. Fail the shared session instead
       // of leaving a retained entry to retry forever or stacking two interactive phases.
@@ -10368,6 +10371,7 @@ function materializeCoopAbilityOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
     phaseManager.tryRemovePhase("ErAbilityCapsulePhase", phase => phase.coopSeq === presentation.pinned);
     phaseManager.tryRemovePhase("ErGreaterAbilityCapsulePhase", phase => phase.coopSeq === presentation.pinned);
     phaseManager.tryRemovePhase("ErGreaterAbilityRandomizerPhase", phase => phase.coopSeq === presentation.pinned);
+    phaseManager.tryRemovePhase("ErDexNavPhase", phase => phase.coopSeq === presentation.pinned);
     const watcher = operation.owner !== runtime.controller.localSeatId;
     const phase = phaseManager.create(expectedPhaseName, presentation.partyIndex, presentation.pinned, watcher) as {
       installCoopV2AbilityPresentation: (operationId: string, presentation: CoopAbilityPresentationPayload) => boolean;
@@ -10891,6 +10895,10 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   if (receive !== "executed" && receive !== "duplicate") {
     return false;
   }
+  // This exact terminal supersedes every presentation-only narration observation for the encounter.
+  // The primary Mystery pin may intentionally survive into a reward/battle successor, so address-live
+  // checks alone cannot retire the old ACK retry; clear it at the ordered terminal boundary.
+  clearCoopGuestMeNarrationLease(runtime);
   // Compatibility waiters (notably the detached Colosseum lease) may still be blocked on 9M. Wake them
   // only AFTER a leave transaction cleared its pin; their boundary fence then exits without mutating.
   // Battle control is never mirrored here because the live replay would otherwise execute it twice.

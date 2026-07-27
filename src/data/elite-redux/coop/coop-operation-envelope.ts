@@ -327,8 +327,10 @@ export interface CoopAbilityPickPayload {
 export interface CoopAbilityPresentationPayload {
   readonly pinned: number;
   readonly partyIndex: number;
-  readonly workflow: "capsule" | "greater-capsule" | "greater-randomizer";
+  readonly workflow: "capsule" | "greater-capsule" | "greater-randomizer" | "dex-nav";
   readonly rolledAbilityIds?: readonly number[] | undefined;
+  /** Literal authority-owned biome pool for Dex Nav; replicas never derive it from local arena state. */
+  readonly candidateSpeciesIds?: readonly number[] | undefined;
   /** Frozen exits captured from the enclosing reward continuation before input opens. */
   readonly returnPlan?: CoopNestedInteractionReturnPlan | undefined;
 }

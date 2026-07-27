@@ -169,7 +169,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   // rosterSync intent is merged host-authoritatively; blocking it skips the guest straight into
   // battle phases before a launch snapshot/currentBattle exists.
   "SelectStarterPhase",
-  "ErDexNavPhase", // per-client dex-nav selection (REVIEW row: acquisitions are host-shared, so this is intent-only)
+  "ErDexNavPhase", // authority-presented nested picker; only the item owner writes its account dex
   "SelectGenderPhase", // account-local one-time gender pick (REVIEW row: per-account, not shared state)
 
   // ── WAVE-1 BOUNDARY-TAIL ALLOWANCE (migration contract §3.3 KEYSTONE) ──

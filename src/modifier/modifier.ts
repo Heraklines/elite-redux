@@ -2812,14 +2812,11 @@ export class ErGreaterAbilityRandomizerModifier extends ConsumablePokemonModifie
  */
 export class ErDexNavModifier extends ConsumableModifier {
   override apply(): boolean {
-    // Co-op (wiring audit): gate the species picker to the item USER (the reward OWNER). The Dex Nav
-    // registers species in the PER-ACCOUNT pokedex, so on the WATCHER - which applies this same
-    // consumable only to keep the reward shop in lockstep - it must NOT open the (drivable) picker nor
-    // grant the watcher free dex entries from the owner's item. Thread the live shop's owner/watcher
-    // flag (the same context the ER ability pickers use) so ErDexNavPhase opens the picker on the owner
-    // and skips it on the watcher. Solo / owner / lockstep => watcher=false => byte-identical.
-    const { watcher } = coopAbilityPickerContext();
-    globalScene.phaseManager.unshiftNew("ErDexNavPhase", watcher);
+    // Dex Nav is a nested authoritative picker just like the ER ability items: both clients queue an
+    // address-bound phase, only the alternating owner writes its per-account dex, and the watcher waits
+    // for the exact immutable result before either reward continuation can advance.
+    const { seq, watcher } = coopAbilityPickerContext();
+    globalScene.phaseManager.unshiftNew("ErDexNavPhase", 0, seq, watcher);
     return true;
   }
 }

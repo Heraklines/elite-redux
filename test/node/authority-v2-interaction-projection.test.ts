@@ -192,6 +192,21 @@ describe("Authority V2 immutable interaction projection", () => {
     expect(projectionPlanOfCoopV2InteractionEntry(entryOf(surface, value))?.kind).toBe(kind);
   });
 
+  it("projects the authority-owned Dex Nav pool onto the exact nested phase", () => {
+    const value = envelope(
+      "ABILITY_PRESENT",
+      { pinned: 3, partyIndex: 0, workflow: "dex-nav", candidateSpeciesIds: [16, 19, 25] },
+      "INTERACTION",
+      1,
+      3 * COOP_ABILITY_ACTION_STRIDE,
+    );
+    expect(projectionPlanOfCoopV2InteractionEntry(entryOf("op:ability", value))).toMatchObject({
+      kind: "ability",
+      phaseName: "ErDexNavPhase",
+      presentation: { workflow: "dex-nav", candidateSpeciesIds: [16, 19, 25] },
+    });
+  });
+
   it("preserves the concrete market subclass and exact remaining stock", () => {
     const value = envelope(
       "SHOP_BUY",

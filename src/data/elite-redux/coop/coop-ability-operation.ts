@@ -261,6 +261,7 @@ export function commitCoopAbilityPresentation(
     readonly partyIndex: number;
     readonly workflow: CoopAbilityPresentationPayload["workflow"];
     readonly rolledAbilityIds?: readonly number[] | undefined;
+    readonly candidateSpeciesIds?: readonly number[] | undefined;
     readonly returnPlan?: CoopAbilityPresentationPayload["returnPlan"];
     readonly localRole: CoopRole;
     readonly wave: number;
@@ -272,6 +273,7 @@ export function commitCoopAbilityPresentation(
     return null;
   }
   const randomizer = params.workflow === "greater-randomizer";
+  const dexNav = params.workflow === "dex-nav";
   if (
     !Number.isSafeInteger(params.pinned)
     || params.pinned < 0
@@ -283,6 +285,12 @@ export function commitCoopAbilityPresentation(
         || !params.rolledAbilityIds.every(id => Number.isSafeInteger(id) && id > 0)
         || new Set(params.rolledAbilityIds).size !== params.rolledAbilityIds.length
       : params.rolledAbilityIds !== undefined)
+    || (dexNav
+      ? !Array.isArray(params.candidateSpeciesIds)
+        || params.candidateSpeciesIds.length < 2
+        || !params.candidateSpeciesIds.every(id => Number.isSafeInteger(id) && id > 0)
+        || new Set(params.candidateSpeciesIds).size !== params.candidateSpeciesIds.length
+      : params.candidateSpeciesIds !== undefined)
     || (params.returnPlan !== undefined && !isCoopNestedInteractionReturnPlan(params.returnPlan))
   ) {
     return null;
@@ -301,6 +309,7 @@ export function commitCoopAbilityPresentation(
         partyIndex: params.partyIndex,
         workflow: params.workflow,
         ...(randomizer ? { rolledAbilityIds: [...(params.rolledAbilityIds ?? [])] } : {}),
+        ...(dexNav ? { candidateSpeciesIds: [...(params.candidateSpeciesIds ?? [])] } : {}),
         ...(params.returnPlan == null ? {} : { returnPlan: structuredClone(params.returnPlan) }),
       } satisfies CoopAbilityPresentationPayload,
     };
@@ -682,6 +691,7 @@ function applyJournaledAbilityEnvelope(
   } else {
     const payload = operation.payload as CoopAbilityPresentationPayload | undefined;
     const randomizer = payload?.workflow === "greater-randomizer";
+    const dexNav = payload?.workflow === "dex-nav";
     if (
       payload == null
       || !Number.isSafeInteger(payload.pinned)
@@ -690,13 +700,20 @@ function applyJournaledAbilityEnvelope(
       || payload.partyIndex < 0
       || (payload.workflow !== "capsule"
         && payload.workflow !== "greater-capsule"
-        && payload.workflow !== "greater-randomizer")
+        && payload.workflow !== "greater-randomizer"
+        && payload.workflow !== "dex-nav")
       || (randomizer
         ? !Array.isArray(payload.rolledAbilityIds)
           || payload.rolledAbilityIds.length !== 4
           || !payload.rolledAbilityIds.every(id => Number.isSafeInteger(id) && id > 0)
           || new Set(payload.rolledAbilityIds).size !== payload.rolledAbilityIds.length
         : payload.rolledAbilityIds !== undefined)
+      || (dexNav
+        ? !Array.isArray(payload.candidateSpeciesIds)
+          || payload.candidateSpeciesIds.length < 2
+          || !payload.candidateSpeciesIds.every(id => Number.isSafeInteger(id) && id > 0)
+          || new Set(payload.candidateSpeciesIds).size !== payload.candidateSpeciesIds.length
+        : payload.candidateSpeciesIds !== undefined)
       || (payload.returnPlan !== undefined && !isCoopNestedInteractionReturnPlan(payload.returnPlan))
     ) {
       return "rejected";

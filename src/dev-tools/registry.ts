@@ -211,7 +211,7 @@ export function getCoopBrowserCommanderFixtureStarters(): Starter[] | null {
 /**
  * Materialize the deterministic public faint-replacement precondition in the normal starter UI.
  *
- * The configured owner visibly submits a Magikarp lead with Healing Wish plus a legal reserve.
+ * The configured owner visibly submits a Magikarp lead with Healing Wish plus two legal reserves.
  * Healing Wish makes the first real public command self-faint without depending on a random wave-1
  * enemy, while the other seat receives a one-mon attacking team. The exact build flag and per-page
  * URL value keep this CI-only fixture unreachable in normal local, staging, and production bundles.
@@ -227,14 +227,12 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
   const specs =
     fixture === "faint-owner"
       ? [
-          // MEMENTO (not HEALING_WISH): an UNCONDITIONAL self-faint on hit (SacrificialAttrOnHit) with no
-          // party-margin dependency. HEALING_WISH's condition (activePlayerParty > getBattlerCount) is at
-          // the exact margin for the 3-mon fixture team vs a 2-battler double, so it intermittently failed
-          // ("But it failed!" -> no self-faint -> replacementCount=0; public journey run 29890984177). Memento
-          // hits the live enemy on the won turn and always faints the user, mirroring the game-over fixture's
-          // proven lone-Memento pattern, so the faint replacement is deterministic.
-          { speciesId: SpeciesId.MAGIKARP, moveset: [MoveId.MEMENTO] },
+          // Healing Wish is self-targeting and executes before the attacking partners erase both enemies.
+          // Memento required a live target, so on a won turn it could emit with no targets and never faint.
+          // Two reserves keep Healing Wish's party-margin condition strictly true in the two-battler fixture.
+          { speciesId: SpeciesId.MAGIKARP, moveset: [MoveId.HEALING_WISH] },
           { speciesId: SpeciesId.SEEL, moveset: [MoveId.WATER_SPOUT] },
+          { speciesId: SpeciesId.RATTATA, moveset: [MoveId.TACKLE] },
         ]
       : [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }];
   return specs.map(({ speciesId, moveset }) => ({

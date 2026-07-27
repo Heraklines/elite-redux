@@ -276,13 +276,20 @@ export const COOP_V2_INTERACTION_REGISTRY = {
       && value.partyIndex >= 0
       && (value.workflow === "capsule"
         || value.workflow === "greater-capsule"
-        || value.workflow === "greater-randomizer")
+        || value.workflow === "greater-randomizer"
+        || value.workflow === "dex-nav")
       && (value.workflow === "greater-randomizer"
         ? integerArray(value.rolledAbilityIds)
           && value.rolledAbilityIds.length === 4
           && value.rolledAbilityIds.every(id => id > 0)
           && new Set(value.rolledAbilityIds).size === value.rolledAbilityIds.length
         : value.rolledAbilityIds === undefined)
+      && (value.workflow === "dex-nav"
+        ? integerArray(value.candidateSpeciesIds)
+          && value.candidateSpeciesIds.length >= 2
+          && value.candidateSpeciesIds.every(id => id > 0)
+          && new Set(value.candidateSpeciesIds).size === value.candidateSpeciesIds.length
+        : value.candidateSpeciesIds === undefined)
       && (value.returnPlan === undefined || isCoopNestedInteractionReturnPlan(value.returnPlan)),
   },
   ABILITY_PICK: {

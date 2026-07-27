@@ -72,6 +72,8 @@ export const COOP_ABILITY_OP = {
   GCAP_RUN2: 14,
   /** Greater Randomizer: replace a slot with the host's LITERAL rolled abilityId. data = [GRAND, slot, abilityId]. */
   GRAND: 15,
+  /** Dex Nav: register the owner's two literal species ids. data = [DEX_NAV, speciesA, speciesB]. */
+  DEX_NAV: 16,
 } as const;
 
 /**
