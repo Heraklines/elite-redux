@@ -154,6 +154,45 @@ describe("#806 stall watchdog end-to-end (keepalive + mutual-wait detection + re
     );
   });
 
+  it("retracts a resolved wait claim before a stale peer beat can trigger recovery", async () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const hostT = new WebRtcTransport("host", a);
+    const guestT = new WebRtcTransport("guest", b);
+    const hostRelay = new CoopInteractionRelay(hostT);
+    const guestRelay = new CoopInteractionRelay(guestT);
+    const stubRuntime = { controller: { versionMismatch: false } } as unknown as CoopRuntime;
+
+    // The renderer entered its wait earlier, as in a slow replacement/presentation replay.
+    const guestWait = guestRelay.awaitInteractionChoice(555_001, 1_200_000);
+    await vi.advanceTimersByTimeAsync(13_000);
+    wireCoopStallWatchdog(hostT, hostRelay, idleStream, stubRuntime);
+    wireCoopStallWatchdog(guestT, guestRelay, idleStream, stubRuntime);
+    const hostWait = hostRelay.awaitInteractionChoice(555_002, 1_200_000);
+    let hostResolved = false;
+    void hostWait.then(() => {
+      hostResolved = true;
+    });
+
+    // Guest has emitted positive beats for its old wait; host is one second short of its trigger.
+    await vi.advanceTimersByTimeAsync(19_000);
+    hostRelay.sendInteractionChoice(555_001, "test", 1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await guestWait)?.choice).toBe(1);
+
+    // At the next tick host can still observe the previous positive sample before guest's timer retracts it.
+    // A single stale sample must only arm confirmation, never cancel an otherwise healthy one-sided wait.
+    await vi.advanceTimersByTimeAsync(11_000);
+    expect(hostResolved, "the host wait survives the retired guest claim").toBe(false);
+    expect(getCoopCausalTrace().some(event => event.stage === "stall-detected")).toBe(false);
+
+    guestRelay.sendInteractionChoice(555_002, "test", 2);
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await hostWait)?.choice).toBe(2);
+  });
+
   it("#857 R2: idle keepalive pings are NOT a deadlock signal (idle channel + pings -> watchdog never fires)", async () => {
     const a = new MockWire();
     const b = new MockWire();

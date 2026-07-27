@@ -4612,3 +4612,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The failure-first stream regression now proves the source tick survives split consumption, and the fast contract pins
   provenance-based rejection plus the absence of premature control-apply retirement. Local policy-safe evidence is
   93/93 Authority V2 contracts; engine and two-browser proof remain remote-only.
+
+## 2026-07-27 - Retired waits retract stale stall claims
+
+- Focused gate `30269276702` validates the provenance correction across every selected runtime shard: static, B7, S5,
+  P1, T4, and C1 are green, including the previously stuck wave-2 transition. Lane A passed 116/117 tests; its only red
+  was a new optional-encounter assertion whose fixture had not supplied an encounter. The regression now supplies and
+  verifies the complete immutable descriptor rather than expecting transport to invent one.
+- The exact faint journey `30265194132` was mechanically and visually synchronized through the wave-2 command screen,
+  but exposed a watchdog false positive. The guest retired its replacement wait, committed the wave and reward, and
+  opened the shop; one second later the host interpreted the guest's last positive beat from the retired wait as proof
+  of a mutual deadlock. The guest's shop rendezvous arrived three milliseconds after that recovery diagnosis.
+- A positive stall beat is now explicitly retracted with a zero beat whenever its local wait resolves, falls below the
+  reporting threshold, or becomes a protected V2 human-input lease. Mutual recovery also requires the condition to
+  persist across two watchdog samples, so a timer may no longer join two unrelated waits into a false deadlock. A
+  failure-first fake-timer regression recreates the crossing exactly while preserving normal confirmed-deadlock
+  recovery. Co-op Vitest and the exact two-browser faint replay remain remote-only; no deployment occurred.

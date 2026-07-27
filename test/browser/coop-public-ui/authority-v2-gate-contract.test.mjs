@@ -211,7 +211,18 @@ test("the stall watchdog preserves an exact V2 human-input lease", () => {
   const watchdogStart = coopRuntime.indexOf("export function wireCoopStallWatchdog");
   const watchdogEnd = coopRuntime.indexOf("function wireCoopDisconnectReaction", watchdogStart);
   assert.ok(watchdogStart >= 0 && watchdogEnd > watchdogStart, "the complete stall watchdog source exists");
-  assert.match(coopRuntime.slice(watchdogStart, watchdogEnd), /hasCoopV2HumanDeliberationLease\(runtime\)/u);
+  const watchdog = coopRuntime.slice(watchdogStart, watchdogEnd);
+  assert.match(watchdog, /hasCoopV2HumanDeliberationLease\(runtime\)/u);
+  assert.match(
+    watchdog,
+    /const clearLocalStallClaim = \(\) => \{[\s\S]*waitingMs: 0[\s\S]*localStallClaimOpen = false/u,
+    "a resolved local wait explicitly retracts its positive peer-visible stall claim",
+  );
+  assert.match(
+    watchdog,
+    /mutualStallCandidateAt == null[\s\S]*mutualStallCandidateAt = Date\.now\(\)[\s\S]*Date\.now\(\) - mutualStallCandidateAt >= COOP_STALL_TICK_MS/u,
+    "mutual recovery requires the same condition on two watchdog samples",
+  );
 });
 
 test("operation state transactions cross one engine-free composition seam", () => {

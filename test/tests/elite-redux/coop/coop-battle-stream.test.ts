@@ -947,8 +947,14 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     const hostStream = new CoopBattleStreamer(host);
     const guestStream = new CoopBattleStreamer(guest);
     const compatibilityState = emptyAuthoritativeState(33, 1, 201);
+    const encounter = {
+      battleType: 3,
+      mysteryEncounterType: 57,
+      formatId: "triple",
+      enemyLevels: [5],
+    };
 
-    hostStream.sendEnemyParty(33, [{ fieldIndex: 0, data: { speciesId: 389 } }], 57, 3, compatibilityState);
+    hostStream.sendEnemyParty(33, [{ fieldIndex: 0, data: { speciesId: 389 } }], 57, 3, compatibilityState, encounter);
     await flushWire();
 
     expect(guestStream.consumeEnemyPartyState(33)).toEqual(compatibilityState);
@@ -956,7 +962,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(remainder.state, "presentation already consumed only the state projection").toBeUndefined();
     expect(remainder.partyStateTick, "the party keeps its immutable source tick").toBe(201);
     expect(remainder.enemies?.[0]?.data.speciesId).toBe(389);
-    expect(remainder.encounter?.battleType).toBe(3);
+    expect(remainder.encounter).toEqual(encounter);
   });
 
   it("bounds unconsumed event-only wave states to the latest four waves", async () => {

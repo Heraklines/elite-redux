@@ -3106,6 +3106,8 @@ export function wireCoopStallWatchdog(
   runtime: CoopRuntime,
 ): void {
   let peerBeat: { ms: number; at: number } | null = null;
+  let localStallClaimOpen = false;
+  let mutualStallCandidateAt: number | null = null;
   let lastRecoveryAt = 0;
   const asymEscalator = createCoopAsymmetricEscalator({
     triggerMs: COOP_STALL_TRIGGER_MS,
@@ -3119,6 +3121,16 @@ export function wireCoopStallWatchdog(
       peerBeat = { ms: msg.waitingMs, at: Date.now() };
     }
   });
+  const clearLocalStallClaim = () => {
+    if (!localStallClaimOpen) {
+      return;
+    }
+    // A positive beat is a time-bounded claim about one currently-open wait, not a sticky peer state. If
+    // that wait resolves or becomes a protected human lease, explicitly retract it before the peer can use
+    // the previous sample to recover a newly-progressing renderer (the faint -> wave -> shop crossing).
+    transport.send({ t: "stallBeat", waitingMs: 0 });
+    localStallClaimOpen = false;
+  };
   const timer = setInterval(() => {
     try {
       const point = readCoopBattlePoint();
@@ -3171,10 +3183,15 @@ export function wireCoopStallWatchdog(
         || activeV2Control?.kind === "REPLACEMENT"
         || hasCoopV2HumanDeliberationLease(runtime)
       ) {
+        clearLocalStallClaim();
+        mutualStallCandidateAt = null;
         return;
       }
       if (localMs >= COOP_STALL_REPORT_MS) {
         transport.send({ t: "stallBeat", waitingMs: localMs });
+        localStallClaimOpen = true;
+      } else {
+        clearLocalStallClaim();
       }
       const peerFresh = peerBeat != null && Date.now() - peerBeat.at < COOP_STALL_TICK_MS * 2.5;
       // ASYMMETRIC ESCALATION: the local side is stalled (network wait OR a registered machine wait like a
@@ -3205,13 +3222,24 @@ export function wireCoopStallWatchdog(
         );
         return;
       }
-      const mutualStall =
+      const mutualStallObserved =
         localMs >= COOP_STALL_TRIGGER_MS
         && peerFresh
         && (peerBeat?.ms ?? 0) >= COOP_STALL_TRIGGER_MS
         && Date.now() - lastRecoveryAt > COOP_STALL_RECOVERY_COOLDOWN_MS;
+      let mutualStall = false;
+      if (!mutualStallObserved) {
+        mutualStallCandidateAt = null;
+      } else if (mutualStallCandidateAt == null) {
+        // One sample can straddle two different waits: the peer may have just retired its old wait while
+        // our timer observes its prior positive beat. Demand the same mutual condition on the next tick.
+        mutualStallCandidateAt = Date.now();
+      } else {
+        mutualStall = Date.now() - mutualStallCandidateAt >= COOP_STALL_TICK_MS;
+      }
       if (mutualStall || asymAction === "recover") {
         lastRecoveryAt = Date.now();
+        mutualStallCandidateAt = null;
         const recoveryId = `stall:e${runtime.controller.sessionEpoch ?? 0}:g${coopSessionGeneration()}:w${point.wave}:t${point.turn}`;
         recordCoopCausalEvent({
           domain: "recovery",
