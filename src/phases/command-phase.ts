@@ -38,6 +38,7 @@ import {
   isCoopSharedTerminalFrozen,
   isCoopV2CommandAdmissionFrozen,
   isCoopV2CommandEntryPresentationActive,
+  isCoopV2ControlCutoverActive,
   isCoopV2ControlSurfaceStartFrozen,
   isShowdownSyncSession,
   isVersusSession,
@@ -1218,14 +1219,12 @@ export class CommandPhase extends FieldPhase {
       if (!globalScene.gameMode.isCoop || getCoopRuntime()?.spoof != null) {
         return null;
       }
-      // authority-v2 turn CUTOVER note: the successor COMMAND ADDRESS is STATED by the host and PROJECTED
-      // (frozen decision 4 - the guest never DERIVES its next command from this barrier). The reciprocal
-      // next-command rendezvous below is pure PACING, NOT authority: it only ARRIVEs + AWAITs the partner at
-      // the shared cmd:<wave>:<turn> point and never chooses a command or an address. An earlier cutover pass
-      // short-circuited it entirely, which dropped the reciprocal faint-replacement/command lock (#839) - the
-      // faster seat then raced ahead of a partner mid-replay (the observed missing-arrival class). So it MUST
-      // keep running under cutover; it stays a no-op / byte-identical outside a live co-op run (the guards
-      // below) and re-introduces no second authority for the command content.
+      // Authority V2 states and proves the exact COMMAND ADDRESS before this function runs. This rendezvous
+      // remains host-side presentation pacing only: both seats still ARRIVE, but the authoritative guest must
+      // never AWAIT here. Field CommandPhases are sequential, so when the guest owns the earlier field slot,
+      // waiting for the host's later-slot arrival forms a dependency cycle: the host cannot reach that slot
+      // until it receives the guest's earlier command. The host retains the #839 replacement/command pacing
+      // lock; the guest's exact V2 control proof is the safe release condition on either ownership layout.
       const rendezvous = getCoopRendezvous();
       if (rendezvous == null) {
         return null;
@@ -1256,6 +1255,11 @@ export class CommandPhase extends FieldPhase {
         .some(p => p != null && p.coopOwner === partnerRole && !p.isFainted() && p.isAllowedInBattle());
       if (!partnerHasCommandable) {
         coopLog("rendezvous", `next-command barrier ${point} ARRIVE-ONLY (partner half exhausted, no await)`);
+        rendezvous.arrive(point);
+        return null;
+      }
+      if (isCoopAuthoritativeGuest() && isCoopV2ControlCutoverActive()) {
+        coopLog("rendezvous", `next-command barrier ${point} ARRIVE-ONLY (Authority V2 control installed)`);
         rendezvous.arrive(point);
         return null;
       }

@@ -949,6 +949,23 @@ test("the reciprocal command continuation resumes only in its captured runtime a
   );
 });
 
+test("an exact Authority V2 guest command control arrives without waiting on a later sequential slot", () => {
+  const barrierStart = commandPhase.indexOf("private coopNextCommandBarrier");
+  const barrierEnd = commandPhase.indexOf("private queueFightErrorMessage", barrierStart);
+  assert.ok(barrierStart >= 0 && barrierEnd > barrierStart, "the command rendezvous source slice is present");
+  const barrier = commandPhase.slice(barrierStart, barrierEnd);
+  assert.match(
+    barrier,
+    /if \(isCoopAuthoritativeGuest\(\) && isCoopV2ControlCutoverActive\(\)\) \{\s*coopLog\([\s\S]*?rendezvous\.arrive\(point\);\s*return null;\s*\}/u,
+    "the authoritative guest still announces its exact command point but cannot deadlock on host arrival",
+  );
+  assert.ok(
+    barrier.indexOf("isCoopAuthoritativeGuest() && isCoopV2ControlCutoverActive()")
+      < barrier.indexOf("rendezvous.hasPartnerArrived(point)"),
+    "the V2 guest arrive-only release must run before every reciprocal await path",
+  );
+});
+
 test("interaction DATA cannot wait on a successor phase that ordinary V2 projection must create", () => {
   const materialStart = coopRuntime.indexOf("function materializeCoopMeOperationFromOp(");
   const materialEnd = coopRuntime.indexOf("\ntype CoopV2InteractionLiveMaterializer", materialStart);

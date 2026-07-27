@@ -4647,3 +4647,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Policy-safe local evidence is clean: the Authority V2 source contract passes 93/93, changed-file Biome and
   `git diff --check` pass, and TypeScript reports 215 inherited errors with zero in the changed files. Engine and
   two-browser replay proof remain GitHub-hosted; no deployment occurred.
+
+## 2026-07-27 - V2 guest command control cannot deadlock on sequential field ownership
+
+- The exact market-wide-lens browser artifacts reproduced the testers' live "partner is choosing a move" stall after
+  a successful guest-owned Mystery. Both replicas had applied the complete wave-2/t1 command frontier at revision 10,
+  but the encounter assigned the guest to field 0 and the host to field 1. The guest parked its already-proven field-0
+  CommandPhase on the legacy reciprocal rendezvous; the host could not reach its later field-1 arrival until it received
+  the guest's field-0 command. That dependency cycle is why the common host-field-0 fixture and prior soaks missed it.
+- Under the complete Authority V2 control cutover, the authoritative guest now announces the exact command rendezvous
+  point without awaiting it. This happens only after the command ledger has proven the stated owner, actor, wave, turn,
+  and real installed CommandPhase. Host-side waiting remains intact for replacement/presentation pacing, so the #839
+  protection is preserved in both ownership layouts while the obsolete guest wait can no longer seal its own command.
+- A source contract pins ARRIVE-ONLY before every reciprocal await path. Policy-compliant local verification remains
+  source/static only; the exact reversed-ownership engine and two-browser replays are dispatched to GitHub-hosted
+  runners, with no local co-op Vitest/browser execution and no deployment.
