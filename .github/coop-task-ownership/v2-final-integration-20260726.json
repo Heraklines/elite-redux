@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "2086e7558c74c3548ef6e3aabb8f4888b7d854f8",
+  "baseSha": "d95c887eb36353c0835f90b6c8fbcef8e74cd7c9",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -188,7 +188,5 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": [
-    "src/data/elite-redux/coop/coop-operation-envelope.ts"
-  ]
+  "lockedSchemaFiles": []
 }

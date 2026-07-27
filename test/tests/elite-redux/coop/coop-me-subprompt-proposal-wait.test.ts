@@ -79,6 +79,15 @@ const STATE: CoopAuthoritativeBattleStateV1 = {
 /** The guest owns the ME (odd counter); the pinned pump ordinal the presentation was minted under. */
 const ME_PINNED = 3;
 
+const ME_INTRO_VISUALS = {
+  enterFromRight: false,
+  x: 228,
+  y: 76,
+  alpha: 1,
+  visible: true,
+  spriteConfigs: [{ spriteKey: "global_trade_system", fileRoot: "mystery-encounters", hasShadow: true }],
+} as const;
+
 type Presentation = Extract<CoopInteractionOutcome, { k: "mePresent" }>;
 
 type MysteryPlan = Extract<NonNullable<ReturnType<typeof projectionPlanOfCoopV2InteractionEntry>>, { kind: "mystery" }>;
@@ -105,7 +114,7 @@ function meControlAndPlan(presentation: Presentation): {
       kind,
       owner,
       status: "applied",
-      payload: { present: true, mysteryEncounterType: 6, presentation },
+      payload: { present: true, mysteryEncounterType: 6, introVisuals: ME_INTRO_VISUALS, presentation },
     },
     authoritativeState: STATE,
   };

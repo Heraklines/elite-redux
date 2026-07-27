@@ -213,11 +213,12 @@ describe("ordered-wait local presentation lease", () => {
     ).toBe(false);
   });
 
-  it("admits only the exact next-turn BattleEnd message needed to reach an allowed wave successor", () => {
+  it("admits only the exact normalized or next-turn BattleEnd message needed to reach an allowed wave successor", () => {
     const turnWait = successorWait({
       afterOperationId: "turn-commit-w3-t7",
       wave: 3,
-      turn: 7,
+      // deferredCoopV2WaveSuccessorWait already normalizes the turn-7 commit to settlement turn 8.
+      turn: 8,
       allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
       allowNextWaveStart: false,
     });
@@ -231,6 +232,10 @@ describe("ordered-wait local presentation lease", () => {
 
     expect(successorWaitAllowsLocalPresentationInput(turnWait, exactBattleEndMessage)).toBe(true);
     expect(
+      successorWaitAllowsLocalPresentationInput({ ...turnWait, turn: 7 }, exactBattleEndMessage),
+      "a replacement-origin wait may still name the resolving turn and settle exactly once at N+1",
+    ).toBe(true);
+    expect(
       successorWaitAllowsLocalPresentationInput(
         { ...turnWait, allowedKinds: ["CONTROL_COMMIT", "TERMINAL_COMMIT"] },
         exactBattleEndMessage,
@@ -239,7 +244,7 @@ describe("ordered-wait local presentation lease", () => {
     expect(
       successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, phaseName: "PartyUiPhase" }),
     ).toBe(false);
-    expect(successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, turn: 9 })).toBe(false);
+    expect(successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, turn: 10 })).toBe(false);
     expect(successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, wave: 4 })).toBe(false);
     expect(
       successorWaitAllowsLocalPresentationInput(turnWait, {
