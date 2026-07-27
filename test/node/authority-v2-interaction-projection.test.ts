@@ -146,7 +146,11 @@ describe("Authority V2 immutable interaction projection", () => {
       "op:me",
       envelope(
         "ME_PRESENT",
-        { present: true, presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: ["A"] } },
+        {
+          present: true,
+          mysteryEncounterType: 6,
+          presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: ["A"] },
+        },
         "MYSTERY_ENCOUNTER",
         0,
         (COOP_ME_PUMP_SEQ_BASE + 3) * 8000,

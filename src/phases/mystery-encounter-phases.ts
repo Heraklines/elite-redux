@@ -580,12 +580,18 @@ export class MysteryEncounterPhase extends Phase {
       // #862). Host-driven regardless of who owns the ME (the host is the sole engine, #693). No-op when
       // the flag is OFF; the legacy presentation stream above is the fallback and stays live either way.
       const pinned = coopMeInteractionStartValue();
+      const mysteryEncounterType =
+        globalScene.currentBattle?.mysteryEncounter?.encounterType ?? globalScene.currentBattle?.mysteryEncounterType;
       const operationId = commitMeOwnerIntent({
         kind: "ME_PRESENT",
         seq: seqMe,
         pinned,
         step: nextCoopMePresentationStep(pinned),
-        payload: { present: true, presentation: present },
+        payload: {
+          present: true,
+          ...(mysteryEncounterType == null ? {} : { mysteryEncounterType }),
+          presentation: present,
+        },
         localRole: getCoopController()?.role ?? "host",
         wave: globalScene.currentBattle?.waveIndex ?? -1,
         turn: COOP_ME_AUTHORITY_TURN,

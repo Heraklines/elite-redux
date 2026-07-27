@@ -259,6 +259,7 @@ describe("complete retained Mystery terminal transaction", () => {
       step: 0,
       payload: {
         present: true,
+        mysteryEncounterType: 6,
         presentation: { k: "mePresent" as const, tokens: {}, meetsReqs: [], labels: [] },
       },
       localRole: "host" as const,

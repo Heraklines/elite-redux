@@ -147,12 +147,18 @@ function commitAndPublishMePresentation(
   presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
 ): boolean {
   const pinned = coopMeInteractionStartValue();
+  const mysteryEncounterType =
+    globalScene.currentBattle?.mysteryEncounter?.encounterType ?? globalScene.currentBattle?.mysteryEncounterType;
   const operationId = commitMeOwnerIntent({
     kind: "ME_PRESENT",
     seq,
     pinned,
     step: nextCoopMePresentationStep(pinned),
-    payload: { present: true, presentation },
+    payload: {
+      present: true,
+      ...(mysteryEncounterType == null ? {} : { mysteryEncounterType }),
+      presentation,
+    },
     localRole: getCoopController()?.role ?? "host",
     wave: globalScene.currentBattle?.waveIndex ?? -1,
     turn: 0,

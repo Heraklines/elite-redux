@@ -4949,6 +4949,38 @@ function prepareCoopV2InteractionStateMaterialConsumer(entry: CoopAuthorityEntry
   if (stateWave === currentWave) {
     return true;
   }
+  if (stateWave + 1 === currentWave) {
+    // Crossroads and World-Map phases retain the completed source wave even if the renderer's ambient
+    // Battle object has already advanced. Admit that older result only through the exact still-live phase
+    // generation and operation address. This is not a generic stale-state escape hatch: every other
+    // interaction, a replaced phase, a different operation, or a wider wave gap remains fail-closed.
+    const operationKind = material.envelope.pendingOperation?.kind;
+    const phase = globalScene.phaseManager?.getCurrentPhase() as
+      | {
+          is?: (phaseName: string) => boolean;
+          coopV2ControlOperationId?: string | null;
+          requireCoopSourceWave?: () => number;
+        }
+      | undefined;
+    const expectedPhaseName =
+      operationKind === "CROSSROADS_PICK"
+        ? "ErCrossroadsPhase"
+        : operationKind === "BIOME_PICK"
+          ? "SelectBiomePhase"
+          : null;
+    if (
+      expectedPhaseName != null
+      && phase?.is?.(expectedPhaseName) === true
+      && phase.coopV2ControlOperationId === entry.operationId
+    ) {
+      try {
+        return phase.requireCoopSourceWave?.() === stateWave;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
   if (stateWave !== currentWave + 1) {
     return false;
   }
@@ -10827,6 +10859,9 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
       || pinned < 0
       || pinned >= 100_000
       || payload?.present !== true
+      || typeof payload.mysteryEncounterType !== "number"
+      || !Number.isSafeInteger(payload.mysteryEncounterType)
+      || payload.mysteryEncounterType < 0
       || payload.presentation?.k !== "mePresent"
     ) {
       return false;
@@ -10837,6 +10872,16 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
         return false;
       }
     } else if (activePin !== pinned) {
+      return false;
+    }
+    const battle = globalScene.currentBattle;
+    const mysteryEncounterType = payload.mysteryEncounterType;
+    const existingMysteryEncounterType = battle?.mysteryEncounter?.encounterType ?? battle?.mysteryEncounterType;
+    if (
+      battle == null
+      || battle.waveIndex !== envelope.wave
+      || (existingMysteryEncounterType != null && existingMysteryEncounterType !== mysteryEncounterType)
+    ) {
       return false;
     }
     const immutableState = structuredClone(envelope.authoritativeState);
@@ -10880,6 +10925,10 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     if (getCoopMeBattleInteractionCounter() !== pinned) {
       setCoopMeBattleInteractionCounter(pinned);
     }
+    // Install only the host-stated descriptor. Constructing `mysteryEncounter` here would run a second
+    // mechanics engine on the renderer; CoopReplayMePhase rehydrates a presentation shell only if the
+    // committed terminal later enters a Mystery battle.
+    battle.mysteryEncounterType = mysteryEncounterType;
     // DATA application deliberately does not require or install a phase. The ordered V2 control projector
     // reconstructs CoopReplayMePhase from this same immutable entry and separately proves its real handler.
     // This removes the former circular dependency (DATA waited for the phase; projection waited for DATA).

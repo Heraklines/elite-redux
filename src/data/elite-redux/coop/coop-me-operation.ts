@@ -1013,6 +1013,19 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
   }
   try {
     const s = state();
+    if (params.localRole === "host" && params.kind === "ME_PRESENT" && isCoopV2InteractionCutoverActive()) {
+      const presentation = params.payload as CoopMePresentPayload;
+      if (
+        presentation.present !== true
+        || typeof presentation.mysteryEncounterType !== "number"
+        || !Number.isSafeInteger(presentation.mysteryEncounterType)
+        || presentation.mysteryEncounterType < 0
+        || presentation.presentation?.k !== "mePresent"
+      ) {
+        coopWarn("me", "ME_PRESENT commit rejected: immutable encounter identity or presentation is incomplete");
+        return null;
+      }
+    }
     if (params.kind === "ME_TERMINAL" && !isCompleteCoopMeTerminalPayload(params.payload)) {
       const value = params.payload as Partial<CoopMeTerminalPayload>;
       const outcome =

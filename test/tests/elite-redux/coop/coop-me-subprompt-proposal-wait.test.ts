@@ -105,7 +105,7 @@ function meControlAndPlan(presentation: Presentation): {
       kind,
       owner,
       status: "applied",
-      payload: { present: true, presentation },
+      payload: { present: true, mysteryEncounterType: 6, presentation },
     },
     authoritativeState: STATE,
   };

@@ -244,12 +244,18 @@ export function coopQuizHostStreamSession(questions: readonly unknown[], stopOnW
   };
   coopLog("me", `quiz HOST stream session count=${wireQuestions.length} stopOnWrong=${stopOnWrong} seq=${seq} (#818)`);
   const pinned = coopMeInteractionStartValue();
+  const mysteryEncounterType =
+    globalScene.currentBattle?.mysteryEncounter?.encounterType ?? globalScene.currentBattle?.mysteryEncounterType;
   const operationId = commitMeOwnerIntent({
     kind: "ME_PRESENT",
     seq,
     pinned,
     step: nextCoopMePresentationStep(pinned),
-    payload: { present: true, presentation: outcome },
+    payload: {
+      present: true,
+      ...(mysteryEncounterType == null ? {} : { mysteryEncounterType }),
+      presentation: outcome,
+    },
     localRole: getCoopController()?.role ?? "host",
     wave: globalScene.currentBattle?.waveIndex ?? -1,
     turn: 0,

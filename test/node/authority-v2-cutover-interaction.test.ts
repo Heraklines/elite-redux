@@ -279,7 +279,11 @@ describe("Authority V2 interaction cutover", () => {
     const pinned = 1;
     const value = envelope(
       "ME_PRESENT",
-      { present: true, presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: [] } },
+      {
+        present: true,
+        mysteryEncounterType: 6,
+        presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: [] },
+      },
       "MYSTERY_ENCOUNTER",
       0,
       (COOP_ME_PUMP_SEQ_BASE + pinned) * 8000,
@@ -298,6 +302,18 @@ describe("Authority V2 interaction cutover", () => {
         envelope: value,
       }),
     ).not.toBeNull();
+  });
+
+  it("rejects a Mystery presentation that omits its immutable encounter identity", () => {
+    const pinned = 1;
+    const value = envelope(
+      "ME_PRESENT",
+      { present: true, presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: [] } },
+      "MYSTERY_ENCOUNTER",
+      0,
+      (COOP_ME_PUMP_SEQ_BASE + pinned) * 8000,
+    );
+    expect(buildCoopV2InteractionEnvelopeEntry({ context: FRAME, surfaceClass: "op:me", envelope: value })).toBeNull();
   });
 
   it("authorizes the exact chained biome picker after a Crossroads Leave", () => {
@@ -325,6 +341,7 @@ describe("Authority V2 interaction cutover", () => {
       "ME_PRESENT",
       {
         present: true,
+        mysteryEncounterType: 6,
         presentation: {
           k: "mePresent",
           tokens: {},

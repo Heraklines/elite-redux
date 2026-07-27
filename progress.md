@@ -4557,3 +4557,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The prior candidate's real two-browser faint/replacement journey `30251023444` passed end-to-end. The new dirty-lane
   failure is therefore narrower than generic replacement handling and was found only because the campaign exercised a
   surviving-wave, remote-owned faint while the dedicated faint journey covered a different replacement topology.
+
+## 2026-07-27 - Mystery identity and completed-wave interaction material are address-exact
+
+- Exact gate `30254593293` proved the signed Mystery bridge creates the correct destination Battle and replay phase,
+  but also exposed that `ME_PRESENT` carried labels and a battle checkpoint without the host-selected encounter type.
+  The renderer therefore had no authoritative identity from which to render the event. Every host presentation now
+  carries that immutable descriptor; V2 rejects an absent descriptor before revision construction, and the guest
+  installs only the type without constructing a second local Mystery mechanics engine.
+- The same gate caught the opposite wave race at Crossroads. A result retains its completed source-wave address while
+  the renderer can already expose the next Battle object. Cross-wave admission now accepts that older result only when
+  the live Crossroads/Map phase proves the exact operation ID and exact retained source wave. Arbitrary stale entries,
+  replaced phase generations, wider gaps, and all other interaction kinds remain fail-closed.
+- Local work remains policy-limited to source/evidence, formatting, ownership, and changed-file type checks. Co-op
+  Vitest and two-browser qualification are dispatched only on GitHub-hosted runners; no deployment occurred.
+- The old-tip faint journey `30254602335` also proved all 16 current-epoch combat presentation events matched exactly
+  (host authority and guest renderer, sequence 0 through 15), but its oracle sliced the two browsers at unrelated
+  wall-clock evidence cursors and reported only the guest's final two receipts. Shared-command proofs now compare the
+  complete canonical current-epoch prefix, which is stronger and insensitive to independent renderer scheduling.

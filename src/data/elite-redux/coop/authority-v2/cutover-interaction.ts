@@ -404,7 +404,9 @@ export const COOP_V2_INTERACTION_REGISTRY = {
     validatePayload: value =>
       isPlainObject(value)
       && typeof value.present === "boolean"
-      && (value.presentation === undefined || outcome(value.presentation)),
+      && (value.present
+        ? integer(value.mysteryEncounterType) && value.mysteryEncounterType >= 0 && outcome(value.presentation)
+        : value.mysteryEncounterType === undefined && value.presentation === undefined),
   },
   ME_SUB: {
     surfaceClass: "op:me",

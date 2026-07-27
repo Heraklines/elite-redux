@@ -541,6 +541,11 @@ export interface CoopMeButtonPayload {
 export interface CoopMePresentPayload {
   /** Whether the host has an ME this wave (the #862 host-authoritative presence verdict; false = the guest self-rolled a phantom). */
   readonly present: boolean;
+  /**
+   * Exact host-selected MysteryEncounterType. A presentation-only replica must never roll or initialize
+   * its own encounter engine merely to discover this identity. Required whenever `present` is true.
+   */
+  readonly mysteryEncounterType?: number;
   /** Exact host-rendered presentation. Required when `present` is true so journal replay never re-derives from guest state. */
   readonly presentation?: Extract<CoopInteractionOutcome, { k: "mePresent" }>;
 }

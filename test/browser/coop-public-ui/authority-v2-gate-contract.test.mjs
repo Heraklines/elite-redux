@@ -2798,6 +2798,24 @@ test("a projected biome transition consumes the exact destination command carrie
   );
 });
 
+test("the campaign presentation oracle compares a canonical epoch prefix instead of unrelated browser cursors", () => {
+  const proofStart = publicUiHarness.indexOf("async assertPresentationLedgerAtSharedCommand(");
+  const proofEnd = publicUiHarness.indexOf("\n  /**", proofStart);
+  assert.ok(
+    proofStart >= 0 && proofEnd > proofStart,
+    "the shared-command presentation proof has a bounded source block",
+  );
+  const proof = publicUiHarness.slice(proofStart, proofEnd);
+  assert.match(proof, /currentEpochPrefix: true/u);
+  const ledgerStart = publicUiHarness.indexOf("assertPresentationLedger(");
+  const ledgerEnd = publicUiHarness.indexOf("\n  /**", ledgerStart);
+  assert.ok(ledgerStart >= 0 && ledgerEnd > ledgerStart, "the ordered presentation ledger has a bounded source block");
+  const ledger = publicUiHarness.slice(ledgerStart, ledgerEnd);
+  assert.match(ledger, /const proofEpoch = currentEpochPrefix \? commandMatch\.comparable\?\.epoch : null/u);
+  assert.match(ledger, /\.slice\(currentEpochPrefix \? 0 : \(cursors\[client\.label\] \?\? 0\)\)/u);
+  assert.match(ledger, /event\.observation\?\.epoch === proofEpoch/u);
+});
+
 test("a V2 biome receipt is consumed without consulting the retired operation revision clock", () => {
   const watcherStart = biomeOperation.indexOf("export function adoptBiomeWatcherChoice(");
   const watcherEnd = biomeOperation.indexOf(

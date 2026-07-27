@@ -2423,15 +2423,24 @@ export class DuoPublicUiRig {
    * the shared command frontier. This compares canonical wire events, not localized text or Showdown's
    * guest-side battler-index reflection.
    */
-  assertPresentationLedger(cursors, commandMatch, proofName, { allowEmpty = false } = {}) {
+  assertPresentationLedger(cursors, commandMatch, proofName, { allowEmpty = false, currentEpochPrefix = false } = {}) {
     const before = new Map([
       [this.host, commandMatch.hostProjection.event.index],
       [this.guest, commandMatch.guestProjection.event.index],
     ]);
+    const proofEpoch = currentEpochPrefix ? commandMatch.comparable?.epoch : null;
+    if (currentEpochPrefix && !Number.isSafeInteger(proofEpoch)) {
+      throw new Error(`${proofName}: current-epoch presentation proof had no exact gameplay epoch`);
+    }
     const ledger = client =>
       client.evidence.events
-        .slice(cursors[client.label] ?? 0)
-        .filter(event => event.index < before.get(client) && event.kind === "browser-presentation-event")
+        .slice(currentEpochPrefix ? 0 : (cursors[client.label] ?? 0))
+        .filter(
+          event =>
+            event.index < before.get(client)
+            && event.kind === "browser-presentation-event"
+            && (proofEpoch == null || event.observation?.epoch === proofEpoch),
+        )
         .map(event => event.observation);
     const hostLedger = ledger(this.host);
     const guestLedger = ledger(this.guest);
@@ -2516,7 +2525,13 @@ export class DuoPublicUiRig {
     }
     // A legal turn can contain zero visible events (for example, both actions are structurally skipped).
     // Empty/empty is therefore valid here; any non-empty loss, duplicate, reorder, or payload drift fails.
-    this.assertPresentationLedger(cursors, match, proofName, { allowEmpty: true });
+    // Evidence indices are local wall-clock cursors, not a shared presentation coordinate. A slow
+    // renderer can complete the tail of turn N after the authority has already sampled its round-N+1
+    // control cursor. Slicing each browser at those unrelated indices produces a false suffix mismatch
+    // even when the complete canonical ledger is identical. At a proved shared command frontier, compare
+    // the entire current-epoch prefix instead: this is strictly stronger and remains immune to cross-seat
+    // scheduling skew.
+    this.assertPresentationLedger(cursors, match, proofName, { allowEmpty: true, currentEpochPrefix: true });
   }
 
   /**
