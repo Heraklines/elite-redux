@@ -266,6 +266,7 @@ import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle"
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
   COOP_ME_AUTHORITY_TURN,
+  captureCoopMeCommittedTerminalCursor,
   commitMeOwnerIntent,
   coopMeNarrationOperationId,
   isCompleteCoopMeTerminalPayload,
@@ -11593,10 +11594,17 @@ export function coopHostStreamMeMessage(text: string, actionablePrompt = false):
     coopWarn("me", `host refused unaddressed ME-message pinned=${pinned} wave=${wave} step=${step}`);
     return;
   }
+  // A committed ME terminal has already transferred mechanical control to its typed successor
+  // (normally the reward flow, a spawned battle, or the next wave). Encounter implementations can
+  // still render explanatory text from callbacks queued before that transfer. That text is cosmetic:
+  // minting another guest-owned ME acknowledgement lease here would fence the successor behind a
+  // renderer that has already left CoopReplayMePhase.
+  const terminalCommitted = captureCoopMeCommittedTerminalCursor(pinned) != null;
   const requiresAck =
     actionablePrompt
     && isCoopV2InteractionCutoverActive(runtime.durability)
     && coopInteractionOwnerSeat(pinned) !== runtime.controller.localSeatId
+    && !terminalCommitted
     && !coopMeHandoffBattleStarted()
     && !coopMeBespokeHostDrives();
   if (requiresAck && runtime.meNarration.hostPending != null) {

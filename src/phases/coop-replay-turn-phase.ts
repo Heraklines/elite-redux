@@ -469,6 +469,11 @@ export class CoopReplayTurnPhase extends Phase {
             "replay",
             `guest replay turn=${this.turn}: retained gameOver terminal supersedes unresolved replay at safe event boundary -> end`,
           );
+          // A live-event/checkpoint leg may have won awaitTurnOrLiveEvent while its joined turn-resolution
+          // waiter remained parked for a carrier GameOver can never send. Retire that losing leg as part of
+          // the same ordered supersession; otherwise the stall watchdog keeps reporting an invisible wait
+          // long after this phase has correctly ended.
+          streamer.abortTurnWait(this.turn, this.sourceWave);
           this.end();
           return;
         }
@@ -483,6 +488,7 @@ export class CoopReplayTurnPhase extends Phase {
             "replay",
             `guest replay turn=${this.turn}: retained WON wave-advance supersedes phantom next-turn replay -> end`,
           );
+          streamer.abortTurnWait(this.turn, this.sourceWave);
           this.end();
           return;
         }

@@ -4,6 +4,7 @@
  */
 
 import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } from "./campaign-nav.mjs";
+import { delay } from "./evidence.mjs";
 
 const TITLE_PHASE = /Start Phase TitlePhase/u;
 const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
@@ -61,21 +62,73 @@ async function waitForReadyYesConfirmation(client, surfaceId, from) {
   return ready;
 }
 
-async function declineSoloSwitchPromptBeforeCommand(client, from) {
-  const boundary = await client.evidence.waitForCondition(
-    sink => sink.findLastSemanticSurface(from, "command:command") ?? sink.findLastSemanticSurface(from, "check-switch"),
-    { timeoutMs: client.config.timeoutMs, description: "solo command or optional switch prompt after overwrite" },
+function isActionableLocalSoloSurface(observation) {
+  return (
+    observation?.coop === false
+    && observation.ownerModel === "local"
+    && observation.seatsWithInput?.includes(0)
+    && observation.ready?.handlerActive === true
+    && observation.ready.inputBlocked !== true
   );
-  if (boundary.observation.surfaceId !== "check-switch") {
-    return;
+}
+
+/**
+ * Drive only real public input while a newly-overwritten solo run renders its battle intro. The old
+ * helper waited for Command/check-switch without advancing ordinary MESSAGE prompts, so it timed out
+ * inside ShowAbilityPhase even though the save mutation and launch had both succeeded. A prompt is
+ * pressed once, then must visibly leave its actionable edge before another press is allowed.
+ */
+async function driveSoloPresentationToCommand(client, from) {
+  const deadline = Date.now() + Math.max(client.config.timeoutMs * 3, 180_000);
+  let cursor = from;
+  let messagePressArmed = true;
+  while (Date.now() < deadline) {
+    const boundary = client.evidence.findLastSemanticSurface(cursor);
+    const observation = boundary?.observation;
+    if (isActionableLocalSoloSurface(observation) && observation.surfaceId === "command:command") {
+      client.evidence.record("solo-presentation-command-proof", {
+        from,
+        observationIndex: boundary.index,
+        phase: observation.phase,
+      });
+      return boundary;
+    }
+    if (isActionableLocalSoloSurface(observation) && observation.surfaceId === "check-switch") {
+      await selectOptionById(client, {
+        surfaceId: "check-switch",
+        targetId: "no",
+        navKeys: ["ArrowUp", "ArrowDown"],
+        timeoutMs: client.config.timeoutMs,
+        fromCursor: boundary.index,
+      });
+      cursor = boundary.index + 1;
+      messagePressArmed = true;
+      continue;
+    }
+    const actionableMessage =
+      isActionableLocalSoloSurface(observation)
+      && observation.surfaceId === "battle:message"
+      && observation.ready.awaitingActionInput === true;
+    if (actionableMessage && messagePressArmed) {
+      client.evidence.record("solo-presentation-message-advance", {
+        observationIndex: boundary.index,
+        phase: observation.phase,
+        phaseInstance: observation.phaseInstance,
+      });
+      await client.press("Space", `advance-solo-presentation-${observation.phase}`);
+      cursor = boundary.index + 1;
+      messagePressArmed = false;
+      continue;
+    }
+    if (boundary != null && !actionableMessage) {
+      messagePressArmed = true;
+    }
+    await delay(100);
   }
-  await selectOptionById(client, {
-    surfaceId: "check-switch",
-    targetId: "no",
-    navKeys: ["ArrowUp", "ArrowDown"],
-    timeoutMs: client.config.timeoutMs,
-    fromCursor: boundary.index,
-  });
+  const latest = client.evidence.findLastSemanticSurface(from)?.observation ?? null;
+  throw new Error(
+    `${client.label}: solo presentation did not reach CommandPhase after overwrite; latest=${JSON.stringify(latest)}`,
+  );
 }
 
 function assertExactDeleteProof(client, request, response, tombstone) {
@@ -238,7 +291,7 @@ async function overwriteCoopSaveWithSoloRun(client) {
       `${client.label}: overwrite persisted replacement at event ${soloWrite.index} before exact delete ACK ${deleteResponse.index}`,
     );
   }
-  await declineSoloSwitchPromptBeforeCommand(client, mutationCursor);
+  await driveSoloPresentationToCommand(client, mutationCursor);
   await client.waitForLocalCommand(mutationCursor);
   await client.checkpoint("overwrite-solo-wave1-command");
   client.evidence.record("save-overwrite-proof", {

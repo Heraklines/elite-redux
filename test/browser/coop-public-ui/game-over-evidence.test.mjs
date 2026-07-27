@@ -52,6 +52,11 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     replayPump.indexOf("coopRetainedGameOverSupersedesReplay") < replayPump.indexOf("awaitTurnOrLiveEvent"),
     "terminal releases the impossible resolution wait only at the empty event boundary",
   );
+  assert.match(
+    replayPump,
+    /coopRetainedGameOverSupersedesReplay[\s\S]*abortTurnWait\(this\.turn, this\.sourceWave\)[\s\S]*coopRetainedWinSupersedesReplay[\s\S]*abortTurnWait\(this\.turn, this\.sourceWave\)/u,
+    "both terminal successors retire the losing turn-wait leg instead of leaking it into the stall watchdog",
+  );
   assert.match(duoRegression, /coopRetainedGameOverSupersedesReplay\(7, 1\)[\s\S]*toBe\(true\)/u);
   assert.match(duoRegression, /coopRetainedGameOverSupersedesReplay\(6, 1\)[\s\S]*toBe\(false\)/u);
   assert.match(duoRegression, /coopRetainedGameOverSupersedesReplay\(7, 0\)[\s\S]*toBe\(false\)/u);
@@ -87,13 +92,15 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     "the final screenshot must follow both completed GameOver fades, not the transient faint narration",
   );
   for (const exactEvidence of [
+    "PARITY kind=TERMINAL_COMMIT rev=",
     "settled WAVE_ADVANCE committed wave=1",
+    "kind=TERMINAL_COMMIT result=admitted",
+    "bootstrap wave=1 outcome=gameOver wake=1",
     "ignore raw waveResolved for correctness wave=1 outcome=gameOver",
-    "wave-advance JOURNAL bootstrap wave=1 outcome=gameOver",
-    "safe-boundary wake wave=1 unparkedReplay=([01])",
     "retained gameOver terminal supersedes unresolved replay at safe event boundary",
-    "retained WAVE_ADVANCE continuationReady wave=1",
-    "host RELEASE contiguous acknowledged authority cls=op:global",
+    "DATA applied rev=",
+    "kind=TERMINAL_COMMIT .* outcome=applied control=TERMINAL/",
+    "stage=controlInstalled sender=\\\\d+ generation=\\\\d+ advanced retired=true",
     'record("retained-game-over-race-proof"',
   ]) {
     assert.ok(harness.includes(exactEvidence), `harness retains exact terminal evidence: ${exactEvidence}`);

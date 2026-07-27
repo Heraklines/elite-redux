@@ -421,6 +421,14 @@ export class UI extends Phaser.GameObjects.Container {
       if (isCoopV2InteractionHumanInputFrozen() && !hostEngineDialogueAdvance) {
         return false;
       }
+      // The exact narration lease owns every host MESSAGE surface until the remote owner dismisses
+      // it, including ordinary MessagePhase instances queued after MysteryEncounterPhase has ended.
+      // The authenticated acknowledgement path advances through advanceCoopHostMeNarrationFromGuest,
+      // so blocking public input here cannot block the rightful owner.
+      if (hostEngineDialogueAdvance && coopHostMeNarrationAwaitingGuestAck()) {
+        coopLog("me", "ui: host blocks local narration press while exact guest acknowledgement is pending");
+        return false;
+      }
       if (meInteractiveSurfaceActive) {
         // Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2): the host runs the sole engine
         // (beginOwner, never a watcher in authoritative mode), but the GUEST makes the pick - the
@@ -440,10 +448,6 @@ export class UI extends Phaser.GameObjects.Container {
           // is pure text-advance with no choice semantics, so let it through; every
           // CHOICE screen (options / party / secondary) stays blocked.
           if (this.getMode() === UiMode.MESSAGE) {
-            if (coopHostMeNarrationAwaitingGuestAck()) {
-              coopLog("me", "ui: host blocks local narration press while exact guest acknowledgement is pending");
-              return false;
-            }
             coopLog("me", "ui: host ADVANCES engine dialogue on guest-owned ME (#816)", { button });
             return this.processInputInner(button);
           }

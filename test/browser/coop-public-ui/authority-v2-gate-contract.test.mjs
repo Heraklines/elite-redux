@@ -1843,8 +1843,13 @@ test("pre-battle Mystery engine narration cannot depend on the selector phase st
   );
   assert.match(
     coopRuntime,
-    /coopHostStreamMeMessage\(text: string, actionablePrompt = false\)[\s\S]*coopMeNarrationOperationId\([\s\S]*requiresAck[\s\S]*battleStream\.sendMeMessage/u,
+    /coopHostStreamMeMessage\(text: string, actionablePrompt = false\)[\s\S]*coopMeNarrationOperationId\([\s\S]*captureCoopMeCommittedTerminalCursor\(pinned\)[\s\S]*&& !terminalCommitted[\s\S]*requiresAck[\s\S]*battleStream\.sendMeMessage/u,
     "the host publishes a deterministic prompt identity before exposing a guest-owned narration lease",
+  );
+  assert.match(
+    coopUi,
+    /if \(hostEngineDialogueAdvance && coopHostMeNarrationAwaitingGuestAck\(\)\) \{[\s\S]*return false;[\s\S]*if \(meInteractiveSurfaceActive\)/u,
+    "the exact guest narration lease blocks host input even after the selector becomes an ordinary MessagePhase",
   );
   assert.match(
     coopRuntime,
