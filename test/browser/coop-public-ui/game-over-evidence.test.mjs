@@ -11,16 +11,18 @@ import test from "node:test";
 const root = resolve(import.meta.dirname, "../../..");
 
 test("GameOver journey uses visible starters, real command input, and exact retained terminal evidence", async () => {
-  const [workflow, registry, runtime, replay, transport, harness, journeys, duoRegression] = await Promise.all([
-    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
-    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
-    readFile(resolve(root, "src/data/elite-redux/coop/coop-runtime.ts"), "utf8"),
-    readFile(resolve(root, "src/phases/coop-replay-turn-phase.ts"), "utf8"),
-    readFile(resolve(root, "src/data/elite-redux/coop/coop-webrtc-transport.ts"), "utf8"),
-    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
-    readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
-    readFile(resolve(root, "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"), "utf8"),
-  ]);
+  const [workflow, registry, runtime, replay, transport, harness, journeys, duoRegression, gameOverPhase] =
+    await Promise.all([
+      readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+      readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+      readFile(resolve(root, "src/data/elite-redux/coop/coop-runtime.ts"), "utf8"),
+      readFile(resolve(root, "src/phases/coop-replay-turn-phase.ts"), "utf8"),
+      readFile(resolve(root, "src/data/elite-redux/coop/coop-webrtc-transport.ts"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
+      readFile(resolve(root, "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"), "utf8"),
+      readFile(resolve(root, "src/phases/game-over-phase.ts"), "utf8"),
+    ]);
 
   assert.match(workflow, /^\s{10}- game-over$/mu);
   assert.match(workflow, /inputs\.journey == 'game-over' && 'game-over'/u);
@@ -60,6 +62,11 @@ test("GameOver journey uses visible starters, real command input, and exact reta
   assert.match(
     harness,
     /driveWaveToGameOver\(\)[\s\S]*driveSequentialCommandRound\([\s\S]*waitForPostTurnOutcome\([\s\S]*outcome\.kind !== "gameOver"/u,
+  );
+  assert.match(
+    gameOverPhase,
+    /const completedBattle = globalScene\.currentBattle;[\s\S]*const preWaveSessionData = await globalScene\.gameData\.getSession[\s\S]*waveIndex: completedBattle\.waveIndex/u,
+    "run history must survive the retained terminal clearing currentBattle during its cloud await",
   );
   assert.match(
     harness,

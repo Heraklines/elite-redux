@@ -61,6 +61,23 @@ async function waitForReadyYesConfirmation(client, surfaceId, from) {
   return ready;
 }
 
+async function declineSoloSwitchPromptBeforeCommand(client, from) {
+  const boundary = await client.evidence.waitForCondition(
+    sink => sink.findLastSemanticSurface(from, "command:command") ?? sink.findLastSemanticSurface(from, "check-switch"),
+    { timeoutMs: client.config.timeoutMs, description: "solo command or optional switch prompt after overwrite" },
+  );
+  if (boundary.observation.surfaceId !== "check-switch") {
+    return;
+  }
+  await selectOptionById(client, {
+    surfaceId: "check-switch",
+    targetId: "no",
+    navKeys: ["ArrowUp", "ArrowDown"],
+    timeoutMs: client.config.timeoutMs,
+    fromCursor: boundary.index,
+  });
+}
+
 function assertExactDeleteProof(client, request, response, tombstone) {
   if (
     request.index >= response.index
@@ -221,6 +238,7 @@ async function overwriteCoopSaveWithSoloRun(client) {
       `${client.label}: overwrite persisted replacement at event ${soloWrite.index} before exact delete ACK ${deleteResponse.index}`,
     );
   }
+  await declineSoloSwitchPromptBeforeCommand(client, mutationCursor);
   await client.waitForLocalCommand(mutationCursor);
   await client.checkpoint("overwrite-solo-wave1-command");
   client.evidence.record("save-overwrite-proof", {

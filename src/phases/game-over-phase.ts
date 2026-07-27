@@ -443,6 +443,12 @@ export class GameOverPhase extends BattlePhase {
    * @returns A promise containing the {@linkcode SessionSaveData}
    */
   private async getRunHistoryEntry(): Promise<SessionSaveData> {
+    // GameOver's retained terminal may tear the co-op runtime down and clear currentBattle while the
+    // cloud session read below is in flight. Capture this completed battle before the async boundary.
+    const completedBattle = globalScene.currentBattle;
+    if (completedBattle == null) {
+      throw new Error("Cannot record run history without the completed battle");
+    }
     const preWaveSessionData = await globalScene.gameData.getSession(globalScene.sessionSlotId);
     return {
       seed: globalScene.seed,
@@ -460,13 +466,13 @@ export class GameOverPhase extends BattlePhase {
       pokeballCounts: globalScene.pokeballCounts,
       money: Math.floor(globalScene.money),
       score: globalScene.score,
-      waveIndex: globalScene.currentBattle.waveIndex,
-      battleType: globalScene.currentBattle.battleType,
-      trainer: globalScene.currentBattle.trainer ? new TrainerData(globalScene.currentBattle.trainer) : null,
+      waveIndex: completedBattle.waveIndex,
+      battleType: completedBattle.battleType,
+      trainer: completedBattle.trainer ? new TrainerData(completedBattle.trainer) : null,
       gameVersion: globalScene.game.config.gameVersion,
       timestamp: Date.now(),
       challenges: globalScene.gameMode.challenges.map(c => new ChallengeData(c)),
-      mysteryEncounterType: globalScene.currentBattle.mysteryEncounter?.encounterType ?? -1,
+      mysteryEncounterType: completedBattle.mysteryEncounter?.encounterType ?? -1,
       mysteryEncounterSaveData: globalScene.mysteryEncounterSaveData,
       playerFaints: globalScene.arena.playerFaints,
     } as SessionSaveData;

@@ -465,7 +465,9 @@ const TURN_RESOLVE_PROMPT_SURFACES = {
 /**
  * A command frontier normally closes on TURN_COMMIT, but four closed interaction surfaces can be
  * discovered while that same turn is settling. Their immutable prompt must enter the mechanical log
- * before the player can answer it; requiring TURN_COMMIT first creates an impossible cycle.
+ * before the player can answer it; requiring TURN_COMMIT first creates an impossible cycle. The same
+ * turn may also end the battle outright. Its exact WAVE_ADVANCE/TERMINAL_COMMIT is then the canonical
+ * successor and must not depend on a turn entry the terminal path deliberately supersedes.
  *
  * This is deliberately stricter than "any interaction at the same coordinate": only a registered
  * TURN_RESOLVE prompt whose envelope id is the Authority V2 entry id may interrupt command control.
@@ -524,7 +526,10 @@ export function controlAllowsSuccessorEntry(
     case "COMMAND_FRONTIER": {
       const address = mechanicalAddressOf(next.kind, next.context.sessionEpoch, next.material.payload);
       return (
-        (next.kind === "TURN_COMMIT" || isExactTurnResolvePromptEntry(next))
+        (next.kind === "TURN_COMMIT"
+          || next.kind === "WAVE_ADVANCE"
+          || next.kind === "TERMINAL_COMMIT"
+          || isExactTurnResolvePromptEntry(next))
         && address?.epoch === control.epoch
         && address.wave === control.wave
         && address.turn === control.turn

@@ -159,10 +159,18 @@ test("fresh/dirty account exempts ONLY the two exact missing save/session reads,
   assert.equal(isExpectedMissingSystemSaveError("warning", notFound, `${api}/savedata/system/get`, true), false);
 });
 
-test("only the unavailable staging tournament poll is non-fatal", () => {
+test("only an unavailable non-production tournament poll is non-fatal", () => {
   const notFound = "Failed to load resource: the server responded with a status of 404 ()";
   const staging = "https://er-save-api-staging.heraklines.workers.dev";
   assert.equal(isExpectedUnavailableStagingTournamentError("error", notFound, `${staging}/tournament/list`), true);
+  assert.equal(
+    isExpectedUnavailableStagingTournamentError("error", notFound, "http://127.0.0.1:8788/tournament/list"),
+    true,
+  );
+  assert.equal(
+    isExpectedUnavailableStagingTournamentError("error", notFound, "http://localhost:8788/tournament/list"),
+    true,
+  );
   assert.equal(
     isExpectedUnavailableStagingTournamentError(
       "error",

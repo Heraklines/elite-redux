@@ -479,17 +479,21 @@ export function isExpectedMissingSystemSaveError(type, text, source, freshAccoun
 }
 
 /**
- * The staging save Worker deliberately has no tournament service mounted. The title screen polls the
- * optional endpoint anyway, so Chromium emits a 404 console error even though account, save, lobby, and
- * gameplay continue normally. Excuse only that exact GET-resource symptom on the exact staging host; a
- * production failure, another path/status, or an application exception remains fatal.
+ * The staging save Worker and journey-local save fixture deliberately have no tournament service mounted.
+ * The title screen polls the optional endpoint anyway, so Chromium emits a 404 console error even though
+ * account, save, lobby, and gameplay continue normally. Excuse only that exact GET-resource symptom on the
+ * staging host or loopback fixture; a production failure, another path/status, or exception remains fatal.
  */
 export function isExpectedUnavailableStagingTournamentError(type, text, source) {
   if (type !== "error" || !/Failed to load resource:.*status of 404/iu.test(text)) {
     return false;
   }
   const url = parsedUrl(source);
-  return url?.hostname === "er-save-api-staging.heraklines.workers.dev" && url.pathname === "/tournament/list";
+  const expectedHost =
+    url?.hostname === "er-save-api-staging.heraklines.workers.dev"
+    || url?.hostname === "127.0.0.1"
+    || url?.hostname === "localhost";
+  return expectedHost && url?.pathname === "/tournament/list";
 }
 
 /**
@@ -1540,7 +1544,7 @@ export class EvidenceSink {
           reason: expectedLocaleFallback
             ? "selected locale falls back to the bundled English namespace"
             : expectedUnavailableTournament
-              ? "optional tournament service is not mounted on the staging save Worker"
+              ? "optional tournament service is not mounted on this non-production save Worker"
               : "fresh account has no persisted save yet",
         });
       } else if (

@@ -2950,6 +2950,22 @@ test("the browser observer derives interaction ownership from the rendering phas
   );
 });
 
+test("an exact final battle boundary can close the command frontier without a phantom turn commit", () => {
+  const admissionStart = nextControl.indexOf("export function controlAllowsSuccessorEntry(");
+  const commandCaseStart = nextControl.indexOf('case "COMMAND_FRONTIER":', admissionStart);
+  const replacementCaseStart = nextControl.indexOf('case "REPLACEMENT":', commandCaseStart);
+  assert.ok(commandCaseStart >= 0 && replacementCaseStart > commandCaseStart, "command admission has a bounded case");
+  const commandAdmission = nextControl.slice(commandCaseStart, replacementCaseStart);
+  assert.match(commandAdmission, /next\.kind === "TURN_COMMIT"/u);
+  assert.match(commandAdmission, /next\.kind === "WAVE_ADVANCE"/u);
+  assert.match(commandAdmission, /next\.kind === "TERMINAL_COMMIT"/u);
+  assert.match(
+    commandAdmission,
+    /address\?\.epoch === control\.epoch[\s\S]*address\.wave === control\.wave[\s\S]*address\.turn === control\.turn/u,
+    "direct wave/terminal successors remain bound to the exact command address",
+  );
+});
+
 test("the one-process soak retains the authority browser while nested peer pumps settle a wave crossing", () => {
   const crossingStart = soakDriver.indexOf("  const crossCommandBoundaryWithReplayGuest = async (");
   const crossingEnd = soakDriver.indexOf(

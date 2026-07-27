@@ -28,6 +28,7 @@ import { type ControlSurface, createCoopControlProjector } from "#data/elite-red
 import {
   commandControlTargetId,
   commandTargetsOwnedBySeat,
+  controlAllowsSuccessorEntry,
   controlIdOf,
   controlOwnerSeatId,
   controlOwnerSeatIds,
@@ -114,6 +115,23 @@ const successorWait = (
   allowNextWaveStart: true,
   expectedOperationId: null,
   ...over,
+});
+
+describe("command-frontier successor admission", () => {
+  const mechanicalEntry = (kind: "WAVE_ADVANCE" | "TERMINAL_COMMIT", wave = 3, turn = 2) => ({
+    kind,
+    operationId: `${kind}-w${wave}-t${turn}`,
+    context: { sessionEpoch: 1 },
+    material: { payload: { wave, turn } },
+  });
+
+  it("admits an exact wave or terminal boundary directly from the command turn it resolves", () => {
+    const frontier = command();
+    expect(controlAllowsSuccessorEntry(frontier, "command-open", mechanicalEntry("WAVE_ADVANCE"))).toBe(true);
+    expect(controlAllowsSuccessorEntry(frontier, "command-open", mechanicalEntry("TERMINAL_COMMIT"))).toBe(true);
+    expect(controlAllowsSuccessorEntry(frontier, "command-open", mechanicalEntry("TERMINAL_COMMIT", 3, 3))).toBe(false);
+    expect(controlAllowsSuccessorEntry(frontier, "command-open", mechanicalEntry("WAVE_ADVANCE", 4, 2))).toBe(false);
+  });
 });
 
 describe("ordered-wait local presentation lease", () => {

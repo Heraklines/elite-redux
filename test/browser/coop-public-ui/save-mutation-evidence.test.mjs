@@ -64,6 +64,8 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   assert.doesNotMatch(journeys, /pressUntilExactDeleteRequest|attempt <= 3/u);
   assert.match(journeys, /"\/savedata\/session\/coop-cas-delete"/u);
   assert.match(journeys, /soloWrite\.index <= deleteResponse\.index/u);
+  assert.match(journeys, /declineSoloSwitchPromptBeforeCommand[\s\S]*surfaceId: "check-switch"[\s\S]*targetId: "no"/u);
+  assert.match(journeys, /await declineSoloSwitchPromptBeforeCommand\(client, mutationCursor\)/u);
   assert.match(journeys, /client\.waitForLocalCommand\(mutationCursor\)/u);
   assert.match(journeys, /sessionStorageKeys\(deletedCold\)/u);
   assert.match(harness, /browser\.createBrowserContext\(\)/u);
