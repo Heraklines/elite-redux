@@ -1,0 +1,337 @@
+{
+  "invariant": "no-park",
+  "seed": 20260727,
+  "wave": 3,
+  "detail": "wave crossing threw (strand/stall): client phase drive to projected retained replacement HANG on NewBattlePhase; queued=[CoopPartnerSyncPhase], ui=MESSAGE",
+  "replay": "SOAK_SEED=20260727",
+  "phaseState": {
+    "hostPhase": "CommandPhase",
+    "guestPhase": "NewBattlePhase",
+    "hostInteractionCounter": 2,
+    "guestInteractionCounter": 2,
+    "hostWave": 3,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 1863302142,
+        "battlerIndex": -1,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 197,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2357449684,
+        "battlerIndex": -1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 225,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 679871432,
+        "battlerIndex": -1,
+        "speciesId": 273,
+        "speciesName": "Seedot",
+        "hp": 16,
+        "maxHp": 16,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 371,
+            "ppUsed": 0
+          },
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 74,
+            "ppUsed": 0
+          },
+          {
+            "id": 235,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 4084732885,
+        "battlerIndex": -1,
+        "speciesId": 261,
+        "speciesName": "Poochyena",
+        "hp": 16,
+        "maxHp": 16,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 316,
+            "ppUsed": 0
+          },
+          {
+            "id": 46,
+            "ppUsed": 0
+          },
+          {
+            "id": 336,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 1863302142,
+        "battlerIndex": 0,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 197,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1218304158,
+        "battlerIndex": 1,
+        "speciesId": 94,
+        "speciesName": "Gengar",
+        "hp": 0,
+        "maxHp": 179,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 1
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 838050213,
+        "battlerIndex": 2,
+        "speciesId": 21,
+        "speciesName": "Spearow",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 314,
+            "ppUsed": 0
+          },
+          {
+            "id": 808,
+            "ppUsed": 0
+          },
+          {
+            "id": 501,
+            "ppUsed": 0
+          },
+          {
+            "id": 197,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 4022138879,
+        "battlerIndex": 3,
+        "speciesId": 509,
+        "speciesName": "Purrloin",
+        "hp": 0,
+        "maxHp": 14,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 468,
+            "ppUsed": 0
+          },
+          {
+            "id": 252,
+            "ppUsed": 1
+          },
+          {
+            "id": 495,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260727 preseeded=false",
+    "wave 1 turn 1: replay guest crossed cmd:1:1 through real public COMMAND=opened",
+    "wave 1: host slot move=53 guest slot move=53",
+    "wave 1 turn 1: progress enemyHp=[16:0/14,263:0/14] playerHp=[143:303/303,94:179/179]",
+    "wave 1: reward shop owner=host leave",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=85 guest slot move=53",
+    "wave 2 turn 1: forced-faint guest EXPLOSION self-KO",
+    "wave 2 turn 1: progress enemyHp=[21:0/16,509:0/14] playerHp=[143:197/303,94:0/179]",
+    "wave 2: reward shop owner=guest take-nonparty"
+  ]
+}
