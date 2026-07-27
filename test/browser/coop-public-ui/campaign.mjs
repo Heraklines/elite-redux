@@ -45,6 +45,11 @@ const BATTLE_PROMPT_PHASES = new Map([
   ["battle:exp", "ExpPhase"],
 ]);
 const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;
+// Run 30232043330 measured one software-WebGL MoveEffectPhase -> DamageAnimPhase gap at 100.2s while
+// both engines and the exact presentation ledger continued converging. Give only the animations-on
+// profile 50% headroom over that observed intra-phase cost; skipped-animation profiles retain the
+// stricter 90s stall detector and every profile remains capped by its immutable hard ceiling.
+const ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS = 150_000;
 const OUTCOME_HARD_CEILING_MS = 360_000;
 // Track R cycle 13 - animations-on-surface profile calibration (integration-owner authorized).
 // INVESTIGATION FIRST: this is NOT generic timeout inflation. The launch config already sets every
@@ -798,6 +803,7 @@ export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
           && Number.isSafeInteger(observation.phaseInstance)
           && observation.ready?.handlerActive === true
           && observation.ready?.awaitingActionInput === true
+          && observation.ready?.inputBlocked !== true
           && !consumedInstances.has(instanceKey)
         );
       });
@@ -956,18 +962,17 @@ export async function waitForOutcomeBounded(
     // OUTCOME_HARD_CEILING_MS; only the animations-on-surface caller passes the calibrated value, so no
     // other profile's budget changes. Ignored unless extendForAnimationProgress is set.
     animationHardCeilingMs = null,
+    animationProgressAllowanceMs = null,
     singleSidedConfirmMs = 0,
   } = {},
 ) {
   const clients = Object.values(rig.clients);
   const fixedDeadline = Date.now() + timeoutMs;
   const animationBudget = extendForAnimationProgress
-    ? createAnimationProgressBudget(
-        rig,
-        from,
-        timeoutMs,
-        animationHardCeilingMs == null ? {} : { hardCeilingMs: animationHardCeilingMs },
-      )
+    ? createAnimationProgressBudget(rig, from, timeoutMs, {
+        ...(animationHardCeilingMs == null ? {} : { hardCeilingMs: animationHardCeilingMs }),
+        ...(animationProgressAllowanceMs == null ? {} : { animationAllowanceMs: animationProgressAllowanceMs }),
+      })
     : null;
   const confirmationHardDeadline =
     (animationBudget?.hardDeadline() ?? fixedDeadline) + Math.max(0, singleSidedConfirmMs);
@@ -1173,6 +1178,7 @@ async function driveBattleWave(rig, policy, stats) {
         advanceBattlePrompt,
         extendForAnimationProgress: true,
         animationHardCeilingMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : null,
+        animationProgressAllowanceMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS : null,
         stopOnOwnedCommandFrontier: true,
         singleSidedConfirmMs: SINGLE_SIDED_COMMAND_CONFIRM_MS,
       });
@@ -1191,6 +1197,7 @@ async function driveBattleWave(rig, policy, stats) {
         advanceBattlePrompt,
         extendForAnimationProgress: true,
         animationHardCeilingMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : null,
+        animationProgressAllowanceMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS : null,
         stopOnOwnedCommandFrontier: true,
         singleSidedConfirmMs: SINGLE_SIDED_COMMAND_CONFIRM_MS,
       });

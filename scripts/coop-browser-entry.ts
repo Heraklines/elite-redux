@@ -17,7 +17,14 @@ const [
   { globalScene },
   { captureCoopSaveDataDigest },
   { canonicalize, fnv1a64 },
-  { getCoopRuntime, isCoopV2InteractionHumanInputFrozen },
+  {
+    coopHostEngineDialogueMessageAdvanceAllowed,
+    coopHostMeNarrationAwaitingGuestAck,
+    getCoopNetcodeMode,
+    getCoopRuntime,
+    isCoopV2InteractionHumanInputFrozen,
+  },
+  { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress },
   { setCoopPresentationObserver },
   { setCoopPresentationHardWallMsForTest },
   { BattlerTagType },
@@ -35,6 +42,7 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-engine"),
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
+  import("../src/data/elite-redux/coop/coop-me-pin-state"),
   import("../src/data/elite-redux/coop/coop-turn-recorder"),
   import("../src/phases/coop-presentation-watchdog"),
   import("../src/enums/battler-tag-type"),
@@ -1390,13 +1398,28 @@ function observeSemanticSurface(): void {
       // stamp it explicitly so host SwitchPhase and replica CoopGuestFaintSwitchPhase share one
       // accurate contract (and so future N-player seats do not inherit a two-seat parity guess).
       const localReplacementOwner = semantic.operationClass === "replacement" && uiMode === "PARTY";
+      // Learn-move control belongs to the Pokemon's stable co-op owner, not to whichever seat owned
+      // the reward/biome interaction that queued the phase. A guest buying a TM for a host-owned mon
+      // can therefore leave the interaction counter pointing at the guest while the real actionable
+      // CONFIRM is correctly on the host (campaign 30232043330, wave 4). Project the phase's party slot
+      // owner so the public oracle does not wait for an impossible self-owner surface on the watcher.
+      const learnMovePartySlot = (currentPhase as unknown as { partyMemberIndex?: unknown }).partyMemberIndex;
+      const learnMoveOwnerRole =
+        semantic.operationClass === "learn-move" && Number.isSafeInteger(learnMovePartySlot)
+          ? ((globalScene.getPlayerParty()[learnMovePartySlot as number] as { coopOwner?: string } | undefined)
+              ?.coopOwner ?? "host")
+          : null;
+      const learnMoveOwnerSeat =
+        learnMoveOwnerRole == null ? null : runtime.controller.role === learnMoveOwnerRole ? localSeat : partnerSeat;
       ownerSeat = localReplacementOwner
         ? localSeat
-        : semantic.ownerModel === "interaction" && isLocalOwner != null
-          ? isLocalOwner
-            ? localSeat
-            : partnerSeat
-          : null;
+        : learnMoveOwnerSeat == null
+          ? semantic.ownerModel === "interaction" && isLocalOwner != null
+            ? isLocalOwner
+              ? localSeat
+              : partnerSeat
+            : null
+          : learnMoveOwnerSeat;
       // This client's view of who may input: a local surface = this seat drives its own; an
       // interaction surface = only the owner. A driver unions both clients' markers.
       seatsWithInput = semantic.ownerModel === "local" ? [localSeat] : ownerSeat == null ? [] : [ownerSeat];
@@ -1470,7 +1493,33 @@ function observeSemanticSurface(): void {
     // two-browser driver hammer keys that the game correctly rejected and mislabeled the product freeze
     // as cursor geometry.
     const v2InputFrozen = runtime == null ? false : isCoopV2InteractionHumanInputFrozen(runtime);
-    const inputBlocked = v2InputFrozen || handlerInputBlocked === true ? true : handlerInputBlocked;
+    // Mirror Ui.processInputCoopAware's #816 exception exactly. The host engine may dismiss a
+    // guest-owned Mystery MESSAGE despite the general V2 interaction freeze, but not while it is
+    // waiting for the guest renderer's acknowledgement of that same prompt. Publishing the pending
+    // window as actionable made the keyboard oracle spend and deduplicate a key production rejected.
+    const hostEngineDialogueAdvance =
+      runtime != null
+      && coopHostEngineDialogueMessageAdvanceAllowed({
+        localRole: runtime.controller.role,
+        isMessageMode: uiMode === "MESSAGE",
+        netcodeMode: getCoopNetcodeMode(),
+        meInProgress: coopMeInProgress(),
+        meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        meBespokeHostDrives: coopMeBespokeHostDrives(),
+      });
+    const interactiveMysteryPhase =
+      phase === "MysteryEncounterPhase"
+      || phase === "MysteryEncounterOptionSelectedPhase"
+      || phase === "MysteryEncounterRewardsPhase"
+      || phase === "PostMysteryEncounterPhase"
+      || phase === "ErQuizPhase";
+    const hostEngineDialogueBlockedByAck =
+      runtime != null
+      && hostEngineDialogueAdvance
+      && interactiveMysteryPhase
+      && coopHostMeNarrationAwaitingGuestAck(runtime);
+    const v2SurfaceInputBlocked = v2InputFrozen && (!hostEngineDialogueAdvance || hostEngineDialogueBlockedByAck);
+    const inputBlocked = v2SurfaceInputBlocked || handlerInputBlocked === true ? true : handlerInputBlocked;
     const phaseAuthorityOperationId = (currentPhase as unknown as { coopV2ControlOperationId?: unknown })
       .coopV2ControlOperationId;
     const authorityAddress =

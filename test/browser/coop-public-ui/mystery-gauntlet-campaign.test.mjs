@@ -518,6 +518,90 @@ test("the mystery narration driver advances the authoritative selected-option ph
   assert.equal(await advance(), false, "one prompt generation must never be submitted twice");
 });
 
+test("the mystery narration driver waits through an exact guest-ack fence without consuming the prompt", async () => {
+  const events = [
+    {
+      index: 0,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "mystery-encounter:message",
+        operationClass: "encounter-prompt",
+        phase: "MysteryEncounterPhase",
+        uiMode: "MESSAGE",
+        ownerModel: "interaction",
+        coop: true,
+        localSeat: 0,
+        ownerSeat: 1,
+        seatsWithInput: [1],
+        phaseInstance: 13,
+        ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: true },
+      },
+    },
+  ];
+  const presses = [];
+  const host = {
+    label: "host-seat",
+    evidence: {
+      events,
+      findLastSemanticSurface(fromCursor = 0) {
+        return events.filter(event => event.index >= fromCursor && event.kind === "browser-surface2").at(-1) ?? null;
+      },
+      record() {},
+    },
+    async press(key) {
+      presses.push(key);
+    },
+  };
+  const guest = {
+    label: "guest-seat",
+    evidence: {
+      events: [],
+      findLastSemanticSurface() {
+        return null;
+      },
+      record() {},
+    },
+    async press() {},
+  };
+  const advance = createMysteryNarrationAdvancer(
+    { host, guest, clients: { host, guest } },
+    { "host-seat": 0, "guest-seat": 0 },
+    {},
+    "guest-ack-fence",
+  );
+
+  assert.equal(await advance(), false, "production-rejected pending-ack input is not spent");
+  events.push({
+    ...events[0],
+    index: 1,
+    observation: { ...events[0].observation, ready: { ...events[0].observation.ready, inputBlocked: false } },
+  });
+  assert.equal(await advance(), true, "the same exact prompt becomes drivable after its acknowledgement fence clears");
+  assert.deepEqual(presses, ["Space"]);
+});
+
+test("Authority V2 routes guest replay narration through its exact acknowledgement path", async () => {
+  const ui = await readFile(resolve(root, "src/ui/ui.ts"), "utf8");
+  const observer = await readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8");
+  assert.match(
+    ui,
+    /const authoritativeGuestReplay =[\s\S]*phaseName === "CoopReplayMePhase" && getCoopNetcodeMode\(\) === "authoritative"[\s\S]*\|\| authoritativeGuestReplay/u,
+    "the guest replay phase must reach coopGuestAcknowledgeMeNarration after a consumed MESSAGE press",
+  );
+  assert.match(
+    observer,
+    /hostEngineDialogueBlockedByAck[\s\S]*coopHostMeNarrationAwaitingGuestAck\(runtime\)/u,
+    "the public oracle must expose the same host pending-ack fence production enforces",
+  );
+  assert.match(observer, /const learnMovePartySlot =/u);
+  assert.match(observer, /semantic\.operationClass === "learn-move"/u);
+  assert.match(
+    observer,
+    /getPlayerParty\(\)\[learnMovePartySlot as number\][\s\S]*\.coopOwner/u,
+    "learn-move ownership must come from the Pokemon rather than the prior alternating interaction",
+  );
+});
+
 test("the continuity profile visibly declines Bargain and co-op cannot persist a half-open phase", async () => {
   const policy = await readFile(resolve(root, "test/browser/coop-public-ui/campaign-policy.mjs"), "utf8");
   const menu = await readFile(resolve(root, "src/ui/handlers/menu-ui-handler.ts"), "utf8");

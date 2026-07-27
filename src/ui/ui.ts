@@ -489,12 +489,18 @@ export class UI extends Phaser.GameObjects.Container {
    */
   private coopMeInteractivePhase(): boolean {
     const phaseName = globalScene.phaseManager.getCurrentPhase()?.phaseName;
+    // Authority V2 gives the guest owner an address-exact human-input lease while its retained
+    // replay phase renders host-streamed narration. Route that phase through the ready-press path
+    // so a consumed MESSAGE action calls coopGuestAcknowledgeMeNarration instead of emitting an
+    // obsolete generic interactionChoice (public Mystery campaign 30232043330).
+    const authoritativeGuestReplay = phaseName === "CoopReplayMePhase" && getCoopNetcodeMode() === "authoritative";
     return (
       phaseName === "MysteryEncounterPhase"
       || phaseName === "MysteryEncounterOptionSelectedPhase"
       || phaseName === "MysteryEncounterRewardsPhase"
       || phaseName === "PostMysteryEncounterPhase" // ER quiz (#633 Fix #4b): the quiz answer is an interactive choice that must be relayed, // else each client answers independently -> different rewards. Route it through the same // owner-drives / watcher-mirrors pump as the ME screens.
       || phaseName === "ErQuizPhase"
+      || authoritativeGuestReplay
     );
   }
 
