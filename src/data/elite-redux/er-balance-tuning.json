@@ -6,9 +6,10 @@
   "er.items.resistBerryPct": {
     "hell": 15
   },
-  "er.money.streakCapPct": 11,
-  "er.shop.dearMult": 1.3,
+  "er.money.streakCapPct": 12,
   "vanilla.catch.ballMult": {
+    "greatBall": 1.7,
+    "pokeball": 1.1,
     "rogueBall": 4,
     "ultraBall": 2.5
   },
