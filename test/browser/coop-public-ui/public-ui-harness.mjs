@@ -86,7 +86,10 @@ const COLD_REJOIN_RELEASE_MS = 160_000;
 // Trace-enabled four-core run 29405818635 reached the matching cmd:1:1 observations 0.45s and
 // 1.05s after the ordinary ceiling across the two owner parities, with causal Phaser progress.
 // Keep that measured launch allowance Commander-only; ordinary waits retain the tighter ceiling.
-const COMMANDER_BOUNDARY_HARD_CEILING_MS = 420_000;
+// The dual Commander projection is presentation-heavy on throttled headed CI. Run 30262681369
+// proved both owner parities converged exactly five seconds after the former seven-minute ceiling;
+// retain a bounded one-minute scheduling margin without allowing keepalives to extend it.
+const COMMANDER_BOUNDARY_HARD_CEILING_MS = 480_000;
 // Independent-process guest-owned run 29427072889 made real replay progress again after a measured
 // ~100s animation gap. Keep Commander waits alive across that observed dilation while retaining the
 // immutable seven-minute ceiling above; ordinary battle waits remain at the tighter 90s allowance.
