@@ -3566,6 +3566,10 @@ export const REPLAY_DRAIN_PHASES = new Set([
   "CoopSwitchReplayPhase",
   "CoopPresentationReceiptPhase",
   "CoopFaintReplayPhase",
+  // Replacement commits may fence an empty or non-empty retained PostSummon prefix before installing
+  // state/control. Production PhaseManager starts this proof phase automatically; the in-process harness
+  // must drive it too or it returns one phase early and inspects the pre-replacement field.
+  "CoopFinalizeEntryPresentationPhase",
   "CoopGuestFaintSwitchPhase",
   // The renderer gate replaces a forbidden local resolution phase (commonly MovePhase) with this
   // fail-closed no-op. It can legitimately sit ahead of the replay presentation/finalize tree and must

@@ -313,11 +313,26 @@ test("the production turn boundary is owned by a runtime mutation ledger, not a 
 
 test("V2 replacement animation drains before its checkpoint can install", () => {
   const replay = read("src/phases/coop-replay-turn-phase.ts");
+  const checkpoint = read("src/phases/coop-push-replacement-checkpoint-phase.ts");
+  const switchPhase = read("src/phases/switch-phase.ts");
+  const harness = read("test/tools/coop-duo-harness.ts");
   const presentationGate = replay.indexOf("hasRenderedReplacementPresentation(envelope)");
   const apply = replay.indexOf("this.applyReplacementTransaction(envelope)", presentationGate);
   assert.ok(presentationGate >= 0, "replacement replay has an exactly-once presentation gate");
   assert.ok(apply > presentationGate, "checkpoint apply occurs only after the presentation gate");
   assert.match(replay, /CoopSwitchReplayPhase[\s\S]+CoopReplayTurnPhase[\s\S]+this\.end\(\)/u);
+  assert.match(checkpoint, /private readonly noSummonExpected: boolean/u);
+  assert.match(checkpoint, /constructor\(noSummonExpected = false\)[\s\S]+this\.noSummonExpected = noSummonExpected/u);
+  assert.match(
+    checkpoint,
+    /recordedPresentation == null && !this\.noSummonExpected[\s\S]+recordedPresentation \?\? \[\]/u,
+  );
+  assert.equal(
+    [...switchPhase.matchAll(/unshiftNew\("CoopPushReplacementCheckpointPhase", true\)/gu)].length,
+    2,
+    "only the two explicit no-replacement paths may publish an empty presentation without a summon recorder",
+  );
+  assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
 test("protocol 52 binds every structured presentation cue to stable actors and actual animation boundaries", () => {

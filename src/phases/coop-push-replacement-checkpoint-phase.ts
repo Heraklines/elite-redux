@@ -29,6 +29,18 @@ import { snapshotCoopRecordedPresentation } from "#data/elite-redux/coop/coop-tu
  */
 export class CoopPushReplacementCheckpointPhase extends Phase {
   public readonly phaseName = "CoopPushReplacementCheckpointPhase";
+  private readonly noSummonExpected: boolean;
+
+  /**
+   * A half-wiped seat still resolves a real REPLACEMENT transaction, but no SwitchSummonPhase exists and
+   * therefore no summon-presentation recorder can open. Carry that fact explicitly from the picker instead
+   * of treating every empty recorder as either valid or fatal: completed summons remain fail-closed, while
+   * the typed no-replacement result publishes an intentionally empty immutable presentation prefix.
+   */
+  constructor(noSummonExpected = false) {
+    super();
+    this.noSummonExpected = noSummonExpected;
+  }
 
   public override start(): void {
     super.start();
@@ -85,11 +97,12 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
         // consequence it recorded (hazards, ability flyouts, stat/status changes, weather and narration)
         // into the same immutable REPLACEMENT_COMMIT that states the next command frontier. The best-effort
         // live copies are only latency hints; this retained prefix is the loss/reconnect-safe authority.
-        const entryPresentation = snapshotCoopRecordedPresentation();
-        if (isCoopV2ReplacementCutoverActive() && entryPresentation == null) {
+        const recordedPresentation = snapshotCoopRecordedPresentation();
+        if (isCoopV2ReplacementCutoverActive() && recordedPresentation == null && !this.noSummonExpected) {
           fatal(`Authority V2 replacement for wave ${wave}, turn ${turn} had no active presentation recording.`);
           return;
         }
+        const entryPresentation = recordedPresentation ?? [];
         const v2 = commitCoopV2ReplacementAuthority(
           {
             checkpoint: carrier.checkpoint,
@@ -100,7 +113,7 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
             epoch: controller.sessionEpoch,
             wave: carrier.authoritativeState.wave,
             turn: carrier.authoritativeState.turn,
-            entryPresentation: entryPresentation ?? [],
+            entryPresentation,
           },
           { mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true },
         );

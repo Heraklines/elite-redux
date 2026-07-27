@@ -364,7 +364,7 @@ export class SwitchPhase extends BattlePhase {
                     } else if (receipt.v2Staged === true) {
                       // Explicit no-replacement is still an authoritative transaction: no summon phase will
                       // create a later capture point, so publish the complete sealed-slot state now.
-                      scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+                      scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase", true);
                     }
                     scene.phaseManager.shiftPhase();
                   }),
@@ -485,7 +485,7 @@ export class SwitchPhase extends BattlePhase {
           if (receipt.v2Staged === true) {
             // No SwitchSummonPhase follows a half-wipe. Queue the post-resolution capture explicitly so
             // the typed null selection and complete sealed-slot carrier cannot remain staged forever.
-            scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+            scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase", true);
           }
         }
         coopRelay.sendInteractionChoice(seq, "switch", -1, [0]);
