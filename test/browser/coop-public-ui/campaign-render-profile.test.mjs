@@ -72,6 +72,9 @@ test("public keys release before waiting for the exact production input dispatch
     harness,
     /keyboard\.down\(key\)[\s\S]+keyboard\.up\(key\)[\s\S]+waitForPublicInputDispatch\(this\.evidence/u,
   );
+  assert.match(harness, /findLastInputHealth\(this\.pageCursor\)/u);
+  assert.match(harness, /findLastInputEcho\(this\.pageCursor\)/u);
+  assert.match(harness, /findLastInputDispatch\(this\.pageCursor\)/u);
   assert.doesNotMatch(harness, /keyboard\.press\(key, \{ delay: Math\.min\(this\.config\.actionDelayMs, 100\) \}\)/u);
   const inputDispatchWait = evidence.slice(
     evidence.indexOf("export async function waitForPublicInputDispatch"),

@@ -1404,10 +1404,14 @@ export class PublicUiClient {
       }
       this.evidence.record("key", { key, purpose });
       const echoCursor = this.evidence.cursor();
+      // Input counters are owned by the current browser document and restart at zero after a
+      // cold reopen. Evidence is intentionally retained across page generations, so consulting
+      // the unscoped latest observation here compares the new document's first key (domKeys=1)
+      // with the previous document's final count and falsely rejects a key the game consumed.
       const domKeysBefore = Math.max(
-        Number(this.evidence.findLastInputHealth()?.observation?.domKeys ?? 0),
-        Number(this.evidence.findLastInputEcho()?.observation?.domKeys ?? 0),
-        Number(this.evidence.findLastInputDispatch()?.observation?.domKeys ?? 0),
+        Number(this.evidence.findLastInputHealth(this.pageCursor)?.observation?.domKeys ?? 0),
+        Number(this.evidence.findLastInputEcho(this.pageCursor)?.observation?.domKeys ?? 0),
+        Number(this.evidence.findLastInputDispatch(this.pageCursor)?.observation?.domKeys ?? 0),
       );
       // Dispatch one real public key tap, then demand the read-only receipt from InputsController's exact
       // production input_down event. Releasing before awaiting the receipt keeps the game's 250 ms hold-repeat
