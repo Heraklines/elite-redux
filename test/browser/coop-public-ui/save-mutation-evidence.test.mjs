@@ -81,9 +81,13 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
     journeys,
     /driveSoloPresentationToCommand[\s\S]*surfaceId === "battle:message"[\s\S]*awaitingActionInput === true[\s\S]*advance-solo-presentation-/u,
   );
+  assert.match(
+    journeys,
+    /driveSoloPresentationToCommand[\s\S]*observation\.operationClass === "command"[\s\S]*observation\.phase === "CommandPhase"/u,
+  );
   assert.match(journeys, /driveSoloPresentationToCommand[\s\S]*surfaceId === "check-switch"[\s\S]*targetId: "no"/u);
   assert.match(journeys, /await driveSoloPresentationToCommand\(client, mutationCursor\)/u);
-  assert.match(journeys, /client\.waitForLocalCommand\(mutationCursor\)/u);
+  assert.doesNotMatch(journeys, /client\.waitForLocalCommand\(mutationCursor\)/u);
   assert.match(journeys, /sessionStorageKeys\(deletedCold\)/u);
   assert.match(harness, /browser\.createBrowserContext\(\)/u);
   assert.match(harness, /brand-new cookie jar and local storage/u);

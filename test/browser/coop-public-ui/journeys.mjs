@@ -84,11 +84,19 @@ async function driveSoloPresentationToCommand(client, from) {
   while (Date.now() < deadline) {
     const boundary = client.evidence.findLastSemanticSurface(cursor);
     const observation = boundary?.observation;
-    if (isActionableLocalSoloSurface(observation) && observation.surfaceId === "command:command") {
+    // A single Space that dismisses the final narration may also open FIGHT before the next observer
+    // sample. That is already a real, actionable CommandPhase—not a failure to reach one. Accept any
+    // live solo command sub-surface while retaining the exact phase and public-input proof.
+    if (
+      isActionableLocalSoloSurface(observation)
+      && observation.operationClass === "command"
+      && observation.phase === "CommandPhase"
+    ) {
       client.evidence.record("solo-presentation-command-proof", {
         from,
         observationIndex: boundary.index,
         phase: observation.phase,
+        surfaceId: observation.surfaceId,
       });
       return boundary;
     }
@@ -291,7 +299,6 @@ async function overwriteCoopSaveWithSoloRun(client) {
     );
   }
   await driveSoloPresentationToCommand(client, mutationCursor);
-  await client.waitForLocalCommand(mutationCursor);
   await client.checkpoint("overwrite-solo-wave1-command");
   client.evidence.record("save-overwrite-proof", {
     deleteResponseIndex: deleteResponse.index,

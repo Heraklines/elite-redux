@@ -84,13 +84,12 @@ const POST_TURN_ABSOLUTE_CEILING_MS = 900_000;
 const GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS = 180_000;
 const GAME_OVER_POST_TURN_HARD_CEILING_MS = 900_000;
 const COLD_REJOIN_RELEASE_MS = 160_000;
-// Trace-enabled four-core run 29405818635 reached the matching cmd:1:1 observations 0.45s and
-// 1.05s after the ordinary ceiling across the two owner parities, with causal Phaser progress.
-// Keep that measured launch allowance Commander-only; ordinary waits retain the tighter ceiling.
-// The dual Commander projection is presentation-heavy on throttled headed CI. Run 30262681369
-// proved both owner parities converged exactly five seconds after the former seven-minute ceiling;
-// retain a bounded one-minute scheduling margin without allowing keepalives to extend it.
-const COMMANDER_BOUNDARY_HARD_CEILING_MS = 480_000;
+// Commander exercises the heaviest wave-entry presentation path in two headed Chromiums. Exact-SHA
+// run 30263992512 was still producing real phase transitions at 7m49s (HideAbilityPhase) when the
+// former eight-minute circuit breaker expired. Use the ordinary 15-minute absolute ceiling for this
+// journey too; the rolling allowance below still expires a non-progressing wait after 150 seconds,
+// and heartbeats/retries never count as progress.
+const COMMANDER_BOUNDARY_HARD_CEILING_MS = 900_000;
 // Independent-process guest-owned run 29427072889 made real replay progress again after a measured
 // ~100s animation gap. Keep Commander waits alive across that observed dilation while retaining the
 // immutable seven-minute ceiling above; ordinary battle waits remain at the tighter 90s allowance.

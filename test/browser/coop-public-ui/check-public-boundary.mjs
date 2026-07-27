@@ -120,7 +120,7 @@ if (
   || !usesNamedPostTurnProgressBudget
   || !harness.includes("const POST_TURN_ABSOLUTE_CEILING_MS = 900_000;")
   || !harness.includes("hardCeilingMs = POST_TURN_ABSOLUTE_CEILING_MS")
-  || !harness.includes("const COMMANDER_BOUNDARY_HARD_CEILING_MS = 480_000;")
+  || !harness.includes("const COMMANDER_BOUNDARY_HARD_CEILING_MS = 900_000;")
   || !harness.includes("hardCeilingMs: COMMANDER_BOUNDARY_HARD_CEILING_MS")
   || !harness.includes("return this.assertCommanderCommandBoundary(cursors, purpose, { expectedWave })")
   || (harness.match(/waitForCommanderCommandBoundaryDrivingBattlePrompts\(/gu)?.length ?? 0) < 4
@@ -187,7 +187,7 @@ if (
   || !harness.includes("createPublicBattleProgressBudget(this, from, this.config.timeoutMs, progressBudgetOptions)")
 ) {
   failures.push(
-    "public-ui-harness.mjs: Commander post-turn waits must admit measured animation dilation under the immutable seven-minute ceiling",
+    "public-ui-harness.mjs: Commander post-turn waits must admit measured animation dilation under a bounded progress-sensitive ceiling",
   );
 }
 if (
