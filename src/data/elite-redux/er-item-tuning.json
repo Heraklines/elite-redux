@@ -85,7 +85,8 @@
     "tier": "MASTER"
   },
   "NUGGET": {
-    "tier": "COMMON"
+    "tier": "COMMON",
+    "weight": 2
   },
   "RARE_EVOLUTION_ITEM": {
     "weight": 5
