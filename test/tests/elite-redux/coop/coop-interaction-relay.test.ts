@@ -16,7 +16,7 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 describe("co-op alternating-interaction relay (#633)", () => {
   it("deduplicates committed redelivery by operation id without conflating identical later presentations", async () => {
@@ -195,7 +195,13 @@ describe("co-op alternating-interaction relay (#633)", () => {
     expect(guestRelay.sendV2MeNarrationObservation(seq, 5, step, operationId)).toBe(true);
     guest.send({ t: "interactionChoice", seq, kind: "meBtn", choice: 5, data: [step] });
 
+    // Loopback intentionally mirrors WebRTC's asynchronous wire boundary. Waiting for the actual
+    // observation also lets both the duplicate exact ACK and the raw retired button drain before the
+    // idempotence/FIFO assertions below (Lane A runs with a shared scheduler and exposed the old
+    // synchronous test assumption in run 30227239945).
+    await vi.waitUntil(() => observed.length === 1, { timeout: 1_000, interval: 1 });
     expect(observed).toEqual([{ seq, choice: 5, step, operationId }]);
+    await expect(hostRelay.awaitInteractionChoice(seq, 1, ["meBtn"])).resolves.toBeNull();
 
     guestRelay.dispose();
     hostRelay.dispose();

@@ -66,7 +66,6 @@ import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/c
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
   addressCoopFaintSwitchChoiceData,
-  armCoopFaintSwitchIntentResend,
   COOP_FAINT_SWITCH_RESOLUTION_NONE,
   type CoopFaintSourceAddress,
   captureCoopFaintSwitchOperationBinding,
@@ -1742,17 +1741,13 @@ export class CoopFaintReplayPhase extends PokemonPhase {
           operationBinding,
         );
         sendCoopFaintSwitchChoice(relay, fieldIndex, -1, data);
-        armCoopFaintSwitchIntentResend(
-          {
-            payload: { fieldIndex, partySlot: -1, data },
-            localRole: controller.role,
-            wave: sourceWave,
-            turn: sourceTurn,
-            occurrence,
-            resend: () => sendCoopFaintSwitchChoice(relay, fieldIndex, -1, data),
-          },
-          operationBinding,
-        );
+        // This is an observation that no human picker exists, not a player proposal. The authority can
+        // independently prove the same empty owner-half and may therefore skip SwitchPhase entirely and
+        // authorize the next command frontier. Retaining/resending NONE as a proposal in that case leaves
+        // hasPendingCoopFaintSwitchReplacementIntent() true forever, so the renderer parks in
+        // CoopReplayTurnPhase while the authority is already accepting the next turn (campaign
+        // 30224225375, wave 5). One durable relay is enough when a waiter exists; a host that did open the
+        // replacement boundary also has its own bounded auto-pick/no-replacement fallback.
         return; // nothing to send out - the host's flow decides (wipe / lone survivor)
       }
       globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", fieldIndex, this.faintSourceAddress);

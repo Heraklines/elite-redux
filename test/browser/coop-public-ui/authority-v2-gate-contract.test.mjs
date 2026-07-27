@@ -2191,6 +2191,26 @@ test("a retained V2 replacement is consumed before the next replica command can 
   );
 });
 
+test("a half-wiped renderer never manufactures an immortal no-replacement proposal lease", () => {
+  const noBenchStart = replayPhases.indexOf("if (!hasBench) {");
+  const noBenchEnd = replayPhases.indexOf(
+    'globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase"',
+    noBenchStart,
+  );
+  assert.ok(noBenchStart >= 0 && noBenchEnd > noBenchStart, "the guest half-wipe branch is structurally present");
+  const noBenchBranch = replayPhases.slice(noBenchStart, noBenchEnd);
+  assert.match(
+    noBenchBranch,
+    /markCoopFaintSwitchPickerSettled[\s\S]*COOP_FAINT_SWITCH_RESOLUTION_NONE[\s\S]*sendCoopFaintSwitchChoice/u,
+    "the renderer publishes one exact NONE observation after proving no picker exists",
+  );
+  assert.doesNotMatch(
+    noBenchBranch,
+    /armCoopFaintSwitchIntentResend/u,
+    "NONE is not a human proposal and cannot fence a later authoritative command frontier forever",
+  );
+});
+
 test("a committed guest picker settles and buffers its V2 carrier before yielding to TurnInit", () => {
   const closeStart = guestFaintSwitchPhase.indexOf("const closePicker = (): void => {");
   const closeEnd = guestFaintSwitchPhase.indexOf("\n    };", closeStart) + 7;
