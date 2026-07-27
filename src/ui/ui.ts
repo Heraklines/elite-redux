@@ -13,7 +13,9 @@ import {
   notifyCoopOperationContinuationSurface,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
+  coopGuestAcknowledgeMeNarration,
   coopHostEngineDialogueMessageAdvanceAllowed,
+  coopHostMeNarrationAwaitingGuestAck,
   coopHostStreamMeMessage,
   getCoopBattleStreamer,
   getCoopController,
@@ -429,6 +431,10 @@ export class UI extends Phaser.GameObjects.Container {
           // is pure text-advance with no choice semantics, so let it through; every
           // CHOICE screen (options / party / secondary) stays blocked.
           if (this.getMode() === UiMode.MESSAGE) {
+            if (coopHostMeNarrationAwaitingGuestAck()) {
+              coopLog("me", "ui: host blocks local narration press while exact guest acknowledgement is pending");
+              return false;
+            }
             coopLog("me", "ui: host ADVANCES engine dialogue on guest-owned ME (#816)", { button });
             return this.processInputInner(button);
           }
@@ -437,13 +443,19 @@ export class UI extends Phaser.GameObjects.Container {
           }
           return false; // the guest owns this ME; the host applies the relayed index programmatically
         }
+        const modeBefore = this.getMode();
         const wasReady = this.coopMeReady(); // only relay presses the handler will ACT on
         const result = this.processInputInner(button);
         if (wasReady) {
           if (isCoopDebug()) {
             coopLog("me", "ui: owner press consumed + relayed", { button });
           }
-          mePump.relayOwnerButton(button);
+          // Under Authority V2, a guest-owned narration prompt is a dedicated address-exact presentation
+          // lease. Acknowledge only after the real local handler consumed the press; all other Mystery
+          // input keeps the legacy pump behavior (which V2 itself suppresses for retired raw buttons).
+          if (!(result && modeBefore === UiMode.MESSAGE && coopGuestAcknowledgeMeNarration(button))) {
+            mePump.relayOwnerButton(button);
+          }
         } else if (isCoopDebug()) {
           coopLog("me", "ui: owner scroll-skip press NOT relayed (handler not ready)", { button });
         }
@@ -498,6 +510,29 @@ export class UI extends Phaser.GameObjects.Container {
       return handler.isAwaitingPromptAction();
     }
     return true;
+  }
+
+  /**
+   * Runtime-owned sink for one authenticated guest narration acknowledgement. It can touch only the
+   * host's live, handler-ready Mystery MESSAGE surface; an early acknowledgement is retried by the runtime
+   * and a stale/wrong-mode acknowledgement returns false without consuming any later prompt.
+   */
+  advanceCoopHostMeNarrationFromGuest(button: number): boolean {
+    if (
+      !Number.isSafeInteger(button)
+      || !coopHostEngineDialogueMessageAdvanceAllowed({
+        localRole: getCoopController()?.role ?? "guest",
+        isMessageMode: this.getMode() === UiMode.MESSAGE,
+        netcodeMode: getCoopNetcodeMode(),
+        meInProgress: coopMeInProgress(),
+        meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        meBespokeHostDrives: coopMeBespokeHostDrives(),
+      })
+      || !this.coopMeReady()
+    ) {
+      return false;
+    }
+    return this.processInputInner(button as Button);
   }
 
   /** The original input dispatch, reused by the co-op mirror's owner + replay paths (#633). */
@@ -569,7 +604,7 @@ export class UI extends Phaser.GameObjects.Container {
         if (isCoopDebug()) {
           coopLog("me", "ui: host streams ME narration (showText)", { len: text.length, preview: text.slice(0, 40) });
         }
-        coopHostStreamMeMessage(text);
+        coopHostStreamMeMessage(text, prompt !== false);
       }
       if (handler instanceof MessageUiHandler) {
         (handler as MessageUiHandler).showText(text, delay, callback, callbackDelay, prompt, promptDelay);
@@ -628,7 +663,7 @@ export class UI extends Phaser.GameObjects.Container {
             preview: text.slice(0, 40),
           });
         }
-        coopHostStreamMeMessage(text);
+        coopHostStreamMeMessage(text, true);
       }
       if (handler instanceof MessageUiHandler) {
         (handler as MessageUiHandler).showDialogue(

@@ -44,6 +44,7 @@ import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operatio
 import { notifyCoopOperationContinuationSurface } from "#data/elite-redux/coop/coop-operation-journal";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
+  coopGuestObserveMeNarration,
   coopSessionGeneration,
   failCoopSharedSession,
   getCoopBattleStreamer,
@@ -431,22 +432,26 @@ export class CoopReplayMePhase extends Phase {
       // periodic resend ceiling; the retained exact tail then materializes on this scene/context.
       this.boundRuntime?.durability?.reconnect();
     }
-    // Render the host's authoritative ME narration as it arrives (cosmetic; the outcome rides the
-    // reward alternation + the comprehensive P4 resync, so a dropped line can never desync). Dropped
-    // at the terminal in leaveDefensive / finishWithoutLeaving.
+    // Render the host's authoritative ME narration as it arrives. The text is non-mechanical, but an
+    // actionable guest-owned line carries an exact presentation lease: only a real local dismissal may
+    // advance the host's matching MessagePhase. The subscription is dropped at the encounter terminal.
     this.offMeMessage =
-      getCoopBattleStreamer()?.onMeMessage(text => {
+      getCoopBattleStreamer()?.onMeMessage(message => {
         if (!this.boundaryStillLive()) {
           return;
         }
+        coopGuestObserveMeNarration(message, this.boundRuntime);
         try {
           // #816: render DIRECTLY - queued messages never display while this phase is
           // parked awaiting the host, which is exactly when narration arrives.
           // #817: the ME selector handler HAS a message area (showText routes into it),
           // so narration renders inside the encounter window instead of overdrawing it.
-          globalScene.ui.showText(text, null, undefined, null, true);
-        } catch {
-          /* a narration render failure must never hang the guest's encounter */
+          globalScene.ui.showText(message.text, null, undefined, null, true);
+        } catch (error) {
+          if (message.requiresAck) {
+            coopWarn("me", `guest could not render actionable narration id=${message.operationId}`, error);
+            failCoopSharedSession(`Mystery narration ${message.operationId} could not render on its owner.`);
+          }
         }
         // Track R: post-pick narration IS the guest owner's public continuation surface for its committed
         // ME_PICK (UiMode.MESSAGE maps to no continuation surface by design). Release the retained pick op

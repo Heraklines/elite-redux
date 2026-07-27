@@ -7,9 +7,10 @@
 // TWO-ENGINE co-op FAULT-INJECTION (#633, Layer-A robustness). Proves the netcode property that LIVE
 // WebRTC play depends on: CUE LOSS CANNOT DESYNC A CO-OP SESSION. A real WebRTC datachannel configured
 // unordered/unreliable DROPs, REORDERs, and DELAYs frames; the co-op design marks the PRESENTATION cue
-// class (`battleEvent` / `uiInput` / `meMessage` / `meCursor`) as the drop/reorder/delay-SAFE class (see
-// the protocol comments in coop-transport.ts) because the AUTHORITATIVE per-turn checkpoint reconciles all
-// state regardless of which cue was lost. This test wraps the loopback pair with a SEEDED faulting
+// class (`battleEvent` / `uiInput` / `meCursor`) as the drop/reorder/delay-SAFE class (see the protocol
+// comments in coop-transport.ts) because the AUTHORITATIVE per-turn checkpoint reconciles all state
+// regardless of which cue was lost. Protocol 52 excludes actionable `meMessage` prompts from that class:
+// their exact presentation lease is part of forward progress. This test wraps the loopback pair with a SEEDED faulting
 // transport (test/tools/coop-fault-transport.ts) that injects all three fault classes on the live cue
 // stream, drives several real battle waves through BOTH real engines, and asserts the guest CONVERGES to
 // byte-identical checksum state despite the faults - vs a CONTROL run with faults OFF.

@@ -169,6 +169,38 @@ describe("co-op alternating-interaction relay (#633)", () => {
     authority.dispose();
   });
 
+  it("admits one exact guest Mystery narration acknowledgement without feeding a proposal FIFO", async () => {
+    const { host, guest } = createLoopbackPair();
+    const seq = 8_000_001;
+    const step = 3;
+    const operationId = "7:1:ME_BUTTON:64000011003";
+    let pending = true;
+    const observed: Array<{ seq: number; choice: number; step: number; operationId: string }> = [];
+    const guestRelay = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+    });
+    const hostRelay = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+      validateV2MeNarrationObservation: input =>
+        pending && input.seq === seq && input.choice === 5 && input.step === step && input.operationId === operationId,
+      onV2MeNarrationObservation: input => {
+        pending = false;
+        observed.push(input);
+      },
+    });
+
+    expect(guestRelay.sendV2MeNarrationObservation(seq, 5, step, operationId)).toBe(true);
+    expect(guestRelay.sendV2MeNarrationObservation(seq, 5, step, operationId)).toBe(true);
+    guest.send({ t: "interactionChoice", seq, kind: "meBtn", choice: 5, data: [step] });
+
+    expect(observed).toEqual([{ seq, choice: 5, step, operationId }]);
+
+    guestRelay.dispose();
+    hostRelay.dispose();
+  });
+
   it("carries only exact account-local dexSync telemetry outside the V2 mechanical log", async () => {
     const { host, guest } = createLoopbackPair();
     const timer: { fire?: () => void } = {};

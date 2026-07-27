@@ -266,7 +266,9 @@ import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handof
 import {
   COOP_ME_AUTHORITY_TURN,
   commitMeOwnerIntent,
+  coopMeNarrationOperationId,
   isCompleteCoopMeTerminalPayload,
+  isCoopMeNarrationOperationId,
   isCoopMeOperationEnabled,
   isCoopMeQuizAnswerOperationId,
   receiveCoopMeTerminalTransactionFor,
@@ -279,6 +281,7 @@ import {
   canRestoreCoopActiveMysteryControl,
   captureCoopActiveMysteryControl,
   captureCoopMeControlTransactionState,
+  coopMeBespokeHostDrives,
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
   coopMeInteractionStartValue,
@@ -4221,6 +4224,23 @@ export interface CoopWaveBoundaryStatus {
 }
 
 /** Everything tied to one live co-op session. */
+interface CoopMeNarrationLease {
+  readonly wave: number;
+  readonly seq: number;
+  readonly step: number;
+  readonly operationId: string;
+  acknowledged: boolean;
+  acknowledgedAt: number | null;
+  choice: number | null;
+}
+
+interface CoopMeNarrationRuntimeState {
+  readonly nextStepByPinned: Map<number, number>;
+  hostPending: CoopMeNarrationLease | null;
+  guestPending: Extract<CoopMessage, { t: "meMessage" }> | null;
+  hostAdvanceTimer: ReturnType<typeof setTimeout> | null;
+}
+
 export interface CoopRuntime {
   /** The local player's session brain (host authority in the spoof/dev path). */
   controller: CoopSessionController;
@@ -4238,6 +4258,8 @@ export interface CoopRuntime {
   uiMirror: CoopUiMirror;
   /** Owner->watcher AUTHORITATIVE input pump for whole mystery-encounter lockstep (#633). */
   mePump: CoopMePump;
+  /** Exact guest-rendered narration lease; never a mechanical authority or successor source. */
+  meNarration: CoopMeNarrationRuntimeState;
   /** Reciprocal two-sided rendezvous barriers at pacing sync points (#839). */
   rendezvous: CoopRendezvous;
   /** The local client's transport endpoint. */
@@ -5729,6 +5751,213 @@ export function coopHostEngineDialogueMessageAdvanceAllowed(ctx: {
     && !ctx.meHandoffBattleStarted
     && !ctx.meBespokeHostDrives
   );
+}
+
+/** Whether the host's current ME MessagePhase is leased to the remote encounter owner. */
+export function coopHostMeNarrationAwaitingGuestAck(runtime: CoopRuntime | null = active): boolean {
+  return runtime?.controller.role === "host" && runtime.meNarration.hostPending != null;
+}
+
+/** Install one exact streamed narration prompt as the guest owner's current public input surface. */
+export function coopGuestObserveMeNarration(
+  message: Extract<CoopMessage, { t: "meMessage" }>,
+  runtime: CoopRuntime | null = active,
+): void {
+  if (
+    runtime == null
+    || runtime.controller.role !== "guest"
+    || runtime.controller.authorityRole === "authority"
+    || !message.requiresAck
+    || !isCoopV2InteractionCutoverActive(runtime.durability)
+  ) {
+    return;
+  }
+  const pinned = message.seq - COOP_ME_PUMP_SEQ_BASE;
+  const valid =
+    coopMeInteractionStartValue() === pinned
+    && globalScene.currentBattle?.waveIndex === message.wave
+    && coopInteractionOwnerSeat(pinned) === runtime.controller.localSeatId
+    && isCoopMeNarrationOperationId({
+      operationId: message.operationId,
+      epoch: runtime.controller.sessionEpoch,
+      pinned,
+      step: message.step,
+      seq: message.seq,
+    });
+  if (!valid) {
+    coopWarn("me", `guest refused stale/malformed narration lease id=${message.operationId}`);
+    return;
+  }
+  const prior = runtime.meNarration.guestPending;
+  if (prior != null && prior.operationId !== message.operationId) {
+    failCoopRuntimeSharedSession(
+      runtime,
+      `Mystery narration ${message.operationId} arrived before ${prior.operationId} was dismissed.`,
+      { boundary: "surface", reasonCode: "continuation-failed", wave: message.wave },
+    );
+    return;
+  }
+  runtime.meNarration.guestPending = message;
+}
+
+/**
+ * Guest UI -> relay edge for a real, handler-ready narration dismissal. Returns true only when the exact
+ * presentation observation was emitted; callers then suppress the retired generic `meBtn` carrier.
+ */
+export function coopGuestAcknowledgeMeNarration(choice: number, runtime: CoopRuntime | null = active): boolean {
+  const message = runtime?.meNarration.guestPending;
+  if (
+    runtime == null
+    || message == null
+    || runtime.controller.role !== "guest"
+    || runtime.controller.authorityRole === "authority"
+    || !Number.isSafeInteger(choice)
+    || choice < 0
+    || choice >= 32
+    || globalScene.currentBattle?.waveIndex !== message.wave
+    || coopMeInteractionStartValue() !== message.seq - COOP_ME_PUMP_SEQ_BASE
+  ) {
+    return false;
+  }
+  const sent = runtime.interactionRelay.sendV2MeNarrationObservation(
+    message.seq,
+    choice,
+    message.step,
+    message.operationId,
+  );
+  if (sent) {
+    runtime.meNarration.guestPending = null;
+  }
+  return sent;
+}
+
+interface CoopMeNarrationObservation {
+  readonly seq: number;
+  readonly choice: number;
+  readonly step: number;
+  readonly operationId: string;
+}
+
+/** Authenticate the observation against the one runtime-owned host lease; no legacy cursor participates. */
+function validateCoopMeNarrationObservation(
+  runtime: CoopRuntime | null,
+  observation: CoopMeNarrationObservation,
+): boolean {
+  const pending = runtime?.meNarration.hostPending;
+  if (
+    runtime == null
+    || pending == null
+    || pending.acknowledged
+    || runtime.controller.role !== "host"
+    || runtime.controller.authorityRole !== "authority"
+    || !isCoopV2InteractionCutoverActive(runtime.durability)
+    || pending.seq !== observation.seq
+    || pending.step !== observation.step
+    || pending.operationId !== observation.operationId
+    || !Number.isSafeInteger(observation.choice)
+    || observation.choice < 0
+    || observation.choice >= 32
+  ) {
+    return false;
+  }
+  const pinned = observation.seq - COOP_ME_PUMP_SEQ_BASE;
+  return (
+    coopInteractionOwnerSeat(pinned) !== runtime.controller.localSeatId
+    && isCoopMeNarrationOperationId({
+      operationId: observation.operationId,
+      epoch: runtime.controller.sessionEpoch,
+      pinned,
+      step: observation.step,
+      seq: observation.seq,
+    })
+  );
+}
+
+const COOP_ME_NARRATION_ADVANCE_RETRY_MS = 50;
+const COOP_ME_NARRATION_ADVANCE_CEILING_MS = 30_000;
+
+/** Apply an authenticated guest acknowledgement only when the host's real Message handler is actionable. */
+function consumeCoopMeNarrationObservation(runtime: CoopRuntime | null, observation: CoopMeNarrationObservation): void {
+  if (!validateCoopMeNarrationObservation(runtime, observation) || runtime == null) {
+    return;
+  }
+  const pending = runtime.meNarration.hostPending;
+  if (pending == null) {
+    return;
+  }
+  pending.acknowledged = true;
+  pending.acknowledgedAt = Date.now();
+  pending.choice = observation.choice;
+  scheduleCoopHostMeNarrationAdvance(runtime, pending.operationId);
+}
+
+function scheduleCoopHostMeNarrationAdvance(runtime: CoopRuntime, operationId: string): void {
+  if (runtime.meNarration.hostAdvanceTimer != null) {
+    clearTimeout(runtime.meNarration.hostAdvanceTimer);
+    runtime.meNarration.hostAdvanceTimer = null;
+  }
+  runWhenCoopRuntimeActive(runtime, () => {
+    const pending = runtime.meNarration.hostPending;
+    if (pending?.operationId !== operationId || !pending.acknowledged || pending.choice == null) {
+      return;
+    }
+    const pinned = pending.seq - COOP_ME_PUMP_SEQ_BASE;
+    // Address identity becoming stale revokes this lease. Readiness is different: an acknowledgement may
+    // legitimately outrun the host's queued MessagePhase/handler by a few frames, so MESSAGE mode and
+    // handler actionability are retried below instead of discarding the exact acknowledgement.
+    if (
+      globalScene.currentBattle?.waveIndex !== pending.wave
+      || coopMeInteractionStartValue() !== pinned
+      || runtime.controller.role !== "host"
+      || runtime.controller.netcodeMode !== "authoritative"
+      || !coopMeInProgress()
+      || coopMeHandoffBattleStarted()
+      || coopMeBespokeHostDrives()
+    ) {
+      runtime.meNarration.hostPending = null;
+      return;
+    }
+    const acknowledgedAt = pending.acknowledgedAt ?? Date.now();
+    if (Date.now() - acknowledgedAt >= COOP_ME_NARRATION_ADVANCE_CEILING_MS) {
+      runtime.meNarration.hostPending = null;
+      failCoopRuntimeSharedSession(
+        runtime,
+        `Mystery narration ${operationId} was acknowledged but its host Message handler never became actionable.`,
+        { boundary: "surface", reasonCode: "continuation-failed", wave: pending.wave },
+      );
+      return;
+    }
+    if (
+      !coopHostEngineDialogueMessageAdvanceAllowed({
+        localRole: runtime.controller.role,
+        isMessageMode: globalScene.ui?.getMode() === UiMode.MESSAGE,
+        netcodeMode: runtime.controller.netcodeMode,
+        meInProgress: coopMeInProgress(),
+        meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        meBespokeHostDrives: coopMeBespokeHostDrives(),
+      })
+    ) {
+      runtime.meNarration.hostAdvanceTimer = setTimeout(
+        () => scheduleCoopHostMeNarrationAdvance(runtime, operationId),
+        COOP_ME_NARRATION_ADVANCE_RETRY_MS,
+      );
+      return;
+    }
+    // Clear before dispatch: the Message callback may synchronously stream the next narration lease.
+    runtime.meNarration.hostPending = null;
+    const advanced = globalScene.ui?.advanceCoopHostMeNarrationFromGuest?.(pending.choice) === true;
+    if (advanced) {
+      coopLog("me", `host advanced exact guest-owned narration id=${operationId}`);
+      return;
+    }
+    if (runtime.meNarration.hostPending == null) {
+      runtime.meNarration.hostPending = pending;
+      runtime.meNarration.hostAdvanceTimer = setTimeout(
+        () => scheduleCoopHostMeNarrationAdvance(runtime, operationId),
+        COOP_ME_NARRATION_ADVANCE_RETRY_MS,
+      );
+    }
+  });
 }
 
 /** Retry the exact retained interaction claim after a real phase reports that its public handler is active. */
@@ -11177,23 +11406,70 @@ export function coopGuestShouldAdoptMeBattleParty(): boolean {
  * HOST (#633, TRACK-2 Phase C, non-battle ME narration): stream one ME dialogue/text line to the
  * guest's CoopReplayMePhase so its screen matches the host-run encounter. Hard no-op off the live
  * AUTHORITATIVE host (solo / guest / lockstep never emit), so those paths are byte-for-byte
- * unaffected. Cosmetic - the reward alternation + the per-ME full-state snapshot carry the OUTCOME,
- * so a dropped/late line can only blank a narration line, never desync. Best-effort + guarded.
+ * unaffected. The text remains non-mechanical, but an actionable guest-owned prompt now carries an exact
+ * presentation lease: its reliable acknowledgement is what advances the matching host MessagePhase.
  */
-export function coopHostStreamMeMessage(text: string): void {
+export function coopHostStreamMeMessage(text: string, actionablePrompt = false): void {
   if (!globalScene.gameMode.isCoop || active == null || getCoopNetcodeMode() !== "authoritative") {
     return;
   }
   if (active.controller.role !== "host") {
     return;
   }
+  const runtime = active;
+  const pinned = coopMeInteractionStartValue();
+  const wave = globalScene.currentBattle?.waveIndex ?? -1;
+  const seq = COOP_ME_PUMP_SEQ_BASE + pinned;
+  const step = runtime.meNarration.nextStepByPinned.get(pinned) ?? 0;
+  const operationId = coopMeNarrationOperationId({
+    epoch: runtime.controller.sessionEpoch,
+    pinned,
+    step,
+    seq,
+  });
+  if (pinned < 0 || wave < 0 || operationId == null) {
+    coopWarn("me", `host refused unaddressed ME-message pinned=${pinned} wave=${wave} step=${step}`);
+    return;
+  }
+  const requiresAck =
+    actionablePrompt
+    && isCoopV2InteractionCutoverActive(runtime.durability)
+    && coopInteractionOwnerSeat(pinned) !== runtime.controller.localSeatId
+    && !coopMeHandoffBattleStarted()
+    && !coopMeBespokeHostDrives();
+  if (requiresAck && runtime.meNarration.hostPending != null) {
+    failCoopRuntimeSharedSession(
+      runtime,
+      `Mystery narration ${operationId} opened before ${runtime.meNarration.hostPending.operationId} completed.`,
+      { boundary: "surface", reasonCode: "continuation-failed", wave },
+    );
+    return;
+  }
+  runtime.meNarration.nextStepByPinned.set(pinned, step + 1);
+  if (requiresAck) {
+    runtime.meNarration.hostPending = {
+      wave,
+      seq,
+      step,
+      operationId,
+      acknowledged: false,
+      acknowledgedAt: null,
+      choice: null,
+    };
+  }
   try {
     if (isCoopDebug()) {
-      coopLog("me", `host stream ME-message len=${text.length}`);
+      coopLog(
+        "me",
+        `host stream ME-message wave=${wave} seq=${seq} step=${step} ack=${Number(requiresAck)} len=${text.length}`,
+      );
     }
-    active.battleStream.sendMeMessage(text);
+    runtime.battleStream.sendMeMessage({ text, wave, seq, step, operationId, requiresAck });
   } catch (e) {
     /* an ME narration send failure must never break the host's encounter */
+    if (runtime.meNarration.hostPending?.operationId === operationId) {
+      runtime.meNarration.hostPending = null;
+    }
     coopWarn("me", "host stream ME-message failed", e);
   }
 }
@@ -11964,6 +12240,8 @@ export function assembleCoopRuntime(
         seq,
       });
     },
+    validateV2MeNarrationObservation: observation => validateCoopMeNarrationObservation(runtime, observation),
+    onV2MeNarrationObservation: observation => consumeCoopMeNarrationObservation(runtime, observation),
     publishRewardOptions: (seq, reroll, options, rewardSurface, projection) => {
       if (runtime == null || controller.authorityRole !== "authority") {
         return null;
@@ -12083,6 +12361,12 @@ export function assembleCoopRuntime(
     interactionRelay,
     uiMirror,
     mePump,
+    meNarration: {
+      nextStepByPinned: new Map<number, number>(),
+      hostPending: null,
+      guestPending: null,
+      hostAdvanceTimer: null,
+    },
     rendezvous,
     localTransport: transport,
     durability,
@@ -12386,6 +12670,13 @@ export function clearCoopRuntime(): void {
   // harness. Zero leaked timers is the harness's own invariant (its dispose cancels every armed timer).
   disposeCoopV2Shadow(active);
   clearCoopV2ShadowInbound();
+  if (active.meNarration.hostAdvanceTimer != null) {
+    clearTimeout(active.meNarration.hostAdvanceTimer);
+    active.meNarration.hostAdvanceTimer = null;
+  }
+  active.meNarration.hostPending = null;
+  active.meNarration.guestPending = null;
+  active.meNarration.nextStepByPinned.clear();
   active.controller.dispose();
   active.battleSync.dispose();
   active.battleStream.dispose();

@@ -28,6 +28,7 @@
 // GameManager / no two-engine boot).
 // =============================================================================
 
+import { coopMeNarrationOperationId, isCoopMeNarrationOperationId } from "#data/elite-redux/coop/coop-me-operation";
 import { coopHostEngineDialogueMessageAdvanceAllowed } from "#data/elite-redux/coop/coop-runtime";
 import { describe, expect, it } from "vitest";
 
@@ -42,6 +43,15 @@ const HOST_ENGINE_DIALOGUE = {
 } as const;
 
 describe("Authority-V2 host engine-dialogue carve-out (campaign 29933294323 mystery park)", () => {
+  it("binds every guest narration acknowledgement to one epoch, ME pin, and prompt ordinal", () => {
+    const address = { epoch: 7, pinned: 1, seq: 8_000_001, step: 3 } as const;
+    const operationId = coopMeNarrationOperationId(address);
+    expect(operationId).toBe("7:1:ME_BUTTON:64000011003");
+    expect(isCoopMeNarrationOperationId({ ...address, operationId: operationId! })).toBe(true);
+    expect(isCoopMeNarrationOperationId({ ...address, step: 4, operationId: operationId! })).toBe(false);
+    expect(isCoopMeNarrationOperationId({ ...address, epoch: 8, operationId: operationId! })).toBe(false);
+  });
+
   it("ALLOWS the authoritative host to advance its own MESSAGE dialogue on a guest-owned ME (#816 under V2)", () => {
     // Without this the V2 freeze shadows #816 and the post-pick narration parks forever.
     expect(coopHostEngineDialogueMessageAdvanceAllowed({ ...HOST_ENGINE_DIALOGUE })).toBe(true);

@@ -94,6 +94,8 @@ const proposalAdmission = readFileSync(
   "utf8",
 );
 const interactionRelay = readFileSync(new URL("src/data/elite-redux/coop/coop-interaction-relay.ts", root), "utf8");
+const coopDurability = readFileSync(new URL("src/data/elite-redux/coop/coop-durability.ts", root), "utf8");
+const coopUi = readFileSync(new URL("src/ui/ui.ts", root), "utf8");
 const rewardOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-reward-operation.ts", root), "utf8");
 const authorityStateHooks = readFileSync(
   new URL("src/data/elite-redux/coop/coop-authority-state-hooks.ts", root),
@@ -1751,6 +1753,36 @@ test("pre-battle Mystery engine narration cannot depend on the selector phase st
     /ctx\.meInteractiveSurfaceActive/u,
     "an ordinary MessagePhase remains part of the live Mystery narration after its selector phase ends",
   );
+  assert.match(
+    coopRuntime,
+    /coopHostStreamMeMessage\(text: string, actionablePrompt = false\)[\s\S]*coopMeNarrationOperationId\([\s\S]*requiresAck[\s\S]*battleStream\.sendMeMessage/u,
+    "the host publishes a deterministic prompt identity before exposing a guest-owned narration lease",
+  );
+  assert.match(
+    coopRuntime,
+    /validateCoopMeNarrationObservation[\s\S]*pending\.operationId !== observation\.operationId[\s\S]*isCoopMeNarrationOperationId/u,
+    "the authority accepts only the exact live narration identity",
+  );
+  assert.match(
+    coopRuntime,
+    /COOP_ME_NARRATION_ADVANCE_CEILING_MS[\s\S]*isMessageMode: globalScene\.ui\?\.getMode\(\) === UiMode\.MESSAGE[\s\S]*hostAdvanceTimer = setTimeout[\s\S]*advanceCoopHostMeNarrationFromGuest/u,
+    "an early acknowledgement retries until the real host Message handler is actionable and then advances it",
+  );
+  assert.match(
+    coopUi,
+    /result && modeBefore === UiMode\.MESSAGE && coopGuestAcknowledgeMeNarration\(button\)/u,
+    "only a real handler-consumed guest press emits the presentation acknowledgement",
+  );
+  assert.doesNotMatch(
+    coopDurability,
+    /COOP_COSMETIC_TYPES[\s\S]*"meMessage"/u,
+    "an actionable narration lease is reliable rather than a fault-sheddable cosmetic cue",
+  );
+  assert.match(
+    replayMePhase,
+    /catch \(error\)[\s\S]*message\.requiresAck[\s\S]*failCoopSharedSession\(`Mystery narration/u,
+    "an actionable prompt that cannot render fails closed instead of leaving the host invisibly fenced",
+  );
 });
 
 test("a host-owned V2 learn-move prompt retains the guest at the same wave until its exact result", () => {
@@ -1995,8 +2027,13 @@ test("every retained V2 interaction proposal is identity-idempotent before any l
   );
   assert.match(
     interactionRelay,
-    /this\.isInteractionAuthorityV2\(\) && msg\.kind === "meBtn"[\s\S]*dropped retired raw Mystery button[\s\S]*return;/u,
-    "a stale peer cannot inject an obsolete Mystery button into a V2 waiter or FIFO",
+    /this\.isInteractionAuthorityV2\(\) && msg\.kind === "meBtn"[\s\S]*validateV2MeNarrationObservation\(observation\)[\s\S]*onV2MeNarrationObservation\(observation\)[\s\S]*dropped retired\/stale Mystery button[\s\S]*return;/u,
+    "only an exact narration observation may cross the retired Mystery-button boundary",
+  );
+  assert.match(
+    interactionRelay,
+    /sendV2MeNarrationObservation\([\s\S]*kind: "meBtn"[\s\S]*data: \[step\][\s\S]*cosmeticOperationId: operationId/u,
+    "the guest acknowledgement carries its immutable prompt identity and ordinal",
   );
   assert.match(
     interactionRelay,

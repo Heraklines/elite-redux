@@ -17,7 +17,8 @@
 //
 //   - `classifyCoopMessage` / `isCoopDurableMessage` / `isCoopCosmeticMessage` -
 //     the AUTHORITATIVE vs COSMETIC message-class split (§4.1). Cosmetic streams
-//     (battleEvent render ticks, cursor mirror, ME narration) stay fire-and-forget;
+//     (battleEvent render ticks and cursor mirrors) stay fire-and-forget; actionable Mystery narration
+//     is durable because its exact presentation lease gates forward progress.
 //     the authoritative backbone gets durability.
 //   - `CoopOutboundQueue` (§4.3) - a BOUNDED (count + bytes) FIFO outbound queue
 //     that ENQUEUES durable frames while the channel is dark and flushes them on
@@ -57,8 +58,8 @@ export type CoopMessageType = CoopMessage["t"];
 /**
  * The durability CLASS of a wire message.
  *  - `cosmetic`  - PRESENTATION-ONLY: a dropped/reordered/late frame only stutters an animation or a
- *    narration line; the authoritative checkpoint reconciles it. Sheddable, never journaled (§4.1).
- *    (`battleEvent`, `uiInput`, `meCursor`, `meMessage` - the exact set coop-fault-transport faults
+ *    visual cue; the authoritative checkpoint reconciles it. Sheddable, never journaled (§4.1).
+ *    (`battleEvent`, `uiInput`, `meCursor` - the exact set coop-fault-transport faults
  *    by default, and the classes the protocol comments in coop-transport.ts declare desync-safe.)
  *  - `internal`  - TRANSPORT-INTERNAL keepalive / stall beat: time-sensitive, never queued or journaled
  *    (a stale ping helps nobody). (`ping`, `pong`, `stallBeat`.)
@@ -77,7 +78,6 @@ const COOP_COSMETIC_TYPES: ReadonlySet<CoopMessageType> = new Set<CoopMessageTyp
   "battleEvent",
   "uiInput",
   "meCursor",
-  "meMessage",
 ]);
 
 /** Transport-internal keepalive / liveness frames - never queued (time-sensitive) and never journaled. */

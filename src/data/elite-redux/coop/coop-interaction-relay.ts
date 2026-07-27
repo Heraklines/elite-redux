@@ -340,6 +340,20 @@ export interface CoopInteractionRelayOptions {
     readonly questionIndex: number;
     readonly operationId: string;
   }) => boolean;
+  /** Authenticate one guest dismissal of the host's exact streamed Mystery narration prompt. */
+  validateV2MeNarrationObservation?: (input: {
+    readonly seq: number;
+    readonly choice: number;
+    readonly step: number;
+    readonly operationId: string;
+  }) => boolean;
+  /** Consume an already-authenticated narration acknowledgement as presentation-only input. */
+  onV2MeNarrationObservation?: (input: {
+    readonly seq: number;
+    readonly choice: number;
+    readonly step: number;
+    readonly operationId: string;
+  }) => void;
   /** Resolve the active remote-owned V2 control from one exact relay wait address. */
   resolveV2AuthorityProposalControlId?: (input: {
     readonly relaySequence: number;
@@ -492,6 +506,10 @@ export class CoopInteractionRelay {
   private readonly validateV2QuizAnswerObservation: NonNullable<
     CoopInteractionRelayOptions["validateV2QuizAnswerObservation"]
   >;
+  private readonly validateV2MeNarrationObservation: NonNullable<
+    CoopInteractionRelayOptions["validateV2MeNarrationObservation"]
+  >;
+  private readonly onV2MeNarrationObservation: NonNullable<CoopInteractionRelayOptions["onV2MeNarrationObservation"]>;
   private readonly resolveV2AuthorityProposalControlId: NonNullable<
     CoopInteractionRelayOptions["resolveV2AuthorityProposalControlId"]
   >;
@@ -587,6 +605,8 @@ export class CoopInteractionRelay {
     this.isLocalAuthority = opts.isLocalAuthority ?? (() => transport.role === "host");
     this.isV2AuthorityProposalWaitRequired = opts.isV2AuthorityProposalWaitRequired ?? (() => false);
     this.validateV2QuizAnswerObservation = opts.validateV2QuizAnswerObservation ?? (() => false);
+    this.validateV2MeNarrationObservation = opts.validateV2MeNarrationObservation ?? (() => false);
+    this.onV2MeNarrationObservation = opts.onV2MeNarrationObservation ?? (() => {});
     this.resolveV2AuthorityProposalControlId = opts.resolveV2AuthorityProposalControlId ?? (() => null);
     this.projectV2AuthorityProposalWait = opts.projectV2AuthorityProposalWait ?? (() => false);
     this.revokeV2AuthorityProposalWait = opts.revokeV2AuthorityProposalWait ?? (() => {});
@@ -780,6 +800,45 @@ export class CoopInteractionRelay {
       choice,
       data: [questionIndex],
     });
+    return true;
+  }
+
+  /**
+   * GUEST: acknowledge one exact host-engine Mystery narration prompt.
+   *
+   * This deliberately bypasses the retired generic `meBtn` pump. It is an address-exact presentation
+   * observation, not a choice proposal: it allocates no V2 revision, carries no result, and can only wake
+   * the matching host MessagePhase lease registered by the runtime.
+   */
+  sendV2MeNarrationObservation(seq: number, choice: number, step: number, operationId: string): boolean {
+    if (
+      !this.isInteractionAuthorityV2()
+      || this.isLocalAuthority()
+      || !Number.isSafeInteger(seq)
+      || seq < 0
+      || !Number.isSafeInteger(choice)
+      || choice < 0
+      || choice >= 32
+      || !Number.isSafeInteger(step)
+      || step < 0
+      || step >= 1000
+      || !isValidOperationId(operationId)
+    ) {
+      return false;
+    }
+    recordCoopUiRelayCarrier(
+      "interactionChoice",
+      `seq=${seq} kind=meBtn choice=${choice} step=${step} cosmeticOperationId=${operationId}`,
+    );
+    this.transport.send({
+      t: "interactionChoice",
+      seq,
+      kind: "meBtn",
+      choice,
+      data: [step],
+      cosmeticOperationId: operationId,
+    });
+    coopLog("v2-interaction", `sent Mystery narration observation id=${operationId} step=${step}`);
     return true;
   }
 
@@ -1953,10 +2012,27 @@ export class CoopInteractionRelay {
       return;
     }
     if (this.isInteractionAuthorityV2() && msg.kind === "meBtn") {
-      // Defense in depth for a stale/mixed peer: no raw Mystery button may enter a V2 waiter or FIFO.
-      // The complete ME_TERMINAL entry locally materializes the one compatibility terminal wake-up still
-      // needed by detached legacy phases; ordinary buttons have no Authority V2 consumer.
-      coopLog("v2-interaction", `dropped retired raw Mystery button seq=${msg.seq} choice=${msg.choice}`);
+      // The generic Mystery button pump remains retired. Admit only the exact, non-mechanical narration
+      // acknowledgement shape; consume it directly rather than letting it enter a proposal waiter/FIFO.
+      const step = msg.data?.length === 1 && Number.isSafeInteger(msg.data[0]) ? msg.data[0] : null;
+      const observation =
+        step == null || !isValidOperationId(msg.cosmeticOperationId)
+          ? null
+          : {
+              seq: msg.seq,
+              choice: msg.choice,
+              step,
+              operationId: msg.cosmeticOperationId,
+            };
+      if (this.isLocalAuthority() && observation != null && this.validateV2MeNarrationObservation(observation)) {
+        coopLog(
+          "v2-interaction",
+          `accepted Mystery narration observation id=${observation.operationId} step=${observation.step}`,
+        );
+        this.onV2MeNarrationObservation(observation);
+        return;
+      }
+      coopLog("v2-interaction", `dropped retired/stale Mystery button seq=${msg.seq} choice=${msg.choice}`);
       return;
     }
     if (this.isInteractionAuthorityV2() && !this.isLocalAuthority()) {

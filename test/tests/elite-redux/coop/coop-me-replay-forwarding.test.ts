@@ -113,23 +113,52 @@ describe("co-op non-battle ME replay forwarding (#633, TRACK-2 Phase C)", () => 
     const guestStream = new CoopBattleStreamer(guest);
 
     const queued: string[] = [];
-    const off = guestStream.onMeMessage(text => queued.push(text));
+    const off = guestStream.onMeMessage(message => queued.push(message.text));
 
-    hostStream.sendMeMessage("A mysterious stranger appears.");
-    hostStream.sendMeMessage("Will you help, or walk away?");
+    hostStream.sendMeMessage({
+      text: "A mysterious stranger appears.",
+      wave: 12,
+      seq: COOP_ME_PUMP_SEQ_BASE,
+      step: 0,
+      operationId: "1:0:ME_BUTTON:64000003000",
+      requiresAck: false,
+    });
+    hostStream.sendMeMessage({
+      text: "Will you help, or walk away?",
+      wave: 12,
+      seq: COOP_ME_PUMP_SEQ_BASE,
+      step: 1,
+      operationId: "1:0:ME_BUTTON:64000003001",
+      requiresAck: true,
+    });
     await new Promise(r => setTimeout(r, 0));
 
     expect(queued).toEqual(["A mysterious stranger appears.", "Will you help, or walk away?"]);
 
     // CoopReplayMePhase drops the subscription at its terminal: no line lands after.
     off();
-    hostStream.sendMeMessage("This should not be queued.");
+    hostStream.sendMeMessage({
+      text: "This should not be queued.",
+      wave: 12,
+      seq: COOP_ME_PUMP_SEQ_BASE,
+      step: 2,
+      operationId: "1:0:ME_BUTTON:64000003002",
+      requiresAck: false,
+    });
     await new Promise(r => setTimeout(r, 0));
     expect(queued).toHaveLength(2);
   });
 
   it("the meMessage wire shape is pure JSON (survives a serialize round-trip byte-identical)", () => {
-    const msg: CoopMessage = { t: "meMessage", text: "The well glows faintly." };
+    const msg: CoopMessage = {
+      t: "meMessage",
+      text: "The well glows faintly.",
+      wave: 12,
+      seq: COOP_ME_PUMP_SEQ_BASE,
+      step: 0,
+      operationId: "1:0:ME_BUTTON:64000003000",
+      requiresAck: true,
+    };
     expect(JSON.parse(JSON.stringify(msg))).toEqual(msg);
   });
 });

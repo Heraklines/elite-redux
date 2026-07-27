@@ -143,7 +143,7 @@ export type CoopRole = "host" | "guest";
 // er-coop-51 separates move narration from the actual animation boundary. Successful spread moves carry
 // every rendered target/substitute flag, failed moves carry no false animation, and charging turns carry
 // the exact charge animation instead of being rendered as the completed attack.
-export const COOP_PROTOCOL_VERSION = "er-coop-51";
+export const COOP_PROTOCOL_VERSION = "er-coop-52";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1895,8 +1895,9 @@ export type CoopMessage =
       data?: number[];
       rewardSurface?: CoopRewardSurfaceIdentity | undefined;
       /**
-       * Exact non-mechanical V2 presentation observation. Only the narrowly registered quiz-answer
-       * carrier may set this; it never advances the authority log or chooses a successor.
+       * Exact non-mechanical V2 presentation observation. Only the narrowly registered quiz-answer and
+       * Mystery-narration acknowledgement carriers may set this; neither advances the authority log nor
+       * chooses a successor.
        */
       cosmeticOperationId?: string | undefined;
     }
@@ -1932,10 +1933,20 @@ export type CoopMessage =
    * Host -> guest (#633, TRACK-2 Phase C, NON-BATTLE ME narration): one mystery-encounter
    * dialogue/text line the host's authoritative ME engine produced, ALREADY localized by the host
    * (the guest's CoopReplayMePhase queues it verbatim so its screen matches the host-run encounter).
-   * Cosmetic only - the reward alternation + the full-state snapshot carry the OUTCOME, so a
-   * dropped/late `meMessage` can only blank a narration line, never desync the run.
+   * `operationId`/`seq`/`step` address this exact rendered line. When `requiresAck` is true, the remote
+   * encounter owner must dismiss this prompt before the host's sole engine may advance its matching
+   * MessagePhase. The acknowledgement is presentation-only; retained ME entries still carry every
+   * mechanical result and successor.
    */
-  | { t: "meMessage"; text: string }
+  | {
+      t: "meMessage";
+      text: string;
+      wave: number;
+      seq: number;
+      step: number;
+      operationId: string;
+      requiresAck: boolean;
+    }
   /**
    * Owner -> watcher (#633 Fix #2): the EXACT reward-screen option list the owner rolled
    * for interaction `seq`. The watcher rebuilds these instead of re-rolling its own pool
@@ -2329,7 +2340,7 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "meChecksum":
       return `seq=${msg.seq} checksum=${msg.checksum}`;
     case "meMessage":
-      return `len=${msg.text.length}`;
+      return `wave=${msg.wave} seq=${msg.seq} step=${msg.step} ack=${Number(msg.requiresAck)} id=${msg.operationId} len=${msg.text.length}`;
     case "rewardOptions":
       return `seq=${msg.seq} reroll=${msg.reroll} options=${msg.options.length}`;
     case "requestRewardOptions":

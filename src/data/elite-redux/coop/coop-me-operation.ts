@@ -53,6 +53,7 @@
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
+// biome-ignore lint/suspicious/noImportCycles: the retained ME authority adapter captures the canonical battle image through the established runtime/engine composition cycle.
 import { captureCoopAuthoritativeBattleState, coopNextStateTick } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -783,6 +784,50 @@ export function isCoopMeQuizAnswerOperationId(params: {
       "QUIZ_ANSWER",
     )
   );
+}
+
+/**
+ * Mint the immutable, non-mechanical identity for one actionable Mystery narration prompt.
+ *
+ * Narration acknowledgements deliberately reuse the closed `ME_BUTTON` identity domain without
+ * entering the mechanical Authority V2 log. The surrounding retained ME presentation/terminal owns
+ * progression; this ID only proves which exact streamed prompt a guest actually dismissed.
+ */
+export function coopMeNarrationOperationId(params: {
+  readonly epoch: number;
+  readonly pinned: number;
+  readonly step: number;
+  readonly seq: number;
+}): string | null {
+  if (
+    !Number.isSafeInteger(params.epoch)
+    || params.epoch <= 0
+    || !Number.isSafeInteger(params.pinned)
+    || params.pinned < 0
+    || !Number.isSafeInteger(params.step)
+    || params.step < 0
+    || params.step >= 1000
+    || params.seq !== COOP_ME_PUMP_SEQ_BASE + params.pinned
+  ) {
+    return null;
+  }
+  return makeCoopOperationId(
+    params.epoch,
+    ownerSeatFor("ME_BUTTON", params.pinned),
+    meOpAddr("ME_BUTTON", params.seq, params.step),
+    "ME_BUTTON",
+  );
+}
+
+/** Validate an exact narration acknowledgement without consulting the retired legacy revision cursor. */
+export function isCoopMeNarrationOperationId(params: {
+  readonly operationId: string;
+  readonly epoch: number;
+  readonly pinned: number;
+  readonly step: number;
+  readonly seq: number;
+}): boolean {
+  return params.operationId === coopMeNarrationOperationId(params);
 }
 
 /** Project one newly applied owner intent into the reconnect control snapshot. */

@@ -22,8 +22,9 @@
 // PRESENTATION-ONLY (see the protocol comments in coop-transport.ts): `battleEvent` ("a dropped /
 // reordered / late battleEvent only stutters the animation; it can never desync the guest - the
 // checkpoint reconciles all state"), `uiInput` ("a dropped/late/out-of-order uiInput can never change
-// the run, only stutter the cursor"), `meMessage` ("a dropped/late meMessage can only blank a narration
-// line, never desync"), and `meCursor` (cosmetic). Those are the CUES this wrapper faults BY DEFAULT.
+// the run, only stutter the cursor"), and `meCursor` (cosmetic). Those are the CUES this wrapper faults
+// BY DEFAULT. `meMessage` is intentionally excluded: protocol 52 turns an actionable Mystery narration
+// into an exact presentation lease, so its reliable delivery is now part of forward progress.
 // The AUTHORITATIVE backbone (turnResolution + its checkpoint/checksum, stateSync, waveResolved,
 // enemyPartySync/launchSnapshot, the reward interactionOutcome) is the source of truth that HEALS a
 // dropped cue: the per-turn checkpoint re-asserts the full field state, so the guest converges regardless
@@ -54,7 +55,6 @@ export type CoopFaultKind = "drop" | "reorder" | "delay";
 export const COOP_DEFAULT_CUE_TYPES: ReadonlySet<CoopMessageType> = new Set<CoopMessageType>([
   "battleEvent",
   "uiInput",
-  "meMessage",
   "meCursor",
 ]);
 
@@ -89,6 +89,7 @@ export const COOP_AUTHORITATIVE_TYPES: ReadonlySet<CoopMessageType> = new Set<Co
   "interactionChoice",
   "interactionOutcome",
   "interaction",
+  "meMessage",
   "rewardOptions",
   "waveResolved",
   "waveEndState",

@@ -221,6 +221,7 @@ const AUTHORITY_FATAL_RETRY_MS = 500;
 const AUTHORITY_FATAL_DEADLINE_MS = 3_000;
 const AUTHORITY_ACK_RETENTION = 32;
 const AUTHORITY_COMMIT_RETENTION = 64;
+const ME_MESSAGE_RETENTION = 64;
 const AUTHORITY_TOMBSTONE_RETENTION = AUTHORITY_COMMIT_RETENTION;
 const AUTHORITY_RETIRED_REPLACEMENT_RETENTION = AUTHORITY_COMMIT_RETENTION;
 // Longer than the 120s hot-rejoin grace, but finite: a reconnect gets its full recovery window before
@@ -1423,8 +1424,12 @@ export class CoopBattleStreamer {
   private durabilitySnapshotHandler: ((result: CoopStateSyncResult) => void) | null = null;
   /** WATCHER: handler for the owner's ME-boundary checksum (#633, TRACK-2 Phase C). */
   private meChecksumHandler: ((seq: number, checksum: string) => void) | null = null;
-  /** GUEST: handler for the host's ME narration lines (#633, TRACK-2 Phase C, non-battle ME). */
-  private meMessageHandler: ((text: string) => void) | null = null;
+  /** GUEST: handler for exact host ME narration leases (#633, non-battle ME). */
+  private meMessageHandler: ((message: Extract<CoopMessage, { t: "meMessage" }>) => void) | null = null;
+  /** Narration can beat CoopReplayMePhase subscription; retain a bounded, identity-deduped FIFO. */
+  private readonly pendingMeMessages: Extract<CoopMessage, { t: "meMessage" }>[] = [];
+  /** A reconnect/redelivery may never display or acknowledge the same narration lease twice. */
+  private readonly seenMeMessageOperationIds = new Set<string>();
   /** GUEST: handler for the host's wave-resolved signal (#633, authoritative wave-advance). */
   private waveResolvedHandler:
     | ((
@@ -3910,16 +3915,16 @@ export class CoopBattleStreamer {
     this.meChecksumHandler = handler;
   }
 
-  /**
-   * HOST (#633, TRACK-2 Phase C, non-battle ME narration): stream one ME dialogue/text line to the
-   * guest's CoopReplayMePhase so its screen matches the host-run encounter. Cosmetic - the outcome
-   * rides the reward alternation + the full-state snapshot, so a dropped line never desyncs.
-   */
-  sendMeMessage(text: string): void {
+  /** HOST: stream one exactly-addressed ME narration line to the guest renderer. */
+  sendMeMessage(message: Omit<Extract<CoopMessage, { t: "meMessage" }>, "t">): void {
     if (isCoopDebug()) {
-      coopLog("replay", `host SEND meMessage len=${text.length}`);
+      coopLog(
+        "replay",
+        `host SEND meMessage wave=${message.wave} seq=${message.seq} step=${message.step} `
+          + `ack=${Number(message.requiresAck)} id=${message.operationId} len=${message.text.length}`,
+      );
     }
-    this.transport.send({ t: "meMessage", text });
+    this.transport.send({ t: "meMessage", ...message });
   }
 
   /**
@@ -3928,15 +3933,48 @@ export class CoopBattleStreamer {
    * guest's encounter screen renders the same text the host's authoritative ME engine produced.
    * Returns an unsubscribe function (CoopReplayMePhase drops it when the encounter terminal fires).
    */
-  onMeMessage(handler: (text: string) => void): () => void {
+  onMeMessage(handler: (message: Extract<CoopMessage, { t: "meMessage" }>) => void): () => void {
     coopLog("stream", `guest REGISTER onMeMessage handler (was=${this.meMessageHandler != null})`);
     this.meMessageHandler = handler;
+    const pending = this.pendingMeMessages.splice(0);
+    for (const message of pending) {
+      this.deliverMeMessage(message);
+    }
     return () => {
       if (this.meMessageHandler === handler) {
         coopLog("stream", "guest UNREGISTER onMeMessage handler (null-out)");
         this.meMessageHandler = null;
       }
     };
+  }
+
+  /** Deliver one narration lease once; retain it if the replay phase has not subscribed yet. */
+  private deliverMeMessage(message: Extract<CoopMessage, { t: "meMessage" }>): void {
+    if (this.seenMeMessageOperationIds.has(message.operationId)) {
+      coopLog("replay", `guest DROP duplicate meMessage id=${message.operationId}`);
+      return;
+    }
+    if (this.meMessageHandler == null) {
+      if (this.pendingMeMessages.some(pending => pending.operationId === message.operationId)) {
+        return;
+      }
+      if (this.pendingMeMessages.length >= ME_MESSAGE_RETENTION) {
+        const evicted = this.pendingMeMessages.shift();
+        coopWarn("replay", `guest EVICT oldest pending meMessage id=${evicted?.operationId ?? "unknown"}`);
+      }
+      this.pendingMeMessages.push(message);
+      coopLog("replay", `guest BUFFER meMessage id=${message.operationId} pending=${this.pendingMeMessages.length}`);
+      return;
+    }
+    this.seenMeMessageOperationIds.add(message.operationId);
+    while (this.seenMeMessageOperationIds.size > ME_MESSAGE_RETENTION) {
+      const oldest = this.seenMeMessageOperationIds.values().next().value as string | undefined;
+      if (oldest == null) {
+        break;
+      }
+      this.seenMeMessageOperationIds.delete(oldest);
+    }
+    this.meMessageHandler(message);
   }
 
   /** HOST: subscribe to already-authenticated exact recovery requests. */
@@ -4976,6 +5014,8 @@ export class CoopBattleStreamer {
     this.ackedAuthorityFailures.clear();
     this.authorityFailureRevision = 0;
     this.meMessageHandler = null;
+    this.pendingMeMessages.length = 0;
+    this.seenMeMessageOperationIds.clear();
   }
 
   /** Stop listening and fail any in-flight awaits. */
@@ -5099,6 +5139,8 @@ export class CoopBattleStreamer {
     this.enemyPartyRequestHandler = null;
     this.meChecksumHandler = null;
     this.meMessageHandler = null;
+    this.pendingMeMessages.length = 0;
+    this.seenMeMessageOperationIds.clear();
     this.waveResolvedHandler = null;
     this.waveEndStateHandler = null;
   }
@@ -6121,15 +6163,31 @@ export class CoopBattleStreamer {
         this.meChecksumHandler?.(msg.seq, msg.checksum);
         return;
       case "meMessage":
-        // GUEST: one host-authoritative ME narration line - the diverted CoopReplayMePhase queues it.
-        // HOT PATH (per narration line): build the trace string only when debug is on.
+        // GUEST: one exactly-addressed host narration lease. Validate before retaining it; a malformed
+        // cosmetic carrier may never create an actionable acknowledgement surface.
+        if (
+          !Number.isSafeInteger(msg.wave)
+          || msg.wave < 0
+          || !Number.isSafeInteger(msg.seq)
+          || msg.seq < 0
+          || !Number.isSafeInteger(msg.step)
+          || msg.step < 0
+          || msg.step >= 1000
+          || typeof msg.operationId !== "string"
+          || msg.operationId.length === 0
+          || typeof msg.requiresAck !== "boolean"
+        ) {
+          coopWarn("replay", "guest DROP malformed meMessage address");
+          return;
+        }
         if (isCoopDebug()) {
           coopLog(
             "stream",
-            `guest RECV meMessage len=${msg.text.length} ${this.meMessageHandler == null ? "-> DROPPED (no handler)" : "-> handler"}`,
+            `guest RECV meMessage wave=${msg.wave} seq=${msg.seq} step=${msg.step} ack=${Number(msg.requiresAck)} `
+              + `id=${msg.operationId} len=${msg.text.length} ${this.meMessageHandler == null ? "-> buffer" : "-> handler"}`,
           );
         }
-        this.meMessageHandler?.(msg.text);
+        this.deliverMeMessage(msg);
         return;
       case "waveResolved":
         // GUEST: the host cleared/ended this wave - run the normal post-battle tail.

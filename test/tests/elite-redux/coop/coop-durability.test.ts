@@ -129,6 +129,15 @@ describe("durability §4.1: message classification (authoritative vs cosmetic vs
       },
       { t: "interactionChoice", seq: 1, kind: "reward", choice: 0 },
       { t: "interactionOutcome", seq: 1, kind: "reward", outcome: { k: "reward" } as never },
+      {
+        t: "meMessage",
+        text: "hi",
+        wave: 1,
+        seq: 8_000_001,
+        step: 0,
+        operationId: "7:1:ME_BUTTON:64000011000",
+        requiresAck: true,
+      },
       { t: "stateSync", ticket: {} as never, captured: {} as never, blob: "b" },
       { t: "launchSnapshot", wave: 1, session: "s" },
       { t: "runConfig", difficulty: "elite", challenges: [] },
@@ -148,7 +157,6 @@ describe("durability §4.1: message classification (authoritative vs cosmetic vs
       { t: "battleEvent", epoch: 7, wave: 1, turn: 1, seq: 0, event: { k: "msg", text: "x" } as never },
       { t: "uiInput", seq: 1, n: 0, button: 0, mode: 0 },
       { t: "meCursor", index: 0 },
-      { t: "meMessage", text: "hi" },
     ];
     for (const m of cosmetic) {
       expect(classifyCoopMessage(m), m.t).toBe("cosmetic");
