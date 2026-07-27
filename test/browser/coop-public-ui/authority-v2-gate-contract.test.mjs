@@ -2885,7 +2885,7 @@ test("campaign speed setup follows semantic title identities across a late title
 });
 
 test("the browser observer republishes an unchanged menu after a non-semantic modal closes", () => {
-  const classify = browserEntry.indexOf("const semantic = classifySemanticSurface(phase, uiMode);");
+  const classify = browserEntry.indexOf("classifySemanticSurface(phase, uiMode);");
   const selection = browserEntry.indexOf("const selection = readSelection(handler, uiMode);", classify);
   assert.ok(classify >= 0 && selection > classify, "the semantic classification block is bounded");
   const classification = browserEntry.slice(classify, selection);
