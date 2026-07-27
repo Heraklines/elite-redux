@@ -113,7 +113,10 @@ describe("co-op non-battle ME replay forwarding (#633, TRACK-2 Phase C)", () => 
     const guestStream = new CoopBattleStreamer(guest);
 
     const queued: string[] = [];
-    const off = guestStream.onMeMessage(message => queued.push(message.text));
+    const off = guestStream.onMeMessage(message => {
+      queued.push(message.text);
+      return true;
+    });
 
     hostStream.sendMeMessage({
       text: "A mysterious stranger appears.",

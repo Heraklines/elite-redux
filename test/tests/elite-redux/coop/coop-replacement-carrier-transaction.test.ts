@@ -5,6 +5,7 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
+import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { installCoopAuthoritativeProjectionAdapter } from "#data/elite-redux/coop/coop-presentation";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
@@ -320,6 +321,56 @@ describe("production replacement carrier transaction", () => {
       "the finalized turn-N replay cannot reopen behind the replacement-owned command",
     ).toBe(false);
     expect(unshiftNew.mock.calls.some(([name]) => name === "CoopFinalizeTurnPhase")).toBe(false);
+  });
+
+  it("keeps replacement state and command control closed behind the retained post-summon renderer fence", async () => {
+    const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+    runtime.controller.role = "guest";
+    const checkpointApply = vi.spyOn(coopEngine, "applyCoopCheckpoint");
+    const replacementState = state(20);
+    const message = {
+      t: "battleCheckpoint" as const,
+      reason: "replacement",
+      epoch: runtime.controller.sessionEpoch,
+      wave: 4,
+      turn: 2,
+      revision: 20,
+      checkpoint: checkpoint(19),
+      checksum,
+      fullField: fullField(),
+      authoritativeState: replacementState,
+    };
+    const nextControl: CoopNextControl = {
+      kind: "COMMAND_FRONTIER",
+      epoch: runtime.controller.sessionEpoch,
+      wave: 4,
+      turn: 2,
+      commands: [{ ownerSeatId: 1, fieldIndex: 1, pokemonId: 101 }],
+    };
+
+    phase = new CoopReplayTurnPhase(1, 0, undefined, 4);
+    phase.start();
+    runtime.battleStream.ingestAuthoritativeV2Replacement(message, nextControl, 9, null, [
+      {
+        k: "statStage",
+        bi: 1,
+        actor: { side: "player", pokemonId: 101 },
+        stat: 5,
+        value: -1,
+      },
+    ]);
+    await flushWire();
+
+    expect(
+      checkpointApply,
+      "mechanical replacement state cannot apply before presentation proof",
+    ).not.toHaveBeenCalled();
+    expect(unshiftNew.mock.calls.map(([name]) => name)).toEqual([
+      "CoopStatStageReplayPhase",
+      "CoopFinalizeEntryPresentationPhase",
+      "CoopReplayTurnPhase",
+    ]);
+    expect(unshiftNew.mock.calls.some(([name]) => name === "CommandPhase")).toBe(false);
   });
 
   it("keeps turn N parked for wrong epoch, wrong wave, N+2, and non-replacement N+1 checkpoints", async () => {

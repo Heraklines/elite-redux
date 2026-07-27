@@ -165,6 +165,11 @@ export interface CoopCheckpointEnvelope {
   authorityRevision?: number;
   /** Local-only immutable V2 summon event; excluded from legacy carrier identity/ACK canonicalization. */
   replacementPresentation?: CoopSwitchPresentation | null;
+  /**
+   * Local-only retained post-summon prefix paired with the V2 replacement. Excluded from the legacy
+   * checkpoint identity because the Authority V2 entry digest/order owns it.
+   */
+  replacementEntryPresentation?: readonly CoopBattleEvent[];
 }
 
 /**
@@ -4674,8 +4679,12 @@ export class CoopBattleStreamer {
     nextControl: CoopNextControl,
     authorityRevision: number,
     presentation: CoopSwitchPresentation | null,
+    entryPresentation: readonly CoopBattleEvent[],
   ): void {
-    this.handle(msg, "authority-v2", nextControl, authorityRevision, presentation);
+    if (!isStrictCoopEntryPresentation(entryPresentation)) {
+      throw new Error("refusing malformed Authority V2 replacement entry presentation");
+    }
+    this.handle(msg, "authority-v2", nextControl, authorityRevision, presentation, entryPresentation);
   }
 
   /** Whether this exact V2 replacement has already drained its pre-checkpoint visual event. */
@@ -5171,6 +5180,7 @@ export class CoopBattleStreamer {
     authorityNextControl?: CoopNextControl,
     authorityRevision?: number,
     replacementPresentation: CoopSwitchPresentation | null = null,
+    replacementEntryPresentation?: readonly CoopBattleEvent[],
   ): void {
     switch (msg.t) {
       case "enemyPartySync": {
@@ -5738,7 +5748,13 @@ export class CoopBattleStreamer {
             const retained = copyAdmittedAuthority(admission.seen);
             const delivered =
               source === "authority-v2" && authorityNextControl !== undefined && authorityRevision !== undefined
-                ? { ...retained, authorityNextControl, authorityRevision, replacementPresentation }
+                ? {
+                    ...retained,
+                    authorityNextControl,
+                    authorityRevision,
+                    replacementPresentation,
+                    replacementEntryPresentation: structuredClone(replacementEntryPresentation ?? []),
+                  }
                 : retained;
             coopLog(
               "checkpoint",
@@ -5763,7 +5779,13 @@ export class CoopBattleStreamer {
         const key = bufferedAuthorityKey("replacement", envelope);
         const deliveredEnvelope =
           source === "authority-v2" && authorityNextControl !== undefined && authorityRevision !== undefined
-            ? { ...envelope, authorityNextControl, authorityRevision, replacementPresentation }
+            ? {
+                ...envelope,
+                authorityNextControl,
+                authorityRevision,
+                replacementPresentation,
+                replacementEntryPresentation: structuredClone(replacementEntryPresentation ?? []),
+              }
             : envelope;
         // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
         // carrying the host's checksum so the guest can verify convergence after applying.

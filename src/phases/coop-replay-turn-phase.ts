@@ -580,6 +580,9 @@ export class CoopReplayTurnPhase extends Phase {
               this.end();
               return;
             }
+            if (this.queueReplacementEntryPresentation(streamer, envelope)) {
+              return;
+            }
             if (!this.applyReplacementTransaction(envelope)) {
               this.parkForReplacementRetry(streamer, envelope);
               return;
@@ -1187,6 +1190,68 @@ export class CoopReplayTurnPhase extends Phase {
   }
 
   /**
+   * Drain the replacement's complete retained post-summon prefix before its state image or command
+   * successor can install. Live `battleEvent` copies are latency hints and may have arrived while this
+   * replay was still parked on the faint's source turn; they are keyed to the successor turn and therefore
+   * cannot release this transaction. The immutable REPLACEMENT_COMMIT prefix closes that gap.
+   */
+  private queueReplacementEntryPresentation(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    envelope: CoopCheckpointEnvelope,
+  ): boolean {
+    const events = envelope.replacementEntryPresentation;
+    if (events == null) {
+      if (envelope.authorityRevision != null) {
+        this.failAuthority(
+          streamer,
+          "replacement",
+          `Replacement revision ${envelope.authorityRevision} had no retained post-summon presentation.`,
+          envelope,
+        );
+        return true;
+      }
+      return false;
+    }
+    const renderedThrough = streamer.renderedThroughForTurn(envelope.turn, envelope.wave);
+    if (renderedThrough >= events.length) {
+      return false;
+    }
+    const remaining = events.slice(renderedThrough);
+    this.renderEvents(remaining, {
+      turn: envelope.turn,
+      sourceWave: envelope.wave,
+      fromIndex: renderedThrough,
+    });
+    coopLog(
+      "replay",
+      `guest replacement rev=${envelope.authorityRevision ?? "legacy"} queued retained post-summon `
+        + `presentation turn=${envelope.turn} seq=${renderedThrough}..${events.length - 1}`,
+    );
+    // Queue the proof fence after every concrete presentation child, followed by this exact replay
+    // continuation. The fence advances the shared watermark only when every outcome settled successfully;
+    // a failure broadcasts the shared authority terminal and the continuation can never apply state/control.
+    globalScene.phaseManager.unshiftNew(
+      "CoopFinalizeEntryPresentationPhase",
+      envelope.turn,
+      envelope.wave,
+      events.length,
+      this.presentationOutcomeTokens,
+      streamer,
+    );
+    globalScene.phaseManager.unshiftNew(
+      "CoopReplayTurnPhase",
+      this.turn,
+      this.rendered,
+      [...this.fromHpByBi.entries()],
+      this.sourceWave,
+      this.entryPresentationOnly,
+      this.presentationOutcomeTokens,
+    );
+    this.end();
+    return true;
+  }
+
+  /**
    * Apply one complete replacement frame and prove exact convergence before control can reopen. This is a
    * control/consumption transaction, not a rollback-capable data transaction: lower-level appliers may have
    * mutated state before reporting failure, so a same-frame retry explicitly reasserts the accepted state.
@@ -1385,7 +1450,14 @@ export class CoopReplayTurnPhase extends Phase {
    * are replayed from immutable authority events too. Each unshift is guarded so one garbled event can
    * never hang the turn - the checkpoint still corrects its state.
    */
-  private renderEvents(events: CoopBattleEvent[]): void {
+  private renderEvents(
+    events: CoopBattleEvent[],
+    address: { readonly turn: number; readonly sourceWave: number; readonly fromIndex: number } = {
+      turn: this.turn,
+      sourceWave: this.sourceWave,
+      fromIndex: this.rendered,
+    },
+  ): void {
     // SHOWDOWN (Task F1): reflect every bi-bearing event into the versus guest's LOCAL orientation so the
     // replay phases animate the correct sprites (a missed bi = a move/hp/faint on the wrong side). Swapped
     // at RENDER time (the guest's own context), covering both the live per-event and batched paths that
@@ -1396,7 +1468,7 @@ export class CoopReplayTurnPhase extends Phase {
     const localEvents = isShowdownGuestFlipGated()
       ? canonicalEvents.map(event => swapBattleEvent(event))
       : canonicalEvents;
-    coopLog("replay", `guest replay turn=${this.turn}: rendering ${localEvents.length} event(s)`);
+    coopLog("replay", `guest replay turn=${address.turn}: rendering ${localEvents.length} event(s)`);
     // Running per-mon hp so multi-hit drains chain (hit1: cur->hp1, hit2: hp1->hp2, ...). Seeded
     // lazily from the live (pre-checkpoint) hp the first time a mon is seen. INSTANCE state (#782):
     // the chain is carried across live-pump continuations via the ctor, so an increment boundary
@@ -1582,11 +1654,11 @@ export class CoopReplayTurnPhase extends Phase {
               event.narrate === true,
               event.sp,
               {
-                wave: this.sourceWave,
-                turn: this.turn,
+                wave: address.sourceWave,
+                turn: address.turn,
                 // The existing stream seq is identical to the event's turn-resolution batch index.
-                // `this.rendered` is this continuation's exact starting watermark.
-                occurrence: this.rendered + eventOffset,
+                // `address.fromIndex` is this continuation's exact starting watermark.
+                occurrence: address.fromIndex + eventOffset,
               },
               event.actor,
               outcomeToken,
@@ -1611,8 +1683,8 @@ export class CoopReplayTurnPhase extends Phase {
         if (hasCoopPresentationObserver()) {
           pm.unshiftNew(
             "CoopPresentationReceiptPhase",
-            this.turn,
-            this.rendered + eventOffset,
+            address.turn,
+            address.fromIndex + eventOffset,
             canonicalEvents[eventOffset],
             outcomeToken,
           );
@@ -1625,7 +1697,7 @@ export class CoopReplayTurnPhase extends Phase {
     const breakdown = Object.entries(tally)
       .map(([k, n]) => `${k}=${n}`)
       .join(" ");
-    coopLog("replay", `guest replay turn=${this.turn}: rendered phases [${breakdown || "none"}]`);
+    coopLog("replay", `guest replay turn=${address.turn}: rendered phases [${breakdown || "none"}]`);
   }
 }
 

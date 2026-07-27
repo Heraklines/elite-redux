@@ -180,6 +180,7 @@ import {
   resetCoopStateTicks,
   // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates battle-engine callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-battle-engine";
+import { isStrictCoopEntryPresentation } from "#data/elite-redux/coop/coop-battle-event-validator";
 import {
   CoopBattleStreamer,
   type CoopStateSyncFailure,
@@ -4685,6 +4686,7 @@ function reconstructCoopV2TurnResolution(
 function reconstructCoopV2ReplacementCheckpoint(entry: CoopAuthorityEntry): {
   readonly checkpoint: Extract<CoopMessage, { t: "battleCheckpoint" }>;
   readonly presentation: CoopSwitchPresentation | null;
+  readonly entryPresentation: readonly CoopBattleEvent[];
 } | null {
   const image = decodeReplacementCommitMaterial(entry);
   const carrier = image?.authorityCarrier;
@@ -4704,6 +4706,7 @@ function reconstructCoopV2ReplacementCheckpoint(entry: CoopAuthorityEntry): {
     || typeof carrier.wave !== "number"
     || typeof carrier.turn !== "number"
     || carrier.presentation === undefined
+    || !isStrictCoopEntryPresentation(carrier.entryPresentation)
   ) {
     return null;
   }
@@ -4738,6 +4741,7 @@ function reconstructCoopV2ReplacementCheckpoint(entry: CoopAuthorityEntry): {
       authoritativeState: state,
     },
     presentation: carrier.presentation,
+    entryPresentation: structuredClone(carrier.entryPresentation),
   };
 }
 
@@ -6557,6 +6561,7 @@ function buildCoopV2LiveSeams(
             entry.nextControl,
             entry.revision,
             replacement.presentation,
+            replacement.entryPresentation,
           );
           // The checkpoint is now retained in the correct replica stream. Release a preceding
           // null-successor turn only after that carrier exists, allowing the normal TurnInit/replay path

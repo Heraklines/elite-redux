@@ -273,6 +273,18 @@ export function sealCoopEntryPresentation(): CoopBattleEvent[] | null {
   return recording.events.slice(0, recording.entryPresentationLength);
 }
 
+/**
+ * HOST replacement authority: snapshot every event recorded through the latest completed summon.
+ *
+ * Unlike {@link sealCoopEntryPresentation}, this deliberately does not freeze the first boundary. A
+ * same-turn double or triple faint publishes one replacement commit after each summon; every later commit
+ * must therefore contain the expanded cumulative prefix. The guest's shared per-turn proof watermark skips
+ * the prefix already proved by an earlier replacement and renders only the new suffix.
+ */
+export function snapshotCoopRecordedPresentation(): CoopBattleEvent[] | null {
+  return recording == null ? null : recording.events.slice();
+}
+
 export interface CoopRecordedFaintAddress {
   /** The immutable source turn stamped when the authority opened this recording. */
   readonly turn: number;

@@ -3,6 +3,7 @@ import {
   endCoopRecording,
   recordCoopEvent,
   sealCoopEntryPresentation,
+  snapshotCoopRecordedPresentation,
 } from "#data/elite-redux/coop/coop-turn-recorder";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -75,6 +76,19 @@ describe("co-op turn recorder summon window", () => {
         { k: "message", text: "after command" },
       ],
     });
+  });
+
+  it("expands the retained replacement prefix after every same-turn summon", () => {
+    beginCoopRecording(2, "epoch-a:9");
+    recordCoopEvent({ k: "message", text: "first replacement entered" });
+
+    expect(snapshotCoopRecordedPresentation()).toEqual([{ k: "message", text: "first replacement entered" }]);
+
+    recordCoopEvent({ k: "weather", weather: 1, turnsLeft: 5, anim: 2101 });
+    expect(snapshotCoopRecordedPresentation()).toEqual([
+      { k: "message", text: "first replacement entered" },
+      { k: "weather", weather: 1, turnsLeft: 5, anim: 2101 },
+    ]);
   });
 
   it("does not preserve the same numeric turn across waves or sessions", () => {

@@ -23,6 +23,7 @@ const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.y
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
 const coopBattleEngine = readFileSync(new URL("src/data/elite-redux/coop/coop-battle-engine.ts", root), "utf8");
 const battleStream = readFileSync(new URL("src/data/elite-redux/coop/coop-battle-stream.ts", root), "utf8");
+const turnRecorder = readFileSync(new URL("src/data/elite-redux/coop/coop-turn-recorder.ts", root), "utf8");
 const turnCutover = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/cutover-turn.ts", root), "utf8");
 const meOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-operation.ts", root), "utf8");
 const operationSurfaceRegistry = readFileSync(
@@ -192,6 +193,47 @@ test("an N+1 replacement command resets every turn-local presentation watermark"
   assert.match(pivot, /continuesSameTurn \? this\.rendered : 0/u);
   assert.match(pivot, /continuesSameTurn \? \[\.\.\.this\.fromHpByBi\.entries\(\)\] : undefined/u);
   assert.match(pivot, /continuesSameTurn \? this\.presentationOutcomeTokens : undefined/u);
+});
+
+test("replacement command control cannot overtake retained post-summon presentation", () => {
+  assert.match(
+    pushReplacementCheckpointPhase,
+    /const entryPresentation = snapshotCoopRecordedPresentation\(\)[\s\S]*entryPresentation == null[\s\S]*fatal\([\s\S]*entryPresentation: entryPresentation \?\? \[\]/u,
+    "the real post-summon checkpoint snapshots its complete ordered prefix and fails closed when V2 cannot record it",
+  );
+  assert.match(
+    turnRecorder,
+    /function snapshotCoopRecordedPresentation\(\)[\s\S]*recording\.events\.slice\(\)/u,
+    "chained replacements retain a cumulative prefix instead of freezing the first summon's boundary",
+  );
+  assert.match(
+    replacementAdapter,
+    /interface ReplacementAuthorityCarrier[\s\S]*entryPresentation\?: readonly CoopBattleEvent\[\]/u,
+    "the immutable replacement material carries the ordered post-summon prefix",
+  );
+  assert.match(
+    coopRuntime,
+    /isStrictCoopEntryPresentation\(carrier\.entryPresentation\)[\s\S]*ingestAuthoritativeV2Replacement\([\s\S]*replacement\.entryPresentation/u,
+    "replica admission validates and forwards the retained prefix through the V2 replacement transaction",
+  );
+  assert.match(
+    battleStream,
+    /replacementEntryPresentation\?: readonly CoopBattleEvent\[\][\s\S]*mechanicalCheckpointEnvelope/u,
+    "the prefix is local V2 projection material rather than a second legacy checkpoint identity",
+  );
+  const prefixFence = replayTurnPhase.indexOf("private queueReplacementEntryPresentation(");
+  const applyReplacement = replayTurnPhase.indexOf("private applyReplacementTransaction(");
+  assert.ok(prefixFence >= 0 && applyReplacement > prefixFence, "replacement replay exposes a bounded prefix fence");
+  const prefix = replayTurnPhase.slice(prefixFence, applyReplacement);
+  assert.match(prefix, /renderedThroughForTurn\(envelope\.turn, envelope\.wave\)/u);
+  assert.match(prefix, /"CoopFinalizeEntryPresentationPhase"/u);
+  assert.match(prefix, /"CoopReplayTurnPhase"/u);
+  const queuePrefix = replayTurnPhase.indexOf("this.queueReplacementEntryPresentation(streamer, envelope)");
+  const applyFrame = replayTurnPhase.indexOf("this.applyReplacementTransaction(envelope)", queuePrefix);
+  assert.ok(
+    queuePrefix >= 0 && applyFrame > queuePrefix,
+    "the complete renderer proof fence runs before replacement state and command control can install",
+  );
 });
 
 test("every release soak and focused replay executes the complete Authority V2 graph", () => {

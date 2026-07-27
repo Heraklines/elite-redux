@@ -145,11 +145,22 @@ describe("co-op replacement continuation releases from the command-barrier park 
       doReturn: false,
       actor: { side: "player", pokemonId: 101 },
     } as const;
-    guestStream.ingestAuthoritativeV2Replacement(message, nextControl, 41, presentation);
+    const entryPresentation = [
+      { k: "message" as const, text: "Pikachu was caught in a sticky web!" },
+      {
+        k: "statStage" as const,
+        bi: 0,
+        actor: { side: "player" as const, pokemonId: 101 },
+        stat: 5,
+        value: -1,
+      },
+    ];
+    guestStream.ingestAuthoritativeV2Replacement(message, nextControl, 41, presentation, entryPresentation);
     const delivered = guestStream.consumeCheckpoint();
     expect(delivered?.authorityNextControl).toEqual(nextControl);
     expect(delivered?.authorityRevision).toBe(41);
     expect(delivered?.replacementPresentation).toEqual(presentation);
+    expect(delivered?.replacementEntryPresentation).toEqual(entryPresentation);
     expect(delivered == null ? false : guestStream.hasRenderedReplacementPresentation(delivered)).toBe(false);
     if (delivered != null) {
       guestStream.noteRenderedReplacementPresentation(delivered);

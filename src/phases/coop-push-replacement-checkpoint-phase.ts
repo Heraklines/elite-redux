@@ -16,6 +16,7 @@ import {
   getCoopBattleStreamer,
   getCoopController,
 } from "#data/elite-redux/coop/coop-runtime";
+import { snapshotCoopRecordedPresentation } from "#data/elite-redux/coop/coop-turn-recorder";
 
 /**
  * Co-op (#633, the guest-faint deadlock): pushed by the HOST right after it auto-summons a
@@ -80,6 +81,15 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
           fatal(`Host could not capture replacement authority for wave ${wave}, turn ${turn}.`);
           return;
         }
+        // SwitchSummonPhase's PostSummon child has drained before this capture point. Seal every visible
+        // consequence it recorded (hazards, ability flyouts, stat/status changes, weather and narration)
+        // into the same immutable REPLACEMENT_COMMIT that states the next command frontier. The best-effort
+        // live copies are only latency hints; this retained prefix is the loss/reconnect-safe authority.
+        const entryPresentation = snapshotCoopRecordedPresentation();
+        if (isCoopV2ReplacementCutoverActive() && entryPresentation == null) {
+          fatal(`Authority V2 replacement for wave ${wave}, turn ${turn} had no active presentation recording.`);
+          return;
+        }
         const v2 = commitCoopV2ReplacementAuthority(
           {
             checkpoint: carrier.checkpoint,
@@ -90,6 +100,7 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
             epoch: controller.sessionEpoch,
             wave: carrier.authoritativeState.wave,
             turn: carrier.authoritativeState.turn,
+            entryPresentation: entryPresentation ?? [],
           },
           { mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true },
         );

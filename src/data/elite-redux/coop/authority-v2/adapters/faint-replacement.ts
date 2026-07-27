@@ -56,7 +56,8 @@ import {
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { ApplyMaterialFn } from "#data/elite-redux/coop/authority-v2/replica";
-import type { CoopSwitchPresentation } from "#data/elite-redux/coop/coop-transport";
+import { isStrictCoopEntryPresentation } from "#data/elite-redux/coop/coop-battle-event-validator";
+import type { CoopBattleEvent, CoopSwitchPresentation } from "#data/elite-redux/coop/coop-transport";
 
 // ---------------------------------------------------------------------------
 // Identity - the typed proposal (no positional arrays, no hole-able payloads)
@@ -176,6 +177,12 @@ export interface ReplacementAuthorityCarrier {
   readonly turn: unknown;
   /** Exact summon animation authored by this replacement, or explicit null for a sealed empty slot. */
   readonly presentation?: CoopSwitchPresentation | null;
+  /**
+   * Complete ordered post-summon prefix recorded before the replacement states command control.
+   * This includes entry hazards, ability flyouts, weather/terrain, stat changes, and narration. The
+   * replica must prove this exact prefix before the replacement may install its COMMAND_FRONTIER.
+   */
+  readonly entryPresentation?: readonly CoopBattleEvent[];
 }
 
 /**
@@ -389,6 +396,9 @@ export function toReplacementCommitImage(
   if (presentation === undefined) {
     throw new Error("[authority-v2/faint-replacement] live authority carrier has invalid replacement presentation");
   }
+  if (!isStrictCoopEntryPresentation(authorityCarrier.entryPresentation)) {
+    throw new Error("[authority-v2/faint-replacement] live authority carrier has invalid entry presentation");
+  }
   return {
     ...baseImage,
     authorityCarrier: {
@@ -401,6 +411,7 @@ export function toReplacementCommitImage(
       wave: authorityCarrier.wave,
       turn: authorityCarrier.turn,
       presentation,
+      entryPresentation: structuredClone(authorityCarrier.entryPresentation),
     },
   };
 }
@@ -733,12 +744,13 @@ function decodeReplacementAuthorityCarrier(value: unknown): ReplacementAuthority
     "wave",
     "turn",
     "presentation",
+    "entryPresentation",
   ] as const;
   if (required.some(field => !(field in value))) {
     return null;
   }
   const presentation = decodeReplacementPresentation(value.presentation);
-  if (presentation === undefined) {
+  if (presentation === undefined || !isStrictCoopEntryPresentation(value.entryPresentation)) {
     return null;
   }
   return {
@@ -751,6 +763,7 @@ function decodeReplacementAuthorityCarrier(value: unknown): ReplacementAuthority
     wave: value.wave,
     turn: value.turn,
     presentation,
+    entryPresentation: structuredClone(value.entryPresentation) as CoopBattleEvent[],
   };
 }
 

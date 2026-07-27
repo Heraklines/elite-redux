@@ -169,6 +169,10 @@ function carrier(turn = 5): ReplacementAuthorityCarrier {
       doReturn: false,
       actor: { side: "player", pokemonId: 101 },
     },
+    entryPresentation: [
+      { k: "message", text: "Pikachu was caught in a sticky web!" },
+      { k: "statStage", bi: 0, actor: { side: "player", pokemonId: 101 }, stat: 5, value: -1 },
+    ],
   };
 }
 
@@ -307,6 +311,10 @@ describe("authority-v2 replacement staged transaction", () => {
           switchType: 1,
           doReturn: false,
         },
+        entryPresentation: [
+          { k: "message", text: "Pikachu was caught in a sticky web!" },
+          { k: "statStage", bi: 0, stat: 5, value: -1 },
+        ],
       },
     });
     expect(cutover.pendingCount).toBe(0);
