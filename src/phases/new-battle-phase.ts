@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import type { CoopAuthorityEntryKind, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { getCoopBiomeTransitionTailPermit } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   coopSessionGeneration,
   failCoopSharedSession,
@@ -312,7 +313,23 @@ export class NewBattlePhase extends BattlePhase {
       return false;
     }
     coopLog("v2-control", `NewBattlePhase consumed signed destination carrier wave=${command.wave}`);
-    globalScene.phaseManager.pushNew("NextEncounterPhase");
+    // A guest-owned natural World Map pick can finish its SwitchBiomePhase before the retained N+1 command
+    // carrier reaches this signed NewBattlePhase. The old unconditional NextEncounter tail then skipped the
+    // exact NewBiome presentation and, more importantly, left its fully prepared one-shot permit alive. The
+    // next BIOME_PICK could not arm a different permit and remained material-deferred forever (god-c wave
+    // 160 -> 170). Select the encounter tail from the immutable, scene-local permit only after command DATA
+    // installed the exact destination; no local biome inference or RNG is involved.
+    const biomePermit = getCoopBiomeTransitionTailPermit();
+    const entersCommittedBiome =
+      biomePermit != null
+      && biomePermit.sessionEpoch === successor.sessionEpoch
+      && biomePermit.switchAdopted
+      && biomePermit.historyRecorded
+      && biomePermit.switchPrepared
+      && !biomePermit.encounterAdopted
+      && biomePermit.nextWave === command.wave
+      && biomePermit.destinationBiomeId === globalScene.arena.biomeId;
+    globalScene.phaseManager.pushNew(entersCommittedBiome ? "NewBiomeEncounterPhase" : "NextEncounterPhase");
     this.end();
     return globalScene.phaseManager.getCurrentPhase() !== this;
   }

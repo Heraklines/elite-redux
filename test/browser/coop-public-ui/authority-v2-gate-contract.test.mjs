@@ -646,7 +646,16 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     /successor\.kind === "REPLACEMENT_COMMIT"[\s\S]*?"CoopReplayTurnPhase"[\s\S]*?"next-encounter"[\s\S]*?this\.end\(\)/u,
     "a future-wave replacement is replayed before its encounter instead of leaving NewBattle parked",
   );
-  assert.match(release, /pushNew\("NextEncounterPhase"\)[\s\S]*?this\.end\(\)/u);
+  assert.match(
+    release,
+    /const biomePermit = getCoopBiomeTransitionTailPermit\(\)[\s\S]*?biomePermit\.nextWave === command\.wave[\s\S]*?biomePermit\.destinationBiomeId === globalScene\.arena\.biomeId/u,
+    "a retained biome result chooses its encounter tail from the exact destination permit",
+  );
+  assert.match(
+    release,
+    /pushNew\(entersCommittedBiome \? "NewBiomeEncounterPhase" : "NextEncounterPhase"\)[\s\S]*?this\.end\(\)/u,
+    "ordinary waves retain NextEncounter while a complete biome permit cannot skip NewBiome presentation",
+  );
   assert.match(
     replayTurnPhase,
     /replacementContinuation === "next-encounter"[\s\S]*?acknowledgeReplacement\(envelope, "continuationReady"\)[\s\S]*?unshiftNew\("NextEncounterPhase"\)/u,

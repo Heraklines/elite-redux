@@ -4697,3 +4697,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The harness now attests the exact current, address-matched CommandPhase immediately before starting it. Normal input
   phases and synchronous automatic commands share the same proof edge; production code is unchanged, and a healthy
   Commander transition can no longer produce a timing-dependent gate red.
+
+## 2026-07-27 - Guest-owned biome transitions retain their committed encounter tail
+
+- Calibrated god-c soak seed `20470486` remained synchronized through wave 169, then stalled after the wave-170 World
+  Map result: the host reached `PartyHealPhase`, while the guest retained revision 1128 in `materialDeferred` and stayed
+  in `SelectBiomePhase`. The relevant earlier boundary was wave 160, where the guest owned the natural map pick.
+- That wave-160 result correctly installed and prepared the guest's exact BIOME_PICK permit, but the already-signed
+  `NewBattlePhase` always queued `NextEncounterPhase`. It therefore skipped `NewBiomeEncounterPhase`, never finalized
+  the one-shot permit, and still appeared healthy for nine more waves. The next BIOME_PICK correctly refused to replace
+  that apparently unfinished permit, producing the delayed softlock.
+- A signed destination command now selects `NewBiomeEncounterPhase` only when the current scene has the exact complete
+  permit for that epoch, destination wave, destination arena, and all switch-preparation stages. Ordinary transitions
+  retain `NextEncounterPhase`. The natural guest-owned real-engine regression now drives through wave-11 actionable
+  command and requires both browser-scoped permits to be finalized, closing the coverage gap that stopped at the
+  interaction counter.
+- Co-op engine and browser proof remain remote-only. Local verification is limited to source/static/type policy checks;
+  no deployment occurred.

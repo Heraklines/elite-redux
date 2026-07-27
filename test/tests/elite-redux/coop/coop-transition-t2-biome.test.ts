@@ -1871,6 +1871,47 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
 
       expect(rig.hostRuntime.controller.interactionCounter(), "host advanced past the natural biome pick").toBe(2);
       expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced past the natural biome pick").toBe(2);
+
+      // Keep driving the real queues through the destination encounter. The former test stopped at the
+      // interaction counter, so it missed the guest-only lifecycle split reproduced by god-c: a guest-owned
+      // natural pick reached signed NewBattlePhase, which unconditionally queued NextEncounterPhase, skipped
+      // NewBiomeEncounterPhase, and left the prepared BIOME_PICK permit alive until the next map ten waves
+      // later. That later result then remained material-deferred forever.
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
+      const guestReplicaCommand = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "natural-biome destination CommandPhase", {
+          matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === 11,
+        }),
+      );
+      await withClient(rig.guestCtx, async () => {
+        guestReplicaCommand.start();
+        await drainLoopback();
+      });
+      await withClient(rig.hostCtx, async () => {
+        const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
+        expect(hostCommand.phaseName).toBe("CommandPhase");
+        hostCommand.start();
+        await drainLoopback();
+      });
+      const guestCommand = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "natural-biome guest-owned CommandPhase", {
+          matches: phase =>
+            phase.phaseName === "CommandPhase"
+            && rig.guestScene.currentBattle.waveIndex === 11
+            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+        }),
+      );
+      await withClient(rig.guestCtx, async () => {
+        guestCommand.start();
+        await drainLoopback();
+      });
+
+      expect(withClientSync(rig.hostCtx, () => getCoopBiomeTransitionTailPermit())).toBeNull();
+      expect(
+        withClientSync(rig.guestCtx, () => getCoopBiomeTransitionTailPermit()),
+        "the guest's NewBiomeEncounter consumes the exact permit before command becomes actionable",
+      ).toBeNull();
+      expect(getObservedCoopGuestPhases()).toContain("NewBiomeEncounterPhase");
       logs.flush();
     } finally {
       headlessAtlas.restore();

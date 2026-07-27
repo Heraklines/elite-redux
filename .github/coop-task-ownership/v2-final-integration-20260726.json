@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "fce9cfe8734548907502d4eeb9c868175e4a7a99",
+  "baseSha": "6354f3dd45456f47fabfd899d0d718757389925f",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -168,6 +168,7 @@
     "test/tests/elite-redux/coop/coop-soak-fidelity.test.ts",
     "test/tests/elite-redux/coop/coop-soak-resume.test.ts",
     "test/tests/elite-redux/coop/coop-stall-watchdog.test.ts",
+    "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts",
     "test/tests/elite-redux/coop/coop-transition-t2-mystery.test.ts",
     "test/tests/elite-redux/editor/custom-trainer-worker-validation.test.ts",
     "test/tests/elite-redux/editor/custom-trainers-editor.smoke.test.ts",
