@@ -4747,3 +4747,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The source contract now rejects any local shift/end in the no-choice observation branch and proves that only the
   exact immutable result can release it. Local policy-safe evidence is 94/94 Authority V2 contracts, Biome clean,
   `git diff --check` clean, and no changed-file TypeScript diagnostics. Browser/engine qualification remains remote.
+
+## 2026-07-27 - Soak replacement driver recognizes an already-installed immutable successor
+
+- Diagnostic soak `30279420456` proved `god-b`, `god-c`, the 45-wave journey, and asymmetric Mystery/faint green. Its
+  `level` and `god-a` reds both ended with synchronized fields, Authority V2 frontiers fully applied, and both clients
+  on the exact destination `CommandPhase`; the one-process reciprocal helper nevertheless spent five seconds searching
+  for the preceding `CoopGuestFaintSwitchPhase`, which the committed replacement had correctly superseded.
+- The reciprocal driver now treats that picker as superseded only when the guest is on the requested destination
+  wave/turn, the current CommandPhase owns the guest field index, and the public UI is already COMMAND/FIGHT. A stale,
+  wrong-slot, wrong-address, or non-actionable CommandPhase still fails closed.
+- The source contract requires this exact successor proof before any picker search. Local policy-safe evidence is
+  95/95 Authority V2 contracts, formatting clean (only inherited complexity notices), `git diff --check` clean, and no
+  changed-file TypeScript diagnostics. The deterministic level/god-a reproductions remain remote-only.

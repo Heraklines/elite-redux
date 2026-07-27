@@ -2323,8 +2323,24 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       const currentGuest = rig.guestScene.phaseManager.getCurrentPhase() as unknown as {
         readonly phaseName?: string;
         readonly coopV2ControlOperationId?: string | null;
+        readonly getFieldIndex?: () => number;
         start(): void;
       };
+      const currentGuestMode = withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode());
+      if (
+        currentGuest?.phaseName === "CommandPhase"
+        && currentGuest.getFieldIndex?.() === COOP_GUEST_FIELD_INDEX
+        && rig.guestScene.currentBattle.waveIndex === wave
+        && rig.guestScene.currentBattle.turn === turn
+        && (currentGuestMode === UiMode.COMMAND || currentGuestMode === UiMode.FIGHT)
+      ) {
+        // The consecutive REPLACEMENT_COMMIT can close the exact picker and install its destination command
+        // while this shared-process host scope is still settling SwitchPhase. That is normal two-browser
+        // progress, not evidence that the picker was skipped: requiring the superseded phase to reappear makes
+        // a synchronized pair (both at the new command) fail after five seconds. Accept only the addressed,
+        // guest-owned, publicly actionable command; any stale or non-actionable CommandPhase remains red.
+        return;
+      }
       if (
         currentGuest?.phaseName === "CoopGuestFaintSwitchPhase"
         && (hostControlOperationId == null || currentGuest.coopV2ControlOperationId === hostControlOperationId)
