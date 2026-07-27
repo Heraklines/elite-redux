@@ -1,4 +1,10 @@
 {
+  "BERRY_POUCH": {
+    "tier": "ULTRA"
+  },
+  "BIG_NUGGET": {
+    "tier": "GREAT"
+  },
   "DNA_SPLICERS": {
     "tier": "ULTRA"
   },
@@ -67,5 +73,8 @@
   },
   "MULTI_LENS": {
     "tier": "MASTER"
+  },
+  "NUGGET": {
+    "tier": "COMMON"
   }
 }
