@@ -1,12 +1,17 @@
 {
   "er.ai.enabled": 1,
   "er.ai.experimentalHell": 1,
+  "er.ai.sharpnessElite": 0.8,
+  "er.ai.sharpnessHell": 0.95,
   "er.items.resistBerryPct": {
     "hell": 15
   },
+  "er.money.streakCapPct": 11,
+  "er.shop.dearMult": 1.3,
   "vanilla.catch.ballMult": {
     "rogueBall": 4,
     "ultraBall": 2.5
   },
+  "vanilla.money.starting": 1200,
   "vanilla.pokerusCount": 8
 }
