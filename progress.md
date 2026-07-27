@@ -4432,3 +4432,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   down. Compositor frames, released keys, later keydowns, and descendant element blur cannot satisfy the wait.
 - Permitted local evidence: 78/78 V2/browser contracts, both public driver boundaries, targeted Biome, changed-file
   TypeScript filtering, and `git diff --check` pass. Exact browser proof remains GitHub-hosted.
+
+## 2026-07-27 - Dex Nav authority cutover and browser-failure closure candidate
+
+- Exact `d5dc8194d` qualification established a clean mechanical baseline: the full 44-job co-op gate, focused
+  Authority V2 gate, mutation gate, and fresh/resume journey all passed. The remaining public-browser reds were
+  individually classified from screenshots, semantic surfaces, ordered V2 logs, and state digests.
+- The depth lane found the remaining real interaction seam: `ErDexNavPhase` locally derived a biome pool and the
+  watcher skipped rather than participating in the ordered nested interaction. Dex Nav now uses `ABILITY_PRESENT`
+  with an immutable authority-owned candidate set, an address-exact owner/watcher phase, a literal result, the
+  captured reward return plan, and the ordinary V2 settlement/proof path. Only the item owner writes its account dex.
+- Mystery's stale narration ACK lease is retired at the exact ordered ME terminal even when the main pin correctly
+  survives into a battle/reward successor. The faint journeys now use self-targeting Healing Wish plus two reserves;
+  the old Memento fixture could lose its live target after the attacking partner cleared the field and never faint.
+- Four harness false reds were repaired without relaxing state convergence: reward watchers prove explicit input
+  blocking; solo CheckSwitch accepts its actual interaction owner model; paired GameOver permits at most two
+  post-latch heartbeat/leave refusals; and sequential command scans clone caller cursors so a replacement cannot
+  erase a retained frontier proof. The animations-on between-wave ceiling is still progress-gated and immutable,
+  but now reuses the measured dense-turn SwiftShader budget after two runs reached command 22-44 seconds late.
+- Local policy-compliant evidence is clean: TypeScript, changed-file Biome, `git diff --check`, and the source/evidence
+  Node suites. No local co-op Vitest, Chromium, or soak was run; no staging/production deployment occurred. The next
+  action is one exact-SHA hosted qualification across depth, Mystery, surface, market, save, GameOver, and both faint
+  ownership journeys, followed by the full gate.
