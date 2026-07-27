@@ -2467,6 +2467,38 @@ test("a committed guest picker settles and buffers its V2 carrier before yieldin
   );
 });
 
+test("an ordered no-choice replacement dissolves without exposing an impossible PARTY modal", () => {
+  const noChoiceStart = guestFaintSwitchPhase.indexOf("private dissolveNoChoiceReplacement(");
+  const boundaryStart = guestFaintSwitchPhase.indexOf("public override start(): void", noChoiceStart);
+  assert.ok(noChoiceStart >= 0 && boundaryStart > noChoiceStart, "the no-choice replacement boundary is bounded");
+  const orderedOpen = guestFaintSwitchPhase.slice(noChoiceStart, boundaryStart);
+  assert.match(orderedOpen, /const hasLegalOwnerBench =/u);
+  assert.match(
+    orderedOpen,
+    /if \(hasLegalOwnerBench\) \{[\s\S]*return false;[\s\S]*isCoopFaintSwitchPickerSettled\([\s\S]*sendCoopFaintSwitchChoice\([\s\S]*scene\.phaseManager\.shiftPhase\(\);/u,
+    "a wiped owner half publishes at most one exact NONE result and yields before opening PARTY",
+  );
+  const call = guestFaintSwitchPhase.indexOf(
+    "this.dissolveNoChoiceReplacement(sourceWave, sourceTurn, occurrence, operationBinding)",
+    boundaryStart,
+  );
+  const openStart = guestFaintSwitchPhase.indexOf("beginCoopFaintSwitchWindow()", boundaryStart);
+  assert.ok(
+    call >= boundaryStart && openStart > call,
+    "the no-choice branch runs before the human-input lease can open",
+  );
+});
+
+test("direct Mystery narration is excluded only from the duplicate battle-turn recorder", () => {
+  const queueStart = phaseManager.indexOf("queueMessage(");
+  const queueEnd = phaseManager.indexOf("const phase = new MessagePhase", queueStart);
+  assert.ok(queueStart >= 0 && queueEnd > queueStart, "PhaseManager.queueMessage has a bounded recorder block");
+  const queue = phaseManager.slice(queueStart, queueEnd);
+  assert.match(queue, /globalScene\.gameMode\.isCoop && coopMeInProgress\(\) && !coopMeHandoffBattleStarted\(\)/u);
+  assert.match(queue, /isCoopRecording\(\) && !directMysteryNarration/u);
+  assert.match(queue, /recordCoopMessage\(message\)/u);
+});
+
 test("the public post-turn scanner never infers replacement ownership from a phase name", () => {
   const scanStart = publicUiHarness.indexOf("async waitForPostTurnOutcome(");
   const scanEnd = publicUiHarness.indexOf("\n  async driveReplacement(", scanStart);

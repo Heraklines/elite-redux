@@ -11,9 +11,11 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
+  COOP_FAINT_SWITCH_RESOLUTION_NONE,
   COOP_FAINT_SWITCH_RESOLUTION_OWNER,
   type CoopFaintSourceAddress,
   captureCoopFaintSwitchOperationBinding,
+  isCoopFaintSwitchPickerSettled,
   markCoopFaintSwitchPickerSettled,
   registerCoopFaintSwitchPickerTerminal,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
@@ -34,6 +36,7 @@ import {
   retryCoopV2PendingAuthorityAtSafeBoundary,
   runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
+import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import { UiMode } from "#enums/ui-mode";
 import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
 
@@ -63,6 +66,67 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     super();
     this.fieldIndex = fieldIndex;
     this.faintSourceAddress = faintSourceAddress;
+  }
+
+  /** Dissolve an exact ordered replacement control that has no possible human choice. */
+  private dissolveNoChoiceReplacement(
+    sourceWave: number,
+    sourceTurn: number,
+    occurrence: number,
+    operationBinding: ReturnType<typeof captureCoopFaintSwitchOperationBinding>,
+  ): boolean {
+    const controller = getCoopController();
+    const relay = getCoopInteractionRelay();
+    if (controller == null || relay == null) {
+      return false;
+    }
+    const scene = globalScene;
+    const battlerCount = scene.currentBattle?.getBattlerCount() ?? 0;
+    const hasLegalOwnerBench = scene
+      .getPlayerParty()
+      .some(
+        (mon, partyIndex) =>
+          partyIndex >= battlerCount
+          && partyIndex < 6
+          && !mon.isFainted()
+          && !coopSwitchBlocksMonForOwner(controller.role, mon.coopOwner),
+      );
+    if (hasLegalOwnerBench) {
+      return false;
+    }
+    // The ordered replacement control can arrive after live faint presentation already proved that this
+    // owner half has no legal reserve. It still authorizes an exact NONE result, but it must never create
+    // an impossible PARTY modal. If the live path already published that result, merely dissolve this
+    // reconstructed phase; otherwise publish the same addressed observation exactly once here.
+    const alreadySettled = isCoopFaintSwitchPickerSettled(
+      sourceWave,
+      sourceTurn,
+      this.fieldIndex,
+      operationBinding,
+      occurrence,
+    );
+    if (!alreadySettled) {
+      markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding, occurrence);
+      const data = addressCoopFaintSwitchChoiceData(
+        [0],
+        {
+          wave: sourceWave,
+          turn: sourceTurn,
+          occurrence,
+          fieldIndex: this.fieldIndex,
+          partySlot: -1,
+          resolution: COOP_FAINT_SWITCH_RESOLUTION_NONE,
+        },
+        operationBinding,
+      );
+      sendCoopFaintSwitchChoice(relay, this.fieldIndex, -1, data);
+    }
+    coopLog(
+      "replay",
+      `guest own-faint picker SKIP slot=${this.fieldIndex}: no legal owner bench under ordered control`,
+    );
+    scene.phaseManager.shiftPhase();
+    return true;
   }
 
   public override start(): void {
@@ -143,6 +207,9 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       return;
     }
     this.opened = true;
+    if (this.dissolveNoChoiceReplacement(sourceWave, sourceTurn, occurrence, operationBinding)) {
+      return;
+    }
     const materialBoundaryStillPresent = (): boolean =>
       coopSessionGeneration() === sourceGeneration
       && scene.phaseManager.getCurrentPhase() === this

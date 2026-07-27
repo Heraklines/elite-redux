@@ -596,6 +596,17 @@ export function markCoopFaintSwitchPickerSettled(
   s.pickerTerminals.delete(fieldIndex);
 }
 
+/** Whether this exact faint occurrence has already proved that its local picker is gone. */
+export function isCoopFaintSwitchPickerSettled(
+  wave: number,
+  turn: number,
+  fieldIndex: number,
+  binding?: CoopFaintSwitchOperationBinding | null,
+  occurrence = 0,
+): boolean {
+  return state(binding).settledPickers.has(pickerKey(wave, turn, occurrence, fieldIndex));
+}
+
 /**
  * Guest live-sink terminal. True means the exact picker was already closed locally or was synchronously
  * settled now; false keeps the retained operation unacknowledged and retriable.
@@ -859,11 +870,21 @@ export function materializeCoopV2ReplacementPickerTerminal(
   const s = requireCoopOpSurfaceStateFor<FaintSwitchOpState>(opState, "faintSwitch");
   const address = image.sourceAddress;
   const key = pickerKey(address.wave, address.turn, address.occurrence, address.fieldIndex);
-  if (s.settledPickers.has(key)) {
+  const terminal = s.pickerTerminals.get(address.fieldIndex);
+  // A no-surface proof can be recorded by the early live faint renderer before the ordered TURN_COMMIT
+  // projects its typed replacement control. If a stale local reconstruction nevertheless opened a new
+  // exact-address modal, that LIVE terminal takes precedence over the old tombstone: returning true here
+  // would install the post-replacement checkpoint underneath an immortal PARTY menu (depth campaign
+  // 30262257832). Only absence of a matching live terminal may use the prior no-surface proof.
+  const matchingTerminal =
+    terminal != null
+    && terminal.wave === address.wave
+    && terminal.turn === address.turn
+    && terminal.occurrence === address.occurrence;
+  if (s.settledPickers.has(key) && !matchingTerminal) {
     settleCoopV2FaintSwitchProposalRetry(s, image, localSeatId);
     return true;
   }
-  const terminal = s.pickerTerminals.get(address.fieldIndex);
   if (terminal == null) {
     // An explicit no-legal-replacement terminal is produced for a wiped owner half. The renderer correctly
     // does not open a modal with zero legal choices, so absence of a terminal is the exact material proof,

@@ -14,6 +14,7 @@ import {
   commitFaintSwitchAuthorityIntent,
   coopFaintSwitchOperationAddress,
   hasPendingCoopFaintSwitchReplacementIntent,
+  isCoopFaintSwitchPickerSettled,
   markCoopFaintSwitchPickerSettled,
   materializeCoopFaintSwitchPickerTerminal,
   materializeCoopV2ReplacementPickerTerminal,
@@ -165,6 +166,47 @@ describe("co-op faint-switch operation migration", () => {
       ),
       "a concrete timeout fallback must still close its exact live picker before state installation",
     ).toBe(false);
+  });
+
+  it("does not let an earlier no-surface proof bypass a reconstructed exact-address picker", () => {
+    const guestState = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(guestState);
+    const binding = captureCoopFaintSwitchOperationBinding("guest");
+    const address = {
+      epoch: 1,
+      wave: 8,
+      turn: 2,
+      occurrence: 19,
+      fieldIndex: COOP_GUEST_FIELD_INDEX,
+    };
+    markCoopFaintSwitchPickerSettled(address.wave, address.turn, address.fieldIndex, binding, address.occurrence);
+    expect(
+      isCoopFaintSwitchPickerSettled(address.wave, address.turn, address.fieldIndex, binding, address.occurrence),
+    ).toBe(true);
+    let closeAttempts = 0;
+    registerCoopFaintSwitchPickerTerminal(
+      {
+        wave: address.wave,
+        turn: address.turn,
+        occurrence: address.occurrence,
+        fieldIndex: address.fieldIndex,
+        consume: () => {
+          closeAttempts++;
+          return false;
+        },
+      },
+      binding,
+    );
+
+    expect(
+      materializeCoopV2ReplacementPickerTerminal(
+        { sourceAddress: address, ownerSeatId: 1, resolution: "fallback-auto", selected: null },
+        1,
+        guestState,
+      ),
+      "a live recreated modal must close before the post-replacement image can apply",
+    ).toBe(false);
+    expect(closeAttempts).toBe(1);
   });
 
   it("V2 retires only the materially settled owner proposal window for every terminal resolution", () => {

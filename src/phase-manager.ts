@@ -12,6 +12,7 @@ import { DynamicQueueManager } from "#app/dynamic-queue-manager";
 import { globalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { PhaseTree } from "#app/phase-tree";
+import { coopMeHandoffBattleStarted, coopMeInProgress } from "#data/elite-redux/coop/coop-me-pin-state";
 import type { CoopMutationLedger, CoopMutationToken } from "#data/elite-redux/coop/coop-mutation-ledger";
 import { coopRendererGateNeutralizes } from "#data/elite-redux/coop/coop-renderer-gate";
 import { isCoopRecording, recordCoopMessage } from "#data/elite-redux/coop/coop-turn-recorder";
@@ -755,7 +756,13 @@ export class PhaseManager {
     // turn it records each narration line so it can stream the ordered events to the
     // guest (which renders them + computes nothing). Inert unless a recording is open
     // (only the host, mid-turn, in a live co-op run) - solo is byte-for-byte unaffected.
-    if (isCoopRecording()) {
+    // Direct Mystery narration is already an authoritative presentation stream at the terminal
+    // `ui.showText` / `ui.showDialogue` render site. Recording that same queued MessagePhase into the
+    // ordinary battle-turn ledger claims a second mechanical presentation event that no renderer should
+    // replay: the guest has already rendered the dedicated ME carrier. A spawned ME battle is different;
+    // once handoff starts its narration belongs to the normal turn stream again.
+    const directMysteryNarration = globalScene.gameMode.isCoop && coopMeInProgress() && !coopMeHandoffBattleStarted();
+    if (isCoopRecording() && !directMysteryNarration) {
       recordCoopMessage(message);
     }
     // Co-op ME narration (#633, ADD-3) is streamed to the guest from `ui.showText` / `ui.showDialogue`
