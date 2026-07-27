@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "6354f3dd45456f47fabfd899d0d718757389925f",
+  "baseSha": "27030eaf5ae14546b9d59f038d06f0ab356ead19",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -190,6 +190,8 @@
     "test/tests/elite-redux/tools/dump-stats-species-extra.test.ts",
     "test/tests/moves/beat-up.test.ts",
     "test/tools/coop-duo-harness.ts",
+    "test/tools/coop-soak-coverage.ts",
+    "test/tools/coop-soak-driver.ts",
     "test/tools/ui-baselines/tournament-bracket-4.png",
     "test/visual/tournament-toast-qa.mjs",
     "workers/er-editor-api/src/index.ts",

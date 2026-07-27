@@ -92,6 +92,7 @@ import {
   getCoopOperationJournalCommittedClasses,
   getCoopOperationLiveSinkInvoked,
 } from "#data/elite-redux/coop/coop-operation-journal";
+import type { CoopOperationSurfaceClass } from "#data/elite-redux/coop/coop-operation-surface-registry";
 import {
   clearCoopRuntime,
   getCoopActiveWaveTransition,
@@ -1327,6 +1328,26 @@ function durableMeCoverageCarrier(message: CoopMessage): { seq: number; kind: "m
   return Number.isSafeInteger(seq) && seq >= 0 ? { seq, kind: semanticKind } : null;
 }
 
+/** Map the final Authority V2 carrier back to the semantic operation surface the coverage registry owns. */
+function v2OperationCoverageCarrier(message: CoopMessage): CoopOperationSurfaceClass | null {
+  if (message.t !== "authorityEntry") {
+    return null;
+  }
+  const entry = { context: message.ctx, ...message.body };
+  switch (message.body.kind) {
+    case "INTERACTION_COMMIT":
+      return decodeCoopV2InteractionEnvelope(entry)?.surfaceClass ?? null;
+    case "REPLACEMENT_COMMIT":
+      return "op:faintSwitch";
+    case "WAVE_ADVANCE":
+    case "TERMINAL_COMMIT":
+      return "op:wave";
+    case "CONTROL_COMMIT":
+    case "TURN_COMMIT":
+      return null;
+  }
+}
+
 function installCoverageTaps(rig: DuoRig, hits: SoakHitSet): void {
   const recordSend = (seq: number, kind: string): void => {
     hits.kinds.add(kind);
@@ -1341,6 +1362,10 @@ function installCoverageTaps(rig: DuoRig, hits: SoakHitSet): void {
     const transport = runtime.localTransport;
     const realSend = transport.send.bind(transport);
     transport.send = (message: CoopMessage): void => {
+      const operationSurface = v2OperationCoverageCarrier(message);
+      if (operationSurface != null) {
+        hits.operations.add(operationSurface);
+      }
       if (message.t === "interactionChoice" || message.t === "interactionOutcome") {
         recordSend(message.seq, message.kind);
       } else {

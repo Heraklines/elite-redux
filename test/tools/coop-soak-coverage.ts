@@ -124,7 +124,7 @@ export interface SoakHitSet {
   bands: Set<string>;
   /** Battle-flow situation values the run reached (the wave-start + per-turn situation taps). */
   situations: Set<string>;
-  /** Authoritative operation classes committed by the host during the run. */
+  /** Semantic operation classes committed through final V2 entries (or a negotiated legacy journal). */
   operations: Set<string>;
   /** Modes where a real `Ui.processInput` synchronously reached an authoritative carrier. */
   uiRelays: Set<UiMode>;

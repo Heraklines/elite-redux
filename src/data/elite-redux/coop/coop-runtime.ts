@@ -4928,6 +4928,12 @@ interface CoopV2ControlSuccessorClaim {
     readonly turn: number;
     readonly stateTick: number;
   };
+  readonly replacementOpenMaterial?: {
+    readonly origin: "settled-wave" | "pre-encounter";
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
   readonly replacementStateMaterial?: {
     readonly wave: number;
     readonly turn: number;
@@ -4964,6 +4970,16 @@ function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSu
             stateTick: interaction.envelope.authoritativeState.tick,
           },
         }),
+    ...(commandOpen?.kind === "replacement-open"
+      ? {
+          replacementOpenMaterial: {
+            origin: commandOpen.origin,
+            wave: commandOpen.wave,
+            turn: commandOpen.turn,
+            stateTick: commandOpen.authoritativeState.tick,
+          },
+        }
+      : {}),
     ...(replacement == null
       ? {}
       : {
@@ -5095,6 +5111,32 @@ function prepareCoopV2CommandOpenMaterialConsumer(runtime: CoopRuntime, entry: C
   // A real CommandPhase registered its complete address in v2DeferredCommandStarts. It already owns the
   // correct battle shell, so there is no transition-local structural work to perform.
   return [...runtime.v2DeferredCommandStarts.values()].some(claim => commandOpenControlAddressesClaim(control, claim));
+}
+
+/**
+ * Let an exact pre-encounter replacement-open create the N+1 Battle identity it already signs.
+ *
+ * The complete CONTROL_COMMIT is the first ordered entry after a terminal reward when a field slot starts
+ * the next wave empty. Deferring it until a later REPLACEMENT_COMMIT creates a global-log cycle: that result
+ * is revision N+1 and cannot apply before this revision N. Only the signed NewBattlePhase wait may build the
+ * shell, and it validates the epoch, source wait, pre-encounter origin, destination address and state tick.
+ */
+function prepareCoopV2ReplacementOpenMaterialConsumer(entry: CoopAuthorityEntry): boolean {
+  const material = decodeControlOpenEntry(entry);
+  if (material?.kind !== "replacement-open" || material.origin !== "pre-encounter") {
+    return false;
+  }
+  const successor = coopV2ControlSuccessorClaim(entry);
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        canReleaseForCoopV2Control?: (claim: CoopV2ControlSuccessorClaim) => boolean;
+        prepareForCoopV2ControlMaterial?: (claim: CoopV2ControlSuccessorClaim) => boolean;
+      }
+    | undefined;
+  return (
+    phase?.canReleaseForCoopV2Control?.(successor) === true
+    && phase.prepareForCoopV2ControlMaterial?.(successor) === true
+  );
 }
 
 /**
@@ -6590,7 +6632,7 @@ function buildCoopV2LiveSeams(
           if (receiverScene != null && receiverScene !== globalScene) {
             return "deferred";
           }
-          const replacementCursorAction =
+          let replacementCursorAction =
             material.kind === "replacement-open" && globalScene.currentBattle != null
               ? classifyReplacementOpenCursor(
                   material,
@@ -6598,6 +6640,18 @@ function buildCoopV2LiveSeams(
                   globalScene.currentBattle.turn,
                 )
               : null;
+          if (
+            material.kind === "replacement-open"
+            && replacementCursorAction === "await-destination"
+            && prepareCoopV2ReplacementOpenMaterialConsumer(entry)
+            && globalScene.currentBattle != null
+          ) {
+            replacementCursorAction = classifyReplacementOpenCursor(
+              material,
+              globalScene.currentBattle.waveIndex,
+              globalScene.currentBattle.turn,
+            );
+          }
           if (replacementCursorAction === "await-destination") {
             coopLog(
               "v2-control",
@@ -6688,6 +6742,11 @@ function buildCoopV2LiveSeams(
             if (entry.nextControl.kind !== "REPLACEMENT") {
               return false;
             }
+            // A pre-encounter replacement-open is itself the signed successor of NewBattlePhase. Its
+            // complete state is installed now, so release that structural wait before projecting the exact
+            // local picker (or the passive remote-owner wait). The following REPLACEMENT_COMMIT remains the
+            // only entry allowed to install the selected post-summon state.
+            releaseCoopV2ParkedTurnBoundary(runtime, entry);
             return true;
           }
           ensureCoopV2CommandPresentation(runtime);

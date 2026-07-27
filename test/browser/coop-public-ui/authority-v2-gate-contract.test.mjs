@@ -614,7 +614,12 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   assert.match(
     newBattlePhase,
     /successor\.kind === "REPLACEMENT_COMMIT"[\s\S]*?command\.kind === "AWAIT_SUCCESSOR"[\s\S]*?command\.afterOperationId === successor\.operationId[\s\S]*?command\.allowedKinds\.includes\("CONTROL_COMMIT"\)/u,
-    "a complete pre-encounter replacement is the only other mechanical entry allowed to create the shell",
+    "a complete pre-encounter replacement result remains a legal first mechanical successor",
+  );
+  assert.match(
+    newBattlePhase,
+    /successor\.kind === "CONTROL_COMMIT"[\s\S]*?command\.kind === "REPLACEMENT"[\s\S]*?replacementOpenMaterial\?\.origin === "pre-encounter"[\s\S]*?destinationWave === wait\.wave \+ 1[\s\S]*?destinationTurn === 1/u,
+    "the preceding complete replacement-open control may create only its exact signed N+1/t1 shell",
   );
   const prepare = newBattlePhase.slice(
     newBattlePhase.indexOf("public prepareForCoopV2ControlMaterial"),
@@ -645,6 +650,20 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     release,
     /successor\.kind === "REPLACEMENT_COMMIT"[\s\S]*?"CoopReplayTurnPhase"[\s\S]*?"next-encounter"[\s\S]*?this\.end\(\)/u,
     "a future-wave replacement is replayed before its encounter instead of leaving NewBattle parked",
+  );
+  assert.match(
+    release,
+    /releaseCoopV2PreEncounterReplacementOpen\(successor\)[\s\S]*?replacementOpenRelease != null[\s\S]*?return replacementOpenRelease/u,
+    "replacement-open keeps a remote-owner structural wait parked but releases an exact local-owner picker",
+  );
+  const replacementOpenRelease = newBattlePhase.slice(
+    newBattlePhase.indexOf("private releaseCoopV2PreEncounterReplacementOpen("),
+    newBattlePhase.indexOf("public releaseForCoopV2Control("),
+  );
+  assert.match(
+    replacementOpenRelease,
+    /successor\.kind !== "CONTROL_COMMIT" \|\| successor\.replacementOpenMaterial == null[\s\S]*?material\.origin !== "pre-encounter"[\s\S]*?localSeatId !== command\.ownerSeatId[\s\S]*?return true[\s\S]*?this\.end\(\)/u,
+    "the branch distinguishes a remote ordered wait from the local actionable replacement surface",
   );
   assert.match(
     release,
@@ -1608,7 +1627,7 @@ test("a won-wave faint reopens replacement only through one exact phase-owned CO
   assert.match(
     controlOpenAdapter,
     /classifyReplacementOpenCursor[\s\S]*"advance-one"[\s\S]*"await-destination"/u,
-    "replacement-open owns one exact same-wave cursor edge but never manufactures a future Battle shell",
+    "replacement-open owns one exact same-wave cursor edge and otherwise requests a signed destination",
   );
 
   const controlApplyStart = coopRuntime.indexOf('if (entry.kind === "CONTROL_COMMIT")');
@@ -1622,10 +1641,26 @@ test("a won-wave faint reopens replacement only through one exact phase-owned CO
   const applyState = controlApply.indexOf("applyCoopAuthoritativeBattleState(material.authoritativeState, true)");
   const adoptCursor = controlApply.indexOf('replacementCursorAction === "advance-one"');
   assert.ok(applyState >= 0 && adoptCursor > applyState, "complete DATA applies before its ordered cursor edge");
+  const prepareDestination = controlApply.indexOf("prepareCoopV2ReplacementOpenMaterialConsumer(entry)");
+  assert.ok(
+    prepareDestination >= 0 && prepareDestination < applyState,
+    "an exact pre-encounter replacement creates its signed shell before immutable DATA is applied",
+  );
+  assert.match(
+    coopRuntime,
+    /function prepareCoopV2ReplacementOpenMaterialConsumer[\s\S]*?material\?\.kind !== "replacement-open" \|\| material\.origin !== "pre-encounter"[\s\S]*?canReleaseForCoopV2Control[\s\S]*?prepareForCoopV2ControlMaterial/u,
+    "only the current address-exact transition owner can prepare a replacement destination",
+  );
   assert.doesNotMatch(
     controlApply.slice(0, applyState),
     /deferred replacement-open[\s\S]*until battle/u,
     "same-wave DATA cannot wait for the turn that the same immutable entry authorizes",
+  );
+
+  assert.match(
+    soakDriver,
+    /function v2OperationCoverageCarrier[\s\S]*?case "INTERACTION_COMMIT"[\s\S]*?case "REPLACEMENT_COMMIT"[\s\S]*?case "WAVE_ADVANCE"[\s\S]*?case "TERMINAL_COMMIT"[\s\S]*?hits\.operations\.add\(operationSurface\)/u,
+    "soak coverage follows final Authority V2 semantic carriers instead of requiring a suppressed legacy journal",
   );
 
   const establishStart = coopRuntime.indexOf("export function establishCoopV2ReplacementControlBoundary(");

@@ -4714,3 +4714,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   interaction counter.
 - Co-op engine and browser proof remain remote-only. Local verification is limited to source/static/type policy checks;
   no deployment occurred.
+
+## 2026-07-27 - Pre-encounter replacement control creates its signed destination shell
+
+- Diagnostic soak `30276550644` separated two real progression failures from two stale coverage reds. The level lane
+  parked at wave 3 and god-a parked at wave 34 with `NewBattlePhase` current and `CoopPartnerSyncPhase` queued. In both
+  traces, revision N was a complete pre-encounter `replacement-open` CONTROL_COMMIT for wave N+1/turn 1 while the
+  renderer still owned wave N. Revision N+1 was its REPLACEMENT_COMMIT, so deferring N until N+1 created a strict
+  global-log cycle that no timeout or redelivery could resolve.
+- The signed `NewBattlePhase` wait now recognizes only an exact same-epoch, pre-encounter replacement-open addressed to
+  its N+1/turn-1 destination. It creates only the projected Battle identity before the complete immutable state applies.
+  A local owner releases into the exact replacement picker; a remote owner retains the structural phase until the
+  consecutive REPLACEMENT_COMMIT supplies the chosen checkpoint and presentation. Unrelated phases, wider wave gaps,
+  settled-wave replacements, invalid state ticks, and mismatched control addresses remain fail-closed.
+- The same diagnostic proved god-b and god-c mechanically completed all requested 70 waves. Their only red was
+  `operation:op:wave` coverage: Authority V2 correctly suppresses the legacy operation journal that the coverage tap
+  still consulted. The tap now maps final INTERACTION, REPLACEMENT, WAVE, and TERMINAL entries to the existing semantic
+  operation registry, preserving the coverage requirement without demanding a retired legacy carrier.
+- Policy-safe local evidence is the 94/94 Authority V2 source contract plus formatting/static/type checks. The real
+  level/god-a reproductions and complete focused gate remain GitHub-hosted; no deployment occurred.

@@ -105,8 +105,10 @@ export interface CoopReplacementOpenMaterialV2 {
  *
  * Generic state application is deliberately cursor-neutral. A same-wave winning-turn picker is the
  * ordered permission to reproduce exactly one TurnEnd increment after its complete material applies.
- * A pre-encounter picker cannot manufacture the next Battle shell: it remains deferred until the signed
- * destination flow has constructed that exact wave/turn. Every other coordinate fails closed.
+ * A pre-encounter picker cannot generically manufacture the next Battle shell. It remains deferred unless
+ * the exact signed NewBattle wait proves this CONTROL_COMMIT is its N+1/t1 successor; that structural bridge
+ * may then create only the addressed shell before applying the complete immutable state. Every unrelated
+ * phase and every other coordinate fails closed.
  */
 export type CoopReplacementOpenCursorAction = "ready" | "advance-one" | "await-destination" | "invalid";
 

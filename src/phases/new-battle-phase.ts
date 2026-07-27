@@ -67,6 +67,12 @@ interface CoopV2NextWaveCommandClaim {
     readonly turn: number;
     readonly stateTick: number;
   };
+  readonly replacementOpenMaterial?: {
+    readonly origin: "settled-wave" | "pre-encounter";
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
   readonly replacementStateMaterial?: {
     readonly wave: number;
     readonly turn: number;
@@ -105,13 +111,15 @@ export class NewBattlePhase extends BattlePhase {
    * Prove that the next mechanical entry is the exact N+1/t1 successor of this signed ordered wait.
    * Merely reaching NewBattlePhase is never enough: the phase remains parked until this address-exact claim
    * is admitted by the global V2 log. A pre-encounter replacement is a first-class successor because a
-   * surviving party can enter the new wave with an empty field slot; its complete REPLACEMENT_COMMIT must
-   * render before the encounter while still being the only entry allowed to create the destination shell.
+   * surviving party can enter the new wave with an empty field slot. Its complete replacement-open control
+   * may create the signed destination shell; the consecutive REPLACEMENT_COMMIT must render the chosen
+   * state before the encounter. Neither entry grants a generic phase permission to advance the wave.
    */
   public canReleaseForCoopV2Control(successor: CoopV2NextWaveCommandClaim): boolean {
     const wait = this.coopV2Await;
     const command = successor.nextControl;
     const commandMaterial = successor.commandOpenMaterial;
+    const replacementOpenMaterial = successor.replacementOpenMaterial;
     const replacementMaterial = successor.replacementStateMaterial;
     const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
     const exactCommand =
@@ -132,8 +140,16 @@ export class NewBattlePhase extends BattlePhase {
       && command.turn === replacementMaterial.turn
       && replacementMaterial.stateTick > 0
       && command.allowedKinds.includes("CONTROL_COMMIT");
-    const destinationWave = commandMaterial?.wave ?? replacementMaterial?.wave;
-    const destinationTurn = commandMaterial?.turn ?? replacementMaterial?.turn;
+    const exactPreEncounterReplacementOpen =
+      successor.kind === "CONTROL_COMMIT"
+      && command.kind === "REPLACEMENT"
+      && replacementOpenMaterial?.origin === "pre-encounter"
+      && command.epoch === successor.sessionEpoch
+      && command.wave === replacementOpenMaterial.wave
+      && command.turn === replacementOpenMaterial.turn
+      && replacementOpenMaterial.stateTick > 0;
+    const destinationWave = commandMaterial?.wave ?? replacementOpenMaterial?.wave ?? replacementMaterial?.wave;
+    const destinationTurn = commandMaterial?.turn ?? replacementOpenMaterial?.turn ?? replacementMaterial?.turn;
     return (
       wait != null
       && this.coopV2Generation >= 0
@@ -142,7 +158,7 @@ export class NewBattlePhase extends BattlePhase {
       && successor.sessionEpoch === wait.epoch
       && successor.sessionEpoch === getCoopController()?.sessionEpoch
       && successor.operationId.length > 0
-      && (exactCommand || exactPreEncounterReplacement)
+      && (exactCommand || exactPreEncounterReplacementOpen || exactPreEncounterReplacement)
       && destinationWave === wait.wave + 1
       && destinationTurn === 1
       && (ambientWave === wait.wave || ambientWave === destinationWave)
@@ -155,8 +171,14 @@ export class NewBattlePhase extends BattlePhase {
       return false;
     }
     const wait = this.coopV2Await;
-    const destinationWave = successor.commandOpenMaterial?.wave ?? successor.replacementStateMaterial?.wave;
-    const destinationTurn = successor.commandOpenMaterial?.turn ?? successor.replacementStateMaterial?.turn;
+    const destinationWave =
+      successor.commandOpenMaterial?.wave
+      ?? successor.replacementOpenMaterial?.wave
+      ?? successor.replacementStateMaterial?.wave;
+    const destinationTurn =
+      successor.commandOpenMaterial?.turn
+      ?? successor.replacementOpenMaterial?.turn
+      ?? successor.replacementStateMaterial?.turn;
     const currentBattle = globalScene.currentBattle;
     if (wait == null || destinationWave == null || destinationTurn == null || currentBattle == null) {
       return false;
@@ -271,12 +293,42 @@ export class NewBattlePhase extends BattlePhase {
     }
   }
 
+  /** Retain a remote-owned picker bridge until DATA arrives; expose a local-owned picker after material install. */
+  private releaseCoopV2PreEncounterReplacementOpen(successor: CoopV2NextWaveCommandClaim): boolean | null {
+    if (successor.kind !== "CONTROL_COMMIT" || successor.replacementOpenMaterial == null) {
+      return null;
+    }
+    const material = successor.replacementOpenMaterial;
+    const command = successor.nextControl;
+    if (
+      material.origin !== "pre-encounter"
+      || command.kind !== "REPLACEMENT"
+      || globalScene.currentBattle?.waveIndex !== material.wave
+      || globalScene.currentBattle.turn !== material.turn
+    ) {
+      return false;
+    }
+    coopLog("v2-replacement", `NewBattlePhase consumed signed pre-encounter replacement-open wave=${material.wave}`);
+    if (getCoopController()?.localSeatId !== command.ownerSeatId) {
+      // The remote owner's control is installed without a local PARTY surface. Retain this structural
+      // bridge until the consecutive REPLACEMENT_COMMIT supplies the immutable answer; ending it now
+      // would let an empty queue derive TurnInit while the authority is still waiting for that player.
+      return true;
+    }
+    this.end();
+    return globalScene.phaseManager.getCurrentPhase() !== this;
+  }
+
   /** Release only after the signed N+1 carrier has either installed DATA or retained its replay transaction. */
   public releaseForCoopV2Control(successor: CoopV2NextWaveCommandClaim): boolean {
     if (!this.canReleaseForCoopV2Control(successor)) {
       return false;
     }
     const command = successor.nextControl;
+    const replacementOpenRelease = this.releaseCoopV2PreEncounterReplacementOpen(successor);
+    if (replacementOpenRelease != null) {
+      return replacementOpenRelease;
+    }
     if (successor.kind === "REPLACEMENT_COMMIT") {
       const material = successor.replacementStateMaterial;
       if (
