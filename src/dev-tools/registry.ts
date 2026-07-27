@@ -252,10 +252,12 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
 /**
  * Materialize a deterministic public party wipe in the normal co-op starter UI.
  *
- * Both players visibly submit one Magikarp whose only move is Memento. The two real command
- * surfaces therefore collect ordinary player choices, then the production battle and faint
- * call chains end the run without depending on a random enemy roll. As with every public-browser
- * fixture, both the exact bundle identity and exact per-page query must agree.
+ * Both players visibly submit one fast, Inner Focus Crobat whose only move is Memento. Inner Focus
+ * makes a random Fake Out/flinch incapable of cancelling the scripted self-faint, while Crobat's
+ * speed and a Jolly nature put the move ahead of ordinary wave-1 enemies. The two real command
+ * surfaces therefore collect ordinary player choices, then the production battle and faint call
+ * chains end the run without depending on a random enemy roll. As with every public-browser fixture,
+ * both the exact bundle identity and exact per-page query must agree.
  */
 export function getCoopBrowserGameOverFixtureStarters(): Starter[] | null {
   if (!isCoopBrowserGameOverFixtureBuild() || typeof location === "undefined") {
@@ -266,13 +268,15 @@ export function getCoopBrowserGameOverFixtureStarters(): Starter[] | null {
   }
   return [
     {
-      speciesId: SpeciesId.MAGIKARP,
+      speciesId: SpeciesId.CROBAT,
       shiny: false,
       variant: 0,
       formIndex: 0,
       abilityIndex: 0,
       passive: false,
-      nature: Nature.HARDY,
+      // Crobat's primary ability is Inner Focus; keep the slot explicit so fixture determinism
+      // cannot silently change if a future caller starts supplying a different default.
+      nature: Nature.JOLLY,
       moveset: [MoveId.MEMENTO] as StarterMoveset,
       pokerus: false,
       ivs: new Array(6).fill(31),

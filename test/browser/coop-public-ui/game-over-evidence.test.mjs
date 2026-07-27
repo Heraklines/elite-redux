@@ -31,7 +31,11 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     workflow,
     /Verify retained GameOver two-engine operation regression[\s\S]*coop-duo-wave-operation\.test\.ts/u,
   );
-  assert.match(registry, /getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*SpeciesId\.MAGIKARP[\s\S]*MoveId\.MEMENTO/u);
+  assert.match(
+    registry,
+    /getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*SpeciesId\.CROBAT[\s\S]*abilityIndex: 0[\s\S]*Nature\.JOLLY[\s\S]*MoveId\.MEMENTO/u,
+    "the public terminal fixture uses Crobat's primary Inner Focus slot plus maximum practical wave-1 speed",
+  );
   assert.match(
     transport,
     /VITE_COOP_BROWSER_FIXTURE !== "game-over"[\s\S]*get\("coopfixture"\) !== "game-over"[\s\S]*pendingOperation\?\.kind !== "WAVE_ADVANCE"[\s\S]*payload\?\.outcome === "gameOver"/u,
