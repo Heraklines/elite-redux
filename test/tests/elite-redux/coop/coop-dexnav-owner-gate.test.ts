@@ -22,12 +22,14 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { ErDexNavPhase } from "#phases/er-dex-nav-phase";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -40,10 +42,15 @@ describe.skipIf(!RUN)("co-op Dex Nav owner-gate (wiring audit)", () => {
   });
 
   beforeEach(async () => {
+    clearCoopRuntime();
     game = new GameManager(phaserGame);
     game.override.enemySpecies(SpeciesId.MAGIKARP).startingWave(5);
     // A live battle gives us a real arena (the picker reads its wild pool) + a real ui.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+  });
+
+  afterEach(() => {
+    clearCoopRuntime();
   });
 
   afterAll(() => {
@@ -51,7 +58,17 @@ describe.skipIf(!RUN)("co-op Dex Nav owner-gate (wiring audit)", () => {
   });
 
   it("WATCHER: ErDexNavPhase never reads the dex pool or opens owner input", () => {
-    const phase = new ErDexNavPhase(0, -1, true);
+    const { guest } = createLoopbackPair();
+    const guestRuntime = assembleCoopRuntime(guest, {
+      username: "dex-nav-watcher",
+      netcodeMode: "authoritative",
+    });
+    const awaitSpy = vi
+      .spyOn(guestRuntime.interactionRelay, "awaitInteractionChoice")
+      .mockReturnValue(new Promise(() => {}));
+    setCoopRuntime(guestRuntime);
+
+    const phase = new ErDexNavPhase(0, 42, true);
     // Stub end() so calling it out-of-queue doesn't shift the real phase queue.
     const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
     const poolSpy = vi.spyOn(globalScene.arena, "getErDexNavSpeciesPool");
@@ -61,6 +78,7 @@ describe.skipIf(!RUN)("co-op Dex Nav owner-gate (wiring audit)", () => {
 
     // The watcher is passive: no local pool derivation and no owner OPTION_SELECT.
     expect(endSpy, "watcher remains parked for an authoritative result").not.toHaveBeenCalled();
+    expect(awaitSpy, "watcher waits on the live session relay rather than ending as a solo phase").toHaveBeenCalled();
     expect(poolSpy, "watcher never reads the dex pool (picker skipped)").not.toHaveBeenCalled();
     expect(
       setModeSpy.mock.calls.some(([mode]) => mode === UiMode.OPTION_SELECT),

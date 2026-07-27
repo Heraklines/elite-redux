@@ -4454,3 +4454,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Node suites. No local co-op Vitest, Chromium, or soak was run; no staging/production deployment occurred. The next
   action is one exact-SHA hosted qualification across depth, Mystery, surface, market, save, GameOver, and both faint
   ownership journeys, followed by the full gate.
+
+## 2026-07-27 - Dex Nav watcher gate uses a live co-op fixture
+
+- Exact full gate `30247099159` on `2eeab52a2` passed static/type, fast public contracts, all Authority V2 mutation
+  shards, browser-native WebRTC/rejoin, and 32/33 engine shards. Its sole red was the new Dex Nav owner-gate test:
+  the watcher fixture used `coopSeq=-1` with no runtime or relay, which correctly takes the explicit non-co-op end
+  path, while the assertion expected a live co-op watcher to remain parked for authority.
+- The fixture now installs a real authoritative guest runtime and holds its real interaction relay pending. It still
+  requires the watcher to remain parked, never derive the local biome pool, and never open owner OPTION_SELECT input.
+  No production behavior or authority rule changed. Hosted B11/focused proof remains required; local co-op Vitest was
+  not run under the repository policy.
