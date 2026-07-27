@@ -203,7 +203,7 @@ if (
   || !harness.includes("owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label]")
   || !harness.includes("watcher.waitForAddressedRewardWatcher(")
   || !harness.includes("!semantic.observation.seatsWithInput?.includes(client.publicSeat)")
-  || !harness.includes("semantic.observation.ready.awaitingActionInput === false")
+  || !harness.includes("semantic.observation.ready.inputBlocked === true")
   || !harness.includes("this.evidence.find(SHARED_SESSION_TERMINAL, from)")
   || !harness.includes('projection: "actionable-confirmation"')
   || !harness.includes('projection: "non-actionable-shop-watcher"')

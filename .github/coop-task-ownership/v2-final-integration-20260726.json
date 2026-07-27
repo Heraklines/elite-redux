@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "a518f70f90813e4e50f428045c1583cbb69a0622",
+  "baseSha": "e869a01611399c99dbe4618aef77d5d516d86942",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -109,6 +109,7 @@
     "test/browser/coop-public-ui/campaign-policy.mjs",
     "test/browser/coop-public-ui/campaign-render-profile.test.mjs",
     "test/browser/coop-public-ui/campaign.mjs",
+    "test/browser/coop-public-ui/check-public-boundary.mjs",
     "test/browser/coop-public-ui/evidence.mjs",
     "test/browser/coop-public-ui/faint-replacement-evidence.test.mjs",
     "test/browser/coop-public-ui/fatal-console-evidence.test.mjs",
