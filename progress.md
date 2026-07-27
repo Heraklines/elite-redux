@@ -4584,3 +4584,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   exact AWAIT_SUCCESSOR froze that presentation and made its explicitly allowed WAVE_ADVANCE unreachable. That ordered
   wait now leases only an actionable same-wave, exact-next-turn MessagePhase when WAVE_ADVANCE is named; wrong phase,
   wrong address, non-actionable, and no-wave waits remain frozen.
+
+## 2026-07-27 - Complete V2 command state retires split compatibility wave carriers
+
+- Exact Mystery campaign `30265192044` reached Gentle Giant at wave 2 and exposed a real authority inversion. The host's
+  complete V2 command-open state tick 29 carried both Torterra with SLEEP and five turns remaining, and the guest applied
+  it successfully. An older `enemyPartySync` tick 27 had already donated its state half to presentation, so the later
+  CommandPhase could no longer compare that tick; it consumed the remaining legacy enemy manifest and rebuilt both
+  enemies without status, producing the only mechanical digest difference.
+- After a complete command-open state applies, the runtime now atomically retires every split enemy/encounter/state
+  compatibility carrier at or below that authoritative tick before marking material applied or releasing public input.
+  The existing per-wave floor rejects delayed dominated replays while preserving strictly newer same-wave carriers.
+- Failure-first coverage consumes the old carrier's state half before retirement, then proves its manifest and encounter
+  descriptor cannot survive or reappear. The fast source contract pins complete-state apply -> retirement -> material
+  proof -> command release ordering. Policy-compliant local evidence is 93/93 contracts, targeted Biome, and
+  `git diff --check`; the stream regression and real two-browser Mystery proof remain GitHub-hosted.

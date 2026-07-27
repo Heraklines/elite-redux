@@ -275,6 +275,23 @@ test("replacement command control cannot overtake retained post-summon presentat
   );
 });
 
+test("command-open retires every dominated split wave-start carrier before releasing input", () => {
+  const controlStart = coopRuntime.indexOf('if (entry.kind === "CONTROL_COMMIT")');
+  const controlEnd = coopRuntime.indexOf('if (entry.kind === "WAVE_ADVANCE"', controlStart);
+  assert.ok(controlStart >= 0 && controlEnd > controlStart, "the CONTROL_COMMIT applier has a bounded source block");
+  const controlApply = coopRuntime.slice(controlStart, controlEnd);
+  const stateApply = controlApply.indexOf("applyCoopAuthoritativeBattleState(material.authoritativeState, true)");
+  const retire = controlApply.indexOf(
+    "runtime.battleStream.retireEnemyPartyAuthorityThrough(material.wave, material.authoritativeState.tick)",
+  );
+  const mark = controlApply.indexOf("markCoopV2ControlMaterialApplied(runtime, entry)");
+  const release = controlApply.indexOf("releaseCoopV2DeferredCommandStarts(runtime, entry.nextControl)");
+  assert.ok(stateApply >= 0, "command-open applies its complete immutable state");
+  assert.ok(retire > stateApply, "compatibility retirement follows successful complete-state application");
+  assert.ok(mark > retire, "the control cannot become materialApplied before compatibility retirement");
+  assert.ok(release > mark, "public command input releases only after the retired-carrier fence");
+});
+
 test("a stale BGM loop callback cannot abort an authoritative encounter", () => {
   assert.match(
     battleScene,
