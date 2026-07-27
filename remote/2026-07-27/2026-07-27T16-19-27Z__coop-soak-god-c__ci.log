@@ -1,0 +1,58 @@
+===== COOP SOAK RESULT =====
+profile: god-c
+verdict: PASS
+waves_requested: 70
+run_mode: diagnostic
+calibration_id: god-200
+target_sha: f6599ef9d457b630acdd6114d4618350dcc34f25
+checked_out_sha: f6599ef9d457b630acdd6114d4618350dcc34f25
+base_seed: 20260727
+campaign_seed: 20470486
+run: 30283625218 (workflow source f6599ef9d457b630acdd6114d4618350dcc34f25)
+timestamp: 2026-07-27T16-19-27Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20470486 WAVES=70 - replay this run with:  SOAK_SEED=20470486 SOAK_WAVES=70 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] DONE seed=20470486 waves=70/70 resyncHeals=0 assertions=0 findings=0 trainerWaves=12 (fixed=8 random=4) skips={"mysteryEncounterDisabledV1":1} elapsedMs=327417
+
+----- vitest result tail -----
+[coop:transport] state guest connected -> closed
+[coop:transport] state host connected -> disconnected
+[coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[33m[coop:runtime] partner channel disconnected -> entering membership recovery (shared waits retained)[39m
+[33m[coop:runtime] shared session terminal requested: Your partner disconnected and no authenticated rejoin path is available.[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:launch] clearCoopRuntime role=guest netcode=authoritative gen->5
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:launch] clearCoopRuntime role=host netcode=authoritative gen->6
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state host disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > retained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m21825[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:297:3[39m
+
+[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 16:13:09
+[2m   Duration [22m 377.29s[2m (transform 20.91s, setup 25.23s, import 329ms, tests 350.71s, environment 845ms)[22m
+
