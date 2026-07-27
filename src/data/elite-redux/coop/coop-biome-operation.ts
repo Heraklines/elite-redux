@@ -45,6 +45,7 @@
 
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
+// biome-ignore lint/suspicious/noImportCycles: This operation adapter captures the canonical battle image through the established runtime/engine composition cycle.
 import { captureCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_BIOME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -989,14 +990,26 @@ function biomeBoundaryValidator(params: {
 /** A live host cannot open a second biome-tail slot while another exact transition is unfinished. */
 function hostBiomeTailSlotAvailable(operationId: string, payload: CoopBiomePickPayload, wave: number): boolean {
   const active = getCoopBiomeTransitionTailPermit();
-  return (
-    active == null
-    || (active.operationId === operationId
-      && active.wave === wave
-      && active.sourceBiomeId === payload.sourceBiomeId
-      && active.destinationBiomeId === payload.biomeId
-      && active.nextWave === payload.nextWave)
-  );
+  if (active == null) {
+    return true;
+  }
+  const exactRetry =
+    active.operationId === operationId
+    && active.wave === wave
+    && active.sourceBiomeId === payload.sourceBiomeId
+    && active.destinationBiomeId === payload.biomeId
+    && active.nextWave === payload.nextWave;
+  if (exactRetry) {
+    return true;
+  }
+  // NewBiomeEncounter normally clears a fully-consumed permit after shifting to the next public boundary.
+  // A displaced presentation callback can leave only its `encounterAdopted` tombstone behind even though
+  // gameplay has demonstrably continued for several waves. The renderer gate already admits a later exact
+  // permit in this state and performs the final revision check once the V2 commit owns a revision. Mirror
+  // that narrow pre-commit rule here; otherwise this revision-less reservation check rejects the new
+  // guest-owned proposal forever as `host-permit-slot-busy` before the real gate can validate it.
+  const proposed = parseCoopOperationId(operationId);
+  return active.encounterAdopted && proposed?.epoch === active.sessionEpoch && wave >= active.nextWave;
 }
 
 function armPreparedBiomeTail(

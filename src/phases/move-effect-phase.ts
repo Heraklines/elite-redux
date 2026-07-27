@@ -28,6 +28,8 @@ import {
   bypassesOpponentMultiHitSuppression,
   suppressesOpponentDamageBoosts,
 } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import {
   erRecordAchievementMoveDamage,
@@ -62,6 +64,10 @@ import { MoveTarget } from "#enums/move-target";
 import { isReflected, isVirtual, MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
+import {
+  armCoopPresentationProgressWatchdog,
+  type CoopPresentationProgressWatchdog,
+} from "#phases/coop-presentation-watchdog";
 
 /**
  * Elite Redux: scan ALL of the user's active ability attrs (primary ability +
@@ -301,20 +307,55 @@ export class MoveEffectPhase extends PokemonPhase {
         hitsSubstitute,
       });
       let animationsLeft = targetsForAnimation.length;
+      let animationSettled = false;
+      let watchdog: CoopPresentationProgressWatchdog | undefined;
+      const settleAnimations = () => {
+        if (animationSettled) {
+          return;
+        }
+        animationsLeft--;
+        if (animationsLeft > 0) {
+          return;
+        }
+        animationSettled = true;
+        watchdog?.remove();
+        this.postAnimCallback(user, targets);
+      };
+      const expireAnimations = () => {
+        if (animationSettled) {
+          return;
+        }
+        animationSettled = true;
+        watchdog?.remove();
+        coopWarn(
+          "presentation",
+          `MoveEffectPhase move=${move.id} animation did not complete; continuing mechanics to avoid a freeze`,
+        );
+        this.postAnimCallback(user, targets);
+      };
+      // Move animation completion is presentation evidence, never mechanical authority. A missing Phaser callback
+      // previously parked the authoritative host in MoveEffectPhase forever while every renderer correctly waited
+      // for the next signed turn material. Use the same renderer-progress proof as replay presentation: a stopped
+      // renderer expires quickly, and an advancing but broken tween remains bounded by the immutable hard wall.
+      if (globalScene.gameMode.isCoop && getCoopController()?.netcodeMode === "authoritative") {
+        watchdog = armCoopPresentationProgressWatchdog(expireAnimations);
+      }
 
       for (const [targetIndex, target] of targetsForAnimation.entries()) {
-        new MoveAnim(
-          move.id as MoveId,
-          user,
-          target.getBattlerIndex(),
-          // Some moves used in mystery encounters should be played even on an empty field
-          globalScene.currentBattle?.mysteryEncounter?.hasBattleAnimationsWithoutTargets ?? false,
-        ).play(hitsSubstitute[targetIndex] ?? false, () => {
-          animationsLeft--;
-          if (animationsLeft === 0) {
-            this.postAnimCallback(user, targets);
-          }
-        });
+        try {
+          new MoveAnim(
+            move.id as MoveId,
+            user,
+            target.getBattlerIndex(),
+            // Some moves used in mystery encounters should be played even on an empty field
+            globalScene.currentBattle?.mysteryEncounter?.hasBattleAnimationsWithoutTargets ?? false,
+          ).play(hitsSubstitute[targetIndex] ?? false, settleAnimations);
+        } catch (error) {
+          // Starting an animation can fail on a missing/corrupt asset before Phaser owns a completion callback.
+          // Count only that target as settled; the exact same all-target barrier still owns mechanical continuation.
+          coopWarn("presentation", `MoveEffectPhase move=${move.id} animation failed to start`, error);
+          settleAnimations();
+        }
       }
       return;
     }

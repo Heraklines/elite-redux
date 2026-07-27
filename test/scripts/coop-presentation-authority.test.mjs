@@ -236,6 +236,7 @@ test("every authority event receives an ordered renderer-completion receipt in t
 test("presentation liveness uses an exact runtime wall scheduler rather than the ambient Phaser scene clock", () => {
   const watchdog = read("src/phases/coop-presentation-watchdog.ts");
   const replayPhases = read("src/phases/coop-replay-phases.ts");
+  const moveEffect = read("src/phases/move-effect-phase.ts");
   const browser = read("scripts/coop-browser-entry.ts");
   const abilityReplay = replayPhases.slice(
     replayPhases.indexOf("export class CoopShowAbilityReplayPhase"),
@@ -254,6 +255,18 @@ test("presentation liveness uses an exact runtime wall scheduler rather than the
   assert.match(browser, /setCoopPresentationHardWallMsForTest\(CI_COOP_PRESENTATION_HARD_WALL_MS\)/u);
   assert.doesNotMatch(browser, /intentionally-skipped/u);
   assert.doesNotMatch(watchdog, /globalScene\.time\.delayedCall/u);
+  assert.match(
+    moveEffect,
+    /globalScene\.gameMode\.isCoop && getCoopController\(\)\?\.netcodeMode === "authoritative"[\s\S]+watchdog = armCoopPresentationProgressWatchdog\(expireAnimations\)/u,
+  );
+  assert.match(
+    moveEffect,
+    /let animationSettled = false[\s\S]+if \(animationSettled\) \{[\s\S]+return;[\s\S]+this\.postAnimCallback\(user, targets\)/u,
+  );
+  assert.match(
+    moveEffect,
+    /try \{[\s\S]+\.play\(hitsSubstitute\[targetIndex\] \?\? false, settleAnimations\)[\s\S]+catch \(error\)[\s\S]+settleAnimations\(\)/u,
+  );
   for (const [name, phase] of [
     ["ability", abilityReplay],
     ["capture", captureReplay],

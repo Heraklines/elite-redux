@@ -2326,14 +2326,17 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         readonly getFieldIndex?: () => number;
         start(): void;
       };
-      const currentGuestMode = withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode());
-      if (
-        currentGuest?.phaseName === "CommandPhase"
-        && currentGuest.getFieldIndex?.() === COOP_GUEST_FIELD_INDEX
-        && rig.guestScene.currentBattle.waveIndex === wave
-        && rig.guestScene.currentBattle.turn === turn
-        && (currentGuestMode === UiMode.COMMAND || currentGuestMode === UiMode.FIGHT)
-      ) {
+      const isExactGuestDestinationCommand = (phase: typeof currentGuest): boolean => {
+        const mode = withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode());
+        return (
+          phase?.phaseName === "CommandPhase"
+          && phase.getFieldIndex?.() === COOP_GUEST_FIELD_INDEX
+          && rig.guestScene.currentBattle.waveIndex === wave
+          && rig.guestScene.currentBattle.turn === turn
+          && (mode === UiMode.COMMAND || mode === UiMode.FIGHT)
+        );
+      };
+      if (isExactGuestDestinationCommand(currentGuest)) {
         // The consecutive REPLACEMENT_COMMIT can close the exact picker and install its destination command
         // while this shared-process host scope is still settling SwitchPhase. That is normal two-browser
         // progress, not evidence that the picker was skipped: requiring the superseded phase to reappear makes
@@ -2351,6 +2354,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       const guestReplacement = (await withClient(rig.guestCtx, () =>
         driveClientPhaseQueueTo(rig.guestScene, "projected retained replacement", {
           matches: phase => {
+            if (isExactGuestDestinationCommand(phase as typeof currentGuest)) {
+              return true;
+            }
             if (phase.phaseName !== "CoopGuestFaintSwitchPhase") {
               return false;
             }
@@ -2364,6 +2370,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         readonly phaseName: string;
         start(): void;
       };
+      if (guestReplacement.phaseName === "CommandPhase") {
+        // The command can become actionable while driveClientPhaseQueueTo is pumping the destination runtime.
+        // It is the same exact supersession proof checked above, reached later in the bounded wait.
+        return;
+      }
       if (drivenGuestReplacementPhases.has(guestReplacement as object)) {
         return;
       }

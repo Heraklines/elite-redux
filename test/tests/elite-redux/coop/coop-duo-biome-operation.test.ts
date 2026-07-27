@@ -50,6 +50,13 @@ import {
   setCoopWaveBarrierMs,
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { setCoopOperationDurability } from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  adoptCoopBiomeTransitionSwitchPermit,
+  armCoopBiomeTransitionTailPermit,
+  consumeCoopBiomeTransitionEncounterPermit,
+  markCoopBiomeTransitionHistoryRecorded,
+  markCoopBiomeTransitionSwitchPrepared,
+} from "#data/elite-redux/coop/coop-renderer-gate";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
@@ -380,6 +387,65 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       () => decision(8, "guest", BiomeId.SWAMP, hostBinding),
       "a callback cannot execute guest materialization against a captured host runtime",
     ).toThrow(/binding role=host.*localRole=guest/);
+  }, 300_000);
+
+  it("admits a later guest-owned biome proposal after a displaced encounter finalizer leaves a consumed tombstone", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, () => {
+      const binding = captureCoopBiomeOperationBinding();
+      const epoch = rig.hostRuntime.controller.sessionEpoch;
+      const staleOperationId = `${epoch}:0:BIOME_PICK:${COOP_BIOME_PICK_SEQ_BASE + 2}`;
+      expect(
+        armCoopBiomeTransitionTailPermit({
+          operationId: staleOperationId,
+          sessionEpoch: epoch,
+          revision: 1,
+          wave: 5,
+          sourceBiomeId: BiomeId.TOWN,
+          destinationBiomeId: BiomeId.PLAINS,
+          nextWave: 6,
+        }),
+      ).toBe(true);
+      expect(
+        adoptCoopBiomeTransitionSwitchPermit({
+          destinationBiomeId: BiomeId.PLAINS,
+          sourceBiomeId: BiomeId.TOWN,
+          wave: 5,
+        }),
+      ).not.toBeNull();
+      expect(markCoopBiomeTransitionHistoryRecorded(staleOperationId)).not.toBeNull();
+      expect(markCoopBiomeTransitionSwitchPrepared(staleOperationId)).not.toBeNull();
+      expect(
+        consumeCoopBiomeTransitionEncounterPermit({ destinationBiomeId: BiomeId.PLAINS, nextWave: 6 }),
+      ).not.toBeNull();
+
+      const pinned = 41;
+      const operationId = coopBiomeOperationId("BIOME_PICK", COOP_BIOME_PICK_SEQ_BASE + pinned, pinned, binding);
+      const decision = adoptBiomeWatcherChoice(
+        {
+          kind: "BIOME_PICK",
+          seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
+          pinned,
+          res: { choice: 0, data: [BiomeId.TEMPLE], operationId },
+          localRole: "host",
+          wave: 35,
+          turn: 2,
+          sourceBiomeId: BiomeId.PLAINS,
+          nextWave: 36,
+          allowedRoutes: [BiomeId.TEMPLE],
+          deterministicDestination: null,
+          armLocalTail: true,
+        },
+        binding,
+      );
+      expect(decision, "a consumed older permit cannot block the next ordered V2 biome proposal").toMatchObject({
+        adopt: true,
+        operationId,
+        requiresAuthorityCommit: true,
+      });
+    });
   }, 300_000);
 
   it("DURABILITY: dropping the first V2 entry still materializes the committed op through the real guest travel path", async () => {

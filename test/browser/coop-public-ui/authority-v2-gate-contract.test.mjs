@@ -2617,14 +2617,30 @@ test("the soak never waits for a replacement picker already superseded by its ex
   const driveEnd = soakDriver.indexOf("\n    // A real co-op pair owns one JS realm per client.", driveStart);
   assert.ok(driveStart >= 0 && driveEnd > driveStart, "the reciprocal replacement driver is bounded");
   const drive = soakDriver.slice(driveStart, driveEnd);
-  const superseded = drive.indexOf('currentGuest?.phaseName === "CommandPhase"');
+  const superseded = drive.indexOf('phase?.phaseName === "CommandPhase"');
   const pickerDrive = drive.indexOf('driveClientPhaseQueueTo(rig.guestScene, "projected retained replacement"');
-  assert.ok(superseded >= 0 && pickerDrive > superseded, "the immutable successor is checked before picker search");
+  const successorGuard = drive.indexOf("const isExactGuestDestinationCommand =");
+  assert.ok(
+    successorGuard >= 0 && pickerDrive > successorGuard,
+    "the immutable successor is checked before picker search",
+  );
+  assert.ok(superseded >= successorGuard && pickerDrive > superseded, "the helper proves a real CommandPhase");
   const guard = drive.slice(superseded, pickerDrive);
-  assert.match(guard, /currentGuest\.getFieldIndex\?\.\(\) === COOP_GUEST_FIELD_INDEX/u);
+  assert.match(guard, /phase\.getFieldIndex\?\.\(\) === COOP_GUEST_FIELD_INDEX/u);
   assert.match(guard, /currentBattle\.waveIndex === wave[\s\S]*currentBattle\.turn === turn/u);
-  assert.match(guard, /currentGuestMode === UiMode\.COMMAND \|\| currentGuestMode === UiMode\.FIGHT/u);
-  assert.match(guard, /return;/u);
+  assert.match(guard, /mode === UiMode\.COMMAND \|\| mode === UiMode\.FIGHT/u);
+  assert.match(guard, /if \(isExactGuestDestinationCommand\(currentGuest\)\)[\s\S]*return;/u);
+  const pickerWait = drive.slice(pickerDrive);
+  assert.match(
+    pickerWait,
+    /matches: phase => \{[\s\S]*isExactGuestDestinationCommand\(phase as typeof currentGuest\)[\s\S]*return true;/u,
+    "the same proof can supersede a picker while the bounded destination pump is already running",
+  );
+  assert.match(
+    pickerWait,
+    /guestReplacement\.phaseName === "CommandPhase"[\s\S]*return;/u,
+    "an exact late successor is never started as though it were the retired replacement picker",
+  );
 });
 
 test("direct Mystery narration is excluded only from the duplicate battle-turn recorder", () => {
@@ -3464,5 +3480,12 @@ test("a projected Mystery phase cannot attest through its predecessor's active h
   assert.ok(
     readinessFence >= 0 && handlerActive > readinessFence,
     "phase-owned readiness rejects a queued/stale generation before generic handler evidence is read",
+  );
+});
+
+test("a consumed biome-tail tombstone cannot reject a later V2 map proposal before its revision is assigned", () => {
+  assert.match(
+    biomeOperation,
+    /function hostBiomeTailSlotAvailable[\s\S]*?active\.encounterAdopted[\s\S]*?proposed\?\.epoch === active\.sessionEpoch[\s\S]*?wave >= active\.nextWave/u,
   );
 });

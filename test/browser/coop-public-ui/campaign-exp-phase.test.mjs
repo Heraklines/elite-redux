@@ -15,6 +15,7 @@ import {
   currentPairedBattleKind,
   driveBattleFallback,
   findRegisteredSurface,
+  findSharedSuccessorWavePresentation,
   hasPassiveBattleProgressSurface,
   hasProvisionalCommandWatcherSurface,
   resolveSurfaceOwner,
@@ -1177,6 +1178,52 @@ test("the outcome wait drains already-buffered completion evidence at its deadli
   };
 
   assert.deepEqual(await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 0), { kind: "reward" });
+});
+
+test("an embedded Mystery battle recognizes an exact shared next-wave encounter as healthy progress", async () => {
+  const nextEncounter = localSeat => ({
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      operationClass: "battle-progress",
+      phase: "NextEncounterPhase",
+      coop: true,
+      localSeat,
+      seatsWithInput: [localSeat],
+      membershipRevision: 3,
+      connectionGeneration: 0,
+      mysteryEncounterType: 87,
+      stateDigest: "next-wave-state",
+      address: { epoch: 7, wave: 3, turn: 1 },
+      ready: { handlerActive: true, awaitingActionInput: true },
+    },
+  });
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  authority.evidence.events.push({ ...nextEncounter(0), index: authority.evidence.events.length });
+  renderer.evidence.events.push({ ...nextEncounter(1), index: renderer.evidence.events.length });
+  const rig = {
+    activeBattleWave: 2,
+    host: authority,
+    clients: { authority, renderer },
+    config: { faintOwnerSeat: "renderer" },
+  };
+  const boundary = {
+    epoch: 7,
+    wave: 3,
+    turn: 1,
+    stateDigest: "next-wave-state",
+    mysteryEncounterType: 87,
+  };
+
+  assert.deepEqual(findSharedSuccessorWavePresentation(rig, { authority: 0, renderer: 0 }), boundary);
+  assert.deepEqual(await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 0), {
+    kind: "wave-transition",
+    boundary,
+  });
+
+  renderer.evidence.events.at(-1).observation.stateDigest = "diverged";
+  assert.equal(findSharedSuccessorWavePresentation(rig, { authority: 0, renderer: 0 }), null);
 });
 
 test("the campaign outcome wait accepts the first owned command frontier without waiting for its peer", async () => {

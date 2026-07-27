@@ -1015,6 +1015,61 @@ export function createRegisteredSurfaceProgressBudget(
   });
 }
 
+/**
+ * Prove that an embedded battle has already crossed into the next wave's public encounter presentation.
+ *
+ * Mystery battles do not necessarily open the ordinary reward shop. Their authoritative terminal path can install
+ * the next wave's `NextEncounterPhase` directly, so waiting only for reward/faint/command markers mislabels healthy
+ * cross-wave progress as a battle softlock. This proof is intentionally narrow: both CURRENT semantic surfaces must
+ * be the same immutable next-wave/turn-1 state, on the exact encounter phase, and newer than this submitted turn.
+ */
+export function findSharedSuccessorWavePresentation(rig, from) {
+  const clients = Object.values(rig.clients);
+  const events = clients.map(client => client.evidence.findLastSemanticSurface(from[client.label] ?? 0));
+  if (events.some(event => event == null)) {
+    return null;
+  }
+  const observations = events.map(event => event.observation);
+  const first = observations[0];
+  const address = first.address;
+  if (
+    first.surfaceId !== "battle:message"
+    || first.operationClass !== "battle-progress"
+    || first.phase !== "NextEncounterPhase"
+    || first.coop !== true
+    || !Number.isSafeInteger(address?.epoch)
+    || address.wave !== rig.activeBattleWave + 1
+    || address.turn !== 1
+    || typeof first.stateDigest !== "string"
+    || first.stateDigest.length === 0
+  ) {
+    return null;
+  }
+  const sharedIdentity = observation =>
+    JSON.stringify([
+      observation.surfaceId,
+      observation.operationClass,
+      observation.phase,
+      observation.address?.epoch,
+      observation.address?.wave,
+      observation.address?.turn,
+      observation.membershipRevision,
+      observation.connectionGeneration,
+      observation.mysteryEncounterType ?? null,
+      observation.stateDigest,
+    ]);
+  if (observations.some(observation => sharedIdentity(observation) !== sharedIdentity(first))) {
+    return null;
+  }
+  return Object.freeze({
+    epoch: address.epoch,
+    wave: address.wave,
+    turn: address.turn,
+    stateDigest: first.stateDigest,
+    mysteryEncounterType: first.mysteryEncounterType ?? null,
+  });
+}
+
 /** Poll the post-turn outcome markers for a bounded window; null on timeout (no throw). */
 export async function waitForOutcomeBounded(
   rig,
@@ -1059,6 +1114,10 @@ export async function waitForOutcomeBounded(
     }
     if (clients.every(client => client.evidence.find(REWARD_PHASE, from[client.label]))) {
       return { kind: "reward" };
+    }
+    const successorWave = findSharedSuccessorWavePresentation(rig, from);
+    if (successorWave != null) {
+      return { kind: "wave-transition", boundary: successorWave };
     }
     for (const client of clients) {
       // Ownership-PROVEN faint detection only: the semantic party:replacement mirror carries the
@@ -1150,6 +1209,13 @@ async function driveBattleWave(rig, policy, stats) {
   let commandCursors = fromEach(clients, client => findOwnedCommandFrontier(client, 0)?.index ?? 0);
   let pendingCommandProof = null;
   const fallbackWindow = Math.min(rig.config.timeoutMs, 15_000);
+  const finishSuccessorWaveTransition = (outcome, cursors) => {
+    // Preserve the post-command floor so the between-wave driver can consume an encounter prompt that was already
+    // visible when this battle wait returned. Capturing a fresh cursor there would strand the exact current prompt.
+    stats._successorWaveCursors = cursors;
+    rig.host.evidence.record("campaign-successor-wave-presentation", outcome.boundary);
+    return "transition";
+  };
   for (let turn = 1; turn <= rig.config.maxTurns; turn++) {
     const purpose = `wave-${stats.wave}-turn-${turn}`;
     if (pendingCommandProof != null) {
@@ -1174,6 +1240,9 @@ async function driveBattleWave(rig, policy, stats) {
       }
       if (superseded?.kind === "wipe") {
         return "wipe";
+      }
+      if (superseded?.kind === "wave-transition") {
+        return finishSuccessorWaveTransition(superseded, pendingCommandProof.cursors);
       }
     }
     const { outcomeCursors, expectedCommandAddress } = await rig.driveSequentialCommandRound(
@@ -1216,6 +1285,9 @@ async function driveBattleWave(rig, policy, stats) {
         }
         if (superseded?.kind === "wipe") {
           return "wipe";
+        }
+        if (superseded?.kind === "wave-transition") {
+          return finishSuccessorWaveTransition(superseded, pendingCommandProof.cursors);
         }
         throw error;
       }
@@ -1295,6 +1367,9 @@ async function driveBattleWave(rig, policy, stats) {
       });
       await rig.assertRetainedContinuation(from, `wave-${stats.wave}-turn-${turn}-reward`);
       return "reward";
+    }
+    if (outcome.kind === "wave-transition") {
+      return finishSuccessorWaveTransition(outcome, from);
     }
     if (outcome.kind === "faint") {
       stats.faints += 1;
@@ -2679,7 +2754,8 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
   // Owner markers for reward/biome/crossroads/etc. are searched from the wave start
   // (surfaceCursors); the next command and terminal are searched from the post-battle
   // cursor so this wave's own commands never read as the next wave.
-  const commandCursors = fromEach(clients, client => client.evidence.cursor());
+  const commandCursors = stats._successorWaveCursors ?? fromEach(clients, client => client.evidence.cursor());
+  stats._successorWaveCursors = undefined;
   const advanceBattlePrompt = createBattlePromptAdvancer(
     rig,
     commandCursors,

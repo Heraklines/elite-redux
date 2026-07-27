@@ -4760,3 +4760,49 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The source contract requires this exact successor proof before any picker search. Local policy-safe evidence is
   95/95 Authority V2 contracts, formatting clean (only inherited complexity notices), `git diff --check` clean, and no
   changed-file TypeScript diagnostics. The deterministic level/god-a reproductions remain remote-only.
+
+## 2026-07-27 - Authority move animation callbacks are mechanically bounded
+
+- The animations-on surface lane in campaign `30275884200` recorded Lovely Bite (`moveId=5008`) and its immutable
+  `moveAnim` event, then left the authority in `MoveEffectPhase` indefinitely. The renderer was correctly waiting for
+  later signed material; the mechanics host alone still trusted `MoveAnim.play()` to invoke every target callback.
+- Authoritative co-op move animation now uses the same frame-progress wall-clock watchdog as the replay presentation
+  phases. Normal completion removes it, a start throw settles only that target, and a lost callback advances mechanics
+  exactly once. The guard is restricted to authoritative co-op, leaving solo, Showdown, and tournament behavior
+  unchanged. Late animation callbacks cannot double-apply the move.
+
+## 2026-07-27 - Embedded Mystery battles expose their exact next-wave presentation
+
+- Campaign `30275884200` also proved both browsers had already left the wave-2 Mystery battle and installed the same
+  wave-3/turn-1 `NextEncounterPhase` (epoch, membership, connection generation, encounter type, and state digest all
+  matched). The browser driver knew only reward, wipe, faint, and command outcomes, so it called that healthy direct
+  transition a wave-2 softlock and never pressed the already-visible wave-3 prompt.
+- The outcome oracle now accepts only a paired, current, exact-next-wave `battle:message` presentation with identical
+  immutable identity on both browsers. It preserves the submitted-turn evidence floor so the between-wave driver can
+  consume a prompt that was already visible before battle classification returned; any digest/address mismatch stays
+  red. Failure-first browser-unit coverage proves both acceptance and rejection.
+
+## 2026-07-27 - Replacement supersession is recognized throughout the bounded picker pump
+
+- Exact diagnostic soak `30280934116` made the earlier replacement harness correction more precise. Level wave 3 and
+  god-a wave 34 reached the exact actionable guest `CommandPhase` while the bounded picker search was already running.
+  The pre-search supersession probe happened a few milliseconds too early, and the pump then rejected the healthy
+  CommandPhase because its match predicate still accepted only the retired replacement picker.
+- The exact destination command proof is now shared by both the initial probe and every pump iteration. A late command
+  match exits without starting it as a replacement phase. Wrong field, wave, turn, mode, or phase remain rejected.
+
+## 2026-07-27 - A consumed biome permit cannot block a later ordered World Map result
+
+- The same soak's god-b lane played mechanically synchronized through wave 35, then a guest-owned Crossroads -> World
+  Map choice remained parked. The payload was valid (`choice=0`, Temple `biomeId=29`); `biome=undefined` in the log was
+  only obsolete reverse-enum formatting. The host's exact refusal was `host-permit-slot-busy`.
+- A wave-30 transition had reached `encounterAdopted` and gameplay continued for five waves, but a displaced encounter
+  finalizer left that fully consumed permit as a tombstone. The renderer gate already allows a later same-session,
+  ordered permit and performs the real revision check after commit. The earlier revision-less reservation preflight
+  now mirrors that narrow rule instead of rejecting the proposal before it can receive a V2 revision. Unconsumed,
+  cross-session, and earlier-wave permits remain fail-closed.
+- A two-engine regression constructs the consumed tombstone and requires the later guest-owned map proposal to retain
+  for authoritative commit. Local policy-safe evidence is 182/182 fast architecture/browser contracts,
+  `git diff --check`, TypeScript's 215 inherited diagnostics with zero in changed files, and scoped formatting. The
+  pre-existing `coop-biome-operation.ts` import-cycle diagnostic is unchanged. Engine, soak, and two-browser proof
+  remain GitHub-hosted; no deployment occurred.
