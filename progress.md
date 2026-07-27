@@ -4539,3 +4539,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   formatting, and `git diff --check` pass. The inherited TypeScript baseline remains 575 diagnostic lines with none in
   this batch's changed TypeScript files. Co-op Vitest and real Chromium qualification remain GitHub-hosted; no deployment
   occurred.
+
+## 2026-07-27 - A remote replacement control cannot release its own source turn
+
+- The exact `06b7be4de` dirty-account campaign reached wave 2 mechanically converged, then exposed a real V2 control
+  error. TURN_COMMIT revision 8 correctly stated a host-owned replacement and the host opened its actionable PARTY
+  picker. On the renderer, the safe-boundary retry presented that same TURN_COMMIT back to its parked finalizer; the
+  finalizer mistook the executable control for the replacement answer, ended, and synchronously regenerated
+  TurnInit/CoopReplayTurn 959 times until the stack overflowed. The later immutable result had not yet been chosen.
+- Remote replacement opens are now retained for both legitimate shapes: a replacement stated directly by TURN_COMMIT
+  and a later CONTROL_COMMIT after an ordered wait. The renderer has no local picker wake, so only the consecutive,
+  operation-exact REPLACEMENT_COMMIT may release its finalizer. Local-owned replacement control still releases into its
+  real projected PARTY picker, preserving input actionability.
+- A failure-first engine regression models the exact revision-8 TURN source, asserts zero phase shifts while the remote
+  picker is open, then proves revision-9 immutable material advances the live turn cursor and releases exactly once.
+  The fast source contract also pins both control-open entry kinds.
+- The prior candidate's real two-browser faint/replacement journey `30251023444` passed end-to-end. The new dirty-lane
+  failure is therefore narrower than generic replacement handling and was found only because the campaign exercised a
+  surviving-wave, remote-owned faint while the dedicated faint journey covered a different replacement topology.

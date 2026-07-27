@@ -5587,9 +5587,9 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
     if (resumedLocalPicker) {
       runtime.v2ProjectedReplacementControlId = controlIdOf(entry.nextControl);
     }
-    // A remote-owned replacement has no local picker wake. Still present its ordered CONTROL_COMMIT to the
-    // parked turn so the finalizer can retain the exact replacement operation as an intermediate boundary;
-    // the following REPLACEMENT_COMMIT, not an empty Phaser queue, releases progression.
+    // A remote-owned replacement has no local picker wake. Still present its ordered TURN/CONTROL commit to
+    // the parked turn so the finalizer can retain the exact replacement operation as an intermediate
+    // boundary; the following REPLACEMENT_COMMIT, not an empty Phaser queue, releases progression.
     if (resumedLocalPicker || entry.nextControl.ownerSeatId !== runtime.controller.localSeatId) {
       releaseCoopV2ParkedTurnBoundary(runtime, entry);
     }

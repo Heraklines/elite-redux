@@ -641,8 +641,8 @@ test("a remote replacement result releases an AWAIT_SUCCESSOR turn through its o
   );
   assert.match(
     finalizer,
-    /replacement\.ownerSeatId !== getCoopController\(\)\?\.localSeatId[\s\S]*?authorityRemoteReplacementOpen \?\?= successor[\s\S]*?return true/u,
-    "a renderer without the replacement picker retains the control-open instead of ending into an empty queue",
+    /successor\.kind === "CONTROL_COMMIT"[\s\S]*?successor\.kind === "TURN_COMMIT"[\s\S]*?replacement\.ownerSeatId !== getCoopController\(\)\?\.localSeatId[\s\S]*?authorityRemoteReplacementOpen \?\?= successor[\s\S]*?return true/u,
+    "a renderer without the replacement picker retains both control-open shapes instead of ending into an empty queue",
   );
   assert.match(
     coopRuntime,

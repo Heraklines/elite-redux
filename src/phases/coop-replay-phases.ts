@@ -2194,10 +2194,10 @@ export class CoopFinalizeTurnPhase extends Phase {
    */
   private authoritySuccessorReady: CoopV2ControlSuccessorClaim | null = null;
   /**
-   * A remote-owned replacement opens in two globally ordered steps: CONTROL_COMMIT installs the picker on
-   * the authority, then REPLACEMENT_COMMIT installs its immutable answer on this renderer. The renderer has
-   * no local picker to put in front of this finalizer, so retain the first entry as an authenticated bridge
-   * instead of ending into an empty queue between those two revisions.
+   * A remote-owned replacement opens in two globally ordered steps: TURN_COMMIT/CONTROL_COMMIT installs the
+   * picker on the authority, then REPLACEMENT_COMMIT installs its immutable answer on this renderer. The
+   * renderer has no local picker to put in front of this finalizer, so retain the first entry as an
+   * authenticated bridge instead of ending into an empty queue between those two revisions.
    */
   private authorityRemoteReplacementOpen: CoopV2ControlSuccessorClaim | null = null;
   private authoritySuccessorMachineWaitEnd: (() => void) | null = null;
@@ -2429,8 +2429,11 @@ export class CoopFinalizeTurnPhase extends Phase {
       return false;
     }
     const replacement = successor.nextControl;
-    if (
+    const opensReplacementControl =
       successor.kind === "CONTROL_COMMIT"
+      || (successor.kind === "TURN_COMMIT" && successor.revision === this.authorityRevision);
+    if (
+      opensReplacementControl
       && replacement.kind === "REPLACEMENT"
       && replacement.ownerSeatId !== getCoopController()?.localSeatId
     ) {

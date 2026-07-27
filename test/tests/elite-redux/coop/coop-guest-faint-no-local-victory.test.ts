@@ -355,6 +355,69 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     expect(rec.shiftPhaseCalls, "the exact immutable answer releases the parked turn once").toBe(1);
   });
 
+  it("does not mistake a TURN_COMMIT's remote replacement control for its immutable result", () => {
+    startAuthoritativeGuestSession();
+    const controller = getCoopController();
+    expect(controller).not.toBeNull();
+    const ownerSeatId = controller?.localSeatId === 0 ? 1 : 0;
+    const replacementOperationId = "RC/e1/w5/t1/o0/f0/s0";
+    const replacementControl = {
+      kind: "REPLACEMENT" as const,
+      operationId: replacementOperationId,
+      ownerSeatId,
+      epoch: 1,
+      wave: 5,
+      turn: 1,
+      occurrence: 0,
+      fieldIndex: 0,
+      remaining: [],
+    };
+    const phase = new CoopFinalizeTurnPhase(
+      1,
+      {} as CoopBattleCheckpoint,
+      "checksum",
+      undefined,
+      undefined,
+      undefined,
+      1,
+      5,
+      16,
+      replacementControl,
+      8,
+    );
+    callPrivate(phase, "finishTurn");
+    expect(coopMachineWaitLabels()).toEqual([expect.stringContaining("authority-v2-successor:w5:t1:r16")]);
+
+    const sourceTurn: CoopV2ControlSuccessorClaim = {
+      sessionEpoch: 1,
+      revision: 8,
+      kind: "TURN_COMMIT",
+      operationId: "TURN/e1/w5/t1",
+      nextControl: replacementControl,
+    };
+    expect(phase.releaseForCoopV2Control(sourceTurn)).toBe(true);
+    expect(rec.shiftPhaseCalls, "the renderer has no local picker and must remain parked").toBe(0);
+    expect(coopMachineWaitLabels()).toEqual([expect.stringContaining("authority-v2-successor:w5:t1:r16")]);
+
+    const replacementResult: CoopV2ControlSuccessorClaim = {
+      sessionEpoch: 1,
+      revision: 9,
+      kind: "REPLACEMENT_COMMIT",
+      operationId: replacementOperationId,
+      nextControl: {
+        kind: "COMMAND_FRONTIER",
+        epoch: 1,
+        wave: 5,
+        turn: 2,
+        ownerSeatIds: [0, 1],
+      },
+    };
+    expect(phase.releaseForCoopV2Control(replacementResult)).toBe(true);
+    expect(rec.shiftPhaseCalls, "only the consecutive immutable replacement answer releases the turn").toBe(1);
+    expect(rec.turn).toBe(2);
+    expect(coopMachineWaitLabels()).toEqual([]);
+  });
+
   it("destructive Authority V2 projection retires a replay pump without letting its late completion shift the successor", async () => {
     startAuthoritativeGuestSession();
     const phaseManager = new PhaseManager();
