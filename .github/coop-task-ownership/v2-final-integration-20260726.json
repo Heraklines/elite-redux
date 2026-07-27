@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "d95c887eb36353c0835f90b6c8fbcef8e74cd7c9",
+  "baseSha": "8f7e94b3f06974524f3912e0278862f4785157bf",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -49,6 +49,7 @@
     "src/data/elite-redux/er-custom-trainers.json",
     "src/data/elite-redux/er-custom-trainers.ts",
     "src/data/elite-redux/er-egg-moves.json",
+    "src/data/elite-redux/er-item-tuning.json",
     "src/data/elite-redux/er-newcomer-species.ts",
     "src/data/elite-redux/er-species-abilities.json",
     "src/data/elite-redux/er-trainer-runtime-hook.ts",
