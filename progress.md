@@ -4496,3 +4496,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   and the campaign source contract proves the Mystery result is wired into semantic leave. The focused Mystery Node
   suite passes 30/30 and the sealed public-driver boundary passes. Hosted Chromium replay remains required; no local
   browser or co-op Vitest run and no deployment occurred.
+
+## 2026-07-27 - Remote replacement and recovered wave tails remain in one ordered V2 chain
+
+- The failed fresh journey's public guest trace exposed one continuous production failure, not a generic timeout. Its
+  parked TURN revision 3 admitted a remote-owned replacement CONTROL revision 4, but the renderer had no local picker
+  and therefore never retained that intermediate control. The immutable REPLACEMENT revision 5 was then two revisions
+  beyond the parked turn and could not release it. Recovery eventually installed wave DATA and its exact reward, but
+  left the obsolete pending wave bootstrap alive; after the reward an unsigned local NewBattle tail fell through an
+  empty queue, repeatedly manufactured TurnInit/Replay against the retained won wave, and overflowed the call stack.
+- A remote-owned replacement CONTROL is now an authenticated intermediate bridge: the parked finalizer retains its
+  exact operation and releases only for the consecutive matching REPLACEMENT_COMMIT. The runtime presents that control
+  to the finalizer even though no renderer-owned picker exists. A phase-level regression proves the open does not shift
+  and the exact immutable result shifts once.
+- Completing an exactly projected wave transaction now retires the matching one-shot pending bootstrap, so recovery
+  cannot later replay the resolved Victory boundary. Every ordinary reward/market terminal, including a recovery-
+  restored phase, also removes unsigned NewBattle tails and installs the committed V2 next-wave wait before teardown.
+- Policy-compliant local evidence is clean: all 280/280 public source/evidence contracts (including 86/86 Authority V2
+  contracts), both sealed public-driver boundaries, targeted Biome, `git diff --check`, and changed-file TypeScript
+  filtering. The repository TypeScript baseline remains inherited-red with no diagnostic in this batch's files. Co-op
+  Vitest and real Chromium qualification remain GitHub-hosted; no deployment occurred.

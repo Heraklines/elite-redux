@@ -376,9 +376,10 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
     this.coopV2TerminalSettlement ??= { operationId, settle };
-    // A natural phase retained the host-stated wave tail that constructed it. A Mystery reward has its own
-    // PostMysteryEncounter finalizer. Only a destructive ordinary reward/market needs this missing bridge.
-    if (!this.coopV2DestructivelyProjected || this.coopRewardSurface != null || !successor.allowNextWaveStart) {
+    // A Mystery reward has its own PostMysteryEncounter finalizer. Every ordinary V2 reward/market terminal,
+    // including one restored directly by recovery, must replace its locally-derived NewBattle tail with the
+    // signed wait. Whether this phase happened to be constructed by the projector is not authority evidence.
+    if (this.coopRewardSurface != null || !successor.allowNextWaveStart) {
       return true;
     }
     if (this.coopV2NextWaveAwait != null && JSON.stringify(this.coopV2NextWaveAwait) !== JSON.stringify(successor)) {
@@ -399,6 +400,9 @@ export class SelectModifierPhase extends BattlePhase {
     ) {
       return;
     }
+    // The ordinary host phase tree may already contain an unsigned NewBattlePhase. The committed wait is the
+    // sole structural authority after this terminal, so replace every local copy before queuing its exact one.
+    this.coopOwningScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
     this.coopOwningScene.phaseManager.pushNew("NewBattlePhase", {
       afterOperationId: wait.afterOperationId,
       epoch: wait.epoch,

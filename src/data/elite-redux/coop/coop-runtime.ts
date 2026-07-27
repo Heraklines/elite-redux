@@ -5163,6 +5163,20 @@ function applyCoopV2WaveEntry(runtime: CoopRuntime, entry: CoopAuthorityEntry): 
 }
 
 function completeCoopV2WaveTransaction(runtime: CoopRuntime, transaction: CoopV2WaveLiveTransaction): void {
+  if (pendingWaveAdvance?.wave === transaction.transition.wave) {
+    // Recovery may install the wave's immutable DATA and exact reward/interaction successor without running
+    // the legacy VictoryPhase bootstrap that normally consumes this latch. Once the V2 transaction has real
+    // controlInstalled proof, that bootstrap is obsolete: retaining it lets an empty scheduler later mistake
+    // the resolved source wave for a playable turn and recursively manufacture TurnInit -> Replay forever.
+    // Retire it as the same one-shot boundary (and make any already-queued wake a harmless no-op).
+    pendingWaveAdvance = null;
+    activeGuestWaveTransition = transaction.transition;
+    lastResolvedWave = Math.max(lastResolvedWave, transaction.transition.wave);
+    coopLog(
+      "v2-wave",
+      `retired recovered wave bootstrap wave=${transaction.transition.wave} after exact successor installation`,
+    );
+  }
   transaction.continuationReady = true;
   runtime.v2CompletedWaveTransactions.set(transaction.transition.wave, transaction);
   runtime.v2WaveTransactions.delete(transaction.transition.wave);
@@ -5491,7 +5505,8 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
   if (!runtime.v2ControlLedger.markMaterialApplied(entry)) {
     return false;
   }
-  if (entry.nextControl.kind === "REPLACEMENT" && releaseCoopV2DeferredInteractionStarts(runtime, entry.nextControl)) {
+  if (entry.nextControl.kind === "REPLACEMENT") {
+    const resumedLocalPicker = releaseCoopV2DeferredInteractionStarts(runtime, entry.nextControl);
     // A replica can render a faint event before the authority reaches its settled TURN_COMMIT. Its
     // early picker deliberately retires without opening input and waits here. Reconstruct that exact
     // generation only after the immutable turn material is installed, then let ordinary projection
@@ -5500,8 +5515,15 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
     // same-entry successor before that finalizer decides whether to park; if it already parked, this
     // releases it synchronously. Non-owners have no local picker and remain parked until the later
     // REPLACEMENT_COMMIT installs its authoritative checkpoint carrier.
-    runtime.v2ProjectedReplacementControlId = controlIdOf(entry.nextControl);
-    releaseCoopV2ParkedTurnBoundary(runtime, entry);
+    if (resumedLocalPicker) {
+      runtime.v2ProjectedReplacementControlId = controlIdOf(entry.nextControl);
+    }
+    // A remote-owned replacement has no local picker wake. Still present its ordered CONTROL_COMMIT to the
+    // parked turn so the finalizer can retain the exact replacement operation as an intermediate boundary;
+    // the following REPLACEMENT_COMMIT, not an empty Phaser queue, releases progression.
+    if (resumedLocalPicker || entry.nextControl.ownerSeatId !== runtime.controller.localSeatId) {
+      releaseCoopV2ParkedTurnBoundary(runtime, entry);
+    }
   }
   if (entry.kind !== "CONTROL_COMMIT" && entry.nextControl.kind === "COMMAND_FRONTIER") {
     // A replacement/wave/turn result can itself state the next command frontier. The real CommandPhase may

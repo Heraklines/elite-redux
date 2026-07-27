@@ -565,8 +565,16 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   assert.match(phaseEnd, /super\.end\(\);\s*return true/u);
   assert.match(
     selectModifierPhase,
-    /pushNew\("NewBattlePhase", \{[\s\S]*?afterOperationId: wait\.afterOperationId,[\s\S]*?epoch: wait\.epoch,[\s\S]*?wave: wait\.wave,[\s\S]*?turn: wait\.turn/u,
-    "the bridge preserves the immutable AWAIT_SUCCESSOR address",
+    /removeAllPhasesOfType\("NewBattlePhase"\);[\s\S]*?pushNew\("NewBattlePhase", \{[\s\S]*?afterOperationId: wait\.afterOperationId,[\s\S]*?epoch: wait\.epoch,[\s\S]*?wave: wait\.wave,[\s\S]*?turn: wait\.turn/u,
+    "the bridge replaces every unsigned local tail and preserves the immutable AWAIT_SUCCESSOR address",
+  );
+  const terminalSuccessorStart = selectModifierPhase.indexOf("public installCoopV2TerminalSuccessor(");
+  const terminalSuccessorEnd = selectModifierPhase.indexOf("\n  /**", terminalSuccessorStart + 1);
+  const terminalSuccessor = selectModifierPhase.slice(terminalSuccessorStart, terminalSuccessorEnd);
+  assert.doesNotMatch(
+    terminalSuccessor,
+    /!this\.coopV2DestructivelyProjected/u,
+    "a recovery-restored ordinary reward receives the same signed wait as a destructively projected reward",
   );
   assert.match(
     newBattlePhase,
@@ -584,6 +592,28 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     newBattlePhase.indexOf("start()"),
   );
   assert.match(release, /pushNew\("NextEncounterPhase"\)[\s\S]*?this\.end\(\)/u);
+});
+
+test("a remote replacement result releases an AWAIT_SUCCESSOR turn through its ordered control-open bridge", () => {
+  const finalizerStart = replayPhases.indexOf("private acceptsCoopV2ControlSuccessor(");
+  const finalizerEnd = replayPhases.indexOf("\n  private completeCoopV2ControlRelease(", finalizerStart);
+  assert.ok(finalizerStart >= 0 && finalizerEnd > finalizerStart, "the finalizer successor bridge is bounded");
+  const finalizer = replayPhases.slice(finalizerStart, finalizerEnd);
+  assert.match(
+    finalizer,
+    /authorityRemoteReplacementOpen[\s\S]*?successor\.revision === remoteReplacementOpen\.revision \+ 1[\s\S]*?successor\.kind === "REPLACEMENT_COMMIT"[\s\S]*?successor\.operationId === remoteReplacementOpen\.nextControl\.operationId/u,
+    "the immutable result must be consecutive and match the exact replacement operation",
+  );
+  assert.match(
+    finalizer,
+    /replacement\.ownerSeatId !== getCoopController\(\)\?\.localSeatId[\s\S]*?authorityRemoteReplacementOpen \?\?= successor[\s\S]*?return true/u,
+    "a renderer without the replacement picker retains the control-open instead of ending into an empty queue",
+  );
+  assert.match(
+    coopRuntime,
+    /entry\.nextControl\.ownerSeatId !== runtime\.controller\.localSeatId[\s\S]*?releaseCoopV2ParkedTurnBoundary\(runtime, entry\)/u,
+    "the replica material path presents the remote control-open to the parked finalizer",
+  );
 });
 
 test("a legacy enemy manifest cannot overwrite a newer V2 wave image", () => {

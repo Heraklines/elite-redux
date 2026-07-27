@@ -2193,6 +2193,13 @@ export class CoopFinalizeTurnPhase extends Phase {
    * otherwise a fast replica loses the release merely because the log retry beat the finalizer by one stack.
    */
   private authoritySuccessorReady: CoopV2ControlSuccessorClaim | null = null;
+  /**
+   * A remote-owned replacement opens in two globally ordered steps: CONTROL_COMMIT installs the picker on
+   * the authority, then REPLACEMENT_COMMIT installs its immutable answer on this renderer. The renderer has
+   * no local picker to put in front of this finalizer, so retain the first entry as an authenticated bridge
+   * instead of ending into an empty queue between those two revisions.
+   */
+  private authorityRemoteReplacementOpen: CoopV2ControlSuccessorClaim | null = null;
   private authoritySuccessorMachineWaitEnd: (() => void) | null = null;
   private supersedingCheckpoint: CoopCheckpointEnvelope | null | undefined;
   private turnCommitSupersededBy: CoopCheckpointEnvelope | undefined;
@@ -2329,6 +2336,7 @@ export class CoopFinalizeTurnPhase extends Phase {
     this.ended = true;
     this.awaitingAuthoritySuccessor = false;
     this.authoritySuccessorReady = null;
+    this.authorityRemoteReplacementOpen = null;
     this.authoritySuccessorMachineWaitEnd?.();
     this.authoritySuccessorMachineWaitEnd = null;
     this.clearTurnCommitRetry();
@@ -2388,14 +2396,27 @@ export class CoopFinalizeTurnPhase extends Phase {
       && statedControl?.kind === "REPLACEMENT"
       && successor.kind === "REPLACEMENT_COMMIT"
       && successor.operationId === statedControl.operationId;
-    const addressAccepted = sameEntryReplacement || orderedSuccessor || orderedReplacementResult;
+    const remoteReplacementOpen = this.authorityRemoteReplacementOpen;
+    const orderedRemoteReplacementResult =
+      remoteReplacementOpen?.nextControl.kind === "REPLACEMENT"
+      && successor.revision === remoteReplacementOpen.revision + 1
+      && successor.kind === "REPLACEMENT_COMMIT"
+      && successor.operationId === remoteReplacementOpen.nextControl.operationId;
+    const addressAccepted =
+      sameEntryReplacement || orderedSuccessor || orderedReplacementResult || orderedRemoteReplacementResult;
     const prior = this.authoritySuccessorReady;
     const conflictsWithLatchedSuccessor =
       prior != null
       && (prior.revision !== successor.revision
         || prior.operationId !== successor.operationId
         || controlIdOf(prior.nextControl) !== controlIdOf(successor.nextControl));
-    return addressAccepted && !conflictsWithLatchedSuccessor;
+    const conflictsWithRemoteReplacementOpen =
+      remoteReplacementOpen != null
+      && successor.kind === "CONTROL_COMMIT"
+      && (remoteReplacementOpen.revision !== successor.revision
+        || remoteReplacementOpen.operationId !== successor.operationId
+        || controlIdOf(remoteReplacementOpen.nextControl) !== controlIdOf(successor.nextControl));
+    return addressAccepted && !conflictsWithLatchedSuccessor && !conflictsWithRemoteReplacementOpen;
   }
 
   /** Non-mutating proof used before an immutable successor applies its material state. */
@@ -2406,6 +2427,20 @@ export class CoopFinalizeTurnPhase extends Phase {
   public releaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
     if (!this.acceptsCoopV2ControlSuccessor(successor)) {
       return false;
+    }
+    const replacement = successor.nextControl;
+    if (
+      successor.kind === "CONTROL_COMMIT"
+      && replacement.kind === "REPLACEMENT"
+      && replacement.ownerSeatId !== getCoopController()?.localSeatId
+    ) {
+      this.authorityRemoteReplacementOpen ??= successor;
+      coopLog(
+        "v2-turn",
+        `guest retained remote replacement-open rev=${successor.revision} op=${replacement.operationId} `
+          + "until its immutable REPLACEMENT_COMMIT",
+      );
+      return true;
     }
     this.authoritySuccessorReady ??= successor;
     if (!this.awaitingAuthoritySuccessor) {

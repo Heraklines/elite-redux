@@ -36,7 +36,7 @@ import { clearCoopRuntime, getCoopController, startLocalCoopSession } from "#dat
 import { clearCoopMachineWaits, coopMachineWaitLabels } from "#data/elite-redux/coop/coop-stall-probe";
 import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { CoopInertPhase } from "#phases/coop-inert-phase";
-import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
+import { CoopFinalizeTurnPhase, type CoopV2ControlSuccessorClaim } from "#phases/coop-replay-phases";
 import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -257,6 +257,102 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     ordinaryDiscard.retire();
     ordinaryDiscard.end();
     expect(rec.shiftPhaseCalls).toBe(shiftsAfterSuccessorStart);
+  });
+
+  it("keeps a remote-owned replacement bridge parked until its consecutive immutable result arrives", () => {
+    startAuthoritativeGuestSession();
+    const controller = getCoopController();
+    expect(controller).not.toBeNull();
+    const ownerSeatId = controller?.localSeatId === 0 ? 1 : 0;
+    const wait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "TURN/e1/w5/t1",
+      epoch: 1,
+      wave: 5,
+      turn: 1,
+      allowedKinds: ["CONTROL_COMMIT" as const],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    const phase = new CoopFinalizeTurnPhase(
+      1,
+      {} as CoopBattleCheckpoint,
+      "checksum",
+      undefined,
+      undefined,
+      undefined,
+      1,
+      5,
+      16,
+      wait,
+      7,
+    );
+    callPrivate(phase, "finishTurn");
+    const replacementOperationId = "RC/e1/w5/t2/o0/f0/s0";
+    const replacementOpen: CoopV2ControlSuccessorClaim = {
+      sessionEpoch: 1,
+      revision: 8,
+      kind: "CONTROL_COMMIT",
+      operationId: "CONTROL/e1/w5/t2/replacement",
+      nextControl: {
+        kind: "REPLACEMENT",
+        operationId: replacementOperationId,
+        ownerSeatId,
+        epoch: 1,
+        wave: 5,
+        turn: 2,
+        occurrence: 0,
+        fieldIndex: 0,
+        remaining: [],
+      },
+    };
+    expect(phase.releaseForCoopV2Control(replacementOpen)).toBe(true);
+    expect(rec.shiftPhaseCalls, "the remote picker is not a renderer wake").toBe(0);
+    expect(
+      phase.releaseForCoopV2Control({
+        ...replacementOpen,
+        operationId: "CONTROL/e1/w5/t2/other-replacement",
+        nextControl: {
+          kind: "REPLACEMENT",
+          operationId: "RC/e1/w5/t2/o1/f0/s0",
+          ownerSeatId,
+          epoch: 1,
+          wave: 5,
+          turn: 2,
+          occurrence: 1,
+          fieldIndex: 0,
+          remaining: [],
+        },
+      }),
+      "a different replacement cannot overwrite the retained global revision",
+    ).toBe(false);
+
+    const replacementResult: CoopV2ControlSuccessorClaim = {
+      sessionEpoch: 1,
+      revision: 9,
+      kind: "REPLACEMENT_COMMIT",
+      operationId: replacementOperationId,
+      nextControl: {
+        kind: "AWAIT_SUCCESSOR",
+        afterOperationId: replacementOperationId,
+        epoch: 1,
+        wave: 5,
+        turn: 2,
+        allowedKinds: ["WAVE_ADVANCE"],
+        allowNextWaveStart: false,
+        expectedOperationId: null,
+      },
+    };
+    expect(
+      phase.releaseForCoopV2Control({ ...replacementResult, revision: 10 }),
+      "a gapped replacement result cannot release the turn",
+    ).toBe(false);
+    expect(
+      phase.releaseForCoopV2Control({ ...replacementResult, operationId: "RC/e1/w5/t2/o0/f1/s0" }),
+      "a result for another field operation cannot release the turn",
+    ).toBe(false);
+    expect(phase.releaseForCoopV2Control(replacementResult)).toBe(true);
+    expect(rec.shiftPhaseCalls, "the exact immutable answer releases the parked turn once").toBe(1);
   });
 
   it("destructive Authority V2 projection retires a replay pump without letting its late completion shift the successor", async () => {
