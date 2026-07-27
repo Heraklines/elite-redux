@@ -3,9 +3,6 @@
     "elite": {
       "trainerCadence": 5
     },
-    "hell": {
-      "factoryTeamPct": 20,
-      "trainerCadence": 3
-    }
+    "hell": {}
   }
 }
