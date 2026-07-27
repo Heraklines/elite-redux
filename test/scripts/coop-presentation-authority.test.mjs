@@ -327,6 +327,7 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
     checkpoint,
     /recordedPresentation == null && !this\.noSummonExpected[\s\S]+recordedPresentation \?\? \[\]/u,
   );
+  assert.match(checkpoint, /host sealing intentional empty replacement presentation/u);
   assert.equal(
     [...switchPhase.matchAll(/unshiftNew\("CoopPushReplacementCheckpointPhase", true\)/gu)].length,
     2,

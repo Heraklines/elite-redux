@@ -102,6 +102,12 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
           fatal(`Authority V2 replacement for wave ${wave}, turn ${turn} had no active presentation recording.`);
           return;
         }
+        if (recordedPresentation == null && this.noSummonExpected) {
+          coopLog(
+            "v2-replacement",
+            `host sealing intentional empty replacement presentation wave=${wave} turn=${turn}`,
+          );
+        }
         const entryPresentation = recordedPresentation ?? [];
         const v2 = commitCoopV2ReplacementAuthority(
           {
