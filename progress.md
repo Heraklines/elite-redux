@@ -4687,3 +4687,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A failure-first real-engine regression creates a five-turn stored terrain, activates the Clueless suppression view,
   applies a complete signed NONE state, and requires the underlying object to be removed. The regression and the exact
   god-b soak remain GitHub-hosted under the co-op test policy; no deployment occurred.
+
+## 2026-07-27 - Commander auto-skip attests its real pre-start command boundary
+
+- Focused gate `30276032723` ran 82/83 lane-B tests green. Its only failure was fixture ordering: `buildDuo`
+  started the real guest-owned CommandPhase, drained its effects, and only then attempted to mark that phase as the
+  public command boundary. Commander correctly installs an automatic skip and can finish synchronously, so the current
+  phase had already advanced to TurnStartPhase even though the real queued CommandPhase had just executed.
+- The harness now attests the exact current, address-matched CommandPhase immediately before starting it. Normal input
+  phases and synchronous automatic commands share the same proof edge; production code is unchanged, and a healthy
+  Commander transition can no longer produce a timing-dependent gate red.

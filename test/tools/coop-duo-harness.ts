@@ -3231,11 +3231,14 @@ export async function buildDuo(
             phase.phaseName === "CommandPhase"
             && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
         });
+        // Attest the real queued boundary while that exact phase is current. Starting it can legitimately
+        // complete synchronously (Commander installs an automatic skip) and advance to TurnStartPhase;
+        // checking afterward made a healthy production transition look like a missing command surface.
+        markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
         manuallyStartedDuoPhases.add(guestOwnCommand);
         guestOwnCommand.start();
         adoptedCommandReentryPermits.add(guestOwnCommand);
         await drainLoopback();
-        markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
       }
     });
     await withClient(hostCtx, async () => {

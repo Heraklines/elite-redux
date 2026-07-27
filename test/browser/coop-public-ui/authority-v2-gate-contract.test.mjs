@@ -915,12 +915,12 @@ test("the real command proof edge eagerly completes V2 and the duo fixture creat
   assert.ok(adoptsHost >= 0, "the already-real host control is adopted");
   assert.ok(
     materializesGuest > adoptsHost
-      && startsGuest > materializesGuest
+      && marksGuest > materializesGuest
+      && startsGuest > marksGuest
       && permitsGuestReentry > startsGuest
-      && marksGuest > permitsGuestReentry
-      && restartsHost > marksGuest
+      && restartsHost > permitsGuestReentry
       && permitsHostReentry > restartsHost,
-    "the synthetic second browser crosses the same TurnInit/Command/proof/pacing order with one bootstrap re-entry permit per adopted control",
+    "the synthetic second browser proves the real TurnInit/Command boundary before execution can synchronously advance it",
   );
 
   const startHelperStart = duoHarness.indexOf("function startDuoCommandPhaseIfNeeded(");
