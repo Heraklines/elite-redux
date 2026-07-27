@@ -13,6 +13,7 @@ import {
   createMysteryNarrationAdvancer,
   createRegisteredSurfaceProgressBudget,
   driveMysteryEncounterChoice,
+  mechanicalBoundaryFromPairedSurfaces,
 } from "./campaign.mjs";
 import {
   chooseAffordableStarterPair,
@@ -243,6 +244,34 @@ test("reward targeting chooses a legal visible party slot instead of blindly sel
   });
 });
 
+test("a Mystery reward keeps its paired owner boundary for semantic leave confirmation", () => {
+  const watcher = {
+    index: 10,
+    observation: {
+      surfaceId: "reward-shop",
+      localSeat: 0,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      address: { epoch: 7, wave: 2, turn: 1 },
+      stateDigest: "same-state",
+    },
+  };
+  const owner = {
+    index: 12,
+    observation: {
+      ...watcher.observation,
+      localSeat: 1,
+      ready: { handlerActive: true, awaitingActionInput: true },
+    },
+  };
+
+  assert.deepEqual(mechanicalBoundaryFromPairedSurfaces([watcher, owner], "reward-shop"), {
+    authority: owner.observation,
+    ownerEvent: owner,
+    peerEvents: [watcher],
+  });
+});
+
 test("Mystery choice navigation skips a production-disabled default through verified public keys", async () => {
   const events = [
     {
@@ -323,6 +352,7 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /selected\.startsWith\("party-option:"\)/u);
   assert.match(campaign, /campaign-reward-target-action/u);
   assert.match(campaign, /await driveConfirmedLeave\(rig, driver, client, mechanicalBoundary\.authority, cursors\)/u);
+  assert.match(campaign, /mechanicalBoundary = mysteryCheckpoint\.boundary/u);
   // Track R dirty lane wave-3: the watcher's non-actionable reward-shop replica is emitted ONCE and held on
   // a digest-budget-throttled runner (guest "mechanical digest p95 70.7ms exceeds the 50ms budget"), so the
   // reward-watcher wait must scan from the WAVE-START cursor (not a post-convergence cursor), else it times

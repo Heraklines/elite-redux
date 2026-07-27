@@ -4482,3 +4482,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Policy-compliant local evidence passes: 137/137 public source/evidence contracts and both sealed public-driver
   boundaries. Exact two-browser market proof remains GitHub-hosted; no local Chromium or co-op Vitest was run and no
   deployment occurred.
+
+## 2026-07-27 - Mystery reward retains its semantic confirmation boundary
+
+- Mystery campaign `30246925309` reached the same wave-2 reward address, options, owner, and mechanical digest in both
+  browsers. The final screenshots showed the owner in the real `reward:confirm` Yes/No dialog and the watcher parked
+  on its blocked reward replica; this was not a production divergence or softlock.
+- The Mystery checkpoint returned only a target-wave boolean. Its caller therefore discarded the already-proven
+  owner boundary and sent `Backspace, Space` as one blind reward macro, opening the confirmation but never driving it.
+  Paired Mystery checkpoints now return their actionable owner event and watcher events as a mechanical boundary.
+  Reward surfaces retain that boundary and route through the ordinary address/digest-exact confirmation barrier.
+- A behavior contract proves the boundary is selected from the actual owner even when the watcher event arrives first,
+  and the campaign source contract proves the Mystery result is wired into semantic leave. The focused Mystery Node
+  suite passes 30/30 and the sealed public-driver boundary passes. Hosted Chromium replay remains required; no local
+  browser or co-op Vitest run and no deployment occurred.

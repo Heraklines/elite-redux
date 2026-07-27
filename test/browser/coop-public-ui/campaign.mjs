@@ -1583,6 +1583,23 @@ function appendMysteryProof(rig, event, proof) {
   }
 }
 
+export function mechanicalBoundaryFromPairedSurfaces(events, surfaceId) {
+  const ownerEvent = events.find(event => {
+    const observation = event?.observation;
+    return (
+      observation?.localSeat === observation?.ownerSeat && observation.seatsWithInput?.includes(observation.ownerSeat)
+    );
+  });
+  if (ownerEvent == null) {
+    throw new Error(`[campaign-convergence] paired ${surfaceId} surface omitted its actionable owner`);
+  }
+  return {
+    authority: ownerEvent.observation,
+    ownerEvent,
+    peerEvents: events.filter(event => event !== ownerEvent),
+  };
+}
+
 async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, stage) {
   const clients = Object.values(rig.clients);
   const events = await Promise.all(
@@ -1661,7 +1678,7 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
         address: first.address,
       };
       await Promise.all(clients.map(client => client.checkpoint(`wave-${first.address.wave}-target-addressed`)));
-      return true;
+      return { targetReached: true, boundary: null };
     }
   }
   let event = stats.mysteryEvents.find(candidate => candidate.wave === first.address.wave);
@@ -1689,7 +1706,10 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
   }
   appendMysteryProof(rig, event, proof);
   await Promise.all(clients.map(client => client.checkpoint(`wave-${event.wave}-mystery-${stage}-${surfaceId}`)));
-  return false;
+  return {
+    targetReached: false,
+    boundary: mechanicalBoundaryFromPairedSurfaces(events, surfaceId),
+  };
 }
 
 const MYSTERY_WATCHER_SURFACES = new Set([
@@ -2442,10 +2462,17 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
     } else if (driver.name === "mystery-subprompt") {
       await checkpointAsymmetricMysteryPromptSurface(rig, cursors, stats, client);
     } else if (mysteryStage != null && driver.v2SurfaceId) {
-      const targetReached = await checkpointPairedMysterySurface(rig, driver.v2SurfaceId, cursors, stats, mysteryStage);
-      if (targetReached) {
+      const mysteryCheckpoint = await checkpointPairedMysterySurface(
+        rig,
+        driver.v2SurfaceId,
+        cursors,
+        stats,
+        mysteryStage,
+      );
+      if (mysteryCheckpoint.targetReached) {
         return "target-reached";
       }
+      mechanicalBoundary = mysteryCheckpoint.boundary;
     } else if (driver.name === "reward-target") {
       mechanicalBoundary = await checkpointRewardPartyTarget(rig, cursors, client);
     } else if (driver.name === "learn-move-confirm") {
