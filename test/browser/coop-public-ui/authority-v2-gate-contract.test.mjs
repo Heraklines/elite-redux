@@ -159,6 +159,36 @@ test("nested reward successors consume exact immutable modifier follow-up metada
   );
 });
 
+test("a reward pool reopened after a nested picker cannot recommit its stale presentation image", () => {
+  assert.match(
+    rewardOperation,
+    /export function coopRewardPresentationActionSlot[\s\S]*generation === 0[\s\S]*reroll[\s\S]*generation - 1/u,
+    "each nested reopen owns a distinct operation-id slot while generation zero keeps the original address",
+  );
+  assert.match(
+    rewardOperation,
+    /generation === 0 && reroll >= COOP_REWARD_PRESENTATION_REOPEN_BASE/u,
+    "generation-zero addresses cannot overlap the ordered-reopen operation-id band",
+  );
+  assert.match(
+    selectModifierPhase,
+    /copied\.coopRewardPresentationGeneration = this\.coopRewardPresentationGeneration \+ 1/u,
+    "the real continuation phase advances the presentation generation",
+  );
+  assert.match(
+    selectModifierPhase,
+    /sendRewardOptions\([\s\S]*this\.coopRewardPresentationGeneration/u,
+    "the public reward phase publishes that generation at the production relay edge",
+  );
+  assert.match(
+    coopRuntime,
+    /coopRewardPresentationActionSlot\(payload\.pinned, payload\.reroll, payload\.generation, payload\.rewardSurface\)[\s\S]*!== parsed\.pinnedSeq/u,
+    "the replica rejects a presentation whose immutable generation does not match its operation address",
+  );
+  assert.match(interactionCutover, /!integer\(value\.generation\)/u);
+  assert.match(interactionCutover, /surface === "market" && value\.generation !== 0/u);
+});
+
 test("the stall watchdog preserves an exact V2 human-input lease", () => {
   assert.match(coopRuntime, /function hasCoopV2HumanDeliberationLease\(runtime: CoopRuntime\): boolean/u);
   assert.match(

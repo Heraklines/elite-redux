@@ -149,6 +149,7 @@ describe("Authority V2 interaction cutover", () => {
             surface: "market",
             pinned: 0,
             reroll: 0,
+            generation: 0,
             options: [
               { id: "A", tier: 0, upgradeCount: 0, cost: 1 },
               { id: "B", tier: 0, upgradeCount: 0, cost: 1 },

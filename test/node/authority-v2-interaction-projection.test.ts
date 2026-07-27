@@ -158,7 +158,7 @@ describe("Authority V2 immutable interaction projection", () => {
       "op:reward",
       envelope(
         "REWARD_PRESENT",
-        { surface: "reward", pinned: 3, reroll: 0, options: [OPTION] },
+        { surface: "reward", pinned: 3, reroll: 0, generation: 0, options: [OPTION] },
         "REWARD_SELECT",
         1,
         3 * COOP_REWARD_ACTION_STRIDE,
@@ -173,6 +173,7 @@ describe("Authority V2 immutable interaction projection", () => {
           surface: "market",
           pinned: 3,
           reroll: 0,
+          generation: 0,
           options: [OPTION],
           marketKind: "black-market",
           remainingStock: [2],
@@ -203,6 +204,7 @@ describe("Authority V2 immutable interaction projection", () => {
             surface: "market",
             pinned: 3,
             reroll: 0,
+            generation: 0,
             options: [OPTION],
             marketKind: "exotic",
             remainingStock: [1],
@@ -262,7 +264,7 @@ describe("Authority V2 immutable interaction projection", () => {
   it("retains the immutable source entry and refuses address-only shared-interaction recovery", () => {
     const value = envelope(
       "REWARD_PRESENT",
-      { surface: "reward", pinned: 3, reroll: 0, options: [OPTION] },
+      { surface: "reward", pinned: 3, reroll: 0, generation: 0, options: [OPTION] },
       "REWARD_SELECT",
       1,
       3 * COOP_REWARD_ACTION_STRIDE,

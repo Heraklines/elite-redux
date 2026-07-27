@@ -482,6 +482,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
                   surface: "reward",
                   pinned,
                   reroll: 0,
+                  generation: 0,
                   options: [{ id: `REWARD_${choice}`, tier: 0, upgradeCount: 0, cost: 0 }],
                 },
               },

@@ -218,6 +218,10 @@ function rewardPresentationPayload(value: unknown, surface: "reward" | "market")
     || value.pinned < 0
     || !integer(value.reroll)
     || value.reroll < 0
+    || !integer(value.generation)
+    || value.generation < 0
+    || value.generation >= 64
+    || (surface === "market" && value.generation !== 0)
     || !Array.isArray(value.options)
   ) {
     return false;

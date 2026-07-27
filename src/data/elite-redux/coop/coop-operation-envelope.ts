@@ -257,6 +257,8 @@ export type CoopRewardPresentationPayload =
       readonly surface: "reward";
       readonly pinned: number;
       readonly reroll: number;
+      /** Ordered reopen of this same option pool (for example after a nested learn-move picker). */
+      readonly generation: number;
       readonly options: readonly CoopSerializedRewardOption[];
       readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
     }
@@ -264,6 +266,8 @@ export type CoopRewardPresentationPayload =
       readonly surface: "market";
       readonly pinned: number;
       readonly reroll: number;
+      /** Markets currently publish once per lifecycle; retained for a common, collision-free identity. */
+      readonly generation: number;
       readonly options: readonly CoopSerializedRewardOption[];
       /** The exact subclass whose rules and presentation this stock belongs to. */
       readonly marketKind: CoopMarketProjectionKind;

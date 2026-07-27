@@ -379,6 +379,7 @@ export interface CoopInteractionRelayOptions {
     options: readonly CoopSerializedRewardOption[],
     rewardSurface?: CoopRewardSurfaceIdentity,
     projection?: CoopRewardOptionsProjection,
+    generation?: number,
   ) => string | null;
 }
 
@@ -1320,6 +1321,7 @@ export class CoopInteractionRelay {
     options: CoopSerializedRewardOption[],
     rewardSurface?: CoopRewardSurfaceIdentity,
     projection?: CoopRewardOptionsProjection,
+    generation = 0,
   ): string | null {
     const key = rewardOptionsKey(seq, reroll, rewardSurface);
     this.sentRewardOptions.set(key, options);
@@ -1343,7 +1345,8 @@ export class CoopInteractionRelay {
         coopWarn("v2-interaction", `refused non-authority rewardOptions key=${key}`);
         return null;
       }
-      const operationId = this.publishRewardOptions?.(seq, reroll, options, rewardSurface, projection) ?? null;
+      const operationId =
+        this.publishRewardOptions?.(seq, reroll, options, rewardSurface, projection, generation) ?? null;
       if (operationId == null) {
         coopWarn("v2-interaction", `could not retain authoritative rewardOptions key=${key}`);
         return null;

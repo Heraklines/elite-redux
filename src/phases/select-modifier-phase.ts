@@ -297,6 +297,8 @@ export class SelectModifierPhase extends BattlePhase {
   private readonly coopContinuationIdentityFailure: string | null;
   /** Stable P36 address of this ordered Mystery reward surface; absent for ordinary reward shops. */
   private readonly coopRewardSurface: CoopRewardSurfaceIdentity | undefined;
+  /** Ordered render generation; increments when this pool reopens after a nested authoritative picker. */
+  private coopRewardPresentationGeneration: number;
   /**
    * A destructively projected Mystery reward must recreate its typed finalizer before opening. The local
    * MysteryEncounterRewardsPhase normally queues this tail, but Authority V2 intentionally discards that
@@ -423,6 +425,7 @@ export class SelectModifierPhase extends BattlePhase {
       || projection.surface !== "reward"
       || projection.pinned < 0
       || projection.reroll < 0
+      || projection.generation !== this.coopRewardPresentationGeneration
       || !sameRewardSurface
       || this.rerollCount !== projection.reroll
       || (this.coopInteractionStart >= 0 && this.coopInteractionStart !== projection.pinned)
@@ -444,6 +447,7 @@ export class SelectModifierPhase extends BattlePhase {
     isCopy = false,
     coopContinuation: SelectModifierCoopContinuation = { kind: "ambient" },
     coopRewardSurface?: CoopRewardSurfaceIdentity,
+    coopRewardPresentationGeneration = 0,
   ) {
     super();
 
@@ -452,6 +456,7 @@ export class SelectModifierPhase extends BattlePhase {
     this.customModifierSettings = customModifierSettings;
     this.isCopy = isCopy;
     this.coopRewardSurface = coopRewardSurface;
+    this.coopRewardPresentationGeneration = coopRewardPresentationGeneration;
     const continuationIdentity =
       coopContinuation.kind === "wave-boundary"
         ? resolveCoopRetainedWaveContinuationIdentity(true)
@@ -1685,6 +1690,7 @@ export class SelectModifierPhase extends BattlePhase {
     // here, the copy's terminal advance is from-pinned + idempotent (a duplicate no-ops on both sides).
     copied.coopInteractionStart = this.coopInteractionStart;
     copied.coopRewardOperationBinding = this.coopRewardOperationBinding;
+    copied.coopRewardPresentationGeneration = this.coopRewardPresentationGeneration + 1;
     copied.greaterAbilityRandomizerChoiceCaches = this.greaterAbilityRandomizerChoiceCaches;
     return copied;
   }
@@ -1962,6 +1968,7 @@ export class SelectModifierPhase extends BattlePhase {
         surface: "reward",
         pinned: this.coopInteractionStart,
         reroll: this.rerollCount,
+        generation: this.coopRewardPresentationGeneration,
         options: serializeRewardOptions(this.typeOptions),
         ...(this.coopRewardSurface == null ? {} : { rewardSurface: this.coopRewardSurface }),
       },
@@ -2150,12 +2157,21 @@ export class SelectModifierPhase extends BattlePhase {
         this.rerollCount,
         serialized,
         this.coopRewardSurface,
+        undefined,
+        this.coopRewardPresentationGeneration,
       );
       if (operationId != null) {
         this.coopV2ControlOperationId = operationId;
+      } else if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
+        failCoopSharedSession(
+          `Reward presentation generation ${this.coopRewardPresentationGeneration} could not be retained`,
+        );
       }
-    } catch {
-      /* a serialize/send failure must never break the owner's reward screen */
+    } catch (error) {
+      if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
+        coopWarn("reward", "Authority V2 reward presentation publication threw", error);
+        failCoopSharedSession("Reward presentation could not be published to Authority V2");
+      }
     }
   }
 

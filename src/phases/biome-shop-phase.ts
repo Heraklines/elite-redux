@@ -169,6 +169,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       surface: "market",
       pinned: this.coopBiomeStart,
       reroll: COOP_BIOME_STOCK_REROLL,
+      generation: 0,
       options: serializeRewardOptions(this.shopOptions),
       marketKind: this.coopMarketProjectionKind(),
       remainingStock: [...this.qtys],
@@ -186,6 +187,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       || projection.marketKind !== this.coopMarketProjectionKind()
       || projection.pinned < 0
       || projection.reroll !== COOP_BIOME_STOCK_REROLL
+      || projection.generation !== 0
       || projection.remainingStock.length !== projection.options.length
       || (this.coopBiomeStart >= 0 && this.coopBiomeStart !== projection.pinned)
       || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
@@ -232,6 +234,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       projection.surface === "market"
       && projection.marketKind === this.coopMarketProjectionKind()
       && projection.reroll === COOP_BIOME_STOCK_REROLL
+      && projection.generation === 0
       && projection.pinned >= 0
       && this.coopBiomeStart === projection.pinned
       && projection.options.length === projection.remainingStock.length

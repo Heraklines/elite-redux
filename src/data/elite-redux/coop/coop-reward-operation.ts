@@ -178,6 +178,39 @@ export { COOP_REWARD_ACTION_STRIDE };
 /** Disjoint action range for the ambient stream and each of the at most 16 P36 Mystery surfaces. */
 export const COOP_REWARD_SURFACE_ACTION_STRIDE = 5_000;
 
+/** Maximum ordered reopens of one reward pool before failing closed instead of aliasing an old control. */
+export const COOP_REWARD_PRESENTATION_GENERATION_LIMIT = 64;
+
+/** Keep generation-zero addresses below the disjoint band reserved for ordered reopens. */
+const COOP_REWARD_PRESENTATION_REOPEN_BASE = 1_000;
+
+/**
+ * Presentation operation address. Generation zero preserves the historical reroll address; later reopens use
+ * a disjoint band so returning from a nested picker can never recommit an already-retired, stale state image.
+ */
+export function coopRewardPresentationActionSlot(
+  pinned: number,
+  reroll: number,
+  generation: number,
+  rewardSurface?: CoopRewardSurfaceIdentity,
+): number | null {
+  if (
+    !Number.isSafeInteger(reroll)
+    || reroll < 0
+    || !Number.isSafeInteger(generation)
+    || generation < 0
+    || generation >= COOP_REWARD_PRESENTATION_GENERATION_LIMIT
+    || (generation === 0 && reroll >= COOP_REWARD_PRESENTATION_REOPEN_BASE)
+  ) {
+    return null;
+  }
+  const actionOrdinal =
+    generation === 0
+      ? reroll
+      : COOP_REWARD_PRESENTATION_REOPEN_BASE + reroll * COOP_REWARD_PRESENTATION_GENERATION_LIMIT + generation - 1;
+  return coopRewardOperationActionSlot(pinned, actionOrdinal, rewardSurface);
+}
+
 /** Existing cursor mirror reserves six bits for rerolls; P36 adds a disjoint ordered-surface namespace. */
 export const COOP_REWARD_MIRROR_REROLL_STRIDE = 64;
 export const COOP_ME_REWARD_MIRROR_SEQ_BASE = 1_000_000_000;
@@ -958,6 +991,16 @@ function completeRewardContinuation(
     || continuation.rewardSurface?.ordinal !== prepared.rewardSurface?.ordinal
     || !Number.isSafeInteger(continuation.reroll)
     || continuation.reroll < 0
+    || !Number.isSafeInteger(continuation.generation)
+    || continuation.generation < 0
+    || continuation.generation >= COOP_REWARD_PRESENTATION_GENERATION_LIMIT
+    || coopRewardPresentationActionSlot(
+      continuation.pinned,
+      continuation.reroll,
+      continuation.generation,
+      continuation.rewardSurface,
+    ) == null
+    || (continuation.surface === "market" && continuation.generation !== 0)
     || !Array.isArray(continuation.options)
     || continuation.options.some(
       option =>
@@ -1063,6 +1106,7 @@ export function commitCoopRewardOptionsPresentation(
     readonly surface: CoopShopSurface;
     readonly pinned: number;
     readonly reroll: number;
+    readonly generation: number;
     readonly options: readonly CoopSerializedRewardOption[];
     readonly marketKind?: CoopMarketProjectionKind;
     readonly remainingStock?: readonly number[];
@@ -1081,6 +1125,10 @@ export function commitCoopRewardOptionsPresentation(
     || params.pinned < 0
     || !Number.isSafeInteger(params.reroll)
     || params.reroll < 0
+    || !Number.isSafeInteger(params.generation)
+    || params.generation < 0
+    || params.generation >= COOP_REWARD_PRESENTATION_GENERATION_LIMIT
+    || (params.surface === "market" && params.generation !== 0)
     || !Array.isArray(params.options)
     || params.options.some(
       option =>
@@ -1103,7 +1151,12 @@ export function commitCoopRewardOptionsPresentation(
   }
   try {
     const s = state(binding);
-    const actionSlot = coopRewardOperationActionSlot(params.pinned, params.reroll, params.rewardSurface);
+    const actionSlot = coopRewardPresentationActionSlot(
+      params.pinned,
+      params.reroll,
+      params.generation,
+      params.rewardSurface,
+    );
     if (actionSlot == null) {
       return null;
     }
@@ -1118,6 +1171,7 @@ export function commitCoopRewardOptionsPresentation(
             surface: "reward",
             pinned: params.pinned,
             reroll: params.reroll,
+            generation: params.generation,
             options: structuredClone(params.options),
             ...(params.rewardSurface == null ? {} : { rewardSurface: params.rewardSurface }),
           }
@@ -1125,6 +1179,7 @@ export function commitCoopRewardOptionsPresentation(
             surface: "market",
             pinned: params.pinned,
             reroll: params.reroll,
+            generation: params.generation,
             options: structuredClone(params.options),
             marketKind: params.marketKind!,
             remainingStock: [...params.remainingStock!],

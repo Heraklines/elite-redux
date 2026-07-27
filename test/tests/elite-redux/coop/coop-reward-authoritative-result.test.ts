@@ -18,6 +18,7 @@ import {
   adoptRewardWatcherChoice,
   captureCoopRewardOperationBinding,
   captureCoopRewardResultState,
+  commitCoopRewardOptionsPresentation,
   commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
   isCoopRewardActionTerminal,
@@ -76,6 +77,7 @@ function rewardContinuation(pinned: number, reroll = 0, rewardSurface?: CoopRewa
       surface: "reward" as const,
       pinned,
       reroll,
+      generation: 0,
       options: [{ id: "TEST_REWARD", tier: 0, upgradeCount: 0, cost: 0 }],
       ...(rewardSurface == null ? {} : { rewardSurface }),
     },
@@ -89,6 +91,7 @@ function marketContinuation(pinned: number, remainingStock: readonly number[]) {
       surface: "market" as const,
       pinned,
       reroll: 777,
+      generation: 0,
       options: remainingStock.map((_, index) => ({
         id: `TEST_MARKET_${index}`,
         tier: 0,
@@ -153,6 +156,50 @@ describe("P33 retained reward/shop authoritative results", () => {
     expect(isCoopRewardActionTerminal("reward", "shop", 0, [1])).toBe(false);
     expect(isCoopRewardActionTerminal("market", "biomeShop", 0)).toBe(false);
     expect(isCoopRewardActionTerminal("market", "biomeShop", COOP_INTERACTION_LEAVE)).toBe(true);
+  });
+
+  it("gives a reward pool reopened after a nested picker a fresh state-bearing operation identity", async () => {
+    const pair = createLoopbackPair();
+    const hostManager = new CoopDurabilityManager(pair.host);
+    setCoopOperationDurability(hostManager);
+    const received: Array<{ readonly id: string; readonly tick: number }> = [];
+    pair.guest.onMessage(message => {
+      if (message.t === "envelope" && message.envelope.pendingOperation?.kind === "REWARD_PRESENT") {
+        received.push({
+          id: message.envelope.pendingOperation.id,
+          tick: message.envelope.authoritativeState.tick ?? -1,
+        });
+      }
+    });
+    let captureTick = 18;
+    setCoopRewardAuthorityStateHooksForTest({
+      capture: () => state(captureTick, 1_000, `presentation-${captureTick}`, 7, 3),
+      apply: () => true,
+      reapply: () => true,
+    });
+    const params = {
+      surface: "reward" as const,
+      pinned: 0,
+      reroll: 0,
+      options: [{ id: "TM_CASE", tier: 0, upgradeCount: 0, cost: 0 }],
+      localRole: "host" as const,
+      wave: 7,
+      turn: 3,
+    };
+
+    const initial = commitCoopRewardOptionsPresentation({ ...params, generation: 0 });
+    captureTick = 21;
+    const reopened = commitCoopRewardOptionsPresentation({ ...params, generation: 1 });
+    await flushWire();
+
+    expect(initial).not.toBeNull();
+    expect(reopened).not.toBeNull();
+    expect(reopened?.operationId).not.toBe(initial?.operationId);
+    expect(received).toEqual([
+      { id: initial!.operationId, tick: 18 },
+      { id: reopened!.operationId, tick: 21 },
+    ]);
+    hostManager.dispose();
   });
 
   it("host-owned buy/skip/reroll results carry non-empty post-action state and open projection only after apply", async () => {

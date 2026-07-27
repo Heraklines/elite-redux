@@ -373,6 +373,7 @@ import {
   COOP_REWARD_ACTION_STRIDE,
   COOP_REWARD_SURFACE_ACTION_STRIDE,
   commitCoopRewardOptionsPresentation,
+  coopRewardPresentationActionSlot,
   isCoopRewardOperationEnabled,
   isValidCoopRewardSurfaceIdentity,
   resetCoopRewardOperationState,
@@ -6849,6 +6850,7 @@ function materializeCoopV2InteractionProjection(
           address: { wave: control.wave, turn: control.turn },
         },
         plan.projection.rewardSurface,
+        plan.projection.generation,
       ) as Phase & {
         installCoopV2RewardProjection(
           operationId: string,
@@ -10107,15 +10109,15 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
   }
   if (op.kind === "REWARD_PRESENT" || op.kind === "SHOP_PRESENT") {
     const payload = op.payload as CoopRewardPresentationPayload;
-    const expectedSurfaceBand = payload.rewardSurface == null ? 0 : payload.rewardSurface.ordinal + 1;
     if (
       (op.kind === "REWARD_PRESENT" && payload.surface !== "reward")
       || (op.kind === "SHOP_PRESENT" && payload.surface !== "market")
       || payload.pinned !== pinned
       || !Number.isSafeInteger(payload.reroll)
       || payload.reroll < 0
-      || ordinal % COOP_REWARD_SURFACE_ACTION_STRIDE !== payload.reroll
-      || Math.floor(ordinal / COOP_REWARD_SURFACE_ACTION_STRIDE) !== expectedSurfaceBand
+      || (payload.surface === "market" && payload.generation !== 0)
+      || coopRewardPresentationActionSlot(payload.pinned, payload.reroll, payload.generation, payload.rewardSurface)
+        !== parsed.pinnedSeq
       || !Array.isArray(payload.options)
       || payload.options.some(
         option =>
@@ -12408,7 +12410,7 @@ export function assembleCoopRuntime(
     },
     validateV2MeNarrationObservation: observation => validateCoopMeNarrationObservation(runtime, observation),
     onV2MeNarrationObservation: observation => consumeCoopMeNarrationObservation(runtime, observation),
-    publishRewardOptions: (seq, reroll, options, rewardSurface, projection) => {
+    publishRewardOptions: (seq, reroll, options, rewardSurface, projection, generation = 0) => {
       if (runtime == null || controller.authorityRole !== "authority") {
         return null;
       }
@@ -12423,6 +12425,7 @@ export function assembleCoopRuntime(
             surface: reroll === COOP_BIOME_STOCK_REROLL ? "market" : "reward",
             pinned: seq,
             reroll,
+            generation,
             options,
             ...(projection == null
               ? {}
