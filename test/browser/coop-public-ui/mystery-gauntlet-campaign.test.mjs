@@ -89,6 +89,20 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
       assert.equal(dispatch.find(driver => driver.name === "reward-target")?.semanticOnly, true);
       assert.deepEqual(
         dispatch
+          .filter(driver =>
+            ["mystery-subprompt", "mystery-quiz", "mystery-bargain", "mystery-colosseum"].includes(driver.name),
+          )
+          .map(driver => [driver.name, driver.semanticOnly]),
+        [
+          ["mystery-subprompt", true],
+          ["mystery-quiz", true],
+          ["mystery-bargain", true],
+          ["mystery-colosseum", true],
+        ],
+        "mutually exclusive Mystery variants must register only from their exact semantic surface",
+      );
+      assert.deepEqual(
+        dispatch
           .filter(driver => driver.name.startsWith("learn-move-"))
           .map(driver => [driver.name, driver.v2SurfaceId, driver.phase.source]),
         [

@@ -24,7 +24,7 @@ const [
     getCoopRuntime,
     isCoopV2InteractionHumanInputFrozen,
   },
-  { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress },
+  { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress, coopMeInteractionStartValue },
   { setCoopPresentationObserver },
   { setCoopPresentationHardWallMsForTest },
   { BattlerTagType },
@@ -472,6 +472,51 @@ interface SemanticSurface {
   readonly surfaceId: string;
   readonly operationClass: string;
   readonly ownerModel: SemanticOwnerModel;
+}
+
+/**
+ * Resolve the immutable interaction coordinate owned by the phase currently rendering a
+ * shared surface. The live controller counter is only the next global cursor: a terminal
+ * arriving on the peer can advance it while this exact UI remains open. Production phases
+ * deliberately pin their owner decisions at open, so the read-only browser mirror must use
+ * the same coordinate or it can report the real owner as a watcher.
+ */
+function semanticPinnedInteractionCounter(semantic: SemanticSurface, currentPhase: unknown): number | null {
+  const phase = currentPhase as {
+    coopAdvancePinned?: unknown;
+    coopBargainStart?: unknown;
+    coopBiomeStart?: unknown;
+    coopInteractionStart?: unknown;
+    coopStartCounter?: unknown;
+    coopV2BiomeInteractionPin?: () => number;
+  };
+  let candidate: unknown = null;
+  switch (semantic.surfaceId) {
+    case "reward-shop":
+    case "party:reward-target":
+    case "reward:confirm":
+      candidate = phase.coopInteractionStart;
+      break;
+    case "biome-market":
+      candidate = phase.coopBiomeStart;
+      break;
+    case "crossroads":
+      candidate = phase.coopStartCounter;
+      break;
+    case "world-map":
+    case "biome-select":
+      candidate = phase.coopV2BiomeInteractionPin?.() ?? phase.coopAdvancePinned;
+      break;
+    case "bargain":
+      candidate = phase.coopBargainStart;
+      break;
+    default:
+      if (semantic.operationClass === "encounter" || semantic.operationClass === "encounter-prompt") {
+        candidate = coopMeInteractionStartValue();
+      }
+      break;
+  }
+  return Number.isSafeInteger(candidate) && (candidate as number) >= 0 ? (candidate as number) : null;
 }
 
 /** Map (phase, uiMode) to a stable semantic surfaceId + operation class + ownership model. */
@@ -1402,7 +1447,8 @@ function observeSemanticSurface(): void {
       const partnerSeat = localSeat === 0 ? 1 : 0;
       let isLocalOwner: boolean | null = null;
       try {
-        isLocalOwner = runtime.controller.isLocalOwnerAtCounter(runtime.controller.interactionCounter());
+        const pinned = semanticPinnedInteractionCounter(semantic, currentPhase);
+        isLocalOwner = runtime.controller.isLocalOwnerAtCounter(pinned ?? runtime.controller.interactionCounter());
       } catch {
         isLocalOwner = null;
       }

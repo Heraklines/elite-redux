@@ -2934,6 +2934,22 @@ test("the browser observer republishes an unchanged menu after a non-semantic mo
   );
 });
 
+test("the browser observer derives interaction ownership from the rendering phase's immutable pin", () => {
+  assert.match(
+    browserEntry,
+    /function semanticPinnedInteractionCounter\(semantic: SemanticSurface, currentPhase: unknown\)/u,
+  );
+  assert.match(browserEntry, /case "reward-shop":[\s\S]*candidate = phase\.coopInteractionStart;/u);
+  assert.match(browserEntry, /case "biome-market":[\s\S]*candidate = phase\.coopBiomeStart;/u);
+  assert.match(browserEntry, /case "crossroads":[\s\S]*candidate = phase\.coopStartCounter;/u);
+  assert.match(browserEntry, /candidate = coopMeInteractionStartValue\(\);/u);
+  assert.match(
+    browserEntry,
+    /const pinned = semanticPinnedInteractionCounter\(semantic, currentPhase\);[\s\S]*isLocalOwnerAtCounter\(pinned \?\? runtime\.controller\.interactionCounter\(\)\)/u,
+    "an advanced live cursor must not flip the owner of an already-rendered interaction",
+  );
+});
+
 test("the one-process soak retains the authority browser while nested peer pumps settle a wave crossing", () => {
   const crossingStart = soakDriver.indexOf("  const crossCommandBoundaryWithReplayGuest = async (");
   const crossingEnd = soakDriver.indexOf(
