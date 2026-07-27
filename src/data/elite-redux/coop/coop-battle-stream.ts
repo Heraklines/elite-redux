@@ -4800,7 +4800,10 @@ export class CoopBattleStreamer {
       this.liveWaiter = settleLive;
       this.checkpointWaiter = settleCheckpoint;
       void this.awaitTurn(turn, sourceWave).then(res => {
-        const superseded = res == null && this.supersededTurnWaits.delete(waitKey);
+        // Every same-address replay joins one physical turn promise. A typed successor can therefore
+        // resolve several promise reactions in the same microtask checkpoint. Keep the supersession
+        // marker visible to all of them; the producer removes it only after those reactions drain.
+        const superseded = res == null && this.supersededTurnWaits.has(waitKey);
         if (!settled) {
           settled = true;
           cleanup();
@@ -4837,6 +4840,30 @@ export class CoopBattleStreamer {
     }
     coopWarn("replay", `guest awaitTurn turn=${turn} ABORT (phantom turn dissolve #859)`);
     pending.finish(null);
+    return true;
+  }
+
+  /**
+   * Resolve every consumer joined to an obsolete addressed turn wait as a benign typed successor.
+   * Unlike {@linkcode abortTurnWait}, this is not a session failure/phantom flag owned by one phase:
+   * replacement, wave, and terminal commits can supersede several duplicate replay phases sharing the
+   * same promise, and every one must observe `kind: "superseded"` instead of treating null as a stall.
+   */
+  supersedeTurnWait(turn: number, sourceWave?: number): boolean {
+    const lookup = this.turnWaitAddress(turn, sourceWave);
+    const pending = this.pending.get(lookup.key);
+    if (pending == null) {
+      return false;
+    }
+    rememberBoundedValue(this.supersededTurnWaits, lookup.key);
+    coopWarn("replay", `guest awaitTurn turn=${turn} SUPERSEDE (typed successor installed)`);
+    pending.finish(null);
+    if (pending.address != null) {
+      this.clearTurnCommitRequestsAtAddress(pending.address);
+    }
+    // Promise reactions registered before finish() are queued first. Removing in our own microtask leaves
+    // the marker available to every joined awaitTurnOrLiveEvent consumer, without leaking it to a future wait.
+    queueMicrotask(() => this.supersededTurnWaits.delete(lookup.key));
     return true;
   }
 

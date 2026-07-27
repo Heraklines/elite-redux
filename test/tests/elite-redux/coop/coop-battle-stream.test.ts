@@ -2221,6 +2221,29 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       await expect(currentReplay).resolves.toEqual({ kind: "turn", res: null });
     });
 
+    it("supersedes every same-address replay joined to one finalized faint-turn wait", async () => {
+      const { guest } = createLoopbackPair();
+      const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext: () => ({ epoch: 7, wave: 5, turn: 1 }),
+      });
+
+      // Two replay phases can overlap while an own-faint replacement carrier is in flight. They share one
+      // physical awaitTurn promise, even though only the newest checkpoint listener receives the carrier.
+      const firstReplay = guestStream.awaitTurnOrLiveEvent(1, 0, 5);
+      const duplicateReplay = guestStream.awaitTurnOrLiveEvent(1, 0, 5);
+      expect(guestStream.retainedAuthorityDiagnostics().waiters).toBe(1);
+
+      expect(guestStream.supersedeTurnWait(1, 5)).toBe(true);
+      await expect(Promise.all([firstReplay, duplicateReplay])).resolves.toEqual([
+        { kind: "superseded" },
+        { kind: "superseded" },
+      ]);
+      expect(guestStream.retainedAuthorityDiagnostics().waiters).toBe(0);
+      expect(guestStream.retainedAuthorityDiagnostics().requests).toBe(0);
+      expect(guestStream.supersedeTurnWait(1, 5)).toBe(false);
+      guestStream.dispose();
+    });
+
     it("keeps the newest buffered revision, ignores an identical duplicate, and rejects a reordered older one", async () => {
       const { host, guest } = createLoopbackPair();
       const guestStream = new CoopBattleStreamer(guest, {

@@ -473,7 +473,7 @@ export class CoopReplayTurnPhase extends Phase {
           // waiter remained parked for a carrier GameOver can never send. Retire that losing leg as part of
           // the same ordered supersession; otherwise the stall watchdog keeps reporting an invisible wait
           // long after this phase has correctly ended.
-          streamer.abortTurnWait(this.turn, this.sourceWave);
+          streamer.supersedeTurnWait(this.turn, this.sourceWave);
           this.end();
           return;
         }
@@ -488,7 +488,7 @@ export class CoopReplayTurnPhase extends Phase {
             "replay",
             `guest replay turn=${this.turn}: retained WON wave-advance supersedes phantom next-turn replay -> end`,
           );
-          streamer.abortTurnWait(this.turn, this.sourceWave);
+          streamer.supersedeTurnWait(this.turn, this.sourceWave);
           this.end();
           return;
         }
@@ -702,6 +702,7 @@ export class CoopReplayTurnPhase extends Phase {
                 // The central projector queues an exact successor phase only for a replacement owned by
                 // THIS replica. Waiting for another carrier here would strand its actionable PARTY picker
                 // (the authority cannot produce the next replacement until this player chooses).
+                streamer.supersedeTurnWait(this.turn, this.sourceWave);
                 this.end();
                 return;
               }
@@ -797,6 +798,10 @@ export class CoopReplayTurnPhase extends Phase {
               // host (which is correctly awaiting OUR command). The re-queued CoopReplayTurnPhase below re-arms
               // the await legitimately AFTER the command is broadcast.
               streamer.cancelPendingTurnCommitRequests(envelope.epoch, envelope.wave, envelope.turn);
+              // More than one replay phase can join the finalized faint-turn promise while the replacement
+              // carrier is in flight. The checkpoint listener wakes only the phase applying this successor;
+              // retire every losing joined consumer before opening the signed N+1 command frontier.
+              streamer.supersedeTurnWait(this.turn, this.sourceWave);
               // The committed COMMAND_FRONTIER is the sole authority for this input lease. A stale local
               // turnCommands cell can survive the replacement crossing, but it may neither veto the signed
               // successor nor leak the replaced actor's per-turn ephemera into the new command. Reset only the
@@ -853,6 +858,7 @@ export class CoopReplayTurnPhase extends Phase {
                 "replay",
                 `guest replay turn=${this.turn}: WON-wave advance already pending -> end into the queued wave-advance boundary`,
               );
+              streamer.supersedeTurnWait(this.turn, this.sourceWave);
               this.end();
               return;
             }

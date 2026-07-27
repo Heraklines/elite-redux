@@ -46,6 +46,21 @@ test("faint replacement waits for the owned actionable party surface before pres
   assert.match(stream, /peekCheckpointForTurn\(turn: number, sourceWave\?: number\)/u);
   assert.match(replayTurn, /peekCheckpointForTurn\(this\.turn, this\.sourceWave\)/u);
   assert.match(replayTurn, /consumeCheckpointForTurn\(this\.turn, this\.sourceWave\)/u);
+  assert.match(
+    replayTurn,
+    /cancelPendingTurnCommitRequests\(envelope\.epoch, envelope\.wave, envelope\.turn\);[\s\S]*supersedeTurnWait\(this\.turn, this\.sourceWave\);[\s\S]*unshiftNew\("CommandPhase", ownSlot\)/u,
+    "a replacement-to-command successor retires every replay phase joined to its obsolete faint-turn wait",
+  );
+  assert.match(
+    stream,
+    /supersedeTurnWait\(turn: number, sourceWave\?: number\)[\s\S]*supersededTurnWaits[\s\S]*pending\.finish\(null\)/u,
+    "the stream exposes address-exact typed-successor cancellation",
+  );
+  assert.match(
+    stream,
+    /const superseded = res == null && this\.supersededTurnWaits\.has\(waitKey\)/u,
+    "every same-address consumer joined to one physical promise observes supersession",
+  );
   assert.match(hostSwitch, /let operationSourceAddress = this\.faintSourceAddress \?\? \{[\s\S]*wave:[\s\S]*turn:/u);
   assert.match(
     hostSwitch,

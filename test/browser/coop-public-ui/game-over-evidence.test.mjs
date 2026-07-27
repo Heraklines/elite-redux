@@ -54,8 +54,8 @@ test("GameOver journey uses visible starters, real command input, and exact reta
   );
   assert.match(
     replayPump,
-    /coopRetainedGameOverSupersedesReplay[\s\S]*abortTurnWait\(this\.turn, this\.sourceWave\)[\s\S]*coopRetainedWinSupersedesReplay[\s\S]*abortTurnWait\(this\.turn, this\.sourceWave\)/u,
-    "both terminal successors retire the losing turn-wait leg instead of leaking it into the stall watchdog",
+    /coopRetainedGameOverSupersedesReplay[\s\S]*supersedeTurnWait\(this\.turn, this\.sourceWave\)[\s\S]*coopRetainedWinSupersedesReplay[\s\S]*supersedeTurnWait\(this\.turn, this\.sourceWave\)/u,
+    "both terminal successors retire every joined turn-wait consumer instead of leaking one into the stall watchdog",
   );
   assert.match(duoRegression, /coopRetainedGameOverSupersedesReplay\(7, 1\)[\s\S]*toBe\(true\)/u);
   assert.match(duoRegression, /coopRetainedGameOverSupersedesReplay\(6, 1\)[\s\S]*toBe\(false\)/u);
