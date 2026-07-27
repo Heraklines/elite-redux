@@ -26,6 +26,7 @@ const battleStream = readFileSync(new URL("src/data/elite-redux/coop/coop-battle
 const turnRecorder = readFileSync(new URL("src/data/elite-redux/coop/coop-turn-recorder.ts", root), "utf8");
 const turnCutover = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/cutover-turn.ts", root), "utf8");
 const meOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-operation.ts", root), "utf8");
+const mePresentation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-presentation.ts", root), "utf8");
 const operationSurfaceRegistry = readFileSync(
   new URL("src/data/elite-redux/coop/coop-operation-surface-registry.ts", root),
   "utf8",
@@ -1273,7 +1274,11 @@ test("repeated Mystery rounds bind the new log address only when their fresh pre
   const rebind = replayMePhase.slice(rebindStart, rebindEnd);
   assert.match(rebind, /boundaryStillLive\(\)/u);
   assert.match(rebind, /this\.settled/u);
-  assert.match(rebind, /installCoopV2MePresentation\(operationId, this\.interactionCounter, presentation\)/u);
+  assert.match(
+    rebind,
+    /installCoopV2MePresentation\([\s\S]*?operationId,[\s\S]*?this\.interactionCounter,[\s\S]*?this\.coopV2MysteryEncounterType,[\s\S]*?this\.coopV2InstalledIntroVisuals,[\s\S]*?presentation/u,
+    "a repeated presentation retains both the immutable encounter identity and its resolved visual material",
+  );
 
   const outcomeStart = replayMePhase.indexOf("const outcome = winner.outcome;");
   const repeatStart = replayMePhase.indexOf(
@@ -3239,6 +3244,29 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
     /if \(activeClientLabel === owner\.label\)/u,
     "a repeated client label may not authorize any scheduled callback realm",
   );
+});
+
+test("an Authority V2 Mystery selector renders the authority's resolved visuals without a second mechanics engine", () => {
+  assert.match(
+    mePresentation,
+    /introVisuals\.spriteConfigs\.map[\s\S]*?species: _species[\s\S]*?visualPresentationByEncounter\.set/u,
+    "the authority commits resolved sprite material and retains it across repeated selector rounds",
+  );
+  const visualStart = replayMePhase.indexOf("private async installCoopV2IntroVisualShell()");
+  const visualEnd = replayMePhase.indexOf("public disposeCoopV2IntroVisualShell()", visualStart);
+  assert.ok(
+    visualStart >= 0 && visualEnd > visualStart,
+    "the visual-only Mystery projector has a bounded source block",
+  );
+  const visualProjector = replayMePhase.slice(visualStart, visualEnd);
+  assert.match(visualProjector, /new MysteryEncounterIntroVisuals\(/u);
+  assert.match(
+    visualProjector,
+    /setPosition\(descriptor\.x, descriptor\.y\)\.setAlpha\(descriptor\.alpha\)\.setVisible\(descriptor\.visible\)/u,
+    "the replay shell installs the authority's settled container transform, not the off-screen constructor default",
+  );
+  assert.match(visualProjector, /await visuals\.loadAssets\(\)[\s\S]*?visuals\.initSprite\(\)/u);
+  assert.doesNotMatch(visualProjector, /getMysteryEncounter|\.onInit\(/u);
 });
 
 test("a projected Mystery phase cannot attest through its predecessor's active handler", () => {

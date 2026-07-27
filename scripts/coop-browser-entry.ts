@@ -1521,7 +1521,16 @@ function observeSemanticSurface(): void {
     // sentinel that lets the public driver wait for their real option surfaces instead of
     // racing repeated Action keys; gameplay surfaces still carry their actual wave/turn.
     const { wave, turn } = semanticBattleAddress(battle);
-    const mysteryEncounterType = battle?.mysteryEncounter?.encounterType ?? null;
+    // Authority V2 replay phases intentionally do not construct a second Mystery mechanics object.
+    // Their immutable committed identity is nevertheless the exact presentation identity and must be
+    // visible to the read-only browser oracle after the resolved visual shell has been installed.
+    const replayMysteryEncounterType =
+      phase === "CoopReplayMePhase"
+        ? (currentPhase as unknown as { coopV2MysteryEncounterType?: unknown }).coopV2MysteryEncounterType
+        : null;
+    const mysteryEncounterType =
+      battle?.mysteryEncounter?.encounterType
+      ?? (Number.isSafeInteger(replayMysteryEncounterType) ? (replayMysteryEncounterType as number) : null);
     const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
     const readPromptGeneration = (handler as unknown as { getPromptGeneration?: () => number }).getPromptGeneration;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;

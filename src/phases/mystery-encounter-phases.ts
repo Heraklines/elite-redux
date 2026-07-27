@@ -32,6 +32,7 @@ import {
   setCoopMeInteractionStart,
   setCoopMeTerminalControl,
 } from "#data/elite-redux/coop/coop-me-pin-state";
+import { captureCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import type {
   CoopMeRewardSurfaceProjection,
@@ -582,6 +583,7 @@ export class MysteryEncounterPhase extends Phase {
       const pinned = coopMeInteractionStartValue();
       const mysteryEncounterType =
         globalScene.currentBattle?.mysteryEncounter?.encounterType ?? globalScene.currentBattle?.mysteryEncounterType;
+      const introVisuals = captureCoopMeIntroVisualPresentation();
       const operationId = commitMeOwnerIntent({
         kind: "ME_PRESENT",
         seq: seqMe,
@@ -590,6 +592,7 @@ export class MysteryEncounterPhase extends Phase {
         payload: {
           present: true,
           ...(mysteryEncounterType == null ? {} : { mysteryEncounterType }),
+          ...(introVisuals == null ? {} : { introVisuals }),
           presentation: present,
         },
         localRole: getCoopController()?.role ?? "host",

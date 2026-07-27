@@ -537,7 +537,44 @@ export interface CoopMeButtonPayload {
   readonly button: number;
 }
 
-/** ME_PRESENT intent/outcome: the host's presentation-handoff ack (#8, host-authoritative ME presence verdict, #862). */
+/**
+ * JSON-safe, already-resolved field sprite material for one Mystery selector generation.
+ *
+ * The authority captures this after `MysteryEncounter.onInit` and `MysteryEncounterIntroVisuals`
+ * have resolved procedural Pokemon/item sprites. A renderer may construct these sprites, but it must
+ * never call the encounter's init/option/reward callbacks merely to discover what the authority showed.
+ */
+export interface CoopMeIntroSpritePresentation {
+  readonly spriteKey: string;
+  readonly fileRoot: string;
+  readonly formIndex?: number;
+  readonly hasShadow?: boolean;
+  readonly disableAnimation?: boolean;
+  readonly repeat?: boolean;
+  readonly startFrame?: number;
+  readonly hidden?: boolean;
+  readonly tint?: number;
+  readonly x?: number;
+  readonly y?: number;
+  readonly yShadow?: number;
+  readonly scale?: number;
+  readonly isPokemon?: boolean;
+  readonly isShiny?: boolean;
+  readonly variant?: number;
+  readonly isItem?: boolean;
+  readonly alpha?: number;
+}
+
+export interface CoopMeIntroVisualPresentation {
+  readonly spriteConfigs: readonly CoopMeIntroSpritePresentation[];
+  readonly enterFromRight: boolean;
+  readonly x: number;
+  readonly y: number;
+  readonly alpha: number;
+  readonly visible: boolean;
+}
+
+/** ME_PRESENT intent/outcome: the host's complete presentation-handoff result (#8/#862). */
 export interface CoopMePresentPayload {
   /** Whether the host has an ME this wave (the #862 host-authoritative presence verdict; false = the guest self-rolled a phantom). */
   readonly present: boolean;
@@ -546,6 +583,8 @@ export interface CoopMePresentPayload {
    * its own encounter engine merely to discover this identity. Required whenever `present` is true.
    */
   readonly mysteryEncounterType?: number;
+  /** Complete immutable intro visual material. Required whenever `present` is true under Authority V2. */
+  readonly introVisuals?: CoopMeIntroVisualPresentation;
   /** Exact host-rendered presentation. Required when `present` is true so journal replay never re-derives from guest state. */
   readonly presentation?: Extract<CoopInteractionOutcome, { k: "mePresent" }>;
 }

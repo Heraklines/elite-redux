@@ -297,6 +297,7 @@ import {
   setCoopMeInteractionStart,
   setCoopMeTerminalControl,
 } from "#data/elite-redux/coop/coop-me-pin-state";
+import { isCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { isCompleteCoopMeResyncOutcome } from "#data/elite-redux/coop/coop-me-terminal-validator";
 import { CoopMembershipController } from "#data/elite-redux/coop/coop-membership";
@@ -6963,10 +6964,20 @@ function materializeCoopV2InteractionProjection(
         installCoopV2MePresentation(
           operationId: string,
           interactionCounter: number,
+          mysteryEncounterType: number,
+          introVisuals: NonNullable<CoopMePresentPayload["introVisuals"]>,
           presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
         ): boolean;
       };
-      return phase.installCoopV2MePresentation(plan.operationId, plan.pinned, plan.presentation) ? phase : null;
+      return phase.installCoopV2MePresentation(
+        plan.operationId,
+        plan.pinned,
+        plan.mysteryEncounterType,
+        plan.introVisuals,
+        plan.presentation,
+      )
+        ? phase
+        : null;
     }
     case "revival":
       return phaseManager.create("CoopGuestRevivalPhase", plan.fieldIndex, plan.operationId, ownerIsLocal);
@@ -10862,6 +10873,7 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
       || typeof payload.mysteryEncounterType !== "number"
       || !Number.isSafeInteger(payload.mysteryEncounterType)
       || payload.mysteryEncounterType < 0
+      || !isCoopMeIntroVisualPresentation(payload.introVisuals)
       || payload.presentation?.k !== "mePresent"
     ) {
       return false;
@@ -10926,8 +10938,8 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
       setCoopMeBattleInteractionCounter(pinned);
     }
     // Install only the host-stated descriptor. Constructing `mysteryEncounter` here would run a second
-    // mechanics engine on the renderer; CoopReplayMePhase rehydrates a presentation shell only if the
-    // committed terminal later enters a Mystery battle.
+    // mechanics engine on the renderer. CoopReplayMePhase reconstructs the committed visual-only intro
+    // container; it instantiates full Mystery mechanics only if the terminal enters a Mystery battle.
     battle.mysteryEncounterType = mysteryEncounterType;
     // DATA application deliberately does not require or install a phase. The ordered V2 control projector
     // reconstructs CoopReplayMePhase from this same immutable entry and separately proves its real handler.

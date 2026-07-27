@@ -37,6 +37,7 @@ import { controlsEqual, validateNextControl } from "#data/elite-redux/coop/autho
 import type { CoopAuthorityV2Shadow } from "#data/elite-redux/coop/authority-v2/shadow";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import type { CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
+import { isCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import {
   isCompleteCoopMeResyncOutcome,
   isCompleteCoopMeTerminalPayload,
@@ -405,8 +406,13 @@ export const COOP_V2_INTERACTION_REGISTRY = {
       isPlainObject(value)
       && typeof value.present === "boolean"
       && (value.present
-        ? integer(value.mysteryEncounterType) && value.mysteryEncounterType >= 0 && outcome(value.presentation)
-        : value.mysteryEncounterType === undefined && value.presentation === undefined),
+        ? integer(value.mysteryEncounterType)
+          && value.mysteryEncounterType >= 0
+          && isCoopMeIntroVisualPresentation(value.introVisuals)
+          && outcome(value.presentation)
+        : value.mysteryEncounterType === undefined
+          && value.introVisuals === undefined
+          && value.presentation === undefined),
   },
   ME_SUB: {
     surfaceClass: "op:me",

@@ -101,6 +101,8 @@ export type CoopV2InteractionProjectionPlan =
       readonly kind: "mystery";
       readonly operationId: string;
       readonly pinned: number;
+      readonly mysteryEncounterType: number;
+      readonly introVisuals: NonNullable<CoopMePresentPayload["introVisuals"]>;
       readonly presentation: NonNullable<CoopMePresentPayload["presentation"]>;
     }
   | {
@@ -289,11 +291,17 @@ export function projectionPlanOfCoopV2InteractionEntry(
     case "ME_PRESENT": {
       const presentation = payload as unknown as CoopMePresentPayload;
       const pinned = Math.floor(parsed.pinnedSeq / 8000) - COOP_ME_PUMP_SEQ_BASE;
-      return presentation.present === true && presentation.presentation != null && pinned >= 0
+      return presentation.present === true
+        && presentation.mysteryEncounterType != null
+        && presentation.introVisuals != null
+        && presentation.presentation != null
+        && pinned >= 0
         ? {
             kind: "mystery",
             operationId: control.operationId,
             pinned,
+            mysteryEncounterType: presentation.mysteryEncounterType,
+            introVisuals: structuredClone(presentation.introVisuals),
             presentation: structuredClone(presentation.presentation),
           }
         : null;

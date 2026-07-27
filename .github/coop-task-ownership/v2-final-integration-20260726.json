@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "c77ba299a1de68b3158d0f0f2e3984047565a5af",
+  "baseSha": "2086e7558c74c3548ef6e3aabb8f4888b7d854f8",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -33,6 +33,7 @@
     "src/data/elite-redux/coop/coop-learn-move-operation.ts",
     "src/data/elite-redux/coop/coop-lobby.ts",
     "src/data/elite-redux/coop/coop-me-operation.ts",
+    "src/data/elite-redux/coop/coop-me-presentation.ts",
     "src/data/elite-redux/coop/coop-nested-interaction.ts",
     "src/data/elite-redux/coop/coop-operation-envelope.ts",
     "src/data/elite-redux/coop/coop-operation-surface-registry.ts",
@@ -60,6 +61,7 @@
     "src/data/mystery-encounters/utils/encounter-phase-utils.ts",
     "src/dev-tools/registry.ts",
     "src/dev-tools/test-suite/scenarios.ts",
+    "src/field/mystery-encounter-intro.ts",
     "src/init/init.ts",
     "src/modifier/modifier.ts",
     "src/phase-manager.ts",
@@ -68,6 +70,7 @@
     "src/phases/command-phase.ts",
     "src/phases/coop-presentation-watchdog.ts",
     "src/phases/coop-push-replacement-checkpoint-phase.ts",
+    "src/phases/coop-replay-me-phase.ts",
     "src/phases/coop-replay-phases.ts",
     "src/phases/coop-replay-turn-phase.ts",
     "src/phases/er-ability-capsule-phase.ts",
@@ -185,5 +188,7 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-operation-envelope.ts"
+  ]
 }

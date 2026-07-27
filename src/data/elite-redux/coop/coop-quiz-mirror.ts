@@ -39,6 +39,7 @@ import {
   coopMeInteractionStartValue,
   setCoopMeActivePresentation,
 } from "#data/elite-redux/coop/coop-me-pin-state";
+import { captureCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import { isCoopOperationJournalActive } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   coopSessionGeneration,
@@ -246,6 +247,7 @@ export function coopQuizHostStreamSession(questions: readonly unknown[], stopOnW
   const pinned = coopMeInteractionStartValue();
   const mysteryEncounterType =
     globalScene.currentBattle?.mysteryEncounter?.encounterType ?? globalScene.currentBattle?.mysteryEncounterType;
+  const introVisuals = captureCoopMeIntroVisualPresentation();
   const operationId = commitMeOwnerIntent({
     kind: "ME_PRESENT",
     seq,
@@ -254,6 +256,7 @@ export function coopQuizHostStreamSession(questions: readonly unknown[], stopOnW
     payload: {
       present: true,
       ...(mysteryEncounterType == null ? {} : { mysteryEncounterType }),
+      ...(introVisuals == null ? {} : { introVisuals }),
       presentation: outcome,
     },
     localRole: getCoopController()?.role ?? "host",

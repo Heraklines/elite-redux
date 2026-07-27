@@ -22,6 +22,7 @@ import {
   coopMeInteractionStartValue,
   setCoopMeActivePresentation,
 } from "#data/elite-redux/coop/coop-me-pin-state";
+import { captureCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import {
   COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopMeRewardSurfaceProjection,
@@ -149,6 +150,7 @@ function commitAndPublishMePresentation(
   const pinned = coopMeInteractionStartValue();
   const mysteryEncounterType =
     globalScene.currentBattle?.mysteryEncounter?.encounterType ?? globalScene.currentBattle?.mysteryEncounterType;
+  const introVisuals = captureCoopMeIntroVisualPresentation();
   const operationId = commitMeOwnerIntent({
     kind: "ME_PRESENT",
     seq,
@@ -157,6 +159,7 @@ function commitAndPublishMePresentation(
     payload: {
       present: true,
       ...(mysteryEncounterType == null ? {} : { mysteryEncounterType }),
+      ...(introVisuals == null ? {} : { introVisuals }),
       presentation,
     },
     localRole: getCoopController()?.role ?? "host",

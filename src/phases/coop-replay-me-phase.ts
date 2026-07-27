@@ -40,7 +40,10 @@ import {
   setOnMeSnapshotRebind,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
-import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import type {
+  CoopMeIntroVisualPresentation,
+  CoopMeTerminalPayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import { notifyCoopOperationContinuationSurface } from "#data/elite-redux/coop/coop-operation-journal";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
@@ -64,6 +67,7 @@ import type {
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { UiMode } from "#enums/ui-mode";
+import { MysteryEncounterIntroVisuals, type MysteryEncounterSpriteConfig } from "#field/mystery-encounter-intro";
 import { leaveEncounterWithoutBattle } from "#mystery-encounters/encounter-phase-utils";
 import { abortActiveCoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import type { ErQuizResult } from "#phases/er-quiz-phase";
@@ -99,6 +103,7 @@ let activeCoopReplayMePhase: CoopReplayMePhase | null = null;
 setOnMePinCleared(() => {
   coopMeHostPresentation = null;
   activeCoopReplayMePhase?.disposeRecoveryTimer();
+  activeCoopReplayMePhase?.disposeCoopV2IntroVisualShell();
   activeCoopReplayMePhase = null;
 });
 
@@ -249,8 +254,14 @@ export class CoopReplayMePhase extends Phase {
   public readonly phaseName = "CoopReplayMePhase";
   /** Exact immutable V2 presentation address owned by this replay generation. */
   public coopV2ControlOperationId: string | null;
+  /** Exact committed Mystery identity exposed to presentation observers without a mechanics object. */
+  public coopV2MysteryEncounterType: number | null = null;
   /** Presentation installed on this exact V2 generation before its scheduler edge (not a legacy carrier). */
   private coopV2InstalledPresentation: Extract<CoopInteractionOutcome, { k: "mePresent" }> | null = null;
+  /** Resolved immutable intro-sprite material installed by the Authority V2 projector. */
+  private coopV2InstalledIntroVisuals: CoopMeIntroVisualPresentation | null = null;
+  /** Renderer-owned visual shell. It deliberately has no Mystery mechanics callbacks. */
+  private coopV2ProjectedIntroVisuals: MysteryEncounterIntroVisuals | null = null;
 
   private readonly interactionCounter: number;
   /** Guest->host pick / sub-pick + host->guest present / outcome channel (`8_000_000 + counter`). */
@@ -354,15 +365,26 @@ export class CoopReplayMePhase extends Phase {
   public installCoopV2MePresentation(
     operationId: string,
     interactionCounter: number,
+    mysteryEncounterType: number,
+    introVisuals: CoopMeIntroVisualPresentation,
     presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
   ): boolean {
-    if (operationId.length === 0 || interactionCounter !== this.interactionCounter || presentation.k !== "mePresent") {
+    if (
+      operationId.length === 0
+      || interactionCounter !== this.interactionCounter
+      || !Number.isSafeInteger(mysteryEncounterType)
+      || mysteryEncounterType < 0
+      || (this.coopV2MysteryEncounterType != null && this.coopV2MysteryEncounterType !== mysteryEncounterType)
+      || presentation.k !== "mePresent"
+    ) {
       return false;
     }
     // A multi-round Mystery reuses this replay shell but every authoritative presentation has a distinct
     // ordered operation ID. The V2 runtime is the sole caller and has already admitted that newer entry;
     // replacing the address here is the required generation handoff, not local successor derivation.
     this.coopV2ControlOperationId = operationId;
+    this.coopV2MysteryEncounterType = mysteryEncounterType;
+    this.coopV2InstalledIntroVisuals = structuredClone(introVisuals);
     this.coopV2InstalledPresentation = structuredClone(presentation);
     setCoopMeHostPresentation(structuredClone(this.coopV2InstalledPresentation));
     return true;
@@ -392,7 +414,78 @@ export class CoopReplayMePhase extends Phase {
     if (operationId === this.coopV2ControlOperationId) {
       return true;
     }
-    return this.installCoopV2MePresentation(operationId, this.interactionCounter, presentation);
+    if (this.coopV2MysteryEncounterType == null || this.coopV2InstalledIntroVisuals == null) {
+      return false;
+    }
+    return this.installCoopV2MePresentation(
+      operationId,
+      this.interactionCounter,
+      this.coopV2MysteryEncounterType,
+      this.coopV2InstalledIntroVisuals,
+      presentation,
+    );
+  }
+
+  /**
+   * Render the authority's resolved sprite material without constructing or initializing an encounter engine.
+   * The selector is not exposed until asset load and sprite installation finish on this exact live generation.
+   */
+  private async installCoopV2IntroVisualShell(): Promise<boolean> {
+    if (this.coopV2ProjectedIntroVisuals != null) {
+      return true;
+    }
+    const descriptor = this.coopV2InstalledIntroVisuals;
+    if (descriptor == null || this.coopV2MysteryEncounterType == null || !this.boundaryStillLive()) {
+      return false;
+    }
+    const stale = globalScene.currentBattle?.mysteryEncounter?.introVisuals;
+    if (stale != null) {
+      try {
+        globalScene.field.remove(stale, true);
+      } catch {
+        stale.destroy(true);
+      }
+      if (globalScene.currentBattle?.mysteryEncounter != null) {
+        globalScene.currentBattle.mysteryEncounter.introVisuals = undefined;
+      }
+    }
+    const visuals = new MysteryEncounterIntroVisuals({
+      spriteConfigs: structuredClone(descriptor.spriteConfigs) as MysteryEncounterSpriteConfig[],
+      enterIntroVisualsFromRight: descriptor.enterFromRight,
+    });
+    visuals.setPosition(descriptor.x, descriptor.y).setAlpha(descriptor.alpha).setVisible(descriptor.visible);
+    this.coopV2ProjectedIntroVisuals = visuals;
+    globalScene.field.add(visuals);
+    try {
+      await visuals.loadAssets();
+      if (!this.boundaryStillLive() || this.coopV2ProjectedIntroVisuals !== visuals) {
+        this.disposeCoopV2IntroVisualShell();
+        return false;
+      }
+      visuals.initSprite();
+      visuals.playAnim();
+      visuals.playShinySparkles();
+      return true;
+    } catch (error) {
+      this.disposeCoopV2IntroVisualShell();
+      coopWarn("me", "authoritative Mystery intro visual could not render", error);
+      failCoopSharedSession(`Mystery presentation ${this.coopV2ControlOperationId ?? "unknown"} could not render`);
+      return false;
+    }
+  }
+
+  /** Idempotent teardown for leave, battle, detached handoff, recovery supersession, and runtime clear. */
+  public disposeCoopV2IntroVisualShell(): void {
+    const visuals = this.coopV2ProjectedIntroVisuals;
+    this.coopV2ProjectedIntroVisuals = null;
+    if (visuals == null) {
+      return;
+    }
+    try {
+      (this.boundScene ?? globalScene).field.remove(visuals, true);
+    } catch {
+      visuals.destroy(true);
+    }
   }
 
   /**
@@ -643,6 +736,13 @@ export class CoopReplayMePhase extends Phase {
 
       if (this.initialPresentationEntered) {
         return; // verified snapshot already rebound this same initial selector
+      }
+      if (!(await this.installCoopV2IntroVisualShell())) {
+        return;
+      }
+      if (!this.boundaryStillLive()) {
+        this.disposeCoopV2IntroVisualShell();
+        return;
       }
       this.initialPresentationEntered = true;
 
@@ -1776,6 +1876,7 @@ export class CoopReplayMePhase extends Phase {
     const currentPhase = globalScene.phaseManager.getCurrentPhase();
     hideCoopControllerTag();
     getCoopUiMirror()?.endSession();
+    this.disposeCoopV2IntroVisualShell();
     if (!coopMeHandoffBattleStarted()) {
       abortActiveCoopReplayTurnPhase("committed non-battle ME terminal");
     }
@@ -2283,6 +2384,7 @@ export class CoopReplayMePhase extends Phase {
     // ME-battle-won victory-tail check is scoped to THIS battle (a stale flag can't misfire on a later one).
     setCoopMeHandoffBattleStarted(globalScene.currentBattle?.waveIndex ?? -1);
     hideCoopControllerTag();
+    this.disposeCoopV2IntroVisualShell();
     // #854: force-close any lingering reward/ME cursor mirror before the spawned battle runs - a mirror
     // an abandoned pre-battle embedded shop left open would otherwise overlay the ME battle's command UI.
     getCoopUiMirror()?.endSession();
@@ -2376,6 +2478,7 @@ export class CoopReplayMePhase extends Phase {
     if (this.settled) {
       return;
     }
+    this.disposeCoopV2IntroVisualShell();
     coopLog(
       "me",
       "SHOP HANDOFF: host opened the embedded ME reward shop - running guest shop as ME-owner role (#821/#828)",
@@ -2426,6 +2529,7 @@ export class CoopReplayMePhase extends Phase {
       });
       return;
     }
+    this.disposeCoopV2IntroVisualShell();
     coopLog("me", "QUIZ HANDOFF: owner opened the embedded ME quiz - running mirror ErQuizPhase (#818)", {
       counter: this.interactionCounter,
       questions: sub.questions.length,
@@ -2536,6 +2640,7 @@ export class CoopReplayMePhase extends Phase {
       counter: this.interactionCounter,
     });
     hideCoopControllerTag();
+    this.disposeCoopV2IntroVisualShell();
     // #854: force-close any lingering reward/ME cursor mirror at the ME terminal (see the detached
     // branch above) - a mirror the abandoned embedded shop never closed must not overlay the next wave.
     getCoopUiMirror()?.endSession();

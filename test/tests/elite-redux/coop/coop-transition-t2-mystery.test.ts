@@ -343,7 +343,51 @@ async function crossIntoNaturallyCarriedMystery(
     await drainLoopback();
   });
   await waitForMode(rig.guestCtx, UiMode.MYSTERY_ENCOUNTER, "guest Mystery selector");
-  return rig.guestScene.phaseManager.getCurrentPhase();
+  const replay = rig.guestScene.phaseManager.getCurrentPhase() as Phase & {
+    coopV2MysteryEncounterType: number | null;
+    coopV2ProjectedIntroVisuals: {
+      spriteConfigs: Array<{ spriteKey: string; fileRoot: string }>;
+      x: number;
+      y: number;
+      alpha: number;
+      visible: boolean;
+    } | null;
+  };
+  expect(replay.coopV2MysteryEncounterType, "replay exposes the exact committed Mystery identity").toBe(type);
+  expect(
+    replay.coopV2ProjectedIntroVisuals,
+    "replay installed a renderer-only intro shell before input opened",
+  ).not.toBeNull();
+  expect(
+    replay.coopV2ProjectedIntroVisuals?.spriteConfigs.map(({ spriteKey, fileRoot }) => ({ spriteKey, fileRoot })),
+    "replay rendered the authority's resolved sprite keys without constructing a second Mystery engine",
+  ).toEqual(
+    rig.hostScene.currentBattle.mysteryEncounter?.introVisuals?.spriteConfigs.map(({ spriteKey, fileRoot }) => ({
+      spriteKey,
+      fileRoot,
+    })),
+  );
+  expect(
+    replay.coopV2ProjectedIntroVisuals == null
+      ? null
+      : {
+          x: replay.coopV2ProjectedIntroVisuals.x,
+          y: replay.coopV2ProjectedIntroVisuals.y,
+          alpha: replay.coopV2ProjectedIntroVisuals.alpha,
+          visible: replay.coopV2ProjectedIntroVisuals.visible,
+        },
+    "replay installs the authority's settled container transform instead of the off-screen constructor position",
+  ).toEqual(
+    rig.hostScene.currentBattle.mysteryEncounter?.introVisuals == null
+      ? null
+      : {
+          x: rig.hostScene.currentBattle.mysteryEncounter.introVisuals.x,
+          y: rig.hostScene.currentBattle.mysteryEncounter.introVisuals.y,
+          alpha: rig.hostScene.currentBattle.mysteryEncounter.introVisuals.alpha,
+          visible: rig.hostScene.currentBattle.mysteryEncounter.introVisuals.visible,
+        },
+  );
+  return replay;
 }
 
 async function driveGuestOwnedMysteryRounds(

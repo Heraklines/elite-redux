@@ -84,6 +84,15 @@ const RESYNC = {
   authoritativeState: STATE,
 } as const;
 
+const ME_INTRO_VISUALS = {
+  enterFromRight: false,
+  x: 228,
+  y: 76,
+  alpha: 1,
+  visible: true,
+  spriteConfigs: [{ spriteKey: "global_trade_system", fileRoot: "mystery-encounters", hasShadow: true }],
+} as const;
+
 function envelope(
   kind: CoopOperationKind,
   payload: unknown,
@@ -282,6 +291,7 @@ describe("Authority V2 interaction cutover", () => {
       {
         present: true,
         mysteryEncounterType: 6,
+        introVisuals: ME_INTRO_VISUALS,
         presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: [] },
       },
       "MYSTERY_ENCOUNTER",
@@ -308,7 +318,27 @@ describe("Authority V2 interaction cutover", () => {
     const pinned = 1;
     const value = envelope(
       "ME_PRESENT",
-      { present: true, presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: [] } },
+      {
+        present: true,
+        introVisuals: ME_INTRO_VISUALS,
+        presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: [] },
+      },
+      "MYSTERY_ENCOUNTER",
+      0,
+      (COOP_ME_PUMP_SEQ_BASE + pinned) * 8000,
+    );
+    expect(buildCoopV2InteractionEnvelopeEntry({ context: FRAME, surfaceClass: "op:me", envelope: value })).toBeNull();
+  });
+
+  it("rejects a Mystery presentation that omits its complete resolved intro visual material", () => {
+    const pinned = 1;
+    const value = envelope(
+      "ME_PRESENT",
+      {
+        present: true,
+        mysteryEncounterType: 6,
+        presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: [] },
+      },
       "MYSTERY_ENCOUNTER",
       0,
       (COOP_ME_PUMP_SEQ_BASE + pinned) * 8000,
@@ -342,6 +372,7 @@ describe("Authority V2 interaction cutover", () => {
       {
         present: true,
         mysteryEncounterType: 6,
+        introVisuals: ME_INTRO_VISUALS,
         presentation: {
           k: "mePresent",
           tokens: {},

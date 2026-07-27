@@ -59,6 +59,7 @@ import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redu
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import { setCoopMeOwnerIntentOrdinals } from "#data/elite-redux/coop/coop-me-pin-state";
+import { isCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import { isCompleteCoopMeTerminalPayload } from "#data/elite-redux/coop/coop-me-terminal-validator";
 
 // biome-ignore lint/performance/noBarrelFile: retained compatibility export for existing co-op surface imports
@@ -1020,6 +1021,7 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
         || typeof presentation.mysteryEncounterType !== "number"
         || !Number.isSafeInteger(presentation.mysteryEncounterType)
         || presentation.mysteryEncounterType < 0
+        || !isCoopMeIntroVisualPresentation(presentation.introVisuals)
         || presentation.presentation?.k !== "mePresent"
       ) {
         coopWarn("me", "ME_PRESENT commit rejected: immutable encounter identity or presentation is incomplete");

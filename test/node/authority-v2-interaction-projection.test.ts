@@ -58,6 +58,14 @@ const STATE: CoopAuthoritativeBattleStateV1 = {
 };
 
 const OPTION = { id: "POKE_BALL", tier: 0, upgradeCount: 0, cost: 25 };
+const ME_INTRO_VISUALS = {
+  enterFromRight: false,
+  x: 228,
+  y: 76,
+  alpha: 1,
+  visible: true,
+  spriteConfigs: [{ spriteKey: "global_trade_system", fileRoot: "mystery-encounters", hasShadow: true }],
+} as const;
 
 function envelope(
   kind: CoopOperationKind,
@@ -149,6 +157,7 @@ describe("Authority V2 immutable interaction projection", () => {
         {
           present: true,
           mysteryEncounterType: 6,
+          introVisuals: ME_INTRO_VISUALS,
           presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: ["A"] },
         },
         "MYSTERY_ENCOUNTER",
@@ -208,6 +217,26 @@ describe("Authority V2 immutable interaction projection", () => {
       kind: "ability",
       phaseName: "ErDexNavPhase",
       presentation: { workflow: "dex-nav", candidateSpeciesIds: [16, 19, 25] },
+    });
+  });
+
+  it("preserves the exact Mystery identity and resolved intro sprite material", () => {
+    const value = envelope(
+      "ME_PRESENT",
+      {
+        present: true,
+        mysteryEncounterType: 29,
+        introVisuals: ME_INTRO_VISUALS,
+        presentation: { k: "mePresent", tokens: {}, meetsReqs: [], labels: ["Trade"] },
+      },
+      "MYSTERY_ENCOUNTER",
+      0,
+      (COOP_ME_PUMP_SEQ_BASE + 3) * 8000,
+    );
+    expect(projectionPlanOfCoopV2InteractionEntry(entryOf("op:me", value))).toMatchObject({
+      kind: "mystery",
+      mysteryEncounterType: 29,
+      introVisuals: ME_INTRO_VISUALS,
     });
   });
 

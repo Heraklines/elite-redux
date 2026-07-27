@@ -80,7 +80,7 @@ export class MysteryEncounterSpriteConfig {
  * Note: intro visuals are not "Trainers" or any other specific game object, though they may contain trainer sprites
  */
 export class MysteryEncounterIntroVisuals extends Phaser.GameObjects.Container {
-  public encounter: MysteryEncounter;
+  public encounter: Pick<MysteryEncounter, "spriteConfigs" | "enterIntroVisualsFromRight">;
   public spriteConfigs: MysteryEncounterSpriteConfig[];
   public enterFromRight: boolean;
   private shinySparkleSprites: {
@@ -89,7 +89,7 @@ export class MysteryEncounterIntroVisuals extends Phaser.GameObjects.Container {
   }[];
 
   // TODO: Refactor
-  constructor(encounter: MysteryEncounter) {
+  constructor(encounter: Pick<MysteryEncounter, "spriteConfigs" | "enterIntroVisualsFromRight">) {
     super(globalScene, -72, 76);
     this.encounter = encounter;
     this.enterFromRight = encounter.enterIntroVisualsFromRight ?? false;
