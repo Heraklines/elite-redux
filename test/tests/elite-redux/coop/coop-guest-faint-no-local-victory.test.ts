@@ -409,7 +409,7 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
         epoch: 1,
         wave: 5,
         turn: 2,
-        ownerSeatIds: [0, 1],
+        commands: [{ ownerSeatId: 0, fieldIndex: 0, pokemonId: 100 }],
       },
     };
     expect(phase.releaseForCoopV2Control(replacementResult)).toBe(true);
