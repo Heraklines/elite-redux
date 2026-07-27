@@ -236,6 +236,14 @@ test("replacement command control cannot overtake retained post-summon presentat
   );
 });
 
+test("a stale BGM loop callback cannot abort an authoritative encounter", () => {
+  assert.match(
+    battleScene,
+    /const startedBgm = this\.sound\.add\(bgmName, \{ loop: true \}\)[\s\S]*this\.bgm = startedBgm[\s\S]*startedBgm\.on\("looped", \(\) => \{[\s\S]*this\.bgm !== startedBgm \|\| startedBgm\.pendingRemove[\s\S]*try \{[\s\S]*startedBgm\.play\(\{ seek: loopPoint \}\)[\s\S]*catch/u,
+    "an obsolete or failed sound is presentation-only and cannot strand EncounterPhase before V2 command-open",
+  );
+});
+
 test("every release soak and focused replay executes the complete Authority V2 graph", () => {
   const nightlySoak = jobBlock(nightlySoakWorkflow, "soak");
   const focusedSoak = jobBlock(focusedSoakWorkflow, "replay");

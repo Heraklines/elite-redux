@@ -3305,7 +3305,7 @@ export class BattleScene extends SceneBase {
 
     bgmName = timedEventManager.getEventBgmReplacement(bgmName);
 
-    if (this.bgm && bgmName === this.bgm.key) {
+    if (this.bgm && !this.bgm.pendingRemove && bgmName === this.bgm.key) {
       if (!this.bgm.isPlaying) {
         try {
           this.bgm.play({
@@ -3355,12 +3355,27 @@ export class BattleScene extends SceneBase {
         if (this.bgm && !this.bgm.pendingRemove && this.bgm.isPlaying) {
           this.bgm.stop();
         }
-        this.bgm = this.sound.add(bgmName, { loop: true });
-        this.bgm.play({
+        const startedBgm = this.sound.add(bgmName, { loop: true });
+        this.bgm = startedBgm;
+        startedBgm.play({
           volume: this.masterVolume * this.bgmVolume,
         });
         if (loopPoint) {
-          this.bgm.on("looped", () => this.bgm.play({ seek: loopPoint }));
+          // The LOOPED callback belongs to this exact sound, not the mutable `this.bgm` slot. Encounter
+          // transitions can replace/destroy that slot while an old Phaser sound still emits its final
+          // update. Replaying the destroyed replacement dereferences its nulled `currentConfig.seek` and,
+          // on the authoritative co-op browser, strands EncounterPhase before command-open. Audio is
+          // optional presentation: stale callbacks are ignored and a live callback is failure-contained.
+          startedBgm.on("looped", () => {
+            if (this.bgm !== startedBgm || startedBgm.pendingRemove) {
+              return;
+            }
+            try {
+              startedBgm.play({ seek: loopPoint });
+            } catch (error) {
+              console.warn(`[bgm] loop seek failed for "${bgmName}" (handled, progression continues):`, error);
+            }
+          });
         }
       } catch (e) {
         console.warn(`[bgm] play failed for "${bgmName}" (handled, music continues with the prior track):`, e);
