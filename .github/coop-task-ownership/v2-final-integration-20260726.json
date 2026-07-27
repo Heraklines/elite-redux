@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "aca337953a6238c44991a436272d19a45e093d19",
+  "baseSha": "57b25f751cd84ee8bc2326164b05a2b57c6219e9",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -100,6 +100,7 @@
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
     "test/browser/coop-public-ui/campaign-exp-phase.test.mjs",
     "test/browser/coop-public-ui/campaign-nav.mjs",
+    "test/browser/coop-public-ui/campaign-policy.mjs",
     "test/browser/coop-public-ui/campaign-render-profile.test.mjs",
     "test/browser/coop-public-ui/campaign.mjs",
     "test/browser/coop-public-ui/evidence.mjs",

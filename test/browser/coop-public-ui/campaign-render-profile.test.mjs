@@ -55,11 +55,27 @@ test("render profiles are explicit and the depth profile retains public Settings
     assert.equal(policy.moveAnimationsExpected, false);
     assert.deepEqual(policy.keys.renderProfileToggle, ["ArrowRight"]);
     assert.deepEqual(policy.keys.renderProfileOpen.slice(-6), ["r", ...new Array(5).fill("ArrowDown")]);
+    assert.equal(policy.keys.renderProfileCloseKeysFromEnv, false);
+    assert.deepEqual(policy.keys.renderProfileClose, ["Backspace"]);
   });
 
   withRenderProfile("unlabelled-fast-mode", () => {
     assert.throws(() => loadCampaignPolicy(), /COOP_UI_RENDER_PROFILE/u);
   });
+});
+
+test("default Display Settings close waits for a fresh title surface and semantically restores New Game", async () => {
+  const campaign = await readFile(new URL("./campaign.mjs", import.meta.url), "utf8");
+  const configureStart = campaign.indexOf("async function configureRenderProfile");
+  const configureEnd = campaign.indexOf("async function assertRenderProfileExecution", configureStart);
+  const configure = campaign.slice(configureStart, configureEnd);
+
+  assert.match(configure, /const closeCursor = client\.evidence\.cursor\(\)/u);
+  assert.match(configure, /findLastSemanticSurface\(closeCursor, "title-menu"\)/u);
+  assert.match(
+    configure,
+    /selectOptionById\(client, \{[\s\S]*surfaceId: "title-menu"[\s\S]*targetId: "new-game"[\s\S]*submit: false[\s\S]*fromCursor: closeCursor/u,
+  );
 });
 
 test("public keys release before waiting for the exact production input dispatch", async () => {

@@ -406,7 +406,29 @@ async function configureRenderProfile(rig, policy, progress) {
         : "move-animation rendering intentionally skipped; mechanics/network/public UI retained",
     });
     await client.checkpoint(`render-profile-${policy.renderProfile}-selected`);
+    const closeCursor = client.evidence.cursor();
     await client.sequence(policy.keys.renderProfileClose, `close-render-profile-${policy.renderProfile}`);
+    if (policy.keys.renderProfileCloseKeysFromEnv) {
+      // Explicit maintainer reproductions preserve their exact sequence and pacing.
+      await delay(client.config.settleDelayMs);
+    } else {
+      // Do not let the next workflow stage race a key whose input dispatch was accepted but
+      // whose Title cursor update has not rendered yet. The market journey in run
+      // 30237105683 selected Load Game this way: the old blind ArrowUp tail was still
+      // draining while enterCoopLobby planned from the preceding Settings observation.
+      await client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(closeCursor, "title-menu"), {
+        timeoutMs: client.config.timeoutMs,
+        description: "fresh Title menu after closing Display Settings",
+      });
+      await selectOptionById(client, {
+        surfaceId: "title-menu",
+        targetId: "new-game",
+        navKeys: ["ArrowUp", "ArrowDown"],
+        submit: false,
+        timeoutMs: client.config.timeoutMs,
+        fromCursor: closeCursor,
+      });
+    }
   }
   await progress.note("render profile visibly selected and observer-attested", {
     renderProfile: policy.renderProfile,

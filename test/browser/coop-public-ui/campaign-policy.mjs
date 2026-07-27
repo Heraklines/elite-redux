@@ -217,7 +217,13 @@ export function loadCampaignPolicy() {
         "ArrowDown",
       ]),
       renderProfileToggle: envKeys("COOP_UI_RENDER_PROFILE_TOGGLE_KEYS", ["ArrowRight"]),
-      renderProfileClose: envKeys("COOP_UI_RENDER_PROFILE_CLOSE_KEYS", ["Backspace", "ArrowUp", "ArrowUp", "ArrowUp"]),
+      // The default close only leaves Display Settings. `configureRenderProfile` then
+      // observes the freshly installed Title surface and navigates to New Game by stable
+      // option id. Blind trailing arrows could still be draining when lobby navigation
+      // began, moving the cursor from New Game to Load Game on a CPU-dilated runner.
+      // A non-empty override remains an exact diagnostic/reproduction sequence.
+      renderProfileCloseKeysFromEnv: (process.env.COOP_UI_RENDER_PROFILE_CLOSE_KEYS ?? "").trim().length > 0,
+      renderProfileClose: envKeys("COOP_UI_RENDER_PROFILE_CLOSE_KEYS", ["Backspace"]),
       // A non-empty override preserves exact diagnostic/reproduction sequences. Without one,
       // the campaign opens FIGHT, reads the visible usable moves, and navigates to the strongest
       // damaging option through public keys; the array remains the explicit-override payload.
