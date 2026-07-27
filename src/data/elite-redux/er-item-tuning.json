@@ -9,7 +9,7 @@
     "tier": "ULTRA"
   },
   "BIG_NUGGET": {
-    "tier": "GREAT"
+    "tier": "ULTRA"
   },
   "DNA_SPLICERS": {
     "tier": "ULTRA",
@@ -85,8 +85,8 @@
     "tier": "MASTER"
   },
   "NUGGET": {
-    "tier": "COMMON",
-    "weight": 2
+    "tier": "GREAT",
+    "weight": 0
   },
   "RARE_EVOLUTION_ITEM": {
     "weight": 5
