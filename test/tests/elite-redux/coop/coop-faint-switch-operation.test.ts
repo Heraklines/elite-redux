@@ -211,6 +211,15 @@ describe("co-op faint-switch operation migration", () => {
       "a live recreated modal must close before the post-replacement image can apply",
     ).toBe(false);
     expect(closeAttempts).toBe(1);
+    expect(
+      materializeCoopV2ReplacementPickerTerminal(
+        { sourceAddress: address, ownerSeatId: 1, resolution: "fallback-auto", selected: null },
+        0,
+        guestState,
+      ),
+      "another seat never owns this local modal terminal",
+    ).toBe(true);
+    expect(closeAttempts, "the wrong local seat cannot consume the live terminal").toBe(1);
   });
 
   it("V2 retires only the materially settled owner proposal window for every terminal resolution", () => {

@@ -2502,6 +2502,11 @@ test("direct Mystery narration is excluded only from the duplicate battle-turn r
   assert.match(queue, /globalScene\.gameMode\.isCoop && coopMeInProgress\(\) && !coopMeHandoffBattleStarted\(\)/u);
   assert.match(queue, /isCoopRecording\(\) && !directMysteryNarration/u);
   assert.match(queue, /recordCoopMessage\(message\)/u);
+  assert.doesNotMatch(
+    queue,
+    /directMysteryNarration[\s\S]*recordCoopMessage\(message\)[\s\S]*recordCoopMessage\(message\)/u,
+    "the queue has one generic recorder call, never a second Mystery-specific copy",
+  );
 });
 
 test("the public post-turn scanner never infers replacement ownership from a phase name", () => {
