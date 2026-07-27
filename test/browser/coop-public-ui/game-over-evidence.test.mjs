@@ -37,6 +37,11 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     "the public terminal fixture uses Crobat's primary Inner Focus slot plus maximum practical wave-1 speed",
   );
   assert.match(
+    harness,
+    /const CROBAT_SPECIES_ID = 169;[\s\S]*gameOverFixture[\s\S]*\? \[CROBAT_SPECIES_ID\]/u,
+    "the public driver must attest the same Crobat party that the fixture materializes",
+  );
+  assert.match(
     transport,
     /VITE_COOP_BROWSER_FIXTURE !== "game-over"[\s\S]*get\("coopfixture"\) !== "game-over"[\s\S]*pendingOperation\?\.kind !== "WAVE_ADVANCE"[\s\S]*payload\?\.outcome === "gameOver"/u,
   );

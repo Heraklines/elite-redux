@@ -64,6 +64,7 @@ const RENDEZVOUS_RECOVERY_RETRY_POINT =
 const TATSUGIRI_SPECIES_ID = 978;
 const DONDOZO_SPECIES_ID = 977;
 const MAGIKARP_SPECIES_ID = 129;
+const CROBAT_SPECIES_ID = 169;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
 // Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
@@ -3163,7 +3164,7 @@ export class DuoPublicUiRig {
                 ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                 : [BULBASAUR_SPECIES_ID]
               : gameOverFixture
-                ? [MAGIKARP_SPECIES_ID]
+                ? [CROBAT_SPECIES_ID]
                 : null;
           const result =
             expectedSeededSpecies == null
