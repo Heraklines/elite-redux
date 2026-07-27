@@ -4225,6 +4225,7 @@ export interface CoopWaveBoundaryStatus {
 
 /** Everything tied to one live co-op session. */
 interface CoopMeNarrationLease {
+  readonly text: string;
   readonly wave: number;
   readonly seq: number;
   readonly step: number;
@@ -4232,12 +4233,19 @@ interface CoopMeNarrationLease {
   acknowledged: boolean;
   acknowledgedAt: number | null;
   choice: number | null;
+  resendTimer: ReturnType<typeof setTimeout> | null;
+}
+
+interface CoopGuestMeNarrationLease {
+  readonly message: Extract<CoopMessage, { t: "meMessage" }>;
+  acknowledgedChoice: number | null;
+  retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
 interface CoopMeNarrationRuntimeState {
   readonly nextStepByPinned: Map<number, number>;
   hostPending: CoopMeNarrationLease | null;
-  guestPending: Extract<CoopMessage, { t: "meMessage" }> | null;
+  guestPending: CoopGuestMeNarrationLease | null;
   hostAdvanceTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -5633,32 +5641,18 @@ function observeCoopV2InteractionSurface(
  * phase. This remains an authority-issued lease: the sole host engine mints it for one session/wave/pin/step,
  * this runtime retains it, and only the still-live replay phase can expose its actionable message handler.
  */
-function hasCoopGuestMeNarrationInputLease(runtime: CoopRuntime): boolean {
-  const message = runtime.meNarration.guestPending;
-  const phase = globalScene.phaseManager?.getCurrentPhase();
-  const handler = globalScene.ui?.getHandler() as
-    | {
-        active?: boolean;
-        isCoopV2InputActionable?: () => boolean;
-      }
-    | undefined;
-  if (
-    message == null
-    || !message.requiresAck
-    || runtime.controller.role !== "guest"
-    || runtime.controller.authorityRole !== "replica"
-    || !isCoopV2InteractionCutoverActive(runtime.durability)
-    || phase?.phaseName !== "CoopReplayMePhase"
-    || globalScene.ui?.getMode() !== UiMode.MESSAGE
-    || handler?.active !== true
-    || handler.isCoopV2InputActionable?.() !== true
-    || globalScene.currentBattle?.waveIndex !== message.wave
-  ) {
-    return false;
-  }
+function isCoopGuestMeNarrationAddressLive(
+  runtime: CoopRuntime,
+  message: Extract<CoopMessage, { t: "meMessage" }>,
+): boolean {
   const pinned = message.seq - COOP_ME_PUMP_SEQ_BASE;
   return (
-    coopMeInteractionStartValue() === pinned
+    message.requiresAck
+    && runtime.controller.role === "guest"
+    && runtime.controller.authorityRole === "replica"
+    && isCoopV2InteractionCutoverActive(runtime.durability)
+    && globalScene.currentBattle?.waveIndex === message.wave
+    && coopMeInteractionStartValue() === pinned
     && coopInteractionOwnerSeat(pinned) === runtime.controller.localSeatId
     && isCoopMeNarrationOperationId({
       operationId: message.operationId,
@@ -5668,6 +5662,28 @@ function hasCoopGuestMeNarrationInputLease(runtime: CoopRuntime): boolean {
       seq: message.seq,
     })
   );
+}
+
+function hasCoopGuestMeNarrationInputLease(runtime: CoopRuntime): boolean {
+  const message = runtime.meNarration.guestPending?.message;
+  const phase = globalScene.phaseManager?.getCurrentPhase();
+  const handler = globalScene.ui?.getHandler() as
+    | {
+        active?: boolean;
+        isCoopV2InputActionable?: () => boolean;
+      }
+    | undefined;
+  if (
+    message == null
+    || !isCoopGuestMeNarrationAddressLive(runtime, message)
+    || phase?.phaseName !== "CoopReplayMePhase"
+    || globalScene.ui?.getMode() !== UiMode.MESSAGE
+    || handler?.active !== true
+    || handler.isCoopV2InputActionable?.() !== true
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -5810,42 +5826,81 @@ export function coopHostMeNarrationAwaitingGuestAck(runtime: CoopRuntime | null 
 export function coopGuestObserveMeNarration(
   message: Extract<CoopMessage, { t: "meMessage" }>,
   runtime: CoopRuntime | null = active,
-): void {
-  if (
-    runtime == null
-    || runtime.controller.role !== "guest"
-    || runtime.controller.authorityRole === "authority"
-    || !message.requiresAck
-    || !isCoopV2InteractionCutoverActive(runtime.durability)
-  ) {
-    return;
+): boolean {
+  if (runtime == null) {
+    return false;
   }
-  const pinned = message.seq - COOP_ME_PUMP_SEQ_BASE;
-  const valid =
-    coopMeInteractionStartValue() === pinned
-    && globalScene.currentBattle?.waveIndex === message.wave
-    && coopInteractionOwnerSeat(pinned) === runtime.controller.localSeatId
-    && isCoopMeNarrationOperationId({
-      operationId: message.operationId,
-      epoch: runtime.controller.sessionEpoch,
-      pinned,
-      step: message.step,
-      seq: message.seq,
-    });
-  if (!valid) {
+  if (!isCoopGuestMeNarrationAddressLive(runtime, message)) {
     coopWarn("me", `guest refused stale/malformed narration lease id=${message.operationId}`);
-    return;
+    return false;
   }
   const prior = runtime.meNarration.guestPending;
-  if (prior != null && prior.operationId !== message.operationId) {
-    failCoopRuntimeSharedSession(
-      runtime,
-      `Mystery narration ${message.operationId} arrived before ${prior.operationId} was dismissed.`,
-      { boundary: "surface", reasonCode: "continuation-failed", wave: message.wave },
-    );
+  if (prior?.message.operationId === message.operationId) {
+    return true;
+  }
+  if (prior != null) {
+    if (prior.acknowledgedChoice == null) {
+      failCoopRuntimeSharedSession(
+        runtime,
+        `Mystery narration ${message.operationId} arrived before ${prior.message.operationId} was dismissed.`,
+        { boundary: "surface", reasonCode: "continuation-failed", wave: message.wave },
+      );
+      return false;
+    }
+    clearCoopGuestMeNarrationLease(runtime);
+  }
+  runtime.meNarration.guestPending = {
+    message,
+    acknowledgedChoice: null,
+    retryTimer: null,
+  };
+  return true;
+}
+
+const COOP_ME_NARRATION_REDELIVERY_MS = 1_000;
+
+/** Retire the guest's presentation-only retry lease without touching mechanical Mystery state. */
+export function clearCoopGuestMeNarrationLease(runtime: CoopRuntime | null = active): void {
+  const pending = runtime?.meNarration.guestPending;
+  if (runtime == null || pending == null) {
     return;
   }
-  runtime.meNarration.guestPending = message;
+  if (pending.retryTimer != null) {
+    clearTimeout(pending.retryTimer);
+    pending.retryTimer = null;
+  }
+  runtime.meNarration.guestPending = null;
+}
+
+function scheduleCoopGuestMeNarrationAckRetry(runtime: CoopRuntime, operationId: string): void {
+  const pending = runtime.meNarration.guestPending;
+  if (pending?.message.operationId !== operationId || pending.acknowledgedChoice == null) {
+    return;
+  }
+  if (pending.retryTimer != null) {
+    clearTimeout(pending.retryTimer);
+  }
+  pending.retryTimer = setTimeout(() => {
+    pending.retryTimer = null;
+    const current = runtime.meNarration.guestPending;
+    if (
+      active !== runtime
+      || current !== pending
+      || current.message.operationId !== operationId
+      || current.acknowledgedChoice == null
+      || !isCoopGuestMeNarrationAddressLive(runtime, current.message)
+    ) {
+      clearCoopGuestMeNarrationLease(runtime);
+      return;
+    }
+    runtime.interactionRelay.sendV2MeNarrationObservation(
+      current.message.seq,
+      current.acknowledgedChoice,
+      current.message.step,
+      current.message.operationId,
+    );
+    scheduleCoopGuestMeNarrationAckRetry(runtime, operationId);
+  }, COOP_ME_NARRATION_REDELIVERY_MS);
 }
 
 /**
@@ -5853,17 +5908,16 @@ export function coopGuestObserveMeNarration(
  * presentation observation was emitted; callers then suppress the retired generic `meBtn` carrier.
  */
 export function coopGuestAcknowledgeMeNarration(choice: number, runtime: CoopRuntime | null = active): boolean {
-  const message = runtime?.meNarration.guestPending;
+  const pending = runtime?.meNarration.guestPending;
+  const message = pending?.message;
   if (
     runtime == null
+    || pending == null
     || message == null
-    || runtime.controller.role !== "guest"
-    || runtime.controller.authorityRole === "authority"
     || !Number.isSafeInteger(choice)
     || choice < 0
     || choice >= 32
-    || globalScene.currentBattle?.waveIndex !== message.wave
-    || coopMeInteractionStartValue() !== message.seq - COOP_ME_PUMP_SEQ_BASE
+    || !isCoopGuestMeNarrationAddressLive(runtime, message)
   ) {
     return false;
   }
@@ -5874,7 +5928,8 @@ export function coopGuestAcknowledgeMeNarration(choice: number, runtime: CoopRun
     message.operationId,
   );
   if (sent) {
-    runtime.meNarration.guestPending = null;
+    pending.acknowledgedChoice = choice;
+    scheduleCoopGuestMeNarrationAckRetry(runtime, message.operationId);
   }
   return sent;
 }
@@ -5924,6 +5979,54 @@ function validateCoopMeNarrationObservation(
 const COOP_ME_NARRATION_ADVANCE_RETRY_MS = 50;
 const COOP_ME_NARRATION_ADVANCE_CEILING_MS = 30_000;
 
+function scheduleCoopHostMeNarrationRedelivery(runtime: CoopRuntime, operationId: string): void {
+  const pending = runtime.meNarration.hostPending;
+  if (pending?.operationId !== operationId || pending.acknowledged) {
+    return;
+  }
+  if (pending.resendTimer != null) {
+    clearTimeout(pending.resendTimer);
+  }
+  pending.resendTimer = setTimeout(() => {
+    pending.resendTimer = null;
+    const current = runtime.meNarration.hostPending;
+    const pinned = current == null ? -1 : current.seq - COOP_ME_PUMP_SEQ_BASE;
+    if (
+      active !== runtime
+      || current !== pending
+      || current.operationId !== operationId
+      || current.acknowledged
+      || runtime.controller.role !== "host"
+      || runtime.controller.authorityRole !== "authority"
+      || !isCoopV2InteractionCutoverActive(runtime.durability)
+      || globalScene.currentBattle?.waveIndex !== current.wave
+      || coopMeInteractionStartValue() !== pinned
+      || coopInteractionOwnerSeat(pinned) === runtime.controller.localSeatId
+      || !coopMeInProgress()
+      || coopMeHandoffBattleStarted()
+      || coopMeBespokeHostDrives()
+    ) {
+      if (current === pending) {
+        runtime.meNarration.hostPending = null;
+      }
+      return;
+    }
+    try {
+      runtime.battleStream.sendMeMessage({
+        text: current.text,
+        wave: current.wave,
+        seq: current.seq,
+        step: current.step,
+        operationId: current.operationId,
+        requiresAck: true,
+      });
+    } catch (error) {
+      coopWarn("me", `host could not redeliver Mystery narration ${operationId}`, error);
+    }
+    scheduleCoopHostMeNarrationRedelivery(runtime, operationId);
+  }, COOP_ME_NARRATION_REDELIVERY_MS);
+}
+
 /** Apply an authenticated guest acknowledgement only when the host's real Message handler is actionable. */
 function consumeCoopMeNarrationObservation(runtime: CoopRuntime | null, observation: CoopMeNarrationObservation): void {
   if (!validateCoopMeNarrationObservation(runtime, observation) || runtime == null) {
@@ -5932,6 +6035,10 @@ function consumeCoopMeNarrationObservation(runtime: CoopRuntime | null, observat
   const pending = runtime.meNarration.hostPending;
   if (pending == null) {
     return;
+  }
+  if (pending.resendTimer != null) {
+    clearTimeout(pending.resendTimer);
+    pending.resendTimer = null;
   }
   pending.acknowledged = true;
   pending.acknowledgedAt = Date.now();
@@ -11496,6 +11603,7 @@ export function coopHostStreamMeMessage(text: string, actionablePrompt = false):
   runtime.meNarration.nextStepByPinned.set(pinned, step + 1);
   if (requiresAck) {
     runtime.meNarration.hostPending = {
+      text,
       wave,
       seq,
       step,
@@ -11503,6 +11611,7 @@ export function coopHostStreamMeMessage(text: string, actionablePrompt = false):
       acknowledged: false,
       acknowledgedAt: null,
       choice: null,
+      resendTimer: null,
     };
   }
   try {
@@ -11513,10 +11622,14 @@ export function coopHostStreamMeMessage(text: string, actionablePrompt = false):
       );
     }
     runtime.battleStream.sendMeMessage({ text, wave, seq, step, operationId, requiresAck });
+    if (requiresAck) {
+      scheduleCoopHostMeNarrationRedelivery(runtime, operationId);
+    }
   } catch (e) {
-    /* an ME narration send failure must never break the host's encounter */
-    if (runtime.meNarration.hostPending?.operationId === operationId) {
-      runtime.meNarration.hostPending = null;
+    // An actionable lease must stay retained: a transient dark-channel send is not evidence that the
+    // replica saw the prompt. The exact same identity is retried until acknowledgement or address expiry.
+    if (requiresAck && runtime.meNarration.hostPending?.operationId === operationId) {
+      scheduleCoopHostMeNarrationRedelivery(runtime, operationId);
     }
     coopWarn("me", "host stream ME-message failed", e);
   }
@@ -12722,8 +12835,12 @@ export function clearCoopRuntime(): void {
     clearTimeout(active.meNarration.hostAdvanceTimer);
     active.meNarration.hostAdvanceTimer = null;
   }
+  if (active.meNarration.hostPending?.resendTimer != null) {
+    clearTimeout(active.meNarration.hostPending.resendTimer);
+    active.meNarration.hostPending.resendTimer = null;
+  }
   active.meNarration.hostPending = null;
-  active.meNarration.guestPending = null;
+  clearCoopGuestMeNarrationLease(active);
   active.meNarration.nextStepByPinned.clear();
   active.controller.dispose();
   active.battleSync.dispose();

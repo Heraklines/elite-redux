@@ -1765,13 +1765,48 @@ test("pre-battle Mystery engine narration cannot depend on the selector phase st
   );
   assert.match(
     coopRuntime,
-    /function hasCoopGuestMeNarrationInputLease[\s\S]*guestPending[\s\S]*phaseName !== "CoopReplayMePhase"[\s\S]*isCoopMeNarrationOperationId[\s\S]*isCoopV2InteractionHumanInputFrozen[\s\S]*hasCoopGuestMeNarrationInputLease\(runtime\)/u,
+    /function isCoopGuestMeNarrationAddressLive[\s\S]*isCoopMeNarrationOperationId[\s\S]*function hasCoopGuestMeNarrationInputLease[\s\S]*guestPending[\s\S]*phaseName !== "CoopReplayMePhase"[\s\S]*isCoopV2InteractionHumanInputFrozen[\s\S]*hasCoopGuestMeNarrationInputLease\(runtime\)/u,
     "the guest's exact rendered narration lease must cross the global V2 physical-input freeze",
   );
   assert.match(
     coopRuntime,
     /COOP_ME_NARRATION_ADVANCE_CEILING_MS[\s\S]*isMessageMode: globalScene\.ui\?\.getMode\(\) === UiMode\.MESSAGE[\s\S]*hostAdvanceTimer = setTimeout[\s\S]*advanceCoopHostMeNarrationFromGuest/u,
     "an early acknowledgement retries until the real host Message handler is actionable and then advances it",
+  );
+  assert.match(
+    coopRuntime,
+    /interface CoopMeNarrationLease[\s\S]*readonly text: string[\s\S]*resendTimer:[\s\S]*scheduleCoopHostMeNarrationRedelivery[\s\S]*battleStream\.sendMeMessage/u,
+    "the authority retains and redelivers an unacknowledged narration lease across a dark transport window",
+  );
+  assert.match(
+    coopRuntime,
+    /interface CoopGuestMeNarrationLease[\s\S]*acknowledgedChoice:[\s\S]*retryTimer:[\s\S]*scheduleCoopGuestMeNarrationAckRetry[\s\S]*sendV2MeNarrationObservation/u,
+    "the replica retains and retries its exact dismissal until a successor or stale address retires it",
+  );
+  const guestAckStart = coopRuntime.indexOf("export function coopGuestAcknowledgeMeNarration(");
+  const guestAckEnd = coopRuntime.indexOf("\ninterface CoopMeNarrationObservation", guestAckStart);
+  assert.ok(guestAckStart >= 0 && guestAckEnd > guestAckStart, "the guest acknowledgement block is bounded");
+  assert.doesNotMatch(
+    coopRuntime.slice(guestAckStart, guestAckEnd),
+    /guestPending = null/u,
+    "enqueueing one acknowledgement is not delivery proof and cannot discard the retry lease",
+  );
+  assert.match(
+    replayMePhase,
+    /clearCoopGuestMeNarrationLease[\s\S]*this\.offMeMessage = \(\) => \{[\s\S]*clearCoopGuestMeNarrationLease\(this\.boundRuntime\)/u,
+    "every replay teardown retires its retained acknowledgement timer through the narration unsubscribe",
+  );
+  assert.match(battleStream, /meMessageHandler:[\s\S]*=> boolean/u, "the replay handler reports exact acceptance");
+  const narrationDeliveryStart = battleStream.indexOf("private deliverMeMessage(");
+  const narrationDeliveryEnd = battleStream.indexOf("\n  /**", narrationDeliveryStart + 1);
+  assert.ok(narrationDeliveryStart >= 0 && narrationDeliveryEnd > narrationDeliveryStart);
+  const narrationDelivery = battleStream.slice(narrationDeliveryStart, narrationDeliveryEnd);
+  const acceptedHandler = narrationDelivery.indexOf("accepted = this.meMessageHandler(message)");
+  const retainedMessage = narrationDelivery.indexOf("this.pendingMeMessages.push(message)", acceptedHandler);
+  const seenMessage = narrationDelivery.indexOf("this.seenMeMessageOperationIds.add(message.operationId)");
+  assert.ok(
+    acceptedHandler >= 0 && retainedMessage > acceptedHandler && seenMessage > retainedMessage,
+    "a narration is deduplicated only after the exact replay boundary accepts it, so an early delivery remains replayable",
   );
   assert.match(
     coopUi,

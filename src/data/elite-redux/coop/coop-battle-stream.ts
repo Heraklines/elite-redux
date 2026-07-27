@@ -1425,7 +1425,7 @@ export class CoopBattleStreamer {
   /** WATCHER: handler for the owner's ME-boundary checksum (#633, TRACK-2 Phase C). */
   private meChecksumHandler: ((seq: number, checksum: string) => void) | null = null;
   /** GUEST: handler for exact host ME narration leases (#633, non-battle ME). */
-  private meMessageHandler: ((message: Extract<CoopMessage, { t: "meMessage" }>) => void) | null = null;
+  private meMessageHandler: ((message: Extract<CoopMessage, { t: "meMessage" }>) => boolean) | null = null;
   /** Narration can beat CoopReplayMePhase subscription; retain a bounded, identity-deduped FIFO. */
   private readonly pendingMeMessages: Extract<CoopMessage, { t: "meMessage" }>[] = [];
   /** A reconnect/redelivery may never display or acknowledge the same narration lease twice. */
@@ -3933,7 +3933,7 @@ export class CoopBattleStreamer {
    * guest's encounter screen renders the same text the host's authoritative ME engine produced.
    * Returns an unsubscribe function (CoopReplayMePhase drops it when the encounter terminal fires).
    */
-  onMeMessage(handler: (message: Extract<CoopMessage, { t: "meMessage" }>) => void): () => void {
+  onMeMessage(handler: (message: Extract<CoopMessage, { t: "meMessage" }>) => boolean): () => void {
     coopLog("stream", `guest REGISTER onMeMessage handler (was=${this.meMessageHandler != null})`);
     this.meMessageHandler = handler;
     const pending = this.pendingMeMessages.splice(0);
@@ -3948,7 +3948,7 @@ export class CoopBattleStreamer {
     };
   }
 
-  /** Deliver one narration lease once; retain it if the replay phase has not subscribed yet. */
+  /** Deliver one narration lease once; retain it until the exact replay boundary accepts it. */
   private deliverMeMessage(message: Extract<CoopMessage, { t: "meMessage" }>): void {
     if (this.seenMeMessageOperationIds.has(message.operationId)) {
       coopLog("replay", `guest DROP duplicate meMessage id=${message.operationId}`);
@@ -3966,6 +3966,27 @@ export class CoopBattleStreamer {
       coopLog("replay", `guest BUFFER meMessage id=${message.operationId} pending=${this.pendingMeMessages.length}`);
       return;
     }
+    let accepted = false;
+    try {
+      accepted = this.meMessageHandler(message);
+    } catch (error) {
+      coopWarn("replay", `guest narration handler threw for id=${message.operationId}`, error);
+    }
+    if (!accepted) {
+      if (!this.pendingMeMessages.some(pending => pending.operationId === message.operationId)) {
+        if (this.pendingMeMessages.length >= ME_MESSAGE_RETENTION) {
+          const evicted = this.pendingMeMessages.shift();
+          coopWarn("replay", `guest EVICT oldest pending meMessage id=${evicted?.operationId ?? "unknown"}`);
+        }
+        this.pendingMeMessages.push(message);
+      }
+      coopLog("replay", `guest RETAIN unaccepted meMessage id=${message.operationId}`);
+      return;
+    }
+    const pendingIndex = this.pendingMeMessages.findIndex(pending => pending.operationId === message.operationId);
+    if (pendingIndex >= 0) {
+      this.pendingMeMessages.splice(pendingIndex, 1);
+    }
     this.seenMeMessageOperationIds.add(message.operationId);
     while (this.seenMeMessageOperationIds.size > ME_MESSAGE_RETENTION) {
       const oldest = this.seenMeMessageOperationIds.values().next().value as string | undefined;
@@ -3974,7 +3995,6 @@ export class CoopBattleStreamer {
       }
       this.seenMeMessageOperationIds.delete(oldest);
     }
-    this.meMessageHandler(message);
   }
 
   /** HOST: subscribe to already-authenticated exact recovery requests. */

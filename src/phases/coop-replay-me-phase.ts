@@ -44,6 +44,7 @@ import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operatio
 import { notifyCoopOperationContinuationSurface } from "#data/elite-redux/coop/coop-operation-journal";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
+  clearCoopGuestMeNarrationLease,
   coopGuestObserveMeNarration,
   coopSessionGeneration,
   failCoopSharedSession,
@@ -435,31 +436,38 @@ export class CoopReplayMePhase extends Phase {
     // Render the host's authoritative ME narration as it arrives. The text is non-mechanical, but an
     // actionable guest-owned line carries an exact presentation lease: only a real local dismissal may
     // advance the host's matching MessagePhase. The subscription is dropped at the encounter terminal.
-    this.offMeMessage =
-      getCoopBattleStreamer()?.onMeMessage(message => {
-        if (!this.boundaryStillLive()) {
-          return;
+    const unsubscribeMeMessage = getCoopBattleStreamer()?.onMeMessage(message => {
+      if (!this.boundaryStillLive()) {
+        return !message.requiresAck;
+      }
+      if (message.requiresAck && !coopGuestObserveMeNarration(message, this.boundRuntime)) {
+        return false;
+      }
+      try {
+        // #816: render DIRECTLY - queued messages never display while this phase is
+        // parked awaiting the host, which is exactly when narration arrives.
+        // #817: the ME selector handler HAS a message area (showText routes into it),
+        // so narration renders inside the encounter window instead of overdrawing it.
+        globalScene.ui.showText(message.text, null, undefined, null, true);
+      } catch (error) {
+        if (message.requiresAck) {
+          coopWarn("me", `guest could not render actionable narration id=${message.operationId}`, error);
+          failCoopSharedSession(`Mystery narration ${message.operationId} could not render on its owner.`);
         }
-        coopGuestObserveMeNarration(message, this.boundRuntime);
-        try {
-          // #816: render DIRECTLY - queued messages never display while this phase is
-          // parked awaiting the host, which is exactly when narration arrives.
-          // #817: the ME selector handler HAS a message area (showText routes into it),
-          // so narration renders inside the encounter window instead of overdrawing it.
-          globalScene.ui.showText(message.text, null, undefined, null, true);
-        } catch (error) {
-          if (message.requiresAck) {
-            coopWarn("me", `guest could not render actionable narration id=${message.operationId}`, error);
-            failCoopSharedSession(`Mystery narration ${message.operationId} could not render on its owner.`);
-          }
-        }
-        // Track R: post-pick narration IS the guest owner's public continuation surface for its committed
-        // ME_PICK (UiMode.MESSAGE maps to no continuation surface by design). Release the retained pick op
-        // here so its authority-continuation deadline can never exhaust -> Title. No-op until material apply
-        // / off the guest-owner path (see releaseAppliedPickContinuationSurface). Runs AFTER the render try
-        // so a render failure never blocks the release.
-        this.releaseAppliedPickContinuationSurface();
-      }) ?? null;
+        return !message.requiresAck;
+      }
+      // Track R: post-pick narration IS the guest owner's public continuation surface for its committed
+      // ME_PICK (UiMode.MESSAGE maps to no continuation surface by design). Release the retained pick op
+      // here so its authority-continuation deadline can never exhaust -> Title. No-op until material apply
+      // / off the guest-owner path (see releaseAppliedPickContinuationSurface). Runs AFTER the render try
+      // so a render failure never blocks the release.
+      this.releaseAppliedPickContinuationSurface();
+      return true;
+    });
+    this.offMeMessage = () => {
+      unsubscribeMeMessage?.();
+      clearCoopGuestMeNarrationLease(this.boundRuntime);
+    };
 
     // #821 SHOP HANDOFF (live 'the reward shop doesn't load for the other player'): a
     // non-battle ME's embedded reward shop's OPTION list is always rolled + streamed by the

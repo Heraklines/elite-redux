@@ -33,6 +33,58 @@ import { describe, expect, it } from "vitest";
 
 const flushWire = () => new Promise<void>(resolve => queueMicrotask(resolve));
 
+describe("Mystery narration admission", () => {
+  const narration = {
+    text: "The chest rattles.",
+    wave: 2,
+    seq: 8_000_001,
+    step: 0,
+    operationId: "7:1:ME_BUTTON:64000011000",
+    requiresAck: true,
+  } as const;
+
+  it("retains an early narration until the exact replay boundary accepts it, then deduplicates it", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+    let accepts = false;
+    let deliveries = 0;
+    guestStream.onMeMessage(() => {
+      deliveries += 1;
+      return accepts;
+    });
+
+    hostStream.sendMeMessage(narration);
+    await flushWire();
+    expect(deliveries).toBe(1);
+
+    accepts = true;
+    hostStream.sendMeMessage(narration);
+    await flushWire();
+    expect(deliveries).toBe(2);
+
+    hostStream.sendMeMessage(narration);
+    await flushWire();
+    expect(deliveries).toBe(2);
+  });
+
+  it("replays a narration that arrived before the replay phase subscribed", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+
+    hostStream.sendMeMessage(narration);
+    await flushWire();
+
+    const received: string[] = [];
+    guestStream.onMeMessage(message => {
+      received.push(message.operationId);
+      return true;
+    });
+    expect(received).toEqual([narration.operationId]);
+  });
+});
+
 const emptyCheckpoint = (): CoopBattleCheckpoint => ({
   tick: 19,
   field: [
