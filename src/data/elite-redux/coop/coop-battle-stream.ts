@@ -2495,11 +2495,17 @@ export class CoopBattleStreamer {
     enemies: CoopSerializedEnemy[] | null;
     encounter: CoopEncounterAuthority | undefined;
     state: CoopAuthoritativeBattleStateV1 | undefined;
+    partyStateTick: number | undefined;
   } {
+    // Presentation may have consumed the carrier's state projection before CommandPhase gets its party
+    // projection. Preserve the immutable source tick from the party itself so that caller can still prove
+    // whether a complete Authority V2 image causally dominates this lossy compatibility manifest.
+    const bufferedParty = this.lastEnemyParty?.wave === wave ? this.lastEnemyParty : null;
     return {
       enemies: this.consumeEnemyParty(wave),
       encounter: this.consumeEnemyPartyEncounter(wave),
       state: this.consumeEnemyPartyState(wave),
+      partyStateTick: bufferedParty?.stateTick,
     };
   }
 

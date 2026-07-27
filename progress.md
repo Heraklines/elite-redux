@@ -4599,3 +4599,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   descriptor cannot survive or reappear. The fast source contract pins complete-state apply -> retirement -> material
   proof -> command release ordering. Policy-compliant local evidence is 93/93 contracts, targeted Biome, and
   `git diff --check`; the stream regression and real two-browser Mystery proof remain GitHub-hosted.
+
+## 2026-07-27 - Split wave-carrier provenance replaces premature global retirement
+
+- Focused gate `30267802784` disproved the first retirement boundary. The complete V2 state correctly materialized wave
+  2, but deleting the raw carrier immediately also removed the permit that `NextEncounterPhase` still consumes before it
+  may advance. Host replays stayed below the new retirement floor, so P1 and C3 parked forever on the wave-2 transition.
+- The runtime no longer globally retires compatibility material when command-open applies. Instead, the party projection
+  retains its immutable source tick even after presentation consumes the carrier's state projection. `CommandPhase`
+  atomically consumes the remainder and skips its lossy rebuild when that source tick is lower than or equal to the
+  already-applied complete V2 state. This preserves the encounter permit while fencing the Gentle Giant status overwrite.
+- The failure-first stream regression now proves the source tick survives split consumption, and the fast contract pins
+  provenance-based rejection plus the absence of premature control-apply retirement. Local policy-safe evidence is
+  93/93 Authority V2 contracts; engine and two-browser proof remain remote-only.

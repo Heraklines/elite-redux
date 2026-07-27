@@ -275,21 +275,22 @@ test("replacement command control cannot overtake retained post-summon presentat
   );
 });
 
-test("command-open retires every dominated split wave-start carrier before releasing input", () => {
-  const controlStart = coopRuntime.indexOf('if (entry.kind === "CONTROL_COMMIT")');
-  const controlEnd = coopRuntime.indexOf('if (entry.kind === "WAVE_ADVANCE"', controlStart);
-  assert.ok(controlStart >= 0 && controlEnd > controlStart, "the CONTROL_COMMIT applier has a bounded source block");
-  const controlApply = coopRuntime.slice(controlStart, controlEnd);
-  const stateApply = controlApply.indexOf("applyCoopAuthoritativeBattleState(material.authoritativeState, true)");
-  const retire = controlApply.indexOf(
-    "runtime.battleStream.retireEnemyPartyAuthorityThrough(material.wave, material.authoritativeState.tick)",
+test("command fallback rejects a dominated split carrier by its retained party provenance", () => {
+  assert.match(
+    battleStream,
+    /const bufferedParty = this\.lastEnemyParty\?\.wave === wave \? this\.lastEnemyParty : null;[\s\S]*partyStateTick: bufferedParty\?\.stateTick/u,
+    "consuming the state projection cannot erase the party manifest's immutable source tick",
   );
-  const mark = controlApply.indexOf("markCoopV2ControlMaterialApplied(runtime, entry)");
-  const release = controlApply.indexOf("releaseCoopV2DeferredCommandStarts(runtime, entry.nextControl)");
-  assert.ok(stateApply >= 0, "command-open applies its complete immutable state");
-  assert.ok(retire > stateApply, "compatibility retirement follows successful complete-state application");
-  assert.ok(mark > retire, "the control cannot become materialApplied before compatibility retirement");
-  assert.ok(release > mark, "public command input releases only after the retired-carrier fence");
+  assert.match(
+    commandPhase,
+    /const carrierTick = carrier\.partyStateTick \?\? carrier\.state\?\.tick;[\s\S]*carrierTick <= coopAppliedStateTick\(\)/u,
+    "CommandPhase discards lower or equal compatibility material before it can rebuild complete V2 state",
+  );
+  assert.doesNotMatch(
+    coopRuntime,
+    /runtime\.battleStream\.retireEnemyPartyAuthorityThrough\(material\.wave, material\.authoritativeState\.tick\)/u,
+    "CONTROL_COMMIT must not globally delete the raw encounter permit before NextEncounterPhase consumes it",
+  );
 });
 
 test("a stale BGM loop callback cannot abort an authoritative encounter", () => {

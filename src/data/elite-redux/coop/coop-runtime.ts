@@ -6600,15 +6600,6 @@ function buildCoopV2LiveSeams(
           if (!stateApplied) {
             return false;
           }
-          if (material.kind === "command-open") {
-            // The complete command-open image causally dominates every wave-keyed compatibility projection
-            // at or below its tick. Retire the split enemy/encounter/state carrier as ONE unit now, before a
-            // released CommandPhase can consume only its legacy enemy manifest and rebuild freshly-applied
-            // PokemonData with omitted fields (Gentle Giant exposed SLEEP(5) becoming NONE on both enemies).
-            // The floor also rejects a delayed lower/equal enemyPartySync after this stack unwinds; a strictly
-            // newer same-wave embedded-battle carrier remains admissible by the stream's existing rule.
-            runtime.battleStream.retireEnemyPartyAuthorityThrough(material.wave, material.authoritativeState.tick);
-          }
           if (material.kind === "replacement-open") {
             // The CONTROL_COMMIT, not an ambient renderer phase, owns this cursor edge. Its complete state
             // must apply first; only then may a same-wave winning-turn picker reproduce the one authenticated

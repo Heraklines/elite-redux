@@ -642,14 +642,16 @@ export class CommandPhase extends FieldPhase {
     // Phase B) / CoopReplayTurnPhase; only the wave-start enemy-party belt-and-suspenders stays.
     if (controller.role !== "host" && turn === 1) {
       const carrier = streamer.consumeEnemyPartyAuthority(waveIndex);
-      if (carrier.state !== undefined && carrier.state.tick < coopAppliedStateTick()) {
+      const carrierTick = carrier.partyStateTick ?? carrier.state?.tick;
+      if (carrierTick !== undefined && carrierTick <= coopAppliedStateTick()) {
         // Selector MEs and their spawned battle share a wave. A replayed pre-terminal selector carrier is
-        // obsolete as one atomic unit: never clear the live enemies/descriptor and only then discover its
-        // state twin is stale.
+        // obsolete as one atomic unit. The state projection may already have been consumed by presentation,
+        // so compare the party's retained source tick before rebuilding complete V2 PokemonData from the
+        // compatibility manifest. Equality is dominated too: V2 owns the complete image at that exact tick.
         coopLog(
           "stream",
           `guest discarded stale enemyParty carrier before command wave=${waveIndex} `
-            + `tick=${carrier.state.tick} applied=${coopAppliedStateTick()}`,
+            + `tick=${carrierTick} applied=${coopAppliedStateTick()}`,
         );
         ensureCoopAuthoritativeCommandPresentation();
         return true;

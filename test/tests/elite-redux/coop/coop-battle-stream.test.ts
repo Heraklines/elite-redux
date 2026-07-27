@@ -942,7 +942,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(admitted.state, "the newer state stays paired with its party").toEqual(spawnedBattle);
   });
 
-  it("retires split compatibility material even after its state half was consumed", async () => {
+  it("retains party provenance after the carrier's state projection was consumed", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);
     const guestStream = new CoopBattleStreamer(guest);
@@ -952,16 +952,11 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     await flushWire();
 
     expect(guestStream.consumeEnemyPartyState(33)).toEqual(compatibilityState);
-    // Authority V2 command-open then applies a complete newer state. The compatibility carrier's state half
-    // has already been consumed by presentation replay, but its party/descriptor halves must still retire.
-    guestStream.retireEnemyPartyAuthorityThrough(33, 203);
-
-    expect(guestStream.consumeEnemyParty(33), "an older split manifest cannot rebuild V2 state").toBeNull();
-    expect(guestStream.meTypeForWave(33), "the matching split descriptor retires atomically").toBeUndefined();
-
-    hostStream.sendEnemyParty(33, [{ fieldIndex: 0, data: { speciesId: 389 } }], 57, 3, compatibilityState);
-    await flushWire();
-    expect(guestStream.consumeEnemyParty(33), "a delayed dominated replay remains fenced").toBeNull();
+    const remainder = guestStream.consumeEnemyPartyAuthority(33);
+    expect(remainder.state, "presentation already consumed only the state projection").toBeUndefined();
+    expect(remainder.partyStateTick, "the party keeps its immutable source tick").toBe(201);
+    expect(remainder.enemies?.[0]?.data.speciesId).toBe(389);
+    expect(remainder.encounter?.battleType).toBe(3);
   });
 
   it("bounds unconsumed event-only wave states to the latest four waves", async () => {
