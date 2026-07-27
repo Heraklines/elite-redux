@@ -4666,3 +4666,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   failure was a stale transaction assertion: production intentionally added the explicit `command-or-wait`
   continuation argument, while the test still expected the old five-argument replay constructor. The contract now
   asserts the complete six-argument call; no production behavior was changed for that gate-only correction.
+- The baseline depth campaign was also a harness false red after four fully synchronized waves. Both replicas proved
+  wave 5/t1 at the same address and digest, with an actionable owner and a passive `command:watcher`; classification
+  nevertheless required both replicas to publish the legacy v1 owner observation. Passive watchers intentionally emit
+  only the V2 semantic surface. Battle-kind classification now consumes every current owner observation that exists,
+  still rejects disagreement between multiple owners, and relies on the immediately preceding shared-frontier proof
+  for the passive replica. Focused behavior tests cover both the owner/watcher layout and real divergence.

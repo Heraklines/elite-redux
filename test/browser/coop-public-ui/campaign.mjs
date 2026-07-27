@@ -2634,14 +2634,20 @@ export function hasPassiveBattleProgressSurface(clients, cursors) {
   });
 }
 
-function currentPairedBattleKind(rig, wave) {
-  const observations = Object.values(rig.clients).map(client => {
+export function currentPairedBattleKind(rig, wave) {
+  const observations = Object.values(rig.clients).flatMap(client => {
     const event = client.evidence.findLastSurface("command");
-    if (event?.observation.wave !== wave) {
-      throw new Error(`[campaign-mystery] ${client.label} has no current command observation for wave ${wave}`);
-    }
-    return event.observation;
+    return event?.observation.wave === wave ? [event.observation] : [];
   });
+  // An actionable command owner publishes both the legacy continuation observation and the semantic
+  // V2 surface. Its passive peer publishes only command:watcher: it has no interactive Command UI and
+  // therefore deliberately emits no legacy continuation observation. The shared-command-frontier proof
+  // immediately before this loop already establishes the watcher's exact address and digest. Classify
+  // from every current owner observation that exists; requiring a legacy watcher event turns a healthy
+  // owner/watcher frontier into a harness-only failure whenever ownership changes between waves.
+  if (observations.length === 0) {
+    throw new Error(`[campaign-mystery] no current command owner observation for wave ${wave}`);
+  }
   const first = observations[0];
   const fields = observation => ({
     battleType: observation.battleType,

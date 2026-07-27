@@ -12,6 +12,7 @@ import {
   clientsAwaitingTurnProgress,
   createAnimationProgressBudget,
   createBattlePromptAdvancer,
+  currentPairedBattleKind,
   driveBattleFallback,
   findRegisteredSurface,
   hasPassiveBattleProgressSurface,
@@ -130,6 +131,69 @@ class FakeEvidence {
     });
   }
 }
+
+test("battle-kind classification accepts a V2-only passive command watcher", () => {
+  const owner = new FakeEvidence();
+  owner.events.push({
+    index: 0,
+    kind: "browser-surface",
+    observation: {
+      surface: "command",
+      wave: 5,
+      battleType: "TRAINER",
+      trainerBoss: false,
+      maxBossSegments: 0,
+    },
+  });
+  const watcher = new FakeEvidence();
+  watcher.events.push(
+    {
+      index: 0,
+      kind: "browser-surface",
+      observation: {
+        surface: "command",
+        wave: 4,
+        battleType: "WILD",
+        trainerBoss: false,
+        maxBossSegments: 0,
+      },
+    },
+    {
+      index: 1,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "command:watcher",
+        operationClass: "command",
+        address: { epoch: 7, wave: 5, turn: 1 },
+      },
+    },
+  );
+
+  assert.deepEqual(
+    currentPairedBattleKind({ clients: { owner: { evidence: owner }, watcher: { evidence: watcher } } }, 5),
+    { wave: 5, battleType: "TRAINER", trainerBoss: false, maxBossSegments: 0 },
+  );
+});
+
+test("battle-kind classification still rejects current owner observations that disagree", () => {
+  const evidence = battleType => {
+    const sink = new FakeEvidence();
+    sink.events.push({
+      index: 0,
+      kind: "browser-surface",
+      observation: { surface: "command", wave: 5, battleType, trainerBoss: false, maxBossSegments: 0 },
+    });
+    return sink;
+  };
+  assert.throws(
+    () =>
+      currentPairedBattleKind(
+        { clients: { first: { evidence: evidence("WILD") }, second: { evidence: evidence("TRAINER") } } },
+        5,
+      ),
+    /battle kind diverged at wave 5/u,
+  );
+});
 
 test("an explicitly unblocked handler remains actionable when its enclosing phase is not awaiting narration", () => {
   const starter = {
