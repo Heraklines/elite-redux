@@ -1108,8 +1108,7 @@ test("reward leave waits for the exact owned actionable semantic shop surface", 
     localSeat: 0,
     ownerSeat: 0,
     seatsWithInput: [0],
-    // The empty reward watcher uses the generic message readiness bit but is explicitly blocked.
-    ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: true },
+    ready: { handlerActive: true, awaitingActionInput: false },
   };
   evidence.push({ kind: "browser-surface2", observation: rewardObservation });
   evidence.push({
@@ -1156,7 +1155,8 @@ test("reward leave requires the peer to remain an exact addressed non-actionable
     localSeat: 1,
     ownerSeat: 0,
     seatsWithInput: [0],
-    ready: { handlerActive: true, awaitingActionInput: false },
+    // The empty watcher can inherit the generic message readiness bit; explicit blocking proves it is inert.
+    ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: true },
   };
   evidence.push({ kind: "browser-surface2", observation: watcherObservation });
   const watcher = { label: "watcher", publicSeat: 1, evidence, config: { timeoutMs: 0 } };
