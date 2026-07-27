@@ -4672,3 +4672,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   only the V2 semantic surface. Battle-kind classification now consumes every current owner observation that exists,
   still rejects disagreement between multiple owners, and relies on the immediately preceding shared-frontier proof
   for the passive replica. Focused behavior tests cover both the owner/watcher layout and real divergence.
+
+## 2026-07-27 - Authoritative NONE clears suppressed terrain state
+
+- Calibrated soak `30271751644` god-b remained mechanically synchronized through wave 61, then exposed a real
+  non-convergent terrain split at wave 62: the host's complete state carried terrain NONE while the guest retained
+  terrain 5. Every checkpoint and full-state retry logged the clear as applied, but the next checksum still read 5,
+  eventually terminalizing an otherwise healthy session after the recovery deadline.
+- ER Clueless suppresses the effective `Arena.terrainType` getter to NONE while intentionally retaining the underlying
+  Terrain object. Terrain management also used that effective getter, so authoritative `trySetTerrain(NONE)` mistook
+  the stored terrain for an already-clear arena and performed no mutation. `canSetTerrain`, the Toxic protection gate,
+  and the clear-message source now use the stored terrain identity; gameplay effect queries keep using the suppressed
+  getter as designed.
+- A failure-first real-engine regression creates a five-turn stored terrain, activates the Clueless suppression view,
+  applies a complete signed NONE state, and requires the underlying object to be removed. The regression and the exact
+  god-b soak remain GitHub-hosted under the co-op test policy; no deployment occurred.

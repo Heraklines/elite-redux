@@ -43,6 +43,7 @@ import {
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { PokemonSummonData } from "#data/pokemon-data";
+import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -294,6 +295,21 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
     expect(mon.getTag(BattlerTagType.ER_BLEED)?.turnCount).toBe(42);
     expect(mon.getTag(BattlerTagType.ER_FROSTBITE)?.turnCount).toBe(37);
     expect(mon.getTag(BattlerTagType.ER_FEAR)?.turnCount).toBe(2);
+  });
+
+  it("authoritative NONE clears a stored terrain while Clueless suppresses its effective getter", async () => {
+    await startCoopDouble();
+    const authoritative = captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+    expect(authoritative?.terrain).toBe(TerrainType.NONE);
+
+    const arena = globalScene.arena;
+    expect(arena.trySetTerrain(TerrainType.GRASSY, true, undefined, 5)).toBe(true);
+    expect(arena.terrain?.terrainType).toBe(TerrainType.GRASSY);
+
+    vi.spyOn(arena, "isFieldEffectSuppressed").mockReturnValue(true);
+    expect(arena.terrainType, "Clueless hides the effect without deleting its stored state").toBe(TerrainType.NONE);
+    expect(applyCoopAuthoritativeBattleState(authoritative ?? undefined, true)).toBe(true);
+    expect(arena.terrain, "the complete signed NONE state removes the suppressed terrain object").toBeNull();
   });
 
   // GAP 1 (#633): arena tags (hazards / screens / tailwind) are set by host MoveEffectPhases the

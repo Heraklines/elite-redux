@@ -603,7 +603,12 @@ export class Arena {
 
   /** @returns Whether or not the terrain can be set to the specified terrain */
   public canSetTerrain(terrain: TerrainType): boolean {
-    return this.terrainType !== terrain;
+    // Terrain management must compare the stored effect, not the EFFECTIVE getter.
+    // ER Clueless deliberately makes `terrainType` report NONE while retaining the
+    // underlying Terrain so it can resume when suppression ends. Comparing through
+    // that getter made `trySetTerrain(NONE)` falsely return "already clear", leaving
+    // a signed authoritative clear unable to remove the guest's stale terrain.
+    return (this.terrain?.terrainType ?? TerrainType.NONE) !== terrain;
   }
 
   /**
@@ -617,11 +622,10 @@ export class Arena {
     if (!this.canSetTerrain(terrain)) {
       return false;
     }
-    if (this.terrainType === TerrainType.TOXIC && terrain !== TerrainType.TOXIC && isToxicTerrainProtected()) {
+    const oldTerrainType = this.terrain?.terrainType ?? TerrainType.NONE;
+    if (oldTerrainType === TerrainType.TOXIC && terrain !== TerrainType.TOXIC && isToxicTerrainProtected()) {
       return false;
     }
-
-    const oldTerrainType = this.terrainType;
 
     const terrainDuration = new NumberHolder(0);
 
