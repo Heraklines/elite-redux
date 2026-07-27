@@ -35,8 +35,9 @@
 //     gate test does NOT swallow a hard LOCKSTEP/NO-PARK/TEARDOWN breach (unlike the non-gating evidence test
 //     coop-soak-fidelity.test.ts), so any hard-invariant failure = nonzero exit = GATE RED. Bounded to
 //     PROD_FIDELITY_GATE_WAVES waves so the gate stays wall-clock-bounded (the long god soak stays nightly).
-//   - Lane S (Showdown): every tracked Showdown test. Versus rides the same authority transport and cannot
-//     remain outside the deploy gate merely because its files live beside, rather than under, coop/.
+//   - Lane S (Showdown): every tracked test for the currently routed Showdown lockstep mode. Retired
+//     authoritative-versus specs remain loud in the non-gating lane until they are rewritten for lockstep;
+//     they cannot veto co-op qualification for a mode the title screen no longer launches.
 //   - Lane T (topology/triples): the format model plus every tracked ER triple/probe/repro test, including
 //     the 3v2 faint/switch regressions and the six-battler presentation offsets.
 //
@@ -89,16 +90,21 @@ const TIMING_MANIFEST_PATH = resolve(__dirname, "coop-gate-timings.json");
 const TIMING_MANIFEST = JSON.parse(readFileSync(TIMING_MANIFEST_PATH, "utf8"));
 
 /**
- * QUARANTINE (#879): files that fail PRE-EXISTINGLY - they exit non-zero even run SOLO on a clean parent
- * HEAD, so their failure is NOT the multi-fork scheduling nondeterminism this gate exists to fix and NO
- * scheduling change can make them green. They are run in a SEPARATE, LOUDLY-REPORTED, NON-GATING pass so the
- * gate's exit code reflects the SHIPPABLE surface, and are listed here with the reason + the verify command
- * so the pre-existing defect is fixed SEPARATELY (never silently). This is NOT weakening an assertion - the
- * quarantined file still runs with every assertion intact; it is simply not allowed to mask the scheduling
- * fix behind a defect that predates it. Keep this list EMPTY-by-default discipline: only a file proven to
- * fail solo belongs here, each with its reason.
+ * NON-GATING files are either proven pre-existing solo failures or tests for a deliberately retired runtime
+ * architecture. They still run with every assertion intact and are reported loudly, but cannot veto the
+ * shippable surface they do not exercise. Keep this list empty-by-default: every entry needs an exact reason
+ * and an active replacement suite.
  */
-const QUARANTINE = new Map();
+const QUARANTINE = new Map([
+  [
+    "showdown-versus-doubles.test.ts",
+    "retired authoritative-versus fixture; Showdown 1v1 currently routes to dual-engine lockstep and is gated by showdown-sync-duo.test.ts",
+  ],
+  [
+    "showdown-versus-faint.test.ts",
+    "retired Authority V2 replacement fixture; Showdown 1v1 currently routes to dual-engine lockstep and is gated by showdown-sync-duo.test.ts",
+  ],
+]);
 
 /** Read a test file and report whether it gates on ER_SCENARIO (i.e. it boots the real engine). */
 function isEngineGated(absPath) {
@@ -177,7 +183,10 @@ export function categorize() {
       lanes.A.push(rel);
     }
   }
-  lanes.S.push(...trackedTests("test/tests/elite-redux/showdown/*.test.ts"));
+  for (const file of trackedTests("test/tests/elite-redux/showdown/*.test.ts")) {
+    const basename = file.slice(file.lastIndexOf("/") + 1);
+    (QUARANTINE.has(basename) ? lanes.Q : lanes.S).push(file);
+  }
   // PhaseInterceptor drives every real-engine co-op soak. Its regression file lives outside the co-op
   // directory, so directory-only discovery silently omitted the harness contract from the full gate.
   // Keep it isolated with the other engine-backed files: a green campaign is not evidence that the

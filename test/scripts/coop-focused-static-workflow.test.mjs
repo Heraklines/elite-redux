@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { assertFocusedCandidateLimit, impactLanes } from "../../scripts/run-coop-gate.mjs";
+import { assertFocusedCandidateLimit, categorize, impactLanes } from "../../scripts/run-coop-gate.mjs";
 
 const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const workflow = readFileSync(resolve(root, ".github/workflows/coop-focused-branch.yml"), "utf8").replaceAll(
@@ -164,6 +164,23 @@ test("ownership metadata does not manufacture a six-lane runtime impact", () => 
     [...impactLanes([".github/workflows/coop-focused-branch.yml"])].sort(),
     ["A", "B", "C", "P", "S", "T"],
     "executable GitHub workflow changes still require every representative lane",
+  );
+});
+
+test("retired authoritative Showdown specs stay loud without vetoing the active lockstep mode", () => {
+  const lanes = categorize();
+  const retired = [
+    "test/tests/elite-redux/showdown/showdown-versus-doubles.test.ts",
+    "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts",
+  ];
+  for (const file of retired) {
+    assert.equal(lanes.S.includes(file), false, `${file} must not gate the lockstep Showdown route`);
+    assert.equal(lanes.Q.includes(file), true, `${file} must remain visible in non-gating evidence`);
+  }
+  assert.equal(
+    lanes.S.includes("test/tests/elite-redux/showdown/showdown-sync-duo.test.ts"),
+    true,
+    "the real dual-engine lockstep replacement/command suite remains gating",
   );
 });
 
