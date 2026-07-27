@@ -1273,6 +1273,33 @@ test("fallback stops retrying when an earlier key visibly enters the turn", asyn
   );
 });
 
+test("fallback treats only the exact next owned command address as submitted-turn progress", async () => {
+  const authority = fakeClient("authority", ["[coop:turn] host recorder: begin turn=1"]);
+  const renderer = fakeClient("renderer");
+  authority.publicSeat = 0;
+  renderer.publicSeat = 1;
+  renderer.evidence.pushOwnedCommandSurface(1, { epoch: 7, wave: 1, turn: 2 });
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+
+  assert.deepEqual(clientsAwaitingTurnProgress(rig, from, "7:1:1"), []);
+  assert.deepEqual(
+    await driveBattleFallback(rig, ["Space", "ArrowRight", "Space", "Space"], from, "fallback", "7:1:1"),
+    [],
+  );
+  assert.deepEqual(renderer.presses, [], "no stale fallback key may enter the successor CommandPhase");
+
+  const sameAddress = fakeClient("same-address");
+  sameAddress.publicSeat = 1;
+  sameAddress.evidence.pushOwnedCommandSurface(1, { epoch: 7, wave: 1, turn: 1 });
+  const sameRig = { host: authority, clients: { authority, sameAddress } };
+  assert.deepEqual(
+    clientsAwaitingTurnProgress(sameRig, { authority: 0, "same-address": 0 }, "7:1:1"),
+    [sameAddress],
+    "a re-emitted source frontier cannot suppress the human retry",
+  );
+});
+
 test("real phase and stream progress extend the outcome wait but never cross its hard ceiling", () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");

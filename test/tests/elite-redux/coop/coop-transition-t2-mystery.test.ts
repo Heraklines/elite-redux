@@ -298,7 +298,11 @@ async function crossIntoNaturallyCarriedMystery(
   forceNextMysteryEncounter(game.override, type);
   queueHostEncounterPrompts(game);
   await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase", false));
-  const guestMe = await driveQueuedPhaseWithPublicDialogue(rig.guestCtx, "MysteryEncounterPhase");
+  // The authority must publish ME_PRESENT before the renderer may choose a wave-12 phase. The previous
+  // fixture drove the guest's local NewBattle tree until it independently rolled MysteryEncounterPhase,
+  // which bypassed the signed N+1 wait and made this gate less strict than two real V2 browsers.
+  await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
+  const guestMe = await driveQueuedPhaseWithPublicDialogue(rig.guestCtx, "CoopReplayMePhase");
 
   expect(rig.hostScene.currentBattle.waveIndex).toBe(MYSTERY_WAVE);
   expect(rig.guestScene.currentBattle.waveIndex).toBe(MYSTERY_WAVE);
@@ -330,12 +334,11 @@ async function crossIntoNaturallyCarriedMystery(
     withClientSync(rig.hostCtx, () => capturePartyWithAbsentFusionNormalized()),
   );
 
-  await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
   await withClient(rig.guestCtx, async () => {
     guestMe.start();
     await drainLoopback();
     const replay = rig.guestScene.phaseManager.getCurrentPhase();
-    expect(replay?.phaseName, "queued Mystery phase diverted into the real replay phase").toBe("CoopReplayMePhase");
+    expect(replay?.phaseName, "ordered Mystery presentation opened the real replay phase").toBe("CoopReplayMePhase");
     replay.start();
     await drainLoopback();
   });

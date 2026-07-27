@@ -38,7 +38,12 @@ import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { type CoopMePresentPayload, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  getCoopV2Shadow,
+  setCoopMeV2ChecksumGraceMsForTest,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
@@ -1506,6 +1511,10 @@ describe.skipIf(!RUN)(
       // synchronous handlers can otherwise apply the guest recovery while the host globalScene is ambient,
       // an execution two independent browsers cannot produce.
       rig.pair.setDestinationContextDelivery?.(true);
+      // This injects a genuine mismatch after the ordered presentation already applied. Production waits
+      // for a possible following ME_PRESENT tick so repeated-round transport skew cannot false-fire; collapse
+      // only that grace here to exercise the correlated recovery path immediately.
+      setCoopMeV2ChecksumGraceMsForTest(0);
       let recoveryApplyStarted = false;
       let recoveredReplayStarted = false;
       try {
@@ -1551,6 +1560,7 @@ describe.skipIf(!RUN)(
           await withClient(rig.guestCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
         }
       } finally {
+        setCoopMeV2ChecksumGraceMsForTest(null);
         rig.pair.setDestinationContextDelivery?.(false);
       }
 

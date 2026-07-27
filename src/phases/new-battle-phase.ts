@@ -39,8 +39,8 @@ export interface ErGauntletBargainQueue {
  * Exact ordered wait installed by a terminal Authority V2 interaction.
  *
  * This is renderer-local structural authority, not a second network message: every field comes from the
- * committed AWAIT_SUCCESSOR that explicitly permits wave N+1 to start. The following CONTROL_COMMIT still
- * owns creation and mutation of the destination battle.
+ * committed AWAIT_SUCCESSOR that explicitly permits wave N+1 to start. The following CONTROL_COMMIT or
+ * non-battle INTERACTION_COMMIT still owns creation and mutation of the destination battle.
  */
 export interface CoopV2NextWaveAwaitPermit {
   readonly afterOperationId: string;
@@ -60,6 +60,11 @@ interface CoopV2NextWaveCommandClaim {
     readonly turn: number;
     readonly stateTick: number;
     readonly entryPresentation: readonly unknown[];
+  };
+  readonly interactionStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
   };
 }
 
@@ -167,6 +172,77 @@ export class NewBattlePhase extends BattlePhase {
     } catch (error) {
       coopWarn("v2-control", "NewBattlePhase could not prepare its signed destination Battle shell", error);
       failCoopSharedSession(`The shared interaction could not create battle wave ${command.wave}.`);
+      return false;
+    }
+  }
+
+  /** Prove that a non-battle interaction is the exact first authoritative surface of wave N+1. */
+  public canPrepareForCoopV2InteractionMaterial(successor: CoopV2NextWaveCommandClaim): boolean {
+    const wait = this.coopV2Await;
+    const control = successor.nextControl;
+    const material = successor.interactionStateMaterial;
+    const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
+    return (
+      wait != null
+      && this.coopV2Generation >= 0
+      && coopSessionGeneration() === this.coopV2Generation
+      && globalScene.phaseManager.getCurrentPhase() === this
+      && successor.sessionEpoch === wait.epoch
+      && successor.sessionEpoch === getCoopController()?.sessionEpoch
+      && successor.kind === "INTERACTION_COMMIT"
+      && successor.operationId.length > 0
+      && control.kind === "SHARED_INTERACTION"
+      && control.operationId === successor.operationId
+      && material != null
+      && control.epoch === successor.sessionEpoch
+      && control.wave === material.wave
+      && control.turn === material.turn
+      && material.wave === wait.wave + 1
+      && material.stateTick > 0
+      && (ambientWave === wait.wave || ambientWave === material.wave)
+    );
+  }
+
+  /** Build only the destination Battle identity; the interaction entry applies every mechanical field. */
+  public prepareForCoopV2InteractionMaterial(successor: CoopV2NextWaveCommandClaim): boolean {
+    if (!this.canPrepareForCoopV2InteractionMaterial(successor)) {
+      return false;
+    }
+    const wait = this.coopV2Await;
+    const material = successor.interactionStateMaterial;
+    const currentBattle = globalScene.currentBattle;
+    if (wait == null || material == null || currentBattle == null) {
+      return false;
+    }
+    if (currentBattle.waveIndex === material.wave) {
+      this.coopV2DestinationBattleCreated = true;
+      return true;
+    }
+    if (
+      this.coopV2DestinationBattleCreated
+      || currentBattle.waveIndex !== wait.wave
+      || material.wave !== currentBattle.waveIndex + 1
+    ) {
+      return false;
+    }
+    try {
+      const destinationBattle = globalScene.newCoopV2ProjectedBattle();
+      if (globalScene.currentBattle !== destinationBattle || destinationBattle.waveIndex !== material.wave) {
+        throw new Error(
+          `interaction destination Battle address mismatch expectedWave=${material.wave} `
+            + `actual=${destinationBattle.waveIndex}`,
+        );
+      }
+      this.coopV2DestinationBattleCreated = true;
+      coopLog(
+        "v2-interaction",
+        `NewBattlePhase prepared signed interaction shell wave=${wait.wave}->${destinationBattle.waveIndex} `
+          + `after=${wait.afterOperationId}`,
+      );
+      return true;
+    } catch (error) {
+      coopWarn("v2-interaction", "NewBattlePhase could not prepare its signed interaction Battle shell", error);
+      failCoopSharedSession(`The shared interaction could not create battle wave ${material.wave}.`);
       return false;
     }
   }

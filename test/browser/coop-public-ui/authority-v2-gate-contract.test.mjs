@@ -587,11 +587,46 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   );
   assert.match(prepare, /globalScene\.newCoopV2ProjectedBattle\(\)/u);
   assert.doesNotMatch(prepare, /globalScene\.newBattle\(\)/u);
+  const interactionPrepare = newBattlePhase.slice(
+    newBattlePhase.indexOf("public canPrepareForCoopV2InteractionMaterial"),
+    newBattlePhase.indexOf("public releaseForCoopV2Control"),
+  );
+  assert.match(
+    interactionPrepare,
+    /successor\.kind === "INTERACTION_COMMIT"[\s\S]*?control\.kind === "SHARED_INTERACTION"[\s\S]*?material\.wave === wait\.wave \+ 1/u,
+    "the same signed bridge admits an exact non-battle interaction only at wave N+1",
+  );
+  assert.match(interactionPrepare, /globalScene\.newCoopV2ProjectedBattle\(\)/u);
+  assert.match(
+    coopRuntime,
+    /prepareCoopV2InteractionStateMaterialConsumer\(entry\)[\s\S]*?const stateApplied =/u,
+    "cross-wave interaction DATA cannot apply before its exact destination Battle shell exists",
+  );
   const release = newBattlePhase.slice(
     newBattlePhase.indexOf("public releaseForCoopV2Control"),
     newBattlePhase.indexOf("start()"),
   );
   assert.match(release, /pushNew\("NextEncounterPhase"\)[\s\S]*?this\.end\(\)/u);
+});
+
+test("a repeated Mystery checksum waits for the ordered V2 presentation before requesting recovery", () => {
+  const checksumStart = coopRuntime.indexOf("function wireCoopMeChecksumCheck");
+  const checksumEnd = coopRuntime.indexOf("/**\n * Co-op AUTHORITATIVE move-learn forward listener", checksumStart);
+  assert.ok(checksumStart >= 0 && checksumEnd > checksumStart, "the Mystery checksum verifier exists");
+  const checksumVerifier = coopRuntime.slice(checksumStart, checksumEnd);
+  assert.match(
+    checksumVerifier,
+    /const acceptedTickAtReceipt = coopAppliedStateTick\(\)[\s\S]*?isCoopV2InteractionCutoverActive\(runtime\.durability\)[\s\S]*?coopAppliedStateTick\(\) <= acceptedTickAtReceipt/u,
+    "the legacy checksum cannot outrun the globally ordered presentation state tick",
+  );
+  assert.match(
+    checksumVerifier,
+    /setTimeout\(verifyAfterOrderedPresentation,[\s\S]*?queueMicrotask\(verifyAfterOrderedPresentation\)/u,
+    "verification retries across renderer frames instead of treating one microtask as an ordering proof",
+  );
+  const warning = checksumVerifier.indexOf("me-entry MISMATCH");
+  const grace = checksumVerifier.indexOf("setTimeout(verifyAfterOrderedPresentation");
+  assert.ok(grace >= 0 && warning > grace, "bounded ordered-presentation grace precedes recovery escalation");
 });
 
 test("a remote replacement result releases an AWAIT_SUCCESSOR turn through its ordered control-open bridge", () => {

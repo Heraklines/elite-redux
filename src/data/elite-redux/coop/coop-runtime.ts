@@ -2755,6 +2755,14 @@ function wireCoopWaveEndState(controller: CoopSessionController, battleStream: C
  * turning the pump's silent "identical state" assumption into detect-and-heal (reusing the
  * Phase A machinery). Additive: on a match nothing changes, so the working pump is intact.
  */
+const COOP_ME_V2_CHECKSUM_GRACE_MS = 15_000;
+let coopMeV2ChecksumGraceMs = COOP_ME_V2_CHECKSUM_GRACE_MS;
+
+/** Focused-test seam; null restores the production ordered-presentation grace. */
+export function setCoopMeV2ChecksumGraceMsForTest(value: number | null): void {
+  coopMeV2ChecksumGraceMs = value == null ? COOP_ME_V2_CHECKSUM_GRACE_MS : Math.max(0, Math.trunc(value));
+}
+
 function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleStreamer): void {
   battleStream.onMeChecksum((seq, ownerChecksum) => {
     const ours = captureCoopChecksum();
@@ -2762,10 +2770,14 @@ function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleS
       coopLog("checksum", `recv meChecksum seq=${seq} MATCH owner=${ownerChecksum} watcher=${ours}`);
       return;
     }
-    // An ordered delivery batch can contain this legacy checksum immediately before the retained
-    // ME_PRESENT whose bound state explains it (multi-round encounters mutate party HP between screens).
-    // Let that batch drain before treating the mismatch as recovery-worthy.
-    queueMicrotask(() =>
+    // The legacy checksum is sent immediately before the retained ME_PRESENT whose complete DATA explains
+    // it. WebRTC preserves transport order, but applying that globally-ordered entry can span many browser
+    // frames while predecessor control retires. A microtask is not an ordering proof: it caused repeated
+    // delve rounds to request a false stateSync against the prior presentation. Under V2, wait for a newer
+    // accepted state tick (or a bounded genuine-mismatch deadline) before escalating.
+    const acceptedTickAtReceipt = coopAppliedStateTick();
+    const deadline = Date.now() + coopMeV2ChecksumGraceMs;
+    const verifyAfterOrderedPresentation = (): void => {
       runWhenCoopRuntimeActive(runtime, () => {
         const settled = captureCoopChecksum();
         if (
@@ -2777,6 +2789,14 @@ function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleS
             "checksum",
             `recv meChecksum seq=${seq} MATCH after retained delivery owner=${ownerChecksum} watcher=${settled}`,
           );
+          return;
+        }
+        if (
+          isCoopV2InteractionCutoverActive(runtime.durability)
+          && coopAppliedStateTick() <= acceptedTickAtReceipt
+          && Date.now() < deadline
+        ) {
+          setTimeout(verifyAfterOrderedPresentation, Math.min(50, Math.max(1, deadline - Date.now())));
           return;
         }
         coopWarn(
@@ -2817,8 +2837,9 @@ function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleS
             );
           },
         });
-      }),
-    );
+      });
+    };
+    queueMicrotask(verifyAfterOrderedPresentation);
   });
 }
 
@@ -4873,10 +4894,16 @@ interface CoopV2ControlSuccessorClaim {
     readonly stateTick: number;
     readonly entryPresentation: readonly CoopBattleEvent[];
   };
+  readonly interactionStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
 }
 
 function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSuccessorClaim {
   const commandOpen = decodeControlOpenEntry(entry);
+  const interaction = decodeCoopV2InteractionEnvelope(entry);
   return {
     sessionEpoch: entry.context.sessionEpoch,
     revision: entry.revision,
@@ -4893,7 +4920,49 @@ function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSu
           },
         }
       : {}),
+    ...(interaction == null
+      ? {}
+      : {
+          interactionStateMaterial: {
+            wave: interaction.envelope.authoritativeState.wave,
+            turn: interaction.envelope.authoritativeState.turn,
+            stateTick: interaction.envelope.authoritativeState.tick,
+          },
+        }),
   };
+}
+
+/**
+ * Let an exact signed next-wave wait create the destination Battle shell for a non-battle interaction.
+ *
+ * A command-open already has this structural admission seam. Mystery is the other legal first surface of
+ * wave N+1: its ME_PRESENT carries complete immutable DATA, but that DATA must not be applied to wave N's
+ * Battle object. Only the parked phase which owns the predecessor interaction wait may create the shell.
+ */
+function prepareCoopV2InteractionStateMaterialConsumer(entry: CoopAuthorityEntry): boolean {
+  const material = decodeCoopV2InteractionEnvelope(entry);
+  if (material == null) {
+    return false;
+  }
+  const stateWave = material.envelope.authoritativeState.wave;
+  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+  if (stateWave === currentWave) {
+    return true;
+  }
+  if (stateWave !== currentWave + 1) {
+    return false;
+  }
+  const claim = coopV2ControlSuccessorClaim(entry);
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        canPrepareForCoopV2InteractionMaterial?: (successor: CoopV2ControlSuccessorClaim) => boolean;
+        prepareForCoopV2InteractionMaterial?: (successor: CoopV2ControlSuccessorClaim) => boolean;
+      }
+    | undefined;
+  return (
+    phase?.canPrepareForCoopV2InteractionMaterial?.(claim) === true
+    && phase.prepareForCoopV2InteractionMaterial?.(claim) === true
+  );
 }
 
 /**
@@ -6377,6 +6446,14 @@ function buildCoopV2LiveSeams(
           }
           const receiverScene = runtimeSceneBindings.get(runtime);
           if (receiverScene != null && receiverScene !== globalScene) {
+            return "deferred";
+          }
+          if (!prepareCoopV2InteractionStateMaterialConsumer(entry)) {
+            coopLog(
+              "v2-interaction",
+              `deferred cross-wave DATA rev=${entry.revision} until its signed destination shell is prepared `
+                + `phase=${globalScene.phaseManager?.getCurrentPhase()?.phaseName ?? "none"}`,
+            );
             return "deferred";
           }
           const stateApplied = runtime.v2InteractionStateApplied.has(entry.operationId)

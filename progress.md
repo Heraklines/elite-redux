@@ -4516,3 +4516,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   contracts), both sealed public-driver boundaries, targeted Biome, `git diff --check`, and changed-file TypeScript
   filtering. The repository TypeScript baseline remains inherited-red with no diagnostic in this batch's files. Co-op
   Vitest and real Chromium qualification remain GitHub-hosted; no deployment occurred.
+
+## 2026-07-27 - Signed Mystery wave entry and repeated-presentation ordering
+
+- Lane P proved that a terminal reward's signed N+1 wait could create a destination Battle only for a command control.
+  A legitimate Mystery-first wave therefore parked forever: the retained `ME_PRESENT` carried complete state, but the
+  guest correctly refused to apply wave-N+1 DATA to wave N and no local classifier was allowed to choose the successor.
+  The same exact wait now admits a non-battle `INTERACTION_COMMIT`, creates only the destination Battle identity through
+  `newCoopV2ProjectedBattle()`, and leaves all mechanical mutation and presentation authority to that ordered entry.
+- The Mystery engine fixture now follows the production graph: authority publishes `ME_PRESENT`, then the renderer
+  consumes the projected replay. It no longer advances the guest's local NewBattle tree until the guest independently
+  rolls a Mystery phase, which had hidden the missing V2 bridge from the gate.
+- A repeated Mystery campaign exposed a separate false desync. The legacy `meChecksum` is transported immediately before
+  the retained V2 presentation, but predecessor teardown can delay applying that entry across multiple Phaser frames.
+  The verifier now waits for a newer accepted V2 state tick under a bounded 15-second ceiling before escalating; an
+  already-applied genuine mismatch still takes the correlated recovery path immediately in the focused test.
+- Market evidence found a public-driver spill rather than product divergence: both browsers had reached the exact next
+  command address after the old TurnStart line fell outside the evidence cursor, and the remaining fallback keys opened
+  the successor's Ball menu. Only an exact same-epoch/wave, turn+1 owned command suppresses the retry; same-address
+  re-emission remains pending.
+- Policy-compliant local evidence is clean: 123/123 focused Node source/evidence contracts, changed-file Biome,
+  formatting, and `git diff --check` pass. The inherited TypeScript baseline remains 575 diagnostic lines with none in
+  this batch's changed TypeScript files. Co-op Vitest and real Chromium qualification remain GitHub-hosted; no deployment
+  occurred.

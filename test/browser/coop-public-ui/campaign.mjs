@@ -473,9 +473,34 @@ async function assertRenderProfileExecution(rig, policy, progress) {
   await progress.note("render profile governed real battle execution", proof);
 }
 
+function isExactNextTurnCommand(observation, expectedCommandAddress) {
+  if (observation == null || expectedCommandAddress == null) {
+    return false;
+  }
+  const expected = expectedCommandAddress.split(":").map(Number);
+  const address = observation.address;
+  return (
+    expected.length === 3
+    && expected.every(Number.isSafeInteger)
+    && address != null
+    && address.epoch === expected[0]
+    && address.wave === expected[1]
+    && address.turn === expected[2] + 1
+  );
+}
+
 /** Clients whose submitted command has not yet opened the real turn/replay path. */
-export function clientsAwaitingTurnProgress(rig, from) {
-  return Object.values(rig.clients).filter(client => !client.evidence.find(TURN_PROGRESS, from[client.label] ?? 0));
+export function clientsAwaitingTurnProgress(rig, from, expectedCommandAddress = null) {
+  return Object.values(rig.clients).filter(client => {
+    const cursor = from[client.label] ?? 0;
+    if (client.evidence.find(TURN_PROGRESS, cursor)) {
+      return false;
+    }
+    // A CPU-starved renderer can publish its next exact CommandPhase after TurnStart scrolled past the
+    // caller's evidence floor. That newer owned frontier is conclusive progress for the submitted turn.
+    // A same-address re-emission is deliberately not progress: it may be the still-unsubmitted command.
+    return !isExactNextTurnCommand(findOwnedCommandFrontier(client, cursor)?.observation, expectedCommandAddress);
+  });
 }
 
 export function findOwnedCommandFrontier(client, from) {
@@ -574,8 +599,8 @@ export function allClientsAtCurrentCommandFrontier(clients, from) {
  * blindly replaying the whole fallback on BOTH clients in that state smears its keys across damage,
  * faint and EXP messages. Progress evidence makes the fallback selective instead.
  */
-export async function driveBattleFallback(rig, keys, from, purpose) {
-  const pending = clientsAwaitingTurnProgress(rig, from);
+export async function driveBattleFallback(rig, keys, from, purpose, expectedCommandAddress = null) {
+  const pending = clientsAwaitingTurnProgress(rig, from, expectedCommandAddress);
   await Promise.all(
     pending.map(async client => {
       for (const [index, key] of keys.entries()) {
@@ -584,7 +609,7 @@ export async function driveBattleFallback(rig, keys, from, purpose) {
         // waiting for browser focus. Re-check the public turn evidence before every key so the
         // remaining fallback cannot spill into the next CommandPhase and open its Fight submenu
         // (market-wide-lens run 30246932430).
-        if (!clientsAwaitingTurnProgress(rig, from).includes(client)) {
+        if (!clientsAwaitingTurnProgress(rig, from, expectedCommandAddress).includes(client)) {
           client.evidence.record("campaign-battle-fallback-superseded", {
             purpose,
             inputSeat: client.label,
@@ -1230,7 +1255,13 @@ async function driveBattleWave(rig, policy, stats) {
       // Cycle only clients lacking turn-progress evidence; never replay input on a client whose
       // valid turn is already executing under browser CPU pressure.
       fallbackClients.push(
-        ...(await driveBattleFallback(rig, policy.keys.battleFallback, from, `${purpose}-fallback`)),
+        ...(await driveBattleFallback(
+          rig,
+          policy.keys.battleFallback,
+          from,
+          `${purpose}-fallback`,
+          expectedCommandAddress,
+        )),
       );
       if (fallbackClients.length > 0) {
         stats.fallbackTurns += 1;
