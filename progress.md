@@ -4662,3 +4662,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A source contract pins ARRIVE-ONLY before every reciprocal await path. Policy-compliant local verification remains
   source/static only; the exact reversed-ownership engine and two-browser replays are dispatched to GitHub-hosted
   runners, with no local co-op Vitest/browser execution and no deployment.
+- The preceding replacement candidate's focused gate passed static and every selected shard except lane A. Its sole
+  failure was a stale transaction assertion: production intentionally added the explicit `command-or-wait`
+  continuation argument, while the test still expected the old five-argument replay constructor. The contract now
+  asserts the complete six-argument call; no production behavior was changed for that gate-only correction.

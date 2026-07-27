@@ -315,7 +315,7 @@ describe("production replacement carrier transaction", () => {
     expect(
       unshiftNew.mock.calls.find(([name, turn]) => name === "CoopReplayTurnPhase" && turn === 2)?.slice(2),
       "the N+1 renderer must not inherit turn N's presentation watermark or HP animation chain",
-    ).toEqual([0, undefined, 4, false, undefined]);
+    ).toEqual([0, undefined, 4, false, undefined, "command-or-wait"]);
     expect(
       unshiftNew.mock.calls.some(([name, turn]) => name === "CoopReplayTurnPhase" && turn === 1),
       "the finalized turn-N replay cannot reopen behind the replacement-owned command",
