@@ -4575,3 +4575,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   (host authority and guest renderer, sequence 0 through 15), but its oracle sliced the two browsers at unrelated
   wall-clock evidence cursors and reported only the guest's final two receipts. Shared-command proofs now compare the
   complete canonical current-epoch prefix, which is stronger and insensitive to independent renderer scheduling.
+- The depth lane in campaign `30254595511` exposed the same invalid shared-clock assumption in its continuation proof:
+  the exact `TURN/e.../w4/t1` receipt and retirement were present and the guest reached the identical reward at V2
+  frontier 25/25/25, but the receipt preceded the host's local cursor while the renderer ACK followed the guest's.
+  Exact V2 operation IDs are epoch-unique, so those two identity proofs now scan the complete host trace.
+- The dirty lane in that campaign exposed a real wave-win deadlock. BattleEnd inserted the actionable scattered-money
+  MessagePhase (`You picked up ₽400!`) at wave 3/turn 3 ahead of `CoopVictorySealPhase`, while the preceding turn's
+  exact AWAIT_SUCCESSOR froze that presentation and made its explicitly allowed WAVE_ADVANCE unreachable. That ordered
+  wait now leases only an actionable same-wave, exact-next-turn MessagePhase when WAVE_ADVANCE is named; wrong phase,
+  wrong address, non-actionable, and no-wave waits remain frozen.

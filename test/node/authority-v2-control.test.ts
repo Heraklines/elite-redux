@@ -213,6 +213,42 @@ describe("ordered-wait local presentation lease", () => {
     ).toBe(false);
   });
 
+  it("admits only the exact next-turn BattleEnd message needed to reach an allowed wave successor", () => {
+    const turnWait = successorWait({
+      afterOperationId: "turn-commit-w3-t7",
+      wave: 3,
+      turn: 7,
+      allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      allowNextWaveStart: false,
+    });
+    const exactBattleEndMessage = {
+      sessionEpoch: 1,
+      wave: 3,
+      turn: 8,
+      phaseName: "MessagePhase",
+      messageHandlerActionable: true,
+    };
+
+    expect(successorWaitAllowsLocalPresentationInput(turnWait, exactBattleEndMessage)).toBe(true);
+    expect(
+      successorWaitAllowsLocalPresentationInput(
+        { ...turnWait, allowedKinds: ["CONTROL_COMMIT", "TERMINAL_COMMIT"] },
+        exactBattleEndMessage,
+      ),
+    ).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, phaseName: "PartyUiPhase" }),
+    ).toBe(false);
+    expect(successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, turn: 9 })).toBe(false);
+    expect(successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, wave: 4 })).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(turnWait, {
+        ...exactBattleEndMessage,
+        messageHandlerActionable: false,
+      }),
+    ).toBe(false);
+  });
+
   it("admits the complete Mystery battle pre-command presentation only at its exact command frontier", () => {
     const exactBattleWait = successorWait({
       allowNextWaveStart: false,

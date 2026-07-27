@@ -1465,6 +1465,15 @@ test("the public continuation oracle proves exact V2 retirement or authenticated
   assert.match(proof, /const exactSubsumption = new RegExp/u);
   assert.match(proof, /rev=\$\{authorityRevision \+ 1\}/u, "only the exact next ordered revision may subsume the turn");
   assert.match(proof, /subsumed=.*\$\{authorityRevision\}/u, "the proof names the exact predecessor revision");
+  assert.equal(
+    [
+      ...proof.matchAll(
+        /this\.host\.evidence\.waitFor\((?:exactTurnReceipt|exactMechanicalRetirement), \{[\s\S]*?from: 0,/gu,
+      ),
+    ].length,
+    2,
+    "exact V2 identity proofs scan the full host trace instead of comparing cross-browser wall-clock cursors",
+  );
   assert.match(proof, /"v2-subsumption" : "v2-retirement"/u);
 });
 
@@ -1891,6 +1900,19 @@ test("an ME battle handoff leases its whole exact-address action-only pre-comman
     lease,
     /proof\.phaseName === "MysteryEncounterBattlePhase"/u,
     "the lease cannot strand entry abilities by recognizing only the first intro phase",
+  );
+});
+
+test("a turn wait leases only its exact BattleEnd message on the path to an allowed wave successor", () => {
+  const start = nextControl.indexOf("export function successorWaitAllowsLocalPresentationInput(");
+  const end = nextControl.indexOf("\ninterface MechanicalAddress", start);
+  assert.notEqual(start, -1, "the ordered-wait presentation lease exists");
+  assert.ok(end > start, "the ordered-wait presentation lease has a bounded source block");
+  const lease = nextControl.slice(start, end);
+  assert.match(
+    lease,
+    /wait\.allowedKinds\.includes\("WAVE_ADVANCE"\)[\s\S]*proof\.wave === wait\.wave[\s\S]*proof\.turn === wait\.turn \+ 1[\s\S]*proof\.phaseName === "MessagePhase"/u,
+    "the settlement lease is pinned to the exact next-turn action-only MessagePhase and an explicit wave edge",
   );
 });
 

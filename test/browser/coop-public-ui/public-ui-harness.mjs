@@ -2963,7 +2963,12 @@ export class DuoPublicUiRig {
         "u",
       );
       const turnReceipt = await this.host.evidence.waitFor(exactTurnReceipt, {
-        from: cursors[this.host.label],
+        // The guest's renderer ACK and the authority receipt are emitted by independent browsers. The
+        // exact authority receipt can legitimately precede the host's caller-sampled wall-clock cursor
+        // while the renderer ACK follows the guest cursor. The operation ID is globally unique inside
+        // this epoch, so scan the complete trace for that exact identity instead of treating unrelated
+        // evidence indices as one shared clock.
+        from: 0,
         timeoutMs: this.config.timeoutMs,
         description: `${proofName} exact Authority V2 turn revision`,
       });
@@ -2990,7 +2995,7 @@ export class DuoPublicUiRig {
         "u",
       );
       const retirement = await this.host.evidence.waitFor(exactMechanicalRetirement, {
-        from: cursors[this.host.label],
+        from: 0,
         timeoutMs: this.config.timeoutMs,
         description: `${proofName} exact Authority V2 retirement or supersession`,
       });
