@@ -18,6 +18,7 @@
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
+import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allSpecies } from "#data/data-lists";
 import {
   ER_ABILITY_SWAPS,
@@ -26,6 +27,8 @@ import {
   resolveErSpeciesConstId,
 } from "#data/elite-redux/er-type-nativization";
 import type { PokemonSpecies, PokemonSpeciesForm } from "#data/pokemon-species";
+import { PokemonType } from "#enums/pokemon-type";
+import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -55,6 +58,49 @@ function targetsOf(species: PokemonSpecies, isMega: boolean, baseConst: string):
     }
   }
   return out;
+}
+
+function evolutionDescendants(sourceId: number): number[] {
+  const visited = new Set<number>([sourceId]);
+  const queue = [sourceId];
+  const descendants: number[] = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const evolution of pokemonEvolutions[current as SpeciesId] ?? []) {
+      const evolvedId = evolution.speciesId as number;
+      if (visited.has(evolvedId)) {
+        continue;
+      }
+      visited.add(evolvedId);
+      queue.push(evolvedId);
+      descendants.push(evolvedId);
+    }
+  }
+
+  return descendants;
+}
+
+function evolutionTypeFailures(speciesConst: string, sourceId: number, grantedType: PokemonType): string[] {
+  const failures: string[] = [];
+  for (const evolvedId of evolutionDescendants(sourceId)) {
+    const evolved = speciesById(evolvedId);
+    if (!evolved) {
+      failures.push(`${speciesConst}: unresolved evolution ${evolvedId}`);
+      continue;
+    }
+    const targets: PokemonSpeciesForm[] = [
+      evolved as unknown as PokemonSpeciesForm,
+      ...(evolved.forms as PokemonSpeciesForm[]).filter(form => form.formKey !== "redux"),
+    ];
+    for (const target of targets) {
+      const types = [target.type1, target.type2, ...target.getExtraTypes()];
+      if (!types.includes(grantedType)) {
+        failures.push(`${speciesConst} -> ${evolved.name} form ${target.formIndex}: missing ${grantedType}`);
+      }
+    }
+  }
+  return failures;
 }
 
 describe.skipIf(!RUN)("ER type-nativization sweep (Pass A)", () => {
@@ -102,6 +148,39 @@ describe.skipIf(!RUN)("ER type-nativization sweep (Pass A)", () => {
       expect(nativeTypes, `${e.species} lacks native type ${e.grantedType}`).toContain(e.grantedType);
     }
     expect(missing, missing.join("\n")).toEqual([]);
+  });
+
+  it("every reachable evolution inherits the nativized line type", () => {
+    const missing: string[] = [];
+
+    for (const entry of ER_TYPE_NATIVIZATION) {
+      if (entry.isMega) {
+        continue;
+      }
+      const sourceId = resolveErSpeciesConstId(entry.species);
+      if (sourceId === undefined) {
+        continue;
+      }
+      missing.push(...evolutionTypeFailures(entry.species, sourceId, entry.grantedType));
+    }
+
+    expect(missing, missing.join("\n")).toEqual([]);
+  });
+
+  it("does not leak a vanilla line's inherited type into its Redux form", () => {
+    const cases = [
+      [SpeciesId.DODRIO, PokemonType.GROUND],
+      [SpeciesId.GROTLE, PokemonType.GROUND],
+      [SpeciesId.TORTERRA, PokemonType.GROUND],
+    ] as const;
+
+    for (const [speciesId, leakedType] of cases) {
+      const redux = speciesById(speciesId)?.forms.find(form => form.formKey === "redux");
+      expect(redux, `missing Redux form for species ${speciesId}`).toBeDefined();
+      expect(redux!.isOfType(leakedType), `${redux!.name} incorrectly inherited ${PokemonType[leakedType]}`).toBe(
+        false,
+      );
+    }
   });
 
   it("SWEEP INTEGRITY: no species/form retains a type-grant ability (except intentional replacements)", () => {

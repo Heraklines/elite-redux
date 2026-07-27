@@ -23,7 +23,6 @@ on:
       - "scripts/write-coop-ci-status.mjs"
       - "src/**"
       - "test/**"
-      - "docs/coop-task-ownership.md"
       - "tsconfig*.json"
       - "vite.config.ts"
       - "vitest.config.ts"

@@ -8,7 +8,6 @@
     ".github/coop-task-ownership/p33-ci-train-ownership.json",
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
     ".github/workflows/coop-focused-branch.yml",
-    "docs/coop-task-ownership.md",
     "scripts/guard-coop-task-ownership.mjs",
     "test/scripts/guard-coop-task-ownership.test.mjs"
   ]
