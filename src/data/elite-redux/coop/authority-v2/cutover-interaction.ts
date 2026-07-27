@@ -1027,10 +1027,11 @@ export function successorOfCoopV2InteractionEnvelope(
 
 /**
  * Whether an interaction entry closes a real executable result phase before entering an ordered wait.
- * `AWAIT_SUCCESSOR` alone is not enough to answer this: absence presentations (`ME_PRESENT:false`) and an
- * empty Bargain offer deliberately install a no-input wait and therefore have no result picker to settle.
- * Keeping this distinction closed here makes authority admission and replica acknowledgement use the same
- * semantic rule instead of duplicating operation-kind guesses.
+ * `AWAIT_SUCCESSOR` alone is not enough to answer this: absence presentations (`ME_PRESENT:false`), an
+ * empty Bargain offer, and a deterministic biome transition (`BIOME_PICK` with `nodeIndex:-1`) deliberately
+ * install a no-input wait and therefore have no result picker to settle. Keeping this distinction closed
+ * here makes authority admission and replica acknowledgement use the same semantic rule instead of
+ * duplicating operation-kind guesses.
  */
 export function requiresCoopV2InteractionTerminalProof(
   surfaceClass: CoopOperationSurfaceClass,
@@ -1041,7 +1042,11 @@ export function requiresCoopV2InteractionTerminalProof(
   if (operation == null || successor?.kind !== "AWAIT_SUCCESSOR") {
     return false;
   }
-  return operation.kind !== "ME_PRESENT" && operation.kind !== "BARGAIN_PRESENT";
+  return (
+    operation.kind !== "ME_PRESENT"
+    && operation.kind !== "BARGAIN_PRESENT"
+    && !(operation.kind === "BIOME_PICK" && isPlainObject(operation.payload) && operation.payload.nodeIndex === -1)
+  );
 }
 
 export function buildCoopV2InteractionEnvelopeEntry(input: {

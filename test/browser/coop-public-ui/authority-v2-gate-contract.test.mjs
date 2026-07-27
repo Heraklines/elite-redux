@@ -189,6 +189,14 @@ test("a reward pool reopened after a nested picker cannot recommit its stale pre
   assert.match(interactionCutover, /surface === "market" && value\.generation !== 0/u);
 });
 
+test("a deterministic biome transition cannot wait for a picker terminal that does not exist", () => {
+  assert.match(
+    interactionCutover,
+    /operation\.kind === "BIOME_PICK"[\s\S]*operation\.payload\.nodeIndex === -1/u,
+    "the no-input deterministic biome result must release its ordered successor without a UI terminal proof",
+  );
+});
+
 test("the stall watchdog preserves an exact V2 human-input lease", () => {
   assert.match(coopRuntime, /function hasCoopV2HumanDeliberationLease\(runtime: CoopRuntime\): boolean/u);
   assert.match(

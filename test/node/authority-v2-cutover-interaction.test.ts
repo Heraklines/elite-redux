@@ -31,6 +31,7 @@ import {
 import type { CoopOperationSurfaceClass } from "#data/elite-redux/coop/coop-operation-surface-registry";
 import {
   COOP_BIOME_PICK_SEQ_BASE,
+  COOP_BIOME_TRANSITION_SEQ_BASE,
   COOP_CROSSROADS_SEQ_BASE,
   COOP_ME_PUMP_SEQ_BASE,
   COOP_ME_TERM_SEQ_BASE,
@@ -388,6 +389,30 @@ describe("Authority V2 interaction cutover", () => {
         envelope("BARGAIN_PRESENT", { pinned: 1, sins: [] }, "INTERACTION", 0),
       ),
     ).toBe(false);
+    expect(
+      requiresCoopV2InteractionTerminalProof(
+        "op:biome",
+        envelope(
+          "BIOME_PICK",
+          { sourceBiomeId: 1, biomeId: 26, nodeIndex: -1, nextWave: 2 },
+          "BIOME_SELECT",
+          0,
+          COOP_BIOME_TRANSITION_SEQ_BASE + 1,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      requiresCoopV2InteractionTerminalProof(
+        "op:biome",
+        envelope(
+          "BIOME_PICK",
+          { sourceBiomeId: 1, biomeId: 2, nodeIndex: 0, nextWave: 2 },
+          "BIOME_SELECT",
+          1,
+          COOP_BIOME_PICK_SEQ_BASE + 1,
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("keeps a Mystery terminal's transaction address separate from its later immutable state", () => {
