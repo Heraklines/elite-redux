@@ -600,6 +600,11 @@ test("Authority V2 routes guest replay narration through its exact acknowledgeme
     /getPlayerParty\(\)\[learnMovePartySlot as number\][\s\S]*\.coopOwner/u,
     "learn-move ownership must come from the Pokemon rather than the prior alternating interaction",
   );
+  assert.match(
+    observer,
+    /phase === "CoopReplayLearnMovePhase"[\s\S]*replayLearnMoveOwner \? "learn-move:confirm" : "learn-move:summary"/u,
+    "a guest replay must distinguish its actionable owner picker from the read-only host-owned watcher",
+  );
 });
 
 test("the continuity profile visibly declines Bargain and co-op cannot persist a half-open phase", async () => {

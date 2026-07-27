@@ -1314,7 +1314,20 @@ function observeSemanticSurface(): void {
     if (!handler?.active) {
       return;
     }
-    const semantic = classifySemanticSurface(phase, uiMode);
+    const classifiedSemantic = classifySemanticSurface(phase, uiMode);
+    // A guest-owned full-moveset prompt is rendered by a queue-owned replay phase. Both its
+    // actionable owner picker and the host-owned read-only fallback use SUMMARY, so phase name plus
+    // the immutable constructor owner flag is the stable distinction. Without this override the
+    // guest owner is mislabeled as a generic info screen and the campaign can never drive its pick.
+    const replayLearnMoveOwner = (currentPhase as unknown as { ownerIsGuest?: unknown }).ownerIsGuest;
+    const semantic =
+      phase === "CoopReplayLearnMovePhase" && uiMode === "SUMMARY" && typeof replayLearnMoveOwner === "boolean"
+        ? {
+            surfaceId: replayLearnMoveOwner ? "learn-move:confirm" : "learn-move:summary",
+            operationClass: "learn-move",
+            ownerModel: "interaction" as const,
+          }
+        : classifiedSemantic;
     if (semantic == null) {
       const membership = runtime?.membership.snapshot();
       if (runtime == null || membership?.state !== "active") {
@@ -1403,7 +1416,8 @@ function observeSemanticSurface(): void {
       // can therefore leave the interaction counter pointing at the guest while the real actionable
       // CONFIRM is correctly on the host (campaign 30232043330, wave 4). Project the phase's party slot
       // owner so the public oracle does not wait for an impossible self-owner surface on the watcher.
-      const learnMovePartySlot = (currentPhase as unknown as { partyMemberIndex?: unknown }).partyMemberIndex;
+      const learnMovePhase = currentPhase as unknown as { partyMemberIndex?: unknown; partySlot?: unknown };
+      const learnMovePartySlot = learnMovePhase.partyMemberIndex ?? learnMovePhase.partySlot;
       const learnMoveOwnerRole =
         semantic.operationClass === "learn-move" && Number.isSafeInteger(learnMovePartySlot)
           ? ((globalScene.getPlayerParty()[learnMovePartySlot as number] as { coopOwner?: string } | undefined)
