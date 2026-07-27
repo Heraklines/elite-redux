@@ -198,8 +198,8 @@ test("an N+1 replacement command resets every turn-local presentation watermark"
 test("replacement command control cannot overtake retained post-summon presentation", () => {
   assert.match(
     pushReplacementCheckpointPhase,
-    /const entryPresentation = snapshotCoopRecordedPresentation\(\)[\s\S]*entryPresentation == null[\s\S]*fatal\([\s\S]*entryPresentation: entryPresentation \?\? \[\]/u,
-    "the real post-summon checkpoint snapshots its complete ordered prefix and fails closed when V2 cannot record it",
+    /const recordedPresentation = snapshotCoopRecordedPresentation\(\)[\s\S]*recordedPresentation == null && !this\.noSummonExpected[\s\S]*fatal\([\s\S]*const entryPresentation = recordedPresentation \?\? \[\][\s\S]*entryPresentation,/u,
+    "a real post-summon checkpoint fails closed without its recording, while an explicit no-summon result carries an empty immutable prefix",
   );
   assert.match(
     turnRecorder,
