@@ -1,0 +1,49 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:4d56628e6717697c244403a758fcfe9278ff9992:run-30289534441.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+platform: Win32
+screen:   1366x768 @1x  devmem:8 GB
+boot:     boot-start@0ms -> loading-complete@86456ms -> title-shown@94768ms
+lastSess: ok (reached title)
+mode:     0  wave:?
+seed:     qpCElM3By2M023REZVzQbYWS
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:4d56628e6717697c244403a758fcfe9278ff9992:run-30289534441.1","source":"github","sha":"4d56628e6717697c244403a758fcfe9278ff9992","workflow":{"provider":"github-actions","runId":"30289534441","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[20:19:07.594] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[20:19:08.745] LOG: [ER] build {"version":1,"id":"github:4d56628e6717697c244403a758fcfe9278ff9992:run-30289534441.1","source":"github","sha":"4d56628e6717697c244403a758fcfe9278ff9992","workflow":{"provider":"github-actions","runId":"30289534441","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[20:19:11.013] LOG: [dev-tools] loaded — 737 scenarios + Send Logs button
+[20:20:09.837] DEBUG: Destroying loading scene
+[20:20:09.837] DEBUG: Destroyed loading scene
+[20:20:10.067] LOG: Seed: qpCElM3By2M023REZVzQbYWS
+[20:20:10.067] LOG: Wave Seed: qpCElM3By2M023REZVzQbYWS 0
+[20:20:15.739] LOG: %cStart Phase LoginPhase color:green;
+[20:20:16.839] LOG: Client Session: sB3MseL3h4yjvIB1YtVdXC9LAGWGkIU8
+[20:20:18.122] LOG: %cStart Phase TitlePhase color:green;
+[20:20:18.124] LOG: Getting Session Slot id: %d 0
+[20:20:18.172] LOG: use seasonal splash messages true
+[20:20:23.448] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:20:23.657] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_3
+[20:20:23.657] LOG: Machoc's variant icon does not exist. Replacing with default.
+[20:20:23.690] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_2
+[20:20:23.690] LOG: Soporifik's variant icon does not exist. Replacing with default.
+[20:20:23.788] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 293_2
+[20:20:23.788] LOG: Chuchmur's variant icon does not exist. Replacing with default.
+[20:20:23.966] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 639_3
+[20:20:23.966] LOG: Terrakium's variant icon does not exist. Replacing with default.
+[20:20:24.001] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 718_3
+[20:20:24.002] LOG: Zygarde's variant icon does not exist. Replacing with default.
+[20:20:24.023] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 765_2
+[20:20:24.023] LOG: Gouroutan's variant icon does not exist. Replacing with default.
+[20:20:24.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[20:20:24.062] LOG: Moumouton's variant icon does not exist. Replacing with default.
+[20:20:24.071] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 843_2
+[20:20:24.071] LOG: Dunaja's variant icon does not exist. Replacing with default.
+[20:20:24.376] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'setPosition') @ https://elite-redux-staging.pages.dev/assets/battle-scene-DoOKIUrl.js:1001:48135
+
+----- REPLAY TRACE (JSON) -----
+(none)
