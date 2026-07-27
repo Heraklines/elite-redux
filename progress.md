@@ -4628,3 +4628,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   persist across two watchdog samples, so a timer may no longer join two unrelated waits into a false deadlock. A
   failure-first fake-timer regression recreates the crossing exactly while preserving normal confirmed-deadlock
   recovery. Co-op Vitest and the exact two-browser faint replay remain remote-only; no deployment occurred.
+
+## 2026-07-27 - Future-wave replacements are ordered before the encounter
+
+- Exact baseline qualification is green at `dfbba16b7`: focused gate `30270057315` passed and all 45 jobs in sharded
+  gate `30271119785` passed. The calibrated release soak `30271751644` then found a common real-engine frontier in the
+  level and god-a lanes while journey and Mystery-asymmetry remained green.
+- The host entered wave N+1 with a fainted lead, committed the complete N+1/t1 `REPLACEMENT_COMMIT`, and only then
+  committed command-open. The renderer correctly deferred that future-wave replacement while still on wave N, but its
+  signed `NewBattlePhase` accepted only command or interaction successors. Revision N+1 therefore stayed
+  `materialDeferred`, revision N+2 stayed behind the gap, and the UI parked forever on `NewBattlePhase` with
+  `CoopPartnerSyncPhase` queued.
+- A complete replacement is now a typed first-class next-wave successor. The parked phase validates its exact epoch,
+  operation, address, successor wait, and positive state tick; creates only the signed destination Battle shell; and
+  routes the retained checkpoint through the ordinary replay transaction. Switch/post-summon presentation and checksum
+  proof complete before `NextEncounterPhase` starts. Chained local- and remote-owned replacements preserve the same
+  continuation until every field slot is settled.
+- Policy-safe local evidence is clean: the Authority V2 source contract passes 93/93, changed-file Biome and
+  `git diff --check` pass, and TypeScript reports 215 inherited errors with zero in the changed files. Engine and
+  two-browser replay proof remain GitHub-hosted; no deployment occurred.

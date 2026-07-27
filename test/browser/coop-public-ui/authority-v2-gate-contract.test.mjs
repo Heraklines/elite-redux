@@ -608,8 +608,13 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   );
   assert.match(
     newBattlePhase,
-    /canReleaseForCoopV2Control[\s\S]*?successor\.kind === "CONTROL_COMMIT"[\s\S]*?command\.wave === wait\.wave \+ 1[\s\S]*?command\.turn === 1/u,
-    "the projected NewBattle shell accepts only the exact next-wave command carrier",
+    /canReleaseForCoopV2Control[\s\S]*?successor\.kind === "CONTROL_COMMIT"[\s\S]*?destinationWave === wait\.wave \+ 1[\s\S]*?destinationTurn === 1/u,
+    "the projected NewBattle shell accepts an exact next-wave command carrier",
+  );
+  assert.match(
+    newBattlePhase,
+    /successor\.kind === "REPLACEMENT_COMMIT"[\s\S]*?command\.kind === "AWAIT_SUCCESSOR"[\s\S]*?command\.afterOperationId === successor\.operationId[\s\S]*?command\.allowedKinds\.includes\("CONTROL_COMMIT"\)/u,
+    "a complete pre-encounter replacement is the only other mechanical entry allowed to create the shell",
   );
   const prepare = newBattlePhase.slice(
     newBattlePhase.indexOf("public prepareForCoopV2ControlMaterial"),
@@ -636,7 +641,17 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     newBattlePhase.indexOf("public releaseForCoopV2Control"),
     newBattlePhase.indexOf("start()"),
   );
+  assert.match(
+    release,
+    /successor\.kind === "REPLACEMENT_COMMIT"[\s\S]*?"CoopReplayTurnPhase"[\s\S]*?"next-encounter"[\s\S]*?this\.end\(\)/u,
+    "a future-wave replacement is replayed before its encounter instead of leaving NewBattle parked",
+  );
   assert.match(release, /pushNew\("NextEncounterPhase"\)[\s\S]*?this\.end\(\)/u);
+  assert.match(
+    replayTurnPhase,
+    /replacementContinuation === "next-encounter"[\s\S]*?acknowledgeReplacement\(envelope, "continuationReady"\)[\s\S]*?unshiftNew\("NextEncounterPhase"\)/u,
+    "the retained replacement transaction releases the encounter only after its presentation and checksum proof",
+  );
 });
 
 test("a repeated Mystery checksum waits for the ordered V2 presentation before requesting recovery", () => {

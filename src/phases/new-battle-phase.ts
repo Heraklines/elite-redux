@@ -66,6 +66,11 @@ interface CoopV2NextWaveCommandClaim {
     readonly turn: number;
     readonly stateTick: number;
   };
+  readonly replacementStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
 }
 
 /** Replace the synthetic Bargain wave's ordinary encounter tail with one durable phase. */
@@ -96,15 +101,38 @@ export class NewBattlePhase extends BattlePhase {
   }
 
   /**
-   * Prove that the next CONTROL_COMMIT is the exact N+1/t1 successor of this signed ordered wait.
+   * Prove that the next mechanical entry is the exact N+1/t1 successor of this signed ordered wait.
    * Merely reaching NewBattlePhase is never enough: the phase remains parked until this address-exact claim
-   * is admitted by the global V2 log.
+   * is admitted by the global V2 log. A pre-encounter replacement is a first-class successor because a
+   * surviving party can enter the new wave with an empty field slot; its complete REPLACEMENT_COMMIT must
+   * render before the encounter while still being the only entry allowed to create the destination shell.
    */
   public canReleaseForCoopV2Control(successor: CoopV2NextWaveCommandClaim): boolean {
     const wait = this.coopV2Await;
     const command = successor.nextControl;
-    const material = successor.commandOpenMaterial;
+    const commandMaterial = successor.commandOpenMaterial;
+    const replacementMaterial = successor.replacementStateMaterial;
     const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
+    const exactCommand =
+      successor.kind === "CONTROL_COMMIT"
+      && command.kind === "COMMAND_FRONTIER"
+      && commandMaterial != null
+      && command.epoch === successor.sessionEpoch
+      && command.wave === commandMaterial.wave
+      && command.turn === commandMaterial.turn
+      && Array.isArray(commandMaterial.entryPresentation);
+    const exactPreEncounterReplacement =
+      successor.kind === "REPLACEMENT_COMMIT"
+      && command.kind === "AWAIT_SUCCESSOR"
+      && replacementMaterial != null
+      && command.afterOperationId === successor.operationId
+      && command.epoch === successor.sessionEpoch
+      && command.wave === replacementMaterial.wave
+      && command.turn === replacementMaterial.turn
+      && replacementMaterial.stateTick > 0
+      && command.allowedKinds.includes("CONTROL_COMMIT");
+    const destinationWave = commandMaterial?.wave ?? replacementMaterial?.wave;
+    const destinationTurn = commandMaterial?.turn ?? replacementMaterial?.turn;
     return (
       wait != null
       && this.coopV2Generation >= 0
@@ -112,41 +140,36 @@ export class NewBattlePhase extends BattlePhase {
       && globalScene.phaseManager.getCurrentPhase() === this
       && successor.sessionEpoch === wait.epoch
       && successor.sessionEpoch === getCoopController()?.sessionEpoch
-      && successor.kind === "CONTROL_COMMIT"
       && successor.operationId.length > 0
-      && command?.kind === "COMMAND_FRONTIER"
-      && material != null
-      && command.epoch === successor.sessionEpoch
-      && command.wave === material.wave
-      && command.turn === material.turn
-      && command.wave === wait.wave + 1
-      && command.turn === 1
-      && Array.isArray(material.entryPresentation)
-      && (ambientWave === wait.wave || ambientWave === command.wave)
+      && (exactCommand || exactPreEncounterReplacement)
+      && destinationWave === wait.wave + 1
+      && destinationTurn === 1
+      && (ambientWave === wait.wave || ambientWave === destinationWave)
     );
   }
 
-  /** Build only the Battle identity required for the signed command image; no encounter tail is inferred. */
+  /** Build only the Battle identity required for the signed mechanical image; no encounter tail is inferred. */
   public prepareForCoopV2ControlMaterial(successor: CoopV2NextWaveCommandClaim): boolean {
     if (!this.canReleaseForCoopV2Control(successor)) {
       return false;
     }
     const wait = this.coopV2Await;
-    const command = successor.nextControl;
+    const destinationWave = successor.commandOpenMaterial?.wave ?? successor.replacementStateMaterial?.wave;
+    const destinationTurn = successor.commandOpenMaterial?.turn ?? successor.replacementStateMaterial?.turn;
     const currentBattle = globalScene.currentBattle;
-    if (wait == null || command.kind !== "COMMAND_FRONTIER" || currentBattle == null) {
+    if (wait == null || destinationWave == null || destinationTurn == null || currentBattle == null) {
       return false;
     }
-    if (currentBattle.waveIndex === command.wave) {
-      const alreadyPrepared = currentBattle.turn === command.turn;
+    if (currentBattle.waveIndex === destinationWave) {
+      const alreadyPrepared = currentBattle.turn === destinationTurn;
       this.coopV2DestinationBattleCreated ||= alreadyPrepared;
       return alreadyPrepared;
     }
     if (
       this.coopV2DestinationBattleCreated
       || currentBattle.waveIndex !== wait.wave
-      || command.wave !== currentBattle.waveIndex + 1
-      || command.turn !== 1
+      || destinationWave !== currentBattle.waveIndex + 1
+      || destinationTurn !== 1
     ) {
       return false;
     }
@@ -154,11 +177,11 @@ export class NewBattlePhase extends BattlePhase {
       const destinationBattle = globalScene.newCoopV2ProjectedBattle();
       if (
         globalScene.currentBattle !== destinationBattle
-        || destinationBattle.waveIndex !== command.wave
-        || destinationBattle.turn !== command.turn
+        || destinationBattle.waveIndex !== destinationWave
+        || destinationBattle.turn !== destinationTurn
       ) {
         throw new Error(
-          `destination Battle address mismatch expected=${command.wave}:${command.turn} `
+          `destination Battle address mismatch expected=${destinationWave}:${destinationTurn} `
             + `actual=${destinationBattle.waveIndex}:${destinationBattle.turn}`,
         );
       }
@@ -171,7 +194,7 @@ export class NewBattlePhase extends BattlePhase {
       return true;
     } catch (error) {
       coopWarn("v2-control", "NewBattlePhase could not prepare its signed destination Battle shell", error);
-      failCoopSharedSession(`The shared interaction could not create battle wave ${command.wave}.`);
+      failCoopSharedSession(`The shared interaction could not create battle wave ${destinationWave}.`);
       return false;
     }
   }
@@ -247,12 +270,40 @@ export class NewBattlePhase extends BattlePhase {
     }
   }
 
-  /** Release only after CONTROL_COMMIT DATA has installed the complete N+1 battle image. */
+  /** Release only after the signed N+1 carrier has either installed DATA or retained its replay transaction. */
   public releaseForCoopV2Control(successor: CoopV2NextWaveCommandClaim): boolean {
     if (!this.canReleaseForCoopV2Control(successor)) {
       return false;
     }
     const command = successor.nextControl;
+    if (successor.kind === "REPLACEMENT_COMMIT") {
+      const material = successor.replacementStateMaterial;
+      if (
+        material == null
+        || command.kind !== "AWAIT_SUCCESSOR"
+        || !this.prepareForCoopV2ControlMaterial(successor)
+        || globalScene.currentBattle?.waveIndex !== material.wave
+        || globalScene.currentBattle.turn !== material.turn
+      ) {
+        return false;
+      }
+      coopLog(
+        "v2-replacement",
+        `NewBattlePhase routed signed pre-encounter replacement wave=${material.wave} before encounter`,
+      );
+      globalScene.phaseManager.unshiftNew(
+        "CoopReplayTurnPhase",
+        material.turn,
+        0,
+        undefined,
+        material.wave,
+        false,
+        undefined,
+        "next-encounter",
+      );
+      this.end();
+      return globalScene.phaseManager.getCurrentPhase() !== this;
+    }
     if (
       command.kind !== "COMMAND_FRONTIER"
       || globalScene.currentBattle?.waveIndex !== command.wave

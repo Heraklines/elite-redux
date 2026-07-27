@@ -4928,11 +4928,17 @@ interface CoopV2ControlSuccessorClaim {
     readonly turn: number;
     readonly stateTick: number;
   };
+  readonly replacementStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
 }
 
 function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSuccessorClaim {
   const commandOpen = decodeControlOpenEntry(entry);
   const interaction = decodeCoopV2InteractionEnvelope(entry);
+  const replacement = reconstructCoopV2ReplacementCheckpoint(entry);
   return {
     sessionEpoch: entry.context.sessionEpoch,
     revision: entry.revision,
@@ -4956,6 +4962,15 @@ function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSu
             wave: interaction.envelope.authoritativeState.wave,
             turn: interaction.envelope.authoritativeState.turn,
             stateTick: interaction.envelope.authoritativeState.tick,
+          },
+        }),
+    ...(replacement == null
+      ? {}
+      : {
+          replacementStateMaterial: {
+            wave: replacement.checkpoint.authoritativeState.wave,
+            turn: replacement.checkpoint.authoritativeState.turn,
+            stateTick: replacement.checkpoint.authoritativeState.tick,
           },
         }),
   };

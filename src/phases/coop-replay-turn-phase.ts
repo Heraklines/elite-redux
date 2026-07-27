@@ -91,6 +91,7 @@ let activeCoopReplayTurnPhase: CoopReplayTurnPhase | null = null;
 const REPLACEMENT_RETRY_LIMIT = 3;
 const REPLACEMENT_RETRY_TIMEOUT_MS = 2_000;
 const REPLACEMENT_PRESENTATION_TIMEOUT_MS = 15_000;
+type CoopReplacementReplayContinuation = "command-or-wait" | "next-encounter";
 
 function fieldMonHp(bi: number, actor?: CoopPresentationActorRef): number | undefined {
   if (actor == null) {
@@ -177,6 +178,8 @@ export class CoopReplayTurnPhase extends Phase {
   /** Exact V2 command-open delivery for the turn-one prefix; never keyed by wave alone. */
   private v2EntryPresentationResolver: ((prefix: CoopEntryPresentationPrefix | null) => void) | null = null;
   private v2EntryPresentationBuffered: CoopEntryPresentationPrefix | null = null;
+  /** Ordered structural continuation after a replacement checkpoint; ordinary turns retain the legacy pivot. */
+  private readonly replacementContinuation: CoopReplacementReplayContinuation;
 
   constructor(
     turn: number,
@@ -185,6 +188,7 @@ export class CoopReplayTurnPhase extends Phase {
     sourceWave?: number,
     entryPresentationOnly = false,
     presentationOutcomeTokens?: readonly CoopPresentationOutcomeToken[],
+    replacementContinuation: CoopReplacementReplayContinuation = "command-or-wait",
   ) {
     super();
     this.turn = turn;
@@ -193,6 +197,7 @@ export class CoopReplayTurnPhase extends Phase {
     this.sourceWave = sourceWave ?? globalScene.currentBattle?.waveIndex ?? 0;
     this.entryPresentationOnly = entryPresentationOnly;
     this.presentationOutcomeTokens = [...(presentationOutcomeTokens ?? [])];
+    this.replacementContinuation = replacementContinuation;
   }
 
   /** Bind this async phase to the exact phase tree that created it. */
@@ -435,6 +440,7 @@ export class CoopReplayTurnPhase extends Phase {
             this.sourceWave,
             this.entryPresentationOnly,
             this.presentationOutcomeTokens,
+            this.replacementContinuation,
           );
           this.end();
           return;
@@ -454,6 +460,7 @@ export class CoopReplayTurnPhase extends Phase {
             this.sourceWave,
             this.entryPresentationOnly,
             this.presentationOutcomeTokens,
+            this.replacementContinuation,
           );
           this.end();
           return;
@@ -578,6 +585,7 @@ export class CoopReplayTurnPhase extends Phase {
                 this.sourceWave,
                 this.entryPresentationOnly,
                 this.presentationOutcomeTokens,
+                this.replacementContinuation,
               );
               coopLog(
                 "replay",
@@ -703,6 +711,21 @@ export class CoopReplayTurnPhase extends Phase {
                 // THIS replica. Waiting for another carrier here would strand its actionable PARTY picker
                 // (the authority cannot produce the next replacement until this player chooses).
                 streamer.supersedeTurnWait(this.turn, this.sourceWave);
+                if (this.replacementContinuation === "next-encounter") {
+                  // The central projector already queued the exact owner picker as an unshifted child.
+                  // Queue its checkpoint consumer after that picker (unshifted phases are FIFO) so every
+                  // pre-encounter faint is settled before the encounter is allowed to start.
+                  globalScene.phaseManager.unshiftNew(
+                    "CoopReplayTurnPhase",
+                    envelope.turn,
+                    0,
+                    undefined,
+                    envelope.wave,
+                    false,
+                    undefined,
+                    this.replacementContinuation,
+                  );
+                }
                 this.end();
                 return;
               }
@@ -716,6 +739,34 @@ export class CoopReplayTurnPhase extends Phase {
                   + `${nextReplacement.operationId} (${nextReplacement.remaining.length} later)`,
               );
               continue;
+            }
+            if (this.replacementContinuation === "next-encounter") {
+              const successor = envelope.authorityNextControl;
+              if (
+                successor?.kind !== "AWAIT_SUCCESSOR"
+                || successor.epoch !== envelope.epoch
+                || successor.wave !== envelope.wave
+                || successor.turn !== envelope.turn
+                || !successor.allowedKinds.includes("CONTROL_COMMIT")
+              ) {
+                this.failAuthority(
+                  streamer,
+                  "replacement",
+                  `Pre-encounter replacement ${envelope.wave}:${envelope.turn} had no ordered encounter successor wait.`,
+                  envelope,
+                );
+                return;
+              }
+              if (!streamer.acknowledgeReplacement(envelope, "continuationReady")) {
+                return;
+              }
+              coopLog(
+                "v2-replacement",
+                `guest pre-encounter replacement settled wave=${envelope.wave}; releasing NextEncounterPhase`,
+              );
+              globalScene.phaseManager.unshiftNew("NextEncounterPhase");
+              this.end();
+              return;
             }
             if (!hasLocalCommandSlot && hasLivingLocalMon) {
               this.failAuthority(
@@ -820,6 +871,7 @@ export class CoopReplayTurnPhase extends Phase {
                 this.sourceWave,
                 continuesSameTurn && this.entryPresentationOnly,
                 continuesSameTurn ? this.presentationOutcomeTokens : undefined,
+                this.replacementContinuation,
               );
               this.end();
               return;
@@ -1258,6 +1310,7 @@ export class CoopReplayTurnPhase extends Phase {
       this.sourceWave,
       this.entryPresentationOnly,
       this.presentationOutcomeTokens,
+      this.replacementContinuation,
     );
     this.end();
     return true;
