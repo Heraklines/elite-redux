@@ -5626,6 +5626,51 @@ function observeCoopV2InteractionSurface(
 }
 
 /**
+ * Prove the replica's one exact, host-streamed Mystery narration prompt as human-actionable input.
+ *
+ * The mechanical ME_PICK has already been committed when this surface opens, so the control ledger can
+ * legitimately be parked on its ordered successor rather than the selector control that created the replay
+ * phase. This remains an authority-issued lease: the sole host engine mints it for one session/wave/pin/step,
+ * this runtime retains it, and only the still-live replay phase can expose its actionable message handler.
+ */
+function hasCoopGuestMeNarrationInputLease(runtime: CoopRuntime): boolean {
+  const message = runtime.meNarration.guestPending;
+  const phase = globalScene.phaseManager?.getCurrentPhase();
+  const handler = globalScene.ui?.getHandler() as
+    | {
+        active?: boolean;
+        isCoopV2InputActionable?: () => boolean;
+      }
+    | undefined;
+  if (
+    message == null
+    || !message.requiresAck
+    || runtime.controller.role !== "guest"
+    || runtime.controller.authorityRole !== "replica"
+    || !isCoopV2InteractionCutoverActive(runtime.durability)
+    || phase?.phaseName !== "CoopReplayMePhase"
+    || globalScene.ui?.getMode() !== UiMode.MESSAGE
+    || handler?.active !== true
+    || handler.isCoopV2InputActionable?.() !== true
+    || globalScene.currentBattle?.waveIndex !== message.wave
+  ) {
+    return false;
+  }
+  const pinned = message.seq - COOP_ME_PUMP_SEQ_BASE;
+  return (
+    coopMeInteractionStartValue() === pinned
+    && coopInteractionOwnerSeat(pinned) === runtime.controller.localSeatId
+    && isCoopMeNarrationOperationId({
+      operationId: message.operationId,
+      epoch: runtime.controller.sessionEpoch,
+      pinned,
+      step: message.step,
+      seq: message.seq,
+    })
+  );
+}
+
+/**
  * Physical UI input gate for the interaction cutover. Programmatic peer replay calls the handler directly
  * and bypasses this gate; a local human is authorized only by the exact active phase/handler generation.
  */
@@ -5641,6 +5686,9 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
   ) {
     // Until wave/reward/command controls share this ledger, an absence of an interaction claim is not proof
     // that the current screen belongs to the interaction domain. Once a claim exists, enforcement is strict.
+    return false;
+  }
+  if (hasCoopGuestMeNarrationInputLease(runtime)) {
     return false;
   }
   projectCoopV2InteractionControl(runtime, pending);

@@ -1765,6 +1765,11 @@ test("pre-battle Mystery engine narration cannot depend on the selector phase st
   );
   assert.match(
     coopRuntime,
+    /function hasCoopGuestMeNarrationInputLease[\s\S]*guestPending[\s\S]*phaseName !== "CoopReplayMePhase"[\s\S]*isCoopMeNarrationOperationId[\s\S]*isCoopV2InteractionHumanInputFrozen[\s\S]*hasCoopGuestMeNarrationInputLease\(runtime\)/u,
+    "the guest's exact rendered narration lease must cross the global V2 physical-input freeze",
+  );
+  assert.match(
+    coopRuntime,
     /COOP_ME_NARRATION_ADVANCE_CEILING_MS[\s\S]*isMessageMode: globalScene\.ui\?\.getMode\(\) === UiMode\.MESSAGE[\s\S]*hostAdvanceTimer = setTimeout[\s\S]*advanceCoopHostMeNarrationFromGuest/u,
     "an early acknowledgement retries until the real host Message handler is actionable and then advances it",
   );
