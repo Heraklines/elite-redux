@@ -2490,6 +2490,11 @@ test("an ordered no-choice replacement dissolves without exposing an impossible 
 });
 
 test("direct Mystery narration is excluded only from the duplicate battle-turn recorder", () => {
+  assert.match(
+    phaseManager,
+    /import \{ coopMeHandoffBattleStarted, coopMeInProgress \} from "#data\/elite-redux\/coop\/coop-me-pin-state";/u,
+    "the recorder guard reads the runtime Mystery handoff predicates directly",
+  );
   const queueStart = phaseManager.indexOf("queueMessage(");
   const queueEnd = phaseManager.indexOf("const phase = new MessagePhase", queueStart);
   assert.ok(queueStart >= 0 && queueEnd > queueStart, "PhaseManager.queueMessage has a bounded recorder block");

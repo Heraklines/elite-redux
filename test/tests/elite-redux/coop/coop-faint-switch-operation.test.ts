@@ -183,6 +183,10 @@ describe("co-op faint-switch operation migration", () => {
     expect(
       isCoopFaintSwitchPickerSettled(address.wave, address.turn, address.fieldIndex, binding, address.occurrence),
     ).toBe(true);
+    expect(
+      isCoopFaintSwitchPickerSettled(address.wave, address.turn, address.fieldIndex, binding, address.occurrence + 1),
+      "the no-surface tombstone is occurrence-exact",
+    ).toBe(false);
     let closeAttempts = 0;
     registerCoopFaintSwitchPickerTerminal(
       {
