@@ -1,0 +1,58 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 70
+run_mode: diagnostic
+calibration_id: god-200
+target_sha: f6599ef9d457b630acdd6114d4618350dcc34f25
+checked_out_sha: f6599ef9d457b630acdd6114d4618350dcc34f25
+base_seed: 20260727
+campaign_seed: 20260727
+run: 30283625218 (workflow source f6599ef9d457b630acdd6114d4618350dcc34f25)
+timestamp: 2026-07-27T16-28-11Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260727 WAVES=70 - replay this run with:  SOAK_SEED=20260727 SOAK_WAVES=70 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=46 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1865,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":1725,"maxHp":1725,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":227,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":561,"hp":92,"maxHp":92,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5043,"formIndex":0,"isTerastallized":false,"teraType":2,"bossSegments":2,"bossSegmentIndex":1,"moves":[[93,0],[322,0],[466,0],[472,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":329,"hp":77,"maxHp":77,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5115,"formIndex":0,"isTerastallized":false,"teraType":4,"bossSegments":1,"bossSegmentIndex":0,"moves":[[318,0],[815,0],[806,0],[175,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1865,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":1725,"maxHp":1725,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":227,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":561,"hp":92,"maxHp":92,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5043,"formIndex":0,"isTerastallized":false,"teraType":2,"bossSegments":2,"bossSegmentIndex":1,"moves":[[93,0],[322,0],[466,0],[472,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":329,"hp":74,"maxHp":74,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5115,"formIndex":0,"isTerastallized":false,"teraType":4,"bossSegments":1,"bossSegmentIndex":0,"moves":[[318,0],[815,0],[806,0],[175,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+
+----- vitest result tail -----
+
+[90mstdout[2m | Console.console.<computed> [as log] (/home/runner/work/elite-redux/elite-redux/src/utils/console-ring-buffer.ts:93:7)
+[22m[39m[coop:interaction] interactionCounter() read -> 7 (role=host)
+[coop:health] tick=7g turn=2 wave=6 counter=7 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=16s transport=closed journal=0/0 queue=0
+
+[90mstdout[2m | Console.console.<computed> [as log] (/home/runner/work/elite-redux/elite-redux/src/utils/console-ring-buffer.ts:93:7)
+[22m[39m[coop:interaction] interactionCounter() read -> 61 (role=host)
+[coop:health] tick=7g turn=2 wave=6 counter=61 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=576s transport=closed journal=0/0 queue=0
+
+[90mstdout[2m | Console.console.<computed> [as log] (/home/runner/work/elite-redux/elite-redux/src/utils/console-ring-buffer.ts:93:7)
+[22m[39m[coop:interaction] interactionCounter() read -> 7 (role=host)
+[coop:health] tick=7g turn=2 wave=6 counter=7 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=46s transport=closed journal=0/0 queue=0
+
+[90mstdout[2m | Console.console.<computed> [as log] (/home/runner/work/elite-redux/elite-redux/src/utils/console-ring-buffer.ts:93:7)
+[22m[39m[coop:interaction] interactionCounter() read -> 61 (role=host)
+[coop:health] tick=7g turn=2 wave=6 counter=61 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=611s transport=closed journal=0/0 queue=0
+
+[90mstdout[2m | Console.console.<computed> [as log] (/home/runner/work/elite-redux/elite-redux/src/utils/console-ring-buffer.ts:93:7)
+[22m[39m[coop:interaction] interactionCounter() read -> 7 (role=host)
+[coop:health] tick=7g turn=2 wave=6 counter=7 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=76s transport=closed journal=0/0 queue=0
+
+[90mstdout[2m | Console.console.<computed> [as log] (/home/runner/work/elite-redux/elite-redux/src/utils/console-ring-buffer.ts:93:7)
+[22m[39m[coop:interaction] interactionCounter() read -> 61 (role=host)
+[coop:health] tick=7g turn=2 wave=6 counter=61 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=641s transport=closed journal=0/0 queue=0
+
+[90mstdout[2m | Console.console.<computed> [as log] (/home/runner/work/elite-redux/elite-redux/src/utils/console-ring-buffer.ts:93:7)
+[22m[39m[coop:interaction] interactionCounter() read -> 7 (role=host)
+[coop:health] tick=7g turn=2 wave=6 counter=7 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=106s transport=closed journal=0/0 queue=0
+
+[90mstdout[2m | Console.console.<computed> [as log] (/home/runner/work/elite-redux/elite-redux/src/utils/console-ring-buffer.ts:93:7)
+[22m[39m[coop:interaction] interactionCounter() read -> 7 (role=host)
+[coop:health] tick=7g turn=2 wave=6 counter=7 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=136s transport=closed journal=0/0 queue=0
+
+[90mstdout[2m | Console.console.<computed> [as log] (/home/runner/work/elite-redux/elite-redux/src/utils/console-ring-buffer.ts:93:7)
+[22m[39m[coop:interaction] interactionCounter() read -> 61 (role=host)
+[coop:health] tick=7g turn=2 wave=6 counter=61 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=676s transport=closed journal=0/0 queue=0
+
+close timed out after 10000ms
+Tests closed successfully but something prevents Vite server from exiting
+You can try to identify the cause by enabling "hanging-process" reporter. See https://vitest.dev/guide/reporters.html#hanging-process-reporter
