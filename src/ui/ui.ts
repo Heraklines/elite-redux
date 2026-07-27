@@ -391,7 +391,16 @@ export class UI extends Phaser.GameObjects.Container {
       // rewards stay identical. Gated on the ME-interactive phase set, so embedded battles +
       // the end-of-ME reward shop fall through to their own owners.
       const mePump = getCoopMePump();
-      const meInteractiveSurfaceActive = mePump != null && mePump.isSessionActive() && this.coopMeInteractivePhase();
+      const authoritativeGuestReplayActive =
+        globalScene.phaseManager.getCurrentPhase()?.phaseName === "CoopReplayMePhase"
+        && getCoopNetcodeMode() === "authoritative";
+      // The legacy pump session ends as soon as the selected ME option is accepted. Authority V2 can
+      // legitimately retain the same CoopReplayMePhase for one or more address-exact narration prompts
+      // after that point. Requiring legacy liveness here makes those real consumed presses fall through to
+      // UiMirror, which only resends the already-committed ME_PICK and can never release the host's ME_BUTTON
+      // acknowledgement fence (campaign 30234239664). The current V2 replay phase is its own control lease.
+      const meInteractiveSurfaceActive =
+        mePump != null && (mePump.isSessionActive() || authoritativeGuestReplayActive) && this.coopMeInteractivePhase();
       // Authority V2 grants a shared interaction to one exact phase/handler generation. An ordered successor
       // wait, stale handler, wrong owner, or merely queued phase is not a human-input lease. Programmatic peer
       // replay uses processInputInner and therefore remains able to drive the watcher after authenticated input.

@@ -589,6 +589,11 @@ test("Authority V2 routes guest replay narration through its exact acknowledgeme
     "the guest replay phase must reach coopGuestAcknowledgeMeNarration after a consumed MESSAGE press",
   );
   assert.match(
+    ui,
+    /const authoritativeGuestReplayActive =[\s\S]*phaseName === "CoopReplayMePhase"[\s\S]*const meInteractiveSurfaceActive =[\s\S]*mePump\.isSessionActive\(\) \|\| authoritativeGuestReplayActive/u,
+    "a retained V2 replay prompt must not depend on the retired legacy Mystery pump session",
+  );
+  assert.match(
     observer,
     /hostEngineDialogueBlockedByAck[\s\S]*coopHostMeNarrationAwaitingGuestAck\(runtime\)/u,
     "the public oracle must expose the same host pending-ack fence production enforces",
