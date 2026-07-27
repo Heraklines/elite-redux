@@ -576,7 +576,27 @@ export function allClientsAtCurrentCommandFrontier(clients, from) {
  */
 export async function driveBattleFallback(rig, keys, from, purpose) {
   const pending = clientsAwaitingTurnProgress(rig, from);
-  await Promise.all(pending.map(client => client.sequence(keys, `${purpose}-${client.label}`)));
+  await Promise.all(
+    pending.map(async client => {
+      for (const [index, key] of keys.entries()) {
+        // A fallback is a human retry of a command that did not visibly enter the turn. Under
+        // severe runner dilation, the first retry can succeed while later queued keys are still
+        // waiting for browser focus. Re-check the public turn evidence before every key so the
+        // remaining fallback cannot spill into the next CommandPhase and open its Fight submenu
+        // (market-wide-lens run 30246932430).
+        if (!clientsAwaitingTurnProgress(rig, from).includes(client)) {
+          client.evidence.record("campaign-battle-fallback-superseded", {
+            purpose,
+            inputSeat: client.label,
+            keysSent: index,
+            keysSuppressed: keys.length - index,
+          });
+          break;
+        }
+        await client.press(key, `${purpose}-${client.label}:${index + 1}/${keys.length}`);
+      }
+    }),
+  );
   return pending;
 }
 

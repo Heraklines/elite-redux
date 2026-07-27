@@ -4465,3 +4465,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   requires the watcher to remain parked, never derive the local biome pool, and never open owner OPTION_SELECT input.
   No production behavior or authority rule changed. Hosted B11/focused proof remains required; local co-op Vitest was
   not run under the repository policy.
+
+## 2026-07-27 - Public battle fallback cannot spill into a successor command
+
+- Focused run `30248008171` proved the corrected live Dex Nav watcher fixture and B11 shard green. Full run
+  `30247099159` therefore has compositional green evidence for all 44 jobs: its only red was the stale fixture.
+- Market journey `30246932430` was mechanically converged at the same authoritative turn address and digest in both
+  browsers. Its public evidence showed the authority browser already inside the next Fight submenu while a fallback
+  key from the previous turn was still being delivered. Under severe runner dilation the first fallback key had
+  visibly entered the turn, but the remaining three keys were queued as an indivisible sequence and crossed the
+  authoritative boundary. The sequential command driver then correctly refused to resurrect the superseded menu.
+- Battle fallback now rechecks public turn-progress evidence before every individual key. Once any retry visibly
+  succeeds, it records the suppressed tail and stops, matching a human who stops retrying when the next turn appears.
+  The failure-first contract recreates the successor CommandPhase after the first key and proves the remaining three
+  keys cannot open its Fight submenu.
+- Policy-compliant local evidence passes: 137/137 public source/evidence contracts and both sealed public-driver
+  boundaries. Exact two-browser market proof remains GitHub-hosted; no local Chromium or co-op Vitest was run and no
+  deployment occurred.

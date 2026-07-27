@@ -15,7 +15,8 @@
 // the exact Authority V2 presentation/result and closes the same reward continuation without writing dex.
 //
 // This is a fails-before/passes-after guard: pre-fix ErDexNavPhase had no watcher flag and always
-// read the pool + opened the picker; now a watcher-constructed phase ends WITHOUT touching the picker.
+// read the pool + opened the picker; now a live watcher parks on the authoritative V2 result without
+// touching the local pool or opening its own picker. Explicit non-co-op watcher fixtures still end.
 //
 // HOW TO RUN (gated ER_SCENARIO=1, like every co-op engine test):
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-dexnav-owner-gate.test.ts

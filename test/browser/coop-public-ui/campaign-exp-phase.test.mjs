@@ -1234,12 +1234,43 @@ test("fallback input is sent only to the client whose command never entered the 
     renderer,
   ]);
   assert.equal(authority.sequences.length, 0);
-  assert.deepEqual(renderer.sequences, [
-    {
-      keys: ["Space", "ArrowRight", "Space", "Space"],
-      purpose: "fallback-renderer",
-    },
+  assert.deepEqual(renderer.presses, [
+    { key: "Space", purpose: "fallback-renderer:1/4" },
+    { key: "ArrowRight", purpose: "fallback-renderer:2/4" },
+    { key: "Space", purpose: "fallback-renderer:3/4" },
+    { key: "Space", purpose: "fallback-renderer:4/4" },
   ]);
+});
+
+test("fallback stops retrying when an earlier key visibly enters the turn", async () => {
+  const authority = fakeClient("authority", ["[coop:turn] host recorder: begin turn=1"]);
+  const renderer = fakeClient("renderer");
+  renderer.press = async function press(key, purpose) {
+    this.presses.push({ key, purpose });
+    this.evidence.pushConsole("Start Phase TurnStartPhase");
+    this.evidence.pushOwnedCommandSurface(1, { epoch: 7, wave: 1, turn: 2 });
+  };
+  const rig = { host: authority, clients: { authority, renderer } };
+
+  assert.deepEqual(
+    await driveBattleFallback(
+      rig,
+      ["Space", "ArrowRight", "Space", "Space"],
+      { authority: 0, renderer: 0 },
+      "fallback",
+    ),
+    [renderer],
+  );
+  assert.deepEqual(
+    renderer.presses,
+    [{ key: "Space", purpose: "fallback-renderer:1/4" }],
+    "the three stale keys must not spill into the next live command UI",
+  );
+  const suppression = renderer.evidence.events.find(event => event.kind === "campaign-battle-fallback-superseded");
+  assert.deepEqual(
+    { keysSent: suppression?.keysSent, keysSuppressed: suppression?.keysSuppressed },
+    { keysSent: 1, keysSuppressed: 3 },
+  );
 });
 
 test("real phase and stream progress extend the outcome wait but never cross its hard ceiling", () => {
