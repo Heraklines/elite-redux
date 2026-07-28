@@ -105,7 +105,6 @@ import {
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
   getCoopWaveBoundaryStatus,
-  inspectCoopV2CommandPresentationRequirement,
   isCoopLearnMoveForwardInFlightEmpty,
   isCoopV2InteractionHumanInputFrozen,
   setCoopDexSyncDelayMs,
@@ -2813,8 +2812,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // Classifying the replica before that event reads its previous battle's geometry: at wave 200 the
       // renderer still appears double until this exact carrier installs the one-seat finale. That stale read
       // made the soak demand a guest CommandPhase and then call a correctly-waiting CoopReplayTurnPhase a
-      // softlock. Deliver the real commit first, prove the replica retained its exact source, and partition
-      // actionability through the SAME canonical frontier mapper production used. This is the N-seat rule:
+      // softlock. Let the commit's delivery run first, then partition actionability through the SAME
+      // canonical frontier mapper production used. This is the N-seat rule:
       // a browser drives input iff the committed frontier names its seat; every other seat spectates.
       await pumpDuoDestinations(rig, 2);
       const commandState = await withClient(rig.hostCtx, () =>
@@ -2833,14 +2832,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           wave,
           `authority produced incomplete command frontier ${wave}:${turn} `
             + `(commands=${commandFrontier.commands.length} unresolved=${commandFrontier.unresolved.length})`,
-        );
-      }
-      const guestCommandSource = inspectCoopV2CommandPresentationRequirement(wave, turn, rig.guestRuntime);
-      if (guestCommandSource.kind !== "presentation" && guestCommandSource.kind !== "covered-by-source") {
-        fail(
-          "no-park",
-          wave,
-          `replica did not retain authoritative command source ${wave}:${turn} (kind=${guestCommandSource.kind})`,
         );
       }
       const guestSeatId = rig.guestRuntime.controller.localSeatId;

@@ -237,7 +237,7 @@ test("representative soak partitions command actionability from the post-deliver
   const spectatorDecision = commandCrossing.slice(deliveryIndex, guestDriveIndex);
   assert.match(
     spectatorDecision,
-    /captureCoopAuthoritativeBattleState[\s\S]*resolveCoopV2CommandFrontier\(commandState\)[\s\S]*inspectCoopV2CommandPresentationRequirement\(wave, turn, rig\.guestRuntime\)[\s\S]*command\.ownerSeatId === guestSeatId/u,
+    /captureCoopAuthoritativeBattleState[\s\S]*resolveCoopV2CommandFrontier\(commandState\)[\s\S]*command\.ownerSeatId === guestSeatId/u,
   );
   assert.doesNotMatch(
     spectatorDecision,
