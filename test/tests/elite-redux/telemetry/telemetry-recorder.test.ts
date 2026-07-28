@@ -22,6 +22,10 @@ import type {
 import { TELEMETRY_SCHEMA_VERSION } from "#data/elite-redux/telemetry/telemetry-schema";
 import { snapshotBattleState, snapshotMon, type TelemetryMonSource } from "#data/elite-redux/telemetry/telemetry-state";
 import { MemoryTelemetryStore } from "#data/elite-redux/telemetry/telemetry-store";
+import {
+  isPlayerTelemetryBattleEligible,
+  resolvePlayerTelemetryBase,
+} from "#data/elite-redux/telemetry/telemetry-transport";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -60,6 +64,31 @@ function envelope(sessionId = "sess-1", mode: "solo" | "coop" | "showdown" = "so
     startedAt: 1000,
   };
 }
+
+describe("player telemetry endpoint", () => {
+  it("excludes Showdown and tournament versus battles", () => {
+    expect(isPlayerTelemetryBattleEligible(true)).toBe(false);
+    expect(isPlayerTelemetryBattleEligible(false)).toBe(true);
+  });
+
+  it("uses the save API and ignores the Showdown telemetry Worker", () => {
+    expect(
+      resolvePlayerTelemetryBase({
+        VITE_SERVER_URL: "https://er-save-api-staging.example/",
+        VITE_SERVER_URL_TELEMETRY: "https://er-showdown-telemetry-staging.example",
+      } as Parameters<typeof resolvePlayerTelemetryBase>[0]),
+    ).toBe("https://er-save-api-staging.example");
+  });
+
+  it("supports a dedicated player telemetry override", () => {
+    expect(
+      resolvePlayerTelemetryBase({
+        VITE_SERVER_URL: "https://save.example",
+        VITE_SERVER_URL_PLAYER_TELEMETRY: "https://player-telemetry.example/",
+      }),
+    ).toBe("https://player-telemetry.example");
+  });
+});
 
 function decisionEvent(wave: number): TelemetryEvent {
   return {

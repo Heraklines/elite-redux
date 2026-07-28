@@ -146,11 +146,14 @@ Partitioning by day + mode makes the offline ML pipeline's reads cheap (scan a d
 
 Everything is built so production is a deliberate, small change - NOT a rewrite:
 
+Player-run telemetry is intentionally disabled for Showdown and tournament versus sessions. Those modes
+retain their existing, independent `VITE_SERVER_URL_TELEMETRY` pipeline.
+
 1. Create the prod bucket: `npx wrangler r2 bucket create er-telemetry`.
 2. Uncomment the `[[r2_buckets]]` block (binding `TELEMETRY`, bucket `er-telemetry`) in
    `workers/er-save-api/wrangler.toml`.
 3. Deploy the prod worker (maintainer only, explicit permission): `npx wrangler deploy`.
-4. Set `VITE_TELEMETRY=prod` (+ `VITE_TELEMETRY_SALT`, optional `VITE_SERVER_URL_TELEMETRY`) in the
+4. Set `VITE_TELEMETRY=prod` (+ `VITE_TELEMETRY_SALT`, optional `VITE_SERVER_URL_PLAYER_TELEMETRY`) in the
    prod build env and rebuild the client.
 5. Add a player-facing privacy note + (if required) an opt-out toggle before flipping on.
 6. Watch the Worker request/day + R2 storage dashboards for the first days at prod volume; tune the

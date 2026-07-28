@@ -27,6 +27,22 @@ export interface EncodedBatch {
   enc: "gz" | "lz";
 }
 
+export interface PlayerTelemetryEnv {
+  VITE_SERVER_URL_PLAYER_TELEMETRY?: string;
+  VITE_SERVER_URL?: string;
+}
+
+/** Player-run capture deliberately excludes Showdown and tournament versus sessions. */
+export function isPlayerTelemetryBattleEligible(isVersus: boolean): boolean {
+  return !isVersus;
+}
+
+/** Resolve the player-decision ingest host. Showdown telemetry uses a different Worker and env key. */
+export function resolvePlayerTelemetryBase(env: PlayerTelemetryEnv): string | null {
+  const url = env.VITE_SERVER_URL_PLAYER_TELEMETRY ?? env.VITE_SERVER_URL ?? "";
+  return url ? url.replace(/\/$/, "") : null;
+}
+
 /** Gzip a UTF-8 string to an ArrayBuffer via CompressionStream, or null when unavailable. */
 async function gzip(json: string): Promise<ArrayBuffer | null> {
   if (typeof CompressionStream === "undefined") {

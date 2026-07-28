@@ -61,7 +61,11 @@ import {
   openIdbTelemetryStore,
   type TelemetryStore,
 } from "#data/elite-redux/telemetry/telemetry-store";
-import { sendTelemetryBatch } from "#data/elite-redux/telemetry/telemetry-transport";
+import {
+  isPlayerTelemetryBattleEligible,
+  resolvePlayerTelemetryBase,
+  sendTelemetryBatch,
+} from "#data/elite-redux/telemetry/telemetry-transport";
 import { Command } from "#enums/command";
 import { UiMode } from "#enums/ui-mode";
 import { version } from "#package.json";
@@ -87,9 +91,7 @@ export function isTelemetryEnabled(): boolean {
 
 /** The telemetry worker base URL (own env, else the save-API host), or null when unconfigured. */
 function telemetryBase(): string | null {
-  const env = import.meta.env as { VITE_SERVER_URL_TELEMETRY?: string; VITE_SERVER_URL?: string };
-  const url = env.VITE_SERVER_URL_TELEMETRY ?? env.VITE_SERVER_URL ?? "";
-  return url ? url.replace(/\/$/, "") : null;
+  return resolvePlayerTelemetryBase(import.meta.env);
 }
 
 /** The upload closure the queue uses: reads the session token fresh (cookie) each send. Never throws. */
@@ -133,9 +135,6 @@ async function computePlayerIdHash(): Promise<string> {
 
 function currentMode(): TelemetryMode {
   try {
-    if (isVersusSession()) {
-      return "showdown";
-    }
     if (globalScene?.gameMode?.isCoop) {
       return "coop";
     }
@@ -180,6 +179,9 @@ function ensureSession(): boolean {
   if (store == null || base == null) {
     return false; // telemetry not enabled / not initialized
   }
+  if (!isPlayerTelemetryBattleEligible(isVersusSession())) {
+    return false; // Showdown and tournament battles retain their independent telemetry path.
+  }
   const seed = globalScene?.seed ?? "";
   if (seed === "" || globalScene?.currentBattle == null) {
     return false; // no active run yet
@@ -193,7 +195,7 @@ function ensureSession(): boolean {
   endTelemetrySession();
   const env = makeEnvelope(randomString(24), currentMode(), seed);
   const q = new TelemetryQueue(store, env, upload, DEFAULT_TELEMETRY_QUEUE_CONFIG);
-  void store.saveEnvelope(env);
+  store.saveEnvelope(env).catch(() => {});
   beginTelemetrySession(env, q);
   return true;
 }
@@ -270,7 +272,8 @@ function buildAction(fieldIndex: number, command: Command, cursor: number): Tele
 
 /**
  * Capture one battle decision as a (state, action) training pair. `actor` = "self" for this client's own
- * committed command (all modes), "partner" for an observed co-op partner command. No-op unless recording.
+ * committed command (solo/co-op), "partner" for an observed co-op partner command. Showdown and tournament
+ * versus sessions are excluded. No-op unless recording.
  */
 export function recordTelemetryDecision(
   fieldIndex: number,
@@ -380,7 +383,7 @@ function recordSurfaceChoice(chosenIndex: number, chosenLabel: string): void {
 
 function recordInput(code: number, mode: number): void {
   try {
-    if (!isTelemetryRecording()) {
+    if (!ensureSession() || !isTelemetryRecording()) {
       return;
     }
     const event: TelemetryInputEvent = {

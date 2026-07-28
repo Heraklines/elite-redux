@@ -209,6 +209,9 @@ jobs:
             # Showdown/tournament state: isolated staging worker + staging D1.
             # Without this the client falls back to VITE_SERVER_URL (404 no-op).
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry-staging.heraklines.workers.dev"
+            # Player decision telemetry is staging-only. Production does not set this flag and the
+            # production save Worker has no telemetry R2 binding.
+            echo "VITE_TELEMETRY=staging"
             echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"
             # Enable the in-game dev TEST SUITE on STAGING only (Dev Scenarios menu,
             # Pass/Fail, Send Logs). Production's Cloudflare Pages build does NOT set
