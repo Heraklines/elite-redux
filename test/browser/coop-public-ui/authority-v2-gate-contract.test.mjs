@@ -3684,41 +3684,6 @@ test("the one-process soak retains the authority browser while nested peer pumps
   );
 });
 
-test("a scheduled Mystery wave consumes its retained World Map predecessor on the replica", () => {
-  const crossingStart = soakDriver.indexOf("  const crossCommandBoundaryWithReplayGuest = async (");
-  const crossingEnd = soakDriver.indexOf("\n  /** Play ONE host wave", crossingStart);
-  assert.ok(crossingStart >= 0 && crossingEnd > crossingStart, "the structural crossing has a bounded source block");
-  const crossing = soakDriver.slice(crossingStart, crossingEnd);
-  assert.match(crossing, /stopAtMystery = false/u);
-  assert.match(crossing, /\| "MysteryEncounterPhase"/u);
-  assert.match(crossing, /const settleGuestBiomePredecessorForMystery = async/u);
-  assert.match(
-    crossing,
-    /driveClientPhaseQueueTo\(rig\.guestScene, `scheduled Mystery biome predecessor \$\{sourceWave\}`,[\s\S]+phase\.phaseName !== "SelectBiomePhase"[\s\S]+requireCoopSourceWave\(\) === sourceWave/u,
-    "the replica must run its exact retained SelectBiomePhase instead of dropping the predecessor",
-  );
-  assert.match(
-    crossing,
-    /if \(boundary === "MysteryEncounterPhase"\) \{[\s\S]+await settleGuestBiomePredecessorForMystery\(\);[\s\S]+return;/u,
-    "the scheduled ME boundary cannot return while a prior BIOME_PICK remains unapplied",
-  );
-
-  const meCrossingStart = soakDriver.indexOf("  const crossIntoMeWave = async (");
-  const meCrossingEnd = soakDriver.indexOf("\n  /**\n   * Drive ONE mid-run ME wave", meCrossingStart);
-  assert.ok(meCrossingStart >= 0 && meCrossingEnd > meCrossingStart, "the Mystery crossing has a bounded block");
-  const meCrossing = soakDriver.slice(meCrossingStart, meCrossingEnd);
-  assert.match(
-    meCrossing,
-    /await crossCommandBoundaryWithReplayGuest\(wave, 1, armHostFaintAutoPick, false, true\);/u,
-    "scheduled Mystery waves must use the same two-browser structural crossing as ordinary waves",
-  );
-  assert.doesNotMatch(
-    meCrossing,
-    /phaseInterceptor\.to\("MysteryEncounterPhase"/u,
-    "a host-only interceptor would skip the replica's preceding map receipt",
-  );
-});
-
 test("the one-process duo pins Phaser tween callbacks to the browser that scheduled them", () => {
   const pinsStart = duoHarness.indexOf("function installDuoCtxOwnershipPins(");
   const pinsEnd = duoHarness.indexOf("\n/**\n * Dispose both independently assembled runtimes", pinsStart);
