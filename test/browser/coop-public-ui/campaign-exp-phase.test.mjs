@@ -931,6 +931,45 @@ test("successor-address trainer victory advances only after the browser observes
   assert.equal(await advance(), false, "one trainer-victory prompt generation receives exactly one action");
 });
 
+test("successor-address trainer settlement drains money and modifier reward prompts", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+  authority.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
+  renderer.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
+  const advance = createBattlePromptAdvancer(rig, from, {}, "post-turn-trainer-settlement", {
+    expectedCommandAddress: "7:5:5",
+  });
+
+  authority.evidence.pushBattleReadiness("battle:message", "MoneyRewardPhase", true, 40, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), false, "an unexplained future-turn money prompt must stay fail-closed");
+
+  authority.evidence.pushConsole("Start Phase BattleEndPhase");
+  authority.evidence.pushBattleReadiness("battle:message", "MoneyRewardPhase", true, 41, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), true, "the trainer's exact money narration must be actionable");
+
+  authority.evidence.pushBattleReadiness("battle:message", "ModifierRewardPhase", true, 42, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), true, "the trainer's exact modifier narration must be actionable");
+  assert.deepEqual(
+    authority.presses.map(entry => entry.key),
+    ["Space", "Space"],
+  );
+  assert.equal(await advance(), false, "each trainer-settlement prompt generation receives exactly one action");
+});
+
 test("battle prompt consumption survives helper recreation and stale ready surfaces never spend input", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");

@@ -34,7 +34,12 @@ const OUTCOME_PROGRESS_RESOLUTION = /\[coop:replay\] guest (?:RECV turnResolutio
 const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
 const BATTLE_END_PHASE = /Start Phase BattleEndPhase/u;
 const FAINT_PHASE = /Start Phase FaintPhase/u;
-const NEXT_TURN_BATTLE_PROMPT_PHASES = new Set(["MessagePhase", "TrainerVictoryPhase"]);
+const NEXT_TURN_BATTLE_PROMPT_PHASES = new Set([
+  "MessagePhase",
+  "TrainerVictoryPhase",
+  "MoneyRewardPhase",
+  "ModifierRewardPhase",
+]);
 const POST_MYSTERY_PHASE = /Start Phase PostMysteryEncounterPhase/u;
 const BARGAIN_OWNER_TERMINAL = /bargain OWNER terminal: outcome blob sent/u;
 const BARGAIN_WATCHER_TERMINAL = /bargain WATCHER: outcome blob received -> converging/u;
@@ -690,9 +695,10 @@ function currentSharedCommandAddress(clients, purpose) {
  * turn N (run 29676344808: "You picked up ₽30!"). Requiring the old address strands a real actionable
  * human prompt. FaintPhase likewise runs after TurnEnd advances the public address, so its later
  * faint narration is stamped N+1 (public journey 30186100483). Trainer battles likewise render their
- * post-BattleEnd human prompt in TrainerVictoryPhase (mystery run 30366178580). The exception remains
- * fail-closed: same epoch and wave, exactly the next turn, a closed terminal-prompt phase, and this
- * browser must have observed BattleEndPhase or FaintPhase between the scan floor and the prompt.
+ * post-BattleEnd human prompts through TrainerVictoryPhase, MoneyRewardPhase, and ModifierRewardPhase
+ * (mystery runs 30366178580 and 30370796112). The exception remains fail-closed: same epoch and wave,
+ * exactly the next turn, a closed action-only settlement phase, and this browser must have observed
+ * BattleEndPhase or FaintPhase between the scan floor and the prompt.
  * Arbitrary future-turn battle messages still cannot authorize input.
  */
 function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
@@ -786,9 +792,14 @@ export function createBattlePromptAdvancer(
         const observation = event.observation;
         const expectedPhase = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
         const instanceKey = instanceKeyFor(client, observation);
+        // Prompt cursors advance after every public Space, but the structural BattleEnd/Faint proof
+        // authorizes the entire bounded settlement narration chain. Keep that proof's scan floor at
+        // this driver's boundary; otherwise consuming TrainerVictory/MoneyReward hides BattleEnd from
+        // the immediately following MoneyReward/ModifierReward prompt (run 30370796112).
+        const addressMatches = battlePromptMatchesAddress(client, from[client.label] ?? 0, event, expectedAddress);
         return (
           BATTLE_PROMPT_PHASES.has(observation.surfaceId)
-          && battlePromptMatchesAddress(client, cursors.get(client.label) ?? 0, event, expectedAddress)
+          && addressMatches
           && (expectedPhase == null
             || observation.phase === expectedPhase
             || (expectedPhase instanceof Set && expectedPhase.has(observation.phase)))
@@ -1794,6 +1805,40 @@ export function mechanicalBoundaryFromPairedSurfaces(events, surfaceId) {
   };
 }
 
+const normalizeMysteryProjectionPhase = phase => (phase === "CoopReplayMePhase" ? "MysteryEncounterPhase" : phase);
+
+/**
+ * Compare a projected Mystery surface against the host-authored immutable view.
+ *
+ * Nested structured phases such as ErQuizPhase do not retain the ambient
+ * `mysteryEncounterType` on every renderer even though the paired presentation already proved that
+ * lineage. A missing value is therefore telemetry, while two conflicting non-null values are still
+ * divergence. Address, state digest, options, operation, phase, and ownership remain exact.
+ */
+export function pairedMysteryProjectionMatches(authority, observation, stage) {
+  const sameAddress = JSON.stringify(observation.address) === JSON.stringify(authority.address);
+  const sameOptions = JSON.stringify(observation.optionIds ?? null) === JSON.stringify(authority.optionIds ?? null);
+  const authorityEncounterType = authority.mysteryEncounterType ?? null;
+  const observedEncounterType = observation.mysteryEncounterType ?? null;
+  const sameEncounterLineage =
+    stage === "reward"
+    || authorityEncounterType == null
+    || observedEncounterType == null
+    || observedEncounterType === authorityEncounterType;
+  return (
+    observation.surfaceId === authority.surfaceId
+    && normalizeMysteryProjectionPhase(observation.phase) === normalizeMysteryProjectionPhase(authority.phase)
+    && observation.uiMode === authority.uiMode
+    && observation.operationClass === authority.operationClass
+    && observation.ownerSeat === authority.ownerSeat
+    && observation.selectedOptionId === authority.selectedOptionId
+    && sameEncounterLineage
+    && observation.stateDigest === authority.stateDigest
+    && sameAddress
+    && sameOptions
+  );
+}
+
 async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, stage) {
   const clients = Object.values(rig.clients);
   let events = await Promise.all(
@@ -1820,34 +1865,12 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
   // as the convergence target and require every browser to publish that exact immutable view within the
   // ordinary bounded surface deadline. A genuinely different digest/options/owner never matches and still
   // fails closed; this merely observes the same asynchronous projection edge humans experience.
-  const authorityEvent = events.find(event => event.observation.localRole === "host") ?? events[0];
+  const authorityEvent = events.find(surfaceEvent => surfaceEvent.observation.localRole === "host") ?? events[0];
   const authority = authorityEvent.observation;
   // The two engines legitimately host the SAME mystery surface from different phase classes: the
   // authoritative host sits in MysteryEncounterPhase while the replaying guest presents it from
-  // CoopReplayMePhase (run 29595067992: every other field incl. the state digest matched). Compare
-  // phases modulo that known pairing - a genuine divergence still differs in digest/address/options.
-  const normalizeMePhase = phase => (phase === "CoopReplayMePhase" ? "MysteryEncounterPhase" : phase);
-  const matchesAuthority = observation => {
-    const sameAddress = JSON.stringify(observation.address) === JSON.stringify(authority.address);
-    const sameOptions = JSON.stringify(observation.optionIds ?? null) === JSON.stringify(authority.optionIds ?? null);
-    // Once the encounter has committed its terminal, each renderer may clear the
-    // presentation-only mysteryEncounter object on a different frame while opening
-    // the same addressed reward. Reward convergence is proven by its options,
-    // owner, address, and full mechanical digest; encounter identity was already
-    // proven at presentation/subprompt and remains in the campaign event ledger.
-    return (
-      observation.surfaceId === authority.surfaceId
-      && normalizeMePhase(observation.phase) === normalizeMePhase(authority.phase)
-      && observation.uiMode === authority.uiMode
-      && observation.operationClass === authority.operationClass
-      && observation.ownerSeat === authority.ownerSeat
-      && observation.selectedOptionId === authority.selectedOptionId
-      && (stage === "reward" || observation.mysteryEncounterType === authority.mysteryEncounterType)
-      && observation.stateDigest === authority.stateDigest
-      && sameAddress
-      && sameOptions
-    );
-  };
+  // CoopReplayMePhase (run 29595067992: every other field incl. the state digest matched).
+  const matchesAuthority = observation => pairedMysteryProjectionMatches(authority, observation, stage);
   if (!observations.every(matchesAuthority)) {
     events = await Promise.all(
       clients.map(client =>
@@ -1865,7 +1888,10 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
     );
     observations = events.map(surfaceEvent => surfaceEvent.observation);
   }
-  const first = observations[0];
+  // Keep the authority's complete immutable metadata as the canonical proof. A renderer may omit
+  // presentation lineage on a nested structured phase, but it may never replace the proven value
+  // with null in the campaign ledger.
+  const first = authority;
   const proof = {
     stage,
     surfaceId,

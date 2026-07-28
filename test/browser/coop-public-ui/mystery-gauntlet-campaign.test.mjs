@@ -15,6 +15,7 @@ import {
   createRegisteredSurfaceProgressBudget,
   driveMysteryEncounterChoice,
   mechanicalBoundaryFromPairedSurfaces,
+  pairedMysteryProjectionMatches,
 } from "./campaign.mjs";
 import {
   chooseAffordableStarterPair,
@@ -603,6 +604,38 @@ test("a generic Mystery secondary prompt has one actionable owner and one conver
   assert.throws(
     () => assertAsymmetricMysteryPromptProjection(owner, { ...watcher, stateDigest: "diverged" }),
     /owner\/watcher state diverged/u,
+  );
+});
+
+test("paired structured Mystery surfaces inherit nullable encounter metadata without hiding conflicts", () => {
+  const authority = {
+    surfaceId: "quiz",
+    phase: "ErQuizPhase",
+    uiMode: "ER_QUIZ",
+    operationClass: "quiz",
+    ownerSeat: 0,
+    selectedOptionId: "cursor:0",
+    optionIds: null,
+    mysteryEncounterType: 33,
+    stateDigest: "mechanical-state",
+    address: { epoch: 19, wave: 3, turn: 1 },
+  };
+  const renderer = { ...authority, mysteryEncounterType: null };
+
+  assert.equal(
+    pairedMysteryProjectionMatches(authority, renderer, "subprompt"),
+    true,
+    "a nested renderer may omit encounter metadata already proven by the paired presentation",
+  );
+  assert.equal(
+    pairedMysteryProjectionMatches(authority, { ...renderer, mysteryEncounterType: 21 }, "subprompt"),
+    false,
+    "two conflicting non-null encounter identities remain a hard divergence",
+  );
+  assert.equal(
+    pairedMysteryProjectionMatches(authority, { ...renderer, stateDigest: "diverged" }, "subprompt"),
+    false,
+    "nullable presentation metadata cannot weaken mechanical digest convergence",
   );
 });
 
