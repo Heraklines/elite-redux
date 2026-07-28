@@ -532,11 +532,35 @@ async function assertRenderProfileExecution(rig, policy, progress) {
         : "animations-skipped-depth: renderer never issued a structured animations-disabled receipt",
     );
   }
+  const authoritySwitch = rig.host.evidence.findPresentationEvent({
+    stage: "authority-recorded",
+    eventKind: "switch",
+  });
+  const switchAddress = authoritySwitch?.observation;
+  const rendererSwitch =
+    switchAddress == null
+      ? null
+      : rig.guest.evidence.findPresentationEvent({
+          stage: policy.moveAnimationsExpected ? "renderer-completed" : "renderer-skipped",
+          eventKind: "switch",
+          reason: policy.moveAnimationsExpected ? null : "animations-disabled",
+          wave: switchAddress.wave,
+          turn: switchAddress.turn,
+          seq: switchAddress.seq,
+        });
+  if (authoritySwitch != null && rendererSwitch == null) {
+    throw new Error(
+      `${policy.renderProfile}: authoritative switch ${switchAddress.wave}:${switchAddress.turn}:${switchAddress.seq} `
+        + "did not produce its exact guest renderer receipt",
+    );
+  }
   const proof = {
     renderProfile: policy.renderProfile,
     moveAnimations: policy.moveAnimationsExpected,
     authorityMoveEventIndex: authorityMove.index,
     rendererMoveEventIndex: rendererEvidence.index,
+    authoritySwitchEventIndex: authoritySwitch?.index ?? null,
+    rendererSwitchEventIndex: rendererSwitch?.index ?? null,
   };
   rig.host.evidence.record("campaign-render-profile-proof", proof);
   rig.guest.evidence.record("campaign-render-profile-proof", proof);

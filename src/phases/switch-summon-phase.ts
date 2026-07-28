@@ -21,9 +21,9 @@ import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
 import { SwitchType } from "#enums/switch-type";
-import { TrainerSlot } from "#enums/trainer-slot";
 import type { Pokemon } from "#field/pokemon";
 import { SwitchEffectTransferModifier } from "#modifiers/modifier";
+import { enemyTrainerSlotForSwitch } from "#phases/battle-phase";
 import { SummonPhase } from "#phases/summon-phase";
 import { inSpeedOrder } from "#utils/speed-order-generator";
 import i18next from "i18next";
@@ -63,8 +63,10 @@ export class SwitchSummonPhase extends SummonPhase {
       // (wrong summon pool arg + wrong trainer sprite/name shown). getNextSummonIndex
       // also normalizes slot to NONE outside partnered doubles, so this keeps the two
       // in agreement.
-      const partnered = globalScene.currentBattle.double && !!globalScene.currentBattle.trainer?.isDouble();
-      const trainerSlot = partnered && this.fieldIndex ? TrainerSlot.TRAINER_PARTNER : TrainerSlot.TRAINER;
+      const trainerSlot = enemyTrainerSlotForSwitch(
+        this.fieldIndex,
+        globalScene.currentBattle.double && !!globalScene.currentBattle.trainer?.isDouble(),
+      );
       if (this.slotIndex === -1) {
         //@ts-expect-error
         this.slotIndex = globalScene.currentBattle.trainer?.getNextSummonIndex(trainerSlot); // TODO: what would be the default trainer-slot fallback?
@@ -145,7 +147,10 @@ export class SwitchSummonPhase extends SummonPhase {
           })
         : i18next.t("battle:trainerComeBack", {
             trainerName: globalScene.currentBattle.trainer?.getName(
-              this.fieldIndex % 2 ? TrainerSlot.TRAINER_PARTNER : TrainerSlot.TRAINER,
+              enemyTrainerSlotForSwitch(
+                this.fieldIndex,
+                globalScene.currentBattle.double && !!globalScene.currentBattle.trainer?.isDouble(),
+              ),
             ),
             pokemonName: pokemon.getNameToRender(),
           }),
@@ -411,7 +416,10 @@ export class SwitchSummonPhase extends SummonPhase {
     // "Trainer sent out XYZ!"
     return i18next.t("battle:trainerGo", {
       trainerName: globalScene.currentBattle.trainer?.getName(
-        this.fieldIndex % 2 ? TrainerSlot.TRAINER_PARTNER : TrainerSlot.TRAINER,
+        enemyTrainerSlotForSwitch(
+          this.fieldIndex,
+          globalScene.currentBattle.double && !!globalScene.currentBattle.trainer?.isDouble(),
+        ),
       ),
       pokemonName: this.getPokemon().getNameToRender(),
     });

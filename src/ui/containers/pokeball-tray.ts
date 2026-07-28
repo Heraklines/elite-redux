@@ -1,3 +1,4 @@
+import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import type { Pokemon } from "#field/pokemon";
 
@@ -6,6 +7,11 @@ export class PokeballTray extends Phaser.GameObjects.Container {
 
   private bg: Phaser.GameObjects.NineSlice;
   private balls: Phaser.GameObjects.Sprite[];
+  private hiddenX = 0;
+  private hiddenBallXs: number[] = [];
+
+  /** Invalidates detached show/hide callbacks when a newer presentation owns this tray. */
+  private presentationGeneration = 0;
 
   public shown: boolean;
 
@@ -38,6 +44,8 @@ export class PokeballTray extends Phaser.GameObjects.Container {
       ball.setOrigin(0, 0);
       this.add(ball);
     }
+    this.hiddenX = this.x;
+    this.hiddenBallXs = this.balls.map(ball => ball.x);
 
     this.setVisible(false);
     this.shown = false;
@@ -45,13 +53,14 @@ export class PokeballTray extends Phaser.GameObjects.Container {
     return this;
   }
 
-  showPbTray(party: Pokemon[]): Promise<void> {
+  showPbTray(party: Pokemon[], scene: BattleScene = globalScene): Promise<void> {
     return new Promise(resolve => {
       if (this.shown) {
         return resolve();
       }
+      const generation = ++this.presentationGeneration;
 
-      globalScene.fieldUI.bringToTop(this);
+      scene.fieldUI.bringToTop(this);
 
       this.x += 104 * (this.player ? 1 : -1);
 
@@ -59,7 +68,7 @@ export class PokeballTray extends Phaser.GameObjects.Container {
       this.bg.alpha = 1;
 
       this.balls.forEach((ball, b) => {
-        ball.x += (globalScene.scaledCanvas.width + 104) * (this.player ? 1 : -1);
+        ball.x += (scene.scaledCanvas.width + 104) * (this.player ? 1 : -1);
         let ballFrame = "ball";
         if (b >= party.length) {
           ballFrame = "empty";
@@ -71,21 +80,28 @@ export class PokeballTray extends Phaser.GameObjects.Container {
         ball.setFrame(ballFrame);
       });
 
-      globalScene.playSound("se/pb_tray_enter");
+      scene.playSound("se/pb_tray_enter");
 
-      globalScene.tweens.add({
+      scene.tweens.add({
         targets: this,
         x: `${this.player ? "-" : "+"}=104`,
         duration: 500,
         ease: "Sine.easeIn",
         onComplete: () => {
+          if (generation !== this.presentationGeneration) {
+            return;
+          }
           this.balls.forEach((ball, b) => {
-            globalScene.tweens.add({
+            scene.tweens.add({
               targets: ball,
               x: `${this.player ? "-" : "+"}=104`,
               duration: b * 100,
               ease: "Sine.easeIn",
-              onComplete: () => globalScene.playSound(`se/${b < party.length ? "pb_tray_ball" : "pb_tray_empty"}`),
+              onComplete: () => {
+                if (generation === this.presentationGeneration) {
+                  scene.playSound(`se/${b < party.length ? "pb_tray_ball" : "pb_tray_empty"}`);
+                }
+              },
             });
           });
         },
@@ -94,27 +110,28 @@ export class PokeballTray extends Phaser.GameObjects.Container {
       this.setVisible(true);
       this.shown = true;
 
-      globalScene.time.delayedCall(1100, () => resolve());
+      scene.time.delayedCall(1100, () => resolve());
     });
   }
 
-  hide(): Promise<void> {
+  hide(scene: BattleScene = globalScene): Promise<void> {
     return new Promise(resolve => {
       if (!this.shown) {
         return resolve();
       }
+      const generation = ++this.presentationGeneration;
 
       this.balls.forEach((ball, b) => {
-        globalScene.tweens.add({
+        scene.tweens.add({
           targets: ball,
-          x: `${this.player ? "-" : "+"}=${globalScene.scaledCanvas.width}`,
+          x: `${this.player ? "-" : "+"}=${scene.scaledCanvas.width}`,
           duration: 250,
           delay: b * 100,
           ease: "Sine.easeIn",
         });
       });
 
-      globalScene.tweens.add({
+      scene.tweens.add({
         targets: this.bg,
         width: 144,
         alpha: 0,
@@ -122,12 +139,35 @@ export class PokeballTray extends Phaser.GameObjects.Container {
         ease: "Sine.easeIn",
       });
 
-      globalScene.time.delayedCall(850, () => {
-        this.setVisible(false);
+      scene.time.delayedCall(850, () => {
+        if (generation === this.presentationGeneration) {
+          this.setVisible(false);
+        }
         resolve();
       });
 
       this.shown = false;
     });
+  }
+
+  /**
+   * Cancel a torn presentation and restore the same hidden geometry a newly set-up tray owns.
+   * A late callback from an older show/hide generation cannot hide a newer entrance.
+   */
+  settleHidden(scene: BattleScene = globalScene): void {
+    this.presentationGeneration++;
+    try {
+      scene.tweens.killTweensOf([this, this.bg, ...this.balls]);
+    } catch {
+      // A destroyed scene still permits the absolute object postcondition below.
+    }
+    this.x = this.hiddenX;
+    this.bg.width = 104;
+    this.bg.alpha = 1;
+    this.balls.forEach((ball, index) => {
+      ball.x = this.hiddenBallXs[index] ?? ball.x;
+    });
+    this.setVisible(false);
+    this.shown = false;
   }
 }

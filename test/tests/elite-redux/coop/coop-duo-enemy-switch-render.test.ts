@@ -154,6 +154,10 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     // Sanity: the ACE_TRAINER double has a bench past the 2 leads (the reserve the trainer sends in).
     const hostParty = rig.hostScene.getEnemyParty();
     expect(hostParty.length, "the ACE_TRAINER double fielded a bench past the 2 leads").toBeGreaterThan(2);
+    const guestTrainer = rig.guestScene.currentBattle.trainer!;
+    const guestTrainerTweens = vi.spyOn(rig.guestScene.tweens, "add");
+    const guestTrayShow = vi.spyOn(rig.guestScene.pbTrayEnemy, "showPbTray");
+    const guestTraySettle = vi.spyOn(rig.guestScene.pbTrayEnemy, "settleHidden");
 
     // Wave-start parity (the mirror rebuilt the guest byte-identical to the host).
     const hostChk0 = await withClient(rig.hostCtx, () => captureCoopChecksum());
@@ -237,6 +241,9 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
           .sort(),
         replacementBase: base(replacement),
         allyBase: base(ally),
+        trainerAlpha: rig.guestScene.currentBattle.trainer?.alpha,
+        trayShown: rig.guestScene.pbTrayEnemy.shown,
+        trayVisible: rig.guestScene.pbTrayEnemy.visible,
       };
     });
     expect(guestFacts.hasReplacement, "guest has the replacement mon (by host id) in its enemy field").toBe(true);
@@ -248,6 +255,21 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
       hostFacts.onFieldCount,
     );
     expect(guestFacts.species, "guest on-field enemy species match host after the switch").toEqual(hostFacts.species);
+    expect(guestTrayShow, "the guest positively replays the enemy trainer's Pokeball tray entrance").toHaveBeenCalled();
+    expect(
+      guestTrainerTweens.mock.calls.some(([config]) => {
+        const tween = config as { targets?: unknown; alpha?: number };
+        return tween.targets === guestTrainer && tween.alpha === 1;
+      }),
+      "the guest positively replays the exact enemy trainer entrance",
+    ).toBe(true);
+    expect(
+      guestTraySettle,
+      "the already-projected/recovery-shaped replay owns an absolute tray cleanup",
+    ).toHaveBeenCalled();
+    expect(guestFacts.trainerAlpha, "the trainer portrait is hidden after replay drains").toBe(0);
+    expect(guestFacts.trayShown, "the enemy Pokeball tray cannot stay logically open").toBe(false);
+    expect(guestFacts.trayVisible, "the enemy Pokeball tray cannot remain visibly stale").toBe(false);
 
     // ===== RENDER-PRESENTATION: the reserve was SUMMONED onto the LIVE platform, not seated at the stale
     // ctor-default base. The reconstructed reserve must inherit the surviving ally's live double-battle

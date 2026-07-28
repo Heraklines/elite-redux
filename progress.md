@@ -5154,3 +5154,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Remaining independent presentation debt from this audit: enemy trainer switches are mechanically and sprite
   synchronized, but `CoopSwitchReplayPhase` does not yet reproduce or explicitly settle the authority's trainer/tray
   reveal-hide grammar. That is the next bounded visual cleanup; Showdown and tournament were not touched.
+
+## 2026-07-29 - Enemy trainer switches retain and retire their complete presentation
+
+- `CoopSwitchReplayPhase` now reproduces the ordinary trainer switch grammar: exact format-aware trainer portrait
+  and Pokeball-tray reveal, 750 ms pre-switch delay, 1500 ms visible hold, exit, narration, and immutable ball/sprite
+  replay. The trainer-slot resolver is shared with `SwitchSummonPhase`; only partnered doubles select the partner,
+  so triple slots can no longer display or name a nonexistent second trainer.
+- Every new timer and nested tween continuation is bound to the originating scene, runtime, and session generation.
+  Success, failure, watchdog expiry, destructive phase retirement, and already-projected recovery all cancel owned
+  delays and settle the trainer plus tray before the presentation outcome can release its exact watermark.
+- Pokeball-tray callbacks now have their own presentation generation, and `settleHidden` restores fresh hidden
+  geometry. A delayed hide from an older switch therefore cannot blank a newer tray entrance.
+- Failure-first source coverage proves the timing, ownership, cleanup ordering, and triple-safe resolver. The existing
+  two-engine enemy-switch reconstruction scenario now requires positive guest trainer/tray replay and absolute final
+  cleanup, while real two-browser campaigns correlate every switch they encounter to the exact guest receipt.
+  Co-op engine/browser execution remains remote-only; no Showdown, tournament, wire schema, or mechanics changed.

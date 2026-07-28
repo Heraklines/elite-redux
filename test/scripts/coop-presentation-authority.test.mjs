@@ -38,6 +38,73 @@ test("switch presentation is host-authored and the renderer never predicts its o
   assert.doesNotMatch(guestTurn, /mirrorGuestOwnSwitch|summonCoopPlayerField/u);
 });
 
+test("enemy switch replay owns the ordinary trainer/tray grammar and retires it absolutely", () => {
+  const battlePhase = read("src/phases/battle-phase.ts");
+  const producer = read("src/phases/switch-summon-phase.ts");
+  const replay = read("src/phases/coop-replay-phases.ts");
+  const tray = read("src/ui/containers/pokeball-tray.ts");
+  const presentation = read("src/data/elite-redux/coop/coop-field-presentation.ts");
+  const campaign = read("test/browser/coop-public-ui/campaign.mjs");
+  const evidence = read("test/browser/coop-public-ui/evidence.mjs");
+  const replayStart = replay.indexOf("export class CoopSwitchReplayPhase");
+  const replayEnd = replay.indexOf("\n}\n\n/**\n * GUEST: render a status change", replayStart);
+  const switchReplay = replay.slice(replayStart, replayEnd);
+
+  assert.match(
+    battlePhase,
+    /enemyTrainerSlotForSwitch[\s\S]+partneredDouble && fieldIndex > 0[\s\S]+TRAINER_PARTNER/u,
+    "only a partnered double may select the second trainer; triple positions stay on the primary trainer",
+  );
+  assert.ok(
+    [...producer.matchAll(/enemyTrainerSlotForSwitch\(/gu)].length >= 3,
+    "ordinary reveal, recall narration, and send-out narration share the same format-aware resolver",
+  );
+  assert.doesNotMatch(producer, /fieldIndex\s*%\s*2\s*\?\s*TrainerSlot\.TRAINER_PARTNER/u);
+  assert.match(
+    switchReplay,
+    /const scene = globalScene;[\s\S]+const runtime = getCoopRuntime\(\);[\s\S]+const generation = coopSessionGeneration\(\);/u,
+  );
+  assert.match(
+    switchReplay,
+    /runWhenCoopRuntimeActive\(runtime,[\s\S]+ownedActivations\.add\(cancel\)/u,
+    "detached timers/tweens queue only under their exact runtime and retirement cancels queued activations",
+  );
+  assert.match(switchReplay, /for \(const cancel of ownedActivations\)[\s\S]+cancel\(\)/u);
+  assert.match(
+    switchReplay,
+    /showEnemyTrainerPresentation\(scene, trainerSlot\);[\s\S]+pbTrayEnemy\.showPbTray\(scene\.getEnemyParty\(\), scene\)/u,
+    "an enemy switch positively reveals both ordinary trainer surfaces",
+  );
+  assert.match(
+    switchReplay,
+    /const scheduleEnemyIncoming[\s\S]+schedule\(1500,[\s\S]+hideEnemyTrainerPresentation\(scene\)[\s\S]+pbTrayEnemy\.hide\(scene\)[\s\S]+projectIncoming\(\)/u,
+    "the renderer preserves the authority's pre-switch delay and visible hold before trainer/tray exit",
+  );
+  assert.match(switchReplay, /schedule\(750, \(\) => scheduleEnemyIncoming\(\)\)/u);
+  assert.match(
+    switchReplay,
+    /finish = \(outcome[\s\S]+timer\.remove\(false\)[\s\S]+cleanupEnemyTrainerPresentation\(\)[\s\S]+settleCoopPresentationOutcome/u,
+    "cleanup and owned timer cancellation precede the presentation proof",
+  );
+  assert.match(switchReplay, /retire\(\)[\s\S]+this\.retireActiveRun\?\.\(\)/u);
+  assert.match(
+    switchReplay,
+    /pbTrayEnemy\.settleHidden\(scene\)[\s\S]+settleCoopTrainerPresentation\("enemy", scene\)/u,
+  );
+  assert.match(tray, /presentationGeneration[\s\S]+generation !== this\.presentationGeneration/u);
+  assert.match(tray, /settleHidden\(scene:[\s\S]+killTweensOf[\s\S]+setVisible\(false\)[\s\S]+shown = false/u);
+  assert.match(presentation, /settleCoopTrainerPresentation\([\s\S]+scene: BattleScene = globalScene/u);
+  assert.match(
+    campaign,
+    /eventKind: "switch"[\s\S]+wave: switchAddress\.wave[\s\S]+turn: switchAddress\.turn[\s\S]+seq: switchAddress\.seq/u,
+    "real two-browser campaigns correlate every encountered switch with its exact renderer receipt",
+  );
+  assert.match(
+    evidence,
+    /findPresentationEvent\([\s\S]+wave = null[\s\S]+turn = null[\s\S]+seq = null[\s\S]+event\.observation\.seq === seq/u,
+  );
+});
+
 test("healing is an authority-authored presentation and every event kind is exhaustively rendered", () => {
   const pokemon = read("src/field/pokemon.ts");
   const replay = read("src/phases/coop-replay-turn-phase.ts");
