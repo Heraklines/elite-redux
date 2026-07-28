@@ -2952,6 +2952,116 @@ export class DuoPublicUiRig {
     return match.comparable;
   }
 
+  /**
+   * Prove the command frontier that a completed sequential public-input round actually consumed.
+   *
+   * Most rounds leave an owner/watcher (or owner/owner) projection on both browsers and retain the
+   * stronger shared-digest proof above. A depleted seat is different: Authority V2 omits that seat
+   * from the immutable COMMAND_FRONTIER, the remaining owner submits, and the authority immediately
+   * enters the exact-address battle phase. The omitted browser therefore may never publish a
+   * CommandPhase watcher at that address. Requiring one after the real owner has already acted is an
+   * impossible UI state and made healthy one-owner battles time out (campaign run 30337372289).
+   *
+   * The sequential driver records the closed input partition while the public surfaces are live. This
+   * branch accepts it only when at least one exact-address actionable owner was driven, every omitted
+   * client is named, and an authenticated authority browser published an exact-address non-command
+   * phase proving collection had closed. The ordinary next-frontier/reward proof still establishes
+   * the resulting cross-browser state convergence; this proof concerns only who was allowed to act.
+   */
+  async assertSequentialCommandFrontier(
+    round,
+    cursors,
+    proofName,
+    { allowAddressRepeat = false, expectedWave = null } = {},
+  ) {
+    const partition = round?.commandPartition ?? null;
+    if (partition == null) {
+      return this.assertSharedCommandFrontier(cursors, proofName, {
+        allowAddressRepeat,
+        expectedWave,
+        expectedAddress: round?.expectedCommandAddress ?? null,
+      });
+    }
+    if (partition.address !== round.expectedCommandAddress) {
+      throw new Error(
+        `${proofName}: sequential command partition address ${partition.address} disagrees with round ${round.expectedCommandAddress}`,
+      );
+    }
+    const addressParts = partition.address.split(":").map(Number);
+    if (
+      addressParts.length !== 3
+      || addressParts.some(part => !Number.isSafeInteger(part))
+      || (expectedWave != null && addressParts[1] !== expectedWave)
+    ) {
+      throw new Error(`${proofName}: invalid sequential command partition address ${partition.address}`);
+    }
+    const clients = Object.values(this.clients);
+    const labels = new Set(clients.map(client => client.label));
+    const ownerLabels = new Set(partition.owners.map(owner => owner.label));
+    const omittedLabels = new Set(partition.omitted.map(omitted => omitted.label));
+    if (
+      partition.owners.length === 0
+      || ownerLabels.size !== partition.owners.length
+      || omittedLabels.size !== partition.omitted.length
+      || [...ownerLabels].some(label => !labels.has(label) || omittedLabels.has(label))
+      || [...omittedLabels].some(label => !labels.has(label))
+      || ownerLabels.size + omittedLabels.size !== labels.size
+    ) {
+      throw new Error(`${proofName}: sequential command partition does not cover each public client exactly once`);
+    }
+    for (const owner of partition.owners) {
+      const client = clients.find(candidate => candidate.label === owner.label);
+      if (
+        client == null
+        || owner.seat !== client.publicSeat
+        || owner.eventIndex < (cursors[owner.label] ?? 0)
+        || typeof owner.stateDigest !== "string"
+        || owner.stateDigest.length === 0
+      ) {
+        throw new Error(`${proofName}: invalid exact-address command owner proof for ${owner.label}`);
+      }
+    }
+    if (new Set(partition.owners.map(owner => owner.stateDigest)).size !== 1) {
+      throw new Error(`${proofName}: command owners disagree on the exact-address pre-input state`);
+    }
+    const authority = clients.find(client => client.label === partition.collectionClosed.label);
+    if (
+      authority == null
+      || authority.publicRole !== "host"
+      || partition.collectionClosed.eventIndex < (cursors[authority.label] ?? 0)
+      || partition.collectionClosed.address !== partition.address
+      || partition.collectionClosed.phase === "CommandPhase"
+      || !["battle-progress", "reward"].includes(partition.collectionClosed.operationClass)
+    ) {
+      throw new Error(`${proofName}: invalid authoritative command-collection close proof`);
+    }
+    const priorAddress = this.lastSharedSurfaceAddress.get("command");
+    if (!allowAddressRepeat && priorAddress === partition.address) {
+      throw new Error(`${proofName}: sequential command partition repeated ${partition.address}`);
+    }
+    this.lastSharedSurfaceAddress.set("command", partition.address);
+    const comparable = {
+      surface: "command",
+      epoch: addressParts[0],
+      wave: addressParts[1],
+      turn: addressParts[2],
+      stateDigest: partition.owners[0].stateDigest,
+      ownerSeats: partition.owners.map(owner => owner.seat),
+      omittedSeats: partition.omitted.map(omitted => omitted.seat),
+      projection: "authoritative-collection-close",
+    };
+    for (const client of clients) {
+      client.evidence.record("sequential-command-frontier-proof", {
+        proofName,
+        address: partition.address,
+        projection: ownerLabels.has(client.label) ? "owner" : "omitted",
+        collectionClosed: partition.collectionClosed,
+        observation: comparable,
+      });
+    }
+    return comparable;
+  }
+
   async assertRetainedContinuation(cursors, proofName) {
     if (!this.host || !this.guest) {
       throw new Error(`${proofName}: retained continuation proof requires a paired host and guest`);
@@ -3978,12 +4088,59 @@ export class DuoPublicUiRig {
       submittedCommandAddress == null
         ? null
         : `${submittedCommandAddress.epoch}:${submittedCommandAddress.wave}:${submittedCommandAddress.turn}`;
+    const commandPartition =
+      commandCollectionClosed == null || expectedCommandAddress == null
+        ? null
+        : {
+            address: expectedCommandAddress,
+            owners: clients
+              .filter(client => commandEvents[client.label] != null)
+              .map(client => {
+                const event = commandEvents[client.label];
+                const observation = event.observation;
+                const address = observation?.address;
+                if (
+                  event.kind !== "browser-surface2"
+                  || observation?.surfaceId !== "command:command"
+                  || observation.phase !== "CommandPhase"
+                  || observation.uiMode !== "COMMAND"
+                  || observation.ready?.handlerActive !== true
+                  || observation.localSeat !== client.publicSeat
+                  || !observation.seatsWithInput?.includes(client.publicSeat)
+                  || !sameAddress(address, submittedCommandAddress)
+                  || typeof observation.stateDigest !== "string"
+                  || observation.stateDigest.length === 0
+                ) {
+                  throw new Error(`${purpose}: invalid exact-address command owner evidence for ${client.label}`);
+                }
+                return {
+                  label: client.label,
+                  seat: client.publicSeat,
+                  eventIndex: event.index,
+                  stateDigest: observation.stateDigest,
+                };
+              }),
+            omitted: clients
+              .filter(client => commandEvents[client.label] == null)
+              .map(client => ({ label: client.label, seat: client.publicSeat })),
+            collectionClosed: {
+              label: commandCollectionClosed.client.label,
+              eventIndex: commandCollectionClosed.event.index,
+              address: expectedCommandAddress,
+              operationClass: commandCollectionClosed.event.observation.operationClass,
+              phase: commandCollectionClosed.event.observation.phase,
+            },
+          };
+    if (commandPartition != null && commandPartition.owners.length === 0) {
+      throw new Error(`${purpose}: authoritative command collection closed without a public command owner`);
+    }
     return {
       commandEvents,
       outcomeCursors,
       presentationCursors:
         presentationCursors ?? Object.fromEntries(clients.map(client => [client.label, from[client.label] ?? 0])),
       expectedCommandAddress,
+      commandPartition,
     };
   }
 

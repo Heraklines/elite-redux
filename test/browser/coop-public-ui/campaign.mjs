@@ -1274,7 +1274,7 @@ async function driveBattleWave(rig, policy, stats) {
         return finishSuccessorWaveTransition(superseded, pendingCommandProof.cursors);
       }
     }
-    const { outcomeCursors, expectedCommandAddress } = await rig.driveSequentialCommandRound(
+    const commandRound = await rig.driveSequentialCommandRound(
       commandCursors,
       policy.keys.battle,
       `${purpose}-attack-first`,
@@ -1288,16 +1288,16 @@ async function driveBattleWave(rig, policy, stats) {
               }),
       },
     );
+    const { outcomeCursors, expectedCommandAddress } = commandRound;
     if (pendingCommandProof != null) {
       try {
-        await rig.assertSharedCommandFrontier(pendingCommandProof.cursors, pendingCommandProof.name, {
+        await rig.assertSequentialCommandFrontier(commandRound, pendingCommandProof.cursors, pendingCommandProof.name, {
           // The exact expected address and per-round cursors already prove freshness. The frontier
           // may also have been accepted by another public journey boundary before this deliberately
           // deferred proof runs, so a mutable global "last address" must not hide the historical
           // owner+watcher pair after the following sequential round has superseded it.
           allowAddressRepeat: true,
           expectedWave: rig.activeBattleWave,
-          expectedAddress: expectedCommandAddress,
         });
         await rig.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
       } catch (error) {

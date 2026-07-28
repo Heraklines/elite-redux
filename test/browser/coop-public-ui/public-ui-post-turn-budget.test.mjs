@@ -4,6 +4,7 @@
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createAnimationProgressBudget, createBattlePromptAdvancer, driveConfirmedLeave } from "./campaign.mjs";
 import { findOwnedActionableTargetSurface } from "./campaign-nav.mjs";
@@ -16,6 +17,8 @@ import {
   findSharedCommandFrontierMatch,
   PublicUiClient,
 } from "./public-ui-harness.mjs";
+
+const campaignSource = readFileSync(new URL("./campaign.mjs", import.meta.url), "utf8");
 
 class FakeEvidence {
   constructor(label) {
@@ -66,6 +69,7 @@ function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
       phase: "CommandPhase",
       uiMode: "COMMAND",
       address,
+      stateDigest: `digest-${address.epoch}-${address.wave}-${address.turn}`,
       localSeat,
       seatsWithInput: [localSeat],
       ready: { handlerActive: true },
@@ -903,6 +907,7 @@ test("sequential command driver accepts an exact-address collection close when t
   };
   const rig = {
     clients: { first, second },
+    lastSharedSurfaceAddress: new Map(),
     config: { timeoutMs: 1_000 },
   };
 
@@ -920,6 +925,44 @@ test("sequential command driver accepts an exact-address collection close when t
   assert.equal(secondProof.skippedAfterCollectionClosed, true);
   assert.equal(secondProof.collectionClosedObservedBy, "first");
   assert.equal(result.expectedCommandAddress, "73:1:2");
+  assert.equal(result.commandPartition.address, "73:1:2");
+  assert.deepEqual(result.commandPartition.owners, [
+    { label: "first", seat: 0, eventIndex: 0, stateDigest: "digest-73-1-2" },
+  ]);
+  assert.deepEqual(result.commandPartition.omitted, [{ label: "second", seat: 1 }]);
+  assert.deepEqual(result.commandPartition.collectionClosed, {
+    label: "first",
+    eventIndex: firstEvidence.events.find(event => event.observation?.phase === "MovePhase").index,
+    address: "73:1:2",
+    operationClass: "battle-progress",
+    phase: "MovePhase",
+  });
+  const frontier = await DuoPublicUiRig.prototype.assertSequentialCommandFrontier.call(
+    rig,
+    result,
+    { first: 0, second: 0 },
+    "turn-1-next-command",
+    { expectedWave: 1 },
+  );
+  assert.deepEqual(frontier.ownerSeats, [0]);
+  assert.deepEqual(frontier.omittedSeats, [1]);
+  assert.equal(frontier.projection, "authoritative-collection-close");
+  assert.equal(firstEvidence.events.at(-1).kind, "sequential-command-frontier-proof");
+  assert.equal(secondEvidence.events.at(-1).projection, "omitted");
+});
+
+test("campaign deferred frontiers consume the sequential round's authoritative owner partition", () => {
+  const start = campaignSource.indexOf("async function driveBattleWave(");
+  const end = campaignSource.indexOf("\n/**", start + 1);
+  assert.ok(start >= 0 && end > start, "driveBattleWave has a bounded source block");
+  const driveBattleWave = campaignSource.slice(start, end);
+  assert.match(driveBattleWave, /const commandRound = await rig\.driveSequentialCommandRound\(/u);
+  assert.match(driveBattleWave, /rig\.assertSequentialCommandFrontier\(commandRound, pendingCommandProof\.cursors/u);
+  assert.doesNotMatch(
+    driveBattleWave,
+    /rig\.assertSharedCommandFrontier\(pendingCommandProof\.cursors/u,
+    "a depleted/omitted seat must not be required to publish an impossible same-address command watcher",
+  );
 });
 
 test("renderer presentation cannot close command collection before its delayed Showdown command", async () => {
