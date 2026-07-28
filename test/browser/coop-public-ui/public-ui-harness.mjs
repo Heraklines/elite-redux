@@ -1011,15 +1011,27 @@ export class PublicUiClient {
   }
 
   async reopen() {
+    await this.prepareReopen();
+    await this.open();
+  }
+
+  /** Close the old page without starting the replacement renderer yet. */
+  async prepareReopen() {
     this.evidence.record("reopen", { reason: "cold browser page using same isolated context" });
     // Closing a loading page intentionally aborts asset preloads. Detach only this page's error observer
     // immediately before teardown; errors from the replacement page remain strict.
     this.page?.removeAllListeners("pageerror");
     await this.page?.close().catch(() => {});
-    await this.open();
+    this.page = null;
   }
 
   async replaceWithEmptyContext() {
+    await this.prepareEmptyContext();
+    await this.open();
+  }
+
+  /** Replace the storage boundary without concurrently booting another full Phaser renderer. */
+  async prepareEmptyContext() {
     const browser = this.context.browser();
     if (browser == null) {
       throw new Error(`${this.label}: browser disappeared before cold-context replacement`);
@@ -1032,7 +1044,6 @@ export class PublicUiClient {
     this.context = await browser.createBrowserContext();
     this.authenticatedOnce = true;
     this.forceVisibleLogin = true;
-    await this.open();
   }
 
   async loginOrReuseSession() {
@@ -4400,7 +4411,7 @@ export class DuoPublicUiRig {
   async coldReopenAndPair(requesterSeat) {
     const abandonedAt = Date.now();
     await this.stopChromeTrace();
-    await Promise.all(Object.values(this.clients).map(client => client.reopen()));
+    await this.coldReopenClients();
     await this.loginBoth();
     // The worker releases a crashed pair only after the 30s presence window plus 120s hot-rejoin grace.
     // Login usually consumes most of this interval; wait only the bounded remainder before a fresh announce.
@@ -4416,8 +4427,25 @@ export class DuoPublicUiRig {
 
   async coldReplaceContextsAndLogin() {
     await this.stopChromeTrace();
-    await Promise.all(Object.values(this.clients).map(client => client.replaceWithEmptyContext()));
+    const clients = Object.values(this.clients);
+    // Both old devices disappear together, preserving the production cold-disconnect boundary. Boot the
+    // replacement renderers one at a time: hosted CI gives both visible Chromiums one CPU, unlike two real
+    // player devices. Concurrent Phaser/asset initialization starved one healthy page past the five-minute
+    // canvas timeout while its network remained active (journey 30335842445).
+    await Promise.all(clients.map(client => client.prepareEmptyContext()));
+    for (const client of clients) {
+      await client.open();
+    }
     await this.loginBoth();
+  }
+
+  /** Close both old pages concurrently, then boot each independent device without shared-runner starvation. */
+  async coldReopenClients() {
+    const clients = Object.values(this.clients);
+    await Promise.all(clients.map(client => client.prepareReopen()));
+    for (const client of clients) {
+      await client.open();
+    }
   }
 
   async close() {

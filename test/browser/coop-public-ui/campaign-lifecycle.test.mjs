@@ -106,3 +106,23 @@ test("campaign setup has a causal first-command deadline and progress marker", a
   assert.match(campaign, /setup stage failed before first shared command surface/u);
   assert.match(campaign, /setup stage completed within immutable deadline/u);
 });
+
+test("cold journeys preserve simultaneous disconnect while staggering renderer boot per virtual device", async () => {
+  const harness = await readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8");
+  const journeys = await readFile(new URL("journeys.mjs", import.meta.url), "utf8");
+  assert.match(
+    harness,
+    /async coldReopenClients\(\)[\s\S]*Promise\.all\(clients\.map\(client => client\.prepareReopen\(\)\)\)[\s\S]*for \(const client of clients\)[\s\S]*await client\.open\(\)/u,
+    "both old pages close together but CPU-heavy Phaser boots do not compete on one CI machine",
+  );
+  assert.match(
+    harness,
+    /async coldReplaceContextsAndLogin\(\)[\s\S]*Promise\.all\(clients\.map\(client => client\.prepareEmptyContext\(\)\)\)[\s\S]*for \(const client of clients\)[\s\S]*await client\.open\(\)/u,
+    "brand-new contexts use the same per-device boot discipline",
+  );
+  assert.doesNotMatch(
+    journeys,
+    /Promise\.all\(Object\.values\(rig\.clients\)\.map\(client => client\.reopen\(\)\)\)/u,
+    "no journey bypasses the contention-safe rig boundary",
+  );
+});

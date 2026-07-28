@@ -416,7 +416,7 @@ async function saveMutations(rig) {
   }
 
   await rig.stopChromeTrace();
-  await Promise.all(Object.values(rig.clients).map(client => client.reopen()));
+  await rig.coldReopenClients();
   await rig.loginBoth();
 
   const deleted = rig.client("host-seat");
