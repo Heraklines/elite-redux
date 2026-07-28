@@ -5091,3 +5091,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   and scene, preventing a two-engine microtask from attesting the peer handler.
 - Local-safe TypeScript, scoped Biome, and node-pure source contracts are green. The engine regressions remain
   remote-only; no deployment occurred.
+
+## 2026-07-29 - Exact gate 30403366964 artifact corrections
+
+- The first Bargain correction removed premature V2 rotation but the failure-first duo still exposed an async realm
+  bug: its guest UI terminal resumed while the host was ambient and consulted the process-global controller. Bargain
+  now binds owner terminal, watcher outcome, UI closure, relay, controller, and rotation to the phase's captured
+  runtime/scene. A guest proposal can no longer be mistaken for a host-local commit in the in-process topology.
+- The host-first double-faint row now reaches both ordered replacements. Its final assertion was over-specific: when
+  the first replacement receives its real `controlInstalled` receipt before the second commits, it is already retired
+  and must not also appear in `subsumes`. The proof now accepts exactly normal retirement or explicit supersession.
+- The initial scheduled-Mystery harness rewrite fixed the late biome predecessor but disturbed existing ME reward
+  tails. It was reverted. The replacement is targeted: retain the original host crossing, then drive only the exact
+  guest `SelectBiomePhase` predecessor before the ME mirror can replace that battle.
+- Gate `30403366964` remains historical evidence for these mechanisms. The next exact-SHA qualification must prove
+  B1, B6, C1/C3, and static together. No local engine/browser execution and no deployment occurred.

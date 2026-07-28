@@ -45,8 +45,10 @@ import {
   isCoopV2InteractionHumanInputFrozen,
   notifyCoopV2InteractionSurfaceReady,
   retainCoopV2InteractionProposal,
+  runWhenCoopRuntimeActive,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { erRecordSevenSinOutcome } from "#data/elite-redux/er-achievement-detection";
 import { erAchvRun } from "#data/elite-redux/er-achievement-run-state";
 import {
@@ -192,7 +194,7 @@ export class TheBargainPhase extends Phase {
 
   /** Advance ownership only after this runtime has retained/applied the exact immutable Bargain result. */
   private advanceCoopBargainFromCommittedResult(): void {
-    const controller = getCoopController();
+    const controller = this.coopOwningRuntime?.controller ?? getCoopController();
     if (controller == null || this.coopBargainStart < 0) {
       return;
     }
@@ -212,13 +214,13 @@ export class TheBargainPhase extends Phase {
    */
   private flushCoopBargainTerminal(): void {
     const outcome = this.coopTerminalOutcome;
-    const controller = getCoopController();
+    const runtime = this.coopOwningRuntime ?? getCoopRuntime();
+    const controller = runtime?.controller ?? getCoopController();
     if (outcome == null || controller == null) {
       return;
     }
     const operationId = coopBargainOperationId(this.coopBargainStart);
     const seq = COOP_BARGAIN_SEQ_BASE + this.coopBargainStart;
-    const runtime = this.coopOwningRuntime ?? getCoopRuntime();
     const awaitsAuthoritativeResult =
       controller.role === "guest" && isCoopV2InteractionCutoverActive(runtime?.durability);
     // A host/legacy owner has already ended its exact local phase before publishing. A V2 guest owner is
@@ -242,7 +244,7 @@ export class TheBargainPhase extends Phase {
     if (!awaitsAuthoritativeResult && isCoopV2InteractionCutoverActive(runtime?.durability)) {
       this.advanceCoopBargainFromCommittedResult();
     }
-    const relay = getCoopInteractionRelay();
+    const relay = runtime?.interactionRelay ?? getCoopInteractionRelay();
     const sendProposal = (): void => relay?.sendInteractionOutcomeProposal(seq, "bargain", outcome, operationId);
     if (awaitsAuthoritativeResult) {
       if (relay == null || runtime == null) {
@@ -326,15 +328,22 @@ export class TheBargainPhase extends Phase {
   /** Close locally only when no host-authored V2 result still owns this phase's successor. */
   private closeCoopBargainOwnerTerminal(): void {
     const runtime = this.coopOwningRuntime ?? getCoopRuntime();
-    const controller = getCoopController();
-    const parkForAuthority =
-      this.coopTerminalOutcome != null
-      && controller?.role === "guest"
-      && isCoopV2InteractionCutoverActive(runtime?.durability);
-    if (!parkForAuthority) {
-      super.end();
+    const close = (): void => {
+      const controller = runtime?.controller ?? getCoopController();
+      const parkForAuthority =
+        this.coopTerminalOutcome != null
+        && controller?.role === "guest"
+        && isCoopV2InteractionCutoverActive(runtime?.durability);
+      if (!parkForAuthority) {
+        super.end();
+      }
+      this.flushCoopBargainTerminal();
+    };
+    if (runtime == null) {
+      close();
+    } else {
+      runWhenCoopRuntimeActive(runtime, close);
     }
-    this.flushCoopBargainTerminal();
   }
 
   /** Co-op WATCHER (#795): renders the immutable offer passively and adopts the owner's outcome verbatim. */
@@ -347,8 +356,9 @@ export class TheBargainPhase extends Phase {
     } catch {
       /* cosmetic */
     }
-    const controller = getCoopController();
-    const relay = getCoopInteractionRelay();
+    const runtime = this.coopOwningRuntime ?? getCoopRuntime();
+    const controller = runtime?.controller ?? getCoopController();
+    const relay = runtime?.interactionRelay ?? getCoopInteractionRelay();
     const seq = COOP_BARGAIN_SEQ_BASE + this.coopBargainStart;
     const operationId = coopBargainOperationId(this.coopBargainStart);
     // The host watching a guest-owned Bargain consumes a non-authority proposal and turns it into the
@@ -362,8 +372,22 @@ export class TheBargainPhase extends Phase {
         : controller.role === "host"
           ? await relay.awaitInteractionOutcomeProposal(seq, "bargain", operationId, COOP_BIOME_WAIT_MS)
           : await relay.awaitInteractionOutcome(seq, COOP_BIOME_WAIT_MS);
+    const finish = (): void => this.finishCoopBargainWatch(outcome, controller?.role ?? null, runtime);
+    if (runtime == null) {
+      finish();
+    } else {
+      runWhenCoopRuntimeActive(runtime, finish);
+    }
+  }
+
+  /** Resume the watcher only in the runtime/scene that owns its phase after the relay promise settles. */
+  private finishCoopBargainWatch(
+    outcome: CoopInteractionOutcome | null,
+    localRole: CoopRuntime["controller"]["role"] | null,
+    runtime: CoopRuntime | null,
+  ): void {
     const adoption =
-      controller == null
+      localRole == null
         ? {
             accepted: false,
             projectionApplied: false,
@@ -374,7 +398,7 @@ export class TheBargainPhase extends Phase {
         : adoptBargainWatcherOutcome({
             pinned: this.coopBargainStart,
             outcome,
-            localRole: controller.role,
+            localRole,
             wave: globalScene.currentBattle?.waveIndex ?? 0,
             turn: globalScene.currentBattle?.turn ?? 0,
           });
@@ -385,13 +409,13 @@ export class TheBargainPhase extends Phase {
         return;
       }
     } else {
-      if (controller?.role === "host" && outcome?.k === "meResync" && isCoopBargainOperationEnabled()) {
+      if (localRole === "host" && outcome?.k === "meResync" && isCoopBargainOperationEnabled()) {
         failCoopSharedSession(`Bargain proposal ${this.coopBargainStart} could not enter durable authority`);
         return;
       }
       coopWarn("reward", `bargain WATCHER: ${outcome == null ? "TIMEOUT" : "unexpected outcome kind"} -> move on`);
     }
-    const v2 = isCoopV2InteractionCutoverActive(this.coopOwningRuntime?.durability);
+    const v2 = isCoopV2InteractionCutoverActive(runtime?.durability);
     if (!v2) {
       advanceCoopInteractionForContinuation(this.coopBargainStart);
     } else if (adoption.accepted && !adoption.requiresAuthorityCommit) {
@@ -403,10 +427,10 @@ export class TheBargainPhase extends Phase {
     } catch {
       /* cosmetic */
     }
-    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+    const finalize = (): void => {
       this.end();
       if (adoption.accepted && adoption.operationId != null) {
-        settleCoopV2InteractionOperation(adoption.operationId, this.coopOwningRuntime);
+        settleCoopV2InteractionOperation(adoption.operationId, runtime);
       }
       if (
         adoption.requiresAuthorityCommit
@@ -426,6 +450,13 @@ export class TheBargainPhase extends Phase {
       } else if (v2 && adoption.requiresAuthorityCommit) {
         // Guest-owned proposal: authority rotates only after retaining its complete immutable result.
         this.advanceCoopBargainFromCommittedResult();
+      }
+    };
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+      if (runtime == null) {
+        finalize();
+      } else {
+        runWhenCoopRuntimeActive(runtime, finalize);
       }
     });
   }

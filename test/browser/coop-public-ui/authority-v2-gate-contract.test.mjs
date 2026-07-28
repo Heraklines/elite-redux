@@ -3684,6 +3684,32 @@ test("the one-process soak retains the authority browser while nested peer pumps
   );
 });
 
+test("a scheduled Mystery preserves the replica's retained World Map predecessor", () => {
+  const helperStart = soakDriver.indexOf("  const settleGuestBiomePredecessorForMystery = async (");
+  const helperEnd = soakDriver.indexOf("\n\n  /**\n   * Drive ONE mid-run ME wave", helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart, "the targeted predecessor helper has a bounded source block");
+  const helper = soakDriver.slice(helperStart, helperEnd);
+  assert.match(helper, /phase\.phaseName !== "SelectBiomePhase"/u);
+  assert.match(helper, /requireCoopSourceWave\(\) === sourceWave/u);
+  assert.match(helper, /guestBiome\.start\(\)/u);
+  assert.match(helper, /rig\.guestScene\.arena\.biomeId !== rig\.hostScene\.arena\.biomeId/u);
+
+  const scheduledStart = soakDriver.indexOf("        const nextMeType = opts.meWaves?.get(wave + 1);");
+  const scheduledEnd = soakDriver.indexOf("      } catch (e) {", scheduledStart);
+  const scheduled = soakDriver.slice(scheduledStart, scheduledEnd);
+  assert.match(scheduled, /await withClient\(rig\.hostCtx,[\s\S]+persistInstalledClientMePins\(rig\.hostCtx\)/u);
+  assert.match(
+    scheduled,
+    /await settleGuestBiomePredecessorForMystery\(wave \+ 1\)/u,
+    "the replica predecessor retires only after the authority ME is captured and before its mirror is installed",
+  );
+  assert.match(
+    soakDriver,
+    /const crossIntoMeWave = async \(type:[\s\S]+game\.phaseInterceptor\.to\("MysteryEncounterPhase", false\)/u,
+    "the existing host crossing remains intact; broad crossing rewrites previously stranded the ME reward tail",
+  );
+});
+
 test("the one-process duo pins Phaser tween callbacks to the browser that scheduled them", () => {
   const pinsStart = duoHarness.indexOf("function installDuoCtxOwnershipPins(");
   const pinsEnd = duoHarness.indexOf("\n/**\n * Dispose both independently assembled runtimes", pinsStart);

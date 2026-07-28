@@ -229,7 +229,7 @@ describe.skipIf(!RUN)(
       await withClient(rig.guestCtx, async () => {
         const ui = rig.guestScene.ui as unknown as StubbableUi;
         const realSetMode = ui.setMode.bind(ui);
-        let choosePartySlot: ((slotIndex: number) => void) | null = null;
+        const partyPicker: { current: ((slotIndex: number) => void) | null } = { current: null };
         ui.showText = (...args: unknown[]): unknown => {
           const cb = args.find(a => typeof a === "function") as (() => void) | undefined;
           cb?.();
@@ -238,7 +238,7 @@ describe.skipIf(!RUN)(
         ui.setMode = (...args: unknown[]): unknown => {
           const mode = args[0];
           if (mode === UiMode.PARTY) {
-            choosePartySlot = args[3] as (slotIndex: number) => void;
+            partyPicker.current = args[3] as (slotIndex: number) => void;
             return Promise.resolve();
           }
           if (mode === UiMode.MESSAGE) {
@@ -249,8 +249,8 @@ describe.skipIf(!RUN)(
         (guestPicker as Phase).start();
         await Promise.resolve();
         ui.setMode = realSetMode;
-        expect(choosePartySlot, "the actionable PARTY surface exposed its public picker callback").not.toBeNull();
-        choosePartySlot?.(OWNER_PICK_SLOT);
+        expect(partyPicker.current, "the actionable PARTY surface exposed its public picker callback").not.toBeNull();
+        partyPicker.current?.(OWNER_PICK_SLOT);
       });
 
       // ===== (D) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the helper's

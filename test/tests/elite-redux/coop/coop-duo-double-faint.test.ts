@@ -448,10 +448,15 @@ describe.skipIf(!RUN)(
         finalReplacement?.operationId,
         "the chained replacement result belongs to the deliberately second-fainted owner and field slot",
       ).toMatch(new RegExp(`/f${order.secondFieldIndex}/s${order.secondOwnerSeatId}$`, "u"));
+      const firstReplacementRetiredNormally = allLogs.some(line =>
+        new RegExp(`receipt rev=${firstReplacement?.revision ?? -1} .*stage=controlInstalled .*retired=true`, "u").test(
+          line,
+        ),
+      );
       expect(
-        finalReplacement?.subsumes,
-        "the complete-field replacement explicitly subsumes its intermediate same-chain commit",
-      ).toContain(firstReplacement?.revision);
+        finalReplacement?.subsumes.includes(firstReplacement?.revision ?? -1) || firstReplacementRetiredNormally,
+        "the intermediate replacement is either explicitly subsumed or already retired by its real installed successor",
+      ).toBe(true);
       expect(
         finalReplacement?.nextControl,
         "the complete replacement field advances to the command frontier",

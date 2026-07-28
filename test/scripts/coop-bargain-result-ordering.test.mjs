@@ -38,4 +38,11 @@ test("Authority V2 Bargain rotation is owned by the immutable result commit", ()
     watcherCommit >= 0 && watcherAdvance > watcherCommit,
     "a guest-owned proposal cannot rotate the authority before its immutable result is retained",
   );
+
+  const ownerClose = method("private closeCoopBargainOwnerTerminal(): void", "private async coopBargainWatch");
+  assert.match(ownerClose, /runWhenCoopRuntimeActive\(runtime, close\)/u);
+  const watch = method("private async coopBargainWatch(): Promise<void>", "private rollAvailableSins");
+  assert.match(watch, /const controller = runtime\?\.controller \?\? getCoopController\(\)/u);
+  assert.match(watch, /runWhenCoopRuntimeActive\(runtime, finish\)/u);
+  assert.match(watch, /runWhenCoopRuntimeActive\(runtime, finalize\)/u);
 });

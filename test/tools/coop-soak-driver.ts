@@ -3731,6 +3731,63 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   };
 
   /**
+   * Retire the replica's exact signed World Map predecessor before replacing its battle with a scheduled ME.
+   * A reward terminal can construct the authority's ME immediately while the one-process PhaseInterceptor has
+   * intentionally suppressed the replica scheduler. Real browsers start that retained SelectBiomePhase on their
+   * own; the soak must drive the same phase instead of letting mirrorHostMeToGuest overwrite it.
+   */
+  type ScheduledMysteryBiomeBoundary = Phase & { requireCoopSourceWave(): number };
+  const settleGuestBiomePredecessorForMystery = async (destinationWave: number): Promise<void> => {
+    if (rig.guestScene.arena.biomeId === rig.hostScene.arena.biomeId) {
+      return;
+    }
+    const sourceWave = destinationWave - 1;
+    const guestBiome = (await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, `scheduled Mystery biome predecessor ${sourceWave}`, {
+        matches: phase => {
+          if (phase.phaseName !== "SelectBiomePhase") {
+            return false;
+          }
+          try {
+            return (phase as unknown as ScheduledMysteryBiomeBoundary).requireCoopSourceWave() === sourceWave;
+          } catch {
+            return false;
+          }
+        },
+      }),
+    )) as unknown as ScheduledMysteryBiomeBoundary;
+    await withClient(rig.guestCtx, async () => {
+      guestBiome.start();
+      await drainLoopback();
+    });
+    const identity = guestBiome as unknown as object;
+    for (let attempt = 0; attempt < 160; attempt++) {
+      await pumpDuoDestinations(rig, 1);
+      if ((rig.guestScene.phaseManager.getCurrentPhase() as unknown as object | undefined) !== identity) {
+        break;
+      }
+      await new Promise<void>(resolve => setTimeout(resolve, 10));
+    }
+    if ((rig.guestScene.phaseManager.getCurrentPhase() as unknown as object | undefined) === identity) {
+      fail(
+        "no-park",
+        sourceWave,
+        "scheduled Mystery replica did not retire its retained World Map predecessor "
+          + `(hostBiome=${rig.hostScene.arena.biomeId} guestBiome=${rig.guestScene.arena.biomeId})`,
+      );
+    }
+    if (rig.guestScene.arena.biomeId !== rig.hostScene.arena.biomeId) {
+      fail(
+        "desync",
+        sourceWave,
+        "scheduled Mystery World Map predecessor landed in different biomes "
+          + `(host=${rig.hostScene.arena.biomeId} guest=${rig.guestScene.arena.biomeId})`,
+      );
+    }
+    actionScript.push(`wave ${sourceWave}: guest consumed retained World Map before scheduled Mystery wave`);
+  };
+
+  /**
    * Drive ONE mid-run ME wave across BOTH engines (BUILD 1). The host is parked at MysteryEncounterPhase (ME
    * set) from {@linkcode crossIntoMeWave}. Mirror the host's ME onto the guest, then route by counter parity:
    *   - HOST-OWNED (even counter): the host drives its OWN pick (option 1 = a SAFE non-battle option) + embedded
@@ -5229,6 +5286,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             // so deferring this until processMeWave would read the wrong browser-local module graph.
             persistInstalledClientMePins(rig.hostCtx);
           });
+          // The authority may already have constructed this ME from the preceding reward terminal. Preserve the
+          // replica's retained BIOME_PICK ordering before processMeWave installs the ME battle image.
+          await settleGuestBiomePredecessorForMystery(wave + 1);
         }
       } catch (e) {
         // #846: the crossing itself can hit a run-end (a killing turn that also wiped the host, or a
