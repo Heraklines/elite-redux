@@ -234,6 +234,38 @@ test("animation progress may extend a wait but cannot cross its absolute present
   assert.equal(budget.hardDeadline(), 1_390);
 });
 
+test("a completed campaign proves the final presentation prefix without requiring another command", async () => {
+  const hostEvidence = new FakeEvidence("host-seat");
+  const guestEvidence = new FakeEvidence("guest-seat");
+  const event = { k: "showAbility", actor: { side: "enemy", index: 0 }, abilityId: 12 };
+  hostEvidence.push({
+    kind: "browser-presentation-event",
+    observation: { stage: "authority-recorded", role: "host", epoch: 7, wave: 10, turn: 3, seq: 4, event },
+  });
+  guestEvidence.push({
+    kind: "browser-presentation-event",
+    observation: { stage: "renderer-completed", role: "guest", epoch: 7, wave: 10, turn: 3, seq: 4, event },
+  });
+  let invocation = null;
+  const rig = {
+    host: { evidence: hostEvidence },
+    guest: { evidence: guestEvidence },
+    config: { timeoutMs: 100 },
+    assertPresentationLedger(cursors, match, proofName, options) {
+      invocation = { cursors, match, proofName, options };
+      return [event];
+    },
+  };
+
+  const ledger = await DuoPublicUiRig.prototype.assertCurrentPresentationLedger.call(rig, "final-wave-ledger");
+
+  assert.deepEqual(ledger, [event]);
+  assert.equal(invocation.match.comparable.epoch, 7);
+  assert.equal(invocation.match.hostProjection.event.index, 1);
+  assert.equal(invocation.match.guestProjection.event.index, 1);
+  assert.deepEqual(invocation.options, { allowEmpty: false, currentEpochPrefix: true });
+});
+
 test("Commander post-turn prompts use its proven address without inventing a hidden-owner command surface", async () => {
   const address = { epoch: 73, wave: 1, turn: 2 };
   const pressed = [];

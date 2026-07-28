@@ -146,17 +146,15 @@ test("a chained Mystery gauntlet refreshes only from proven surface progress and
 test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wave profile", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
   assert.match(workflow, /VITE_DEV_TOOLS: 1/u);
-  // The live difficulty picker's semantic id renamed "mystery-test" -> "mystery"
-  // (run 29586411356 failed loudly on the stale id); a comment line now sits between
-  // the difficulty and option keys, so match the keys individually in order.
   assert.match(
     workflow,
-    /profile: mystery-gauntlet\s+artifact: mystery\s+waves: "10"\s+difficulty: mystery\s+[\s\S]{0,400}?difficulty_option: mystery\s+require_mystery: "1"/u,
+    /profile: "mystery-gauntlet", artifact: "mystery", waves: "10",\s+difficulty: "mystery", difficulty_option: "mystery", require_mystery: "1"/u,
   );
   assert.match(workflow, /COOP_UI_DIFFICULTY_ID: \$\{\{ matrix\.difficulty \}\}/u);
   assert.match(workflow, /COOP_UI_DIFFICULTY_OPTION_ID: \$\{\{ matrix\.difficulty_option \}\}/u);
   assert.match(workflow, /COOP_UI_REQUIRE_MYSTERY_GAUNTLET: \$\{\{ matrix\.require_mystery \}\}/u);
-  assert.match(workflow, /profile: mystery-gauntlet[\s\S]{0,700}?reward_mode: pick-first/u);
+  assert.match(workflow, /profile: "mystery-gauntlet"[\s\S]{0,700}?reward_mode: "pick-first"/u);
+  assert.match(workflow, /campaign_profile:[\s\S]*- mystery/u, "mystery-only diagnosis is directly dispatchable");
 });
 
 test("Mystery gauntlet picks the visible safe exit while normal play preserves the first enabled choice", () => {

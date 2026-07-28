@@ -930,6 +930,36 @@ function findOwnedCommandUi(client, from) {
   return client.evidence.find(LOCAL_COMMAND, from) ?? null;
 }
 
+function attemptCurrentPresentationLedger(rig, host, guest, proofName) {
+  const authorityEvent = host.evidence.events.findLast(
+    event => event.kind === "browser-presentation-event" && event.observation?.stage === "authority-recorded",
+  );
+  const epoch = authorityEvent?.observation?.epoch;
+  if (!Number.isSafeInteger(epoch) || epoch <= 0) {
+    return { ledger: null, error: new Error(`${proofName}: authority emitted no current-epoch presentation event`) };
+  }
+  const currentTail = {
+    hostProjection: { event: { index: host.evidence.cursor() } },
+    guestProjection: { event: { index: guest.evidence.cursor() } },
+    comparable: { epoch },
+  };
+  try {
+    const ledger = rig.assertPresentationLedger({}, currentTail, proofName, {
+      allowEmpty: false,
+      currentEpochPrefix: true,
+    });
+    return { ledger, error: null };
+  } catch (error) {
+    const failure = error instanceof Error ? error : new Error(String(error));
+    // Missing/unequal tails can be ordinary renderer lag. Structurally invalid receipts are
+    // decided failures and must not be disguised as a later generic timeout.
+    if (!/presentation ledger (?:was empty|diverged)/u.test(failure.message)) {
+      throw failure;
+    }
+    return { ledger: null, error: failure };
+  }
+}
+
 export class PublicUiClient {
   constructor(browserContext, credentials, config) {
     this.context = browserContext;
@@ -961,7 +991,7 @@ export class PublicUiClient {
       // 404 like a fresh account. expectReclaim is that lane's unique signal (run 29654429335).
       config.expectReclaim === true,
       // Per-profile checkpoint pixel-integrity capture (replay-pacing harness trim): the depth lane
-      // passes false -> DOM-only checkpoints; surface + mystery keep the PNG pixel oracle.
+      // passes false -> first-shape DOM checkpoints; surface + mystery keep the PNG pixel oracle.
       config.checkpointPixelCapture,
     );
   }
@@ -2546,6 +2576,32 @@ export class DuoPublicUiRig {
     // the entire current-epoch prefix instead: this is strictly stronger and remains immune to cross-seat
     // scheduling skew.
     this.assertPresentationLedger(cursors, match, proofName, { allowEmpty: true, currentEpochPrefix: true });
+  }
+
+  /**
+   * Final campaign-tail counterpart of the shared-command proof. A wave may settle directly into a
+   * reward, transition, or terminal without opening another command, so there is no later final-player
+   * input edge at which to compare the just-finished turn. At a settled campaign boundary, wait until
+   * the renderer has consumed the authority's complete current-epoch prefix and apply the exact same
+   * canonical receipt oracle used during ordinary command progression.
+   */
+  async assertCurrentPresentationLedger(proofName) {
+    const host = this.host;
+    const guest = this.guest;
+    if (!host || !guest) {
+      throw new Error(`${proofName}: paired host/guest presentation observations were unavailable`);
+    }
+    const deadline = Date.now() + this.config.timeoutMs;
+    let lastError = null;
+    while (Date.now() < deadline) {
+      const attempt = attemptCurrentPresentationLedger(this, host, guest, proofName);
+      if (attempt.ledger != null) {
+        return attempt.ledger;
+      }
+      lastError = attempt.error;
+      await delay(100);
+    }
+    throw new Error(`${proofName}: final presentation ledger did not settle: ${lastError?.message ?? "no evidence"}`);
   }
 
   /**

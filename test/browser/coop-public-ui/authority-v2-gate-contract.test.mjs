@@ -3289,7 +3289,7 @@ test("the campaign presentation oracle compares a canonical epoch prefix instead
   );
   const proof = publicUiHarness.slice(proofStart, proofEnd);
   assert.match(proof, /currentEpochPrefix: true/u);
-  const ledgerStart = publicUiHarness.indexOf("assertPresentationLedger(");
+  const ledgerStart = publicUiHarness.indexOf("\n  assertPresentationLedger(cursors, commandMatch");
   const ledgerEnd = publicUiHarness.indexOf("\n  /**", ledgerStart);
   assert.ok(ledgerStart >= 0 && ledgerEnd > ledgerStart, "the ordered presentation ledger has a bounded source block");
   const ledger = publicUiHarness.slice(ledgerStart, ledgerEnd);

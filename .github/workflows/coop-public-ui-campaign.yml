@@ -13,6 +13,17 @@ on:
         required: false
         type: string
         default: "2"
+      campaign_profile:
+        description: Run every browser campaign profile, or isolate one profile for fast diagnosis
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - surface
+          - depth
+          - mystery
+          - dirty
       cadence:
         description: Human input cadence (fast keeps 30 waves inside the CI budget)
         required: true
@@ -68,7 +79,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: coop-public-ui-campaign-${{ github.ref }}
+  # Different explicitly selected profiles may qualify in parallel on separate hosted machines.
+  # Repeated runs of the same profile/ref remain serialized so they cannot contend for one diagnosis line.
+  group: coop-public-ui-campaign-${{ github.ref }}-${{ (github.event_name == 'workflow_dispatch' && inputs.campaign_profile) || github.event_name }}
   cancel-in-progress: false
 
 env:
@@ -284,73 +297,70 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+  campaign-plan:
+    name: Select concrete campaign profiles
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Build the requested profile matrix
+        id: matrix
+        env:
+          SELECTED_PROFILE: ${{ inputs.campaign_profile || 'all' }}
+          DEPTH_WAVES: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
+          SURFACE_WAVES: ${{ inputs.surface_waves || '2' }}
+          DEPTH_REWARD_MODE: ${{ inputs.reward_mode || 'pick-first' }}
+        shell: bash
+        run: |
+          profiles="$(jq -cn \
+            --arg depthWaves "$DEPTH_WAVES" \
+            --arg surfaceWaves "$SURFACE_WAVES" \
+            --arg depthRewardMode "$DEPTH_REWARD_MODE" \
+            '[
+              {
+                profile: "animations-on-surface", artifact: "surface", waves: $surfaceWaves,
+                difficulty: "ace", difficulty_option: "ace", require_mystery: "0",
+                reward_mode: "leave", campaign_timeout_ms: "3120000",
+                process_timeout: "55m", job_timeout_minutes: 65
+              },
+              {
+                profile: "animations-skipped-depth", artifact: "depth", waves: $depthWaves,
+                difficulty: "youngster", difficulty_option: "youngster", require_mystery: "0",
+                reward_mode: $depthRewardMode, campaign_timeout_ms: "2700000",
+                process_timeout: "48m", job_timeout_minutes: 55
+              },
+              {
+                profile: "mystery-gauntlet", artifact: "mystery", waves: "10",
+                difficulty: "mystery", difficulty_option: "mystery", require_mystery: "1",
+                reward_mode: "pick-first", campaign_timeout_ms: "4800000",
+                process_timeout: "83m", job_timeout_minutes: 90
+              },
+              {
+                profile: "animations-skipped-depth", artifact: "dirty", waves: "3",
+                difficulty: "ace", difficulty_option: "ace", require_mystery: "0",
+                dirty_accounts: "1", reward_mode: "leave", campaign_timeout_ms: "2700000",
+                process_timeout: "48m", job_timeout_minutes: 55
+              }
+            ]')"
+          if [[ "$SELECTED_PROFILE" != "all" ]]; then
+            profiles="$(jq -c --arg selected "$SELECTED_PROFILE" '[.[] | select(.artifact == $selected)]' <<<"$profiles")"
+          fi
+          if [[ "$(jq 'length' <<<"$profiles")" -eq 0 ]]; then
+            echo "Unknown campaign profile: $SELECTED_PROFILE" >&2
+            exit 1
+          fi
+          echo "matrix=$(jq -cn --argjson include "$profiles" '{include: $include}')" >> "$GITHUB_OUTPUT"
+
   campaign:
     name: ${{ matrix.waves }}-wave co-op / ${{ matrix.profile }} / ${{ inputs.cadence || 'fast' }}
-    needs: browser-build
+    needs:
+      - browser-build
+      - campaign-plan
     runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ matrix.job_timeout_minutes }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - profile: animations-on-surface
-            artifact: surface
-            # Two complete real-animation waves cover both reward-owner directions plus entry,
-            # move, damage, faint, replacement, and reward presentation. A third wave made no new
-            # presentation claim and only crossed the old 45m outer deadline on ~3fps hosted GPUs.
-            waves: ${{ inputs.surface_waves || '2' }}
-            difficulty: ace
-            difficulty_option: ace
-            require_mystery: "0"
-            reward_mode: leave
-            campaign_timeout_ms: "3120000"
-            process_timeout: 55m
-            job_timeout_minutes: 65
-          - profile: animations-skipped-depth
-            artifact: depth
-            waves: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
-            # The long lane qualifies sustained synchronization, not challenge balance. Ace wiped both
-            # correctly synchronized clients on wave 4 even with semantic best-move selection and rewards,
-            # making the 30-wave claim unreachable for reasons unrelated to co-op. Keep the short surface
-            # and dirty-account lanes on Ace; use the real easiest difficulty for long-run depth.
-            difficulty: youngster
-            difficulty_option: youngster
-            require_mystery: "0"
-            reward_mode: ${{ inputs.reward_mode || 'pick-first' }}
-            campaign_timeout_ms: "2700000"
-            process_timeout: 48m
-            job_timeout_minutes: 55
-          - profile: mystery-gauntlet
-            artifact: mystery
-            waves: "10"
-            difficulty: mystery
-            # The live difficulty picker renamed its option id "mystery-test" -> "mystery"
-            # (run 29586411356: selectOptionById target not in ["youngster","ace","elite","hell","mystery"]).
-            difficulty_option: mystery
-            require_mystery: "1"
-            # This is a ten-wave public-play journey, so act like a player trying to survive it:
-            # take visible rewards instead of throwing every one away before the scripted boss/ghost.
-            reward_mode: pick-first
-            campaign_timeout_ms: "2700000"
-            process_timeout: 48m
-            job_timeout_minutes: 55
-          # Account-state fidelity lane (harness post-mortem 2026-07-17): every other profile
-          # registers PRISTINE accounts, which made the whole dirty-account bug class (full slots,
-          # divergent co-op remnants, reclaim ranking, guest checkpoint no-safe-slot) invisible to
-          # CI while it broke four live pairs in one evening. This lane pre-seeds BOTH accounts
-          # full (4 solo saves + 1 divergent remnant), logs in visibly, and proves the launch
-          # reclaims the remnant FIRST and still reaches real waves.
-          - profile: animations-skipped-depth
-            artifact: dirty
-            waves: "3"
-            difficulty: ace
-            difficulty_option: ace
-            require_mystery: "0"
-            dirty_accounts: "1"
-            reward_mode: leave
-            campaign_timeout_ms: "2700000"
-            process_timeout: 48m
-            job_timeout_minutes: 55
+      matrix: ${{ fromJSON(needs.campaign-plan.outputs.matrix) }}
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -530,7 +540,7 @@ jobs:
       - campaign
     runs-on: ubuntu-latest
     steps:
-      - name: Require healthy staging and every concrete browser profile
+      - name: Require healthy staging and every requested browser profile
         env:
           STAGING_HEALTHY: ${{ needs.staging-health.outputs.healthy }}
           HEALTH_RESULT: ${{ needs.staging-health.result }}

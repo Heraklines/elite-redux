@@ -3385,6 +3385,7 @@ export async function runCampaign(rig) {
       }
     }
     if (status === "continue" && wavesCleared >= policy.targetWaves) {
+      await rig.assertCurrentPresentationLedger(`campaign-final-wave-${wavesCleared}-presentation-ledger`);
       assertRetainedEvolutionPresentationParity(rig, policy);
     }
   } finally {

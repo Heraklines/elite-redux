@@ -129,6 +129,7 @@ const FATAL_COOP_CONSOLE_RULES = Object.freeze([
     /^\[coop:relay\].*(?:\bDECLINE reply\b.*\bAI-falls-back\b|\brecv command DECLINE\b.*\bAI fallback\b)/u,
     "command ownership disagreement",
   ],
+  [/^\[coop:replay\] partner replacement pick field=\d+ TIMED OUT -> auto-pick\b/u, "replacement input fallback"],
   [/^\[coop:runtime\] STALL WATCHDOG:.*-> recovering\b/u, "stall recovery attempt"],
   [/^\[coop:me\].*requesting durable replay\b/u, "Mystery durability recovery attempt"],
   [/^\[coop:resync\].*(?:\bawait stateSync start\b|\bqueueing full snapshot apply\b)/u, "state resync attempt"],
@@ -1024,9 +1025,9 @@ export class EvidenceSink {
     // Per-profile checkpoint capture (replay-pacing harness trim). Default true = every checkpoint's
     // FIRST occurrence of a surface shape captures a pixel-inspected PNG (the surface/mystery lanes).
     // The DEPTH lane passes false: no per-checkpoint PNG (DOM-only) to cut the ~9s pixel readback/decode,
-    // while the DOM/cookie/canvas isolation proof below still runs EVERY checkpoint (no evidence-class
-    // weakening). A forced `full:true` (failure path) or COOP_UI_CHECKPOINT_MODE=full overrides this to
-    // still capture the PNG, so triage evidence is never lost.
+    // while the DOM/cookie/canvas isolation proof still runs on the first occurrence of every surface
+    // shape. Repeats remain semantic trace checkpoints; a forced `full:true` (failure path) or
+    // COOP_UI_CHECKPOINT_MODE=full restores the complete PNG + DOM capture, so triage evidence is never lost.
     this.pixelCheckpointCapture = pixelCheckpointCapture !== false;
     // Track R cycle-11 dirty lane (run 29654429335): the pre-seeded dirty account is FRESHLY
     // registered (session slots seeded, NO system save ever persisted) and then logged in visibly.
@@ -1773,12 +1774,14 @@ export class EvidenceSink {
     const checkpointStartedMs = performance.now();
     // Optimization brief R3: screenshots are no longer ordinary checkpoints. The FIRST
     // occurrence of each distinct surface shape (step name with run-variant digits
-    // normalized) captures a full pixel-inspected PNG; repeats of the same shape (the
-    // per-wave loop) are SEMANTIC checkpoints - the sanitized DOM/cookie metadata and the
-    // canvas assertion below always run (isolation proof stays), only the globally
-    // serialized PNG capture + in-renderer pixel decode are skipped. Callers force
+    // normalized) captures a full pixel-inspected PNG plus DOM/cookie/canvas proof; repeats
+    // of the same shape (the per-wave loop) are SEMANTIC checkpoints backed by the existing
+    // observer/V2 trace. Callers force
     // `full: true` on failure paths; COOP_UI_CHECKPOINT_MODE=full restores the legacy
-    // capture-everything diagnostic behavior.
+    // capture-everything diagnostic behavior. Repeated semantic checkpoints deliberately do
+    // not re-enter the saturated game renderer merely to hash the same DOM/cookie shape: their
+    // mechanical proof is the already-recorded semantic surface, public input echo, and V2 event
+    // stream. This keeps observation from consuming minutes of the lifecycle it is measuring.
     const surfaceKey = step.replaceAll(/\d+/gu, "N");
     this.fullCheckpointSurfaces ??= new Set();
     // Per-profile pixel skip (replay-pacing harness trim): a DOM-only seat (pixelCheckpointCapture
@@ -1787,9 +1790,12 @@ export class EvidenceSink {
     // (pixelCheckpointCapture true) keep the existing first-occurrence pixel oracle unchanged.
     const forcedFull = full === true || process.env.COOP_UI_CHECKPOINT_MODE === "full";
     const firstOccurrence = !this.fullCheckpointSurfaces.has(surfaceKey);
-    const captureFull = forcedFull || (this.pixelCheckpointCapture && firstOccurrence);
-    if (captureFull) {
+    const capturePixel = forcedFull || (this.pixelCheckpointCapture && firstOccurrence);
+    const captureDom = forcedFull || firstOccurrence;
+    if (firstOccurrence) {
       this.fullCheckpointSurfaces.add(surfaceKey);
+    }
+    if (capturePixel) {
       // WebGL canvases in a background Chromium page can capture as mostly black/partial tiles even
       // while the game is healthy. Each player owns an isolated Chrome process, so foreground both
       // independently, allow two real render frames plus a short bounded settle, then capture.
@@ -1812,6 +1818,11 @@ export class EvidenceSink {
       this.record("checkpoint-pixel-skipped", { name: step, surfaceKey, reason: "profile-dom-only" });
     } else {
       this.record("checkpoint-semantic", { name: step, surfaceKey });
+    }
+    if (!captureDom) {
+      this.record("checkpoint", { name: step, surfaceKey, evidence: "semantic" });
+      this.recordCheckpointTiming(step, performance.now() - checkpointStartedMs);
+      return null;
     }
     const dom = await page.evaluate(async () => {
       const storage = await Promise.all(

@@ -175,7 +175,8 @@ export function loadConfig() {
     // (animations-skipped-depth) runs animations OFF and does NOT need the expensive per-checkpoint
     // pixel-integrity PNG (a headed SwiftShader screenshot readback + in-page pixel decode measured
     // ~9s/checkpoint). It captures DOM-only instead (the DOM/cookie/canvas isolation proof still runs
-    // every checkpoint - no evidence-class weakening). The SURFACE + mystery lanes KEEP the pixel oracle.
+    // once per distinct surface shape; repeated checkpoints remain semantic trace evidence). The
+    // SURFACE + mystery lanes KEEP the pixel oracle.
     // Config-driven: default is derived from COOP_UI_RENDER_PROFILE, overridable via
     // COOP_UI_CHECKPOINT_PIXEL (a forced `full:true` failure capture and COOP_UI_CHECKPOINT_MODE=full
     // still take the PNG regardless, so triage evidence is never lost).

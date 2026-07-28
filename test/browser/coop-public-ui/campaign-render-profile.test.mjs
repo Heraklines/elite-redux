@@ -168,6 +168,10 @@ test("public input pacing accepts only the exact keyboard dispatch for this DOM 
 
 test("public input pacing cannot accept frame or UI changes without a game dispatch", async () => {
   const sink = new EvidenceSink("input-no-dispatch", ".");
+  // This is an in-memory pacing contract, not an artifact test. Install the same console-only
+  // recorder as the neighboring cases before emitting observations so parallel `node --test`
+  // workers never race a non-initialized filesystem sink in the repository root.
+  attachConsoleOnly(sink);
   const waiting = waitForPublicInputDispatch(sink, { from: 0, domKeysBefore: 7, timeoutMs: 30 });
   sink.record("browser-input-health", { observation: { domKeys: 8, frame: 102 } });
   sink.record("browser-input-echo", { observation: { domKeys: 8, active: true, cursor: 1 } });

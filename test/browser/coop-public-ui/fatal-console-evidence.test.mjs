@@ -34,6 +34,7 @@ const fatalLines = [
   "[coop:durability] recovery EXHAUSTED cls=reward from=1 blocked=3 attempts=8 reason=gap",
   "[coop:relay] peer recv commandRequest fieldIndex=0 owner=guest turn=2 for a slot that is NOT ours -> DECLINE reply (host AI-falls-back, #693)",
   "[coop:relay] recv command DECLINE fieldIndex=0 turn=2 -> AI fallback",
+  "[coop:replay] partner replacement pick field=1 TIMED OUT -> auto-pick",
   "[coop:runtime] STALL WATCHDOG: asymmetric wait (local=30s peer=0s) -> recovering (cancel orphan waits)",
   "[coop:me] host await guest index missing; retaining selector and requesting durable replay",
   "[coop:resync] await stateSync start seq=8000001",

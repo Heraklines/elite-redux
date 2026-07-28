@@ -5,8 +5,9 @@
 
 // Per-profile checkpoint capture trim (branch coop/fix-replay-pacing): the DEPTH lane
 // (animations-skipped-depth) captures DOM-only checkpoints (no ~9s per-checkpoint pixel PNG);
-// the SURFACE + mystery lanes keep the pixel oracle. Config-driven + overridable, and the
-// DOM/cookie/canvas isolation proof still runs on EVERY checkpoint (no evidence-class weakening).
+// the SURFACE + mystery lanes keep the pixel oracle. Each distinct surface shape gets the
+// DOM/cookie/canvas isolation proof once; repeated checkpoints retain semantic/V2 evidence without
+// re-entering a saturated renderer just to serialize the same diagnostic shape.
 
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -106,7 +107,7 @@ test("checkpoint: a DOM-only seat records a deliberate pixel skip and NEVER a pi
     const skip = sink.events.find(event => event.kind === "checkpoint-pixel-skipped");
     assert.equal(skip.reason, "profile-dom-only");
     assert.ok(!kinds.includes("checkpoint-pixel-integrity"), "no pixel-integrity PNG was captured");
-    assert.ok(kinds.includes("checkpoint"), "the checkpoint (DOM/cookie) evidence was still emitted");
+    assert.ok(kinds.includes("checkpoint"), "the first-shape checkpoint (DOM/cookie) evidence was emitted");
     await sink.flush();
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -122,6 +123,48 @@ test("checkpoint: the DOM-only path STILL enforces the non-zero game canvas isol
       () => sink.checkpoint(domPage([]), noCookies, "wave-2-cleared"),
       /no non-zero game canvas/u,
       "a blank/zero canvas still fails closed even in DOM-only mode",
+    );
+    await sink.flush();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("checkpoint: a repeated surface shape stays semantic and does not re-enter the game renderer", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "coop-ff-semantic-"));
+  let evaluations = 0;
+  let cookieReads = 0;
+  const page = domPage();
+  page.evaluate = async () => {
+    evaluations += 1;
+    return {
+      title: "Elite Redux",
+      url: "https://example.test/",
+      bodyText: "battle",
+      canvases: [{ width: 480, height: 270, clientWidth: 480, clientHeight: 270 }],
+      inputs: [],
+      storage: [],
+    };
+  };
+  const context = {
+    cookies: async () => {
+      cookieReads += 1;
+      return [];
+    },
+  };
+  try {
+    const sink = new EvidenceSink("seat", dir, [], 0, false, false);
+    await sink.init();
+    const first = await sink.checkpoint(page, context, "wave-1-cleared");
+    const repeated = await sink.checkpoint(page, context, "wave-2-cleared");
+
+    assert.ok(first.canvases.length > 0, "the first surface-shape checkpoint retains full DOM proof");
+    assert.equal(repeated, null, "a repeated semantic checkpoint does not fabricate stale DOM material");
+    assert.equal(evaluations, 1);
+    assert.equal(cookieReads, 1);
+    assert.ok(
+      sink.events.some(event => event.kind === "checkpoint-semantic" && event.name === "wave-2-cleared"),
+      "the repeated checkpoint remains explicit trace evidence",
     );
     await sink.flush();
   } finally {

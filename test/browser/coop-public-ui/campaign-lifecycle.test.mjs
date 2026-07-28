@@ -78,18 +78,33 @@ test("workflow reserves artifact-upload headroom and budgets the real-animation 
   assert.match(workflow, /timeout-minutes: \$\{\{ matrix\.job_timeout_minutes \}\}/u);
   assert.match(
     workflow,
-    /profile: animations-on-surface[\s\S]*waves: \$\{\{ inputs\.surface_waves \|\| '2' \}\}[\s\S]*campaign_timeout_ms: "3120000"[\s\S]*process_timeout: 55m[\s\S]*job_timeout_minutes: 65/u,
+    /profile: "animations-on-surface", artifact: "surface", waves: \$surfaceWaves,[\s\S]*campaign_timeout_ms: "3120000",[\s\S]*process_timeout: "55m", job_timeout_minutes: 65/u,
   );
-  assert.match(workflow, /profile: animations-skipped-depth[\s\S]*campaign_timeout_ms: "2700000"/u);
+  assert.match(workflow, /profile: "animations-skipped-depth"[\s\S]*campaign_timeout_ms: "2700000"/u);
   assert.match(
     workflow,
-    /profile: animations-skipped-depth[\s\S]*artifact: depth[\s\S]*difficulty: youngster[\s\S]*difficulty_option: youngster/u,
+    /profile: "animations-skipped-depth", artifact: "depth"[\s\S]*difficulty: "youngster", difficulty_option: "youngster"/u,
     "the long depth lane measures sustained co-op on the survivable real difficulty",
   );
   assert.match(
     workflow,
-    /artifact: dirty[\s\S]*difficulty: ace[\s\S]*difficulty_option: ace/u,
+    /artifact: "dirty"[\s\S]*difficulty: "ace", difficulty_option: "ace"/u,
     "the short dirty-account lane retains hard-combat coverage",
+  );
+  assert.match(
+    workflow,
+    /artifact: "mystery"[\s\S]*campaign_timeout_ms: "4800000"[\s\S]*process_timeout: "83m", job_timeout_minutes: 90/u,
+    "the exact ten-wave mystery lane is not killed by the old five-wave hosted-runner ceiling",
+  );
+  assert.match(
+    workflow,
+    /SELECTED_PROFILE:[\s\S]*jq -c --arg selected "\$SELECTED_PROFILE" '\[\.\[\] \| select\(\.artifact == \$selected\)\]'/u,
+    "manual iteration can isolate one expensive campaign profile without weakening full/nightly qualification",
+  );
+  assert.match(
+    workflow,
+    /group: coop-public-ui-campaign-\$\{\{ github\.ref \}\}-\$\{\{ \(github\.event_name == 'workflow_dispatch' && inputs\.campaign_profile\) \|\| github\.event_name \}\}/u,
+    "different targeted profile runs can occupy separate hosted machines instead of queueing behind one ref-wide lock",
   );
   assert.match(workflow, /COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: \$\{\{ matrix\.campaign_timeout_ms \}\}/u);
   assert.match(workflow, /COOP_UI_SETUP_HARD_TIMEOUT_MS: "1200000"/u);
