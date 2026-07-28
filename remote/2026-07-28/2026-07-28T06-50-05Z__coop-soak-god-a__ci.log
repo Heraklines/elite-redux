@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: 5a3cd401243eb3f5f3f0d8e7b20588996741d7d9
+checked_out_sha: 5a3cd401243eb3f5f3f0d8e7b20588996741d7d9
+base_seed: 20260728
+campaign_seed: 20260728
+run: 30335798920 (workflow source 5a3cd401243eb3f5f3f0d8e7b20588996741d7d9)
+timestamp: 2026-07-28T06-50-05Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260728 WAVES=200 - replay this run with:  SOAK_SEED=20260728 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[34mThe sunlight is strong.[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: PositionalTagPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: BerryPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: CheckStatusEffectPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: TurnEndPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: CoopTurnCommitPhase[39m
+[coop:turn] host recorder: finalize turn=1 events=22 seq=22
+[coop:checkpoint] build field=4 weather=1/0 terrain=0/0 arenaTags=0 money=4280 mons=[bi0:sp493/hp1865-1865/st0/fnt0 bi1:sp150/hp1695-1725/st0/fnt0 bi2:sp961/hp0-80/st7/fnt1 bi3:sp90/hp1-80/st0/fnt0]
+[coop:checkpoint] host capture field=4 weather=1 terrain=0 money=4280 arenaTags=0 mons=[bi0:sp493/hp1865-1865/st0/fnt0 bi1:sp150/hp1695-1725/st0/fnt0 bi2:sp961/hp0-80/st7/fnt1 bi3:sp90/hp1-80/st0/fnt0]
+[coop:interaction] interactionCounter() read -> 67 (role=host)
+[coop:replay] host SEND turnResolution e=1828066438156698 wave=57 turn=1 rev=1077 events=22 checksum=e2402cd88dfc86fe
+[coop:transport] send host t=authorityEntry t=authorityEntry
+[coop:v2-shadow] PARITY kind=TURN_COMMIT rev=342 match=true field=- successor=owner-field
+[coop:transport] send host t=turnResolution e=1828066438156698 wave=57 turn=1 rev=1077 events=22 checksum=e2402cd88dfc86fe
+[coop:transport] recv guest t=authorityEntry t=authorityEntry handlers=1
+[coop:transport] recv guest t=turnResolution e=1828066438156698 wave=57 turn=1 rev=1077 events=22 checksum=e2402cd88dfc86fe handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[38;2;255;127;80mPhaseInterceptor.to: Stopping on completion of CoopTurnCommitPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:replay] guest IGNORE duplicate consumed entry presentation wave=57
+[coop:replay] guest RECV enemyPartySync wave=57 count=2 -> buffered (no waiter)
+[coop:stream] guest IGNORE cosmetic turnResolution e=1828066438156698 wave=57 turn=1 rev=1077
+[coop:v2-replica] admit rev=342 kind=TURN_COMMIT result=admitted frontier=342/341/341
+[coop:transport] send guest t=authorityReceipt t=authorityReceipt
+[coop:replay] guest RECV turnResolution e=1828066438156698 wave=57 turn=1 events=22 checksum=e2402cd88dfc86fe -> buffered (no waiter)
+[coop:v2-replica] apply rev=342 kind=TURN_COMMIT resume=admitted outcome=materialDeferred reason=material revision 342 is awaiting live completion frontier=342/341/341
+[coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+
