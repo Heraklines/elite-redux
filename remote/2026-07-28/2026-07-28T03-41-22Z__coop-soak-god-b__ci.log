@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: 4fd7dda616b9e3a8a07ab50ae266940a0e8f0155
+checked_out_sha: 4fd7dda616b9e3a8a07ab50ae266940a0e8f0155
+base_seed: 20260728
+campaign_seed: 20365457
+run: 30326522519 (workflow source 4fd7dda616b9e3a8a07ab50ae266940a0e8f0155)
+timestamp: 2026-07-28T03-41-22Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365457 WAVES=200 - replay this run with:  SOAK_SEED=20365457 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mError[22m: client phase drive to initial guest-owned CommandPhase HANG on CoopReplayTurnPhase; queued=[CommandPhase,CommandPhase,TurnStartPhase], ui=MESSAGE[39m
+[36m [2m❯[22m driveClientPhaseQueueTo test/tools/coop-duo-harness.ts:[2m2077:15[22m[39m
+    [90m2075|[39m       if (Date.now() >= deadline) {
+    [90m2076|[39m         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? […
+    [90m2077|[39m         throw new Error(
+    [90m   |[39m               [31m^[39m
+    [90m2078|[39m           `client phase drive to ${target} HANG on ${phase.phaseName};…
+    [90m2079|[39m             + `ui=${UiMode[scene.ui.getMode()] ?? scene.ui.getMode()}`,
+[90m [2m❯[22m test/tools/coop-duo-harness.ts:[2m3242:33[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m757:12[22m[39m
+[90m [2m❯[22m buildDuo test/tools/coop-duo-harness.ts:[2m3235:5[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m1558:15[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m184:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[31m[1mError[22m: client phase drive to initial guest-owned CommandPhase HANG on CoopReplayTurnPhase; queued=[CommandPhase,CommandPhase,TurnStartPhase], ui=MESSAGE[39m
+[36m [2m❯[22m driveClientPhaseQueueTo test/tools/coop-duo-harness.ts:[2m2077:15[22m[39m
+    [90m2075|[39m       if (Date.now() >= deadline) {
+    [90m2076|[39m         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? […
+    [90m2077|[39m         throw new Error(
+    [90m   |[39m               [31m^[39m
+    [90m2078|[39m           `client phase drive to ${target} HANG on ${phase.phaseName};…
+    [90m2079|[39m             + `ui=${UiMode[scene.ui.getMode()] ?? scene.ui.getMode()}`,
+[90m [2m❯[22m test/tools/coop-duo-harness.ts:[2m3242:33[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m757:12[22m[39m
+[90m [2m❯[22m buildDuo test/tools/coop-duo-harness.ts:[2m3235:5[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m1558:15[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m309:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m   Start at [22m 03:40:30
+[2m   Duration [22m 51.62s[2m (transform 20.95s, setup 25.37s, import 318ms, tests 25.04s, environment 721ms)[22m
+
