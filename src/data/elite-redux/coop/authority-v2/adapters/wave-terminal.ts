@@ -58,6 +58,7 @@ import type {
   CoopNextControl,
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { isPlainObject } from "#data/elite-redux/coop/authority-v2/frame-context";
 import {
   controlIdOf,
   type ProjectableControl,
@@ -107,6 +108,19 @@ export type CoopWaveProgressionPresentationV2 =
       readonly toLevel: number;
       readonly preStats: readonly number[];
       readonly postStats: readonly number[];
+    }
+  | {
+      readonly k: "evolution";
+      readonly partySlot: number;
+      readonly pokemonId: number;
+      readonly fromSpeciesId: number;
+      readonly fromFormIndex: number;
+      readonly fromSpriteKey: string;
+      readonly toSpeciesId: number;
+      readonly toFormIndex: number;
+      readonly toSpriteKey: string;
+      /** Exact immutable PokemonData immediately after this evolution (supports multiple evolutions per wave). */
+      readonly postPokemon: Readonly<Record<string, unknown>>;
     };
 
 /**
@@ -299,6 +313,34 @@ function isStatVector(value: unknown): value is readonly number[] {
   );
 }
 
+function isBoundedSpriteKey(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 256;
+}
+
+function isEvolutionPostPokemon(
+  value: unknown,
+  pokemonId: number,
+  speciesId: number,
+  formIndex: number,
+): value is Readonly<Record<string, unknown>> {
+  if (
+    !isPlainObject(value)
+    || value.id !== pokemonId
+    || value.species !== speciesId
+    || value.formIndex !== formIndex
+    || value.player !== true
+  ) {
+    return false;
+  }
+  try {
+    // Reject pathological material before it enters the retained log. Ordinary PokemonData is well below
+    // this cap; the bound also prevents a presentation-only cue from becoming an unbounded wire payload.
+    return JSON.stringify(value).length <= 128 * 1024;
+  } catch {
+    return false;
+  }
+}
+
 /** Strict closed-union validation for the presentation retained in a wave/terminal carrier. */
 export function isValidWaveProgressionPresentation(value: unknown): value is CoopWaveProgressionPresentationV2 {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
@@ -318,6 +360,20 @@ export function isValidWaveProgressionPresentation(value: unknown): value is Coo
       && isSafeNonNegInt(event.fromExp)
       && isSafeNonNegInt(event.toExp)
       && event.toExp >= event.fromExp
+    );
+  }
+  if (event.k === "evolution") {
+    return (
+      isSafePositiveInt(event.fromSpeciesId)
+      && isSafeNonNegInt(event.fromFormIndex)
+      && isBoundedSpriteKey(event.fromSpriteKey)
+      && isSafePositiveInt(event.toSpeciesId)
+      && isSafeNonNegInt(event.toFormIndex)
+      && isBoundedSpriteKey(event.toSpriteKey)
+      && isEvolutionPostPokemon(event.postPokemon, event.pokemonId, event.toSpeciesId, event.toFormIndex)
+      && (event.fromSpeciesId !== event.toSpeciesId
+        || event.fromFormIndex !== event.toFormIndex
+        || event.fromSpriteKey !== event.toSpriteKey)
     );
   }
   return (

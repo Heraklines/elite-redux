@@ -469,14 +469,14 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
-test("protocol 58 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
+test("protocol 59 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-58"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-59"/u);
   assert.match(
     transport,
     /interface CoopFullMonSnapshot[\s\S]+tags: string\[\]/u,
@@ -544,6 +544,7 @@ test("protocol 58 binds every structured presentation cue and retained Mystery m
   const exp = read("src/phases/exp-phase.ts");
   const partyExp = read("src/phases/show-party-exp-bar-phase.ts");
   const levelUp = read("src/phases/level-up-phase.ts");
+  const evolution = read("src/phases/evolution-phase.ts");
   const progressionReplay = read("src/phases/coop-wave-progression-replay-phase.ts");
   const battleEngine = read("src/data/elite-redux/coop/coop-battle-engine.ts");
   const meTerminalValidator = read("src/data/elite-redux/coop/coop-me-terminal-validator.ts");
@@ -554,6 +555,7 @@ test("protocol 58 binds every structured presentation cue and retained Mystery m
   assert.match(exp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+display: "field"/u);
   assert.match(partyExp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+display: "party"/u);
   assert.match(levelUp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+k: "levelUp"/u);
+  assert.match(evolution, /recordCoopWaveProgressionPresentation\(\{[\s\S]+k: "evolution"/u);
   assert.match(runtime, /progression,[\s\S]+commitHostWave/u);
   const replayGate = runtime.indexOf("if (!transaction.progressionReady)");
   const stateApply = runtime.indexOf("applyCoopAuthoritativeBattleState(immutableState, true)", replayGate);
@@ -573,6 +575,31 @@ test("protocol 58 binds every structured presentation cue and retained Mystery m
     "embedded Mystery progression drains before ME terminal DATA applies",
   );
   assert.match(progressionReplay, /PROGRESSION_STEP_WATCHDOG_MS/u);
+  assert.match(
+    progressionReplay,
+    /new PokemonData\(event\.postPokemon\)\.toPokemon[\s\S]+new CoopEvolutionPresentation\(pokemon, evolved\)\.play\(signal\)/u,
+    "the guest evolution cutscene uses immutable post-image material and never re-runs evolution mechanics",
+  );
+  assert.match(
+    evolution,
+    /postPokemon: JSON\.parse\(JSON\.stringify\(new PokemonData\(this\.pokemon\)\)\)/u,
+    "each evolution retains its own complete intermediate post-image rather than borrowing final wave state",
+  );
+  assert.match(
+    progressionReplay,
+    /controller\.abort\(\)[\s\S]+await render\(controller\.signal\)/u,
+    "the evolution watchdog cancels and then joins its renderer instead of releasing DATA from Promise.race",
+  );
+  assert.match(
+    progressionReplay,
+    /cycleCancelled\.value = true[\s\S]+for \(const cancel of \[\.\.\.this\.cancellationHooks\]\)/u,
+    "a cancelled evolution stops its recursive animation and every owned callback",
+  );
+  assert.match(
+    progressionReplay,
+    /const cleanupTimeout = setTimeout\(resolve, EVOLUTION_CLEANUP_WATCHDOG_MS\)[\s\S]+clearTimeout\(cleanupTimeout\)/u,
+    "a damaged UI cannot turn evolution cleanup itself into an unbounded wave wait",
+  );
   assert.match(progressionReplay, /this\.end\(\);[\s\S]+this\.onComplete\(\)/u);
 });
 

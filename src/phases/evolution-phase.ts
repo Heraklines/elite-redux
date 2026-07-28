@@ -5,12 +5,14 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { FusionSpeciesFormEvolution } from "#balance/pokemon-evolutions";
+import { recordCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-runtime";
 import { erRecordAchievementEvolution } from "#data/elite-redux/er-achievement-tracker";
 import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { getTypeRgb } from "#data/type";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
+import { PokemonData } from "#system/pokemon-data";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import type { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { fixedInt } from "#utils/common";
@@ -28,6 +30,9 @@ export class EvolutionPhase extends Phase {
   protected evoChain: Phaser.Tweens.TweenChain | null = null;
 
   private preEvolvedPokemonName: string;
+  private readonly coopPreEvolutionSpeciesId: number;
+  private readonly coopPreEvolutionFormIndex: number;
+  private readonly coopPreEvolutionSpriteKey: string;
 
   private evolution: SpeciesFormEvolution | null;
   /**
@@ -77,6 +82,9 @@ export class EvolutionPhase extends Phase {
     this.fusionSpeciesEvolved = evolution instanceof FusionSpeciesFormEvolution;
     this.canCancel = canCancel;
     this.evolutionChoices = evolutionChoices;
+    this.coopPreEvolutionSpeciesId = pokemon.species.speciesId;
+    this.coopPreEvolutionFormIndex = pokemon.formIndex;
+    this.coopPreEvolutionSpriteKey = pokemon.getSpriteKey(true);
   }
 
   validate(): boolean {
@@ -563,7 +571,24 @@ export class EvolutionPhase extends Phase {
       // Co-op (#633 Fix #4c): keep cancel disabled in co-op for the same determinism reason.
       this.evolutionHandler.canCancel = this.canCancel && !globalScene.gameMode.isCoop;
 
-      this.pokemon.evolve(this.evolution, this.pokemon.species).then(() => this.postEvolve(evolvedPokemon));
+      this.pokemon.evolve(this.evolution, this.pokemon.species).then(() => {
+        const partySlot = globalScene.getPlayerParty().indexOf(this.pokemon);
+        if (partySlot >= 0) {
+          recordCoopWaveProgressionPresentation({
+            k: "evolution",
+            partySlot,
+            pokemonId: this.pokemon.id,
+            fromSpeciesId: this.coopPreEvolutionSpeciesId,
+            fromFormIndex: this.coopPreEvolutionFormIndex,
+            fromSpriteKey: this.coopPreEvolutionSpriteKey,
+            toSpeciesId: this.pokemon.species.speciesId,
+            toFormIndex: this.pokemon.formIndex,
+            toSpriteKey: this.pokemon.getSpriteKey(true),
+            postPokemon: JSON.parse(JSON.stringify(new PokemonData(this.pokemon))) as Record<string, unknown>,
+          });
+        }
+        this.postEvolve(evolvedPokemon);
+      });
     });
   }
 }

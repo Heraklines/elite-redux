@@ -156,7 +156,9 @@ export type CoopRole = "host" | "guest";
 // apply the settled mechanics silently and cannot prove or replay the progression cues before rewards.
 // er-coop-58 carries the same retained progression through an embedded battle's ME_TERMINAL and requires
 // its guest replay to finish before the terminal state/reward successor installs.
-export const COOP_PROTOCOL_VERSION = "er-coop-58";
+// er-coop-59 adds the authority's exact evolution transition and replays the full guest cutscene from the
+// immutable pre/post Pokemon images before either WAVE_ADVANCE or an ME_TERMINAL may apply its DATA.
+export const COOP_PROTOCOL_VERSION = "er-coop-59";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that

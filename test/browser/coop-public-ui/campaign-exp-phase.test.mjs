@@ -9,6 +9,7 @@ import {
   allClientsAtCurrentCommandFrontier,
   allClientsAtOwnedCommandFrontier,
   assertAsymmetricLearnMoveProjection,
+  assertRetainedEvolutionPresentationParity,
   chooseUntriedRewardOption,
   clientsAwaitingTurnProgress,
   createAnimationProgressBudget,
@@ -134,6 +135,31 @@ class FakeEvidence {
     });
   }
 }
+
+function evolutionRig(hostLines, guestLines) {
+  const host = { evidence: new FakeEvidence(hostLines) };
+  const guest = { evidence: new FakeEvidence(guestLines) };
+  return { host, guest, clients: { host, guest } };
+}
+
+test("retained evolution proof requires exact authority/renderer identity and depth coverage", () => {
+  const host = "[coop:progression] HOST progression capture wave=17 seq=3 k=evolution slot=0 species=1->2";
+  const guest = "[coop:progression] GUEST retained evolution complete wave=17 slot=0 species=1->2";
+  assert.deepEqual(assertRetainedEvolutionPresentationParity(evolutionRig([host], [guest]), { targetWaves: 30 }), {
+    authority: ["17:0:1->2"],
+    renderer: ["17:0:1->2"],
+    required: true,
+  });
+  assert.throws(
+    () => assertRetainedEvolutionPresentationParity(evolutionRig([host], []), { targetWaves: 30 }),
+    /presentation mismatch/u,
+  );
+  assert.throws(
+    () => assertRetainedEvolutionPresentationParity(evolutionRig([], []), { targetWaves: 30 }),
+    /without exercising retained evolution/u,
+  );
+  assert.doesNotThrow(() => assertRetainedEvolutionPresentationParity(evolutionRig([], []), { targetWaves: 10 }));
+});
 
 test("battle-kind classification accepts a V2-only passive command watcher", () => {
   const owner = new FakeEvidence();

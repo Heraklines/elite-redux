@@ -81,6 +81,40 @@ function fromEach(clients, fn) {
 }
 
 const DIGEST_PARTS = /\[coop-browser:digest-parts\] (\{.*\})/u;
+const HOST_RETAINED_EVOLUTION =
+  /\[coop:progression\] HOST progression capture wave=(\d+) seq=\d+ k=evolution slot=(\d+) species=(\d+)->(\d+)/u;
+const GUEST_RETAINED_EVOLUTION =
+  /\[coop:progression\] GUEST retained evolution complete wave=(\d+) slot=(\d+) species=(\d+)->(\d+)/u;
+
+function retainedEvolutionKeys(client, pattern) {
+  return client.evidence.events.flatMap(event => {
+    const match = pattern.exec(event.text ?? "");
+    return match == null ? [] : [`${match[1]}:${match[2]}:${match[3]}->${match[4]}`];
+  });
+}
+
+/**
+ * Every authority-recorded evolution must finish once on the renderer before the wave DATA boundary.
+ * The 30-wave depth profile must also exercise at least one real evolution so a green campaign cannot
+ * silently omit this presentation class while only testing low-level protocol validators.
+ */
+export function assertRetainedEvolutionPresentationParity(rig, policy) {
+  const authority = retainedEvolutionKeys(rig.host, HOST_RETAINED_EVOLUTION).toSorted();
+  const renderer = retainedEvolutionKeys(rig.guest, GUEST_RETAINED_EVOLUTION).toSorted();
+  const proof = { authority, renderer, required: policy.targetWaves >= 30 };
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-retained-evolution-proof", proof);
+  }
+  if (proof.required && authority.length === 0) {
+    throw new Error("[campaign-evolution] 30-wave depth completed without exercising retained evolution");
+  }
+  if (JSON.stringify(authority) !== JSON.stringify(renderer)) {
+    throw new Error(
+      `[campaign-evolution] retained evolution presentation mismatch authority=${JSON.stringify(authority)} renderer=${JSON.stringify(renderer)}`,
+    );
+  }
+  return proof;
+}
 
 /** The most recent per-mon innate ids ({player, enemy}) a client emitted, or null. */
 function latestInnates(client) {
@@ -3348,6 +3382,9 @@ export async function runCampaign(rig) {
           `[campaign-mystery] observed ${mysteryCoverage.events.length} distinct completed event waves; required ${policy.mysteryGauntlet.minSurfaces}`,
         );
       }
+    }
+    if (status === "continue" && wavesCleared >= policy.targetWaves) {
+      assertRetainedEvolutionPresentationParity(rig, policy);
     }
   } finally {
     rig.marketCoverage = marketCoverage;

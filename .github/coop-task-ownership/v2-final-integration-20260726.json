@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "3b703b60f7a09158e94e42b8e947c911b65bd092",
+  "baseSha": "9848fd8a599a8c931e8808295d28bad61de34286",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -97,6 +97,7 @@
     "src/phases/er-dex-nav-phase.ts",
     "src/phases/er-greater-ability-capsule-phase.ts",
     "src/phases/er-greater-ability-randomizer-phase.ts",
+    "src/phases/evolution-phase.ts",
     "src/phases/exp-phase.ts",
     "src/phases/game-over-phase.ts",
     "src/phases/learn-move-phase.ts",
@@ -242,5 +243,5 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": ["src/data/elite-redux/coop/coop-transport.ts"]
 }

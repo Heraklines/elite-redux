@@ -4505,9 +4505,10 @@ export function recordCoopWaveProgressionPresentation(
     return false;
   }
   capture.events.push(structuredClone(event));
+  const exactEvolution = event.k === "evolution" ? ` species=${event.fromSpeciesId}->${event.toSpeciesId}` : "";
   coopLog(
     "progression",
-    `HOST progression capture wave=${capture.wave} seq=${capture.events.length - 1} k=${event.k} slot=${event.partySlot}`,
+    `HOST progression capture wave=${capture.wave} seq=${capture.events.length - 1} k=${event.k} slot=${event.partySlot}${exactEvolution}`,
   );
   return true;
 }

@@ -427,6 +427,20 @@ describe("material completeness validation", () => {
     ).toBe(true);
     expect(
       isValidWaveProgressionPresentation({
+        k: "evolution",
+        partySlot: 1,
+        pokemonId: 42,
+        fromSpeciesId: 4,
+        fromFormIndex: 0,
+        fromSpriteKey: "pkmn__charmander",
+        toSpeciesId: 5,
+        toFormIndex: 0,
+        toSpriteKey: "pkmn__charmeleon",
+        postPokemon: { id: 42, player: true, species: 5, formIndex: 0 },
+      }),
+    ).toBe(true);
+    expect(
+      isValidWaveProgressionPresentation({
         k: "exp",
         partySlot: 1,
         pokemonId: 42,
@@ -447,6 +461,34 @@ describe("material completeness validation", () => {
         toLevel: 6,
         preStats: [10],
         postStats: [11],
+      }),
+    ).toBe(false);
+    expect(
+      isValidWaveProgressionPresentation({
+        k: "evolution",
+        partySlot: 1,
+        pokemonId: 42,
+        fromSpeciesId: 4,
+        fromFormIndex: 0,
+        fromSpriteKey: "same",
+        toSpeciesId: 4,
+        toFormIndex: 0,
+        toSpriteKey: "same",
+        postPokemon: { id: 42, player: true, species: 4, formIndex: 0 },
+      }),
+    ).toBe(false);
+    expect(
+      isValidWaveProgressionPresentation({
+        k: "evolution",
+        partySlot: 1,
+        pokemonId: 42,
+        fromSpeciesId: 4,
+        fromFormIndex: 0,
+        fromSpriteKey: "pkmn__charmander",
+        toSpeciesId: 5,
+        toFormIndex: 0,
+        toSpriteKey: "pkmn__charmeleon",
+        postPokemon: { id: 99, player: true, species: 5, formIndex: 0 },
       }),
     ).toBe(false);
   });
