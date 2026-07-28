@@ -136,6 +136,9 @@
     "ability2": 92,
     "hidden": 34
   },
+  "SPECIES_DISCUPID": {
+    "ability1": 220
+  },
   "SPECIES_DUSTOX": {
     "hidden": 118
   },
