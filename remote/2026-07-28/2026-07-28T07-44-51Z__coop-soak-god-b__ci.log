@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: 07b823176f6ceba80a2f8446f10d68eda9113899
+checked_out_sha: 07b823176f6ceba80a2f8446f10d68eda9113899
+base_seed: 20260728
+campaign_seed: 20365457
+run: 30339318987 (workflow source 07b823176f6ceba80a2f8446f10d68eda9113899)
+timestamp: 2026-07-28T07-44-51Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365457 WAVES=200 - replay this run with:  SOAK_SEED=20365457 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[33m[bgm] audio missing from cache for key "battle_aqua_magma_grunt"; keeping the current track (#826)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39mLocalized grunt name: Magma Grunt
+[34mMagma Grunt would like to battle![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:replay] guest RECV enemyPartySync wave=35 count=2 -> buffered (no waiter)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: SummonPhase[39m
+[coop:turn] host recorder: preserve recording scope=1828069918812007:35 turn=1 events=0 seq=0
+Localized grunt name: Magma Grunt
+[34mMagma Grunt sent out Mightyena![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: SummonPhase[39m
+[coop:turn] host recorder: preserve recording scope=1828069918812007:35 turn=1 events=0 seq=0
+Localized grunt name: Magma Grunt
+[34mMagma Grunt sent out Baltoy![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: SummonPhase[39m
+[coop:turn] host recorder: preserve recording scope=1828069918812007:35 turn=1 events=0 seq=0
+[34mGo! Arceus![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: ToggleDoublePositionPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: SummonPhase[39m
+[coop:turn] host recorder: preserve recording scope=1828069918812007:35 turn=1 events=0 seq=0
+[34mGo! Rayquaza![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: InitEncounterPhase[39m
+[coop:turn] host recorder: preserve recording scope=1828069918812007:35 turn=1 events=0 seq=0
+
