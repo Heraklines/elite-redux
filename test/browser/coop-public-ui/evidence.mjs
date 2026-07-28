@@ -953,6 +953,7 @@ export function semanticSurfaceView(text) {
   const nullableSeat = seat => seat === null || (Number.isSafeInteger(seat) && seat >= 0);
   const nullableRevision = revision => revision === null || (Number.isSafeInteger(revision) && revision >= 0);
   const nullableMysteryEncounterType = type => type === null || (Number.isSafeInteger(type) && type >= 0);
+  const nullableDisplayedWave = wave => wave === null || (Number.isSafeInteger(wave) && wave > 0);
   const nullableStateDigest = digest =>
     digest === null || (typeof digest === "string" && /^[0-9a-f]{16}$/iu.test(digest) && digest !== CHECKSUM_SENTINEL);
   if (
@@ -990,6 +991,7 @@ export function semanticSurfaceView(text) {
     || value.phaseInstance <= 0
     || !nullablePositiveInteger(value.surfaceGeneration)
     || !nullableMysteryEncounterType(value.mysteryEncounterType)
+    || !nullableDisplayedWave(value.displayedWave)
     || !nullableStateDigest(value.stateDigest)
     || (value.coop && value.address.wave > 0 && (value.address.epoch < 1 || value.stateDigest === null))
     || (value.coop

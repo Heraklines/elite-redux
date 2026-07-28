@@ -128,6 +128,36 @@ test("the host's ordinary NewBattle tail is routed by the exact committed biome 
   );
 });
 
+test("a projected Mystery surface refreshes and proves its authoritative HUD wave", () => {
+  const battleScene = read("src/battle-scene.ts");
+  const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
+  const observer = read("scripts/coop-browser-entry.ts");
+  const evidence = read("test/browser/coop-public-ui/evidence.mjs");
+  const campaign = read("test/browser/coop-public-ui/campaign.mjs");
+
+  assert.match(
+    battleScene,
+    /public getDisplayedBiomeWaveIndex\(\): number \| null[\s\S]+this\.biomeWaveText\.visible[\s\S]+this\.biomeWaveText\.text/u,
+    "the exact-browser observer has a read-only view of the wave players can actually see",
+  );
+  assert.match(
+    runtime,
+    /case "mystery": \{[\s\S]+globalScene\.updateBiomeWaveText\(\)[\s\S]+phaseManager\.create\(\s*"CoopReplayMePhase"/u,
+    "the immutable Mystery projector refreshes cosmetics after its wave material is installed",
+  );
+  assert.match(
+    observer,
+    /const displayedWave = globalScene\.getDisplayedBiomeWaveIndex\(\)[\s\S]+semanticDigestKey = \[[\s\S]+displayedWave[\s\S]+const observation = \{[\s\S]+displayedWave/u,
+    "a wave-label change invalidates the observer cache and enters the semantic proof",
+  );
+  assert.match(evidence, /nullableDisplayedWave[\s\S]+value\.displayedWave/u);
+  assert.match(
+    campaign,
+    /authority\.displayedWave === authority\.address\.wave[\s\S]+observation\.displayedWave === observation\.address\.wave/u,
+    "paired Mystery convergence rejects a stale label on either real browser",
+  );
+});
+
 test("damage effectiveness and critical presentation are authority-authored end to end", () => {
   const pokemon = read("src/field/pokemon.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");

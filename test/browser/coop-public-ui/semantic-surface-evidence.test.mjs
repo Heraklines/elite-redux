@@ -32,6 +32,7 @@ function valid(overrides = {}) {
     phaseInstance: 4,
     surfaceGeneration: 2,
     mysteryEncounterType: 17,
+    displayedWave: 10,
     stateDigest: "0123456789abcdef",
     uiMode: "MODIFIER_SELECT",
     ...overrides,
@@ -107,6 +108,7 @@ test("semantic evidence accepts the paired pre-battle title surface without weak
         optionIds: ["yes", "no"],
         optionCount: 2,
         phase: "TitlePhase",
+        displayedWave: null,
         stateDigest: null,
         uiMode: "CONFIRM",
       }),
@@ -153,6 +155,10 @@ test("semantic evidence rejects every malformed claimed proof", () => {
   );
   assert.throws(
     () => semanticSurfaceView(`${PREFIX}${JSON.stringify(valid({ mysteryEncounterType: "17" }))}`),
+    /invalid semantic surface observation/u,
+  );
+  assert.throws(
+    () => semanticSurfaceView(`${PREFIX}${JSON.stringify(valid({ displayedWave: "10" }))}`),
     /invalid semantic surface observation/u,
   );
   assert.throws(

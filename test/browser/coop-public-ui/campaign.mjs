@@ -1883,6 +1883,8 @@ export function pairedMysteryProjectionMatches(authority, observation, stage) {
     || authorityEncounterType == null
     || observedEncounterType == null
     || observedEncounterType === authorityEncounterType;
+  const sameDisplayedWave =
+    authority.displayedWave === authority.address.wave && observation.displayedWave === observation.address.wave;
   return (
     observation.surfaceId === authority.surfaceId
     && normalizeMysteryProjectionPhase(observation.phase) === normalizeMysteryProjectionPhase(authority.phase)
@@ -1892,6 +1894,7 @@ export function pairedMysteryProjectionMatches(authority, observation, stage) {
     && observation.selectedOptionId === authority.selectedOptionId
     && sameEncounterLineage
     && observation.stateDigest === authority.stateDigest
+    && sameDisplayedWave
     && sameAddress
     && sameOptions
   );

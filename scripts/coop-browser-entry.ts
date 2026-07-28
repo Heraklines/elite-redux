@@ -1623,11 +1623,13 @@ function observeSemanticSurface(): void {
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
         ? (promptGeneration as number)
         : semanticPhaseInstance;
+    const displayedWave = globalScene.getDisplayedBiomeWaveIndex();
     const semanticDigestKey = [
       semantic.surfaceId,
       uiMode,
       semanticSurfaceInstance,
       `${epoch}:${wave}:${turn}`,
+      displayedWave,
       selection.selectedOptionId ?? "",
       selection.optionIds?.join(",") ?? "",
       moveSlots == null ? "" : JSON.stringify(moveSlots),
@@ -1678,6 +1680,9 @@ function observeSemanticSurface(): void {
       phase,
       phaseInstance: semanticSurfaceInstance,
       surfaceGeneration,
+      // This is the parsed wave number from the visible top-right HUD label, not another read of
+      // currentBattle. It catches a cosmetically stale renderer after mechanical V2 convergence.
+      displayedWave,
       // Stable registry identity, not localized presentation text. This lets two real browsers
       // prove that an apparently matching Mystery surface is actually the same encounter and
       // lets the ten-wave gauntlet prove non-repeating event breadth.

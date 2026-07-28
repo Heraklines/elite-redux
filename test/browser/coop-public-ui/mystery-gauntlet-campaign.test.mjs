@@ -652,6 +652,7 @@ test("paired structured Mystery surfaces inherit nullable encounter metadata wit
     selectedOptionId: "cursor:0",
     optionIds: null,
     mysteryEncounterType: 33,
+    displayedWave: 3,
     stateDigest: "mechanical-state",
     address: { epoch: 19, wave: 3, turn: 1 },
   };
@@ -671,6 +672,16 @@ test("paired structured Mystery surfaces inherit nullable encounter metadata wit
     pairedMysteryProjectionMatches(authority, { ...renderer, stateDigest: "diverged" }, "subprompt"),
     false,
     "nullable presentation metadata cannot weaken mechanical digest convergence",
+  );
+  assert.equal(
+    pairedMysteryProjectionMatches(authority, { ...renderer, displayedWave: 2 }, "subprompt"),
+    false,
+    "a renderer cannot present an old HUD wave under a newer authoritative Mystery address",
+  );
+  assert.equal(
+    pairedMysteryProjectionMatches({ ...authority, displayedWave: 2 }, renderer, "subprompt"),
+    false,
+    "the authority surface itself cannot attest with a stale rendered HUD wave",
   );
 });
 

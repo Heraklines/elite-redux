@@ -3107,6 +3107,19 @@ export class BattleScene extends SceneBase {
     this.enemyModifierBar.setVisible(false);
   }
 
+  /** Read the wave number players can currently see without consulting mechanical battle state. */
+  public getDisplayedBiomeWaveIndex(): number | null {
+    if (!this.biomeWaveText.visible) {
+      return null;
+    }
+    const match = / - ([0-9]+)$/u.exec(this.biomeWaveText.text);
+    if (match == null) {
+      return null;
+    }
+    const waveIndex = Number(match[1]);
+    return Number.isSafeInteger(waveIndex) && waveIndex > 0 ? waveIndex : null;
+  }
+
   updateBiomeWaveText(): void {
     // Defensive: this can be invoked mid-transition (e.g. session init before
     // the first battle is constructed) when `currentBattle` is momentarily null.

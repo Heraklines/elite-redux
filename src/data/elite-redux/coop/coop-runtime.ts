@@ -7283,6 +7283,10 @@ function materializeCoopV2InteractionProjection(
       if (coopMeInteractionStartValue() !== plan.pinned) {
         return null;
       }
+      // A retained first-of-wave Mystery can be projected after the signed destination Battle was
+      // constructed without passing through ModifierSelectUiHandler, the ordinary HUD refresh seam.
+      // Refresh only the cosmetic label from the already-applied Battle state before exposing the UI.
+      globalScene.updateBiomeWaveText();
       setCoopMeActivePresentation(plan.presentation);
       runtime.interactionRelay.materializeCommittedInteractionOutcome(
         COOP_ME_PUMP_SEQ_BASE + plan.pinned,
