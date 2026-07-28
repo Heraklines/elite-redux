@@ -23,7 +23,7 @@
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
 import type { BattleFormat } from "#data/battle-format";
-import { SerializableBattlerTag } from "#data/battler-tags";
+import { getBattlerTag, SerializableBattlerTag, SubstituteTag } from "#data/battler-tags";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
   isCoopAuthoritativeGuestGated,
@@ -4036,16 +4036,43 @@ function reconcileTags(mon: Pokemon, wantTagTypes: number[]): void {
     // mapping to BattlerTagType and are rejected before apply rather than being silently mis-reconciled.
     const want = new Set((wantTagTypes as unknown[]).filter((tag): tag is string => typeof tag === "string"));
     const have = new Set(mon.summonData.tags.map(t => t.tagType as unknown as string));
-    // Drop tags the host no longer has.
-    for (const have_t of [...have]) {
-      if (!want.has(have_t)) {
-        mon.removeTag(have_t as BattlerTagType);
+    // This is a REPLICA projector, not a battle-mechanics entry point. Pokemon.removeTag/addTag invoke
+    // onRemove/onAdd plus immunity/held-item/ability checks; several tags then queue stat changes,
+    // messages, or sprite phases. Calling either API here lets recovery re-resolve mechanics after the
+    // authority already committed them (and can manufacture a second presentation subtree). Reconcile the
+    // type set structurally instead. Existing instances are retained so their carried runtime companions
+    // survive; newly missing instances are inert identity shells whose detailed mechanics are irrelevant on
+    // the pure renderer and whose authoritative end state is reasserted by the same transaction.
+    const tags = mon.summonData.tags;
+    for (let index = tags.length - 1; index >= 0; index--) {
+      const tag = tags[index];
+      if (want.has(tag.tagType as unknown as string)) {
+        continue;
       }
+      // A dropped Substitute-removal cue must not leave a stale doll forever. This is teardown of an
+      // already-rendered node only; do not invoke SubstituteTag.onRemove (which would narrate and enqueue a
+      // locally-derived animation). The ordered authority stream owns the ordinary removal presentation.
+      if (tag instanceof SubstituteTag) {
+        try {
+          if (tag.sprite?.active) {
+            tag.sprite.destroy();
+            if (!tag.sourceInFocus) {
+              const [offsetX, offsetY] = mon.getSubstituteOffset();
+              mon.setPosition(mon.x - offsetX, mon.y - offsetY);
+            }
+            mon.setAlpha(1);
+          }
+        } catch {
+          /* a torn presentation node is already semantically absent */
+        }
+      }
+      tags.splice(index, 1);
     }
-    // Add tags the host has that we don't (best-effort: identity only, no source-move).
+    // Add host-present identities without onAdd/canAddTag. Source/turn detail is intentionally not invented:
+    // the frozen fallback carrier contains only tag identity, and the renderer never executes tag mechanics.
     for (const want_t of want) {
       if (!have.has(want_t)) {
-        mon.addTag(want_t as BattlerTagType);
+        tags.push(getBattlerTag(want_t as BattlerTagType, 0, 0 as MoveId, mon.id));
       }
     }
   } catch {

@@ -201,6 +201,39 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
     expect(captureCoopChecksum()).toBe(hostChecksum);
   });
 
+  it("(C) fallback tag projection never invokes gameplay add/remove hooks on the renderer", async () => {
+    const field = await startCoopDouble();
+    const mon = field[COOP_GUEST_FIELD_INDEX];
+    const withTag = captureCoopFullSnapshot();
+    expect(withTag).not.toBeNull();
+    const monSnapshot = withTag?.field.find(entry => entry.bi === mon.getBattlerIndex());
+    expect(monSnapshot).toBeDefined();
+    if (withTag == null || monSnapshot == null) {
+      return;
+    }
+    monSnapshot.tags = [BattlerTagType.AQUA_RING];
+
+    const addSpy = vi.spyOn(mon, "addTag");
+    applyCoopFullSnapshot(withTag);
+    expect(mon.getTag(BattlerTagType.AQUA_RING), "the authority tag identity is hydrated").toBeDefined();
+    expect(addSpy, "replica hydration cannot run immunity checks or tag onAdd mechanics").not.toHaveBeenCalled();
+    addSpy.mockRestore();
+
+    const withoutTag = captureCoopFullSnapshot();
+    expect(withoutTag).not.toBeNull();
+    const removeSnapshot = withoutTag?.field.find(entry => entry.bi === mon.getBattlerIndex());
+    expect(removeSnapshot).toBeDefined();
+    if (withoutTag == null || removeSnapshot == null) {
+      return;
+    }
+    removeSnapshot.tags = [];
+    const removeSpy = vi.spyOn(mon, "removeTag");
+    applyCoopFullSnapshot(withoutTag);
+    expect(mon.getTag(BattlerTagType.AQUA_RING), "the absent authority tag is removed structurally").toBeUndefined();
+    expect(removeSpy, "replica cleanup cannot run tag onRemove mechanics").not.toHaveBeenCalled();
+    removeSpy.mockRestore();
+  });
+
   it("(D) authoritative state round-trips exotic live summonData byte-identically and preserves Pokemon.id identity", async () => {
     const field = await startCoopDouble();
     resetCoopStateTicks();

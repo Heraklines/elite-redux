@@ -52,6 +52,19 @@ test("healing is an authority-authored presentation and every event kind is exha
   assert.match(replay, /const unhandledEvent: never = event/u);
 });
 
+test("authoritative tag recovery hydrates identity without re-entering battle mechanics", () => {
+  const engine = read("src/data/elite-redux/coop/coop-battle-engine.ts");
+  const start = engine.indexOf("function reconcileTags(");
+  const end = engine.indexOf("\n}\n\n/**", start);
+  const reconcile = engine.slice(start, end);
+
+  assert.ok(start >= 0 && end > start, "the replica tag projector is present");
+  assert.doesNotMatch(reconcile, /mon\.addTag\(/u, "recovery must not execute tag onAdd/immunity mechanics");
+  assert.doesNotMatch(reconcile, /mon\.removeTag\(/u, "recovery must not execute tag onRemove mechanics");
+  assert.match(reconcile, /tags\.push\(getBattlerTag\(/u, "missing authority identities are hydrated directly");
+  assert.match(reconcile, /tag instanceof SubstituteTag[\s\S]+tag\.sprite\?\.active[\s\S]+tag\.sprite\.destroy\(\)/u);
+});
+
 test("sacrificial spread presentation is authored once without dropping any mechanical target", () => {
   const producer = read("src/phases/move-effect-phase.ts");
   const replayPump = read("src/phases/coop-replay-turn-phase.ts");
