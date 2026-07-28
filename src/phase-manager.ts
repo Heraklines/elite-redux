@@ -647,6 +647,43 @@ export class PhaseManager {
   }
 
   /**
+   * Close one exact authority-owned phase, retain its ordered result, and only then start the successor.
+   *
+   * Ordinary {@linkcode shiftPhase} starts the next phase synchronously. An interaction result that needs
+   * terminal proof would therefore have to choose between proving too early or letting a locally queued
+   * successor open before its immutable Authority V2 entry exists. This seam separates those two scheduler
+   * edges without exposing the phase tree: `commitAfterClose` runs after `phase` is no longer current, but
+   * before a newly dequeued successor starts. Returning false leaves that successor unstarted so the shared
+   * terminal path can fail closed; a parked standby is restored exactly as ordinary `shiftPhase` does.
+   */
+  public shiftPhaseThroughCoopAuthorityCommit(phase: Phase, commitAfterClose: () => boolean): boolean {
+    if (this.currentPhase !== phase || this.coopTerminalProgressionFrozen || this.coopRecoveryProgressionFrozen()) {
+      return false;
+    }
+    this.settleCoopMutationPhase(phase);
+    if (this.standbyPhase) {
+      this.currentPhase = this.standbyPhase;
+      this.standbyPhase = null;
+      return commitAfterClose();
+    }
+
+    let nextPhase = this.phaseQueue.getNextPhase();
+    if (nextPhase?.is("DynamicPhaseMarker")) {
+      nextPhase = this.dynamicQueueManager.popNextPhase(nextPhase.phaseType);
+    }
+    if (nextPhase == null) {
+      this.turnStart();
+    } else {
+      this.currentPhase = nextPhase;
+    }
+    if (!commitAfterClose()) {
+      return false;
+    }
+    this.startCurrentPhase();
+    return true;
+  }
+
+  /**
    * Helper method to start and log the current phase.
    *
    * @privateRemarks

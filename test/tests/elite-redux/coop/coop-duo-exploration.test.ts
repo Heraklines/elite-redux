@@ -36,6 +36,7 @@ import {
   isCoopV2InteractionHumanInputFrozen,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_LEARN_MOVE_FWD_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
@@ -73,7 +74,7 @@ import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { PartyOption } from "#ui/party-ui-handler";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -1022,6 +1023,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // through SUMMARY input; the retired test pre-buffered an unidentified raw relay proposal before the
     // prompt existed, which Authority V2 must reject.
     let v2PromptCommitted = false;
+    let v2DecisionCommitted = false;
+    let hostRawResults = 0;
+    const retainedDecision: { message: CoopMessage | null } = { message: null };
     const offSpy = pair.host.onMessage(() => {});
     const realSend = pair.host.send.bind(pair.host);
     (pair.host as { send: (m: CoopMessage) => void }).send = (msg: CoopMessage) => {
@@ -1030,23 +1034,35 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         && msg.body.kind === "INTERACTION_COMMIT"
         && msg.body.operationId.includes(":LEARN_MOVE:")
       ) {
-        v2PromptCommitted = true;
+        const material = msg.body.material.payload as {
+          envelope?: { pendingOperation?: { payload?: { type?: unknown } } };
+        };
+        const type = material.envelope?.pendingOperation?.payload?.type;
+        v2PromptCommitted ||= type === "prompt";
+        v2DecisionCommitted ||= type === "decision";
+        if (type === "decision") {
+          retainedDecision.message = structuredClone(msg);
+        }
+      }
+      if (msg.t === "interactionChoice" && msg.kind === "learnMove") {
+        hostRawResults++;
       }
       realSend(msg);
     };
-    let phaseDone = false;
+    let hostLearnPhase: object | null = null;
     await withClient(rig.hostCtx, () => {
       const phase = new LearnMovePhase(PARTY_SLOT, NEW_MOVE);
-      const seam = phase as unknown as { end: () => void };
-      const realEnd = seam.end.bind(phase);
-      seam.end = () => {
-        phaseDone = true;
-        realEnd();
-      };
+      hostLearnPhase = phase;
       haltQueueAfterCurrent();
+      expect(
+        rig.hostScene.phaseManager.overridePhase(phase),
+        "the authority learn picker is the real current phase",
+      ).toBe(true);
+      // PhaseInterceptor suppresses the production start edge in engine tests.
       phase.start();
     });
     await pumpDuoDestinations(rig, 8);
+    let projectedGuestPhase: object | null = null;
     await withClient(rig.guestCtx, async () => {
       if (rig.guestScene.ui.getMode() !== UiMode.SUMMARY) {
         const replay = await driveClientPhaseQueueTo(rig.guestScene, "projected learn-move replay", {
@@ -1067,19 +1083,210 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
           && handler.isCoopV2InputActionable?.() === true;
       }
       expect(summaryReady, "guest reached the exact projected learn-move SUMMARY").toBe(true);
+      projectedGuestPhase = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(
+        (projectedGuestPhase as { phaseName?: string } | null)?.phaseName,
+        "the SUMMARY belongs to the exact projected learn-move phase",
+      ).toBe("CoopReplayLearnMovePhase");
+      // A stale/wrong legacy result is deliberately injected before human input. The exact projected phase
+      // must ignore it; only its matching immutable INTERACTION_COMMIT may release this boundary.
+      realSend({
+        t: "interactionChoice",
+        seq: COOP_LEARN_MOVE_FWD_SEQ_BASE + PARTY_SLOT,
+        kind: "learnMove",
+        choice: gengar.getMaxMoveCount(),
+      });
+      await drainLoopback();
+      expect(rig.guestScene.phaseManager.getCurrentPhase(), "a wrong raw result cannot close the V2 picker").toBe(
+        projectedGuestPhase,
+      );
       // LEARN_MOVE opens on the pink new-move row. DOWN wraps to existing move slot 0, ACTION forgets it.
       expect(rig.guestScene.ui.processInput(Button.DOWN), "guest navigates to move slot 0").toBe(true);
       expect(rig.guestScene.ui.processInput(Button.ACTION), "guest submits the forget pick through SUMMARY").toBe(true);
+      // FAILURE-FIRST: the local raw proposal is not a result. The owner must remain parked on this exact
+      // phase until the host's immutable decision entry applies and states its typed successor.
+      expect(
+        rig.guestScene.phaseManager.getCurrentPhase(),
+        "the guest owner cannot release progression from its local raw proposal",
+      ).toBe(projectedGuestPhase);
+      expect(rig.guestScene.ui.getMode(), "the picker stays visible while Authority V2 adjudicates").toBe(
+        UiMode.SUMMARY,
+      );
     });
-    for (let i = 0; i < 80 && !phaseDone; i++) {
+    let guestReleased = false;
+    let hostReleased = false;
+    for (let i = 0; i < 80 && (!hostReleased || !guestReleased || !v2DecisionCommitted); i++) {
       await pumpDuoDestinations(rig, 1);
+      hostReleased = withClientSync(rig.hostCtx, () => rig.hostScene.phaseManager.getCurrentPhase() !== hostLearnPhase);
+      guestReleased = withClientSync(
+        rig.guestCtx,
+        () => rig.guestScene.phaseManager.getCurrentPhase() !== projectedGuestPhase,
+      );
     }
     offSpy();
     expect(v2PromptCommitted, "the forget prompt entered the immutable V2 log (never legacy-only)").toBe(true);
-    expect(phaseDone, "the host learn phase completed on the guest's buffered pick").toBe(true);
+    expect(v2DecisionCommitted, "the host retained the complete immutable learn-move decision").toBe(true);
+    expect(hostRawResults, "the authority emitted no legacy result carrier after V2 cutover").toBe(0);
+    expect(hostReleased, "the host learn phase completed on the guest's exact pick").toBe(true);
+    expect(guestReleased, "only the committed decision released the guest's projected phase").toBe(true);
+    expect(rig.guestScene.ui.getMode(), "the committed result closed the guest picker").not.toBe(UiMode.SUMMARY);
     const movesAfter = gengar.moveset.map(m => m?.moveId);
     expect(movesAfter, "the guest's pick applied: slot 0 forgotten, the new move learned").toContain(NEW_MOVE);
     expect(movesAfter, "the forgotten move is gone").not.toContain(MoveId.SHADOW_BALL);
+    const guestPhaseAfterCommit = withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase());
+    const decisionRedelivery = retainedDecision.message;
+    expect(decisionRedelivery, "the exact immutable result is available for redelivery coverage").not.toBeNull();
+    if (decisionRedelivery != null) {
+      realSend(structuredClone(decisionRedelivery));
+      await pumpDuoDestinations(rig, 2);
+    }
+    expect(
+      withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase()),
+      "duplicate immutable-result delivery is idempotent and cannot reopen/advance the boundary",
+    ).toBe(guestPhaseAfterCommit);
+    expect(
+      gengar.moveset.map(m => m?.moveId),
+      "duplicate delivery cannot apply the move twice",
+    ).toEqual(movesAfter);
+    logs.flush();
+  }, 240_000);
+
+  it("Authority V2: a HOST-owned decline closes both exact pickers without a legacy result", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    await retireDuoInitialCommandForBoundaryTest(rig);
+    const { LearnMovePhase } = await import("#phases/learn-move-phase");
+    const { PokemonMove } = await import("#moves/pokemon-move");
+    const PARTY_SLOT = 0;
+    const FULL_MOVESET = [MoveId.TACKLE, MoveId.SPLASH, MoveId.PROTECT, MoveId.HYPNOSIS];
+    const NEW_MOVE = MoveId.SWORDS_DANCE;
+    for (const scene of [rig.hostScene, rig.guestScene]) {
+      scene.getPlayerParty()[PARTY_SLOT].moveset = FULL_MOVESET.map(moveId => new PokemonMove(moveId));
+    }
+    expect(
+      (rig.hostScene.getPlayerParty()[PARTY_SLOT] as unknown as { coopOwner?: string }).coopOwner ?? "host",
+      "the authority owns the tested mon",
+    ).toBe("host");
+
+    let promptCommitted = false;
+    let decisionCommitted = false;
+    let committedForgetSlot: number | null = null;
+    let hostRawResults = 0;
+    const realSend = pair.host.send.bind(pair.host);
+    (pair.host as { send: (message: CoopMessage) => void }).send = (message: CoopMessage) => {
+      if (
+        message.t === "authorityEntry"
+        && message.body.kind === "INTERACTION_COMMIT"
+        && message.body.operationId.includes(":LEARN_MOVE:")
+      ) {
+        const material = message.body.material.payload as {
+          envelope?: { pendingOperation?: { payload?: { type?: unknown; forgetSlot?: unknown } } };
+        };
+        const payload = material.envelope?.pendingOperation?.payload;
+        promptCommitted ||= payload?.type === "prompt";
+        decisionCommitted ||= payload?.type === "decision";
+        if (payload?.type === "decision" && typeof payload.forgetSlot === "number") {
+          committedForgetSlot = payload.forgetSlot;
+        }
+      }
+      if (message.t === "interactionChoice" && message.kind === "learnMove") {
+        hostRawResults++;
+      }
+      realSend(message);
+    };
+
+    const showText = withClientSync(rig.hostCtx, () =>
+      vi.spyOn(rig.hostScene.ui, "showTextPromise").mockResolvedValue(),
+    );
+    let hostLearnPhase: object | null = null;
+    await withClient(rig.hostCtx, () => {
+      const phase = new LearnMovePhase(PARTY_SLOT, NEW_MOVE);
+      hostLearnPhase = phase;
+      haltQueueAfterCurrent();
+      expect(rig.hostScene.phaseManager.overridePhase(phase), "the host picker owns the real phase boundary").toBe(
+        true,
+      );
+      phase.start();
+    });
+
+    let firstConfirm: object | null = null;
+    for (let attempt = 0; attempt < 100 && firstConfirm == null; attempt++) {
+      await pumpDuoDestinations(rig, 1);
+      firstConfirm = withClientSync(rig.hostCtx, () => {
+        const handler = rig.hostScene.ui.getHandler() as unknown as {
+          active?: boolean;
+          isCoopV2InputActionable?: () => boolean;
+        };
+        return rig.hostScene.ui.getMode() === UiMode.CONFIRM
+          && handler.active === true
+          && handler.isCoopV2InputActionable?.() === true
+          ? handler
+          : null;
+      });
+    }
+    expect(promptCommitted, "the host-owned presentation entered Authority V2 before input").toBe(true);
+    expect(firstConfirm, "the host reached its exact actionable replace confirmation").not.toBeNull();
+
+    let projectedGuestPhase: object | null = null;
+    await withClient(rig.guestCtx, async () => {
+      if (rig.guestScene.ui.getMode() !== UiMode.SUMMARY) {
+        const replay = await driveClientPhaseQueueTo(rig.guestScene, "host-owned learn-move watcher", {
+          matches: phase => phase.phaseName === "CoopReplayLearnMovePhase",
+        });
+        replay.start();
+      }
+      for (let attempt = 0; attempt < 100 && rig.guestScene.ui.getMode() !== UiMode.SUMMARY; attempt++) {
+        await drainLoopback();
+      }
+      projectedGuestPhase = rig.guestScene.phaseManager.getCurrentPhase();
+      expect((projectedGuestPhase as { phaseName?: string }).phaseName).toBe("CoopReplayLearnMovePhase");
+      expect(rig.guestScene.ui.getMode(), "the partner sees the host-owned picker read-only").toBe(UiMode.SUMMARY);
+    });
+
+    withClientSync(rig.hostCtx, () => {
+      expect(rig.hostScene.ui.processInput(Button.CANCEL), "the host rejects replacing a move").toBe(true);
+    });
+    let stopConfirmReady = false;
+    for (let attempt = 0; attempt < 100 && !stopConfirmReady; attempt++) {
+      await pumpDuoDestinations(rig, 1);
+      stopConfirmReady = withClientSync(rig.hostCtx, () => {
+        const handler = rig.hostScene.ui.getHandler() as unknown as {
+          active?: boolean;
+          isCoopV2InputActionable?: () => boolean;
+        };
+        return (
+          rig.hostScene.ui.getMode() === UiMode.CONFIRM
+          && handler !== firstConfirm
+          && handler.active === true
+          && handler.isCoopV2InputActionable?.() === true
+        );
+      });
+    }
+    expect(stopConfirmReady, "the host reached the exact stop-teaching confirmation").toBe(true);
+    withClientSync(rig.hostCtx, () => {
+      expect(rig.hostScene.ui.processInput(Button.ACTION), "the host commits the decline").toBe(true);
+    });
+
+    let hostReleased = false;
+    let guestReleased = false;
+    for (let attempt = 0; attempt < 100 && (!decisionCommitted || !hostReleased || !guestReleased); attempt++) {
+      await pumpDuoDestinations(rig, 1);
+      hostReleased = withClientSync(rig.hostCtx, () => rig.hostScene.phaseManager.getCurrentPhase() !== hostLearnPhase);
+      guestReleased = withClientSync(
+        rig.guestCtx,
+        () => rig.guestScene.phaseManager.getCurrentPhase() !== projectedGuestPhase,
+      );
+    }
+    showText.mockRestore();
+    expect(decisionCommitted, "the complete decline result was retained").toBe(true);
+    expect(committedForgetSlot, "decline uses the exact move-cap sentinel").toBe(FULL_MOVESET.length);
+    expect(hostRawResults, "host authority emitted no legacy decline result").toBe(0);
+    expect(hostReleased, "the host picker closed after retention").toBe(true);
+    expect(guestReleased, "the read-only guest picker closed from the same immutable result").toBe(true);
+    expect(rig.hostScene.getPlayerParty()[PARTY_SLOT].moveset.map(move => move?.moveId)).toEqual(FULL_MOVESET);
+    expect(rig.guestScene.getPlayerParty()[PARTY_SLOT].moveset.map(move => move?.moveId)).toEqual(FULL_MOVESET);
     logs.flush();
   }, 240_000);
 

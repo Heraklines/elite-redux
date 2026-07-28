@@ -3,6 +3,8 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
+import { captureCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
@@ -22,6 +24,7 @@ import type {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   advanceCoopInteractionForContinuation,
+  type CoopRuntime,
   clearCoopLearnMoveForwardInFlight,
   failCoopSharedSession,
   getCoopController,
@@ -38,6 +41,7 @@ import {
   COOP_LEARN_MOVE_FWD_SEQ_BASE,
   COOP_LEARN_MOVE_SEQ,
 } from "#data/elite-redux/coop/coop-seq-registry";
+import { coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
 import { isErOmniformMon } from "#data/elite-redux/omniform-movesets";
@@ -104,8 +108,13 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     readonly maxMoveCount: number;
     readonly wave: number;
     readonly turn: number;
+    readonly interactionCounter: number;
     readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
   } | null = null;
+  /** Guest-owner proposal retained until the matching immutable result closes this exact phase. */
+  private coopAwaitingAuthorityDecisionOperationId: string | null = null;
+  private coopSubmittedV2ForgetSlot: number | null = null;
+  private coopCommittedV2ResultSettled = false;
 
   constructor(
     partyMemberIndex: number,
@@ -338,57 +347,93 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       maxMoveCount,
       wave: globalScene.currentBattle?.waveIndex ?? 0,
       turn: globalScene.currentBattle?.turn ?? 0,
+      interactionCounter: this.coopInteractionCounter?.() ?? -1,
       ...(nextInteraction == null ? {} : { nextInteraction: structuredClone(nextInteraction) }),
     };
     return true;
   }
 
   /**
-   * Publish the immutable post-mutation result at the phase terminal. The authority-side V2 admission gate
-   * requires this exact settlement proof, so neither a queued callback nor a pre-mutation choice can commit.
+   * Close and retain one host-authored V2 decision in the only safe order.
+   *
+   * The state image is captured after the learn/decline has fully rendered but before a successor can mutate
+   * it. The real phase then shifts, and only that completed scheduler edge may record terminal proof. The
+   * immutable decision is retained next; a successful TM/free-Memory learn rotates ownership from that
+   * retained commit, never through the legacy broadcast path. A decline leaves its back-out copy intact.
    */
-  private commitPreparedCoopV2LearnMoveDecision(): boolean {
+  private closeAndCommitPreparedCoopV2LearnMoveDecision(): boolean {
     const pending = this.coopPendingV2Decision;
     const binding = this.coopOperationBinding;
     if (pending == null || binding == null || !isCoopLearnMoveAuthorityV2Active(binding)) {
+      return false;
+    }
+    const runtime = this.coopOwningRuntime;
+    const state = captureCoopAuthoritativeBattleState(pending.turn);
+    if (
+      runtime == null
+      || getCoopRuntime() !== runtime
+      || globalScene.phaseManager.getCurrentPhase() !== this
+      || !isCompleteCoopOperationAuthorityState(state, pending.wave, pending.turn)
+    ) {
+      failCoopSharedSession(`Learn-move result ${pending.operationId} could not capture its exact terminal state`);
       return true;
     }
-    if (!settleCoopV2InteractionOperation(pending.operationId, this.coopOwningRuntime)) {
-      failCoopSharedSession(`Learn-move result ${pending.operationId} could not prove its phase terminal`);
-      return false;
-    }
-    if (
-      !commitCoopLearnMoveDecision(
-        {
-          payload: {
-            type: "decision",
-            partySlot: this.partyMemberIndex,
-            moveId: this.moveId,
-            forgetSlot: pending.forgetSlot,
-            maxMoveCount: pending.maxMoveCount,
-            ...(pending.nextInteraction == null ? {} : { nextInteraction: structuredClone(pending.nextInteraction) }),
+    const learned = pending.forgetSlot >= 0 && pending.forgetSlot < pending.maxMoveCount;
+    const continuationRemoved =
+      learned
+      && (this.learnMoveType === LearnMoveType.TM || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1))
+      && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+
+    const closed = globalScene.phaseManager.shiftPhaseThroughCoopAuthorityCommit(this, () => {
+      if (globalScene.phaseManager.getCurrentPhase() === this) {
+        return false;
+      }
+      if (!settleCoopV2InteractionOperation(pending.operationId, runtime)) {
+        failCoopSharedSession(`Learn-move result ${pending.operationId} could not prove its phase terminal`);
+        return false;
+      }
+      if (
+        !commitCoopLearnMoveDecision(
+          {
+            payload: {
+              type: "decision",
+              partySlot: this.partyMemberIndex,
+              moveId: this.moveId,
+              forgetSlot: pending.forgetSlot,
+              maxMoveCount: pending.maxMoveCount,
+              ...(pending.nextInteraction == null ? {} : { nextInteraction: structuredClone(pending.nextInteraction) }),
+            },
+            ownerRole: pending.ownerRole,
+            localRole: "host",
+            wave: pending.wave,
+            turn: pending.turn,
+            operationId: pending.operationId,
+            authoritativeState: state,
           },
-          ownerRole: pending.ownerRole,
-          localRole: "host",
-          wave: pending.wave,
-          turn: pending.turn,
-          operationId: pending.operationId,
-        },
-        binding,
-      )
-    ) {
-      failCoopSharedSession(`Learn-move result ${pending.operationId} could not enter Authority V2`);
-      return false;
+          binding,
+        )
+      ) {
+        failCoopSharedSession(`Learn-move result ${pending.operationId} could not enter Authority V2`);
+        return false;
+      }
+      this.coopPendingV2Decision = null;
+      if (continuationRemoved) {
+        runtime.controller.advanceInteractionFromAuthoritativeCommit(pending.interactionCounter);
+      }
+      return true;
+    });
+    if (!closed) {
+      failCoopSharedSession(`Learn-move result ${pending.operationId} could not close before its successor`);
     }
-    this.coopPendingV2Decision = null;
     return true;
   }
 
-  /** End only after any staged V2 result has captured the complete final state. */
+  /** Legacy ends normally; V2 uses the close/proof/retain terminal above and never falls through twice. */
   private endAfterCoopLearnMoveDecision(): void {
-    if (this.commitPreparedCoopV2LearnMoveDecision()) {
-      this.end();
+    if (this.closeAndCommitPreparedCoopV2LearnMoveDecision()) {
+      return;
     }
+    this.end();
   }
 
   /**
@@ -437,7 +482,11 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       if (!this.prepareCoopV2LearnMoveDecision(moveIndex, "host")) {
         return;
       }
-    } else if (this.coopOperationBinding != null && localRole === "host") {
+      // The exact immutable decision is the sole V2 result carrier. A raw compatibility result could close
+      // the peer picker before state retention and therefore must not be broadcast after cutover.
+      return;
+    }
+    if (this.coopOperationBinding != null && localRole === "host") {
       const committed = commitCoopLearnMoveDecision(
         {
           payload: {
@@ -696,10 +745,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    * is materialized; this method only proves the matching result and releases the phase.
    */
   private async coopWatchHostOwnedV2Decision(move: Move, pokemon: Pokemon): Promise<void> {
-    const relay = this.coopRelay;
     const binding = this.coopOperationBinding;
     const presentationOperationId = this.coopV2ControlOperationId;
-    if (relay == null || binding == null || presentationOperationId == null) {
+    if (binding == null || presentationOperationId == null) {
       clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
       failCoopSharedSession(`Host-owned learn-move watcher for slot ${this.partyMemberIndex} lost its V2 binding`);
       return;
@@ -710,29 +758,108 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     });
     getCoopUiMirror()?.beginSession("watcher", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
     notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    // Authority V2's exact committed-result consumer closes this phase after applying the complete state
+    // and validating its typed successor. The legacy 20-minute relay FIFO has no release authority here.
+  }
 
-    const seq = COOP_LEARN_MOVE_FWD_SEQ_BASE + this.partyMemberIndex;
-    const result = await relay.awaitInteractionChoice(seq, COOP_LEARN_MOVE_FWD_WAIT_MS, COOP_LEARN_MOVE_CHOICE_KINDS);
-    getCoopUiMirror()?.endSession();
-    const expectedOperationId = coopLearnMoveDecisionOperationId(presentationOperationId);
-    if (
-      expectedOperationId == null
-      || result?.operationId !== expectedOperationId
-      || !settleCoopV2InteractionOperation(expectedOperationId, this.coopOwningRuntime)
-    ) {
-      clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
-      failCoopSharedSession(`Host-owned learn-move watcher for slot ${this.partyMemberIndex} lost its exact V2 result`);
-      return;
-    }
+  /** Remove a successful teach's back-out copy before shifting; V2 rotates only after terminal proof. */
+  private prepareCoopV2LearnMoveContinuation(
+    forgetSlot: number,
+    maxMoveCount: number,
+  ): {
+    readonly removed: boolean;
+    readonly interactionCounter: number;
+  } {
+    const learned = forgetSlot >= 0 && forgetSlot < maxMoveCount;
+    return {
+      removed:
+        learned
+        && (this.learnMoveType === LearnMoveType.TM
+          || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1))
+        && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase"),
+      interactionCounter: this.coopInteractionCounter?.() ?? -1,
+    };
+  }
 
-    clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
+  /**
+   * Close this queue-owned picker only from its exact immutable V2 decision.
+   *
+   * The runtime invokes this after the INTERACTION_COMMIT passed identity/payload validation, its complete
+   * authoritative state was installed, and its AWAIT_SUCCESSOR claim was registered. A raw relay result,
+   * stale operation, superseded phase, or wrong runtime cannot release progression.
+   */
+  public settleCoopV2CommittedLearnMoveResult(
+    operationId: string,
+    partySlot: number,
+    moveId: number,
+    forgetSlot: number,
+    maxMoveCount: number,
+    ownerSeatId: number,
+    runtime: CoopRuntime,
+  ): boolean {
+    const expectedOperationId =
+      this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+    const pokemon = this.getPokemon();
+    const monOwner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    const guestOwner = monOwner === "guest";
     if (
-      (this.learnMoveType === LearnMoveType.TM || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1))
-      && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")
+      this.coopCommittedV2ResultSettled
+      || runtime !== this.coopOwningRuntime
+      || getCoopRuntime() !== runtime
+      || globalScene.phaseManager.getCurrentPhase() !== this
+      || !isCoopLearnMoveAuthorityV2Active(this.coopOperationBinding)
+      || operationId !== expectedOperationId
+      || partySlot !== this.partyMemberIndex
+      || moveId !== this.moveId
+      || maxMoveCount !== pokemon.getMaxMoveCount()
+      || ownerSeatId !== coopSeatOfRole(monOwner)
+      || (guestOwner
+        ? this.coopAwaitingAuthorityDecisionOperationId !== operationId || this.coopSubmittedV2ForgetSlot !== forgetSlot
+        : !this.coopAwaitingHostOwnedPresentation || this.coopAwaitingAuthorityDecisionOperationId != null)
     ) {
-      advanceCoopInteractionForContinuation(this.coopInteractionCounter?.() ?? -1);
+      return false;
     }
-    void globalScene.ui.setMode(this.messageMode).then(() => this.end());
+    this.coopCommittedV2ResultSettled = true;
+    this.coopAwaitingAuthorityDecisionOperationId = null;
+    this.coopSubmittedV2ForgetSlot = null;
+    this.coopAwaitingHostOwnedPresentation = false;
+    const continuation = this.prepareCoopV2LearnMoveContinuation(forgetSlot, maxMoveCount);
+    coopLog("v2-proposal", `committed learn-move result ${operationId} applied; closing exact queued picker`);
+    void globalScene.ui
+      .setModeBoundedWhen(
+        this.messageMode,
+        2_000,
+        () =>
+          getCoopRuntime() === runtime
+          && globalScene.phaseManager.getCurrentPhase() === this
+          && isCoopLearnMoveAuthorityV2Active(this.coopOperationBinding)
+          && this.coopV2ControlOperationId != null
+          && coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId) === operationId,
+      )
+      .then(result => {
+        if (result === "superseded" || globalScene.phaseManager.getCurrentPhase() !== this) {
+          failCoopSharedSession(`Committed learn-move result ${operationId} lost its exact queued phase`);
+          return;
+        }
+        getCoopUiMirror()?.endSession();
+        clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
+        super.end();
+        if (globalScene.phaseManager.getCurrentPhase() === this) {
+          failCoopSharedSession(`Committed learn-move result ${operationId} did not close its queued phase`);
+          return;
+        }
+        if (!settleCoopV2InteractionOperation(operationId, runtime)) {
+          failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its queued terminal`);
+          return;
+        }
+        if (continuation.removed) {
+          runtime.controller.advanceInteractionFromAuthoritativeCommit(continuation.interactionCounter);
+        }
+      })
+      .catch(() => {
+        failCoopSharedSession(`Committed learn-move result ${operationId} could not close its queued picker`);
+      });
+    return true;
   }
 
   /**
@@ -864,8 +991,6 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         return;
       }
       settled = true;
-      mirror?.endSession();
-      clearCoopLearnMoveForwardInFlight(slot);
       // Relay the human's forget-slot to the host (the sole engine); it applies the forget + learns.
       coopLog("learnmove", "guest relays owned-mon forget-pick (#835)", { seq, moveIndex });
       const payload = {
@@ -877,6 +1002,15 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       };
       const decisionOperationId =
         this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+      const awaitsAuthoritativeResult = isCoopLearnMoveAuthorityV2Active(operationBinding);
+      if (awaitsAuthoritativeResult && decisionOperationId == null) {
+        failCoopSharedSession(`Guest learn-move picker for slot ${slot} lost its exact V2 result address`);
+        return;
+      }
+      if (awaitsAuthoritativeResult) {
+        this.coopAwaitingAuthorityDecisionOperationId = decisionOperationId;
+        this.coopSubmittedV2ForgetSlot = moveIndex;
+      }
       relay?.sendInteractionChoice(seq, "learnMove", moveIndex, undefined, undefined, decisionOperationId ?? undefined);
       armCoopLearnMoveIntentResend(
         {
@@ -895,14 +1029,12 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         },
         operationBinding,
       );
-      if (
-        isCoopLearnMoveAuthorityV2Active(operationBinding)
-        && (decisionOperationId == null
-          || !settleCoopV2InteractionOperation(decisionOperationId, this.coopOwningRuntime))
-      ) {
-        failCoopSharedSession(`Guest learn-move picker for slot ${slot} lost its exact V2 result address`);
+      if (awaitsAuthoritativeResult) {
+        coopLog("v2-proposal", `parked guest learn-move phase for committed result id=${decisionOperationId}`);
         return;
       }
+      mirror?.endSession();
+      clearCoopLearnMoveForwardInFlight(slot);
       // DEFERRED continuation cleanup: now that the pick is committed, remove the back-out SelectModifier
       // copy + advance the alternation (the same commit the immediate no-op path does, but AFTER the pick
       // instead of before it - so the picker overlay lived long enough for the human to use it).
@@ -1169,6 +1301,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    * @param Pokemon The Pokemon learning the move
    */
   async learnMove(index: number, move: Move, pokemon: Pokemon, textMessage?: string) {
+    const v2DecisionOwnsContinuation =
+      this.coopPendingV2Decision != null && isCoopLearnMoveAuthorityV2Active(this.coopOperationBinding);
     if (this.learnMoveType === LearnMoveType.TM) {
       if (!pokemon.usedTMs) {
         pokemon.usedTMs = [];
@@ -1176,13 +1310,17 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       pokemon.usedTMs.push(this.moveId);
       // #789-class: the continuation-copy removal is the interaction commit (see the guest mirror
       // branch above) - advance the alternation or the rotation stalls after a committed TM.
-      if (globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")) {
+      if (!v2DecisionOwnsContinuation && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")) {
         advanceCoopInteractionForContinuation(
           this.coopInteractionCounter?.() ?? getCoopController()?.interactionCounter() ?? -1,
         );
       }
     } else if (this.learnMoveType === LearnMoveType.MEMORY) {
-      if (this.cost === -1 && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")) {
+      if (
+        this.cost === -1
+        && !v2DecisionOwnsContinuation
+        && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")
+      ) {
         advanceCoopInteractionForContinuation(
           this.coopInteractionCounter?.() ?? getCoopController()?.interactionCounter() ?? -1,
         );

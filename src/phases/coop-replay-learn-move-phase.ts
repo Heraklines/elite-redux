@@ -17,6 +17,7 @@ import {
   isCoopLearnMoveAuthorityV2Active,
 } from "#data/elite-redux/coop/coop-learn-move-operation";
 import {
+  type CoopRuntime,
   clearCoopLearnMoveForwardInFlight,
   failCoopSharedSession,
   getCoopInteractionRelay,
@@ -31,6 +32,7 @@ import {
   COOP_LEARN_MOVE_FWD_SEQ_BASE,
   COOP_LEARN_MOVE_SEQ,
 } from "#data/elite-redux/coop/coop-seq-registry";
+import { coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
 import { UiMode } from "#enums/ui-mode";
 import { SummaryUiMode } from "#ui/summary-ui-handler";
 
@@ -152,6 +154,10 @@ export class CoopReplayLearnMovePhase extends Phase {
   private readonly seq: number;
   /** Set in {@linkcode relayAndEnd} so the picker resolves the forward EXACTLY once. */
   private settled = false;
+  /** Guest-owned intent retained until the matching immutable decision closes this exact phase. */
+  private submittedV2MoveIndex: number | null = null;
+  /** At-most-once guard for the committed-result terminal. */
+  private committedV2ResultSettled = false;
   private operationBinding: CoopLearnMoveOperationBinding | null = null;
   private relay: CoopInteractionRelay | null = null;
   private readonly ownerIsGuest: boolean;
@@ -254,21 +260,85 @@ export class CoopReplayLearnMovePhase extends Phase {
     });
     getCoopUiMirror()?.beginSession("watcher", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
     notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
-    const result = await relay.awaitInteractionChoice(this.seq, 1_200_000, COOP_LEARN_MOVE_CHOICE_KINDS);
+    if (isCoopLearnMoveAuthorityV2Active(this.operationBinding)) {
+      // The runtime's exact INTERACTION_COMMIT consumer closes this phase after applying the complete
+      // authoritative state and validating its typed AWAIT_SUCCESSOR. The compatibility FIFO is cosmetic.
+      return;
+    }
+    await relay.awaitInteractionChoice(this.seq, 1_200_000, COOP_LEARN_MOVE_CHOICE_KINDS);
     getCoopUiMirror()?.endSession();
+    clearCoopLearnMoveForwardInFlight(this.partySlot);
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+  }
+
+  /**
+   * Close this projected picker only from its exact immutable V2 decision.
+   *
+   * The runtime calls this after validating the INTERACTION_COMMIT, applying its complete state image, and
+   * binding the decision's typed AWAIT_SUCCESSOR in the global control ledger. A raw relay choice cannot
+   * call this method, and a cancelled/superseded/wrong-generation result fails closed.
+   */
+  public settleCoopV2CommittedLearnMoveResult(
+    operationId: string,
+    partySlot: number,
+    moveId: number,
+    forgetSlot: number,
+    maxMoveCount: number,
+    ownerSeatId: number,
+    runtime: CoopRuntime,
+  ): boolean {
     const expectedOperationId =
       this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
     if (
-      isCoopLearnMoveAuthorityV2Active(this.operationBinding)
-      && (expectedOperationId == null
-        || result?.operationId !== expectedOperationId
-        || !settleCoopV2InteractionOperation(expectedOperationId, this.coopOwningRuntime))
+      this.committedV2ResultSettled
+      || runtime !== this.coopOwningRuntime
+      || getCoopRuntime() !== runtime
+      || globalScene.phaseManager.getCurrentPhase() !== this
+      || !isCoopLearnMoveAuthorityV2Active(this.operationBinding)
+      || operationId !== expectedOperationId
+      || partySlot !== this.partySlot
+      || moveId !== this.moveId
+      || maxMoveCount !== this.maxMoveCount
+      || ownerSeatId !== coopSeatOfRole(this.ownerIsGuest ? "guest" : "host")
+      || (this.ownerIsGuest && this.submittedV2MoveIndex !== forgetSlot)
+      || (!this.ownerIsGuest && this.submittedV2MoveIndex != null)
     ) {
-      failCoopSharedSession(`Learn-move watcher for slot ${this.partySlot} could not settle its exact V2 result`);
-      return;
+      return false;
     }
-    clearCoopLearnMoveForwardInFlight(this.partySlot);
-    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+    this.committedV2ResultSettled = true;
+    this.settled = true;
+    coopLog("v2-proposal", `committed learn-move result ${operationId} applied; closing exact projected picker`);
+    void globalScene.ui
+      .setModeBoundedWhen(
+        UiMode.MESSAGE,
+        2_000,
+        () =>
+          getCoopRuntime() === runtime
+          && globalScene.phaseManager.getCurrentPhase() === this
+          && isCoopLearnMoveAuthorityV2Active(this.operationBinding)
+          && this.coopV2ControlOperationId != null
+          && coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId) === operationId,
+      )
+      .then(result => {
+        if (result === "superseded" || globalScene.phaseManager.getCurrentPhase() !== this) {
+          failCoopSharedSession(`Committed learn-move result ${operationId} lost its exact projected phase`);
+          return;
+        }
+        getCoopUiMirror()?.endSession();
+        clearCoopLearnMoveForwardInFlight(this.partySlot);
+        super.end();
+        if (globalScene.phaseManager.getCurrentPhase() === this) {
+          failCoopSharedSession(`Committed learn-move result ${operationId} did not close its projected phase`);
+          return;
+        }
+        if (!settleCoopV2InteractionOperation(operationId, runtime)) {
+          failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its projected terminal`);
+        }
+      })
+      .catch(() => {
+        failCoopSharedSession(`Committed learn-move result ${operationId} could not close its projected picker`);
+      });
+    return true;
   }
 
   /**
@@ -281,8 +351,6 @@ export class CoopReplayLearnMovePhase extends Phase {
       return;
     }
     this.settled = true;
-    getCoopUiMirror()?.endSession();
-    clearCoopLearnMoveForwardInFlight(this.partySlot);
     coopLog("learnmove", "guest relays move-forget pick", { seq: this.seq, kind: LEARN_MOVE_CHOICE_KIND, moveIndex });
     const relay = this.relay;
     const operationBinding = this.operationBinding;
@@ -292,6 +360,14 @@ export class CoopReplayLearnMovePhase extends Phase {
     }
     const decisionOperationId =
       this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+    const awaitsAuthoritativeResult = isCoopLearnMoveAuthorityV2Active(operationBinding);
+    if (awaitsAuthoritativeResult && decisionOperationId == null) {
+      failCoopSharedSession(`Learn-move replay for slot ${this.partySlot} lost its exact V2 result address`);
+      return;
+    }
+    if (awaitsAuthoritativeResult) {
+      this.submittedV2MoveIndex = moveIndex;
+    }
     relay.sendInteractionChoice(
       this.seq,
       LEARN_MOVE_CHOICE_KIND,
@@ -323,13 +399,12 @@ export class CoopReplayLearnMovePhase extends Phase {
       },
       operationBinding,
     );
-    if (
-      isCoopLearnMoveAuthorityV2Active(operationBinding)
-      && (decisionOperationId == null || !settleCoopV2InteractionOperation(decisionOperationId, this.coopOwningRuntime))
-    ) {
-      failCoopSharedSession(`Learn-move replay for slot ${this.partySlot} lost its exact V2 result address`);
+    if (awaitsAuthoritativeResult) {
+      coopLog("v2-proposal", `parked learn-move replay for committed result id=${decisionOperationId}`);
       return;
     }
+    getCoopUiMirror()?.endSession();
+    clearCoopLearnMoveForwardInFlight(this.partySlot);
     void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }
 }

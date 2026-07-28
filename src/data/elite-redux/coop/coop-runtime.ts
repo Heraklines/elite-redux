@@ -11353,7 +11353,61 @@ function materializeCoopStormglassFromOp(runtime: CoopRuntime, envelope: CoopAut
   return false;
 }
 
-/** Route journaled learn presentations/host terminals into the same relay seams as their raw carriers. */
+/**
+ * Close a projected per-move learn picker only from its exact admitted V2 result claim. Complete state
+ * application has already succeeded when this runs; terminal proof still waits for the real phase to end.
+ */
+function settleCoopV2CommittedLearnMoveResult(
+  runtime: CoopRuntime,
+  operationId: string,
+  payload: Extract<CoopLearnMovePayload, { type: "decision" }>,
+): boolean {
+  const control = runtime.v2ControlLedger.latestControl;
+  const sourceEntry = control == null ? null : runtime.v2ControlLedger.sourceEntryOf(control);
+  const sourceMaterial = sourceEntry == null ? null : decodeCoopV2InteractionEnvelope(sourceEntry);
+  const sourceOperation = sourceMaterial?.envelope.pendingOperation;
+  if (
+    control?.kind !== "AWAIT_SUCCESSOR"
+    || control.afterOperationId !== operationId
+    || sourceEntry?.kind !== "INTERACTION_COMMIT"
+    || sourceEntry.operationId !== operationId
+    || sourceOperation?.kind !== "LEARN_MOVE"
+    || sourceOperation.id !== operationId
+    || sourceOperation.status !== "applied"
+    || JSON.stringify(sourceOperation.payload) !== JSON.stringify(payload)
+  ) {
+    return false;
+  }
+  if (runtime.v2SettledInteractionOperations.has(operationId)) {
+    return true;
+  }
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        settleCoopV2CommittedLearnMoveResult?: (
+          committedOperationId: string,
+          partySlot: number,
+          moveId: number,
+          forgetSlot: number,
+          maxMoveCount: number,
+          ownerSeatId: number,
+          owningRuntime: CoopRuntime,
+        ) => boolean;
+      }
+    | undefined;
+  return (
+    phase?.settleCoopV2CommittedLearnMoveResult?.(
+      operationId,
+      payload.partySlot,
+      payload.moveId,
+      payload.forgetSlot,
+      payload.maxMoveCount,
+      sourceOperation.owner,
+      runtime,
+    ) === true
+  );
+}
+
+/** Route journaled learn presentations/terminals into the real projected phase consumer. */
 function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
     return false;
@@ -11375,9 +11429,12 @@ function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuth
       );
       return true;
     }
+    if (isCoopV2InteractionCutoverActive(runtime.durability)) {
+      return settleCoopV2CommittedLearnMoveResult(runtime, op.id, payload);
+    }
     if (op.owner === 0) {
-      // The host-owned result closes the guest's exact read-only replay phase. The immutable state was
-      // already applied above; this carrier is only the phase-terminal proof and carries the result ID.
+      // Legacy compatibility: the raw result still closes the guest's read-only replay phase. Under V2 the
+      // exact committed-result consumer above owns release and this FIFO is not consulted.
       runtime.interactionRelay.materializeCommittedInteractionChoice(
         COOP_LEARN_MOVE_FWD_SEQ_BASE + payload.partySlot,
         "learnMove",

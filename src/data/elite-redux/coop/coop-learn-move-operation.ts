@@ -45,7 +45,7 @@ import {
   COOP_LEARN_MOVE_FWD_SEQ_BASE,
 } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
-import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 type LearnPayload = CoopLearnMovePayload | CoopLearnMoveBatchPayload;
 type LearnDecision =
@@ -200,8 +200,8 @@ function guest(binding?: CoopLearnMoveOperationBinding | null): CoopOperationGue
 function nextAddress(s: LearnMoveOpState): number {
   return s.revisionFloor + ++s.ordinal;
 }
-function context(wave: number, turn: number) {
-  return coopOperationCommitContext(wave, turn, "TURN_RESOLVE");
+function context(wave: number, turn: number, authoritativeState?: CoopAuthoritativeBattleStateV1) {
+  return coopOperationCommitContext(wave, turn, "TURN_RESOLVE", authoritativeState);
 }
 function kindOf(payload: LearnPayload): Extract<CoopOperationKind, "LEARN_MOVE" | "LEARN_MOVE_BATCH"> {
   return "moveId" in payload ? "LEARN_MOVE" : "LEARN_MOVE_BATCH";
@@ -214,6 +214,7 @@ function commit(
     wave: number;
     turn: number;
     operationId?: string;
+    authoritativeState?: CoopAuthoritativeBattleStateV1;
   },
   binding?: CoopLearnMoveOperationBinding | null,
 ): string | null {
@@ -249,8 +250,10 @@ function commit(
       status: "proposed",
       payload: structuredClone(params.payload),
     };
-    const result = host(binding).submit(operation, context(params.wave, params.turn), intent =>
-      intent.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
+    const result = host(binding).submit(
+      operation,
+      context(params.wave, params.turn, params.authoritativeState),
+      intent => (intent.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" }),
     );
     if (result.kind !== "committed" && result.kind !== "reack") {
       return null;
@@ -299,10 +302,12 @@ export function sendCoopLearnMovePromptWithOperationId(
   if (operationId == null) {
     return null;
   }
-  relay.sendInteractionOutcome(COOP_LEARN_MOVE_FWD_SEQ_BASE + payload.partySlot, "learnMoveForward", {
-    k: "learnMoveForward",
-    ...payload,
-  });
+  if (!isCoopLearnMoveAuthorityV2Active(binding)) {
+    relay.sendInteractionOutcome(COOP_LEARN_MOVE_FWD_SEQ_BASE + payload.partySlot, "learnMoveForward", {
+      k: "learnMoveForward",
+      ...payload,
+    });
+  }
   return operationId;
 }
 export function sendCoopLearnMovePrompt(
@@ -347,6 +352,8 @@ export function commitCoopLearnMoveDecision(
     wave: number;
     turn: number;
     operationId?: string;
+    /** Exact post-decision image captured before the LearnMovePhase shifts to its successor. */
+    authoritativeState?: CoopAuthoritativeBattleStateV1;
   },
   binding?: CoopLearnMoveOperationBinding | null,
 ): boolean {
