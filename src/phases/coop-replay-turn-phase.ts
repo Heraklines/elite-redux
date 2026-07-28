@@ -102,6 +102,25 @@ function fieldMonHp(bi: number, actor?: CoopPresentationActorRef): number | unde
   return matches.length === 1 ? matches[0].hp : undefined;
 }
 
+/** Install the signed pre-command image after any local encounter-shell setup has completed. */
+function installCoopEntryPresentationState(prefix: CoopEntryPresentationPrefix): boolean {
+  const prefixState = prefix.authoritativeState;
+  if (prefixState == null) {
+    return true;
+  }
+  const acceptedPrefixTick = coopAppliedStateTick();
+  if (acceptedPrefixTick > prefix.stateTick) {
+    return true;
+  }
+  if (acceptedPrefixTick === prefix.stateTick) {
+    return reapplyAcceptedCoopAuthoritativeBattleState(prefixState, true);
+  }
+  return (
+    applyCoopAuthoritativeBattleState(prefixState, true)
+    || reapplyAcceptedCoopAuthoritativeBattleState(prefixState, true)
+  );
+}
+
 export function abortActiveCoopReplayTurnPhase(reason: string): boolean {
   return activeCoopReplayTurnPhase?.abortPhantom(reason) ?? false;
 }
@@ -1068,15 +1087,12 @@ export class CoopReplayTurnPhase extends Phase {
       // A command-open can be admitted before this concrete renderer exists (for example while the
       // two-engine fixture is still leaving LoginPhase). In that case its DATA is deliberately deferred.
       // The retained V2 prefix therefore carries the complete image that authored it, and this exact
-      // address-checked phase is the safe material consumer. The final-boss late-consumer path is already
-      // at this tick and simply proves the same watermark without reapplying anything.
-      const prefixState = prefix.authoritativeState;
-      if (
-        prefixState != null
-        && coopAppliedStateTick() < prefix.stateTick
-        && !applyCoopAuthoritativeBattleState(prefixState, true)
-        && !reapplyAcceptedCoopAuthoritativeBattleState(prefixState, true)
-      ) {
+      // address-checked phase is the safe material consumer. Even when that tick was already accepted,
+      // reassert it here: SwitchBiome/NewBiomeEncounter is a presentation shell that may run after the
+      // early apply and recalculate derived enemy stats before this fence (level-soak seed 20260728 changed
+      // a signed 58 max HP back to the locally generated 56). A strictly newer accepted tick still wins;
+      // its older prefix remains presentation-only.
+      if (!installCoopEntryPresentationState(prefix)) {
         this.failAuthority(
           streamer,
           "turnResolution",

@@ -4876,3 +4876,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   now has a legitimate material consumer instead of terminating the shared session.
 - This remains co-op Authority V2 code only. Showdown and tournament are untouched; their old lockstep architecture
   keeps its existing behavior. Engine and full browser qualification remain remote-only; no deployment occurred.
+
+## 2026-07-28 - The pre-command fence reasserts state mutated by the encounter shell
+
+- Calibrated level soak `30326953423` found one real wave-31 field divergence: the host's Honedge entered with signed
+  HP/max-HP 58 while the guest exposed 56. The tick-571 command state had applied successfully during
+  `SwitchBiomePhase`, but the renderer's subsequent `NewBiomeEncounterPhase` shell recalculated the guest object's
+  derived stats. The old presentation fence saw that tick 571 was already accepted and treated the matching carrier as
+  proof without restoring its contents.
+- The exact address-checked pre-command presentation fence now reasserts an equal accepted tick after all local
+  encounter-shell setup and before rendering the retained entrance events. A strictly newer accepted tick still
+  supersedes the older carrier, so delayed compatibility presentation cannot roll state backward. This closes the
+  authoritative-state-to-real-CommandPhase mutation window rather than teaching the soak to ignore it.
+- Showdown and tournament remain untouched. Engine, calibrated soak, and two-browser qualification remain remote-only;
+  no deployment occurred.
