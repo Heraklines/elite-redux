@@ -2851,11 +2851,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ignoreOverride: boolean,
     activeOnly: boolean,
     ignoreFaint = false,
+    ignoreMentalPollution = false,
   ): readonly PokemonAbilitySource[] {
     const sources: PokemonAbilitySource[] = [];
     const seenIds = new Set<AbilityId>();
     const active = this.getAbility(ignoreOverride);
-    if (!activeOnly || this.canApplyAbility(false, 0, ignoreFaint)) {
+    if (!activeOnly || this.canApplyAbility(false, 0, ignoreFaint, ignoreMentalPollution)) {
       seenIds.add(active.id);
       sources.push({ ability: active, passive: false });
     }
@@ -2872,7 +2873,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (!isGiftSlot && slot >= enemySlotLimit && !isFormChangeDriver) {
         continue;
       }
-      if (activeOnly && !this.canApplyAbility(true, slot, ignoreFaint)) {
+      if (activeOnly && !this.canApplyAbility(true, slot, ignoreFaint, ignoreMentalPollution)) {
         continue;
       }
       if (seenIds.has(ability.id)) {
@@ -3280,7 +3281,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return globalScene.gameData.starterData[owner.getRootSpeciesId()]?.passiveAttr ?? 0;
   }
 
-  public canApplyAbility(passive = false, passiveSlot = 0, ignoreFaint = false): boolean {
+  public canApplyAbility(
+    passive = false,
+    passiveSlot = 0,
+    ignoreFaint = false,
+    ignoreMentalPollution = false,
+  ): boolean {
     // ER 3-passive: resolve the candidate ability first (before the unlock gates
     // below) so we can special-case form-change-driving innates. We avoid falling
     // back to `this.getAbility()` for an empty passive slot because that would
@@ -3393,16 +3399,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // holder is still suppressed. Dynamic: lifts the moment the holder stops
     // being enraged (i.e. switches out) or this mon leaves the field.
     if (
-      ability.suppressable
+      !ignoreMentalPollution
+      && ability.suppressable
       && this.isOnField()
+      && !this.hasActiveMentalPollution()
       && globalScene
         .getField(true)
-        .some(
-          p =>
-            p !== this
-            && p.getTag(BattlerTagType.ER_ENRAGE) != null
-            && p.hasAbilityWithAttr("SuppressFieldAbilitiesWhenEnragedAbAttr"),
-        )
+        .some(p => p !== this && p.getTag(BattlerTagType.ER_ENRAGE) != null && p.hasActiveMentalPollution())
     ) {
       return false;
     }
@@ -3482,6 +3485,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public hasAbilityWithAttr(attrType: AbAttrString, canApply = true, ignoreOverride = false): boolean {
     const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
     return sources.some(source => source.ability.hasAttr(attrType));
+  }
+
+  /**
+   * Resolve Mental Pollution through every ordinary source gate except its own field suppression.
+   * A normal active-source lookup would ask every candidate whether another enraged holder suppresses
+   * it, recursively bouncing between two holders until the JavaScript stack overflows. The one skipped
+   * gate is also the ability's explicit holder exemption; unlocks, faint, Neutralizing Gas, transforms,
+   * requested suppression, and ability conditions remain authoritative.
+   */
+  private hasActiveMentalPollution(): boolean {
+    return this.collectAbilitySources(false, true, false, true).some(source =>
+      source.ability.hasAttr("SuppressFieldAbilitiesWhenEnragedAbAttr"),
+    );
   }
 
   /** Return post-summon priorities for every currently active ability source. */

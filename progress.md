@@ -4937,3 +4937,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The production 120-second hard wall remains unchanged and fail-closed for the renderer. Exact remote Focused,
   animations-on campaign, and broader qualification are still required; no local co-op engine/browser run and no
   deployment occurred.
+
+## 2026-07-28 - Mental Pollution active-source lookup cannot recurse between holders
+
+- Exact god-c soak `30327843809` crossed 139 waves, then wave 140 raised repeated `RangeError: Maximum call stack size
+  exceeded` from `canApplyAbility -> hasAbilityWithAttr -> collectAbilitySources`. Two fielded holders could each ask
+  whether the other's Mental Pollution was active while evaluating the same suppression gate, producing unbounded
+  mutual recursion. This was a production battle-mechanics crash, not a V2 divergence or harness artifact.
+- Mental Pollution now resolves through the ordinary active-source gates while explicitly skipping only its own field
+  suppression edge. Holders remain mutually exempt as the dex requires; unlock, faint, Neutralizing Gas, transform,
+  requested-suppression, and condition gates still apply. A direct two-enraged-holder regression covers the former
+  recursive composition.
+- The exact god-c seed and full remote qualification remain required. No local co-op engine/browser execution and no
+  deployment occurred.
+- Focused run `30330864879` also found two stale tests from the preceding retained-market migration: the malformed-kind
+  negative fixture relied on a now-invalid direct union assertion, and registry completeness still demanded direct
+  concrete shop-phase calls. The negative now crosses `unknown` explicitly, while completeness requires all three
+  encounters to call `setEncounterMarketReward` with one of the closed retained subtypes.

@@ -432,7 +432,11 @@ describe("complete retained Mystery terminal transaction", () => {
     ).toBe(true);
     expect(
       validates([
-        { kind: "market", surfaceId: "market:me:49:0", marketKind: "generic" } as CoopMeRewardSurfaceProjection,
+        {
+          kind: "market",
+          surfaceId: "market:me:49:0",
+          marketKind: "generic",
+        } as unknown as CoopMeRewardSurfaceProjection,
       ]),
     ).toBe(false);
     expect(validates([eggReward({ id: -1 })])).toBe(false);

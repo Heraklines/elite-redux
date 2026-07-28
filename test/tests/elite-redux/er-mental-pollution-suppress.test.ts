@@ -90,4 +90,17 @@ describe.skipIf(!RUN)("ER Mental Pollution — on-enrage field ability suppressi
 
     expect(enemy.hp, "Earthquake damaged the foe — Levitate immunity was suppressed").toBeLessThan(enemy.getMaxHp());
   }, 120_000);
+
+  it("two enraged Mental Pollution holders remain mutually exempt without recursive source lookup", async () => {
+    game.override.ability(MENTAL_POLLUTION).enemyAbility(MENTAL_POLLUTION);
+    await game.classicMode.startBattle(SpeciesId.GYARADOS);
+    const player = game.scene.getPlayerPokemon()!;
+    const enemy = game.scene.getEnemyPokemon()!;
+
+    player.addTag(BattlerTagType.ER_ENRAGE, 1, undefined, player.id);
+    enemy.addTag(BattlerTagType.ER_ENRAGE, 1, undefined, enemy.id);
+
+    expect(player.hasAbility(MENTAL_POLLUTION), "player holder remains active and self-exempt").toBe(true);
+    expect(enemy.hasAbility(MENTAL_POLLUTION), "enemy holder remains active and self-exempt").toBe(true);
+  }, 120_000);
 });

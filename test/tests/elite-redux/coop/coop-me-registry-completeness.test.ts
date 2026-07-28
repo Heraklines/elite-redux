@@ -168,11 +168,10 @@ describe("co-op Mystery Encounter registry and exceptional-surface completeness"
     expect(filesMatching(/initSubsequentOptionSelect\(/), "Safari is the only direct repeated selector").toEqual([
       "safari-zone-encounter.ts",
     ]);
-    expect(filesMatching(/unshiftNew\("(?:Exotic|BlackMarket|ImportBazaar)ShopPhase"/)).toEqual([
-      "black-market-encounter.ts",
-      "exotic-trader-encounter.ts",
-      "import-bazaar-encounter.ts",
-    ]);
+    expect(
+      filesMatching(/setEncounterMarketReward\("(?:black-market|exotic|import-bazaar)"\)/),
+      "embedded markets declare their exact retained destination instead of opening a local phase",
+    ).toEqual(["black-market-encounter.ts", "exotic-trader-encounter.ts", "import-bazaar-encounter.ts"]);
     expect(filesMatching(/unshiftNew\("ColosseumChoicePhase"/)).toEqual(["colosseum-encounter.ts"]);
 
     assertProof("coop-duo-mystery.test.ts", ["ErQuizPhase", "ER_INTO_THE_CALDERA"]);
