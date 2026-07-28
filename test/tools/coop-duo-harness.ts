@@ -2046,11 +2046,24 @@ export async function driveClientPhaseQueueTo(
       if (scene.phaseManager.getCurrentPhase() !== phase) {
         break;
       }
+      // Authority V2 can make an already-current phase become the requested public surface without
+      // replacing that phase object. The concrete replacement case is a CommandPhase that starts parked,
+      // then receives its exact COMMAND_FRONTIER while pumpPeer services the other browser. Checking only
+      // at the outer loop entrance observes the pre-release state forever and reports a false HANG even
+      // though the same phase now owns the correct field/wave/turn and actionable UI. Re-evaluate the
+      // caller's full address-exact predicate after this client's continuations and again after peer
+      // delivery; do not weaken the predicate to a phase-name shortcut.
+      if (matches(phase)) {
+        return phase;
+      }
       // A real peer keeps servicing tail requests, delivery leases, and receipts while this client waits.
       // Directly-constructed duo guests share one event loop, so schedule the registered authority context
       // unless the caller supplied a more specialized reciprocal pump.
       await pumpPeer?.();
       await drainLoopback();
+      if (scene.phaseManager.getCurrentPhase() === phase && matches(phase)) {
+        return phase;
+      }
       // A retained V2 boundary can arrive while this one-process fixture is already waiting on its
       // synthetic boot phase. Production completed login/title before pairing, so cross the exact same
       // fail-closed seam here as at the outer phase boundary. Without this post-delivery check the real

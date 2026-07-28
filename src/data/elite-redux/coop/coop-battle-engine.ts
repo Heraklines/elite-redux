@@ -1203,7 +1203,7 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
     }
     if ((arena.terrain?.terrainType ?? 0) !== checkpoint.terrain) {
       coopWarn("checkpoint", `terrain host=${checkpoint.terrain} guest=${arena.terrain?.terrainType ?? 0} -> applied`);
-      arena.trySetTerrain(checkpoint.terrain as TerrainType, true);
+      arena.trySetTerrain(checkpoint.terrain as TerrainType, true, undefined, undefined, true);
     }
     // Reconcile arena tags (#633 GAP 1): add hazards/screens/tailwind the guest's MoveEffectPhases
     // never set, remove ones the host cleared. This is the top resync-loop fix - the checksum hashes
@@ -2749,6 +2749,7 @@ function readAuthoritativeSeat(mon: Pokemon): CoopAuthoritativeFieldSeat {
     partyIndex: readPartyIndex(mon),
     pokemonId: mon.id,
     presented: mon.isOnField(),
+    fainted: mon.isFainted(),
     ...(ownerSeatId === undefined ? {} : { ownerSeatId }),
     ...(resolvedOwner === undefined ? {} : { owner: resolvedOwner }),
     ...(side === "enemy" ? { bossSegmentIndex: boss.bossSegmentIndex } : {}),
@@ -3566,6 +3567,7 @@ function validateAuthoritativeStateEnvelope(
       || !Number.isSafeInteger(seat.partyIndex)
       || !Number.isSafeInteger(seat.pokemonId)
       || typeof seat.presented !== "boolean"
+      || (seat.fainted != null && typeof seat.fainted !== "boolean")
       || seatKeys.has(seatKey)
       || !partyIds[seat.side].has(seat.pokemonId)
     ) {
@@ -3916,7 +3918,7 @@ function applyCoopAuthoritativeBattleStateInternal(
       arena.weather.maxDuration = Math.max(arena.weather.maxDuration, weatherTurnsLeft);
     }
     if ((arena.terrain?.terrainType ?? 0) !== state.terrain) {
-      arena.trySetTerrain(state.terrain as TerrainType, true);
+      arena.trySetTerrain(state.terrain as TerrainType, true, undefined, undefined, true);
     }
     // Terrain is the same authoritative material domain as weather. Leaving this counter at the local
     // constructor default lets equal terrain identities expire on different turns without a checksum alarm.
@@ -4810,7 +4812,7 @@ export function applyCoopFullSnapshot(
     }
     if ((arena.terrain?.terrainType ?? 0) !== snapshot.terrain) {
       coopWarn("heal", `terrain host=${snapshot.terrain} guest=${arena.terrain?.terrainType ?? 0} -> applied`);
-      arena.trySetTerrain(snapshot.terrain as TerrainType, true);
+      arena.trySetTerrain(snapshot.terrain as TerrainType, true, undefined, undefined, true);
     }
     // Reconcile arena tags (#633 GAP 1): the full snapshot now HEALS hazards / screens / tailwind,
     // not just the per-turn checkpoint - so a guest that resyncs on a mismatch converges its arena.

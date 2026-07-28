@@ -22,6 +22,11 @@ const nightlySoakWorkflow = readFileSync(new URL(".github/workflows/nightly-coop
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
 const coopBattleEngine = readFileSync(new URL("src/data/elite-redux/coop/coop-battle-engine.ts", root), "utf8");
+const arenaSource = readFileSync(new URL("src/field/arena.ts", root), "utf8");
+const commandFrontier = readFileSync(
+  new URL("src/data/elite-redux/coop/authority-v2/command-frontier.ts", root),
+  "utf8",
+);
 const battleStream = readFileSync(new URL("src/data/elite-redux/coop/coop-battle-stream.ts", root), "utf8");
 const turnRecorder = readFileSync(new URL("src/data/elite-redux/coop/coop-turn-recorder.ts", root), "utf8");
 const turnCutover = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/cutover-turn.ts", root), "utf8");
@@ -2640,6 +2645,71 @@ test("the soak never waits for a replacement picker already superseded by its ex
     pickerWait,
     /guestReplacement\.phaseName === "CommandPhase"[\s\S]*return;/u,
     "an exact late successor is never started as though it were the retired replacement picker",
+  );
+});
+
+test("the duo phase pump recognizes a target that becomes actionable without changing phase identity", () => {
+  const driveStart = duoHarness.indexOf("export async function driveClientPhaseQueueTo(");
+  const driveEnd = duoHarness.indexOf("\nexport type { Pokemon };", driveStart);
+  assert.ok(driveStart >= 0 && driveEnd > driveStart, "the generic duo phase driver is bounded");
+  const drive = duoHarness.slice(driveStart, driveEnd);
+  const waitStart = drive.indexOf("const deadline = Date.now() + perPhaseTimeoutMs;");
+  const peerPump = drive.indexOf("await pumpPeer?.();", waitStart);
+  const timeout = drive.indexOf("if (Date.now() >= deadline)", peerPump);
+  assert.ok(waitStart >= 0 && peerPump > waitStart && timeout > peerPump, "the same-phase wait loop is bounded");
+  const wait = drive.slice(waitStart, timeout);
+  assert.match(
+    wait.slice(0, peerPump - waitStart),
+    /if \(matches\(phase\)\) \{[\s\S]*return phase;/u,
+    "the driver's own settled continuations can expose the exact target",
+  );
+  assert.match(
+    wait.slice(peerPump - waitStart),
+    /scene\.phaseManager\.getCurrentPhase\(\) === phase && matches\(phase\)[\s\S]*return phase;/u,
+    "peer delivery can expose an address-exact target on the already-current phase",
+  );
+});
+
+test("a wiped replica seat installs the next command as a watcher instead of waiting on an impossible menu", () => {
+  assert.match(commandFrontier, /if \(seat\.fainted === true\) \{[\s\S]*continue;/u);
+  assert.match(
+    replayTurnPhase,
+    /if \(!hasLocalCommandSlot && !waveWon\) \{[\s\S]*supersedeTurnWait\(this\.turn, this\.sourceWave\)[\s\S]*"CoopReplayTurnPhase",[\s\S]*commandTurn,[\s\S]*this\.sourceWave,[\s\S]*true,[\s\S]*this\.end\(\);/u,
+  );
+});
+
+test("an acknowledged Mystery narration may be superseded only by the host engine's exact next prompt", () => {
+  const streamStart = coopRuntime.indexOf("export function coopHostStreamMeMessage(");
+  const streamEnd = coopRuntime.indexOf("\nexport function", streamStart + 1);
+  assert.ok(streamStart >= 0 && streamEnd > streamStart);
+  const stream = coopRuntime.slice(streamStart, streamEnd);
+  assert.match(stream, /if \(!prior\.acknowledged\) \{[\s\S]*failCoopRuntimeSharedSession/u);
+  assert.match(
+    stream,
+    /if \(runtime\.meNarration\.hostAdvanceTimer != null\) \{[\s\S]*clearTimeout[\s\S]*hostAdvanceTimer = null;[\s\S]*hostPending = null;/u,
+  );
+});
+
+test("the Mystery campaign waits for exact authority-surface convergence across a transient wave edge", () => {
+  const checkpointStart = campaignDriver.indexOf("async function checkpointPairedMysterySurface(");
+  const checkpointEnd = campaignDriver.indexOf("\nasync function", checkpointStart + 1);
+  assert.ok(checkpointStart >= 0 && checkpointEnd > checkpointStart);
+  const checkpoint = campaignDriver.slice(checkpointStart, checkpointEnd);
+  assert.match(checkpoint, /localRole === "host"/u);
+  assert.match(checkpoint, /if \(!observations\.every\(matchesAuthority\)\)/u);
+  assert.match(checkpoint, /paired Mystery \$\{stage\} convergence at/u);
+});
+
+test("authoritative terrain material bypasses local gameplay protection without weakening normal terrain rules", () => {
+  assert.match(arenaSource, /authoritativeOverride = false/u);
+  assert.match(
+    arenaSource,
+    /!authoritativeOverride[\s\S]*oldTerrainType === TerrainType\.TOXIC[\s\S]*isToxicTerrainProtected\(\)/u,
+  );
+  assert.equal(
+    [...coopBattleEngine.matchAll(/trySetTerrain\([^;]+undefined, undefined, true\)/gu)].length,
+    3,
+    "checkpoint, complete state, and heal snapshot all install signed terrain exactly",
   );
 });
 

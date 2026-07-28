@@ -4806,3 +4806,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `git diff --check`, TypeScript's 215 inherited diagnostics with zero in changed files, and scoped formatting. The
   pre-existing `coop-biome-operation.ts` import-cycle diagnostic is unchanged. Engine, soak, and two-browser proof
   remain GitHub-hosted; no deployment occurred.
+
+## 2026-07-28 - Exact campaign/soak evidence closes four retained progression stalls
+
+- Exact level soak `30283625218` reached synchronized wave-3 CommandPhase on both engines after replacement revision
+  12 and command revision 13. The generic duo driver had sampled that same phase before its frontier became actionable
+  and never sampled it again. Its bounded wait now re-evaluates the full address predicate after local continuation work
+  and peer delivery; phase-name shortcuts remain forbidden.
+- God-b's wave-62 host/guest terrain split was a real material-application bug: the guest received authoritative NONE,
+  but its local Stench/Toxic-protection belief vetoed the clear. Checkpoint, complete-state, and heal-snapshot installers
+  now bypass gameplay-only terrain persistence only after their immutable material has validated. Ordinary gameplay
+  still protects Toxic Terrain, and direct field faint state now prevents stale party data from publishing impossible
+  command actors.
+- Dirty campaign revision 19 exposed the corresponding wiped-seat control edge. A replica with no living local actor
+  now retires the finalized faint-turn pump into an exact entry-prefix watcher for the adopted next turn. It can apply
+  and receipt the global command without inventing a CommandPhase, then waits for the surviving partner's real turn.
+- Depth exposed an acknowledged Mystery prompt whose old host handler was structurally superseded before its 50ms
+  actionability retry. A new host-authored narration may retire that prior lease only after its exact guest
+  acknowledgement; its stale retry is cancelled before the successor is installed. An unacknowledged overlap remains
+  a shared terminal. The Mystery browser checkpoint now waits for the guest to project the host's exact immutable
+  surface rather than treating one transient host-ahead frame as divergence.
+- The exact-browser bundle no longer replaces production's 120-second presentation hard wall with a 576-second
+  per-callback CI value. Surface qualification therefore exercises staging semantics. Local policy-safe evidence is
+  118/118 architecture/presentation contracts, zero changed-file TypeScript diagnostics, scoped formatting, and
+  `git diff --check`; real
+  engine, soak, and two-browser qualification remain GitHub-hosted. No deployment occurred.

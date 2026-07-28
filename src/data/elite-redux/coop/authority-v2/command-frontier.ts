@@ -99,6 +99,13 @@ export function resolveCoopV2CommandFrontier(state: CoopAuthoritativeBattleState
     if (!seat.presented) {
       continue;
     }
+    // The field actor is the command surface itself, so its direct engine faint bit outranks a party
+    // reconstruction. A just-fainted slot can temporarily coexist with a stale/ambiguous party record
+    // during an intentional empty replacement. Publishing it as a command target creates a frontier no
+    // CommandPhase can ever prove and strands every later global revision behind that impossible receipt.
+    if (seat.fainted === true) {
+      continue;
+    }
     if ((seatHp(state, seat) ?? 1) <= 0) {
       continue;
     }

@@ -616,14 +616,27 @@ export class Arena {
    * @param terrain - The {@linkcode TerrainType} to try and set.
    * @param ignoreAnim - (Default `false`) Whether to prevent showing an the animation
    * @param user - (Optional) The {@linkcode Pokemon} creating the terrain
+   * @param authoritativeOverride - (Default `false`) Whether an already-validated authoritative state may
+   *   bypass local gameplay-only persistence rules. This is reserved for immutable co-op material replay.
    * @returns Whether the terrain was successfully set.
    */
-  public trySetTerrain(terrain: TerrainType, ignoreAnim = false, user?: Pokemon, turnsOverride?: number): boolean {
+  public trySetTerrain(
+    terrain: TerrainType,
+    ignoreAnim = false,
+    user?: Pokemon,
+    turnsOverride?: number,
+    authoritativeOverride = false,
+  ): boolean {
     if (!this.canSetTerrain(terrain)) {
       return false;
     }
     const oldTerrainType = this.terrain?.terrainType ?? TerrainType.NONE;
-    if (oldTerrainType === TerrainType.TOXIC && terrain !== TerrainType.TOXIC && isToxicTerrainProtected()) {
+    if (
+      !authoritativeOverride
+      && oldTerrainType === TerrainType.TOXIC
+      && terrain !== TerrainType.TOXIC
+      && isToxicTerrainProtected()
+    ) {
       return false;
     }
 

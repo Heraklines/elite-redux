@@ -378,8 +378,10 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /wave-\$\{event\.wave\}-mystery-terminal/u);
   assert.match(campaign, /battleType: observation\.battleType/u);
   assert.match(campaign, /maxBossSegments: observation\.maxBossSegments/u);
-  assert.match(campaign, /observation\.mysteryEncounterType !== first\.mysteryEncounterType/u);
-  assert.match(campaign, /observation\.stateDigest !== first\.stateDigest/u);
+  assert.match(campaign, /observation\.mysteryEncounterType === authority\.mysteryEncounterType/u);
+  assert.match(campaign, /if \(!observations\.every\(matchesAuthority\)\)/u);
+  assert.match(campaign, /paired Mystery \$\{stage\} convergence at/u);
+  assert.match(campaign, /observation\.stateDigest === authority\.stateDigest/u);
   assert.match(campaign, /duplicateWaves/u);
   assert.match(campaign, /ordinary encounters were not six distinct registry types/u);
   // Track R run 29644735938 mystery lane: the ME driver never advanced the owner's post-pick narration.

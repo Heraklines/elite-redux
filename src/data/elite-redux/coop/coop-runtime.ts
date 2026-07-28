@@ -11878,12 +11878,27 @@ export function coopHostStreamMeMessage(text: string, actionablePrompt = false):
     && !coopMeHandoffBattleStarted()
     && !coopMeBespokeHostDrives();
   if (requiresAck && runtime.meNarration.hostPending != null) {
-    failCoopRuntimeSharedSession(
-      runtime,
-      `Mystery narration ${operationId} opened before ${runtime.meNarration.hostPending.operationId} completed.`,
-      { boundary: "surface", reasonCode: "continuation-failed", wave },
-    );
-    return;
+    const prior = runtime.meNarration.hostPending;
+    if (!prior.acknowledged) {
+      failCoopRuntimeSharedSession(
+        runtime,
+        `Mystery narration ${operationId} opened before ${prior.operationId} completed.`,
+        { boundary: "surface", reasonCode: "continuation-failed", wave },
+      );
+      return;
+    }
+    // Some encounter callbacks structurally leave their old Message handler (for example through
+    // PostSummon -> TurnInit) after the remote owner has already acknowledged it, before the 50ms host
+    // actionability retry can press that now-obsolete handler. Opening the next host-authored narration is
+    // conclusive engine proof that the acknowledged lease was superseded. Retire both the lease and its
+    // pending retry before installing the successor; otherwise the stale retry can press the new prompt and
+    // the successor falsely fail-closes as overlapping (campaign 30283628062 depth lane).
+    if (runtime.meNarration.hostAdvanceTimer != null) {
+      clearTimeout(runtime.meNarration.hostAdvanceTimer);
+      runtime.meNarration.hostAdvanceTimer = null;
+    }
+    runtime.meNarration.hostPending = null;
+    coopLog("me", `host retired acknowledged narration ${prior.operationId} at successor ${operationId}`);
   }
   runtime.meNarration.nextStepByPinned.set(pinned, step + 1);
   if (requiresAck) {

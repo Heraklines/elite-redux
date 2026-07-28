@@ -132,6 +132,22 @@ describe("resolveCoopV2CommandFrontier", () => {
     expect(result.commands).toEqual([{ ownerSeatId: 3, pokemonId: 22, fieldIndex: 0 }]);
   });
 
+  it("excludes a directly fainted field actor even when a stale party record still reports HP", () => {
+    const result = resolveCoopV2CommandFrontier(
+      state(
+        [fieldSeat("player", 0, 10, { ownerSeatId: 0 }), fieldSeat("player", 1, 11, { ownerSeatId: 1, fainted: true })],
+        [
+          { id: 10, hp: 30 },
+          { id: 11, hp: 20 },
+        ],
+        [],
+      ),
+    );
+
+    expect(result.unresolved).toEqual([]);
+    expect(result.commands).toEqual([{ ownerSeatId: 0, pokemonId: 10, fieldIndex: 0 }]);
+  });
+
   it("excludes a healthy logical slot occupant that has no real presented CommandPhase", () => {
     const result = resolveCoopV2CommandFrontier(
       state(

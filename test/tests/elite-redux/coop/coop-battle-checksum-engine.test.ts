@@ -312,6 +312,24 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
     expect(arena.terrain, "the complete signed NONE state removes the suppressed terrain object").toBeNull();
   });
 
+  it("authoritative NONE clears Toxic terrain despite a guest-local Stench protection belief", async () => {
+    const field = await startCoopDouble();
+    const authoritative = captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+    expect(authoritative?.terrain).toBe(TerrainType.NONE);
+
+    const arena = globalScene.arena;
+    expect(arena.trySetTerrain(TerrainType.TOXIC, true, undefined, 8)).toBe(true);
+    expect(arena.terrain?.terrainType).toBe(TerrainType.TOXIC);
+    vi.spyOn(field[COOP_HOST_FIELD_INDEX], "hasAbility").mockImplementation(ability => ability === AbilityId.STENCH);
+    expect(arena.trySetTerrain(TerrainType.NONE, true), "ordinary gameplay retains Toxic Terrain protection").toBe(
+      false,
+    );
+    expect(arena.terrain?.terrainType).toBe(TerrainType.TOXIC);
+
+    expect(applyCoopAuthoritativeBattleState(authoritative ?? undefined, true)).toBe(true);
+    expect(arena.terrain, "signed host material cannot be vetoed by guest-local ability state").toBeNull();
+  });
+
   // GAP 1 (#633): arena tags (hazards / screens / tailwind) are set by host MoveEffectPhases the
   // pure-renderer guest never runs, so the guest never has them and the checksum (which hashes
   // (tagType, side)) resync-loops every turn. The full snapshot now carries + reconciles them.

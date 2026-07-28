@@ -1708,7 +1708,7 @@ export function mechanicalBoundaryFromPairedSurfaces(events, surfaceId) {
 
 async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, stage) {
   const clients = Object.values(rig.clients);
-  const events = await Promise.all(
+  let events = await Promise.all(
     clients.map(client =>
       client.evidence.waitForCondition(
         sink => {
@@ -1726,36 +1726,58 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
       ),
     ),
   );
-  const observations = events.map(surfaceEvent => surfaceEvent.observation);
-  const first = observations[0];
+  let observations = events.map(surfaceEvent => surfaceEvent.observation);
+  // A fast authority can open N+1 while the renderer is still installing the globally ordered terminal for
+  // N. That is a provisional frame, not proof of divergence. Use the authority browser's complete surface
+  // as the convergence target and require every browser to publish that exact immutable view within the
+  // ordinary bounded surface deadline. A genuinely different digest/options/owner never matches and still
+  // fails closed; this merely observes the same asynchronous projection edge humans experience.
+  const authorityEvent = events.find(event => event.observation.localRole === "host") ?? events[0];
+  const authority = authorityEvent.observation;
   // The two engines legitimately host the SAME mystery surface from different phase classes: the
   // authoritative host sits in MysteryEncounterPhase while the replaying guest presents it from
   // CoopReplayMePhase (run 29595067992: every other field incl. the state digest matched). Compare
   // phases modulo that known pairing - a genuine divergence still differs in digest/address/options.
   const normalizeMePhase = phase => (phase === "CoopReplayMePhase" ? "MysteryEncounterPhase" : phase);
-  for (const observation of observations.slice(1)) {
-    const sameAddress = JSON.stringify(observation.address) === JSON.stringify(first.address);
-    const sameOptions = JSON.stringify(observation.optionIds ?? null) === JSON.stringify(first.optionIds ?? null);
+  const matchesAuthority = observation => {
+    const sameAddress = JSON.stringify(observation.address) === JSON.stringify(authority.address);
+    const sameOptions = JSON.stringify(observation.optionIds ?? null) === JSON.stringify(authority.optionIds ?? null);
     // Once the encounter has committed its terminal, each renderer may clear the
     // presentation-only mysteryEncounter object on a different frame while opening
     // the same addressed reward. Reward convergence is proven by its options,
     // owner, address, and full mechanical digest; encounter identity was already
     // proven at presentation/subprompt and remains in the campaign event ledger.
-    if (
-      observation.surfaceId !== first.surfaceId
-      || normalizeMePhase(observation.phase) !== normalizeMePhase(first.phase)
-      || observation.uiMode !== first.uiMode
-      || observation.operationClass !== first.operationClass
-      || observation.ownerSeat !== first.ownerSeat
-      || observation.selectedOptionId !== first.selectedOptionId
-      || (stage !== "reward" && observation.mysteryEncounterType !== first.mysteryEncounterType)
-      || observation.stateDigest !== first.stateDigest
-      || !sameAddress
-      || !sameOptions
-    ) {
-      throw new Error(`[campaign-mystery] paired ${stage} surface diverged: ${JSON.stringify(observations)}`);
-    }
+    return (
+      observation.surfaceId === authority.surfaceId
+      && normalizeMePhase(observation.phase) === normalizeMePhase(authority.phase)
+      && observation.uiMode === authority.uiMode
+      && observation.operationClass === authority.operationClass
+      && observation.ownerSeat === authority.ownerSeat
+      && observation.selectedOptionId === authority.selectedOptionId
+      && (stage === "reward" || observation.mysteryEncounterType === authority.mysteryEncounterType)
+      && observation.stateDigest === authority.stateDigest
+      && sameAddress
+      && sameOptions
+    );
+  };
+  if (!observations.every(matchesAuthority)) {
+    events = await Promise.all(
+      clients.map(client =>
+        client.evidence.waitForCondition(
+          sink => {
+            const event = sink.findLastSemanticSurface(cursors[client.label] ?? 0, surfaceId);
+            return event != null && matchesAuthority(event.observation) ? event : null;
+          },
+          {
+            timeoutMs: rig.config.timeoutMs,
+            description: `paired Mystery ${stage} convergence at ${JSON.stringify(authority.address)}`,
+          },
+        ),
+      ),
+    );
+    observations = events.map(surfaceEvent => surfaceEvent.observation);
   }
+  const first = observations[0];
   const proof = {
     stage,
     surfaceId,

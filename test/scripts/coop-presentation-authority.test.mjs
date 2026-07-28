@@ -251,8 +251,11 @@ test("presentation liveness uses an exact runtime wall scheduler rather than the
   assert.match(watchdog, /streamer\.scheduleAuthorityRetry\(callback, ms\)/u);
   assert.match(watchdog, /generation !== coopSessionGeneration\(\) \|\| getCoopBattleStreamer\(\) !== streamer/u);
   assert.match(watchdog, /DEFAULT_COOP_PRESENTATION_HARD_WALL_MS = 120_000/u);
-  assert.match(browser, /CI_COOP_PRESENTATION_HARD_WALL_MS = 18_000 \* 32/u);
-  assert.match(browser, /setCoopPresentationHardWallMsForTest\(CI_COOP_PRESENTATION_HARD_WALL_MS\)/u);
+  assert.doesNotMatch(
+    browser,
+    /setCoopPresentationHardWallMsForTest|CI_COOP_PRESENTATION_HARD_WALL_MS/u,
+    "the exact browser must exercise the same fail-closed presentation wall as staging",
+  );
   assert.doesNotMatch(browser, /intentionally-skipped/u);
   assert.doesNotMatch(watchdog, /globalScene\.time\.delayedCall/u);
   assert.match(

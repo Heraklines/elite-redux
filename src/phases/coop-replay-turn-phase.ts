@@ -818,6 +818,7 @@ export class CoopReplayTurnPhase extends Phase {
               coopHasPendingWaveAdvance()
               || coopWaveAdvanceSignaledFor(this.sourceWave)
               || (enemyParty.length > 0 && enemyParty.every(mon => mon == null || mon.isFainted()));
+            const commandTurn = globalScene.currentBattle.turn;
             if (ownSlot >= 0 && ownMon?.isActive() === true && !waveWon) {
               // The checkpoint may be the N+1 replacement consumed by a replay that originally parked on N.
               // Cursor adoption above is the authoritative crossing; the command we open now and the replay
@@ -826,7 +827,6 @@ export class CoopReplayTurnPhase extends Phase {
               // command for N+1, and that duplicate target picker can then block TURN/REPLACEMENT material
               // forever (real dirty-lane wave-3 trace). Capture once so async phase progression cannot retarget
               // the continuation after this immutable checkpoint decision.
-              const commandTurn = globalScene.currentBattle.turn;
               const continuesSameTurn = commandTurn === this.turn;
               if (
                 !streamer.registerReplacementContinuation(envelope, {
@@ -898,6 +898,33 @@ export class CoopReplayTurnPhase extends Phase {
               );
             }
             if (!streamer.acknowledgeReplacement(envelope, "continuationReady")) {
+              return;
+            }
+            if (!hasLocalCommandSlot && !waveWon) {
+              // A wiped seat has no CommandPhase with which to admit the next global command-open. It still
+              // owns a real renderer continuation for the surviving partner's next turn. Replace this
+              // already-finalized faint-turn waiter with an exact command-prefix consumer at the adopted
+              // cursor; the CONTROL_COMMIT can then install its immutable state/presentation and retire for
+              // this seat without inventing human input. The ordinary replay created after that prefix waits
+              // on the host's turn outcome. Leaving this phase on `this.turn` strands the command-open at
+              // materialDeferred and gaps every later revision (campaign 30283628062 dirty lane).
+              streamer.cancelPendingTurnCommitRequests(envelope.epoch, envelope.wave, envelope.turn);
+              streamer.supersedeTurnWait(this.turn, this.sourceWave);
+              globalScene.phaseManager.unshiftNew(
+                "CoopReplayTurnPhase",
+                commandTurn,
+                0,
+                undefined,
+                this.sourceWave,
+                true,
+                undefined,
+                this.replacementContinuation,
+              );
+              coopLog(
+                "replay",
+                `guest replay turn=${this.turn}: installed watcher command-prefix consumer for turn=${commandTurn}`,
+              );
+              this.end();
               return;
             }
             if (waveWon && coopHasPendingWaveAdvance()) {

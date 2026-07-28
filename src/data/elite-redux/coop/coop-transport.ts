@@ -1000,6 +1000,8 @@ export interface CoopAuthoritativeFieldSeat {
    * convergence; presentation must not infer visibility from that logical list.
    */
   presented: boolean;
+  /** Direct host-engine faint state for this logical slot; authoritative frontiers prefer it over party fallbacks. */
+  fainted?: boolean;
   /** Stable participant seat id. Required by Authority V2 command frontiers; role is legacy compatibility. */
   ownerSeatId?: number;
   owner?: CoopRole;
