@@ -110,6 +110,7 @@ import {
   type ErCombatDatasetRecord,
   type ErCombatDecisionRecord,
   type ErCombatMoveCandidate,
+  type ErCombatTargetRef,
   validateCombatDecisionRecord,
 } from "#data/elite-redux/ai/combat-contract";
 import {
@@ -691,14 +692,18 @@ function doPlayerActions(
   }
 }
 
-function chosenTargetEntityId(game: GameManager, battlerIndex: number | undefined): number | null {
+function chosenTargetRef(game: GameManager, battlerIndex: number | undefined): ErCombatTargetRef | null {
   if (battlerIndex == null) {
     return null;
   }
-  return (
-    [...game.scene.getPlayerField(), ...game.scene.getEnemyField()].find(mon => mon?.getBattlerIndex() === battlerIndex)
-      ?.id ?? null
-  );
+  const selfSlot = game.scene.getPlayerField().findIndex(mon => mon?.getBattlerIndex() === battlerIndex);
+  if (selfSlot >= 0) {
+    return { side: "self", entityId: game.scene.getPlayerField()[selfSlot].id, activeSlot: selfSlot };
+  }
+  const opponentSlot = game.scene.getEnemyField().findIndex(mon => mon?.getBattlerIndex() === battlerIndex);
+  return opponentSlot < 0
+    ? null
+    : { side: "opponent", entityId: game.scene.getEnemyField()[opponentSlot].id, activeSlot: opponentSlot };
 }
 
 function findChosenCombatCandidate(
@@ -729,7 +734,7 @@ function findChosenCombatCandidate(
     moveId === MoveId.STRUGGLE
       ? -1
       : mon.getMoveset().findIndex(move => move.moveId === moveId && move.ppUsed < move.getMovePp());
-  const targetEntityId = chosenTargetEntityId(game, action.target);
+  const chosenTarget = chosenTargetRef(game, action.target);
   const matches = candidates.filter(
     (candidate): candidate is ErCombatMoveCandidate =>
       candidate.kind === "move"
@@ -738,15 +743,26 @@ function findChosenCombatCandidate(
       && candidate.moveSlot === moveSlot
       && candidate.tera === !!action.tera
       && (candidate.targetMode === "random"
-        || targetEntityId == null
-        || candidate.targets.some(target => target.entityId === targetEntityId)),
+        || chosenTarget == null
+        || candidate.targets.some(
+          target =>
+            target.side === chosenTarget.side
+            && target.activeSlot === chosenTarget.activeSlot
+            && target.entityId === chosenTarget.entityId,
+        )),
   );
   if (matches.length === 1) {
     return matches[0];
   }
-  if (targetEntityId == null && matches.length > 1) {
-    const firstLiveOpponent = game.scene.getEnemyField().find(enemy => enemy?.isActive(true) && !enemy.isFainted())?.id;
-    return matches.find(candidate => candidate.targets.some(target => target.entityId === firstLiveOpponent)) ?? null;
+  if (chosenTarget == null && matches.length > 1) {
+    const firstLiveOpponentSlot = game.scene
+      .getEnemyField()
+      .findIndex(enemy => enemy?.isActive(true) && !enemy.isFainted());
+    return (
+      matches.find(candidate =>
+        candidate.targets.some(target => target.side === "opponent" && target.activeSlot === firstLiveOpponentSlot),
+      ) ?? null
+    );
   }
   return null;
 }
@@ -823,9 +839,23 @@ function buildAiDecisionForSlot({
     return null;
   }
   if (chosen == null) {
+    const diagnostics = candidates.map(candidate =>
+      candidate.kind === "move"
+        ? {
+            kind: candidate.kind,
+            actorSlot: candidate.actorSlot,
+            moveSlot: candidate.moveSlot,
+            moveId: candidate.moveId,
+            tera: candidate.tera,
+            targets: candidate.targets.map(target => ({ entityId: target.entityId, activeSlot: target.activeSlot })),
+          }
+        : candidate,
+    );
     throw new Error(
       `AI dataset label did not map to one legal candidate: episode=${AI_EPISODE_ID} `
-        + `decision=${jointActionId}:${actorSlot} action=${JSON.stringify(perSlotAction)}`,
+        + `decision=${jointActionId}:${actorSlot} action=${JSON.stringify(perSlotAction)} `
+        + `actor=${mon.id} target=${JSON.stringify(chosenTargetRef(game, perSlotAction.target))} `
+        + `candidates=${JSON.stringify(diagnostics)}`,
     );
   }
   const record: ErCombatDecisionRecord = {
@@ -1754,6 +1784,8 @@ function isAutopilotMode(phaseName: string, mode: UiMode): boolean {
     case UiMode.ER_MAP:
     case UiMode.MYSTERY_ENCOUNTER:
       return true;
+    case UiMode.LEARN_MOVE_BATCH:
+      return phaseName === "LearnMoveBatchPhase";
     case UiMode.MODIFIER_SELECT:
       return phaseName === "SelectModifierPhase";
     case UiMode.OPTION_SELECT:
@@ -1796,6 +1828,7 @@ function isInteractiveMenuMode(mode: UiMode): boolean {
     case UiMode.EGG_HATCH_SUMMARY:
     case UiMode.EGG_HATCH_SCENE:
     case UiMode.SAVE_SLOT:
+    case UiMode.LEARN_MOVE_BATCH:
       return true;
     default:
       return false;
@@ -2068,6 +2101,14 @@ function dispatchMenu(game: GameManager, st: RunState, phaseName: string, mode: 
     case UiMode.MYSTERY_ENCOUNTER:
       driveMysteryEncounter(game, st);
       return true;
+    case UiMode.LEARN_MOVE_BATCH:
+      // Decline the whole batch deterministically: Cancel opens the confirmation,
+      // Right selects "Yes", and Action exits without altering the moveset.
+      game.scene.ui.processInput(Button.CANCEL);
+      game.scene.ui.processInput(Button.RIGHT);
+      game.scene.ui.processInput(Button.ACTION);
+      st.log.push("learn-move-batch: declined");
+      return true;
     case UiMode.MESSAGE:
       game.scene.ui.processInput(Button.ACTION); // advance ME intro/outro dialogue
       return true;
@@ -2309,7 +2350,8 @@ function smartDefaultAction(game: GameManager): TurnAction {
   const enemies = game.scene.getEnemyField();
   const field = game.scene.getPlayerField();
   const liveEnemyIdx = enemies.findIndex(e => e != null && !e.isFainted());
-  const targetBattler = liveEnemyIdx >= 0 ? ((BattlerIndex.ENEMY + liveEnemyIdx) as BattlerIndex) : undefined;
+  const targetBattler =
+    liveEnemyIdx >= 0 ? ((game.scene.currentBattle.arrangement.enemyOffset + liveEnemyIdx) as BattlerIndex) : undefined;
   const a: TurnAction = {};
   if (field[0]) {
     const m = pickBestMove(field[0], enemies);
