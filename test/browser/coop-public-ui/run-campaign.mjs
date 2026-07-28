@@ -24,6 +24,7 @@ await mkdir(config.artifactDir, { recursive: true });
 const startedAt = new Date();
 let rig;
 let preview;
+let assetProxyStats = null;
 let failure = null;
 const cleanupErrors = [];
 let gracefulCleanupCompleted = true;
@@ -86,6 +87,7 @@ try {
     );
   }
   if (preview) {
+    assetProxyStats = preview.assetProxyStats();
     await withinDeadline(preview.close(), lifecycle.cleanupTimeoutMs, "sealed preview close").catch(error => {
       gracefulCleanupCompleted = false;
       const cleanupError = error instanceof Error ? error : new Error(String(error));
@@ -136,6 +138,7 @@ try {
           assetSha: preview.manifest.assetSha,
         }
       : null,
+    assetProxy: assetProxyStats ?? { enabled: false },
     error: failure
       ? {
           name: failure.name,

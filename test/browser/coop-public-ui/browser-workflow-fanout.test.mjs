@@ -79,6 +79,28 @@ test("every two-browser journey gives each real Chromium its own display and per
   );
 });
 
+test("campaign asset proxy is explicit for non-surface profiles and remains off for the production surface oracle", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
+  const plan = jobBlock(workflow, "campaign-plan");
+  const entry = artifact => {
+    const marker = `artifact: "${artifact}"`;
+    const start = plan.indexOf(marker);
+    assert.notEqual(start, -1, `campaign matrix contains ${artifact}`);
+    const next = plan.indexOf("\n              {", start);
+    return plan.slice(start, next < 0 ? plan.length : next);
+  };
+
+  assert.match(entry("surface"), /proxy_assets: "0"/u, "surface keeps the direct production 302/CDN path");
+  for (const artifact of ["depth", "mystery", "dirty"]) {
+    assert.match(entry(artifact), /proxy_assets: "1"/u, `${artifact} explicitly shares the exact-SHA proxy`);
+  }
+  assert.match(
+    jobBlock(workflow, "campaign"),
+    /COOP_UI_PROXY_PRODUCTION_ASSETS: \$\{\{ matrix\.proxy_assets \}\}/u,
+    "the matrix choice is wired into the sealed preview config",
+  );
+});
+
 test("journey push qualification covers ordinary gameplay phases and statically owns CommandPhase", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   assert.match(

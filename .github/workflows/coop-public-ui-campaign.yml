@@ -178,6 +178,7 @@ jobs:
             test/browser/coop-public-ui/evidence.mjs \
             test/browser/coop-public-ui/faint-replacement-evidence.test.mjs \
             test/browser/coop-public-ui/preview-server.mjs \
+            test/browser/coop-public-ui/preview-server.test.mjs \
             test/browser/coop-public-ui/public-ui-harness.mjs \
             test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs \
             test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
@@ -199,6 +200,7 @@ jobs:
           test/browser/coop-public-ui/checkpoint-pixel-profile.test.mjs
           test/browser/coop-public-ui/faint-replacement-evidence.test.mjs
           test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs
+          test/browser/coop-public-ui/preview-server.test.mjs
           test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
           test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
 
@@ -331,25 +333,28 @@ jobs:
               {
                 profile: "animations-on-surface", artifact: "surface", waves: $surfaceWaves,
                 difficulty: "ace", difficulty_option: "ace", require_mystery: "0",
+                proxy_assets: "0",
                 reward_mode: "leave", campaign_timeout_ms: "3120000",
                 process_timeout: "55m", job_timeout_minutes: 65
               },
               {
                 profile: "animations-skipped-depth", artifact: "depth", waves: $depthWaves,
                 difficulty: "youngster", difficulty_option: "youngster", require_mystery: "0",
+                proxy_assets: "1",
                 reward_mode: $depthRewardMode, campaign_timeout_ms: "2700000",
                 process_timeout: "48m", job_timeout_minutes: 55
               },
               {
                 profile: "mystery-gauntlet", artifact: "mystery", waves: "10",
                 difficulty: "mystery", difficulty_option: "mystery", require_mystery: "1",
+                proxy_assets: "1",
                 reward_mode: "pick-first", campaign_timeout_ms: "4800000",
                 process_timeout: "83m", job_timeout_minutes: 90
               },
               {
                 profile: "animations-skipped-depth", artifact: "dirty", waves: "3",
                 difficulty: "ace", difficulty_option: "ace", require_mystery: "0",
-                dirty_accounts: "1", reward_mode: "leave", campaign_timeout_ms: "2700000",
+                proxy_assets: "1", dirty_accounts: "1", reward_mode: "leave", campaign_timeout_ms: "2700000",
                 process_timeout: "48m", job_timeout_minutes: 55
               }
             ]')"
@@ -429,6 +434,9 @@ jobs:
           COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
           COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
+          # Depth/Mystery/dirty still fetch the exact sealed jsDelivr SHA, but both seats share one
+          # bounded preview cache. The animation-surface oracle stays on the direct production 302 path.
+          COOP_UI_PROXY_PRODUCTION_ASSETS: ${{ matrix.proxy_assets }}
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_ACCOUNT_MODE: ${{ matrix.dirty_accounts == '1' && 'login' || 'register' }}

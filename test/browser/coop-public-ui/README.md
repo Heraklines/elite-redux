@@ -9,7 +9,9 @@ The workflow builds the normal application once, adds only the CI entry's read-o
 the bundle manifest, and fans runners from that same artifact. It resolves the current `er-assets` HEAD just
 as staging deployment does, then seals the rewritten Cloudflare redirects and inert cache-buster manifest
 into the artifact. Its localhost preview therefore loads images, audio, battle animations, and fonts from
-one immutable production asset revision instead of a partial development-asset checkout. The observer emits only after a real UI
+one immutable production asset revision instead of a partial development-asset checkout. Non-surface campaign profiles may
+explicitly proxy those same exact-SHA CDN responses through one bounded cache shared by both browser processes; the surface
+profile retains the direct production redirect path. The observer emits only after a real UI
 handler is rendered and active. It reports role, membership generation, epoch/wave/turn, phase/mode, and the
 mechanical digest; it exposes no mutation method. A journey passes a boundary only when both clients report
 the same address, digest, and continuation surface. Every battle turn also correlates the guest's exact
@@ -210,9 +212,12 @@ trustworthy (all lossless - they never change what is asserted):
   overwhelming majority of players run 10x). It is a persisted account setting, so it applies to
   the whole run. Override the key path with `COOP_UI_SPEED_KEYS` (JSON), or pass `"[]"` to leave
   the account's speed unchanged; `COOP_UI_RAISE_SPEED=0` skips the step entirely.
-- **Assets always load from the real jsDelivr production CDN** in every profile - local asset
-  serving is deliberately NOT offered, so a CDN/asset regression can still surface.
-- The campaign workflow fans two labelled profiles from the same immutable bundle. The short
+- **Assets always originate from the real jsDelivr production CDN** in every profile - local asset
+  substitution is deliberately NOT offered. The `animations-on-surface` profile follows the sealed
+  production 302 directly. Depth, Mystery, and dirty-account profiles explicitly enable a bounded
+  localhost proxy that deduplicates identical exact-SHA CDN fetches across both seats; upstream errors
+  fail the run rather than falling back to local files or an unchecked URL.
+- The campaign workflow fans four labelled profiles from the same immutable bundle. The short
   `animations-on-surface` lane (default 3 waves, `surface_waves`) keeps Move Animations ON and must
   observe both the authoritative move phase and the guest renderer replay. The longer
   `animations-skipped-depth` lane (`campaign_waves`, default 30) visibly selects Move Animations OFF

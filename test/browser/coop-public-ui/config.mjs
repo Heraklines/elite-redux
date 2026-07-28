@@ -165,6 +165,10 @@ export function loadConfig() {
       ? resolve(ROOT, process.env.COOP_UI_BROWSER_DIST.trim())
       : null,
     assetDir: resolve(ROOT, process.env.COOP_UI_ASSET_DIR?.trim() || "assets"),
+    // Explicit campaign-only optimization. False preserves the production-faithful exact-SHA 302;
+    // true lets both browser processes share one bounded localhost cache whose misses still fetch
+    // exclusively from those same validated pinned er-assets redirects.
+    proxyProductionAssets: boolean("COOP_UI_PROXY_PRODUCTION_ASSETS", false),
     expectedApiOrigin: process.env.COOP_UI_EXPECTED_API_ORIGIN?.trim() || null,
     expectedSignalOrigin: process.env.COOP_UI_EXPECTED_SIGNAL_ORIGIN?.trim() || null,
     entryContract: process.env.COOP_BROWSER_ENTRY_CONTRACT?.trim() || "public-ui-v1",

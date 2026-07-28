@@ -11,6 +11,14 @@ import { delay } from "./evidence.mjs";
 
 /** One year + immutable: the exact production semantics for content-addressed assets. */
 const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+const EXACT_ASSET_SHA = /^[0-9a-f]{40}$/u;
+const EXACT_ASSET_TARGET = /^https:\/\/cdn\.jsdelivr\.net\/gh\/Heraklines\/er-assets@([0-9a-f]{40})\/[^\s]*$/u;
+const DEFAULT_PROXY_MAX_BYTES = 256 * 1024 * 1024;
+const DEFAULT_PROXY_MAX_ENTRY_BYTES = 32 * 1024 * 1024;
+const DEFAULT_PROXY_MAX_ENTRIES = 8_192;
+const DEFAULT_PROXY_MAX_CONCURRENT = 8;
+const DEFAULT_PROXY_FETCH_TIMEOUT_MS = 120_000;
+const VALIDATED_ASSET_REDIRECT = Symbol("validated-asset-redirect");
 
 /**
  * True for Vite's content-addressed build output (`assets/<name>-<hash>.<ext>`). Only these
@@ -28,9 +36,12 @@ const CONTENT_TYPES = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".mp3": "audio/mpeg",
+  ".mp4": "video/mp4",
   ".ogg": "audio/ogg",
   ".png": "image/png",
   ".svg": "image/svg+xml",
+  ".ttf": "font/ttf",
+  ".wav": "audio/wav",
   ".webmanifest": "application/manifest+json; charset=utf-8",
   ".woff2": "font/woff2",
 };
@@ -83,24 +94,50 @@ function verifyArtifact(config) {
   return manifest;
 }
 
-function productionAssetRedirects(config) {
-  const redirectsPath = resolve(config.browserDist, "_redirects");
+export function parseProductionAssetRedirects(contents, expectedAssetSha) {
+  if (!EXACT_ASSET_SHA.test(expectedAssetSha ?? "")) {
+    throw new Error(`sealed artifact asset SHA is invalid: ${expectedAssetSha ?? ""}`);
+  }
   const redirects = [];
-  for (const rawLine of readFileSync(redirectsPath, "utf8").split(/\r?\n/gu)) {
+  for (const rawLine of contents.split(/\r?\n/gu)) {
     const line = rawLine.trim();
     if (line.length === 0 || line.startsWith("#")) {
       continue;
     }
     const [source, target, status, ...extra] = line.split(/\s+/gu);
+    const targetMatch = EXACT_ASSET_TARGET.exec(target ?? "");
+    const wildcard = source?.endsWith("/*") === true;
+    const splatCount = target?.match(/:splat/gu)?.length ?? 0;
     if (
       extra.length > 0
       || status !== "302"
       || !source?.startsWith("/")
-      || !/^https:\/\/cdn\.jsdelivr\.net\/gh\/Heraklines\/er-assets@[0-9a-f]{40}\//u.test(target ?? "")
+      || source.includes("..")
+      || source.includes("\\")
+      || targetMatch == null
+      || (wildcard ? splatCount !== 1 : splatCount !== 0)
     ) {
       throw new Error(`unsupported production asset redirect: ${line}`);
     }
-    redirects.push({ source, target });
+    const targetUrl = new URL(target);
+    if (
+      targetUrl.protocol !== "https:"
+      || targetUrl.hostname !== "cdn.jsdelivr.net"
+      || targetUrl.port !== ""
+      || targetUrl.username !== ""
+      || targetUrl.password !== ""
+      || targetUrl.search !== ""
+      || targetUrl.hash !== ""
+    ) {
+      throw new Error(`unsupported production asset redirect: ${line}`);
+    }
+    const assetSha = targetMatch[1];
+    if (assetSha !== expectedAssetSha) {
+      throw new Error(
+        `production asset redirect SHA ${assetSha} does not match sealed artifact asset SHA ${expectedAssetSha}`,
+      );
+    }
+    redirects.push(Object.freeze({ source, target, assetSha, [VALIDATED_ASSET_REDIRECT]: true }));
   }
   if (
     !redirects.some(({ source }) => source === "/images/*")
@@ -108,21 +145,365 @@ function productionAssetRedirects(config) {
   ) {
     throw new Error("production asset redirects must include the pinned image and font surfaces");
   }
-  return redirects;
+  return Object.freeze(redirects);
 }
 
-function redirectedAsset(pathname, redirects) {
-  for (const { source, target } of redirects) {
+function productionAssetRedirects(config, expectedAssetSha) {
+  return parseProductionAssetRedirects(
+    readFileSync(resolve(config.browserDist, "_redirects"), "utf8"),
+    expectedAssetSha,
+  );
+}
+
+function resolveRedirectedAsset(pathname, redirects) {
+  for (const rule of redirects) {
+    const { source, target, assetSha } = rule;
+    let redirected;
+    let requiredTargetPath;
     if (source.endsWith("/*")) {
       const prefix = source.slice(0, -1);
       if (pathname.startsWith(prefix)) {
-        return target.replace(":splat", pathname.slice(prefix.length));
+        const splat = pathname.slice(prefix.length);
+        if (splat.includes("\\") || splat.split("/").some(segment => segment === "." || segment === "..")) {
+          return null;
+        }
+        redirected = target.replace(
+          ":splat",
+          splat
+            .split("/")
+            .map(segment => encodeURIComponent(segment))
+            .join("/"),
+        );
+        requiredTargetPath = new URL(target.replace(":splat", "")).pathname;
       }
     } else if (pathname === source) {
-      return target;
+      redirected = target;
+      requiredTargetPath = new URL(target).pathname;
     }
+    if (redirected == null) {
+      continue;
+    }
+    const url = new URL(redirected);
+    const exactRepoPrefix = `/gh/Heraklines/er-assets@${assetSha}/`;
+    if (
+      url.protocol !== "https:"
+      || url.hostname !== "cdn.jsdelivr.net"
+      || url.port !== ""
+      || url.username !== ""
+      || url.password !== ""
+      || url.search !== ""
+      || url.hash !== ""
+      || !url.pathname.startsWith(exactRepoPrefix)
+      || (source.endsWith("/*") ? !url.pathname.startsWith(requiredTargetPath) : url.pathname !== requiredTargetPath)
+    ) {
+      return null;
+    }
+    return Object.freeze({ href: url.href, assetSha, source });
   }
   return null;
+}
+
+function positiveInteger(value, name) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive safe integer`);
+  }
+  return value;
+}
+
+function requireValidatedAssetRedirects(redirects) {
+  if (
+    !Array.isArray(redirects)
+    || redirects.length === 0
+    || redirects.some(rule => rule?.[VALIDATED_ASSET_REDIRECT] !== true)
+  ) {
+    throw new Error("sealed preview requires the validated redirect table");
+  }
+  return redirects;
+}
+
+/**
+ * One bounded cache shared by both browser processes behind the sealed localhost origin.
+ *
+ * The proxy accepts a request pathname, never a caller-provided URL. Its only possible upstream URL
+ * comes from `resolveRedirectedAsset()` over the manifest-SHA-validated redirect table above. At most
+ * `maxBytes + 2 * maxConcurrent * maxEntryBytes` bytes can be resident while misses are downloading
+ * (stream chunks plus their final contiguous buffers); the settled LRU itself never exceeds
+ * maxBytes/maxEntries. Failed/incomplete responses are never retained.
+ */
+export function createSharedProductionAssetProxy({
+  redirects,
+  fetchImpl = fetch,
+  maxBytes = DEFAULT_PROXY_MAX_BYTES,
+  maxEntryBytes = DEFAULT_PROXY_MAX_ENTRY_BYTES,
+  maxEntries = DEFAULT_PROXY_MAX_ENTRIES,
+  maxConcurrent = DEFAULT_PROXY_MAX_CONCURRENT,
+  fetchTimeoutMs = DEFAULT_PROXY_FETCH_TIMEOUT_MS,
+} = {}) {
+  requireValidatedAssetRedirects(redirects);
+  positiveInteger(maxBytes, "asset proxy maxBytes");
+  positiveInteger(maxEntryBytes, "asset proxy maxEntryBytes");
+  positiveInteger(maxEntries, "asset proxy maxEntries");
+  positiveInteger(maxConcurrent, "asset proxy maxConcurrent");
+  positiveInteger(fetchTimeoutMs, "asset proxy fetchTimeoutMs");
+  if (maxEntryBytes > maxBytes) {
+    throw new Error("asset proxy maxEntryBytes cannot exceed maxBytes");
+  }
+
+  const cache = new Map();
+  const inFlight = new Map();
+  const waiting = [];
+  const controllers = new Set();
+  let active = 0;
+  let cacheBytes = 0;
+  let closed = false;
+  const stats = {
+    requests: 0,
+    cacheHits: 0,
+    inFlightHits: 0,
+    upstreamFetches: 0,
+    evictions: 0,
+    failures: 0,
+  };
+
+  function acquire() {
+    if (closed) {
+      return Promise.reject(new Error("production asset proxy is closed"));
+    }
+    if (active < maxConcurrent) {
+      active++;
+      return Promise.resolve();
+    }
+    return new Promise((resolveAcquire, rejectAcquire) => waiting.push({ resolveAcquire, rejectAcquire }));
+  }
+
+  function release() {
+    active--;
+    const next = waiting.shift();
+    if (next != null && !closed) {
+      active++;
+      next.resolveAcquire();
+    }
+  }
+
+  function cached(href) {
+    const entry = cache.get(href);
+    if (entry == null) {
+      return null;
+    }
+    cache.delete(href);
+    cache.set(href, entry);
+    return entry;
+  }
+
+  function retain(href, entry) {
+    while (cache.size >= maxEntries || cacheBytes + entry.body.length > maxBytes) {
+      const oldest = cache.entries().next().value;
+      if (oldest == null) {
+        break;
+      }
+      cache.delete(oldest[0]);
+      cacheBytes -= oldest[1].body.length;
+      stats.evictions++;
+    }
+    cache.set(href, entry);
+    cacheBytes += entry.body.length;
+  }
+
+  async function fetchEntry(asset) {
+    await acquire();
+    const controller = new AbortController();
+    controllers.add(controller);
+    const timeout = setTimeout(
+      () => controller.abort(new Error(`production asset fetch exceeded ${fetchTimeoutMs}ms`)),
+      fetchTimeoutMs,
+    );
+    timeout.unref?.();
+    try {
+      stats.upstreamFetches++;
+      const upstream = await fetchImpl(asset.href, {
+        method: "GET",
+        redirect: "error",
+        signal: controller.signal,
+        headers: { Accept: "*/*" },
+      });
+      if (upstream.status !== 200 || upstream.body == null) {
+        throw new Error(`exact-SHA asset fetch returned HTTP ${upstream.status}`);
+      }
+      const declaredLength = upstream.headers.get("content-length");
+      if (declaredLength != null) {
+        const value = Number(declaredLength);
+        if (!Number.isSafeInteger(value) || value < 0 || value > maxEntryBytes) {
+          throw new Error(`exact-SHA asset Content-Length is outside the ${maxEntryBytes}-byte bound`);
+        }
+      }
+      const chunks = [];
+      let bytes = 0;
+      for await (const value of upstream.body) {
+        const chunk = Buffer.from(value);
+        bytes += chunk.length;
+        if (bytes > maxEntryBytes) {
+          throw new Error(`exact-SHA asset body exceeded the ${maxEntryBytes}-byte bound`);
+        }
+        chunks.push(chunk);
+      }
+      const entry = Object.freeze({
+        body: Buffer.concat(chunks, bytes),
+        contentType:
+          upstream.headers.get("content-type")
+          || CONTENT_TYPES[extname(new URL(asset.href).pathname)]
+          || "application/octet-stream",
+        etag: upstream.headers.get("etag"),
+        lastModified: upstream.headers.get("last-modified"),
+      });
+      retain(asset.href, entry);
+      return entry;
+    } finally {
+      clearTimeout(timeout);
+      controllers.delete(controller);
+      release();
+    }
+  }
+
+  return Object.freeze({
+    async get(pathname) {
+      stats.requests++;
+      const asset = resolveRedirectedAsset(pathname, redirects);
+      if (asset == null) {
+        return null;
+      }
+      const retained = cached(asset.href);
+      if (retained != null) {
+        stats.cacheHits++;
+        return retained;
+      }
+      const pending = inFlight.get(asset.href);
+      if (pending != null) {
+        stats.inFlightHits++;
+        return pending;
+      }
+      const request = fetchEntry(asset)
+        .catch(error => {
+          stats.failures++;
+          throw error;
+        })
+        .finally(() => inFlight.delete(asset.href));
+      inFlight.set(asset.href, request);
+      return request;
+    },
+    snapshot() {
+      return Object.freeze({
+        enabled: true,
+        ...stats,
+        entries: cache.size,
+        bytes: cacheBytes,
+        maxBytes,
+        maxEntryBytes,
+        maxEntries,
+        maxConcurrent,
+        activeFetches: active,
+        queuedFetches: waiting.length,
+        inFlight: inFlight.size,
+        workingSetLimitBytes: maxBytes + 2 * maxConcurrent * maxEntryBytes,
+      });
+    },
+    close() {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      for (const controller of controllers) {
+        controller.abort(new Error("production asset proxy closed"));
+      }
+      for (const waiter of waiting.splice(0)) {
+        waiter.rejectAcquire(new Error("production asset proxy closed"));
+      }
+      cache.clear();
+      cacheBytes = 0;
+    },
+  });
+}
+
+function assetResponseHeaders(entry) {
+  return {
+    "Cache-Control": IMMUTABLE_CACHE_CONTROL,
+    "Content-Length": String(entry.body.length),
+    "Content-Type": entry.contentType,
+    ...(entry.etag == null ? {} : { ETag: entry.etag }),
+    ...(entry.lastModified == null ? {} : { "Last-Modified": entry.lastModified }),
+  };
+}
+
+/** Request handler extracted so node-pure contracts can prove redirect/proxy behavior without booting Chrome. */
+export function createSealedPreviewRequestHandler({
+  origin,
+  browserDist,
+  assetDir,
+  assetRedirects,
+  productionAssetProxy = null,
+  onProxyError = error => process.stderr.write(`[sealed-preview] production asset proxy failed: ${error.message}\n`),
+}) {
+  requireValidatedAssetRedirects(assetRedirects);
+  return (request, response) =>
+    (async () => {
+      let pathname;
+      try {
+        pathname = decodeURIComponent(new URL(request.url ?? "/", origin).pathname);
+      } catch {
+        response.writeHead(400).end("bad request");
+        return;
+      }
+      const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+      const absolute = safeStaticFile(browserDist, requested);
+      const redirected = resolveRedirectedAsset(pathname, assetRedirects);
+      if (absolute == null && redirected != null) {
+        if (productionAssetProxy == null) {
+          // Default remains the exact pre-proxy behavior: a content-addressed immutable 302.
+          response.writeHead(302, { "Cache-Control": IMMUTABLE_CACHE_CONTROL, Location: redirected.href }).end();
+          return;
+        }
+        if (request.method !== "GET" && request.method !== "HEAD") {
+          response.writeHead(405, { "Cache-Control": "no-store", Allow: "GET, HEAD" }).end();
+          return;
+        }
+        let entry;
+        try {
+          entry = await productionAssetProxy.get(pathname);
+        } catch (error) {
+          const cause = error instanceof Error ? error : new Error(String(error));
+          onProxyError(new Error(`${pathname}: ${cause.message}`, { cause }));
+          response
+            .writeHead(502, { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" })
+            .end("bad gateway");
+          return;
+        }
+        if (entry == null) {
+          response
+            .writeHead(404, { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" })
+            .end("not found");
+          return;
+        }
+        response.writeHead(200, assetResponseHeaders(entry));
+        response.end(request.method === "HEAD" ? undefined : entry.body);
+        return;
+      }
+      const fallbackAsset = absolute ?? safeStaticFile(assetDir, requested);
+      if (fallbackAsset == null) {
+        response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("not found");
+        return;
+      }
+      response.writeHead(200, {
+        "Cache-Control": isHashedBuildAsset(requested) ? IMMUTABLE_CACHE_CONTROL : "no-store",
+        "Content-Type": CONTENT_TYPES[extname(fallbackAsset)] ?? "application/octet-stream",
+      });
+      createReadStream(fallbackAsset).pipe(response);
+    })().catch(error => {
+      if (!response.headersSent && !response.writableEnded && !response.destroyed) {
+        response.writeHead(500, { "Cache-Control": "no-store" }).end("internal server error");
+      }
+      process.stderr.write(
+        `[sealed-preview] request handler failed: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    });
 }
 
 /** Serve only the sealed bundle and the exact pinned production assets; game source is never mounted. */
@@ -140,40 +521,19 @@ export async function startSealedPreview(config) {
     throw new Error("sealed public-UI preview must use an isolated localhost HTTP origin");
   }
   const manifest = verifyArtifact(config);
-  const assetRedirects = productionAssetRedirects(config);
-  const server = createServer((request, response) => {
-    let pathname;
-    try {
-      pathname = decodeURIComponent(new URL(request.url ?? "/", origin).pathname);
-    } catch {
-      response.writeHead(400).end("bad request");
-      return;
-    }
-    const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-    const absolute = safeStaticFile(config.browserDist, requested);
-    const redirected = redirectedAsset(pathname, assetRedirects);
-    if (absolute == null && redirected != null) {
-      // Optimization brief R5: the redirect target is pinned to an exact er-assets commit
-      // SHA (content-addressed), so the redirect is IMMUTABLE - production-faithful (prod
-      // serves these assets content-addressed) and it stops each cold seat re-fetching
-      // ~7.5k unchanged CDN assets on every reload.
-      response.writeHead(302, { "Cache-Control": IMMUTABLE_CACHE_CONTROL, Location: redirected }).end();
-      return;
-    }
-    const fallbackAsset = absolute ?? safeStaticFile(config.assetDir, requested);
-    if (fallbackAsset == null) {
-      response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("not found");
-      return;
-    }
-    // Optimization brief R5: hashed build chunks are content-addressed by Vite, so they are
-    // IMMUTABLE exactly like production hosting serves them. index.html, manifests, and any
-    // un-hashed fallback stay no-store so a re-sealed bundle is always picked up.
-    response.writeHead(200, {
-      "Cache-Control": isHashedBuildAsset(requested) ? IMMUTABLE_CACHE_CONTROL : "no-store",
-      "Content-Type": CONTENT_TYPES[extname(fallbackAsset)] ?? "application/octet-stream",
-    });
-    createReadStream(fallbackAsset).pipe(response);
-  });
+  const assetRedirects = productionAssetRedirects(config, manifest.assetSha);
+  const productionAssetProxy = config.proxyProductionAssets
+    ? createSharedProductionAssetProxy({ redirects: assetRedirects })
+    : null;
+  const server = createServer(
+    createSealedPreviewRequestHandler({
+      origin,
+      browserDist: config.browserDist,
+      assetDir: config.assetDir,
+      assetRedirects,
+      productionAssetProxy,
+    }),
+  );
   await new Promise((resolveListen, rejectListen) => {
     server.once("error", rejectListen);
     server.listen(Number(url.port), url.hostname, resolveListen);
@@ -185,12 +545,14 @@ export async function startSealedPreview(config) {
       if (response.ok) {
         return {
           manifest,
+          assetProxyStats: () => productionAssetProxy?.snapshot() ?? Object.freeze({ enabled: false }),
           close: () => {
             // A failed browser can leave keep-alive asset requests open. Stop accepting new
             // requests and sever those sockets so campaign teardown cannot wait forever.
             return new Promise((resolveClose, rejectClose) => {
               server.close(error => (error ? rejectClose(error) : resolveClose()));
               server.closeAllConnections();
+              productionAssetProxy?.close();
             });
           },
         };
@@ -201,5 +563,6 @@ export async function startSealedPreview(config) {
     await delay(100);
   }
   await new Promise(resolveClose => server.close(() => resolveClose()));
+  productionAssetProxy?.close();
   throw new Error("timed out waiting for sealed public-UI preview");
 }

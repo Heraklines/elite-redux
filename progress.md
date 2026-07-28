@@ -4958,3 +4958,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   discovery path, so ordinary CI would skip it and the co-op engine lane would never run it. The explicit engine
   inventory now includes both this exact soak-exposed mechanics regression and the existing PhaseInterceptor contract;
   a source-level gate test prevents either from silently falling out of Lane B.
+
+## 2026-07-28 - Shared exact-SHA asset proxy for non-surface browser campaigns
+
+- The sealed preview keeps its existing immutable 302 behavior by default. An explicit
+  `COOP_UI_PROXY_PRODUCTION_ASSETS=1` enables one cache shared by both browser processes; only the depth,
+  Mystery, and dirty-account campaign matrix entries opt in, while the animation-surface oracle stays direct-CDN.
+- Proxy targets can be derived only from `_redirects` rules validated against the sealed manifest's exact 40-hex
+  er-assets SHA. Upstream redirects, non-200 responses, invalid sizes, and fetch failures fail closed without a local
+  asset or 302 fallback. The response retains the upstream content type and immutable cache semantics.
+- Simultaneous misses for the same URL share one promise. The settled LRU is capped at 256 MiB / 8,192 entries;
+  individual assets are capped at 32 MiB and eight concurrent streamed misses give a documented 768 MiB maximum
+  cache-plus-download working set. The current er-assets checkout's largest file is 6,030,909 bytes.
+- Node contracts cover closed-by-default config, manifest-SHA validation, unchanged proxy-off 302s, two-seat
+  deduplication, MIME/cache headers, byte/entry eviction, oversized streaming bodies, URL admission, and fail-closed
+  errors. Browser/co-op Vitest execution remains remote-only per `AGENTS.md`; no deployment occurred.
