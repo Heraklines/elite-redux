@@ -442,6 +442,7 @@ import {
   resetCoopStormglassOperationState,
   setCoopStormglassOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-stormglass-operation";
+import { captureCoopTrainerAuthority } from "#data/elite-redux/coop/coop-trainer-authority";
 import {
   captureCoopTrainerVictoryMaterial,
   installCoopTrainerVictoryMaterial,
@@ -12263,6 +12264,13 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
     const hostTurn = globalScene.currentBattle?.turn ?? -1;
     const encounterMode = options?.encounterMode ?? globalScene.currentBattle?.mysteryEncounter?.encounterMode;
     const disableSwitch = options?.disableSwitch ?? false;
+    const trainer =
+      encounterMode === MysteryEncounterMode.TRAINER_BATTLE && globalScene.currentBattle?.trainer != null
+        ? captureCoopTrainerAuthority(
+            globalScene.currentBattle.trainer,
+            globalScene.currentBattle.mysteryEncounter?.getSeedOffset() ?? globalScene.currentBattle.waveIndex,
+          )
+        : null;
     const priorControl = captureCoopActiveMysteryControl();
     const step =
       priorControl?.interactionCounter === pinned && priorControl.terminal === "battle-settled"
@@ -12282,6 +12290,7 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
       || typeof encounterMode !== "number"
       || !Number.isSafeInteger(encounterMode)
       || encounterMode < 0
+      || (encounterMode === MysteryEncounterMode.TRAINER_BATTLE) !== (trainer != null)
     ) {
       failCoopSharedSession("Mystery battle handoff had no complete host boundary");
       return false;
@@ -12293,6 +12302,7 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
         kind: "battle",
         hostTurn,
         encounterMode,
+        trainer,
         disableSwitch,
       },
     } satisfies CoopMeTerminalPayload;

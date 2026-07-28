@@ -36,6 +36,7 @@ const meTerminalValidator = readFileSync(
   "utf8",
 );
 const operationEnvelope = readFileSync(new URL("src/data/elite-redux/coop/coop-operation-envelope.ts", root), "utf8");
+const trainerAuthority = readFileSync(new URL("src/data/elite-redux/coop/coop-trainer-authority.ts", root), "utf8");
 const trainerVictoryBoundary = readFileSync(
   new URL("src/data/elite-redux/coop/coop-trainer-victory-boundary.ts", root),
   "utf8",
@@ -1382,6 +1383,47 @@ test("Mystery trainer victory is installed from immutable terminal material", ()
     meBoundary,
     /snapshotCoopTrainerVictoryBoundary/u,
     "the renderer's mutable Mystery battle cannot become trainer authority again",
+  );
+});
+
+test("an embedded Mystery trainer battle retains and renders its trainer presentation", () => {
+  assert.match(
+    operationEnvelope,
+    /readonly trainer: CoopSerializedTrainer \| null;/u,
+    "the battle destination carries trainer identity instead of consulting replica-local encounter state",
+  );
+  assert.match(
+    meTerminalValidator,
+    /encounterMode === MysteryEncounterMode\.TRAINER_BATTLE[\s\S]*isCompleteCoopSerializedTrainer\(destination\.trainer\)/u,
+    "trainer mode cannot enter the mechanical log without complete immutable presentation material",
+  );
+  assert.match(
+    coopRuntime,
+    /captureCoopTrainerAuthority\([\s\S]*globalScene\.currentBattle\.trainer,[\s\S]*getSeedOffset\(\)[\s\S]*trainer,/u,
+    "the host captures the trainer while the embedded battle still owns it",
+  );
+  assert.match(
+    trainerAuthority,
+    /selectedEncounterMessage = randSeedItem\(encounterMessages\)[\s\S]*selectedEncounterMessage,/u,
+    "the authority commits the exact selected trainer dialogue instead of a replica-side re-roll",
+  );
+  assert.match(
+    replayMePhase,
+    /installCoopTrainerAuthority\(committedDestination\.trainer\)[\s\S]*MysteryEncounterBattlePhase/u,
+    "the replica installs the trainer before opening the sanctioned battle phase",
+  );
+  const presentationStart = mysteryEncounterPhases.indexOf("private materializeAuthoritativeGuestBattle(): void");
+  const presentationEnd = mysteryEncounterPhases.indexOf("private endBattleSetup()", presentationStart);
+  assert.ok(presentationStart >= 0 && presentationEnd > presentationStart, "the renderer battle materializer exists");
+  const presentation = mysteryEncounterPhases.slice(presentationStart, presentationEnd);
+  assert.match(presentation, /this\.showEnemyTrainer\(\)/u);
+  assert.match(presentation, /globalScene\.ui\.showDialogue/u);
+  assert.match(presentation, /globalScene\.ui\.showText\(this\.getBattleMessage\(\)/u);
+  assert.doesNotMatch(presentation, /randSeedItem/u, "the replica must not re-roll trainer dialogue");
+  assert.doesNotMatch(
+    presentation,
+    /(?:unshift|push)New\("SummonPhase"/u,
+    "trainer presentation must not re-enable a second mechanics engine on the replica",
   );
 });
 

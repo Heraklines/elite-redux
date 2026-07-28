@@ -80,17 +80,41 @@ function leavePayload(wave: number, selectBiome = false): CoopMeTerminalPayload 
   };
 }
 
+function trainerPresentation() {
+  return {
+    trainerType: 1,
+    variant: 0,
+    partyTemplateIndex: 0,
+    name: "Aster",
+    nameWithTitle: "Ace Trainer Aster",
+    renderNames: {
+      none: "Aster",
+      noneWithTitle: "Ace Trainer Aster",
+      trainer: "Aster",
+      trainerWithTitle: "Ace Trainer Aster",
+      partner: "",
+      partnerWithTitle: "",
+    },
+    encounterMessages: ["Let us battle."],
+    selectedEncounterMessage: "Let us battle.",
+    victoryMessages: ["Well fought."],
+    defeatMessages: ["You lost."],
+  };
+}
+
 function battlePayload(
   wave: number,
   options: { encounterMode?: number; disableSwitch?: boolean } = {},
 ): CoopMeTerminalPayload {
+  const encounterMode = options.encounterMode ?? 2;
   return {
     terminal: "battle",
     outcome: outcome(wave, 1),
     destination: {
       kind: "battle",
       hostTurn: 3,
-      encounterMode: options.encounterMode ?? 2,
+      encounterMode,
+      trainer: encounterMode === 1 ? trainerPresentation() : null,
       disableSwitch: options.disableSwitch ?? false,
     },
   };
@@ -372,6 +396,21 @@ describe("complete retained Mystery terminal transaction", () => {
     ).toBe(false);
     expect(isCompleteCoopMeTerminalPayload(leavePayload(12, true))).toBe(true);
     expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(true);
+    expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 1 }))).toBe(true);
+    expect(
+      isCompleteCoopMeTerminalPayload({
+        ...battlePayload(12, { encounterMode: 1 }),
+        destination: { ...battlePayload(12, { encounterMode: 1 }).destination, trainer: null },
+      }),
+      "a trainer battle cannot delegate its presentation identity to guest-local state",
+    ).toBe(false);
+    expect(
+      isCompleteCoopMeTerminalPayload({
+        ...battlePayload(12, { encounterMode: 2 }),
+        destination: { ...battlePayload(12, { encounterMode: 2 }).destination, trainer: trainerPresentation() },
+      }),
+      "a wild battle cannot retain an unrelated trainer presentation",
+    ).toBe(false);
     expect(
       isCompleteCoopMeTerminalPayload(
         settledPayload(12, {

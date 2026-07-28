@@ -16,9 +16,14 @@ import {
   type CoopMeTerminalPayload,
   type CoopTrainerVictoryMaterial,
 } from "#data/elite-redux/coop/coop-operation-envelope";
-import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopInteractionOutcome,
+  CoopSerializedTrainer,
+} from "#data/elite-redux/coop/coop-transport";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { EggSourceType } from "#enums/egg-source-types";
+import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { VariantTier } from "#enums/variant-tier";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -38,6 +43,7 @@ const COOP_ME_EGG_DESCRIPTOR_MAX_LENGTH = 256;
 const COOP_TRAINER_VICTORY_TEXT_MAX_LENGTH = 512;
 const COOP_TRAINER_VICTORY_MESSAGE_LIMIT = 32;
 const COOP_TRAINER_VICTORY_REWARD_LIMIT = 16;
+const COOP_TRAINER_PRESENTATION_MESSAGE_LIMIT = 64;
 const COOP_MODIFIER_TYPE_ID_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 const REGISTERED_EGG_SPECIES = new Set<number>(Object.values(ER_ID_MAP.species));
 const VALID_EGG_SOURCE_TYPES = new Set<number>(
@@ -124,6 +130,47 @@ function isBoundedText(value: unknown): value is string {
   return typeof value === "string" && value.length <= COOP_TRAINER_VICTORY_TEXT_MAX_LENGTH;
 }
 
+function isOptionalBoundedText(value: unknown): value is string | undefined {
+  return value === undefined || isBoundedText(value);
+}
+
+function isBoundedTextArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length <= COOP_TRAINER_PRESENTATION_MESSAGE_LIMIT && value.every(isBoundedText);
+}
+
+function isCompleteCoopSerializedTrainer(value: unknown): value is CoopSerializedTrainer {
+  if (!isPlainObject(value) || !isPlainObject(value.renderNames)) {
+    return false;
+  }
+  const names = value.renderNames;
+  return (
+    isSafeNonNegativeInteger(value.trainerType)
+    && isSafeNonNegativeInteger(value.variant)
+    && isSafeNonNegativeInteger(value.partyTemplateIndex)
+    && isOptionalBoundedText(value.nameKey)
+    && isOptionalBoundedText(value.partnerNameKey)
+    && isOptionalBoundedText(value.name)
+    && isOptionalBoundedText(value.partnerName)
+    && isBoundedText(value.nameWithTitle)
+    && isBoundedText(names.none)
+    && isBoundedText(names.noneWithTitle)
+    && isBoundedText(names.trainer)
+    && isBoundedText(names.trainerWithTitle)
+    && isBoundedText(names.partner)
+    && isBoundedText(names.partnerWithTitle)
+    && isBoundedTextArray(value.encounterMessages)
+    && (value.selectedEncounterMessage === null || isBoundedText(value.selectedEncounterMessage))
+    && isBoundedTextArray(value.victoryMessages)
+    && isBoundedTextArray(value.defeatMessages)
+    && isOptionalBoundedText(value.erGhostApproach)
+    && isOptionalBoundedText(value.erGhostAura)
+    && (value.erGhostFxSpeed === undefined
+      || (typeof value.erGhostFxSpeed === "number" && Number.isFinite(value.erGhostFxSpeed)))
+    && (value.erGhostFxIntensity === undefined
+      || (typeof value.erGhostFxIntensity === "number" && Number.isFinite(value.erGhostFxIntensity)))
+  );
+}
+
 function isCompleteCoopTrainerVictoryMaterial(value: unknown): value is CoopTrainerVictoryMaterial {
   if (!isPlainObject(value)) {
     return false;
@@ -208,10 +255,12 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
     return false;
   }
   if (value.terminal === "battle") {
+    const trainerBattle = destination.encounterMode === MysteryEncounterMode.TRAINER_BATTLE;
     return (
       destination.kind === "battle"
       && isSafeNonNegativeInteger(destination.hostTurn)
       && isSafeNonNegativeInteger(destination.encounterMode)
+      && (trainerBattle ? isCompleteCoopSerializedTrainer(destination.trainer) : destination.trainer === null)
       && typeof destination.disableSwitch === "boolean"
       && outcome.authoritativeState.enemyParty.length > 0
     );

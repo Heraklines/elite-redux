@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "2a29164de778f4f57e8cd2140745ff3d31045f3c",
+  "baseSha": "1eca9b89f3b43bcb6bbf198bcf5587ddaf78ae17",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -47,6 +47,7 @@
     "src/data/elite-redux/coop/coop-renderer-gate.ts",
     "src/data/elite-redux/coop/coop-reward-operation.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/data/elite-redux/coop/coop-trainer-authority.ts",
     "src/data/elite-redux/coop/coop-trainer-victory-boundary.ts",
     "src/data/elite-redux/coop/coop-transport.ts",
     "src/data/elite-redux/coop/coop-turn-recorder.ts",
@@ -87,6 +88,7 @@
     "src/phases/coop-replay-me-phase.ts",
     "src/phases/coop-replay-phases.ts",
     "src/phases/coop-replay-turn-phase.ts",
+    "src/phases/encounter-phase.ts",
     "src/phases/er-ability-capsule-phase.ts",
     "src/phases/er-custom-trainer-install.ts",
     "src/phases/er-dex-nav-phase.ts",
@@ -173,6 +175,7 @@
     "test/tests/elite-redux/coop/coop-duo-mystery.test.ts",
     "test/tests/elite-redux/coop/coop-faint-switch-operation.test.ts",
     "test/tests/elite-redux/coop/coop-form-change-ordering.test.ts",
+    "test/tests/elite-redux/coop/coop-guest-battletype-adopt.test.ts",
     "test/tests/elite-redux/coop/coop-guest-faint-no-local-victory.test.ts",
     "test/tests/elite-redux/coop/coop-me-host-dialogue-freeze.test.ts",
     "test/tests/elite-redux/coop/coop-me-registry-completeness.test.ts",
@@ -222,5 +225,8 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-operation-envelope.ts",
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ]
 }

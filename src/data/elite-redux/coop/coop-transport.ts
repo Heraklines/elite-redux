@@ -480,6 +480,8 @@ export interface CoopSerializedTrainer {
       }
     | undefined;
   encounterMessages?: string[] | undefined;
+  /** Exact encounter line selected by the authority, or null when this trainer has no intro dialogue. */
+  selectedEncounterMessage: string | null;
   victoryMessages?: string[] | undefined;
   defeatMessages?: string[] | undefined;
   erGhostApproach?: string | undefined;

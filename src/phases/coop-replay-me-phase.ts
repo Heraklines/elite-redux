@@ -60,6 +60,7 @@ import {
   setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_TERMINAL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
+import { installCoopTrainerAuthority } from "#data/elite-redux/coop/coop-trainer-authority";
 import type {
   CoopActiveMysteryEncounterSnapshotV1,
   CoopInteractionOutcome,
@@ -2437,6 +2438,10 @@ export class CoopReplayMePhase extends Phase {
       }
       battle.turn = committedDestination.hostTurn;
       encounter.encounterMode = committedDestination.encounterMode as MysteryEncounterMode;
+      const trainer = installCoopTrainerAuthority(committedDestination.trainer);
+      if (encounter.encounterMode === MysteryEncounterMode.TRAINER_BATTLE && trainer == null) {
+        throw new Error("committed Mystery trainer battle has no authoritative trainer");
+      }
       globalScene.phaseManager.clearPhaseQueue();
       globalScene.phaseManager.pushNew("MysteryEncounterBattlePhase", committedDestination.disableSwitch);
       coopLog("me", "guest queued committed ME battle destination", {

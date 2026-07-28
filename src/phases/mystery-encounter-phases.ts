@@ -58,6 +58,7 @@ import {
   isCoopAuthoritativeGuest,
   notifyCoopV2InteractionSurfaceReady,
   retryCoopV2PendingAuthorityAtSafeBoundary,
+  runWhenCoopRuntimeActive,
   setCoopMeBattleInteractionCounter,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -1172,6 +1173,10 @@ export class MysteryEncounterBattlePhase extends Phase {
     const battle = globalScene.currentBattle;
     const playerCapacity = battle.arrangement.playerCapacity;
     const enemyCapacity = battle.arrangement.enemyCapacity;
+    const enemySeats = globalScene
+      .getEnemyParty()
+      .slice(0, enemyCapacity)
+      .map((pokemon, slot) => ({ pokemon, slot }));
     settleCoopFieldPresentation({
       side: "player",
       seats: globalScene
@@ -1184,28 +1189,112 @@ export class MysteryEncounterBattlePhase extends Phase {
       hideStale: true,
       trainerDisposition: "hide-player",
     });
-    settleCoopFieldPresentation({
-      side: "enemy",
-      seats: globalScene
-        .getEnemyParty()
-        .slice(0, enemyCapacity)
-        .map((pokemon, slot) => ({ pokemon, slot })),
-      capacity: enemyCapacity,
-      boundary: "me-battle-summon",
-      desired: "visible",
-      hideStale: true,
-      trainerDisposition: "hide-enemy",
-    });
-    battle.started = true;
-    globalScene.pbTray.showPbTray(globalScene.getPlayerParty());
-    globalScene.pbTrayEnemy.showPbTray(globalScene.getEnemyParty());
-    globalScene.playBgm();
-    coopLog(
-      "me",
-      `authoritative guest materialized ME battle players=${Math.min(playerCapacity, globalScene.getPlayerParty().length)} `
-        + `enemies=${Math.min(enemyCapacity, globalScene.getEnemyParty().length)}`,
+    const revealEnemyField = (): void => {
+      settleCoopFieldPresentation({
+        side: "enemy",
+        seats: enemySeats,
+        capacity: enemyCapacity,
+        boundary: "me-battle-summon",
+        desired: "visible",
+        hideStale: true,
+        trainerDisposition: "hide-enemy",
+      });
+      coopLog(
+        "me",
+        `authoritative guest materialized ME battle players=${Math.min(playerCapacity, globalScene.getPlayerParty().length)} `
+          + `enemies=${Math.min(enemyCapacity, globalScene.getEnemyParty().length)} mode=${battle.mysteryEncounter?.encounterMode}`,
+      );
+      this.end();
+    };
+    const beginBattle = (onReady: () => void): void => {
+      battle.started = true;
+      globalScene.playBgm();
+      globalScene.pbTray.showPbTray(globalScene.getPlayerParty());
+      globalScene.pbTrayEnemy.showPbTray(globalScene.getEnemyParty());
+      onReady();
+    };
+
+    if (battle.mysteryEncounter?.encounterMode !== MysteryEncounterMode.TRAINER_BATTLE) {
+      beginBattle(revealEnemyField);
+      return;
+    }
+    if (battle.trainer == null) {
+      failCoopSharedSession("Authoritative Mystery trainer battle reached presentation without trainer material");
+      return;
+    }
+
+    const trainer = battle.trainer;
+    const runtime = getCoopRuntime();
+    if (runtime == null) {
+      failCoopSharedSession("Authoritative Mystery trainer presentation lost its owning runtime");
+      return;
+    }
+    // The host awaited this trainer's dynamic sprite load before opening its own battle phase. The
+    // replica received the descriptor earlier with the retained terminal, so hold this presentation phase
+    // until its equivalent local asset is initialized instead of flashing a blank trainer for one browser.
+    void trainer.loadAssets().then(
+      () =>
+        runWhenCoopRuntimeActive(runtime, () => {
+          if (globalScene.currentBattle !== battle || globalScene.phaseManager.getCurrentPhase() !== this) {
+            return;
+          }
+          trainer.initSprite();
+          // Keep the already-adopted enemy state hidden until the same trainer intro/dialogue boundary the
+          // host renders. This is presentation-only: no SummonPhase, ability, hazard, modifier, or gameplay
+          // RNG runs on the replica. The descriptor was installed before this phase opened.
+          settleCoopFieldPresentation({
+            side: "enemy",
+            seats: enemySeats,
+            capacity: enemyCapacity,
+            boundary: "me-battle-summon",
+            desired: "hidden",
+            hideStale: true,
+            trainerDisposition: "unchanged",
+          });
+          this.showEnemyTrainer();
+          const revealTrainerBattle = (): void => {
+            beginBattle(() => {
+              const completeTrainerIntro = (): void => {
+                this.hideEnemyTrainer();
+                revealEnemyField();
+              };
+              if (battle.mysteryEncounter?.hideBattleIntroMessage) {
+                completeTrainerIntro();
+              } else {
+                globalScene.ui.showText(this.getBattleMessage(), null, completeTrainerIntro, 1000, true);
+              }
+            });
+          };
+          const encounterMessages = trainer.getEncounterMessages();
+          if (encounterMessages.length === 0) {
+            revealTrainerBattle();
+            return;
+          }
+          // The authority committed exactly one selected line into the trainer descriptor.
+          const message = encounterMessages[0]!;
+          const showDialogueAndBattle = (): void => {
+            globalScene.ui.showDialogue(message, trainer.getName(TrainerSlot.NONE, true), null, () => {
+              globalScene.charSprite.hide().then(() => globalScene.hideFieldOverlay(250).then(revealTrainerBattle));
+            });
+          };
+          if (trainer.config.hasCharSprite && !globalScene.ui.shouldSkipDialogue(message)) {
+            globalScene
+              .showFieldOverlay(500)
+              .then(() =>
+                globalScene.charSprite
+                  .showCharacter(trainer.getKey(), getCharVariantFromDialogue(encounterMessages[0]))
+                  .then(showDialogueAndBattle),
+              );
+          } else {
+            showDialogueAndBattle();
+          }
+        }),
+      error =>
+        runWhenCoopRuntimeActive(runtime, () => {
+          coopWarn("me", "authoritative Mystery trainer presentation assets failed", error);
+          failCoopSharedSession("Authoritative Mystery trainer presentation could not load");
+        }),
     );
-    this.end();
   }
 
   /**

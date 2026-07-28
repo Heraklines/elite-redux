@@ -144,6 +144,7 @@ describe.skipIf(!RUN)("co-op GUEST newBattle adopts the host's battleType verdic
             partnerWithTitle: "Backpacker Host Echo",
           },
           encounterMessages: ["The host-authored challenge."],
+          selectedEncounterMessage: "The host-authored challenge.",
           victoryMessages: ["The host-authored defeat."],
           defeatMessages: ["The host-authored victory."],
         },

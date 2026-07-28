@@ -27,6 +27,7 @@ import type {
   CoopInteractionOutcome,
   CoopRewardSurfaceIdentity,
   CoopSerializedRewardOption,
+  CoopSerializedTrainer,
 } from "#data/elite-redux/coop/coop-transport";
 
 /** A co-op player seat id (0..N-1). The host/authority is a specific id, conventionally 0. */
@@ -568,6 +569,8 @@ export type CoopMeTerminalDestination =
       readonly hostTurn: number;
       /** Exact {@linkcode MysteryEncounterMode}; the guest must never infer it from its reconstructed party. */
       readonly encounterMode: number;
+      /** Complete trainer identity/presentation, required exactly for an embedded trainer battle. */
+      readonly trainer: CoopSerializedTrainer | null;
       /** Constructor argument for the host's `MysteryEncounterBattlePhase`. */
       readonly disableSwitch: boolean;
     }
