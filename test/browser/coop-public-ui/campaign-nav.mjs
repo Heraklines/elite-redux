@@ -223,11 +223,11 @@ export function chooseNavigationKey(observation, targetId, navKeys, step) {
   const options = observation?.optionIds;
   const current = Array.isArray(options) ? options.indexOf(observation.selectedOptionId) : -1;
   const target = Array.isArray(options) ? options.indexOf(targetId) : -1;
-  // FIGHT is a two-column grid (and may gain a fifth cell). Its option order is
-  // stable, but treating it as a one-dimensional wrap-around list sends arrows
-  // to nonexistent neighbours. Follow the same row/column geometry a human sees.
+  // COMMAND and FIGHT are two-column grids (and may gain a fifth cell). Their option
+  // order is stable, but treating either as a one-dimensional wrap-around list sends
+  // arrows to nonexistent neighbours. Follow the same row/column geometry a human sees.
   if (
-    observation?.surfaceId === "command:fight"
+    (observation?.surfaceId === "command:command" || observation?.surfaceId === "command:fight")
     && current >= 0
     && target >= 0
     && surfaceNavKeys.includes("ArrowUp")
@@ -299,9 +299,31 @@ export function chooseBestCampaignMove(observation, cycleIndex = 0) {
  * Space/arrow key presses. Target selection remains owned by the harness's addressed
  * command-target driver.
  */
-export async function driveBestCampaignMove(client, purpose, { timeoutMs = 15_000, cycleIndex = 0 } = {}) {
+export async function driveBestCampaignMove(
+  client,
+  purpose,
+  { timeoutMs = 15_000, cycleIndex = 0, commandEvent = null } = {},
+) {
+  const command =
+    commandEvent?.observation?.surfaceId === "command:command"
+      ? commandEvent
+      : client.evidence.findLastSemanticSurface(0, "command:command");
+  if (command == null) {
+    throw new Error(`${client.label}: ${purpose} exposed no command:command semantic surface`);
+  }
   const fightCursor = client.evidence.cursor();
-  await client.press("Space", `${purpose}-open-fight`);
+  // CommandUiHandler remembers its cursor. A cancelled/superseded target flow can therefore reopen
+  // COMMAND on Ball, Pokemon, or Run. Pressing Space blindly here opened that remembered option and
+  // made the driver wait forever for FIGHT (depth run 30357074506). Navigate the same visible grid a
+  // human uses and prove Fight is selected before submitting.
+  await selectOptionById(client, {
+    surfaceId: "command:command",
+    targetId: "command:fight",
+    navKeys: ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"],
+    submitKey: "Space",
+    fromCursor: command.index,
+    timeoutMs,
+  });
   const fight = await waitForActionableSemanticSurface(client, "command:fight", {
     fromCursor: fightCursor,
     timeoutMs,

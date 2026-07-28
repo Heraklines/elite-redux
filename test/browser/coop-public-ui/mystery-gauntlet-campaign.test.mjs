@@ -210,6 +210,20 @@ test("campaign fight policy prefers a usable damaging move and follows the visib
     ),
     "ArrowRight",
   );
+  assert.equal(
+    chooseNavigationKey(
+      {
+        surfaceId: "command:command",
+        selectedOptionId: "command:ball",
+        optionIds: ["command:fight", "command:ball", "command:pokemon", "command:run"],
+      },
+      "command:fight",
+      ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"],
+      0,
+    ),
+    "ArrowLeft",
+    "a remembered Ball cursor must visibly return to Fight instead of submitting Ball",
+  );
 
   withEnvironment({ COOP_UI_BATTLE_KEYS: "" }, () => {
     assert.equal(loadCampaignPolicy().keys.battleKeysFromEnv, false);
@@ -219,6 +233,17 @@ test("campaign fight policy prefers a usable damaging move and follows the visib
     assert.equal(policy.keys.battleKeysFromEnv, true);
     assert.deepEqual(policy.keys.battle, ["Space", "ArrowRight", "Space"]);
   });
+});
+
+test("campaign move driving semantically selects Fight instead of assuming the remembered command cursor", async () => {
+  const navigation = await readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8");
+  const start = navigation.indexOf("export async function driveBestCampaignMove");
+  const end = navigation.indexOf("\n}\n\n/** Wait until", start);
+  const drive = navigation.slice(start, end);
+
+  assert.ok(start >= 0 && end > start, "the campaign move driver is present");
+  assert.match(drive, /surfaceId: "command:command"[\s\S]+targetId: "command:fight"/u);
+  assert.doesNotMatch(drive, /client\.press\("Space", `\$\{purpose\}-open-fight`\)/u);
 });
 
 test("title navigation never shortcuts upward into the notification inbox", () => {
