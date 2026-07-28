@@ -382,8 +382,8 @@ test("public co-op launch waits for an actionable save decision and chooses sema
   );
   assert.match(
     browserEntry,
-    /phase === "TitlePhase"\s*&& uiMode === "MESSAGE"\s*&& \(runtime == null \|\| runtime\.controller\.sessionEpoch <= 0\)/u,
-    "the semantic observer suppresses only unbound title narration, not the live co-op launch handler",
+    /phase === "TitlePhase"[\s\S]*?&& uiMode === "MESSAGE"[\s\S]*?&& !preBindingGuestLaunchMessage[\s\S]*?&& \(runtime == null \|\| runtime\.controller\.sessionEpoch <= 0\)/u,
+    "the semantic observer suppresses unbound title narration except the real pre-binding guest launch handler",
   );
   assert.match(
     publicUiHarness,
@@ -408,13 +408,24 @@ test("public co-op launch waits for an actionable save decision and chooses sema
   const resume = publicUiHarness.slice(resumeStart, resumeEnd);
   assert.match(
     resume,
-    /RECV resumeOffer[\s\S]*?guestClient\.press\("Space", "guest-open-resume-offer"\)[\s\S]*?selectOptionById\(guestClient, \{[\s\S]*?surfaceId: "confirm:TitlePhase"[\s\S]*?targetId: "yes"/u,
-    "the guest must wait for the actionable confirmation and choose Yes semantically after opening a resume offer",
+    /RECV resumeOffer[\s\S]*?guestClient\.waitForActionableCoopLaunchMessage\([\s\S]*?"guest resume offer"[\s\S]*?"guest"[\s\S]*?guestClient\.press\("Space", "guest-open-resume-offer"\)[\s\S]*?selectOptionById\(guestClient, \{[\s\S]*?surfaceId: "confirm:TitlePhase"[\s\S]*?targetId: "yes"/u,
+    "the guest must wait for the actionable offer callback, open it once, and choose Yes semantically",
   );
   assert.doesNotMatch(
     resume,
     /guest-accept-resume-offer/u,
     "a fixed-delay second Space can arrive before the resume confirmation exists and silently decline on timeout",
+  );
+
+  assert.match(
+    browserEntry,
+    /const preBindingGuestLaunchMessage =[\s\S]*?phase === "TitlePhase"[\s\S]*?uiMode === "MESSAGE"[\s\S]*?runtime\.controller\.role === "guest"[\s\S]*?runtime\.controller\.sessionEpoch === 0/u,
+    "the read-only oracle identifies the legitimate guest launch prompt before P33 binds its positive epoch",
+  );
+  assert.match(
+    browserEntry,
+    /membership\.state !== "active" && !preBindingGuestLaunchMessage/u,
+    "only the exact pre-binding guest launch prompt bypasses active-membership surface suppression",
   );
 });
 

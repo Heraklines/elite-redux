@@ -1741,15 +1741,21 @@ export class PublicUiClient {
    * with several cloud saves. A fixed burst of Space keys races that work and can finish before the
    * prompt exists; the semantic mirror exposes the exact handler/callback readiness instead.
    */
-  async waitForActionableCoopLaunchMessage(from = this.evidence.cursor(), purpose = "co-op launch decision") {
+  async waitForActionableCoopLaunchMessage(
+    from = this.evidence.cursor(),
+    purpose = "co-op launch decision",
+    expectedRole = "host",
+  ) {
     return this.evidence.waitForCondition(
       sink => {
         const event = sink.findLastSemanticSurface(from, "battle:message");
         const observation = event?.observation;
+        const localSeat = observation?.localSeat;
         return observation?.phase === "TitlePhase"
-          && observation.localRole === "host"
-          && observation.localSeat === this.publicSeat
-          && observation.seatsWithInput?.includes(this.publicSeat)
+          && observation.localRole === expectedRole
+          && Number.isInteger(localSeat)
+          && (this.publicSeat == null || localSeat === this.publicSeat)
+          && observation.seatsWithInput?.includes(localSeat)
           && observation.ready?.handlerActive === true
           && observation.ready.awaitingActionInput === true
           && observation.ready.inputBlocked !== true
@@ -3469,11 +3475,12 @@ export class DuoPublicUiRig {
       timeoutMs: this.config.timeoutMs,
       description: "host sends the selected resume offer",
     });
-    await guestClient.evidence.waitFor(/RECV resumeOffer/u, {
+    const receivedGuestOffer = await guestClient.evidence.waitFor(/RECV resumeOffer/u, {
       from: resumeCursors[guestClient.label],
       timeoutMs: this.config.timeoutMs,
       description: "guest receives public resume offer",
     });
+    await guestClient.waitForActionableCoopLaunchMessage(receivedGuestOffer.index, "guest resume offer", "guest");
     const guestResumeConfirmCursor = guestClient.evidence.cursor();
     await guestClient.press("Space", "guest-open-resume-offer");
     // Opening the remote offer schedules a public confirmation asynchronously. Under the real

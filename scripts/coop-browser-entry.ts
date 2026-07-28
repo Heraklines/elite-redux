@@ -1301,11 +1301,22 @@ function observeSemanticSurface(): void {
       lastSemanticPhase = currentPhase;
       semanticPhaseInstance += 1;
     }
-    // A paired controller can exist briefly on TitlePhase before the new session epoch is bound. Suppress
-    // only that impossible co-op epoch-0 narration. Once a positive session exists, this same public
-    // Title/MESSAGE handler is the host's actionable Resume/New Game boundary and must be observable; hiding
-    // it made the two-browser oracle wait forever after production had proved the callback was installed.
-    if (phase === "TitlePhase" && uiMode === "MESSAGE" && (runtime == null || runtime.controller.sessionEpoch <= 0)) {
+    // A P33 guest intentionally remains at epoch zero until it accepts the host's immutable resume offer.
+    // Its Title/MESSAGE callback is therefore a real pre-binding human boundary, not impossible narration:
+    // hiding it makes a keyboard-only oracle race localized text rendering and press before the callback is
+    // actionable. Other epoch-zero Title messages remain local setup noise and stay suppressed.
+    const preBindingGuestLaunchMessage =
+      phase === "TitlePhase"
+      && uiMode === "MESSAGE"
+      && runtime != null
+      && runtime.controller.role === "guest"
+      && runtime.controller.sessionEpoch === 0;
+    if (
+      phase === "TitlePhase"
+      && uiMode === "MESSAGE"
+      && !preBindingGuestLaunchMessage
+      && (runtime == null || runtime.controller.sessionEpoch <= 0)
+    ) {
       return;
     }
     // When this seat has no locally actionable battler, the real continuation is the exact replay waiter,
@@ -1437,7 +1448,7 @@ function observeSemanticSurface(): void {
     let seatsWithInput: number[] = [0];
     if (runtime != null) {
       const membership = runtime.membership.snapshot();
-      if (membership.state !== "active") {
+      if (membership.state !== "active" && !preBindingGuestLaunchMessage) {
         return;
       }
       coop = true;
