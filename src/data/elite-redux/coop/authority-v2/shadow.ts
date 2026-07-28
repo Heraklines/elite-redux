@@ -51,10 +51,12 @@ import {
   type CoopReplacementOpenMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import {
+  armReplacementOwnerWindowAfterControlProof as armReplacementOwnerWindowAfterControlProofOnContext,
   buildReplacementCommitEntry,
   type ReplacementAuthorityCarrier,
   type ReplacementProposal,
   type ReplacementResolutionMode,
+  type ReplacementSourceAddress,
   type ReplacementSuccessor,
   replacementImageDigest,
   replacementOperationId,
@@ -1325,6 +1327,33 @@ export class CoopAuthorityV2Shadow {
       // Covers a synchronous receipt delivered between the caller's commit return and waiter construction.
       this.flushAuthorityPeerStageWaiters();
     });
+  }
+
+  /**
+   * Arm one replacement fallback on this harness's runtime-owned scheduler.
+   *
+   * Callers must first prove the remote owner's exact `controlInstalled` receipt.
+   * Keeping the scheduler context private to the harness prevents a phase from
+   * manufacturing a second clock or falling back to a raw wall-time timeout.
+   */
+  armReplacementOwnerWindowAfterControlProof(
+    address: ReplacementSourceAddress,
+    ownerSeatId: number,
+    waitForControlProof: () => Promise<boolean>,
+    controlProofIsCurrent: () => boolean,
+    onFallback: () => void,
+  ): Promise<(() => void) | null> {
+    if (this.disposed) {
+      return Promise.resolve(null);
+    }
+    return armReplacementOwnerWindowAfterControlProofOnContext(
+      this.runtimeContext,
+      address,
+      ownerSeatId,
+      waitForControlProof,
+      controlProofIsCurrent,
+      onFallback,
+    );
   }
 
   /** Retain one non-authority human proposal until its exact V2 result enters the ordered log. */

@@ -21,6 +21,7 @@ import {
   getCoopFaintSwitchWaitMs,
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
+  armCoopV2ReplacementOwnerWindowAfterControlProof,
   coopOwnerOfPlayerFieldSlot,
   coopSessionGeneration,
   establishCoopV2ReplacementControlBoundary,
@@ -244,15 +245,67 @@ export class SwitchPhase extends BattlePhase {
           // ShowdownEnemyFaintSwitchPhase for the rationale): a slow-but-alive partner must not be misread as
           // a deadlock. Paired 1:1 with endCoopFaintSwitchWindow in the .then (always runs).
           beginCoopFaintSwitchWindow();
-          void awaitAddressedCoopFaintSwitchChoice(
-            coopRelay,
-            {
-              ...sourceAddress,
-              fieldIndex: this.fieldIndex,
-              timeoutMs: getCoopFaintSwitchWaitMs(),
-            },
-            operationBinding,
-          ).then(res => {
+          const awaitOwnerChoice = async (): Promise<
+            | {
+                readonly kind: "resolved";
+                readonly choice: NonNullable<Awaited<ReturnType<typeof awaitAddressedCoopFaintSwitchChoice>>>;
+              }
+            | { readonly kind: "fallback" }
+            | { readonly kind: "failed" }
+          > => {
+            if (!isCoopV2ReplacementCutoverActive() || this.coopV2ControlOperationId == null) {
+              const choice = await awaitAddressedCoopFaintSwitchChoice(
+                coopRelay,
+                {
+                  ...sourceAddress,
+                  fieldIndex: this.fieldIndex,
+                  timeoutMs: getCoopFaintSwitchWaitMs(),
+                },
+                operationBinding,
+              );
+              return choice == null ? { kind: "fallback" } : { kind: "resolved", choice };
+            }
+            const fallback = new AbortController();
+            const cancelOwnerWindow = await armCoopV2ReplacementOwnerWindowAfterControlProof(
+              {
+                epoch: runtime.controller.sessionEpoch,
+                ...sourceAddress,
+                fieldIndex: this.fieldIndex,
+                ownerSeatId,
+                operationId: this.coopV2ControlOperationId,
+              },
+              () => fallback.abort(),
+              runtime,
+            );
+            if (cancelOwnerWindow == null) {
+              return { kind: "failed" };
+            }
+            try {
+              const choice = await awaitAddressedCoopFaintSwitchChoice(
+                coopRelay,
+                {
+                  ...sourceAddress,
+                  fieldIndex: this.fieldIndex,
+                  timeoutMs: null,
+                  signal: fallback.signal,
+                },
+                operationBinding,
+              );
+              if (choice != null) {
+                return { kind: "resolved", choice };
+              }
+              // Only this lease's own 60s expiry authorizes fallback. Recovery cancellation, relay
+              // disposal, waiter supersession, or any other null is a failed boundary, never an auto-pick.
+              return fallback.signal.aborted ? { kind: "fallback" } : { kind: "failed" };
+            } finally {
+              cancelOwnerWindow();
+            }
+          };
+          const ownerChoice = awaitOwnerChoice().catch(error => {
+            coopWarn("replay", "replacement owner lease rejected", error);
+            return { kind: "failed" } as const;
+          });
+          void ownerChoice.then(outcome => {
             endCoopFaintSwitchWindow();
             // Resolve + commit under THIS runtime (see the close verdict below): the continuation
             // resumes on the shared microtask queue, and boundaryStillLive reads the ACTIVE runtime.
@@ -264,6 +317,11 @@ export class SwitchPhase extends BattlePhase {
                 failCoopSharedSession("The replacement flow lost its exact host boundary before committing.");
                 return;
               }
+              if (outcome.kind === "failed") {
+                failCoopSharedSession("The replacement owner never installed its exact Authority V2 picker.");
+                return;
+              }
+              const res = outcome.kind === "resolved" ? outcome.choice : null;
               const battlerCount = scene.currentBattle.getBattlerCount();
               let slotIndex = res?.choice ?? -1;
               // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's

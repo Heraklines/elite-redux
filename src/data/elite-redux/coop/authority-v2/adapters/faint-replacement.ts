@@ -588,6 +588,45 @@ export function armReplacementOwnerWindow(
   );
 }
 
+/**
+ * Gate the human-input owner window behind one exact remote executable-control proof.
+ *
+ * Replay/setup time before `waitForControlProof` resolves true never creates a timer and therefore cannot
+ * consume the owner's decision budget. Runtime cancellation and a superseded address both fail closed; a
+ * late proof can never resurrect a timer after either event.
+ */
+export async function armReplacementOwnerWindowAfterControlProof(
+  ctx: CoopRuntimeContext,
+  address: ReplacementSourceAddress,
+  ownerSeatId: number,
+  waitForControlProof: () => Promise<boolean>,
+  controlProofIsCurrent: () => boolean,
+  onFallback: () => void,
+): Promise<(() => void) | null> {
+  if (ctx.cancellation.aborted) {
+    return null;
+  }
+  let removeAbortListener = () => {};
+  const cancelled = new Promise<boolean>(resolve => {
+    const onAbort = () => resolve(false);
+    ctx.cancellation.addEventListener("abort", onAbort, { once: true });
+    removeAbortListener = () => ctx.cancellation.removeEventListener("abort", onAbort);
+    if (ctx.cancellation.aborted) {
+      resolve(false);
+    }
+  });
+  let proven = false;
+  try {
+    proven = await Promise.race([waitForControlProof().catch(() => false), cancelled]);
+  } finally {
+    removeAbortListener();
+  }
+  if (!proven || ctx.cancellation.aborted || !controlProofIsCurrent()) {
+    return null;
+  }
+  return armReplacementOwnerWindow(ctx, address, ownerSeatId, onFallback);
+}
+
 // ---------------------------------------------------------------------------
 // REPLICA - the applier seam + the anti-softlock picker close
 // ---------------------------------------------------------------------------

@@ -24,6 +24,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { COOP_REPLACEMENT_OWNER_WINDOW_MS } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -34,13 +35,16 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  advanceCoopActiveTime,
   buildDuo,
   type CoopResyncProbe,
+  clearCoopSchedulerActiveTimeClock,
   drainLoopback,
   driveClientPhaseQueueTo,
   driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   installCoopResyncProbe,
+  installCoopSchedulerActiveTimeClock,
   installDuoLogCapture,
   materializeGuestInputAfterReplacement,
   presentedFieldMon,
@@ -95,12 +99,16 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     resyncProbe?.restore();
     resyncProbe = undefined;
     setCoopFaintSwitchWaitMs(60_000);
+    clearCoopSchedulerActiveTimeClock();
     logs.dispose();
     clearCoopRuntime();
     initGlobalScene(game.scene);
   });
 
   it("guest picks CHARIZARD; the host summons THE GUEST'S pick; the guest materializes + can command it", async () => {
+    // Failure-first regression: the old host-side raw timeout began before the guest's replay had even
+    // opened PARTY. Keep it tiny so spending setup/replay time from the owner's decision budget fails loudly.
+    setCoopFaintSwitchWaitMs(V2_REPLACEMENT_CUTOVER ? 30 : 4_000);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
@@ -153,6 +161,27 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       "the guest-owned field slot was vacated by the faint on the host",
     ).toBe(true);
 
+    // Begin the host crossing BEFORE the guest renders the faint. Authority V2 must remain parked on the
+    // exact peer control proof: no owner deadline exists until PARTY is genuinely actionable in that browser.
+    const unshiftBeforeOwnerReady = V2_REPLACEMENT_CUTOVER ? vi.spyOn(rig.hostScene.phaseManager, "unshiftNew") : null;
+    let hostAdvance: Promise<void> | undefined;
+    if (V2_REPLACEMENT_CUTOVER) {
+      await withClient(rig.hostCtx, async () => {
+        hostAdvance = game.phaseInterceptor.to("CommandPhase", false);
+        await vi.waitUntil(() => rig.hostScene.phaseManager.getCurrentPhase()?.phaseName === "SwitchPhase", {
+          timeout: 5_000,
+          interval: 10,
+        });
+      });
+      await new Promise<void>(resolve => setTimeout(resolve, 75));
+      const prematureSummons = unshiftBeforeOwnerReady?.mock.calls.filter(([name]) => name === "SwitchSummonPhase");
+      unshiftBeforeOwnerReady?.mockRestore();
+      expect(
+        prematureSummons,
+        "replay/setup latency before the owner picker is actionable cannot trigger an auto-pick",
+      ).toHaveLength(0);
+    }
+
     // GUEST renders turn 1: the faint presentation opens the guest's OWN picker
     // (CoopGuestFaintSwitchPhase). The headless guest has no human, so stub the ONE
     // PARTY open to pick CHARIZARD - the RELAY send + seq keying stay fully real.
@@ -197,9 +226,8 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     // HOST: begin crossing its SwitchPhase. The retained result must first be applied under the
     // guest's complete destination context and materially ACKed; alternating the two contexts is
     // the in-process equivalent of two independent browser event loops.
-    let hostAdvance: Promise<void> | undefined;
     await withClient(rig.hostCtx, async () => {
-      hostAdvance = game.phaseInterceptor.to("CommandPhase", false);
+      hostAdvance ??= game.phaseInterceptor.to("CommandPhase", false);
       await drainLoopback();
     });
     expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
@@ -242,7 +270,6 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       resyncProbe.count(),
       "the guest-faint replacement converged with ZERO forced resyncs (no player-facing divergence)",
     ).toBe(0);
-
     // #799 (live Wingull/Chinchou transposition): after the replacement flow the two engines'
     // party ARRAYS must be permutation-identical INCLUDING ORDER - a transposition here is the
     // root of wrong-mon summons and slot-targeted item cross-application.
@@ -255,6 +282,9 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
 
   it("idle guest picker closes from the retained fallback before the host summons and both engines reach the next command", async () => {
     setCoopFaintSwitchWaitMs(30);
+    if (V2_REPLACEMENT_CUTOVER) {
+      installCoopSchedulerActiveTimeClock();
+    }
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
     const hostTransportSendSpy = vi.spyOn(rig.pair.host, "send");
@@ -319,7 +349,9 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
           if (args[0] === UiMode.PARTY) {
             pickerOpens++;
             idlePickerCallback = args[3] as (slotIndex: number, option: number) => void;
-            return;
+            // V2 controlInstalled requires the real address-exact active/actionable PARTY handler. Keep its
+            // callback idle, but do not replace the public surface with a synthetic no-op.
+            return V2_REPLACEMENT_CUTOVER ? realSetMode(...args) : undefined;
           }
           if (args[0] === UiMode.MESSAGE && pickerOpens > 0) {
             pickerCloses++;
@@ -374,6 +406,18 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       await withClient(rig.hostCtx, async () => {
         hostAdvance = game.phaseInterceptor.to("CommandPhase", false);
         if (V2_REPLACEMENT_CUTOVER) {
+          await drainLoopback();
+          await vi.waitUntil(
+            () =>
+              rig.hostRuntime.interactionRelay
+                .describeAwaitedInteractions()
+                .some(wait => wait.expectedKinds.includes("switch")),
+            { timeout: 5_000, interval: 10 },
+          );
+          // The exact owner picker is now proven actionable. Only these 60 seconds of scheduler-owned
+          // humanInput time may trigger the deterministic fallback.
+          advanceCoopActiveTime(COOP_REPLACEMENT_OWNER_WINDOW_MS);
+          await Promise.resolve();
           await vi.waitUntil(
             () =>
               unshiftSpy.mock.calls.some(([name]) => name === "SwitchSummonPhase")

@@ -885,11 +885,20 @@ export class CoopInteractionRelay {
    */
   awaitInteractionChoice(
     seq: number,
-    timeoutMs = this.timeoutMs,
+    timeoutMs: number | null = this.timeoutMs,
     expectedKinds?: readonly string[],
     expectedRewardSurface?: CoopRewardSurfaceIdentity | null,
     authorityControlOperationId?: string,
+    signal?: AbortSignal,
   ): Promise<CoopInteractionChoice | null> {
+    if (timeoutMs == null && signal == null) {
+      coopWarn("relay", `AWAIT interactionChoice seq=${seq} refused an unbounded wait without an external lease`);
+      return Promise.resolve(null);
+    }
+    if (signal?.aborted) {
+      coopWarn("relay", `AWAIT interactionChoice seq=${seq} -> ABORTED before wait`);
+      return Promise.resolve(null);
+    }
     if (this.cancelledSeqs.has(seq)) {
       coopWarn("relay", `AWAIT interactionChoice seq=${seq} -> STICKY-CANCELLED (resync rescue) resolve null`);
       return Promise.resolve(null);
@@ -959,7 +968,7 @@ export class CoopInteractionRelay {
         if (isCoopDebug()) {
           coopLog(
             "relay",
-            `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} -> BUFFER-HIT resolve ${summarizeChoice(next)}`,
+            `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs ?? "external"} -> BUFFER-HIT resolve ${summarizeChoice(next)}`,
           );
         }
         return Promise.resolve(next);
@@ -974,7 +983,7 @@ export class CoopInteractionRelay {
     }
     coopLog(
       "relay",
-      `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} expected=[${(expectedKinds ?? []).join(",")}] -> network-wait`,
+      `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs ?? "external"} expected=[${(expectedKinds ?? []).join(",")}] -> network-wait`,
     );
     if (this.isAuthorityWaitCreationFrozen()) {
       coopWarn("relay", `AWAIT interactionChoice seq=${seq} REFUSED (Authority V2 recovery fence held)`);
@@ -990,6 +999,7 @@ export class CoopInteractionRelay {
     return new Promise<CoopInteractionChoice | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
+      let removeAbortListener: () => void = () => {};
       const waiterToken = {};
       const authorityWait =
         resolvedAuthorityControlOperationId === undefined
@@ -1007,6 +1017,7 @@ export class CoopInteractionRelay {
         }
         settled = true;
         cancelTimer();
+        removeAbortListener();
         if (this.pending.get(seq)?.finish === finish) {
           this.pendingSince.delete(seq);
           this.pending.delete(seq);
@@ -1026,6 +1037,15 @@ export class CoopInteractionRelay {
         expectedKinds,
         expectedRewardSurface,
       });
+      if (signal != null) {
+        const abort = () => finish(null);
+        signal.addEventListener("abort", abort, { once: true });
+        removeAbortListener = () => signal.removeEventListener("abort", abort);
+        if (signal.aborted) {
+          finish(null);
+          return;
+        }
+      }
       if (
         authorityWait != null
         && this.isInteractionAuthorityV2()
@@ -1039,7 +1059,9 @@ export class CoopInteractionRelay {
         finish(null);
         return;
       }
-      cancelTimer = this.schedule(() => finish(null), timeoutMs);
+      if (!settled && timeoutMs != null) {
+        cancelTimer = this.schedule(() => finish(null), timeoutMs);
+      }
     });
   }
 

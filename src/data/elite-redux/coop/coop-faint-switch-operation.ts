@@ -468,17 +468,22 @@ export async function awaitAddressedCoopFaintSwitchChoice(
     turn: number;
     occurrence?: number;
     fieldIndex: number;
-    timeoutMs: number;
+    /** Null delegates expiry to an address-exact Authority V2 owner lease. */
+    timeoutMs: number | null;
+    signal?: AbortSignal;
   },
   binding?: CoopFaintSwitchOperationBinding | null,
 ): Promise<CoopInteractionChoice | null> {
-  const deadline = Date.now() + Math.max(0, params.timeoutMs);
+  const deadline = params.timeoutMs == null ? null : Date.now() + Math.max(0, params.timeoutMs);
   do {
-    const remaining = Math.max(0, deadline - Date.now());
+    const remaining = deadline == null ? null : Math.max(0, deadline - Date.now());
     const choice = await relay.awaitInteractionChoice(
       COOP_FAINT_SWITCH_SEQ_BASE + params.fieldIndex,
       remaining,
       COOP_SWITCH_CHOICE_KINDS,
+      undefined,
+      undefined,
+      params.signal,
     );
     if (choice == null || !isCoopFaintSwitchOperationEnabled()) {
       return choice;
@@ -491,7 +496,7 @@ export async function awaitAddressedCoopFaintSwitchChoice(
       `dropped stale faint-switch proposal field=${params.fieldIndex} expected=${params.wave}:${params.turn} `
         + `choice=${choice.choice} data=[${choice.data?.join(",") ?? ""}]`,
     );
-  } while (Date.now() < deadline);
+  } while (deadline == null || Date.now() < deadline);
   return null;
 }
 

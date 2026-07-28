@@ -1909,6 +1909,44 @@ test("replacement controls are proven by the real async PARTY surface and multi-
     ownerAwaitParty > ownerOpenParty && ownerNotifyReady > ownerAwaitParty,
     "the authority owner also proves control only after PARTY is public",
   );
+  const remoteOwnerStart = switchPhase.indexOf("const awaitOwnerChoice = async");
+  const remoteOwnerEnd = switchPhase.indexOf("// LOCKSTEP WATCHER", remoteOwnerStart);
+  assert.notEqual(remoteOwnerStart, -1, "the remote-owned SwitchPhase has one bounded choice lease");
+  assert.ok(remoteOwnerEnd > remoteOwnerStart, "the remote-owner lease block is bounded before lockstep");
+  const remoteOwner = switchPhase.slice(remoteOwnerStart, remoteOwnerEnd);
+  const proofGatedWindow = remoteOwner.indexOf("armCoopV2ReplacementOwnerWindowAfterControlProof(");
+  const externalWait = remoteOwner.indexOf("timeoutMs: null", proofGatedWindow);
+  assert.ok(
+    proofGatedWindow >= 0 && externalWait > proofGatedWindow,
+    "the V2 remote wait gets its deadline only after the exact control-proof-gated owner lease arms",
+  );
+  assert.match(remoteOwner.slice(proofGatedWindow), /signal: fallback\.signal/u);
+  assert.match(
+    remoteOwner.slice(proofGatedWindow),
+    /return fallback\.signal\.aborted \? \{ kind: "fallback" \} : \{ kind: "failed" \}/u,
+    "only the exact owner lease expiry may authorize an automatic replacement",
+  );
+
+  const runtimeLeaseStart = coopRuntime.indexOf(
+    "export async function armCoopV2ReplacementOwnerWindowAfterControlProof(",
+  );
+  const runtimeLeaseEnd = coopRuntime.indexOf("\n}\n", runtimeLeaseStart) + 3;
+  assert.notEqual(runtimeLeaseStart, -1, "the runtime exposes the exact replacement owner lease");
+  assert.ok(runtimeLeaseEnd > runtimeLeaseStart + 2, "the replacement owner lease has a bounded source block");
+  const runtimeLease = coopRuntime.slice(runtimeLeaseStart, runtimeLeaseEnd);
+  assert.match(runtimeLease, /sourceEntryOf\(control\)\?\.operationId/u);
+  assert.match(runtimeLease, /waitForAuthorityPeerStage\([\s\S]*"controlInstalled"/u);
+
+  const adapterLeaseStart = replacementAdapter.indexOf(
+    "export async function armReplacementOwnerWindowAfterControlProof(",
+  );
+  const adapterLeaseEnd = replacementAdapter.indexOf("\n}\n", adapterLeaseStart) + 3;
+  assert.notEqual(adapterLeaseStart, -1, "the replacement adapter gates the humanInput timer behind proof");
+  const adapterLease = replacementAdapter.slice(adapterLeaseStart, adapterLeaseEnd);
+  assert.ok(
+    adapterLease.indexOf("await Promise.race(") < adapterLease.indexOf("return armReplacementOwnerWindow("),
+    "no owner-window timer is armed before the exact proof resolves",
+  );
   const versusBind = switchPhase.indexOf("this.coopV2ControlOperationId = replacementOperationId(", ownerNotifyReady);
   const versusOpenParty = switchPhase.indexOf("const openedVersusParty = globalScene.ui.setMode(", versusBind);
   const versusAwaitParty = switchPhase.indexOf("Promise.resolve(openedVersusParty).then(", versusOpenParty);
