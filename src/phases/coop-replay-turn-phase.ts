@@ -277,6 +277,7 @@ export class CoopReplayTurnPhase extends Phase {
         : {
             events: structuredClone(material.entryPresentation),
             stateTick: material.stateTick,
+            authoritativeState: structuredClone(material.authoritativeState),
             controlOperationId: successor.operationId,
           };
     const resolve = this.v2EntryPresentationResolver;
@@ -1059,16 +1060,35 @@ export class CoopReplayTurnPhase extends Phase {
           this.failAuthority(
             streamer,
             "turnResolution",
-            `Showdown entry state for wave ${this.sourceWave} could not be installed before presentation.`,
+            `Authoritative entry state for wave ${this.sourceWave} could not be installed before presentation.`,
           );
           return;
         }
+      }
+      // A command-open can be admitted before this concrete renderer exists (for example while the
+      // two-engine fixture is still leaving LoginPhase). In that case its DATA is deliberately deferred.
+      // The retained V2 prefix therefore carries the complete image that authored it, and this exact
+      // address-checked phase is the safe material consumer. The final-boss late-consumer path is already
+      // at this tick and simply proves the same watermark without reapplying anything.
+      const prefixState = prefix.authoritativeState;
+      if (
+        prefixState != null
+        && coopAppliedStateTick() < prefix.stateTick
+        && !applyCoopAuthoritativeBattleState(prefixState, true)
+        && !reapplyAcceptedCoopAuthoritativeBattleState(prefixState, true)
+      ) {
+        this.failAuthority(
+          streamer,
+          "turnResolution",
+          `Authoritative entry state for wave ${this.sourceWave} could not be installed before presentation.`,
+        );
+        return;
       }
       if (coopAppliedStateTick() < prefix.stateTick) {
         this.failAuthority(
           streamer,
           "turnResolution",
-          `Showdown entry presentation requires state tick ${prefix.stateTick}, applied ${coopAppliedStateTick()}.`,
+          `Authoritative entry presentation requires state tick ${prefix.stateTick}, applied ${coopAppliedStateTick()}.`,
         );
         return;
       }
@@ -1097,7 +1117,7 @@ export class CoopReplayTurnPhase extends Phase {
       this.failAuthority(
         streamer,
         "turnResolution",
-        `Showdown entry presentation for wave ${this.sourceWave} could not be replayed.`,
+        `Authoritative entry presentation for wave ${this.sourceWave} could not be replayed.`,
       );
     }
   }

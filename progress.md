@@ -4862,3 +4862,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Policy-safe local evidence: 60/60 focused browser/source contracts and syntax checks green, formatting and
   `git diff --check` clean. Co-op Vitest, Chromium, deterministic soak, and full sharded qualification remain remote by
   repository policy. No staging or production deployment occurred.
+
+## 2026-07-28 - Retained command presentation carries its complete V2 state image
+
+- Focused C 2/5 on `4fd7dda61` delivered turn-one `CONTROL_COMMIT` while the guest fixture was still leaving
+  `LoginPhase`, so Authority V2 correctly deferred DATA until a real engine consumer existed. The later
+  `CoopReplayTurnPhase` recovered the retained presentation and its tick 3 watermark, but only applied the older tick 2
+  enemy-party compatibility carrier; it then failed closed with `requires state tick 3, applied 2`.
+- The immutable V2 presentation prefix now includes the complete command-open state that authored its events. Both the
+  direct parked-phase release and the late ledger fallback carry that image. The exact address-checked replay phase
+  installs it only when its applied tick is behind, before any entrance ability/message/stat presentation is queued.
+  A final-boss consumer already at the signed tick performs no reapply, while an early-admitted/deferred command-open
+  now has a legitimate material consumer instead of terminating the shared session.
+- This remains co-op Authority V2 code only. Showdown and tournament are untouched; their old lockstep architecture
+  keeps its existing behavior. Engine and full browser qualification remain remote-only; no deployment occurred.

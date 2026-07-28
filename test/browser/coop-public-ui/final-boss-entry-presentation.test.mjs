@@ -12,6 +12,7 @@ test("a late turn-one renderer reads its exact retired command prefix from the V
   assert.match(runtime, /material\?\.kind !== "command-open"/u);
   assert.match(runtime, /!controlsEqual\(source\.nextControl, control\)/u);
   assert.match(runtime, /events: structuredClone\(material\.entryPresentation\)/u);
+  assert.match(runtime, /authoritativeState: structuredClone\(material\.authoritativeState\)/u);
   assert.match(runtime, /controlOperationId: source\.operationId/u);
 
   const readIndex = replay.indexOf("readRetainedCoopV2CommandEntryPresentation(this.sourceWave, this.turn)");
@@ -19,4 +20,7 @@ test("a late turn-one renderer reads its exact retired command prefix from the V
   assert.ok(readIndex >= 0, "the presentation-only replay must consult the retained global-log source");
   assert.ok(waitIndex > readIndex, "the impossible network wait may only be installed after the ledger fallback");
   assert.match(replay.slice(readIndex, waitIndex), /return Promise\.resolve\(retained\)/u);
+  assert.match(replay, /const prefixState = prefix\.authoritativeState/u);
+  assert.match(replay, /applyCoopAuthoritativeBattleState\(prefixState, true\)/u);
+  assert.match(replay, /coopAppliedStateTick\(\) < prefix\.stateTick/u);
 });

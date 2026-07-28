@@ -4922,6 +4922,7 @@ interface CoopV2ControlSuccessorClaim {
     readonly wave: number;
     readonly turn: number;
     readonly stateTick: number;
+    readonly authoritativeState: CoopAuthoritativeBattleStateV1;
     readonly entryPresentation: readonly CoopBattleEvent[];
   };
   readonly interactionStateMaterial?: {
@@ -4958,6 +4959,7 @@ function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSu
             wave: commandOpen.wave,
             turn: commandOpen.turn,
             stateTick: commandOpen.authoritativeState.tick,
+            authoritativeState: commandOpen.authoritativeState,
             entryPresentation: commandOpen.entryPresentation,
           },
         }
@@ -9018,6 +9020,7 @@ export function readRetainedCoopV2CommandEntryPresentation(
   return {
     events: structuredClone(material.entryPresentation),
     stateTick: material.authoritativeState.tick,
+    authoritativeState: structuredClone(material.authoritativeState),
     controlOperationId: source.operationId,
   };
 }

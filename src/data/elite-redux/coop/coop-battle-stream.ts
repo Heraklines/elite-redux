@@ -141,6 +141,8 @@ export interface CoopTurnBoundaryIdentity {
 export interface CoopEntryPresentationPrefix {
   readonly events: readonly CoopBattleEvent[];
   readonly stateTick: number;
+  /** Complete state image that authored a V2 prefix; legacy wave carriers keep this in enemyPartySync. */
+  readonly authoritativeState?: CoopAuthoritativeBattleStateV1;
   /** Exact Authority V2 CONTROL_COMMIT that owns this prefix; absent on the legacy wave carrier. */
   readonly controlOperationId?: string;
 }
