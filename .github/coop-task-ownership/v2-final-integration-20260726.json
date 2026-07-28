@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "4afabc86bf2248d22670edf5d7d263cc1299b19a",
+  "baseSha": "cb4aea222d329f313e9260ec9427cc166a22274f",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -90,7 +90,6 @@
     "src/phases/coop-presentation-watchdog.ts",
     "src/phases/coop-push-replacement-checkpoint-phase.ts",
     "src/phases/coop-replay-me-phase.ts",
-    "src/phases/coop-replay-phases.ts",
     "src/phases/coop-replay-phases.ts",
     "src/phases/coop-replay-turn-phase.ts",
     "src/phases/coop-wave-progression-replay-phase.ts",
