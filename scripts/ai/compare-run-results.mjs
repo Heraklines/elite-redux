@@ -10,8 +10,10 @@ if (!withoutCapturePath || !withCapturePath || !datasetPath) {
 function normalizedResult(path) {
   const result = JSON.parse(readFileSync(path, "utf8"));
   const { totalMs: _totalMs, bootMs: _bootMs, msPerWave: _msPerWave, waves = [], ...stable } = result;
+  const { biomeOptions: _biomeOptions, ...stableState } = stable.state ?? {};
   return {
     ...stable,
+    state: stableState,
     waves: waves.map(({ ms: _ms, ...wave }) => wave),
   };
 }

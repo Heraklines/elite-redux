@@ -2265,7 +2265,9 @@ function moveTypeEffectiveness(moveType: number, enemy: Pokemon): number {
  * for waves the script/forcedMove don't cover.
  */
 function pickBestMove(mon: Pokemon, enemies: (Pokemon | undefined)[]): MoveId | null {
-  const usable = mon.getMoveset().filter(m => m.ppUsed < m.getMovePp());
+  // Use the engine's legality check so the unattended policy respects temporary
+  // restrictions such as Torment, Disable, Encore, Taunt, and Imprison.
+  const usable = mon.getMoveset().filter(m => m.isUsable(mon, false, true)[0]);
   if (usable.length === 0) {
     return null;
   }
