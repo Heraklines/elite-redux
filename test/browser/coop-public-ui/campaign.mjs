@@ -1257,6 +1257,14 @@ export async function waitForOutcomeBounded(
         }
       }
     }
+    // A target press can synchronously publish the submitted turn's progress evidence. Re-check
+    // that evidence before invoking the target hook again: a browser may keep the old target
+    // surface rendered for another frame, and a test double may deliberately keep returning true.
+    // Letting the callback outrank this proof can spin forever and starve both the deadline and the
+    // successfully observed outcome (campaign build 30385689570).
+    if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
+      return { kind: "turn-progress" };
+    }
     // A move submission can open SelectTargetPhase only after the final sequential command owner
     // has been removed from the command driver's pending set. The target is ordinary required human
     // input, not evidence that the move failed. Consume only the caller's exact-address, readiness-
@@ -1264,9 +1272,6 @@ export async function waitForOutcomeBounded(
     // on every turn and then used fallback's first Space merely to confirm this visible picker).
     if (driveTargetSelection && (await driveTargetSelection())) {
       continue;
-    }
-    if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
-      return { kind: "turn-progress" };
     }
     // A next-turn owner can open before its partner finishes a real CommandPhase MESSAGE prompt.
     // The caller's ordinary advancer is pinned to the command that was just submitted and therefore
