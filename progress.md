@@ -5106,3 +5106,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   guest `SelectBiomePhase` predecessor before the ME mirror can replace that battle.
 - Gate `30403366964` remains historical evidence for these mechanisms. The next exact-SHA qualification must prove
   B1, B6, C1/C3, and static together. No local engine/browser execution and no deployment occurred.
+
+## 2026-07-29 - Batch move learning releases only from its immutable V2 decision
+
+- Guest-owned batch move proposals now retain their exact projected phase and visible panel until the authority
+  commits the complete assignment/fallback result. The legacy raw-choice FIFO, 20-minute timeout, and legacy retry
+  counter cannot close or advance an Authority V2 batch surface.
+- Host-owned and guest-owned results close both real panels only after the retained `INTERACTION_COMMIT` material,
+  exact `AWAIT_SUCCESSOR`, real UI closure, and terminal proof agree. Wrong-address, wrong same-address material,
+  duplicate delivery, dropped legacy echoes, and fallback-to-per-move paths fail closed or advance at most once.
+- Legacy behavior remains unchanged. The focused Node source contract is green; co-op engine/browser validation stays
+  remote-only under `AGENTS.md`, and no deployment occurred.

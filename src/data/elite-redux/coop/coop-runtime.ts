@@ -4531,8 +4531,8 @@ function clearCoopWaveProgressionCapture(runtime: CoopRuntime, wave: number): vo
 
 /**
  * Production phase terminal proof for an authoritative interaction result. FIFO injection, a raw proposal,
- * and a queued phase may never call this; only the exact operation consumer calls it after ending/shifting
- * its local phase. The proof belongs to the runtime even before V2 negotiation: legacy journal fallback
+ * and a queued phase may never call this; only the exact operation consumer calls it after ending/retiring
+ * its local phase or closing its destructive terminal handler. The proof belongs to the runtime even before V2 negotiation: legacy journal fallback
  * uses the same live materializers and must be able to finish their deferred entry without inventing a
  * weaker completion rule. Only V2 retry/projection below remains cutover-gated.
  */
@@ -11407,7 +11407,57 @@ function settleCoopV2CommittedLearnMoveResult(
   );
 }
 
-/** Route journaled learn presentations/terminals into the real projected phase consumer. */
+/**
+ * Close a projected batch learn owner/watcher only from its exact admitted V2 result claim. Complete state
+ * has already applied when this runs; materialApplied still waits for the real panel/phase terminal proof.
+ */
+function settleCoopV2CommittedLearnMoveBatchResult(
+  runtime: CoopRuntime,
+  operationId: string,
+  payload: Extract<CoopLearnMoveBatchPayload, { type: "decision" }>,
+): boolean {
+  const control = runtime.v2ControlLedger.latestControl;
+  const sourceEntry = control == null ? null : runtime.v2ControlLedger.sourceEntryOf(control);
+  const sourceMaterial = sourceEntry == null ? null : decodeCoopV2InteractionEnvelope(sourceEntry);
+  const sourceOperation = sourceMaterial?.envelope.pendingOperation;
+  if (
+    control?.kind !== "AWAIT_SUCCESSOR"
+    || control.afterOperationId !== operationId
+    || sourceEntry?.kind !== "INTERACTION_COMMIT"
+    || sourceEntry.operationId !== operationId
+    || sourceOperation?.kind !== "LEARN_MOVE_BATCH"
+    || sourceOperation.id !== operationId
+    || sourceOperation.status !== "applied"
+    || JSON.stringify(sourceOperation.payload) !== JSON.stringify(payload)
+  ) {
+    return false;
+  }
+  if (runtime.v2SettledInteractionOperations.has(operationId)) {
+    return true;
+  }
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        settleCoopV2CommittedLearnMoveBatchResult?: (
+          committedOperationId: string,
+          partySlot: number,
+          assignments: readonly (readonly [number, number])[],
+          fallback: boolean,
+          owningRuntime: CoopRuntime,
+        ) => boolean;
+      }
+    | undefined;
+  return (
+    phase?.settleCoopV2CommittedLearnMoveBatchResult?.(
+      operationId,
+      payload.partySlot,
+      payload.assignments,
+      payload.fallback,
+      runtime,
+    ) === true
+  );
+}
+
+/** Route journaled learn presentations/terminals into their exact projected phase consumers. */
 function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
     return false;
@@ -11462,6 +11512,15 @@ function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuth
       op.id,
     );
     return true;
+  }
+  if (isCoopV2InteractionCutoverActive(runtime.durability)) {
+    // The first pass starts the exact projected phase/UI terminal and deliberately defers materialApplied.
+    // Its proof retries this retained entry after that phase has retired; completion must then come from the
+    // address-exact proof, never a missing phase or the legacy committed-choice echo.
+    if (runtime.v2SettledInteractionOperations.has(op.id)) {
+      return true;
+    }
+    return settleCoopV2CommittedLearnMoveBatchResult(runtime, op.id, payload);
   }
   if (op.owner !== 0) {
     return true;

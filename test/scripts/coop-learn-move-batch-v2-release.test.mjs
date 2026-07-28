@@ -1,0 +1,110 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+
+const root = new URL("../../", import.meta.url);
+const read = path => readFileSync(new URL(path, root), "utf8").replace(/\r\n/gu, "\n");
+const authority = read("src/phases/learn-move-batch-phase.ts");
+const replica = read("src/phases/coop-replay-learn-move-batch.ts");
+const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
+const duo = read("test/tests/elite-redux/coop/coop-duo-learn-move.test.ts");
+
+const method = (source, start, end) => source.slice(source.indexOf(start), source.indexOf(end));
+
+test("batch decisions close the authority UI, retain one immutable result, then release its phase", () => {
+  const terminal = method(authority, "private closeAndCommitCoopV2BatchResult(", "private coopBatchLearnMove(");
+  const close = terminal.indexOf(".setModeBoundedWhen(");
+  const retire = terminal.indexOf("this.retire();", close);
+  const proof = terminal.indexOf("settleCoopV2InteractionOperation(", retire);
+  const commit = terminal.indexOf("this.commitCoopBatchResult(", proof);
+  const successor = terminal.indexOf("afterCommit();", commit);
+  const shift = terminal.indexOf("scene.phaseManager.shiftPhase();", successor);
+  assert.ok(
+    close >= 0 && retire > close && proof > retire && commit > proof && successor > commit && shift > successor,
+    "the real panel must close/retire before proof; the immutable successor must install before scheduler release",
+  );
+  assert.match(terminal, /runWhenCoopRuntimeActive\(owningRuntime/u);
+
+  const watcher = method(authority, "private async coopHostWatchBatch(", "\n  }\n}");
+  assert.match(watcher, /v2 \? null : COOP_LEARN_MOVE_BATCH_WAIT_MS/u);
+  assert.match(watcher, /getCoopV2InteractionRuntimeCancellationSignal/u);
+  assert.match(watcher, /this\.coopV2ControlOperationId \?\? undefined/u);
+  assert.match(watcher, /decodeExactCoopLearnMoveBatchTerminal/u);
+  assert.doesNotMatch(
+    watcher.slice(watcher.indexOf("if (res == null)"), watcher.indexOf("if (res.choice")),
+    /closeAndCommitCoopV2BatchResult/u,
+    "a null V2 proposal wait cannot authorize fallback or progression",
+  );
+});
+
+test("guest owner and watcher release only through the exact committed batch result", () => {
+  const committed = method(replica, "public settleCoopV2CommittedLearnMoveBatchResult(", "\n  }\n}\n\n/**");
+  assert.match(committed, /control\?\.kind !== "AWAIT_SUCCESSOR"/u);
+  assert.match(committed, /sourceEntry\?\.kind !== "INTERACTION_COMMIT"/u);
+  assert.match(committed, /decodeInteractionMaterial\(sourceEntry\)/u);
+  assert.match(committed, /!committedMatches/u);
+  assert.match(committed, /!this\.coopPanelReady/u);
+  assert.match(committed, /submitted\.assignments\.every/u);
+  assert.match(committed, /\.setModeBoundedWhen\(/u);
+  assert.match(committed, /runWhenCoopRuntimeActive\(runtime/u);
+  assert.ok(
+    committed.indexOf("super.end();") < committed.indexOf("settleCoopV2InteractionOperation(operationId, runtime)"),
+    "replica terminal proof is published only after the exact projected phase retires",
+  );
+
+  const owner = method(replica, "if (ownerIsGuest) {", "// GUEST WATCHES");
+  assert.ok(
+    owner.indexOf("phase.parkCoopV2Decision(") < owner.indexOf("sendProposal();"),
+    "the exact proposal is parked before a synchronous result can race back",
+  );
+  assert.match(owner, /retainCoopV2InteractionProposal\(/u);
+  assert.match(owner, /markCoopV2PanelReady/u);
+  assert.match(owner, /parked guest batch owner for committed result/u);
+  assert.ok(
+    owner.indexOf("parked guest batch owner for committed result") < owner.indexOf("mirror?.endSession()"),
+    "the V2 owner returns parked before the legacy close branch",
+  );
+
+  const watcher = replica.slice(replica.indexOf("// GUEST WATCHES"));
+  assert.ok(
+    watcher.indexOf("if (isCoopLearnMoveAuthorityV2Active(operationBinding))")
+      < watcher.indexOf(".awaitInteractionChoice("),
+    "the V2 watcher returns before the raw 20-minute result FIFO",
+  );
+});
+
+test("runtime and focused two-engine coverage reject raw, wrong, duplicate, and fallback release seams", () => {
+  const materializer = method(
+    runtime,
+    "function settleCoopV2CommittedLearnMoveBatchResult(",
+    "/** Route journaled learn presentations/terminals",
+  );
+  assert.match(materializer, /control\?\.kind !== "AWAIT_SUCCESSOR"/u);
+  assert.match(materializer, /sourceEntry\?\.kind !== "INTERACTION_COMMIT"/u);
+  assert.match(materializer, /settleCoopV2CommittedLearnMoveBatchResult\?\./u);
+
+  const learnMaterializer = method(
+    runtime,
+    "function materializeCoopLearnMoveFromOp(",
+    "/** Feed one journal-delivered colosseum",
+  );
+  const proofFastPath = learnMaterializer.indexOf("runtime.v2SettledInteractionOperations.has(op.id)");
+  const direct = learnMaterializer.indexOf("return settleCoopV2CommittedLearnMoveBatchResult(runtime, op.id, payload)");
+  const legacyEcho = learnMaterializer.indexOf("materializeCommittedInteractionChoice(", direct);
+  assert.ok(
+    proofFastPath >= 0 && direct > proofFastPath && legacyEcho > direct,
+    "V2 completes a proven redelivery or returns through the exact phase consumer before legacy echo code",
+  );
+
+  assert.match(duo, /guest owner remains on the exact projected phase after sending its raw proposal/u);
+  assert.match(duo, /a wrong result identity cannot close the parked owner/u);
+  assert.match(duo, /a same-address but wrong immutable assignment is rejected after the commit exists/u);
+  assert.match(duo, /a duplicate immutable result cannot close or advance twice/u);
+  assert.match(duo, /dropBatchCommittedChoiceEcho/u);
+  assert.match(duo, /HOST-owned fallback: immutable fallback closes both panels/u);
+});

@@ -17,7 +17,9 @@ import {
   getCoopNetcodeMode,
   getCoopRuntime,
   getCoopUiMirror,
+  getCoopV2InteractionRuntimeCancellationSignal,
   notifyCoopV2InteractionSurfaceReady,
+  runWhenCoopRuntimeActive,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
@@ -72,6 +74,42 @@ export function decodeCoopLearnMoveBatchTerminal(count: number, data: number[] |
     out.push([flat[i * 2] as MoveId, flat[i * 2 + 1]]);
   }
   return out;
+}
+
+/**
+ * Authority V2 accepts a batch proposal only when the raw carrier is a complete, exact encoding of legal
+ * panel assignments. The legacy decoder above intentionally stays permissive for old sessions; V2 must not
+ * silently truncate malformed data and then bless the repaired value as authoritative.
+ */
+function decodeExactCoopLearnMoveBatchTerminal(
+  count: number,
+  data: number[] | undefined,
+  learnableIds: readonly MoveId[],
+  maxMoveCount: number,
+): [MoveId, number][] | null {
+  if (!Number.isSafeInteger(count) || count < 0 || !Array.isArray(data) || data.length !== count * 2) {
+    return null;
+  }
+  const offered = new Set<number>(learnableIds);
+  const assigned = new Set<number>();
+  const decoded: [MoveId, number][] = [];
+  for (let index = 0; index < count; index++) {
+    const moveId = data[index * 2];
+    const slotIndex = data[index * 2 + 1];
+    if (
+      !Number.isSafeInteger(moveId)
+      || !offered.has(moveId)
+      || assigned.has(moveId)
+      || !Number.isSafeInteger(slotIndex)
+      || slotIndex < 0
+      || slotIndex >= maxMoveCount
+    ) {
+      return null;
+    }
+    assigned.add(moveId);
+    decoded.push([moveId as MoveId, slotIndex]);
+  }
+  return decoded;
 }
 
 /**
@@ -313,10 +351,6 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       !v2 || this.coopV2ControlOperationId == null
         ? null
         : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
-    if (v2 && (operationId == null || !settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime))) {
-      failCoopSharedSession(`Learn-move batch result for slot ${this.partyMemberIndex} lost its exact V2 address`);
-      return false;
-    }
     if (
       !commitCoopLearnMoveBatchDecision(
         {
@@ -339,6 +373,68 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Authority-side V2 terminal: close the exact real panel, retire its phase, publish terminal proof, then
+   * retain the complete post-application decision and typed successor. A raw choice or timeout never calls
+   * this seam. The explicit runtime/binding survive the duo harness deliberately installing the peer ambiently.
+   */
+  private closeAndCommitCoopV2BatchResult(
+    assignments: readonly [MoveId, number][],
+    fallback: boolean,
+    ownerRole: CoopRole,
+    operationBinding: CoopLearnMoveOperationBinding,
+    afterCommit: () => void = () => undefined,
+  ): void {
+    const operationId =
+      this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+    const owningRuntime = this.coopOwningRuntime;
+    if (operationId == null || owningRuntime == null || !isCoopLearnMoveAuthorityV2Active(operationBinding)) {
+      failCoopSharedSession(`Learn-move batch result for slot ${this.partyMemberIndex} lost its exact V2 address`);
+      return;
+    }
+    const scene = globalScene;
+    const returnMode = this.coopReturnMode();
+    void scene.ui
+      .setModeBoundedWhen(
+        returnMode,
+        2_000,
+        () =>
+          scene.phaseManager.getCurrentPhase() === this
+          && this.coopV2ControlOperationId != null
+          && coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId) === operationId
+          && isCoopLearnMoveAuthorityV2Active(operationBinding),
+      )
+      .then(result => {
+        runWhenCoopRuntimeActive(owningRuntime, () => {
+          if (result === "superseded" || globalScene !== scene || scene.phaseManager.getCurrentPhase() !== this) {
+            failCoopSharedSession(`Learn-move batch result ${operationId} lost its exact authority phase`);
+            return;
+          }
+          getCoopUiMirror()?.endSession();
+          // Retire without shifting: terminal proof now belongs to a dead real handler, while no locally
+          // inferred successor can start before the immutable result installs its global control claim.
+          this.retire();
+          if (!settleCoopV2InteractionOperation(operationId, owningRuntime)) {
+            failCoopSharedSession(`Learn-move batch result ${operationId} could not prove its authority terminal`);
+            return;
+          }
+          if (!this.commitCoopBatchResult(assignments, fallback, ownerRole, operationBinding)) {
+            return;
+          }
+          coopLog("v2-proposal", `committed learn-move batch result id=${operationId} fallback=${fallback}`);
+          afterCommit();
+          // Shift only after the global result installed its AWAIT_SUCCESSOR. This prevents the local queue
+          // (especially a fallback LearnMovePhase) from opening under the retired prompt control.
+          scene.phaseManager.shiftPhase();
+        });
+      })
+      .catch(() => {
+        runWhenCoopRuntimeActive(owningRuntime, () => {
+          failCoopSharedSession(`Learn-move batch result ${operationId} could not close its authority panel`);
+        });
+      });
   }
 
   /**
@@ -439,11 +535,15 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         if (learned.length > 0) {
           globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
         }
+        if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
+          this.closeAndCommitCoopV2BatchResult(learned, false, "host", operationBinding);
+          return;
+        }
         mirror?.endSession();
-        const { choice, data } = encodeCoopLearnMoveBatchTerminal(learned);
         if (!this.commitCoopBatchResult(learned, false, "host", operationBinding)) {
           return;
         }
+        const { choice, data } = encodeCoopLearnMoveBatchTerminal(learned);
         relay?.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, choice, data);
         coopLog("learnmove", "host drove batch panel, relays terminal to watcher (#848)", { seq, count: choice });
         globalScene.ui.setMode(returnMode).then(() => this.end());
@@ -453,6 +553,14 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
           return;
         }
         finished = true;
+        if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
+          this.closeAndCommitCoopV2BatchResult([], true, "host", operationBinding, () => {
+            for (const id of learnable) {
+              globalScene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
+            }
+          });
+          return;
+        }
         mirror?.endSession();
         if (!this.commitCoopBatchResult([], true, "host", operationBinding)) {
           return;
@@ -523,22 +631,31 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     } catch (e) {
       coopWarn("learnmove", "host watcher batch panel failed to open (still awaiting terminal) (#848)", e);
     }
+    const v2 = isCoopLearnMoveAuthorityV2Active(operationBinding);
+    const runtimeCancellation = v2 ? getCoopV2InteractionRuntimeCancellationSignal(this.coopOwningRuntime) : null;
+    if (v2 && (runtimeCancellation == null || this.coopV2ControlOperationId == null)) {
+      failCoopSharedSession(`Learn-move batch watcher for slot ${this.partyMemberIndex} lost its V2 proposal lease`);
+      return;
+    }
     const res = await relay.awaitInteractionChoice(
       seq,
-      COOP_LEARN_MOVE_BATCH_WAIT_MS,
+      v2 ? null : COOP_LEARN_MOVE_BATCH_WAIT_MS,
       COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
+      undefined,
+      this.coopV2ControlOperationId ?? undefined,
+      runtimeCancellation ?? undefined,
     );
-    mirror?.endSession();
     const expectedDecisionOperationId =
       this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
-    if (
-      isCoopLearnMoveAuthorityV2Active(operationBinding)
-      && (expectedDecisionOperationId == null || res?.operationId !== expectedDecisionOperationId)
-    ) {
+    if (v2 && (expectedDecisionOperationId == null || res?.operationId !== expectedDecisionOperationId)) {
+      if (res == null && runtimeCancellation?.aborted) {
+        return;
+      }
       failCoopSharedSession(`Learn-move batch decision for slot ${this.partyMemberIndex} was not exact`);
       return;
     }
     if (res == null) {
+      mirror?.endSession();
       coopWarn("learnmove", "guest batch terminal null (timeout/disconnect); keeping current moves (#848)", { seq });
       if (!this.commitCoopBatchResult([], true, "guest", operationBinding)) {
         return;
@@ -549,6 +666,19 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     }
     if (res.choice === COOP_LEARN_MOVE_BATCH_FALLBACK) {
       coopWarn("learnmove", "guest batch panel fell back; host runs relayed per-move flow (#848)", { seq });
+      if (v2) {
+        if (res.data != null && res.data.length > 0) {
+          failCoopSharedSession(`Learn-move batch fallback for slot ${this.partyMemberIndex} carried assignments`);
+          return;
+        }
+        this.closeAndCommitCoopV2BatchResult([], true, "guest", operationBinding, () => {
+          for (const id of learnable) {
+            globalScene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
+          }
+        });
+        return;
+      }
+      mirror?.endSession();
       if (!this.commitCoopBatchResult([], true, "guest", operationBinding)) {
         return;
       }
@@ -556,7 +686,13 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       this.coopPerMoveFallback(learnable);
       return;
     }
-    const assignments = decodeCoopLearnMoveBatchTerminal(res.choice, res.data);
+    const assignments = v2
+      ? decodeExactCoopLearnMoveBatchTerminal(res.choice, res.data, learnable, pokemon.getMaxMoveCount())
+      : decodeCoopLearnMoveBatchTerminal(res.choice, res.data);
+    if (assignments == null) {
+      failCoopSharedSession(`Learn-move batch decision for slot ${this.partyMemberIndex} was malformed`);
+      return;
+    }
     // Apply the guest owner's picks AUTHORITATIVELY from the pre-panel snapshot (unaffected by cursor drift).
     pokemon.moveset.splice(0, pokemon.moveset.length, ...snapshotMoveset);
     if (snapshotSummon && pokemon.summonData?.moveset) {
@@ -570,6 +706,11 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     if (assignments.length > 0) {
       globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
     }
+    if (v2) {
+      this.closeAndCommitCoopV2BatchResult(assignments, false, "guest", operationBinding);
+      return;
+    }
+    mirror?.endSession();
     if (!this.commitCoopBatchResult(assignments, false, "guest", operationBinding)) {
       return;
     }

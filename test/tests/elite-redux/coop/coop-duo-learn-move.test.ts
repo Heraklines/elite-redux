@@ -26,7 +26,9 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { coopLearnMoveDecisionOperationId } from "#data/elite-redux/coop/coop-learn-move-operation";
 import {
+  type CoopRuntime,
   clearCoopRuntime,
   isCoopLearnMoveForwardInFlightEmpty,
   isCoopV2InteractionHumanInputFrozen,
@@ -43,7 +45,6 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type DuoRig,
-  drainLoopback,
   installDuoLogCapture,
   pumpDuoDestinations,
   retireDuoInitialCommandForBoundaryTest,
@@ -62,6 +63,18 @@ function toCoop(scene: BattleScene): void {
 
 /** The new move offered by the (forced) level-up - deliberately NOT in the full moveset below. */
 const NEW_MOVE = MoveId.WATER_GUN;
+
+interface ProjectedBatchPhaseProbe {
+  readonly phaseName?: string;
+  readonly coopV2ControlOperationId: string | null;
+  settleCoopV2CommittedLearnMoveBatchResult(
+    operationId: string,
+    partySlot: number,
+    assignments: readonly (readonly [number, number])[],
+    fallback: boolean,
+    runtime: CoopRuntime,
+  ): boolean;
+}
 
 describe.skipIf(!RUN)(
   "co-op DUO level-up Move Learn: batch panel is the shared path, owner's panel CLOSES (#848)",
@@ -223,6 +236,51 @@ describe.skipIf(!RUN)(
       );
     }
 
+    /** Drain the immutable result until both real panels have closed and the projected phase retired. */
+    async function awaitBatchResultClosure(rig: DuoRig): Promise<void> {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        const closed =
+          withClientSync(rig.hostCtx, () => rig.hostScene.ui.getMode() !== UiMode.LEARN_MOVE_BATCH)
+          && withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode() !== UiMode.LEARN_MOVE_BATCH)
+          && isCoopLearnMoveForwardInFlightEmpty();
+        if (closed) {
+          return;
+        }
+        await withClient(rig.hostCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
+      }
+      throw new Error("the immutable learn-move batch result did not close both exact panels");
+    }
+
+    /** Drop the retired local committed-choice echo. Authority V2 must never consult it for release. */
+    function dropBatchCommittedChoiceEcho(rig: DuoRig): () => number {
+      const relay = rig.guestRuntime.interactionRelay;
+      const original = relay.materializeCommittedInteractionChoice.bind(relay);
+      let dropped = 0;
+      relay.materializeCommittedInteractionChoice = (...args: Parameters<typeof original>) => {
+        if (args[1] === "learnMoveBatch") {
+          dropped++;
+          return;
+        }
+        original(...args);
+      };
+      return () => dropped;
+    }
+
+    /** Inject one wrong same-address payload after the immutable entry exists, before admitting the real one. */
+    function probeWrongCommittedBatchResult(
+      phase: ProjectedBatchPhaseProbe,
+      wrongAssignments: readonly (readonly [number, number])[],
+    ): () => boolean | null {
+      const original = phase.settleCoopV2CommittedLearnMoveBatchResult.bind(phase);
+      let rejected: boolean | null = null;
+      phase.settleCoopV2CommittedLearnMoveBatchResult = (operationId, partySlot, assignments, fallback, runtime) => {
+        rejected ??= original(operationId, partySlot, wrongAssignments, fallback, runtime);
+        return original(operationId, partySlot, assignments, fallback, runtime);
+      };
+      return () => rejected;
+    }
+
     it("GUEST-owned mon: guest DRIVES the panel, host applies, BOTH panels close (the P0 fix)", async () => {
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
       const pair = createLoopbackPair();
@@ -256,6 +314,15 @@ describe.skipIf(!RUN)(
       // The V2 prompt projects the guest overlay asynchronously. Wait for both exact phase/handler
       // generations and the guest's physical-input lease instead of equating one drain with UI readiness.
       await awaitBatchPanels(rig, "guest");
+      const projectedGuestPhase = withClientSync(
+        rig.guestCtx,
+        () => rig.guestScene.phaseManager.getCurrentPhase() as unknown as ProjectedBatchPhaseProbe,
+      );
+      const presentationOperationId = projectedGuestPhase.coopV2ControlOperationId;
+      const decisionOperationId =
+        presentationOperationId == null ? null : coopLearnMoveDecisionOperationId(presentationOperationId);
+      expect(decisionOperationId, "the projected guest owner has one exact result address").not.toBeNull();
+      const droppedCommittedEchoes = dropBatchCommittedChoiceEcho(rig);
 
       // The guest human picks the replacement. withClientSync = SEND-ONLY: it clears the in-flight mark + relays
       // the terminal (queued) + closes the guest panel, all synchronously under the guest ctx; the host's await
@@ -267,17 +334,49 @@ describe.skipIf(!RUN)(
         invertRuntimeWhenPanelCommits(rig.guestScene, rig.hostRuntime);
       });
       await driveOwnerPickFirstSlot(rig, "guest");
-      // THE P0: the OWNER (guest) signalled back + tore its picker down - it did NOT strand.
-      expect(isCoopLearnMoveForwardInFlightEmpty(), "the guest released the picker (no strand - the P0 fix)").toBe(
-        true,
-      );
-      expect(rig.guestScene.ui.getMode(), "the GUEST owner's panel CLOSED (the P0 fix)").not.toBe(
+      // The raw proposal is input, not a result. It must leave the exact owner phase and public panel parked.
+      expect(
+        withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase()),
+        "the guest owner remains on the exact projected phase after sending its raw proposal",
+      ).toBe(projectedGuestPhase);
+      expect(
+        withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode()),
+        "the guest owner panel stays visible until the immutable result applies",
+      ).toBe(UiMode.LEARN_MOVE_BATCH);
+      expect(isCoopLearnMoveForwardInFlightEmpty(), "the V2 owner cannot retire its in-flight phase early").toBe(false);
+      expect(
+        withClientSync(rig.guestCtx, () =>
+          projectedGuestPhase.settleCoopV2CommittedLearnMoveBatchResult(
+            `${decisionOperationId!}-wrong`,
+            guestOwnedSlot,
+            [[NEW_MOVE, 0]],
+            false,
+            rig.guestRuntime,
+          ),
+        ),
+        "a wrong result identity cannot close the parked owner",
+      ).toBe(false);
+
+      await awaitBatchResultClosure(rig);
+      expect(droppedCommittedEchoes(), "V2 never emits the retired committed-choice echo").toBe(0);
+      expect(
+        withClientSync(rig.guestCtx, () =>
+          projectedGuestPhase.settleCoopV2CommittedLearnMoveBatchResult(
+            decisionOperationId!,
+            guestOwnedSlot,
+            [[NEW_MOVE, 0]],
+            false,
+            rig.guestRuntime,
+          ),
+        ),
+        "a duplicate immutable result cannot close or advance twice",
+      ).toBe(false);
+      expect(rig.guestScene.ui.getMode(), "the GUEST owner's panel CLOSED from the immutable result").not.toBe(
         UiMode.LEARN_MOVE_BATCH,
       );
-
-      // HOST: the relayed terminal resolves the parked await under the HOST ctx; the host applies + closes.
-      await withClient(rig.hostCtx, () => drainLoopback());
-      expect(rig.hostScene.ui.getMode(), "the HOST watcher panel CLOSED").not.toBe(UiMode.LEARN_MOVE_BATCH);
+      expect(rig.hostScene.ui.getMode(), "the HOST watcher panel CLOSED after retaining that result").not.toBe(
+        UiMode.LEARN_MOVE_BATCH,
+      );
 
       // The moveset converged: the HOST applied the guest's pick authoritatively (NEW_MOVE over slot 0).
       const hostMoves = hostMon.moveset.map(m => m.moveId);
@@ -316,6 +415,28 @@ describe.skipIf(!RUN)(
       });
       // The replica watcher and authority owner both have to prove the real panel before host input is legal.
       await awaitBatchPanels(rig, "host");
+      const projectedGuestPhase = withClientSync(
+        rig.guestCtx,
+        () => rig.guestScene.phaseManager.getCurrentPhase() as unknown as ProjectedBatchPhaseProbe,
+      );
+      const presentationOperationId = projectedGuestPhase.coopV2ControlOperationId;
+      const decisionOperationId =
+        presentationOperationId == null ? null : coopLearnMoveDecisionOperationId(presentationOperationId);
+      expect(decisionOperationId, "the projected guest watcher has one exact result address").not.toBeNull();
+      const droppedCommittedEchoes = dropBatchCommittedChoiceEcho(rig);
+      const wrongCommittedResultRejected = probeWrongCommittedBatchResult(projectedGuestPhase, [[MoveId.EMBER, 0]]);
+      expect(
+        withClientSync(rig.guestCtx, () =>
+          projectedGuestPhase.settleCoopV2CommittedLearnMoveBatchResult(
+            decisionOperationId!,
+            hostOwnedSlot,
+            [[MoveId.EMBER, 0]],
+            false,
+            rig.guestRuntime,
+          ),
+        ),
+        "a same-address but wrong immutable assignment cannot close the watcher before commit",
+      ).toBe(false);
 
       // The HOST human picks (drives its own panel). withClientSync = SEND-ONLY: done() relays the terminal
       // (queued) + closes the host panel synchronously.
@@ -325,16 +446,98 @@ describe.skipIf(!RUN)(
         invertRuntimeWhenPanelCommits(rig.hostScene, rig.guestRuntime);
       });
       await driveOwnerPickFirstSlot(rig, "host");
-      expect(rig.hostScene.ui.getMode(), "the HOST owner's panel CLOSED").not.toBe(UiMode.LEARN_MOVE_BATCH);
-
-      // GUEST: the relayed terminal (delivered under the guest ctx) force-closes the watcher panel.
-      await withClient(rig.guestCtx, () => drainLoopback());
+      await awaitBatchResultClosure(rig);
+      expect(rig.hostScene.ui.getMode(), "the HOST owner's panel CLOSED after retaining its result").not.toBe(
+        UiMode.LEARN_MOVE_BATCH,
+      );
       expect(rig.guestScene.ui.getMode(), "the GUEST watcher panel CLOSED").not.toBe(UiMode.LEARN_MOVE_BATCH);
       expect(isCoopLearnMoveForwardInFlightEmpty(), "no learn-move picker left in-flight (no strand)").toBe(true);
+      expect(droppedCommittedEchoes(), "V2 never emits the retired committed-choice echo").toBe(0);
+      expect(
+        wrongCommittedResultRejected(),
+        "a same-address but wrong immutable assignment is rejected after the commit exists",
+      ).toBe(false);
+      expect(
+        withClientSync(rig.guestCtx, () =>
+          projectedGuestPhase.settleCoopV2CommittedLearnMoveBatchResult(
+            decisionOperationId!,
+            hostOwnedSlot,
+            [[NEW_MOVE, 0]],
+            false,
+            rig.guestRuntime,
+          ),
+        ),
+        "a duplicate host-owned result cannot advance the watcher twice",
+      ).toBe(false);
 
       const hostMoves = hostMon.moveset.map(m => m.moveId);
       expect(hostMoves, "host learned NEW_MOVE over the forgotten slot").toContain(NEW_MOVE);
       expect(hostMoves, "host: the chosen move was forgotten").not.toContain(forgottenMove);
+
+      logs.flush();
+    }, 120_000);
+
+    it("HOST-owned fallback: immutable fallback closes both panels before the typed per-move successor opens", async () => {
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+      const pair = createLoopbackPair();
+      const rig: DuoRig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+
+      const hostOwnedSlot = 0;
+      giveFullMoveset(rig, hostOwnedSlot);
+      const before = rig.hostScene.getPlayerParty()[hostOwnedSlot].moveset.map(move => move.moveId);
+      await retireDuoInitialCommandForBoundaryTest(rig);
+
+      withClientSync(rig.hostCtx, () => {
+        const phase = rig.hostScene.phaseManager.create("LearnMoveBatchPhase", hostOwnedSlot, [NEW_MOVE]);
+        expect(rig.hostScene.phaseManager.overridePhase(phase), "the fallback source is the real batch phase").toBe(
+          true,
+        );
+        startedBatchPhases.add(phase);
+        phase.start();
+      });
+      await awaitBatchPanels(rig, "host");
+      const projectedGuestPhase = withClientSync(
+        rig.guestCtx,
+        () => rig.guestScene.phaseManager.getCurrentPhase() as unknown as ProjectedBatchPhaseProbe,
+      );
+      const decisionOperationId =
+        projectedGuestPhase.coopV2ControlOperationId == null
+          ? null
+          : coopLearnMoveDecisionOperationId(projectedGuestPhase.coopV2ControlOperationId);
+      expect(decisionOperationId, "the fallback has one exact result address").not.toBeNull();
+      const droppedCommittedEchoes = dropBatchCommittedChoiceEcho(rig);
+
+      withClientSync(rig.hostCtx, () => {
+        const handler = rig.hostScene.ui.getHandler() as unknown as { deps: { fallback: () => void } | null };
+        expect(handler.deps, "the real host panel exposes its guarded fallback callback").not.toBeNull();
+        handler.deps!.fallback();
+      });
+      await awaitBatchResultClosure(rig);
+
+      expect(droppedCommittedEchoes(), "fallback release does not consult the retired result FIFO").toBe(0);
+      expect(
+        rig.hostScene.getPlayerParty()[hostOwnedSlot].moveset.map(move => move.moveId),
+        "fallback itself applies the complete unchanged moveset before opening the typed per-move path",
+      ).toEqual(before);
+      const hostFrontier = withClientSync(rig.hostCtx, () => [
+        rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+        ...rig.hostScene.phaseManager.getQueuedPhaseNames(),
+      ]);
+      expect(hostFrontier, "the committed fallback authorizes the known-good per-move successor").toContain(
+        "LearnMovePhase",
+      );
+      expect(
+        withClientSync(rig.guestCtx, () =>
+          projectedGuestPhase.settleCoopV2CommittedLearnMoveBatchResult(
+            decisionOperationId!,
+            hostOwnedSlot,
+            [],
+            true,
+            rig.guestRuntime,
+          ),
+        ),
+        "a duplicate fallback result cannot re-open or re-advance the batch boundary",
+      ).toBe(false);
 
       logs.flush();
     }, 120_000);
