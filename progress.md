@@ -4923,3 +4923,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   guest phase is derived from retained authority. Local policy-safe evidence is clean full TypeScript, the updated
   presentation contract green, scoped formatting, and `git diff --check`. Real Mystery and two-browser proof remain
   remote-only; Showdown and tournament are untouched, and no deployment occurred.
+
+## 2026-07-28 - Sacrificial spread moves retain one completion-safe global animation
+
+- Exact animations-on campaign `30327840863` recorded Self-Destruct (`moveId=120`) with the same three targets on both
+  browsers. The host started three concurrent `MoveAnim` instances and hit its 120-second production hard wall; the
+  guest replayed the same fan-out and failed with `move-watchdog-expired`. Mechanics and identities were synchronized,
+  but concurrent animations contended for shared actor sprites and did not provide every completion callback.
+- In Authority V2 co-op only, a move with `SacrificialAttr` now authors one exact presentation target. Its `moveUsed`,
+  HP, faint, checkpoint, and move-effect mechanics still retain and apply every target. The guest consumes the narrower
+  `moveAnim` target list verbatim and does not infer the move class. Ordinary multi-target animation, solo play, and the
+  old Showdown/tournament lockstep paths are unchanged.
+- The production 120-second hard wall remains unchanged and fail-closed for the renderer. Exact remote Focused,
+  animations-on campaign, and broader qualification are still required; no local co-op engine/browser run and no
+  deployment occurred.

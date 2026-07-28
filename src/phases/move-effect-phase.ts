@@ -292,7 +292,19 @@ export class MoveEffectPhase extends PokemonPhase {
       || move.getAttrs("MoveEffectAttr").some(attr => attr.trigger === MoveEffectTrigger.POST_TARGET)
     ) {
       const moveTargets = this.getTargets();
-      const targetsForAnimation = moveTargets.length > 0 ? moveTargets : [user];
+      const allAnimationTargets = moveTargets.length > 0 ? moveTargets : [user];
+      const authoritativeCoopPresentation =
+        globalScene.gameMode.isCoop && getCoopController()?.netcodeMode === "authoritative";
+      // Explosion-style moves have one user-centred/global animation even when their mechanics affect
+      // several battlers. Starting one BattleAnim per target makes those instances contend for the same
+      // user/target sprite state and, on a constrained real browser, can leave Phaser without a completion
+      // callback. The authority therefore authors one exact presentation target for sacrificial spread
+      // moves. `moveUsed`, HP, faint, and checkpoint material still retain every mechanical target; the
+      // renderer consumes this narrower moveAnim payload verbatim and never re-derives the policy.
+      const targetsForAnimation =
+        authoritativeCoopPresentation && move.hasAttr("SacrificialAttr")
+          ? allAnimationTargets.slice(0, 1)
+          : allAnimationTargets;
       const hitsSubstitute = targetsForAnimation.map(target => move.hitsSubstitute(user, target));
       recordCoopEvent({
         k: "moveAnim",
@@ -337,7 +349,7 @@ export class MoveEffectPhase extends PokemonPhase {
       // previously parked the authoritative host in MoveEffectPhase forever while every renderer correctly waited
       // for the next signed turn material. Use the same renderer-progress proof as replay presentation: a stopped
       // renderer expires quickly, and an advancing but broken tween remains bounded by the immutable hard wall.
-      if (globalScene.gameMode.isCoop && getCoopController()?.netcodeMode === "authoritative") {
+      if (authoritativeCoopPresentation) {
         watchdog = armCoopPresentationProgressWatchdog(expireAnimations);
       }
 

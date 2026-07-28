@@ -52,6 +52,43 @@ test("healing is an authority-authored presentation and every event kind is exha
   assert.match(replay, /const unhandledEvent: never = event/u);
 });
 
+test("sacrificial spread presentation is authored once without dropping any mechanical target", () => {
+  const producer = read("src/phases/move-effect-phase.ts");
+  const replayPump = read("src/phases/coop-replay-turn-phase.ts");
+  const replay = read("src/phases/coop-replay-phases.ts");
+  const boundaryStart = producer.indexOf("const allAnimationTargets");
+  const boundaryEnd = producer.indexOf("\n    this.postAnimCallback(user, targets);", boundaryStart);
+  const boundary = producer.slice(boundaryStart, boundaryEnd);
+
+  assert.ok(boundaryStart >= 0 && boundaryEnd > boundaryStart, "the move-animation boundary is present");
+  assert.match(
+    boundary,
+    /authoritativeCoopPresentation\s*&&\s*move\.hasAttr\("SacrificialAttr"\)[\s\S]+allAnimationTargets\.slice\(0, 1\)/u,
+    "only the authoritative co-op host collapses a user-centred sacrificial spread animation",
+  );
+  assert.match(
+    boundary,
+    /recordCoopEvent\(\{[\s\S]+k:\s*"moveAnim"[\s\S]+targets:\s*targetsForAnimation\.map/u,
+    "the retained event identifies exactly the visual playback targets",
+  );
+  assert.match(
+    boundary,
+    /for \(const \[targetIndex, target\] of targetsForAnimation\.entries\(\)\)[\s\S]+new MoveAnim/u,
+    "the authority plays the same target set it retained",
+  );
+  assert.match(
+    producer,
+    /this\.applyToTargets\(user, targets\)/u,
+    "move mechanics still apply to the complete hit-check target set",
+  );
+  assert.match(replayPump, /case "moveAnim":[\s\S]+\[\.\.\.event\.targets\]/u);
+  assert.doesNotMatch(
+    replay,
+    /SacrificialAttr/u,
+    "the renderer follows retained presentation and never infers move policy",
+  );
+});
+
 test("damage effectiveness and critical presentation are authority-authored end to end", () => {
   const pokemon = read("src/field/pokemon.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
