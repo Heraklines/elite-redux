@@ -25,6 +25,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
+  getCoopV2InteractionRuntimeCancellationSignal,
   notifyCoopV2InteractionSurfaceReady,
   runWhenCoopRuntimeActive,
   settleCoopV2InteractionOperation,
@@ -165,13 +166,30 @@ export class CoopGuestRevivalPhase extends Phase {
     operationBinding: CoopRevivalOperationBinding,
     seq: number,
   ): Promise<void> {
-    const result = await relay.awaitInteractionChoice(seq, getCoopFaintSwitchWaitMs(), COOP_REVIVAL_CHOICE_KINDS);
+    const v2 = isCoopRevivalAuthorityV2Active(operationBinding);
+    const runtimeCancellation = v2 ? getCoopV2InteractionRuntimeCancellationSignal(this.coopOwningRuntime) : null;
+    if (v2 && runtimeCancellation == null) {
+      failCoopSharedSession(
+        `Revival Blessing watcher for slot ${this.fieldIndex} has no exact V2 runtime cancellation`,
+      );
+      return;
+    }
+    // A read-only watcher has no right to invent a human-decision deadline. Under V2 it waits for the exact
+    // immutable host result and owns only the runtime lifecycle signal; legacy retains its existing ceiling.
+    const result = await relay.awaitInteractionChoice(
+      seq,
+      v2 ? null : getCoopFaintSwitchWaitMs(),
+      COOP_REVIVAL_CHOICE_KINDS,
+      undefined,
+      undefined,
+      runtimeCancellation ?? undefined,
+    );
     const expectedOperationId =
       result == null || this.coopV2ControlOperationId == null
         ? null
         : coopRevivalDecisionOperationId(this.coopV2ControlOperationId, result.choice);
     if (
-      isCoopRevivalAuthorityV2Active(operationBinding)
+      v2
       && (expectedOperationId == null
         || result?.operationId !== expectedOperationId
         || !settleCoopV2InteractionOperation(expectedOperationId, this.coopOwningRuntime))

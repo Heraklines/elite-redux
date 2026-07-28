@@ -8333,6 +8333,117 @@ export async function armCoopV2ReplacementOwnerWindowAfterControlProof(
   );
 }
 
+/** A remote interaction owner's scheduler-backed decision window. */
+export interface CoopV2InteractionOwnerWindowLease {
+  /** Aborts the relay wait on this lease's expiry or runtime invalidation. */
+  readonly signal: AbortSignal;
+  /** True only when this exact address remained current through its own human-input expiry. */
+  readonly expired: () => boolean;
+  /** Release the timer/listeners after a real proposal wins. */
+  readonly cancel: () => void;
+}
+
+/**
+ * Upper bound for obtaining a remote interaction owner's executable-control proof.
+ * This is connected synchronization time, never human deliberation; failure cannot authorize fallback.
+ */
+const COOP_V2_INTERACTION_CONTROL_PROOF_WAIT_MS = 300_000;
+
+/**
+ * Prove one exact remote-owned shared-interaction control, then arm its `humanInput` deadline.
+ *
+ * The returned AbortSignal belongs exclusively to this lease. `expired()` distinguishes its legitimate
+ * deadline from runtime cancellation, recovery fencing, or a superseded control, so a phase cannot turn an
+ * unrelated null relay result into an automatic decision.
+ */
+export async function armCoopV2InteractionOwnerWindowAfterControlProof(
+  operationId: string,
+  durationMs: number,
+  runtime: CoopRuntime | null = active,
+): Promise<CoopV2InteractionOwnerWindowLease | null> {
+  if (
+    runtime == null
+    || operationId.length === 0
+    || runtime.controller.authorityRole !== "authority"
+    || runtime.controller.localSeatId !== runtime.controller.authoritySeatId
+    || !isCoopV2InteractionCutoverActive(runtime.durability)
+  ) {
+    return null;
+  }
+  const harness = coopV2ShadowHarnesses.get(runtime);
+  if (harness == null) {
+    return null;
+  }
+  const exactSourceOperationId = (): string | null => {
+    const control = runtime.v2ControlLedger.latestControl;
+    if (
+      control?.kind !== "SHARED_INTERACTION"
+      || control.operationId !== operationId
+      || control.ownerSeatId === runtime.controller.localSeatId
+      || !runtime.v2ControlLedger.isMaterialApplied(control)
+    ) {
+      return null;
+    }
+    const source = runtime.v2ControlLedger.sourceEntryOf(control);
+    return source != null && controlsEqual(source.nextControl, control) ? source.operationId : null;
+  };
+  const sourceOperationId = exactSourceOperationId();
+  if (sourceOperationId == null) {
+    return null;
+  }
+
+  const leaseAbort = new AbortController();
+  let expired = false;
+  const invalidate = (reason: string): void => {
+    if (!leaseAbort.signal.aborted) {
+      leaseAbort.abort(reason);
+    }
+  };
+  const cancelOwnerWindow = await harness.armInteractionOwnerWindowAfterControlProof(
+    {
+      ownerId: `authority-v2:interaction-owner-window:${operationId}`,
+      address: `authority-v2/interaction-owner-window/${operationId}`,
+      reason: `remote interaction owner window for ${operationId}`,
+    },
+    durationMs,
+    () =>
+      harness.waitForAuthorityPeerStage(
+        sourceOperationId,
+        "controlInstalled",
+        COOP_V2_INTERACTION_CONTROL_PROOF_WAIT_MS,
+      ),
+    () => exactSourceOperationId() === sourceOperationId && !isCoopV2AuthorityWaitCreationFrozen(runtime),
+    () => {
+      expired = true;
+      invalidate(`authority-v2-interaction-owner-window-expired:${operationId}`);
+    },
+    () => invalidate(`authority-v2-interaction-owner-window-invalidated:${operationId}`),
+  );
+  if (cancelOwnerWindow == null) {
+    return null;
+  }
+  return {
+    signal: leaseAbort.signal,
+    expired: () => expired,
+    cancel: () => {
+      cancelOwnerWindow();
+      invalidate(`authority-v2-interaction-owner-window-cancelled:${operationId}`);
+    },
+  };
+}
+
+/**
+ * Runtime-owned cancellation for a V2 interaction watcher that has no fallback deadline.
+ * A missing signal means no exact V2 runtime owns the phase, so the caller must fail closed.
+ */
+export function getCoopV2InteractionRuntimeCancellationSignal(
+  runtime: CoopRuntime | null = active,
+): AbortSignal | null {
+  return runtime == null || !isCoopV2InteractionCutoverActive(runtime.durability)
+    ? null
+    : (coopV2ShadowHarnesses.get(runtime)?.runtimeCancellationSignal() ?? null);
+}
+
 /**
  * Retain a non-authority interaction proposal until its exact immutable V2
  * result enters the ordered log. The lease is not an authority entry and can

@@ -97,6 +97,10 @@ const replacementAdapter = readFileSync(
   new URL("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts", root),
   "utf8",
 );
+const humanInputLease = readFileSync(
+  new URL("src/data/elite-redux/coop/authority-v2/human-input-lease.ts", root),
+  "utf8",
+);
 const interactionCutover = readFileSync(
   new URL("src/data/elite-redux/coop/authority-v2/cutover-interaction.ts", root),
   "utf8",
@@ -1943,9 +1947,10 @@ test("replacement controls are proven by the real async PARTY surface and multi-
   const adapterLeaseEnd = replacementAdapter.indexOf("\n}\n", adapterLeaseStart) + 3;
   assert.notEqual(adapterLeaseStart, -1, "the replacement adapter gates the humanInput timer behind proof");
   const adapterLease = replacementAdapter.slice(adapterLeaseStart, adapterLeaseEnd);
+  assert.match(adapterLease, /return armHumanInputWindowAfterControlProof\(/u);
   assert.ok(
-    adapterLease.indexOf("await Promise.race(") < adapterLease.indexOf("return armReplacementOwnerWindow("),
-    "no owner-window timer is armed before the exact proof resolves",
+    humanInputLease.indexOf("await Promise.race(") < humanInputLease.indexOf("ctx.scheduler.schedule("),
+    "the shared lease cannot arm any humanInput timer before the exact proof resolves",
   );
   const versusBind = switchPhase.indexOf("this.coopV2ControlOperationId = replacementOperationId(", ownerNotifyReady);
   const versusOpenParty = switchPhase.indexOf("const openedVersusParty = globalScene.ui.setMode(", versusBind);

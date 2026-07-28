@@ -50,6 +50,7 @@ import type {
   CoopRuntimeContext,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { armHumanInputWindowAfterControlProof } from "#data/elite-redux/coop/authority-v2/human-input-lease";
 import {
   controlIdOf,
   type ProjectableControl,
@@ -603,28 +604,14 @@ export async function armReplacementOwnerWindowAfterControlProof(
   controlProofIsCurrent: () => boolean,
   onFallback: () => void,
 ): Promise<(() => void) | null> {
-  if (ctx.cancellation.aborted) {
-    return null;
-  }
-  let removeAbortListener = () => {};
-  const cancelled = new Promise<boolean>(resolve => {
-    const onAbort = () => resolve(false);
-    ctx.cancellation.addEventListener("abort", onAbort, { once: true });
-    removeAbortListener = () => ctx.cancellation.removeEventListener("abort", onAbort);
-    if (ctx.cancellation.aborted) {
-      resolve(false);
-    }
-  });
-  let proven = false;
-  try {
-    proven = await Promise.race([waitForControlProof().catch(() => false), cancelled]);
-  } finally {
-    removeAbortListener();
-  }
-  if (!proven || ctx.cancellation.aborted || !controlProofIsCurrent()) {
-    return null;
-  }
-  return armReplacementOwnerWindow(ctx, address, ownerSeatId, onFallback);
+  return armHumanInputWindowAfterControlProof(
+    ctx,
+    replacementOwnerWindowOwner(address, ownerSeatId),
+    COOP_REPLACEMENT_OWNER_WINDOW_MS,
+    waitForControlProof,
+    controlProofIsCurrent,
+    onFallback,
+  );
 }
 
 // ---------------------------------------------------------------------------

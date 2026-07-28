@@ -33,6 +33,7 @@ import {
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_CATCH_FULL_SEQ, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
+  armCoopV2InteractionOwnerWindowAfterControlProof,
   failCoopSharedSession,
   getCoopInteractionRelay,
   getCoopRuntime,
@@ -129,38 +130,85 @@ export function coopHostPrepareWildCatchFullDecision(
   if (promptOperationId !== "legacy") {
     onPromptCommitted?.(promptOperationId);
   }
-  return relay
-    .awaitInteractionChoice(COOP_CATCH_FULL_SEQ, getCoopFaintSwitchWaitMs(), COOP_CATCH_FULL_CHOICE_KINDS)
-    .then(pick => {
-      const expectedDecisionOperationId =
-        promptOperationId === "legacy" ? null : coopCatchFullDecisionOperationId(promptOperationId);
-      if (
-        isCoopV2InteractionCutoverActive(operationBinding.durability)
-        && (expectedDecisionOperationId == null || pick?.operationId !== expectedDecisionOperationId)
-      ) {
-        failCoopSharedSession(`Catch-full decision for species ${speciesId} did not match its exact V2 prompt`);
-        return null;
+  const awaitCatcherDecision = async (): Promise<
+    | {
+        readonly kind: "resolved";
+        readonly pick: Awaited<ReturnType<typeof relay.awaitInteractionChoice>>;
+        readonly leaseExpired: boolean;
       }
-      const slot = pick?.choice ?? null;
-      const partySize = globalScene.getPlayerParty().length;
-      if (slot == null || slot < 0 || slot >= partySize) {
-        coopWarn(
-          "replay",
-          "host: catch-full catcher declined/out-of-range/timeout; the caught mon is NOT kept (#856)",
-          {
-            seq: COOP_CATCH_FULL_SEQ,
-            slot,
-            partySize,
-            fromNull: pick == null,
-          },
-        );
-        return preparedDecision(speciesId, null, wave, turn, operationBinding, promptOperationId, operationId =>
-          settleCoopV2InteractionOperation(operationId, owningRuntime),
-        );
-      }
-      coopLog("replay", "host received catcher catch-full replace slot (#856)", { seq: COOP_CATCH_FULL_SEQ, slot });
-      return preparedDecision(speciesId, slot, wave, turn, operationBinding, promptOperationId, operationId =>
+    | { readonly kind: "failed" }
+  > => {
+    if (!isCoopV2InteractionCutoverActive(operationBinding.durability)) {
+      return {
+        kind: "resolved",
+        pick: await relay.awaitInteractionChoice(
+          COOP_CATCH_FULL_SEQ,
+          getCoopFaintSwitchWaitMs(),
+          COOP_CATCH_FULL_CHOICE_KINDS,
+        ),
+        leaseExpired: false,
+      };
+    }
+    if (promptOperationId === "legacy") {
+      return { kind: "failed" };
+    }
+    const lease = await armCoopV2InteractionOwnerWindowAfterControlProof(
+      promptOperationId,
+      getCoopFaintSwitchWaitMs(),
+      owningRuntime,
+    );
+    if (lease == null) {
+      return { kind: "failed" };
+    }
+    try {
+      const pick = await relay.awaitInteractionChoice(
+        COOP_CATCH_FULL_SEQ,
+        null,
+        COOP_CATCH_FULL_CHOICE_KINDS,
+        undefined,
+        promptOperationId,
+        lease.signal,
+      );
+      // Only this address's own post-proof humanInput expiry may decline the grant. A recovery cancellation,
+      // relay disposal, or superseded control fails closed rather than masquerading as an idle player.
+      const leaseExpired = lease.expired();
+      return pick != null || leaseExpired ? { kind: "resolved", pick, leaseExpired } : { kind: "failed" };
+    } finally {
+      lease.cancel();
+    }
+  };
+  return awaitCatcherDecision().then(outcome => {
+    if (outcome.kind === "failed") {
+      failCoopSharedSession(`Catch-full owner window for species ${speciesId} lost its exact V2 control`);
+      return null;
+    }
+    const pick = outcome.pick;
+    const expectedDecisionOperationId =
+      promptOperationId === "legacy" ? null : coopCatchFullDecisionOperationId(promptOperationId);
+    if (
+      isCoopV2InteractionCutoverActive(operationBinding.durability)
+      && !outcome.leaseExpired
+      && (expectedDecisionOperationId == null || pick?.operationId !== expectedDecisionOperationId)
+    ) {
+      failCoopSharedSession(`Catch-full decision for species ${speciesId} did not match its exact V2 prompt`);
+      return null;
+    }
+    const slot = pick?.choice ?? null;
+    const partySize = globalScene.getPlayerParty().length;
+    if (slot == null || slot < 0 || slot >= partySize) {
+      coopWarn("replay", "host: catch-full catcher declined/out-of-range/timeout; the caught mon is NOT kept (#856)", {
+        seq: COOP_CATCH_FULL_SEQ,
+        slot,
+        partySize,
+        fromNull: pick == null,
+      });
+      return preparedDecision(speciesId, null, wave, turn, operationBinding, promptOperationId, operationId =>
         settleCoopV2InteractionOperation(operationId, owningRuntime),
       );
-    });
+    }
+    coopLog("replay", "host received catcher catch-full replace slot (#856)", { seq: COOP_CATCH_FULL_SEQ, slot });
+    return preparedDecision(speciesId, slot, wave, turn, operationBinding, promptOperationId, operationId =>
+      settleCoopV2InteractionOperation(operationId, owningRuntime),
+    );
+  });
 }

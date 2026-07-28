@@ -12,6 +12,7 @@ import {
   sendCoopRevivalPromptWithOperationId,
 } from "#data/elite-redux/coop/coop-revival-operation";
 import {
+  armCoopV2InteractionOwnerWindowAfterControlProof,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
@@ -29,6 +30,15 @@ import type { PartyOption } from "#ui/party-ui-handler";
 import { PartyUiHandler, PartyUiMode } from "#ui/party-ui-handler";
 import { toDmgValue } from "#utils/common";
 import i18next from "i18next";
+
+type CoopRevivalPartnerResult = NonNullable<
+  Awaited<ReturnType<NonNullable<ReturnType<typeof getCoopInteractionRelay>>["awaitInteractionChoice"]>>
+>;
+
+type CoopRevivalPartnerDecision =
+  | { readonly kind: "resolved"; readonly result: CoopRevivalPartnerResult }
+  | { readonly kind: "fallback" }
+  | { readonly kind: "failed" };
 
 /**
  * Sets the Party UI and handles the effect of Revival Blessing
@@ -175,79 +185,149 @@ export class RevivalBlessingPhase extends BattlePhase {
       PartyUiHandler.FilterFainted,
     );
     Promise.resolve(watcherMode).then(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
-    void relay.awaitInteractionChoice(seq, getCoopFaintSwitchWaitMs(), COOP_REVIVAL_CHOICE_KINDS).then(res => {
-      const v2 = isCoopRevivalAuthorityV2Active(this.coopOperationBinding);
-      const expectedDecisionOperationId =
-        res == null || presentationOperationId === "legacy"
-          ? null
-          : coopRevivalDecisionOperationId(presentationOperationId, res.choice);
-      if (v2 && (expectedDecisionOperationId == null || res?.operationId !== expectedDecisionOperationId)) {
-        failCoopSharedSession("Revival Blessing decision did not match its exact V2 presentation.");
-        this.end();
-        return;
-      }
-      const party = globalScene.getPlayerParty();
-      let slotIndex = res?.choice ?? -1;
-      const pickedSpecies = res?.data?.[1] ?? 0;
-      if (!v2 && pickedSpecies > 0) {
-        const bySpecies = party.findIndex(p => p.isFainted() && p.species?.speciesId === pickedSpecies);
-        if (bySpecies >= 0 && bySpecies !== slotIndex) {
-          coopLog(
-            "replay",
-            `revival owner-pick: identity resolve sp=${pickedSpecies} slot ${slotIndex} -> ${bySpecies}`,
-          );
-          slotIndex = bySpecies;
-        }
-      }
-      if (!v2 && (slotIndex < 0 || slotIndex >= 6 || !party[slotIndex]?.isFainted())) {
-        // Timeout or invalid: revive the partner's first fainted mon, else any fainted.
-        slotIndex = party.findIndex(p => p.isFainted() && p.coopOwner === this.user.coopOwner);
-        if (slotIndex < 0) {
-          slotIndex = party.findIndex(p => p.isFainted());
-        }
-        coopLog("replay", `revival owner-pick: fallback -> party[${slotIndex}]`);
-      }
-      if (v2 && (slotIndex < 0 || slotIndex >= 6 || !party[slotIndex]?.isFainted())) {
-        failCoopSharedSession("Revival Blessing V2 decision addressed an invalid target.");
-        this.end();
-        return;
-      }
-      if (slotIndex >= 0) {
-        this.applyRevive(slotIndex, party[slotIndex]);
-        const decisionPayload = {
-          type: "decision" as const,
-          fieldIndex,
-          partySlot: slotIndex,
-          speciesId: party[slotIndex].species?.speciesId ?? 0,
-        };
-        settleCoopV2InteractionOperation(
-          coopRevivalOperationId(
-            decisionPayload,
-            wave,
-            turn,
-            this.user.coopOwner ?? "guest",
-            this.coopOperationBinding,
-          ),
-          this.coopOwningRuntime,
-        );
-        const committed = commitRevivalAuthorityDecision(
-          {
-            payload: decisionPayload,
-            ownerRole: this.user.coopOwner ?? "guest",
-            localRole: "host",
-            wave,
-            turn,
-          },
-          this.coopOperationBinding,
-        );
-        if (!committed) {
-          failCoopSharedSession("Guest-owned Revival Blessing decision could not enter durable authority.");
-          this.end();
-          return;
-        }
-      }
-      void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
+    this.finishCoopPartnerPick(relay, seq, presentationOperationId, fieldIndex, wave, turn).catch(error => {
+      coopLog("replay", `revival owner-pick lease failed (${String(error)})`);
+      failCoopSharedSession("Revival Blessing owner window failed before its exact decision committed.");
+      this.end();
     });
+  }
+
+  private async awaitCoopPartnerDecision(
+    relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+    seq: number,
+    presentationOperationId: string,
+  ): Promise<CoopRevivalPartnerDecision> {
+    if (!isCoopRevivalAuthorityV2Active(this.coopOperationBinding)) {
+      const result = await relay.awaitInteractionChoice(seq, getCoopFaintSwitchWaitMs(), COOP_REVIVAL_CHOICE_KINDS);
+      return result == null ? { kind: "fallback" } : { kind: "resolved", result };
+    }
+    if (presentationOperationId === "legacy") {
+      return { kind: "failed" };
+    }
+    const lease = await armCoopV2InteractionOwnerWindowAfterControlProof(
+      presentationOperationId,
+      getCoopFaintSwitchWaitMs(),
+      this.coopOwningRuntime,
+    );
+    if (lease == null) {
+      return { kind: "failed" };
+    }
+    try {
+      const result = await relay.awaitInteractionChoice(
+        seq,
+        null,
+        COOP_REVIVAL_CHOICE_KINDS,
+        undefined,
+        presentationOperationId,
+        lease.signal,
+      );
+      if (result != null) {
+        return { kind: "resolved", result };
+      }
+      // Only this exact post-proof humanInput expiry authorizes the deterministic revive fallback.
+      return lease.expired() ? { kind: "fallback" } : { kind: "failed" };
+    } finally {
+      lease.cancel();
+    }
+  }
+
+  private resolveCoopPartnerSlot(
+    outcome: Exclude<CoopRevivalPartnerDecision, { readonly kind: "failed" }>,
+    v2: boolean,
+  ): number {
+    const party = globalScene.getPlayerParty();
+    const result = outcome.kind === "resolved" ? outcome.result : null;
+    let slotIndex = result?.choice ?? -1;
+    const pickedSpecies = result?.data?.[1] ?? 0;
+    if (!v2 && pickedSpecies > 0) {
+      const bySpecies = party.findIndex(p => p.isFainted() && p.species?.speciesId === pickedSpecies);
+      if (bySpecies >= 0 && bySpecies !== slotIndex) {
+        coopLog("replay", `revival owner-pick: identity resolve sp=${pickedSpecies} slot ${slotIndex} -> ${bySpecies}`);
+        slotIndex = bySpecies;
+      }
+    }
+    const invalidLegacyPick = !v2 && (slotIndex < 0 || slotIndex >= 6 || !party[slotIndex]?.isFainted());
+    if (outcome.kind === "fallback" || invalidLegacyPick) {
+      slotIndex = party.findIndex(p => p.isFainted() && p.coopOwner === this.user.coopOwner);
+      if (slotIndex < 0) {
+        slotIndex = party.findIndex(p => p.isFainted());
+      }
+      coopLog("replay", `revival owner-pick: fallback -> party[${slotIndex}]`);
+    }
+    return slotIndex;
+  }
+
+  private commitCoopPartnerRevive(slotIndex: number, fieldIndex: number, wave: number, turn: number): boolean {
+    const pokemon = globalScene.getPlayerParty()[slotIndex];
+    if (pokemon == null) {
+      return false;
+    }
+    this.applyRevive(slotIndex, pokemon);
+    const decisionPayload = {
+      type: "decision" as const,
+      fieldIndex,
+      partySlot: slotIndex,
+      speciesId: pokemon.species?.speciesId ?? 0,
+    };
+    settleCoopV2InteractionOperation(
+      coopRevivalOperationId(decisionPayload, wave, turn, this.user.coopOwner ?? "guest", this.coopOperationBinding),
+      this.coopOwningRuntime,
+    );
+    return commitRevivalAuthorityDecision(
+      {
+        payload: decisionPayload,
+        ownerRole: this.user.coopOwner ?? "guest",
+        localRole: "host",
+        wave,
+        turn,
+      },
+      this.coopOperationBinding,
+    );
+  }
+
+  private async finishCoopPartnerPick(
+    relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+    seq: number,
+    presentationOperationId: string,
+    fieldIndex: number,
+    wave: number,
+    turn: number,
+  ): Promise<void> {
+    const outcome = await this.awaitCoopPartnerDecision(relay, seq, presentationOperationId);
+    if (outcome.kind === "failed") {
+      failCoopSharedSession("Revival Blessing owner window lost its exact Authority V2 control.");
+      this.end();
+      return;
+    }
+    const v2 = isCoopRevivalAuthorityV2Active(this.coopOperationBinding);
+    const result = outcome.kind === "resolved" ? outcome.result : null;
+    const expectedDecisionOperationId =
+      result == null || presentationOperationId === "legacy"
+        ? null
+        : coopRevivalDecisionOperationId(presentationOperationId, result.choice);
+    if (
+      v2
+      && outcome.kind === "resolved"
+      && (expectedDecisionOperationId == null || outcome.result.operationId !== expectedDecisionOperationId)
+    ) {
+      failCoopSharedSession("Revival Blessing decision did not match its exact V2 presentation.");
+      this.end();
+      return;
+    }
+    const slotIndex = this.resolveCoopPartnerSlot(outcome, v2);
+    const pokemon = globalScene.getPlayerParty()[slotIndex];
+    if (v2 && (slotIndex < 0 || slotIndex >= 6 || !pokemon?.isFainted())) {
+      failCoopSharedSession("Revival Blessing V2 decision addressed an invalid target.");
+      this.end();
+      return;
+    }
+    if (slotIndex >= 0 && !this.commitCoopPartnerRevive(slotIndex, fieldIndex, wave, turn)) {
+      failCoopSharedSession("Guest-owned Revival Blessing decision could not enter durable authority.");
+      this.end();
+      return;
+    }
+    await Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE));
+    this.end();
   }
 
   /** Apply the revive + (in doubles) the follow-up summon for `pokemon` at `slotIndex`. */

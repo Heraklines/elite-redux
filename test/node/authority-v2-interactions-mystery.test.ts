@@ -61,6 +61,7 @@ import type {
   CoopNextControl,
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { armHumanInputWindowAfterControlProof } from "#data/elite-redux/coop/authority-v2/human-input-lease";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import { type CoopSchedulerClock, createCoopScheduler } from "#data/elite-redux/coop/authority-v2/scheduler";
 import { describe, expect, it, vi } from "vitest";
@@ -553,6 +554,104 @@ describe("revival pick", () => {
         successor: BATTLE_SUCCESSOR,
       }),
     ).toThrow(CoopInteractionBuildError);
+  });
+});
+
+describe.each(["catch-full", "revival"])("%s remote-owner human-input lease", surface => {
+  it("burns no decision time before the exact control proof and expires only after a fresh full window", async () => {
+    const clock = new ManualClock();
+    const scheduler = createCoopScheduler(clock);
+    const cancellation = new AbortController();
+    let prove!: (ready: boolean) => void;
+    const proof = new Promise<boolean>(resolve => {
+      prove = resolve;
+    });
+    let expiries = 0;
+    const pending = armHumanInputWindowAfterControlProof(
+      { scheduler, cancellation: cancellation.signal } as unknown as CoopRuntimeContext,
+      {
+        ownerId: `authority-v2:interaction-owner-window:${surface}`,
+        address: `authority-v2/interaction-owner-window/${surface}`,
+        reason: `${surface} owner input`,
+      },
+      60_000,
+      () => proof,
+      () => true,
+      () => {
+        expiries++;
+      },
+    );
+
+    clock.advance(180_000);
+    expect(scheduler.pendingTimerCount, "pre-actionability time cannot create or consume a human timer").toBe(0);
+    expect(expiries).toBe(0);
+
+    prove(true);
+    const cancel = await pending;
+    expect(cancel).toBeTypeOf("function");
+    expect(scheduler.pendingTimerCount).toBe(1);
+    clock.advance(59_999);
+    expect(expiries).toBe(0);
+    clock.advance(1);
+    expect(expiries).toBe(1);
+    cancel?.();
+    expect(scheduler.pendingTimerCount).toBe(0);
+  });
+
+  it("treats cancellation and supersession as invalidation, never expiry", async () => {
+    const clock = new ManualClock();
+    const scheduler = createCoopScheduler(clock);
+    const cancellation = new AbortController();
+    let current = true;
+    let expiries = 0;
+    let invalidations = 0;
+    const cancel = await armHumanInputWindowAfterControlProof(
+      { scheduler, cancellation: cancellation.signal } as unknown as CoopRuntimeContext,
+      {
+        ownerId: `authority-v2:interaction-owner-window:${surface}`,
+        address: `authority-v2/interaction-owner-window/${surface}`,
+        reason: `${surface} owner input`,
+      },
+      60_000,
+      () => Promise.resolve(true),
+      () => current,
+      () => {
+        expiries++;
+      },
+      () => {
+        invalidations++;
+      },
+    );
+    expect(cancel).toBeTypeOf("function");
+
+    current = false;
+    clock.advance(60_000);
+    expect(expiries).toBe(0);
+    expect(invalidations).toBe(1);
+    expect(scheduler.pendingTimerCount).toBe(0);
+
+    const second = await armHumanInputWindowAfterControlProof(
+      { scheduler, cancellation: cancellation.signal } as unknown as CoopRuntimeContext,
+      {
+        ownerId: `authority-v2:interaction-owner-window:${surface}:cancelled`,
+        address: `authority-v2/interaction-owner-window/${surface}/cancelled`,
+        reason: `${surface} cancelled owner input`,
+      },
+      60_000,
+      () => Promise.resolve(true),
+      () => true,
+      () => {
+        expiries++;
+      },
+      () => {
+        invalidations++;
+      },
+    );
+    cancellation.abort();
+    expect(expiries).toBe(0);
+    expect(invalidations).toBe(2);
+    expect(scheduler.pendingTimerCount).toBe(0);
+    second?.();
   });
 });
 

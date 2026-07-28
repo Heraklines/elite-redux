@@ -122,6 +122,7 @@ import type {
   CoopNextControl,
   CoopReplicaMechanicalStage,
   CoopRuntimeContext,
+  CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import { COOP_FRAME_PROTOCOL_VERSION, type CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import {
@@ -129,6 +130,7 @@ import {
   bindFrameContext,
   type CoopFrameConnectionBindingV2,
 } from "#data/elite-redux/coop/authority-v2/frame-context";
+import { armHumanInputWindowAfterControlProof } from "#data/elite-redux/coop/authority-v2/human-input-lease";
 import { CoopLifecycle } from "#data/elite-redux/coop/authority-v2/lifecycle";
 import {
   controlIdOf,
@@ -1354,6 +1356,40 @@ export class CoopAuthorityV2Shadow {
       controlProofIsCurrent,
       onFallback,
     );
+  }
+
+  /**
+   * Arm an address-exact shared-interaction owner window on this harness's runtime scheduler.
+   *
+   * This is the same proof-gated `humanInput` lease used by replacement. The runtime supplies the immutable
+   * interaction operation as the timer owner and the exact control-ledger currentness predicate; phases do
+   * not receive the scheduler context and therefore cannot manufacture a second deadline.
+   */
+  armInteractionOwnerWindowAfterControlProof(
+    owner: CoopTimerOwner,
+    durationMs: number,
+    waitForControlProof: () => Promise<boolean>,
+    controlProofIsCurrent: () => boolean,
+    onExpire: () => void,
+    onInvalidated: () => void,
+  ): Promise<(() => void) | null> {
+    if (this.disposed) {
+      return Promise.resolve(null);
+    }
+    return armHumanInputWindowAfterControlProof(
+      this.runtimeContext,
+      owner,
+      durationMs,
+      waitForControlProof,
+      controlProofIsCurrent,
+      onExpire,
+      onInvalidated,
+    );
+  }
+
+  /** Runtime-owned cancellation for a V2 watcher that has no human-input fallback deadline. */
+  runtimeCancellationSignal(): AbortSignal {
+    return this.runtimeContext.cancellation;
   }
 
   /** Retain one non-authority human proposal until its exact V2 result enters the ordered log. */
