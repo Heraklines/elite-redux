@@ -1,7 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
+import { isCoopAuthoritativeGuest, recordCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-runtime";
 import { isErOmniformMon, omniformUnionLevelMoves } from "#data/elite-redux/omniform-movesets";
 import { ExpNotification } from "#enums/exp-notification";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -49,6 +49,16 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
     if (!this.preStats) {
       this.pokemon.calculateStats();
     }
+    const resolvedPostStats = this.postStats ?? this.pokemon.stats.slice(0);
+    recordCoopWaveProgressionPresentation({
+      k: "levelUp",
+      partySlot: this.partyMemberIndex,
+      pokemonId: this.pokemon.id,
+      fromLevel: this.lastLevel,
+      toLevel: this.level,
+      preStats: prevStats,
+      postStats: resolvedPostStats,
+    });
     this.pokemon.updateInfo();
     if (globalScene.expParty === ExpNotification.DEFAULT) {
       globalScene.playSound("level_up_fanfare");

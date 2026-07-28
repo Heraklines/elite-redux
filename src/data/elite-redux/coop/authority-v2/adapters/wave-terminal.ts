@@ -80,6 +80,36 @@ export type CoopWaveVictoryKindV2 = "wild" | "trainer";
 export type CoopWaveMeBoundaryV2 = "none" | "battle-victory";
 
 /**
+ * Immutable presentation observed while the authority resolves post-battle party progression.
+ *
+ * These cues are deliberately retained inside the settled WAVE_ADVANCE material rather than the
+ * already-closed TURN_COMMIT. They may update the renderer to the exact stated values while animating,
+ * but they never calculate EXP, stats, moves, or successors. The complete authoritative state beside
+ * them remains the sole mechanical result.
+ */
+export type CoopWaveProgressionPresentationV2 =
+  | {
+      readonly k: "exp";
+      readonly partySlot: number;
+      readonly pokemonId: number;
+      readonly display: "field" | "party";
+      readonly expGain: number;
+      readonly fromLevel: number;
+      readonly toLevel: number;
+      readonly fromExp: number;
+      readonly toExp: number;
+    }
+  | {
+      readonly k: "levelUp";
+      readonly partySlot: number;
+      readonly pokemonId: number;
+      readonly fromLevel: number;
+      readonly toLevel: number;
+      readonly preStats: readonly number[];
+      readonly postStats: readonly number[];
+    };
+
+/**
  * Complete engine carrier required by LIVE cutover. It stays opaque to this engine-free adapter, but it is
  * part of the digested immutable material. Shadow-only fixtures may omit it; a live replica must reject an
  * entry without it before signing materialApplied.
@@ -87,6 +117,8 @@ export type CoopWaveMeBoundaryV2 = "none" | "battle-victory";
 export interface CoopWaveTerminalAuthorityCarrierV2 {
   readonly authoritativeState: unknown;
   readonly transition: unknown;
+  /** Exact ordered post-turn EXP/level presentation, empty when no party member progressed. */
+  readonly progression: readonly CoopWaveProgressionPresentationV2[];
 }
 
 /**
@@ -255,6 +287,49 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
+function isSafePositiveInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function isStatVector(value: unknown): value is readonly number[] {
+  return (
+    Array.isArray(value)
+    && value.length === 6
+    && value.every(stat => typeof stat === "number" && Number.isSafeInteger(stat) && stat >= 0)
+  );
+}
+
+/** Strict closed-union validation for the presentation retained in a wave/terminal carrier. */
+export function isValidWaveProgressionPresentation(value: unknown): value is CoopWaveProgressionPresentationV2 {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const event = value as Partial<CoopWaveProgressionPresentationV2>;
+  if (!isSafeNonNegInt(event.partySlot) || !isSafePositiveInt(event.pokemonId)) {
+    return false;
+  }
+  if (event.k === "exp") {
+    return (
+      (event.display === "field" || event.display === "party")
+      && isSafePositiveInt(event.expGain)
+      && isSafePositiveInt(event.fromLevel)
+      && isSafePositiveInt(event.toLevel)
+      && event.toLevel >= event.fromLevel
+      && isSafeNonNegInt(event.fromExp)
+      && isSafeNonNegInt(event.toExp)
+      && event.toExp >= event.fromExp
+    );
+  }
+  return (
+    event.k === "levelUp"
+    && isSafePositiveInt(event.fromLevel)
+    && isSafePositiveInt(event.toLevel)
+    && event.toLevel > event.fromLevel
+    && isStatVector(event.preStats)
+    && isStatVector(event.postStats)
+  );
+}
+
 /** Whether a value is a COMPLETE, internally-consistent wave-transition material. */
 export function isValidWaveTransitionMaterial(value: unknown): value is CoopWaveTransitionMaterialV2 {
   if (value == null || typeof value !== "object") {
@@ -318,6 +393,9 @@ function isValidOptionalAuthorityCarrier(value: unknown): boolean {
     && carrier.transition != null
     && typeof carrier.transition === "object"
     && !Array.isArray(carrier.transition)
+    && Array.isArray(carrier.progression)
+    && carrier.progression.length <= 128
+    && carrier.progression.every(isValidWaveProgressionPresentation)
   );
 }
 

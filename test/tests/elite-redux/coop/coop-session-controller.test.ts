@@ -72,10 +72,10 @@ describe("co-op session controller (#633, P1)", () => {
     });
 
     it("rejects an older peer that cannot decode the complete battle presentation stream", async () => {
-      // er-coop-56: an older peer cannot decode the authority-authored shiny entrance cue,
-      // so pairing must fail closed instead of letting one renderer guess or omit it
+      // er-coop-57: an older peer cannot decode the retained post-turn EXP/level presentation,
+      // so pairing must fail closed instead of letting one renderer silently snap or omit it
       // instead of opening a battle whose clients display different move outcomes.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-56");
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-57");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",

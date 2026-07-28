@@ -536,6 +536,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     const hostV2 = getCoopV2Shadow(rig.hostRuntime);
     expect(hostV2, "the exact journey negotiated the Authority V2 log").not.toBeNull();
     const turnCommitSpy = vi.spyOn(hostV2!, "tapTurnCommit");
+    const waveCommitSpy = vi.spyOn(hostV2!, "tapWaveAdvance");
     await driveDuoGuestTackleThroughPublicUi(game, rig, {
       restartAlreadyOpenHost: false,
       guestTarget: BattlerIndex.ENEMY_2,
@@ -663,6 +664,12 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     // Do not inspect progression while either engine is still in its victory tail. Stop both before their
     // real reward surface starts; reaching it proves BattleEnd completed and the retained DATA was applied.
     await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
+    const committedWave = waveCommitSpy.mock.calls.find(([tap]) => tap.transition.wave === 1)?.[0];
+    const progression = committedWave?.transition.authorityCarrier?.progression ?? [];
+    expect(
+      progression.filter(event => event.k === "exp").map(event => event.pokemonId),
+      "WAVE_ADVANCE retains one exact EXP presentation for both owners instead of silently snapping state",
+    ).toEqual(expect.arrayContaining(before.map(mon => mon.id)));
     const guestReward = await withClient(rig.guestCtx, () =>
       driveClientPhaseQueueTo(rig.guestScene, "SelectModifierPhase"),
     );
@@ -670,7 +677,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(
       getCoopWaveBoundaryStatus(1, rig.guestRuntime),
       "the guest reward boundary admitted the exact ordered V2 DATA",
-    ).toMatchObject({ authority: "v2", dataApplied: true });
+    ).toMatchObject({ authority: "v2", progressionReady: true, dataApplied: true });
     expect(resync.count(), "the public victory journey requested no full-state recovery").toBe(0);
     resync.restore();
 

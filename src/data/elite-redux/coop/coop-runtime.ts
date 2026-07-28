@@ -37,10 +37,12 @@ import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/ad
 import {
   type CoopTerminalMaterialV2,
   type CoopWaveAdvanceDestination,
+  type CoopWaveProgressionPresentationV2,
   type CoopWaveTransitionMaterialV2,
   classifyWaveSettlementCursor,
   digestOfMaterial,
   isValidTerminalMaterial,
+  isValidWaveProgressionPresentation,
   isValidWaveTransitionMaterial,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
@@ -4243,10 +4245,13 @@ interface CoopV2WaveLiveTransaction {
   readonly materialDigest: string;
   readonly transition: CoopWaveAdvancePayload;
   readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+  readonly progression: readonly CoopWaveProgressionPresentationV2[];
   readonly terminalId: string | null;
   readonly terminalReason: CoopTerminalMaterialV2["reason"] | null;
   readonly nextControlId: string;
   bootstrapProjected: boolean;
+  progressionReplayStarted: boolean;
+  progressionReady: boolean;
   dataApplied: boolean;
   continuationReady: boolean;
 }
@@ -4279,6 +4284,7 @@ export interface CoopWaveBoundaryStatus {
   readonly operationId: string;
   readonly transition: CoopWaveAdvancePayload;
   readonly dataApplied: boolean;
+  readonly progressionReady?: boolean;
   readonly continuationReady: boolean;
   readonly entryRevision?: number;
 }
@@ -4438,6 +4444,11 @@ export interface CoopRuntime {
   v2ProjectedInteractionControlId: string | null;
   /** Runtime-owned V2 wave/terminal transactions awaiting safe DATA and real destination proof. */
   readonly v2WaveTransactions: Map<number, CoopV2WaveLiveTransaction>;
+  /** Authority-only ordered post-turn presentation captured between TURN_COMMIT and WAVE_ADVANCE. */
+  v2WaveProgressionCapture: {
+    readonly wave: number;
+    readonly events: CoopWaveProgressionPresentationV2[];
+  } | null;
   /**
    * Bounded read-only completion evidence. Completed entries leave the live map as soon as their exact
    * public destination installs; retaining only their immutable status makes observability honest without
@@ -4447,6 +4458,70 @@ export interface CoopRuntime {
 }
 
 let active: CoopRuntime | null = null;
+
+/** Open (or preserve) the authority's post-turn presentation capture for one resolving wave. */
+export function beginCoopWaveProgressionCapture(wave: number, runtime: CoopRuntime | null = active): boolean {
+  if (
+    runtime == null
+    || runtime.controller.authorityRole !== "authority"
+    || !coopV2WaveCutovers.has(runtime)
+    || !Number.isSafeInteger(wave)
+    || wave <= 0
+  ) {
+    return false;
+  }
+  if (runtime.v2WaveProgressionCapture?.wave === wave) {
+    return true;
+  }
+  if (runtime.v2WaveProgressionCapture != null) {
+    coopWarn(
+      "progression",
+      `discard stale host progression capture wave=${runtime.v2WaveProgressionCapture.wave} before wave=${wave}`,
+    );
+  }
+  runtime.v2WaveProgressionCapture = { wave, events: [] };
+  coopLog("progression", `HOST progression capture begin wave=${wave}`);
+  return true;
+}
+
+/** Append one complete authority-observed EXP/level cue; no active wave capture means an intentional no-op. */
+export function recordCoopWaveProgressionPresentation(
+  event: CoopWaveProgressionPresentationV2,
+  runtime: CoopRuntime | null = active,
+): boolean {
+  const capture = runtime?.v2WaveProgressionCapture;
+  if (
+    runtime == null
+    || runtime.controller.authorityRole !== "authority"
+    || !coopV2WaveCutovers.has(runtime)
+    || capture == null
+    || !isValidWaveProgressionPresentation(event)
+    || capture.events.length >= 128
+  ) {
+    return false;
+  }
+  capture.events.push(structuredClone(event));
+  coopLog(
+    "progression",
+    `HOST progression capture wave=${capture.wave} seq=${capture.events.length - 1} k=${event.k} slot=${event.partySlot}`,
+  );
+  return true;
+}
+
+function snapshotCoopWaveProgressionCapture(
+  runtime: CoopRuntime,
+  wave: number,
+): readonly CoopWaveProgressionPresentationV2[] {
+  return runtime.v2WaveProgressionCapture?.wave === wave
+    ? structuredClone(runtime.v2WaveProgressionCapture.events)
+    : [];
+}
+
+function clearCoopWaveProgressionCapture(runtime: CoopRuntime, wave: number): void {
+  if (runtime.v2WaveProgressionCapture?.wave === wave) {
+    runtime.v2WaveProgressionCapture = null;
+  }
+}
 
 /**
  * Production phase terminal proof for an authoritative interaction result. FIFO injection, a raw proposal,
@@ -4832,6 +4907,7 @@ function decodeCoopV2WaveTransaction(entry: CoopAuthorityEntry): CoopV2WaveLiveT
   }
   const transition = structuredClone(carrier.transition);
   const authoritativeState = structuredClone(carrier.authoritativeState) as CoopAuthoritativeBattleStateV1;
+  const progression = structuredClone(carrier.progression);
   if (
     authoritativeState == null
     || typeof authoritativeState !== "object"
@@ -4870,10 +4946,13 @@ function decodeCoopV2WaveTransaction(entry: CoopAuthorityEntry): CoopV2WaveLiveT
     materialDigest: entry.material.digest,
     transition,
     authoritativeState,
+    progression,
     terminalId: terminalMaterial?.terminalId ?? null,
     terminalReason: terminalMaterial?.reason ?? null,
     nextControlId: controlIdOf(entry.nextControl),
     bootstrapProjected: false,
+    progressionReplayStarted: false,
+    progressionReady: progression.length === 0,
     dataApplied: false,
     continuationReady: false,
   };
@@ -5240,6 +5319,49 @@ function bootstrapCoopV2WaveTransaction(runtime: CoopRuntime, transaction: CoopV
   return true;
 }
 
+function completeCoopV2WaveProgressionReplay(runtime: CoopRuntime, wave: number, entryRevision: number): void {
+  runWhenCoopRuntimeActive(runtime, () => {
+    const transaction = runtime.v2WaveTransactions.get(wave);
+    if (transaction == null || transaction.entryRevision !== entryRevision || transaction.progressionReady) {
+      return;
+    }
+    transaction.progressionReady = true;
+    coopLog(
+      "v2-wave",
+      `presentation complete rev=${entryRevision} wave=${wave} events=${transaction.progression.length}`,
+    );
+    const completed = coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries() ?? 0;
+    if (completed > 0) {
+      coopLog("v2-wave", `presentation boundary completed ${completed} retained V2 entry`);
+    }
+  });
+}
+
+function beginCoopV2WaveProgressionReplay(runtime: CoopRuntime, transaction: CoopV2WaveLiveTransaction): boolean {
+  if (transaction.progressionReady) {
+    return true;
+  }
+  if (transaction.progressionReplayStarted) {
+    return false;
+  }
+  const phaseManager = globalScene.phaseManager;
+  if (phaseManager?.getCurrentPhase()?.phaseName !== "BattleEndPhase" || phaseManager.getStandbyPhase() != null) {
+    return false;
+  }
+  const phase = phaseManager.create(
+    "CoopWaveProgressionReplayPhase",
+    transaction.transition.wave,
+    transaction.progression,
+    () => completeCoopV2WaveProgressionReplay(runtime, transaction.transition.wave, transaction.entryRevision),
+  );
+  transaction.progressionReplayStarted = true;
+  if (!phaseManager.overridePhase(phase)) {
+    transaction.progressionReplayStarted = false;
+    return false;
+  }
+  return false;
+}
+
 function applyCoopV2WaveDataAtBoundary(runtime: CoopRuntime, transaction: CoopV2WaveLiveTransaction): boolean {
   if (active !== runtime || runtime.controller.authorityRole !== "replica") {
     return false;
@@ -5265,6 +5387,10 @@ function applyCoopV2WaveDataAtBoundary(runtime: CoopRuntime, transaction: CoopV2
   }
   if (transaction.dataApplied) {
     return exactBattleEnd ? releaseCoopSettledWaveBoundary(sourceWave) : true;
+  }
+  if (!transaction.progressionReady) {
+    beginCoopV2WaveProgressionReplay(runtime, transaction);
+    return false;
   }
 
   const immutableState = structuredClone(transaction.authoritativeState);
@@ -9383,6 +9509,7 @@ export function getCoopWaveBoundaryStatus(
       operationId: v2.operationId,
       transition: v2.transition,
       dataApplied: v2.dataApplied,
+      progressionReady: v2.progressionReady,
       continuationReady: v2.continuationReady,
       entryRevision: v2.entryRevision,
     };
@@ -11396,9 +11523,11 @@ function commitCoopV2SettledWaveAdvance(
   ) {
     return false;
   }
+  const progression = snapshotCoopWaveProgressionCapture(runtime, transition.wave);
   const authorityCarrier = {
     authoritativeState: structuredClone(state),
     transition: structuredClone(transition),
+    progression,
   };
   const terminal =
     transition.outcome === "gameOver"
@@ -11413,14 +11542,17 @@ function commitCoopV2SettledWaveAdvance(
       turn: state.turn,
       authorityCarrier,
     };
-    return (
+    const committed =
       cutover.commitHostTerminal({
         operationId: terminalId,
         terminal: material,
         legacyImage: material,
         legacyDigest: digestOfMaterial(material),
-      }) != null
-    );
+      }) != null;
+    if (committed) {
+      clearCoopWaveProgressionCapture(runtime, transition.wave);
+    }
+    return committed;
   }
 
   const base = {
@@ -11490,15 +11622,18 @@ function commitCoopV2SettledWaveAdvance(
       expectedOperationId: null,
     };
   }
-  return (
+  const committed =
     cutover.commitHostWave({
       operationId,
       transition: material,
       destination,
       legacyImage: material,
       legacyDigest: digestOfMaterial(material),
-    }) != null
-  );
+    }) != null;
+  if (committed) {
+    clearCoopWaveProgressionCapture(runtime, transition.wave);
+  }
+  return committed;
 }
 
 type CoopV2SettledWaveDestinationSurface =
@@ -12953,6 +13088,7 @@ export function assembleCoopRuntime(
     v2ProjectedReplacementControlId: null,
     v2ProjectedInteractionControlId: null,
     v2WaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
+    v2WaveProgressionCapture: null,
     v2CompletedWaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
   };
   sharedTerminalStates.set(runtime, {

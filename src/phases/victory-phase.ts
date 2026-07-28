@@ -4,6 +4,7 @@ import { modifierTypes } from "#data/data-lists";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { isCoopMeOperationJournalActive } from "#data/elite-redux/coop/coop-me-operation";
 import {
+  beginCoopWaveProgressionCapture,
   broadcastCoopWaveResolved,
   captureCoopAutomaticVictorySealIdentity,
   failCoopSharedSession,
@@ -84,6 +85,13 @@ export class VictoryPhase extends PokemonPhase {
       this.coopSourceWave == null
         ? globalScene.currentBattle.isBattleMysteryEncounter()
         : retainedSourceTransition?.meBoundary === "battle-victory";
+
+    if (!isMysteryEncounter) {
+      // TURN_COMMIT intentionally closes before this Victory/EXP tail. Open a separate wave-scoped
+      // presentation capture so the settled WAVE_ADVANCE can retain the exact EXP/level cues beside its
+      // complete state image. Replica calls are inert; only the V2 authority owns this buffer.
+      beginCoopWaveProgressionCapture(globalScene.currentBattle.waveIndex);
+    }
 
     // The authoritative renderer may have no live encounter mechanics object. Training Session is the only
     // encounter that suppresses this statistic, and its host-authored type survives structural adoption.

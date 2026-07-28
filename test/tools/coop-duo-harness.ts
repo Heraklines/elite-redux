@@ -3580,6 +3580,7 @@ export const REPLAY_DRAIN_PHASES = new Set([
   // falsely classified a healthy authority stream as a stranded renderer at the first Tera turn.
   "CoopTeraReplayPhase",
   "CoopShinySparkleReplayPhase",
+  "CoopWaveProgressionReplayPhase",
   "CoopCaptureReplayPhase",
   "CoopSwitchReplayPhase",
   "CoopPresentationReceiptPhase",

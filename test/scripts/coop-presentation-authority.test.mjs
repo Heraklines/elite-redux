@@ -469,14 +469,14 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
-test("protocol 56 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
+test("protocol 57 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-56"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-57"/u);
   assert.match(
     transport,
     /interface CoopFullMonSnapshot[\s\S]+tags: string\[\]/u,
@@ -538,6 +538,25 @@ test("protocol 56 binds every structured presentation cue and retained Mystery m
     /beginCoopRecording\([\s\S]+enemyPokemon\.isShiny\(true\) && !authoritativeGuest/u,
     "encounter sparkles enter the retained prefix and the renderer cannot also derive a duplicate",
   );
+  const waveAdapter = read("src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts");
+  const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
+  const victory = read("src/phases/victory-phase.ts");
+  const exp = read("src/phases/exp-phase.ts");
+  const partyExp = read("src/phases/show-party-exp-bar-phase.ts");
+  const levelUp = read("src/phases/level-up-phase.ts");
+  const progressionReplay = read("src/phases/coop-wave-progression-replay-phase.ts");
+  assert.match(waveAdapter, /readonly progression: readonly CoopWaveProgressionPresentationV2\[\]/u);
+  assert.match(waveAdapter, /carrier\.progression\.every\(isValidWaveProgressionPresentation\)/u);
+  assert.match(victory, /beginCoopWaveProgressionCapture\(globalScene\.currentBattle\.waveIndex\)/u);
+  assert.match(exp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+display: "field"/u);
+  assert.match(partyExp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+display: "party"/u);
+  assert.match(levelUp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+k: "levelUp"/u);
+  assert.match(runtime, /progression,[\s\S]+commitHostWave/u);
+  const replayGate = runtime.indexOf("if (!transaction.progressionReady)");
+  const stateApply = runtime.indexOf("applyCoopAuthoritativeBattleState(immutableState, true)", replayGate);
+  assert.ok(replayGate >= 0 && stateApply > replayGate, "retained progression drains before wave DATA applies");
+  assert.match(progressionReplay, /PROGRESSION_STEP_WATCHDOG_MS/u);
+  assert.match(progressionReplay, /this\.end\(\);[\s\S]+this\.onComplete\(\)/u);
 });
 
 test("every co-op renderer boundary triggers the production two-browser journey", () => {

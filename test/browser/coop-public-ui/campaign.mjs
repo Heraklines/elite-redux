@@ -40,9 +40,9 @@ const BARGAIN_WATCHER_TERMINAL = /bargain WATCHER: outcome blob received -> conv
 const BATTLE_PROMPT_PHASES = new Map([
   // Battle narration is rendered by MessageUiHandler from several phase classes (SummonPhase,
   // ShowTrainerPhase, replay phases, and MessagePhase itself). The semantic surface's prompt
-  // generation is the actionable identity; only EXP needs an exact phase-class restriction.
+  // generation is the actionable identity; EXP accepts the authority phase and its retained V2 renderer.
   ["battle:message", null],
-  ["battle:exp", "ExpPhase"],
+  ["battle:exp", new Set(["ExpPhase", "CoopWaveProgressionReplayPhase"])],
 ]);
 const INTERACTIVE_MYSTERY_NARRATION_PHASES = new Set([
   "MysteryEncounterPhase",
@@ -750,7 +750,9 @@ export function createBattlePromptAdvancer(
         return (
           BATTLE_PROMPT_PHASES.has(observation.surfaceId)
           && battlePromptMatchesAddress(client, cursors.get(client.label) ?? 0, event, expectedAddress)
-          && (expectedPhase == null || observation.phase === expectedPhase)
+          && (expectedPhase == null
+            || observation.phase === expectedPhase
+            || (expectedPhase instanceof Set && expectedPhase.has(observation.phase)))
           && observation.uiMode === "MESSAGE"
           && observation.ownerModel === "local"
           && observation.coop === true
@@ -787,7 +789,10 @@ export function createBattlePromptAdvancer(
       cursors.set(client.label, readyEvent.index + 1);
       const { surfaceId, phase, phaseInstance } = readyEvent.observation;
       consumedInstances.add(instanceKeyFor(client, readyEvent.observation));
-      const statName = phase === "ExpPhase" ? "postBattleExpPrompts" : "battleMessagePrompts";
+      const statName =
+        phase === "ExpPhase" || phase === "CoopWaveProgressionReplayPhase"
+          ? "postBattleExpPrompts"
+          : "battleMessagePrompts";
       stats[statName] = (stats[statName] ?? 0) + 1;
       client.evidence.record("campaign-battle-prompt-advance", {
         surfaceId,

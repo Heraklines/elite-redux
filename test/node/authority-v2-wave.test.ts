@@ -36,6 +36,7 @@ import {
   digestOfMaterial,
   entryControlWave,
   isValidTerminalMaterial,
+  isValidWaveProgressionPresentation,
   isValidWaveTransitionMaterial,
   shadowOfWaveTerminalEntry,
   terminalSubsumes,
@@ -399,6 +400,57 @@ describe("WAVE_ADVANCE settlement cursor ownership", () => {
 // ---------------------------------------------------------------------------
 
 describe("material completeness validation", () => {
+  it("accepts only complete immutable post-battle progression cues", () => {
+    expect(
+      isValidWaveProgressionPresentation({
+        k: "exp",
+        partySlot: 1,
+        pokemonId: 42,
+        display: "party",
+        expGain: 120,
+        fromLevel: 5,
+        toLevel: 6,
+        fromExp: 500,
+        toExp: 620,
+      }),
+    ).toBe(true);
+    expect(
+      isValidWaveProgressionPresentation({
+        k: "levelUp",
+        partySlot: 1,
+        pokemonId: 42,
+        fromLevel: 5,
+        toLevel: 6,
+        preStats: [10, 11, 12, 13, 14, 15],
+        postStats: [11, 12, 13, 14, 15, 16],
+      }),
+    ).toBe(true);
+    expect(
+      isValidWaveProgressionPresentation({
+        k: "exp",
+        partySlot: 1,
+        pokemonId: 42,
+        display: "field",
+        expGain: 0,
+        fromLevel: 5,
+        toLevel: 5,
+        fromExp: 500,
+        toExp: 500,
+      }),
+    ).toBe(false);
+    expect(
+      isValidWaveProgressionPresentation({
+        k: "levelUp",
+        partySlot: 1,
+        pokemonId: 42,
+        fromLevel: 5,
+        toLevel: 6,
+        preStats: [10],
+        postStats: [11],
+      }),
+    ).toBe(false);
+  });
+
   it("accepts a complete transition and rejects incomplete/inconsistent ones", () => {
     expect(isValidWaveTransitionMaterial(WIN_TRANSITION)).toBe(true);
     expect(
@@ -407,9 +459,19 @@ describe("material completeness validation", () => {
         authorityCarrier: {
           authoritativeState: { version: 1, tick: 10, wave: 3, turn: 2 },
           transition: { outcome: "win", wave: 3 },
+          progression: [],
         },
       }),
     ).toBe(true);
+    expect(
+      isValidWaveTransitionMaterial({
+        ...WIN_TRANSITION,
+        authorityCarrier: {
+          authoritativeState: { version: 1, tick: 10, wave: 3, turn: 2 },
+          transition: { outcome: "win", wave: 3 },
+        },
+      }),
+    ).toBe(false);
     expect(
       isValidWaveTransitionMaterial({
         ...WIN_TRANSITION,
@@ -443,6 +505,7 @@ describe("material completeness validation", () => {
         authorityCarrier: {
           authoritativeState: { version: 1, tick: 10, wave: 3, turn: 2 },
           transition: { outcome: "gameOver", wave: 3 },
+          progression: [],
         },
       }),
     ).toBe(true);

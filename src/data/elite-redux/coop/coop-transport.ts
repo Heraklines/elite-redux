@@ -151,7 +151,9 @@ export type CoopRole = "host" | "guest";
 // critical capture, and shake outcome, so mixed builds must refuse pairing.
 // er-coop-56 makes shiny sparkle cues authority-authored. Older renderers locally guess initial sparkles
 // and omit switch-in sparkles because they never run the host's SummonPhase.
-export const COOP_PROTOCOL_VERSION = "er-coop-56";
+// er-coop-57 retains the exact post-turn EXP and level-up presentation in WAVE_ADVANCE. Older renderers
+// apply the settled mechanics silently and cannot prove or replay the progression cues before rewards.
+export const COOP_PROTOCOL_VERSION = "er-coop-57";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that

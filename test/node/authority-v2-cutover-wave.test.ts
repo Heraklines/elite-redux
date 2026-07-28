@@ -150,6 +150,7 @@ const WAVE_MATERIAL: CoopWaveTransitionMaterialV2 = {
   authorityCarrier: {
     authoritativeState: { version: 1, tick: 90, wave: 8, turn: 5 },
     transition,
+    progression: [],
   },
 };
 
@@ -162,6 +163,7 @@ const TERMINAL_MATERIAL: CoopTerminalMaterialV2 = {
   authorityCarrier: {
     authoritativeState: { version: 1, tick: 90, wave: 8, turn: 5 },
     transition: { ...transition, outcome: "gameOver", nextWave: 8, nextLogicalPhase: "terminal" },
+    progression: [],
   },
 };
 

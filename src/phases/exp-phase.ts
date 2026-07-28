@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { getExperienceGainMultiplier } from "#data/elite-redux/archetypes/ability-meta-consumers";
+import { recordCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-runtime";
 import { ExpBoosterModifier } from "#modifiers/modifier";
 import { PlayerPartyMemberPokemonPhase } from "#phases/player-party-member-pokemon-phase";
 import { NumberHolder } from "#utils/common";
@@ -38,8 +39,20 @@ export class ExpPhase extends PlayerPartyMemberPokemonPhase {
       fastForward ? 0 : null,
       () => {
         const lastLevel = pokemon.level;
+        const lastExp = pokemon.exp;
         pokemon.addExp(exp.value);
         const newLevel = pokemon.level;
+        recordCoopWaveProgressionPresentation({
+          k: "exp",
+          partySlot: this.partyMemberIndex,
+          pokemonId: pokemon.id,
+          display: "field",
+          expGain: exp.value,
+          fromLevel: lastLevel,
+          toLevel: newLevel,
+          fromExp: lastExp,
+          toExp: pokemon.exp,
+        });
         if (newLevel > lastLevel) {
           globalScene.phaseManager.unshiftNew("LevelUpPhase", this.partyMemberIndex, lastLevel, newLevel);
         }
