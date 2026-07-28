@@ -42,7 +42,7 @@ describe("Authority V2 form-change phase ordering", () => {
     );
   });
 
-  it("does not recreate an inert enemy revert after a recorded faint", () => {
+  it("suppresses only duplicate faint cleanup and retains living switch reverts on either side", () => {
     const leaveField = methodBody(
       "src/field/pokemon.ts",
       "leaveField(clearEffects = true, hideInfo = true, destroy = false)",
@@ -50,8 +50,9 @@ describe("Authority V2 form-change phase ordering", () => {
     );
     expect(leaveField).toMatch(/const coopTurnRecording = globalScene\.gameMode\.isCoop && isCoopRecording\(\);/);
     expect(leaveField).toMatch(
-      /if \(!coopTurnRecording \|\| this\.isPlayer\(\)\) \{[\s\S]*?SpeciesFormChangeActiveTrigger, !coopTurnRecording/,
+      /if \(!coopTurnRecording \|\| !this\.isFainted\(\)\) \{[\s\S]*?SpeciesFormChangeActiveTrigger, !coopTurnRecording/,
     );
+    expect(leaveField).not.toMatch(/!coopTurnRecording \|\| this\.isPlayer\(\)/);
   });
 
   it("keeps the ordering override co-op-specific so Showdown and lockstep stay unchanged", () => {

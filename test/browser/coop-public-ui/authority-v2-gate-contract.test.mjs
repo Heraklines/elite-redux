@@ -1342,10 +1342,24 @@ test("Mystery trainer victory is installed from immutable terminal material", ()
     /readonly trainerVictoryMaterial: CoopTrainerVictoryMaterial \| null;/u,
     "the terminal schema makes the trainer result explicit rather than optional ambient state",
   );
+  // Keep this source-level boundary check compatible with the explicit local narrowing required by
+  // TypeScript. Behavioral transaction tests exercise malformed/null/mismatched material; this check only
+  // proves that the production validator still connects all three clauses instead of prescribing one
+  // expression shape and turning a type-safe refactor into a browser-build red.
   assert.match(
     meTerminalValidator,
-    /destination\.trainerVictory[\s\S]*isCompleteCoopTrainerVictoryMaterial\(destination\.trainerVictoryMaterial\)[\s\S]*destination\.trainerVictoryMaterial\.sourceWave === outcome\.authoritativeState\.wave/u,
-    "admission requires complete material at the same authoritative wave",
+    /if \(destination\.trainerVictory\)[\s\S]*isCompleteCoopTrainerVictoryMaterial\(destination\.trainerVictoryMaterial\)/u,
+    "trainer-victory admission requires complete immutable material",
+  );
+  assert.match(
+    meTerminalValidator,
+    /trainerVictoryMaterial = destination\.trainerVictoryMaterial/u,
+    "the validated material is narrowed into the retained transaction",
+  );
+  assert.match(
+    meTerminalValidator,
+    /trainerVictoryMaterial\.sourceWave === outcome\.authoritativeState\.wave/u,
+    "the narrowed material must belong to the exact authoritative wave",
   );
   assert.match(
     coopRuntime,
@@ -1354,7 +1368,7 @@ test("Mystery trainer victory is installed from immutable terminal material", ()
   );
   assert.match(
     coopRuntime,
-    /installCoopTrainerVictoryMaterial\(globalScene, payload\.destination\.trainerVictoryMaterial\) == null/u,
+    /const trainerVictoryMaterial =[\s\S]*payload\.destination\.trainerVictoryMaterial[\s\S]*installCoopTrainerVictoryMaterial\(globalScene, trainerVictoryMaterial\) == null/u,
     "the replica installs trainer material before executing the typed destination",
   );
   assert.match(trainerVictoryBoundary, /modifierRewardTypeIds[\s\S]*getModifierTypeFuncById/u);

@@ -8074,13 +8074,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // HP back proportionally, restore its own max HP, and clear the blended look.
     erShatteredPsycheOnLeaveField(this);
     this.switchOutStatus = true;
-    // FaintPhase already omits an off-field enemy revert while an authoritative co-op turn is
-    // recording. leaveField() runs later from the faint tween and used to recreate that same inert
-    // QuietFormChangePhase on the root queue (god-a wave 115), after the turn-commit barrier. Do not
-    // recreate it. A player's off-field revert is material, so keep it in the current causal subtree.
-    // Solo and Showdown/lockstep preserve the original delayed behavior.
+    // FaintPhase already owns every material active-form revert for a fainted Pokemon while an
+    // authoritative co-op turn is recording. leaveField() runs later from the faint tween and used
+    // to recreate that phase behind the turn-commit barrier (god-a wave 115). Suppress only that
+    // duplicate faint cleanup. A living Pokemon leaving through a voluntary or forced switch still
+    // needs its material bench form installed in this causal subtree, regardless of side. Solo and
+    // Showdown/lockstep preserve the original delayed behavior.
     const coopTurnRecording = globalScene.gameMode.isCoop && isCoopRecording();
-    if (!coopTurnRecording || this.isPlayer()) {
+    if (!coopTurnRecording || !this.isFainted()) {
       globalScene.triggerPokemonFormChange(this, SpeciesFormChangeActiveTrigger, !coopTurnRecording);
     }
     globalScene.field.remove(this, destroy);

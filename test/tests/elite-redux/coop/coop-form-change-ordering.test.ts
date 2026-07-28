@@ -59,10 +59,11 @@ describe.skipIf(!RUN)("co-op recorded form changes settle before immutable turn 
     );
   }
 
-  it("does not queue the fainted enemy's inert revert behind CoopTurnCommitPhase", () => {
+  it("does not queue a fainted enemy's duplicate revert behind CoopTurnCommitPhase", () => {
     const enemy = globalScene.getEnemyPokemon();
     expect(enemy, "the Aegislash enemy fixture is on the field").not.toBeNull();
     forceBladeForm(enemy!);
+    enemy!.hp = 0;
 
     globalScene.phaseManager.clearPhaseQueue();
     globalScene.phaseManager.pushNew("CoopTurnCommitPhase");
@@ -74,20 +75,21 @@ describe.skipIf(!RUN)("co-op recorded form changes settle before immutable turn 
     ).not.toContain("QuietFormChangePhase");
   });
 
-  it("queues a material player revert inside the current subtree, ahead of the commit", () => {
-    const player = globalScene.getPlayerPokemon();
-    expect(player, "the player Aegislash fixture is on the field").not.toBeNull();
-    forceBladeForm(player!);
+  it("queues a living enemy switch revert inside the current subtree, ahead of the commit", () => {
+    const enemy = globalScene.getEnemyPokemon();
+    expect(enemy, "the Aegislash enemy fixture is on the field").not.toBeNull();
+    forceBladeForm(enemy!);
+    expect(enemy!.isFainted()).toBe(false);
 
     globalScene.phaseManager.clearPhaseQueue();
     globalScene.phaseManager.pushNew("CoopTurnCommitPhase");
-    player!.leaveField();
+    enemy!.leaveField();
 
     const queued = globalScene.phaseManager.getQueuedPhaseNames();
     expect(queued).toContain("QuietFormChangePhase");
     expect(
       queued.indexOf("QuietFormChangePhase"),
-      "the material form mutation executes before immutable commit capture",
+      "a living opponent's material bench form executes before immutable commit capture",
     ).toBeLessThan(queued.indexOf("CoopTurnCommitPhase"));
   });
 });
