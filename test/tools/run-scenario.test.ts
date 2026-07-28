@@ -104,6 +104,19 @@ import {
   recordLivingChromeTransformation,
 } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { isInnateSlotSuppressed } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
+import {
+  ER_COMBAT_CONTRACT_VERSION,
+  type ErCombatCandidate,
+  type ErCombatDatasetRecord,
+  type ErCombatDecisionRecord,
+  type ErCombatMoveCandidate,
+  validateCombatDecisionRecord,
+} from "#data/elite-redux/ai/combat-contract";
+import {
+  type ErCombatEarlierChoice,
+  enumerateErCombatCandidates,
+  snapshotErCombatObservation,
+} from "#data/elite-redux/ai/combat-engine-adapter";
 import { getErPendingNodes, resetErRouting, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { TerrainType } from "#data/terrain";
 import { getTypeDamageMultiplier } from "#data/type";
@@ -341,6 +354,12 @@ const TO_END = process.env.ER_RUN_TO_END === "1"; // play until victory / game-o
 const QUIET = process.env.ER_RUN_QUIET === "1"; // suppress per-turn STATE spam
 const AUTO_FIRST = process.env.ER_RUN_AUTO_FIRST === "1"; // press through unknown menus (option 0 / cancel)
 const JSON_OUT = (process.env.ER_RUN_JSON_OUT ?? "").trim(); // machine-readable result path
+const AI_DATA_OUT = (process.env.ER_RUN_AI_DATA_OUT ?? "").trim();
+const AI_BUILD_SHA = (process.env.ER_AI_BUILD_SHA ?? process.env.GITHUB_SHA ?? "local").trim();
+const AI_DEX_HASH = (process.env.ER_AI_DEX_HASH ?? "unknown").trim();
+const AI_DICTIONARY_HASH = (process.env.ER_AI_DICTIONARY_HASH ?? "unknown").trim();
+const AI_EPISODE_ID = (process.env.ER_AI_EPISODE_ID ?? INPUT?.run?.seed ?? "local-episode").trim();
+const AI_DATASET_RECORDS: ErCombatDatasetRecord[] = [];
 
 function computeWaves(): number {
   const env = Number(process.env.ER_RUN_WAVES);
@@ -670,6 +689,167 @@ function doPlayerActions(
   if (field.length > 2 && field[2]) {
     applyAction(game, field[2], 2 as BattlerIndex, slotAction(action, 2), forcedMove, log);
   }
+}
+
+function chosenTargetEntityId(game: GameManager, battlerIndex: number | undefined): number | null {
+  if (battlerIndex == null) {
+    return null;
+  }
+  return (
+    [...game.scene.getPlayerField(), ...game.scene.getEnemyField()].find(mon => mon?.getBattlerIndex() === battlerIndex)
+      ?.id ?? null
+  );
+}
+
+function findChosenCombatCandidate(
+  game: GameManager,
+  mon: Pokemon,
+  actorSlot: number,
+  action: SlotAction,
+  forcedMove: MoveId | null,
+  candidates: readonly ErCombatCandidate[],
+): ErCombatCandidate | null {
+  if (action.ball != null || action.run) {
+    return null; // outside the explicitly-scoped combat-command dataset
+  }
+  if (action.switch != null) {
+    return (
+      candidates.find(
+        candidate =>
+          candidate.kind === "switch" && candidate.partyIndex === action.switch && candidate.transfer === "normal",
+      ) ?? null
+    );
+  }
+  const moveId =
+    resolveMove(action.move)
+    ?? forcedMove
+    ?? mon.getMoveset().find(move => move.ppUsed < move.getMovePp())?.moveId
+    ?? MoveId.STRUGGLE;
+  const moveSlot =
+    moveId === MoveId.STRUGGLE
+      ? -1
+      : mon.getMoveset().findIndex(move => move.moveId === moveId && move.ppUsed < move.getMovePp());
+  const targetEntityId = chosenTargetEntityId(game, action.target);
+  const matches = candidates.filter(
+    (candidate): candidate is ErCombatMoveCandidate =>
+      candidate.kind === "move"
+      && candidate.actorSlot === actorSlot
+      && candidate.moveId === moveId
+      && candidate.moveSlot === moveSlot
+      && candidate.tera === !!action.tera
+      && (candidate.targetMode === "random"
+        || targetEntityId == null
+        || candidate.targets.some(target => target.entityId === targetEntityId)),
+  );
+  if (matches.length === 1) {
+    return matches[0];
+  }
+  if (targetEntityId == null && matches.length > 1) {
+    const firstLiveOpponent = game.scene.getEnemyField().find(enemy => enemy?.isActive(true) && !enemy.isFainted())?.id;
+    return matches.find(candidate => candidate.targets.some(target => target.entityId === firstLiveOpponent)) ?? null;
+  }
+  return null;
+}
+
+function recordAiTurn(
+  game: GameManager,
+  action: TurnAction | undefined,
+  forcedMove: MoveId | null,
+  sourcePolicy: ErCombatDecisionRecord["sourcePolicy"],
+): void {
+  if (!AI_DATA_OUT) {
+    return;
+  }
+  const scene = game.scene;
+  const wave = scene.currentBattle.waveIndex;
+  const turn = scene.currentBattle.turn;
+  const jointActionId = `${AI_EPISODE_ID}:${wave}:${turn}`;
+  const earlier: ErCombatEarlierChoice[] = [];
+  const field = scene.getPlayerField();
+  for (let actorSlot = 0; actorSlot < field.length; actorSlot++) {
+    const mon = field[actorSlot];
+    if (!mon?.isActive(true) || mon.isFainted()) {
+      continue;
+    }
+    const built = buildAiDecisionForSlot({
+      game,
+      mon,
+      actorSlot,
+      action,
+      forcedMove,
+      sourcePolicy,
+      jointActionId,
+      earlier,
+    });
+    if (built == null) {
+      continue;
+    }
+    AI_DATASET_RECORDS.push(built.record);
+    const chosen = built.chosen;
+    earlier.push({
+      kind: chosen.kind,
+      id: chosen.id,
+      ...(chosen.kind === "switch" ? { partyIndex: chosen.partyIndex } : {}),
+      ...(chosen.kind === "move" ? { tera: chosen.tera } : {}),
+    });
+  }
+}
+
+interface BuildAiDecisionOptions {
+  game: GameManager;
+  mon: Pokemon;
+  actorSlot: number;
+  action: TurnAction | undefined;
+  forcedMove: MoveId | null;
+  sourcePolicy: ErCombatDecisionRecord["sourcePolicy"];
+  jointActionId: string;
+  earlier: readonly ErCombatEarlierChoice[];
+}
+
+function buildAiDecisionForSlot({
+  game,
+  mon,
+  actorSlot,
+  action,
+  forcedMove,
+  sourcePolicy,
+  jointActionId,
+  earlier,
+}: BuildAiDecisionOptions): { record: ErCombatDecisionRecord; chosen: ErCombatCandidate } | null {
+  const perSlotAction = slotAction(action, actorSlot as 0 | 1 | 2);
+  const candidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier);
+  const chosen = findChosenCombatCandidate(game, mon, actorSlot, perSlotAction, forcedMove, candidates);
+  if (chosen == null && (perSlotAction.ball != null || perSlotAction.run)) {
+    return null;
+  }
+  if (chosen == null) {
+    throw new Error(
+      `AI dataset label did not map to one legal candidate: episode=${AI_EPISODE_ID} `
+        + `decision=${jointActionId}:${actorSlot} action=${JSON.stringify(perSlotAction)}`,
+    );
+  }
+  const record: ErCombatDecisionRecord = {
+    kind: "combat_decision",
+    schemaVersion: ER_COMBAT_CONTRACT_VERSION,
+    candidateScope: "combat-command",
+    buildSha: AI_BUILD_SHA,
+    dexHash: AI_DEX_HASH,
+    dictionaryHash: AI_DICTIONARY_HASH,
+    episodeId: AI_EPISODE_ID,
+    jointActionId,
+    decisionId: `${jointActionId}:${actorSlot}`,
+    sourcePolicy,
+    actorSlot,
+    earlierCandidateIds: earlier.map(choice => choice.id),
+    observation: snapshotErCombatObservation(game.scene),
+    candidates,
+    chosenCandidateId: chosen.id,
+  };
+  const validationErrors = validateCombatDecisionRecord(record);
+  if (validationErrors.length > 0) {
+    throw new Error(`invalid AI combat decision ${record.decisionId}: ${validationErrors.join("; ")}`);
+  }
+  return { record, chosen };
 }
 
 /** Whether the turn forces at least one enemy move. */
@@ -1345,6 +1525,12 @@ async function playBattle(
       turnsPlayed++;
       console.log(`\n=== WAVE ${wave} TURN ${turn} (wave ${game.scene.currentBattle?.waveIndex}) ===`);
       const action = opts.script?.[turn - 1];
+      recordAiTurn(
+        game,
+        action,
+        opts.forcedMove ?? null,
+        action ? "scripted" : opts.forcedMove == null ? "first-usable" : "forced-move",
+      );
       doPlayerActions(game, action, opts.forcedMove ?? null, actionLog);
       if (action && hasEnemyForce(action)) {
         await forceEnemyActions(game, action, actionLog);
@@ -2176,7 +2362,14 @@ async function playWaveTurns(
     }
     // Scripted action for this turn; else force the requested move; else pick the best
     // damaging move per slot (so type immunities don't wall an otherwise-winnable wave).
-    const action = opts.script?.[turn - 1] ?? (opts.forcedMove == null ? smartDefaultAction(game) : undefined);
+    const scriptedAction = opts.script?.[turn - 1];
+    const action = scriptedAction ?? (opts.forcedMove == null ? smartDefaultAction(game) : undefined);
+    recordAiTurn(
+      game,
+      action,
+      opts.forcedMove ?? null,
+      scriptedAction ? "scripted" : opts.forcedMove == null ? "smart-default-v1" : "forced-move",
+    );
     doPlayerActions(game, action, opts.forcedMove ?? null, st.log);
     if (action && hasEnemyForce(action)) {
       await forceEnemyActions(game, action, st.log);
@@ -2439,6 +2632,12 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
         console.log("AUTO-FIRST:\n - " + result.autoFirstLog.join("\n - "));
       }
       writeJsonOut(result);
+      writeAiDataOut({
+        outcome: result.outcome,
+        startWave: result.startWave,
+        finalWave: result.finalWave,
+        wavesCleared: result.wavesCleared,
+      });
       if (EXPECT) {
         const failures = evaluateExpect(EXPECT, {
           game,
@@ -2475,6 +2674,12 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
     console.log(
       `\nRESULT ${JSON.stringify({ outcome, turnsPlayed, wavesPlayed, maxHits, startWave, endWave, enemyMovesUsed, state })}`,
     );
+    writeAiDataOut({
+      outcome,
+      startWave,
+      finalWave: endWave,
+      wavesCleared: outcome === "victory" ? wavesPlayed : Math.max(0, wavesPlayed - 1),
+    });
 
     // Self-verify against the optional `expect` block; otherwise a clean finish
     // (no throw / no soft-lock) is the pass.
@@ -2541,6 +2746,32 @@ function writeJsonOut(result: RunResult): void {
     console.log(`JSON result written to ${JSON_OUT}`);
   } catch (err) {
     console.log(`could not write JSON result: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+function writeAiDataOut(result: { outcome: string; startWave: number; finalWave: number; wavesCleared: number }): void {
+  if (!AI_DATA_OUT) {
+    return;
+  }
+  AI_DATASET_RECORDS.push({
+    kind: "episode_terminal",
+    schemaVersion: ER_COMBAT_CONTRACT_VERSION,
+    buildSha: AI_BUILD_SHA,
+    dexHash: AI_DEX_HASH,
+    dictionaryHash: AI_DICTIONARY_HASH,
+    episodeId: AI_EPISODE_ID,
+    outcome: result.outcome,
+    startWave: result.startWave,
+    finalWave: result.finalWave,
+    wavesCleared: result.wavesCleared,
+    truncated: !["victory", "player-wiped"].includes(result.outcome),
+  });
+  try {
+    mkdirSync(dirname(AI_DATA_OUT), { recursive: true });
+    writeFileSync(AI_DATA_OUT, `${AI_DATASET_RECORDS.map(record => JSON.stringify(record)).join("\n")}\n`);
+    console.log(`AI dataset written to ${AI_DATA_OUT} (${AI_DATASET_RECORDS.length - 1} decisions + terminal)`);
+  } catch (err) {
+    throw new Error(`could not write AI dataset: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

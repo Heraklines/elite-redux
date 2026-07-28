@@ -64,6 +64,7 @@ import {
   maybeBeginSinglePlayerReplayRecording,
   maybeCaptureReplayCheckpoint,
 } from "#data/elite-redux/replay-single-recording";
+import { Gender } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
@@ -219,6 +220,10 @@ function buildDevEnemy(spec: DevEnemyMonSpec, fallbackLevel: number, trainerBatt
     enemy.calculateStats();
     enemy.generateName();
   }
+  if (spec.ivs && spec.ivs.length > 0) {
+    enemy.ivs = Array.from({ length: 6 }, (_, index) => Math.max(0, Math.min(31, Math.floor(spec.ivs?.[index] ?? 31))));
+    enemy.calculateStats();
+  }
   if (spec.moveIds && spec.moveIds.length > 0) {
     const moves = spec.moveIds.slice(0, 4).map(id => new PokemonMove(id));
     enemy.moveset = moves;
@@ -233,6 +238,13 @@ function buildDevEnemy(spec: DevEnemyMonSpec, fallbackLevel: number, trainerBatt
   }
   if (spec.shiny) {
     enemy.shiny = true;
+    enemy.variant = Math.max(0, Math.min(2, Math.floor(spec.variant ?? 0)));
+  }
+  if (spec.female !== undefined) {
+    enemy.gender = spec.female ? Gender.FEMALE : Gender.MALE;
+  }
+  if (spec.passive !== undefined) {
+    enemy.passive = spec.passive;
   }
   return enemy;
 }
@@ -1048,6 +1060,11 @@ export class EncounterPhase extends BattlePhase {
     // Dev scenario builder (staging only): a fully custom enemy party staged
     // for this wave. Consumed ONCE; null in production builds.
     const devEnemyParty = this.loaded ? null : consumePendingDevEnemyParty();
+    if (devEnemyParty && battle.enemyLevels) {
+      battle.enemyLevels = devEnemyParty.map(member =>
+        Math.max(1, Math.floor(member.level ?? battle.getLevelForWave())),
+      );
+    }
 
     // Multi-format (triple+): the enemy-gen loop below is bounded by enemyLevels.length, which
     // can come up short of the side's capacity (a small trainer party, or new-battle-phase

@@ -15,6 +15,7 @@ import {
 } from "#app/dev-tools/test-suite/scenario-spec";
 import Overrides from "#app/overrides";
 import { resetErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { BattleType } from "#enums/battle-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { WeatherType } from "#enums/weather-type";
@@ -86,11 +87,46 @@ describe("ER scenario builder spec", () => {
     };
     buildDevScenario(spec).scenario.setup();
     const staged = consumePendingDevEnemyParty();
+    expect(Overrides.BATTLE_TYPE_OVERRIDE).toBe(BattleType.TRAINER);
     expect(staged).toHaveLength(2);
     expect(staged?.[0]).toMatchObject({ speciesId: SpeciesId.SNORLAX, level: 55, isBoss: true });
     expect(staged?.[1].speciesId).toBe(SpeciesId.GENGAR);
     // Consumed = cleared.
     expect(consumePendingDevEnemyParty()).toBeNull();
+  });
+
+  it("preserves saved ghost fields and level 200 for mirrored evaluations", () => {
+    const ivs = [31, 30, 29, 28, 27, 26];
+    const spec: ScenarioSpec = {
+      ...SPEC,
+      run: { ...SPEC.run, level: 200 },
+      party: [{ species: SpeciesId.PIKACHU, ivs, passive: true }],
+      enemy: {
+        kind: "party",
+        party: [
+          {
+            species: SpeciesId.GENGAR,
+            level: 200,
+            ivs,
+            shiny: true,
+            variant: 2,
+            female: true,
+            passive: true,
+          },
+        ],
+      },
+    };
+    const starters = buildDevScenario(spec).scenario.setup();
+    expect(Overrides.STARTING_LEVEL_OVERRIDE).toBe(200);
+    expect(starters[0]).toMatchObject({ ivs, passive: true });
+    expect(consumePendingDevEnemyParty()?.[0]).toMatchObject({
+      level: 200,
+      ivs,
+      shiny: true,
+      variant: 2,
+      female: true,
+      passive: true,
+    });
   });
 
   it("a trainer-class enemy sets the trainer overrides", () => {

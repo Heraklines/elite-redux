@@ -67,12 +67,16 @@ export interface SpecMon {
   /** Force an arbitrary ER innate/passive by numeric AbilityId. */
   passiveAbility?: number | undefined;
   nature?: number | undefined;
+  /** Six saved IVs in HP/Atk/Def/SpAtk/SpDef/Speed order. */
+  ivs?: number[] | undefined;
   /** Up to 4 numeric MoveIds. */
   moves?: number[] | undefined;
   shiny?: boolean | undefined;
   /** Shiny tier: 0 normal/1 rare/2 epic. */
   variant?: number | undefined;
   female?: boolean | undefined;
+  /** Whether the saved run member had its innate/passive unlock enabled. */
+  passive?: boolean | undefined;
 }
 
 export interface SpecEnemyMon extends SpecMon {
@@ -330,11 +334,11 @@ function toStarter(mon: SpecMon): Starter {
     formIndex: mon.formIndex ?? 0,
     female: mon.female,
     abilityIndex: mon.abilitySlot ?? 0,
-    passive: false,
+    passive: mon.passive ?? false,
     nature: (mon.nature ?? Nature.HARDY) as Nature,
     moveset: (mon.moves?.length ?? 0) > 0 ? (mon.moves?.slice(0, 4) as unknown as StarterMoveset) : undefined,
     pokerus: false,
-    ivs: new Array(6).fill(31),
+    ivs: Array.from({ length: 6 }, (_, index) => Math.max(0, Math.min(31, Math.floor(mon.ivs?.[index] ?? 31)))),
   };
 }
 
@@ -508,7 +512,7 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       O.STARTING_TERRAIN_OVERRIDE = run.terrain as TerrainType;
     }
     if (run.level && run.level >= 1) {
-      O.STARTING_LEVEL_OVERRIDE = Math.min(100, run.level);
+      O.STARTING_LEVEL_OVERRIDE = Math.min(200, run.level);
     }
     if (run.triple) {
       O.BATTLE_STYLE_OVERRIDE = "triple";
@@ -566,6 +570,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       O.BATTLE_TYPE_OVERRIDE = BattleType.TRAINER;
       O.RANDOM_TRAINER_OVERRIDE = { trainerType: enemy.trainerType as Exclude<TrainerType, TrainerType.UNKNOWN> };
     } else if (enemy?.kind === "party" && enemy.party && enemy.party.length > 0) {
+      // A custom party is a real trainer roster with reserves, not a multi-wild
+      // encounter that ends as soon as the currently fielded slots faint.
+      O.BATTLE_TYPE_OVERRIDE = BattleType.TRAINER;
       const devParty: DevEnemyMonSpec[] = enemy.party.slice(0, 6).map(p => {
         const m: DevEnemyMonSpec = { speciesId: p.species };
         if (p.level !== undefined) {
@@ -573,6 +580,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
         }
         if (p.moves && p.moves.length > 0) {
           m.moveIds = p.moves.slice(0, 4);
+        }
+        if (p.ivs && p.ivs.length > 0) {
+          m.ivs = p.ivs.slice(0, 6);
         }
         if (p.abilitySlot !== undefined) {
           m.abilitySlot = p.abilitySlot;
@@ -588,6 +598,15 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
         }
         if (p.shiny !== undefined) {
           m.shiny = p.shiny;
+        }
+        if (p.variant !== undefined) {
+          m.variant = p.variant;
+        }
+        if (p.female !== undefined) {
+          m.female = p.female;
+        }
+        if (p.passive !== undefined) {
+          m.passive = p.passive;
         }
         return m;
       });
@@ -653,6 +672,10 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     // - the uniform ENEMY_*_OVERRIDEs can only express a single side-wide value.
     if (spec.enemy?.kind === "party" && spec.enemy.party) {
       const enemyParty = globalScene.getEnemyParty();
+      // Random trainer generation adds wave-scaled vitamins, berries, and items.
+      // Custom rosters are explicit fixtures, so remove those generated modifiers
+      // before applying only the per-member items declared by the scenario.
+      globalScene.clearEnemyModifiers();
       spec.enemy.party.slice(0, 6).forEach((p, i) => {
         const mon = enemyParty[i];
         if (!mon) {
@@ -672,11 +695,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
 
   // Build incrementally so optional fields are never set to `undefined`
   // (the shared DevScenario type runs under exactOptionalPropertyTypes).
-  const hasPerMonEnemyFields =
-    spec.enemy?.kind === "party"
-    && (spec.enemy.party ?? []).some(p => p.status || p.bossSegments || (p.heldItems?.length ?? 0) > 0);
+  const hasCustomEnemyParty = spec.enemy?.kind === "party" && (spec.enemy.party?.length ?? 0) > 0;
   const scenario: DevScenario = { label, description, setup: setupFn };
-  if (spec.start || spec.enemy?.kind === "wild" || hasPerMonEnemyFields) {
+  if (spec.start || spec.enemy?.kind === "wild" || hasCustomEnemyParty) {
     scenario.onBattleStart = onBattleStartFn;
   }
   const shopFuncs = (spec.items?.shop ?? [])

@@ -1,0 +1,932 @@
+{
+  "schemaVersion": 1,
+  "capturedDate": "2026-07-28",
+  "source": "Sanitized read-only snapshot of distinct winning Hell ghost runs; no run, account, or player identifiers retained.",
+  "normalization": "Species, form, ability slot, IVs, nature, gender, shiny tier, passive flag, and first four moves are preserved. Both evaluation sides run at level 200. Run-accumulated held-item stacks are excluded.",
+  "teams": [
+    {
+      "id": "hell-winner-01",
+      "members": [
+        {
+          "species": 70032,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 30, 31, 31],
+          "nature": 13,
+          "gender": 1,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [168, 736, 737, 748]
+        },
+        {
+          "species": 10070,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 10,
+          "gender": 1,
+          "shiny": true,
+          "variant": 0,
+          "passive": false,
+          "moves": [448, 664, 871, 575]
+        },
+        {
+          "species": 658,
+          "formIndex": 3,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 13,
+          "gender": 1,
+          "shiny": true,
+          "variant": 0,
+          "passive": false,
+          "moves": [594, 822, 5106, 5108]
+        },
+        {
+          "species": 10031,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 10,
+          "gender": 1,
+          "shiny": true,
+          "variant": 0,
+          "passive": false,
+          "moves": [777, 177, 676, 483]
+        },
+        {
+          "species": 10040,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 30, 31, 30, 31, 31],
+          "nature": 20,
+          "gender": 1,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [902, 687, 738, 816]
+        },
+        {
+          "species": 579,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 15,
+          "gender": 1,
+          "shiny": true,
+          "variant": 0,
+          "passive": false,
+          "moves": [736, 737, 683, 105]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-02",
+      "members": [
+        {
+          "species": 1008,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 15,
+          "gender": -1,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [82, 804, 460, 524]
+        },
+        {
+          "species": 289,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [30, 31, 28, 31, 31, 26],
+          "nature": 2,
+          "gender": 0,
+          "shiny": true,
+          "variant": 0,
+          "passive": false,
+          "moves": [409, 389, 343, 339]
+        },
+        {
+          "species": 4146,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [24, 19, 15, 12, 29, 22],
+          "nature": 14,
+          "gender": -1,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [822, 555, 379, 307]
+        },
+        {
+          "species": 882,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [10, 15, 8, 22, 22, 4],
+          "nature": 15,
+          "gender": -1,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [755, 409, 339, 692]
+        },
+        {
+          "species": 264,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [30, 25, 2, 5, 4, 13],
+          "nature": 23,
+          "gender": 1,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [175, 387, 838, 667]
+        },
+        {
+          "species": 10013,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [19, 24, 31, 13, 12, 21],
+          "nature": 18,
+          "gender": 1,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [158, 575, 163, 679]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-03",
+      "members": [
+        {
+          "species": 10454,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 27, 24, 23, 31, 31],
+          "nature": 11,
+          "gender": 0,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [551, 85, 94, 417]
+        },
+        {
+          "species": 418,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [818, 857, 813, 916]
+        },
+        {
+          "species": 316,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 5,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [281, 414, 668, 919]
+        },
+        {
+          "species": 711,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 15,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [844, 520, 807, 5140]
+        },
+        {
+          "species": 263,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 13,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [245, 667, 609, 38]
+        },
+        {
+          "species": 70003,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 0,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [577, 585, 736, 503]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-04",
+      "members": [
+        {
+          "species": 10079,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [860, 333, 331, 14]
+        },
+        {
+          "species": 941,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 28, 31, 31, 25, 29],
+          "nature": 10,
+          "gender": 0,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [417, 270, 13, 521]
+        },
+        {
+          "species": 500,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [30, 31, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [394, 837, 344, 66]
+        },
+        {
+          "species": 227,
+          "formIndex": 4,
+          "abilitySlot": 1,
+          "ivs": [23, 26, 3, 21, 26, 10],
+          "nature": 18,
+          "gender": 1,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [211, 845, 368, 413]
+        },
+        {
+          "species": 743,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [28, 20, 15, 26, 25, 21],
+          "nature": 11,
+          "gender": 0,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [78, 676, 577, 227]
+        },
+        {
+          "species": 10039,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [30, 31, 30, 30, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 0,
+          "passive": false,
+          "moves": [14, 91, 291, 5143]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-05",
+      "members": [
+        {
+          "species": 1007,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 0,
+          "gender": -1,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [799, 292, 14, 891]
+        },
+        {
+          "species": 297,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [30, 31, 31, 31, 31, 31],
+          "nature": 0,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [179, 252, 561, 742]
+        },
+        {
+          "species": 87,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 0,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [573, 252, 227, 303]
+        },
+        {
+          "species": 316,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 0,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [34, 139, 747, 281]
+        },
+        {
+          "species": 10031,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 0,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [660, 40, 884, 831]
+        },
+        {
+          "species": 707,
+          "formIndex": 1,
+          "abilitySlot": 0,
+          "ivs": [19, 15, 18, 31, 16, 18],
+          "nature": 12,
+          "gender": 1,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [686, 544, 324, 5097]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-06",
+      "members": [
+        {
+          "species": 10280,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [131, 813, 5108, 331]
+        },
+        {
+          "species": 10003,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 13,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [454, 611, 389, 668]
+        },
+        {
+          "species": 306,
+          "formIndex": 1,
+          "abilitySlot": 0,
+          "ivs": [31, 27, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": true,
+          "moves": [864, 103, 444, 368]
+        },
+        {
+          "species": 424,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [252, 5108, 292, 860]
+        },
+        {
+          "species": 10035,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 30],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [184, 162, 5115, 389]
+        },
+        {
+          "species": 521,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [30, 31, 31, 30, 31, 31],
+          "nature": 0,
+          "gender": 0,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [297, 814, 143, 95]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-07",
+      "members": [
+        {
+          "species": 10729,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [895, 854, 781, 5016]
+        },
+        {
+          "species": 10082,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 30, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [226, 70, 354, 303]
+        },
+        {
+          "species": 10375,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [13, 30, 28, 25, 15, 29],
+          "nature": 15,
+          "gender": -1,
+          "shiny": true,
+          "variant": 0,
+          "passive": false,
+          "moves": [744, 825, 711, 5110]
+        },
+        {
+          "species": 352,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 30, 29, 31],
+          "nature": 8,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": true,
+          "moves": [5055, 729, 197, 489]
+        },
+        {
+          "species": 4264,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 29, 31, 30, 31, 30],
+          "nature": 13,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": true,
+          "moves": [845, 575, 555, 316]
+        },
+        {
+          "species": 10003,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 29, 31],
+          "nature": 0,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [454, 898, 575, 565]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-08",
+      "members": [
+        {
+          "species": 518,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 29, 31, 28, 31],
+          "nature": 1,
+          "gender": 0,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [849, 396, 384, 385]
+        },
+        {
+          "species": 10682,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 30, 31, 31, 31, 31],
+          "nature": 17,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [797, 202, 417, 414]
+        },
+        {
+          "species": 10792,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 10,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [304, 448, 871, 485]
+        },
+        {
+          "species": 931,
+          "formIndex": 2,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 10,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [448, 304, 182, 270]
+        },
+        {
+          "species": 497,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 10,
+          "gender": 0,
+          "shiny": true,
+          "variant": 0,
+          "passive": false,
+          "moves": [859, 70, 437, 434]
+        },
+        {
+          "species": 455,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 2,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [746, 242, 5029, 680]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-09",
+      "members": [
+        {
+          "species": 260,
+          "formIndex": 1,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [857, 872, 619, 836]
+        },
+        {
+          "species": 10759,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [31, 30, 31, 31, 31, 31],
+          "nature": 10,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": true,
+          "moves": [417, 570, 13, 82]
+        },
+        {
+          "species": 10857,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 15,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [5110, 871, 585, 691]
+        },
+        {
+          "species": 10853,
+          "formIndex": 1,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 15,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [594, 5015, 5019, 332]
+        },
+        {
+          "species": 1013,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 30, 30],
+          "nature": 10,
+          "gender": -1,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [504, 570, 733, 902]
+        },
+        {
+          "species": 160,
+          "formIndex": 1,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 13,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": true,
+          "moves": [349, 5115, 5013, 5000]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-10",
+      "members": [
+        {
+          "species": 887,
+          "formIndex": 1,
+          "abilitySlot": 2,
+          "ivs": [27, 31, 29, 29, 26, 22],
+          "nature": 3,
+          "gender": 0,
+          "shiny": false,
+          "variant": 0,
+          "passive": true,
+          "moves": [612, 680, 751, 708]
+        },
+        {
+          "species": 10082,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 30],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [276, 303, 827, 557]
+        },
+        {
+          "species": 181,
+          "formIndex": 1,
+          "abilitySlot": 0,
+          "ivs": [30, 31, 30, 29, 31, 31],
+          "nature": 15,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [53, 909, 744, 294]
+        },
+        {
+          "species": 10006,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [30, 31, 31, 30, 31, 31],
+          "nature": 14,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [252, 584, 570, 417]
+        },
+        {
+          "species": 263,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [31, 30, 30, 31, 30, 30],
+          "nature": 1,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [38, 667, 300, 316]
+        },
+        {
+          "species": 10322,
+          "formIndex": 1,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 29, 31, 31, 31],
+          "nature": 15,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [295, 585, 396, 483]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-11",
+      "members": [
+        {
+          "species": 10766,
+          "formIndex": 0,
+          "abilitySlot": 0,
+          "ivs": [27, 25, 24, 30, 21, 24],
+          "nature": 13,
+          "gender": 0,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [612, 157, 5, 136]
+        },
+        {
+          "species": 10841,
+          "formIndex": 1,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [532, 89, 5105, 65]
+        },
+        {
+          "species": 10792,
+          "formIndex": 1,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 10,
+          "gender": 0,
+          "shiny": true,
+          "variant": 0,
+          "passive": false,
+          "moves": [483, 917, 485, 448]
+        },
+        {
+          "species": 10699,
+          "formIndex": 1,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 3,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": true,
+          "moves": [5106, 198, 824, 64]
+        },
+        {
+          "species": 1018,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [12, 26, 20, 25, 19, 18],
+          "nature": 21,
+          "gender": 1,
+          "shiny": false,
+          "variant": 0,
+          "passive": false,
+          "moves": [5011, 82, 819, 309]
+        },
+        {
+          "species": 10837,
+          "formIndex": 1,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 13,
+          "gender": 0,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [452, 14, 457, 66]
+        }
+      ]
+    },
+    {
+      "id": "hell-winner-12",
+      "members": [
+        {
+          "species": 635,
+          "formIndex": 1,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 29, 31, 31],
+          "nature": 10,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [822, 840, 188, 907]
+        },
+        {
+          "species": 244,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 17,
+          "gender": -1,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [519, 780, 89, 284]
+        },
+        {
+          "species": 181,
+          "formIndex": 1,
+          "abilitySlot": 0,
+          "ivs": [31, 31, 31, 31, 31, 31],
+          "nature": 19,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [53, 909, 744, 84]
+        },
+        {
+          "species": 2053,
+          "formIndex": 0,
+          "abilitySlot": 1,
+          "ivs": [29, 31, 31, 31, 31, 31],
+          "nature": 1,
+          "gender": 0,
+          "shiny": true,
+          "variant": 1,
+          "passive": false,
+          "moves": [737, 734, 575, 6]
+        },
+        {
+          "species": 101,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 31, 31, 31, 31, 30],
+          "nature": 10,
+          "gender": -1,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [412, 558, 879, 417]
+        },
+        {
+          "species": 6101,
+          "formIndex": 0,
+          "abilitySlot": 2,
+          "ivs": [31, 29, 31, 31, 31, 31],
+          "nature": 12,
+          "gender": -1,
+          "shiny": true,
+          "variant": 2,
+          "passive": false,
+          "moves": [605, 73, 787, 720]
+        }
+      ]
+    }
+  ]
+}

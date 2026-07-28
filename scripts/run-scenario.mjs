@@ -24,6 +24,8 @@ import { spawnSync } from "node:child_process";
  *                    rewards / biomePicks / biomeShops / meOptions / eggs / onCatchFull /
  *                    crossroads / forceMysteryEncounters / betweenWaves (+ run.* sub-keys)
  *   --json-out FILE  write a machine-readable run result to FILE
+ *   --ai-data-out FILE  write versioned combat-decision JSONL for offline training
+ *   --episode-id ID  stable episode id stamped into AI dataset rows
  *   --no-miss        force every move to hit
  *   --no-crit        force no crits (deterministic stat stages)
  *   --real-rng       restore the real seeded randBattleSeedInt (probabilistic procs)
@@ -42,7 +44,8 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
   console.log(
     "Usage: node scripts/run-scenario.mjs <ERS1-code | @file.json | demo> "
       + "[--turns N] [--move MOVE] [--waves N] [--to-end] [--quiet] [--auto-first] "
-      + "[--policy @file.json] [--json-out FILE] [--no-miss] [--no-crit] [--real-rng]",
+      + "[--policy @file.json] [--json-out FILE] [--ai-data-out FILE] [--episode-id ID] "
+      + "[--no-miss] [--no-crit] [--real-rng]",
   );
   process.exit(argv.length === 0 ? 1 : 0);
 }
@@ -56,6 +59,8 @@ let quiet = false;
 let autoFirst = false;
 let policyArg;
 let jsonOut;
+let aiDataOut;
+let episodeId;
 let noMiss = false;
 let noCrit = false;
 let realRng = false;
@@ -76,6 +81,10 @@ for (let i = 1; i < argv.length; i++) {
     policyArg = argv[++i];
   } else if (argv[i] === "--json-out") {
     jsonOut = argv[++i];
+  } else if (argv[i] === "--ai-data-out") {
+    aiDataOut = argv[++i];
+  } else if (argv[i] === "--episode-id") {
+    episodeId = argv[++i];
   } else if (argv[i] === "--no-miss") {
     noMiss = true;
   } else if (argv[i] === "--no-crit") {
@@ -113,6 +122,12 @@ if (autoFirst) {
 }
 if (jsonOut) {
   env.ER_RUN_JSON_OUT = jsonOut;
+}
+if (aiDataOut) {
+  env.ER_RUN_AI_DATA_OUT = aiDataOut;
+}
+if (episodeId) {
+  env.ER_AI_EPISODE_ID = episodeId;
 }
 if (policyArg) {
   // A `@file.json` reads the file; otherwise the arg IS the inline JSON blob.

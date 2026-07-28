@@ -1,0 +1,265 @@
+name: AI Baseline Pilot (Non-Production)
+
+# Artifact-only research lane. It has no deployment job, environment, production
+# endpoint, cloud credential, or write permission.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/combat-ai-baselines-20260728
+    paths:
+      - ".github/workflows/ai-baseline-pilot.yml"
+      - "ml/baselines/**"
+      - "scripts/ai/**"
+      - "scripts/run-scenario.mjs"
+      - "src/data/elite-redux/ai/**"
+      - "src/dev-tools/registry.ts"
+      - "src/dev-tools/test-suite/scenario-spec.ts"
+      - "src/phases/encounter-phase.ts"
+      - "test/node/combat-contract.test.ts"
+      - "test/tests/elite-redux/er-scenario-spec.test.ts"
+      - "test/tools/run-scenario.test.ts"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-baseline-pilot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Contract and pure tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Run fast contract tests
+        run: pnpm exec vitest run --config test/node/vitest.config.ts test/node/combat-contract.test.ts --no-color
+      - name: Verify ghost fields reach the dev-scenario engine adapter
+        run: ER_SCENARIO=1 pnpm exec vitest run test/tests/elite-redux/er-scenario-spec.test.ts --no-color
+      - name: Validate mirrored ghost-team fixtures
+        run: node scripts/ai/test-ghost-gauntlet.mjs
+      - name: Check changed AI files
+        run: >-
+          pnpm exec biome check
+          scripts/ai/compare-run-results.mjs
+          scripts/ai/ghost-gauntlet.mjs
+          scripts/ai/make-ghost-gauntlet.mjs
+          scripts/ai/summarize-ghost-gauntlet.mjs
+          scripts/ai/test-ghost-gauntlet.mjs
+          src/data/elite-redux/ai/combat-contract.ts
+          src/data/elite-redux/ai/combat-engine-adapter.ts
+          src/dev-tools/registry.ts
+          src/dev-tools/test-suite/scenario-spec.ts
+          src/phases/encounter-phase.ts
+          test/node/combat-contract.test.ts
+          test/tests/elite-redux/er-scenario-spec.test.ts
+          test/tools/run-scenario.test.ts
+
+  ghost-gauntlet:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Ghost winner pair ${{ matrix.pairId }} (both sides)
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { pair: 0, pairId: "01" }
+          - { pair: 1, pairId: "02" }
+          - { pair: 2, pairId: "03" }
+          - { pair: 3, pairId: "04" }
+          - { pair: 4, pairId: "05" }
+          - { pair: 5, pairId: "06" }
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Build strict inverse matchup
+        run: >-
+          node scripts/ai/make-ghost-gauntlet.mjs
+          ml/evaluation/ghost-winner-teams.v1.json
+          "${{ matrix.pair }}"
+          ai-gauntlet
+      - name: Play leg A
+        run: >-
+          node scripts/run-scenario.mjs
+          "@ai-gauntlet/pair-${{ matrix.pairId }}-leg-a.json"
+          --waves 1 --turns 80 --quiet --auto-first --real-rng
+          --json-out "ai-gauntlet/pair-${{ matrix.pairId }}-leg-a-result.json"
+      - name: Play inverse leg B
+        run: >-
+          node scripts/run-scenario.mjs
+          "@ai-gauntlet/pair-${{ matrix.pairId }}-leg-b.json"
+          --waves 1 --turns 80 --quiet --auto-first --real-rng
+          --json-out "ai-gauntlet/pair-${{ matrix.pairId }}-leg-b-result.json"
+      - name: Upload both sides of the matchup
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-ghost-gauntlet-pair-${{ matrix.pairId }}
+          path: ai-gauntlet
+          retention-days: 30
+          if-no-files-found: error
+
+  ghost-gauntlet-summary:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Side-balanced ghost gauntlet report
+    needs: ghost-gauntlet
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-ghost-gauntlet-pair-*
+          path: ai-gauntlet
+          merge-multiple: true
+      - name: Summarize mirrored results
+        shell: bash
+        run: |
+          mkdir -p ai-report
+          node scripts/ai/summarize-ghost-gauntlet.mjs ai-gauntlet ai-report/ghost-gauntlet.json ai-report/ghost-gauntlet.md
+          cat ai-report/ghost-gauntlet.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload ghost gauntlet report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-ghost-gauntlet-report
+          path: ai-report
+          retention-days: 30
+          if-no-files-found: error
+
+  generate:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Real-engine shard ${{ matrix.shard }}
+    needs: [contract, capture-neutrality]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Build deterministic scenario
+        run: node scripts/ai/make-pilot-scenario.mjs "${{ matrix.shard }}" "ai-work/scenario-${{ matrix.shard }}.json"
+      - name: Compute immutable data identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          dex_hash=$(find src/data/elite-redux -type f \( -name 'er-*.ts' -o -name '*mechanic*.ts' \) -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+          dictionary_hash=$(sha256sum scripts/export-data-dictionary.mjs | cut -d' ' -f1)
+          echo "dex_hash=$dex_hash" >> "$GITHUB_OUTPUT"
+          echo "dictionary_hash=$dictionary_hash" >> "$GITHUB_OUTPUT"
+      - name: Generate real-engine decisions
+        env:
+          ER_AI_BUILD_SHA: ${{ github.sha }}
+          ER_AI_DEX_HASH: ${{ steps.identity.outputs.dex_hash }}
+          ER_AI_DICTIONARY_HASH: ${{ steps.identity.outputs.dictionary_hash }}
+        run: >-
+          node scripts/run-scenario.mjs "@ai-work/scenario-${{ matrix.shard }}.json"
+          --waves 32 --turns 20 --quiet --auto-first --real-rng
+          --episode-id "pilot-${{ github.run_id }}-${{ matrix.shard }}"
+          --json-out "ai-work/result-${{ matrix.shard }}.json"
+          --ai-data-out "ai-work/decisions-${{ matrix.shard }}.jsonl"
+      - name: Upload immutable shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-baseline-shard-${{ matrix.shard }}
+          path: |
+            ai-work/decisions-${{ matrix.shard }}.jsonl
+            ai-work/result-${{ matrix.shard }}.json
+            ai-work/scenario-${{ matrix.shard }}.json
+          retention-days: 14
+          if-no-files-found: error
+
+  capture-neutrality:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Recorder preserves real-engine outcome
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Build deterministic smoke scenario
+        run: node scripts/ai/make-pilot-scenario.mjs 0 ai-neutral/scenario.json
+      - name: Run without capture
+        run: >-
+          node scripts/run-scenario.mjs @ai-neutral/scenario.json
+          --waves 3 --turns 20 --quiet --auto-first --real-rng
+          --json-out ai-neutral/without-capture.json
+      - name: Run with capture
+        env:
+          ER_AI_BUILD_SHA: ${{ github.sha }}
+          ER_AI_DEX_HASH: capture-neutrality-smoke
+          ER_AI_DICTIONARY_HASH: capture-neutrality-smoke
+        run: >-
+          node scripts/run-scenario.mjs @ai-neutral/scenario.json
+          --waves 3 --turns 20 --quiet --auto-first --real-rng
+          --episode-id capture-neutrality-smoke
+          --json-out ai-neutral/with-capture.json
+          --ai-data-out ai-neutral/decisions.jsonl
+      - name: Assert capture neutrality and visibility boundary
+        run: >-
+          node scripts/ai/compare-run-results.mjs
+          ai-neutral/without-capture.json ai-neutral/with-capture.json ai-neutral/decisions.jsonl
+
+  train:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: CPU baseline leaderboard
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-baseline-shard-*
+          path: ai-data
+          merge-multiple: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml/baselines/requirements.txt
+      - name: Install pinned CPU baselines
+        run: python -m pip install --requirement ml/baselines/requirements.txt
+      - name: Train and evaluate leakage-safe baselines
+        run: >-
+          python ml/baselines/train_candidate_baselines.py
+          --data ai-data
+          --report-json ai-report/leaderboard.json
+          --report-md ai-report/leaderboard.md
+      - name: Publish run summary
+        shell: bash
+        run: cat ai-report/leaderboard.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload leaderboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-baseline-leaderboard
+          path: ai-report
+          retention-days: 30
+          if-no-files-found: error

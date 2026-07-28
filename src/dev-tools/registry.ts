@@ -310,6 +310,7 @@ export function consumePendingDevShop(): ModifierTypeFunc[] | null {
 export interface DevEnemyMonSpec {
   speciesId: number;
   level?: number;
+  ivs?: number[];
   moveIds?: number[];
   /** 0 = ability1, 1 = ability2, 2 = hidden. */
   abilitySlot?: number;
@@ -317,6 +318,9 @@ export interface DevEnemyMonSpec {
   formIndex?: number;
   isBoss?: boolean;
   shiny?: boolean;
+  variant?: number;
+  female?: boolean;
+  passive?: boolean;
 }
 
 let pendingDevEnemyParty: DevEnemyMonSpec[] | null = null;
