@@ -68,6 +68,20 @@ describe("ordered capture presentation contract", () => {
   });
 });
 
+describe("ordered shiny presentation contract", () => {
+  const sparkle = {
+    k: "shinySparkle",
+    bi: 2,
+    actor: { side: "enemy", pokemonId: 25 },
+  } as const;
+
+  it("requires an exact displayed battler address", () => {
+    expect(isStrictCoopBattleEvent(sparkle)).toBe(true);
+    expect(isStrictCoopBattleEvent({ ...sparkle, bi: -1 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...sparkle, actor: { side: "enemy", pokemonId: 0 } })).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------

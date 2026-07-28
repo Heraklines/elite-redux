@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import type { BattlerIndex } from "#enums/battler-index";
 import { PokemonPhase } from "#phases/pokemon-phase";
 
@@ -20,6 +21,11 @@ export class ShinySparklePhase extends PokemonPhase {
       this.end();
       return;
     }
+    recordCoopEvent({
+      k: "shinySparkle",
+      bi: this.battlerIndex,
+      actor: { side: pokemon.isPlayer() ? "player" : "enemy", pokemonId: pokemon.id },
+    });
     pokemon.sparkle();
     globalScene.time.delayedCall(1000, () => this.end());
   }

@@ -190,6 +190,8 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
       };
     case "captureAttempt":
       return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+    case "shinySparkle":
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "commonAnim":
       return {
         ...event,

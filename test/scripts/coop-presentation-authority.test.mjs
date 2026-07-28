@@ -469,14 +469,14 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
-test("protocol 55 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
+test("protocol 56 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-55"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-56"/u);
   assert.match(
     transport,
     /interface CoopFullMonSnapshot[\s\S]+tags: string\[\]/u,
@@ -527,6 +527,16 @@ test("protocol 55 binds every structured presentation cue and retained Mystery m
     read("src/phases/coop-replay-turn-phase.ts"),
     /case "captureAttempt":[\s\S]+createCoopPresentationOutcomeToken\(\)[\s\S]+unshiftNew\("CoopCaptureReplayPhase", event, outcomeToken\)/u,
     "the exact attempt owns an outcome-gated pre-checkpoint renderer phase",
+  );
+  assert.match(
+    read("src/phases/shiny-sparkle-phase.ts"),
+    /recordCoopEvent\(\{[\s\S]+k: "shinySparkle"[\s\S]+pokemonId: pokemon\.id/u,
+    "shiny sparkle records stable actor identity at the observed host presentation boundary",
+  );
+  assert.match(
+    read("src/phases/encounter-phase.ts"),
+    /beginCoopRecording\([\s\S]+enemyPokemon\.isShiny\(true\) && !authoritativeGuest/u,
+    "encounter sparkles enter the retained prefix and the renderer cannot also derive a duplicate",
   );
 });
 

@@ -386,6 +386,64 @@ export class CoopCommonAnimReplayPhase extends Phase {
   }
 }
 
+/** GUEST: play one authority-observed shiny entrance cue against its stable displayed actor. */
+export class CoopShinySparkleReplayPhase extends Phase {
+  public readonly phaseName = "CoopShinySparkleReplayPhase";
+
+  constructor(
+    private readonly bi: number,
+    private readonly actor: CoopPresentationActorRef,
+    private readonly outcomeToken: CoopPresentationOutcomeToken = createCoopPresentationOutcomeToken(),
+  ) {
+    super();
+  }
+
+  public override start(): void {
+    super.start();
+    const actorFingerprint = `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}:shiny-sparkle`;
+    const pokemon = exactDisplayedActor(this.actor);
+    if (pokemon == null || pokemon.getBattlerIndex() !== this.bi || !pokemon.isShiny(true)) {
+      settleCoopPresentationOutcome(this.outcomeToken, {
+        kind: "failed",
+        reason: "shiny-sparkle-actor-not-displayed",
+        actorFingerprint,
+      });
+      this.end();
+      return;
+    }
+    if (!globalScene.moveAnimations) {
+      settleCoopPresentationOutcome(this.outcomeToken, {
+        kind: "intentionally-skipped",
+        reason: "animations-disabled",
+        actorFingerprint,
+      });
+      this.end();
+      return;
+    }
+
+    let ended = false;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
+    const finish = (outcome: CoopPresentationOutcome) => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      settleCoopPresentationOutcome(this.outcomeToken, outcome);
+      this.end();
+    };
+    try {
+      watchdog = armCoopPresentationProgressWatchdog(() =>
+        finish({ kind: "failed", reason: "shiny-sparkle-watchdog-expired", actorFingerprint }),
+      );
+      pokemon.sparkle();
+      globalScene.time.delayedCall(1_000, () => finish({ kind: "rendered", actorFingerprint }));
+    } catch {
+      finish({ kind: "failed", reason: "shiny-sparkle-presentation-threw", actorFingerprint });
+    }
+  }
+}
+
 async function refreshAuthorityAppearance(pokemon: Pokemon): Promise<void> {
   pokemon.generateName();
   pokemon.setScale(pokemon.getSpriteScale());

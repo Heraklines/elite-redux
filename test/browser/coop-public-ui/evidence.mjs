@@ -87,6 +87,7 @@ const PRESENTATION_EVENT_KINDS = new Set([
   "tera",
   "commonAnim",
   "pokemonAnim",
+  "shinySparkle",
   "captureAttempt",
   "formChange",
   "transform",

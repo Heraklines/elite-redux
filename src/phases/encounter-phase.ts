@@ -50,6 +50,7 @@ import type {
   CoopEncounterAuthority,
   CoopSerializedEnemy,
 } from "#data/elite-redux/coop/coop-transport";
+import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
@@ -2016,8 +2017,19 @@ export class EncounterPhase extends BattlePhase {
     let playerPresentationReady: Promise<number> | null = null;
     const enemyField = globalScene.getEnemyField();
 
+    // The enemy shiny cue is queued before InitEncounter/Summon normally open the retained turn prefix.
+    // Open the same idempotent scope here so the host-authored sparkle cannot be lost. The renderer never
+    // guesses this cue locally below; it receives the exact actor through the ordered entry presentation.
+    const controller = getCoopController();
+    if (isAuthoritativeBattleSession() && controller?.role === "host") {
+      beginCoopRecording(
+        globalScene.currentBattle.turn,
+        `${controller.sessionEpoch}:${globalScene.currentBattle.waveIndex}`,
+      );
+    }
+
     enemyField.forEach((enemyPokemon, e) => {
-      if (enemyPokemon.isShiny(true)) {
+      if (enemyPokemon.isShiny(true) && !authoritativeGuest) {
         globalScene.phaseManager.unshiftNew("ShinySparklePhase", globalScene.currentBattle.arrangement.enemyOffset + e);
       }
       /** This sets Eternatus' held item to be untransferrable, preventing it from being stolen */

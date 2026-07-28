@@ -199,6 +199,8 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
         && ((event.companionBi === null && event.companionActor === null)
           || (isActorAddressableBattlerIndex(event.companionBi) && isPresentationActorRef(event.companionActor)))
       );
+    case "shinySparkle":
+      return isValidBattlerIndex(event.bi) && isPresentationActorRef(event.actor);
     case "captureAttempt":
       return (
         isValidBattlerIndex(event.bi)

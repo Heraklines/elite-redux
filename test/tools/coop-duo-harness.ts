@@ -3579,6 +3579,7 @@ export const REPLAY_DRAIN_PHASES = new Set([
   // production-shaped soak return at the child while CoopFinalizeTurnPhase was still queued, which
   // falsely classified a healthy authority stream as a stranded renderer at the first Tera turn.
   "CoopTeraReplayPhase",
+  "CoopShinySparkleReplayPhase",
   "CoopCaptureReplayPhase",
   "CoopSwitchReplayPhase",
   "CoopPresentationReceiptPhase",

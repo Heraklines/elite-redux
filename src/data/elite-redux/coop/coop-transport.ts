@@ -149,7 +149,9 @@ export type CoopRole = "host" | "guest";
 // er-coop-55 moves every capture attempt into the ordered presentation stream. Older renderers know only
 // the post-checkpoint successful-catch approximation and silently omit failed throws, the exact target,
 // critical capture, and shake outcome, so mixed builds must refuse pairing.
-export const COOP_PROTOCOL_VERSION = "er-coop-55";
+// er-coop-56 makes shiny sparkle cues authority-authored. Older renderers locally guess initial sparkles
+// and omit switch-in sparkles because they never run the host's SummonPhase.
+export const COOP_PROTOCOL_VERSION = "er-coop-56";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1212,6 +1214,8 @@ export type CoopBattleEvent =
       companionBi: number | null;
       companionActor: CoopPresentationActorRef | null;
     }
+  /** Play one authority-observed shiny entrance cue against the exact displayed actor. */
+  | { k: "shinySparkle"; bi: number; actor: CoopPresentationActorRef }
   /** Replay the authority's exact throw/shake/result against the still-live target before checkpoint apply. */
   | CoopCaptureAttemptPresentation
   /** Apply and display one authority-resolved ordinary form change without re-running its mechanics. */

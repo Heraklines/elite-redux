@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "37b5a64e62ad90bd32f548cf2ca2dbf32eabc652",
+  "baseSha": "8809732ae4da593587d17f0ff78029bb632da661",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -106,6 +106,7 @@
     "src/phases/select-biome-phase.ts",
     "src/phases/select-modifier-phase.ts",
     "src/phases/select-starter-phase.ts",
+    "src/phases/shiny-sparkle-phase.ts",
     "src/phases/showdown-result-phase.ts",
     "src/phases/summon-phase.ts",
     "src/phases/switch-phase.ts",
