@@ -43,6 +43,7 @@ import {
   buildDuo,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   installDuoLogCapture,
   settleDuoPromise,
@@ -285,56 +286,83 @@ describe.skipIf(!RUN)(
       // The GUEST renders turn 1: its OWN faint (slot 1) opens CoopGuestFaintSwitchPhase; stub the ONE PARTY
       // open to pick CHARIZARD (slot 3) - the relay send + seq keying stay fully real. The host-owned faint
       // (slot 0) is host-chosen, so the guest replays it. Their order comes only from the battle above.
-      await withClient(rig.guestCtx, async () => {
-        const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
-        const realSetMode = ui.setMode.bind(ui);
-        ui.setMode = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.PARTY) {
-            ui.setMode = realSetMode; // one-shot
-            const opened = realSetMode(...args);
-            // Model a public keypress, not a callback injected before PARTY exists. The phase attaches its
-            // actionability proof to this same completion promise after setMode returns; nesting the pick
-            // one microtask later guarantees the real handler is active and the exact V2 control is proven.
-            Promise.resolve(opened).then(
-              () => {
-                queueMicrotask(() => (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0));
-              },
-              () => undefined,
-            );
-            return opened;
-          }
-          return realSetMode(...args);
-        };
-        try {
-          await driveGuestReplayTurn(rig.guestScene, turn);
-        } finally {
-          ui.setMode = realSetMode;
+      const guestUi = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+      const realGuestSetMode = guestUi.setMode.bind(guestUi);
+      guestUi.setMode = (...args: unknown[]): unknown => {
+        if (args[0] === UiMode.PARTY) {
+          guestUi.setMode = realGuestSetMode; // one-shot: exactly one guest-owned faint exists in either row
+          const opened = realGuestSetMode(...args);
+          // Model a public keypress, not a callback injected before PARTY exists. The phase attaches its
+          // actionability proof to this same completion promise after setMode returns; nesting the pick
+          // one microtask later guarantees the real handler is active and the exact V2 control is proven.
+          Promise.resolve(opened).then(
+            () => {
+              queueMicrotask(() => (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0));
+            },
+            () => undefined,
+          );
+          return opened;
         }
-      });
+        return realGuestSetMode(...args);
+      };
+      try {
+        await withClient(rig.guestCtx, async () => {
+          await driveGuestReplayTurn(rig.guestScene, turn);
+        });
 
-      // THE PATH under test: arm the host faint auto-picker POST-HOC, then cross to the next CommandPhase. TWO
-      // SwitchPhases open in this crossing - the guest-owned one (watcher/relay, MESSAGE) and the host-owned
-      // one (OWNER, PARTY) - in the table's exact order. The #847 fix makes the
-      // picker PERSIST (re-arm) across the whole crossing and match the host-owned slot, so it drains EVERY
-      // host-owned SwitchPhase regardless of intervening phases / ordering / async timing. This test locks in
-      // that BOTH replacements always drive (the guard); the live wave-66 strand additionally needed the
-      // shipped soak coverage-floor's emergent multi-mon timing, which this deterministic 2-faint setup does
-      // not recreate - so it exercises + guards the path rather than reproducing the exact pre-fix hang.
-      // The crossing settles under BOTH destination contexts: the FAINT_SWITCH operation envelopes
-      // park in the destination pump until the guest context runs, and the host's material-ACK
-      // barrier cannot resolve until the guest applies + ACKs them (the b59dba12 B-lane hang class:
-      // "operation delivery RETRY attempt=8/8" -> stuck at SwitchPhase).
-      let hostAdvance: Promise<void> | undefined;
-      await withClient(rig.hostCtx, async () => {
-        armPendingHostFaintPicker(game, rig);
-        // Run the target (no `false`): the host's next-command rendezvous barrier lives in
-        // CommandPhase.start() (coopNextCommandBarrier) - parking the phase unrun means the host
-        // never announces its post-replacement arrival and any reciprocity await times out.
-        hostAdvance = game.phaseInterceptor.to("CommandPhase") as Promise<void>;
-        await drainLoopback();
-      });
-      expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
-      await settleDuoPromise(rig, hostAdvance!, "double-KO replacement host crossing");
+        // THE PATH under test: arm the host faint auto-picker POST-HOC, then cross to the next CommandPhase. TWO
+        // SwitchPhases open in this crossing - the guest-owned one (watcher/relay, MESSAGE) and the host-owned
+        // one (OWNER, PARTY) - in the table's exact order. The #847 fix makes the
+        // picker PERSIST (re-arm) across the whole crossing and match the host-owned slot, so it drains EVERY
+        // host-owned SwitchPhase regardless of intervening phases / ordering / async timing. This test locks in
+        // that BOTH replacements always drive (the guard); the live wave-66 strand additionally needed the
+        // shipped soak coverage-floor's emergent multi-mon timing, which this deterministic 2-faint setup does
+        // not recreate - so it exercises + guards the path rather than reproducing the exact pre-fix hang.
+        // The crossing settles under BOTH destination contexts: the FAINT_SWITCH operation envelopes
+        // park in the destination pump until the guest context runs, and the host's material-ACK
+        // barrier cannot resolve until the guest applies + ACKs them (the b59dba12 B-lane hang class:
+        // "operation delivery RETRY attempt=8/8" -> stuck at SwitchPhase).
+        let hostAdvance: Promise<void> | undefined;
+        await withClient(rig.hostCtx, async () => {
+          armPendingHostFaintPicker(game, rig);
+          // Run the target (no `false`): the host's next-command rendezvous barrier lives in
+          // CommandPhase.start() (coopNextCommandBarrier) - parking the phase unrun means the host
+          // never announces its post-replacement arrival and any reciprocity await times out.
+          hostAdvance = game.phaseInterceptor.to("CommandPhase") as Promise<void>;
+          await drainLoopback();
+        });
+        expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+
+        if (order.firstOwnerSeatId === 0) {
+          // The first host-owned replacement result is the immutable permit for the guest-owned second
+          // picker. In production, Finalize.end() shifts into and starts this replica tail automatically.
+          // PhaseInterceptor deliberately disables that automatic starter, so this one-process engine
+          // fixture must advance the REAL guest queue while the host is waiting. Waiting for hostAdvance
+          // first and driving turn+1 afterward is an impossible cycle: rev3 remains materialDeferred, the
+          // guest picker never opens, and the host correctly remains in its second SwitchPhase.
+          await withClient(rig.guestCtx, async () => {
+            const picker = await driveClientPhaseQueueTo(rig.guestScene, "host-first chained guest replacement", {
+              matches: phase => phase.phaseName === "CoopGuestFaintSwitchPhase",
+              pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+            });
+            picker.start();
+            const deadline = Date.now() + 5_000;
+            while (rig.guestScene.phaseManager.getCurrentPhase() === picker && Date.now() < deadline) {
+              await withClient(rig.hostCtx, () => drainLoopback());
+              await drainLoopback();
+              await new Promise<void>(resolve => setTimeout(resolve, 0));
+            }
+            expect(
+              rig.guestScene.phaseManager.getCurrentPhase(),
+              "the exact guest picker closed from its immutable replacement result",
+            ).not.toBe(picker);
+          });
+        }
+
+        await settleDuoPromise(rig, hostAdvance!, "double-KO replacement host crossing");
+      } finally {
+        guestUi.setMode = realGuestSetMode;
+      }
       // The reciprocity proof is itself a two-engine crossing: the host's arrival frame reaches the
       // guest only while the guest's inbox pumps, so the awaitPartner promise must settle under BOTH
       // destination contexts (a guest-only await with the vitest 50ms rendezvous budget times out
