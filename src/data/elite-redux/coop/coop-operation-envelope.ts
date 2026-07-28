@@ -427,7 +427,7 @@ export type CoopLearnMoveBatchPayload =
       | {
           readonly fallback: true;
           /** The exact first single-move surface authorized after batch fallback. */
-          readonly nextInteraction: CoopInteractionSuccessorRef;
+          readonly nextInteraction: Extract<CoopInteractionSuccessorRef, { readonly kind: "learn-move" }>;
         }
     ));
 

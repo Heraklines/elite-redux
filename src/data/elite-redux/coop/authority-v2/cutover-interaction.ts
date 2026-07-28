@@ -387,8 +387,9 @@ export const COOP_V2_INTERACTION_REGISTRY = {
             assignment => Array.isArray(assignment) && assignment.length === 2 && assignment.every(integer),
           )
           && typeof payload.fallback === "boolean"
-          && (payload.nextInteraction === undefined || isCoopInteractionSuccessorRef(payload.nextInteraction))
-          && (!payload.fallback || isCoopInteractionSuccessorRef(payload.nextInteraction)),
+          && (payload.fallback
+            ? isCoopInteractionSuccessorRef(payload.nextInteraction) && payload.nextInteraction.kind === "learn-move"
+            : payload.nextInteraction === undefined),
       ),
   },
   ME_BUTTON: {

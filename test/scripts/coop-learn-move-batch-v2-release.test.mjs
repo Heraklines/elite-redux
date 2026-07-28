@@ -121,10 +121,16 @@ test("batch fallback carries one mandatory immutable single-move successor into 
     payloadStart,
     envelope.indexOf("// -----------------------------------------------------------------------------", payloadStart),
   );
-  assert.match(payload, /readonly fallback: true;[\s\S]*readonly nextInteraction: CoopInteractionSuccessorRef/u);
+  assert.match(
+    payload,
+    /readonly fallback: true;[\s\S]*readonly nextInteraction: Extract<CoopInteractionSuccessorRef, \{ readonly kind: "learn-move" \}>/u,
+  );
 
   const validator = method(cutover, "LEARN_MOVE_BATCH: {", "ME_BUTTON: {");
-  assert.match(validator, /!payload\.fallback \|\| isCoopInteractionSuccessorRef\(payload\.nextInteraction\)/u);
+  assert.match(
+    validator,
+    /payload\.fallback[\s\S]*isCoopInteractionSuccessorRef\(payload\.nextInteraction\)[\s\S]*payload\.nextInteraction\.kind === "learn-move"[\s\S]*payload\.nextInteraction === undefined/u,
+  );
 
   const successor = method(cutover, 'case "LEARN_MOVE":', 'case "ME_PRESENT":');
   assert.match(successor, /isCoopInteractionSuccessorRef\(payload\?\.nextInteraction\)/u);
