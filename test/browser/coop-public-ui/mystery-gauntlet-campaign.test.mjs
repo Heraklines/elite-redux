@@ -159,6 +159,19 @@ test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wav
   assert.match(workflow, /campaign_profile:[\s\S]*- mystery/u, "mystery-only diagnosis is directly dispatchable");
 });
 
+test("Mystery qualification keeps one visual proof without screenshotting every checkpoint shape", async () => {
+  const [campaign, config] = await Promise.all([
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+  ]);
+  assert.match(config, /renderProfile === "animations-on-surface"/u);
+  assert.match(
+    campaign,
+    /const firstMysteryVisualProof = stage === "presentation" && stats\.mysteryEvents\.length === 0/u,
+  );
+  assert.match(campaign, /client\.checkpoint\([\s\S]*\{ full: firstMysteryVisualProof \}/u);
+});
+
 test("Mystery gauntlet picks the visible safe exit while normal play preserves the first enabled choice", () => {
   const observation = {
     optionIds: [

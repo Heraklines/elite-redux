@@ -4,8 +4,8 @@
  */
 
 // Per-profile checkpoint capture trim (branch coop/fix-replay-pacing): the DEPTH lane
-// (animations-skipped-depth) captures DOM-only checkpoints (no ~9s per-checkpoint pixel PNG);
-// the SURFACE + mystery lanes keep the pixel oracle. Each distinct surface shape gets the
+// (animations-skipped-depth and Mystery) captures DOM-only checkpoints (no ~9s per-checkpoint pixel PNG);
+// the SURFACE lane keeps the pixel oracle. Each distinct surface shape gets the
 // DOM/cookie/canvas isolation proof once; repeated checkpoints retain semantic/V2 evidence without
 // re-entering a saturated renderer just to serialize the same diagnostic shape.
 
@@ -50,12 +50,19 @@ function withEnv(overrides, callback) {
   }
 }
 
-test("config: the depth profile defaults to DOM-only checkpoints, surface/unset keep pixel capture", () => {
+test("config: skipped-animation profiles default to DOM-only checkpoints; surface/unset keep pixel capture", () => {
   withEnv({ COOP_UI_RENDER_PROFILE: "animations-skipped-depth" }, () => {
     assert.equal(loadConfig().checkpointPixelCapture, false, "depth lane is DOM-only by default");
   });
   withEnv({ COOP_UI_RENDER_PROFILE: "animations-on-surface" }, () => {
     assert.equal(loadConfig().checkpointPixelCapture, true, "surface lane keeps the pixel oracle");
+  });
+  withEnv({ COOP_UI_RENDER_PROFILE: "mystery-gauntlet" }, () => {
+    assert.equal(
+      loadConfig().checkpointPixelCapture,
+      false,
+      "Mystery keeps one explicit visual proof, not every shape",
+    );
   });
   withEnv({}, () => {
     delete process.env.COOP_UI_RENDER_PROFILE;

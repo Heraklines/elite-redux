@@ -106,6 +106,7 @@ const allowedRewardModes = new Set(["leave", "pick-first"]);
 const allowedMarketModes = new Set(["leave", "target-held"]);
 const allowedModes = new Set(["gating", "shakedown", "nightly"]);
 const allowedRenderProfiles = new Set(["animations-on-surface", "animations-skipped-depth", "mystery-gauntlet"]);
+const allowedGameSpeeds = new Set([2, 3, 4, 5, 7, 10]);
 
 /** Read every campaign-only knob (base gameplay config still comes from loadConfig). */
 export function loadCampaignPolicy() {
@@ -141,6 +142,10 @@ export function loadCampaignPolicy() {
   }
   const targetWaves = envInteger("COOP_UI_CAMPAIGN_WAVES", 30);
   const mysteryRequired = envBoolean("COOP_UI_REQUIRE_MYSTERY_GAUNTLET", false);
+  const gameSpeed = envInteger("COOP_UI_GAME_SPEED", 10);
+  if (!allowedGameSpeeds.has(gameSpeed)) {
+    throw new Error(`COOP_UI_GAME_SPEED must be one of ${[...allowedGameSpeeds].join(", ")}`);
+  }
   return {
     mode,
     targetWaves,
@@ -171,10 +176,12 @@ export function loadCampaignPolicy() {
     renderProfile,
     moveAnimationsExpected: renderProfile === "animations-on-surface",
     raiseSpeed: envBoolean("COOP_UI_RAISE_SPEED", true),
+    gameSpeed,
     keys: {
-      // Drive the in-game Game Speed setting to 10x (Ludicrous) through the REAL Settings
-      // UI, once, early in the run - the maintainer's players overwhelmingly play at 10x, so
-      // it is the MORE representative default (not an opt-in). Derived from the live menu
+      // Drive the in-game Game Speed setting through the REAL Settings UI once, early in the
+      // run. The default remains the player-representative 10x, while COOP_UI_GAME_SPEED lets
+      // remote benchmarks measure whether a lower value completes sooner under SwiftShader.
+      // Derived from the live menu
       // structure: Title menu is New Game(0)/Load Game(1)/Profile(2)/Settings(3); Game Speed
       // is the first settings row and WRAPS (clamp:false) over values [2,3,4,5,7,10] from the
       // fresh-account default index 1, so exactly 4 RIGHT presses land on index 5 = 10x.

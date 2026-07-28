@@ -416,8 +416,9 @@ export async function captureCheckpointPngWithFallback(
   );
 }
 
-function isCapturedApiHost(hostname) {
-  return CAPTURED_API_HOST.test(hostname) || hostname === "127.0.0.1" || hostname === "localhost";
+export function isCapturedApiUrl(value, configuredOrigins = new Set()) {
+  const url = value instanceof URL ? value : parsedUrl(value);
+  return url != null && (CAPTURED_API_HOST.test(url.hostname) || configuredOrigins.has(url.origin));
 }
 
 // NEVER capture request bodies for the auth routes: /account/register and /account/login carry
@@ -1017,6 +1018,7 @@ export class EvidenceSink {
     expectedMissingSystemSaveErrors = 0,
     freshAccountMissingSaves = false,
     pixelCheckpointCapture = true,
+    capturedApiOrigins = [],
   ) {
     this.label = label;
     this.dir = resolve(artifactDir, label);
@@ -1029,6 +1031,15 @@ export class EvidenceSink {
     // shape. Repeats remain semantic trace checkpoints; a forced `full:true` (failure path) or
     // COOP_UI_CHECKPOINT_MODE=full restores the complete PNG + DOM capture, so triage evidence is never lost.
     this.pixelCheckpointCapture = pixelCheckpointCapture !== false;
+    // A localhost hostname is not enough to identify an API: the exact-SHA preview server is
+    // localhost too. Capture complete request/response evidence only for the configured Worker
+    // origins, while successful preview assets stay in the compact static-traffic aggregate.
+    this.capturedApiOrigins = new Set(
+      capturedApiOrigins.flatMap(value => {
+        const url = parsedUrl(value);
+        return url == null ? [] : [url.origin];
+      }),
+    );
     // Track R cycle-11 dirty lane (run 29654429335): the pre-seeded dirty account is FRESHLY
     // registered (session slots seeded, NO system save ever persisted) and then logged in visibly.
     // So its system/session reads legitimately 404 exactly like a register-mode fresh account, even
@@ -1591,7 +1602,7 @@ export class EvidenceSink {
       const method = request.method();
       if (
         url == null
-        || !isCapturedApiHost(url.hostname)
+        || !isCapturedApiUrl(url, this.capturedApiOrigins)
         || isCredentialPath(url.pathname)
         || !["POST", "PUT", "PATCH"].includes(method)
       ) {
@@ -1670,7 +1681,7 @@ export class EvidenceSink {
       // entry instead of a full per-response event (~45k such events per journey went
       // through one serialized appendFile each). API hosts, non-GETs, and error statuses
       // keep complete individual records below.
-      const isApi = responseUrl != null && isCapturedApiHost(responseUrl.hostname);
+      const isApi = responseUrl != null && isCapturedApiUrl(responseUrl, this.capturedApiOrigins);
       if (method === "GET" && status < 400 && !isApi) {
         const cls =
           status === 304
@@ -1703,7 +1714,11 @@ export class EvidenceSink {
       // Capture the response BODY for a non-2xx status on the co-op workers only, so the exact
       // error text (e.g. the first-save CAS 409 message) is in the artifact. Bodies carry no
       // credentials on these routes; auth error bodies are advisory, so this is safe.
-      if (responseUrl != null && isCapturedApiHost(responseUrl.hostname) && (status < 200 || status >= 300)) {
+      if (
+        responseUrl != null
+        && isCapturedApiUrl(responseUrl, this.capturedApiOrigins)
+        && (status < 200 || status >= 300)
+      ) {
         response
           .text()
           .then(text => {

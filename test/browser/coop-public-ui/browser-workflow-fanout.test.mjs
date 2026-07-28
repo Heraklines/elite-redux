@@ -65,6 +65,20 @@ test("journey bundle resolves one validated asset SHA even when the GitHub API i
   assert.match(build, /grep -Eq '\^\[0-9a-f\]\{40\}\$'/u, "either lookup path must produce an exact commit SHA");
 });
 
+test("every two-browser journey gives each real Chromium its own display and persistent cache", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
+  const journey = jobBlock(workflow, "primary-journey");
+  assert.match(journey, /COOP_UI_HEADLESS: "0"/u);
+  assert.match(journey, /COOP_UI_SEAT_PROFILE_DIR: \$\{\{ runner\.temp \}\}\/coop-seat-profiles/u);
+  assert.match(journey, /Xvfb :98[\s\S]*Xvfb :99/u);
+  assert.match(journey, /COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99/u);
+  assert.match(
+    journey,
+    /export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99[\s\S]*if \[\[/u,
+    "the display assignment must cover both conditional journey entrypoints",
+  );
+});
+
 test("journey push qualification covers ordinary gameplay phases and statically owns CommandPhase", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   assert.match(

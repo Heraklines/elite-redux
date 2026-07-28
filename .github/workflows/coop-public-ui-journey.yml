@@ -402,9 +402,25 @@ jobs:
           # Normal two-player fidelity keeps PNGs, semantic/network JSONL, key latency, render and
           # WebRTC evidence while omitting only that optional timeline. Manual diagnostics may opt in.
           COOP_UI_CHROME_TRACE: ${{ inputs.chrome_trace && '1' || '0' }}
+          # Two players run on two independent visible displays, matching separate devices while
+          # eliminating artificial cross-seat focus/input serialization on one CI desktop.
+          COOP_UI_HEADLESS: "0"
+          COOP_UI_VIEWPORT_WIDTH: "1440"
+          COOP_UI_VIEWPORT_HEIGHT: "900"
+          COOP_UI_SEAT_PROFILE_DIR: ${{ runner.temp }}/coop-seat-profiles
           NODE_OPTIONS: --max-old-space-size=4096
         shell: bash
         run: |
+          Xvfb :98 -screen 0 1440x900x24 > /dev/null 2>&1 &
+          Xvfb :99 -screen 0 1440x900x24 > /dev/null 2>&1 &
+          for socket in /tmp/.X11-unix/X98 /tmp/.X11-unix/X99; do
+            for _ in $(seq 1 50); do
+              [ -S "$socket" ] && break
+              sleep 0.1
+            done
+            [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
+          done
+          export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99
           if [[ "${{ inputs.journey || 'fresh-resume' }}" == "market-wide-lens" ]]; then
             node test/browser/coop-public-ui/run-campaign.mjs
           else
@@ -491,8 +507,24 @@ jobs:
           COOP_UI_HOST_PASSWORD: ${{ secrets.COOP_UI_ALT_HOST_PASSWORD }}
           COOP_UI_GUEST_USERNAME: ${{ secrets.COOP_UI_ALT_GUEST_USERNAME }}
           COOP_UI_GUEST_PASSWORD: ${{ secrets.COOP_UI_ALT_GUEST_PASSWORD }}
+          COOP_UI_HEADLESS: "0"
+          COOP_UI_VIEWPORT_WIDTH: "1440"
+          COOP_UI_VIEWPORT_HEIGHT: "900"
+          COOP_UI_SEAT_PROFILE_DIR: ${{ runner.temp }}/coop-seat-profiles
           NODE_OPTIONS: --max-old-space-size=4096
-        run: node test/browser/coop-public-ui/run.mjs
+        shell: bash
+        run: |
+          Xvfb :98 -screen 0 1440x900x24 > /dev/null 2>&1 &
+          Xvfb :99 -screen 0 1440x900x24 > /dev/null 2>&1 &
+          for socket in /tmp/.X11-unix/X98 /tmp/.X11-unix/X99; do
+            for _ in $(seq 1 50); do
+              [ -S "$socket" ] && break
+              sleep 0.1
+            done
+            [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
+          done
+          export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99
+          node test/browser/coop-public-ui/run.mjs
 
       - name: Upload compact reverse diagnosis first
         if: always()

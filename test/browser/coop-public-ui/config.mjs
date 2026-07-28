@@ -133,6 +133,7 @@ export function loadConfig() {
   const difficultyOptionId = process.env.COOP_UI_DIFFICULTY_OPTION_ID?.trim() || difficultyId;
   const hostLocale = process.env.COOP_UI_HOST_LOCALE?.trim() || "en";
   const guestLocale = process.env.COOP_UI_GUEST_LOCALE?.trim() || "en";
+  const renderProfile = process.env.COOP_UI_RENDER_PROFILE?.trim() || "animations-on-surface";
   if (!allowedSeats.has(requesterSeat)) {
     throw new Error(`COOP_UI_REQUESTER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
   }
@@ -176,14 +177,12 @@ export function loadConfig() {
     // pixel-integrity PNG (a headed SwiftShader screenshot readback + in-page pixel decode measured
     // ~9s/checkpoint). It captures DOM-only instead (the DOM/cookie/canvas isolation proof still runs
     // once per distinct surface shape; repeated checkpoints remain semantic trace evidence). The
-    // SURFACE + mystery lanes KEEP the pixel oracle.
+    // SURFACE lane KEEPS the pixel oracle. Mystery explicitly forces one paired presentation
+    // proof, rather than paying the screenshot/readback cost for every nested prompt shape.
     // Config-driven: default is derived from COOP_UI_RENDER_PROFILE, overridable via
     // COOP_UI_CHECKPOINT_PIXEL (a forced `full:true` failure capture and COOP_UI_CHECKPOINT_MODE=full
     // still take the PNG regardless, so triage evidence is never lost).
-    checkpointPixelCapture: boolean(
-      "COOP_UI_CHECKPOINT_PIXEL",
-      (process.env.COOP_UI_RENDER_PROFILE?.trim() || "animations-on-surface") !== "animations-skipped-depth",
-    ),
+    checkpointPixelCapture: boolean("COOP_UI_CHECKPOINT_PIXEL", renderProfile === "animations-on-surface"),
     // Dirty-account fidelity lane: the accounts were pre-seeded full (4 solo saves + 1 divergent
     // remnant in slot 4), so the launch MUST visibly reclaim - and reclaim the remnant FIRST.
     expectReclaim: boolean("COOP_UI_EXPECT_RECLAIM", false),

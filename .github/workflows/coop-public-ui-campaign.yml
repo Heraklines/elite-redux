@@ -47,10 +47,19 @@ on:
         type: boolean
         default: false
       raise_speed:
-        description: Drive Game Speed to 10x through the real Settings UI early in the run
+        description: Drive Game Speed through the real Settings UI early in the run
         required: true
         type: boolean
         default: true
+      game_speed:
+        description: In-game speed to attest (benchmark 5/7/10 under SwiftShader; normal default is 10)
+        required: true
+        type: choice
+        default: "10"
+        options:
+          - "5"
+          - "7"
+          - "10"
       speed_keys:
         description: Override Settings key sequence; blank uses the built-in 10x path, "[]" leaves speed unchanged
         required: false
@@ -81,7 +90,7 @@ permissions:
 concurrency:
   # Different explicitly selected profiles may qualify in parallel on separate hosted machines.
   # Repeated runs of the same profile/ref remain serialized so they cannot contend for one diagnosis line.
-  group: coop-public-ui-campaign-${{ github.ref }}-${{ (github.event_name == 'workflow_dispatch' && inputs.campaign_profile) || github.event_name }}
+  group: coop-public-ui-campaign-${{ github.ref }}-${{ (github.event_name == 'workflow_dispatch' && inputs.campaign_profile) || github.event_name }}-${{ (github.event_name == 'workflow_dispatch' && inputs.game_speed) || '10' }}
   cancel-in-progress: false
 
 env:
@@ -451,8 +460,9 @@ jobs:
           # Default ON for push/schedule; only an explicit dispatch raise_speed=false turns it off.
           # (A bare `inputs.raise_speed == false` is TRUE on push, where inputs is null -> would wrongly skip.)
           COOP_UI_RAISE_SPEED: ${{ (github.event_name != 'workflow_dispatch' || inputs.raise_speed) && '1' || '0' }}
-          # Blank -> the driver's built-in 10x Settings-UI path (default everywhere, incl. nightly).
+          # Blank -> the driver's observation-gated Settings walk to COOP_UI_GAME_SPEED.
           COOP_UI_SPEED_KEYS: ${{ inputs.speed_keys }}
+          COOP_UI_GAME_SPEED: ${{ inputs.game_speed || '10' }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'slow' && '420') || (inputs.cadence == 'normal' && '180') || '70' }}
           COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'slow' && '1300') || (inputs.cadence == 'normal' && '750') || '300' }}

@@ -354,72 +354,84 @@ export async function raiseGameSpeed(rig, policy, progress) {
   const clients = Object.values(rig.clients);
   const keys = policy.keys.speed;
   if (keys.length === 0) {
-    for (const client of clients) {
-      client.evidence.record("campaign-speed", { status: "skipped", reason: "COOP_UI_SPEED_KEYS not set" });
-    }
+    await Promise.all(
+      clients.map(async client => {
+        client.evidence.record("campaign-speed", { status: "skipped", reason: "COOP_UI_SPEED_KEYS not set" });
+      }),
+    );
     await progress.note(
       "speed-raise skipped: set COOP_UI_SPEED_KEYS to a verified Title->Settings->GameSpeed sequence",
     );
     return;
   }
-  for (const client of clients) {
-    const speedCursor = client.evidence.cursor();
-    if (policy.keys.speedKeysFromEnv) {
-      // Maintainer-supplied sequence: replay verbatim (blind), as before.
-      await client.sequence(keys, "raise-game-speed-to-10x");
-      await delay(client.config.settleDelayMs);
-    } else {
-      // 1+2) Navigate by the title menu's stable option ids and submit Settings. The generic
-      // semantic navigator survives a late post-login TitlePhase rebuild (which can reset the
-      // cursor to Continue while initial account migration drains) and verifies every public
-      // arrow reaction. A fixed eight-key loop failed one option before Settings in that race.
-      const openCursor = client.evidence.cursor();
-      await selectOptionById(client, {
-        surfaceId: "title-menu",
-        targetId: "settings",
-        navKeys: ["ArrowDown", "ArrowUp"],
-        submitKey: "Space",
-        timeoutMs: client.config.timeoutMs,
+  await Promise.all(
+    clients.map(async client => {
+      const speedCursor = client.evidence.cursor();
+      if (policy.keys.speedKeysFromEnv) {
+        // Maintainer-supplied sequence: replay verbatim (blind), as before.
+        await client.sequence(keys, `raise-game-speed-to-${policy.gameSpeed}x`);
+        await delay(client.config.settleDelayMs);
+      } else {
+        // 1+2) Navigate by the title menu's stable option ids and submit Settings. The generic
+        // semantic navigator survives a late post-login TitlePhase rebuild (which can reset the
+        // cursor to Continue while initial account migration drains) and verifies every public
+        // arrow reaction. A fixed eight-key loop failed one option before Settings in that race.
+        const openCursor = client.evidence.cursor();
+        await selectOptionById(client, {
+          surfaceId: "title-menu",
+          targetId: "settings",
+          navKeys: ["ArrowDown", "ArrowUp"],
+          submitKey: "Space",
+          timeoutMs: client.config.timeoutMs,
+        });
+        await client.evidence.waitForCondition(sink => sink.findLastRenderProfileObservation(openCursor), {
+          timeoutMs: client.config.timeoutMs,
+          description: "visible Settings menu after semantic title selection",
+        });
+        // 3) Game Speed is the first row; step RIGHT until the observer attests the requested
+        //    benchmark value. The row wraps, so allow a full second lap after a double-step.
+        await pressUntilObserved(
+          client,
+          "ArrowRight",
+          `speed-walk-raise-to-${policy.gameSpeed}x`,
+          observedGameSpeed,
+          policy.gameSpeed,
+          { attempts: 12 },
+        );
+        // 4) Close Settings once, wait for a FRESH title surface, then semantically select New
+        //    Game without submitting it. Waiting for the fresh surface prevents Settings-row
+        //    arrows from being mistaken for title navigation on a heavily dilated runner.
+        const closeCursor = client.evidence.cursor();
+        await client.press("Backspace", "speed-walk-close-settings");
+        await client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(closeCursor, "title-menu"), {
+          timeoutMs: client.config.timeoutMs,
+          description: "fresh Title menu after closing Settings",
+        });
+        await selectOptionById(client, {
+          surfaceId: "title-menu",
+          targetId: "new-game",
+          navKeys: ["ArrowUp", "ArrowDown"],
+          submit: false,
+          timeoutMs: client.config.timeoutMs,
+          fromCursor: closeCursor,
+        });
+      }
+      const attestation = await client.evidence.waitForCondition(
+        sink => sink.findGameSpeed(policy.gameSpeed, speedCursor),
+        {
+          timeoutMs: client.config.timeoutMs,
+          description: `visible Settings Game Speed=${policy.gameSpeed} attestation`,
+        },
+      );
+      client.evidence.record("campaign-speed", {
+        status: "attested",
+        gameSpeed: attestation.observation.gameSpeed,
+        keys: policy.keys.speedKeysFromEnv ? keys : "observation-gated",
       });
-      await client.evidence.waitForCondition(sink => sink.findLastRenderProfileObservation(openCursor), {
-        timeoutMs: client.config.timeoutMs,
-        description: "visible Settings menu after semantic title selection",
-      });
-      // 3) Game Speed is the first row; step RIGHT until the observer attests 10x. The row
-      //    WRAPS ([2,3,4,5,7,10] -> 2), so allow a full second lap if a double-step overshoots.
-      await pressUntilObserved(client, "ArrowRight", "speed-walk-raise-to-10x", observedGameSpeed, 10, {
-        attempts: 12,
-      });
-      // 4) Close Settings once, wait for a FRESH title surface, then semantically select New
-      //    Game without submitting it. Waiting for the fresh surface prevents Settings-row
-      //    arrows from being mistaken for title navigation on a heavily dilated runner.
-      const closeCursor = client.evidence.cursor();
-      await client.press("Backspace", "speed-walk-close-settings");
-      await client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(closeCursor, "title-menu"), {
-        timeoutMs: client.config.timeoutMs,
-        description: "fresh Title menu after closing Settings",
-      });
-      await selectOptionById(client, {
-        surfaceId: "title-menu",
-        targetId: "new-game",
-        navKeys: ["ArrowUp", "ArrowDown"],
-        submit: false,
-        timeoutMs: client.config.timeoutMs,
-        fromCursor: closeCursor,
-      });
-    }
-    const attestation = await client.evidence.waitForCondition(sink => sink.findGameSpeed(10, speedCursor), {
-      timeoutMs: client.config.timeoutMs,
-      description: "visible Settings Game Speed=10 attestation",
-    });
-    client.evidence.record("campaign-speed", {
-      status: "attested",
-      gameSpeed: attestation.observation.gameSpeed,
-      keys: policy.keys.speedKeysFromEnv ? keys : "observation-gated",
-    });
-    await client.checkpoint("speed-raised");
-  }
-  await progress.note("speed-raise observer-attested (Game Speed -> 10x via Settings UI)");
+      await client.checkpoint("speed-raised");
+    }),
+  );
+  await progress.note(`speed-raise observer-attested (Game Speed -> ${policy.gameSpeed}x via Settings UI)`);
 }
 
 /**
@@ -430,57 +442,59 @@ export async function raiseGameSpeed(rig, policy, progress) {
 export async function configureRenderProfile(rig, policy, progress) {
   const clients = Object.values(rig.clients);
   const expected = policy.moveAnimationsExpected;
-  for (const client of clients) {
-    const openCursor = client.evidence.cursor();
-    await client.sequence(policy.keys.renderProfileOpen, `open-render-profile-${policy.renderProfile}`);
-    let attestation = await client.evidence.waitForCondition(
-      sink => sink.findRenderProfile(true, openCursor) ?? sink.findRenderProfile(false, openCursor),
-      {
-        timeoutMs: rig.config.timeoutMs,
-        description: "visible Display Settings move-animation attestation",
-      },
-    );
-    if (attestation.observation.moveAnimations !== expected) {
-      const toggleCursor = client.evidence.cursor();
-      await client.sequence(policy.keys.renderProfileToggle, `toggle-render-profile-${policy.renderProfile}`);
-      attestation = await client.evidence.waitForCondition(sink => sink.findRenderProfile(expected, toggleCursor), {
-        timeoutMs: rig.config.timeoutMs,
-        description: `Move Animations=${expected ? "On" : "Off"} after visible Settings toggle`,
-      });
-    }
-    await delay(client.config.settleDelayMs);
-    client.evidence.record("campaign-render-profile", {
-      profile: policy.renderProfile,
-      moveAnimations: attestation.observation.moveAnimations,
-      fidelity: expected
-        ? "move-animation rendering covered"
-        : "move-animation rendering intentionally skipped; mechanics/network/public UI retained",
-    });
-    await client.checkpoint(`render-profile-${policy.renderProfile}-selected`);
-    const closeCursor = client.evidence.cursor();
-    await client.sequence(policy.keys.renderProfileClose, `close-render-profile-${policy.renderProfile}`);
-    if (policy.keys.renderProfileCloseKeysFromEnv) {
-      // Explicit maintainer reproductions preserve their exact sequence and pacing.
+  await Promise.all(
+    clients.map(async client => {
+      const openCursor = client.evidence.cursor();
+      await client.sequence(policy.keys.renderProfileOpen, `open-render-profile-${policy.renderProfile}`);
+      let attestation = await client.evidence.waitForCondition(
+        sink => sink.findRenderProfile(true, openCursor) ?? sink.findRenderProfile(false, openCursor),
+        {
+          timeoutMs: rig.config.timeoutMs,
+          description: "visible Display Settings move-animation attestation",
+        },
+      );
+      if (attestation.observation.moveAnimations !== expected) {
+        const toggleCursor = client.evidence.cursor();
+        await client.sequence(policy.keys.renderProfileToggle, `toggle-render-profile-${policy.renderProfile}`);
+        attestation = await client.evidence.waitForCondition(sink => sink.findRenderProfile(expected, toggleCursor), {
+          timeoutMs: rig.config.timeoutMs,
+          description: `Move Animations=${expected ? "On" : "Off"} after visible Settings toggle`,
+        });
+      }
       await delay(client.config.settleDelayMs);
-    } else {
-      // Do not let the next workflow stage race a key whose input dispatch was accepted but
-      // whose Title cursor update has not rendered yet. The market journey in run
-      // 30237105683 selected Load Game this way: the old blind ArrowUp tail was still
-      // draining while enterCoopLobby planned from the preceding Settings observation.
-      await client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(closeCursor, "title-menu"), {
-        timeoutMs: client.config.timeoutMs,
-        description: "fresh Title menu after closing Display Settings",
+      client.evidence.record("campaign-render-profile", {
+        profile: policy.renderProfile,
+        moveAnimations: attestation.observation.moveAnimations,
+        fidelity: expected
+          ? "move-animation rendering covered"
+          : "move-animation rendering intentionally skipped; mechanics/network/public UI retained",
       });
-      await selectOptionById(client, {
-        surfaceId: "title-menu",
-        targetId: "new-game",
-        navKeys: ["ArrowUp", "ArrowDown"],
-        submit: false,
-        timeoutMs: client.config.timeoutMs,
-        fromCursor: closeCursor,
-      });
-    }
-  }
+      await client.checkpoint(`render-profile-${policy.renderProfile}-selected`);
+      const closeCursor = client.evidence.cursor();
+      await client.sequence(policy.keys.renderProfileClose, `close-render-profile-${policy.renderProfile}`);
+      if (policy.keys.renderProfileCloseKeysFromEnv) {
+        // Explicit maintainer reproductions preserve their exact sequence and pacing.
+        await delay(client.config.settleDelayMs);
+      } else {
+        // Do not let the next workflow stage race a key whose input dispatch was accepted but
+        // whose Title cursor update has not rendered yet. The market journey in run
+        // 30237105683 selected Load Game this way: the old blind ArrowUp tail was still
+        // draining while enterCoopLobby planned from the preceding Settings observation.
+        await client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(closeCursor, "title-menu"), {
+          timeoutMs: client.config.timeoutMs,
+          description: "fresh Title menu after closing Display Settings",
+        });
+        await selectOptionById(client, {
+          surfaceId: "title-menu",
+          targetId: "new-game",
+          navKeys: ["ArrowUp", "ArrowDown"],
+          submit: false,
+          timeoutMs: client.config.timeoutMs,
+          fromCursor: closeCursor,
+        });
+      }
+    }),
+  );
   await progress.note("render profile visibly selected and observer-attested", {
     renderProfile: policy.renderProfile,
     moveAnimations: expected,
@@ -1923,6 +1937,7 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
       return { targetReached: true, boundary: null };
     }
   }
+  const firstMysteryVisualProof = stage === "presentation" && stats.mysteryEvents.length === 0;
   let event = stats.mysteryEvents.find(candidate => candidate.wave === first.address.wave);
   if (event == null) {
     if (stage !== "presentation") {
@@ -1947,7 +1962,11 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
     );
   }
   appendMysteryProof(rig, event, proof);
-  await Promise.all(clients.map(client => client.checkpoint(`wave-${event.wave}-mystery-${stage}-${surfaceId}`)));
+  await Promise.all(
+    clients.map(client =>
+      client.checkpoint(`wave-${event.wave}-mystery-${stage}-${surfaceId}`, { full: firstMysteryVisualProof }),
+    ),
+  );
   return {
     targetReached: false,
     boundary: mechanicalBoundaryFromPairedSurfaces(events, surfaceId),

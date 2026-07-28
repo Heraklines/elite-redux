@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { loadCampaignPolicy } from "./campaign-policy.mjs";
-import { EvidenceSink, waitForPublicInputDispatch } from "./evidence.mjs";
+import { EvidenceSink, isCapturedApiUrl, waitForPublicInputDispatch } from "./evidence.mjs";
 
 function withRenderProfile(value, callback) {
   const previous = process.env.COOP_UI_RENDER_PROFILE;
@@ -62,6 +62,49 @@ test("render profiles are explicit and the depth profile retains public Settings
   withRenderProfile("unlabelled-fast-mode", () => {
     assert.throws(() => loadCampaignPolicy(), /COOP_UI_RENDER_PROFILE/u);
   });
+});
+
+test("campaign game speed is a closed benchmarkable setting", () => {
+  const previous = process.env.COOP_UI_GAME_SPEED;
+  try {
+    for (const gameSpeed of [5, 7, 10]) {
+      process.env.COOP_UI_GAME_SPEED = String(gameSpeed);
+      assert.equal(loadCampaignPolicy().gameSpeed, gameSpeed);
+    }
+    process.env.COOP_UI_GAME_SPEED = "6";
+    assert.throws(() => loadCampaignPolicy(), /COOP_UI_GAME_SPEED/u);
+  } finally {
+    if (previous == null) {
+      delete process.env.COOP_UI_GAME_SPEED;
+    } else {
+      process.env.COOP_UI_GAME_SPEED = previous;
+    }
+  }
+});
+
+test("independent browser settings are configured concurrently", async () => {
+  const campaign = await readFile(new URL("./campaign.mjs", import.meta.url), "utf8");
+  for (const functionName of ["raiseGameSpeed", "configureRenderProfile"]) {
+    const start = campaign.indexOf(`function ${functionName}`);
+    const end = campaign.indexOf("\n}\n", start);
+    const source = campaign.slice(start, end);
+    assert.match(
+      source,
+      /await Promise\.all\(\s*clients\.map\(async client =>/u,
+      `${functionName} runs both seats together`,
+    );
+    assert.doesNotMatch(source, /for \(const client of clients\)/u);
+  }
+});
+
+test("preview assets are telemetry, while configured local workers remain API evidence", () => {
+  const configuredWorkers = new Set(["http://127.0.0.1:8788", "http://127.0.0.1:8789"]);
+  assert.equal(isCapturedApiUrl(new URL("http://127.0.0.1:4175/images/pokemon/1.png"), configuredWorkers), false);
+  assert.equal(isCapturedApiUrl(new URL("http://127.0.0.1:8788/savedata/session/get"), configuredWorkers), true);
+  assert.equal(
+    isCapturedApiUrl(new URL("https://er-coop-api-staging.heraklines.workers.dev/coop/v3/heartbeat"), new Set()),
+    true,
+  );
 });
 
 test("default Display Settings close waits for a fresh title surface and semantically restores New Game", async () => {
