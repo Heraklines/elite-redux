@@ -483,54 +483,33 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // the watcher is parked mid-market and assert the watch survives to the owner's leave.
     setCoopBiomeMarketTestSkip(false);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
-    const turn = rig.hostScene.currentBattle.turn;
-    await hostPlayWave(rig);
-    await withClient(rig.guestCtx, async () => {
-      await driveGuestReplayTurn(rig.guestScene, turn);
-    });
+    await retireDuoInitialCommandForBoundaryTest(rig);
+    pair.setAutomaticDelivery(false);
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
 
-    // OWNER opens the market + streams the stock but does NOT leave yet (the watcher must PARK).
-    let leaveCb: ((index: number) => boolean) | null = null;
+    // Stage both manager-owned phases exactly as two browsers do. The old skipped fixture monkey-patched
+    // UI.setMode and captured its private callback before the asynchronous V2 control proof installed;
+    // besides bypassing public input, that method replacement leaked into every later test in this file.
+    let ownerDone = false;
+    let watchDone = false;
     await withClient(rig.hostCtx, async () => {
       const phase = liveBiomeShop();
-      (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
-      const ui = globalScene.ui as unknown as {
-        setMode: (...args: unknown[]) => unknown;
-        setOverlayMode: (...args: unknown[]) => unknown;
-        showText: (...args: unknown[]) => unknown;
-      };
-      ui.setMode = (...args: unknown[]): unknown => {
-        if (args[0] === UiMode.BIOME_SHOP) {
-          leaveCb = args[3] as (index: number) => boolean;
-        } else if (args[0] === UiMode.CONFIRM) {
-          (args[1] as () => void)();
-        }
-        return Promise.resolve(true);
-      };
-      ui.showText = (...args: unknown[]): unknown => {
-        (args[2] as (() => void) | undefined)?.();
-        return;
-      };
-      ui.setOverlayMode = (...args: unknown[]): unknown => {
-        if (args[0] === UiMode.CONFIRM) {
-          (args[1] as () => void)();
-        }
-        return Promise.resolve(true);
+      const seam = phase as unknown as { end: () => void };
+      const realEnd = seam.end.bind(phase);
+      seam.end = () => {
+        ownerDone = true;
+        realEnd();
       };
       haltQueueAfterCurrent();
       phase.start();
-      for (let i = 0; i < 8; i++) {
-        await drainLoopback();
-      }
+      await drainLoopback();
+      await new Promise<void>(resolve => setTimeout(resolve, 650));
     });
-    expect(leaveCb, "HARNESS: captured the owner market callback").not.toBeNull();
 
-    // WATCHER parks mid-market (stock adopted, no buys yet), then the resync sweep fires.
-    let watchDone = false;
+    // WATCHER adopts the retained stock and parks on its live V2 terminal wait.
     await withClient(rig.guestCtx, async () => {
       const phase = liveBiomeShop();
       haltQueueAfterCurrent();
@@ -541,38 +520,64 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         realEnd();
       };
       phase.start();
-      for (let i = 0; i < 6; i++) {
-        await drainLoopback();
-      }
-      expect(watchDone, "watcher is PARKED mid-market before the sweep").toBe(false);
-      // THE STRESS: the resync's exact orphan-selector sweep (coop-replay-phases:846).
-      const controller = rig.guestRuntime.controller;
-      getCoopInteractionRelay()?.cancelWaiters(seq => controller.peerAdvancedPastInteraction(seq));
-      for (let i = 0; i < 6; i++) {
-        await drainLoopback();
-      }
-      expect(watchDone, "the sweep did NOT knock the watcher off the live market").toBe(false);
+      await drainLoopback();
+      await new Promise<void>(resolve => setTimeout(resolve, 650));
     });
 
-    // OWNER leaves -> the spared watch must complete + both counters advance once.
-    await withClient(rig.hostCtx, async () => {
-      // The loopback delivers the watch terminal synchronously. Bind that receiver continuation to the
-      // guest realm exactly as a second browser would be bound to its own global scene; otherwise this
-      // shared-process fixture can resume the guest watcher while the host scene is ambient and counterfeit
-      // a cross-client state leak.
-      withClientSync(rig.guestCtx, () => leaveCb?.(-1));
-      for (let i = 0; i < 8; i++) {
-        await drainLoopback();
-      }
-    });
+    let marketReady = false;
+    for (let i = 0; i < 80 && !marketReady; i++) {
+      await pumpDuoDestinations(rig, 1);
+      marketReady = await withClient(rig.hostCtx, () => {
+        const handler = rig.hostScene.ui.getHandler() as unknown as {
+          active?: boolean;
+          isCoopV2InputActionable?: () => boolean;
+        };
+        return (
+          rig.hostScene.ui.getMode() === UiMode.BIOME_SHOP
+          && handler.active === true
+          && handler.isCoopV2InputActionable?.() === true
+          && !isCoopV2InteractionHumanInputFrozen(rig.hostRuntime)
+        );
+      });
+    }
+    expect(marketReady, "owner reached the exact actionable market input surface").toBe(true);
+    expect(watchDone, "watcher is PARKED mid-market before the sweep").toBe(false);
+
+    // THE STRESS: the resync's exact orphan-selector sweep (coop-replay-phases:846). It must spare the
+    // address-exact market watch, which remains live and able to consume the subsequent public leave.
     await withClient(rig.guestCtx, async () => {
-      for (let i = 0; i < 8; i++) {
-        await drainLoopback();
-      }
+      const controller = rig.guestRuntime.controller;
+      getCoopInteractionRelay()?.cancelWaiters(seq => controller.peerAdvancedPastInteraction(seq));
+      await drainLoopback();
     });
-    expect(watchDone, "the watch completed on the owner's leave").toBe(true);
-    expect(rig.hostRuntime.controller.interactionCounter(), "host advanced once").toBe(counterBefore + 1);
-    expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced once").toBe(counterBefore + 1);
+    await pumpDuoDestinations(rig, 6);
+    expect(watchDone, "the sweep did NOT knock the watcher off the live market").toBe(false);
+
+    let leaveOpened = false;
+    for (let i = 0; i < 80 && !leaveOpened; i++) {
+      await pumpDuoDestinations(rig, 1);
+      leaveOpened = await withClient(rig.hostCtx, () => rig.hostScene.ui.processInput(Button.CANCEL));
+    }
+    expect(leaveOpened, "owner requests leave through the real BIOME_SHOP handler").toBe(true);
+    let confirmReady = false;
+    for (let i = 0; i < 80 && !confirmReady; i++) {
+      await pumpDuoDestinations(rig, 1);
+      confirmReady = await withClient(rig.hostCtx, () => rig.hostScene.ui.getMode() === UiMode.CONFIRM);
+    }
+    expect(confirmReady, "market leave opens the real confirmation handler").toBe(true);
+    await withClient(rig.hostCtx, () => {
+      const handler = rig.hostScene.ui.getHandler() as unknown as { unblockInput?: () => void };
+      handler.unblockInput?.();
+      expect(rig.hostScene.ui.processInput(Button.ACTION), "owner confirms leave through public input").toBe(true);
+    });
+
+    for (let i = 0; i < 80 && (!ownerDone || !watchDone); i++) {
+      await pumpDuoDestinations(rig, 1);
+    }
+    expect(ownerDone, "owner market completed after its public leave").toBe(true);
+    expect(watchDone, "the spared watcher consumed the later LEAVE").toBe(true);
+    expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced exactly once").toBe(counterBefore + 1);
+    expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced exactly once").toBe(counterBefore + 1);
     logs.flush();
   }, 240_000);
 
