@@ -515,7 +515,10 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /paired Mystery \$\{stage\} convergence at/u);
   assert.match(campaign, /observation\.stateDigest === authority\.stateDigest/u);
   assert.match(campaign, /duplicateWaves/u);
-  assert.match(campaign, /ordinary encounters were not six distinct registry types/u);
+  assert.match(campaign, /\.filter\(\(\[wave\]\) => wave <= policy\.targetWaves\)/u);
+  assert.match(campaign, /policy\.targetWaves >= 7/u);
+  assert.match(campaign, /Math\.min\(policy\.mysteryGauntlet\.minSurfaces, expectedEvents\.size\)/u);
+  assert.match(campaign, /ordinary encounters were not distinct registry types/u);
   // Track R run 29644735938 mystery lane: the ME driver never advanced the owner's post-pick narration.
   // The between-wave loop must own a per-prompt-generation advancer for the owner's
   // mystery-encounter:message prompts (host MysteryEncounterPhase / guest CoopReplayMePhase), keyed by

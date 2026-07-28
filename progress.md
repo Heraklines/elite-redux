@@ -5004,3 +5004,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Integration tip `7bdd300fb` is TypeScript-clean, 104/104 source contracts green, and ownership-exact. Depth and
   Mystery campaigns continue at `3762ab6b`; surface, focused shards, fresh-wave2, and guest-owned faint replacement
   are qualifying remotely at `7bdd300fb`. No local co-op engine/browser execution and no deployment occurred.
+
+## 2026-07-28 - Short Mystery feedback runs validate the exact requested prefix
+
+- Three-wave Mystery run `30394475044` successfully cleared its requested depth, completed exact retained encounters
+  at waves 2 and 3 with alternating owners, reached wave 4, and recorded zero shared-asset proxy failures. It was
+  falsely marked red because the final oracle always demanded the complete ten-wave schedule.
+- The schedule, distinct-event minimum, wave-7 ghost proof, and wave-8 segmented-boss proof are now bounded by the
+  requested target. The default ten-wave milestone still requires the complete exact schedule; shorter diagnostic
+  runs require the exact prefix and cannot claim milestone qualification.
+- The full and focused gates now explicitly run all `test/scripts/coop-*.test.mjs`, all node-pure
+  `authority-v2-*.test.ts`, and all node-pure `coop-*.test.ts`. The focused aggregate requires this parallel contract
+  job, closing the gap where presentation and migration-completeness contracts were never executed by CI.

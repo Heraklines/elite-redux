@@ -3453,15 +3453,17 @@ export async function runCampaign(rig) {
     }
     assertMarketCoverage(marketCoverage, policy.market);
     if (policy.mysteryGauntlet.required) {
-      const expectedEvents = new Map([
-        [2, "mystery"],
-        [3, "mystery"],
-        [4, "mystery"],
-        [5, "mystery"],
-        [6, "mystery"],
-        [9, "bargain"],
-        [10, "mystery"],
-      ]);
+      const expectedEvents = new Map(
+        [
+          [2, "mystery"],
+          [3, "mystery"],
+          [4, "mystery"],
+          [5, "mystery"],
+          [6, "mystery"],
+          [9, "bargain"],
+          [10, "mystery"],
+        ].filter(([wave]) => wave <= policy.targetWaves),
+      );
       const missing = [...expectedEvents].filter(
         ([wave, kind]) =>
           !mysteryCoverage.events.some(
@@ -3498,29 +3500,35 @@ export async function runCampaign(rig) {
         || new Set(ordinaryMysteryTypes).size !== ordinaryMysteryEvents.length
       ) {
         throw new Error(
-          `[campaign-mystery] ordinary encounters were not six distinct registry types: ${JSON.stringify(ordinaryMysteryTypes)}`,
+          `[campaign-mystery] ordinary encounters were not distinct registry types: ${JSON.stringify(ordinaryMysteryTypes)}`,
         );
       }
       const wildOne = mysteryCoverage.battleKinds.find(kind => kind.wave === 1);
       const ghostSeven = mysteryCoverage.battleKinds.find(kind => kind.wave === 7);
       const bossEight = mysteryCoverage.battleKinds.find(kind => kind.wave === 8);
-      if (wildOne?.battleType !== "WILD" || ghostSeven?.battleType !== "TRAINER") {
-        throw new Error(`[campaign-mystery] wave 1/7 kind mismatch: ${JSON.stringify({ wildOne, ghostSeven })}`);
+      if (wildOne?.battleType !== "WILD") {
+        throw new Error(`[campaign-mystery] wave 1 kind mismatch: ${JSON.stringify({ wildOne })}`);
       }
-      if (bossEight?.battleType !== "WILD" || bossEight.maxBossSegments < 2) {
+      if (policy.targetWaves >= 7 && ghostSeven?.battleType !== "TRAINER") {
+        throw new Error(`[campaign-mystery] wave 7 kind mismatch: ${JSON.stringify({ ghostSeven })}`);
+      }
+      if (policy.targetWaves >= 8 && (bossEight?.battleType !== "WILD" || bossEight.maxBossSegments < 2)) {
         throw new Error(
           `[campaign-mystery] wave 8 was not the scripted segmented wild boss: ${JSON.stringify(bossEight)}`,
         );
       }
       // Only the authority selects the ghost. The renderer adopts the resulting trainer carrier;
       // requiring it to run the selector would weaken the authoritative architecture.
-      await rig.host.evidence.waitFor(/\[er-ghost\] wave 7: (?:ghost|reusing cached ghost) /u, {
-        timeoutMs: rig.config.timeoutMs,
-        description: "authority selected the Mystery gauntlet wave 7 ghost team",
-      });
-      if (mysteryCoverage.events.length < policy.mysteryGauntlet.minSurfaces) {
+      if (policy.targetWaves >= 7) {
+        await rig.host.evidence.waitFor(/\[er-ghost\] wave 7: (?:ghost|reusing cached ghost) /u, {
+          timeoutMs: rig.config.timeoutMs,
+          description: "authority selected the Mystery gauntlet wave 7 ghost team",
+        });
+      }
+      const requiredMysteryEvents = Math.min(policy.mysteryGauntlet.minSurfaces, expectedEvents.size);
+      if (mysteryCoverage.events.length < requiredMysteryEvents) {
         throw new Error(
-          `[campaign-mystery] observed ${mysteryCoverage.events.length} distinct completed event waves; required ${policy.mysteryGauntlet.minSurfaces}`,
+          `[campaign-mystery] observed ${mysteryCoverage.events.length} distinct completed event waves; required ${requiredMysteryEvents}`,
         );
       }
     }

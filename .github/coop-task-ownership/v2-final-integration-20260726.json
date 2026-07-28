@@ -3,10 +3,11 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "7bdd300fbc998d67d4d53311890d97fd5022881c",
+  "baseSha": "0e17287e60918f34b46d7d209ef3dacf01aee535",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
+    ".github/workflows/coop-gate-sharded.yml",
     ".github/workflows/coop-public-ui-campaign.yml",
     ".github/workflows/coop-public-ui-journey.yml",
     ".github/workflows/stats-nightly.yml",
