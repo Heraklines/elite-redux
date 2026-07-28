@@ -145,12 +145,18 @@ test("a chained Mystery gauntlet refreshes only from proven surface progress and
   assert.equal(budget.noteProgress().deadlineMs, 16_000);
 });
 
-test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wave profile", async () => {
+test("workflow builds the staging-only fifth difficulty and fans a configurable ten-wave-default profile", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
   assert.match(workflow, /VITE_DEV_TOOLS: 1/u);
   assert.match(
     workflow,
-    /profile: "mystery-gauntlet", artifact: "mystery", waves: "10",\s+difficulty: "mystery", difficulty_option: "mystery", require_mystery: "1"/u,
+    /mystery_waves:\s+description: [^\n]+\s+required: false\s+type: string\s+default: "10"/u,
+    "manual and milestone dispatches default to the full ten-wave Mystery journey",
+  );
+  assert.match(
+    workflow,
+    /MYSTERY_WAVES: \$\{\{ inputs\.mystery_waves \|\| '10' \}\}[\s\S]*--arg mysteryWaves "\$MYSTERY_WAVES"[\s\S]*profile: "mystery-gauntlet", artifact: "mystery", waves: \$mysteryWaves,\s+difficulty: "mystery", difficulty_option: "mystery", require_mystery: "1"/u,
+    "the dynamic Mystery matrix consumes the dispatch control while push and schedule retain ten waves",
   );
   assert.match(workflow, /COOP_UI_DIFFICULTY_ID: \$\{\{ matrix\.difficulty \}\}/u);
   assert.match(workflow, /COOP_UI_DIFFICULTY_OPTION_ID: \$\{\{ matrix\.difficulty_option \}\}/u);

@@ -121,6 +121,42 @@ test("journey push qualification covers ordinary gameplay phases and statically 
   );
 });
 
+test("journey push defaults to fresh-wave2 while manual milestone runs retain fresh-resume", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
+  const selectedJourneyExpression =
+    "inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume'";
+  const workflowExpression = value => `${String.fromCodePoint(36)}{{ ${value} }}`;
+  const selectedJourney = workflowExpression(selectedJourneyExpression);
+  const githubRef = workflowExpression("github.ref");
+  const normalCadence = workflowExpression("inputs.cadence || 'normal'");
+  const primary = jobBlock(workflow, "primary-journey");
+
+  assert.match(
+    workflow,
+    /workflow_dispatch:\s+inputs:\s+journey:[\s\S]{0,300}?default: fresh-resume[\s\S]{0,200}?- fresh-wave2\s+- fresh-resume/u,
+    "manual and milestone dispatches keep fresh-resume as the visible default and explicit option",
+  );
+  assert.ok(
+    workflow.includes("group: coop-public-ui-" + githubRef + "-" + selectedJourney),
+    "concurrency identifies the journey that a push actually runs",
+  );
+  assert.ok(
+    primary.includes("name: " + selectedJourney + " / " + normalCadence),
+    "the job label identifies fresh-wave2 on push and fresh-resume on a default dispatch",
+  );
+  assert.ok(
+    primary.includes(
+      "COOP_UI_JOURNEY: ${{ inputs.journey == 'market-wide-lens' && 'probe' || " + selectedJourneyExpression + " }}",
+    ),
+    "the driver receives the same selected journey advertised by concurrency and the job label",
+  );
+  assert.doesNotMatch(
+    primary,
+    /inputs\.journey \|\| 'fresh-resume'/u,
+    "a push must not silently retain the old two-launch journey through a stale fallback",
+  );
+});
+
 test("exact GameOver gate runs the retained guest-renderer phase-queue regression", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   const build = jobBlock(workflow, "browser-build");

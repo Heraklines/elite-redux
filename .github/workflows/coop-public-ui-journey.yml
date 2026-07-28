@@ -95,7 +95,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || 'fresh-resume' }}
+  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}
   cancel-in-progress: false
 
 env:
@@ -306,13 +306,13 @@ jobs:
           if-no-files-found: error
 
   primary-journey:
-    name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
+    name: ${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
     needs: browser-build
     runs-on: ubuntu-latest
     # The fresh+resume journey deliberately runs two complete launches. Its adaptive progress budget can
     # remain healthy for roughly 48 minutes on the constrained ~3-fps runner; a 35-minute outer job ceiling
     # previously cancelled it mid-ShowAbilityPhase while both peers were connected and assertion-clean.
-    timeout-minutes: ${{ (inputs.journey || 'fresh-resume') == 'market-wide-lens' && 55 || (inputs.journey || 'fresh-resume') == 'fresh-resume' && 55 || ((inputs.journey || 'fresh-resume') == 'save-mutations' || (inputs.journey || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
+    timeout-minutes: ${{ (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'market-wide-lens' && 55 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'fresh-resume' && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'save-mutations' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
       matrix:
@@ -373,7 +373,7 @@ jobs:
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           # run-campaign.mjs consumes the same base config but owns its own campaign policy;
           # `probe` keeps the base journey validator satisfied for the dedicated market route.
-          COOP_UI_JOURNEY: ${{ inputs.journey == 'market-wide-lens' && 'probe' || inputs.journey || 'fresh-resume' }}
+          COOP_UI_JOURNEY: ${{ inputs.journey == 'market-wide-lens' && 'probe' || inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}
           COOP_UI_ACCOUNT_MODE: register
           COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ github.run_attempt }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
@@ -425,7 +425,7 @@ jobs:
             [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
           done
           export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99
-          if [[ "${{ inputs.journey || 'fresh-resume' }}" == "market-wide-lens" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" ]]; then
             node test/browser/coop-public-ui/run-campaign.mjs
           else
             node test/browser/coop-public-ui/run.mjs
