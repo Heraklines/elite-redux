@@ -11,7 +11,7 @@ import {
 } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { getSaltCircleEscapeSource } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { getActiveCoopV2ReplacementCutover } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
-import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
+import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
@@ -376,7 +376,11 @@ export class SwitchSummonPhase extends SummonPhase {
 
     this.lastPokemon.resetSummonData();
 
-    globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeActiveTrigger, true);
+    // SwitchSummonPhase may be part of an already-open authoritative co-op turn. A root-delayed form
+    // change can otherwise survive through the next TurnEnd and sit behind CoopTurnCommitPhase. Keep
+    // this material mutation in the switch subtree; solo and Showdown/lockstep keep the legacy order.
+    const coopTurnRecording = globalScene.gameMode.isCoop && isCoopRecording();
+    globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeActiveTrigger, !coopTurnRecording);
     // Reverts to weather-based forms when weather suppressors (Cloud Nine/Air Lock) are switched out
     globalScene.arena.triggerWeatherBasedFormChanges(pokemon);
   }
