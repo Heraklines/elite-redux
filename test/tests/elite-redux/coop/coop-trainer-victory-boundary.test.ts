@@ -68,6 +68,13 @@ describe("co-op retained trainer-victory boundary", () => {
     expect(getCoopTrainerVictoryBoundary(renderer, 6)).toBe(installed);
 
     clearCoopTrainerVictoryBoundary(renderer, 6);
+
+    const malformed = { ...structuredClone(material!), modifierRewardTypeIds: ["NOT_A_REGISTERED_REWARD"] };
+    expect(installCoopTrainerVictoryMaterial(renderer, malformed)).toBeNull();
+    expect(
+      getCoopTrainerVictoryBoundary(renderer, 6),
+      "a rejected material image cannot leak into the ledger",
+    ).toBeNull();
   });
 
   it("keeps exact source-wave trainer rewards after the ambient battle advances", () => {

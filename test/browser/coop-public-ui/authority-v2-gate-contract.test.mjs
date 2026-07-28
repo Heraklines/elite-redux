@@ -31,6 +31,15 @@ const battleStream = readFileSync(new URL("src/data/elite-redux/coop/coop-battle
 const turnRecorder = readFileSync(new URL("src/data/elite-redux/coop/coop-turn-recorder.ts", root), "utf8");
 const turnCutover = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/cutover-turn.ts", root), "utf8");
 const meOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-operation.ts", root), "utf8");
+const meTerminalValidator = readFileSync(
+  new URL("src/data/elite-redux/coop/coop-me-terminal-validator.ts", root),
+  "utf8",
+);
+const operationEnvelope = readFileSync(new URL("src/data/elite-redux/coop/coop-operation-envelope.ts", root), "utf8");
+const trainerVictoryBoundary = readFileSync(
+  new URL("src/data/elite-redux/coop/coop-trainer-victory-boundary.ts", root),
+  "utf8",
+);
 const mePresentation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-presentation.ts", root), "utf8");
 const operationSurfaceRegistry = readFileSync(
   new URL("src/data/elite-redux/coop/coop-operation-surface-registry.ts", root),
@@ -50,6 +59,7 @@ const learnMovePhase = readFileSync(new URL("src/phases/learn-move-phase.ts", ro
 const encounterPhase = readFileSync(new URL("src/phases/encounter-phase.ts", root), "utf8");
 const battleScene = readFileSync(new URL("src/battle-scene.ts", root), "utf8");
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
+const trainerVictoryPhase = readFileSync(new URL("src/phases/trainer-victory-phase.ts", root), "utf8");
 const mysteryEncounterPhases = readFileSync(new URL("src/phases/mystery-encounter-phases.ts", root), "utf8");
 const mysteryEncounterUiHandler = readFileSync(
   new URL("src/ui/handlers/mystery-encounter-ui-handler.ts", root),
@@ -1323,6 +1333,41 @@ test("every Mystery result stays on the presentation's pre-battle authority coor
     mysteryCoordinates.length,
     4,
     "presentation, owner picks, and the no-battle terminal all share the fixed Mystery coordinate",
+  );
+});
+
+test("Mystery trainer victory is installed from immutable terminal material", () => {
+  assert.match(
+    operationEnvelope,
+    /readonly trainerVictoryMaterial: CoopTrainerVictoryMaterial \| null;/u,
+    "the terminal schema makes the trainer result explicit rather than optional ambient state",
+  );
+  assert.match(
+    meTerminalValidator,
+    /destination\.trainerVictory[\s\S]*isCompleteCoopTrainerVictoryMaterial\(destination\.trainerVictoryMaterial\)[\s\S]*destination\.trainerVictoryMaterial\.sourceWave === outcome\.authoritativeState\.wave/u,
+    "admission requires complete material at the same authoritative wave",
+  );
+  assert.match(
+    coopRuntime,
+    /plan\.trainerVictory \? captureCoopTrainerVictoryMaterial\(globalScene, battle\) : null/u,
+    "the authority captures the source trainer while its battle still exists",
+  );
+  assert.match(
+    coopRuntime,
+    /installCoopTrainerVictoryMaterial\(globalScene, payload\.destination\.trainerVictoryMaterial\) == null/u,
+    "the replica installs trainer material before executing the typed destination",
+  );
+  assert.match(trainerVictoryBoundary, /modifierRewardTypeIds[\s\S]*getModifierTypeFuncById/u);
+
+  const meBoundaryStart = trainerVictoryPhase.indexOf('meControl?.terminal === "battle-settled"');
+  const meBoundaryEnd = trainerVictoryPhase.indexOf("const retainedIdentity", meBoundaryStart);
+  assert.ok(meBoundaryStart >= 0 && meBoundaryEnd > meBoundaryStart, "the retained Mystery victory branch exists");
+  const meBoundary = trainerVictoryPhase.slice(meBoundaryStart, meBoundaryEnd);
+  assert.match(meBoundary, /getCoopTrainerVictoryBoundary\(globalScene, ambientBattle\.waveIndex\)/u);
+  assert.doesNotMatch(
+    meBoundary,
+    /snapshotCoopTrainerVictoryBoundary/u,
+    "the renderer's mutable Mystery battle cannot become trainer authority again",
   );
 });
 
