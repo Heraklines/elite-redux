@@ -234,7 +234,8 @@ export function loadCampaignPolicy() {
       battleFallback: envKeys("COOP_UI_BATTLE_FALLBACK_KEYS", ["Space", "ArrowRight", "Space", "Space"]),
       // Reward shop: CANCEL opens the skip/leave confirm, ACTION confirms it.
       rewardLeave: envKeys("COOP_UI_REWARD_LEAVE_KEYS", ["Backspace", "Space"]),
-      // Reward pick-first: go to the rewards row and take the leftmost take-able option.
+      // Historical mode name retained for workflow compatibility. The campaign driver semantically
+      // chooses the best visible survival option; this key submits it when it is already selected.
       rewardPickFirst: envKeys("COOP_UI_REWARD_PICK_FIRST_KEYS", ["Space"]),
       biomeShopLeave: envKeys("COOP_UI_BIOME_SHOP_LEAVE_KEYS", ["Backspace", "Space"]),
       // Biome pick: travel the leftmost/default revealed node (ACTION = travel).

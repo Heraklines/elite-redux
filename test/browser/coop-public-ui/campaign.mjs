@@ -2380,8 +2380,34 @@ function authoritativeAddressKey(address) {
   return JSON.stringify([address?.epoch ?? null, address?.wave ?? null, address?.turn ?? null]);
 }
 
+function campaignRewardUtility(optionId) {
+  if (/REVIVE|SACRED_ASH/u.test(optionId)) {
+    return 600;
+  }
+  if (/POTION|RESTORE|HEAL|WATER|SODA|LEMONADE|MOOMOO_MILK|ENERGY_ROOT/u.test(optionId)) {
+    return 500;
+  }
+  if (/RARE_CANDY|CANDY_JAR|EXP_(?:CHARM|SHARE|BALANCE)/u.test(optionId)) {
+    return 400;
+  }
+  if (/BERRY/u.test(optionId)) {
+    return 300;
+  }
+  if (/TEMP_STAT_STAGE_BOOSTER|X_(?:ATTACK|DEFENSE|SP_ATK|SP_DEF|SPEED|ACCURACY)/u.test(optionId)) {
+    return 200;
+  }
+  if (/TM|MINT|ABILITY|VITAMIN|PROTEIN|IRON|CALCIUM|ZINC|CARBOS/u.test(optionId)) {
+    return 100;
+  }
+  return 0;
+}
+
 /**
- * Pick a still-untried visible reward after a learn-move decline returns to the same shop.
+ * Pick the highest-utility still-untried visible reward after a learn-move decline returns to the
+ * same shop. The observer exposes only the option ids a player can currently see; selection still
+ * happens exclusively through public arrow/action keys. Sustain outranks collection/map items so
+ * the depth campaign behaves like a player trying to survive, while stable visible order breaks
+ * ties and makes the run reproducible.
  *
  * Selecting the same TM again is not useful depth coverage: a real player who deliberately declines
  * that teaching flow moves to another option. Returning null is a loud exhaustion signal; it never
@@ -2394,11 +2420,12 @@ export function chooseUntriedRewardOption(authority, rejectedRewardIds) {
     ? authority.optionIds.filter(optionId => typeof optionId === "string")
     : [];
   const rejected = rejectedRewardIds instanceof Set ? rejectedRewardIds : new Set(rejectedRewardIds ?? []);
-  const selected = typeof authority?.selectedOptionId === "string" ? authority.selectedOptionId : null;
-  if (selected != null && !rejected.has(selected)) {
-    return selected;
-  }
-  return options.find(optionId => !rejected.has(optionId)) ?? null;
+  return (
+    options
+      .map((optionId, index) => ({ optionId, index, utility: campaignRewardUtility(optionId) }))
+      .filter(option => !rejected.has(option.optionId))
+      .sort((left, right) => right.utility - left.utility || left.index - right.index)[0]?.optionId ?? null
+  );
 }
 
 async function driveRewardPartyTarget(rig, driver, owner, boundary) {

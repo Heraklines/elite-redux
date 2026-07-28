@@ -705,15 +705,26 @@ test("a blocked current Mystery narration handoff is known provisional work only
   assert.equal(hasProvisionalMysteryNarrationSurface([owner], cursors), false);
 });
 
-test("reward retry selection never resubmits a declined visible option", () => {
+test("reward selection prioritizes visible sustain and never resubmits a declined option", () => {
   const authority = {
-    selectedOptionId: "TM_CASE",
-    optionIds: ["TM_CASE", "MINT", "POKEBALL"],
+    selectedOptionId: "POKEBALL",
+    optionIds: ["POKEBALL", "ER_UPGRADED_MAP", "BERRY", "RARE_CANDY", "SUPER_POTION", "REVIVE"],
   };
-  assert.equal(chooseUntriedRewardOption(authority, new Set()), "TM_CASE");
-  assert.equal(chooseUntriedRewardOption(authority, new Set(["TM_CASE"])), "MINT");
-  assert.equal(chooseUntriedRewardOption(authority, new Set(["TM_CASE", "MINT"])), "POKEBALL");
+  assert.equal(chooseUntriedRewardOption(authority, new Set()), "REVIVE");
+  assert.equal(chooseUntriedRewardOption(authority, new Set(["REVIVE"])), "SUPER_POTION");
+  assert.equal(chooseUntriedRewardOption(authority, new Set(["REVIVE", "SUPER_POTION"])), "RARE_CANDY");
+  assert.equal(chooseUntriedRewardOption(authority, new Set(["REVIVE", "SUPER_POTION", "RARE_CANDY"])), "BERRY");
   assert.equal(chooseUntriedRewardOption(authority, new Set(authority.optionIds)), null);
+});
+
+test("reward selection preserves stable visible order inside one utility tier", () => {
+  assert.equal(
+    chooseUntriedRewardOption(
+      { selectedOptionId: "POKEBALL", optionIds: ["POKEBALL", "SITRUS_BERRY", "LUM_BERRY"] },
+      new Set(),
+    ),
+    "SITRUS_BERRY",
+  );
 });
 
 test("a legacy phase marker stops registering a semantic surface after a later phase supersedes it", () => {

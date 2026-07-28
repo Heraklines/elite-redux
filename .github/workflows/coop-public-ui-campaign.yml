@@ -34,7 +34,7 @@ on:
           - normal
           - slow
       reward_mode:
-        description: Reward shop policy each wave (owner leaves, or takes the first option)
+        description: Reward shop policy each wave (owner leaves, or takes the best visible survival option)
         required: true
         type: choice
         default: pick-first
