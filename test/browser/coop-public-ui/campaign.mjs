@@ -2526,13 +2526,18 @@ async function driveMysteryPartyPicker(rig, owner, cursors, stats) {
  * The observer exposes only ordinal option identity plus the handler's computed availability; every
  * state change here is still a real, verified keyboard action against the public UI.
  */
-export async function driveMysteryEncounterChoice(rig, owner, cursors) {
+export function chooseMysteryEncounterOption(observation, preferLastEnabledOption = false) {
+  const enabled = observation?.optionIds?.filter(id => /^mystery-option:\d+:enabled$/u.test(id)) ?? [];
+  return preferLastEnabledOption ? (enabled.at(-1) ?? null) : (enabled[0] ?? null);
+}
+
+export async function driveMysteryEncounterChoice(rig, owner, cursors, preferLastEnabledOption = false) {
   const fromCursor = cursors[owner.label] ?? 0;
   const choice = await owner.evidence.waitForCondition(
     sink => {
       const event = sink.findLastSemanticSurface(fromCursor, "mystery-encounter");
       const observation = event?.observation;
-      const targetId = observation?.optionIds?.find(id => /^mystery-option:\d+:enabled$/u.test(id));
+      const targetId = chooseMysteryEncounterOption(observation, preferLastEnabledOption);
       return event != null
         && targetId != null
         && observation.ownerSeat === owner.publicSeat
@@ -2713,7 +2718,7 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
     } else if (driver.name === "reward-target" && mechanicalBoundary != null) {
       rewardRetryState.pendingTarget = await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
     } else if (driver.name === "mystery-encounter") {
-      await driveMysteryEncounterChoice(rig, client, cursors);
+      await driveMysteryEncounterChoice(rig, client, cursors, driver.preferLastEnabledOption === true);
     } else if (driver.name === "learn-move-confirm" && mechanicalBoundary != null) {
       await driveLearnMoveDecline(rig, client, mechanicalBoundary);
       const pending = rewardRetryState.pendingTarget;

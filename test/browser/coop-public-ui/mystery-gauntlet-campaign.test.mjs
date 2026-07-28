@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 import {
   assertAsymmetricMysteryPromptProjection,
+  chooseMysteryEncounterOption,
   chooseRewardPartyTargetSlot,
   createMysteryNarrationAdvancer,
   createRegisteredSurfaceProgressBudget,
@@ -63,6 +64,7 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
       assert.equal(policy.maxBattleLoops, 90);
       assert.equal(policy.moveAnimationsExpected, false);
       const dispatch = buildDispatchTable(policy);
+      assert.equal(dispatch.find(driver => driver.name === "mystery-encounter")?.preferLastEnabledOption, true);
       const surfaces = dispatch.map(driver => driver.v2SurfaceId);
       assert.deepEqual(
         ["mystery-encounter", "mystery-encounter:prompt", "quiz", "bargain", "colosseum"].filter(
@@ -154,6 +156,20 @@ test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wav
   assert.match(workflow, /COOP_UI_DIFFICULTY_ID: \$\{\{ matrix\.difficulty \}\}/u);
   assert.match(workflow, /COOP_UI_DIFFICULTY_OPTION_ID: \$\{\{ matrix\.difficulty_option \}\}/u);
   assert.match(workflow, /COOP_UI_REQUIRE_MYSTERY_GAUNTLET: \$\{\{ matrix\.require_mystery \}\}/u);
+  assert.match(workflow, /profile: mystery-gauntlet[\s\S]{0,700}?reward_mode: pick-first/u);
+});
+
+test("Mystery gauntlet picks the visible safe exit while normal play preserves the first enabled choice", () => {
+  const observation = {
+    optionIds: [
+      "mystery-option:0:disabled",
+      "mystery-option:1:enabled",
+      "mystery-option:2:enabled",
+      "mystery-action:view-party",
+    ],
+  };
+  assert.equal(chooseMysteryEncounterOption(observation, false), "mystery-option:1:enabled");
+  assert.equal(chooseMysteryEncounterOption(observation, true), "mystery-option:2:enabled");
 });
 
 test("campaign fight policy prefers a usable damaging move and follows the visible two-column grid", () => {
@@ -413,7 +429,10 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   // public host input needed to reach the exact command-open successor. Once the handoff starts, this phase
   // is local battle presentation, not part of the alternating Mystery interaction.
   assert.match(observer, /phase\.startsWith\("MysteryEncounter"\) && phase !== "MysteryEncounterBattlePhase"/u);
-  assert.match(campaign, /await driveMysteryEncounterChoice\(rig, client, cursors\)/u);
+  assert.match(
+    campaign,
+    /await driveMysteryEncounterChoice\(rig, client, cursors, driver\.preferLastEnabledOption === true\)/u,
+  );
 
   // Track R cycle-11 mystery lane (run 29654429335): a guest-owned PART_TIMER opened a PARTY
   // sub-prompt (surfaceId "party", ownerModel "local", ownerSeat null) with no driver; the owner

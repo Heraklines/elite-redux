@@ -241,7 +241,10 @@ export function loadCampaignPolicy() {
       biomePick: envKeys("COOP_UI_BIOME_PICK_KEYS", ["Space"]),
       // Crossroads: take the first (leftmost) option.
       crossroads: envKeys("COOP_UI_CROSSROADS_KEYS", ["Space"]),
-      // Mystery encounter: first safe option (top-left of the 2x2 grid), then advance.
+      // Mystery encounter: normal campaigns take the first enabled option. The dedicated
+      // coverage gauntlet takes the last enabled option, which is the explicit leave/bank path
+      // on press-your-luck events; otherwise a fresh-account test can die to optional combat
+      // before reaching the later trainer, boss, bargain, and terminal surfaces it exists to prove.
       mystery: envKeys("COOP_UI_MYSTERY_KEYS", ["Space"]),
       // The ten-wave continuity profile proves Bargain ownership + terminal convergence by visibly
       // declining the offer. Accepting a Sin opens deeper party/ability surfaces covered elsewhere.
@@ -329,6 +332,7 @@ export function buildDispatchTable(policy) {
       v2SurfaceId: "mystery-encounter",
       owner: { marker: ME_HOST_OWNER },
       keys: policy.keys.mystery,
+      preferLastEnabledOption: policy.mysteryGauntlet.required,
     },
     {
       name: "mystery-subprompt",

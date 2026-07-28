@@ -328,7 +328,9 @@ jobs:
             # (run 29586411356: selectOptionById target not in ["youngster","ace","elite","hell","mystery"]).
             difficulty_option: mystery
             require_mystery: "1"
-            reward_mode: leave
+            # This is a ten-wave public-play journey, so act like a player trying to survive it:
+            # take visible rewards instead of throwing every one away before the scripted boss/ghost.
+            reward_mode: pick-first
             campaign_timeout_ms: "2700000"
             process_timeout: 48m
             job_timeout_minutes: 55

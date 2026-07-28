@@ -3565,6 +3565,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
           partyTemplateIndex: 1,
           name: "Authority",
           partnerName: "Replay",
+          selectedEncounterMessage: null,
         },
       };
 
