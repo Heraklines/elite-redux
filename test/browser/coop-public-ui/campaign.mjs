@@ -1156,6 +1156,7 @@ export async function waitForOutcomeBounded(
     animationHardCeilingMs = null,
     animationProgressAllowanceMs = null,
     singleSidedConfirmMs = 0,
+    driveTargetSelection = null,
   } = {},
 ) {
   const clients = Object.values(rig.clients);
@@ -1255,6 +1256,14 @@ export async function waitForOutcomeBounded(
           return { kind: "command", client: commandCandidate.client };
         }
       }
+    }
+    // A move submission can open SelectTargetPhase only after the final sequential command owner
+    // has been removed from the command driver's pending set. The target is ordinary required human
+    // input, not evidence that the move failed. Consume only the caller's exact-address, readiness-
+    // proven target before the short blind-fallback timer can arm (run 30380532647 spent 15 seconds
+    // on every turn and then used fallback's first Space merely to confirm this visible picker).
+    if (driveTargetSelection && (await driveTargetSelection())) {
+      continue;
     }
     if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
       return { kind: "turn-progress" };
@@ -1402,10 +1411,13 @@ async function driveBattleWave(rig, policy, stats) {
     const advanceBattlePrompt = createBattlePromptAdvancer(rig, from, stats, purpose, {
       expectedCommandAddress,
     });
+    const driveTargetSelection = () =>
+      rig.driveAddressedTargetSelection(from, expectedCommandAddress, `${purpose}-post-command-target`);
     let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, {
       stopOnTurnProgress: true,
       stopOnOwnedCommandFrontier: true,
       singleSidedConfirmMs: SINGLE_SIDED_COMMAND_CONFIRM_MS,
+      driveTargetSelection,
     });
     const fallbackClients = [];
     let turnProgressed = false;
@@ -1427,18 +1439,25 @@ async function driveBattleWave(rig, policy, stats) {
       });
     }
     if (!outcome && !turnProgressed) {
+      // Drain once after the bounded wait as well. The timer can resume after its deadline while
+      // the target event is already buffered; an exact semantic target must always outrank blind
+      // command cycling. If this consumes the picker, the ordinary outcome wait below observes the
+      // resulting turn and no fallback is counted.
+      const recoveredTarget = await driveTargetSelection();
       // Attack-first did not resolve or fully enter the turn (no PP / disabled / wrong target).
       // Cycle only clients lacking turn-progress evidence; never replay input on a client whose
       // valid turn is already executing under browser CPU pressure.
-      fallbackClients.push(
-        ...(await driveBattleFallback(
-          rig,
-          policy.keys.battleFallback,
-          from,
-          `${purpose}-fallback`,
-          expectedCommandAddress,
-        )),
-      );
+      if (!recoveredTarget) {
+        fallbackClients.push(
+          ...(await driveBattleFallback(
+            rig,
+            policy.keys.battleFallback,
+            from,
+            `${purpose}-fallback`,
+            expectedCommandAddress,
+          )),
+        );
+      }
       if (fallbackClients.length > 0) {
         stats.fallbackTurns += 1;
       }

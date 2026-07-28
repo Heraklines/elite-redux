@@ -4224,6 +4224,32 @@ export class DuoPublicUiRig {
     };
   }
 
+  /**
+   * Consume one currently rendered target picker at the exact command address.
+   *
+   * The final sequential command owner can open SelectTargetPhase after the command driver's
+   * pending set becomes empty. Campaign outcome polling calls this hook so the same public Space a
+   * human would press is driven from semantic actionability evidence instead of after a blind retry
+   * timeout. Consumption is session-scoped because append-only observations outlive the picker UI.
+   */
+  async driveAddressedTargetSelection(from, expectedAddress, purpose) {
+    this.consumedCampaignTargetInstances ??= new Set();
+    for (const client of Object.values(this.clients)) {
+      if (
+        await driveOwnedTargetSelection(
+          client,
+          from[client.label] ?? 0,
+          expectedAddress,
+          this.consumedCampaignTargetInstances,
+          purpose,
+        )
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   async waitForPostTurnOutcome(from, { expectedCommandAddress = null, progressBudgetOptions = {} } = {}) {
     let advanceBattlePrompt = null;
     const consumedTargetInstances = new Set();

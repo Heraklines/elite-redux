@@ -1599,6 +1599,26 @@ test("fallback input is sent only to the client whose command never entered the 
   ]);
 });
 
+test("the bounded outcome wait drives a late addressed target before arming blind fallback input", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  let targetDrives = 0;
+
+  const outcome = await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 100, {
+    stopOnTurnProgress: true,
+    driveTargetSelection: async () => {
+      targetDrives += 1;
+      authority.evidence.pushConsole("Start Phase TurnStartPhase");
+      renderer.evidence.pushConsole("Start Phase TurnStartPhase");
+      return true;
+    },
+  });
+
+  assert.deepEqual(outcome, { kind: "turn-progress" });
+  assert.equal(targetDrives, 1, "the semantic target is consumed during the primary wait, not by fallback");
+});
+
 test("fallback stops retrying when an earlier key visibly enters the turn", async () => {
   const authority = fakeClient("authority", ["[coop:turn] host recorder: begin turn=1"]);
   const renderer = fakeClient("renderer");

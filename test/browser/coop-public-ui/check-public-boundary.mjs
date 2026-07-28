@@ -326,8 +326,13 @@ if (
   || !harness.includes("findOwnedActionableTargetSurface")
   || !harness.includes('"semantic-target-selection-proof"')
   || !harness.includes('"public-ui-post-turn-target"')
+  || !harness.includes("async driveAddressedTargetSelection(")
+  || !campaign.includes("rig.driveAddressedTargetSelection(")
+  || !campaign.includes("driveTargetSelection,")
 ) {
-  failures.push("target selection must remain an address-bound semantic public UI-to-relay chain");
+  failures.push(
+    "target selection must remain an address-bound semantic public UI-to-relay chain before blind fallback",
+  );
 }
 if (
   !browserEntry.includes("function readFightMoveSlots(")
