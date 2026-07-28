@@ -24,12 +24,14 @@
 //                  healGuestFromHost, all PRODUCTION heal mechanisms, NOT content-disabling); and (2) the
 //                  REAL detector - POST-TURN, comparing the guest's REPLAYED state to the host WITHOUT a
 //                  re-mirror (so a checkpoint/replay divergence like the historical move-PP desync surfaces
-//                  instead of being masked). On a mismatch the documented ONE-heal grace runs the resync
-//                  analogue and re-checks; a STILL-diverged boundary is a REAL desync RECORDED as a
-//                  SoakFinding (grouped by diverging fields; first-occurrence replay artifact written) and
-//                  the run CONTINUES, so a long soak surveys the WHOLE game and reports EVERY finding. The
-//                  soak TEST FAILS if any finding was recorded - a faithful red on a real bug, NEVER made
-//                  green by narrowing content.
+//                  instead of being masked). A wave-start sample is admitted only after the guest's exact
+//                  owned command phase exposes an actionable handler and consumes/dominates its latest
+//                  authority carrier. A mismatch gets one ordinary peer-pump settle before recovery. Any
+//                  unexpected divergence which survives that human-actionable boundary is RECORDED as a
+//                  SoakFinding even if the production stateSync analogue subsequently converges it and lets
+//                  the long survey continue. Post-turn keeps the documented one-heal grace and records a
+//                  finding if recovery cannot converge. The soak TEST FAILS if any finding was recorded - a
+//                  faithful red on a real bug, NEVER made green by narrowing content.
 //   (b) LOCKSTEP - interactionCounter() is EQUAL on both controllers at every boundary.
 //   (c) NO-PARK  - a bounded per-wave progress budget; if a wave does not complete in N
 //                  pump iterations the driver dumps both clients' current phase names +
@@ -71,6 +73,7 @@ import {
   captureCoopFullSnapshot,
   captureCoopSaveDataDigest,
   captureCoopSaveDataNormalized,
+  coopAppliedStateTick,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   type CoopBiomeOperationBinding,
@@ -1696,6 +1699,18 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     return { host, guest };
   };
 
+  /**
+   * Exact guest-owned command boundaries which exposed a real, actionable public handler.
+   *
+   * A phase-name match is not this proof. In the shared-process harness a non-owned field-0 CommandPhase can
+   * leave COMMAND as the visible mode while the guest-owned field-1 phase is still deferred behind its V2
+   * carrier. Sampling the checksum in that window compares the host's settled entry image with a renderer
+   * which has not yet crossed the same input seal. Record the proof only after the exact field-1 phase owns an
+   * active/actionable handler and its latest wave-start carrier is already applied or causally dominated.
+   */
+  const guestOwnedCommandProofs = new Set<string>();
+  const commandBoundaryPoint = (wave: number, turn: number): string => `cmd:${wave}:${turn}`;
+
   /** Capture BOTH clients' #837 save-data digests (each under its own ctx). */
   const captureSaveDigests = async (): Promise<{ host: string; guest: string }> => {
     const host = await withClient(rig.hostCtx, () => captureCoopSaveDataDigest());
@@ -1734,7 +1749,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
   };
 
-  /** Record an unhealed host-vs-guest DIGEST divergence as a finding (grouped by fields; artifact on first). */
+  /** Record a persistent host-vs-guest DIGEST divergence as a finding (grouped by fields; artifact on first). */
   const recordDigestFinding = async (wave: number, where: string): Promise<void> => {
     const hostState = await withClient(rig.hostCtx, () => JSON.parse(JSON.stringify(captureCoopChecksumState())));
     const guestState = await withClient(rig.guestCtx, () => JSON.parse(JSON.stringify(captureCoopChecksumState())));
@@ -1774,7 +1789,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
     // eslint-disable-next-line no-console
     console.log(
-      `[coop-soak] FINDING wave ${wave} @${where} (seed ${seed}): unhealed DIGEST divergence [${fields}] - ${sample}`,
+      `[coop-soak] FINDING wave ${wave} @${where} (seed ${seed}): persistent DIGEST divergence [${fields}] - ${sample}`,
     );
     recordFinding(wave, fields, sample);
   };
@@ -1839,18 +1854,33 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   };
 
   /**
-   * INVARIANT (a) DIGEST at a boundary: host and guest captureCoopChecksum() must be EQUAL. On a mismatch,
-   * run the ONE-heal grace `oneHeal` (a resync analogue) and re-check; a STILL-diverged boundary is a REAL
-   * desync the resync did not converge - RECORDED as a finding (the run CONTINUES so a long soak surveys the
-   * whole game). The soak test then FAILS if any finding exists (a faithful red on a real bug, NEVER made
-   * green by narrowing content). Returns the (final) host/guest checksums for the boundary sample.
+   * INVARIANT (a) DIGEST at a boundary: host and guest captureCoopChecksum() must be EQUAL. A caller-supplied
+   * ordinary settle runs before recovery, without applying state. At an actionable wave-start, an unexpected
+   * mismatch which survives that settle is already player-visible and is recorded before the ONE-heal grace;
+   * recovery may continue the survey but cannot erase the finding. At other boundaries, a mismatch which the
+   * production resync analogue still cannot converge is recorded. The soak test then FAILS if any finding
+   * exists (a faithful red on a real bug, NEVER made green by narrowing content). Returns the final checksums.
    */
   const checkDigest = async (
     wave: number,
     where: string,
     oneHeal: () => Promise<void>,
+    settleNaturally?: () => Promise<void>,
   ): Promise<{ host: string; guest: string }> => {
     let chk = await captureChecksums();
+    if (chk.host !== chk.guest && settleNaturally != null) {
+      // A real browser pair keeps servicing its own continuations and the peer inbox before recovery is
+      // requested. Give that ordinary path one bounded chance to consume an already-authorized carrier, then
+      // re-sample. This performs no state application and does not increment the resync counter: a timing-only
+      // mismatch which converges naturally is not a heal, while a mismatch which survives is real evidence.
+      await settleNaturally();
+      const naturallySettled = await captureChecksums();
+      if (naturallySettled.host === naturallySettled.guest) {
+        actionScript.push(`wave ${wave}: DIGEST @${where} converged through ordinary peer/input settling`);
+        return naturallySettled;
+      }
+      chk = naturallySettled;
+    }
     if (chk.host !== chk.guest) {
       resyncHeals++;
       const hostState = await withClient(rig.hostCtx, () => JSON.parse(JSON.stringify(captureCoopChecksumState())));
@@ -1882,9 +1912,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       console.log(
         `[coop-soak] PRE-HEAL ${classification} wave=${wave} where=${where} fields=[${fields.join(",")}] :: ${sample}`,
       );
+      // Once the exact guest-owned input surface is actionable, an unexpected wave-start mismatch is already
+      // player-visible divergence. Keep the production stateSync analogue below so a long soak can continue
+      // surveying later waves, but record the finding first so a successful recovery can never greenwash it.
+      const persistentAtActionableBoundary = where === "wave-start" && classification === "unexpected";
+      if (persistentAtActionableBoundary) {
+        await recordDigestFinding(wave, where);
+      }
       await oneHeal();
       chk = await captureChecksums();
-      if (chk.host !== chk.guest) {
+      if (chk.host !== chk.guest && !persistentAtActionableBoundary) {
         await recordDigestFinding(wave, where);
       }
     }
@@ -1907,23 +1944,63 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   };
 
   /**
-   * WAVE-START boundary: LOCKSTEP + record the boundary digest sample. The guest was just re-mirrored +
-   * faithfully re-synced to the host ({@linkcode healGuestFromHost}), so this is the CLEAN-START parity
-   * check (the launch/resync fidelity). The one-heal here is a second re-mirror (HARNESS mode) or the
-   * production resync analogue (PRODUCTION-FIDELITY mode - no full reset). The REAL replay-desync detection is
-   * the POST-TURN check below.
+   * WAVE-START boundary: require the exact guest-owned public command proof + latest carrier dominance, then
+   * sample LOCKSTEP and the digest. Harness fidelity was just re-mirrored + faithfully re-synced to the host;
+   * production fidelity preserves the guest's real replayed party. An ordinary destination pump gets the only
+   * pre-recovery retry. The one-heal afterward is a second re-mirror (HARNESS) or production stateSync analogue
+   * (PRODUCTION), but an unexpected mismatch already recorded at this actionable boundary remains red.
    */
   const assertWaveBoundary = async (wave: number): Promise<void> => {
     assertLockstep(wave, "wave-start");
-    const chk = await checkDigest(wave, "wave-start", async () => {
-      if (fidelity === "production") {
-        // Heals ONLY via the production trigger (checksum mismatch -> stateSync analogue); no full re-mirror.
-        await resyncHealAnalogue(wave);
-        return;
+    const turn = rig.hostScene.currentBattle.turn;
+    const guestOwnedField = rig.hostScene
+      .getPlayerField()
+      .find(pokemon => pokemon.coopOwner === "guest" && !pokemon.isFainted() && pokemon.isAllowedInBattle());
+    if (guestOwnedField != null) {
+      const point = commandBoundaryPoint(wave, turn);
+      if (!guestOwnedCommandProofs.has(point)) {
+        fail(
+          "no-park",
+          wave,
+          `wave-start digest refused before the guest-owned public command surface proved actionable (${point})`,
+        );
       }
-      await remirrorWave(rig);
-      await healGuestFromHost(rig);
-    });
+      const carrierStatus = withClientSync(rig.guestCtx, () => {
+        const pendingTick = rig.guestRuntime.battleStream.peekEnemyPartyState(wave)?.tick;
+        const appliedTick = coopAppliedStateTick();
+        return { pendingTick, appliedTick };
+      });
+      if (carrierStatus.pendingTick != null && carrierStatus.pendingTick > carrierStatus.appliedTick) {
+        fail(
+          "no-park",
+          wave,
+          "wave-start digest refused before the guest consumed its latest authority carrier "
+            + `(pendingTick=${carrierStatus.pendingTick} appliedTick=${carrierStatus.appliedTick} ${point})`,
+        );
+      }
+    }
+    const chk = await checkDigest(
+      wave,
+      "wave-start",
+      async () => {
+        if (fidelity === "production") {
+          // Heals ONLY via the production trigger (checksum mismatch -> stateSync analogue); no full re-mirror.
+          await resyncHealAnalogue(wave);
+          return;
+        }
+        await remirrorWave(rig);
+        await healGuestFromHost(rig);
+      },
+      async () => {
+        // No direct state copy here. Pump the two real destination event loops and let the already-proved
+        // command surface / transport subscriptions consume their own work exactly as separate browsers do.
+        for (let attempt = 0; attempt < 4; attempt++) {
+          await pumpDuoDestinations(rig, 1);
+          await withClient(rig.guestCtx, () => drainLoopback());
+          await withClient(rig.hostCtx, () => drainLoopback());
+        }
+      },
+    );
     const save = await captureSaveDigests();
     const preimages = opts.captureBoundaryPreimages ? await captureSavePreimages() : undefined;
     boundaryDigests.push({
@@ -2172,26 +2249,59 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       phase: { readonly phaseName: string },
       mode: UiMode,
       label: string,
+      exactReady: () => boolean = () => true,
     ): Promise<"opened" | "ended"> => {
       for (let attempt = 0; attempt < 320; attempt++) {
         const state = await withClient(ctx, async () => {
           await drainLoopback();
+          const handler = ctx.scene.ui.getHandler() as
+            | {
+                active?: boolean;
+                isCoopV2InputActionable?: () => boolean;
+              }
+            | undefined;
+          const phaseOwnedReady = (
+            phase as {
+              isCoopV2ControlSurfaceReady?: (handlerToken: object) => boolean;
+            }
+          ).isCoopV2ControlSurfaceReady;
           return {
             mode: ctx.scene.ui.getMode(),
             current: ctx.scene.phaseManager.getCurrentPhase(),
+            actionable:
+              handler?.active === true
+              && handler.isCoopV2InputActionable?.() === true
+              && (typeof phaseOwnedReady !== "function" || phaseOwnedReady.call(phase, handler))
+              && exactReady(),
           };
         });
         if (state.current !== phase) {
           return "ended";
         }
-        if (state.mode === mode) {
+        if (state.mode === mode && state.actionable) {
           return "opened";
         }
         // Keep this browser-equivalent client installed while its bounded UI transition/tween callback runs.
         await withClient(ctx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
         await pumpDuoDestinations(rig, 1);
       }
-      fail("no-park", transitionSourceWave, `${label} never opened ${UiMode[mode]} or left ${phase.phaseName}`);
+      const detail = withClientSync(ctx, () => {
+        const handler = ctx.scene.ui.getHandler() as
+          | {
+              active?: boolean;
+              isCoopV2InputActionable?: () => boolean;
+            }
+          | undefined;
+        return (
+          `mode=${UiMode[ctx.scene.ui.getMode()]} active=${String(handler?.active)} `
+          + `actionable=${String(handler?.isCoopV2InputActionable?.())}`
+        );
+      });
+      fail(
+        "no-park",
+        transitionSourceWave,
+        `${label} never opened actionable ${UiMode[mode]} or left ${phase.phaseName} (${detail})`,
+      );
       throw new Error(`unreachable after ${label} public-surface failure`);
     };
     const waitForBothBoundaryPhasesToExit = async (
@@ -2417,6 +2527,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // This crossing now owns the real Crossroads + World-Map public UI. Restore the default even on a hard
     // failure so a following test cannot inherit an interactive prompt it did not opt into.
     setCoopBiomePickerDrivenByTest();
+    let guestCommandOpenedExactSurface = false;
+    let restoreGuestCommandModeObserver: (() => void) | null = null;
     try {
       let guestCrossroadsProjected = false;
       let guestBiomeSourceWave: number | null = null;
@@ -2716,6 +2828,20 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           }),
         );
         await withClient(rig.guestCtx, async () => {
+          const guestUi = rig.guestScene.ui;
+          const originalSetMode = guestUi.setMode;
+          // COMMAND handlers are reused across turns. Merely observing an active/actionable handler can
+          // therefore mistake the previous generation for this guest-owned CommandPhase. Observe the real
+          // phase -> UI call chain and make that exact-generation event part of the boundary proof.
+          guestUi.setMode = (mode, ...args) => {
+            if (mode === UiMode.COMMAND && rig.guestScene.phaseManager.getCurrentPhase() === guestCommand) {
+              guestCommandOpenedExactSurface = true;
+            }
+            return originalSetMode.call(guestUi, mode, ...args);
+          };
+          restoreGuestCommandModeObserver = () => {
+            guestUi.setMode = originalSetMode;
+          };
           markRealGuestCommandBoundary(rig.guestScene, wave, turn);
           guestCommand!.start();
           await drainLoopback();
@@ -2805,6 +2931,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         guestCommand!,
         UiMode.COMMAND,
         `guest command ${wave}:${turn}`,
+        () => {
+          const pendingTick = rig.guestRuntime.battleStream.peekEnemyPartyState(wave)?.tick;
+          return guestCommandOpenedExactSurface && (pendingTick == null || pendingTick <= coopAppliedStateTick());
+        },
       );
       const guestHasCommandable = withClientSync(rig.guestCtx, () =>
         rig.guestScene
@@ -2813,6 +2943,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       );
       if (guestHasCommandable && guestCommandSurface !== "opened") {
         fail("no-park", wave, `guest command ${wave}:${turn} left without a public COMMAND handler`);
+      }
+      if (guestHasCommandable && guestCommandSurface === "opened") {
+        guestOwnedCommandProofs.add(point);
       }
       if (guestBiomeBoundary != null && rig.hostScene.arena.biomeId !== rig.guestScene.arena.biomeId) {
         fail(
@@ -2826,6 +2959,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         `wave ${wave} turn ${turn}: replay guest crossed ${point} through real public COMMAND=${guestCommandSurface}`,
       );
     } finally {
+      withClientSync(rig.guestCtx, () => restoreGuestCommandModeObserver?.());
       resetCoopBiomePickerDrivenByTest();
       rig.pair.setDestinationContextDelivery?.(false);
     }
