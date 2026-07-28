@@ -542,26 +542,26 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
   }
 
-  // A NATURAL biome-end pick (no preceding Crossroads) crosses its OWN #858 boundary barrier and must author
-  // its OWN Authority V2 interaction-open. Unlike the chained map above, both engines block at biomepick:<wave>
-  // until the reciprocal arrival is delivered, so pump BOTH after starting them (exactly as driveRealCrossroads
-  // does): the host must cross the barrier and author the exact interaction-open that releases the parked
-  // guest-owned picker. Only then does the guest owner's ER_MAP open.
+  // A NATURAL biome-end pick (no preceding Crossroads) must author its OWN Authority V2 interaction-open.
+  // Start the authority phase first: its ordered CONTROL_COMMIT is allowed to reconstruct a replica map whose
+  // speculative tail was removed by an earlier destructive projection. The legacy biomepick rendezvous is
+  // deliberately absent under V2 because waiting for that missing replica phase before publishing control is
+  // a causal cycle. Only then does the guest owner's ER_MAP open.
   async function driveRealNaturalGuestOwnedMapPick(rig: DuoRig, destination: BiomeId): Promise<void> {
     const pinned = rig.hostRuntime.controller.interactionCounter();
     expect(pinned % 2, "the guest owns the odd-parity natural biome pick").toBe(1);
     await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectBiomePhase", false));
     const hostMap = rig.hostScene.phaseManager.getCurrentPhase();
     expect(hostMap, "host reached the actual queued natural SelectBiomePhase").toBeInstanceOf(SelectBiomePhase);
+    await withClient(rig.hostCtx, async () => {
+      hostMap.start();
+      await drainLoopback();
+    });
     const guestMap = await withClient(rig.guestCtx, () =>
       driveClientPhaseQueueTo(rig.guestScene, "SelectBiomePhase", {
         matches: phase => phase instanceof SelectBiomePhase,
       }),
     );
-    await withClient(rig.hostCtx, async () => {
-      hostMap.start();
-      await drainLoopback();
-    });
     await withClient(rig.guestCtx, async () => {
       setMapTravelTarget(BiomeId.LAKE);
       guestMap.start();

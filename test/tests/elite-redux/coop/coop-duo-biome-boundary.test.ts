@@ -16,11 +16,11 @@
 // wave-10 desync ("map opened on the non-shopping player, then jumped screens when the shop closed,
 // freezing the shopper; the other player advanced with NO biome change").
 //
-// THE FIX: a reciprocal rendezvous barrier at the #848 interaction ENTRY (xroads:<wave> for the
-// crossroads, biomepick:<wave> for a natural biome-end pick). BOTH clients must reach it - i.e. BOTH
-// must have LEFT the shop - before EITHER pins the boundary counter + splits owner/watcher. Neither
-// can over-broadcast K+1 before the other pins K, so the fold can never skip K, and the anti-hang
-// fallback can only fire when the owner is TRULY absent (both time out together), never one-sided.
+// THE LEGACY FIX: a reciprocal rendezvous barrier at the #848 interaction ENTRY (xroads:<wave> or
+// biomepick:<wave>). Authority V2 supersedes that barrier with ordered terminal -> interaction-open
+// entries. Requiring the replica's phase to arrive before publishing the entry is cyclic when the ordered
+// projector correctly removed its speculative tail, so full V2 proves that neither real phase enters the
+// old rendezvous while the engine-free cases below retain its rollback semantics.
 //
 // This file proves, over the SAME production rendezvous instances the phases use (the exact objects
 // ErCrossroadsPhase/SelectBiomePhase await, wired in coop-runtime.ts) plus a focused engine-free
@@ -28,7 +28,8 @@
 //   A. the reciprocal xroads:<wave> barrier BLOCKS the racer until the laggard arrives (both interleave
 //      orders), then resolves both-arrived - the racer cannot advance past the boundary alone.
 //   B. a REAL ErCrossroadsPhase ARRIVES + AWAITS at xroads:<wave> (the crossroads wiring is live).
-//   C. a REAL natural SelectBiomePhase pick ARRIVES + AWAITS at biomepick:<wave> (the biome-pick wiring).
+//   C. a REAL V2 natural SelectBiomePhase authors exact BIOME_PICK control without entering the obsolete
+//      biomepick:<wave> rendezvous (the same closed-graph rule as Crossroads).
 //   D. root cause + fix: the pendingRemote fold SKIPS K without ordering; with the barrier's ordering the
 //      shop advance lands exactly on K (both pin K in lockstep).
 //
@@ -256,11 +257,11 @@ describe.skipIf(!RUN)("co-op DUO wave-boundary barrier (#858): shop -> crossroad
   }, 200_000);
 
   // ===========================================================================================
-  // C. A REAL natural SelectBiomePhase pick ARRIVES + AWAITS at biomepick:<wave> - proving the
-  // biome-pick wiring (select-biome-phase.ts coopAwaitBoundaryBarrier) is live for a natural biome-end
-  // multi-node pick (NOT chained from a crossroads Leave, which barriered at its own entry).
+  // C. A REAL V2 natural SelectBiomePhase authors its exact BIOME_PICK control without entering the
+  // legacy biomepick:<wave> rendezvous. Requiring a replica phase arrival first is cyclic when an ordered
+  // reward projection removed that speculative phase and only this control can reconstruct it.
   // ===========================================================================================
-  it("a real natural SelectBiomePhase pick arrives + awaits at biomepick:<wave> before pinning", async () => {
+  it("a real V2 natural SelectBiomePhase pins exact control without entering the legacy biome barrier", async () => {
     setCoopRendezvousWaitMs(50);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
@@ -275,16 +276,16 @@ describe.skipIf(!RUN)("co-op DUO wave-boundary barrier (#858): shop -> crossroad
     ];
     setErPendingNodes(nodes);
 
-    const counter = rig.hostRuntime.controller.interactionCounter();
-    const ownerCtx = ownerCtxFor(rig, counter);
-    const arriveSpy = vi.spyOn(ownerCtx.runtime.rendezvous, "arrive");
-    const awaitSpy = vi.spyOn(ownerCtx.runtime.rendezvous, "awaitPartner");
+    const authorityCtx = rig.hostCtx;
+    const arriveSpy = vi.spyOn(authorityCtx.runtime.rendezvous, "arrive");
+    const awaitSpy = vi.spyOn(authorityCtx.runtime.rendezvous, "awaitPartner");
 
-    const restoreUi = stubUi(ownerCtx.scene);
+    const restoreUi = stubUi(authorityCtx.scene);
+    let phase!: ReturnType<typeof liveSelectBiome>;
     try {
-      await withClient(ownerCtx, async () => {
-        // NOT chained (no setCoopBiomeInteractionStart) -> the natural-pick boundary barrier applies.
-        liveSelectBiome().start();
+      await withClient(authorityCtx, async () => {
+        phase = liveSelectBiome();
+        phase.start();
         // Fixed drain (no early break) so the phase settles under the UI stub before restoreUi() - see the
         // crossroads test above for why an early break leaks a menu into the next test.
         for (let i = 0; i < 120; i++) {
@@ -297,10 +298,9 @@ describe.skipIf(!RUN)("co-op DUO wave-boundary barrier (#858): shop -> crossroad
 
     const arrived = arriveSpy.mock.calls.map(c => String(c[0]));
     const awaited = awaitSpy.mock.calls.map(c => String(c[0]));
-    expect(arrived, "the real natural biome pick ARRIVED at biomepick:10").toContain("biomepick:10");
-    expect(awaited, "the real natural biome pick AWAITED the partner at biomepick:10 before pinning").toContain(
-      "biomepick:10",
-    );
+    expect(phase.coopV2ControlOperationId, "the natural map retained one exact V2 operation address").not.toBeNull();
+    expect(arrived, "full V2 never enters the obsolete biome arrival barrier").not.toContain("biomepick:10");
+    expect(awaited, "full V2 never waits on the cyclic legacy biome barrier").not.toContain("biomepick:10");
     logs.flush();
   }, 200_000);
 

@@ -2688,6 +2688,42 @@ test("the duo phase pump recognizes a target that becomes actionable without cha
   );
 });
 
+test("a V2 natural World Map publishes control before the replica surface is required", () => {
+  const flowStart = selectBiomePhase.indexOf("private async coopBiomePickFlow(");
+  const flowEnd = selectBiomePhase.indexOf("\n  /** Continue only while", flowStart);
+  assert.ok(flowStart >= 0 && flowEnd > flowStart, "the natural World-Map entry flow is bounded");
+  const flow = selectBiomePhase.slice(flowStart, flowEnd);
+  const cutoverCheck = flow.indexOf("isCoopV2ControlCutoverActive(this.coopOwningRuntime)");
+  const legacyBarrier = flow.indexOf("const barrier = await this.coopAwaitBoundaryBarrier()");
+  const continueStart = flow.lastIndexOf("this.continueCoopBiomePickFlow(controller, revealed, origin, spoofed)");
+  assert.ok(
+    cutoverCheck >= 0 && legacyBarrier > cutoverCheck && continueStart > legacyBarrier,
+    "V2/legacy ordering is decided before either World-Map continuation",
+  );
+  assert.match(
+    flow,
+    /if \(!this\.coopChained && !spoofed && !recoveredExactControl && !v2ControlCutover\) \{[\s\S]*coopAwaitBoundaryBarrier\(\)[\s\S]*return;[\s\S]*this\.continueCoopBiomePickFlow/u,
+    "only rollback sessions require the reciprocal arrival which is cyclic for a projected V2 map",
+  );
+
+  const boundaryStart = soakDriver.indexOf('if (boundary === "SelectBiomePhase")');
+  const boundaryEnd = soakDriver.indexOf("\n        if (guestCrossroadsProjected", boundaryStart);
+  assert.ok(boundaryStart >= 0 && boundaryEnd > boundaryStart, "the soak World-Map crossing is bounded");
+  const boundary = soakDriver.slice(boundaryStart, boundaryEnd);
+  const authorityStart = boundary.indexOf("hostBiomeBoundary.start()");
+  const replicaSearch = boundary.indexOf('driveClientPhaseQueueTo(rig.guestScene, "SelectBiomePhase")');
+  const replicaStart = boundary.indexOf("guestBiomeBoundary!.start()");
+  assert.ok(
+    authorityStart >= 0 && replicaSearch > authorityStart && replicaStart > replicaSearch,
+    "the independent authority browser publishes before the harness searches for its projected replica",
+  );
+  assert.equal(
+    boundary.lastIndexOf("hostBiomeBoundary.start()"),
+    authorityStart,
+    "the authority World-Map generation is started exactly once",
+  );
+});
+
 test("a wiped replica seat installs the next command as a watcher instead of waiting on an impossible menu", () => {
   assert.match(commandFrontier, /if \(seat\.fainted === true\) \{[\s\S]*continue;/u);
   assert.match(

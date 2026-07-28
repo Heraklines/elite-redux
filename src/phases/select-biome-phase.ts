@@ -42,6 +42,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  isCoopV2ControlCutoverActive,
   notifyCoopV2InteractionSurfaceReady,
   notifyCoopWaveContinuationSurfaceReady,
   resolveCoopRetainedWaveContinuationIdentity,
@@ -552,7 +553,15 @@ export class SelectBiomePhase extends BattlePhase {
     // that finished the shop and raced ahead could otherwise drift the lagging client's counter (the
     // coop-session pendingRemote fold) past this interaction, mismatching the relay seq and forcing a
     // one-sided deterministic fallback. Skipped when chained (already barriered) or spoofed (no real peer).
-    if (!this.coopChained && !spoofed) {
+    const recoveredExactControl = this.coopV2ControlOperationId != null;
+    const v2ControlCutover = isCoopV2ControlCutoverActive(this.coopOwningRuntime);
+    // Under the complete V2 graph the preceding terminal entry and this interaction-open entry are the one
+    // ordered barrier. Waiting for a reciprocal legacy World-Map arrival here is cyclic when the replica's
+    // speculative SelectBiome tail was correctly removed by destructive reward projection: the authority
+    // cannot publish BIOME_PICK control until the wait releases, while the replica cannot reconstruct its
+    // SelectBiomePhase until that control arrives. Retain #858 only for rollback sessions. A recovered V2
+    // phase already owns the exact operation address and therefore follows the same no-rendezvous path.
+    if (!this.coopChained && !spoofed && !recoveredExactControl && !v2ControlCutover) {
       const barrier = await this.coopAwaitBoundaryBarrier();
       // The two-engine harness can make the peer scene ambient while this promise settles. Re-enter the
       // phase's bound runtime before reading the counter or constructing either public map surface.

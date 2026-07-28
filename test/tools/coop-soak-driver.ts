@@ -2636,6 +2636,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
         if (boundary === "SelectBiomePhase") {
           const hostBiomeBoundary = rig.hostScene.phaseManager.getCurrentPhase() as unknown as BiomeBoundarySeam;
+          // A real authority browser starts its own World-Map phase independently. Under V2 that start authors
+          // the BIOME_PICK control which may be the replica's sole permission to reconstruct SelectBiomePhase
+          // after a destructively projected reward removed its speculative tail. Searching the guest first
+          // creates a one-process-only causal cycle (guest waits for control while the harness never starts
+          // the host that publishes it). Start the exact authority generation once, then observe the replica.
+          await withClient(rig.hostCtx, async () => {
+            hostBiomeBoundary.start();
+            await drainLoopback();
+          });
           guestBiomeBoundary = (await withClient(rig.guestCtx, () =>
             driveClientPhaseQueueTo(rig.guestScene, "SelectBiomePhase"),
           )) as unknown as BiomeBoundarySeam;
@@ -2684,12 +2693,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
               .map(envelope => envelope.pendingOperation!.id),
           );
 
-          // Start both actual queued map phases. The pinned owner, which may be the guest, drives the real
+          // The authority phase was started above so its V2 control could project a missing replica surface.
+          // Start only the replica generation here. The pinned owner, which may be the guest, drives the real
           // ER_MAP handler; the host validates/commits the intent and the watcher can exit only on receipt.
-          await withClient(rig.hostCtx, async () => {
-            hostBiomeBoundary.start();
-            await drainLoopback();
-          });
           await withClient(rig.guestCtx, async () => {
             guestBiomeBoundary!.start();
             await drainLoopback();
