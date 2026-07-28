@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run_mode: calibrated-release
+calibration_id: journey-45-thirteen-event
+target_sha: 4fd7dda616b9e3a8a07ab50ae266940a0e8f0155
+checked_out_sha: 4fd7dda616b9e3a8a07ab50ae266940a0e8f0155
+base_seed: 20260728
+campaign_seed: fixed-in-test (matrix candidate 20260728 not consumed)
+run: 30326522519 (workflow source 4fd7dda616b9e3a8a07ab50ae266940a0e8f0155)
+timestamp: 2026-07-28T03-41-04Z
+
+----- driver lines -----
+(no [coop-soak] lines captured)
+
+----- vitest result tail -----
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state guest disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:107:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mco-op continuous journey: many mystery events plus biome transitions > plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m13263[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-journey.test.ts:107:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:107:3[22m[2m > [22mco-op continuous journey: many mystery events plus biome transitions[2m > [22mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[31m[1mError[22m: client phase drive to initial guest-owned CommandPhase HANG on CoopReplayTurnPhase; queued=[CommandPhase,CommandPhase,TurnStartPhase], ui=MESSAGE[39m
+[36m [2m❯[22m driveClientPhaseQueueTo test/tools/coop-duo-harness.ts:[2m2077:15[22m[39m
+    [90m2075|[39m       if (Date.now() >= deadline) {
+    [90m2076|[39m         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? […
+    [90m2077|[39m         throw new Error(
+    [90m   |[39m               [31m^[39m
+    [90m2078|[39m           `client phase drive to ${target} HANG on ${phase.phaseName};…
+    [90m2079|[39m             + `ui=${UiMode[scene.ui.getMode()] ?? scene.ui.getMode()}`,
+[90m [2m❯[22m test/tools/coop-duo-harness.ts:[2m3242:33[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m757:12[22m[39m
+[90m [2m❯[22m buildDuo test/tools/coop-duo-harness.ts:[2m3235:5[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m1558:15[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-journey.test.ts:[2m111:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 03:40:22
+[2m   Duration [22m 41.63s[2m (transform 22.00s, setup 26.67s, import 336ms, tests 13.73s, environment 725ms)[22m
+
