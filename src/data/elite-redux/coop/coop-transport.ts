@@ -161,7 +161,10 @@ export type CoopRole = "host" | "guest";
 // er-coop-60 distinguishes an HP mutation that happened after its actor left the displayed field. The
 // renderer proves that exact actor is absent and records a typed nonvisual receipt instead of pretending
 // to animate bench pixels or treating a legitimate Regenerator heal as field-order corruption.
-export const COOP_PROTOCOL_VERSION = "er-coop-60";
+// er-coop-61 distinguishes the field-local form flash from the full player evolution-style form cutscene
+// and carries its immutable preimage. Older renderers only snap the target sprite and would acknowledge
+// presentation before the narration/sound/tint/scale/tween subtree actually completed.
+export const COOP_PROTOCOL_VERSION = "er-coop-61";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1236,7 +1239,11 @@ export type CoopBattleEvent =
       bi: number;
       actor: CoopPresentationActorRef;
       speciesId: number;
+      /** Form displayed immediately before the authority resolved this event. */
+      preFormIndex: number;
       formIndex: number;
+      /** Selects the exact visual grammar; mechanics are always installed from `formIndex`. */
+      presentation: "field" | "evolution";
       animate: boolean;
     }
   /** Apply and display one complete authority-resolved Transform/Imposter result. */

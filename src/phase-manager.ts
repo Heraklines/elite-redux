@@ -87,7 +87,7 @@ import { EvolutionPhase } from "#phases/evolution-phase";
 import { ExoticShopPhase } from "#phases/exotic-shop-phase";
 import { ExpPhase } from "#phases/exp-phase";
 import { FaintPhase } from "#phases/faint-phase";
-import { FormChangePhase } from "#phases/form-change-phase";
+import { CoopFormChangeCutsceneReplayPhase, FormChangePhase } from "#phases/form-change-phase";
 import { GameOverModifierRewardPhase } from "#phases/game-over-modifier-reward-phase";
 import { GameOverPhase } from "#phases/game-over-phase";
 import { HideAbilityPhase } from "#phases/hide-ability-phase";
@@ -229,6 +229,7 @@ const PHASES = Object.freeze({
   CoopFinalizeEntryPresentationPhase,
   CoopFinalizeTurnPhase,
   CoopFaintReplayPhase,
+  CoopFormChangeCutsceneReplayPhase,
   CoopFormChangeReplayPhase,
   CoopHpDrainReplayPhase,
   CoopMoveAnimReplayPhase,

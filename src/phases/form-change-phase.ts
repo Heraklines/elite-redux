@@ -1,6 +1,12 @@
 import type { Animation } from "#app/animations";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import {
+  type CoopPresentationOutcome,
+  type CoopPresentationOutcomeToken,
+  settleCoopPresentationOutcome,
+} from "#data/elite-redux/coop/coop-presentation-outcome";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementFormChange } from "#data/elite-redux/er-achievement-tracker";
 import { erNoteShowdownPlayerMega } from "#data/elite-redux/er-social-achievement-tracker";
 import { getSpeciesFormChangeMessage } from "#data/form-change-triggers";
@@ -13,17 +19,48 @@ import { EvolutionPhase } from "#phases/evolution-phase";
 import { achvs } from "#system/achv";
 import type { PartyUiHandler } from "#ui/party-ui-handler";
 import { fixedInt } from "#utils/common";
+import {
+  armCoopPresentationProgressWatchdog,
+  type CoopPresentationProgressWatchdog,
+} from "./coop-presentation-watchdog";
+
+/**
+ * Renderer-only inputs for the full evolution-style form-change cutscene.
+ *
+ * `pokemon` passed to the phase is a detached cosmetic preimage. Only `authorityPokemon` is the live
+ * actor, and it receives no trigger/ability/stat/modifier work: the signed target appearance is installed
+ * directly. This lets reconnect/recovery replay the old-to-new cutscene without rolling mechanics back.
+ */
+export interface CoopAuthoritativeFormChangeReplay {
+  readonly authorityPokemon: PlayerPokemon;
+  readonly preFormIndex: number;
+  readonly targetFormIndex: number;
+  readonly outcomeToken: CoopPresentationOutcomeToken;
+  readonly actorFingerprint: string;
+}
 
 export class FormChangePhase extends EvolutionPhase {
-  public readonly phaseName = "FormChangePhase";
-  private formChange: SpeciesFormChange;
-  private modal: boolean;
+  public readonly phaseName: "FormChangePhase" | "CoopFormChangeCutsceneReplayPhase" = "FormChangePhase";
+  private readonly formChange: SpeciesFormChange;
+  private readonly modal: boolean;
+  private readonly coopPreFormIndex: number;
+  private readonly coopReplay: CoopAuthoritativeFormChangeReplay | null;
+  private coopPresentationRecorded = false;
+  private coopReplayTerminal = false;
+  private coopReplayWatchdog: CoopPresentationProgressWatchdog | undefined;
 
-  constructor(pokemon: PlayerPokemon, formChange: SpeciesFormChange, modal: boolean) {
+  constructor(
+    pokemon: PlayerPokemon,
+    formChange: SpeciesFormChange,
+    modal: boolean,
+    coopReplay: CoopAuthoritativeFormChangeReplay | null = null,
+  ) {
     super(pokemon, null, 0);
 
     this.formChange = formChange;
     this.modal = modal;
+    this.coopPreFormIndex = pokemon.formIndex;
+    this.coopReplay = coopReplay;
   }
 
   validate(): boolean {
@@ -35,6 +72,81 @@ export class FormChangePhase extends EvolutionPhase {
       return super.setMode();
     }
     return globalScene.ui.setOverlayMode(UiMode.EVOLUTION_SCENE);
+  }
+
+  public override async start(): Promise<void> {
+    const replay = this.coopReplay;
+    if (replay != null) {
+      this.coopReplayWatchdog = armCoopPresentationProgressWatchdog(() => {
+        this.finishCoopReplay({
+          kind: "failed",
+          reason: "form-change-cutscene-watchdog-expired",
+          actorFingerprint: replay.actorFingerprint,
+        });
+      });
+    }
+    try {
+      await super.start();
+    } catch (error) {
+      if (this.coopReplay != null) {
+        this.finishCoopReplay({
+          kind: "failed",
+          reason: "form-change-cutscene-threw",
+          actorFingerprint: this.coopReplay.actorFingerprint,
+        });
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private finishCoopReplay(outcome: CoopPresentationOutcome): void {
+    if (this.coopReplay == null || this.coopReplayTerminal) {
+      return;
+    }
+    this.coopReplayTerminal = true;
+    this.coopReplayWatchdog?.remove();
+    settleCoopPresentationOutcome(this.coopReplay.outcomeToken, outcome);
+    this.pokemon.destroy();
+    void globalScene.ui.revertMode().finally(() => super.end());
+  }
+
+  /** Install only the signed appearance result; never re-run `Pokemon.changeForm()` mechanics. */
+  private async installCoopReplayResult(): Promise<void> {
+    const replay = this.coopReplay;
+    if (replay == null) {
+      await this.pokemon.changeForm(this.formChange);
+      return;
+    }
+    const authorityPokemon = replay.authorityPokemon;
+    authorityPokemon.formIndex = replay.targetFormIndex;
+    authorityPokemon.generateName();
+    authorityPokemon.setScale(authorityPokemon.getSpriteScale());
+    await authorityPokemon.loadAssets(false);
+    authorityPokemon.playAnim();
+    await Promise.all([authorityPokemon.updateInfo(), globalScene.updateFieldScale()]);
+
+    // The detached actor exists only to supply the cutscene's localized post-form name and cry.
+    this.pokemon.formIndex = replay.targetFormIndex;
+    this.pokemon.generateName();
+    this.pokemon.setScale(this.pokemon.getSpriteScale());
+  }
+
+  private recordAuthoritativePresentation(): void {
+    if (this.coopReplay != null || this.coopPresentationRecorded) {
+      return;
+    }
+    this.coopPresentationRecorded =
+      recordCoopEvent({
+        k: "formChange",
+        bi: this.pokemon.getBattlerIndex(),
+        actor: { side: "player", pokemonId: this.pokemon.id },
+        speciesId: this.pokemon.species.speciesId,
+        preFormIndex: this.coopPreFormIndex,
+        formIndex: this.pokemon.formIndex,
+        presentation: "evolution",
+        animate: true,
+      }) != null;
   }
 
   /**
@@ -76,16 +188,20 @@ export class FormChangePhase extends EvolutionPhase {
       onComplete: () => {
         let playEvolutionFanfare = false;
         if (this.formChange.formKey.indexOf(SpeciesFormKey.MEGA) > -1) {
-          globalScene.validateAchv(achvs.MEGA_EVOLVE);
-          erRecordAchievementFormChange(this.pokemon, `${this.formChange.formKey}`);
-          // #900 follow-up (Raw Talent): note a local player mega during an active Showdown match.
-          erNoteShowdownPlayerMega(this.pokemon);
+          if (this.coopReplay == null) {
+            globalScene.validateAchv(achvs.MEGA_EVOLVE);
+            erRecordAchievementFormChange(this.pokemon, `${this.formChange.formKey}`);
+            // #900 follow-up (Raw Talent): note a local player mega during an active Showdown match.
+            erNoteShowdownPlayerMega(this.pokemon);
+          }
           playEvolutionFanfare = true;
         } else if (
           this.formChange.formKey.indexOf(SpeciesFormKey.GIGANTAMAX) > -1
           || this.formChange.formKey.indexOf(SpeciesFormKey.ETERNAMAX) > -1
         ) {
-          globalScene.validateAchv(achvs.GIGANTAMAX);
+          if (this.coopReplay == null) {
+            globalScene.validateAchv(achvs.GIGANTAMAX);
+          }
           playEvolutionFanfare = true;
         }
 
@@ -118,13 +234,37 @@ export class FormChangePhase extends EvolutionPhase {
     this.pokemonEvoSprite.setVisible(true);
     globalScene.animations.doCircleInward(this.evolutionBaseBg, this.evolutionContainer);
     globalScene.time.delayedCall(900, () => {
-      this.pokemon.changeForm(this.formChange).then(() => {
+      if (this.coopReplayTerminal) {
+        transformedPokemon.destroy();
+        return;
+      }
+      const finishMaterialApply = () => {
+        if (this.coopReplayTerminal) {
+          transformedPokemon.destroy();
+          return;
+        }
+        this.recordAuthoritativePresentation();
         if (!this.modal) {
           globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
         }
         globalScene.playSound("se/shine");
         globalScene.animations.doSpray(this.evolutionBaseBg, this.evolutionContainer);
         this.postFormChangeTweens(transformedPokemon, preName);
+      };
+      const apply = this.installCoopReplayResult();
+      if (this.coopReplay == null) {
+        // Preserve the ordinary host phase's existing rejection semantics; the replay-only catch below
+        // must not turn an unrelated failed mechanical form change into a silently swallowed hang.
+        apply.then(finishMaterialApply);
+        return;
+      }
+      apply.then(finishMaterialApply).catch(() => {
+        transformedPokemon.destroy();
+        this.finishCoopReplay({
+          kind: "failed",
+          reason: "form-change-material-apply-threw",
+          actorFingerprint: this.coopReplay?.actorFingerprint ?? "form-change-replay",
+        });
       });
     });
   }
@@ -198,6 +338,35 @@ export class FormChangePhase extends EvolutionPhase {
   }
 
   end(): void {
+    if (this.coopReplay != null) {
+      if (this.coopReplayTerminal) {
+        return;
+      }
+      this.coopReplayWatchdog?.remove();
+      const replay = this.coopReplay;
+      void globalScene.ui
+        .revertMode()
+        .then(() => {
+          if (this.coopReplayTerminal) {
+            return;
+          }
+          this.coopReplayTerminal = true;
+          settleCoopPresentationOutcome(replay.outcomeToken, {
+            kind: "rendered",
+            actorFingerprint: replay.actorFingerprint,
+          });
+          this.pokemon.destroy();
+          super.end();
+        })
+        .catch(() => {
+          this.finishCoopReplay({
+            kind: "failed",
+            reason: "form-change-cutscene-close-threw",
+            actorFingerprint: replay.actorFingerprint,
+          });
+        });
+      return;
+    }
     this.pokemon.findAndRemoveTags(t => t.tagType === BattlerTagType.AUTOTOMIZED);
     if (this.modal) {
       globalScene.ui.revertMode().then(() => {
@@ -212,5 +381,18 @@ export class FormChangePhase extends EvolutionPhase {
     } else {
       super.end();
     }
+  }
+}
+
+/** Dedicated renderer identity for the mechanics-free rich cutscene path. */
+export class CoopFormChangeCutsceneReplayPhase extends FormChangePhase {
+  public override readonly phaseName = "CoopFormChangeCutsceneReplayPhase";
+
+  constructor(
+    presentationPokemon: PlayerPokemon,
+    formChange: SpeciesFormChange,
+    replay: CoopAuthoritativeFormChangeReplay,
+  ) {
+    super(presentationPokemon, formChange, true, replay);
   }
 }

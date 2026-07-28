@@ -1872,15 +1872,7 @@ export class CoopReplayTurnPhase extends Phase {
           case "formChange":
             outcomeToken = createCoopPresentationOutcomeToken();
             this.presentationOutcomeTokens.push(outcomeToken);
-            pm.unshiftNew(
-              "CoopFormChangeReplayPhase",
-              event.bi,
-              event.actor,
-              event.speciesId,
-              event.formIndex,
-              event.animate,
-              outcomeToken,
-            );
+            pm.unshiftNew("CoopFormChangeReplayPhase", event, outcomeToken);
             break;
           case "transform":
             outcomeToken = createCoopPresentationOutcomeToken();

@@ -5091,3 +5091,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   and scene, preventing a two-engine microtask from attesting the peer handler.
 - Local-safe TypeScript, scoped Biome, and node-pure source contracts are green. The engine regressions remain
   remote-only; no deployment occurred.
+
+## 2026-07-29 - Ordinary player form changes retain their full cutscene
+
+- Protocol 61 distinguishes field-local form flashes from the full evolution-style player form cutscene and
+  carries the exact pre/post form indexes. `FormChangePhase` now emits that immutable event once, immediately
+  after its real mechanical result materializes.
+- The renderer creates a detached old-form cosmetic Pokemon, routes a dedicated
+  `CoopFormChangeCutsceneReplayPhase` through the production renderer gate, and uses the ordinary cutscene's
+  exact sound/background/tint/scale/tween/cry/narration chain. Only the signed target form is installed on the
+  live actor; no form trigger, ability, stat, modifier, achievement, or dex mechanic is re-executed.
+- The presentation token settles only after `revertMode()` closes the UI. A progress watchdog fails the shared
+  boundary instead of releasing control on a stuck callback. The detached preimage makes recovery safe even
+  when the live actor already contains the target form; rendered watermarks retain duplicate suppression.
+- Local policy-safe verification: the source contract is green (22/22), changed production files have no
+  TypeScript diagnostics beyond the repository baseline, scoped formatting is clean apart from existing
+  informational debt, and `git diff --check` is green. The added co-op engine regression remains remote-only.

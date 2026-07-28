@@ -23,6 +23,7 @@ export class QuietFormChangePhase extends BattlePhase {
   /** The Pokemon's prior name before changing forms. */
   // TODO: remove? it's unused
   private preName: string;
+  private readonly preFormIndex: number;
   private coopPresentationRecorded = false;
   private coopPresentationEventRecorded = false;
 
@@ -31,6 +32,7 @@ export class QuietFormChangePhase extends BattlePhase {
 
     this.pokemon = pokemon;
     this.formChange = formChange;
+    this.preFormIndex = pokemon.formIndex;
   }
 
   async start(): Promise<void> {
@@ -111,7 +113,9 @@ export class QuietFormChangePhase extends BattlePhase {
           bi: pokemon.getBattlerIndex(),
           actor: { side: pokemon.isPlayer() ? "player" : "enemy", pokemonId: pokemon.id },
           speciesId: pokemon.species.speciesId,
+          preFormIndex: this.preFormIndex,
           formIndex: pokemon.formIndex,
+          presentation: "field",
           animate,
         }) != null;
     }

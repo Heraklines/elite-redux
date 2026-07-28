@@ -253,19 +253,48 @@ test("form changes and Transform carry complete authority material into dedicate
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const form = read("src/phases/quiet-form-change-phase.ts");
+  const richForm = read("src/phases/form-change-phase.ts");
   const transform = read("src/phases/pokemon-transform-phase.ts");
   const engine = read("src/data/elite-redux/coop/coop-battle-engine.ts");
   const replay = read("src/phases/coop-replay-phases.ts");
   const replayPump = read("src/phases/coop-replay-turn-phase.ts");
+  const rendererGate = read("src/data/elite-redux/coop/coop-renderer-gate.ts");
+  const phaseManager = read("src/phase-manager.ts");
 
   assert.match(form, /recordCoopEvent\(\{\s*k: "formChange"[\s\S]+formIndex: pokemon\.formIndex/u);
   assert.match(form, /recordCoopMessage\(message\)/u, "direct form narration must enter the ordered stream");
+  assert.match(
+    richForm,
+    /recordCoopEvent\(\{\s*k: "formChange"[\s\S]+preFormIndex: this\.coopPreFormIndex[\s\S]+presentation: "evolution"/u,
+    "ordinary player form changes must author the rich cutscene exactly where their result materializes",
+  );
+  assert.match(richForm, /if \(this\.coopReplay != null \|\| this\.coopPresentationRecorded\)/u);
+  assert.match(
+    richForm,
+    /authorityPokemon\.formIndex = replay\.targetFormIndex[\s\S]+authorityPokemon\.loadAssets\(false\)[\s\S]+globalScene\.updateFieldScale\(\)/u,
+    "guest replay installs signed appearance without invoking form-change mechanics",
+  );
+  assert.doesNotMatch(
+    richForm.slice(
+      richForm.indexOf("private async installCoopReplayResult"),
+      richForm.indexOf("private recordAuthoritativePresentation"),
+    ),
+    /authorityPokemon\.changeForm|calculateStats|updateModifiers|applyPostFormChange/u,
+  );
   assert.match(transform, /captureCoopMonTransform\(user\)[\s\S]+k: "transform"/u);
   assert.match(transport, /interface CoopMonTransform[\s\S]+passives: number\[\]/u);
   assert.match(engine, /passives: \[\.\.\.\(sd\.passiveAbilities \?\? \[\]\)\]/u);
   assert.match(engine, /sd\.passiveAbilities = transform\.passives\.map/u);
   assert.match(validator, /case "formChange":[\s\S]+case "transform":[\s\S]+isStrictTransformResult/u);
   assert.match(replay, /export class CoopFormChangeReplayPhase[\s\S]+refreshAuthorityAppearance/u);
+  assert.match(
+    replay,
+    /presentation === "evolution"[\s\S]+addPlayerPokemon\([\s\S]+create\("CoopFormChangeCutsceneReplayPhase"/u,
+    "recovery-safe replay must construct its old-form visual from a detached actor through the renderer gate",
+  );
+  assert.match(richForm, /export class CoopFormChangeCutsceneReplayPhase extends FormChangePhase/u);
+  assert.match(rendererGate, /"CoopFormChangeCutsceneReplayPhase"/u);
+  assert.match(phaseManager, /CoopFormChangeCutsceneReplayPhase,[\s\S]+CoopFormChangeReplayPhase/u);
   assert.match(replay, /export class CoopTransformReplayPhase[\s\S]+installAuthorityTransformMaterial/u);
   assert.match(replayPump, /case "formChange":[\s\S]+"CoopFormChangeReplayPhase"/u);
   assert.match(replayPump, /case "transform":[\s\S]+"CoopTransformReplayPhase"/u);
@@ -499,14 +528,19 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
-test("protocol 60 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
+test("protocol 61 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-60"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-61"/u);
+  assert.match(transport, /k: "formChange";[\s\S]+preFormIndex: number;[\s\S]+presentation: "field" \| "evolution";/u);
+  assert.match(
+    validator,
+    /case "formChange":[\s\S]+isSafeAddressPart\(event\.preFormIndex\)[\s\S]+event\.preFormIndex !== event\.formIndex[\s\S]+event\.presentation === "field" \|\| \(event\.presentation === "evolution" && event\.animate\)/u,
+  );
   assert.match(transport, /presentation\?: "off-field"/u);
   assert.match(validator, /event\.presentation === undefined \|\| event\.presentation === "off-field"/u);
   assert.match(read("src/field/pokemon.ts"), /this\.isOnField\(\) \? \{\} : \{ presentation: "off-field" as const \}/u);
