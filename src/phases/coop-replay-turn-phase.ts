@@ -17,6 +17,7 @@ import {
   captureCoopChecksum,
   coopAppliedStateTick,
   drainCoopApplyFailures,
+  readLatestAcceptedCoopAuthoritativeBattleState,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import type {
@@ -283,14 +284,41 @@ export class CoopReplayTurnPhase extends Phase {
       return false;
     }
     const material = successor.commandOpenMaterial;
+    const sourceStateMaterial =
+      successor.kind === "TURN_COMMIT"
+        ? successor.turnStateMaterial
+        : successor.kind === "INTERACTION_COMMIT"
+          ? successor.interactionStateMaterial
+          : successor.kind === "REPLACEMENT_COMMIT"
+            ? successor.replacementStateMaterial
+            : null;
+    const coveredState = material == null ? readLatestAcceptedCoopAuthoritativeBattleState() : null;
+    if (
+      material == null
+      && (sourceStateMaterial == null
+        || coveredState == null
+        || coveredState.tick !== sourceStateMaterial.stateTick
+        || coveredState.wave !== sourceStateMaterial.wave
+        || coveredState.turn !== sourceStateMaterial.turn
+        || coveredState.tick !== coopAppliedStateTick()
+        || coveredState.wave !== this.sourceWave
+        || coveredState.turn !== this.turn)
+    ) {
+      // TURN/REPLACEMENT/INTERACTION may close a speculative prefix wait only after the complete image from
+      // THIS successor has been accepted. Wave/turn alone is insufficient: two sequential replacements share
+      // that address, and the first image must not release the second commit's command frontier.
+      return false;
+    }
     const prefix: CoopEntryPresentationPrefix =
       material == null
         ? {
             // TURN/REPLACEMENT/etc. own and prove their presentation in their ordinary renderer before they
             // state COMMAND_FRONTIER. This empty exact-address release closes only a speculative TurnInit wait;
-            // it does not invent or replay a second presentation stream.
+            // it does not invent or replay a second presentation stream. Carry the accepted image so the
+            // ordinary final proof fence can reassert mechanics with the same strength as CONTROL_COMMIT.
             events: [],
-            stateTick: coopAppliedStateTick(),
+            stateTick: coveredState!.tick,
+            authoritativeState: structuredClone(coveredState!),
             controlOperationId: successor.operationId,
           }
         : {

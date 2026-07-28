@@ -79,7 +79,7 @@ import {
   CoopShowAbilityReplayPhase,
   CoopTransformReplayPhase,
 } from "#phases/coop-replay-phases";
-import { CoopPresentationReceiptPhase } from "#phases/coop-replay-turn-phase";
+import { CoopPresentationReceiptPhase, CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
 import { MovePhase } from "#phases/move-phase";
 import { PokemonTransformPhase } from "#phases/pokemon-transform-phase";
@@ -337,6 +337,57 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       newerState!.tick,
     );
     expect(endSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a replacement successor closes a speculative prefix wait with its complete accepted image", async () => {
+    await startCoopGuest();
+    const controller = getCoopController();
+    expect(controller).not.toBeNull();
+    const state = coopEngine.captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+    expect(state).not.toBeNull();
+    expect(coopEngine.applyCoopAuthoritativeBattleState(state!, true)).toBe(true);
+    const committedState = { ...state!, tick: state!.tick + 1 };
+
+    const phase = new CoopReplayTurnPhase(state!.turn, 0, undefined, state!.wave, true);
+    const successor = {
+      sessionEpoch: controller!.sessionEpoch,
+      revision: 5,
+      kind: "REPLACEMENT_COMMIT",
+      operationId: `RC/e${controller!.sessionEpoch}/w${state!.wave}/t${state!.turn - 1}/o0/f1/s1`,
+      nextControl: {
+        kind: "COMMAND_FRONTIER",
+        epoch: controller!.sessionEpoch,
+        wave: state!.wave,
+        turn: state!.turn,
+        commands: [],
+      },
+      replacementStateMaterial: {
+        wave: committedState.wave,
+        turn: committedState.turn,
+        stateTick: committedState.tick,
+      },
+    } as const;
+    expect(
+      phase.releaseForCoopV2Control(successor),
+      "a prior replacement image at the same wave/turn cannot release this successor",
+    ).toBe(false);
+    expect(coopEngine.applyCoopAuthoritativeBattleState(committedState, true)).toBe(true);
+    expect(
+      phase.releaseForCoopV2Control(successor),
+      "the already-rendered replacement releases the speculative waiter",
+    ).toBe(true);
+    const prefix = (
+      phase as unknown as {
+        v2EntryPresentationBuffered: {
+          stateTick: number;
+          authoritativeState?: { tick: number; wave: number; turn: number };
+        } | null;
+      }
+    ).v2EntryPresentationBuffered;
+    expect(prefix).toMatchObject({
+      stateTick: committedState.tick,
+      authoritativeState: { tick: committedState.tick, wave: committedState.wave, turn: committedState.turn },
+    });
   });
 
   it.each([

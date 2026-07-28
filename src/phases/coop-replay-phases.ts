@@ -2095,6 +2095,21 @@ export interface CoopV2ControlSuccessorClaim {
     readonly authoritativeState: CoopAuthoritativeBattleStateV1;
     readonly entryPresentation: readonly CoopBattleEvent[];
   };
+  readonly turnStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
+  readonly interactionStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
+  readonly replacementStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
 }
 
 /**

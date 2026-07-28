@@ -89,6 +89,32 @@ test("sacrificial spread presentation is authored once without dropping any mech
   );
 });
 
+test("the host's ordinary NewBattle tail is routed by the exact committed biome permit", () => {
+  const newBattle = read("src/phases/new-battle-phase.ts");
+  const battleScene = read("src/battle-scene.ts");
+
+  assert.match(
+    newBattle,
+    /function routeCoopCommittedBiomeEncounterTail[\s\S]+permit\.sessionEpoch !== params\.sessionEpoch[\s\S]+permit\.wave !== params\.sourceWave[\s\S]+permit\.nextWave !== params\.destinationWave[\s\S]+permit\.destinationBiomeId !== params\.destinationBiomeId/u,
+    "the replacement is fenced by exact session, adjacent wave, and destination identity",
+  );
+  assert.match(
+    newBattle,
+    /const sourceWave = globalScene\.currentBattle\?\.waveIndex \?\? -1;[\s\S]+globalScene\.newBattle\(\);[\s\S]+this\.routeCommittedHostBiomeEncounter\(sourceWave\)/u,
+    "the ordinary host construction consults the permit only after the destination Battle exists",
+  );
+  assert.match(
+    newBattle,
+    /newBiomeCount !== 0 \|\| nextEncounterCount !== 1[\s\S]+removeAllPhasesOfType\("NextEncounterPhase"\)[\s\S]+pushNew\("NewBiomeEncounterPhase"\)/u,
+    "only one exact ordinary tail can be replaced",
+  );
+  assert.match(
+    battleScene,
+    /const committedCoopBiomeTransition =[\s\S]+controller\?\.role === "host"[\s\S]+controller\.netcodeMode === "authoritative"[\s\S]+biomePermit\.wave === lastBattle\.waveIndex[\s\S]+biomePermit\.nextWave === this\.currentBattle\.waveIndex[\s\S]+biomePermit\.destinationBiomeId === this\.arena\.biomeId[\s\S]+const isNewBiome = committedCoopBiomeTransition \|\| this\.isNewBiome\(lastBattle\)/u,
+    "the same signed permit drives host post-battle mechanics instead of only repairing presentation",
+  );
+});
+
 test("damage effectiveness and critical presentation are authority-authored end to end", () => {
   const pokemon = read("src/field/pokemon.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
@@ -221,11 +247,21 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
     /class CoopFinalizeEntryPresentationPhase[\s\S]+inspectCoopPresentationOutcomes[\s\S]+noteRenderedThrough[\s\S]+noteConsumedCommandPresentation[\s\S]+this\.end\(\)/u,
     "the last queued phase must prove every outcome before command control can open",
   );
-  assert.match(replay, /controlOperationId: successor\.operationId/u);
   assert.match(
     replay,
-    /successor\.kind !== "CONTROL_COMMIT"[\s\S]+material == null[\s\S]+events: \[\][\s\S]+stateTick: coopAppliedStateTick\(\)/u,
-    "an in-flight non-CONTROL command source closes a speculative prefix wait without inventing events",
+    /const sourceStateMaterial =[^;]+successor\.kind === "TURN_COMMIT"[\s\S]+successor\.kind === "INTERACTION_COMMIT"[\s\S]+successor\.kind === "REPLACEMENT_COMMIT"[\s\S]+const coveredState = material == null \? readLatestAcceptedCoopAuthoritativeBattleState\(\) : null[\s\S]+coveredState\.tick !== sourceStateMaterial\.stateTick[\s\S]+coveredState\.tick !== coopAppliedStateTick\(\)[\s\S]+authoritativeState: structuredClone\(coveredState!\)/u,
+    "a non-CONTROL successor closes a speculative prefix only with its own exact accepted state image",
+  );
+  assert.match(
+    runtime,
+    /const replacement = reconstructCoopV2ReplacementCheckpoint\(entry\)[\s\S]+replacementStateMaterial: \{[\s\S]+stateTick: replacement\.checkpoint\.authoritativeState\.tick/u,
+    "the runtime binds a replacement successor claim to that commit's immutable state tick",
+  );
+  assert.match(replay, /controlOperationId: successor\.operationId/u);
+  assert.doesNotMatch(
+    replay,
+    /successor\.kind !== "CONTROL_COMMIT"[\s\S]+material == null[\s\S]+events: \[\][\s\S]+stateTick: coopAppliedStateTick\(\)[\s\S]+controlOperationId: successor\.operationId[\s\S]+this\.entryPresentationPrefix = prefix/u,
+    "a non-CONTROL source cannot close a speculative prefix with only the mutable applied tick",
   );
   assert.match(stream, /consumedCommandPresentationOperations = new Set<string>/u);
   assert.match(

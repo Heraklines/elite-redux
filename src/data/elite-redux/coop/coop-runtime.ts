@@ -4926,6 +4926,11 @@ interface CoopV2ControlSuccessorClaim {
     readonly authoritativeState: CoopAuthoritativeBattleStateV1;
     readonly entryPresentation: readonly CoopBattleEvent[];
   };
+  readonly turnStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
   readonly interactionStateMaterial?: {
     readonly wave: number;
     readonly turn: number;
@@ -4948,6 +4953,10 @@ function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSu
   const commandOpen = decodeControlOpenEntry(entry);
   const interaction = decodeCoopV2InteractionEnvelope(entry);
   const replacement = reconstructCoopV2ReplacementCheckpoint(entry);
+  const turnResolution =
+    entry.kind === "TURN_COMMIT"
+      ? reconstructCoopV2TurnResolution(entry.material.payload as TurnResolutionImage)
+      : null;
   return {
     sessionEpoch: entry.context.sessionEpoch,
     revision: entry.revision,
@@ -4965,6 +4974,15 @@ function coopV2ControlSuccessorClaim(entry: CoopAuthorityEntry): CoopV2ControlSu
           },
         }
       : {}),
+    ...(turnResolution == null
+      ? {}
+      : {
+          turnStateMaterial: {
+            wave: turnResolution.authoritativeState.wave,
+            turn: turnResolution.authoritativeState.turn,
+            stateTick: turnResolution.authoritativeState.tick,
+          },
+        }),
     ...(interaction == null
       ? {}
       : {
