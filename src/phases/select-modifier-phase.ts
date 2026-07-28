@@ -1801,6 +1801,7 @@ export class SelectModifierPhase extends BattlePhase {
         surface: "reward",
         rewardSurface: this.coopRewardSurface,
         pinned: this.coopInteractionStart,
+        presentationGeneration: this.coopRewardPresentationGeneration,
         label,
         choice,
         data: wire,

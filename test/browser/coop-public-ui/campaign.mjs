@@ -44,6 +44,14 @@ const BATTLE_PROMPT_PHASES = new Map([
   ["battle:message", null],
   ["battle:exp", "ExpPhase"],
 ]);
+const INTERACTIVE_MYSTERY_NARRATION_PHASES = new Set([
+  "MysteryEncounterPhase",
+  "MysteryEncounterOptionSelectedPhase",
+  "MysteryEncounterRewardsPhase",
+  "PostMysteryEncounterPhase",
+  "ErQuizPhase",
+  "CoopReplayMePhase",
+]);
 const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;
 // Run 30232043330 measured one software-WebGL MoveEffectPhase -> DamageAnimPhase gap at 100.2s while
 // both engines and the exact presentation ledger continued converging. Give only the animations-on
@@ -821,6 +829,7 @@ export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
   const clients = Object.values(rig.clients);
   const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
   const consumedInstances = new Set();
+  const interactiveMysteryPhases = INTERACTIVE_MYSTERY_NARRATION_PHASES;
   // Keep this aligned with Ui.coopMeInteractivePhase(): these are the production phases whose
   // MESSAGE handlers can participate in the owner/watcher ME input pump. Run 29672540141 selected
   // a guest-owned option successfully, advanced its selected-option dialogue, and then left the
@@ -828,14 +837,6 @@ export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
   // driver admitted only the opening MysteryEncounterPhase. A real player can and must advance
   // that prompt too. The surface/operation/readiness/ownership fences below remain the authority;
   // this set only names the phase classes in which that exact public prompt is valid.
-  const interactiveMysteryPhases = new Set([
-    "MysteryEncounterPhase",
-    "MysteryEncounterOptionSelectedPhase",
-    "MysteryEncounterRewardsPhase",
-    "PostMysteryEncounterPhase",
-    "ErQuizPhase",
-    "CoopReplayMePhase",
-  ]);
   return async () => {
     for (const client of clients) {
       const readyEvent = client.evidence.events.slice(cursors.get(client.label) ?? 0).find(event => {
@@ -1099,6 +1100,8 @@ export async function waitForOutcomeBounded(
   const confirmationHardDeadline =
     (animationBudget?.hardDeadline() ?? fixedDeadline) + Math.max(0, singleSidedConfirmMs);
   let singleSidedCandidate = null;
+  let nextCommandPromptIdentity = null;
+  let advanceNextCommandPrompt = null;
   while (true) {
     const deadline = animationBudget?.observe() ?? fixedDeadline;
     // A mid-battle wipe / game-over is a real run END, not a driver softlock: classify it
@@ -1164,6 +1167,20 @@ export async function waitForOutcomeBounded(
             client: commandCandidate.client,
             sinceMs: Date.now(),
           };
+          const address = commandCandidate.event.observation?.address;
+          const expectedAddress =
+            Number.isSafeInteger(address?.epoch)
+            && Number.isSafeInteger(address?.wave)
+            && Number.isSafeInteger(address?.turn)
+              ? `${address.epoch}:${address.wave}:${address.turn}`
+              : null;
+          nextCommandPromptIdentity = expectedAddress == null ? null : identity;
+          advanceNextCommandPrompt =
+            expectedAddress == null
+              ? null
+              : createBattlePromptAdvancer(rig, from, {}, "post-turn-next-command-frontier", {
+                  expectedCommandAddress: expectedAddress,
+                });
         }
         if (Date.now() - singleSidedCandidate.sinceMs >= singleSidedConfirmMs) {
           return { kind: "command", client: commandCandidate.client };
@@ -1172,6 +1189,18 @@ export async function waitForOutcomeBounded(
     }
     if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
       return { kind: "turn-progress" };
+    }
+    // A next-turn owner can open before its partner finishes a real CommandPhase MESSAGE prompt.
+    // The caller's ordinary advancer is pinned to the command that was just submitted and therefore
+    // (correctly) rejects this next address. Drive the exact candidate address here while confirming
+    // the one-sided frontier, just as the second human would press that visible prompt. Never scan
+    // generically: a replaced candidate discards this closure and receives a newly pinned one.
+    if (
+      advanceNextCommandPrompt != null
+      && nextCommandPromptIdentity === singleSidedCandidate?.identity
+      && (await advanceNextCommandPrompt())
+    ) {
+      continue;
     }
     if (advanceBattlePrompt && (await advanceBattlePrompt())) {
       continue;
@@ -1262,6 +1291,11 @@ async function driveBattleWave(rig, policy, stats) {
     if (pendingCommandProof != null) {
       try {
         await rig.assertSharedCommandFrontier(pendingCommandProof.cursors, pendingCommandProof.name, {
+          // The exact expected address and per-round cursors already prove freshness. The frontier
+          // may also have been accepted by another public journey boundary before this deliberately
+          // deferred proof runs, so a mutable global "last address" must not hide the historical
+          // owner+watcher pair after the following sequential round has superseded it.
+          allowAddressRepeat: true,
           expectedWave: rig.activeBattleWave,
           expectedAddress: expectedCommandAddress,
         });
@@ -1496,8 +1530,17 @@ export function findRegisteredSurface(rig, dispatch, cursors, handledIndex = new
       }
       if (driver.v2SurfaceId && hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
         return Object.values(rig.clients).some(client => {
-          const event = client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, driver.v2SurfaceId);
-          return semanticAppearanceIsNew(event, handledIndex.get(`${driver.name}:${client.label}`));
+          const cursor = cursors[client.label] ?? 0;
+          const event = client.evidence.findLastSemanticSurface(cursor, driver.v2SurfaceId);
+          // Semantic-only sub-surfaces have no phase/owner fallback. They are pending only while
+          // they are the browser's CURRENT public surface; retaining an old reward-target after
+          // LearnMovePhase (or an old ME subprompt after its successor) mislabeled the eventual
+          // timeout and could mask a genuinely different stuck UI for the entire outer deadline.
+          const current = client.evidence.findLastSemanticSurface(cursor);
+          return (
+            (!driver.semanticOnly || event?.index === current?.index)
+            && semanticAppearanceIsNew(event, handledIndex.get(`${driver.name}:${client.label}`))
+          );
         });
       }
       if (driver.semanticOnly) {
@@ -2288,6 +2331,31 @@ export function chooseRewardPartyTargetSlot(boundary, fallbackSlot = 0) {
   };
 }
 
+function authoritativeAddressKey(address) {
+  return JSON.stringify([address?.epoch ?? null, address?.wave ?? null, address?.turn ?? null]);
+}
+
+/**
+ * Pick a still-untried visible reward after a learn-move decline returns to the same shop.
+ *
+ * Selecting the same TM again is not useful depth coverage: a real player who deliberately declines
+ * that teaching flow moves to another option. Returning null is a loud exhaustion signal; it never
+ * silently loops on an already-rejected choice. Production independently gives each reopened reward
+ * presentation a fresh operation identity, so this policy is representative behavior rather than an
+ * idempotency workaround.
+ */
+export function chooseUntriedRewardOption(authority, rejectedRewardIds) {
+  const options = Array.isArray(authority?.optionIds)
+    ? authority.optionIds.filter(optionId => typeof optionId === "string")
+    : [];
+  const rejected = rejectedRewardIds instanceof Set ? rejectedRewardIds : new Set(rejectedRewardIds ?? []);
+  const selected = typeof authority?.selectedOptionId === "string" ? authority.selectedOptionId : null;
+  if (selected != null && !rejected.has(selected)) {
+    return selected;
+  }
+  return options.find(optionId => !rejected.has(optionId)) ?? null;
+}
+
 async function driveRewardPartyTarget(rig, driver, owner, boundary) {
   const target = chooseRewardPartyTargetSlot(boundary, driver.partySlot ?? 0);
   const targetSlot = target.slot;
@@ -2349,6 +2417,11 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
     optionIds: optionEvent.observation.optionIds,
   });
   await owner.press("Space", `campaign-reward-target-apply-${optionEvent.observation.selectedOptionId}`);
+  return {
+    addressKey: authoritativeAddressKey(boundary.authority.address),
+    address: boundary.authority.address,
+    rewardId: target.rewardId,
+  };
 }
 
 /**
@@ -2562,7 +2635,7 @@ export async function driveConfirmedLeave(rig, driver, owner, authority, waveSta
 }
 
 /** Drive at most one pending between-wave surface. Returns the surface name driven, or null. */
-async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stats, strict) {
+async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stats, strict, rewardRetryState) {
   for (const driver of dispatch) {
     const resolved = resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict);
     if (!resolved) {
@@ -2611,12 +2684,51 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
     await client.checkpoint(`wave-${stats.wave}-${driver.name}-owner`);
     if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
       stats.market = await driveTargetedMarket(rig, cursors, driver.market);
+    } else if (driver.name === "reward" && mechanicalBoundary != null && driver.confirmSurfaceId == null) {
+      const addressKey = authoritativeAddressKey(mechanicalBoundary.authority.address);
+      const rejected = rewardRetryState.rejectedByAddress.get(addressKey) ?? new Set();
+      const targetId = chooseUntriedRewardOption(mechanicalBoundary.authority, rejected);
+      if (targetId == null) {
+        throw new Error(
+          `[campaign-reward-policy] every visible reward at ${addressKey} was already declined: `
+            + `${JSON.stringify(mechanicalBoundary.authority.optionIds ?? null)}`,
+        );
+      }
+      if (targetId === mechanicalBoundary.authority.selectedOptionId) {
+        await client.sequence(driver.keys, `campaign-${driver.name}`);
+      } else {
+        await selectOptionById(client, {
+          surfaceId: "reward-shop",
+          targetId,
+          navKeys: ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"],
+          timeoutMs: rig.config.timeoutMs,
+          fromCursor: mechanicalBoundary.ownerEvent.index,
+        });
+        client.evidence.record("campaign-reward-retry-alternative", {
+          address: mechanicalBoundary.authority.address,
+          rejectedRewardIds: [...rejected],
+          targetId,
+        });
+      }
     } else if (driver.name === "reward-target" && mechanicalBoundary != null) {
-      await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
+      rewardRetryState.pendingTarget = await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
     } else if (driver.name === "mystery-encounter") {
       await driveMysteryEncounterChoice(rig, client, cursors);
     } else if (driver.name === "learn-move-confirm" && mechanicalBoundary != null) {
       await driveLearnMoveDecline(rig, client, mechanicalBoundary);
+      const pending = rewardRetryState.pendingTarget;
+      const addressKey = authoritativeAddressKey(mechanicalBoundary.authority.address);
+      if (pending?.rewardId != null && pending.addressKey === addressKey) {
+        const rejected = rewardRetryState.rejectedByAddress.get(addressKey) ?? new Set();
+        rejected.add(pending.rewardId);
+        rewardRetryState.rejectedByAddress.set(addressKey, rejected);
+        client.evidence.record("campaign-reward-declined", {
+          address: pending.address,
+          rewardId: pending.rewardId,
+          rejectedRewardIds: [...rejected],
+        });
+      }
+      rewardRetryState.pendingTarget = null;
     } else if (driver.mysteryParty) {
       await driveMysteryPartyPicker(rig, client, cursors, stats);
     } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
@@ -2692,6 +2804,35 @@ export function hasProvisionalCommandWatcherSurface(clients, cursors) {
       && observation.ready?.handlerActive === false
       && observation.ready?.awaitingActionInput === false
       && observation.ready?.inputBlocked === true
+    );
+  });
+}
+
+/**
+ * Whether an exact current Mystery narration prompt is still being installed or acknowledged.
+ *
+ * The public semantic observer first publishes the replay/engine MESSAGE handler as blocked, then
+ * republishes the next prompt generation as actionable after the ordered narration step arrives.
+ * On the four-core browser runner that handoff can exceed the short unknown-surface timer even
+ * though the paired session is making healthy progress. Keep that known, non-actionable surface
+ * under the immutable between-wave deadline; as soon as it becomes actionable the ordinary
+ * narration driver owns it, and as soon as another surface supersedes it this exemption vanishes.
+ */
+export function hasProvisionalMysteryNarrationSurface(clients, cursors) {
+  return clients.some(client => {
+    const cursor = cursors[client.label] ?? 0;
+    const event = client.evidence.findLastSemanticSurface(cursor, "mystery-encounter:message");
+    const latest = client.evidence.findLastSemanticSurface(cursor);
+    const observation = event?.observation;
+    return (
+      event?.index === latest?.index
+      && observation?.operationClass === "encounter-prompt"
+      && observation.ownerModel === "interaction"
+      && observation.coop === true
+      && INTERACTIVE_MYSTERY_NARRATION_PHASES.has(observation.phase)
+      && observation.uiMode === "MESSAGE"
+      && observation.ready?.handlerActive === true
+      && (observation.ready.awaitingActionInput !== true || observation.ready.inputBlocked === true)
     );
   });
 }
@@ -2773,6 +2914,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
   const clients = Object.values(rig.clients);
   const dispatch = buildDispatchTable(policy);
   const handledIndex = new Map();
+  const rewardRetryState = { pendingTarget: null, rejectedByAddress: new Map() };
   // Owner markers for reward/biome/crossroads/etc. are searched from the wave start
   // (surfaceCursors); the next command and terminal are searched from the post-battle
   // cursor so this wave's own commands never read as the next wave.
@@ -2869,7 +3011,15 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
 
     // Loud-fail (strict) unless the explicit shakedown/auto-first ordering opt-in is set: the same
     // gate that permits press-through of an unknown surface also permits the role-default fallback.
-    const drove = await driveOnePendingSurface(rig, dispatch, surfaceCursors, handledIndex, stats, !policy.autoFirst);
+    const drove = await driveOnePendingSurface(
+      rig,
+      dispatch,
+      surfaceCursors,
+      handledIndex,
+      stats,
+      !policy.autoFirst,
+      rewardRetryState,
+    );
     if (drove === "target-reached") {
       rig.activeBattleWave = stats.targetBoundary.wave;
       return { status: "continue", boundary: stats.targetBoundary };
@@ -2928,8 +3078,9 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     if (
       hasPassiveBattleProgressSurface(clients, commandCursors)
       || hasProvisionalCommandWatcherSurface(clients, commandCursors)
+      || hasProvisionalMysteryNarrationSurface(clients, commandCursors)
     ) {
-      lastRegisteredSurface = "passive-battle-progress";
+      lastRegisteredSurface = "provisional-public-progress";
       stallSince = 0;
       await delay(150);
       continue;

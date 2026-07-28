@@ -9,6 +9,7 @@ import {
   allClientsAtCurrentCommandFrontier,
   allClientsAtOwnedCommandFrontier,
   assertAsymmetricLearnMoveProjection,
+  chooseUntriedRewardOption,
   clientsAwaitingTurnProgress,
   createAnimationProgressBudget,
   createBattlePromptAdvancer,
@@ -18,6 +19,7 @@ import {
   findSharedSuccessorWavePresentation,
   hasPassiveBattleProgressSurface,
   hasProvisionalCommandWatcherSurface,
+  hasProvisionalMysteryNarrationSurface,
   resolveSurfaceOwner,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
@@ -608,6 +610,84 @@ test("a registered reward waiting for handler readiness is not classified as an 
     null,
     "historical evidence from a completed surface must not hide a later unknown phase",
   );
+});
+
+test("a semantic-only reward target stops registering after a newer public surface supersedes it", () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const driver = {
+    name: "reward-target",
+    v2SurfaceId: "party:reward-target",
+    semanticOnly: true,
+    owner: { role: "host" },
+  };
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: { surfaceId: "party:reward-target" },
+  });
+  assert.equal(findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }), driver);
+
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: { surfaceId: "battle:message", phase: "LearnMovePhase" },
+  });
+  assert.equal(
+    findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }),
+    null,
+    "historical target evidence must not mislabel a later learn-move/product stall",
+  );
+});
+
+test("a blocked current Mystery narration handoff is known provisional work only until actionable", () => {
+  const owner = fakeClient("owner");
+  const cursors = { owner: 0 };
+  const observation = {
+    surfaceId: "mystery-encounter:message",
+    operationClass: "encounter-prompt",
+    ownerModel: "interaction",
+    coop: true,
+    phase: "CoopReplayMePhase",
+    uiMode: "MESSAGE",
+    ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true },
+  };
+  owner.evidence.events.push({ index: 0, kind: "browser-surface2", observation });
+  assert.equal(hasProvisionalMysteryNarrationSurface([owner], cursors), true);
+
+  owner.evidence.events.push({
+    index: 1,
+    kind: "browser-surface2",
+    observation: {
+      ...observation,
+      phaseInstance: 2,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  assert.equal(
+    hasProvisionalMysteryNarrationSurface([owner], cursors),
+    false,
+    "the narration advancer, not the provisional exemption, owns a ready human prompt",
+  );
+
+  owner.evidence.events.push({
+    index: 2,
+    kind: "browser-surface2",
+    observation: { surfaceId: "unknown:future-screen" },
+  });
+  assert.equal(hasProvisionalMysteryNarrationSurface([owner], cursors), false);
+});
+
+test("reward retry selection never resubmits a declined visible option", () => {
+  const authority = {
+    selectedOptionId: "TM_CASE",
+    optionIds: ["TM_CASE", "MINT", "POKEBALL"],
+  };
+  assert.equal(chooseUntriedRewardOption(authority, new Set()), "TM_CASE");
+  assert.equal(chooseUntriedRewardOption(authority, new Set(["TM_CASE"])), "MINT");
+  assert.equal(chooseUntriedRewardOption(authority, new Set(["TM_CASE", "MINT"])), "POKEBALL");
+  assert.equal(chooseUntriedRewardOption(authority, new Set(authority.optionIds)), null);
 });
 
 test("a legacy phase marker stops registering a semantic surface after a later phase supersedes it", () => {
@@ -1243,6 +1323,64 @@ test("the campaign outcome wait accepts the first owned command frontier without
     }),
     { kind: "command", client: authority },
   );
+});
+
+test("one-sided next-command confirmation presses its partner's exact public CommandPhase prompt", async () => {
+  const authority = fakeClient("authority");
+  authority.publicSeat = 0;
+  const renderer = fakeClient("renderer");
+  renderer.publicSeat = 1;
+  const address = { epoch: 7, wave: 2, turn: 3 };
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      operationClass: "battle-progress",
+      ownerModel: "local",
+      coop: true,
+      address,
+      localSeat: 0,
+      seatsWithInput: [0],
+      phase: "CommandPhase",
+      phaseInstance: 14,
+      uiMode: "MESSAGE",
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  renderer.evidence.events.push({
+    index: renderer.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:command",
+      operationClass: "command",
+      coop: true,
+      address,
+      localSeat: 1,
+      seatsWithInput: [1],
+      phase: "CommandPhase",
+      phaseInstance: 35,
+      uiMode: "COMMAND",
+      ready: { handlerActive: true },
+    },
+  });
+  const rig = {
+    host: authority,
+    clients: { authority, renderer },
+    config: { faintOwnerSeat: "renderer" },
+    consumedBattlePromptInstances: new Set(),
+  };
+
+  assert.deepEqual(
+    await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 100, {
+      stopOnOwnedCommandFrontier: true,
+      singleSidedConfirmMs: 5,
+    }),
+    { kind: "command", client: renderer },
+  );
+  assert.deepEqual(authority.presses, [
+    { key: "Space", purpose: "post-turn-next-command-frontier-authority-battle:message-1" },
+  ]);
 });
 
 test("the campaign outcome wait never infers a faint from a host authority SwitchPhase log", async () => {

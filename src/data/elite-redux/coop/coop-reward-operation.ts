@@ -748,6 +748,12 @@ export interface CoopRewardOwnerCommitParams {
   readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
   /** The pinned interaction counter this shop opened on (coopInteractionStart / coopBiomeStart). */
   readonly pinned: number;
+  /**
+   * Ordered presentation generation of this reward pool. A nested picker can cancel back into a
+   * fresh copy at the same interaction pin; retries inside one generation retain their identity,
+   * while a later generation is a new human action and must never alias the committed terminal.
+   */
+  readonly presentationGeneration?: number;
   /** The relayed action's wire label (reward/shop/skip/reroll/check/transfer/lock, or biomeShop). */
   readonly label: string;
   /** The picked option/cursor index, or a sentinel (COOP_INTERACTION_LEAVE / _REROLL). */
@@ -794,7 +800,11 @@ export function commitRewardOwnerIntent(
   try {
     const s = state(binding);
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
-    const terminalKey = rewardStreamKey(params.surface, params.pinned, params.rewardSurface);
+    const presentationGeneration = params.presentationGeneration ?? 0;
+    if (!Number.isSafeInteger(presentationGeneration) || presentationGeneration < 0) {
+      return null;
+    }
+    const terminalKey = `${rewardStreamKey(params.surface, params.pinned, params.rewardSurface)}:presentation:${presentationGeneration}`;
     const retainedTerminal = params.terminal ? s.ownerTerminalOperations.get(terminalKey) : undefined;
     const ordinal =
       retainedTerminal?.ordinal ?? nextOwnerOrdinal(s, params.pinned, params.surface, params.rewardSurface);

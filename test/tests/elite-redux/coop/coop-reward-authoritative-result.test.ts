@@ -202,6 +202,39 @@ describe("P33 retained reward/shop authoritative results", () => {
     hostManager.dispose();
   });
 
+  it("gives a repeated terminal pick a fresh operation only after the nested-picker presentation reopens", () => {
+    const pair = createLoopbackPair();
+    const manager = new CoopDurabilityManager(pair.guest);
+    setCoopOperationDurability(manager);
+    const params = {
+      surface: "reward" as const,
+      pinned: 1,
+      label: "reward",
+      choice: 0,
+      data: [0, 0, 0],
+      terminal: true,
+      localRole: "guest" as const,
+      wave: 2,
+      turn: 3,
+    };
+
+    const initial = commitRewardOwnerIntent({ ...params, presentationGeneration: 0 });
+    const sameGenerationRetry = commitRewardOwnerIntent({ ...params, presentationGeneration: 0 });
+    const reopened = commitRewardOwnerIntent({ ...params, presentationGeneration: 1 });
+
+    expect(initial).not.toBeNull();
+    expect(sameGenerationRetry?.operationId, "transport retry keeps the exact terminal identity").toBe(
+      initial?.operationId,
+    );
+    expect(reopened?.operationId, "canceling back to the copied reward pool is a new human action").not.toBe(
+      initial?.operationId,
+    );
+    expect(initial?.operationId).toBe("1:1:REWARD:100000");
+    expect(reopened?.operationId).toBe("1:1:REWARD:100001");
+    manager.dispose();
+    pair.host.close();
+  });
+
   it("host-owned buy/skip/reroll results carry non-empty post-action state and open projection only after apply", async () => {
     const pair = createLoopbackPair();
     const hostManager = new CoopDurabilityManager(pair.host);
