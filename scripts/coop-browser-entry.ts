@@ -1358,6 +1358,10 @@ function observeSemanticSurface(): void {
         phase,
         phaseInstance: semanticPhaseInstance,
         surfaceGeneration: null,
+        // The passive renderer must satisfy the same visible-HUD proof contract as an
+        // actionable command surface. Omitting this field makes an otherwise valid
+        // command watcher fail closed in the public two-browser oracle.
+        displayedWave: globalScene.getDisplayedBiomeWaveIndex(),
         mysteryEncounterType: battle.mysteryEncounter?.encounterType ?? null,
         stateDigest,
         uiMode,

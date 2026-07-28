@@ -3894,3 +3894,14 @@ test("a consumed biome-tail tombstone cannot reject a later V2 map proposal befo
     /function hostBiomeTailSlotAvailable[\s\S]*?active\.encounterAdopted[\s\S]*?proposed\?\.epoch === active\.sessionEpoch[\s\S]*?wave >= active\.nextWave/u,
   );
 });
+
+test("a passive command watcher carries the same visible-wave proof as an actionable command surface", () => {
+  const watcherStart = browserEntry.indexOf('surfaceId: "command:watcher"');
+  const watcherEnd = browserEntry.indexOf("const canonical = JSON.stringify(observation);", watcherStart);
+  assert.ok(watcherStart >= 0 && watcherEnd > watcherStart, "command watcher observation has a bounded source block");
+  assert.match(
+    browserEntry.slice(watcherStart, watcherEnd),
+    /displayedWave:\s*globalScene\.getDisplayedBiomeWaveIndex\(\)/u,
+    "the watcher cannot emit a mechanically valid proof while omitting its visible HUD wave",
+  );
+});
