@@ -28,6 +28,7 @@
     "src/data/elite-redux/coop/coop-ability-operation.ts",
     "src/data/elite-redux/coop/coop-ability-picker-relay.ts",
     "src/data/elite-redux/coop/coop-authority-state-hooks.ts",
+    "src/data/elite-redux/coop/coop-battle-engine.ts",
     "src/data/elite-redux/coop/coop-battle-event-validator.ts",
     "src/data/elite-redux/coop/coop-battle-stream.ts",
     "src/data/elite-redux/coop/coop-biome-operation.ts",
@@ -136,8 +137,8 @@
     "test/browser/coop-public-ui/resume-scan-isolation.test.mjs",
     "test/browser/coop-public-ui/save-mutation-evidence.test.mjs",
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
-    "test/node/authority-v2-control.test.ts",
     "test/node/authority-v2-command-frontier.test.ts",
+    "test/node/authority-v2-control.test.ts",
     "test/node/authority-v2-cutover-interaction.test.ts",
     "test/node/authority-v2-cutover-replacement.test.ts",
     "test/node/authority-v2-interaction-projection.test.ts",
@@ -201,5 +202,7 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ]
 }
