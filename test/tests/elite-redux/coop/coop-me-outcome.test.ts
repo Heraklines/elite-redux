@@ -41,6 +41,7 @@ const resync = (
   seed: "abcd1234",
   waveSeed: "wave5678",
   dex: "",
+  progression: [],
   ...over,
 });
 

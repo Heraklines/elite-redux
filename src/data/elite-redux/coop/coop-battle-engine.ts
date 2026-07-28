@@ -24,6 +24,7 @@ import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
 import type { BattleFormat } from "#data/battle-format";
 import { getBattlerTag, SerializableBattlerTag, SubstituteTag } from "#data/battler-tags";
+import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
   isCoopAuthoritativeGuestGated,
@@ -5543,7 +5544,9 @@ export function applyCoopCaptureParty(serializedParty: string[]): void {
  * (`seed` / `waveSeed`), and the bigint-safe dex / starter blob. ME-terminal-only - it does NOT
  * bloat the per-turn snapshot. The guest adopts it via {@linkcode applyCoopMeOutcome}.
  */
-export function captureCoopMeOutcome(): Extract<CoopInteractionOutcome, { k: "meResync" }> {
+export function captureCoopMeOutcome(
+  progression: readonly CoopWaveProgressionPresentationV2[] = [],
+): Extract<CoopInteractionOutcome, { k: "meResync" }> {
   return {
     k: "meResync",
     base: captureCoopFullSnapshot(),
@@ -5554,6 +5557,7 @@ export function captureCoopMeOutcome(): Extract<CoopInteractionOutcome, { k: "me
     seed: globalScene.seed ?? "",
     waveSeed: globalScene.waveSeed ?? "",
     dex: captureCoopDexDelta(),
+    progression: structuredClone(progression),
     // #838 UNIFY: the id-based authoritative full-state (captured off-field too, unlike `base` which is
     // null with no live field). The guest adopts THIS instead of the species-based `party` reconcile.
     // Balls stripped (#843) - the ME terminal is a crossing context, so balls stay per-turn-only.

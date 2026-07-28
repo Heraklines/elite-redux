@@ -487,7 +487,10 @@ export interface CoopMeCommittedTerminalCursor {
 }
 
 function canonicalMeOutcomeWithoutAuthority(outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>): string {
-  const { authoritativeState: _crossingState, ...projection } = outcome;
+  // Progression is a one-shot presentation attached to the battle-settled stage. The later final leave
+  // intentionally carries an empty list and must still be allowed to reuse the exact settled state image;
+  // comparing the cue list here would mistake "do not replay twice" for a mechanical state difference.
+  const { authoritativeState: _crossingState, progression: _oneShotPresentation, ...projection } = outcome;
   if (!isPlainObject(projection.base)) {
     return canonicalize(projection);
   }

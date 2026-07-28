@@ -469,14 +469,14 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
-test("protocol 57 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
+test("protocol 58 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-57"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-58"/u);
   assert.match(
     transport,
     /interface CoopFullMonSnapshot[\s\S]+tags: string\[\]/u,
@@ -545,6 +545,9 @@ test("protocol 57 binds every structured presentation cue and retained Mystery m
   const partyExp = read("src/phases/show-party-exp-bar-phase.ts");
   const levelUp = read("src/phases/level-up-phase.ts");
   const progressionReplay = read("src/phases/coop-wave-progression-replay-phase.ts");
+  const battleEngine = read("src/data/elite-redux/coop/coop-battle-engine.ts");
+  const meTerminalValidator = read("src/data/elite-redux/coop/coop-me-terminal-validator.ts");
+  const meOperation = read("src/data/elite-redux/coop/coop-me-operation.ts");
   assert.match(waveAdapter, /readonly progression: readonly CoopWaveProgressionPresentationV2\[\]/u);
   assert.match(waveAdapter, /carrier\.progression\.every\(isValidWaveProgressionPresentation\)/u);
   assert.match(victory, /beginCoopWaveProgressionCapture\(globalScene\.currentBattle\.waveIndex\)/u);
@@ -555,6 +558,20 @@ test("protocol 57 binds every structured presentation cue and retained Mystery m
   const replayGate = runtime.indexOf("if (!transaction.progressionReady)");
   const stateApply = runtime.indexOf("applyCoopAuthoritativeBattleState(immutableState, true)", replayGate);
   assert.ok(replayGate >= 0 && stateApply > replayGate, "retained progression drains before wave DATA applies");
+  assert.match(battleEngine, /captureCoopMeOutcome\([\s\S]+progression[\s\S]+structuredClone\(progression\)/u);
+  assert.match(meTerminalValidator, /value\.progression\.every\(isValidWaveProgressionPresentation\)/u);
+  assert.match(runtime, /outcome: captureCoopMeOutcome\(progression\)/u);
+  assert.match(
+    meOperation,
+    /authoritativeState: _crossingState, progression: _oneShotPresentation/u,
+    "a final Mystery leave can reuse settled mechanics without replaying its battle progression twice",
+  );
+  const meReplayGate = runtime.indexOf("prepareCoopV2MeProgressionPresentation(runtime, entry, material.envelope)");
+  const interactionStateApply = runtime.indexOf("applyCoopAuthoritativeBattleState", meReplayGate);
+  assert.ok(
+    meReplayGate >= 0 && interactionStateApply > meReplayGate,
+    "embedded Mystery progression drains before ME terminal DATA applies",
+  );
   assert.match(progressionReplay, /PROGRESSION_STEP_WATCHDOG_MS/u);
   assert.match(progressionReplay, /this\.end\(\);[\s\S]+this\.onComplete\(\)/u);
 });

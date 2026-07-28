@@ -182,6 +182,7 @@ describe("T3 operation identity and reconnect ordinals", () => {
         seed: "seed",
         waveSeed: "wave-seed",
         dex: "dex",
+        progression: [],
       };
     };
     const first = latch.getOrCapture(capture);

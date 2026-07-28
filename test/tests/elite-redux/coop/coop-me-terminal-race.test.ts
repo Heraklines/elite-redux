@@ -44,6 +44,7 @@ const meResync = (
   seed: "HOSTSEED",
   waveSeed: "HOSTWAVE",
   dex: "dex-blob",
+  progression: [],
   ...over,
 });
 

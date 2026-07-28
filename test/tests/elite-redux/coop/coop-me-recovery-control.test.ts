@@ -353,6 +353,7 @@ describe("CoopReplayMePhase fail-closed terminal recovery", () => {
         seed: "seed",
         waveSeed: "wave-seed",
         dex: "dex",
+        progression: [],
         authoritativeState: {
           version: 1,
           tick: 1,

@@ -20,6 +20,7 @@
 // co-op session costs effectively nothing on CF.
 // =============================================================================
 
+import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 // TYPE-ONLY import (erased at runtime): the data-fingerprint diagnostic message carries a
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
@@ -153,7 +154,9 @@ export type CoopRole = "host" | "guest";
 // and omit switch-in sparkles because they never run the host's SummonPhase.
 // er-coop-57 retains the exact post-turn EXP and level-up presentation in WAVE_ADVANCE. Older renderers
 // apply the settled mechanics silently and cannot prove or replay the progression cues before rewards.
-export const COOP_PROTOCOL_VERSION = "er-coop-57";
+// er-coop-58 carries the same retained progression through an embedded battle's ME_TERMINAL and requires
+// its guest replay to finish before the terminal state/reward successor installs.
+export const COOP_PROTOCOL_VERSION = "er-coop-58";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1335,6 +1338,8 @@ export type CoopInteractionOutcome =
       seed: string;
       waveSeed: string;
       dex: string;
+      /** Exact ordered EXP/level presentation from an embedded Mystery battle; empty otherwise. */
+      progression?: readonly CoopWaveProgressionPresentationV2[];
       /**
        * #838 UNIFY: the id-based authoritative full-state (captured off-field too, unlike `base`). When
        * present the guest adopts the ME-terminal party / field / arena / modifiers / substrates via the

@@ -4449,6 +4449,10 @@ export interface CoopRuntime {
     readonly wave: number;
     readonly events: CoopWaveProgressionPresentationV2[];
   } | null;
+  /** ME terminal presentations already opened for one exact operation (duplicate construction fence). */
+  readonly v2MeProgressionReplayStarted: Set<string>;
+  /** ME terminal presentations fully drained before their immutable interaction DATA may apply. */
+  readonly v2MeProgressionReplayCompleted: Set<string>;
   /**
    * Bounded read-only completion evidence. Completed entries leave the live map as soon as their exact
    * public destination installs; retaining only their immutable status makes observability honest without
@@ -5357,6 +5361,70 @@ function beginCoopV2WaveProgressionReplay(runtime: CoopRuntime, transaction: Coo
   transaction.progressionReplayStarted = true;
   if (!phaseManager.overridePhase(phase)) {
     transaction.progressionReplayStarted = false;
+    return false;
+  }
+  return false;
+}
+
+function progressionFromCoopMeTerminal(
+  envelope: CoopAuthoritativeEnvelopeV1,
+): readonly CoopWaveProgressionPresentationV2[] | null {
+  const operation = envelope.pendingOperation;
+  if (operation?.kind !== "ME_TERMINAL") {
+    return null;
+  }
+  const payload = operation.payload as CoopMeTerminalPayload | undefined;
+  return payload?.terminal === "battle-settled" && Array.isArray(payload.outcome?.progression)
+    ? payload.outcome.progression
+    : null;
+}
+
+/**
+ * Replay an embedded Mystery battle's retained EXP/level cues before its ME_TERMINAL state image applies.
+ * The ordinary interaction applier and recovery redelivery share this same gate; a queued override is not
+ * completion, and the exact operation remains retained until the phase calls back after its real UI drains.
+ */
+function prepareCoopV2MeProgressionPresentation(
+  runtime: CoopRuntime,
+  entry: CoopAuthorityEntry,
+  envelope: CoopAuthoritativeEnvelopeV1,
+): boolean {
+  const progression = progressionFromCoopMeTerminal(envelope);
+  if (
+    progression == null
+    || progression.length === 0
+    || runtime.v2MeProgressionReplayCompleted.has(entry.operationId)
+  ) {
+    return true;
+  }
+  if (runtime.v2MeProgressionReplayStarted.has(entry.operationId)) {
+    return false;
+  }
+  const phaseManager = globalScene.phaseManager;
+  if (
+    phaseManager?.getCurrentPhase()?.phaseName !== "BattleEndPhase"
+    || phaseManager.getStandbyPhase() != null
+    || globalScene.currentBattle?.waveIndex !== envelope.wave
+  ) {
+    return false;
+  }
+  const phase = phaseManager.create("CoopWaveProgressionReplayPhase", envelope.wave, progression, () => {
+    runWhenCoopRuntimeActive(runtime, () => {
+      runtime.v2MeProgressionReplayStarted.delete(entry.operationId);
+      // Only one Mystery encounter can be live. Retain the latest exact id for duplicate delivery without
+      // growing an unbounded second history beside the Authority V2 log.
+      runtime.v2MeProgressionReplayCompleted.clear();
+      runtime.v2MeProgressionReplayCompleted.add(entry.operationId);
+      coopLog(
+        "progression",
+        `GUEST retained Mystery presentation complete op=${entry.operationId} wave=${envelope.wave} events=${progression.length}`,
+      );
+      coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries();
+    });
+  });
+  runtime.v2MeProgressionReplayStarted.add(entry.operationId);
+  if (!phaseManager.overridePhase(phase)) {
+    runtime.v2MeProgressionReplayStarted.delete(entry.operationId);
     return false;
   }
   return false;
@@ -6724,6 +6792,13 @@ function buildCoopV2LiveSeams(
               "v2-interaction",
               `deferred cross-wave DATA rev=${entry.revision} until its signed destination shell is prepared `
                 + `phase=${globalScene.phaseManager?.getCurrentPhase()?.phaseName ?? "none"}`,
+            );
+            return "deferred";
+          }
+          if (!prepareCoopV2MeProgressionPresentation(runtime, entry, material.envelope)) {
+            coopLog(
+              "v2-interaction",
+              `deferred Mystery progression rev=${entry.revision} op=${entry.operationId} before DATA`,
             );
             return "deferred";
           }
@@ -12218,9 +12293,10 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
     return true;
   }
   const step = (prior.terminalStep ?? -1) + 1;
+  const progression = snapshotCoopWaveProgressionCapture(runtime, battle.waveIndex);
   const payload = {
     terminal: "battle-settled",
-    outcome: captureCoopMeOutcome(),
+    outcome: captureCoopMeOutcome(progression),
     destination: {
       kind: "reward",
       hostTurn: battle.turn,
@@ -12244,6 +12320,7 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
     failCoopSharedSession("Mystery battle settlement could not be retained");
     return true;
   }
+  clearCoopWaveProgressionCapture(runtime, battle.waveIndex);
   setCoopMeTerminalControl("battle-settled", battle.turn, {
     operationId,
     step,
@@ -13089,6 +13166,8 @@ export function assembleCoopRuntime(
     v2ProjectedInteractionControlId: null,
     v2WaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
     v2WaveProgressionCapture: null,
+    v2MeProgressionReplayStarted: new Set<string>(),
+    v2MeProgressionReplayCompleted: new Set<string>(),
     v2CompletedWaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
   };
   sharedTerminalStates.set(runtime, {

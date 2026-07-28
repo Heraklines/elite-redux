@@ -68,6 +68,7 @@ function outcome(wave: number, enemies = 0): MeOutcome {
     seed: `seed-${wave}`,
     waveSeed: `wave-${wave}`,
     dex: "dex",
+    progression: [],
     authoritativeState: authoritativeState(wave, enemies),
   };
 }
@@ -395,6 +396,34 @@ describe("complete retained Mystery terminal transaction", () => {
       }),
     ).toBe(false);
     expect(isCompleteCoopMeTerminalPayload(leavePayload(12, true))).toBe(true);
+    const completeSettlement = settledPayload(12);
+    const { progression: _missingProgression, ...outcomeWithoutProgression } = completeSettlement.outcome;
+    expect(
+      isCompleteCoopMeTerminalPayload({ ...completeSettlement, outcome: outcomeWithoutProgression }),
+      "every terminal carries an explicit retained progression list, including an empty one",
+    ).toBe(false);
+    expect(
+      isCompleteCoopMeTerminalPayload({
+        ...completeSettlement,
+        outcome: {
+          ...completeSettlement.outcome,
+          progression: [
+            {
+              k: "exp",
+              partySlot: 0,
+              pokemonId: 42,
+              display: "field",
+              expGain: 120,
+              fromLevel: 5,
+              toLevel: 6,
+              fromExp: 500,
+              toExp: 620,
+            },
+          ],
+        },
+      }),
+      "an embedded battle settlement admits a strict immutable progression cue",
+    ).toBe(true);
     expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(true);
     expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 1 }))).toBe(true);
     expect(

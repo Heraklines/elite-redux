@@ -81,6 +81,7 @@ const RESYNC = {
   seed: "seed",
   waveSeed: "wave-seed",
   dex: "dex",
+  progression: [],
   authoritativeState: STATE,
 } as const;
 

@@ -7,6 +7,7 @@
 // construction. Keeping one validator prevents the V2 log from retaining a terminal image the real
 // destination executor would later reject.
 
+import { isValidWaveProgressionPresentation } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
   COOP_ME_REROLL_MULTIPLIER_MAX,
   COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
@@ -217,6 +218,9 @@ export function isCompleteCoopMeResyncOutcome(value: unknown): value is Extract<
     || typeof value.seed !== "string"
     || typeof value.waveSeed !== "string"
     || typeof value.dex !== "string"
+    || !Array.isArray(value.progression)
+    || value.progression.length > 128
+    || !value.progression.every(isValidWaveProgressionPresentation)
     || !isPlainObject(value.authoritativeState)
   ) {
     return false;
