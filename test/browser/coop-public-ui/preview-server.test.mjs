@@ -179,7 +179,7 @@ test("two simultaneous browser requests share one exact-SHA upstream fetch and i
   try {
     const first = fetch(`${preview.origin}/images/pokemon/test.png`);
     const second = fetch(`${preview.origin}/images/pokemon/test.png`);
-    await waitFor(() => upstreamFetches === 1);
+    await waitFor(() => upstreamFetches === 1 && proxy.snapshot().inFlightHits === 1);
     releaseFetch();
     const responses = await Promise.all([first, second]);
     assert.deepEqual(
