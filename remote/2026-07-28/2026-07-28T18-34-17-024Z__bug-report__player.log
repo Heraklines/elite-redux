@@ -1,0 +1,2044 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:69c32b4bcac346704166fc9e0fd0c05c836352a0:run-30096000311.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36
+platform: Linux armv81
+screen:   384x832 @2.8125x  devmem:8 GB
+boot:     boot-start@0ms -> loading-complete@180026ms -> title-shown@183487ms
+lastSess: ok (reached title)
+mode:     4  wave:61  difficulty:youngster
+seed:     7N3iJfDgVJuekgcMJJaVNiIt
+party:    Kecleon(L48 130/130), Kyogre(L48 162/162), Reuniclus Redux(L48 178/178), Palossand(L43 139/139), Swampage(L43 148/148), Cascoon(L41 98/98)
+
+----- DESCRIPTION -----
+abyss background missing but fixed upon refresh
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:69c32b4bcac346704166fc9e0fd0c05c836352a0:run-30096000311.1","source":"github","sha":"69c32b4bcac346704166fc9e0fd0c05c836352a0","workflow":{"provider":"github-actions","runId":"30096000311","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[18:32:22.120] LOG: Applied X Speed 
+[18:32:22.129] LOG: Applied X Speed 
+[18:32:22.130] LOG: Applied X Speed 
+[18:32:22.130] LOG: Applied X Speed 
+[18:32:22.131] LOG: Applied X Speed 
+[18:32:22.132] LOG: Applied X Speed 
+[18:32:22.132] LOG: Applied X Speed 
+[18:32:22.133] LOG: Applied X Speed 
+[18:32:22.134] LOG: Applied X Speed 
+[18:32:22.134] LOG: Applied X Speed 
+[18:32:22.135] LOG: Applied X Speed 
+[18:32:22.136] LOG: Applied X Speed 
+[18:32:22.136] LOG: Applied X Speed 
+[18:32:22.137] LOG: Applied X Speed 
+[18:32:22.137] LOG: Applied X Speed 
+[18:32:22.138] LOG: Applied X Speed 
+[18:32:22.139] LOG: Applied X Speed 
+[18:32:22.142] LOG: Applied X Speed 
+[18:32:22.143] LOG: Applied X Speed 
+[18:32:22.144] LOG: Applied X Speed 
+[18:32:22.144] LOG: Applied X Speed 
+[18:32:22.145] LOG: Applied X Speed 
+[18:32:22.145] LOG: Applied X Speed 
+[18:32:22.146] LOG: Applied X Speed 
+[18:32:22.147] LOG: Applied X Speed 
+[18:32:22.149] LOG: Applied X Speed 
+[18:32:22.149] LOG: Applied X Speed 
+[18:32:22.150] LOG: Applied X Speed 
+[18:32:22.151] LOG: Applied X Speed 
+[18:32:22.151] LOG: Applied X Speed 
+[18:32:22.152] LOG: Applied X Speed 
+[18:32:22.153] LOG: Applied X Speed 
+[18:32:22.153] LOG: Applied X Speed 
+[18:32:22.155] LOG: Applied X Speed 
+[18:32:22.156] LOG: Applied X Speed 
+[18:32:22.157] LOG: Applied X Speed 
+[18:32:22.157] LOG: Applied X Speed 
+[18:32:22.158] LOG: Applied X Speed 
+[18:32:22.159] LOG: Applied X Speed 
+[18:32:22.160] LOG: Applied X Speed 
+[18:32:22.160] LOG: Applied X Speed 
+[18:32:22.174] LOG: Applied X Speed 
+[18:32:22.174] LOG: Applied X Speed 
+[18:32:22.175] LOG: Applied X Speed 
+[18:32:22.176] LOG: Applied X Speed 
+[18:32:22.176] LOG: Applied X Speed 
+[18:32:22.177] LOG: Applied X Speed 
+[18:32:22.177] LOG: Applied X Speed 
+[18:32:22.178] LOG: Applied X Speed 
+[18:32:22.180] LOG: Move Pool: ["Snap Trap"]
+[18:32:22.180] LOG: Move Scores: [336]
+[18:32:22.180] LOG: Sorted Move Pool: ["Snap Trap"]
+[18:32:22.180] LOG: Chosen Move: Snap Trap
+[18:32:22.180] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:32:22.181] LOG: Applied X Speed 
+[18:32:22.181] LOG: Applied X Speed 
+[18:32:22.182] LOG: Applied X Speed 
+[18:32:22.182] LOG: Applied X Speed 
+[18:32:22.183] LOG: Applied X Speed 
+[18:32:22.184] LOG: Applied X Speed 
+[18:32:22.184] LOG: Applied X Speed 
+[18:32:22.185] LOG: Applied X Speed 
+[18:32:22.186] LOG: Applied X Speed 
+[18:32:22.187] LOG: Applied X Speed 
+[18:32:22.188] LOG: Applied X Speed 
+[18:32:22.189] LOG: Applied X Speed 
+[18:32:22.189] LOG: Applied X Speed 
+[18:32:22.190] LOG: Applied X Speed 
+[18:32:22.192] LOG: Applied X Speed 
+[18:32:22.193] LOG: Applied X Speed 
+[18:32:22.195] LOG: Applied X Speed 
+[18:32:22.197] LOG: Applied X Speed 
+[18:32:22.197] LOG: Applied X Speed 
+[18:32:22.198] LOG: Applied X Speed 
+[18:32:22.198] LOG: Applied X Speed 
+[18:32:22.199] LOG: Applied X Speed 
+[18:32:22.200] LOG: Applied X Speed 
+[18:32:22.200] LOG: Applied X Speed 
+[18:32:22.201] LOG: Applied X Speed 
+[18:32:22.202] LOG: Applied X Speed 
+[18:32:22.202] LOG: Applied X Speed 
+[18:32:22.203] LOG: Applied X Speed 
+[18:32:22.204] LOG: Applied X Speed 
+[18:32:22.204] LOG: Applied X Speed 
+[18:32:22.205] LOG: Applied X Speed 
+[18:32:22.206] LOG: Applied X Speed 
+[18:32:22.206] LOG: Applied X Speed 
+[18:32:22.213] LOG: Applied X Speed 
+[18:32:22.213] LOG: Applied X Speed 
+[18:32:22.214] LOG: Applied X Speed 
+[18:32:22.215] LOG: Applied X Speed 
+[18:32:22.215] LOG: Applied X Speed 
+[18:32:22.216] LOG: Applied X Speed 
+[18:32:22.217] LOG: Applied X Speed 
+[18:32:22.217] LOG: Applied X Speed 
+[18:32:22.218] LOG: Applied X Speed 
+[18:32:22.219] LOG: Applied X Speed 
+[18:32:22.219] LOG: Applied X Speed 
+[18:32:22.220] LOG: Applied X Speed 
+[18:32:22.221] LOG: Applied X Speed 
+[18:32:22.221] LOG: Applied X Speed 
+[18:32:22.222] LOG: Applied X Speed 
+[18:32:22.223] LOG: Applied X Speed 
+[18:32:22.228] WARN: BattlerTag DOUBLE_SHOCKED is missing a score!
+[18:32:22.229] WARN: BattlerTag DOUBLE_SHOCKED is missing a score!
+[18:32:22.231] WARN: BattlerTag DOUBLE_SHOCKED is missing a score!
+[18:32:22.233] LOG: Applied X Speed 
+[18:32:22.233] LOG: Applied X Speed 
+[18:32:22.234] LOG: Applied X Speed 
+[18:32:22.235] LOG: Applied X Speed 
+[18:32:22.235] LOG: Applied X Speed 
+[18:32:22.236] LOG: Applied X Speed 
+[18:32:22.237] LOG: Applied X Speed 
+[18:32:22.237] LOG: Applied X Speed 
+[18:32:22.239] LOG: Applied X Speed 
+[18:32:22.240] LOG: Applied X Speed 
+[18:32:22.241] LOG: Applied X Speed 
+[18:32:22.241] LOG: Applied X Speed 
+[18:32:22.242] LOG: Applied X Speed 
+[18:32:22.243] LOG: Applied X Speed 
+[18:32:22.243] LOG: Applied X Speed 
+[18:32:22.244] LOG: Applied X Speed 
+[18:32:22.255] WARN: BattlerTag DOUBLE_SHOCKED is missing a score!
+[18:32:22.257] LOG: Applied X Speed 
+[18:32:22.258] LOG: Applied X Speed 
+[18:32:22.259] LOG: Applied X Speed 
+[18:32:22.259] LOG: Applied X Speed 
+[18:32:22.260] LOG: Applied X Speed 
+[18:32:22.260] LOG: Applied X Speed 
+[18:32:22.261] LOG: Applied X Speed 
+[18:32:22.262] LOG: Applied X Speed 
+[18:32:22.264] LOG: Applied X Speed 
+[18:32:22.265] LOG: Applied X Speed 
+[18:32:22.265] LOG: Applied X Speed 
+[18:32:22.266] LOG: Applied X Speed 
+[18:32:22.267] LOG: Applied X Speed 
+[18:32:22.267] LOG: Applied X Speed 
+[18:32:22.268] LOG: Applied X Speed 
+[18:32:22.269] LOG: Applied X Speed 
+[18:32:22.270] LOG: Applied X Speed 
+[18:32:22.270] LOG: Applied X Speed 
+[18:32:22.271] LOG: Applied X Speed 
+[18:32:22.271] LOG: Applied X Speed 
+[18:32:22.272] LOG: Applied X Speed 
+[18:32:22.273] LOG: Applied X Speed 
+[18:32:22.273] LOG: Applied X Speed 
+[18:32:22.274] LOG: Applied X Speed 
+[18:32:22.276] LOG: Applied X Speed 
+[18:32:22.277] LOG: Applied X Speed 
+[18:32:22.278] LOG: Applied X Speed 
+[18:32:22.278] LOG: Applied X Speed 
+[18:32:22.279] LOG: Applied X Speed 
+[18:32:22.280] LOG: Applied X Speed 
+[18:32:22.280] LOG: Applied X Speed 
+[18:32:22.281] LOG: Applied X Speed 
+[18:32:22.282] LOG: Applied X Speed 
+[18:32:22.282] LOG: Applied X Speed 
+[18:32:22.283] LOG: Applied X Speed 
+[18:32:22.283] LOG: Applied X Speed 
+[18:32:22.284] LOG: Applied X Speed 
+[18:32:22.285] LOG: Applied X Speed 
+[18:32:22.285] LOG: Applied X Speed 
+[18:32:22.286] LOG: Applied X Speed 
+[18:32:22.286] LOG: Move Pool: ["Double Shock","Belly Drum","Upper Hand","Reversal"]
+[18:32:22.286] LOG: Move Scores: [-20,22,19.5,6]
+[18:32:22.286] LOG: Sorted Move Pool: ["Belly Drum","Upper Hand","Reversal","Double Shock"]
+[18:32:22.286] LOG: Chosen Move: Belly Drum
+[18:32:22.286] LOG: %cStart Phase TurnStartPhase color:green;
+[18:32:22.288] LOG: Applied X Speed 
+[18:32:22.289] LOG: Applied X Speed 
+[18:32:22.290] LOG: Applied X Speed 
+[18:32:22.291] LOG: Applied X Speed 
+[18:32:22.292] LOG: Applied X Speed 
+[18:32:22.293] LOG: Applied X Speed 
+[18:32:22.294] LOG: Applied X Speed 
+[18:32:22.294] LOG: Applied X Speed 
+[18:32:22.295] LOG: Applied X Speed 
+[18:32:22.296] LOG: Applied X Speed 
+[18:32:22.297] LOG: Applied X Speed 
+[18:32:22.301] LOG: Applied X Speed 
+[18:32:22.303] LOG: Applied X Speed 
+[18:32:22.304] LOG: Applied X Speed 
+[18:32:22.305] LOG: Applied X Speed 
+[18:32:22.306] LOG: Applied X Speed 
+[18:32:22.308] LOG: Applied X Speed 
+[18:32:22.310] LOG: Applied X Speed 
+[18:32:22.311] LOG: Applied X Speed 
+[18:32:22.312] LOG: Applied X Speed 
+[18:32:22.314] LOG: Applied X Speed 
+[18:32:22.315] LOG: Applied X Speed 
+[18:32:22.316] LOG: Applied X Speed 
+[18:32:22.317] LOG: Applied X Speed 
+[18:32:22.318] LOG: Applied X Speed 
+[18:32:22.320] LOG: Applied X Speed 
+[18:32:22.320] LOG: Applied X Speed 
+[18:32:22.321] LOG: Applied X Speed 
+[18:32:22.322] LOG: Applied X Speed 
+[18:32:22.323] LOG: Applied X Speed 
+[18:32:22.324] LOG: Applied X Speed 
+[18:32:22.324] LOG: Applied X Speed 
+[18:32:22.325] LOG: Applied X Speed 
+[18:32:22.330] LOG: Applied X Speed 
+[18:32:22.331] LOG: Applied X Speed 
+[18:32:22.332] LOG: Applied X Speed 
+[18:32:22.333] LOG: Applied X Speed 
+[18:32:22.334] LOG: Applied X Speed 
+[18:32:22.336] LOG: Applied X Speed 
+[18:32:22.338] LOG: Applied X Speed 
+[18:32:22.339] LOG: Applied X Speed 
+[18:32:22.340] LOG: Applied X Speed 
+[18:32:22.342] LOG: Applied X Speed 
+[18:32:22.343] LOG: Applied X Speed 
+[18:32:22.345] LOG: Applied X Speed 
+[18:32:22.346] LOG: Applied X Speed 
+[18:32:22.347] LOG: Applied X Speed 
+[18:32:22.348] LOG: Applied X Speed 
+[18:32:22.349] LOG: Applied X Speed 
+[18:32:22.350] LOG: Applied X Speed 
+[18:32:22.351] LOG: Applied X Speed 
+[18:32:22.351] LOG: Applied X Speed 
+[18:32:22.353] LOG: Applied X Speed 
+[18:32:22.353] LOG: Applied X Speed 
+[18:32:22.354] LOG: Applied X Speed 
+[18:32:22.356] LOG: %cStart Phase MovePhase color:green;
+[18:32:22.356] LOG: %cUser: Reuniclus Redux
+Move: BOILING_FLAME
+Use Mode: NORMAL color:orchid
+[18:32:22.357] LOG: Applied X Speed 
+[18:32:22.359] LOG: Applied X Speed 
+[18:32:22.359] LOG: Applied X Speed 
+[18:32:22.361] LOG: Applied X Speed 
+[18:32:22.362] LOG: Applied X Speed 
+[18:32:22.363] LOG: Applied X Speed 
+[18:32:22.363] LOG: Applied X Speed 
+[18:32:22.364] LOG: Applied X Speed 
+[18:32:22.365] LOG: Applied X Speed 
+[18:32:22.366] LOG: Applied X Speed 
+[18:32:22.366] LOG: Applied X Speed 
+[18:32:22.371] LOG: Applied X Speed 
+[18:32:22.372] LOG: Applied X Speed 
+[18:32:22.374] LOG: Applied X Speed 
+[18:32:22.375] LOG: Applied X Speed 
+[18:32:22.376] LOG: Applied X Speed 
+[18:32:22.378] LOG: Applied X Speed 
+[18:32:22.380] LOG: Applied X Speed 
+[18:32:22.381] LOG: Applied X Speed 
+[18:32:22.382] LOG: Applied X Speed 
+[18:32:22.384] LOG: Applied X Speed 
+[18:32:22.385] LOG: Applied X Speed 
+[18:32:22.387] LOG: Applied X Speed 
+[18:32:22.388] LOG: Applied X Speed 
+[18:32:22.389] LOG: Applied X Speed 
+[18:32:22.390] LOG: Applied X Speed 
+[18:32:22.391] LOG: Applied X Speed 
+[18:32:22.392] LOG: Applied X Speed 
+[18:32:22.393] LOG: Applied X Speed 
+[18:32:22.393] LOG: Applied X Speed 
+[18:32:22.395] LOG: Applied X Speed 
+[18:32:22.395] LOG: Applied X Speed 
+[18:32:22.396] LOG: Applied X Speed 
+[18:32:22.400] LOG: Applied X Speed 
+[18:32:22.402] LOG: Applied X Speed 
+[18:32:22.403] LOG: Applied X Speed 
+[18:32:22.404] LOG: Applied X Speed 
+[18:32:22.405] LOG: Applied X Speed 
+[18:32:22.407] LOG: Applied X Speed 
+[18:32:22.409] LOG: Applied X Speed 
+[18:32:22.410] LOG: Applied X Speed 
+[18:32:22.412] LOG: Applied X Speed 
+[18:32:22.413] LOG: Applied X Speed 
+[18:32:22.414] LOG: Applied X Speed 
+[18:32:22.414] LOG: %cStart Phase MessagePhase color:green;
+[18:32:22.504] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:32:22.879] LOG: crit stage: +0
+[18:32:22.896] LOG: Move: Boiling Flame | Base damage: 190.98285714285714 | Power: 240 | Source attack: 130 | Target defense: 70
+[18:32:22.902] LOG: Move: Boiling Flame | Attack damage: 121
+[18:32:22.908] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:22.929] LOG: %cStart Phase MoveEndPhase color:green;
+[18:32:22.934] LOG: Applied X Speed 
+[18:32:22.937] LOG: Applied X Speed 
+[18:32:22.945] LOG: Applied X Speed 
+[18:32:22.946] LOG: Applied X Speed 
+[18:32:22.947] LOG: Applied X Speed 
+[18:32:22.949] LOG: %cStart Phase MovePhase color:green;
+[18:32:22.949] LOG: %cUser: Kyogre
+Move: BLIZZARD
+Use Mode: NORMAL color:orchid
+[18:32:22.950] LOG: Applied X Speed 
+[18:32:22.952] LOG: Applied X Speed 
+[18:32:22.952] LOG: Applied X Speed 
+[18:32:22.954] LOG: Applied X Speed 
+[18:32:22.954] LOG: Applied X Speed 
+[18:32:22.955] LOG: Applied X Speed 
+[18:32:22.956] LOG: Applied X Speed 
+[18:32:22.956] LOG: Applied X Speed 
+[18:32:22.958] LOG: Applied X Speed 
+[18:32:22.958] LOG: Applied X Speed 
+[18:32:22.959] LOG: Applied X Speed 
+[18:32:22.963] LOG: Applied X Speed 
+[18:32:22.964] LOG: Applied X Speed 
+[18:32:22.966] LOG: Applied X Speed 
+[18:32:22.967] LOG: Applied X Speed 
+[18:32:22.968] LOG: Applied X Speed 
+[18:32:22.970] LOG: Applied X Speed 
+[18:32:22.971] LOG: Applied X Speed 
+[18:32:22.972] LOG: Applied X Speed 
+[18:32:22.973] LOG: Applied X Speed 
+[18:32:22.975] LOG: Applied X Speed 
+[18:32:22.976] LOG: Applied X Speed 
+[18:32:22.976] LOG: %cStart Phase MessagePhase color:green;
+[18:32:23.048] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:32:23.048] LOG: Applied Multi Lens 
+[18:32:23.339] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:23.424] WARN: Could not get co-op identity ticket! 503 
+[18:32:23.424] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:23.732] LOG: crit stage: +0
+[18:32:23.741] LOG: Move: Blizzard | Base damage: 96.87 | Power: 110 | Source attack: 179 | Target defense: 88
+[18:32:23.741] LOG: Applied Multi Lens 
+[18:32:23.744] LOG: Move: Blizzard | Attack damage: 123
+[18:32:23.749] LOG: crit stage: +0
+[18:32:23.754] LOG: Move: Blizzard | Base damage: 104.45508196721312 | Power: 110 | Source attack: 268 | Target defense: 122
+[18:32:23.754] LOG: Applied Multi Lens 
+[18:32:23.756] LOG: Move: Blizzard | Attack damage: 44
+[18:32:23.764] LOG: crit stage: +0
+[18:32:23.769] LOG: Move: Blizzard | Base damage: 180.56457142857144 | Power: 110 | Source attack: 268 | Target defense: 70
+[18:32:23.769] LOG: Applied Multi Lens 
+[18:32:23.770] LOG: Move: Blizzard | Attack damage: 93
+[18:32:23.771] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:23.791] LOG: %cStart Phase MessagePhase color:green;
+[18:32:24.005] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:24.049] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:24.075] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:32:24.749] LOG: crit stage: +0
+[18:32:24.759] LOG: Move: Blizzard | Base damage: 104.45508196721312 | Power: 110 | Source attack: 268 | Target defense: 122
+[18:32:24.759] LOG: Applied Multi Lens 
+[18:32:24.761] LOG: Move: Blizzard | Attack damage: 17
+[18:32:24.765] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:24.796] LOG: %cStart Phase MessagePhase color:green;
+[18:32:24.996] LOG: %cStart Phase FaintPhase color:green;
+[18:32:25.000] LOG: Applied X Speed 
+[18:32:25.002] LOG: Applied X Speed 
+[18:32:25.006] LOG: Applied X Speed 
+[18:32:25.008] LOG: Applied X Speed 
+[18:32:25.011] LOG: Applied X Speed 
+[18:32:25.013] LOG: Applied X Speed 
+[18:32:25.015] LOG: Applied X Speed 
+[18:32:25.016] LOG: Applied X Speed 
+[18:32:25.018] LOG: Applied X Speed 
+[18:32:25.019] LOG: Applied X Speed 
+[18:32:25.022] LOG: Applied X Speed 
+[18:32:25.025] LOG: Applied X Speed 
+[18:32:25.438] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:25.486] WARN: Could not get co-op identity ticket! 503 
+[18:32:25.486] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:27.487] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:27.587] WARN: Could not get co-op identity ticket! 503 
+[18:32:27.587] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:27.798] LOG: Applied X Speed 
+[18:32:27.801] LOG: Applied X Speed 
+[18:32:27.805] LOG: Applied X Speed 
+[18:32:27.808] LOG: Applied X Speed 
+[18:32:27.812] LOG: Applied X Speed 
+[18:32:27.813] LOG: Applied X Speed 
+[18:32:27.815] LOG: Applied X Speed 
+[18:32:27.817] LOG: Applied X Speed 
+[18:32:27.819] LOG: Applied X Speed 
+[18:32:27.820] LOG: Applied X Speed 
+[18:32:27.823] LOG: Applied X Speed 
+[18:32:27.826] LOG: Applied X Speed 
+[18:32:27.826] LOG: %cStart Phase MessagePhase color:green;
+[18:32:27.889] LOG: %cStart Phase VictoryPhase color:green;
+[18:32:27.890] LOG: %cStart Phase ExpPhase color:green;
+[18:32:27.890] LOG: Applied Super EXP. Charm 
+[18:32:27.891] LOG: Applied EXP. Charm 
+[18:32:28.207] LOG: %cStart Phase LevelUpPhase color:green;
+[18:32:28.208] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[18:32:28.208] LOG: Applied Super EXP. Charm 
+[18:32:28.208] LOG: Applied EXP. Charm 
+[18:32:28.208] LOG: %cStart Phase LevelUpPhase color:green;
+[18:32:28.208] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[18:32:28.208] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[18:32:28.209] LOG: Applied Super EXP. Charm 
+[18:32:28.209] LOG: Applied EXP. Charm 
+[18:32:28.209] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[18:32:28.209] LOG: %cStart Phase FaintPhase color:green;
+[18:32:28.211] LOG: Applied X Speed 
+[18:32:28.213] LOG: Applied X Speed 
+[18:32:28.215] LOG: Applied X Speed 
+[18:32:28.217] LOG: Applied X Speed 
+[18:32:28.220] LOG: Applied X Speed 
+[18:32:28.221] LOG: Applied X Speed 
+[18:32:28.223] LOG: Applied X Speed 
+[18:32:28.224] LOG: Applied X Speed 
+[18:32:28.225] LOG: Applied X Speed 
+[18:32:28.227] LOG: Applied X Speed 
+[18:32:28.229] LOG: Applied X Speed 
+[18:32:28.231] LOG: Applied X Speed 
+[18:32:29.587] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:29.664] WARN: Could not get co-op identity ticket! 503 
+[18:32:29.664] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:31.033] LOG: Applied X Speed 
+[18:32:31.036] LOG: Applied X Speed 
+[18:32:31.040] LOG: Applied X Speed 
+[18:32:31.043] LOG: Applied X Speed 
+[18:32:31.046] LOG: Applied X Speed 
+[18:32:31.048] LOG: Applied X Speed 
+[18:32:31.050] LOG: Applied X Speed 
+[18:32:31.051] LOG: Applied X Speed 
+[18:32:31.053] LOG: Applied X Speed 
+[18:32:31.054] LOG: Applied X Speed 
+[18:32:31.057] LOG: Applied X Speed 
+[18:32:31.059] LOG: Applied X Speed 
+[18:32:31.059] LOG: %cStart Phase MessagePhase color:green;
+[18:32:31.236] LOG: %cStart Phase VictoryPhase color:green;
+[18:32:31.237] LOG: %cStart Phase ExpPhase color:green;
+[18:32:31.237] LOG: Applied Super EXP. Charm 
+[18:32:31.237] LOG: Applied EXP. Charm 
+[18:32:31.576] LOG: %cStart Phase LevelUpPhase color:green;
+[18:32:31.576] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[18:32:31.576] LOG: Applied Super EXP. Charm 
+[18:32:31.577] LOG: Applied EXP. Charm 
+[18:32:31.577] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[18:32:31.577] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[18:32:31.577] LOG: Applied Super EXP. Charm 
+[18:32:31.577] LOG: Applied EXP. Charm 
+[18:32:31.577] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[18:32:31.577] LOG: %cStart Phase MoveEndPhase color:green;
+[18:32:31.584] LOG: Applied X Speed 
+[18:32:31.586] LOG: Applied X Speed 
+[18:32:31.588] LOG: %cStart Phase MovePhase color:green;
+[18:32:31.588] LOG: %cStart Phase MoveEndPhase color:green;
+[18:32:31.590] LOG: Applied X Speed 
+[18:32:31.593] LOG: Applied X Speed 
+[18:32:31.594] LOG: %cStart Phase MovePhase color:green;
+[18:32:31.594] LOG: %cStart Phase MoveEndPhase color:green;
+[18:32:31.596] LOG: Applied X Speed 
+[18:32:31.596] LOG: %cStart Phase MovePhase color:green;
+[18:32:31.596] LOG: %cUser: Palossand
+Move: SPLISHY_SPLASH
+Use Mode: NORMAL color:orchid
+[18:32:31.598] LOG: Applied X Speed 
+[18:32:31.599] LOG: Applied X Speed 
+[18:32:31.601] LOG: Applied X Speed 
+[18:32:31.602] LOG: Applied X Speed 
+[18:32:31.605] LOG: Applied X Speed 
+[18:32:31.606] LOG: Applied X Speed 
+[18:32:31.607] LOG: Applied X Speed 
+[18:32:31.608] LOG: Applied X Speed 
+[18:32:31.609] LOG: Applied X Speed 
+[18:32:31.611] LOG: Applied X Speed 
+[18:32:31.613] LOG: Applied X Speed 
+[18:32:31.615] LOG: Applied X Speed 
+[18:32:31.615] LOG: %cStart Phase MessagePhase color:green;
+[18:32:31.672] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:31.730] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:32:31.778] WARN: Could not get co-op identity ticket! 503 
+[18:32:31.778] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:32.582] LOG: crit stage: +0
+[18:32:32.591] LOG: Move: Splishy Splash | Base damage: 30.015081967213114 | Power: 90 | Source attack: 101 | Target defense: 122
+[18:32:32.594] LOG: Move: Splishy Splash | Attack damage: 72
+[18:32:32.598] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:32.629] LOG: %cStart Phase MessagePhase color:green;
+[18:32:32.846] LOG: %cStart Phase MoveEndPhase color:green;
+[18:32:32.847] LOG: %cStart Phase MovePhase color:green;
+[18:32:32.847] LOG: %cUser: Ferrothorn
+Move: SNAP_TRAP
+Use Mode: NORMAL color:orchid
+[18:32:32.852] LOG: Applied X Speed 
+[18:32:32.855] LOG: Applied X Speed 
+[18:32:32.860] LOG: Applied X Speed 
+[18:32:32.864] LOG: Applied X Speed 
+[18:32:32.868] LOG: Applied X Speed 
+[18:32:32.870] LOG: Applied X Speed 
+[18:32:32.872] LOG: Applied X Speed 
+[18:32:32.874] LOG: Applied X Speed 
+[18:32:32.876] LOG: Applied X Speed 
+[18:32:32.878] LOG: Applied X Speed 
+[18:32:32.880] LOG: Applied X Speed 
+[18:32:32.883] LOG: Applied X Speed 
+[18:32:32.886] LOG: Applied X Speed 
+[18:32:32.888] LOG: Applied X Speed 
+[18:32:32.890] LOG: Applied X Speed 
+[18:32:32.891] LOG: Applied X Speed 
+[18:32:32.894] LOG: Applied X Speed 
+[18:32:32.895] LOG: Applied X Speed 
+[18:32:32.896] LOG: Applied X Speed 
+[18:32:32.897] LOG: Applied X Speed 
+[18:32:32.898] LOG: Applied X Speed 
+[18:32:32.900] LOG: Applied X Speed 
+[18:32:32.902] LOG: Applied X Speed 
+[18:32:32.904] LOG: Applied X Speed 
+[18:32:32.904] LOG: %cStart Phase MessagePhase color:green;
+[18:32:33.005] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:32:33.013] LOG: Applied X Speed 
+[18:32:33.016] LOG: Applied X Speed 
+[18:32:33.019] LOG: Applied X Speed 
+[18:32:33.021] LOG: Applied X Speed 
+[18:32:33.024] LOG: Applied X Speed 
+[18:32:33.025] LOG: Applied X Speed 
+[18:32:33.027] LOG: Applied X Speed 
+[18:32:33.029] LOG: Applied X Speed 
+[18:32:33.381] LOG: crit stage: +0
+[18:32:33.392] LOG: Move: Snap Trap | Base damage: 52.31999999999999 | Power: 100 | Source attack: 111 | Target defense: 90
+[18:32:33.398] LOG: Move: Snap Trap | Attack damage: 273
+[18:32:33.401] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:33.425] LOG: %cStart Phase MessagePhase color:green;
+[18:32:33.647] LOG: %cStart Phase FaintPhase color:green;
+[18:32:33.651] LOG: Applied X Speed 
+[18:32:33.654] LOG: Applied X Speed 
+[18:32:33.657] LOG: Applied X Speed 
+[18:32:33.659] LOG: Applied X Speed 
+[18:32:33.660] WARN: cry/10720 not found
+[18:32:33.716] LOG: Applied X Speed 
+[18:32:33.717] LOG: Applied X Speed 
+[18:32:33.720] LOG: Applied X Speed 
+[18:32:33.722] LOG: Applied X Speed 
+[18:32:33.723] LOG: %cStart Phase MessagePhase color:green;
+[18:32:33.778] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:33.842] WARN: Could not get co-op identity ticket! 503 
+[18:32:33.843] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:35.272] LOG: %cStart Phase MoveEndPhase color:green;
+[18:32:35.273] LOG: %cStart Phase CheckInterludePhase color:green;
+[18:32:35.273] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:32:35.332] LOG: Applied X Speed 
+[18:32:35.332] LOG: Applied X Speed 
+[18:32:35.334] LOG: Applied X Speed 
+[18:32:35.335] LOG: Applied X Speed 
+[18:32:35.843] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:35.847] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:32:35.847] LOG: %cStart Phase BerryPhase color:green;
+[18:32:35.850] LOG: Applied X Speed 
+[18:32:35.852] LOG: Applied X Speed 
+[18:32:35.855] LOG: Applied X Speed 
+[18:32:35.858] LOG: Applied X Speed 
+[18:32:35.858] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:32:35.859] LOG: Applied X Speed 
+[18:32:35.861] LOG: Applied X Speed 
+[18:32:35.863] LOG: Applied X Speed 
+[18:32:35.865] LOG: Applied X Speed 
+[18:32:35.865] LOG: %cStart Phase TurnEndPhase color:green;
+[18:32:35.867] LOG: Applied X Speed 
+[18:32:35.868] LOG: Applied X Speed 
+[18:32:35.869] LOG: Applied X Speed 
+[18:32:35.869] LOG: Applied Leftovers 
+[18:32:35.871] LOG: Applied X Speed 
+[18:32:35.872] LOG: %cStart Phase PokemonHealPhase color:green;
+[18:32:35.951] WARN: Could not get co-op identity ticket! 503 
+[18:32:35.951] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:36.072] LOG: Applied Healing Charm 
+[18:32:36.080] LOG: %cStart Phase MessagePhase color:green;
+[18:32:36.343] LOG: %cStart Phase SwitchSummonPhase color:green;
+[18:32:36.346] LOG: Applied X Speed 
+[18:32:36.350] LOG: Applied X Speed 
+[18:32:36.353] LOG: Applied X Speed 
+[18:32:36.355] LOG: Applied X Speed 
+[18:32:36.658] LOG: Applied Calcium (enemy)
+[18:32:36.658] LOG: Applied Carbos (enemy)
+[18:32:36.690] WARN: cry/614 not found
+[18:32:36.795] LOG: Applied X Speed 
+[18:32:36.800] LOG: Applied X Speed 
+[18:32:36.801] LOG: Applied X Speed 
+[18:32:36.804] LOG: Applied X Speed 
+[18:32:36.806] LOG: Applied X Speed 
+[18:32:36.807] LOG: Applied X Speed 
+[18:32:36.811] LOG: Applied X Speed 
+[18:32:36.813] LOG: Applied X Speed 
+[18:32:36.816] LOG: Applied X Speed 
+[18:32:36.816] LOG: %cStart Phase PostSummonPhase color:green;
+[18:32:36.816] LOG: Ran PSP for: Swampage
+[18:32:36.818] LOG: %cStart Phase SwitchSummonPhase color:green;
+[18:32:36.820] LOG: Applied X Speed 
+[18:32:36.821] LOG: Applied X Speed 
+[18:32:37.105] LOG: Applied Calcium (enemy)
+[18:32:37.105] LOG: Applied Carbos (enemy)
+[18:32:37.139] WARN: cry/10035 not found
+[18:32:37.261] LOG: Applied X Speed 
+[18:32:37.263] LOG: Applied X Speed 
+[18:32:37.266] LOG: Applied X Speed 
+[18:32:37.268] LOG: Applied X Speed 
+[18:32:37.273] LOG: Applied X Speed 
+[18:32:37.275] LOG: Applied X Speed 
+[18:32:37.279] LOG: Applied X Speed 
+[18:32:37.283] LOG: Applied X Speed 
+[18:32:37.284] LOG: Applied X Speed 
+[18:32:37.287] LOG: Applied X Speed 
+[18:32:37.290] LOG: Applied X Speed 
+[18:32:37.293] LOG: Applied X Speed 
+[18:32:37.295] LOG: Applied X Speed 
+[18:32:37.297] LOG: Applied X Speed 
+[18:32:37.297] LOG: %cStart Phase PostSummonPhase color:green;
+[18:32:37.297] LOG: Ran PSP for: Skulberus
+[18:32:37.303] LOG: %cStart Phase SwitchPhase color:green;
+[18:32:37.952] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:38.023] WARN: Could not get co-op identity ticket! 503 
+[18:32:38.023] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:38.584] LOG: %cStart Phase SwitchSummonPhase color:green;
+[18:32:38.672] LOG: Applied Iron 
+[18:32:38.673] LOG: Applied Protein 
+[18:32:38.705] WARN: cry/614 not found
+[18:32:38.810] LOG: Applied X Speed 
+[18:32:38.816] LOG: Applied X Speed 
+[18:32:38.821] LOG: Applied X Speed 
+[18:32:38.824] LOG: Applied X Speed 
+[18:32:38.826] LOG: Applied X Speed 
+[18:32:38.832] LOG: Applied X Speed 
+[18:32:38.838] LOG: Applied X Speed 
+[18:32:38.840] LOG: Applied X Speed 
+[18:32:38.843] LOG: Applied X Speed 
+[18:32:38.845] LOG: Applied X Speed 
+[18:32:38.847] LOG: Applied X Speed 
+[18:32:38.851] LOG: Applied X Speed 
+[18:32:38.856] LOG: Applied X Speed 
+[18:32:38.858] LOG: Applied X Speed 
+[18:32:38.862] LOG: Applied X Speed 
+[18:32:38.868] LOG: Applied X Speed 
+[18:32:38.873] LOG: Applied X Speed 
+[18:32:38.875] LOG: Applied X Speed 
+[18:32:38.876] LOG: Applied X Speed 
+[18:32:38.876] LOG: %cStart Phase PostSummonPhase color:green;
+[18:32:38.876] LOG: Ran PSP for: Swampage
+[18:32:38.877] LOG: Applied X Speed 
+[18:32:38.878] LOG: Applied X Speed 
+[18:32:38.879] LOG: Applied X Speed 
+[18:32:38.879] LOG: Applied X Speed 
+[18:32:38.880] LOG: Applied X Speed 
+[18:32:38.881] LOG: Applied X Speed 
+[18:32:38.881] LOG: Applied X Speed 
+[18:32:38.882] LOG: Applied X Speed 
+[18:32:38.883] LOG: %cStart Phase TurnInitPhase color:green;
+[18:32:38.883] LOG: %cStart Phase CommandPhase color:green;
+[18:32:40.024] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:40.090] WARN: Could not get co-op identity ticket! 503 
+[18:32:40.090] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:41.737] LOG: Move: SPLISHY_SPLASH Move targets: {"targets":[3,4],"multiple":true} 
+Player Pokemon: Palossand
+[18:32:41.739] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:32:42.094] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:42.160] LOG: %cStart Phase CommandPhase color:green;
+[18:32:42.176] WARN: Could not get co-op identity ticket! 503 
+[18:32:42.176] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:43.466] LOG: Move: MUDDY_WATER Move targets: {"targets":[3,4,5],"multiple":true} 
+Player Pokemon: Kyogre
+[18:32:43.468] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:32:44.035] LOG: %cStart Phase CommandPhase color:green;
+[18:32:44.176] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:44.271] WARN: Could not get co-op identity ticket! 503 
+[18:32:44.271] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:46.278] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:46.334] WARN: Could not get co-op identity ticket! 503 
+[18:32:46.334] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:48.338] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:48.447] WARN: Could not get co-op identity ticket! 503 
+[18:32:48.447] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:48.885] LOG: Move: TOXIC_NEEDLES Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Swampage
+[18:32:48.886] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:32:49.848] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:32:49.851] LOG: Applied X Speed 
+[18:32:49.852] LOG: Applied X Speed 
+[18:32:49.855] LOG: Applied X Speed 
+[18:32:49.857] LOG: Applied X Speed 
+[18:32:49.858] LOG: Applied X Speed 
+[18:32:49.860] LOG: Applied X Speed 
+[18:32:49.862] LOG: Applied X Speed 
+[18:32:49.863] LOG: Applied X Speed 
+[18:32:49.872] LOG: Applied X Speed 
+[18:32:49.874] LOG: Applied X Speed 
+[18:32:49.876] LOG: Applied X Speed 
+[18:32:49.877] LOG: Applied X Speed 
+[18:32:49.879] LOG: Applied X Speed 
+[18:32:49.880] LOG: Applied X Speed 
+[18:32:49.882] LOG: Applied X Speed 
+[18:32:49.883] LOG: Applied X Speed 
+[18:32:49.885] LOG: Applied X Speed 
+[18:32:49.887] LOG: Applied X Speed 
+[18:32:49.889] LOG: Applied X Speed 
+[18:32:49.890] LOG: Applied X Speed 
+[18:32:49.891] LOG: Applied X Speed 
+[18:32:49.891] LOG: Applied X Speed 
+[18:32:49.892] LOG: Applied X Speed 
+[18:32:49.893] LOG: Applied X Speed 
+[18:32:49.904] LOG: Applied X Speed 
+[18:32:49.904] LOG: Applied X Speed 
+[18:32:49.905] LOG: Applied X Speed 
+[18:32:49.906] LOG: Applied X Speed 
+[18:32:49.907] LOG: Applied X Speed 
+[18:32:49.907] LOG: Applied X Speed 
+[18:32:49.908] LOG: Applied X Speed 
+[18:32:49.909] LOG: Applied X Speed 
+[18:32:49.909] LOG: Applied X Speed 
+[18:32:49.910] LOG: Applied X Speed 
+[18:32:49.911] LOG: Applied X Speed 
+[18:32:49.911] LOG: Applied X Speed 
+[18:32:49.912] LOG: Applied X Speed 
+[18:32:49.913] LOG: Applied X Speed 
+[18:32:49.913] LOG: Applied X Speed 
+[18:32:49.914] LOG: Applied X Speed 
+[18:32:49.919] LOG: Applied X Speed 
+[18:32:49.919] LOG: Applied X Speed 
+[18:32:49.920] LOG: Applied X Speed 
+[18:32:49.921] LOG: Applied X Speed 
+[18:32:49.922] LOG: Applied X Speed 
+[18:32:49.922] LOG: Applied X Speed 
+[18:32:49.923] LOG: Applied X Speed 
+[18:32:49.923] LOG: Applied X Speed 
+[18:32:49.925] LOG: Applied X Speed 
+[18:32:49.926] LOG: Applied X Speed 
+[18:32:49.927] LOG: Applied X Speed 
+[18:32:49.927] LOG: Applied X Speed 
+[18:32:49.928] LOG: Applied X Speed 
+[18:32:49.929] LOG: Applied X Speed 
+[18:32:49.929] LOG: Applied X Speed 
+[18:32:49.930] LOG: Applied X Speed 
+[18:32:49.932] LOG: Applied X Speed 
+[18:32:49.933] LOG: Applied X Speed 
+[18:32:49.934] LOG: Applied X Speed 
+[18:32:49.934] LOG: Applied X Speed 
+[18:32:49.935] LOG: Applied X Speed 
+[18:32:49.936] LOG: Applied X Speed 
+[18:32:49.936] LOG: Applied X Speed 
+[18:32:49.937] LOG: Applied X Speed 
+[18:32:49.950] LOG: Battle Seed: rBJ5qzQVAWbh61vC
+[18:32:49.951] LOG: Applied X Speed 
+[18:32:49.952] LOG: Applied X Speed 
+[18:32:49.953] LOG: Applied X Speed 
+[18:32:49.953] LOG: Applied X Speed 
+[18:32:49.954] LOG: Applied X Speed 
+[18:32:49.955] LOG: Applied X Speed 
+[18:32:49.955] LOG: Applied X Speed 
+[18:32:49.956] LOG: Applied X Speed 
+[18:32:49.957] LOG: Applied X Speed 
+[18:32:49.957] LOG: Applied X Speed 
+[18:32:49.958] LOG: Applied X Speed 
+[18:32:49.959] LOG: Applied X Speed 
+[18:32:49.960] LOG: Applied X Speed 
+[18:32:49.960] LOG: Applied X Speed 
+[18:32:49.961] LOG: Applied X Speed 
+[18:32:49.962] LOG: Applied X Speed 
+[18:32:49.964] LOG: Applied X Speed 
+[18:32:49.964] LOG: Applied X Speed 
+[18:32:49.965] LOG: Applied X Speed 
+[18:32:49.966] LOG: Applied X Speed 
+[18:32:49.966] LOG: Applied X Speed 
+[18:32:49.967] LOG: Applied X Speed 
+[18:32:49.967] LOG: Applied X Speed 
+[18:32:49.968] LOG: Applied X Speed 
+[18:32:49.969] LOG: Applied X Speed 
+[18:32:49.970] LOG: Applied X Speed 
+[18:32:49.971] LOG: Applied X Speed 
+[18:32:49.971] LOG: Applied X Speed 
+[18:32:49.972] LOG: Applied X Speed 
+[18:32:49.973] LOG: Applied X Speed 
+[18:32:49.973] LOG: Applied X Speed 
+[18:32:49.974] LOG: Applied X Speed 
+[18:32:49.982] LOG: Applied X Speed 
+[18:32:49.983] LOG: Applied X Speed 
+[18:32:49.983] LOG: Applied X Speed 
+[18:32:49.984] LOG: Applied X Speed 
+[18:32:49.985] LOG: Applied X Speed 
+[18:32:49.985] LOG: Applied X Speed 
+[18:32:49.986] LOG: Applied X Speed 
+[18:32:49.987] LOG: Applied X Speed 
+[18:32:49.989] LOG: Applied X Speed 
+[18:32:49.990] LOG: Applied X Speed 
+[18:32:49.991] LOG: Applied X Speed 
+[18:32:49.991] LOG: Applied X Speed 
+[18:32:49.992] LOG: Applied X Speed 
+[18:32:49.993] LOG: Applied X Speed 
+[18:32:49.993] LOG: Applied X Speed 
+[18:32:49.994] LOG: Applied X Speed 
+[18:32:49.995] LOG: Applied X Speed 
+[18:32:49.996] LOG: Applied X Speed 
+[18:32:49.996] LOG: Applied X Speed 
+[18:32:49.997] LOG: Applied X Speed 
+[18:32:49.998] LOG: Applied X Speed 
+[18:32:49.998] LOG: Applied X Speed 
+[18:32:49.999] LOG: Applied X Speed 
+[18:32:50.000] LOG: Applied X Speed 
+[18:32:50.001] LOG: Move Pool: ["Rapid River","Dire Claw"]
+[18:32:50.001] LOG: Move Scores: [56,342]
+[18:32:50.001] LOG: Sorted Move Pool: ["Dire Claw","Rapid River"]
+[18:32:50.001] LOG: Chosen Move: Dire Claw
+[18:32:50.001] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:32:50.002] LOG: Applied X Speed 
+[18:32:50.003] LOG: Applied X Speed 
+[18:32:50.003] LOG: Applied X Speed 
+[18:32:50.004] LOG: Applied X Speed 
+[18:32:50.005] LOG: Applied X Speed 
+[18:32:50.005] LOG: Applied X Speed 
+[18:32:50.006] LOG: Applied X Speed 
+[18:32:50.007] LOG: Applied X Speed 
+[18:32:50.010] LOG: Applied X Speed 
+[18:32:50.011] LOG: Applied X Speed 
+[18:32:50.012] LOG: Applied X Speed 
+[18:32:50.012] LOG: Applied X Speed 
+[18:32:50.013] LOG: Applied X Speed 
+[18:32:50.014] LOG: Applied X Speed 
+[18:32:50.014] LOG: Applied X Speed 
+[18:32:50.015] LOG: Applied X Speed 
+[18:32:50.016] LOG: Applied X Speed 
+[18:32:50.016] LOG: Applied X Speed 
+[18:32:50.017] LOG: Applied X Speed 
+[18:32:50.018] LOG: Applied X Speed 
+[18:32:50.019] LOG: Applied X Speed 
+[18:32:50.019] LOG: Applied X Speed 
+[18:32:50.020] LOG: Applied X Speed 
+[18:32:50.020] LOG: Applied X Speed 
+[18:32:50.030] LOG: Applied X Speed 
+[18:32:50.030] LOG: Applied X Speed 
+[18:32:50.031] LOG: Applied X Speed 
+[18:32:50.032] LOG: Applied X Speed 
+[18:32:50.032] LOG: Applied X Speed 
+[18:32:50.033] LOG: Applied X Speed 
+[18:32:50.034] LOG: Applied X Speed 
+[18:32:50.035] LOG: Applied X Speed 
+[18:32:50.035] LOG: Applied X Speed 
+[18:32:50.036] LOG: Applied X Speed 
+[18:32:50.037] LOG: Applied X Speed 
+[18:32:50.037] LOG: Applied X Speed 
+[18:32:50.038] LOG: Applied X Speed 
+[18:32:50.039] LOG: Applied X Speed 
+[18:32:50.039] LOG: Applied X Speed 
+[18:32:50.040] LOG: Applied X Speed 
+[18:32:50.049] LOG: Applied X Speed 
+[18:32:50.050] LOG: Applied X Speed 
+[18:32:50.050] LOG: Applied X Speed 
+[18:32:50.051] LOG: Applied X Speed 
+[18:32:50.052] LOG: Applied X Speed 
+[18:32:50.052] LOG: Applied X Speed 
+[18:32:50.053] LOG: Applied X Speed 
+[18:32:50.054] LOG: Applied X Speed 
+[18:32:50.055] LOG: Applied X Speed 
+[18:32:50.055] LOG: Applied X Speed 
+[18:32:50.056] LOG: Applied X Speed 
+[18:32:50.057] LOG: Applied X Speed 
+[18:32:50.057] LOG: Applied X Speed 
+[18:32:50.058] LOG: Applied X Speed 
+[18:32:50.059] LOG: Applied X Speed 
+[18:32:50.059] LOG: Applied X Speed 
+[18:32:50.066] LOG: Applied X Speed 
+[18:32:50.067] LOG: Applied X Speed 
+[18:32:50.067] LOG: Applied X Speed 
+[18:32:50.068] LOG: Applied X Speed 
+[18:32:50.069] LOG: Applied X Speed 
+[18:32:50.069] LOG: Applied X Speed 
+[18:32:50.070] LOG: Applied X Speed 
+[18:32:50.071] LOG: Applied X Speed 
+[18:32:50.073] LOG: Applied X Speed 
+[18:32:50.073] LOG: Applied X Speed 
+[18:32:50.074] LOG: Applied X Speed 
+[18:32:50.075] LOG: Applied X Speed 
+[18:32:50.076] LOG: Applied X Speed 
+[18:32:50.076] LOG: Applied X Speed 
+[18:32:50.077] LOG: Applied X Speed 
+[18:32:50.078] LOG: Applied X Speed 
+[18:32:50.080] LOG: Applied X Speed 
+[18:32:50.081] LOG: Applied X Speed 
+[18:32:50.081] LOG: Applied X Speed 
+[18:32:50.082] LOG: Applied X Speed 
+[18:32:50.083] LOG: Applied X Speed 
+[18:32:50.083] LOG: Applied X Speed 
+[18:32:50.084] LOG: Applied X Speed 
+[18:32:50.085] LOG: Applied X Speed 
+[18:32:50.106] LOG: Applied X Speed 
+[18:32:50.106] LOG: Applied X Speed 
+[18:32:50.107] LOG: Applied X Speed 
+[18:32:50.108] LOG: Applied X Speed 
+[18:32:50.108] LOG: Applied X Speed 
+[18:32:50.109] LOG: Applied X Speed 
+[18:32:50.110] LOG: Applied X Speed 
+[18:32:50.111] LOG: Applied X Speed 
+[18:32:50.113] LOG: Applied X Speed 
+[18:32:50.113] LOG: Applied X Speed 
+[18:32:50.114] LOG: Applied X Speed 
+[18:32:50.115] LOG: Applied X Speed 
+[18:32:50.116] LOG: Applied X Speed 
+[18:32:50.116] LOG: Applied X Speed 
+[18:32:50.117] LOG: Applied X Speed 
+[18:32:50.118] LOG: Applied X Speed 
+[18:32:50.119] LOG: Applied X Speed 
+[18:32:50.119] LOG: Applied X Speed 
+[18:32:50.120] LOG: Applied X Speed 
+[18:32:50.120] LOG: Applied X Speed 
+[18:32:50.121] LOG: Applied X Speed 
+[18:32:50.122] LOG: Applied X Speed 
+[18:32:50.123] LOG: Applied X Speed 
+[18:32:50.123] LOG: Applied X Speed 
+[18:32:50.126] LOG: Applied X Speed 
+[18:32:50.126] LOG: Applied X Speed 
+[18:32:50.127] LOG: Applied X Speed 
+[18:32:50.128] LOG: Applied X Speed 
+[18:32:50.129] LOG: Applied X Speed 
+[18:32:50.129] LOG: Applied X Speed 
+[18:32:50.130] LOG: Applied X Speed 
+[18:32:50.130] LOG: Applied X Speed 
+[18:32:50.131] LOG: Applied X Speed 
+[18:32:50.132] LOG: Applied X Speed 
+[18:32:50.133] LOG: Applied X Speed 
+[18:32:50.134] LOG: Applied X Speed 
+[18:32:50.135] LOG: Applied X Speed 
+[18:32:50.135] LOG: Applied X Speed 
+[18:32:50.136] LOG: Applied X Speed 
+[18:32:50.137] LOG: Applied X Speed 
+[18:32:50.137] LOG: Move Pool: ["Sappy Seed","Power Whip"]
+[18:32:50.137] LOG: Move Scores: [12.75,15]
+[18:32:50.137] LOG: Sorted Move Pool: ["Power Whip","Sappy Seed"]
+[18:32:50.137] LOG: Chosen Move: Sappy Seed
+[18:32:50.137] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:32:50.138] LOG: Applied X Speed 
+[18:32:50.138] LOG: Applied X Speed 
+[18:32:50.139] LOG: Applied X Speed 
+[18:32:50.140] LOG: Applied X Speed 
+[18:32:50.140] LOG: Applied X Speed 
+[18:32:50.141] LOG: Applied X Speed 
+[18:32:50.142] LOG: Applied X Speed 
+[18:32:50.143] LOG: Applied X Speed 
+[18:32:50.144] LOG: Applied X Speed 
+[18:32:50.145] LOG: Applied X Speed 
+[18:32:50.146] LOG: Applied X Speed 
+[18:32:50.147] LOG: Applied X Speed 
+[18:32:50.148] LOG: Applied X Speed 
+[18:32:50.149] LOG: Applied X Speed 
+[18:32:50.152] LOG: Applied X Speed 
+[18:32:50.152] LOG: Applied X Speed 
+[18:32:50.154] LOG: Applied X Speed 
+[18:32:50.154] LOG: Applied X Speed 
+[18:32:50.155] LOG: Applied X Speed 
+[18:32:50.157] LOG: Applied X Speed 
+[18:32:50.159] LOG: Applied X Speed 
+[18:32:50.160] LOG: Applied X Speed 
+[18:32:50.162] LOG: Applied X Speed 
+[18:32:50.164] LOG: Applied X Speed 
+[18:32:50.166] LOG: Applied X Speed 
+[18:32:50.168] LOG: Applied X Speed 
+[18:32:50.169] LOG: Applied X Speed 
+[18:32:50.170] LOG: Applied X Speed 
+[18:32:50.171] LOG: Applied X Speed 
+[18:32:50.171] LOG: Applied X Speed 
+[18:32:50.172] LOG: Applied X Speed 
+[18:32:50.173] LOG: Applied X Speed 
+[18:32:50.173] LOG: Applied X Speed 
+[18:32:50.174] LOG: Applied X Speed 
+[18:32:50.175] LOG: Applied X Speed 
+[18:32:50.176] LOG: Applied X Speed 
+[18:32:50.176] LOG: Applied X Speed 
+[18:32:50.177] LOG: Applied X Speed 
+[18:32:50.178] LOG: Applied X Speed 
+[18:32:50.179] LOG: Applied X Speed 
+[18:32:50.179] LOG: Applied X Speed 
+[18:32:50.180] LOG: Applied X Speed 
+[18:32:50.181] LOG: Applied X Speed 
+[18:32:50.184] LOG: Applied X Speed 
+[18:32:50.186] LOG: Applied X Speed 
+[18:32:50.187] LOG: Applied X Speed 
+[18:32:50.188] LOG: Applied X Speed 
+[18:32:50.188] LOG: Applied X Speed 
+[18:32:50.190] LOG: Applied X Speed 
+[18:32:50.193] LOG: Applied X Speed 
+[18:32:50.193] LOG: Applied X Speed 
+[18:32:50.195] LOG: Applied X Speed 
+[18:32:50.195] LOG: Applied X Speed 
+[18:32:50.196] LOG: Applied X Speed 
+[18:32:50.198] LOG: Applied X Speed 
+[18:32:50.200] LOG: Applied X Speed 
+[18:32:50.201] LOG: Applied X Speed 
+[18:32:50.203] LOG: Applied X Speed 
+[18:32:50.205] LOG: Applied X Speed 
+[18:32:50.207] LOG: Applied X Speed 
+[18:32:50.209] LOG: Applied X Speed 
+[18:32:50.210] LOG: Applied X Speed 
+[18:32:50.213] LOG: Applied X Speed 
+[18:32:50.214] LOG: Applied X Speed 
+[18:32:50.215] LOG: Applied X Speed 
+[18:32:50.215] LOG: Applied X Speed 
+[18:32:50.216] LOG: Applied X Speed 
+[18:32:50.217] LOG: Applied X Speed 
+[18:32:50.217] LOG: Applied X Speed 
+[18:32:50.218] LOG: Applied X Speed 
+[18:32:50.219] LOG: Applied X Speed 
+[18:32:50.220] LOG: Applied X Speed 
+[18:32:50.221] LOG: Applied X Speed 
+[18:32:50.221] LOG: Applied X Speed 
+[18:32:50.222] LOG: Applied X Speed 
+[18:32:50.223] LOG: Applied X Speed 
+[18:32:50.223] LOG: Applied X Speed 
+[18:32:50.224] LOG: Applied X Speed 
+[18:32:50.238] WARN: BattlerTag SNATCH is missing a score!
+[18:32:50.240] LOG: Applied X Speed 
+[18:32:50.241] LOG: Applied X Speed 
+[18:32:50.243] LOG: Applied X Speed 
+[18:32:50.244] LOG: Applied X Speed 
+[18:32:50.244] LOG: Applied X Speed 
+[18:32:50.246] LOG: Applied X Speed 
+[18:32:50.248] LOG: Applied X Speed 
+[18:32:50.249] LOG: Applied X Speed 
+[18:32:50.251] LOG: Applied X Speed 
+[18:32:50.251] LOG: Applied X Speed 
+[18:32:50.252] LOG: Applied X Speed 
+[18:32:50.254] LOG: Applied X Speed 
+[18:32:50.256] LOG: Applied X Speed 
+[18:32:50.257] LOG: Applied X Speed 
+[18:32:50.258] LOG: Applied X Speed 
+[18:32:50.261] LOG: Applied X Speed 
+[18:32:50.263] LOG: Applied X Speed 
+[18:32:50.264] LOG: Applied X Speed 
+[18:32:50.266] LOG: Applied X Speed 
+[18:32:50.267] WARN: BattlerTag SNATCH is missing a score!
+[18:32:50.268] LOG: Applied X Speed 
+[18:32:50.270] LOG: Applied X Speed 
+[18:32:50.271] LOG: Applied X Speed 
+[18:32:50.272] LOG: Applied X Speed 
+[18:32:50.272] LOG: Applied X Speed 
+[18:32:50.274] LOG: Applied X Speed 
+[18:32:50.276] LOG: Applied X Speed 
+[18:32:50.277] LOG: Applied X Speed 
+[18:32:50.278] LOG: Applied X Speed 
+[18:32:50.279] LOG: Applied X Speed 
+[18:32:50.280] LOG: Applied X Speed 
+[18:32:50.282] LOG: Applied X Speed 
+[18:32:50.284] LOG: Applied X Speed 
+[18:32:50.285] LOG: Applied X Speed 
+[18:32:50.287] LOG: Applied X Speed 
+[18:32:50.289] LOG: Applied X Speed 
+[18:32:50.291] LOG: Applied X Speed 
+[18:32:50.293] LOG: Applied X Speed 
+[18:32:50.294] LOG: Applied X Speed 
+[18:32:50.294] LOG: Move Pool: ["Sucker Punch","Double-Edge","Snatch","Roar"]
+[18:32:50.294] LOG: Move Scores: [21,19,0,-20]
+[18:32:50.294] LOG: Sorted Move Pool: ["Sucker Punch","Double-Edge","Snatch","Roar"]
+[18:32:50.294] LOG: Chosen Move: Double-Edge
+[18:32:50.294] LOG: %cStart Phase TurnStartPhase color:green;
+[18:32:50.295] LOG: Applied X Speed 
+[18:32:50.296] LOG: Applied X Speed 
+[18:32:50.298] LOG: Applied X Speed 
+[18:32:50.298] LOG: Applied X Speed 
+[18:32:50.299] LOG: Applied X Speed 
+[18:32:50.301] LOG: Applied X Speed 
+[18:32:50.303] LOG: Applied X Speed 
+[18:32:50.304] LOG: Applied X Speed 
+[18:32:50.305] LOG: Applied X Speed 
+[18:32:50.306] LOG: Applied X Speed 
+[18:32:50.306] LOG: Applied X Speed 
+[18:32:50.308] LOG: Applied X Speed 
+[18:32:50.311] LOG: Applied X Speed 
+[18:32:50.311] LOG: Applied X Speed 
+[18:32:50.313] LOG: Applied X Speed 
+[18:32:50.316] LOG: Applied X Speed 
+[18:32:50.318] LOG: Applied X Speed 
+[18:32:50.319] LOG: Applied X Speed 
+[18:32:50.320] LOG: Applied X Speed 
+[18:32:50.321] LOG: Applied X Speed 
+[18:32:50.323] LOG: Applied X Speed 
+[18:32:50.324] LOG: Applied X Speed 
+[18:32:50.324] LOG: Applied X Speed 
+[18:32:50.325] LOG: Applied X Speed 
+[18:32:50.327] LOG: Applied X Speed 
+[18:32:50.329] LOG: Applied X Speed 
+[18:32:50.330] LOG: Applied X Speed 
+[18:32:50.331] LOG: Applied X Speed 
+[18:32:50.332] LOG: Applied X Speed 
+[18:32:50.333] LOG: Applied X Speed 
+[18:32:50.335] LOG: Applied X Speed 
+[18:32:50.337] LOG: Applied X Speed 
+[18:32:50.338] LOG: Applied X Speed 
+[18:32:50.339] LOG: Applied X Speed 
+[18:32:50.342] LOG: Applied X Speed 
+[18:32:50.344] LOG: Applied X Speed 
+[18:32:50.345] LOG: Applied X Speed 
+[18:32:50.347] LOG: Applied X Speed 
+[18:32:50.348] LOG: Applied X Speed 
+[18:32:50.349] LOG: Applied X Speed 
+[18:32:50.351] LOG: Applied X Speed 
+[18:32:50.351] LOG: Applied X Speed 
+[18:32:50.352] LOG: Applied X Speed 
+[18:32:50.354] LOG: Applied X Speed 
+[18:32:50.356] LOG: Applied X Speed 
+[18:32:50.358] LOG: %cStart Phase MovePhase color:green;
+[18:32:50.358] LOG: %cUser: Kyogre
+Move: MUDDY_WATER
+Use Mode: NORMAL color:orchid
+[18:32:50.359] LOG: Applied X Speed 
+[18:32:50.361] LOG: Applied X Speed 
+[18:32:50.362] LOG: Applied X Speed 
+[18:32:50.363] LOG: Applied X Speed 
+[18:32:50.363] LOG: Applied X Speed 
+[18:32:50.365] LOG: Applied X Speed 
+[18:32:50.367] LOG: Applied X Speed 
+[18:32:50.368] LOG: Applied X Speed 
+[18:32:50.369] LOG: Applied X Speed 
+[18:32:50.370] LOG: Applied X Speed 
+[18:32:50.371] LOG: Applied X Speed 
+[18:32:50.373] LOG: Applied X Speed 
+[18:32:50.375] LOG: Applied X Speed 
+[18:32:50.376] LOG: Applied X Speed 
+[18:32:50.378] LOG: Applied X Speed 
+[18:32:50.380] LOG: Applied X Speed 
+[18:32:50.382] LOG: Applied X Speed 
+[18:32:50.384] LOG: Applied X Speed 
+[18:32:50.385] LOG: Applied X Speed 
+[18:32:50.385] LOG: %cStart Phase MessagePhase color:green;
+[18:32:50.447] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:50.487] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:32:50.488] LOG: Applied Multi Lens 
+[18:32:50.557] WARN: Could not get co-op identity ticket! 503 
+[18:32:50.557] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:51.406] LOG: crit stage: +0
+[18:32:51.416] LOG: Move: Muddy Water | Base damage: 108.05653333333333 | Power: 70 | Source attack: 268 | Target defense: 75
+[18:32:51.416] LOG: Applied Multi Lens 
+[18:32:51.418] LOG: Move: Muddy Water | Attack damage: 452
+[18:32:51.420] LOG: crit stage: +0
+[18:32:51.425] LOG: Move: Muddy Water | Base damage: 67.19868852459017 | Power: 70 | Source attack: 268 | Target defense: 122
+[18:32:51.425] LOG: Applied Multi Lens 
+[18:32:51.427] LOG: Move: Muddy Water | Attack damage: 149
+[18:32:51.429] LOG: crit stage: +0
+[18:32:51.433] LOG: Move: Muddy Water | Base damage: 90.38044444444444 | Power: 70 | Source attack: 268 | Target defense: 90
+[18:32:51.433] LOG: Applied Multi Lens 
+[18:32:51.435] LOG: Move: Muddy Water | Attack damage: 140
+[18:32:51.437] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:51.459] LOG: %cStart Phase MessagePhase color:green;
+[18:32:51.654] LOG: %cStart Phase MessagePhase color:green;
+[18:32:51.871] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:51.912] LOG: %cStart Phase MessagePhase color:green;
+[18:32:52.129] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:52.168] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:32:52.326] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:32:52.379] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:32:52.648] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:52.731] WARN: Could not get co-op identity ticket! 503 
+[18:32:52.731] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:53.282] LOG: crit stage: +0
+[18:32:53.291] LOG: Move: Muddy Water | Base damage: 90.38044444444444 | Power: 70 | Source attack: 268 | Target defense: 90
+[18:32:53.291] LOG: Applied Multi Lens 
+[18:32:53.294] LOG: Move: Muddy Water | Attack damage: 43
+[18:32:53.296] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:32:53.317] LOG: %cStart Phase MessagePhase color:green;
+[18:32:53.529] LOG: %cStart Phase FaintPhase color:green;
+[18:32:53.533] LOG: Applied X Speed 
+[18:32:53.535] LOG: Applied X Speed 
+[18:32:53.539] LOG: Applied X Speed 
+[18:32:53.541] LOG: Applied X Speed 
+[18:32:53.544] LOG: Applied X Speed 
+[18:32:53.546] LOG: Applied X Speed 
+[18:32:53.548] LOG: Applied X Speed 
+[18:32:53.550] LOG: Applied X Speed 
+[18:32:53.551] WARN: cry/10035 not found
+[18:32:53.606] LOG: Applied X Speed 
+[18:32:53.608] LOG: Applied X Speed 
+[18:32:53.611] LOG: Applied X Speed 
+[18:32:53.613] LOG: Applied X Speed 
+[18:32:53.615] LOG: Applied X Speed 
+[18:32:53.617] LOG: Applied X Speed 
+[18:32:53.618] LOG: Applied X Speed 
+[18:32:53.620] LOG: Applied X Speed 
+[18:32:53.620] LOG: %cStart Phase MessagePhase color:green;
+[18:32:54.756] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:54.838] WARN: Could not get co-op identity ticket! 503 
+[18:32:54.838] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:55.588] LOG: %cStart Phase VictoryPhase color:green;
+[18:32:55.588] LOG: %cStart Phase ExpPhase color:green;
+[18:32:55.588] LOG: Applied Super EXP. Charm 
+[18:32:55.588] LOG: Applied EXP. Charm 
+[18:32:55.854] LOG: %cStart Phase ExpPhase color:green;
+[18:32:55.854] LOG: Applied Super EXP. Charm 
+[18:32:55.854] LOG: Applied EXP. Charm 
+[18:32:56.062] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[18:32:56.063] LOG: Applied Super EXP. Charm 
+[18:32:56.063] LOG: Applied EXP. Charm 
+[18:32:56.063] LOG: %cStart Phase LevelUpPhase color:green;
+[18:32:56.064] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[18:32:56.064] LOG: %cStart Phase FaintPhase color:green;
+[18:32:56.067] LOG: Applied X Speed 
+[18:32:56.069] LOG: Applied X Speed 
+[18:32:56.071] LOG: Applied X Speed 
+[18:32:56.073] LOG: Applied X Speed 
+[18:32:56.075] LOG: Applied X Speed 
+[18:32:56.076] LOG: Applied X Speed 
+[18:32:56.078] LOG: Applied X Speed 
+[18:32:56.080] LOG: Applied X Speed 
+[18:32:56.081] WARN: cry/10614 not found
+[18:32:56.149] LOG: Applied X Speed 
+[18:32:56.152] LOG: Applied X Speed 
+[18:32:56.155] LOG: Applied X Speed 
+[18:32:56.158] LOG: Applied X Speed 
+[18:32:56.161] LOG: Applied X Speed 
+[18:32:56.163] LOG: Applied X Speed 
+[18:32:56.164] LOG: Applied X Speed 
+[18:32:56.167] LOG: Applied X Speed 
+[18:32:56.167] LOG: %cStart Phase MessagePhase color:green;
+[18:32:56.290] LOG: %cStart Phase VictoryPhase color:green;
+[18:32:56.290] LOG: %cStart Phase ExpPhase color:green;
+[18:32:56.290] LOG: Applied Super EXP. Charm 
+[18:32:56.290] LOG: Applied EXP. Charm 
+[18:32:56.642] LOG: %cStart Phase LevelUpPhase color:green;
+[18:32:56.642] LOG: %cStart Phase ExpPhase color:green;
+[18:32:56.642] LOG: Applied Super EXP. Charm 
+[18:32:56.642] LOG: Applied EXP. Charm 
+[18:32:56.835] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[18:32:56.836] LOG: Applied Super EXP. Charm 
+[18:32:56.836] LOG: Applied EXP. Charm 
+[18:32:56.836] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[18:32:56.836] LOG: %cStart Phase FaintPhase color:green;
+[18:32:56.839] LOG: Applied X Speed 
+[18:32:56.841] LOG: Applied X Speed 
+[18:32:56.844] LOG: Applied X Speed 
+[18:32:56.846] LOG: Applied X Speed 
+[18:32:56.848] LOG: Applied X Speed 
+[18:32:56.849] LOG: Applied X Speed 
+[18:32:56.851] LOG: Applied X Speed 
+[18:32:56.853] LOG: Applied X Speed 
+[18:32:56.858] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:56.942] WARN: Could not get co-op identity ticket! 503 
+[18:32:56.942] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:58.725] LOG: Applied X Speed 
+[18:32:58.729] LOG: Applied X Speed 
+[18:32:58.733] LOG: Applied X Speed 
+[18:32:58.736] LOG: Applied X Speed 
+[18:32:58.739] LOG: Applied X Speed 
+[18:32:58.742] LOG: Applied X Speed 
+[18:32:58.744] LOG: Applied X Speed 
+[18:32:58.746] LOG: Applied X Speed 
+[18:32:58.746] LOG: %cStart Phase MessagePhase color:green;
+[18:32:59.051] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:32:59.193] WARN: Could not get co-op identity ticket! 503 
+[18:32:59.193] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:32:59.559] LOG: %cStart Phase VictoryPhase color:green;
+[18:32:59.561] LOG: %cStart Phase ExpPhase color:green;
+[18:32:59.561] LOG: Applied Super EXP. Charm 
+[18:32:59.561] LOG: Applied EXP. Charm 
+[18:32:59.841] LOG: %cStart Phase ExpPhase color:green;
+[18:32:59.841] LOG: Applied Super EXP. Charm 
+[18:32:59.841] LOG: Applied EXP. Charm 
+[18:33:00.191] LOG: %cStart Phase LevelUpPhase color:green;
+[18:33:00.192] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[18:33:00.192] LOG: Applied Super EXP. Charm 
+[18:33:00.192] LOG: Applied EXP. Charm 
+[18:33:00.192] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[18:33:00.192] LOG: %cStart Phase MoveEndPhase color:green;
+[18:33:00.201] LOG: Applied X Speed 
+[18:33:00.203] LOG: Applied X Speed 
+[18:33:00.206] LOG: Applied X Speed 
+[18:33:00.208] LOG: Applied X Speed 
+[18:33:00.211] LOG: Applied X Speed 
+[18:33:00.213] LOG: %cStart Phase MovePhase color:green;
+[18:33:00.213] LOG: %cUser: Swampage
+Move: TOXIC_NEEDLES
+Use Mode: NORMAL color:orchid
+[18:33:00.214] LOG: Applied X Speed 
+[18:33:00.215] LOG: Applied X Speed 
+[18:33:00.216] LOG: Applied X Speed 
+[18:33:00.217] LOG: Applied X Speed 
+[18:33:00.219] LOG: Applied X Speed 
+[18:33:00.220] LOG: Applied X Speed 
+[18:33:00.221] LOG: Applied X Speed 
+[18:33:00.222] LOG: Applied X Speed 
+[18:33:00.223] LOG: %cStart Phase MessagePhase color:green;
+[18:33:00.321] LOG: %cStart Phase MessagePhase color:green;
+[18:33:00.521] LOG: %cStart Phase MoveEndPhase color:green;
+[18:33:00.524] LOG: Applied X Speed 
+[18:33:00.530] LOG: Applied X Speed 
+[18:33:00.538] LOG: Applied X Speed 
+[18:33:00.542] LOG: %cStart Phase MovePhase color:green;
+[18:33:00.542] LOG: %cStart Phase MoveEndPhase color:green;
+[18:33:00.544] LOG: Applied X Speed 
+[18:33:00.548] LOG: Applied X Speed 
+[18:33:00.553] LOG: Applied X Speed 
+[18:33:00.555] LOG: %cStart Phase MovePhase color:green;
+[18:33:00.555] LOG: %cStart Phase MoveEndPhase color:green;
+[18:33:00.558] LOG: Applied X Speed 
+[18:33:00.560] LOG: Applied X Speed 
+[18:33:00.560] LOG: %cStart Phase MovePhase color:green;
+[18:33:00.560] LOG: %cStart Phase MoveEndPhase color:green;
+[18:33:00.563] LOG: Applied X Speed 
+[18:33:00.563] LOG: %cStart Phase MovePhase color:green;
+[18:33:00.563] LOG: %cUser: Palossand
+Move: SPLISHY_SPLASH
+Use Mode: NORMAL color:orchid
+[18:33:00.563] LOG: %cStart Phase MessagePhase color:green;
+[18:33:00.671] LOG: %cStart Phase MessagePhase color:green;
+[18:33:00.871] LOG: %cStart Phase MoveEndPhase color:green;
+[18:33:00.872] LOG: %cStart Phase MovePhase color:green;
+[18:33:00.872] LOG: %cStart Phase MoveEndPhase color:green;
+[18:33:00.872] LOG: %cStart Phase CheckInterludePhase color:green;
+[18:33:00.873] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:33:00.873] LOG: %cStart Phase TurnEndPhase color:green;
+[18:33:00.876] LOG: %cStart Phase BattleEndPhase color:green;
+[18:33:00.878] LOG: Battle Score: 1067 (3 Turns x0.91)
+[18:33:00.878] LOG: Total Score: 13154
+[18:33:00.882] LOG: Applied Amulet Coin 
+[18:33:00.885] LOG: Applied Iron 
+[18:33:00.886] LOG: Applied Protein 
+[18:33:00.900] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:33:00.900] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:33:00.924] LOG: %cStart Phase MessagePhase color:green;
+[18:33:01.010] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[18:33:01.195] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:01.250] WARN: Could not get co-op identity ticket! 503 
+[18:33:01.250] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:01.685] LOG: %cStart Phase MoneyRewardPhase color:green;
+[18:33:01.685] LOG: Applied Amulet Coin 
+[18:33:02.856] LOG: %cStart Phase EggLapsePhase color:green;
+[18:33:02.857] LOG: %cStart Phase ModifierRewardPhase color:green;
+[18:33:02.858] LOG: Applied Iron 
+[18:33:02.859] LOG: Applied Protein 
+[18:33:03.219] LOG: %cStart Phase PartyHealPhase color:green;
+[18:33:03.250] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:03.336] WARN: Could not get co-op identity ticket! 503 
+[18:33:03.336] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:05.337] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:05.411] WARN: Could not get co-op identity ticket! 503 
+[18:33:05.411] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:05.671] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:05.671] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:05.672] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:05.672] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:05.672] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:05.672] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:05.672] LOG: %cStart Phase SelectModifierPhase color:green;
+[18:33:07.411] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:07.490] WARN: Could not get co-op identity ticket! 503 
+[18:33:07.490] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:07.683] LOG: Applied Iron 
+[18:33:07.684] LOG: Applied Protein 
+[18:33:09.024] LOG: Applied Iron 
+[18:33:09.024] LOG: Applied Protein 
+[18:33:09.495] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:09.579] WARN: Could not get co-op identity ticket! 503 
+[18:33:09.579] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:11.584] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:11.657] WARN: Could not get co-op identity ticket! 503 
+[18:33:11.657] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:13.665] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:13.714] WARN: Could not get co-op identity ticket! 503 
+[18:33:13.714] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:15.714] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:15.771] WARN: Could not get co-op identity ticket! 503 
+[18:33:15.771] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:16.391] LOG: Applied Iron 
+[18:33:16.392] LOG: Applied Protein 
+[18:33:17.778] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:17.864] WARN: Could not get co-op identity ticket! 503 
+[18:33:17.864] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:19.281] LOG: Applied Iron 
+[18:33:19.282] LOG: Applied Protein 
+[18:33:19.872] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:19.890] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[18:33:19.935] WARN: Could not get co-op identity ticket! 503 
+[18:33:19.936] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:21.936] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:22.024] WARN: Could not get co-op identity ticket! 503 
+[18:33:22.024] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:22.364] LOG: %cStart Phase SelectBiomePhase color:green;
+[18:33:22.364] LOG: Wave Seed: so¥¢£±¡§£¥° 60
+[18:33:23.035] LOG: %cStart Phase PartyHealPhase color:green;
+[18:33:24.029] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:24.097] WARN: Could not get co-op identity ticket! 503 
+[18:33:24.097] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:25.487] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:25.487] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:25.488] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:25.488] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:25.488] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:25.488] LOG: %cStart Phase ResetStatusPhase color:green;
+[18:33:25.488] LOG: %cStart Phase SwitchBiomePhase color:green;
+[18:33:25.914] LOG: %cStart Phase NewBattlePhase color:green;
+[18:33:25.914] LOG: Wave Seed: tp¦£¤²¢¨¤ ¦± 61
+[18:33:25.921] LOG: Applied X Speed 
+[18:33:25.923] LOG: Applied X Speed 
+[18:33:25.925] LOG: Applied X Speed 
+[18:33:25.927] LOG: Applied X Speed 
+[18:33:25.929] LOG: Applied X Speed 
+[18:33:25.930] LOG: Applied X Speed 
+[18:33:25.930] LOG: %cStart Phase ReturnPhase color:green;
+[18:33:25.948] LOG: Applied X Speed 
+[18:33:25.949] LOG: Applied X Speed 
+[18:33:25.951] LOG: Applied X Speed 
+[18:33:25.952] LOG: Applied X Speed 
+[18:33:25.954] LOG: Applied X Speed 
+[18:33:25.955] LOG: Applied X Speed 
+[18:33:25.956] LOG: Applied X Speed 
+[18:33:25.958] LOG: Applied X Speed 
+[18:33:26.033] LOG: Applied X Speed 
+[18:33:26.035] LOG: Applied X Speed 
+[18:33:26.035] LOG: %cStart Phase ReturnPhase color:green;
+[18:33:26.068] LOG: Applied X Speed 
+[18:33:26.071] LOG: Applied X Speed 
+[18:33:26.074] LOG: Applied X Speed 
+[18:33:26.076] LOG: Applied X Speed 
+[18:33:26.079] LOG: Applied X Speed 
+[18:33:26.081] LOG: Applied X Speed 
+[18:33:26.082] LOG: Applied X Speed 
+[18:33:26.084] LOG: Applied X Speed 
+[18:33:26.097] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:26.135] WARN: Could not get co-op identity ticket! 503 
+[18:33:26.135] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:26.155] LOG: %cStart Phase ReturnPhase color:green;
+[18:33:26.192] LOG: Applied X Speed 
+[18:33:26.194] LOG: Applied X Speed 
+[18:33:26.197] LOG: Applied X Speed 
+[18:33:26.199] LOG: Applied X Speed 
+[18:33:26.200] LOG: Applied X Speed 
+[18:33:26.201] LOG: Applied X Speed 
+[18:33:26.202] LOG: Applied X Speed 
+[18:33:26.203] LOG: Applied X Speed 
+[18:33:26.272] LOG: %cStart Phase ShowTrainerPhase color:green;
+[18:33:26.388] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[18:33:26.394] LOG: Starting species pool tier: UNCOMMON
+[18:33:26.402] LOG: Replaced WHISMUR with EXPLOUD
+[18:33:26.402] LOG: ER #419: BST cap (580 @ w61) - replacing Exploud (600) with Loudred (420)
+[18:33:26.414] LOG: Pokemon: Wild Loudred | Species ID: 294 | Level: 43 | Nature: Hasty (+Spd/-Def)
+[18:33:26.414] LOG: Stats (IVs): HP: 146 (29), Atk: 68 (5), Def: 45 (2), Spatk: 91 (18), Spdef: 58 (18), Spd: 72 (24)
+[18:33:26.414] LOG: Ability: Loud Bang | Passive Ability: Soundproof 
+[18:33:26.414] LOG: Moveset: ["Uproar (P)","Stomping Tantrum","Flatter","Howl"]
+[18:33:26.414] LOG: Starting species pool tier: RARE
+[18:33:26.425] LOG: Pokemon: Wild Froslass | Species ID: 478 | Level: 40 | Nature: Naughty (+Atk/-SpDef)
+[18:33:26.425] LOG: Stats (IVs): HP: 113 (18), Atk: 76 (21), Def: 68 (18), Spatk: 103 (27), Spdef: 58 (12), Spd: 99 (15)
+[18:33:26.425] LOG: Ability: Frostbind | Passive Ability: Cryomancy 
+[18:33:26.425] LOG: Moveset: ["Ice Fang","Head Smash","Defense Curl","Freeze-Dry"]
+[18:33:26.425] LOG: Starting species pool tier: UNCOMMON
+[18:33:26.427] LOG: Replaced HOUNDOUR with HOUNDOOM
+[18:33:26.433] LOG: Pokemon: Wild Houndoom | Species ID: 229 | Level: 43 | Nature: Docile (-)
+[18:33:26.433] LOG: Stats (IVs): HP: 119 (5), Atk: 112 (30), Def: 55 (17), Spatk: 101 (4), Spdef: 75 (4), Spd: 100 (12)
+[18:33:26.433] LOG: Ability: Molten Down | Passive Ability: Nocturnal 
+[18:33:26.433] LOG: Moveset: ["Night Daze","Quash","Smokescreen","Sucker Punch"]
+[18:33:26.898] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[18:33:26.898] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[18:33:26.898] LOG: Battle Seed: CmaovgwEKBLJTNNK
+[18:33:26.908] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[18:33:26.908] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[18:33:26.908] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[18:33:26.908] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[18:33:26.908] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[18:33:26.908] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[18:33:26.979] DEBUG: Session data saved to slot 3!
+[18:33:26.980] LOG: Wave Seed: tp¦£¤²¢¨¤ ¦± 61
+[18:33:27.199] LOG: %cStart Phase LevelCapPhase color:green;
+[18:33:27.211] LOG: Applied X Speed 
+[18:33:27.214] LOG: Applied X Speed 
+[18:33:27.216] LOG: Applied X Speed 
+[18:33:27.219] LOG: Applied X Speed 
+[18:33:27.222] LOG: Applied X Speed 
+[18:33:27.223] LOG: Applied X Speed 
+[18:33:27.224] LOG: Applied X Speed 
+[18:33:27.227] LOG: Applied X Speed 
+[18:33:27.230] LOG: Applied X Speed 
+[18:33:27.232] LOG: Applied X Speed 
+[18:33:27.233] LOG: Applied X Speed 
+[18:33:27.235] LOG: Applied X Speed 
+[18:33:27.236] LOG: Applied X Speed 
+[18:33:27.238] LOG: Applied X Speed 
+[18:33:27.240] LOG: Applied X Speed 
+[18:33:27.242] LOG: Applied X Speed 
+[18:33:27.248] LOG: Applied X Speed 
+[18:33:27.251] LOG: Applied X Speed 
+[18:33:27.254] LOG: Applied X Speed 
+[18:33:27.258] LOG: Applied X Speed 
+[18:33:27.265] LOG: Applied X Speed 
+[18:33:27.268] LOG: Applied X Speed 
+[18:33:27.871] LOG: %cStart Phase SummonPhase color:green;
+[18:33:28.022] LOG: Applied Iron 
+[18:33:28.022] LOG: Applied Protein 
+[18:33:28.136] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:28.171] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[18:33:28.178] LOG: %cStart Phase SummonPhase color:green;
+[18:33:28.179] WARN: Could not get co-op identity ticket! 503 
+[18:33:28.179] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:28.322] LOG: Applied Iron 
+[18:33:28.322] LOG: Applied Protein 
+[18:33:28.454] LOG: %cStart Phase SummonPhase color:green;
+[18:33:28.605] LOG: Applied Iron 
+[18:33:28.605] LOG: Applied Protein 
+[18:33:28.638] WARN: cry/614 not found
+[18:33:28.737] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:33:30.182] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:30.250] WARN: Could not get co-op identity ticket! 503 
+[18:33:30.250] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:30.683] LOG: %cStart Phase SwitchPhase color:green;
+[18:33:32.066] LOG: %cStart Phase SwitchSummonPhase color:green;
+[18:33:32.123] LOG: Applied X Speed 
+[18:33:32.126] LOG: Applied X Speed 
+[18:33:32.129] LOG: Applied X Speed 
+[18:33:32.131] LOG: Applied X Speed 
+[18:33:32.133] LOG: Applied X Speed 
+[18:33:32.134] LOG: Applied X Speed 
+[18:33:32.136] LOG: Applied X Speed 
+[18:33:32.138] LOG: Applied X Speed 
+[18:33:32.141] LOG: Applied X Speed 
+[18:33:32.144] LOG: Applied X Speed 
+[18:33:32.145] LOG: Applied X Speed 
+[18:33:32.146] LOG: Applied X Speed 
+[18:33:32.147] LOG: Applied X Speed 
+[18:33:32.149] LOG: Applied X Speed 
+[18:33:32.151] LOG: Applied X Speed 
+[18:33:32.153] LOG: Applied X Speed 
+[18:33:32.156] LOG: Applied X Speed 
+[18:33:32.157] LOG: Applied X Speed 
+[18:33:32.158] LOG: Applied X Speed 
+[18:33:32.160] LOG: Applied X Speed 
+[18:33:32.163] LOG: Applied X Speed 
+[18:33:32.165] LOG: Applied X Speed 
+[18:33:32.250] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:32.273] LOG: Applied Iron 
+[18:33:32.273] LOG: Applied Protein 
+[18:33:32.305] WARN: cry/720 not found
+[18:33:32.353] WARN: Could not get co-op identity ticket! 503 
+[18:33:32.354] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:32.438] LOG: Applied X Speed 
+[18:33:32.442] LOG: Applied X Speed 
+[18:33:32.445] LOG: Applied X Speed 
+[18:33:32.449] LOG: Applied X Speed 
+[18:33:32.453] LOG: Applied X Speed 
+[18:33:32.455] LOG: Applied X Speed 
+[18:33:32.457] LOG: Applied X Speed 
+[18:33:32.460] LOG: Applied X Speed 
+[18:33:32.464] LOG: Applied X Speed 
+[18:33:32.468] LOG: Applied X Speed 
+[18:33:32.470] LOG: Applied X Speed 
+[18:33:32.472] LOG: Applied X Speed 
+[18:33:32.474] LOG: Applied X Speed 
+[18:33:32.477] LOG: Applied X Speed 
+[18:33:32.480] LOG: Applied X Speed 
+[18:33:32.482] LOG: Applied X Speed 
+[18:33:32.485] LOG: Applied X Speed 
+[18:33:32.487] LOG: Applied X Speed 
+[18:33:32.489] LOG: Applied X Speed 
+[18:33:32.492] LOG: Applied X Speed 
+[18:33:32.496] LOG: Applied X Speed 
+[18:33:32.498] LOG: Applied X Speed 
+[18:33:32.498] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:32.498] LOG: Ran PSP for: Reuniclus Redux
+[18:33:32.499] LOG: Applied X Speed 
+[18:33:32.500] LOG: Applied X Speed 
+[18:33:32.500] LOG: Applied X Speed 
+[18:33:32.501] LOG: Applied X Speed 
+[18:33:32.502] LOG: Applied X Speed 
+[18:33:32.503] LOG: Applied X Speed 
+[18:33:32.504] LOG: Applied X Speed 
+[18:33:32.504] LOG: Applied X Speed 
+[18:33:32.505] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:32.505] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:33:34.356] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:34.410] WARN: Could not get co-op identity ticket! 503 
+[18:33:34.411] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:35.728] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:33:36.018] LOG: %cStart Phase SwitchPhase color:green;
+[18:33:36.411] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:36.499] WARN: Could not get co-op identity ticket! 503 
+[18:33:36.500] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:37.254] LOG: %cStart Phase SwitchSummonPhase color:green;
+[18:33:37.310] LOG: Applied X Speed 
+[18:33:37.311] LOG: Applied X Speed 
+[18:33:37.312] LOG: Applied X Speed 
+[18:33:37.314] LOG: Applied X Speed 
+[18:33:37.315] LOG: Applied X Speed 
+[18:33:37.316] LOG: Applied X Speed 
+[18:33:37.317] LOG: Applied X Speed 
+[18:33:37.319] LOG: Applied X Speed 
+[18:33:37.320] LOG: Applied X Speed 
+[18:33:37.322] LOG: Applied X Speed 
+[18:33:37.322] LOG: Applied X Speed 
+[18:33:37.323] LOG: Applied X Speed 
+[18:33:37.324] LOG: Applied X Speed 
+[18:33:37.325] LOG: Applied X Speed 
+[18:33:37.327] LOG: Applied X Speed 
+[18:33:37.328] LOG: Applied X Speed 
+[18:33:37.330] LOG: Applied X Speed 
+[18:33:37.332] LOG: Applied X Speed 
+[18:33:37.334] LOG: Applied X Speed 
+[18:33:37.337] LOG: Applied X Speed 
+[18:33:37.341] LOG: Applied X Speed 
+[18:33:37.343] LOG: Applied X Speed 
+[18:33:37.497] LOG: Applied Iron 
+[18:33:37.497] LOG: Applied Protein 
+[18:33:37.641] LOG: Applied X Speed 
+[18:33:37.646] LOG: Applied X Speed 
+[18:33:37.650] LOG: Applied X Speed 
+[18:33:37.654] LOG: Applied X Speed 
+[18:33:37.657] LOG: Applied X Speed 
+[18:33:37.659] LOG: Applied X Speed 
+[18:33:37.660] LOG: Applied X Speed 
+[18:33:37.664] LOG: Applied X Speed 
+[18:33:37.668] LOG: Applied X Speed 
+[18:33:37.673] LOG: Applied X Speed 
+[18:33:37.678] LOG: Applied X Speed 
+[18:33:37.680] LOG: Applied X Speed 
+[18:33:37.682] LOG: Applied X Speed 
+[18:33:37.685] LOG: Applied X Speed 
+[18:33:37.686] LOG: Applied X Speed 
+[18:33:37.689] LOG: Applied X Speed 
+[18:33:37.692] LOG: Applied X Speed 
+[18:33:37.694] LOG: Applied X Speed 
+[18:33:37.697] LOG: Applied X Speed 
+[18:33:37.700] LOG: Applied X Speed 
+[18:33:37.702] LOG: Applied X Speed 
+[18:33:37.703] LOG: Applied X Speed 
+[18:33:37.703] LOG: Applied X Speed 
+[18:33:37.704] LOG: Applied X Speed 
+[18:33:37.704] LOG: %cStart Phase ShinySparklePhase color:green;
+[18:33:37.771] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:37.771] LOG: Ran PSP for: Kecleon
+[18:33:37.773] LOG: Applied X Speed 
+[18:33:37.776] LOG: Applied X Speed 
+[18:33:37.779] LOG: Applied X Speed 
+[18:33:37.781] LOG: Applied X Speed 
+[18:33:37.783] LOG: Applied X Speed 
+[18:33:37.785] LOG: Applied X Speed 
+[18:33:37.787] LOG: Applied X Speed 
+[18:33:37.788] LOG: Applied X Speed 
+[18:33:37.789] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:37.789] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:33:37.955] LOG: %cStart Phase MovePhase color:green;
+[18:33:37.955] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[18:33:37.968] LOG: Applied X Speed 
+[18:33:37.972] LOG: Applied X Speed 
+[18:33:37.975] LOG: Applied X Speed 
+[18:33:37.978] LOG: Applied X Speed 
+[18:33:37.981] LOG: Applied X Speed 
+[18:33:37.983] LOG: Applied X Speed 
+[18:33:37.984] LOG: Applied X Speed 
+[18:33:37.987] LOG: Applied X Speed 
+[18:33:37.991] LOG: Applied X Speed 
+[18:33:37.997] LOG: Applied X Speed 
+[18:33:38.000] LOG: Applied X Speed 
+[18:33:38.002] LOG: Applied X Speed 
+[18:33:38.004] LOG: Applied X Speed 
+[18:33:38.006] LOG: Applied X Speed 
+[18:33:38.008] LOG: Applied X Speed 
+[18:33:38.011] LOG: Applied X Speed 
+[18:33:38.012] LOG: Applied X Speed 
+[18:33:38.013] LOG: Applied X Speed 
+[18:33:38.015] LOG: Applied X Speed 
+[18:33:38.016] LOG: Applied X Speed 
+[18:33:38.018] LOG: Applied X Speed 
+[18:33:38.018] LOG: Applied X Speed 
+[18:33:38.019] LOG: Applied X Speed 
+[18:33:38.020] LOG: Applied X Speed 
+[18:33:38.020] LOG: %cStart Phase MessagePhase color:green;
+[18:33:38.104] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:33:38.281] LOG: crit stage: +0
+[18:33:38.289] LOG: Move: Scratch | Base damage: 49.488 | Power: 40 | Source attack: 126 | Target defense: 45
+[18:33:38.292] LOG: Move: Scratch | Attack damage: 63
+[18:33:38.294] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:33:38.318] LOG: %cStart Phase MoveEndPhase color:green;
+[18:33:38.318] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:33:38.370] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:33:38.377] LOG: Applied X Speed 
+[18:33:38.380] LOG: Applied X Speed 
+[18:33:38.385] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:38.385] LOG: Ran PSP for: Kyogre
+[18:33:38.387] LOG: Applied X Speed 
+[18:33:38.389] LOG: Applied X Speed 
+[18:33:38.390] LOG: Applied X Speed 
+[18:33:38.392] LOG: Applied X Speed 
+[18:33:38.394] LOG: Applied X Speed 
+[18:33:38.396] LOG: Applied X Speed 
+[18:33:38.397] LOG: Applied X Speed 
+[18:33:38.399] LOG: Applied X Speed 
+[18:33:38.404] LOG: Applied X Speed 
+[18:33:38.406] LOG: Applied X Speed 
+[18:33:38.415] LOG: Applied X Speed 
+[18:33:38.415] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:38.415] LOG: Applied Mystical Rock 
+[18:33:38.421] LOG: Applied X Speed 
+[18:33:38.423] LOG: Applied X Speed 
+[18:33:38.424] LOG: Applied X Speed 
+[18:33:38.425] LOG: Applied X Speed 
+[18:33:38.427] LOG: Applied X Speed 
+[18:33:38.427] LOG: Applied X Speed 
+[18:33:38.428] LOG: Applied X Speed 
+[18:33:38.429] LOG: Applied X Speed 
+[18:33:38.431] LOG: Applied X Speed 
+[18:33:38.434] LOG: Applied X Speed 
+[18:33:38.435] LOG: Applied X Speed 
+[18:33:38.436] LOG: Applied X Speed 
+[18:33:38.437] LOG: Applied X Speed 
+[18:33:38.438] LOG: Applied X Speed 
+[18:33:38.439] LOG: Applied X Speed 
+[18:33:38.440] LOG: Applied X Speed 
+[18:33:38.442] LOG: Applied X Speed 
+[18:33:38.443] LOG: Applied X Speed 
+[18:33:38.444] LOG: Applied X Speed 
+[18:33:38.446] LOG: Applied X Speed 
+[18:33:38.448] LOG: Applied X Speed 
+[18:33:38.449] LOG: Applied X Speed 
+[18:33:38.450] LOG: Applied X Speed 
+[18:33:38.450] LOG: Applied X Speed 
+[18:33:38.451] LOG: Applied Mystical Rock 
+[18:33:38.451] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:33:38.509] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:38.588] WARN: Could not get co-op identity ticket! 503 
+[18:33:38.588] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:38.622] LOG: %cStart Phase CommonAnimPhase color:green;
+[18:33:39.112] LOG: %cStart Phase MessagePhase color:green;
+[18:33:39.329] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:33:39.376] LOG: Applied X Speed 
+[18:33:39.380] LOG: Applied X Speed 
+[18:33:39.391] LOG: Applied X Speed 
+[18:33:39.391] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:39.391] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:33:39.564] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:33:39.757] LOG: %cStart Phase MessagePhase color:green;
+[18:33:39.962] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:33:40.009] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:40.009] LOG: Ran PSP for: Houndoom
+[18:33:40.025] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:40.025] LOG: Ran PSP for: Froslass
+[18:33:40.036] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:40.036] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:40.036] LOG: Ran PSP for: Loudred
+[18:33:40.042] LOG: %cStart Phase TurnInitPhase color:green;
+[18:33:40.042] LOG: %cStart Phase CommandPhase color:green;
+[18:33:40.589] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:40.669] WARN: Could not get co-op identity ticket! 503 
+[18:33:40.669] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:40.781] LOG: Seed: F0fgxg2qDbl8C3KtPCElO6Yz
+[18:33:40.781] LOG: Wave Seed: F0fgxg2qDbl8C3KtPCElO6Yz 0
+[18:33:40.783] LOG: Getting Session Slot id: %d 3
+[18:33:40.812] LOG: Wave Seed: 7N3iJfDgVJuekgcMJJaVNiIt 0
+[18:33:40.812] LOG: Seed: 7N3iJfDgVJuekgcMJJaVNiIt
+[18:33:40.812] LOG: Wave Seed: tp¦£¤²¢¨¤ ¦± 61
+[18:33:40.813] LOG: Applied Iron 
+[18:33:40.814] LOG: Applied Protein 
+[18:33:40.815] LOG: Applied Iron 
+[18:33:40.815] LOG: Applied Protein 
+[18:33:40.816] LOG: Applied Iron 
+[18:33:40.816] LOG: Applied Protein 
+[18:33:40.817] LOG: %cStart Phase EncounterPhase color:green;
+[18:33:40.817] LOG: Pokemon: Wild Loudred | Species ID: 294 | Level: 43 | Nature: Hasty (+Spd/-Def)
+[18:33:40.817] LOG: Stats (IVs): HP: 146 (29), Atk: 68 (5), Def: 45 (2), Spatk: 91 (18), Spdef: 58 (18), Spd: 72 (24)
+[18:33:40.817] LOG: Ability: Loud Bang | Passive Ability: Soundproof 
+[18:33:40.817] LOG: Moveset: ["Uproar (P)","Stomping Tantrum","Flatter","Howl"]
+[18:33:40.818] LOG: Pokemon: Wild Froslass | Species ID: 478 | Level: 40 | Nature: Naughty (+Atk/-SpDef)
+[18:33:40.818] LOG: Stats (IVs): HP: 113 (18), Atk: 76 (21), Def: 68 (18), Spatk: 103 (27), Spdef: 58 (12), Spd: 99 (15)
+[18:33:40.818] LOG: Ability: Frostbind | Passive Ability: Cryomancy 
+[18:33:40.818] LOG: Moveset: ["Ice Fang","Head Smash","Defense Curl","Freeze-Dry"]
+[18:33:40.818] LOG: Pokemon: Wild Houndoom | Species ID: 229 | Level: 43 | Nature: Docile (-)
+[18:33:40.818] LOG: Stats (IVs): HP: 119 (5), Atk: 112 (30), Def: 55 (17), Spatk: 101 (4), Spdef: 75 (4), Spd: 100 (12)
+[18:33:40.818] LOG: Ability: Molten Down | Passive Ability: Nocturnal 
+[18:33:40.818] LOG: Moveset: ["Night Daze","Quash","Smokescreen","Sucker Punch"]
+[18:33:40.819] LOG: Wave Seed: tp¦£¤²¢¨¤ ¦± 61
+[18:33:41.257] LOG: %cStart Phase SummonPhase color:green;
+[18:33:41.396] LOG: Applied Iron 
+[18:33:41.397] LOG: Applied Protein 
+[18:33:41.538] LOG: %cStart Phase SummonPhase color:green;
+[18:33:41.688] LOG: Applied Iron 
+[18:33:41.689] LOG: Applied Protein 
+[18:33:41.820] LOG: %cStart Phase SummonPhase color:green;
+[18:33:41.972] LOG: Applied Iron 
+[18:33:41.972] LOG: Applied Protein 
+[18:33:42.004] WARN: cry/614 not found
+[18:33:42.103] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:33:42.669] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:42.746] WARN: Could not get co-op identity ticket! 503 
+[18:33:42.746] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:43.083] LOG: %cStart Phase SwitchPhase color:green;
+[18:33:44.746] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:44.830] WARN: Could not get co-op identity ticket! 503 
+[18:33:44.830] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:45.530] LOG: %cStart Phase SwitchSummonPhase color:green;
+[18:33:45.578] LOG: Applied X Speed 
+[18:33:45.580] LOG: Applied X Speed 
+[18:33:45.583] LOG: Applied X Speed 
+[18:33:45.584] LOG: Applied X Speed 
+[18:33:45.585] LOG: Applied X Speed 
+[18:33:45.586] LOG: Applied X Speed 
+[18:33:45.587] LOG: Applied X Speed 
+[18:33:45.588] LOG: Applied X Speed 
+[18:33:45.589] LOG: Applied X Speed 
+[18:33:45.590] LOG: Applied X Speed 
+[18:33:45.591] LOG: Applied X Speed 
+[18:33:45.591] LOG: Applied X Speed 
+[18:33:45.592] LOG: Applied X Speed 
+[18:33:45.593] LOG: Applied X Speed 
+[18:33:45.594] LOG: Applied X Speed 
+[18:33:45.595] LOG: Applied X Speed 
+[18:33:45.596] LOG: Applied X Speed 
+[18:33:45.598] LOG: Applied X Speed 
+[18:33:45.599] LOG: Applied X Speed 
+[18:33:45.601] LOG: Applied X Speed 
+[18:33:45.605] LOG: Applied X Speed 
+[18:33:45.606] LOG: Applied X Speed 
+[18:33:45.746] LOG: Applied Protein 
+[18:33:45.746] LOG: Applied Iron 
+[18:33:45.910] LOG: Applied X Speed 
+[18:33:45.912] LOG: Applied X Speed 
+[18:33:45.913] LOG: Applied X Speed 
+[18:33:45.915] LOG: Applied X Speed 
+[18:33:45.917] LOG: Applied X Speed 
+[18:33:45.917] LOG: Applied X Speed 
+[18:33:45.918] LOG: Applied X Speed 
+[18:33:45.919] LOG: Applied X Speed 
+[18:33:45.921] LOG: Applied X Speed 
+[18:33:45.922] LOG: Applied X Speed 
+[18:33:45.923] LOG: Applied X Speed 
+[18:33:45.923] LOG: Applied X Speed 
+[18:33:45.924] LOG: Applied X Speed 
+[18:33:45.925] LOG: Applied X Speed 
+[18:33:45.926] LOG: Applied X Speed 
+[18:33:45.927] LOG: Applied X Speed 
+[18:33:45.930] LOG: Applied X Speed 
+[18:33:45.941] LOG: Applied X Speed 
+[18:33:45.942] LOG: Applied X Speed 
+[18:33:45.944] LOG: Applied X Speed 
+[18:33:45.947] LOG: Applied X Speed 
+[18:33:45.949] LOG: Applied X Speed 
+[18:33:45.949] LOG: %cStart Phase ShinySparklePhase color:green;
+[18:33:46.000] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:46.000] LOG: Ran PSP for: Kecleon
+[18:33:46.001] LOG: Applied X Speed 
+[18:33:46.002] LOG: Applied X Speed 
+[18:33:46.003] LOG: Applied X Speed 
+[18:33:46.004] LOG: Applied X Speed 
+[18:33:46.005] LOG: Applied X Speed 
+[18:33:46.006] LOG: Applied X Speed 
+[18:33:46.007] LOG: Applied X Speed 
+[18:33:46.007] LOG: Applied X Speed 
+[18:33:46.008] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:46.008] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:33:46.174] LOG: %cStart Phase MovePhase color:green;
+[18:33:46.174] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[18:33:46.186] LOG: Applied X Speed 
+[18:33:46.190] LOG: Applied X Speed 
+[18:33:46.192] LOG: Applied X Speed 
+[18:33:46.195] LOG: Applied X Speed 
+[18:33:46.198] LOG: Applied X Speed 
+[18:33:46.199] LOG: Applied X Speed 
+[18:33:46.201] LOG: Applied X Speed 
+[18:33:46.204] LOG: Applied X Speed 
+[18:33:46.206] LOG: Applied X Speed 
+[18:33:46.209] LOG: Applied X Speed 
+[18:33:46.210] LOG: Applied X Speed 
+[18:33:46.211] LOG: Applied X Speed 
+[18:33:46.212] LOG: Applied X Speed 
+[18:33:46.214] LOG: Applied X Speed 
+[18:33:46.216] LOG: Applied X Speed 
+[18:33:46.220] LOG: Applied X Speed 
+[18:33:46.222] LOG: Applied X Speed 
+[18:33:46.224] LOG: Applied X Speed 
+[18:33:46.225] LOG: Applied X Speed 
+[18:33:46.228] LOG: Applied X Speed 
+[18:33:46.231] LOG: Applied X Speed 
+[18:33:46.232] LOG: Applied X Speed 
+[18:33:46.233] LOG: %cStart Phase MessagePhase color:green;
+[18:33:46.312] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:33:46.327] LOG: Battle Seed: CmaovgwEKBLJTNNK
+[18:33:46.480] LOG: crit stage: +0
+[18:33:46.487] LOG: Move: Scratch | Base damage: 49.488 | Power: 40 | Source attack: 126 | Target defense: 45
+[18:33:46.490] LOG: Move: Scratch | Attack damage: 69
+[18:33:46.492] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:33:46.510] LOG: %cStart Phase MoveEndPhase color:green;
+[18:33:46.510] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:33:46.560] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:33:46.651] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:33:46.836] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:46.906] WARN: Could not get co-op identity ticket! 503 
+[18:33:46.906] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:47.160] LOG: %cStart Phase SwitchPhase color:green;
+[18:33:48.275] LOG: %cStart Phase SwitchSummonPhase color:green;
+[18:33:48.332] LOG: Applied X Speed 
+[18:33:48.335] LOG: Applied X Speed 
+[18:33:48.337] LOG: Applied X Speed 
+[18:33:48.340] LOG: Applied X Speed 
+[18:33:48.343] LOG: Applied X Speed 
+[18:33:48.344] LOG: Applied X Speed 
+[18:33:48.345] LOG: Applied X Speed 
+[18:33:48.348] LOG: Applied X Speed 
+[18:33:48.350] LOG: Applied X Speed 
+[18:33:48.353] LOG: Applied X Speed 
+[18:33:48.354] LOG: Applied X Speed 
+[18:33:48.355] LOG: Applied X Speed 
+[18:33:48.356] LOG: Applied X Speed 
+[18:33:48.358] LOG: Applied X Speed 
+[18:33:48.361] LOG: Applied X Speed 
+[18:33:48.363] LOG: Applied X Speed 
+[18:33:48.367] LOG: Applied X Speed 
+[18:33:48.370] LOG: Applied X Speed 
+[18:33:48.373] LOG: Applied X Speed 
+[18:33:48.377] LOG: Applied X Speed 
+[18:33:48.381] LOG: Applied X Speed 
+[18:33:48.383] LOG: Applied X Speed 
+[18:33:48.529] LOG: Applied Protein 
+[18:33:48.530] LOG: Applied Iron 
+[18:33:48.566] WARN: cry/720 not found
+[18:33:48.678] LOG: Applied X Speed 
+[18:33:48.681] LOG: Applied X Speed 
+[18:33:48.684] LOG: Applied X Speed 
+[18:33:48.687] LOG: Applied X Speed 
+[18:33:48.690] LOG: Applied X Speed 
+[18:33:48.692] LOG: Applied X Speed 
+[18:33:48.693] LOG: Applied X Speed 
+[18:33:48.697] LOG: Applied X Speed 
+[18:33:48.702] LOG: Applied X Speed 
+[18:33:48.705] LOG: Applied X Speed 
+[18:33:48.706] LOG: Applied X Speed 
+[18:33:48.708] LOG: Applied X Speed 
+[18:33:48.710] LOG: Applied X Speed 
+[18:33:48.711] LOG: Applied X Speed 
+[18:33:48.713] LOG: Applied X Speed 
+[18:33:48.716] LOG: Applied X Speed 
+[18:33:48.718] LOG: Applied X Speed 
+[18:33:48.720] LOG: Applied X Speed 
+[18:33:48.724] LOG: Applied X Speed 
+[18:33:48.727] LOG: Applied X Speed 
+[18:33:48.728] LOG: Applied X Speed 
+[18:33:48.729] LOG: Applied X Speed 
+[18:33:48.730] LOG: Applied X Speed 
+[18:33:48.730] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:48.730] LOG: Ran PSP for: Reuniclus Redux
+[18:33:48.731] LOG: Applied X Speed 
+[18:33:48.731] LOG: Applied X Speed 
+[18:33:48.732] LOG: Applied X Speed 
+[18:33:48.733] LOG: Applied X Speed 
+[18:33:48.733] LOG: Applied X Speed 
+[18:33:48.734] LOG: Applied X Speed 
+[18:33:48.735] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:48.735] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:33:48.736] LOG: Applied X Speed 
+[18:33:48.737] LOG: Applied X Speed 
+[18:33:48.738] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:48.738] LOG: Ran PSP for: Kyogre
+[18:33:48.739] LOG: Applied X Speed 
+[18:33:48.739] LOG: Applied X Speed 
+[18:33:48.740] LOG: Applied X Speed 
+[18:33:48.740] LOG: Applied X Speed 
+[18:33:48.741] LOG: Applied X Speed 
+[18:33:48.741] LOG: Applied X Speed 
+[18:33:48.743] LOG: Applied X Speed 
+[18:33:48.744] LOG: Applied X Speed 
+[18:33:48.747] LOG: Applied X Speed 
+[18:33:48.747] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:48.747] LOG: Applied Mystical Rock 
+[18:33:48.751] LOG: Applied X Speed 
+[18:33:48.752] LOG: Applied X Speed 
+[18:33:48.752] LOG: Applied X Speed 
+[18:33:48.753] LOG: Applied X Speed 
+[18:33:48.754] LOG: Applied X Speed 
+[18:33:48.755] LOG: Applied X Speed 
+[18:33:48.756] LOG: Applied X Speed 
+[18:33:48.758] LOG: Applied X Speed 
+[18:33:48.760] LOG: Applied X Speed 
+[18:33:48.761] LOG: Applied X Speed 
+[18:33:48.762] LOG: Applied X Speed 
+[18:33:48.762] LOG: Applied X Speed 
+[18:33:48.763] LOG: Applied X Speed 
+[18:33:48.764] LOG: Applied X Speed 
+[18:33:48.765] LOG: Applied X Speed 
+[18:33:48.766] LOG: Applied X Speed 
+[18:33:48.767] LOG: Applied X Speed 
+[18:33:48.768] LOG: Applied X Speed 
+[18:33:48.769] LOG: Applied X Speed 
+[18:33:48.770] LOG: Applied X Speed 
+[18:33:48.771] LOG: Applied X Speed 
+[18:33:48.771] LOG: Applied X Speed 
+[18:33:48.772] LOG: Applied X Speed 
+[18:33:48.772] LOG: Applied Mystical Rock 
+[18:33:48.772] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:33:48.917] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:48.964] LOG: %cStart Phase CommonAnimPhase color:green;
+[18:33:48.980] WARN: Could not get co-op identity ticket! 503 
+[18:33:48.980] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:49.470] LOG: %cStart Phase MessagePhase color:green;
+[18:33:49.704] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:33:49.752] LOG: Applied X Speed 
+[18:33:49.755] LOG: Applied X Speed 
+[18:33:49.764] LOG: Applied X Speed 
+[18:33:49.765] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:49.765] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:33:49.937] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:33:50.131] LOG: %cStart Phase MessagePhase color:green;
+[18:33:50.345] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:33:50.395] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:50.395] LOG: Ran PSP for: Houndoom
+[18:33:50.410] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:50.410] LOG: Ran PSP for: Froslass
+[18:33:50.423] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:50.423] LOG: %cStart Phase PostSummonPhase color:green;
+[18:33:50.423] LOG: Ran PSP for: Loudred
+[18:33:50.433] LOG: %cStart Phase TurnInitPhase color:green;
+[18:33:50.433] LOG: %cStart Phase CommandPhase color:green;
+[18:33:50.986] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:51.060] WARN: Could not get co-op identity ticket! 503 
+[18:33:51.060] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:53.061] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:53.140] WARN: Could not get co-op identity ticket! 503 
+[18:33:53.140] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:55.144] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:55.252] WARN: Could not get co-op identity ticket! 503 
+[18:33:55.253] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:57.253] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:57.363] WARN: Could not get co-op identity ticket! 503 
+[18:33:57.363] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:33:59.363] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:33:59.460] WARN: Could not get co-op identity ticket! 503 
+[18:33:59.461] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:34:01.461] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:34:01.570] WARN: Could not get co-op identity ticket! 503 
+[18:34:01.570] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:34:03.576] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:34:03.703] WARN: Could not get co-op identity ticket! 503 
+[18:34:03.703] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:34:05.704] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:34:05.787] WARN: Could not get co-op identity ticket! 503 
+[18:34:05.787] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:34:07.789] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:34:07.889] WARN: Could not get co-op identity ticket! 503 
+[18:34:07.890] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:34:09.890] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:34:09.991] WARN: Could not get co-op identity ticket! 503 
+[18:34:09.991] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:34:11.992] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:34:12.042] WARN: Could not get co-op identity ticket! 503 
+[18:34:12.042] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:34:14.042] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:34:14.104] WARN: Could not get co-op identity ticket! 503 
+[18:34:14.104] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[18:34:16.106] LOG: [coop:lobby] start announce name=BerNerd1499 protocol=p33
+[18:34:16.187] WARN: Could not get co-op identity ticket! 503 
+[18:34:16.188] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"7N3iJfDgVJuekgcMJJaVNiIt","gameModeId":4,"difficulty":"youngster","challenges":[],"roster":[{"id":1391805950,"player":true,"species":352,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":32,"exp":32006,"levelExp":1106,"gender":0,"hp":90,"stats":[92,88,61,48,94,41],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":729,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":1},{"moveId":245,"ppUsed":0,"ppUp":0},{"moveId":489,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":352,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[0],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[1,1,-1,0,0,1,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[5164,217],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":10,"targets":[3],"useMode":3,"result":2},{"move":252,"targets":[4],"result":1,"useMode":1},{"move":252,"targets":[3],"result":1,"useMode":1},{"move":489,"targets":[0],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[105,217,5224],"erGiftIndex":1,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3643232884,"player":true,"species":382,"formIndex":0,"abilityIndex":0,"passive":true,"shiny":false,"variant":0,"pokeball":0,"level":33,"exp":39962,"levelExp":1106,"gender":-1,"hp":114,"stats":[118,72,83,128,108,73],"ivs":[18,26,14,28,23,21],"nature":15,"moveset":[{"moveId":318,"ppUsed":0,"ppUp":0},{"moveId":5182,"ppUsed":0,"ppUp":0},{"moveId":905,"ppUsed":0,"ppUp":0},{"moveId":59,"ppUsed":1,"ppUp":3}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":382,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[59],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[14,12],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,1,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[2,5094,217],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":59,"targets":[3,4,5],"result":1,"useMode":1},{"move":59,"targets":[3,4,5],"result":1,"useMode":1},{"move":59,"targets":[3,4,5],"result":1,"useMode":1},{"move":905,"targets":[5],"result":4,"useMode":2},{"move":905,"targets":[5],"result":1,"useMode":2}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":5307,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":523476014,"player":true,"species":10720,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":36,"exp":47762,"levelExp":1106,"gender":1,"hp":136,"stats":[139,101,70,101,79,41],"ivs":[31,31,29,31,30,29],"nature":17,"moveset":[{"moveId":5068,"ppUsed":0,"ppUp":0},{"moveId":347,"ppUsed":0,"ppUp":0},{"moveId":61,"ppUsed":0,"ppUp":0},{"moveId":257,"ppUsed":1,"ppUp":1}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":10718,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[257],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[9],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[217],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":257,"targets":[4,5],"result":1,"useMode":1},{"move":257,"targets":[4,5],"result":1,"useMode":1},{"move":0,"targets":[4,5],"useMode":1,"result":2},{"move":257,"targets":[5],"useMode":1,"result":2}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":11,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2216515324,"player":true,"species":770,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":29,"exp":25957,"levelExp":1568,"gender":0,"hp":97,"stats":[100,53,87,74,59,35],"ivs":[30,30,29,30,30,31],"nature":5,"moveset":[{"moveId":841,"ppUsed":0,"ppUp":0},{"moveId":730,"ppUsed":0,"ppUp":0},{"moveId":850,"ppUsed":0,"ppUp":0},{"moveId":815,"ppUsed":0,"ppUp":0}],"status":null,"friendship":101,"metLevel":5,"metBiome":-1,"metSpecies":769,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3812493692,"player":true,"species":10613,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":28,"exp":22350,"levelExp":398,"gender":0,"hp":83,"stats":[83,61,50,34,48,75],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":5106,"ppUsed":0,"ppUp":0},{"moveId":40,"ppUsed":0,"ppUp":0},{"moveId":442,"ppUsed":0,"ppUp":0},{"moveId":857,"ppUsed":0,"ppUp":0}],"status":null,"friendship":51,"metLevel":5,"metBiome":-1,"metSpecies":10612,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2698821391,"player":true,"species":268,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":28,"exp":23370,"levelExp":1418,"gender":0,"hp":70,"stats":[72,29,26,23,38,20],"ivs":[16,13,25,15,24,15],"nature":14,"moveset":[{"moveId":522,"ppUsed":0,"ppUp":0},{"moveId":5048,"ppUsed":0,"ppUp":0},{"moveId":33,"ppUsed":0,"ppUp":0},{"moveId":40,"ppUsed":0,"ppUp":0}],"status":null,"friendship":76,"metLevel":2,"metBiome":0,"metSpecies":265,"metWave":1,"luck":0,"pauseEvolutions":true,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[118],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":118,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":52,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":52,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":3,"target":3}},{"type":"command","wave":52,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":3,"target":4}},{"type":"interaction","seq":19,"kind":"reward","choice":3},{"type":"command","wave":53,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":53,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":53,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":53,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":3,"target":3}},{"type":"command","wave":53,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":3,"target":4}},{"type":"interaction","seq":20,"kind":"reward","choice":2},{"type":"interaction","seq":21,"kind":"learnMove","choice":1},{"type":"interaction","seq":22,"kind":"me","choice":0},{"type":"interaction","seq":23,"kind":"reward","choice":0},{"type":"command","wave":55,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":55,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":3,"target":3}},{"type":"command","wave":55,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":3,"target":4}},{"type":"command","wave":55,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":55,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":55,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":55,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":24,"kind":"reward","choice":0},{"type":"interaction","seq":25,"kind":"crossroads","choice":1},{"type":"interaction","seq":26,"kind":"biome","choice":19},{"type":"command","wave":56,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":56,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":56,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":27,"kind":"learnMove","choice":4},{"type":"command","wave":56,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":56,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":56,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":56,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":3,"target":4}},{"type":"interaction","seq":28,"kind":"learnMove","choice":4},{"type":"interaction","seq":29,"kind":"reward","choice":1},{"type":"command","wave":57,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":57,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":57,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":57,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"interaction","seq":30,"kind":"reward","choice":2},{"type":"command","wave":58,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":58,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":58,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":3,"target":4}},{"type":"interaction","seq":31,"kind":"learnMove","choice":4},{"type":"interaction","seq":32,"kind":"learnMove","choice":4},{"type":"command","wave":58,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":58,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":58,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":33,"kind":"learnMove","choice":4},{"type":"interaction","seq":34,"kind":"reward","choice":2},{"type":"interaction","seq":35,"kind":"me","choice":1},{"type":"command","wave":59,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":59,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":59,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":59,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":59,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":59,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":59,"turn":7,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":1}},{"type":"command","wave":59,"turn":8,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":59,"turn":9,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"command","wave":59,"turn":10,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":36,"kind":"reward","choice":5},{"type":"interaction","seq":37,"kind":"reward","choice":5},{"type":"command","wave":60,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":60,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":60,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":3,"target":4}},{"type":"command","wave":60,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":60,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":3,"target":3}},{"type":"command","wave":60,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":60,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":60,"turn":3,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":60,"turn":3,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"interaction","seq":38,"kind":"crossroads","choice":1},{"type":"interaction","seq":39,"kind":"biome","choice":24}],"endState":{"waveIndex":61,"money":2022,"party":[{"species":352,"level":48,"hp":130,"maxHp":130},{"species":382,"level":48,"hp":162,"maxHp":162},{"species":10720,"level":48,"hp":178,"maxHp":178},{"species":770,"level":43,"hp":139,"maxHp":139},{"species":10614,"level":43,"hp":148,"maxHp":148},{"species":268,"level":41,"hp":98,"maxHp":98}]},"checkpoint":{"wave":52,"seed":"7N3iJfDgVJuekgcMJJaVNiIt","party":[{"id":1391805950,"player":true,"species":352,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":39,"exp":57667,"levelExp":686,"gender":0,"hp":101,"stats":[130,126,87,69,135,58],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":729,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":1,"ppUp":1},{"moveId":245,"ppUsed":0,"ppUp":0},{"moveId":489,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":352,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[0],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[5164,217],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":10,"targets":[3],"result":1,"useMode":3},{"move":252,"targets":[4],"result":1,"useMode":1},{"move":252,"targets":[3],"result":1,"useMode":1},{"move":252,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[105,217,5224],"erGiftIndex":1,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3643232884,"player":true,"species":382,"formIndex":0,"abilityIndex":0,"passive":true,"shiny":false,"variant":0,"pokeball":0,"level":39,"exp":64409,"levelExp":271,"gender":-1,"hp":126,"stats":[162,101,115,179,150,101],"ivs":[18,26,14,28,23,21],"nature":15,"moveset":[{"moveId":318,"ppUsed":0,"ppUp":0},{"moveId":330,"ppUsed":0,"ppUp":0},{"moveId":905,"ppUsed":0,"ppUp":0},{"moveId":59,"ppUsed":1,"ppUp":3}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":382,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[59],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[14],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[-1,0,1,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[2,5094,217],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":59,"targets":[3,4,5],"result":1,"useMode":1},{"move":59,"targets":[3,4,5],"result":1,"useMode":1},{"move":59,"targets":[3,4,5],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":5307,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":523476014,"player":true,"species":10720,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":39,"exp":59951,"levelExp":632,"gender":1,"hp":137,"stats":[178,130,90,130,101,52],"ivs":[31,31,29,31,30,29],"nature":17,"moveset":[{"moveId":5068,"ppUsed":1,"ppUp":0},{"moveId":347,"ppUsed":0,"ppUp":0},{"moveId":61,"ppUsed":0,"ppUp":0},{"moveId":257,"ppUsed":0,"ppUp":1}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":10718,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[257],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[9],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[-1,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[217],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":5068,"targets":[5],"result":1,"useMode":1},{"move":257,"targets":[4,5],"useMode":1,"result":2},{"move":257,"targets":[4,5],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[1],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":11,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2216515324,"player":true,"species":770,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":34,"exp":39309,"levelExp":5,"gender":0,"hp":112,"stats":[139,73,124,103,82,48],"ivs":[30,30,29,30,30,31],"nature":5,"moveset":[{"moveId":841,"ppUsed":0,"ppUp":0},{"moveId":730,"ppUsed":0,"ppUp":0},{"moveId":850,"ppUsed":0,"ppUp":0},{"moveId":815,"ppUsed":0,"ppUp":0}],"status":null,"friendship":101,"metLevel":5,"metBiome":-1,"metSpecies":769,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3812493692,"player":true,"species":10613,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":34,"exp":39768,"levelExp":464,"gender":0,"hp":98,"stats":[148,117,82,62,81,130],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":5106,"ppUsed":0,"ppUp":0},{"moveId":40,"ppUsed":0,"ppUp":0},{"moveId":442,"ppUsed":0,"ppUp":0},{"moveId":857,"ppUsed":0,"ppUp":0}],"status":null,"friendship":51,"metLevel":5,"metBiome":-1,"metSpecies":10612,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2698821391,"player":true,"species":268,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":33,"exp":36722,"levelExp":785,"gender":0,"hp":81,"stats":[98,39,35,31,53,26],"ivs":[16,13,25,15,24,15],"nature":14,"moveset":[{"moveId":522,"ppUsed":0,"ppUp":0},{"moveId":5048,"ppUsed":0,"ppUp":0},{"moveId":33,"ppUsed":0,"ppUp":0},{"moveId":40,"ppUsed":0,"ppUp":0}],"status":null,"friendship":76,"metLevel":2,"metBiome":0,"metSpecies":265,"metWave":1,"luck":0,"pauseEvolutions":true,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[118],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":118,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":2,"className":"MapModifier"},{"player":true,"typeId":"SUPER_EXP_CHARM","args":[60],"stackCount":2,"className":"ExpBoosterModifier"},{"player":true,"typeId":"EXP_SHARE","args":[],"stackCount":2,"className":"ExpShareModifier"},{"player":true,"typeId":"EXP_CHARM","args":[25],"stackCount":5,"className":"ExpBoosterModifier"},{"player":true,"typeId":"EVIOLITE","args":[523476014,[2,4],1.5],"stackCount":1,"className":"EvolutionStatBoosterModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[1391805950,1],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"HEALING_CHARM","args":[1.1],"stackCount":1,"className":"HealingBoosterModifier"},{"player":true,"typeId":"MEGA_BRACELET","args":[],"stackCount":1,"className":"MegaEvolutionAccessModifier"},{"player":true,"typeId":"AMULET_COIN","args":[],"stackCount":3,"className":"MoneyMultiplierModifier"},{"player":true,"typeId":"MULTI_LENS","args":[3643232884],"stackCount":1,"className":"PokemonMultiHitModifier"},{"player":true,"typeId":"MYSTICAL_ROCK","args":[3643232884],"stackCount":1,"className":"FieldEffectModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[2],"args":[3643232884,2],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[3643232884,1],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"EVIOLITE","args":[2698821391,[2,4],1.5],"stackCount":1,"className":"EvolutionStatBoosterModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[4],"args":[3812493692,4],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[0],"args":[3812493692,0],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[7],"args":[3812493692,7],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"ER_EXPERT_BELT","args":[3643232884,"expertBelt",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"GOLDEN_POKEBALL","args":[],"stackCount":1,"className":"ExtraModifierModifier"},{"player":true,"typeId":"ER_COVERT_CLOAK","args":[3643232884,"covertCloak",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[523476014,1],"stackCount":1,"className":"BerryModifier"}],"money":2646,"pokeballCounts":{"0":3,"1":0,"2":0,"3":0,"4":0}}}
