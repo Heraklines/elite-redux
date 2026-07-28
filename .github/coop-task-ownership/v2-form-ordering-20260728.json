@@ -1,0 +1,16 @@
+{
+  "taskId": "v2-form-ordering-20260728",
+  "version": 2,
+  "branch": "ci/coop/v2-form-ordering-20260728",
+  "trainRef": "ci/coop/v2-final-integration-20260726",
+  "baseSha": "948fe40fcda8e17c5030638653381b6bc914e19c",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-form-ordering-20260728.json",
+    "src/field/pokemon.ts",
+    "src/phases/summon-phase.ts",
+    "src/phases/switch-summon-phase.ts",
+    "test/node/authority-v2-form-change-ordering.test.ts",
+    "test/tests/elite-redux/coop/coop-form-change-ordering.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
