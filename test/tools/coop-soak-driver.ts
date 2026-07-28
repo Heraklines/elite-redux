@@ -58,6 +58,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import type { Phase } from "#app/phase";
+import { resolveCoopV2CommandFrontier } from "#data/elite-redux/coop/authority-v2/command-frontier";
 import { decodeCoopV2InteractionEnvelope } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   applyCoopAuthoritativeBattleState,
@@ -65,6 +66,7 @@ import {
   applyCoopCheckpoint,
   applyCoopFieldSnapshot,
   applyCoopFullSnapshot,
+  captureCoopAuthoritativeBattleState,
   captureCoopCaptureParty,
   captureCoopChecksum,
   captureCoopChecksumState,
@@ -103,6 +105,7 @@ import {
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
   getCoopWaveBoundaryStatus,
+  inspectCoopV2CommandPresentationRequirement,
   isCoopLearnMoveForwardInFlightEmpty,
   isCoopV2InteractionHumanInputFrozen,
   setCoopDexSyncDelayMs,
@@ -2779,19 +2782,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
         break;
       }
-      // Sample the finale boundary only AFTER the loop above has driven the real NewBattle/encounter tail.
-      // At a wave-199 -> wave-200 crossing, sampling before that loop observes the old doubles arrangement
-      // and makes the soak demand a guest CommandPhase even though production's live wave-200 host correctly
-      // publishes ARRIVE-ONLY. Battle identity comes from the authority; exact 1v1 geometry on both engines
-      // proves that the replica has no guest-owned command slot to materialize.
-      const hostArrangement = rig.hostScene.currentBattle.arrangement;
-      const guestArrangement = rig.guestScene.currentBattle.arrangement;
-      const finalBossStageOne =
-        rig.hostScene.currentBattle.isClassicFinalBoss
-        && hostArrangement.playerCapacity === 1
-        && hostArrangement.enemyCapacity === 1
-        && guestArrangement.playerCapacity === 1
-        && guestArrangement.enemyCapacity === 1;
       // Both production browsers start their first queued CommandPhase independently. The authority's
       // host-owned phase must therefore start before the replica can pass its read-only field-0 phase:
       // that exact start commits CONTROL_COMMIT, which is the sole ordered permission for the guest to
@@ -2800,26 +2790,63 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // Start the real authority phase now; it can legitimately park on the reciprocal rendezvous until
       // the guest-owned phase below starts. Never manufacture either side through reannounce().
       let hostCommand: { readonly phaseName: string; start(): void } | null = null;
-      if (!restartAlreadyOpenHost) {
-        hostCommand = await withClient(rig.hostCtx, async () => {
-          const current = rig.hostScene.phaseManager.getCurrentPhase();
-          if (
-            current?.phaseName !== "CommandPhase"
-            || rig.hostScene.currentBattle.waveIndex !== wave
-            || rig.hostScene.currentBattle.turn !== turn
-          ) {
-            throw new Error(
-              `host command boundary is not current: ${current?.phaseName ?? "none"} `
-                + `${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`,
-            );
-          }
-          current.start();
-          await drainLoopback();
-          return current;
-        });
+      hostCommand = await withClient(rig.hostCtx, async () => {
+        const current = rig.hostScene.phaseManager.getCurrentPhase();
+        if (
+          current?.phaseName !== "CommandPhase"
+          || rig.hostScene.currentBattle.waveIndex !== wave
+          || rig.hostScene.currentBattle.turn !== turn
+        ) {
+          throw new Error(
+            `${restartAlreadyOpenHost ? "initial " : ""}host command boundary is not current: `
+              + `${current?.phaseName ?? "none"} `
+              + `${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`,
+          );
+        }
+        // Wave one opened before buildDuo installed the live runtime. Re-enter this untouched public phase
+        // once so it publishes the V2 command-open exactly as a production browser launched into co-op.
+        current.start();
+        await drainLoopback();
+        return current;
+      });
+      // The authority CommandPhase start above is the event that authors the immutable COMMAND_FRONTIER.
+      // Classifying the replica before that event reads its previous battle's geometry: at wave 200 the
+      // renderer still appears double until this exact carrier installs the one-seat finale. That stale read
+      // made the soak demand a guest CommandPhase and then call a correctly-waiting CoopReplayTurnPhase a
+      // softlock. Deliver the real commit first, prove the replica retained its exact source, and partition
+      // actionability through the SAME canonical frontier mapper production used. This is the N-seat rule:
+      // a browser drives input iff the committed frontier names its seat; every other seat spectates.
+      await pumpDuoDestinations(rig, 2);
+      const commandState = await withClient(rig.hostCtx, () =>
+        captureCoopAuthoritativeBattleState(rig.hostScene.currentBattle.turn),
+      );
+      if (commandState == null) {
+        return fail("no-park", wave, `authority did not capture command state after starting ${wave}:${turn}`);
       }
+      if (commandState.wave !== wave || commandState.turn !== turn) {
+        fail("no-park", wave, `authority did not expose command state ${wave}:${turn} after its CommandPhase start`);
+      }
+      const commandFrontier = resolveCoopV2CommandFrontier(commandState);
+      if (commandFrontier.commands.length === 0 || commandFrontier.unresolved.length > 0) {
+        fail(
+          "no-park",
+          wave,
+          `authority produced incomplete command frontier ${wave}:${turn} `
+            + `(commands=${commandFrontier.commands.length} unresolved=${commandFrontier.unresolved.length})`,
+        );
+      }
+      const guestCommandSource = inspectCoopV2CommandPresentationRequirement(wave, turn, rig.guestRuntime);
+      if (guestCommandSource.kind !== "presentation" && guestCommandSource.kind !== "covered-by-source") {
+        fail(
+          "no-park",
+          wave,
+          `replica did not retain authoritative command source ${wave}:${turn} (kind=${guestCommandSource.kind})`,
+        );
+      }
+      const guestSeatId = rig.guestRuntime.controller.localSeatId;
+      const guestCommandRequired = commandFrontier.commands.some(command => command.ownerSeatId === guestSeatId);
       let guestCommand: { readonly phaseName: string; start(): void } | null = null;
-      if (!finalBossStageOne) {
+      if (guestCommandRequired) {
         guestCommand = await withClient(rig.guestCtx, () =>
           driveClientPhaseQueueTo(rig.guestScene, `guest command ${wave}:${turn}`, {
             matches: phase =>
@@ -2861,24 +2888,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // authority phase was already started above so it could publish CONTROL_COMMIT; pumping the guest's
       // real arrival now opens its public handler without re-entering that phase.
       await withClient(rig.hostCtx, async () => {
-        if (restartAlreadyOpenHost) {
-          const current = rig.hostScene.phaseManager.getCurrentPhase();
-          if (
-            current?.phaseName !== "CommandPhase"
-            || rig.hostScene.currentBattle.waveIndex !== wave
-            || rig.hostScene.currentBattle.turn !== turn
-          ) {
-            throw new Error(
-              `initial host command boundary is not current: ${current?.phaseName ?? "none"} `
-                + `${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`,
-            );
-          }
-          // Wave one opened before buildDuo installed the live runtime. Re-enter this untouched public phase
-          // once so it publishes the reciprocal rendezvous just like a production browser launched in co-op.
-          current.start();
-          await drainLoopback();
-          return;
-        }
         if (hostCommand == null) {
           throw new Error(`host command ${wave}:${turn} was not started`);
         }
@@ -2903,33 +2912,32 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           fail("no-park", wave, `host command ${wave}:${turn} left without a public COMMAND handler`);
         }
       }
-      // Classic wave 200 stage one is intentionally one player versus one boss. The renderer has no
-      // owned field slot or public CommandPhase until the boss's phase-two transition calls setDouble(true).
-      // Starting its CoopReplayTurnPhase here, before the authority submits slot 0, blocks waiting for a
-      // resolution that cannot exist yet (the former god-a/god-c wave-200 false softlock). A real second
-      // browser simply watches this turn. Preserve that exact behavior: verify both engines agree on the
-      // single geometry, leave the replay pump untouched, and let playWave start it only after host action.
+      // A seat omitted by the immutable frontier is a spectator for this turn. Classic wave-200 stage one
+      // is the current concrete case: only the authority owns its 1v1 command. Starting the renderer's
+      // CoopReplayTurnPhase before the authority submits that command blocks on the future turn result, so
+      // leave the replay pump untouched and let playWave start it only after the host action. The decision
+      // itself is frontier-based and therefore remains correct for any future N-seat temporary spectator.
       const hostPlayerCapacity = rig.hostScene.currentBattle.arrangement.playerCapacity;
-      if (finalBossStageOne) {
+      if (!guestCommandRequired) {
         const guestPlayerCapacity = rig.guestScene.currentBattle.arrangement.playerCapacity;
         const hostPlayerField = rig.hostScene.getPlayerField();
         const guestPlayerField = rig.guestScene.getPlayerField();
-        if (
-          guestPlayerCapacity !== 1
-          || hostPlayerField.length !== 1
-          || guestPlayerField.length !== 1
-          || hostPlayerField[COOP_GUEST_FIELD_INDEX] != null
-          || guestPlayerField[COOP_GUEST_FIELD_INDEX] != null
-        ) {
+        const guestHasCommandableField = withClientSync(rig.guestCtx, () =>
+          rig.guestScene
+            .getPlayerField()
+            .some(mon => mon?.coopOwner === "guest" && !mon.isFainted() && mon.isAllowedInBattle()),
+        );
+        if (guestHasCommandableField || hostPlayerField[COOP_GUEST_FIELD_INDEX] != null) {
           fail(
             "desync",
             wave,
-            `single-owner command geometry diverged hostCap=${hostPlayerCapacity}/field=${hostPlayerField.length} `
-              + `guestCap=${guestPlayerCapacity}/field=${guestPlayerField.length}`,
+            `seat ${guestSeatId} omitted from command frontier but remains locally commandable `
+              + `(hostCap=${hostPlayerCapacity}/field=${hostPlayerField.length} `
+              + `guestCap=${guestPlayerCapacity}/field=${guestPlayerField.length})`,
           );
         }
         actionScript.push(
-          `wave ${wave} turn ${turn}: exact final-boss stage-one boundary crossed without a synthetic guest rendezvous; guest remained a replay spectator until host action`,
+          `wave ${wave} turn ${turn}: committed frontier omitted seat ${guestSeatId}; guest remained a replay spectator until host action`,
         );
         return;
       }

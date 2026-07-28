@@ -216,29 +216,33 @@ test("a directly assigned co-op integration test does not manufacture cross-lane
   );
 });
 
-test("representative soak never manufactures a command rendezvous and scopes the spectator to final-boss stage one", () => {
+test("representative soak partitions command actionability from the post-delivery authoritative frontier", () => {
   assert.doesNotMatch(soakDriver, /rendezvous\.reannounce\(point\)/u);
   const commandCrossing = soakDriver.slice(
     soakDriver.indexOf("const crossCommandBoundaryWithReplayGuest = async"),
     soakDriver.indexOf("/** Play ONE host wave"),
   );
-  const spectatorDecisionIndex = commandCrossing.indexOf("const finalBossStageOne =");
-  const lastTransitionProjectionIndex = commandCrossing.lastIndexOf("if (guestCrossroadsProjected");
   const hostCommandIndex = commandCrossing.indexOf("let hostCommand:");
-  assert.ok(lastTransitionProjectionIndex >= 0, "the source contract found the real transition loop tail");
+  const hostStartIndex = commandCrossing.indexOf("current.start();", hostCommandIndex);
+  const deliveryIndex = commandCrossing.indexOf("await pumpDuoDestinations(rig, 2);", hostStartIndex);
+  const spectatorDecisionIndex = commandCrossing.indexOf("const guestCommandRequired =", deliveryIndex);
+  const guestDriveIndex = commandCrossing.indexOf("let guestCommand:", spectatorDecisionIndex);
   assert.ok(
-    spectatorDecisionIndex > lastTransitionProjectionIndex && spectatorDecisionIndex < hostCommandIndex,
-    "final-boss actionability is sampled after the live transition and before either command is driven",
+    hostStartIndex >= 0
+      && deliveryIndex > hostStartIndex
+      && spectatorDecisionIndex > deliveryIndex
+      && spectatorDecisionIndex < guestDriveIndex,
+    "seat actionability is sampled only after the authority starts and delivers its command commit",
   );
-  const spectatorDecision = commandCrossing.slice(spectatorDecisionIndex, hostCommandIndex);
+  const spectatorDecision = commandCrossing.slice(deliveryIndex, guestDriveIndex);
   assert.match(
     spectatorDecision,
-    /rig\.hostScene\.currentBattle\.isClassicFinalBoss[\s\S]*hostArrangement\.playerCapacity === 1[\s\S]*hostArrangement\.enemyCapacity === 1[\s\S]*guestArrangement\.playerCapacity === 1[\s\S]*guestArrangement\.enemyCapacity === 1/u,
+    /captureCoopAuthoritativeBattleState[\s\S]*resolveCoopV2CommandFrontier\(commandState\)[\s\S]*inspectCoopV2CommandPresentationRequirement\(wave, turn, rig\.guestRuntime\)[\s\S]*command\.ownerSeatId === guestSeatId/u,
   );
   assert.doesNotMatch(
     spectatorDecision,
-    /rig\.guestScene\.currentBattle\.isClassicFinalBoss/u,
-    "battle identity comes from the authority; replica geometry proves that no guest command slot exists",
+    /isClassicFinalBoss/u,
+    "seat actionability comes from the committed frontier, never a local presentation heuristic",
   );
   assert.match(soakDriver, /guestCommand!\.start\(\)[\s\S]*phaseInterceptor\.to\("CommandPhase"\)/u);
 });
