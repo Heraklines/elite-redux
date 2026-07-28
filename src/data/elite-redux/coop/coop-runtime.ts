@@ -10968,7 +10968,32 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
   return false;
 }
 
-/** Feed a journal-delivered Giratina bargain terminal into the receiver's real outcome waiter. */
+/**
+ * Close a guest-owned Bargain only from its exact admitted V2 result claim. Complete state application has
+ * already succeeded when this is called, but materialApplied intentionally remains gated on the phase's real
+ * terminal proof. This source-entry check prevents a raw relay blob, stale operation ID, or ambient phase from
+ * releasing the ordered boundary.
+ */
+function settleCoopV2CommittedBargainResult(runtime: CoopRuntime, operationId: string): boolean {
+  const control = runtime.v2ControlLedger.latestControl;
+  const sourceEntry = control == null ? null : runtime.v2ControlLedger.sourceEntryOf(control);
+  if (
+    control?.kind !== "AWAIT_SUCCESSOR"
+    || control.afterOperationId !== operationId
+    || sourceEntry?.kind !== "INTERACTION_COMMIT"
+    || sourceEntry.operationId !== operationId
+  ) {
+    return false;
+  }
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        settleCoopV2CommittedBargainResult?: (committedOperationId: string, owningRuntime: CoopRuntime) => boolean;
+      }
+    | undefined;
+  return phase?.settleCoopV2CommittedBargainResult?.(operationId, runtime) === true;
+}
+
+/** Feed a journal-delivered Giratina bargain terminal into the receiver's real phase consumer. */
 function materializeCoopBargainOutcomeFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
     return false;
@@ -11019,10 +11044,13 @@ function materializeCoopBargainOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
   ) {
     return false;
   }
-  // Only the non-authority replica owns a phase-local result waiter. A host-owned Bargain wakes its guest
-  // watcher with an apply-proof credit; a guest-owned Bargain wakes the guest owner's ordered wait so it can
-  // end only after this host-authored image is real. The authority already consumed the proposal directly.
+  // Only the non-authority replica owns a result phase. A host-owned Bargain still wakes its read-only guest
+  // watcher through the compatibility FIFO. A guest-owned Bargain instead closes directly from the exact
+  // admitted result/control claim: the raw FIFO is neither correctness evidence nor release authority.
   if (runtime.controller.authorityRole !== "authority") {
+    if (op.owner === runtime.controller.localSeatId && isCoopV2InteractionCutoverActive(runtime.durability)) {
+      return settleCoopV2CommittedBargainResult(runtime, op.id);
+    }
     if (op.owner !== runtime.controller.localSeatId) {
       armCoopBargainJournalMaterialization(op.id);
     }

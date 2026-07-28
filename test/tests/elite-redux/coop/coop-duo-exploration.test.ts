@@ -26,6 +26,7 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import {
+  coopBargainOperationId,
   resetCoopBargainOperationFlag,
   setCoopBargainOperationEnabled,
 } from "#data/elite-redux/coop/coop-bargain-operation";
@@ -1183,6 +1184,127 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       counterBefore + 1,
     );
     expect(rig.guestScene.money, "money converged via the outcome blob").toBe(rig.hostScene.money);
+    logs.flush();
+  }, 240_000);
+
+  it("AUTHORITY V2: a guest-owned Bargain result releases from its committed control, not the raw outcome FIFO", async () => {
+    setCoopBargainOperationEnabled(true);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    await retireDuoInitialCommandForBoundaryTest(rig);
+
+    // Model one already-committed interaction so the Bargain owner rotates to seat 1. This is derived local
+    // material only: the test is not permitted to create a raw interaction-counter release dependency while
+    // arranging its target owner.
+    withClientSync(rig.hostCtx, () => rig.hostRuntime.controller.advanceInteractionFromAuthoritativeCommit(0));
+    withClientSync(rig.guestCtx, () => rig.guestRuntime.controller.advanceInteractionFromAuthoritativeCommit(0));
+    expect(rig.hostRuntime.controller.interactionCounter()).toBe(1);
+    expect(rig.guestRuntime.controller.interactionCounter()).toBe(1);
+
+    const { TheBargainPhase } = await import("#phases/the-bargain-phase");
+    let watcherDone = false;
+    await withClient(rig.hostCtx, async () => {
+      const watcher = new TheBargainPhase();
+      const seam = watcher as unknown as { end: () => void };
+      const realEnd = seam.end.bind(watcher);
+      seam.end = () => {
+        watcherDone = true;
+        realEnd();
+      };
+      expect(rig.hostScene.phaseManager.overridePhase(watcher), "the host watcher owns the real Bargain boundary").toBe(
+        true,
+      );
+      watcher.start();
+      await drainLoopback();
+    });
+
+    let ownerPhase: InstanceType<typeof TheBargainPhase> | null = null;
+    await withClient(rig.guestCtx, async () => {
+      const projected = await driveClientPhaseQueueTo(rig.guestScene, "projected guest-owned Giratina bargain", {
+        matches: phase => phase.phaseName === "TheBargainPhase",
+        pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+      });
+      ownerPhase = projected as InstanceType<typeof TheBargainPhase>;
+      projected.start();
+      await drainLoopback();
+      // Let the carried-input guard expire on the exact projected owner handler.
+      await new Promise(resolve => setTimeout(resolve, 650));
+    });
+
+    const resultOperationId = withClientSync(rig.guestCtx, () => coopBargainOperationId(1));
+    let rawResultMaterializationAttempts = 0;
+    let restoreRawMaterializer = (): void => {};
+    withClientSync(rig.guestCtx, () => {
+      const relay = getCoopInteractionRelay();
+      expect(relay, "the guest owner has its live interaction relay").not.toBeNull();
+      if (relay == null) {
+        return;
+      }
+      const original = relay.materializeCommittedInteractionOutcome.bind(relay);
+      relay.materializeCommittedInteractionOutcome = (seq, outcome, operationId) => {
+        if (operationId === resultOperationId && outcome.k === "meResync") {
+          // Failure-first membrane: pre-fix the committed BARGAIN entry fed this compatibility FIFO and the
+          // owner waited up to COOP_BIOME_WAIT_MS. Swallowing that blob left its real phase parked forever.
+          rawResultMaterializationAttempts += 1;
+          return;
+        }
+        original(seq, outcome, operationId);
+      };
+      restoreRawMaterializer = () => {
+        relay.materializeCommittedInteractionOutcome = original;
+      };
+    });
+
+    try {
+      let ownerReady = false;
+      for (let i = 0; i < 80 && !ownerReady; i++) {
+        await pumpDuoDestinations(rig, 1);
+        ownerReady = await withClient(rig.guestCtx, () => {
+          const handler = rig.guestScene.ui.getHandler() as unknown as {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          };
+          return (
+            rig.guestScene.ui.getMode() === UiMode.ER_BARGAIN
+            && handler.active === true
+            && handler.isCoopV2InputActionable?.() === true
+            && !isCoopV2InteractionHumanInputFrozen(rig.guestRuntime)
+          );
+        });
+      }
+      expect(ownerReady, "the guest reached the exact actionable Bargain control").toBe(true);
+      await withClient(rig.guestCtx, () => {
+        expect(rig.guestScene.ui.processInput(Button.CANCEL), "the guest leaves through public Bargain input").toBe(
+          true,
+        );
+      });
+
+      let ownerDone = false;
+      for (let i = 0; i < 120 && (!ownerDone || !watcherDone); i++) {
+        await pumpDuoDestinations(rig, 1);
+        ownerDone = await withClient(
+          rig.guestCtx,
+          () => ownerPhase != null && rig.guestScene.phaseManager.getCurrentPhase() !== ownerPhase,
+        );
+      }
+
+      expect(rawResultMaterializationAttempts, "the V2 result never consulted the dropped raw FIFO").toBe(0);
+      expect(ownerDone, "the guest owner phase ended from its immutable committed result").toBe(true);
+      expect(watcherDone, "the authority watcher completed and committed the exact result").toBe(true);
+      expect(
+        rig.guestRuntime.v2SettledInteractionOperations.has(resultOperationId),
+        "the phase published its address-exact terminal proof",
+      ).toBe(true);
+      const installedSuccessor = rig.guestRuntime.v2ControlLedger.activeControl;
+      expect(installedSuccessor?.kind, "the committed result installed its typed successor").toBe("AWAIT_SUCCESSOR");
+      expect(
+        installedSuccessor?.kind === "AWAIT_SUCCESSOR" ? installedSuccessor.afterOperationId : null,
+        "the installed ordered wait belongs to the exact Bargain result",
+      ).toBe(resultOperationId);
+    } finally {
+      withClientSync(rig.guestCtx, restoreRawMaterializer);
+    }
     logs.flush();
   }, 240_000);
 

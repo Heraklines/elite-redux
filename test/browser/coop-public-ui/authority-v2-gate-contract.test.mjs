@@ -2527,15 +2527,39 @@ test("every relay-driven remote interaction derives one exact authority proposal
     "a guest owner cannot advance its ambient phase queue at proposal-send time",
   );
 
-  const resultWaitStart = theBargainPhase.indexOf("  private coopAwaitAuthoritativeBargainResult(");
-  const resultWaitEnd = theBargainPhase.indexOf("\n  /** Close locally only", resultWaitStart);
-  assert.ok(resultWaitStart >= 0 && resultWaitEnd > resultWaitStart, "Bargain exposes its exact result wait");
-  const resultWait = theBargainPhase.slice(resultWaitStart, resultWaitEnd);
-  const consumeAddress = resultWait.indexOf("consumeCommittedInteractionOutcomeOperationId");
-  const authorityEnd = resultWait.indexOf("super.end()");
+  const resultSettleStart = theBargainPhase.indexOf("  public settleCoopV2CommittedBargainResult(");
+  const resultSettleEnd = theBargainPhase.indexOf("\n  /** Close locally only", resultSettleStart);
   assert.ok(
-    consumeAddress >= 0 && authorityEnd > consumeAddress,
-    "the parked phase ends only after the exact committed result address is observed",
+    resultSettleStart >= 0 && resultSettleEnd > resultSettleStart,
+    "Bargain exposes its exact committed-result consumer",
+  );
+  const resultSettle = theBargainPhase.slice(resultSettleStart, resultSettleEnd);
+  assert.match(
+    resultSettle,
+    /runtime !== this\.coopOwningRuntime[\s\S]*?this\.coopAwaitingAuthorityOperationId !== operationId[\s\S]*?getCurrentPhase\(\) !== this/u,
+    "the result consumer binds the owning runtime, operation, and live phase generation",
+  );
+  assert.doesNotMatch(
+    resultSettle,
+    /awaitInteractionOutcome|consumeCommittedInteractionOutcomeOperationId|COOP_BIOME_WAIT_MS/u,
+    "a raw Bargain outcome FIFO cannot release the parked V2 phase",
+  );
+  const authorityEnd = resultSettle.indexOf("super.end()");
+  const terminalProof = resultSettle.indexOf("settleCoopV2InteractionOperation");
+  assert.ok(
+    authorityEnd >= 0 && terminalProof > authorityEnd,
+    "the real phase terminal precedes its address-exact settlement proof",
+  );
+
+  assert.match(
+    coopRuntime,
+    /function settleCoopV2CommittedBargainResult[\s\S]*?v2ControlLedger\.latestControl[\s\S]*?sourceEntryOf\(control\)[\s\S]*?control\?\.kind !== "AWAIT_SUCCESSOR"[\s\S]*?sourceEntry\.operationId !== operationId[\s\S]*?settleCoopV2CommittedBargainResult\?\.\(operationId, runtime\)/u,
+    "the runtime releases Bargain only through the exact committed result/control claim",
+  );
+  assert.match(
+    coopRuntime,
+    /op\.owner === runtime\.controller\.localSeatId[\s\S]*?isCoopV2InteractionCutoverActive\(runtime\.durability\)[\s\S]*?return settleCoopV2CommittedBargainResult\(runtime, op\.id\);/u,
+    "a guest-owned V2 Bargain bypasses the compatibility raw-result FIFO",
   );
 });
 

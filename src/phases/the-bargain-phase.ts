@@ -37,6 +37,7 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BARGAIN_SEQ_BASE, COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   advanceCoopInteractionForContinuation,
+  type CoopRuntime,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
@@ -196,7 +197,15 @@ export class TheBargainPhase extends Phase {
     }
     const operationId = coopBargainOperationId(this.coopBargainStart);
     const seq = COOP_BARGAIN_SEQ_BASE + this.coopBargainStart;
-    settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+    const runtime = this.coopOwningRuntime ?? getCoopRuntime();
+    const awaitsAuthoritativeResult =
+      controller.role === "guest" && isCoopV2InteractionCutoverActive(runtime?.durability);
+    // A host/legacy owner has already ended its exact local phase before publishing. A V2 guest owner is
+    // deliberately still parked on this phase, so recording its result terminal here would falsely let the
+    // immutable result become materialApplied before that committed result actually closes the phase.
+    if (!awaitsAuthoritativeResult) {
+      settleCoopV2InteractionOperation(operationId, runtime);
+    }
     if (
       !commitBargainOwnerOutcome({
         pinned: this.coopBargainStart,
@@ -211,10 +220,13 @@ export class TheBargainPhase extends Phase {
     }
     const relay = getCoopInteractionRelay();
     const sendProposal = (): void => relay?.sendInteractionOutcomeProposal(seq, "bargain", outcome, operationId);
-    const runtime = this.coopOwningRuntime ?? getCoopRuntime();
-    if (controller.role === "guest" && isCoopV2InteractionCutoverActive(runtime?.durability)) {
+    if (awaitsAuthoritativeResult) {
       if (relay == null || runtime == null) {
         failCoopSharedSession(`Bargain proposal ${operationId} has no active V2 relay`);
+        return;
+      }
+      if (!this.parkCoopV2AuthoritativeBargainResult(operationId, runtime)) {
+        failCoopSharedSession(`Bargain proposal ${operationId} could not park its exact V2 result phase`);
         return;
       }
       const lease = retainCoopV2InteractionProposal(
@@ -235,59 +247,55 @@ export class TheBargainPhase extends Phase {
         return;
       }
       coopLog("v2-proposal", `retained Bargain outcome proposal id=${operationId} status=${lease}`);
-      this.coopAwaitAuthoritativeBargainResult(operationId, seq, runtime);
       return;
     }
     relay?.sendInteractionOutcome(seq, "bargain", outcome);
     coopLog("reward", `bargain OWNER terminal: outcome blob sent (pinnedStart=${this.coopBargainStart})`);
   }
 
-  /** Guest owner: hold the engine boundary until the exact committed result has materially applied. */
-  private coopAwaitAuthoritativeBargainResult(
-    operationId: string,
-    seq: number,
-    runtime: NonNullable<ReturnType<typeof getCoopRuntime>>,
-  ): void {
+  /** Guest owner: retain one exact phase identity while the authority commits its proposed result. */
+  private parkCoopV2AuthoritativeBargainResult(operationId: string, runtime: CoopRuntime): boolean {
+    if (
+      runtime !== this.coopOwningRuntime
+      || getCoopRuntime() !== runtime
+      || globalScene.phaseManager.getCurrentPhase() !== this
+      || !isCoopV2InteractionCutoverActive(runtime.durability)
+    ) {
+      return false;
+    }
     if (this.coopAwaitingAuthorityOperationId != null) {
       if (this.coopAwaitingAuthorityOperationId !== operationId) {
         failCoopSharedSession(
           `Bargain proposal wait changed identity from ${this.coopAwaitingAuthorityOperationId} to ${operationId}`,
         );
+        return false;
       }
-      return;
+      return true;
     }
     this.coopAwaitingAuthorityOperationId = operationId;
-    const relay = getCoopInteractionRelay();
-    if (relay == null) {
-      failCoopSharedSession(`Bargain result ${operationId} has no live relay`);
-      return;
+    coopLog("v2-proposal", `parked Bargain phase for committed result id=${operationId}`);
+    return true;
+  }
+
+  /**
+   * Exact V2 result consumer. The runtime calls this only after validating the immutable BARGAIN entry,
+   * applying its complete state, and binding its AWAIT_SUCCESSOR claim in the global control ledger. A raw
+   * relay outcome cannot call this method and therefore cannot release progression.
+   */
+  public settleCoopV2CommittedBargainResult(operationId: string, runtime: CoopRuntime): boolean {
+    if (
+      runtime !== this.coopOwningRuntime
+      || getCoopRuntime() !== runtime
+      || this.coopAwaitingAuthorityOperationId !== operationId
+      || globalScene.phaseManager.getCurrentPhase() !== this
+      || !isCoopV2InteractionCutoverActive(runtime.durability)
+    ) {
+      return false;
     }
-    void (async () => {
-      const result = await relay.awaitInteractionOutcome(seq, COOP_BIOME_WAIT_MS);
-      if (getCoopRuntime() !== runtime || this.coopAwaitingAuthorityOperationId !== operationId) {
-        return;
-      }
-      if (result == null) {
-        runtime.durability?.reconnect();
-        failCoopSharedSession(`Bargain result ${operationId} was not recovered`);
-        return;
-      }
-      const committedOperationId = relay.consumeCommittedInteractionOutcomeOperationId(seq, result);
-      if (committedOperationId !== operationId || result.k !== "meResync") {
-        failCoopSharedSession(
-          `Bargain result ${operationId} returned the wrong committed address ${committedOperationId ?? "(missing)"}`,
-        );
-        return;
-      }
-      if (globalScene.phaseManager.getCurrentPhase() !== this) {
-        failCoopSharedSession(`Bargain result ${operationId} arrived after its ordered wait phase was replaced`);
-        return;
-      }
-      this.coopAwaitingAuthorityOperationId = null;
-      coopLog("v2-proposal", `Bargain result ${operationId} materially applied; releasing ordered wait`);
-      super.end();
-      settleCoopV2InteractionOperation(operationId, runtime);
-    })();
+    this.coopAwaitingAuthorityOperationId = null;
+    coopLog("v2-proposal", `committed Bargain result ${operationId} applied; releasing ordered wait`);
+    super.end();
+    return settleCoopV2InteractionOperation(operationId, runtime);
   }
 
   /** Close locally only when no host-authored V2 result still owns this phase's successor. */
