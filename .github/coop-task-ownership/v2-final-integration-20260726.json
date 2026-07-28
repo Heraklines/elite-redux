@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "c6cdc1caf6ed00cbf7500181aea7b3dded3614a2",
+  "baseSha": "0fb4856b0c4dd08444bca8c9afebdd940e3cef57",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -101,6 +101,7 @@
     "src/phases/move-phase.ts",
     "src/phases/mystery-encounter-phases.ts",
     "src/phases/new-battle-phase.ts",
+    "src/phases/pokemon-anim-phase.ts",
     "src/phases/select-biome-phase.ts",
     "src/phases/select-modifier-phase.ts",
     "src/phases/select-starter-phase.ts",
@@ -225,5 +226,7 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ]
 }

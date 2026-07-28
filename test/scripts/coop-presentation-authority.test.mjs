@@ -188,6 +188,37 @@ test("plain common battle animations are authority-authored at enqueue and repla
   assert.match(replayPump, /case "commonAnim":[\s\S]+"CoopCommonAnimReplayPhase"/u);
 });
 
+test("Substitute and Commander sprite transitions are authority-authored and outcome-gated", () => {
+  const manager = read("src/phase-manager.ts");
+  const producer = read("src/phases/pokemon-anim-phase.ts");
+  const transport = read("src/data/elite-redux/coop/coop-transport.ts");
+  const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
+  const replay = read("src/phases/coop-replay-turn-phase.ts");
+  const sideSwap = read("src/data/elite-redux/showdown/showdown-side-swap.ts");
+
+  assert.match(
+    manager,
+    /phase instanceof PokemonAnimPhase && phase\.phaseName === "PokemonAnimPhase"[\s\S]+recordCoopPresentationAtEnqueue\(\)/u,
+  );
+  assert.match(producer, /recordCoopEvent\(\{\s*k: "pokemonAnim"[\s\S]+actor:/u);
+  assert.match(producer, /armCoopPresentationProgressWatchdog/u);
+  assert.match(producer, /settleCoopPresentationOutcome\(this\.coopPresentationOutcomeToken/u);
+  assert.match(
+    transport,
+    /k: "pokemonAnim";\s*anim: number;\s*bi: number;\s*actor: CoopPresentationActorRef;\s*companionBi: number \| null;\s*companionActor: CoopPresentationActorRef \| null;/u,
+  );
+  assert.match(validator, /case "pokemonAnim":[\s\S]+PokemonAnimType\.COMMANDER_REMOVE/u);
+  assert.match(
+    replay,
+    /case "pokemonAnim":[\s\S]+exactSpriteActor\(event\.companionBi, event\.companionActor\)[\s\S]+actor\.summonData\.tags\.push\(substitute\)[\s\S]+"PokemonAnimPhase"/u,
+  );
+  assert.doesNotMatch(
+    replay.slice(replay.indexOf('case "pokemonAnim"'), replay.indexOf('case "formChange"')),
+    /actor\.addTag\(/u,
+  );
+  assert.match(sideSwap, /case "pokemonAnim":[\s\S]+swapBi\(event\.bi/u);
+});
+
 test("form changes and Transform carry complete authority material into dedicated renderer phases", () => {
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
@@ -438,14 +469,14 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
-test("protocol 53 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
+test("protocol 54 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-53"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-54"/u);
   const rewardUtilities = read("src/data/mystery-encounters/utils/encounter-phase-utils.ts");
   assert.match(rewardUtilities, /export function setEncounterMarketReward/u);
   for (const [path, marketKind] of [

@@ -7,6 +7,7 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import type { PhaseManager } from "#app/phase-manager";
+import { getBattlerTag, SubstituteTag } from "#data/battler-tags";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
@@ -33,6 +34,7 @@ import {
   type CoopPresentationOutcomeToken,
   coopPresentationOutcome,
   createCoopPresentationOutcomeToken,
+  settleCoopPresentationOutcome,
 } from "#data/elite-redux/coop/coop-presentation-outcome";
 import {
   coopHasPendingWaveAdvance,
@@ -56,7 +58,10 @@ import {
   observeCoopRenderedPresentation,
 } from "#data/elite-redux/coop/coop-turn-recorder";
 import { swapBattleEvent } from "#data/elite-redux/showdown/showdown-side-swap";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import type { CommonAnim } from "#enums/move-anims-common";
+import { MoveId } from "#enums/move-id";
+import { PokemonAnimType } from "#enums/pokemon-anim-type";
 import { type CoopV2ControlSuccessorClaim, coopNarrateMoveUsed } from "#phases/coop-replay-phases";
 
 /**
@@ -101,6 +106,12 @@ function fieldMonHp(bi: number, actor?: CoopPresentationActorRef): number | unde
   }
   const matches = getActuallyFieldedCoopPokemon(actor.side).filter(candidate => candidate.id === actor.pokemonId);
   return matches.length === 1 ? matches[0].hp : undefined;
+}
+
+/** Resolve one actually displayed sprite actor by immutable slot/side/id; duplicates and drift fail closed. */
+function exactSpriteActor(bi: number, actor: CoopPresentationActorRef) {
+  const matches = getActuallyFieldedCoopPokemon(actor.side).filter(candidate => candidate.id === actor.pokemonId);
+  return matches.length === 1 && matches[0].getBattlerIndex() === bi ? matches[0] : null;
 }
 
 /** Install the signed pre-command image after any local encounter-shell setup has completed. */
@@ -1764,6 +1775,62 @@ export class CoopReplayTurnPhase extends Phase {
               outcomeToken,
             );
             break;
+          case "pokemonAnim": {
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            const actor = exactSpriteActor(event.bi, event.actor);
+            if (actor == null) {
+              settleCoopPresentationOutcome(outcomeToken, {
+                kind: "failed",
+                reason: "pokemon-sprite-actor-not-displayed",
+                actorFingerprint: `${event.actor.side}:p${event.actor.pokemonId}:sprite${event.anim}`,
+              });
+              break;
+            }
+            const anim = event.anim as PokemonAnimType;
+            const companion =
+              event.companionBi == null || event.companionActor == null
+                ? null
+                : exactSpriteActor(event.companionBi, event.companionActor);
+            if (event.companionActor != null && companion == null) {
+              settleCoopPresentationOutcome(outcomeToken, {
+                kind: "failed",
+                reason: "pokemon-sprite-companion-not-displayed",
+                actorFingerprint: `${event.companionActor.side}:p${event.companionActor.pokemonId}:sprite${event.anim}`,
+              });
+              break;
+            }
+            let fieldAssets: Phaser.GameObjects.Sprite[] = [];
+            if (globalScene.moveAnimations && anim === PokemonAnimType.SUBSTITUTE_ADD) {
+              let substitute = actor.getTag(SubstituteTag);
+              if (substitute == null) {
+                // The event is ordered before the turn checkpoint that installs the new tag. Hydrate only
+                // the inert identity shell needed by PokemonAnimPhase to attach its doll; never call addTag
+                // (onAdd would re-run mechanics, narration, and enqueue a duplicate animation).
+                substitute = getBattlerTag(BattlerTagType.SUBSTITUTE, 0, MoveId.SUBSTITUTE, actor.id) as SubstituteTag;
+                substitute.hp = 1;
+                substitute.sourceInFocus = false;
+                actor.summonData.tags.push(substitute);
+              }
+            } else if (
+              globalScene.moveAnimations
+              && anim >= PokemonAnimType.SUBSTITUTE_PRE_MOVE
+              && anim <= PokemonAnimType.SUBSTITUTE_REMOVE
+            ) {
+              const sprite = actor.getTag(SubstituteTag)?.sprite;
+              if (sprite == null || !sprite.active) {
+                settleCoopPresentationOutcome(outcomeToken, {
+                  kind: "failed",
+                  reason: "pokemon-substitute-sprite-not-displayed",
+                  actorFingerprint: `${event.actor.side}:p${event.actor.pokemonId}:sprite${event.anim}`,
+                });
+                break;
+              }
+              fieldAssets = [sprite];
+            }
+            pm.unshiftNew("PokemonAnimPhase", anim, actor, fieldAssets, outcomeToken, event.actor, companion);
+            break;
+          }
           case "formChange":
             outcomeToken = createCoopPresentationOutcomeToken();
             this.presentationOutcomeTokens.push(outcomeToken);

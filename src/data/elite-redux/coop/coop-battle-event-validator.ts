@@ -6,6 +6,7 @@
 
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { ChargeAnim } from "#enums/move-anims-common";
+import { PokemonAnimType } from "#enums/pokemon-anim-type";
 
 /** Hard bound for the summon/on-entry cosmetic prefix retained beside one command-open state. */
 const MAX_ENTRY_PRESENTATION_EVENTS = 256;
@@ -186,6 +187,17 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
         && isPresentationActorRef(event.actor)
         && isActorAddressableBattlerIndex(event.targetBi)
         && isPresentationActorRef(event.targetActor)
+      );
+    case "pokemonAnim":
+      return (
+        isSafeAddressPart(event.anim)
+        && event.anim >= PokemonAnimType.SUBSTITUTE_ADD
+        && event.anim <= PokemonAnimType.COMMANDER_REMOVE
+        && PokemonAnimType[event.anim] !== undefined
+        && isActorAddressableBattlerIndex(event.bi)
+        && isPresentationActorRef(event.actor)
+        && ((event.companionBi === null && event.companionActor === null)
+          || (isActorAddressableBattlerIndex(event.companionBi) && isPresentationActorRef(event.companionActor)))
       );
     case "formChange":
       return (

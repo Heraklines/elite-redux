@@ -60,6 +60,7 @@ import { HitResult } from "#enums/hit-result";
 import { CommonAnim } from "#enums/move-anims-common";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
+import { PokemonAnimType } from "#enums/pokemon-anim-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -82,6 +83,7 @@ import {
 import { CoopPresentationReceiptPhase, CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
 import { MovePhase } from "#phases/move-phase";
+import { PokemonAnimPhase } from "#phases/pokemon-anim-phase";
 import { PokemonTransformPhase } from "#phases/pokemon-transform-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { installLocalV2TurnReplicaFixture, negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
@@ -787,6 +789,51 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     environment.recordCoopPresentationAtEnqueue();
     expect(endCoopRecording().events).toEqual([]);
+  });
+
+  it("records one exact Pokemon sprite transition and bounds its renderer outcome", async () => {
+    const field = await startCoopHost();
+    endCoopRecording();
+    beginCoopRecording(11, "pokemon-sprite-presentation");
+    const pokemon = field[0];
+    const companion = pokemon.getAlly();
+    if (companion == null) {
+      throw new Error("double-battle sprite fixture has no companion");
+    }
+    const producer = new PokemonAnimPhase(PokemonAnimType.COMMANDER_APPLY, pokemon);
+
+    producer.recordCoopPresentationAtEnqueue();
+    producer.recordCoopPresentationAtEnqueue();
+    expect(endCoopRecording().events).toEqual([
+      {
+        k: "pokemonAnim",
+        anim: PokemonAnimType.COMMANDER_APPLY,
+        bi: pokemon.getBattlerIndex(),
+        actor: { side: "player", pokemonId: pokemon.id },
+        companionBi: companion.getBattlerIndex(),
+        companionActor: { side: "player", pokemonId: companion.id },
+      },
+    ]);
+
+    const token = createCoopPresentationOutcomeToken();
+    const originalAnimations = globalScene.moveAnimations;
+    globalScene.moveAnimations = false;
+    const replay = new PokemonAnimPhase(PokemonAnimType.COMMANDER_APPLY, pokemon, [], token, {
+      side: "player",
+      pokemonId: pokemon.id,
+    });
+    const endSpy = vi.spyOn(replay, "end").mockImplementation(() => {});
+    try {
+      replay.start();
+      expect(coopPresentationOutcome(token)).toMatchObject({
+        kind: "intentionally-skipped",
+        reason: "animations-disabled",
+      });
+      expect(endSpy).toHaveBeenCalledOnce();
+    } finally {
+      globalScene.moveAnimations = originalAnimations;
+      endSpy.mockRestore();
+    }
   });
 
   it("records a complete Transform result before its narration", async () => {

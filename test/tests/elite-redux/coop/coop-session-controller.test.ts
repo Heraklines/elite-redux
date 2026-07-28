@@ -72,10 +72,10 @@ describe("co-op session controller (#633, P1)", () => {
     });
 
     it("rejects an older peer that cannot decode the complete battle presentation stream", async () => {
-      // er-coop-53: an older peer cannot decode the retained embedded-Mystery market subtype,
+      // er-coop-54: an older peer cannot decode the retained sprite-presentation event kind,
       // including exact successful/spread/charge animation boundaries, so pairing must fail closed
       // instead of opening a battle whose clients display different move outcomes.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-53");
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-54");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",

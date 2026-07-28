@@ -143,7 +143,10 @@ export type CoopRole = "host" | "guest";
 // er-coop-51 separates move narration from the actual animation boundary. Successful spread moves carry
 // every rendered target/substitute flag, failed moves carry no false animation, and charging turns carry
 // the exact charge animation instead of being rendered as the completed attack.
-export const COOP_PROTOCOL_VERSION = "er-coop-53";
+// er-coop-54 makes Substitute/Commander sprite transitions ordered authority presentation. Older strict
+// renderers reject the new event kind, so mixed builds must refuse pairing instead of silently showing a
+// missing doll or leaving Tatsugiri visible after Commander resolved.
+export const COOP_PROTOCOL_VERSION = "er-coop-54";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1182,6 +1185,15 @@ export type CoopBattleEvent =
       actor: CoopPresentationActorRef;
       targetBi: number;
       targetActor: CoopPresentationActorRef;
+    }
+  /** Replay one exact authority-executed Pokemon sprite transition (PokemonAnimType enum). */
+  | {
+      k: "pokemonAnim";
+      anim: number;
+      bi: number;
+      actor: CoopPresentationActorRef;
+      companionBi: number | null;
+      companionActor: CoopPresentationActorRef | null;
     }
   /** Apply and display one authority-resolved ordinary form change without re-running its mechanics. */
   | {

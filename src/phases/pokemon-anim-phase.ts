@@ -1,9 +1,19 @@
 import { globalScene } from "#app/global-scene";
 import { SubstituteTag } from "#data/battler-tags";
+import {
+  type CoopPresentationOutcomeToken,
+  settleCoopPresentationOutcome,
+} from "#data/elite-redux/coop/coop-presentation-outcome";
+import type { CoopPresentationActorRef } from "#data/elite-redux/coop/coop-transport";
+import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { PokemonAnimType } from "#enums/pokemon-anim-type";
 import { SpeciesId } from "#enums/species-id";
 import type { Pokemon } from "#field/pokemon";
 import { BattlePhase } from "#phases/battle-phase";
+import {
+  armCoopPresentationProgressWatchdog,
+  type CoopPresentationProgressWatchdog,
+} from "#phases/coop-presentation-watchdog";
 
 export class PokemonAnimPhase extends BattlePhase {
   public readonly phaseName = "PokemonAnimPhase";
@@ -13,40 +23,137 @@ export class PokemonAnimPhase extends BattlePhase {
   protected pokemon: Pokemon;
   /** Any other field sprites affected by this animation */
   protected fieldAssets: Phaser.GameObjects.Sprite[];
+  private coopPresentationRecorded = false;
+  private coopPresentationWatchdog: CoopPresentationProgressWatchdog | undefined;
+  private ended = false;
+  private readonly coopPresentationOutcomeToken: CoopPresentationOutcomeToken | undefined;
+  private readonly coopActor: CoopPresentationActorRef | undefined;
+  /** `undefined` lets an ordinary local phase derive its ally; `null` is an authoritative explicit absence. */
+  private readonly coopCompanion: Pokemon | null | undefined;
 
-  constructor(key: PokemonAnimType, pokemon: Pokemon, fieldAssets: Phaser.GameObjects.Sprite[] = []) {
+  constructor(
+    key: PokemonAnimType,
+    pokemon: Pokemon,
+    fieldAssets: Phaser.GameObjects.Sprite[] = [],
+    coopPresentationOutcomeToken?: CoopPresentationOutcomeToken,
+    coopActor?: CoopPresentationActorRef,
+    coopCompanion?: Pokemon | null,
+  ) {
     super();
 
     this.key = key;
     this.pokemon = pokemon;
     this.fieldAssets = fieldAssets;
+    this.coopPresentationOutcomeToken = coopPresentationOutcomeToken;
+    this.coopActor = coopActor;
+    this.coopCompanion = coopCompanion;
+  }
+
+  /** Host enqueue-boundary tap: retain the exact sprite transition before mechanics can change its actor slot. */
+  public recordCoopPresentationAtEnqueue(): void {
+    if (this.coopPresentationRecorded || !isCoopRecording()) {
+      return;
+    }
+    this.coopPresentationRecorded = true;
+    const companion =
+      this.key === PokemonAnimType.COMMANDER_APPLY || this.key === PokemonAnimType.COMMANDER_REMOVE
+        ? this.pokemon.getAlly()
+        : null;
+    recordCoopEvent({
+      k: "pokemonAnim",
+      anim: this.key,
+      bi: this.pokemon.getBattlerIndex(),
+      actor: { side: this.pokemon.isPlayer() ? "player" : "enemy", pokemonId: this.pokemon.id },
+      companionBi: companion?.getBattlerIndex() ?? null,
+      companionActor:
+        companion == null ? null : { side: companion.isPlayer() ? "player" : "enemy", pokemonId: companion.id },
+    });
   }
 
   start(): void {
     super.start();
-
-    switch (this.key) {
-      case PokemonAnimType.SUBSTITUTE_ADD:
-        this.doSubstituteAddAnim();
-        break;
-      case PokemonAnimType.SUBSTITUTE_PRE_MOVE:
-        this.doSubstitutePreMoveAnim();
-        break;
-      case PokemonAnimType.SUBSTITUTE_POST_MOVE:
-        this.doSubstitutePostMoveAnim();
-        break;
-      case PokemonAnimType.SUBSTITUTE_REMOVE:
-        this.doSubstituteRemoveAnim();
-        break;
-      case PokemonAnimType.COMMANDER_APPLY:
-        this.doCommanderApplyAnim();
-        break;
-      case PokemonAnimType.COMMANDER_REMOVE:
-        this.doCommanderRemoveAnim();
-        break;
-      default:
-        this.end();
+    const actorFingerprint =
+      this.coopActor == null
+        ? `${this.pokemon.isPlayer() ? "player" : "enemy"}:p${this.pokemon.id}:sprite${this.key}`
+        : `${this.coopActor.side}:p${this.coopActor.pokemonId}:sprite${this.key}`;
+    if (this.coopPresentationOutcomeToken != null && !globalScene.moveAnimations) {
+      settleCoopPresentationOutcome(this.coopPresentationOutcomeToken, {
+        kind: "intentionally-skipped",
+        reason: "animations-disabled",
+        actorFingerprint,
+      });
+      this.end();
+      return;
     }
+    if (this.coopPresentationOutcomeToken != null) {
+      const outcomeToken = this.coopPresentationOutcomeToken;
+      this.coopPresentationWatchdog = armCoopPresentationProgressWatchdog(() => {
+        settleCoopPresentationOutcome(outcomeToken, {
+          kind: "failed",
+          reason: "pokemon-sprite-animation-watchdog-expired",
+          actorFingerprint,
+        });
+        this.end();
+      });
+    }
+    try {
+      switch (this.key) {
+        case PokemonAnimType.SUBSTITUTE_ADD:
+          this.doSubstituteAddAnim();
+          break;
+        case PokemonAnimType.SUBSTITUTE_PRE_MOVE:
+          this.doSubstitutePreMoveAnim();
+          break;
+        case PokemonAnimType.SUBSTITUTE_POST_MOVE:
+          this.doSubstitutePostMoveAnim();
+          break;
+        case PokemonAnimType.SUBSTITUTE_REMOVE:
+          this.doSubstituteRemoveAnim();
+          break;
+        case PokemonAnimType.COMMANDER_APPLY:
+          this.doCommanderApplyAnim();
+          break;
+        case PokemonAnimType.COMMANDER_REMOVE:
+          this.doCommanderRemoveAnim();
+          break;
+        default:
+          if (this.coopPresentationOutcomeToken != null) {
+            settleCoopPresentationOutcome(this.coopPresentationOutcomeToken, {
+              kind: "failed",
+              reason: "unknown-pokemon-sprite-animation",
+              actorFingerprint,
+            });
+          }
+          this.end();
+      }
+    } catch {
+      if (this.coopPresentationOutcomeToken != null) {
+        settleCoopPresentationOutcome(this.coopPresentationOutcomeToken, {
+          kind: "failed",
+          reason: "pokemon-sprite-animation-threw",
+          actorFingerprint,
+        });
+      }
+      this.end();
+    }
+  }
+
+  public override end(): void {
+    if (this.ended) {
+      return;
+    }
+    this.ended = true;
+    this.coopPresentationWatchdog?.remove();
+    if (this.coopPresentationOutcomeToken != null) {
+      settleCoopPresentationOutcome(this.coopPresentationOutcomeToken, {
+        kind: "rendered",
+        actorFingerprint:
+          this.coopActor == null
+            ? `${this.pokemon.isPlayer() ? "player" : "enemy"}:p${this.pokemon.id}:sprite${this.key}`
+            : `${this.coopActor.side}:p${this.coopActor.pokemonId}:sprite${this.key}`,
+      });
+    }
+    super.end();
   }
 
   private doSubstituteAddAnim(): void {
@@ -253,7 +360,7 @@ export class PokemonAnimPhase extends BattlePhase {
       this.end();
       return;
     }
-    const dondozo = this.pokemon.getAlly();
+    const dondozo = this.coopCompanion === undefined ? this.pokemon.getAlly() : this.coopCompanion;
 
     if (dondozo?.species?.speciesId !== SpeciesId.DONDOZO) {
       this.end();
@@ -334,7 +441,7 @@ export class PokemonAnimPhase extends BattlePhase {
   private doCommanderRemoveAnim(): void {
     // Note: unlike the other Commander animation, this is played through the
     // Dondozo instead of the Tatsugiri.
-    const tatsugiri = this.pokemon.getAlly();
+    const tatsugiri = this.coopCompanion === undefined ? this.pokemon.getAlly() : this.coopCompanion;
     if (tatsugiri == null) {
       console.warn("Aborting COMMANDER_REMOVE anim: Tatsugiri is undefined");
       this.end();

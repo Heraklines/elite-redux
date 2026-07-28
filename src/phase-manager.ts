@@ -430,6 +430,9 @@ export class PhaseManager {
       if (phase instanceof CommonAnimPhase && phase.phaseName === "CommonAnimPhase") {
         phase.recordCoopPresentationAtEnqueue();
       }
+      if (phase instanceof PokemonAnimPhase && phase.phaseName === "PokemonAnimPhase") {
+        phase.recordCoopPresentationAtEnqueue();
+      }
       this.phaseQueue.pushPhase(this.checkDynamic(phase));
     }
   }
@@ -446,6 +449,9 @@ export class PhaseManager {
   public unshiftPhase(...phases: NonEmptyTuple<Phase>): void {
     for (const phase of phases) {
       if (phase instanceof CommonAnimPhase && phase.phaseName === "CommonAnimPhase") {
+        phase.recordCoopPresentationAtEnqueue();
+      }
+      if (phase instanceof PokemonAnimPhase && phase.phaseName === "PokemonAnimPhase") {
         phase.recordCoopPresentationAtEnqueue();
       }
       const toAdd = this.checkDynamic(phase);

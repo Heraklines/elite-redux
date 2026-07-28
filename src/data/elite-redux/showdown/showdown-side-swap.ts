@@ -180,6 +180,14 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
       return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "tera":
       return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
+    case "pokemonAnim":
+      return {
+        ...event,
+        bi: swapBi(event.bi, enemyBase),
+        actor: swapActor(event.actor),
+        companionBi: event.companionBi == null ? null : swapBi(event.companionBi, enemyBase),
+        companionActor: event.companionActor == null ? null : swapActor(event.companionActor),
+      };
     case "commonAnim":
       return {
         ...event,
