@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: 5a3cd401243eb3f5f3f0d8e7b20588996741d7d9
+checked_out_sha: 5a3cd401243eb3f5f3f0d8e7b20588996741d7d9
+base_seed: 20260728
+campaign_seed: 20365457
+run: 30335798920 (workflow source 5a3cd401243eb3f5f3f0d8e7b20588996741d7d9)
+timestamp: 2026-07-28T06-50-05Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365457 WAVES=200 - replay this run with:  SOAK_SEED=20365457 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: MovePhase[39m
+[38;2;0;0;0mUser: Arceus[39m
+[38;2;0;0;0mMove: FLAMETHROWER[39m
+[38;2;0;0;0mUse Mode: NORMAL[39m
+[coop:turn] host recorder: append turn=1 seq=13 k=moveUsed total=14 live=true
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: MessagePhase[39m
+[34mArceus used Flamethrower![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: MoveEffectPhase[39m
+[coop:turn] host recorder: append turn=1 seq=14 k=moveAnim total=15 live=true
+crit stage: +0
+Move: Flamethrower | Base damage: 10751.913043478262 | Power: 90 | Source attack: 1360 | Target defense: 46
+Move: Flamethrower | Attack damage: 3225
+[coop:turn] host recorder: append turn=1 seq=15 k=hp total=16 live=true
+[coop:turn] host recorder: append turn=1 seq=16 k=faint total=17 live=true
+[coop:turn] host recorder: append turn=1 seq=17 k=message total=18 live=true
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: DamageAnimPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: MessagePhase[39m
+[34mIt’s not very effective…[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: FaintPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: MessagePhase[39m
+[34mWild Salandit fainted![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: VictoryPhase[39m
+[coop:progression] HOST applyPartyExp COMPUTE wave=53 expValue=474.6 koMon=Salandit
+
