@@ -3474,9 +3474,25 @@ export class DuoPublicUiRig {
       timeoutMs: this.config.timeoutMs,
       description: "guest receives public resume offer",
     });
+    const guestResumeConfirmCursor = guestClient.evidence.cursor();
     await guestClient.press("Space", "guest-open-resume-offer");
-    await delay(this.config.settleDelayMs);
-    await guestClient.press("Space", "guest-accept-resume-offer");
+    // Opening the remote offer schedules a public confirmation asynchronously. Under the real
+    // headful CI renderer it can take several seconds to materialize, so a fixed-delay second
+    // Space can arrive while the MESSAGE handler is still active and leave the confirmation
+    // unanswered until production's fail-closed 60s timeout. Select the actionable semantic Yes
+    // exactly as a human would after the confirmation is visible.
+    await selectOptionById(guestClient, {
+      surfaceId: "confirm:TitlePhase",
+      targetId: "yes",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: guestResumeConfirmCursor,
+    });
+    await guestClient.evidence.waitFor(/SEND resumeReply .* accept=true/u, {
+      from: guestResumeConfirmCursor,
+      timeoutMs: this.config.timeoutMs,
+      description: "guest sends the selected resume acceptance",
+    });
     await this.completePairingBinding();
     await this.waitForAllLocalCommandsDrivingBattlePrompts(resumeCursors, "resume-battle-intro");
     const boundary = await this.assertSharedCommandFrontier(resumeCursors, "resumed-command", {

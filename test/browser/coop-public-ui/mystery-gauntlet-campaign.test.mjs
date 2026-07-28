@@ -248,6 +248,19 @@ test("campaign fight policy prefers a usable damaging move and follows the visib
   });
 });
 
+test("reward navigation treats the visible reward carousel as one horizontal axis", () => {
+  const observation = {
+    surfaceId: "reward-shop",
+    selectedOptionId: "ER_OMNI_GEM",
+    optionIds: ["ER_OMNI_GEM", "POKEBALL", "BERRY"],
+  };
+  assert.equal(
+    chooseNavigationKey(observation, "BERRY", ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"], 0),
+    "ArrowLeft",
+    "three rewards must reach the wrap-around third card instead of oscillating between cards zero and one",
+  );
+});
+
 test("campaign switch policy chooses only the acting seat's meaningfully healthier reserve", () => {
   const observation = {
     surfaceId: "command:command",

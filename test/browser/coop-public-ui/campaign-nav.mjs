@@ -208,7 +208,17 @@ function navigationKeysForSurface(observation, navKeys) {
   // menu projection contains only the visible option rows, so shortest-path list arithmetic
   // would strand the public driver on that unprojected focus target. DOWN always walks and
   // wraps through every title option using the same path available to a human player.
-  return observation?.surfaceId === "title-menu" && navKeys.includes("ArrowDown") ? ["ArrowDown"] : navKeys;
+  if (observation?.surfaceId === "title-menu" && navKeys.includes("ArrowDown")) {
+    return ["ArrowDown"];
+  }
+  // Reward cards form one horizontal carousel. A generic four-axis fallback alternates
+  // RIGHT/LEFT and can therefore bounce forever between the first two cards, never reaching
+  // the third (10x benchmark run 30377355501). Keep both horizontal directions so ordered
+  // shortest-path navigation can use the wrap-around edge exactly like a player.
+  if (observation?.surfaceId === "reward-shop" && navKeys.includes("ArrowRight") && navKeys.includes("ArrowLeft")) {
+    return ["ArrowRight", "ArrowLeft"];
+  }
+  return navKeys;
 }
 
 /**

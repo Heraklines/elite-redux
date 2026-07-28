@@ -400,6 +400,22 @@ test("public co-op launch waits for an actionable save decision and chooses sema
     /pulseActionUntil/u,
     "save decisions may not regress to fixed blind input bursts",
   );
+
+  const resumeStart = publicUiHarness.indexOf("async resumeRun");
+  const resumeEnd = publicUiHarness.indexOf("async driveWaveToReward", resumeStart);
+  assert.notEqual(resumeStart, -1, "the public harness owns a resume journey");
+  assert.ok(resumeEnd > resumeStart, "the resume journey has a bounded source block");
+  const resume = publicUiHarness.slice(resumeStart, resumeEnd);
+  assert.match(
+    resume,
+    /RECV resumeOffer[\s\S]*?guestClient\.press\("Space", "guest-open-resume-offer"\)[\s\S]*?selectOptionById\(guestClient, \{[\s\S]*?surfaceId: "confirm:TitlePhase"[\s\S]*?targetId: "yes"/u,
+    "the guest must wait for the actionable confirmation and choose Yes semantically after opening a resume offer",
+  );
+  assert.doesNotMatch(
+    resume,
+    /guest-accept-resume-offer/u,
+    "a fixed-delay second Space can arrive before the resume confirmation exists and silently decline on timeout",
+  );
 });
 
 test("public-browser campaign and staging bundle qualify the same V2 cutover", () => {

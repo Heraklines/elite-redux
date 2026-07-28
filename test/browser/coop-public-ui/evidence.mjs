@@ -1801,8 +1801,8 @@ export class EvidenceSink {
     this.fullCheckpointSurfaces ??= new Set();
     // Per-profile pixel skip (replay-pacing harness trim): a DOM-only seat (pixelCheckpointCapture
     // false = the depth lane) NEVER takes the per-checkpoint PNG unless a caller FORCES it (failure
-    // path `full: true`) or COOP_UI_CHECKPOINT_MODE=full is set. Surface/mystery lanes
-    // (pixelCheckpointCapture true) keep the existing first-occurrence pixel oracle unchanged.
+    // path `full: true`) or COOP_UI_CHECKPOINT_MODE=full is set. The surface lane keeps the
+    // first-occurrence pixel oracle; Mystery explicitly forces its first paired presentation.
     const forcedFull = full === true || process.env.COOP_UI_CHECKPOINT_MODE === "full";
     const firstOccurrence = !this.fullCheckpointSurfaces.has(surfaceKey);
     const capturePixel = forcedFull || (this.pixelCheckpointCapture && firstOccurrence);

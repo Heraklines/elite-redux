@@ -107,6 +107,25 @@ test("preview assets are telemetry, while configured local workers remain API ev
   );
 });
 
+test("the public clients wire their exact configured Worker origins into evidence capture", async () => {
+  const harness = await readFile(new URL("./public-ui-harness.mjs", import.meta.url), "utf8");
+  assert.match(
+    harness,
+    /\[config\.expectedApiOrigin, config\.expectedSignalOrigin\]\.filter\(Boolean\)/u,
+    "local preview responses must not regain full per-response evidence through a missing origin configuration",
+  );
+});
+
+test("the remote campaign dispatches independent closed game-speed benchmarks", async () => {
+  const workflow = await readFile(
+    new URL("../../../.github/workflows/coop-public-ui-campaign.yml", import.meta.url),
+    "utf8",
+  );
+  assert.match(workflow, /game_speed:[\s\S]*options:[\s\S]*- "5"[\s\S]*- "7"[\s\S]*- "10"/u);
+  assert.match(workflow, /COOP_UI_GAME_SPEED: \$\{\{ inputs\.game_speed \|\| '10' \}\}/u);
+  assert.match(workflow, /group: .*inputs\.game_speed/u, "speed trials must not serialize behind one concurrency key");
+});
+
 test("default Display Settings close waits for a fresh title surface and semantically restores New Game", async () => {
   const campaign = await readFile(new URL("./campaign.mjs", import.meta.url), "utf8");
   const configureStart = campaign.indexOf("async function configureRenderProfile");

@@ -169,6 +169,7 @@ jobs:
             test/browser/coop-public-ui/campaign.mjs \
             test/browser/coop-public-ui/campaign-exp-phase.test.mjs \
             test/browser/coop-public-ui/campaign-render-profile.test.mjs \
+            test/browser/coop-public-ui/checkpoint-pixel-profile.test.mjs \
             test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs \
             test/browser/coop-public-ui/solo-classic.mjs \
             test/browser/coop-public-ui/run-campaign.mjs \
@@ -195,6 +196,7 @@ jobs:
           test/browser/coop-public-ui/campaign-lifecycle.test.mjs
           test/browser/coop-public-ui/campaign-exp-phase.test.mjs
           test/browser/coop-public-ui/campaign-render-profile.test.mjs
+          test/browser/coop-public-ui/checkpoint-pixel-profile.test.mjs
           test/browser/coop-public-ui/faint-replacement-evidence.test.mjs
           test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs
           test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
