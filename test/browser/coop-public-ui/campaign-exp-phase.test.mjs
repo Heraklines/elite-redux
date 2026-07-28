@@ -1735,3 +1735,25 @@ test("real phase and stream progress extend the outcome wait but never cross its
   );
   assert.ok(records.every(event => event.phaseObservedAt && event.hardDeadlineAt));
 });
+
+test("an exact retained wave successor receives measured headroom under the same immutable ceiling", () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const budget = createAnimationProgressBudget(rig, { authority: 0, renderer: 0 }, 100, {
+    now: () => 1_000,
+    animationAllowanceMs: 50,
+    waveProgressAllowanceMs: 300,
+    hardCeilingMs: 400,
+  });
+
+  renderer.evidence.pushPhase("Start Phase CoopWaveProgressionReplayPhase", new Date(1_050).toISOString(), 50);
+  assert.equal(budget.observe(), 1_350, "the typed progression phase outranks the generic 50ms test allowance");
+  authority.evidence.pushPhase("[coop:v2] applied WAVE_ADVANCE rev=12", new Date(1_180).toISOString(), 180);
+  assert.equal(budget.observe(), 1_400, "the exact entry is still capped by the original hard deadline");
+
+  const records = [...authority.evidence.events, ...renderer.evidence.events].filter(
+    event => event.kind === "campaign-animation-budget",
+  );
+  assert.ok(records.every(event => event.allowanceMs === 300));
+});

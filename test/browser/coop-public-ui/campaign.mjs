@@ -59,6 +59,11 @@ const INTERACTIVE_MYSTERY_NARRATION_PHASES = new Set([
   "CoopReplayMePhase",
 ]);
 const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;
+// Run 30389490030 completed the exact WAVE_ADVANCE and reconstructed the actionable reward shop
+// about 100s after the authority won the turn. That retained progression is a typed causal successor,
+// not an animation keepalive. Give it 50% measured headroom while preserving the same immutable 360s
+// per-turn circuit breaker used by every animations-skipped profile.
+const WAVE_PROGRESSION_ALLOWANCE_MS = 150_000;
 // Run 30366519918 measured one complete Lovely Bite animation at 252.3s on the GPU-less
 // two-browser SwiftShader runner: authority moveAnim seq=17 at 14:22:25.734, then the mechanically
 // resulting hp seq=18 at 14:26:38.030. Both screenshots showed the same live animation and the exact
@@ -992,6 +997,7 @@ export function createAnimationProgressBudget(
   {
     now = () => Date.now(),
     animationAllowanceMs = ANIMATION_PROGRESS_ALLOWANCE_MS,
+    waveProgressAllowanceMs = Math.max(animationAllowanceMs, WAVE_PROGRESSION_ALLOWANCE_MS),
     hardCeilingMs = OUTCOME_HARD_CEILING_MS,
   } = {},
 ) {
@@ -1008,8 +1014,10 @@ export function createAnimationProgressBudget(
     for (const event of events) {
       const text = event.text ?? "";
       const phase = OUTCOME_PROGRESS_PHASE.exec(text)?.[1] ?? null;
+      const retainedWaveProgress = phase === "CoopWaveProgressionReplayPhase" || /\bWAVE_ADVANCE\b/u.test(text);
       const progress =
         phase
+        ?? (retainedWaveProgress ? "wave-successor" : null)
         ?? (OUTCOME_PROGRESS_AUTHORITY.test(text) ? "authority-stream" : null)
         ?? (OUTCOME_PROGRESS_RENDERER.test(text) ? "renderer-stream" : null)
         ?? (OUTCOME_PROGRESS_RESOLUTION.test(text) ? "turn-resolution" : null);
@@ -1019,7 +1027,8 @@ export function createAnimationProgressBudget(
       const parsedEventAtMs = Date.parse(event.at ?? "");
       const eventAtMs = Number.isFinite(parsedEventAtMs) ? Math.max(parsedEventAtMs, startedAtMs) : now();
       const previousDeadlineMs = deadlineMs;
-      deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, eventAtMs + animationAllowanceMs));
+      const allowanceMs = retainedWaveProgress ? waveProgressAllowanceMs : animationAllowanceMs;
+      deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, eventAtMs + allowanceMs));
       client.evidence.record("campaign-animation-budget", {
         phase: progress,
         phaseEventIndex: event.index,
@@ -1031,6 +1040,7 @@ export function createAnimationProgressBudget(
         hardDeadlineAt: new Date(hardDeadlineMs).toISOString(),
         baseTimeoutMs,
         animationAllowanceMs,
+        allowanceMs,
         extensionApplied: deadlineMs > previousDeadlineMs,
         hardCeilingReached: deadlineMs === hardDeadlineMs,
       });
