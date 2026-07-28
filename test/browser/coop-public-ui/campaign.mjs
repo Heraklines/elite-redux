@@ -299,7 +299,7 @@ function observedGameSpeed(sink, from) {
  * hatch), and `[]` still skips the raise entirely. Public keyboard input only - no
  * game-state seams, no coop-runtime surface.
  */
-async function raiseGameSpeed(rig, policy, progress) {
+export async function raiseGameSpeed(rig, policy, progress) {
   const clients = Object.values(rig.clients);
   const keys = policy.keys.speed;
   if (keys.length === 0) {
@@ -376,7 +376,7 @@ async function raiseGameSpeed(rig, policy, progress) {
  * Display Settings UI. The browser observer only reports the applied value; every change
  * is still a public keyboard action and both clients leave a screenshot on the selected row.
  */
-async function configureRenderProfile(rig, policy, progress) {
+export async function configureRenderProfile(rig, policy, progress) {
   const clients = Object.values(rig.clients);
   const expected = policy.moveAnimationsExpected;
   for (const client of clients) {

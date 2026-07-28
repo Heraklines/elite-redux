@@ -78,6 +78,56 @@ test("default Display Settings close waits for a fresh title surface and semanti
   );
 });
 
+test("every gameplay co-op journey visibly applies its requested settings before pairing", async () => {
+  const [campaign, journeySource] = await Promise.all([
+    readFile(new URL("./campaign.mjs", import.meta.url), "utf8"),
+    readFile(new URL("./journeys.mjs", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(campaign, /export async function raiseGameSpeed/u);
+  assert.match(campaign, /export async function configureRenderProfile/u);
+  assert.match(journeySource, /import \{ configureRenderProfile, raiseGameSpeed \} from "\.\/campaign\.mjs";/u);
+  assert.match(journeySource, /import \{ loadCampaignPolicy \} from "\.\/campaign-policy\.mjs";/u);
+
+  const prepareStart = journeySource.indexOf("async function prepareCoopJourneySettings");
+  const prepareEnd = journeySource.indexOf("function sessionStorageKeys", prepareStart);
+  const prepare = journeySource.slice(prepareStart, prepareEnd);
+  assert.ok(prepareStart >= 0 && prepareEnd > prepareStart, "journey settings helper must exist before journey code");
+  assert.match(
+    prepare,
+    /await rig\.loginBoth\(\)[\s\S]+const policy = loadCampaignPolicy\(\)[\s\S]+if \(policy\.raiseSpeed\) \{[\s\S]+await raiseGameSpeed\(rig, policy, progress\)[\s\S]+await configureRenderProfile\(rig, policy, progress\)/u,
+  );
+
+  assert.match(journeySource, /const SETTINGS_EXEMPT_JOURNEYS = new Set\(\["probe", "showdown-battle"\]\);/u);
+  const runStart = journeySource.indexOf("export async function runJourney");
+  const run = journeySource.slice(runStart);
+  assert.match(
+    run,
+    /if \(!SETTINGS_EXEMPT_JOURNEYS\.has\(name\)\) \{[\s\S]+await prepareCoopJourneySettings\(rig\)[\s\S]+await journey\(rig\)/u,
+  );
+
+  const gameplayJourneys = [
+    "fresh-wave2",
+    "fresh-resume",
+    "reverse-resume",
+    "faint-replacement",
+    "commander-skip",
+    "game-over",
+    "resume-scan-isolation",
+    "save-mutations",
+  ];
+  for (const name of gameplayJourneys) {
+    assert.match(journeySource, new RegExp(`"${name}":?`, "u"));
+    assert.equal(settingsExemptFromSource(journeySource).has(name), false);
+  }
+});
+
+function settingsExemptFromSource(source) {
+  const match = source.match(/const SETTINGS_EXEMPT_JOURNEYS = new Set\(\[(?<names>[^\]]+)\]\);/u);
+  assert.ok(match?.groups?.names, "settings exemption declaration must remain statically inspectable");
+  return new Set([...match.groups.names.matchAll(/"(?<name>[^"]+)"/gu)].map(entry => entry.groups.name));
+}
+
 test("public keys release before waiting for the exact production input dispatch", async () => {
   const [harness, evidence, observer] = await Promise.all([
     readFile(new URL("./public-ui-harness.mjs", import.meta.url), "utf8"),

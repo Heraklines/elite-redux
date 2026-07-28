@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { configureRenderProfile, raiseGameSpeed } from "./campaign.mjs";
 import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } from "./campaign-nav.mjs";
+import { loadCampaignPolicy } from "./campaign-policy.mjs";
 import { delay } from "./evidence.mjs";
 
 const TITLE_PHASE = /Start Phase TitlePhase/u;
@@ -11,6 +13,33 @@ const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
 const SLOT_ZERO_FORK_QUARANTINE =
   /resume scan slot=0 load failed \(ignored\) CoopResumeReplicaUnavailableError: (?:equal-revision co-op fork in slot 0|cloud head ancestry conflict for run [0-9a-f-]{36})/u;
+const SETTINGS_EXEMPT_JOURNEYS = new Set(["probe", "showdown-battle"]);
+
+function journeySettingsProgress(rig) {
+  return {
+    note(message, detail = {}) {
+      for (const client of Object.values(rig.clients)) {
+        client.evidence.record("journey-settings-progress", { message, detail });
+      }
+    },
+  };
+}
+
+/**
+ * Apply the workflow's requested speed and rendering profile through the same
+ * observer-gated, public Settings UI walks used by the campaign. This runs after
+ * visible login and before co-op pairing, so every gameplay journey actually
+ * exercises the configuration that its workflow claims to qualify.
+ */
+async function prepareCoopJourneySettings(rig) {
+  await rig.loginBoth();
+  const policy = loadCampaignPolicy();
+  const progress = journeySettingsProgress(rig);
+  if (policy.raiseSpeed) {
+    await raiseGameSpeed(rig, policy, progress);
+  }
+  await configureRenderProfile(rig, policy, progress);
+}
 
 function sessionStorageKeys(dom) {
   return dom.storage.map(item => item.key).filter(key => /^sessionData(?:\d*)_/u.test(key));
@@ -314,7 +343,6 @@ function oppositeSeat(seat) {
 }
 
 async function freshThroughWave2(rig) {
-  await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun();
   await rig.driveWaveToReward();
@@ -342,7 +370,6 @@ async function reverseResume(rig) {
 }
 
 async function faintReplacement(rig) {
-  await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun({ faintFixture: true });
   await rig.driveWaveToReward({ allowFaint: true });
@@ -354,7 +381,6 @@ async function faintReplacement(rig) {
 }
 
 async function commanderSkip(rig) {
-  await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun({ commanderFixture: true });
   await rig.driveCommanderWaveToReward();
@@ -362,7 +388,6 @@ async function commanderSkip(rig) {
 }
 
 async function gameOver(rig) {
-  await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun({ gameOverFixture: true });
   await rig.driveWaveToGameOver();
@@ -376,7 +401,6 @@ async function showdownBattle(rig) {
 }
 
 async function saveMutations(rig) {
-  await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun();
   for (const client of Object.values(rig.clients)) {
@@ -483,7 +507,6 @@ async function isolatedCloudReplicaStatus(rig, client, slot) {
 }
 
 async function resumeScanIsolation(rig) {
-  await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun();
   for (const client of Object.values(rig.clients)) {
@@ -592,6 +615,9 @@ export async function runJourney(rig, name) {
   const journey = journeys[name];
   if (!journey) {
     throw new Error(`No public-UI journey named ${name}`);
+  }
+  if (!SETTINGS_EXEMPT_JOURNEYS.has(name)) {
+    await prepareCoopJourneySettings(rig);
   }
   await journey(rig);
 }
