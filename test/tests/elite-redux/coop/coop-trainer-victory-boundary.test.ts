@@ -5,10 +5,13 @@
 
 import type { Battle } from "#app/battle";
 import type { BattleScene } from "#app/battle-scene";
+import { modifierTypes } from "#data/data-lists";
 import {
   captureCoopTrainerVictoryBoundary,
+  captureCoopTrainerVictoryMaterial,
   clearCoopTrainerVictoryBoundary,
   getCoopTrainerVictoryBoundary,
+  installCoopTrainerVictoryMaterial,
 } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
 import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
@@ -41,6 +44,32 @@ function trainerBattle(wave: number, trainerType: TrainerType, reward: ModifierT
 }
 
 describe("co-op retained trainer-victory boundary", () => {
+  it("round-trips immutable trainer material without consulting the renderer battle", () => {
+    const authority = scene(BiomeId.FOREST);
+    const renderer = scene(BiomeId.TOWN);
+    const source = trainerBattle(6, TrainerType.ACE_TRAINER, modifierTypes.VOUCHER, "Ace Trilo");
+
+    const material = captureCoopTrainerVictoryMaterial(authority, source);
+    expect(material).toMatchObject({
+      sourceWave: 6,
+      trainerType: TrainerType.ACE_TRAINER,
+      modifierRewardTypeIds: ["VOUCHER"],
+      trainerName: "Ace Trilo",
+      biomeId: BiomeId.FOREST,
+    });
+    expect(Object.isFrozen(material)).toBe(true);
+    expect(Object.isFrozen(material?.modifierRewardTypeIds)).toBe(true);
+
+    const installed = installCoopTrainerVictoryMaterial(renderer, structuredClone(material!));
+    expect(installed?.sourceWave).toBe(6);
+    expect(installed?.trainerName).toBe("Ace Trilo");
+    expect(installed?.biomeId).toBe(BiomeId.FOREST);
+    expect(installed?.modifierRewardFuncs).toEqual([modifierTypes.VOUCHER]);
+    expect(getCoopTrainerVictoryBoundary(renderer, 6)).toBe(installed);
+
+    clearCoopTrainerVictoryBoundary(renderer, 6);
+  });
+
   it("keeps exact source-wave trainer rewards after the ambient battle advances", () => {
     const renderer = scene(BiomeId.SPACE);
     const reward = (() => ({ id: "exact-wave-8" })) as unknown as ModifierTypeFunc;

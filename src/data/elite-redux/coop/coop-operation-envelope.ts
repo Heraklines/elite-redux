@@ -517,6 +517,30 @@ export function makeCoopMeMarketRewardSurfaceProjection(
   return { kind: "market", surfaceId, marketKind };
 }
 
+/**
+ * JSON-safe trainer-victory material captured from the authoritative source battle.
+ *
+ * Mystery battle renderers do not execute the host's encounter callback, so their mutable `Battle`
+ * is not a source of truth for trainer identity, rewards, or presentation. A settlement that requests
+ * `TrainerVictoryPhase` therefore carries every value that phase consumes, including stable modifier
+ * registry ids instead of engine function references.
+ */
+export interface CoopTrainerVictoryMaterial {
+  readonly sourceWave: number;
+  readonly trainerType: number;
+  readonly moneyMultiplier: number;
+  readonly modifierRewardTypeIds: readonly string[];
+  readonly isBoss: boolean;
+  readonly hasCharSprite: boolean;
+  readonly victoryBgm: string | null;
+  readonly trainerSpriteKey: string;
+  readonly trainerName: string;
+  readonly trainerDialogueName: string;
+  readonly victoryMessages: readonly string[];
+  readonly biomeId: number;
+  readonly isErGhost: boolean;
+}
+
 /** Complete post-BattleEnd reward destination authored by the authority. */
 export interface CoopMeRewardDestination {
   readonly kind: "reward";
@@ -528,6 +552,8 @@ export interface CoopMeRewardDestination {
   readonly continuation: "rewards" | "encounter" | "none";
   /** Whether the deterministic trainer-victory presentation precedes the reward phase. */
   readonly trainerVictory: boolean;
+  /** Complete source identity when `trainerVictory` is true; explicitly null for every other result. */
+  readonly trainerVictoryMaterial: CoopTrainerVictoryMaterial | null;
   /** Ordered shared modifier surfaces opened before the post-encounter continuation. */
   readonly rewardSurfaces: readonly CoopMeRewardSurfaceProjection[];
   /** Whether EggLapsePhase follows this encounter's reward phase. Meaningful only for `rewards`. */

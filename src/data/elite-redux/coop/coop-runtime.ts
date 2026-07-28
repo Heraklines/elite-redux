@@ -442,6 +442,10 @@ import {
   resetCoopStormglassOperationState,
   setCoopStormglassOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-stormglass-operation";
+import {
+  captureCoopTrainerVictoryMaterial,
+  installCoopTrainerVictoryMaterial,
+} from "#data/elite-redux/coop/coop-trainer-victory-boundary";
 import type {
   CoopActiveControlSnapshotV1,
   CoopAuthoritativeBattleStateV1,
@@ -11194,6 +11198,13 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
       return false;
     },
     executeDestination: () => {
+      if (
+        payload.destination.kind === "reward"
+        && payload.destination.trainerVictory
+        && installCoopTrainerVictoryMaterial(globalScene, payload.destination.trainerVictoryMaterial) == null
+      ) {
+        return false;
+      }
       const hostTurn =
         payload.destination.kind === "battle" || payload.destination.kind === "reward"
           ? payload.destination.hostTurn
@@ -12062,6 +12073,11 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
     failCoopSharedSession("Mystery battle settlement had no retained battle handoff");
     return true;
   }
+  const trainerVictoryMaterial = plan.trainerVictory ? captureCoopTrainerVictoryMaterial(globalScene, battle) : null;
+  if (plan.trainerVictory && trainerVictoryMaterial == null) {
+    failCoopSharedSession("Mystery trainer victory had no complete authoritative trainer material");
+    return true;
+  }
   const step = (prior.terminalStep ?? -1) + 1;
   const payload = {
     terminal: "battle-settled",
@@ -12070,6 +12086,7 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
       kind: "reward",
       hostTurn: battle.turn,
       ...plan,
+      trainerVictoryMaterial,
     },
   } satisfies CoopMeTerminalPayload;
   const operationId = commitMeOwnerIntent({
@@ -12136,6 +12153,7 @@ export function commitCoopMeNoBattleRewardSettlementAfterPreparation(plan: CoopM
       kind: "reward",
       hostTurn: battle.turn,
       ...plan,
+      trainerVictoryMaterial: null,
     },
   } satisfies CoopMeTerminalPayload;
   const operationId = commitMeOwnerIntent({

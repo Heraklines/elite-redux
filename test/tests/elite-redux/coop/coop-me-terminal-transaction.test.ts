@@ -26,6 +26,7 @@ import {
   COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopMeRewardSurfaceProjection,
   type CoopMeTerminalPayload,
+  type CoopTrainerVictoryMaterial,
   makeCoopMeMarketRewardSurfaceProjection,
   makeCoopMeModifierRewardSurfaceProjection,
   makeCoopOperationId,
@@ -95,6 +96,24 @@ function battlePayload(
   };
 }
 
+function trainerVictoryMaterial(wave: number): CoopTrainerVictoryMaterial {
+  return {
+    sourceWave: wave,
+    trainerType: 1,
+    moneyMultiplier: 1,
+    modifierRewardTypeIds: ["VOUCHER"],
+    isBoss: false,
+    hasCharSprite: true,
+    victoryBgm: "victory_trainer",
+    trainerSpriteKey: "trainer",
+    trainerName: "Ace Trainer",
+    trainerDialogueName: "Trainer",
+    victoryMessages: ["A complete retained defeat message."],
+    biomeId: 1,
+    isErGhost: false,
+  };
+}
+
 function settledPayload(
   wave: number,
   options: {
@@ -115,6 +134,7 @@ function settledPayload(
       result: options.result ?? "victory",
       continuation,
       trainerVictory: options.trainerVictory ?? false,
+      trainerVictoryMaterial: options.trainerVictory ? trainerVictoryMaterial(wave) : null,
       rewardSurfaces:
         options.rewardSurfaces
         ?? (continuation === "rewards" ? [makeCoopMeModifierRewardSurfaceProjection("modifier:0")] : []),
@@ -140,6 +160,7 @@ function rewardSettledPayload(
       result: options.result ?? "victory",
       continuation: "rewards",
       trainerVictory: false,
+      trainerVictoryMaterial: null,
       rewardSurfaces: options.rewardSurfaces ?? [makeCoopMeModifierRewardSurfaceProjection("modifier:heal", -1)],
       eggLapse: options.eggLapse ?? true,
     },
@@ -359,6 +380,26 @@ describe("complete retained Mystery terminal transaction", () => {
         }),
       ),
     ).toBe(true);
+    expect(
+      isCompleteCoopMeTerminalPayload({
+        ...settledPayload(12, { trainerVictory: true }),
+        destination: {
+          ...settledPayload(12, { trainerVictory: true }).destination,
+          trainerVictoryMaterial: null,
+        },
+      }),
+      "trainer victory cannot derive identity from the renderer's mutable battle",
+    ).toBe(false);
+    expect(
+      isCompleteCoopMeTerminalPayload({
+        ...settledPayload(12, { trainerVictory: true }),
+        destination: {
+          ...settledPayload(12, { trainerVictory: true }).destination,
+          trainerVictoryMaterial: trainerVictoryMaterial(13),
+        },
+      }),
+      "trainer material must address the same authoritative source wave",
+    ).toBe(false);
     expect(isCompleteCoopMeTerminalPayload(rewardSettledPayload(12))).toBe(true);
     expect(
       isCompleteCoopMeTerminalPayload({

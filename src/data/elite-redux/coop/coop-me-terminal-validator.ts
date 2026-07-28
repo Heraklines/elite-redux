@@ -14,6 +14,7 @@ import {
   type CoopMarketProjectionKind,
   type CoopMeRewardSurfaceProjection,
   type CoopMeTerminalPayload,
+  type CoopTrainerVictoryMaterial,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
@@ -34,6 +35,10 @@ function isBoundedNonNegativeInteger(value: unknown, maximum: number): value is 
 
 const COOP_ME_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
 const COOP_ME_EGG_DESCRIPTOR_MAX_LENGTH = 256;
+const COOP_TRAINER_VICTORY_TEXT_MAX_LENGTH = 512;
+const COOP_TRAINER_VICTORY_MESSAGE_LIMIT = 32;
+const COOP_TRAINER_VICTORY_REWARD_LIMIT = 16;
+const COOP_MODIFIER_TYPE_ID_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 const REGISTERED_EGG_SPECIES = new Set<number>(Object.values(ER_ID_MAP.species));
 const VALID_EGG_SOURCE_TYPES = new Set<number>(
   Object.values(EggSourceType).filter((value): value is number => typeof value === "number"),
@@ -115,6 +120,39 @@ function isCompleteCoopMeRewardSurfacePlan(value: unknown): value is CoopMeRewar
   return true;
 }
 
+function isBoundedText(value: unknown): value is string {
+  return typeof value === "string" && value.length <= COOP_TRAINER_VICTORY_TEXT_MAX_LENGTH;
+}
+
+function isCompleteCoopTrainerVictoryMaterial(value: unknown): value is CoopTrainerVictoryMaterial {
+  if (!isPlainObject(value)) {
+    return false;
+  }
+  return (
+    isSafeNonNegativeInteger(value.sourceWave)
+    && isSafeNonNegativeInteger(value.trainerType)
+    && typeof value.moneyMultiplier === "number"
+    && Number.isFinite(value.moneyMultiplier)
+    && value.moneyMultiplier >= 0
+    && Array.isArray(value.modifierRewardTypeIds)
+    && value.modifierRewardTypeIds.length <= COOP_TRAINER_VICTORY_REWARD_LIMIT
+    && value.modifierRewardTypeIds.every(
+      id => typeof id === "string" && id.length <= 128 && COOP_MODIFIER_TYPE_ID_PATTERN.test(id),
+    )
+    && typeof value.isBoss === "boolean"
+    && typeof value.hasCharSprite === "boolean"
+    && (value.victoryBgm === null || isBoundedText(value.victoryBgm))
+    && isBoundedText(value.trainerSpriteKey)
+    && isBoundedText(value.trainerName)
+    && isBoundedText(value.trainerDialogueName)
+    && Array.isArray(value.victoryMessages)
+    && value.victoryMessages.length <= COOP_TRAINER_VICTORY_MESSAGE_LIMIT
+    && value.victoryMessages.every(isBoundedText)
+    && isSafeNonNegativeInteger(value.biomeId)
+    && typeof value.isErGhost === "boolean"
+  );
+}
+
 /** Strict complete-state image shared by ME terminals and other outcome-blob interactions such as Bargain. */
 export function isCompleteCoopMeResyncOutcome(value: unknown): value is Extract<
   CoopInteractionOutcome,
@@ -188,6 +226,9 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
         && destination.continuation !== "encounter"
         && destination.continuation !== "none")
       || typeof destination.trainerVictory !== "boolean"
+      || !(destination.trainerVictory
+        ? isCompleteCoopTrainerVictoryMaterial(destination.trainerVictoryMaterial)
+        : destination.trainerVictoryMaterial === null)
       || !isCompleteCoopMeRewardSurfacePlan(rewardSurfaces)
       || typeof destination.eggLapse !== "boolean"
     ) {
@@ -195,6 +236,8 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
     }
     const commonValid =
       (!destination.trainerVictory || destination.result === "victory")
+      && (!destination.trainerVictory
+        || destination.trainerVictoryMaterial.sourceWave === outcome.authoritativeState.wave)
       && ((rewardSurfaces.length === 0 && !destination.eggLapse) || destination.continuation === "rewards");
     return value.terminal === "reward-settled"
       ? commonValid && destination.continuation === "rewards" && destination.trainerVictory === false

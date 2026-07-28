@@ -55,12 +55,19 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
     && meControl?.terminal === "battle-settled"
     && ambientBattle?.isBattleMysteryEncounter?.()
   ) {
-    const victory = snapshotCoopTrainerVictoryBoundary(globalScene, ambientBattle);
+    const victory = getCoopTrainerVictoryBoundary(globalScene, ambientBattle.waveIndex);
     if (victory == null) {
       failCoopSharedSession("The retained Mystery settlement declared trainer victory without a trainer boundary.");
       return null;
     }
-    return { authoritativeGuest, victory, liveTrainerMatches: true };
+    const liveTrainerMatches = ambientBattle.trainer?.config.trainerType === victory.trainerType;
+    if (ambientBattle.trainer != null && !liveTrainerMatches) {
+      failCoopSharedSession(
+        `The retained Mystery trainer-victory context named trainer ${victory.trainerType}, but the live battle named trainer ${ambientBattle.trainer.config.trainerType}.`,
+      );
+      return null;
+    }
+    return { authoritativeGuest, victory, liveTrainerMatches };
   }
 
   const retainedIdentity = resolveCoopRetainedWaveContinuationIdentity(true);

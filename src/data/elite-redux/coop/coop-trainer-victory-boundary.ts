@@ -5,12 +5,15 @@
 
 import type { Battle } from "#app/battle";
 import type { BattleScene } from "#app/battle-scene";
+import type { CoopTrainerVictoryMaterial } from "#data/elite-redux/coop/coop-operation-envelope";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { BattleType } from "#enums/battle-type";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { TrainerType } from "#enums/trainer-type";
+import { getModifierTypeFuncById } from "#modifiers/modifier-type";
 import type { ModifierTypeFunc } from "#types/modifier-types";
+import { getModifierType } from "#utils/modifier-utils";
 
 /**
  * Immutable material and presentation identity for one defeated trainer.
@@ -44,6 +47,24 @@ function freezeBoundary(boundary: CoopTrainerVictoryBoundary): CoopTrainerVictor
   Object.freeze(boundary.modifierRewardFuncs);
   Object.freeze(boundary.victoryMessages);
   return Object.freeze(boundary);
+}
+
+function retainBoundary(scene: BattleScene, boundary: CoopTrainerVictoryBoundary): CoopTrainerVictoryBoundary {
+  let byWave = contextsByScene.get(scene);
+  if (byWave == null) {
+    byWave = new Map<number, CoopTrainerVictoryBoundary>();
+    contextsByScene.set(scene, byWave);
+  }
+  byWave.delete(boundary.sourceWave);
+  byWave.set(boundary.sourceWave, boundary);
+  while (byWave.size > MAX_RETAINED_TRAINER_BOUNDARIES) {
+    const oldestWave = byWave.keys().next().value;
+    if (oldestWave === undefined) {
+      break;
+    }
+    byWave.delete(oldestWave);
+  }
+  return boundary;
 }
 
 /** Snapshot a live trainer battle without retaining its mutable Battle/Trainer objects. */
@@ -89,21 +110,76 @@ export function captureCoopTrainerVictoryBoundary(
   if (boundary == null) {
     return null;
   }
-  let byWave = contextsByScene.get(scene);
-  if (byWave == null) {
-    byWave = new Map<number, CoopTrainerVictoryBoundary>();
-    contextsByScene.set(scene, byWave);
+  return retainBoundary(scene, boundary);
+}
+
+/** Capture the complete JSON-safe trainer-victory result for an authoritative terminal entry. */
+export function captureCoopTrainerVictoryMaterial(
+  scene: BattleScene,
+  battle: Battle,
+): CoopTrainerVictoryMaterial | null {
+  const boundary = snapshotCoopTrainerVictoryBoundary(scene, battle);
+  if (boundary == null) {
+    return null;
   }
-  byWave.delete(boundary.sourceWave);
-  byWave.set(boundary.sourceWave, boundary);
-  while (byWave.size > MAX_RETAINED_TRAINER_BOUNDARIES) {
-    const oldestWave = byWave.keys().next().value;
-    if (oldestWave === undefined) {
-      break;
+  try {
+    const modifierRewardTypeIds = boundary.modifierRewardFuncs.map(func => getModifierType(func).id);
+    if (
+      modifierRewardTypeIds.some(id => typeof id !== "string" || id.length === 0 || getModifierTypeFuncById(id) == null)
+    ) {
+      return null;
     }
-    byWave.delete(oldestWave);
+    return Object.freeze({
+      sourceWave: boundary.sourceWave,
+      trainerType: boundary.trainerType,
+      moneyMultiplier: boundary.moneyMultiplier,
+      modifierRewardTypeIds: Object.freeze(modifierRewardTypeIds),
+      isBoss: boundary.isBoss,
+      hasCharSprite: boundary.hasCharSprite,
+      victoryBgm: boundary.victoryBgm ?? null,
+      trainerSpriteKey: boundary.trainerSpriteKey,
+      trainerName: boundary.trainerName,
+      trainerDialogueName: boundary.trainerDialogueName,
+      victoryMessages: Object.freeze([...boundary.victoryMessages]),
+      biomeId: boundary.biomeId,
+      isErGhost: boundary.isErGhost,
+    });
+  } catch {
+    return null;
   }
-  return boundary;
+}
+
+/** Install one validated wire result into the same exact-wave ledger used by ordinary progression. */
+export function installCoopTrainerVictoryMaterial(
+  scene: BattleScene,
+  material: CoopTrainerVictoryMaterial,
+): CoopTrainerVictoryBoundary | null {
+  try {
+    const modifierRewardFuncs = material.modifierRewardTypeIds.map(id => getModifierTypeFuncById(id));
+    if (modifierRewardFuncs.some(func => func == null)) {
+      return null;
+    }
+    return retainBoundary(
+      scene,
+      freezeBoundary({
+        sourceWave: material.sourceWave,
+        trainerType: material.trainerType as TrainerType,
+        moneyMultiplier: material.moneyMultiplier,
+        modifierRewardFuncs,
+        isBoss: material.isBoss,
+        hasCharSprite: material.hasCharSprite,
+        victoryBgm: material.victoryBgm ?? undefined,
+        trainerSpriteKey: material.trainerSpriteKey,
+        trainerName: material.trainerName,
+        trainerDialogueName: material.trainerDialogueName,
+        victoryMessages: [...material.victoryMessages],
+        biomeId: material.biomeId,
+        isErGhost: material.isErGhost,
+      }),
+    );
+  } catch {
+    return null;
+  }
 }
 
 /** Exact-wave read; never falls back to the newest/ambient trainer. */
