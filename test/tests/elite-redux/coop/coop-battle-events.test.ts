@@ -52,6 +52,7 @@ import {
   recordCoopEvent,
   setCoopPresentationObserver,
 } from "#data/elite-redux/coop/coop-turn-recorder";
+import { pokemonFormChanges } from "#data/pokemon-forms";
 import { TerrainType } from "#data/terrain";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -82,6 +83,7 @@ import {
 } from "#phases/coop-replay-phases";
 import { CoopPresentationReceiptPhase, CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
+import { CoopFormChangeCutsceneReplayPhase, FormChangePhase } from "#phases/form-change-phase";
 import { MovePhase } from "#phases/move-phase";
 import { PokemonAnimPhase } from "#phases/pokemon-anim-phase";
 import { PokemonTransformPhase } from "#phases/pokemon-transform-phase";
@@ -729,16 +731,21 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     vi.spyOn(pokemon, "updateInfo").mockResolvedValue();
     const token = createCoopPresentationOutcomeToken();
     const phase = new CoopFormChangeReplayPhase(
-      pokemon.getBattlerIndex(),
-      { side: "player", pokemonId: pokemon.id },
-      pokemon.species.speciesId,
-      1,
-      true,
+      {
+        k: "formChange",
+        bi: pokemon.getBattlerIndex(),
+        actor: { side: "player", pokemonId: pokemon.id },
+        speciesId: pokemon.species.speciesId,
+        preFormIndex: pokemon.formIndex,
+        formIndex: 1,
+        presentation: "field",
+        animate: true,
+      },
       token,
     );
     vi.spyOn(phase, "end").mockImplementation(() => {});
 
-    phase.start();
+    await phase.start();
     await vi.waitFor(() => expect(coopPresentationOutcome(token)).toBeDefined());
 
     expect(pokemon.formIndex).toBe(1);
@@ -746,6 +753,109 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       kind: "intentionally-skipped",
       reason: "animations-disabled",
     });
+  });
+
+  it("records one immutable evolution-style form event after ordinary player form materializes", async () => {
+    const field = await startCoopHost();
+    endCoopRecording();
+    beginCoopRecording(11, "ordinary-form-presentation");
+    const pokemon = field[0];
+    const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
+    expect(formChange, "the Snorlax fixture needs its ordinary G-Max form edge").toBeDefined();
+    const targetFormIndex = pokemon.species.forms.findIndex(form => form.formKey === formChange!.formKey);
+    const phase = new FormChangePhase(pokemon, formChange!, false);
+
+    pokemon.formIndex = targetFormIndex;
+    (
+      phase as unknown as {
+        recordAuthoritativePresentation(): void;
+      }
+    ).recordAuthoritativePresentation();
+    (
+      phase as unknown as {
+        recordAuthoritativePresentation(): void;
+      }
+    ).recordAuthoritativePresentation();
+
+    expect(endCoopRecording().events).toEqual([
+      {
+        k: "formChange",
+        bi: pokemon.getBattlerIndex(),
+        actor: { side: "player", pokemonId: pokemon.id },
+        speciesId: pokemon.species.speciesId,
+        preFormIndex: 0,
+        formIndex: targetFormIndex,
+        presentation: "evolution",
+        animate: true,
+      },
+    ]);
+  });
+
+  it("replays an ordinary form cutscene from a detached preimage and releases only after UI closure", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[0];
+    const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
+    expect(formChange, "the Snorlax fixture needs its ordinary G-Max form edge").toBeDefined();
+    const targetFormIndex = pokemon.species.forms.findIndex(form => form.formKey === formChange!.formKey);
+    const detachedPreimage = globalScene.addPlayerPokemon(
+      pokemon.species,
+      pokemon.level,
+      pokemon.abilityIndex,
+      pokemon.formIndex,
+      pokemon.gender,
+      pokemon.shiny,
+      pokemon.variant,
+      pokemon.ivs,
+      pokemon.nature,
+      pokemon,
+    );
+    vi.spyOn(detachedPreimage, "loadAssets").mockResolvedValue();
+    const addPokemon = vi.spyOn(globalScene, "addPlayerPokemon").mockReturnValueOnce(detachedPreimage);
+    let queuedCutscene: CoopFormChangeCutsceneReplayPhase | null = null;
+    const queue = vi.spyOn(globalScene.phaseManager, "unshiftPhase").mockImplementation(phase => {
+      queuedCutscene = phase as CoopFormChangeCutsceneReplayPhase;
+    });
+    globalScene.moveAnimations = true;
+    const changeForm = vi.spyOn(pokemon, "changeForm");
+    vi.spyOn(pokemon, "loadAssets").mockResolvedValue();
+    vi.spyOn(pokemon, "playAnim").mockImplementation(() => {});
+    vi.spyOn(pokemon, "updateInfo").mockResolvedValue();
+    vi.spyOn(globalScene, "updateFieldScale").mockResolvedValue();
+    const token = createCoopPresentationOutcomeToken();
+    const replay = new CoopFormChangeReplayPhase(
+      {
+        k: "formChange",
+        bi: pokemon.getBattlerIndex(),
+        actor: { side: "player", pokemonId: pokemon.id },
+        speciesId: pokemon.species.speciesId,
+        preFormIndex: pokemon.formIndex,
+        formIndex: targetFormIndex,
+        presentation: "evolution",
+        animate: true,
+      },
+      token,
+    );
+    vi.spyOn(replay, "end").mockImplementation(() => {});
+
+    await replay.start();
+
+    expect(queue).toHaveBeenCalledOnce();
+    expect(queuedCutscene).toBeInstanceOf(CoopFormChangeCutsceneReplayPhase);
+    expect(pokemon.formIndex, "queuing cosmetic presentation cannot pre-apply mechanics").toBe(0);
+    await (
+      queuedCutscene as unknown as {
+        installCoopReplayResult(): Promise<void>;
+      }
+    ).installCoopReplayResult();
+    expect(changeForm, "the renderer cannot execute form-change mechanics").not.toHaveBeenCalled();
+    expect(pokemon.formIndex).toBe(targetFormIndex);
+    expect(coopPresentationOutcome(token), "material alone is not a presentation receipt").toBeUndefined();
+
+    const revertMode = vi.spyOn(globalScene.ui, "revertMode").mockResolvedValue(true);
+    queuedCutscene!.end();
+    await vi.waitFor(() => expect(coopPresentationOutcome(token)).toMatchObject({ kind: "rendered" }));
+    expect(revertMode, "the cutscene's real UI closes before the outcome releases control").toHaveBeenCalledOnce();
+    expect(addPokemon).toHaveBeenCalledOnce();
   });
 
   it("an authority Transform event installs copied passives and appearance without local derivation", async () => {

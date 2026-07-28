@@ -98,6 +98,28 @@ describe("ordered HP presentation contract", () => {
   });
 });
 
+describe("ordered form-change presentation contract", () => {
+  const evolution = {
+    k: "formChange",
+    bi: 0,
+    actor: { side: "player", pokemonId: 25 },
+    speciesId: 143,
+    preFormIndex: 0,
+    formIndex: 1,
+    presentation: "evolution",
+    animate: true,
+  } as const;
+
+  it("requires an immutable preimage and forbids downgrading a rich cutscene to a snap", () => {
+    expect(isStrictCoopBattleEvent(evolution)).toBe(true);
+    expect(isStrictCoopBattleEvent({ ...evolution, preFormIndex: 1 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...evolution, preFormIndex: -1 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...evolution, presentation: "evolution", animate: false })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...evolution, presentation: "unknown" })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...evolution, presentation: "field", animate: false })).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------

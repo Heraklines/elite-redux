@@ -118,6 +118,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "CoopCommonAnimReplayPhase", // exact host-authored shared VFX; no mechanics
   "CoopShinySparkleReplayPhase", // exact host-authored shiny entrance cue
   "CoopWaveProgressionReplayPhase", // retained exact EXP/level presentation before WAVE_ADVANCE DATA
+  "CoopFormChangeCutsceneReplayPhase", // full evolution-style cutscene over detached cosmetic material
   "CoopFormChangeReplayPhase", // exact host-authored form appearance; no local trigger derivation
   "CoopTransformReplayPhase", // exact host-authored Transform material and appearance
   "CoopMoveAnimReplayPhase", // move-anim replay (renders the denied MovePhase)

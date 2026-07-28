@@ -135,6 +135,7 @@ import {
 } from "#data/elite-redux/coop/coop-wave-operation";
 import type { Gender } from "#data/gender";
 import { doPokeballBounceAnim, getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
+import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -146,7 +147,7 @@ import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
-import type { Pokemon } from "#field/pokemon";
+import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import {
   armCoopPresentationProgressWatchdog,
@@ -485,32 +486,95 @@ export class CoopFormChangeReplayPhase extends Phase {
   public readonly phaseName = "CoopFormChangeReplayPhase";
 
   constructor(
-    private readonly bi: number,
-    private readonly actor: CoopPresentationActorRef,
-    private readonly speciesId: number,
-    private readonly formIndex: number,
-    private readonly animate: boolean,
+    private readonly event: Extract<CoopBattleEvent, { k: "formChange" }>,
     private readonly outcomeToken: CoopPresentationOutcomeToken = createCoopPresentationOutcomeToken(),
   ) {
     super();
   }
 
-  public override start(): void {
+  public override async start(): Promise<void> {
     super.start();
-    const actorFingerprint = `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}:sp${this.speciesId}:form${this.formIndex}`;
-    const displayed = exactDisplayedActor(this.actor);
-    const pokemon = displayed ?? exactPartyActor(this.actor);
+    const { actor, animate, bi, formIndex, preFormIndex, presentation, speciesId } = this.event;
+    const actorFingerprint = `${actor.side}:bi${bi}:p${actor.pokemonId}:sp${speciesId}:form${preFormIndex}->${formIndex}:${presentation}`;
+    const displayed = exactDisplayedActor(actor);
+    const pokemon = displayed ?? exactPartyActor(actor);
     if (
       pokemon == null
-      || pokemon.species.speciesId !== this.speciesId
-      || this.formIndex >= pokemon.species.forms.length
-      || (this.animate && displayed == null)
+      || pokemon.species.speciesId !== speciesId
+      || preFormIndex >= pokemon.species.forms.length
+      || formIndex >= pokemon.species.forms.length
+      || (presentation === "field" && animate && displayed == null)
     ) {
       settleCoopPresentationOutcome(this.outcomeToken, {
         kind: "failed",
-        reason: displayed == null && this.animate ? "form-change-actor-not-displayed" : "form-change-material-invalid",
+        reason:
+          displayed == null && presentation === "field" && animate
+            ? "form-change-actor-not-displayed"
+            : "form-change-material-invalid",
         actorFingerprint,
       });
+      this.end();
+      return;
+    }
+
+    if (presentation === "evolution" && animate && globalScene.moveAnimations) {
+      if (!pokemon.isPlayer()) {
+        settleCoopPresentationOutcome(this.outcomeToken, {
+          kind: "failed",
+          reason: "form-change-cutscene-actor-not-player",
+          actorFingerprint,
+        });
+        this.end();
+        return;
+      }
+      const formKey = pokemon.species.forms[formIndex]?.formKey;
+      const preFormKey = pokemon.species.forms[preFormIndex]?.formKey;
+      const formChange = pokemonFormChanges[speciesId]?.find(
+        candidate => candidate.formKey === formKey && candidate.preFormKey === preFormKey && !candidate.quiet,
+      );
+      if (formChange == null) {
+        settleCoopPresentationOutcome(this.outcomeToken, {
+          kind: "failed",
+          reason: "form-change-cutscene-definition-missing",
+          actorFingerprint,
+        });
+        this.end();
+        return;
+      }
+      const playerPokemon = pokemon as PlayerPokemon;
+      const presentationPokemon = globalScene.addPlayerPokemon(
+        playerPokemon.species,
+        playerPokemon.level,
+        playerPokemon.abilityIndex,
+        preFormIndex,
+        playerPokemon.gender,
+        playerPokemon.shiny,
+        playerPokemon.variant,
+        playerPokemon.ivs,
+        playerPokemon.nature,
+        playerPokemon,
+      );
+      try {
+        await presentationPokemon.loadAssets(false);
+      } catch {
+        presentationPokemon.destroy();
+        settleCoopPresentationOutcome(this.outcomeToken, {
+          kind: "failed",
+          reason: "form-change-preimage-assets-failed",
+          actorFingerprint,
+        });
+        this.end();
+        return;
+      }
+      globalScene.phaseManager.unshiftPhase(
+        globalScene.phaseManager.create("CoopFormChangeCutsceneReplayPhase", presentationPokemon, formChange, {
+          authorityPokemon: playerPokemon,
+          preFormIndex,
+          targetFormIndex: formIndex,
+          outcomeToken: this.outcomeToken,
+          actorFingerprint,
+        }),
+      );
       this.end();
       return;
     }
@@ -529,10 +593,10 @@ export class CoopFormChangeReplayPhase extends Phase {
     watchdog = armCoopPresentationProgressWatchdog(() =>
       finish({ kind: "failed", reason: "form-change-watchdog-expired", actorFingerprint }),
     );
-    if (this.animate && globalScene.moveAnimations) {
+    if (animate && globalScene.moveAnimations) {
       globalScene.playSound("battle_anims/PRSFX- Transform");
     }
-    pokemon.formIndex = this.formIndex;
+    pokemon.formIndex = formIndex;
     void refreshAuthorityAppearance(pokemon)
       .then(() =>
         finish(

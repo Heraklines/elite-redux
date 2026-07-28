@@ -1,0 +1,27 @@
+{
+  "taskId": "v2-form-presentation-20260729",
+  "version": 2,
+  "branch": "ci/coop/v2-form-presentation-20260729",
+  "trainRef": "ci/coop/v2-form-presentation-20260729",
+  "baseSha": "043280cfdabe22f6d6a2ae5df1b61e8cdd09174f",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-form-presentation-20260729.json",
+    "progress.md",
+    "src/data/elite-redux/coop/coop-battle-event-validator.ts",
+    "src/data/elite-redux/coop/coop-renderer-gate.ts",
+    "src/data/elite-redux/coop/coop-transport.ts",
+    "src/phase-manager.ts",
+    "src/phases/coop-replay-phases.ts",
+    "src/phases/coop-replay-turn-phase.ts",
+    "src/phases/form-change-phase.ts",
+    "src/phases/quiet-form-change-phase.ts",
+    "test/node/authority-v2-control.test.ts",
+    "test/scripts/coop-presentation-authority.test.mjs",
+    "test/tests/elite-redux/coop/coop-battle-events.test.ts",
+    "test/tests/elite-redux/coop/coop-session-controller.test.ts",
+    "test/tools/coop-duo-harness.ts"
+  ],
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ]
+}

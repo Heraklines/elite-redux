@@ -220,8 +220,11 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
         isActorAddressableBattlerIndex(event.bi)
         && isPresentationActorRef(event.actor)
         && isPositiveSafeAddressPart(event.speciesId)
+        && isSafeAddressPart(event.preFormIndex)
         && isSafeAddressPart(event.formIndex)
+        && event.preFormIndex !== event.formIndex
         && typeof event.animate === "boolean"
+        && (event.presentation === "field" || (event.presentation === "evolution" && event.animate))
       );
     case "transform":
       return (

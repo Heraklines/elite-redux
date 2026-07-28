@@ -5117,3 +5117,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   duplicate delivery, dropped legacy echoes, and fallback-to-per-move paths fail closed or advance at most once.
 - Legacy behavior remains unchanged. The focused Node source contract is green; co-op engine/browser validation stays
   remote-only under `AGENTS.md`, and no deployment occurred.
+
+## 2026-07-29 - Ordinary player form changes retain their full cutscene
+
+- Protocol 61 distinguishes field-local form flashes from the full evolution-style player form cutscene and
+  carries the exact pre/post form indexes. `FormChangePhase` now emits that immutable event once, immediately
+  after its real mechanical result materializes.
+- The renderer creates a detached old-form cosmetic Pokemon, routes a dedicated
+  `CoopFormChangeCutsceneReplayPhase` through the production renderer gate, and uses the ordinary cutscene's
+  exact sound/background/tint/scale/tween/cry/narration chain. Only the signed target form is installed on the
+  live actor; no form trigger, ability, stat, modifier, achievement, or dex mechanic is re-executed.
+- The presentation token settles only after `revertMode()` closes the UI. A progress watchdog fails the shared
+  boundary instead of releasing control on a stuck callback. The detached preimage makes recovery safe even
+  when the live actor already contains the target form; rendered watermarks retain duplicate suppression.
+- Local policy-safe verification: the source contract is green (22/22), changed production files have no
+  TypeScript diagnostics beyond the repository baseline, scoped formatting is clean apart from existing
+  informational debt, and `git diff --check` is green. The added co-op engine regression remains remote-only.
