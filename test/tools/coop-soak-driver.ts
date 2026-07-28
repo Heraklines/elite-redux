@@ -2227,6 +2227,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     turn: number,
     beforeHostCross?: () => void,
     restartAlreadyOpenHost = false,
+    stopAtMystery = false,
   ): Promise<void> => {
     const point = `cmd:${wave}:${turn}`;
     const transitionSourceWave = rig.hostScene.currentBattle.waveIndex;
@@ -2327,6 +2328,66 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           + `(host=${rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"} `
           + `guest=${rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"})`,
       );
+    };
+    /**
+     * A retained reward can let the authority browser finish a deterministic biome transition before the
+     * soak regains control. When the destination is a scheduled Mystery wave, the old host-only crossing
+     * then replaced the replica battle with the ME mirror before its real SelectBiomePhase consumed that
+     * earlier BIOME_PICK. The mechanical log correctly kept ME_PRESENT behind the unapplied predecessor,
+     * while the harness blamed the resulting MysteryEncounterPhase hold on the production divert.
+     *
+     * Real browsers run their phase schedulers independently. If the authority is already at Mystery and
+     * the replica still renders the source biome, cross only the replica's exact retained map phase through
+     * its normal start/receipt terminal. No phase is manufactured and no result is applied directly.
+     */
+    const settleGuestBiomePredecessorForMystery = async (): Promise<void> => {
+      if (rig.guestScene.arena.biomeId === rig.hostScene.arena.biomeId) {
+        return;
+      }
+      const sourceWave = wave - 1;
+      const guestBiome = (await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, `scheduled Mystery biome predecessor ${sourceWave}`, {
+          matches: phase => {
+            if (phase.phaseName !== "SelectBiomePhase") {
+              return false;
+            }
+            try {
+              return (phase as unknown as BiomeBoundarySeam).requireCoopSourceWave() === sourceWave;
+            } catch {
+              return false;
+            }
+          },
+        }),
+      )) as unknown as BiomeBoundarySeam;
+      await withClient(rig.guestCtx, async () => {
+        guestBiome.start();
+        await drainLoopback();
+      });
+      const guestBiomeIdentity = guestBiome as unknown as object;
+      for (let attempt = 0; attempt < 160; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        if ((rig.guestScene.phaseManager.getCurrentPhase() as unknown as object | undefined) !== guestBiomeIdentity) {
+          break;
+        }
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
+      }
+      if ((rig.guestScene.phaseManager.getCurrentPhase() as unknown as object | undefined) === guestBiomeIdentity) {
+        fail(
+          "no-park",
+          sourceWave,
+          "scheduled Mystery replica did not retire its retained World Map predecessor "
+            + `(hostBiome=${rig.hostScene.arena.biomeId} guestBiome=${rig.guestScene.arena.biomeId})`,
+        );
+      }
+      if (rig.guestScene.arena.biomeId !== rig.hostScene.arena.biomeId) {
+        fail(
+          "desync",
+          sourceWave,
+          "scheduled Mystery World Map predecessor landed in different biomes "
+            + `(host=${rig.hostScene.arena.biomeId} guest=${rig.guestScene.arena.biomeId})`,
+        );
+      }
+      actionScript.push(`wave ${sourceWave}: guest consumed retained World Map before scheduled Mystery wave ${wave}`);
     };
     const drivenGuestReplacementPhases = new WeakSet<object>();
     const drivenEncounterPromptGenerations = new WeakMap<object, number>();
@@ -2561,7 +2622,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                 | "ScanIvsPhase"
                 | "TheBargainPhase"
                 | "ErCrossroadsPhase"
-                | "SelectBiomePhase";
+                | "SelectBiomePhase"
+                | "MysteryEncounterPhase";
               return withClient(rig.hostCtx, async () => {
                 // A reward continuation can be created DURING this crossing (ModifierRewardPhase applies the
                 // item), so inspecting the queue before advancing is too early. Start the real authority
@@ -2574,6 +2636,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                   "TheBargainPhase",
                   "ErCrossroadsPhase",
                   "SelectBiomePhase",
+                  "MysteryEncounterPhase",
                 ] as const) as Promise<HostBoundary>;
                 await drainLoopback();
                 // Keep the authority browser as the OUTER scope until its structural Promise settles.
@@ -2771,6 +2834,29 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
               + `and both consumed ${committedBiomeOperationId}`,
           );
           continue;
+        }
+        if (boundary === "MysteryEncounterPhase") {
+          if (!stopAtMystery) {
+            fail(
+              "no-park",
+              transitionSourceWave,
+              `unexpected Mystery surface while crossing to command ${wave}:${turn}`,
+            );
+          }
+          if (
+            rig.hostScene.currentBattle.waveIndex !== wave
+            || rig.hostScene.currentBattle.battleType !== BattleType.MYSTERY_ENCOUNTER
+          ) {
+            fail(
+              "desync",
+              transitionSourceWave,
+              "scheduled Mystery crossing reached the wrong authority battle "
+                + `(actual=${rig.hostScene.currentBattle.waveIndex}/${BattleType[rig.hostScene.currentBattle.battleType]} `
+                + `expected=${wave}/MYSTERY_ENCOUNTER)`,
+            );
+          }
+          await settleGuestBiomePredecessorForMystery();
+          return;
         }
         if (guestCrossroadsProjected && (guestBiomeBoundary != null) !== hostBiomeProjected) {
           fail(
@@ -3706,24 +3792,21 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * Cross the host from wave W-1's shop INTO wave W's forced ME, parking at its {@linkcode MysteryEncounterPhase}
    * (ME rolled + `currentBattle.mysteryEncounter` set, intro dialogue auto-advanced) so {@linkcode processMeWave}
    * can mirror + drive it. FORCES the ME by raising the rate override for just this wave's EncounterPhase then
-   * resetting it to 0 (so ONLY the designated wave rolls an ME). MUST be called under host ctx by the caller.
+   * resetting it to 0 (so ONLY the designated wave rolls an ME). The shared structural crossing owns both
+   * browser contexts; callers must not wrap it in one long-lived client realm.
    */
-  const crossIntoMeWave = async (type: MysteryEncounterType): Promise<boolean> => {
+  const crossIntoMeWave = async (wave: number, type: MysteryEncounterType): Promise<boolean> => {
     game.override.mysteryEncounterChance(100).mysteryEncounter(type);
-    // Auto-advance the EncounterPhase intro dialogue (mirrors runToMysteryEncounter) so the crossing reaches
-    // MysteryEncounterPhase without a live prompt handler.
-    game.onNextPrompt(
-      "EncounterPhase",
-      UiMode.MESSAGE,
-      () => (game.scene.ui.getHandler() as unknown as { processInput(b: number): boolean }).processInput(Button.ACTION),
-      () => game.isCurrentPhase("MysteryEncounterPhase"),
-      true,
-    );
-    armHostFaintAutoPick();
-    await game.phaseInterceptor.to("MysteryEncounterPhase", false);
+    // Use the same two-browser structural crossing as an ordinary battle. It drives any Crossroads/World-Map
+    // predecessor on both real phase trees before stopping at the host Mystery surface; a host-only interceptor
+    // can skip the replica's retained BIOME_PICK and leave ME_PRESENT permanently gapped behind it.
+    await crossCommandBoundaryWithReplayGuest(wave, 1, armHostFaintAutoPick, false, true);
     // Reset the rate so subsequent waves are normal battles again.
     game.override.mysteryEncounterChance(0);
-    const isMe = rig.hostScene.currentBattle.battleType === BattleType.MYSTERY_ENCOUNTER;
+    const isMe =
+      rig.hostScene.currentBattle.waveIndex === wave
+      && rig.hostScene.currentBattle.battleType === BattleType.MYSTERY_ENCOUNTER
+      && rig.hostScene.currentBattle.mysteryEncounter?.encounterType === type;
     if (!isMe) {
       bumpSkip("meForceFailed");
     }
@@ -5208,22 +5291,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         if (nextMeType == null) {
           await crossCommandBoundaryWithReplayGuest(wave + 1, 1, armHostFaintAutoPick);
         } else {
-          await withClient(rig.hostCtx, async () => {
-            const battle = rig.hostScene.currentBattle;
-            const alreadyConstructed =
-              battle.waveIndex === wave + 1
-              && battle.battleType === BattleType.MYSTERY_ENCOUNTER
-              && battle.mysteryEncounter?.encounterType === nextMeType;
-            if (alreadyConstructed) {
-              // The prior terminal already consumed the primed override. Park at the same boundary
-              // crossIntoMeWave promises, then clear the rate so later unscheduled waves remain ordinary.
-              if (rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "MysteryEncounterPhase") {
-                await game.phaseInterceptor.to("MysteryEncounterPhase", false);
-              }
-              game.override.mysteryEncounterChance(0);
-            } else {
-              await crossIntoMeWave(nextMeType);
-            }
+          await crossIntoMeWave(wave + 1, nextMeType);
+          await withClient(rig.hostCtx, () => {
             // Capture the freshly-opened encounter while this exact host scene/runtime is still installed.
             // withClient restores the ambient client on exit (often the guest after a reward watcher pump),
             // so deferring this until processMeWave would read the wrong browser-local module graph.
