@@ -2362,10 +2362,24 @@ test("a host-owned V2 learn-move prompt retains the guest at the same wave until
     /monOwner === "host"[\s\S]*movesetFull[\s\S]*isCoopLearnMoveAuthorityV2Active\(this\.coopOperationBinding\)[\s\S]*markCoopLearnMoveForwardInFlight\(this\.partyMemberIndex\)[\s\S]*this\.coopAwaitingHostOwnedPresentation = true[\s\S]*return;/u,
     "the guest must claim and retain its real LearnMovePhase instead of entering NextEncounter early",
   );
+  const watcherStart = learnMovePhase.indexOf("private async coopWatchHostOwnedV2Decision(");
+  const watcherEnd = learnMovePhase.indexOf("private prepareCoopV2LearnMoveContinuation(", watcherStart);
+  assert.ok(watcherStart >= 0 && watcherEnd > watcherStart, "the host-owned watcher has a bounded source block");
+  const watcher = learnMovePhase.slice(watcherStart, watcherEnd);
+  assert.match(
+    watcher,
+    /setModeWithoutClear\(UiMode\.SUMMARY[\s\S]*beginSession\("watcher"[\s\S]*notifyCoopV2InteractionSurfaceReady\(this\.coopOwningRuntime\)/u,
+    "the retained phase installs and proves its exact public watcher surface",
+  );
+  assert.doesNotMatch(
+    watcher,
+    /awaitInteractionChoice|settleCoopV2InteractionOperation|tryRemovePhase\("SelectModifierPhase"\)|this\.end\(\)/u,
+    "raw relay results and the watcher itself cannot release the retained V2 phase",
+  );
   assert.match(
     learnMovePhase,
-    /coopWatchHostOwnedV2Decision[\s\S]*awaitInteractionChoice\(seq, COOP_LEARN_MOVE_FWD_WAIT_MS, COOP_LEARN_MOVE_CHOICE_KINDS\)[\s\S]*settleCoopV2InteractionOperation\(expectedOperationId, this\.coopOwningRuntime\)[\s\S]*tryRemovePhase\("SelectModifierPhase"\)[\s\S]*this\.end\(\)/u,
-    "only the exact immutable decision may release the retained phase and reward continuation",
+    /public settleCoopV2CommittedLearnMoveResult\([\s\S]*operationId !== expectedOperationId[\s\S]*ownerSeatId !== coopSeatOfRole\(monOwner\)[\s\S]*super\.end\(\)[\s\S]*settleCoopV2InteractionOperation\(operationId, runtime\)/u,
+    "only the exact immutable decision may close the real phase and publish terminal proof",
   );
   assert.match(
     coopRuntime,

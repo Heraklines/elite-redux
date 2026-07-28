@@ -83,7 +83,7 @@ test("exact host/guest owner material is the sole replica release and duplicate 
   const settle = section(
     runtime,
     "function settleCoopV2CommittedLearnMoveResult(",
-    "/** Route journaled learn presentations/terminals into the real projected phase consumer. */",
+    "function settleCoopV2CommittedLearnMoveBatchResult(",
   );
   assert.match(settle, /decodeCoopV2InteractionEnvelope\(sourceEntry\)/u);
   assert.match(settle, /sourceOperation\?\.kind !== "LEARN_MOVE"/u);

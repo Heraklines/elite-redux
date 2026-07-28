@@ -21,9 +21,10 @@ import i18next from "i18next";
 import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 
 export class EvolutionPhase extends Phase {
-  // FormChangePhase inherits from this, but EvolutionPhase is not abstract.
+  // FormChangePhase and its mechanics-free co-op replay inherit from this, but EvolutionPhase is not abstract.
   // We have to use the union here
-  public readonly phaseName: "EvolutionPhase" | "FormChangePhase" = "EvolutionPhase";
+  public readonly phaseName: "EvolutionPhase" | "FormChangePhase" | "CoopFormChangeCutsceneReplayPhase" =
+    "EvolutionPhase";
   protected pokemon: PlayerPokemon;
   protected lastLevel: number;
 
