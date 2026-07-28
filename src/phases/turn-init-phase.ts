@@ -6,6 +6,7 @@ import {
   isShowdownGuestFlipGated,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { hasPendingCoopFaintSwitchReplacementIntent } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   getCoopBattleStreamer,
   getCoopController,
@@ -73,7 +74,15 @@ export class TurnInitPhase extends FieldPhase {
     // TurnInit must enter the ordinary checkpoint-consuming replay even before that carrier is buffered.
     // Treating this as a missing command source creates an entry-presentation-only wait at turn N; the
     // replacement result authorizes command turn N+1 and can never release that mismatched waiter.
-    return inspectCoopV2CommandPresentationRequirement(currentWave, currentTurn).kind === "awaiting-replacement-carrier"
+    if (inspectCoopV2CommandPresentationRequirement(currentWave, currentTurn).kind === "awaiting-replacement-carrier") {
+      return currentTurn;
+    }
+    // A replacement choice is addressed to the faint's source turn, while TurnEnd can advance the live
+    // battle cursor before the result carrier arrives. Keep that exact one-turn-ahead shell on the ordinary
+    // checkpoint pump as well. Otherwise it is misclassified as a missing command source and creates an
+    // entry-presentation-only replay; REPLACEMENT_COMMIT then waits for that replay to consume its checkpoint
+    // while the replay waits for REPLACEMENT_COMMIT to become materialApplied (a closed cycle).
+    return currentTurn > 1 && hasPendingCoopFaintSwitchReplacementIntent(currentWave, currentTurn - 1)
       ? currentTurn
       : null;
   }

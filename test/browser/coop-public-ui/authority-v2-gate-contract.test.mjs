@@ -2501,6 +2501,24 @@ test("a retained V2 replacement is consumed before the next replica command can 
   assert.match(probe, /pending\.epoch !== controller\.sessionEpoch/u);
   assert.match(probe, /pending\.wave !== currentWave/u);
   assert.match(probe, /pending\.turn !== currentTurn && pending\.turn !== currentTurn \+ 1/u);
+  assert.match(
+    probe,
+    /hasPendingCoopFaintSwitchReplacementIntent\(currentWave, currentTurn - 1\)/u,
+    "a locally selected replacement remains a checkpoint replay while its source-turn carrier is in flight",
+  );
+
+  const commandRequirementStart = coopRuntime.indexOf("export function inspectCoopV2CommandPresentationRequirement(");
+  const commandRequirementEnd = coopRuntime.indexOf("\n/**", commandRequirementStart + 1);
+  assert.ok(
+    commandRequirementStart >= 0 && commandRequirementEnd > commandRequirementStart,
+    "the command-presentation requirement has a bounded source block",
+  );
+  const commandRequirement = coopRuntime.slice(commandRequirementStart, commandRequirementEnd);
+  assert.match(
+    commandRequirement,
+    /control\.turn === turn \|\| control\.turn \+ 1 === turn/u,
+    "a replacement control remains authoritative after TurnEnd advances its result shell exactly one turn",
+  );
 
   const replacementCommandStart = replayTurnPhase.indexOf("const waveWon =");
   const replacementCommandEnd = replayTurnPhase.indexOf("if (!hasLocalCommandSlot)", replacementCommandStart);

@@ -228,8 +228,8 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
   );
   assert.match(
     turnInit,
-    /pendingAuthoritativeReplacementTurn[\s\S]+inspectCoopV2CommandPresentationRequirement\(currentWave, currentTurn\)\.kind[\s\S]+=== "awaiting-replacement-carrier"[\s\S]+"CoopReplayTurnPhase"[\s\S]+replacementReplayTurn,[\s\S]+0,/u,
-    "a known replacement frontier uses the checkpoint-consuming replay even before its carrier is buffered",
+    /pendingAuthoritativeReplacementTurn[\s\S]+inspectCoopV2CommandPresentationRequirement\(currentWave, currentTurn\)\.kind[\s\S]+=== "awaiting-replacement-carrier"[\s\S]+hasPendingCoopFaintSwitchReplacementIntent\(currentWave, currentTurn - 1\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+replacementReplayTurn,[\s\S]+0,/u,
+    "a known or exactly one-turn-ahead replacement uses the checkpoint-consuming replay before its carrier is buffered",
   );
   assert.doesNotMatch(turnInit, /isShowdownGuestFlipGated\(\) && globalScene\.currentBattle\.turn === 1/u);
   const entryPump = replay.slice(
@@ -271,8 +271,8 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
   );
   assert.match(
     runtime,
-    /control\?\.kind === "REPLACEMENT"[\s\S]+control\.wave === wave[\s\S]+control\.turn === turn[\s\S]+kind: "awaiting-replacement-carrier"/u,
-    "a typed replacement frontier is never downgraded to a missing command source",
+    /control\?\.kind === "REPLACEMENT"[\s\S]+control\.wave === wave[\s\S]+control\.turn === turn \|\| control\.turn \+ 1 === turn[\s\S]+kind: "awaiting-replacement-carrier"/u,
+    "a typed replacement frontier, including its exact one-turn-ahead shell, is never downgraded to a missing command source",
   );
   assert.match(
     runtime,
