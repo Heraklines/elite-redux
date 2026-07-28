@@ -3,18 +3,9 @@
   "version": 2,
   "branch": "ci/coop/v2-form-ordering-20260728",
   "trainRef": "ci/coop/v2-form-ordering-20260728",
-  "baseSha": "92b7bc2a110b0e1f59949db344041c0ca7c32391",
+  "baseSha": "51b504e484dcfe4dbb57843f3c7be3e808449121",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-form-ordering-20260728.json",
-    "src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts",
-    "src/data/elite-redux/coop/authority-v2/shadow.ts",
-    "src/data/elite-redux/coop/coop-faint-switch-operation.ts",
-    "src/data/elite-redux/coop/coop-interaction-relay.ts",
-    "src/data/elite-redux/coop/coop-runtime.ts",
-    "src/phases/switch-phase.ts",
-    "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
-    "test/node/authority-v2-replacement.test.ts",
-    "test/tests/elite-redux/coop/coop-duo-faint-switch.test.ts",
     "test/tests/elite-redux/coop/coop-interaction-relay.test.ts"
   ],
   "lockedSchemaFiles": []
