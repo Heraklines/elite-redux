@@ -26,6 +26,7 @@ const [
   },
   { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress, coopMeInteractionStartValue },
   { setCoopPresentationObserver },
+  { setCoopPresentationHardWallMsForTest },
   { BattlerTagType },
   { BattleType },
   { Command },
@@ -43,6 +44,7 @@ const [
   import("../src/data/elite-redux/coop/coop-runtime"),
   import("../src/data/elite-redux/coop/coop-me-pin-state"),
   import("../src/data/elite-redux/coop/coop-turn-recorder"),
+  import("../src/phases/coop-presentation-watchdog"),
   import("../src/enums/battler-tag-type"),
   import("../src/enums/battle-type"),
   import("../src/enums/command"),
@@ -54,6 +56,15 @@ const [
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
 ]);
+
+// The exact browser uses the same callbacks and 5s no-progress fence as production, but hosted SwiftShader
+// advances one asset frame per ~333ms instead of a real player's ~16ms. A valid long move such as Explosion
+// therefore crosses production's 120s advancing-renderer ceiling even though both browsers are still drawing.
+// This entry is compiled only by vite.coop-browser.config.mjs and is never imported by staging/production.
+// Keep the measured 18s/event x 32-event ceiling aligned with the animations-on campaign's immutable budget;
+// this grants patience only, and still cannot manufacture either frame progress or the real Phaser callback.
+const CI_COOP_PRESENTATION_HARD_WALL_MS = 18_000 * 32;
+setCoopPresentationHardWallMsForTest(CI_COOP_PRESENTATION_HARD_WALL_MS);
 
 type BrowserContinuationSurface = "command" | "replacement" | "reward" | "starter";
 
