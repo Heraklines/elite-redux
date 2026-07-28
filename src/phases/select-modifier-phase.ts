@@ -2303,6 +2303,19 @@ export class SelectModifierPhase extends BattlePhase {
     }
     const from = this.coopInteractionStart;
     const before = controller.interactionCounter();
+    if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
+      // The immutable INTERACTION_COMMIT and its typed successor are the sole release authority under V2.
+      // Keep the persisted alternation cursor in sync as derived local material, but never broadcast it or
+      // install the legacy peer-counter gate: losing either raw carrier cannot block an already-projected
+      // successor or create a second ordering decision beside the global authority log.
+      controller.advanceInteractionFromAuthoritativeCommit(from);
+      coopLog(
+        "reward",
+        `advance interaction from V2 commit (role=${controller.role} from=${this.coopInteractionStart} `
+          + `counter ${before} -> ${controller.interactionCounter()}); typed successor owns release`,
+      );
+      return;
+    }
     controller.advanceInteraction(from);
     coopLog(
       "reward",

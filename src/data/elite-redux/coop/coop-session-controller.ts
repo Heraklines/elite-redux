@@ -1700,6 +1700,21 @@ export class CoopSessionController {
    * double-count. The broadcast is kept as a monotonic-max safety net only.
    */
   advanceInteraction(fromCounter?: number): void {
+    this.advanceInteractionCursor(fromCounter, true);
+  }
+
+  /**
+   * Authority V2 result projection advances the persisted alternation cursor locally, but the legacy
+   * interaction-counter broadcast is neither proof nor permission to cross the committed successor.
+   * Both replicas derive this idempotent update from the same immutable INTERACTION_COMMIT; progression and
+   * recovery remain owned exclusively by the V2 log/projector.
+   */
+  advanceInteractionFromAuthoritativeCommit(fromCounter: number): void {
+    this.advanceInteractionCursor(fromCounter, false);
+  }
+
+  /** Advance the local persisted cursor, optionally retaining the legacy counter reconciliation carrier. */
+  private advanceInteractionCursor(fromCounter: number | undefined, broadcast: boolean): void {
     // THE ACTIVE DESYNC PATH (#633): the guest counter ran one AHEAD of the host so
     // both drove their own reward screen. Log every call EXHAUSTIVELY - arg, before,
     // whether the inner advance actually fired vs no-opped (idempotency), after, role,
@@ -1711,9 +1726,12 @@ export class CoopSessionController {
       const choice = this.interactionTurn.toJSON();
       coopLog(
         "interaction",
-        `advanceInteraction ADVANCED+BROADCAST (fromCounter=${fromCounter === undefined ? "none" : fromCounter}) counter ${before} -> ${after} role=${this.role}; send interaction screen=${COOP_INTERACTION_TURN_SCREEN} choice=${choice}`,
+        `advanceInteraction ${broadcast ? "ADVANCED+BROADCAST" : "ADVANCED+V2-LOCAL"} (fromCounter=${fromCounter === undefined ? "none" : fromCounter}) counter ${before} -> ${after} role=${this.role}`
+          + (broadcast ? `; send interaction screen=${COOP_INTERACTION_TURN_SCREEN} choice=${choice}` : ""),
       );
-      this.broadcastInteractionCounter("advance");
+      if (broadcast) {
+        this.broadcastInteractionCounter("advance");
+      }
     } else {
       coopLog(
         "interaction",
