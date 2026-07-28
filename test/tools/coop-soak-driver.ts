@@ -2537,9 +2537,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let guestBiomeBoundary: BiomeBoundarySeam | null = null;
       const hostArrangement = rig.hostScene.currentBattle.arrangement;
       const guestArrangement = rig.guestScene.currentBattle.arrangement;
+      // The host owns battle identity. A replica reconstructed from an authoritative state image can
+      // legitimately reach this boundary before its cosmetic `isClassicFinalBoss` flag has been copied,
+      // even though both engines already expose the exact 1v1 stage-one geometry. Production's host-side
+      // CommandPhase makes the same decision from the host battle and publishes ARRIVE-ONLY; requiring the
+      // guest's non-authoritative flag made the soak demand a guest CommandPhase that cannot exist.
       const finalBossStageOne =
         rig.hostScene.currentBattle.isClassicFinalBoss
-        && rig.guestScene.currentBattle.isClassicFinalBoss
         && hostArrangement.playerCapacity === 1
         && hostArrangement.enemyCapacity === 1
         && guestArrangement.playerCapacity === 1

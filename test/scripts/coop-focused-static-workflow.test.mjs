@@ -218,6 +218,18 @@ test("a directly assigned co-op integration test does not manufacture cross-lane
 
 test("representative soak never manufactures a command rendezvous and scopes the spectator to final-boss stage one", () => {
   assert.doesNotMatch(soakDriver, /rendezvous\.reannounce\(point\)/u);
-  assert.match(soakDriver, /currentBattle\.isClassicFinalBoss[\s\S]*playerCapacity === 1[\s\S]*enemyCapacity === 1/u);
+  const spectatorDecision = soakDriver.slice(
+    soakDriver.indexOf("const finalBossStageOne ="),
+    soakDriver.indexOf("await withClient(rig.hostCtx, () => beforeHostCross?.());"),
+  );
+  assert.match(
+    spectatorDecision,
+    /rig\.hostScene\.currentBattle\.isClassicFinalBoss[\s\S]*hostArrangement\.playerCapacity === 1[\s\S]*hostArrangement\.enemyCapacity === 1[\s\S]*guestArrangement\.playerCapacity === 1[\s\S]*guestArrangement\.enemyCapacity === 1/u,
+  );
+  assert.doesNotMatch(
+    spectatorDecision,
+    /rig\.guestScene\.currentBattle\.isClassicFinalBoss/u,
+    "battle identity comes from the authority; replica geometry proves that no guest command slot exists",
+  );
   assert.match(soakDriver, /guestCommand!\.start\(\)[\s\S]*phaseInterceptor\.to\("CommandPhase"\)/u);
 });
