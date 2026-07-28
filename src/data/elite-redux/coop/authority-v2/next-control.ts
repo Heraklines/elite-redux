@@ -252,6 +252,20 @@ export interface CoopV2SharedInteractionPresentationInputProof extends CoopV2Loc
 }
 
 /**
+ * Action-only phases that a trainer-battle victory must drain before BattleEnd can author WAVE_ADVANCE.
+ *
+ * This list is deliberately closed. These phases expose only the MESSAGE handler's ACTION continuation;
+ * phases with a real choice surface must receive their own authoritative control instead of borrowing this
+ * presentation lease.
+ */
+const WAVE_SETTLEMENT_PRESENTATION_PHASES: ReadonlySet<string> = new Set([
+  "MessagePhase",
+  "TrainerVictoryPhase",
+  "MoneyRewardPhase",
+  "ModifierRewardPhase",
+]);
+
+/**
  * Whether an installed shared control grants its owner the exact action-only presentation needed to open
  * that control's registered picker. The bridge is a closed mapping: adding another pre-picker narrative
  * requires naming its operation and concrete phase here, with an engine-free failure-first contract.
@@ -290,15 +304,15 @@ export function sharedInteractionAllowsLocalPresentationInput(
  * add presentation phases, while their choice handlers still use non-MESSAGE UI modes and never satisfy
  * `messageHandlerActionable`.
  *
- * A settled turn can also have one action-only presentation prefix before the authority can author
- * WAVE_ADVANCE. BattleEnd's scattered-money pickup is the concrete production case: the immutable
- * TURN_COMMIT explicitly permits WAVE_ADVANCE, BattleEnd advances the ambient turn, then queues a
- * MessagePhase ahead of the victory seal that creates that entry. Freezing the prompt makes the allowed
- * successor unreachable. Current turn commits normalize the wait itself to that settlement address (N+1),
- * while replacement-origin waits can still name the resolving address (N). Mirror mechanical successor
- * admission by accepting the exact wait turn or its one permitted settlement successor, never anything
- * later. The lease remains limited to an actionable MessagePhase in the same wave and a wait that explicitly
- * names WAVE_ADVANCE; it grants no choice handler and cannot admit any mechanical entry by itself.
+ * A settled turn can also have an action-only presentation chain before the authority can author
+ * WAVE_ADVANCE. That includes BattleEnd's scattered-money MessagePhase and a trainer victory's
+ * TrainerVictoryPhase -> MoneyRewardPhase -> ModifierRewardPhase chain. Freezing any of those prompts makes
+ * the allowed successor unreachable. Current turn commits normalize the wait itself to that settlement
+ * address (N+1), while replacement-origin waits can still name the resolving address (N). Mirror mechanical
+ * successor admission by accepting the exact wait turn or its one permitted settlement successor, never
+ * anything later. The lease remains limited to the closed action-only settlement phase set in the same wave
+ * and a wait that explicitly names WAVE_ADVANCE; it grants no choice handler and cannot admit any mechanical
+ * entry by itself.
  *
  * A Mystery terminal whose immutable destination is a battle similarly names one exact same-address
  * command-open, but the host must drain the battle's complete presentation prefix before that control can be
@@ -328,7 +342,7 @@ export function successorWaitAllowsLocalPresentationInput(
     wait.allowedKinds.includes("WAVE_ADVANCE")
     && proof.wave === wait.wave
     && (proof.turn === wait.turn || proof.turn === wait.turn + 1)
-    && proof.phaseName === "MessagePhase";
+    && WAVE_SETTLEMENT_PRESENTATION_PHASES.has(proof.phaseName);
   if (exactWaveSettlementPresentation) {
     return true;
   }

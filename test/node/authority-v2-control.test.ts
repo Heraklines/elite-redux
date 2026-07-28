@@ -213,7 +213,7 @@ describe("ordered-wait local presentation lease", () => {
     ).toBe(false);
   });
 
-  it("admits only the exact normalized or next-turn BattleEnd message needed to reach an allowed wave successor", () => {
+  it("admits only the exact normalized or next-turn settlement messages needed to reach an allowed wave successor", () => {
     const turnWait = successorWait({
       afterOperationId: "turn-commit-w3-t7",
       wave: 3,
@@ -231,6 +231,12 @@ describe("ordered-wait local presentation lease", () => {
     };
 
     expect(successorWaitAllowsLocalPresentationInput(turnWait, exactBattleEndMessage)).toBe(true);
+    for (const phaseName of ["TrainerVictoryPhase", "MoneyRewardPhase", "ModifierRewardPhase"]) {
+      expect(
+        successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, phaseName }),
+        `${phaseName} must remain actionable so trainer settlement can reach WAVE_ADVANCE`,
+      ).toBe(true);
+    }
     expect(
       successorWaitAllowsLocalPresentationInput({ ...turnWait, turn: 7 }, exactBattleEndMessage),
       "a replacement-origin wait may still name the resolving turn and settle exactly once at N+1",
@@ -242,10 +248,23 @@ describe("ordered-wait local presentation lease", () => {
       ),
     ).toBe(false);
     expect(
+      successorWaitAllowsLocalPresentationInput(
+        { ...turnWait, allowedKinds: ["CONTROL_COMMIT", "TERMINAL_COMMIT"] },
+        { ...exactBattleEndMessage, phaseName: "TrainerVictoryPhase" },
+      ),
+    ).toBe(false);
+    expect(
       successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, phaseName: "PartyUiPhase" }),
     ).toBe(false);
     expect(successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, turn: 10 })).toBe(false);
     expect(successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, wave: 4 })).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(turnWait, {
+        ...exactBattleEndMessage,
+        phaseName: "TrainerVictoryPhase",
+        turn: 10,
+      }),
+    ).toBe(false);
     expect(
       successorWaitAllowsLocalPresentationInput(turnWait, {
         ...exactBattleEndMessage,

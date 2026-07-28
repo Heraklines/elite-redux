@@ -2119,7 +2119,7 @@ test("an ME battle handoff leases its whole exact-address action-only pre-comman
   );
 });
 
-test("a turn wait leases only its exact BattleEnd message on the path to an allowed wave successor", () => {
+test("a turn wait leases only its exact action-only settlement chain on the path to an allowed wave successor", () => {
   const start = nextControl.indexOf("export function successorWaitAllowsLocalPresentationInput(");
   const end = nextControl.indexOf("\ninterface MechanicalAddress", start);
   assert.notEqual(start, -1, "the ordered-wait presentation lease exists");
@@ -2127,8 +2127,16 @@ test("a turn wait leases only its exact BattleEnd message on the path to an allo
   const lease = nextControl.slice(start, end);
   assert.match(
     lease,
-    /wait\.allowedKinds\.includes\("WAVE_ADVANCE"\)[\s\S]*proof\.wave === wait\.wave[\s\S]*proof\.turn === wait\.turn \+ 1[\s\S]*proof\.phaseName === "MessagePhase"/u,
-    "the settlement lease is pinned to the exact next-turn action-only MessagePhase and an explicit wave edge",
+    /wait\.allowedKinds\.includes\("WAVE_ADVANCE"\)[\s\S]*proof\.wave === wait\.wave[\s\S]*proof\.turn === wait\.turn \+ 1[\s\S]*WAVE_SETTLEMENT_PRESENTATION_PHASES\.has\(proof\.phaseName\)/u,
+    "the settlement lease is pinned to the exact turn, a closed action-only phase set, and an explicit wave edge",
+  );
+  for (const phaseName of ["MessagePhase", "TrainerVictoryPhase", "MoneyRewardPhase", "ModifierRewardPhase"]) {
+    assert.match(nextControl, new RegExp(`"${phaseName}"`, "u"), `${phaseName} belongs to the closed settlement set`);
+  }
+  assert.doesNotMatch(
+    nextControl.slice(nextControl.indexOf("const WAVE_SETTLEMENT_PRESENTATION_PHASES"), start),
+    /PartyUiPhase|SelectModifierPhase|SelectBiomePhase/u,
+    "choice surfaces cannot borrow the settlement presentation lease",
   );
 });
 
