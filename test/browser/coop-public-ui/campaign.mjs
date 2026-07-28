@@ -34,6 +34,7 @@ const OUTCOME_PROGRESS_RESOLUTION = /\[coop:replay\] guest (?:RECV turnResolutio
 const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
 const BATTLE_END_PHASE = /Start Phase BattleEndPhase/u;
 const FAINT_PHASE = /Start Phase FaintPhase/u;
+const NEXT_TURN_BATTLE_PROMPT_PHASES = new Set(["MessagePhase", "TrainerVictoryPhase"]);
 const POST_MYSTERY_PHASE = /Start Phase PostMysteryEncounterPhase/u;
 const BARGAIN_OWNER_TERMINAL = /bargain OWNER terminal: outcome blob sent/u;
 const BARGAIN_WATCHER_TERMINAL = /bargain WATCHER: outcome blob received -> converging/u;
@@ -688,10 +689,11 @@ function currentSharedCommandAddress(clients, purpose) {
  * visible prompt therefore carries turn N+1 even though it is the terminal narration for submitted
  * turn N (run 29676344808: "You picked up ₽30!"). Requiring the old address strands a real actionable
  * human prompt. FaintPhase likewise runs after TurnEnd advances the public address, so its later
- * faint narration is stamped N+1 (public journey 30186100483). The exception remains fail-closed:
- * same epoch and wave, exactly the next turn, a MessagePhase prompt, and this browser must have
- * observed BattleEndPhase or FaintPhase between the scan floor and the prompt. Arbitrary future-turn
- * battle messages still cannot authorize input.
+ * faint narration is stamped N+1 (public journey 30186100483). Trainer battles likewise render their
+ * post-BattleEnd human prompt in TrainerVictoryPhase (mystery run 30366178580). The exception remains
+ * fail-closed: same epoch and wave, exactly the next turn, a closed terminal-prompt phase, and this
+ * browser must have observed BattleEndPhase or FaintPhase between the scan floor and the prompt.
+ * Arbitrary future-turn battle messages still cannot authorize input.
  */
 function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
   const observation = event.observation;
@@ -715,7 +717,7 @@ function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
     || expectedParts.length !== 3
     || expectedParts.some(part => !Number.isSafeInteger(part))
     || observation.surfaceId !== "battle:message"
-    || observation.phase !== "MessagePhase"
+    || !NEXT_TURN_BATTLE_PROMPT_PHASES.has(observation.phase)
     || address.epoch !== expectedParts[0]
     || address.wave !== expectedParts[1]
     || address.turn !== expectedParts[2] + 1

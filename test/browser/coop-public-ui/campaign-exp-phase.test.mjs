@@ -888,6 +888,38 @@ test("successor-address faint narration advances only after the browser observes
   assert.equal(await advance(), false, "one faint prompt generation receives exactly one action");
 });
 
+test("successor-address trainer victory advances only after the browser observes BattleEndPhase", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+  authority.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
+  renderer.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
+  const advance = createBattlePromptAdvancer(rig, from, {}, "post-turn-trainer-victory", {
+    expectedCommandAddress: "7:5:5",
+  });
+
+  authority.evidence.pushBattleReadiness("battle:message", "TrainerVictoryPhase", true, 30, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), false, "an unexplained future-turn trainer message must stay fail-closed");
+
+  authority.evidence.pushConsole("Start Phase BattleEndPhase");
+  authority.evidence.pushBattleReadiness("battle:message", "TrainerVictoryPhase", true, 31, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), true, "the exact trainer-victory prompt is a real human-action surface");
+  assert.deepEqual(
+    authority.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.equal(await advance(), false, "one trainer-victory prompt generation receives exactly one action");
+});
+
 test("battle prompt consumption survives helper recreation and stale ready surfaces never spend input", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
