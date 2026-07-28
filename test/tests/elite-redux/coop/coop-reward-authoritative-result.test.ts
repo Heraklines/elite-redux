@@ -231,6 +231,40 @@ describe("P33 retained reward/shop authoritative results", () => {
     );
     expect(initial?.operationId).toBe("1:1:REWARD:100000");
     expect(reopened?.operationId).toBe("1:1:REWARD:100001");
+
+    const initialAdopt = adoptRewardWatcherChoice({
+      ...params,
+      presentationGeneration: 0,
+      localRole: "host",
+      action: { choice: params.choice, data: params.data, operationId: initial!.operationId },
+    });
+    expect(initialAdopt).toMatchObject({ adopt: true, operationId: initial!.operationId });
+    expect(
+      commitRewardAuthoritativeResult(
+        initial!.operationId,
+        state(38, 1_000, "terminal-before-nested-cancel", 2, 3),
+        undefined,
+        { nextInteraction: { kind: "learn-move", wave: 2, turn: 3 } },
+      ),
+    ).not.toBeNull();
+    expect(
+      adoptRewardWatcherChoice({
+        ...params,
+        presentationGeneration: 0,
+        localRole: "host",
+        action: { choice: params.choice, data: params.data, operationId: initial!.operationId },
+      }),
+      "a transport replay from the consumed presentation remains late",
+    ).toEqual({ adopt: false, reason: "stale-or-late" });
+    expect(
+      adoptRewardWatcherChoice({
+        ...params,
+        presentationGeneration: 1,
+        localRole: "host",
+        action: { choice: params.choice, data: params.data, operationId: reopened!.operationId },
+      }),
+      "the copied reward presentation is a new executable human action on the watcher too",
+    ).toMatchObject({ adopt: true, operationId: reopened!.operationId });
     manager.dispose();
     pair.host.close();
   });

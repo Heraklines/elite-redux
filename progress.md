@@ -4831,3 +4831,34 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   118/118 architecture/presentation contracts, zero changed-file TypeScript diagnostics, scoped formatting, and
   `git diff --check`; real
   engine, soak, and two-browser qualification remain GitHub-hosted. No deployment occurred.
+
+## 2026-07-28 - Final-boss presentation, form ordering, actionable soak sampling, and campaign frontiers
+
+- God-b/god-c reached wave 200 with the exact final-boss entrance presentation already committed, but
+  `NewBattlePhase` retired the direct renderer buffer before the late `CoopReplayTurnPhase` consumer installed. The
+  replay phase now reads the exact retained `COMMAND_FRONTIER` presentation prefix from the Authority V2 ledger,
+  validates its address/control, and renders it normally; it does not skip entrance abilities, messages, or stat
+  changes.
+- God-a wave 115 exposed a delayed enemy `QuietFormChangePhase` recreated by `leaveField()` after the turn's causal
+  recorder closed. Co-op recording now suppresses only that inert enemy revert and makes material summon/switch form
+  changes causal while the recorder is open. Player material changes remain recorded; solo, Showdown, tournament, and
+  lockstep retain their previous phase ordering.
+- The one-process soak driver used `UiMode.COMMAND` as a proxy for human actionability and could sample a wave after
+  only one owned command proof. It now requires the live exact handler, its V2 actionability/phase-ready proof, carrier
+  application through the authoritative tick, and a guest-owned command proof. Natural peer delivery is pumped before
+  recovery, and recovery cannot erase a persistent unexpected wave-start mismatch.
+- Browser-campaign Mystery narration and dirty one-sided command edges are now treated as bounded provisional work
+  only with exact current semantic evidence. Historical proof may be reused only at the same address/digest with the
+  explicit repeat fence. Stale semantic-only reward targets no longer mask newer real surfaces.
+- Depth wave 2 proved a real nested-reward retry seam. Declining a TM learn correctly reopened the copied reward pool
+  at the same interaction pin, but terminal idempotency was scoped only by pin/stream, so the new human action reused
+  an already-committed operation. Terminal identity and watcher late fences now include the ordered presentation
+  generation: same-generation transport retries remain idempotent and stale, while a strictly newer copied
+  presentation receives the next deterministic operation ordinal and remains executable on both owner and authority
+  watcher. The failure-first engine regression proves both halves.
+- The animations-on surface campaign still covers entry, move, damage, faint, replacement, and both reward-owner
+  directions, but now targets two waves and receives an explicit 65-minute job budget. Its prior three-wave red was a
+  lifecycle kill during continuous healthy animation progress, not a gameplay stall.
+- Policy-safe local evidence: 60/60 focused browser/source contracts and syntax checks green, formatting and
+  `git diff --check` clean. Co-op Vitest, Chromium, deterministic soak, and full sharded qualification remain remote by
+  repository policy. No staging or production deployment occurred.

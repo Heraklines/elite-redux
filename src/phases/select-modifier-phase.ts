@@ -2076,6 +2076,7 @@ export class SelectModifierPhase extends BattlePhase {
         surface: "reward",
         rewardSurface: this.coopRewardSurface,
         pinned: this.coopInteractionStart,
+        presentationGeneration: this.coopRewardPresentationGeneration,
         action: {
           choice: action.choice,
           data: action.data,
@@ -2639,6 +2640,7 @@ export class SelectModifierPhase extends BattlePhase {
         surface: "reward",
         rewardSurface: this.coopRewardSurface,
         pinned: this.coopInteractionStart,
+        presentationGeneration: this.coopRewardPresentationGeneration,
         action: {
           choice: action.choice,
           data: action.data,

@@ -153,11 +153,14 @@ export function setCoopRewardAuthorityStateHooksForTest(hooks: CoopRewardAuthori
 interface RewardWatcherState {
   ordinal: number;
   ordinalStart: number;
+  /** Highest terminal interaction pin consumed in this semantic reward/market stream. */
   lastLeftStart: number;
+  /** Highest reward-presentation generation terminally consumed at `lastLeftStart`. */
+  lastLeftPresentationGeneration: number;
 }
 
 function freshWatcherState(): RewardWatcherState {
-  return { ordinal: 0, ordinalStart: -1, lastLeftStart: -1 };
+  return { ordinal: 0, ordinalStart: -1, lastLeftStart: -1, lastLeftPresentationGeneration: -1 };
 }
 
 /** Cross-stream ordering plus independent same-pin terminal fences for every ordered reward surface. */
@@ -316,6 +319,7 @@ interface PreparedRewardIntent {
   readonly surface: CoopShopSurface;
   readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
   readonly pinned: number;
+  readonly presentationGeneration: number;
   readonly terminal: boolean;
   readonly wave: number;
   readonly turn: number;
@@ -695,12 +699,24 @@ function retainPreparedIntent(s: RewardOpState, prepared: PreparedRewardIntent):
       existing.surface === prepared.surface
       && rewardSurfaceKey(existing.rewardSurface) === rewardSurfaceKey(prepared.rewardSurface)
       && existing.pinned === prepared.pinned
+      && existing.presentationGeneration === prepared.presentationGeneration
       && existing.terminal === prepared.terminal
       && samePayload(existing.intent.payload, prepared.intent.payload)
     );
   }
   s.preparedIntents.set(key, prepared);
   return true;
+}
+
+/** Record one terminal without treating a later, explicitly-addressed reward reopen as stale. */
+function markWatcherTerminal(watcher: RewardWatcherState, pinned: number, presentationGeneration: number): void {
+  if (
+    pinned > watcher.lastLeftStart
+    || (pinned === watcher.lastLeftStart && presentationGeneration > watcher.lastLeftPresentationGeneration)
+  ) {
+    watcher.lastLeftStart = pinned;
+    watcher.lastLeftPresentationGeneration = presentationGeneration;
+  }
 }
 
 /** Next owner action ordinal in the exact operation-class + reward-surface stream at `pinned`. */
@@ -801,7 +817,12 @@ export function commitRewardOwnerIntent(
     const s = state(binding);
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const presentationGeneration = params.presentationGeneration ?? 0;
-    if (!Number.isSafeInteger(presentationGeneration) || presentationGeneration < 0) {
+    if (
+      !Number.isSafeInteger(presentationGeneration)
+      || presentationGeneration < 0
+      || presentationGeneration >= COOP_REWARD_PRESENTATION_GENERATION_LIMIT
+      || (params.surface === "market" && presentationGeneration !== 0)
+    ) {
       return null;
     }
     const terminalKey = `${rewardStreamKey(params.surface, params.pinned, params.rewardSurface)}:presentation:${presentationGeneration}`;
@@ -837,6 +858,7 @@ export function commitRewardOwnerIntent(
       surface: params.surface,
       rewardSurface: params.rewardSurface,
       pinned: params.pinned,
+      presentationGeneration,
       terminal: params.terminal,
       wave: params.wave,
       turn: params.turn ?? 0,
@@ -1280,7 +1302,7 @@ function advancePreparedWatcher(prepared: PreparedRewardIntent): void {
   prepared.watcherState.ordinal += 1;
   prepared.watcherRoleState.lastAdoptedStart = Math.max(prepared.watcherRoleState.lastAdoptedStart, prepared.pinned);
   if (prepared.terminal) {
-    prepared.watcherState.lastLeftStart = Math.max(prepared.watcherState.lastLeftStart, prepared.pinned);
+    markWatcherTerminal(prepared.watcherState, prepared.pinned, prepared.presentationGeneration);
   }
 }
 
@@ -1293,6 +1315,8 @@ export interface CoopRewardWatcherAdoptParams {
   /** Ordered retained Mystery reward surface; absent for normal-wave rewards and markets. */
   readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
   readonly pinned: number;
+  /** Exact reward-pool generation currently presenting this action; markets remain generation zero. */
+  readonly presentationGeneration?: number;
   /** The awaited relay action (null = owner timed out / disconnected). */
   readonly action: CoopRewardRelayAction | null;
   /** True iff this action LEAVES the interaction for good (skip / leave / market terminal). */
@@ -1332,6 +1356,15 @@ export function adoptRewardWatcherChoice(
   }
   try {
     const s = state(binding);
+    const presentationGeneration = params.presentationGeneration ?? 0;
+    if (
+      !Number.isSafeInteger(presentationGeneration)
+      || presentationGeneration < 0
+      || presentationGeneration >= COOP_REWARD_PRESENTATION_GENERATION_LIMIT
+      || (params.surface === "market" && presentationGeneration !== 0)
+    ) {
+      return { adopt: false, reason: "invalid-presentation-generation" };
+    }
     const { roleState, streamState: ws } = watcherState(
       s,
       params.localRole,
@@ -1342,13 +1375,18 @@ export function adoptRewardWatcherChoice(
     // Stale / late rejection (invariant 6, the #861 shape). The pinned interaction counter is monotonic, so:
     //  - a pick STRICTLY BELOW the highest interaction we have adopted at is a leftover from an interaction a
     //    later one already superseded (the cross-interaction stale buffer);
-    //  - a pick AT OR BELOW the highest interaction we have LEFT is a late choice for an interaction we
-    //    already terminated (the late-after-leave shape).
-    // Within a live interaction (pin > both) every action passes, so a legitimate stream of buys is adopted.
-    if (params.pinned < roleState.lastAdoptedStart || params.pinned <= ws.lastLeftStart) {
+    //  - a pick below the highest interaction we have LEFT, or in an already-consumed generation at that
+    //    same pin, is late. A nested-picker cancel returns to a strictly newer presentation generation and
+    //    is therefore a new human action, not a replay of the consumed terminal.
+    const presentationAlreadyLeft =
+      params.pinned < ws.lastLeftStart
+      || (params.pinned === ws.lastLeftStart && presentationGeneration <= ws.lastLeftPresentationGeneration);
+    if (params.pinned < roleState.lastAdoptedStart || presentationAlreadyLeft) {
       coopWarn(
         "reward",
-        `${params.surface} op WATCHER REJECT stale/late pin=${params.pinned} adoptedStart=${roleState.lastAdoptedStart} leftStart=${ws.lastLeftStart} stream=${rewardSurfaceKey(params.rewardSurface)} role=${params.localRole} (Wave-2d)`,
+        `${params.surface} op WATCHER REJECT stale/late pin=${params.pinned} generation=${presentationGeneration} `
+          + `adoptedStart=${roleState.lastAdoptedStart} left=${ws.lastLeftStart}:${ws.lastLeftPresentationGeneration} `
+          + `stream=${rewardSurfaceKey(params.rewardSurface)} role=${params.localRole} (Wave-2d)`,
       );
       return { adopt: false, reason: "stale-or-late" };
     }
@@ -1396,6 +1434,7 @@ export function adoptRewardWatcherChoice(
           surface: params.surface,
           rewardSurface: params.rewardSurface,
           pinned: params.pinned,
+          presentationGeneration,
           terminal: params.terminal,
           wave: params.wave,
           turn: params.turn ?? 0,
@@ -1443,7 +1482,7 @@ export function adoptRewardWatcherChoice(
         ws.ordinal += 1;
         roleState.lastAdoptedStart = Math.max(roleState.lastAdoptedStart, params.pinned);
         if (params.terminal) {
-          ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
+          markWatcherTerminal(ws, params.pinned, presentationGeneration);
         }
         return { adopt: true, operationId: opId };
       }
@@ -1465,7 +1504,7 @@ export function adoptRewardWatcherChoice(
       ws.ordinal += 1;
       roleState.lastAdoptedStart = Math.max(roleState.lastAdoptedStart, params.pinned);
       if (params.terminal) {
-        ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
+        markWatcherTerminal(ws, params.pinned, presentationGeneration);
       }
       coopLog(
         "reward",
@@ -1507,7 +1546,7 @@ export function adoptRewardWatcherChoice(
     ws.ordinal += 1;
     roleState.lastAdoptedStart = Math.max(roleState.lastAdoptedStart, params.pinned);
     if (params.terminal) {
-      ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
+      markWatcherTerminal(ws, params.pinned, presentationGeneration);
     }
     coopLog(
       "reward",
