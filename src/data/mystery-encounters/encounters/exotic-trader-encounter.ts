@@ -24,6 +24,7 @@ import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import {
   leaveEncounterWithoutBattle,
+  setEncounterMarketReward,
   transitionMysteryEncounterIntroVisuals,
   updatePlayerMoney,
 } from "#mystery-encounters/encounter-phase-utils";
@@ -68,25 +69,9 @@ export const ExoticTraderEncounter: MysteryEncounter = MysteryEncounterBuilder.w
         selected: [{ text: `${namespace}:option.1.selected` }],
       })
       .withOptionPhase(async () => {
-        // Pay the boarding fee, then open the real premium SHOP screen
-        // (ExoticShopPhase: every good Ultra->Master tier, steep prices, no heals).
-        // Launched via the doEncounterRewards hook so it runs as a real phase
-        // BEFORE the post-encounter continuation - a full browse-and-buy market,
-        // not a reward screen.
-        //
-        // Co-op (#832, audit P1#5): this assignment is HOST-ONLY (the authoritative guest
-        // diverts the whole ME into CoopReplayMePhase and never runs this option callback),
-        // and that is intentional - the guest opening its OWN market must key off the host
-        // ACTUALLY opening the shop, not this unconditional-per-option assignment (option 2
-        // must NOT open a shop). The host's ExoticShopPhase (a BiomeShopPhase) streams its
-        // stock under reroll 777; the guest, parked in CoopReplayMePhase, opens a matching
-        // BiomeShopPhase watcher via the #821 handoff routed through openGuestMeEmbeddedShop
-        // (coop-biome-shop.ts). So the guest sees the shop via the STREAM, not doEncounterRewards.
+        // Pay the fee, then retain the exact premium-market continuation before it opens.
         updatePlayerMoney(-boardingFee(), true, false);
-        globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
-          globalScene.phaseManager.unshiftNew("ExoticShopPhase");
-          return true;
-        };
+        setEncounterMarketReward("exotic");
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
         return true;

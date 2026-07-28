@@ -13,7 +13,6 @@
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
-import { globalScene } from "#app/global-scene";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -21,6 +20,7 @@ import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import {
   leaveEncounterWithoutBattle,
+  setEncounterMarketReward,
   transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
@@ -53,20 +53,8 @@ export const ImportBazaarEncounter: MysteryEncounter = MysteryEncounterBuilder.w
         selected: [{ text: `${namespace}:option.1.selected` }],
       })
       .withOptionPhase(async () => {
-        // Open the real bazaar SHOP screen (ImportBazaarShopPhase: imported held
-        // items + supplies at fair prices). Launched via the doEncounterRewards
-        // hook so it runs as a real phase BEFORE the post-encounter continuation -
-        // a full browse-and-buy market, not a free reward screen.
-        //
-        // Co-op (#832, audit P1#5): HOST-ONLY (the authoritative guest diverts into
-        // CoopReplayMePhase and never runs this callback), intentionally - the guest opens
-        // its OWN BiomeShopPhase watcher off the host's streamed stock (reroll 777) via the
-        // #821 handoff routed through openGuestMeEmbeddedShop (coop-biome-shop.ts), keying off
-        // the host ACTUALLY opening the shop. See exotic-trader-encounter.ts for the full note.
-        globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
-          globalScene.phaseManager.unshiftNew("ImportBazaarShopPhase");
-          return true;
-        };
+        // The exact market subtype is retained before either co-op renderer opens it.
+        setEncounterMarketReward("import-bazaar");
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
         return true;

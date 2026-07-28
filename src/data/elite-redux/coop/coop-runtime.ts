@@ -334,6 +334,7 @@ import type {
 import {
   COOP_ME_BATTLE_SETTLED_CHOICE,
   COOP_ME_REWARD_SETTLED_CHOICE,
+  coopMarketProjectionPhaseName,
   parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 // biome-ignore lint/suspicious/noImportCycles: Epoch application is owned by the runtime composition root.
@@ -6954,13 +6955,7 @@ function materializeCoopV2RewardOptionsProjection(
 function coopV2MarketProjectionPhaseName(
   plan: Extract<CoopV2InteractionProjectionPlan, { kind: "market" }>,
 ): "BiomeShopPhase" | "ExoticShopPhase" | "BlackMarketShopPhase" | "ImportBazaarShopPhase" {
-  return plan.projection.marketKind === "biome"
-    ? "BiomeShopPhase"
-    : plan.projection.marketKind === "exotic"
-      ? "ExoticShopPhase"
-      : plan.projection.marketKind === "black-market"
-        ? "BlackMarketShopPhase"
-        : "ImportBazaarShopPhase";
+  return coopMarketProjectionPhaseName(plan.projection.marketKind);
 }
 
 function materializeCoopV2InteractionProjection(

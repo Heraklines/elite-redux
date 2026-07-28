@@ -25,7 +25,10 @@ import {
 import { captureCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import {
   COOP_ME_REWARD_SURFACE_LIMIT,
+  type CoopMarketProjectionKind,
   type CoopMeRewardSurfaceProjection,
+  coopMarketProjectionPhaseName,
+  makeCoopMeMarketRewardSurfaceProjection,
   makeCoopMeModifierRewardSurfaceProjection,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
@@ -1448,6 +1451,26 @@ export function setEncounterRewards(
   encounter.rewardPlan = rewardPlan;
   // Existing encounter callsites still observe the established callback. MysteryEncounterRewardsPhase owns
   // preparation and freezes the P36 ordered projection before invoking this surface seam.
+  encounter.doEncounterRewards = rewardPlan.openRewardSurfaces;
+}
+
+/**
+ * Install one typed embedded-market continuation. This is the only supported Mystery seam for these
+ * markets: the retained P36 settlement must name the exact phase before either renderer opens it.
+ */
+export function setEncounterMarketReward(marketKind: CoopMarketProjectionKind): void {
+  const encounter = globalScene.currentBattle.mysteryEncounter!;
+  const projection = makeCoopMeMarketRewardSurfaceProjection(`market:me:${encounter.encounterType}:0`, marketKind);
+  const rewardPlan: MysteryEncounterRewardPlan = {
+    surfaces: [],
+    rewardSurfaceProjections: [projection],
+    prepareAutomaticEffects: () => {},
+    openRewardSurfaces: () => {
+      globalScene.phaseManager.unshiftNew(coopMarketProjectionPhaseName(marketKind));
+      return true;
+    },
+  };
+  encounter.rewardPlan = rewardPlan;
   encounter.doEncounterRewards = rewardPlan.openRewardSurfaces;
 }
 

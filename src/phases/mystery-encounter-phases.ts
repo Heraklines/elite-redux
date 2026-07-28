@@ -34,9 +34,10 @@ import {
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { captureCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
-import type {
-  CoopMeRewardSurfaceProjection,
-  CoopMeTerminalPayload,
+import {
+  type CoopMeRewardSurfaceProjection,
+  type CoopMeTerminalPayload,
+  coopMarketProjectionPhaseName,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   captureCoopRewardResultState,
@@ -1377,6 +1378,8 @@ export class MysteryEncounterRewardsPhase extends Phase {
               { kind: "ambient" },
               { surfaceId: surface.surfaceId, ordinal },
             );
+          } else if (surface.kind === "market") {
+            globalScene.phaseManager.unshiftNew(coopMarketProjectionPhaseName(surface.marketKind));
           } else {
             const eggOptions = {
               id: surface.id,

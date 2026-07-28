@@ -17,13 +17,13 @@
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
-import { globalScene } from "#app/global-scene";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import {
   leaveEncounterWithoutBattle,
+  setEncounterMarketReward,
   transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
@@ -57,20 +57,8 @@ export const BlackMarketEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
         selected: [{ text: `${namespace}:option.1.selected` }],
       })
       .withOptionPhase(async () => {
-        // Open the real bargain SHOP screen (BlackMarketShopPhase: cheap, mixed-
-        // tier used goods). Launched via the doEncounterRewards hook so it runs
-        // as a real phase before the post-encounter continuation. Not a reward screen.
-        //
-        // Co-op (#832, audit P1#5): HOST-ONLY (the authoritative guest diverts into
-        // CoopReplayMePhase and never runs this callback), intentionally - the guest opens
-        // its OWN BlackMarketShopPhase-flavored BiomeShopPhase watcher off the host's streamed
-        // stock (reroll 777) via the #821 handoff routed through openGuestMeEmbeddedShop
-        // (coop-biome-shop.ts), so it keys off the host ACTUALLY opening the shop (option 1),
-        // never this per-option assignment. See exotic-trader-encounter.ts for the full note.
-        globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
-          globalScene.phaseManager.unshiftNew("BlackMarketShopPhase");
-          return true;
-        };
+        // Retain the exact bargain-market continuation before either co-op renderer opens it.
+        setEncounterMarketReward("black-market");
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
         return true;

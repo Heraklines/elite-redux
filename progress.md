@@ -4907,3 +4907,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   TypeScript, scoped formatting, and `git diff --check`. The exact god-c seed and full remote qualification remain the
   required proof; wave 140's later recursion/no-park red stays independently owned unless the clean rerun removes it.
   Showdown and tournament remain untouched; no deployment occurred.
+
+## 2026-07-28 - Embedded Mystery markets become typed retained V2 destinations
+
+- Exact Mystery gauntlet `30327840863` failed at wave 2 on Import Bazaar with `A no-battle Mystery reward callback
+  had no typed reward-surface plan.` This was a production fail-closed result, not harness noise: Import Bazaar, Exotic
+  Trader, and Black Market were the only encounters still assigning raw `doEncounterRewards` callbacks after a pick.
+  The host could open those shops, but the retained P36 settlement could neither name nor reconstruct them.
+- The closed reward projection now has a validated `market` arm carrying the exact curated subtype. One shared mapping
+  resolves that subtype to its concrete phase for ordinary V2 projection, recovery, proof, host opening, and guest
+  reconstruction. All three encounters use the typed adapter; raw callbacks remain rejected rather than silently
+  falling back to locally inferred UI. Modifier and egg reward behavior is unchanged.
+- The wire contract advances to `er-coop-53`, so an older client cannot pair and misdecode the new mechanical arm.
+  Focused source coverage requires all three encounter callsites, rejects unknown market kinds, and proves the exact
+  guest phase is derived from retained authority. Local policy-safe evidence is clean full TypeScript, the updated
+  presentation contract green, scoped formatting, and `git diff --check`. Real Mystery and two-browser proof remain
+  remote-only; Showdown and tournament are untouched, and no deployment occurred.

@@ -53,7 +53,6 @@ describe("Mystery battle reward preparation boundary", () => {
     const replay = source("src/phases/coop-replay-me-phase.ts");
     const utilities = source("src/data/mystery-encounters/utils/encounter-phase-utils.ts");
     const runtime = source("src/data/elite-redux/coop/coop-runtime.ts");
-
     expect(runtime).toContain("export function commitCoopMeNoBattleRewardSettlementAfterPreparation");
     expect(runtime).toContain('terminal: "reward-settled"');
     expect(runtime).toMatch(/battle\.mysteryEncounter\?\.encounterMode\s*!==\s*MysteryEncounterMode\.NO_BATTLE/u);
@@ -78,6 +77,11 @@ describe("Mystery battle reward preparation boundary", () => {
     const rewardsPhase = source("src/phases/mystery-encounter-phases.ts");
     const replay = source("src/phases/coop-replay-me-phase.ts");
     const runtime = source("src/data/elite-redux/coop/coop-runtime.ts");
+    const embeddedMarkets = [
+      ["import-bazaar-encounter.ts", "import-bazaar"],
+      ["exotic-trader-encounter.ts", "exotic"],
+      ["black-market-encounter.ts", "black-market"],
+    ] as const;
 
     expect(encounter).toContain("export interface MysteryEncounterRewardPlan");
     expect(encounter).toContain(
@@ -103,6 +107,14 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(graves).toContain("registerModifierSurface(settings);");
     expect(graves).not.toMatch(/unshiftNew\([\s\S]*?"SelectModifierPhase"/u);
     expect(utilities).toContain('makeCoopMeModifierRewardSurfaceProjection("modifier:heal", -1)');
+    expect(utilities).toContain("export function setEncounterMarketReward");
+    for (const [fileName, marketKind] of embeddedMarkets) {
+      const embeddedMarket = source(`src/data/mystery-encounters/encounters/${fileName}`);
+      expect(embeddedMarket).toContain(`setEncounterMarketReward("${marketKind}")`);
+      expect(embeddedMarket).not.toMatch(/\.doEncounterRewards\s*=/u);
+    }
+    expect(rewardsPhase).toContain('surface.kind === "market"');
+    expect(rewardsPhase).toContain("coopMarketProjectionPhaseName(surface.marketKind)");
     expect(replay).toContain('"MysteryEncounterRewardsPhase", false, destination.rewardSurfaces');
     expect(replay).not.toContain("destination.rewardShop");
     expect(replay).not.toContain("destination.addHeal");

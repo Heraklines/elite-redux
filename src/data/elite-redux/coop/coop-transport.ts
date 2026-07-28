@@ -143,7 +143,7 @@ export type CoopRole = "host" | "guest";
 // er-coop-51 separates move narration from the actual animation boundary. Successful spread moves carry
 // every rendered target/substitute flag, failed moves carry no false animation, and charging turns carry
 // the exact charge animation instead of being rendered as the completed attack.
-export const COOP_PROTOCOL_VERSION = "er-coop-52";
+export const COOP_PROTOCOL_VERSION = "er-coop-53";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that

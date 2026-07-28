@@ -38,9 +38,10 @@ import {
   coopBiomeShopSeq,
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
-import type {
-  CoopMarketProjectionKind,
-  CoopRewardPresentationPayload,
+import {
+  type CoopMarketProjectionKind,
+  type CoopRewardPresentationPayload,
+  coopMarketProjectionPhaseName,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   adoptRewardWatcherChoice,
@@ -151,16 +152,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     | "ExoticShopPhase"
     | "BlackMarketShopPhase"
     | "ImportBazaarShopPhase" {
-    const phaseNameByMarket = {
-      biome: "BiomeShopPhase",
-      exotic: "ExoticShopPhase",
-      "black-market": "BlackMarketShopPhase",
-      "import-bazaar": "ImportBazaarShopPhase",
-    } as const satisfies Record<
-      CoopMarketProjectionKind,
-      "BiomeShopPhase" | "ExoticShopPhase" | "BlackMarketShopPhase" | "ImportBazaarShopPhase"
-    >;
-    return phaseNameByMarket[this.coopMarketProjectionKind()];
+    return coopMarketProjectionPhaseName(this.coopMarketProjectionKind());
   }
 
   /** Complete phase-local market generation needed by ordinary projection and correlated recovery. */

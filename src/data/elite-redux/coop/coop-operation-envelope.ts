@@ -248,6 +248,23 @@ export interface CoopRewardActionPayload {
 /** Exact concrete market phase. Curated Mystery markets cannot be reconstructed as a generic biome shop. */
 export type CoopMarketProjectionKind = "biome" | "exotic" | "black-market" | "import-bazaar";
 
+/** Exact runtime phase named by one market projection. Kept beside the closed kind union to prevent drift. */
+export type CoopMarketProjectionPhaseName =
+  | "BiomeShopPhase"
+  | "ExoticShopPhase"
+  | "BlackMarketShopPhase"
+  | "ImportBazaarShopPhase";
+
+export function coopMarketProjectionPhaseName(marketKind: CoopMarketProjectionKind): CoopMarketProjectionPhaseName {
+  const phaseNameByKind = {
+    biome: "BiomeShopPhase",
+    exotic: "ExoticShopPhase",
+    "black-market": "BlackMarketShopPhase",
+    "import-bazaar": "ImportBazaarShopPhase",
+  } as const satisfies Record<CoopMarketProjectionKind, CoopMarketProjectionPhaseName>;
+  return phaseNameByKind[marketKind];
+}
+
 /**
  * Authority-owned option presentation. Option pools affect valid indices, costs, RNG consumption, and the
  * resulting mutation, so they are immutable mechanical material rather than a lossy cosmetic relay.
@@ -451,6 +468,13 @@ export interface CoopMeModifierRewardSurfaceProjection {
   readonly rerollMultiplier: number;
 }
 
+/** Exact retained Mystery market. The subtype is mechanical because each phase owns different stock rules. */
+export interface CoopMeMarketRewardSurfaceProjection {
+  readonly kind: "market";
+  readonly surfaceId: string;
+  readonly marketKind: CoopMarketProjectionKind;
+}
+
 /** Exact authority-materialized account egg grant carried beside ordered reward UI surfaces. */
 export interface CoopMeEggRewardSurfaceProjection {
   readonly kind: "egg";
@@ -469,7 +493,10 @@ export interface CoopMeEggRewardSurfaceProjection {
 }
 
 /** Closed projection union. New shared reward/account kinds require a protocol bump and validator arm. */
-export type CoopMeRewardSurfaceProjection = CoopMeModifierRewardSurfaceProjection | CoopMeEggRewardSurfaceProjection;
+export type CoopMeRewardSurfaceProjection =
+  | CoopMeModifierRewardSurfaceProjection
+  | CoopMeMarketRewardSurfaceProjection
+  | CoopMeEggRewardSurfaceProjection;
 
 /**
  * Construct a modifier projection while normalizing the UI's implicit default into explicit wire data.
@@ -480,6 +507,14 @@ export function makeCoopMeModifierRewardSurfaceProjection(
   rerollMultiplier = 1,
 ): CoopMeModifierRewardSurfaceProjection {
   return { kind: "modifier", surfaceId, rerollMultiplier };
+}
+
+/** Construct one exact embedded-market destination for a retained Mystery settlement. */
+export function makeCoopMeMarketRewardSurfaceProjection(
+  surfaceId: string,
+  marketKind: CoopMarketProjectionKind,
+): CoopMeMarketRewardSurfaceProjection {
+  return { kind: "market", surfaceId, marketKind };
 }
 
 /** Complete post-BattleEnd reward destination authored by the authority. */

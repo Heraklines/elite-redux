@@ -26,6 +26,7 @@ import {
   COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopMeRewardSurfaceProjection,
   type CoopMeTerminalPayload,
+  makeCoopMeMarketRewardSurfaceProjection,
   makeCoopMeModifierRewardSurfaceProjection,
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -422,6 +423,18 @@ describe("complete retained Mystery terminal transaction", () => {
     expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", Number.POSITIVE_INFINITY)])).toBe(false);
     expect(validates([eggReward()])).toBe(true);
     expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0"), eggReward()])).toBe(true);
+    expect(validates([makeCoopMeMarketRewardSurfaceProjection("market:me:49:0", "import-bazaar")])).toBe(true);
+    expect(
+      validates([
+        makeCoopMeMarketRewardSurfaceProjection("market:me:49:0", "import-bazaar"),
+        makeCoopMeModifierRewardSurfaceProjection("modifier:1"),
+      ]),
+    ).toBe(true);
+    expect(
+      validates([
+        { kind: "market", surfaceId: "market:me:49:0", marketKind: "generic" } as CoopMeRewardSurfaceProjection,
+      ]),
+    ).toBe(false);
     expect(validates([eggReward({ id: -1 })])).toBe(false);
     expect(validates([eggReward({ tier: 4 })])).toBe(false);
     expect(validates([eggReward({ species: 0 })])).toBe(false);

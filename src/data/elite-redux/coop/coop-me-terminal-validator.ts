@@ -11,6 +11,7 @@ import {
   COOP_ME_REROLL_MULTIPLIER_MAX,
   COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
   COOP_ME_REWARD_SURFACE_LIMIT,
+  type CoopMarketProjectionKind,
   type CoopMeRewardSurfaceProjection,
   type CoopMeTerminalPayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -40,6 +41,12 @@ const VALID_EGG_SOURCE_TYPES = new Set<number>(
 const VALID_VARIANT_TIERS = new Set<number>(
   Object.values(VariantTier).filter((value): value is number => typeof value === "number"),
 );
+const VALID_MARKET_PROJECTION_KINDS = new Set<CoopMarketProjectionKind>([
+  "biome",
+  "exotic",
+  "black-market",
+  "import-bazaar",
+]);
 
 function isCanonicalCoopMeRewardSurfaceId(value: unknown): value is string {
   return (
@@ -57,6 +64,40 @@ function isExecutableCoopMeRerollMultiplier(value: unknown): value is number {
   );
 }
 
+function isCompleteCoopMeEggRewardSurface(surface: Record<string, unknown>): boolean {
+  return (
+    isSafeNonNegativeInteger(surface.id)
+    && isSafeNonNegativeInteger(surface.timestamp)
+    && (surface.sourceType === null
+      || (isSafeNonNegativeInteger(surface.sourceType) && VALID_EGG_SOURCE_TYPES.has(surface.sourceType)))
+    && isBoundedNonNegativeInteger(surface.tier, 3)
+    && isBoundedNonNegativeInteger(surface.hatchWaves, 1_000_000)
+    && isSafeNonNegativeInteger(surface.species)
+    && REGISTERED_EGG_SPECIES.has(surface.species)
+    && typeof surface.isShiny === "boolean"
+    && isSafeNonNegativeInteger(surface.variantTier)
+    && VALID_VARIANT_TIERS.has(surface.variantTier)
+    && isBoundedNonNegativeInteger(surface.eggMoveIndex, 3)
+    && typeof surface.overrideHiddenAbility === "boolean"
+    && (surface.eggDescriptor === null
+      || (typeof surface.eggDescriptor === "string"
+        && surface.eggDescriptor.length <= COOP_ME_EGG_DESCRIPTOR_MAX_LENGTH))
+  );
+}
+
+function isCompleteCoopMeRewardSurface(surface: Record<string, unknown>): boolean {
+  if (surface.kind === "modifier") {
+    return isExecutableCoopMeRerollMultiplier(surface.rerollMultiplier);
+  }
+  if (surface.kind === "market") {
+    return (
+      typeof surface.marketKind === "string"
+      && VALID_MARKET_PROJECTION_KINDS.has(surface.marketKind as CoopMarketProjectionKind)
+    );
+  }
+  return surface.kind === "egg" && isCompleteCoopMeEggRewardSurface(surface);
+}
+
 function isCompleteCoopMeRewardSurfacePlan(value: unknown): value is CoopMeRewardSurfaceProjection[] {
   if (!Array.isArray(value) || value.length > COOP_ME_REWARD_SURFACE_LIMIT) {
     return false;
@@ -66,27 +107,7 @@ function isCompleteCoopMeRewardSurfacePlan(value: unknown): value is CoopMeRewar
     if (!isPlainObject(surface) || !isCanonicalCoopMeRewardSurfaceId(surface.surfaceId)) {
       return false;
     }
-    const validSurface =
-      surface.kind === "modifier"
-        ? isExecutableCoopMeRerollMultiplier(surface.rerollMultiplier)
-        : surface.kind === "egg"
-          && isSafeNonNegativeInteger(surface.id)
-          && isSafeNonNegativeInteger(surface.timestamp)
-          && (surface.sourceType === null
-            || (isSafeNonNegativeInteger(surface.sourceType) && VALID_EGG_SOURCE_TYPES.has(surface.sourceType)))
-          && isBoundedNonNegativeInteger(surface.tier, 3)
-          && isBoundedNonNegativeInteger(surface.hatchWaves, 1_000_000)
-          && isSafeNonNegativeInteger(surface.species)
-          && REGISTERED_EGG_SPECIES.has(surface.species)
-          && typeof surface.isShiny === "boolean"
-          && isSafeNonNegativeInteger(surface.variantTier)
-          && VALID_VARIANT_TIERS.has(surface.variantTier)
-          && isBoundedNonNegativeInteger(surface.eggMoveIndex, 3)
-          && typeof surface.overrideHiddenAbility === "boolean"
-          && (surface.eggDescriptor === null
-            || (typeof surface.eggDescriptor === "string"
-              && surface.eggDescriptor.length <= COOP_ME_EGG_DESCRIPTOR_MAX_LENGTH));
-    if (!validSurface || surfaceIds.has(surface.surfaceId)) {
+    if (!isCompleteCoopMeRewardSurface(surface) || surfaceIds.has(surface.surfaceId)) {
       return false;
     }
     surfaceIds.add(surface.surfaceId);

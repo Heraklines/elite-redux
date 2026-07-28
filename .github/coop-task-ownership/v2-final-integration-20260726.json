@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "f505383c4ff57b4192b4afd6514962bd1688f2a3",
+  "baseSha": "e28e6b3013d2cdb393aa88cd170b0e31da5cc4d3",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -39,6 +39,7 @@
     "src/data/elite-redux/coop/coop-lobby.ts",
     "src/data/elite-redux/coop/coop-me-operation.ts",
     "src/data/elite-redux/coop/coop-me-presentation.ts",
+    "src/data/elite-redux/coop/coop-me-terminal-validator.ts",
     "src/data/elite-redux/coop/coop-nested-interaction.ts",
     "src/data/elite-redux/coop/coop-operation-envelope.ts",
     "src/data/elite-redux/coop/coop-operation-surface-registry.ts",
@@ -64,6 +65,9 @@
     "src/data/elite-redux/showdown/tournament-client.ts",
     "src/data/elite-redux/showdown/tournament-notifications.ts",
     "src/data/moves/move.ts",
+    "src/data/mystery-encounters/encounters/black-market-encounter.ts",
+    "src/data/mystery-encounters/encounters/exotic-trader-encounter.ts",
+    "src/data/mystery-encounters/encounters/import-bazaar-encounter.ts",
     "src/data/mystery-encounters/utils/encounter-phase-utils.ts",
     "src/dev-tools/registry.ts",
     "src/dev-tools/test-suite/scenarios.ts",
@@ -168,6 +172,7 @@
     "test/tests/elite-redux/coop/coop-guest-faint-no-local-victory.test.ts",
     "test/tests/elite-redux/coop/coop-me-host-dialogue-freeze.test.ts",
     "test/tests/elite-redux/coop/coop-me-replay-forwarding.test.ts",
+    "test/tests/elite-redux/coop/coop-me-reward-preparation-boundary.test.ts",
     "test/tests/elite-redux/coop/coop-me-subprompt-proposal-wait.test.ts",
     "test/tests/elite-redux/coop/coop-me-terminal-transaction.test.ts",
     "test/tests/elite-redux/coop/coop-operation-durability-remediation.test.ts",
@@ -210,5 +215,8 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-operation-envelope.ts",
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ]
 }
