@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: 07b823176f6ceba80a2f8446f10d68eda9113899
+checked_out_sha: 07b823176f6ceba80a2f8446f10d68eda9113899
+base_seed: 20260728
+campaign_seed: 20260728
+run: 30339318987 (workflow source 07b823176f6ceba80a2f8446f10d68eda9113899)
+timestamp: 2026-07-28T07-44-51Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260728 WAVES=200 - replay this run with:  SOAK_SEED=20260728 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[22m[39m[coop:checkpoint] guest apply field=4 weather=3 terrain=0 arenaTags=0
+[coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[coop:adopt] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[coop:adopt] biomeOverstayAnchor host=null -> restored (#837/#504)
+[coop:adopt] erBiomeStructure host length=18 startWave=36 -> restored (#841 item 5)
+[coop:adopt] erRelicBattleState host wave=37 -> restored (#837)
+[coop:adopt] erMapState host nodes=3 travelTarget=- fragments=0 -> restored (#865/#841 item 1)
+[coop:adopt] erPendingNodes host count=5 revealed=3 -> restored (#865)
+[coop:resync] guest apply authoritativeState tick=744 wave=37 turn=1 party=6/2 field=4
+[coop:resync] presentation settle boundary=resync-stable side=player desired=visible ids=[1637540612,559297352] changed=0 phase=CoopFinalizeTurnPhase
+[coop:resync] presentation settle boundary=wave-start-pre-intro side=enemy desired=visible ids=[] changed=0 phase=CoopFinalizeTurnPhase
+[coop:interaction] interactionCounter() read -> 43 (role=guest)
+[coop:checksum] capture digest=1fd1f34a276b931a field=4 biome=14 seed=coop-soak-20260728 weather=3 terrain=0 money=3000 party=[493,384,890,150,382,888] partyLevels=[500,500,500,500,500,500] arenaTags=0 modifiers=4 heldItemsDigest=0 pokeballs=[0:40,1:10,2:0,3:0,4:0] mons=[bi0:sp493/hp1633-1865/st0/ab121/form0/tera0:0/boss0:0 bi1:sp384/hp1391-1715/st0/ab263/form0/tera0:15/boss0:0 bi2:sp551/hp0-67/st7/ab22/form0/tera0:4/boss0:0 bi3:sp449/hp0-74/st7/ab79/form0/tera0:4/boss0:0]
+[coop:transport] send guest t=turnCommitAck e=1828069918361308 wave=37 turn=1 rev=744 stage=materialApplied checksum=1fd1f34a276b931a
+[coop:stream] guest ACK turn stage=materialApplied e=1828069918361308 wave=37 turn=1 rev=744
+[coop:checksum] guest finalize materialApplied e=1828069918361308 wave=37 turn=1 rev=744
+[coop:transport] recv host t=turnCommitAck e=1828069918361308 wave=37 turn=1 rev=744 stage=materialApplied checksum=1fd1f34a276b931a handlers=1
+[coop:stream] host IGNORE cosmetic turn ACK stage=materialApplied key=1828069918361308:37:1:744 (v2 owns retirement)
+[coop:transport] send guest t=turnCommitAck e=1828069918361308 wave=37 turn=1 rev=744 stage=presentationReady checksum=1fd1f34a276b931a
+[coop:stream] guest ACK turn stage=presentationReady e=1828069918361308 wave=37 turn=1 rev=744
+[coop:v2-replica] admit rev=219 kind=TURN_COMMIT result=duplicate-pending-material frontier=219/218/218
+[coop:transport] send guest t=authorityReceipt t=authorityReceipt
+[coop:transport] send guest t=authorityReceipt t=authorityReceipt
+[coop:transport] send guest t=authorityReceipt t=authorityReceipt
+[coop:v2-replica] apply rev=219 kind=TURN_COMMIT resume=admitted outcome=applied control=AWAIT_SUCCESSOR/TURN%2Fe1828069918361308%2Fw37%2Ft1/e1828069918361308/w37/t2/CONTROL_COMMIT,WAVE_ADVANCE/interactionAddresses:*/controlAddresses:replacement-open:w37:t2:id*/nextWave:0/next:* frontier=219/219/219
+[coop:v2-turn] safe-boundary retry completed 1 ordered V2 entry after turn=1
+[coop:checksum] guest finalize presentationReady e=1828069918361308 wave=37 turn=1 rev=744
+[coop:v2-turn] guest finalize turn=1: no immediate command successor; waiting for next ordered authority entry
+[coop:replay] guest finalize turn=1: PARKED for ordered Authority V2 successor
+[coop:transport] recv host t=turnCommitAck e=1828069918361308 wave=37 turn=1 rev=744 stage=presentationReady checksum=1fd1f34a276b931a handlers=1
+[coop:stream] host IGNORE cosmetic turn ACK stage=presentationReady key=1828069918361308:37:1:744 (v2 owns retirement)
+[coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+[coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+[coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:v2-authority] receipt rev=219 op=TURN/e1828069918361308/w37/t1 stage=admitted sender=1 generation=0 duplicate highestStage=0
+[coop:v2-authority] receipt rev=219 op=TURN/e1828069918361308/w37/t1 stage=materialApplied sender=1 generation=0 advanced retired=false waiting=[1] subsumed=[]
+[coop:v2-authority] receipt rev=219 op=TURN/e1828069918361308/w37/t1 stage=controlInstalled sender=1 generation=0 advanced retired=true waiting=[] subsumed=[]
+
