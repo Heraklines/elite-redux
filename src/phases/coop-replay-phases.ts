@@ -485,6 +485,16 @@ function installAuthorityTransformMaterial(pokemon: Pokemon, result: CoopMonTran
 export class CoopFormChangeReplayPhase extends Phase {
   public readonly phaseName = "CoopFormChangeReplayPhase";
 
+  private readonly ownerScene = globalScene;
+  private ownerPhaseManager = globalScene.phaseManager;
+  private readonly ownerRuntime = getCoopRuntime();
+  private readonly ownerStreamer = getCoopBattleStreamer();
+  private readonly ownerGeneration = coopSessionGeneration();
+  private readonly scheduledCallbacks = new Set<() => void>();
+  private watchdog: CoopPresentationProgressWatchdog | undefined;
+  private presentationPokemon: PlayerPokemon | null = null;
+  private ended = false;
+
   constructor(
     private readonly event: Extract<CoopBattleEvent, { k: "formChange" }>,
     private readonly outcomeToken: CoopPresentationOutcomeToken = createCoopPresentationOutcomeToken(),
@@ -492,8 +502,113 @@ export class CoopFormChangeReplayPhase extends Phase {
     super();
   }
 
-  public override async start(): Promise<void> {
+  /** The phase factory is the one synchronous boundary that knows which phase tree owns this async replay. */
+  public bindOwnerPhaseManager(phaseManager: typeof globalScene.phaseManager): this {
+    this.ownerPhaseManager = phaseManager;
+    return this;
+  }
+
+  private exactRuntimeInstalled(): boolean {
+    return (
+      globalScene === this.ownerScene
+      && getCoopRuntime() === this.ownerRuntime
+      && getCoopBattleStreamer() === this.ownerStreamer
+      && coopSessionGeneration() === this.ownerGeneration
+    );
+  }
+
+  /**
+   * Promise continuations in the one-process duo engine can resume while the peer is ambient. Re-enter through
+   * the captured stream scheduler; the harness binds that callback to its real browser context, while a real
+   * browser simply executes it on the same runtime. A replaced generation is never retried or guessed.
+   */
+  private dispatchBound(callback: () => void): void {
+    if (this.ended || this.isRetired()) {
+      return;
+    }
+    if (this.exactRuntimeInstalled()) {
+      callback();
+      return;
+    }
+    if (this.ownerStreamer == null || globalScene === this.ownerScene) {
+      this.retire();
+      return;
+    }
+    let cancel = () => {};
+    cancel = this.ownerStreamer.scheduleAuthorityRetry(() => {
+      this.scheduledCallbacks.delete(cancel);
+      if (this.ended || this.isRetired()) {
+        return;
+      }
+      if (!this.exactRuntimeInstalled()) {
+        this.retire();
+        return;
+      }
+      callback();
+    }, 0);
+    this.scheduledCallbacks.add(cancel);
+  }
+
+  private clearOwnedResources(): void {
+    this.watchdog?.remove();
+    this.watchdog = undefined;
+    for (const cancel of this.scheduledCallbacks) {
+      cancel();
+    }
+    this.scheduledCallbacks.clear();
+  }
+
+  private advance(): void {
+    if (this.ended || this.isRetired()) {
+      return;
+    }
+    this.ended = true;
+    this.clearOwnedResources();
+    if (this.ownerPhaseManager.getCurrentPhase() === this) {
+      this.ownerPhaseManager.shiftPhase();
+    }
+  }
+
+  private fail(outcome: CoopPresentationOutcome): void {
+    if (this.ended || this.isRetired()) {
+      return;
+    }
+    settleCoopPresentationOutcome(this.outcomeToken, outcome);
+    this.presentationPokemon?.destroy();
+    this.presentationPokemon = null;
+    this.advance();
+  }
+
+  public override retire(): void {
+    if (this.isRetired()) {
+      return;
+    }
+    super.retire();
+    this.ended = true;
+    this.clearOwnedResources();
+    this.presentationPokemon?.destroy();
+    this.presentationPokemon = null;
+    settleCoopPresentationOutcome(this.outcomeToken, {
+      kind: "failed",
+      reason: "form-change-presentation-retired",
+      actorFingerprint: `form-change:${this.event.actor.side}:p${this.event.actor.pokemonId}`,
+    });
+  }
+
+  public override end(): void {
+    this.advance();
+  }
+
+  public override start(): void {
     super.start();
+    if (!this.exactRuntimeInstalled()) {
+      this.dispatchBound(() => this.startBound());
+      return;
+    }
+    this.startBound();
+  }
+
+  private startBound(): void {
     const { actor, animate, bi, formIndex, preFormIndex, presentation, speciesId } = this.event;
     const actorFingerprint = `${actor.side}:bi${bi}:p${actor.pokemonId}:sp${speciesId}:form${preFormIndex}->${formIndex}:${presentation}`;
     const displayed = exactDisplayedActor(actor);
@@ -505,7 +620,7 @@ export class CoopFormChangeReplayPhase extends Phase {
       || formIndex >= pokemon.species.forms.length
       || (presentation === "field" && animate && displayed == null)
     ) {
-      settleCoopPresentationOutcome(this.outcomeToken, {
+      this.fail({
         kind: "failed",
         reason:
           displayed == null && presentation === "field" && animate
@@ -513,18 +628,16 @@ export class CoopFormChangeReplayPhase extends Phase {
             : "form-change-material-invalid",
         actorFingerprint,
       });
-      this.end();
       return;
     }
 
-    if (presentation === "evolution" && animate && globalScene.moveAnimations) {
+    if (presentation === "evolution" && animate && this.ownerScene.moveAnimations) {
       if (!pokemon.isPlayer()) {
-        settleCoopPresentationOutcome(this.outcomeToken, {
+        this.fail({
           kind: "failed",
           reason: "form-change-cutscene-actor-not-player",
           actorFingerprint,
         });
-        this.end();
         return;
       }
       const formKey = pokemon.species.forms[formIndex]?.formKey;
@@ -533,16 +646,15 @@ export class CoopFormChangeReplayPhase extends Phase {
         candidate => candidate.formKey === formKey && candidate.preFormKey === preFormKey && !candidate.quiet,
       );
       if (formChange == null) {
-        settleCoopPresentationOutcome(this.outcomeToken, {
+        this.fail({
           kind: "failed",
           reason: "form-change-cutscene-definition-missing",
           actorFingerprint,
         });
-        this.end();
         return;
       }
       const playerPokemon = pokemon as PlayerPokemon;
-      const presentationPokemon = globalScene.addPlayerPokemon(
+      const presentationPokemon = this.ownerScene.addPlayerPokemon(
         playerPokemon.species,
         playerPokemon.level,
         playerPokemon.abilityIndex,
@@ -554,58 +666,82 @@ export class CoopFormChangeReplayPhase extends Phase {
         playerPokemon.nature,
         playerPokemon,
       );
-      try {
-        await presentationPokemon.loadAssets(false);
-      } catch {
-        presentationPokemon.destroy();
-        settleCoopPresentationOutcome(this.outcomeToken, {
-          kind: "failed",
-          reason: "form-change-preimage-assets-failed",
-          actorFingerprint,
-        });
-        this.end();
-        return;
-      }
-      globalScene.phaseManager.unshiftPhase(
-        globalScene.phaseManager.create("CoopFormChangeCutsceneReplayPhase", presentationPokemon, formChange, {
-          authorityPokemon: playerPokemon,
-          preFormIndex,
-          targetFormIndex: formIndex,
-          outcomeToken: this.outcomeToken,
-          actorFingerprint,
-        }),
+      this.presentationPokemon = presentationPokemon;
+      // The load belongs to presentation just as much as the cutscene does. Arm the exact-runtime hard wall
+      // before it starts so a loader that neither resolves nor rejects cannot retain the phase forever.
+      this.watchdog = armCoopPresentationProgressWatchdog(() =>
+        this.fail({ kind: "failed", reason: "form-change-preimage-assets-watchdog-expired", actorFingerprint }),
       );
-      this.end();
+      presentationPokemon
+        .loadAssets(false)
+        .then(() =>
+          this.dispatchBound(() => {
+            if (this.presentationPokemon !== presentationPokemon) {
+              return;
+            }
+            this.watchdog?.remove();
+            this.watchdog = undefined;
+            try {
+              const child = this.ownerPhaseManager.create(
+                "CoopFormChangeCutsceneReplayPhase",
+                presentationPokemon,
+                formChange,
+                {
+                  authorityPokemon: playerPokemon,
+                  preFormIndex,
+                  targetFormIndex: formIndex,
+                  outcomeToken: this.outcomeToken,
+                  actorFingerprint,
+                  runtime: {
+                    scene: this.ownerScene,
+                    phaseManager: this.ownerPhaseManager,
+                    runtime: this.ownerRuntime,
+                    streamer: this.ownerStreamer,
+                    generation: this.ownerGeneration,
+                  },
+                },
+              );
+              this.presentationPokemon = null;
+              this.ownerPhaseManager.unshiftPhase(child);
+              this.advance();
+            } catch {
+              this.fail({ kind: "failed", reason: "form-change-cutscene-queue-failed", actorFingerprint });
+            }
+          }),
+        )
+        .catch(() =>
+          this.dispatchBound(() =>
+            this.fail({ kind: "failed", reason: "form-change-preimage-assets-failed", actorFingerprint }),
+          ),
+        );
       return;
     }
 
-    let ended = false;
-    let watchdog: CoopPresentationProgressWatchdog | undefined;
     const finish = (outcome: CoopPresentationOutcome) => {
-      if (ended) {
-        return;
-      }
-      ended = true;
-      watchdog?.remove();
-      settleCoopPresentationOutcome(this.outcomeToken, outcome);
-      this.end();
+      this.fail(outcome);
     };
-    watchdog = armCoopPresentationProgressWatchdog(() =>
+    this.watchdog = armCoopPresentationProgressWatchdog(() =>
       finish({ kind: "failed", reason: "form-change-watchdog-expired", actorFingerprint }),
     );
-    if (animate && globalScene.moveAnimations) {
-      globalScene.playSound("battle_anims/PRSFX- Transform");
+    if (animate && this.ownerScene.moveAnimations) {
+      this.ownerScene.playSound("battle_anims/PRSFX- Transform");
     }
     pokemon.formIndex = formIndex;
-    void refreshAuthorityAppearance(pokemon)
+    refreshAuthorityAppearance(pokemon)
       .then(() =>
-        finish(
-          globalScene.moveAnimations
-            ? { kind: "rendered", actorFingerprint }
-            : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
+        this.dispatchBound(() =>
+          finish(
+            this.ownerScene.moveAnimations
+              ? { kind: "rendered", actorFingerprint }
+              : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
+          ),
         ),
       )
-      .catch(() => finish({ kind: "failed", reason: "form-change-presentation-threw", actorFingerprint }));
+      .catch(() =>
+        this.dispatchBound(() =>
+          finish({ kind: "failed", reason: "form-change-presentation-threw", actorFingerprint }),
+        ),
+      );
   }
 }
 

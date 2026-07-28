@@ -20,8 +20,20 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
-import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopPresentationOutcome,
+  createCoopPresentationOutcomeToken,
+} from "#data/elite-redux/coop/coop-presentation-outcome";
+import {
+  clearCoopRuntime,
+  coopSessionGeneration,
+  getCoopBattleStreamer,
+  getCoopRuntime,
+  getCoopV2Shadow,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { pokemonFormChanges } from "#data/pokemon-forms";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -45,6 +57,14 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 const RUN = process.env.ER_SCENARIO === "1";
 const V2_TURN_CUTOVER = process.env.COOP_AUTHORITY_V2_TURN === "on";
+
+function deferred<T = void>(): { readonly promise: Promise<T>; resolve(value: T): void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibility spike)", () => {
   let phaserGame: Phaser.Game;
@@ -138,6 +158,78 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // globalScene was stolen by the guest ctor; re-point it to the host for the rest of the run.
     expect(globalScene).toBe(guestScene);
     logs.flush();
+  }, 120_000);
+
+  it("a guest form preimage continuation queues only on its captured engine while the host stays ambient", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, scene => {
+      scene.gameMode = getGameMode(GameModes.COOP);
+    });
+    const load = deferred();
+    const token = createCoopPresentationOutcomeToken();
+    let queuedChild: { retire(): void } | null = null;
+    let guestQueue!: ReturnType<typeof vi.spyOn>;
+    const hostQueue = vi.spyOn(rig.hostScene.phaseManager, "unshiftPhase");
+
+    await withClient(rig.guestCtx, () => {
+      const pokemon = rig.guestScene.getPlayerField()[0];
+      const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
+      expect(formChange).toBeDefined();
+      const targetFormIndex = pokemon.species.forms.findIndex(form => form.formKey === formChange!.formKey);
+      const detached = rig.guestScene.addPlayerPokemon(
+        pokemon.species,
+        pokemon.level,
+        pokemon.abilityIndex,
+        pokemon.formIndex,
+        pokemon.gender,
+        pokemon.shiny,
+        pokemon.variant,
+        pokemon.ivs,
+        pokemon.nature,
+        pokemon,
+      );
+      vi.spyOn(detached, "loadAssets").mockReturnValue(load.promise);
+      vi.spyOn(rig.guestScene, "addPlayerPokemon").mockReturnValueOnce(detached);
+      guestQueue = vi.spyOn(rig.guestScene.phaseManager, "unshiftPhase").mockImplementation(phase => {
+        queuedChild = phase;
+      });
+      rig.guestScene.moveAnimations = true;
+      const phase = rig.guestScene.phaseManager.create(
+        "CoopFormChangeReplayPhase",
+        {
+          k: "formChange",
+          bi: pokemon.getBattlerIndex(),
+          actor: { side: "player", pokemonId: pokemon.id },
+          speciesId: pokemon.species.speciesId,
+          preFormIndex: pokemon.formIndex,
+          formIndex: targetFormIndex,
+          presentation: "evolution",
+          animate: true,
+        },
+        token,
+      );
+      expect(getCoopRuntime()).toBe(rig.guestRuntime);
+      expect(getCoopBattleStreamer()).toBe(rig.guestRuntime.battleStream);
+      expect(coopSessionGeneration()).toBeGreaterThanOrEqual(0);
+      phase.start();
+    });
+
+    // Resolve the guest-owned promise while the host browser remains process-global. The continuation must
+    // re-enter through the captured guest scheduler instead of borrowing the host scene/phase queue.
+    await withClient(rig.hostCtx, async () => {
+      load.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(globalScene).toBe(rig.hostScene);
+      expect(getCoopRuntime()).toBe(rig.hostRuntime);
+    });
+    await vi.waitFor(() => expect(guestQueue).toHaveBeenCalledOnce(), { timeout: 2_000 });
+
+    expect(hostQueue, "ambient host ownership is never consulted by the guest promise tail").not.toHaveBeenCalled();
+    expect(queuedChild).not.toBeNull();
+    expect(coopPresentationOutcome(token), "queuing the cutscene is not a rendered receipt").toBeUndefined();
+    await withClient(rig.guestCtx, () => queuedChild?.retire());
   }, 120_000);
 
   it("DUO: host plays a turn, the REAL guest engine RECVs+RESOLVEs+applies the checkpoint over loopback", async () => {

@@ -41,6 +41,8 @@ import {
 } from "#data/elite-redux/coop/coop-presentation-outcome";
 import {
   clearCoopRuntime,
+  coopSessionGeneration,
+  getCoopBattleStreamer,
   getCoopController,
   getCoopRuntime,
   startLocalCoopSession,
@@ -99,6 +101,14 @@ import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+function deferred<T = void>(): { readonly promise: Promise<T>; resolve(value: T): void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 function completeTurnCarrier(turn: number) {
   const carrier = coopEngine.captureCoopAuthoritativeCarrier(turn, "turnResolution");
@@ -862,6 +872,196 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     await vi.waitFor(() => expect(coopPresentationOutcome(token)).toMatchObject({ kind: "rendered" }));
     expect(revertMode, "the cutscene's real UI closes before the outcome releases control").toHaveBeenCalledOnce();
     expect(addPokemon).toHaveBeenCalledOnce();
+  });
+
+  it("bounds a detached form preimage load that never resolves before the cutscene exists", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[0];
+    const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
+    expect(formChange).toBeDefined();
+    const targetFormIndex = pokemon.species.forms.findIndex(form => form.formKey === formChange!.formKey);
+    const detached = globalScene.addPlayerPokemon(
+      pokemon.species,
+      pokemon.level,
+      pokemon.abilityIndex,
+      pokemon.formIndex,
+      pokemon.gender,
+      pokemon.shiny,
+      pokemon.variant,
+      pokemon.ivs,
+      pokemon.nature,
+      pokemon,
+    );
+    vi.spyOn(detached, "loadAssets").mockReturnValue(new Promise(() => {}));
+    vi.spyOn(globalScene, "addPlayerPokemon").mockReturnValueOnce(detached);
+    const destroy = vi.spyOn(detached, "destroy");
+    const runtime = getCoopRuntime()!;
+    let watchdogCallback: (() => void) | undefined;
+    const cancelTimer = vi.fn();
+    vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
+      watchdogCallback = callback;
+      return cancelTimer;
+    });
+    const token = createCoopPresentationOutcomeToken();
+    const phase = globalScene.phaseManager.create(
+      "CoopFormChangeReplayPhase",
+      {
+        k: "formChange",
+        bi: pokemon.getBattlerIndex(),
+        actor: { side: "player", pokemonId: pokemon.id },
+        speciesId: pokemon.species.speciesId,
+        preFormIndex: pokemon.formIndex,
+        formIndex: targetFormIndex,
+        presentation: "evolution",
+        animate: true,
+      },
+      token,
+    );
+    vi.spyOn(globalScene.phaseManager, "getCurrentPhase").mockReturnValue(phase);
+    const shift = vi.spyOn(globalScene.phaseManager, "shiftPhase").mockImplementation(() => {});
+    globalScene.moveAnimations = true;
+
+    phase.start();
+    expect(coopPresentationOutcome(token)).toBeUndefined();
+    watchdogCallback?.();
+
+    expect(coopPresentationOutcome(token)).toMatchObject({
+      kind: "failed",
+      reason: "form-change-preimage-assets-watchdog-expired",
+    });
+    expect(cancelTimer).toHaveBeenCalledOnce();
+    expect(destroy).toHaveBeenCalledOnce();
+    expect(
+      shift,
+      "the failed receipt reaches the finalizer instead of retaining the loader forever",
+    ).toHaveBeenCalledOnce();
+  });
+
+  it("retirement cancels a pending form preimage load and its late completion cannot queue a cutscene", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[0];
+    const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
+    expect(formChange).toBeDefined();
+    const targetFormIndex = pokemon.species.forms.findIndex(form => form.formKey === formChange!.formKey);
+    const load = deferred();
+    const detached = globalScene.addPlayerPokemon(
+      pokemon.species,
+      pokemon.level,
+      pokemon.abilityIndex,
+      pokemon.formIndex,
+      pokemon.gender,
+      pokemon.shiny,
+      pokemon.variant,
+      pokemon.ivs,
+      pokemon.nature,
+      pokemon,
+    );
+    vi.spyOn(detached, "loadAssets").mockReturnValue(load.promise);
+    vi.spyOn(globalScene, "addPlayerPokemon").mockReturnValueOnce(detached);
+    const destroy = vi.spyOn(detached, "destroy");
+    const runtime = getCoopRuntime()!;
+    const cancelTimer = vi.fn();
+    vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(() => cancelTimer);
+    const token = createCoopPresentationOutcomeToken();
+    const phase = globalScene.phaseManager.create(
+      "CoopFormChangeReplayPhase",
+      {
+        k: "formChange",
+        bi: pokemon.getBattlerIndex(),
+        actor: { side: "player", pokemonId: pokemon.id },
+        speciesId: pokemon.species.speciesId,
+        preFormIndex: pokemon.formIndex,
+        formIndex: targetFormIndex,
+        presentation: "evolution",
+        animate: true,
+      },
+      token,
+    );
+    const queue = vi.spyOn(globalScene.phaseManager, "unshiftPhase");
+    globalScene.moveAnimations = true;
+
+    phase.start();
+    phase.retire();
+    load.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(cancelTimer).toHaveBeenCalledOnce();
+    expect(destroy).toHaveBeenCalledOnce();
+    expect(queue, "the obsolete load continuation cannot enter the recovery-owned tree").not.toHaveBeenCalled();
+    expect(coopPresentationOutcome(token)).toMatchObject({
+      kind: "failed",
+      reason: "form-change-presentation-retired",
+    });
+  });
+
+  it("keeps the exact-runtime wall through UI close and ignores a late close after timeout", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[0];
+    const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
+    expect(formChange).toBeDefined();
+    const targetFormIndex = pokemon.species.forms.findIndex(form => form.formKey === formChange!.formKey);
+    const detached = globalScene.addPlayerPokemon(
+      pokemon.species,
+      pokemon.level,
+      pokemon.abilityIndex,
+      pokemon.formIndex,
+      pokemon.gender,
+      pokemon.shiny,
+      pokemon.variant,
+      pokemon.ivs,
+      pokemon.nature,
+      pokemon,
+    );
+    const runtime = getCoopRuntime()!;
+    const token = createCoopPresentationOutcomeToken();
+    const phase = globalScene.phaseManager.create("CoopFormChangeCutsceneReplayPhase", detached, formChange!, {
+      authorityPokemon: pokemon,
+      preFormIndex: pokemon.formIndex,
+      targetFormIndex,
+      outcomeToken: token,
+      actorFingerprint: `player:p${pokemon.id}:form-close`,
+      runtime: {
+        scene: globalScene,
+        phaseManager: globalScene.phaseManager,
+        runtime,
+        streamer: getCoopBattleStreamer(),
+        generation: coopSessionGeneration(),
+      },
+    });
+    vi.spyOn(phase, "setMode").mockResolvedValue();
+    vi.spyOn(phase, "doEvolution").mockImplementation(() => {});
+    vi.spyOn(phase as unknown as { setupEvolutionAssets(): void }, "setupEvolutionAssets").mockImplementation(() => {});
+    vi.spyOn(phase as unknown as { setupPokemonSprites(): void }, "setupPokemonSprites").mockImplementation(() => {});
+    let watchdogCallback: (() => void) | undefined;
+    const cancelTimer = vi.fn();
+    vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
+      watchdogCallback = callback;
+      return cancelTimer;
+    });
+    const close = deferred<boolean>();
+    vi.spyOn(globalScene.ui, "revertMode").mockReturnValue(close.promise);
+    vi.spyOn(globalScene.phaseManager, "getCurrentPhase").mockReturnValue(phase);
+    const shift = vi.spyOn(globalScene.phaseManager, "shiftPhase").mockImplementation(() => {});
+
+    await phase.start();
+    phase.end();
+    expect(coopPresentationOutcome(token), "a requested close is not yet a rendered receipt").toBeUndefined();
+    expect(cancelTimer, "the presentation wall remains armed while close is pending").not.toHaveBeenCalled();
+    watchdogCallback?.();
+
+    expect(coopPresentationOutcome(token)).toMatchObject({
+      kind: "failed",
+      reason: "form-change-cutscene-watchdog-expired",
+    });
+    expect(cancelTimer).toHaveBeenCalledOnce();
+    expect(shift).toHaveBeenCalledOnce();
+
+    close.resolve(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(shift, "the obsolete close continuation cannot advance the successor twice").toHaveBeenCalledOnce();
+    expect(coopPresentationOutcome(token)).toMatchObject({ kind: "failed" });
   });
 
   it("an authority Transform event installs copied passives and appearance without local derivation", async () => {

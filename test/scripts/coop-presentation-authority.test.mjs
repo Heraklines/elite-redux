@@ -311,7 +311,7 @@ test("form changes and Transform carry complete authority material into dedicate
   assert.match(richForm, /if \(this\.coopReplay != null \|\| this\.coopPresentationRecorded\)/u);
   assert.match(
     richForm,
-    /authorityPokemon\.formIndex = replay\.targetFormIndex[\s\S]+authorityPokemon\.loadAssets\(false\)[\s\S]+globalScene\.updateFieldScale\(\)/u,
+    /authorityPokemon\.formIndex = replay\.targetFormIndex[\s\S]+authorityPokemon\.loadAssets\(false\)[\s\S]+this\.scene\.updateFieldScale\(\)/u,
     "guest replay installs signed appearance without invoking form-change mechanics",
   );
   assert.doesNotMatch(
@@ -329,10 +329,35 @@ test("form changes and Transform carry complete authority material into dedicate
   assert.match(replay, /export class CoopFormChangeReplayPhase[\s\S]+refreshAuthorityAppearance/u);
   assert.match(
     replay,
-    /presentation === "evolution"[\s\S]+addPlayerPokemon\([\s\S]+create\("CoopFormChangeCutsceneReplayPhase"/u,
+    /presentation === "evolution"[\s\S]+addPlayerPokemon\([\s\S]+create\(\s*"CoopFormChangeCutsceneReplayPhase"/u,
     "recovery-safe replay must construct its old-form visual from a detached actor through the renderer gate",
   );
   assert.match(richForm, /export class CoopFormChangeCutsceneReplayPhase extends FormChangePhase/u);
+  assert.match(
+    replay,
+    /export class CoopFormChangeReplayPhase[\s\S]+ownerRuntime = getCoopRuntime\(\)[\s\S]+ownerStreamer = getCoopBattleStreamer\(\)[\s\S]+ownerGeneration = coopSessionGeneration\(\)/u,
+    "the async wrapper captures one exact browser runtime before its asset wait",
+  );
+  assert.match(
+    replay,
+    /form-change-preimage-assets-watchdog-expired[\s\S]+\.loadAssets\(false\)[\s\S]+dispatchBound/u,
+    "detached preimage loading is inside the exact-runtime presentation wall",
+  );
+  assert.match(
+    replay,
+    /public override retire\(\): void[\s\S]+clearOwnedResources\(\)[\s\S]+presentationPokemon\?\.destroy\(\)/u,
+    "recovery retirement cancels the wrapper and destroys its detached preimage",
+  );
+  assert.match(
+    richForm,
+    /form-change-cutscene-watchdog-expired[\s\S]+coopReplayClosing = true[\s\S]+this\.scene\.ui\.revertMode\(\)/u,
+    "the cutscene keeps its watchdog alive until the actual UI close proves rendering complete",
+  );
+  assert.match(
+    richForm,
+    /public override retire\(\): void[\s\S]+clearOwnedResources\(\)[\s\S]+form-change-cutscene-retired/u,
+    "a destructively replaced cutscene retires every callback without advancing its old queue",
+  );
   assert.match(rendererGate, /"CoopFormChangeCutsceneReplayPhase"/u);
   assert.match(phaseManager, /CoopFormChangeCutsceneReplayPhase,[\s\S]+CoopFormChangeReplayPhase/u);
   assert.match(replay, /export class CoopTransformReplayPhase[\s\S]+installAuthorityTransformMaterial/u);

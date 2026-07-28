@@ -895,11 +895,13 @@ export class PhaseManager {
 
     // @ts-expect-error: Typescript does not support narrowing the type of operands in generic methods (see https://stackoverflow.com/a/72891234)
     const created = new PhaseClass(...args) as PhaseMap[T];
-    // CoopReplayTurnPhase is an async authority renderer: by the time its network wait resumes, the
-    // ambient global scene is not a reliable owner in the in-process two-browser scheduler. Bind it at
-    // the factory boundary, where this manager is the definitive phase-tree owner. Production still has
-    // one manager/browser; this makes that existing ownership explicit without changing queue order.
+    // Async authority renderers can resume after the in-process two-browser scheduler installed their peer.
+    // Bind them at the factory boundary, where this manager is the definitive phase-tree owner. Production
+    // still has one manager/browser; this makes that existing ownership explicit without changing queue order.
     if (created instanceof CoopReplayTurnPhase) {
+      created.bindOwnerPhaseManager(this);
+    }
+    if (created instanceof CoopFormChangeReplayPhase || created instanceof CoopFormChangeCutsceneReplayPhase) {
       created.bindOwnerPhaseManager(this);
     }
     return created;

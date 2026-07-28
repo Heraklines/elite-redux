@@ -25,6 +25,11 @@ export class EvolutionPhase extends Phase {
   // We have to use the union here
   public readonly phaseName: "EvolutionPhase" | "FormChangePhase" | "CoopFormChangeCutsceneReplayPhase" =
     "EvolutionPhase";
+  /**
+   * The scene that constructed this phase. Co-op's two-engine harness deliberately swaps the process-global
+   * scene while promises are pending, so an async subclass must never rediscover its renderer after an await.
+   */
+  protected readonly scene = globalScene;
   protected pokemon: PlayerPokemon;
   protected lastLevel: number;
 
@@ -41,7 +46,7 @@ export class EvolutionPhase extends Phase {
    * of candidates the player gets to choose between at the start of the phase.
    * Empty/single-element means there is no choice and {@linkcode evolution} is used directly.
    */
-  private evolutionChoices: SpeciesFormEvolution[];
+  private readonly evolutionChoices: SpeciesFormEvolution[];
   private fusionSpeciesEvolved: boolean; // Whether the evolution is of the fused species
   private evolutionBgm: AnySound | null;
   private evolutionHandler: EvolutionSceneUiHandler;
@@ -93,7 +98,7 @@ export class EvolutionPhase extends Phase {
   }
 
   setMode(): Promise<void> {
-    return globalScene.ui.setModeForceTransition(UiMode.EVOLUTION_SCENE);
+    return this.scene.ui.setModeForceTransition(UiMode.EVOLUTION_SCENE);
   }
 
   /** Human-readable target for a candidate evolution (species name, plus form key when set). */
@@ -111,7 +116,7 @@ export class EvolutionPhase extends Phase {
       const options: OptionSelectItem[] = this.evolutionChoices.map(evo => ({
         label: this.getEvolutionChoiceLabel(evo),
         handler: () => {
-          globalScene.ui.revertMode();
+          this.scene.ui.revertMode();
           resolve(evo);
           return true;
         },
@@ -120,16 +125,16 @@ export class EvolutionPhase extends Phase {
       options.push({
         label: i18next.t("menu:cancel"),
         handler: () => {
-          globalScene.ui.revertMode();
+          this.scene.ui.revertMode();
           resolve(null);
           return true;
         },
       });
-      globalScene.ui.showText(
+      this.scene.ui.showText(
         i18next.t("menu:selectEvolution", { pokemonName: getPokemonNameWithAffix(this.pokemon) }),
         null,
         () => {
-          globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+          this.scene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
             options,
             noCancel: true,
           });
@@ -149,32 +154,32 @@ export class EvolutionPhase extends Phase {
    *
    */
   private setupEvolutionAssets(): void {
-    this.evolutionHandler = globalScene.ui.getHandler() as EvolutionSceneUiHandler;
+    this.evolutionHandler = this.scene.ui.getHandler() as EvolutionSceneUiHandler;
     this.evolutionContainer = this.evolutionHandler.evolutionContainer;
-    this.evolutionBaseBg = globalScene.add.image(0, 0, "default_bg").setOrigin(0);
+    this.evolutionBaseBg = this.scene.add.image(0, 0, "default_bg").setOrigin(0);
 
-    this.evolutionBg = globalScene.add
+    this.evolutionBg = this.scene.add
       .video(0, 0, "evo_bg")
       .stop()
       .setOrigin(0)
       .setScale(0.4359673025)
       .setVisible(false);
 
-    this.evolutionBgOverlay = globalScene.add
-      .rectangle(0, 0, globalScene.scaledCanvas.width, globalScene.scaledCanvas.height, 0x262626)
+    this.evolutionBgOverlay = this.scene.add
+      .rectangle(0, 0, this.scene.scaledCanvas.width, this.scene.scaledCanvas.height, 0x262626)
       .setOrigin(0)
       .setAlpha(0);
     this.evolutionContainer.add([this.evolutionBaseBg, this.evolutionBgOverlay, this.evolutionBg]);
 
-    this.evolutionOverlay = globalScene.add.rectangle(
+    this.evolutionOverlay = this.scene.add.rectangle(
       0,
-      -globalScene.scaledCanvas.height,
-      globalScene.scaledCanvas.width,
-      globalScene.scaledCanvas.height - 48,
+      -this.scene.scaledCanvas.height,
+      this.scene.scaledCanvas.width,
+      this.scene.scaledCanvas.height - 48,
       0xffffff,
     );
     this.evolutionOverlay.setOrigin(0).setAlpha(0);
-    globalScene.ui.add(this.evolutionOverlay);
+    this.scene.ui.add(this.evolutionOverlay);
   }
 
   /**
@@ -196,7 +201,7 @@ export class EvolutionPhase extends Phase {
     playErPokemonSpriteAnim(sprite, spriteKey);
 
     if (setPipeline) {
-      sprite.setPipeline(globalScene.spritePipeline, {
+      sprite.setPipeline(this.scene.spritePipeline, {
         tone: [0.0, 0.0, 0.0, 0.0],
         hasShadow: false,
         teraColor: getTypeRgb(pokemon.getTeraType()),
@@ -221,13 +226,13 @@ export class EvolutionPhase extends Phase {
   }
 
   private getPokemonSprite(): Phaser.GameObjects.Sprite {
-    const sprite = globalScene.addPokemonSprite(
+    const sprite = this.scene.addPokemonSprite(
       this.pokemon,
       this.evolutionBaseBg.displayWidth / 2,
       this.evolutionBaseBg.displayHeight / 2,
       "pkmn__sub",
     );
-    sprite.setPipeline(globalScene.spritePipeline, {
+    sprite.setPipeline(this.scene.spritePipeline, {
       tone: [0.0, 0.0, 0.0, 0.0],
       ignoreTimeTint: true,
     });
@@ -262,12 +267,16 @@ export class EvolutionPhase extends Phase {
     super.start();
     await this.setMode();
 
+    if (this.isRetired()) {
+      return;
+    }
+
     if (!this.validate()) {
       // setMode() above put the UI in EVOLUTION_SCENE; only EndEvolutionPhase
       // transitions back to MESSAGE. Bailing straight to end() here would leave
       // the UI stuck in the evolution scene (frozen black screen), so restore
       // it the same way the success/failed paths do.
-      globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
+      this.scene.phaseManager.unshiftNew("EndEvolutionPhase");
       return this.end();
     }
 
@@ -281,17 +290,20 @@ export class EvolutionPhase extends Phase {
       // species) or one cancel + one evolve. There is no relay for this, so co-op resolves
       // it DETERMINISTICALLY: take the FIRST valid evolution (identical on both clients) and
       // never prompt. Solo keeps the interactive branch picker.
-      if (globalScene.gameMode.isCoop) {
+      if (this.scene.gameMode.isCoop) {
         this.evolution = this.evolutionChoices[0];
         this.fusionSpeciesEvolved = this.evolution instanceof FusionSpeciesFormEvolution;
       } else {
         const chosen = await this.promptEvolutionChoice();
+        if (this.isRetired()) {
+          return;
+        }
         if (!chosen) {
           // Same as the validate()-fail bail above: we are in EVOLUTION_SCENE
           // mode, so we must route through EndEvolutionPhase to hand the UI back
           // to MESSAGE. Cancelling Eevee (its branched evolutions trigger this
           // prompt) otherwise froze the game.
-          globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
+          this.scene.phaseManager.unshiftNew("EndEvolutionPhase");
           return this.end();
         }
         this.evolution = chosen;
