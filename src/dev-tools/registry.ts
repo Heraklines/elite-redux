@@ -324,6 +324,7 @@ export interface DevEnemyMonSpec {
 }
 
 let pendingDevEnemyParty: DevEnemyMonSpec[] | null = null;
+let skipNextDevEnemyModifierGeneration = false;
 
 /** Stage a custom enemy party for the next wave's encounter generation. */
 export function setPendingDevEnemyParty(party: DevEnemyMonSpec[]): void {
@@ -335,6 +336,21 @@ export function consumePendingDevEnemyParty(): DevEnemyMonSpec[] | null {
   const p = pendingDevEnemyParty;
   pendingDevEnemyParty = null;
   return p;
+}
+
+/**
+ * Mark the next explicit dev enemy party as a complete fixture. Encounter setup
+ * must not add wave-scaled random trainer modifiers on top of it.
+ */
+export function setSkipNextDevEnemyModifierGeneration(): void {
+  skipNextDevEnemyModifierGeneration = true;
+}
+
+/** Take and clear the one-shot explicit-fixture modifier-generation guard. */
+export function consumeSkipNextDevEnemyModifierGeneration(): boolean {
+  const skip = skipNextDevEnemyModifierGeneration;
+  skipNextDevEnemyModifierGeneration = false;
+  return skip;
 }
 
 // --- Lazy, env-gated loader --------------------------------------------------

@@ -4,7 +4,7 @@
  */
 
 /** Incompatible observation/candidate changes must bump this version. */
-export const ER_COMBAT_CONTRACT_VERSION = 1;
+export const ER_COMBAT_CONTRACT_VERSION = 2;
 
 /** The first training slice scores battle commands, not balls, run, or run-management choices. */
 export type ErCombatCandidateScope = "combat-command";
@@ -113,11 +113,13 @@ export interface ErCombatDecisionRecord {
   episodeId: string;
   jointActionId: string;
   decisionId: string;
-  sourcePolicy: "smart-default-v1" | "scripted" | "forced-move" | "first-usable";
+  sourcePolicy: "smart-default-v1" | "scripted" | "forced-move" | "first-usable" | "tree-model-v1" | "epsilon-tree-v1";
   actorSlot: number;
   earlierCandidateIds: string[];
   observation: ErCombatObservation;
   candidates: ErCombatCandidate[];
+  featureSchemaVersion: number;
+  candidateFeatures: { candidateId: string; values: number[] }[];
   chosenCandidateId: string;
 }
 
@@ -191,6 +193,19 @@ export function validateCombatDecisionRecord(record: ErCombatDecisionRecord): st
   }
   if (record.earlierCandidateIds.some(id => ids.includes(id))) {
     errors.push("earlier same-turn choices cannot be candidates for the current slot");
+  }
+  const featureIds = record.candidateFeatures.map(row => row.candidateId);
+  if (
+    featureIds.length !== ids.length
+    || new Set(featureIds).size !== ids.length
+    || ids.some(id => !featureIds.includes(id))
+  ) {
+    errors.push("candidate features must map exactly once to every legal candidate");
+  }
+  if (
+    record.candidateFeatures.some(row => row.values.length === 0 || row.values.some(value => !Number.isFinite(value)))
+  ) {
+    errors.push("candidate feature vectors must be finite and non-empty");
   }
   return errors;
 }

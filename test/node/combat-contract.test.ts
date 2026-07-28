@@ -11,6 +11,16 @@ import {
   validateCombatDecisionRecord,
   withCanonicalCombatCandidateId,
 } from "#data/elite-redux/ai/combat-contract";
+import {
+  ER_COMBAT_FEATURE_NAMES,
+  ER_COMBAT_FEATURE_SCHEMA_VERSION,
+  extractErCombatCandidateFeatures,
+} from "#data/elite-redux/ai/combat-features";
+import {
+  type ErTreeModelArtifact,
+  scoreErTreeModel,
+  validateErTreeModel,
+} from "#data/elite-redux/ai/combat-tree-model";
 import { describe, expect, it } from "vitest";
 
 describe("ER combat AI contract", () => {
@@ -95,11 +105,112 @@ describe("ER combat AI contract", () => {
       earlierCandidateIds: [],
       observation: {} as ErCombatDecisionRecord["observation"],
       candidates: [candidate],
+      featureSchemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
+      candidateFeatures: [{ candidateId: candidate.id, values: [0] }],
       chosenCandidateId: candidate.id,
     } satisfies ErCombatDecisionRecord;
     expect(validateCombatDecisionRecord(record)).toEqual([]);
     expect(validateCombatDecisionRecord({ ...record, chosenCandidateId: "missing" })).toContain(
       "chosen candidate must map to exactly one legal candidate",
     );
+  });
+
+  it("extracts a fixed finite semantic feature vector without species or move ids", () => {
+    const candidate = withCanonicalCombatCandidateId({
+      kind: "move",
+      actorSlot: 0,
+      moveSlot: 0,
+      moveId: 53,
+      tera: false,
+      targetMode: "resolved",
+      targets: [{ side: "opponent", entityId: 2, activeSlot: 0 }],
+      baseTypeMultiplier: 2,
+      currentStab: true,
+    });
+    const mon = (entityId: number, activeSlot: number, types: number[]) => ({
+      entityId,
+      knowledge: entityId === 1 ? ("self" as const) : ("battle-info" as const),
+      partyIndex: entityId === 1 ? 0 : null,
+      activeSlot,
+      species: entityId === 1 ? 6 : 9,
+      form: 0,
+      level: 100,
+      types,
+      hp: 100,
+      maxHp: 200,
+      status: null,
+      statStages: [0, 0, 0, 0, 0, 0, 0],
+      stats: [200, 150, 140, 160, 140, 130],
+      ability: 1,
+      innates: [2, 3, null],
+      heldItems: entityId === 1 ? ["LEFTOVERS"] : null,
+      moves:
+        entityId === 1
+          ? [{ slot: 0, moveId: 53, type: 9, category: 1, power: 90, accuracy: 100, priority: 0, ppUsed: 1, maxPp: 10 }]
+          : [],
+      fainted: false,
+    });
+    const observation: ErCombatDecisionRecord["observation"] = {
+      version: ER_COMBAT_CONTRACT_VERSION,
+      perspective: "self",
+      wave: 100,
+      turn: 3,
+      biome: 1,
+      battleType: 1,
+      format: 1,
+      weather: 0,
+      terrain: 0,
+      selfParty: [mon(1, 0, [9])],
+      opponentActive: [mon(2, 0, [11])],
+      opponentRosterSize: 1,
+      playerTerasUsed: 0,
+    };
+    const vector = extractErCombatCandidateFeatures(observation, candidate);
+    expect(vector).toHaveLength(ER_COMBAT_FEATURE_NAMES.length);
+    expect(vector.every(Number.isFinite)).toBe(true);
+    expect(ER_COMBAT_FEATURE_NAMES.some(name => name.includes("species") || name.includes("move_id"))).toBe(false);
+
+    const spreadObservation = {
+      ...observation,
+      format: 2,
+      opponentActive: [mon(2, 0, [11]), { ...mon(3, 1, [12]), hp: 25 }],
+      opponentRosterSize: 2,
+    };
+    const spreadCandidate = withCanonicalCombatCandidateId({
+      ...candidate,
+      targets: [
+        { side: "opponent", entityId: 2, activeSlot: 0 },
+        { side: "opponent", entityId: 3, activeSlot: 1 },
+      ],
+    });
+    const reversedCandidate = withCanonicalCombatCandidateId({
+      ...candidate,
+      targets: [...spreadCandidate.targets].reverse(),
+    });
+    expect(extractErCombatCandidateFeatures(spreadObservation, spreadCandidate)).toEqual(
+      extractErCombatCandidateFeatures(spreadObservation, reversedCandidate),
+    );
+  });
+
+  it("scores the neutral JSON tree format used by the headless policy", () => {
+    const model: ErTreeModelArtifact = {
+      schemaVersion: 1,
+      featureSchemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
+      featureCount: ER_COMBAT_FEATURE_NAMES.length,
+      modelName: "unit-tree",
+      modelType: "sklearn_forest",
+      aggregation: "mean",
+      baseScore: 0,
+      trees: [
+        [
+          { feature: 0, threshold: 0.5, left: 1, right: 2 },
+          { feature: -1, threshold: 0, left: -1, right: -1, value: 0.2 },
+          { feature: -1, threshold: 0, left: -1, right: -1, value: 0.8 },
+        ],
+      ],
+    };
+    expect(validateErTreeModel(model)).toEqual([]);
+    expect(scoreErTreeModel(model, [0, ...new Array(model.featureCount - 1).fill(0)])).toBe(0.2);
+    expect(scoreErTreeModel(model, [1, ...new Array(model.featureCount - 1).fill(0)])).toBe(0.8);
   });
 });

@@ -26,6 +26,9 @@ import { spawnSync } from "node:child_process";
  *   --json-out FILE  write a machine-readable run result to FILE
  *   --ai-data-out FILE  write versioned combat-decision JSONL for offline training
  *   --episode-id ID  stable episode id stamped into AI dataset rows
+ *   --ai-model FILE   run an exported ER tree policy through the real combat harness
+ *   --ai-policy MODE  no-model policy: first-usable (default) or smart-default
+ *   --ai-epsilon P    deterministic random-action rate for tree-policy data collection
  *   --no-miss        force every move to hit
  *   --no-crit        force no crits (deterministic stat stages)
  *   --real-rng       restore the real seeded randBattleSeedInt (probabilistic procs)
@@ -45,6 +48,7 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
     "Usage: node scripts/run-scenario.mjs <ERS1-code | @file.json | demo> "
       + "[--turns N] [--move MOVE] [--waves N] [--to-end] [--quiet] [--auto-first] "
       + "[--policy @file.json] [--json-out FILE] [--ai-data-out FILE] [--episode-id ID] "
+      + "[--ai-model FILE] [--ai-policy MODE] [--ai-epsilon P] "
       + "[--no-miss] [--no-crit] [--real-rng]",
   );
   process.exit(argv.length === 0 ? 1 : 0);
@@ -61,6 +65,9 @@ let policyArg;
 let jsonOut;
 let aiDataOut;
 let episodeId;
+let aiModel;
+let aiPolicy;
+let aiEpsilon;
 let noMiss = false;
 let noCrit = false;
 let realRng = false;
@@ -85,6 +92,21 @@ for (let i = 1; i < argv.length; i++) {
     aiDataOut = argv[++i];
   } else if (argv[i] === "--episode-id") {
     episodeId = argv[++i];
+  } else if (argv[i] === "--ai-model") {
+    aiModel = argv[++i];
+  } else if (argv[i] === "--ai-policy") {
+    aiPolicy = argv[++i];
+    if (!["first-usable", "smart-default"].includes(aiPolicy)) {
+      console.error("--ai-policy must be first-usable or smart-default");
+      process.exit(1);
+    }
+  } else if (argv[i] === "--ai-epsilon") {
+    aiEpsilon = argv[++i];
+    const value = Number(aiEpsilon);
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+      console.error("--ai-epsilon must be between 0 and 1");
+      process.exit(1);
+    }
   } else if (argv[i] === "--no-miss") {
     noMiss = true;
   } else if (argv[i] === "--no-crit") {
@@ -128,6 +150,15 @@ if (aiDataOut) {
 }
 if (episodeId) {
   env.ER_AI_EPISODE_ID = episodeId;
+}
+if (aiModel) {
+  env.ER_AI_POLICY_MODEL = aiModel.startsWith("@") ? aiModel.slice(1) : aiModel;
+}
+if (aiPolicy) {
+  env.ER_AI_POLICY_MODE = aiPolicy;
+}
+if (aiEpsilon) {
+  env.ER_AI_POLICY_EPSILON = aiEpsilon;
 }
 if (policyArg) {
   // A `@file.json` reads the file; otherwise the arg IS the inline JSON blob.

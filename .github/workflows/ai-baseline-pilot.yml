@@ -10,6 +10,7 @@ on:
     paths:
       - ".github/workflows/ai-baseline-pilot.yml"
       - "ml/baselines/**"
+      - "ml/evaluation/**"
       - "scripts/ai/**"
       - "scripts/run-scenario.mjs"
       - "src/data/elite-redux/ai/**"
@@ -49,12 +50,15 @@ jobs:
         run: >-
           pnpm exec biome check
           scripts/ai/compare-run-results.mjs
+          scripts/ai/build-ghost-anchor.mjs
           scripts/ai/ghost-gauntlet.mjs
           scripts/ai/make-ghost-gauntlet.mjs
           scripts/ai/summarize-ghost-gauntlet.mjs
           scripts/ai/test-ghost-gauntlet.mjs
           src/data/elite-redux/ai/combat-contract.ts
           src/data/elite-redux/ai/combat-engine-adapter.ts
+          src/data/elite-redux/ai/combat-features.ts
+          src/data/elite-redux/ai/combat-tree-model.ts
           src/dev-tools/registry.ts
           src/dev-tools/test-suite/scenario-spec.ts
           src/phases/encounter-phase.ts
@@ -64,48 +68,67 @@ jobs:
 
   ghost-gauntlet:
     if: github.repository == 'Heraklines/elite-redux'
-    name: Ghost winner pair ${{ matrix.pairId }} (both sides)
-    needs: train
+    name: Ghost winner pair ${{ matrix.pair }} (both sides)
+    needs: retrain
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
+      max-parallel: 6
       matrix:
-        include:
-          - { pair: 0, pairId: "01" }
-          - { pair: 1, pairId: "02" }
-          - { pair: 2, pairId: "03" }
-          - { pair: 3, pairId: "04" }
-          - { pair: 4, pairId: "05" }
-          - { pair: 5, pairId: "06" }
+        pair: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
           submodules: false
       - uses: ./.github/actions/setup-deps
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-iterated-leaderboard
+          path: ai-policy
+      - name: Resolve pair id
+        id: pair
+        shell: bash
+        run: printf 'pair_id=%02d\n' "$(( ${{ matrix.pair }} + 1 ))" >> "$GITHUB_OUTPUT"
       - name: Build strict inverse matchup
         run: >-
           node scripts/ai/make-ghost-gauntlet.mjs
-          ml/evaluation/ghost-winner-teams.v1.json
+          ml/evaluation/ghost-winner-teams.v2.json
           "${{ matrix.pair }}"
           ai-gauntlet
-      - name: Play leg A
+      - name: Play tree-policy leg A
         run: >-
           node scripts/run-scenario.mjs
-          "@ai-gauntlet/pair-${{ matrix.pairId }}-leg-a.json"
+          "@ai-gauntlet/pair-${{ steps.pair.outputs.pair_id }}-leg-a.json"
           --waves 1 --turns 80 --quiet --auto-first --real-rng
-          --json-out "ai-gauntlet/pair-${{ matrix.pairId }}-leg-a-result.json"
-      - name: Play inverse leg B
+          --ai-model ai-policy/models/selected-model.json
+          --json-out "ai-gauntlet/pair-${{ steps.pair.outputs.pair_id }}-selected-tree-v1-leg-a-result.json"
+      - name: Play inverse tree-policy leg B
         run: >-
           node scripts/run-scenario.mjs
-          "@ai-gauntlet/pair-${{ matrix.pairId }}-leg-b.json"
+          "@ai-gauntlet/pair-${{ steps.pair.outputs.pair_id }}-leg-b.json"
           --waves 1 --turns 80 --quiet --auto-first --real-rng
-          --json-out "ai-gauntlet/pair-${{ matrix.pairId }}-leg-b-result.json"
-      - name: Upload both sides of the matchup
+          --ai-model ai-policy/models/selected-model.json
+          --json-out "ai-gauntlet/pair-${{ steps.pair.outputs.pair_id }}-selected-tree-v1-leg-b-result.json"
+      - name: Play smart-default control leg A
+        run: >-
+          node scripts/run-scenario.mjs
+          "@ai-gauntlet/pair-${{ steps.pair.outputs.pair_id }}-leg-a.json"
+          --waves 1 --turns 80 --quiet --auto-first --real-rng
+          --ai-policy smart-default
+          --json-out "ai-gauntlet/pair-${{ steps.pair.outputs.pair_id }}-smart-default-v1-leg-a-result.json"
+      - name: Play inverse smart-default control leg B
+        run: >-
+          node scripts/run-scenario.mjs
+          "@ai-gauntlet/pair-${{ steps.pair.outputs.pair_id }}-leg-b.json"
+          --waves 1 --turns 80 --quiet --auto-first --real-rng
+          --ai-policy smart-default
+          --json-out "ai-gauntlet/pair-${{ steps.pair.outputs.pair_id }}-smart-default-v1-leg-b-result.json"
+      - name: Upload both controllers and both sides of the matchup
         uses: actions/upload-artifact@v4
         with:
-          name: ai-ghost-gauntlet-pair-${{ matrix.pairId }}
+          name: ai-ghost-gauntlet-pair-${{ steps.pair.outputs.pair_id }}
           path: ai-gauntlet
           retention-days: 30
           if-no-files-found: error
@@ -148,8 +171,9 @@ jobs:
     timeout-minutes: 25
     strategy:
       fail-fast: false
+      max-parallel: 6
       matrix:
-        shard: [0, 1, 2, 3, 4, 5]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -253,6 +277,7 @@ jobs:
           --data ai-data
           --report-json ai-report/leaderboard.json
           --report-md ai-report/leaderboard.md
+          --models-dir ai-report/models
       - name: Publish run summary
         shell: bash
         run: cat ai-report/leaderboard.md >> "$GITHUB_STEP_SUMMARY"
@@ -260,6 +285,112 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ai-baseline-leaderboard
+          path: ai-report
+          retention-days: 30
+          if-no-files-found: error
+
+  rollout:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Exploratory tree rollout ${{ matrix.shard }}
+    needs: train
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-baseline-leaderboard
+          path: ai-bootstrap
+      - name: Build held-out-seed rollout scenario
+        shell: bash
+        run: >-
+          node scripts/ai/make-pilot-scenario.mjs
+          "$((100 + ${{ matrix.shard }}))"
+          "ai-work/scenario-${{ matrix.shard }}.json"
+      - name: Compute immutable data identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          dex_hash=$(find src/data/elite-redux -type f \( -name 'er-*.ts' -o -name '*mechanic*.ts' \) -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+          dictionary_hash=$(sha256sum scripts/export-data-dictionary.mjs | cut -d' ' -f1)
+          echo "dex_hash=$dex_hash" >> "$GITHUB_OUTPUT"
+          echo "dictionary_hash=$dictionary_hash" >> "$GITHUB_OUTPUT"
+      - name: Collect deterministic epsilon-tree trajectories
+        env:
+          ER_AI_BUILD_SHA: ${{ github.sha }}
+          ER_AI_DEX_HASH: ${{ steps.identity.outputs.dex_hash }}
+          ER_AI_DICTIONARY_HASH: ${{ steps.identity.outputs.dictionary_hash }}
+        run: >-
+          node scripts/run-scenario.mjs "@ai-work/scenario-${{ matrix.shard }}.json"
+          --waves 16 --turns 20 --quiet --auto-first --real-rng
+          --ai-model ai-bootstrap/models/selected-model.json --ai-epsilon 0.15
+          --episode-id "rollout-${{ github.run_id }}-${{ matrix.shard }}"
+          --json-out "ai-work/result-rollout-${{ matrix.shard }}.json"
+          --ai-data-out "ai-work/decisions-rollout-${{ matrix.shard }}.jsonl"
+      - name: Upload rollout shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-rollout-shard-${{ matrix.shard }}
+          path: |
+            ai-work/decisions-rollout-${{ matrix.shard }}.jsonl
+            ai-work/result-rollout-${{ matrix.shard }}.json
+            ai-work/scenario-${{ matrix.shard }}.json
+          retention-days: 14
+          if-no-files-found: error
+
+  retrain:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Elite-rollout tree iteration
+    needs: rollout
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-baseline-shard-*
+          path: ai-data/bootstrap
+          merge-multiple: true
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-rollout-shard-*
+          path: ai-data/rollout
+          merge-multiple: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml/baselines/requirements.txt
+      - name: Install pinned CPU baselines
+        run: python -m pip install --requirement ml/baselines/requirements.txt
+      - name: Retrain on expert data and successful exploratory trajectories
+        run: >-
+          python ml/baselines/train_candidate_baselines.py
+          --data ai-data
+          --elite-rollouts
+          --report-json ai-report/leaderboard.json
+          --report-md ai-report/leaderboard.md
+          --models-dir ai-report/models
+      - name: Publish iteration summary
+        shell: bash
+        run: cat ai-report/leaderboard.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload iterated policy
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-iterated-leaderboard
           path: ai-report
           retention-days: 30
           if-no-files-found: error

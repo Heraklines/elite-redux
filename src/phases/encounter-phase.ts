@@ -1,7 +1,11 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { Battle } from "#app/battle";
 import { PLAYER_PARTY_MAX_SIZE, WEIGHT_INCREMENT_ON_SPAWN_MISS } from "#app/constants";
-import { consumePendingDevEnemyParty, type DevEnemyMonSpec } from "#app/dev-tools/registry";
+import {
+  consumePendingDevEnemyParty,
+  consumeSkipNextDevEnemyModifierGeneration,
+  type DevEnemyMonSpec,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
@@ -1295,7 +1299,13 @@ export class EncounterPhase extends BattlePhase {
         // were already reconstructed from the host's stream (buildCoopEnemy). Rolling our own
         // here would DOUBLE / diverge them (a fresh seeded modifier roll on top of the adopted
         // set), so skip the whole generation block. Solo / host / non-adopt runs are unchanged.
-        if (!this.loaded && battle.battleType !== BattleType.MYSTERY_ENCOUNTER && !this.coopAdoptedEnemyParty) {
+        const skipDevEnemyModifiers = consumeSkipNextDevEnemyModifierGeneration();
+        if (
+          !this.loaded
+          && battle.battleType !== BattleType.MYSTERY_ENCOUNTER
+          && !this.coopAdoptedEnemyParty
+          && !skipDevEnemyModifiers
+        ) {
           // generate modifiers for MEs, overriding prior ones as applicable
           regenerateModifierPoolThresholds(
             globalScene.getEnemyField(),

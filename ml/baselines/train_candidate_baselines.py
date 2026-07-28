@@ -10,7 +10,7 @@ import pickle
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
 from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, RandomForestClassifier
@@ -22,8 +22,11 @@ try:
 except ModuleNotFoundError:  # The core sklearn ladder remains locally runnable without the optional wheel.
     LGBMClassifier = None
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+FEATURE_SCHEMA_VERSION = 1
 EPSILON = 1e-9
+ROLLOUT_POLICY = "epsilon-tree-v1"
+SUCCESSFUL_ROLLOUT_OUTCOMES = {"victory", "max-waves"}
 
 
 def jsonl_files(path: Path) -> list[Path]:
@@ -69,6 +72,14 @@ def validate_decision(record: dict[str, Any], file: Path, line_number: int) -> N
         raise ValueError(f"{prefix}: chosen label does not map exactly once")
     if not record.get("episodeId") or not record.get("decisionId"):
         raise ValueError(f"{prefix}: missing episode/decision identity")
+    feature_rows = record.get("candidateFeatures", [])
+    feature_ids = [row.get("candidateId") for row in feature_rows]
+    if record.get("featureSchemaVersion") != FEATURE_SCHEMA_VERSION:
+        raise ValueError(f"{prefix}: unsupported feature schema")
+    if len(feature_ids) != len(ids) or len(set(feature_ids)) != len(ids) or set(feature_ids) != set(ids):
+        raise ValueError(f"{prefix}: candidate features do not map one-to-one")
+    if any(not row.get("values") or not all(math.isfinite(float(value)) for value in row["values"]) for row in feature_rows):
+        raise ValueError(f"{prefix}: candidate features must be finite and non-empty")
     for opponent in record.get("observation", {}).get("opponentActive", []):
         if opponent.get("heldItems") is not None:
             raise ValueError(f"{prefix}: opponent held items crossed the Battle Info visibility boundary")
@@ -96,14 +107,32 @@ def validate_dataset(decisions: list[dict[str, Any]], terminals: list[dict[str, 
             raise ValueError(f"dataset must have one known {identity}, found {sorted(map(str, values))}")
 
 
-def ratio(value: float, scale: float) -> float:
-    return float(value) / scale if scale else 0.0
-
-
-def hp_ratio(mon: dict[str, Any] | None) -> float:
-    if not mon:
-        return 0.0
-    return ratio(mon.get("hp", 0), max(1, mon.get("maxHp", 0)))
+def select_elite_rollouts(
+    decisions: list[dict[str, Any]], terminals: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    terminal_by_episode = {record["episodeId"]: record for record in terminals}
+    rollout_episodes = {
+        record["episodeId"] for record in decisions if record["sourcePolicy"] == ROLLOUT_POLICY
+    }
+    successful = {
+        episode
+        for episode in rollout_episodes
+        if terminal_by_episode[episode]["outcome"] in SUCCESSFUL_ROLLOUT_OUTCOMES
+    }
+    selected = [
+        record
+        for record in decisions
+        if record["sourcePolicy"] != ROLLOUT_POLICY or record["episodeId"] in successful
+    ]
+    if not selected:
+        raise ValueError("elite rollout selection removed every decision")
+    return selected, {
+        "episodes": len(rollout_episodes),
+        "successfulEpisodes": len(successful),
+        "successRate": len(successful) / len(rollout_episodes) if rollout_episodes else None,
+        "decisionsBeforeSelection": len(decisions),
+        "decisionsAfterSelection": len(selected),
+    }
 
 
 def active_mon(observation: dict[str, Any], slot: int) -> dict[str, Any]:
@@ -113,89 +142,9 @@ def active_mon(observation: dict[str, Any], slot: int) -> dict[str, Any]:
     raise ValueError(f"no active self mon for slot {slot}")
 
 
-def entity(observation: dict[str, Any], entity_id: int) -> dict[str, Any] | None:
-    return next(
-        (mon for mon in observation["selfParty"] + observation["opponentActive"] if mon["entityId"] == entity_id),
-        None,
-    )
-
-
-def padded(values: Iterable[float], size: int) -> list[float]:
-    result = list(values)[:size]
-    return result + [0.0] * (size - len(result))
-
-
-def candidate_features(decision: dict[str, Any], candidate: dict[str, Any]) -> list[float]:
-    obs = decision["observation"]
-    actor = active_mon(obs, decision["actorSlot"])
-    opponents = obs["opponentActive"]
-    candidate_kind = candidate["kind"]
-    features = [
-        ratio(obs["wave"], 200),
-        ratio(obs["turn"], 50),
-        ratio(obs["format"], 3),
-        ratio(obs.get("weather") or 0, 20),
-        ratio(obs.get("terrain") or 0, 10),
-        ratio(obs.get("playerTerasUsed", 0), 3),
-        hp_ratio(actor),
-        float(actor.get("status") is not None),
-        ratio(actor.get("level", 0), 200),
-        ratio(sum(not mon.get("fainted", False) for mon in obs["selfParty"]), 6),
-        ratio(sum(not mon.get("fainted", False) for mon in opponents), 3),
-        min((hp_ratio(mon) for mon in opponents), default=0.0),
-        sum(hp_ratio(mon) for mon in opponents) / max(1, len(opponents)),
-        float(candidate_kind == "move"),
-        float(candidate_kind == "switch"),
-        float(candidate_kind == "shift"),
-    ]
-    features.extend(ratio(stage, 6) for stage in padded(actor.get("statStages", []), 7))
-    features.extend(ratio(type_id, 20) for type_id in padded(actor.get("types", []), 3))
-
-    move_features = [0.0] * 14
-    switch_features = [0.0] * 7
-    shift_features = [0.0] * 2
-    if candidate_kind == "move":
-        move = next(
-            (move for move in actor.get("moves", []) if move.get("slot") == candidate.get("moveSlot")),
-            None,
-        )
-        if move is None and candidate.get("moveSlot") != -1:
-            raise ValueError(f"missing move slot for candidate {candidate['id']}")
-        targets = [entity(obs, target["entityId"]) for target in candidate.get("targets", [])]
-        target = next((mon for mon in targets if mon is not None), None)
-        move_features = [
-            ratio((move or {}).get("power", 0), 250),
-            ratio((move or {}).get("accuracy", 0), 100),
-            ratio((move or {}).get("priority", 0), 7),
-            ratio((move or {}).get("category", 0), 3),
-            ratio((move or {}).get("type", 0), 20),
-            ratio((move or {}).get("ppUsed", 0), max(1, (move or {}).get("maxPp", 0))),
-            float(candidate.get("tera", False)),
-            float(candidate.get("currentStab", False)),
-            min(4.0, float(candidate.get("baseTypeMultiplier", 1))) / 4.0,
-            ratio(len(candidate.get("targets", [])), 6),
-            float(candidate.get("targetMode") == "random"),
-            hp_ratio(target),
-            ratio((target or {}).get("types", [0])[0] if (target or {}).get("types") else 0, 20),
-            float((target or {}).get("status") is not None),
-        ]
-    elif candidate_kind == "switch":
-        destination = obs["selfParty"][candidate["partyIndex"]]
-        switch_features = [
-            hp_ratio(destination),
-            ratio(destination.get("level", 0) - actor.get("level", 0), 200),
-            float(destination.get("status") is not None),
-            ratio(destination.get("types", [0])[0] if destination.get("types") else 0, 20),
-            ratio(destination.get("types", [0, 0])[1] if len(destination.get("types", [])) > 1 else 0, 20),
-            float(candidate.get("transfer") == "baton"),
-            ratio(candidate.get("partyIndex", 0), 6),
-        ]
-    elif candidate_kind == "shift":
-        shift_features = [
-            ratio(abs(candidate["targetActorSlot"] - candidate["actorSlot"]), 2),
-            ratio(candidate["targetActorSlot"], 3),
-        ]
-    return features + move_features + switch_features + shift_features
+def embedded_candidate_features(decision: dict[str, Any], candidate: dict[str, Any]) -> list[float]:
+    by_id = {row["candidateId"]: row["values"] for row in decision["candidateFeatures"]}
+    return [float(value) for value in by_id[candidate["id"]]]
 
 
 def make_rows(decisions: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, list[str], list[str], list[int]]:
@@ -208,10 +157,13 @@ def make_rows(decisions: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, 
         candidates = decision["candidates"]
         candidate_counts.append(len(candidates))
         for candidate in candidates:
-            x_rows.append(candidate_features(decision, candidate))
+            x_rows.append(embedded_candidate_features(decision, candidate))
             labels.append(int(candidate["id"] == decision["chosenCandidateId"]))
             decision_ids.append(decision["decisionId"])
             episodes.append(decision["episodeId"])
+    feature_counts = {len(row) for row in x_rows}
+    if len(feature_counts) != 1:
+        raise ValueError(f"dataset contains inconsistent feature counts: {sorted(feature_counts)}")
     return np.asarray(x_rows, dtype=np.float32), np.asarray(labels), decision_ids, episodes, candidate_counts
 
 
@@ -306,6 +258,149 @@ def load_generation_metrics(path: Path) -> dict[str, float | int]:
     }
 
 
+def leaf_node(value: float) -> dict[str, Any]:
+    return {"feature": -1, "threshold": 0.0, "left": -1, "right": -1, "value": float(value)}
+
+
+def sklearn_forest_artifact(name: str, model: Any, feature_count: int) -> dict[str, Any]:
+    positive_index = int(np.flatnonzero(model.classes_ == 1)[0])
+    trees: list[list[dict[str, Any]]] = []
+    for estimator in model.estimators_:
+        source = estimator.tree_
+        nodes: list[dict[str, Any]] = []
+        for index in range(source.node_count):
+            if source.children_left[index] < 0:
+                counts = source.value[index][0]
+                probability = float(counts[positive_index] / max(EPSILON, counts.sum()))
+                nodes.append(leaf_node(probability))
+            else:
+                nodes.append(
+                    {
+                        "feature": int(source.feature[index]),
+                        "threshold": float(source.threshold[index]),
+                        "left": int(source.children_left[index]),
+                        "right": int(source.children_right[index]),
+                        "defaultLeft": True,
+                    }
+                )
+        trees.append(nodes)
+    return {
+        "schemaVersion": 1,
+        "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
+        "featureCount": feature_count,
+        "modelName": name,
+        "modelType": "sklearn_forest",
+        "aggregation": "mean",
+        "baseScore": 0.0,
+        "trees": trees,
+    }
+
+
+def hist_gradient_artifact(name: str, model: HistGradientBoostingClassifier, feature_count: int) -> dict[str, Any]:
+    trees: list[list[dict[str, Any]]] = []
+    for iteration in model._predictors:  # sklearn has no public neutral tree export for HGB.
+        source = iteration[0].nodes
+        nodes: list[dict[str, Any]] = []
+        for node in source:
+            if bool(node["is_leaf"]):
+                nodes.append(leaf_node(float(node["value"])))
+            else:
+                if bool(node["is_categorical"]):
+                    raise ValueError("categorical HGB splits are unsupported by the neutral runtime")
+                nodes.append(
+                    {
+                        "feature": int(node["feature_idx"]),
+                        "threshold": float(node["num_threshold"]),
+                        "left": int(node["left"]),
+                        "right": int(node["right"]),
+                        "defaultLeft": bool(node["missing_go_to_left"]),
+                    }
+                )
+        trees.append(nodes)
+    return {
+        "schemaVersion": 1,
+        "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
+        "featureCount": feature_count,
+        "modelName": name,
+        "modelType": "sklearn_hist_gradient_boosting",
+        "aggregation": "sum_logit",
+        "baseScore": float(np.ravel(model._baseline_prediction)[0]),
+        "trees": trees,
+    }
+
+
+def lightgbm_artifact(name: str, model: Any, feature_count: int) -> dict[str, Any]:
+    dumped = model.booster_.dump_model()
+    trees: list[list[dict[str, Any]]] = []
+
+    def flatten(source: dict[str, Any], nodes: list[dict[str, Any]]) -> int:
+        index = len(nodes)
+        nodes.append(leaf_node(0.0))
+        if "leaf_value" in source:
+            nodes[index] = leaf_node(float(source["leaf_value"]))
+            return index
+        if source.get("decision_type") not in ("<=", "<"):
+            raise ValueError(f"unsupported LightGBM decision type {source.get('decision_type')}")
+        left = flatten(source["left_child"], nodes)
+        right = flatten(source["right_child"], nodes)
+        nodes[index] = {
+            "feature": int(source["split_feature"]),
+            "threshold": float(source["threshold"]),
+            "left": left,
+            "right": right,
+            "defaultLeft": bool(source.get("default_left", True)),
+        }
+        return index
+
+    for tree in dumped["tree_info"]:
+        nodes: list[dict[str, Any]] = []
+        flatten(tree["tree_structure"], nodes)
+        trees.append(nodes)
+    return {
+        "schemaVersion": 1,
+        "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
+        "featureCount": feature_count,
+        "modelName": name,
+        "modelType": "lightgbm",
+        "aggregation": "sum_logit",
+        "baseScore": 0.0,
+        "trees": trees,
+    }
+
+
+def export_tree_artifact(name: str, model: Any, feature_count: int) -> dict[str, Any] | None:
+    if isinstance(model, (RandomForestClassifier, ExtraTreesClassifier)):
+        return sklearn_forest_artifact(name, model, feature_count)
+    if isinstance(model, HistGradientBoostingClassifier):
+        return hist_gradient_artifact(name, model, feature_count)
+    if LGBMClassifier is not None and isinstance(model, LGBMClassifier):
+        return lightgbm_artifact(name, model, feature_count)
+    return None
+
+
+def artifact_scores(artifact: dict[str, Any], x: np.ndarray) -> np.ndarray:
+    def tree_score(nodes: list[dict[str, Any]], row: np.ndarray) -> float:
+        index = 0
+        for _ in range(len(nodes) + 1):
+            node = nodes[index]
+            if "value" in node:
+                return float(node["value"])
+            value = float(row[node["feature"]])
+            go_left = node.get("defaultLeft", True) if math.isnan(value) else value <= node["threshold"]
+            index = node["left"] if go_left else node["right"]
+        raise ValueError("neutral tree traversal exceeded node count")
+
+    result = []
+    for row in x:
+        values = [tree_score(tree, row) for tree in artifact["trees"]]
+        if artifact["aggregation"] == "mean":
+            result.append(float(np.mean(values)))
+        else:
+            raw = artifact["baseScore"] + sum(values)
+            result.append(1.0 / (1.0 + math.exp(-max(-50.0, min(50.0, raw)))))
+    return np.asarray(result)
+
+
 def model_specs(seed: int) -> list[tuple[str, Any, bool]]:
     specs = [
         ("logistic", LogisticRegression(max_iter=1000, class_weight=None, random_state=seed), True),
@@ -340,7 +435,21 @@ def model_specs(seed: int) -> list[tuple[str, Any, bool]]:
 
 
 def train(args: argparse.Namespace) -> dict[str, Any]:
-    decisions, terminals = load_records(args.data)
+    all_decisions, terminals = load_records(args.data)
+    decisions, rollout_selection = (
+        select_elite_rollouts(all_decisions, terminals)
+        if args.elite_rollouts
+        else (
+            all_decisions,
+            {
+                "episodes": 0,
+                "successfulEpisodes": 0,
+                "successRate": None,
+                "decisionsBeforeSelection": len(all_decisions),
+                "decisionsAfterSelection": len(all_decisions),
+            },
+        )
+    )
     x, y, decision_ids, episodes, candidate_counts = make_rows(decisions)
     train_episodes, test_episodes = split_episodes(episodes, args.seed)
     train_mask = np.asarray([episode in train_episodes for episode in episodes])
@@ -367,6 +476,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "modelBytes": 0,
         },
     ]
+    artifacts: dict[str, dict[str, Any]] = {}
     for name, model, scale in model_specs(args.seed):
         train_x = scaler.transform(x[train_mask]) if scale else x[train_mask]
         test_x = scaler.transform(x[test_mask]) if scale else x[test_mask]
@@ -381,6 +491,14 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             y[test_mask],
             [decision_id for decision_id, selected in zip(decision_ids, test_mask) if selected],
         )
+        artifact = export_tree_artifact(name, model, x.shape[1])
+        parity_error = None
+        if artifact is not None:
+            neutral_scores = artifact_scores(artifact, x[test_mask])
+            parity_error = float(np.max(np.abs(scores - neutral_scores)))
+            if parity_error > 1e-5:
+                raise ValueError(f"{name} neutral artifact parity error {parity_error}")
+            artifacts[name] = artifact
         leaderboard.append(
             {
                 "model": name,
@@ -388,7 +506,19 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                 "trainSeconds": train_seconds,
                 "inferenceMsPerDecision": 1000 * infer_seconds / max(1, metrics["decisions"]),
                 "modelBytes": len(pickle.dumps({"model": model, "scaler": scaler if scale else None})),
+                "neutralArtifactMaxError": parity_error,
             }
+        )
+
+    learned_rows = [row for row in leaderboard if row["model"] in artifacts]
+    selected = sorted(learned_rows, key=lambda row: (-row["top1"], row["candidateNll"], row["model"]))[0]["model"]
+    if args.models_dir is not None:
+        args.models_dir.mkdir(parents=True, exist_ok=True)
+        for name, artifact in artifacts.items():
+            (args.models_dir / f"{name}.json").write_text(json.dumps(artifact, separators=(",", ":")) + "\n", encoding="utf-8")
+        (args.models_dir / "selected-model.json").write_text(
+            json.dumps(artifacts[selected], separators=(",", ":")) + "\n",
+            encoding="utf-8",
         )
 
     hashes = {
@@ -398,6 +528,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     report = {
         "schemaVersion": SCHEMA_VERSION,
         "metricScope": "offline imitation of the recorded source policy; not battle win rate",
+        "selectedBattlePolicy": selected,
         "seed": args.seed,
         "data": {
             "decisions": len(decisions),
@@ -413,6 +544,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "identity": hashes,
         },
         "generation": load_generation_metrics(args.data),
+        "rolloutSelection": rollout_selection,
         "leaderboard": sorted(leaderboard, key=lambda row: (-row["top1"], row["candidateNll"])),
     }
     return json.loads(json.dumps(report))
@@ -429,6 +561,12 @@ def markdown(report: dict[str, Any]) -> str:
         f"mean candidates: {report['data']['meanCandidates']:.2f}.",
         f"Generation: {report['generation']['shards']} runner shards, {report['generation']['waves']} waves, "
         f"{report['generation']['meanEngineMsPerWave']:.0f} engine ms/wave.",
+        (
+            f"Exploratory rollouts: {report['rolloutSelection']['successfulEpisodes']}/"
+            f"{report['rolloutSelection']['episodes']} reached their requested horizon; "
+            f"{report['rolloutSelection']['decisionsAfterSelection']}/"
+            f"{report['rolloutSelection']['decisionsBeforeSelection']} decisions retained."
+        ),
         "",
         "| Model | Top-1 | Top-3 | MRR | Candidate NLL | Train s | ms/decision | Size KiB |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -447,6 +585,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--report-json", type=Path, required=True)
     parser.add_argument("--report-md", type=Path, required=True)
+    parser.add_argument("--models-dir", type=Path)
+    parser.add_argument(
+        "--elite-rollouts",
+        action="store_true",
+        help="retain epsilon-tree decisions only from episodes that reached their requested horizon",
+    )
     parser.add_argument("--seed", type=int, default=20260728)
     return parser.parse_args()
 

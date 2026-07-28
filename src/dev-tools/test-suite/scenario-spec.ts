@@ -17,11 +17,16 @@
  * Pure logic only (no DOM) so it stays unit-testable.
  */
 
-import { type DevEnemyMonSpec, setPendingDevEnemyParty } from "#app/dev-tools/registry";
+import {
+  type DevEnemyMonSpec,
+  setPendingDevEnemyParty,
+  setSkipNextDevEnemyModifierGeneration,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
+import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
@@ -77,6 +82,8 @@ export interface SpecMon {
   female?: boolean | undefined;
   /** Whether the saved run member had its innate/passive unlock enabled. */
   passive?: boolean | undefined;
+  /** Per-Pokemon held items. Applied to this exact party member after spawn. */
+  heldItems?: SpecItemRow[] | undefined;
 }
 
 export interface SpecEnemyMon extends SpecMon {
@@ -84,12 +91,6 @@ export interface SpecEnemyMon extends SpecMon {
   isBoss?: boolean | undefined;
   status?: number | undefined;
   bossSegments?: number | undefined;
-  /**
-   * Enemy held items / modifiers ({name: modifierTypes key, count?, type?}).
-   * Applies via ENEMY_HELD_ITEMS_OVERRIDE (the whole enemy side), enabling
-   * Frisk / Knock Off / Trick / Bug Bite / berry tests.
-   */
-  heldItems?: SpecItemRow[] | undefined;
 }
 
 /** One ability id disabled for a fixed number of completed turns. */
@@ -180,6 +181,8 @@ export interface ScenarioSpec {
          */
         battleRng?: "min" | undefined;
         difficulty?: "youngster" | "ace" | "elite" | "hell" | undefined;
+        /** Scenario-only enemy brain. `hardest` forces the experimental Hell profile at full sharpness. */
+        enemyAi?: "shipping" | "hardest" | undefined;
         challenges?: { id: number; value: number }[] | undefined;
       }
     | undefined;
@@ -410,17 +413,18 @@ function applyAbilitySuppression(side: "player" | "enemy", suppression: SpecAbil
  * side-wide enemy override at this mon's rows, then restoring it. Synchronous, so
  * the swap is invisible to anything else.
  */
-function applyEnemyHeldItemsToMon(mon: Pokemon, rows: SpecItemRow[] | undefined): void {
+function applyHeldItemsToMon(mon: Pokemon, rows: SpecItemRow[] | undefined, isPlayer: boolean): void {
   const overrides = toModifierOverrides(rows);
   if (overrides.length === 0) {
     return;
   }
-  const prev = O.ENEMY_HELD_ITEMS_OVERRIDE;
-  O.ENEMY_HELD_ITEMS_OVERRIDE = overrides;
+  const key = isPlayer ? "STARTING_HELD_ITEMS_OVERRIDE" : "ENEMY_HELD_ITEMS_OVERRIDE";
+  const prev = O[key];
+  O[key] = overrides;
   try {
-    overrideHeldItems(mon, false);
+    overrideHeldItems(mon, isPlayer);
   } finally {
-    O.ENEMY_HELD_ITEMS_OVERRIDE = prev;
+    O[key] = prev;
   }
 }
 
@@ -520,6 +524,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       O.BATTLE_STYLE_OVERRIDE = "double";
     }
     setErDifficulty(run.difficulty ?? "ace");
+    const hardestEnemyAi = run.enemyAi === "hardest";
+    setErSmartAiTestForced(hardestEnemyAi);
+    setErAiExperimentalMode(hardestEnemyAi ? "all" : "off");
 
     // Enemy side.
     const enemy = spec.enemy;
@@ -611,6 +618,7 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
         return m;
       });
       setPendingDevEnemyParty(devParty);
+      setSkipNextDevEnemyModifierGeneration();
       // Don't downgrade a triple to a double: a triple keeps its 3-wide style set above.
       if (devParty.length >= 2 && !run.triple) {
         O.BATTLE_STYLE_OVERRIDE = "double";
@@ -659,6 +667,15 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     applyStatus("enemy", 2, start.enemy3Status);
     applyAbilitySuppression("player", start.playerAbilitySuppression);
     applyAbilitySuppression("enemy", start.enemyAbilitySuppression);
+    if (spec.party.some(member => (member.heldItems?.length ?? 0) > 0)) {
+      const playerParty = globalScene.getPlayerParty();
+      spec.party.slice(0, 6).forEach((member, index) => {
+        const mon = playerParty[index];
+        if (mon) {
+          applyHeldItemsToMon(mon, member.heldItems, true);
+        }
+      });
+    }
     // Wild ability slot: applied live (simplest reliable path).
     const wildSlot = spec.enemy?.kind === "wild" ? spec.enemy.wild?.abilitySlot : undefined;
     if (wildSlot !== undefined) {
@@ -688,7 +705,7 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
           mon.setBoss(true, Math.min(10, p.bossSegments));
           mon.initBattleInfo();
         }
-        applyEnemyHeldItemsToMon(mon, p.heldItems);
+        applyHeldItemsToMon(mon, p.heldItems, false);
       });
     }
   };

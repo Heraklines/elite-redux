@@ -47,6 +47,7 @@ import {
   consumePendingDevShop,
   consumePendingDevStarterLevels,
   consumePendingDevStarters,
+  consumeSkipNextDevEnemyModifierGeneration,
   type DevMenuCtx,
   registerDevMenu,
   setPendingDevBattleSetup,
@@ -993,6 +994,7 @@ registerDevMenu(ctx => {
   consumePendingDevBattleSetup();
   consumePendingDevShop();
   consumePendingDevEnemyParty();
+  consumeSkipNextDevEnemyModifierGeneration();
   consumePendingDevCustomTrainerForce();
   scenarioBanner?.remove();
   scenarioBanner = null;

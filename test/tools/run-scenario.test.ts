@@ -118,6 +118,15 @@ import {
   enumerateErCombatCandidates,
   snapshotErCombatObservation,
 } from "#data/elite-redux/ai/combat-engine-adapter";
+import {
+  ER_COMBAT_FEATURE_SCHEMA_VERSION,
+  extractErCombatCandidateFeatures,
+} from "#data/elite-redux/ai/combat-features";
+import {
+  type ErTreeModelArtifact,
+  scoreErTreeModel,
+  validateErTreeModel,
+} from "#data/elite-redux/ai/combat-tree-model";
 import { getErPendingNodes, resetErRouting, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { TerrainType } from "#data/terrain";
 import { getTypeDamageMultiplier } from "#data/type";
@@ -361,6 +370,29 @@ const AI_DEX_HASH = (process.env.ER_AI_DEX_HASH ?? "unknown").trim();
 const AI_DICTIONARY_HASH = (process.env.ER_AI_DICTIONARY_HASH ?? "unknown").trim();
 const AI_EPISODE_ID = (process.env.ER_AI_EPISODE_ID ?? INPUT?.run?.seed ?? "local-episode").trim();
 const AI_DATASET_RECORDS: ErCombatDatasetRecord[] = [];
+const AI_MODEL_PATH = (process.env.ER_AI_POLICY_MODEL ?? "").trim();
+const AI_POLICY_MODE = (process.env.ER_AI_POLICY_MODE ?? "first-usable").trim();
+const AI_POLICY_EPSILON = Number(process.env.ER_AI_POLICY_EPSILON ?? "0");
+if (!["first-usable", "smart-default"].includes(AI_POLICY_MODE)) {
+  throw new Error(`unsupported ER_AI_POLICY_MODE: ${AI_POLICY_MODE}`);
+}
+if (!Number.isFinite(AI_POLICY_EPSILON) || AI_POLICY_EPSILON < 0 || AI_POLICY_EPSILON > 1) {
+  throw new Error(`ER_AI_POLICY_EPSILON must be between 0 and 1: ${AI_POLICY_EPSILON}`);
+}
+
+function loadAiTreeModel(path: string): ErTreeModelArtifact | null {
+  if (!path) {
+    return null;
+  }
+  const model = JSON.parse(readFileSync(path.startsWith("@") ? path.slice(1) : path, "utf8")) as ErTreeModelArtifact;
+  const errors = validateErTreeModel(model);
+  if (errors.length > 0) {
+    throw new Error(`invalid ER tree model ${path}: ${errors.join("; ")}`);
+  }
+  return model;
+}
+
+const AI_TREE_MODEL = loadAiTreeModel(AI_MODEL_PATH);
 
 function computeWaves(): number {
   const env = Number(process.env.ER_RUN_WAVES);
@@ -873,8 +905,14 @@ function buildAiDecisionForSlot({
     earlierCandidateIds: earlier.map(choice => choice.id),
     observation: snapshotErCombatObservation(game.scene),
     candidates,
+    featureSchemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
+    candidateFeatures: [],
     chosenCandidateId: chosen.id,
   };
+  record.candidateFeatures = candidates.map(candidate => ({
+    candidateId: candidate.id,
+    values: extractErCombatCandidateFeatures(record.observation, candidate),
+  }));
   const validationErrors = validateCombatDecisionRecord(record);
   if (validationErrors.length > 0) {
     throw new Error(`invalid AI combat decision ${record.decisionId}: ${validationErrors.join("; ")}`);
@@ -1554,12 +1592,25 @@ async function playBattle(
     for (let turn = 1; turn <= opts.maxTurns; turn++) {
       turnsPlayed++;
       console.log(`\n=== WAVE ${wave} TURN ${turn} (wave ${game.scene.currentBattle?.waveIndex}) ===`);
-      const action = opts.script?.[turn - 1];
+      const scriptedAction = opts.script?.[turn - 1];
+      const action =
+        scriptedAction
+        ?? (opts.forcedMove == null && (AI_TREE_MODEL || AI_POLICY_MODE === "smart-default")
+          ? unattendedPolicyAction(game)
+          : undefined);
       recordAiTurn(
         game,
         action,
         opts.forcedMove ?? null,
-        action ? "scripted" : opts.forcedMove == null ? "first-usable" : "forced-move",
+        scriptedAction
+          ? "scripted"
+          : AI_TREE_MODEL && opts.forcedMove == null
+            ? unattendedSourcePolicy()
+            : AI_POLICY_MODE === "smart-default" && opts.forcedMove == null
+              ? "smart-default-v1"
+              : opts.forcedMove == null
+                ? "first-usable"
+                : "forced-move",
       );
       doPlayerActions(game, action, opts.forcedMove ?? null, actionLog);
       if (action && hasEnemyForce(action)) {
@@ -2383,6 +2434,98 @@ function smartDefaultAction(game: GameManager): TurnAction {
   return a;
 }
 
+function setCandidateAction(
+  game: GameManager,
+  action: TurnAction,
+  actorSlot: number,
+  candidate: ErCombatCandidate,
+): void {
+  const targetRef = candidate.kind === "move" && candidate.targets.length === 1 ? candidate.targets[0] : undefined;
+  const targetMon = targetRef
+    ? (targetRef.side === "self" ? game.scene.getPlayerField() : game.scene.getEnemyField())[targetRef.activeSlot]
+    : undefined;
+  const target = targetMon?.getBattlerIndex();
+  const chosenAction: SlotAction =
+    candidate.kind === "move"
+      ? { move: candidate.moveId, tera: candidate.tera, target }
+      : candidate.kind === "switch"
+        ? { switch: candidate.partyIndex }
+        : {};
+  if (actorSlot === 0) {
+    Object.assign(action, chosenAction);
+  } else if (actorSlot === 1) {
+    action.move2 = chosenAction.move;
+    action.target2 = chosenAction.target;
+    action.tera2 = chosenAction.tera;
+    action.switch2 = chosenAction.switch;
+  } else {
+    action.move3 = chosenAction.move;
+    action.target3 = chosenAction.target;
+    action.tera3 = chosenAction.tera;
+    action.switch3 = chosenAction.switch;
+  }
+}
+
+function deterministicPolicyFraction(key: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index++) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 0x1_0000_0000;
+}
+
+function treeModelAction(game: GameManager, model: ErTreeModelArtifact): TurnAction {
+  const observation = snapshotErCombatObservation(game.scene);
+  const action: TurnAction = {};
+  const earlier: ErCombatEarlierChoice[] = [];
+  const field = game.scene.getPlayerField();
+  for (let actorSlot = 0; actorSlot < field.length; actorSlot++) {
+    const actor = field[actorSlot];
+    if (!actor?.isActive(true) || actor.isFainted()) {
+      continue;
+    }
+    // Shift commands are not yet represented by TurnAction; doubles (the baseline
+    // training/eval format) never enumerate them. Keep triple data legal but do not
+    // let an unsupported action leak into execution.
+    const candidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier).filter(
+      candidate => candidate.kind !== "shift",
+    );
+    const ranked = candidates
+      .map(candidate => ({
+        candidate,
+        score: scoreErTreeModel(model, extractErCombatCandidateFeatures(observation, candidate)),
+      }))
+      .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id));
+    const policyKey = `${AI_EPISODE_ID}:${observation.wave}:${observation.turn}:${actorSlot}`;
+    const explore = AI_POLICY_EPSILON > 0 && deterministicPolicyFraction(`${policyKey}:explore`) < AI_POLICY_EPSILON;
+    const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * candidates.length);
+    const chosen = (explore ? candidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate;
+    if (!chosen) {
+      continue;
+    }
+    setCandidateAction(game, action, actorSlot, chosen);
+    earlier.push({
+      kind: chosen.kind,
+      id: chosen.id,
+      ...(chosen.kind === "switch" ? { partyIndex: chosen.partyIndex } : {}),
+      ...(chosen.kind === "move" ? { tera: chosen.tera } : {}),
+    });
+  }
+  return action;
+}
+
+function unattendedPolicyAction(game: GameManager): TurnAction {
+  return AI_TREE_MODEL ? treeModelAction(game, AI_TREE_MODEL) : smartDefaultAction(game);
+}
+
+function unattendedSourcePolicy(): ErCombatDecisionRecord["sourcePolicy"] {
+  if (AI_TREE_MODEL) {
+    return AI_POLICY_EPSILON > 0 ? "epsilon-tree-v1" : "tree-model-v1";
+  }
+  return "smart-default-v1";
+}
+
 /** Play the CURRENT battle wave to completion (victory / wipe / maxTurns). */
 async function playWaveTurns(
   game: GameManager,
@@ -2407,12 +2550,12 @@ async function playWaveTurns(
     // Scripted action for this turn; else force the requested move; else pick the best
     // damaging move per slot (so type immunities don't wall an otherwise-winnable wave).
     const scriptedAction = opts.script?.[turn - 1];
-    const action = scriptedAction ?? (opts.forcedMove == null ? smartDefaultAction(game) : undefined);
+    const action = scriptedAction ?? (opts.forcedMove == null ? unattendedPolicyAction(game) : undefined);
     recordAiTurn(
       game,
       action,
       opts.forcedMove ?? null,
-      scriptedAction ? "scripted" : opts.forcedMove == null ? "smart-default-v1" : "forced-move",
+      scriptedAction ? "scripted" : opts.forcedMove == null ? unattendedSourcePolicy() : "forced-move",
     );
     doPlayerActions(game, action, opts.forcedMove ?? null, st.log);
     if (action && hasEnemyForce(action)) {
@@ -2627,7 +2770,11 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
         ? `player action: scripted (${SCRIPT.length} turns)`
         : FORCED_MOVE
           ? `player action: force ${MoveId[FORCED_MOVE]} every turn`
-          : "player action: first usable move",
+          : AI_TREE_MODEL
+            ? `player action: tree model ${AI_TREE_MODEL.modelName}${AI_POLICY_EPSILON > 0 ? ` (epsilon ${AI_POLICY_EPSILON})` : ""}`
+            : AI_POLICY_MODE === "smart-default"
+              ? "player action: smart-default-v1"
+              : "player action: first usable move",
     );
 
     const bootStart = performance.now();
@@ -3071,6 +3218,31 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
       enemy.getHeldItems().some(m => m.type.name.toLowerCase().includes("leftovers")),
       "enemy should hold Leftovers",
     ).toBe(true);
+  }, 180_000);
+
+  it("per-mon player held items are applied to their exact party members", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "per-mon player held items",
+      run: { level: 100, difficulty: "ace", double: true },
+      party: [
+        { species: SpeciesId.SNORLAX, moves: [MoveId.SPLASH], heldItems: [{ name: "LEFTOVERS" }] },
+        { species: SpeciesId.PIKACHU, moves: [MoveId.SPLASH], heldItems: [{ name: "SHELL_BELL" }] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.CHANSEY, level: 100, moves: [MoveId.SPLASH] },
+          { species: SpeciesId.BLISSEY, level: 100, moves: [MoveId.SPLASH] },
+        ],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, {});
+    const party = game.scene.getPlayerParty();
+    expect(party[0].getHeldItems().some(item => item.type.name.toLowerCase().includes("leftovers"))).toBe(true);
+    expect(party[0].getHeldItems().some(item => item.type.name.toLowerCase().includes("shell bell"))).toBe(false);
+    expect(party[1].getHeldItems().some(item => item.type.name.toLowerCase().includes("shell bell"))).toBe(true);
+    expect(party[1].getHeldItems().some(item => item.type.name.toLowerCase().includes("leftovers"))).toBe(false);
   }, 180_000);
 
   it("extended expect surface reports Nature, items, money, progress, balls, and biome mismatches", async () => {
