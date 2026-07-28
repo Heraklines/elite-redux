@@ -5027,3 +5027,41 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   progression. Legacy sessions keep the existing broadcast and PartnerSync behavior.
 - The failure-first remote regression drops every counter broadcast/request after real reward `controlInstalled` and
   requires both engines to reach the next command through the signed successor.
+
+## 2026-07-28 - Catch-full and Revival fallback clocks begin at actionable control
+
+- Catch-full and guest-owned Revival no longer spend their 60-second human-decision allowance while the owner is
+  replaying, projecting, or waiting for its exact shared-interaction control. Authority V2 first proves the source
+  entry's peer `controlInstalled` stage, then arms one address-owned runtime `humanInput` lease.
+- Only that lease's own expiry can authorize the deterministic fallback. Runtime teardown, recovery fencing,
+  supersession, relay cancellation, or loss of address currentness aborts the wait and fails the shared boundary
+  closed. The non-owning Revival watcher has runtime cancellation but no independent V2 decision clock. Legacy paths
+  retain their prior bounded waits.
+- The common proof-gated helper now also rechecks replacement currentness at the timer edge. Source contracts cover
+  a 180-second pre-proof delay with no timer consumption, a fresh post-proof window, cancellation, and supersession.
+  Browser/co-op engine qualification remains remote-only; no deployment occurred.
+
+## 2026-07-28 - Current exact-browser evidence
+
+- Depth run `30394475090` cleared three requested waves at `3762ab6b`; animation-on surface run `30395226190` cleared
+  two full waves at `7bdd300f`, including ordered switch/off-field HP presentation, and integrated guest-owned faint
+  replacement run `30395226264` is green.
+- Surface screenshots show matching battle geometry, HP/status state, trainer/background cleanup, and an ordered
+  Flame Body ability popup. Per-seat prompt/active-Pokemon differences are expected ownership views, not divergence.
+- Mystery run `30394475044` mechanically cleared its requested three-wave prefix with two exact retained encounters
+  and zero proxy failures. A later screenshot at the same wave-2 interaction address exposed a transient HUD label
+  discrepancy (`Town 1` versus `Town 2`); this remains a presentation-proof item even though both replicas later
+  converged on `Town 4`.
+
+## 2026-07-28 - Guest-owned Bargain releases only from its immutable V2 result
+
+- A guest-owned Giratina Bargain still waited up to the legacy 20-minute raw-outcome domain after proposing its
+  result, even though the Authority V2 interaction commit already carried complete state and a typed successor.
+  Losing the compatibility FIFO could park the real phase indefinitely.
+- The guest owner now parks the exact runtime/operation/phase identity. Only the admitted `BARGAIN`
+  `INTERACTION_COMMIT`, after complete state apply and an address-matching `AWAIT_SUCCESSOR` control claim, can invoke
+  the phase terminal and publish its material proof. Raw relay material, stale IDs, and ambient phases cannot release
+  progression. Host-owned watcher compatibility and all non-V2 behavior remain unchanged.
+- A failure-first DUO case swallows the old raw result materializer and requires both the real phase terminal and its
+  exact installed successor. The engine row runs remotely in Lane B; no local co-op engine/browser execution or
+  deployment occurred.
