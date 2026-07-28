@@ -477,12 +477,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
-  // SKIPPED pending iteration: the watch survives the sweep (core assertion holds when run alone)
-  // but the guest's post-leave advance runs as a CROSS-CTX continuation (the parked await resolves
-  // while the HOST ctx is active), so the guest counter assertion + a state bleed into the next
-  // probe fail. Fix by resolving the leave under withClientSync(guestCtx) like the ME harness
-  // gotcha #5, then un-skip. Filed under the #792 sweep.
-  it.skip("PROBE resync-stress: a mid-park resync cancelWaiters sweep SPARES the live market watch", async () => {
+  it("PROBE resync-stress: a mid-park resync cancelWaiters sweep SPARES the live market watch", async () => {
     // The #718 class: a battle resync's cancelWaiters once knocked watchers off LIVE shops. The
     // market watch parks on the 7M seq band; fire the resync's exact orphan-selector sweep while
     // the watcher is parked mid-market and assert the watch survives to the owner's leave.
@@ -561,7 +556,11 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
 
     // OWNER leaves -> the spared watch must complete + both counters advance once.
     await withClient(rig.hostCtx, async () => {
-      leaveCb?.(-1);
+      // The loopback delivers the watch terminal synchronously. Bind that receiver continuation to the
+      // guest realm exactly as a second browser would be bound to its own global scene; otherwise this
+      // shared-process fixture can resume the guest watcher while the host scene is ambient and counterfeit
+      // a cross-client state leak.
+      withClientSync(rig.guestCtx, () => leaveCb?.(-1));
       for (let i = 0; i < 8; i++) {
         await drainLoopback();
       }

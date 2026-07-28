@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "ab1918e5e4c084c7b49e24ae099ac279c981568d",
+  "baseSha": "75e1d3256a5f8a5c5eebf369067d47e75fb07768",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -170,6 +170,7 @@
     "test/node/authority-v2-soak-actionability.test.ts",
     "test/node/authority-v2-wave.test.ts",
     "test/node/coop-replacement-continuation-park.test.ts",
+    "test/node/coop-test-migration-completeness.test.ts",
     "test/node/coop-turn-recorder-summon-window.test.ts",
     "test/scripts/coop-focused-static-workflow.test.mjs",
     "test/scripts/coop-presentation-authority.test.mjs",
@@ -182,6 +183,7 @@
     "test/tests/elite-redux/coop/coop-dexnav-owner-gate.test.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-boundary.test.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-exploration.test.ts",
     "test/tests/elite-redux/coop/coop-duo-mystery.test.ts",
     "test/tests/elite-redux/coop/coop-faint-switch-operation.test.ts",
     "test/tests/elite-redux/coop/coop-form-change-ordering.test.ts",
@@ -240,7 +242,5 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": [
-    "src/data/elite-redux/coop/coop-transport.ts"
-  ]
+  "lockedSchemaFiles": []
 }
