@@ -1382,7 +1382,7 @@ async function driveBattleWave(rig, policy, stats) {
               }),
       },
     );
-    const { outcomeCursors, expectedCommandAddress } = commandRound;
+    const { outcomeCursors, expectedCommandAddress, commandPartition } = commandRound;
     if (pendingCommandProof != null) {
       try {
         await rig.assertSequentialCommandFrontier(commandRound, pendingCommandProof.cursors, pendingCommandProof.name, {
@@ -1393,7 +1393,13 @@ async function driveBattleWave(rig, policy, stats) {
           allowAddressRepeat: true,
           expectedWave: rig.activeBattleWave,
         });
-        await rig.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
+        await rig.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name, {
+          retainedTurnAddress: pendingCommandProof.retainedTurnAddress,
+          // If the authoritative collection-close proof says the guest has no command at the successor
+          // address (for example its final Pokemon fainted), no guest continuationReady event can exist.
+          // The exact V2 retirement/subsumption proof remains the progression authority.
+          allowGuestOmission: commandPartition?.omitted.some(candidate => candidate.label === rig.guest.label) === true,
+        });
       } catch (error) {
         // Belt-and-braces for the wave-end transient (see the pre-round probe above): if the
         // frontier never converged because the wave actually ENDED, honor the real outcome.
@@ -1516,7 +1522,11 @@ async function driveBattleWave(rig, policy, stats) {
     if (outcome.kind === "command") {
       // The next command owners open one at a time. The next sequential round proves and
       // consumes both public surfaces before asserting two-sided continuation convergence.
-      pendingCommandProof = { cursors: from, name: `wave-${stats.wave}-turn-${turn}-next-command` };
+      pendingCommandProof = {
+        cursors: from,
+        name: `wave-${stats.wave}-turn-${turn}-next-command`,
+        retainedTurnAddress: expectedCommandAddress,
+      };
     }
     commandCursors = from;
   }

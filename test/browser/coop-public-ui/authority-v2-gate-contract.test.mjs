@@ -1708,6 +1708,32 @@ test("the public continuation oracle proves exact V2 retirement or authenticated
   assert.match(proof, /"v2-subsumption" : "v2-retirement"/u);
 });
 
+test("an authoritatively omitted guest uses exact V2 turn retirement instead of waiting for an impossible ACK", () => {
+  const proofStart = publicUiHarness.indexOf("async assertRetainedContinuation(");
+  const proofEnd = publicUiHarness.indexOf("\n  async assertRetainedRewardTerminal(", proofStart);
+  const proof = publicUiHarness.slice(proofStart, proofEnd);
+  assert.match(proof, /allowGuestOmission && !v2TurnCutover/u, "legacy turns still require their guest ACK");
+  assert.match(
+    proof,
+    /const guestEvent = allowGuestOmission[\s\S]*?\? null[\s\S]*?: await this\.guest\.evidence\.waitFor/u,
+    "an exact V2 omission never starts the impossible guest ACK wait",
+  );
+  assert.match(proof, /retainedTurnAddress \?\? acknowledgedTurnAddress/u);
+  assert.match(proof, /side: allowGuestOmission \? "authoritatively-omitted" : "ack"/u);
+
+  const battleStart = campaignDriver.indexOf("async function driveBattleWave(");
+  const battleEnd = campaignDriver.indexOf("\n/**\n * The client that reports ITSELF", battleStart);
+  const battle = campaignDriver.slice(battleStart, battleEnd);
+  assert.match(battle, /const \{ outcomeCursors, expectedCommandAddress, commandPartition \} = commandRound/u);
+  assert.match(battle, /retainedTurnAddress: pendingCommandProof\.retainedTurnAddress/u);
+  assert.match(
+    battle,
+    /commandPartition\?\.omitted\.some\(candidate => candidate\.label === rig\.guest\.label\) === true/u,
+    "only the exact authoritative command partition may omit the guest ACK",
+  );
+  assert.match(battle, /retainedTurnAddress: expectedCommandAddress/u);
+});
+
 test("a materially complete non-control entry wakes the exact command frontier it already owns", () => {
   const markStart = coopRuntime.indexOf("function markCoopV2ControlMaterialApplied(");
   const markEnd = coopRuntime.indexOf("\n}\n", markStart) + 2;

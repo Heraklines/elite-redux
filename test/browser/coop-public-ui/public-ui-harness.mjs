@@ -3137,22 +3137,49 @@ export class DuoPublicUiRig {
     return comparable;
   }
 
-  async assertRetainedContinuation(cursors, proofName) {
+  async assertRetainedContinuation(
+    cursors,
+    proofName,
+    { retainedTurnAddress = null, allowGuestOmission = false } = {},
+  ) {
     if (!this.host || !this.guest) {
       throw new Error(`${proofName}: retained continuation proof requires a paired host and guest`);
     }
-    const guestEvent = await this.guest.evidence.waitFor(GUEST_CONTINUATION_ACK, {
-      from: cursors[this.guest.label],
-      timeoutMs: this.config.timeoutMs,
-      description: `${proofName} guest continuationReady ACK`,
-    });
-    const guestMatch = GUEST_CONTINUATION_ACK.exec(guestEvent.text);
-    if (!guestMatch) {
+    const v2TurnCutover = this.host.evidence.events.some(event => V2_TURN_AUTHORITY_CUTOVER.test(event.text ?? ""));
+    if (allowGuestOmission && !v2TurnCutover) {
+      throw new Error(`${proofName}: a legacy retained turn cannot omit its guest continuationReady ACK`);
+    }
+    const guestEvent = allowGuestOmission
+      ? null
+      : await this.guest.evidence.waitFor(GUEST_CONTINUATION_ACK, {
+          from: cursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: `${proofName} guest continuationReady ACK`,
+        });
+    const guestMatch = guestEvent == null ? null : GUEST_CONTINUATION_ACK.exec(guestEvent.text);
+    if (!allowGuestOmission && !guestMatch) {
       throw new Error(`${proofName}: malformed guest continuationReady evidence`);
     }
-    const retainedAddress = guestMatch.slice(1).join(":");
-    const [epoch, wave, turn] = guestMatch.slice(1, 4);
-    const v2TurnCutover = this.host.evidence.events.some(event => V2_TURN_AUTHORITY_CUTOVER.test(event.text ?? ""));
+    const acknowledgedTurnAddress = guestMatch?.slice(1, 4).join(":") ?? null;
+    if (
+      retainedTurnAddress != null
+      && acknowledgedTurnAddress != null
+      && retainedTurnAddress !== acknowledgedTurnAddress
+    ) {
+      throw new Error(
+        `${proofName}: continuation ACK ${acknowledgedTurnAddress} disagrees with retained turn ${retainedTurnAddress}`,
+      );
+    }
+    const exactTurnAddress = retainedTurnAddress ?? acknowledgedTurnAddress;
+    const exactTurnParts = exactTurnAddress?.split(":") ?? [];
+    if (
+      exactTurnParts.length !== 3
+      || exactTurnParts.some(part => !Number.isSafeInteger(Number(part)) || Number(part) < 0)
+    ) {
+      throw new Error(`${proofName}: missing or malformed retained turn address ${exactTurnAddress ?? "(missing)"}`);
+    }
+    const [epoch, wave, turn] = exactTurnParts;
+    const retainedAddress = guestMatch?.slice(1).join(":") ?? exactTurnAddress;
     let v2ContinuationProof = "legacy-release";
     if (v2TurnCutover) {
       const operationId = `TURN/e${epoch}/w${wave}/t${turn}`;
@@ -3207,7 +3234,11 @@ export class DuoPublicUiRig {
         description: `${proofName} host exact-address retained release`,
       });
     }
-    this.guest.evidence.record("retained-continuation-proof", { proofName, retainedAddress, side: "ack" });
+    this.guest.evidence.record("retained-continuation-proof", {
+      proofName,
+      retainedAddress,
+      side: allowGuestOmission ? "authoritatively-omitted" : "ack",
+    });
     this.host.evidence.record("retained-continuation-proof", {
       proofName,
       retainedAddress,

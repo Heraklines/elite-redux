@@ -5065,3 +5065,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A failure-first DUO case swallows the old raw result materializer and requires both the real phase terminal and its
   exact installed successor. The engine row runs remotely in Lane B; no local co-op engine/browser execution or
   deployment occurred.
+
+## 2026-07-28 - A fainted omitted seat no longer creates an impossible browser ACK wait
+
+- Corrected Mystery run `30396716542` exposed a harness-only false red after healthy wave-2 mechanics: the guest's
+  final active Pokemon fainted with no legal bench, and the authority installed the exact turn-6 command frontier for
+  seat 0 alone. The public oracle correctly proved seat 1 was omitted by an authoritative `FaintPhase` collection
+  close, yet then unconditionally waited for that omitted seat's turn-5 `continuationReady` ACK until timeout.
+- The retained-continuation proof now accepts guest omission only from that exact command partition and only under
+  Authority V2. It proves the predecessor turn's exact authenticated retirement/subsumption instead of starting an
+  impossible ACK wait. Legacy retains the mandatory ACK, and an ACK that does exist must match the retained turn
+  address.
+- Source contracts are 105/105 green. This changes only the observer/driver verdict; production progression and the
+  strict authoritative collection-close proof are unchanged.
