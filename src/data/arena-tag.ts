@@ -50,6 +50,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { CommonBattleAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { recordDirectCoopCommonAnimPresentation } from "#data/elite-redux/coop/coop-common-anim-presentation";
 import { erApplyRoomServiceOnTrickRoom, erTacticalBlocksHazards } from "#data/elite-redux/er-tactical-items";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -586,6 +587,7 @@ export abstract class ConditionalProtectTag extends ArenaTag {
     isProtected.value = true;
     if (!simulated) {
       // TODO: This is a floating animation promise
+      recordDirectCoopCommonAnimPresentation(CommonAnim.PROTECT, defender);
       new CommonBattleAnim(CommonAnim.PROTECT, defender).play();
       globalScene.phaseManager.queueMessage(
         i18next.t(this.onProtectMessageKey, {

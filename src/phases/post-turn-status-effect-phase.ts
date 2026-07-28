@@ -2,6 +2,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { CommonBattleAnim } from "#data/battle-anims";
+import { recordDirectCoopCommonAnimPresentation } from "#data/elite-redux/coop/coop-common-anim-presentation";
 import { getStatusEffectActivationText } from "#data/status-effect";
 import type { BattlerIndex } from "#enums/battler-index";
 import { CommonAnim } from "#enums/move-anims-common";
@@ -58,7 +59,9 @@ export class PostTurnStatusEffectPhase extends PokemonPhase {
       pokemon.updateInfo();
       applyAbAttrs("PostDamageAbAttr", { pokemon, damage: damage.value });
     }
-    new CommonBattleAnim(CommonAnim.POISON + (pokemon.status.effect - 1), pokemon).play(false, () => this.end());
+    const statusAnim = (CommonAnim.POISON + (pokemon.status.effect - 1)) as CommonAnim;
+    recordDirectCoopCommonAnimPresentation(statusAnim, pokemon);
+    new CommonBattleAnim(statusAnim, pokemon).play(false, () => this.end());
   }
 
   override end() {
