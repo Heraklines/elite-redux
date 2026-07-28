@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -60,12 +61,12 @@ export function getActuallyFieldedCoopPokemon(side?: "player" | "enemy"): Pokemo
     );
 }
 
-function completeTweensOf(target: object | object[]): void {
+function completeTweensOf(target: object | object[], scene: BattleScene = globalScene): void {
   try {
     // Advance through the remaining finite tween so Phaser applies its final values and callback. Calling
     // Tween.complete() alone only dispatches completion; it does not write the target's final properties.
     // Info panels need the actual final x/mask state or a half-finished show/hide leaves them off-screen.
-    for (const tween of [...globalScene.tweens.getTweensOf(target)]) {
+    for (const tween of [...scene.tweens.getTweensOf(target)]) {
       if (tween.paused) {
         tween.resume();
       }
@@ -77,9 +78,9 @@ function completeTweensOf(target: object | object[]): void {
 }
 
 /** Stop presentation motion without executing tween completion callbacks. */
-function killTweensOf(target: object | object[]): void {
+function killTweensOf(target: object | object[], scene: BattleScene = globalScene): void {
   try {
-    globalScene.tweens.killTweensOf(target);
+    scene.tweens.killTweensOf(target);
   } catch {
     /* a torn-down/headless tween manager must not block the absolute visual settle */
   }
@@ -116,23 +117,23 @@ function hidePokemonPresentation(pokemon: Pokemon): void {
 }
 
 /** Settle one trainer at its hidden, next-entrance-ready presentation state. */
-export function settleCoopTrainerPresentation(which: "player" | "enemy"): void {
+export function settleCoopTrainerPresentation(which: "player" | "enemy", scene: BattleScene = globalScene): void {
   if (which === "player") {
-    const trainer = globalScene.trainer;
+    const trainer = scene.trainer;
     // ShowTrainerPhase owns a tween whose completion callback ends the gameplay phase. A renderer repair
     // must never execute that callback: it can advance the queue while an authority frame is applying.
-    killTweensOf(trainer);
+    killTweensOf(trainer, scene);
     // ShowTrainerPhase restores `visible`, but not alpha. Keep the persistent player trainer ready for
     // its next entrance while container visibility provides the absolute hidden postcondition.
     trainer.setVisible(false).setAlpha(1);
     return;
   }
 
-  const trainer = globalScene.currentBattle?.trainer;
+  const trainer = scene.currentBattle?.trainer;
   if (trainer == null) {
     return;
   }
-  completeTweensOf([trainer, ...trainer.getSprites(), ...trainer.getTintSprites()]);
+  completeTweensOf([trainer, ...trainer.getSprites(), ...trainer.getTintSprites()], scene);
   // A trainer caught fully shown with no active hide tween still needs the normal hidden (+16,-16)
   // staging position so the next BattlePhase.showEnemyTrainer relative tween returns to the same base.
   if (trainer.alpha > 0) {

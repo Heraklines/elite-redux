@@ -1313,7 +1313,15 @@ export class EvidenceSink {
   }
 
   /** Find canonical host/renderer presentation evidence without depending on debug-log wording. */
-  findPresentationEvent({ stage = null, eventKind = null, reason = null, from = 0 } = {}) {
+  findPresentationEvent({
+    stage = null,
+    eventKind = null,
+    reason = null,
+    wave = null,
+    turn = null,
+    seq = null,
+    from = 0,
+  } = {}) {
     return this.events
       .slice(from)
       .find(
@@ -1321,7 +1329,10 @@ export class EvidenceSink {
           event.kind === "browser-presentation-event"
           && (stage == null || event.observation.stage === stage)
           && (eventKind == null || event.observation.event.k === eventKind)
-          && (reason == null || event.observation.reason === reason),
+          && (reason == null || event.observation.reason === reason)
+          && (wave == null || event.observation.wave === wave)
+          && (turn == null || event.observation.turn === turn)
+          && (seq == null || event.observation.seq === seq),
       );
   }
 
