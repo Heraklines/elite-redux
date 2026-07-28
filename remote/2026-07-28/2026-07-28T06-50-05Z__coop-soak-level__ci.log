@@ -1,0 +1,58 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run_mode: calibrated-release
+calibration_id: level-55-faint
+target_sha: 5a3cd401243eb3f5f3f0d8e7b20588996741d7d9
+checked_out_sha: 5a3cd401243eb3f5f3f0d8e7b20588996741d7d9
+base_seed: 20260728
+campaign_seed: 20260728
+run: 30335798920 (workflow source 5a3cd401243eb3f5f3f0d8e7b20588996741d7d9)
+timestamp: 2026-07-28T06-50-05Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260728 WAVES=55 - replay this run with:  SOAK_SEED=20260728 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] DONE seed=20260728 waves=55/55 resyncHeals=0 assertions=0 findings=0 trainerWaves=6 (fixed=5 random=1) skips={"mysteryEncounterDisabledV1":1} elapsedMs=263112
+
+----- vitest result tail -----
+[coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+[coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+[coop:transport] recv host t=interaction screen=__turn__ handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:interaction] RECV interaction broadcast (deferred catch-up net) received=1 localBefore=1 role=host -> no defer (local >= received)
+[coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[coop:v2-authority] receipt rev=3 op=V2/WAVE/e1828066715766135/w1/tick21 stage=controlInstalled sender=1 generation=0 rejected reason=unknown-revision
+[coop:v2-authority] receipt rev=4 op=1828066715766135:0:REWARD_PRESENT:0 stage=controlInstalled sender=1 generation=0 rejected reason=unknown-revision
+[coop:v2-authority] receipt rev=4 op=1828066715766135:0:REWARD_PRESENT:0 stage=controlInstalled sender=1 generation=0 rejected reason=unknown-revision
+[coop:v2-authority] receipt rev=5 op=1828066715766135:0:REWARD:0 stage=admitted sender=1 generation=0 advanced retired=false waiting=[1] subsumed=[]
+[coop:v2-authority] receipt rev=5 op=1828066715766135:0:REWARD:0 stage=admitted sender=1 generation=0 duplicate highestStage=0
+[coop:v2-authority] receipt rev=5 op=1828066715766135:0:REWARD:0 stage=materialApplied sender=1 generation=0 advanced retired=false waiting=[1] subsumed=[]
+[coop:v2-authority] receipt rev=5 op=1828066715766135:0:REWARD:0 stage=controlInstalled sender=1 generation=0 advanced retired=true waiting=[] subsumed=[]
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[33m[coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=1, counter=1, pendingRemote=1) live counter UNCHANGED (folds in at next advance if still ahead)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:interaction] interactionCounter() read -> 1 (role=guest)
+[coop:interaction] interactionCounter() read -> 1 (role=guest)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:interaction] interactionCounter() read -> 1 (role=host)
+[coop:interaction] interactionCounter() read -> 1 (role=guest)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:interaction] interactionCounter() read -> 1 (role=host)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:interaction] interactionCounter() read -> 1 (role=guest)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[32mStart Phase: NewBattlePhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[32mStart Phase: CoopPartnerSyncPhase[39m
+[coop:interaction] interactionCounter() read -> 1 (role=host)
+
