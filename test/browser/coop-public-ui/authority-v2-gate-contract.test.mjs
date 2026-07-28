@@ -1698,13 +1698,19 @@ test("ordinary replacement projection has an immutable fallback when cosmetic fa
   const prepare = coopRuntime.slice(prepareStart, prepareEnd);
   const readsImmutableEntry = prepare.indexOf("v2ControlLedger.sourceEntryOf(control)");
   const checksExactControl = prepare.indexOf("controlsEqual(sourceEntry.nextControl, control)");
-  const queuesExactPicker = prepare.indexOf('unshiftNew("CoopGuestFaintSwitchPhase"');
+  const createsExactPicker = prepare.indexOf('create("CoopGuestFaintSwitchPhase"');
+  const queuesExactPicker = prepare.indexOf("unshiftPhase(createReplacement())");
+  const preemptsParkedReplay = prepare.indexOf("replaceAwaitingAuthorityWithCoopV2Replacement(createReplacement())");
   const releasesFinalizer = prepare.lastIndexOf("releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry)");
   assert.ok(readsImmutableEntry >= 0, "projection starts from the retained mechanical entry");
   assert.ok(checksExactControl > readsImmutableEntry, "the retained entry must state the identical control");
   assert.ok(
-    queuesExactPicker > checksExactControl,
+    createsExactPicker > checksExactControl && queuesExactPicker > createsExactPicker,
     "the exact picker is reconstructed without a faint-event side token",
+  );
+  assert.ok(
+    preemptsParkedReplay > checksExactControl,
+    "a replacement-open can preempt the replay wait that depends on the picker's future commit",
   );
   assert.ok(
     releasesFinalizer > queuesExactPicker,
@@ -1717,6 +1723,26 @@ test("ordinary replacement projection has an immutable fallback when cosmetic fa
   assert.ok(projectEnd > projectStart, "ordinary interaction projector has a bounded source block");
   const project = coopRuntime.slice(projectStart, projectEnd);
   assert.match(project, /prepareCoopV2OrdinaryReplacementControlSurface\(runtime, control\)/u);
+
+  const replayYieldStart = replayTurnPhase.indexOf("public replaceAwaitingAuthorityWithCoopV2Replacement(");
+  const replayYieldEnd = replayTurnPhase.indexOf("\n  public override start()", replayYieldStart);
+  assert.ok(replayYieldStart >= 0 && replayYieldEnd > replayYieldStart, "the replacement replay-yield seam is bounded");
+  const replayYield = replayTurnPhase.slice(replayYieldStart, replayYieldEnd);
+  assert.match(
+    replayYield,
+    /this\.entryPresentationOnly \|\| !this\.isAwaitingAuthority\(\)/u,
+    "only a genuinely idle authority wait may yield to replacement input",
+  );
+  assert.match(
+    replayYield,
+    /phaseManager\.getCurrentPhase\(\) !== this/u,
+    "a detached or superseded replay cannot replace the live phase tree",
+  );
+  assert.match(
+    replayYield,
+    /replaceWithCoopAuthoritativePhase\(this, successor\)[\s\S]*supersedeTurnWait\(this\.turn, this\.sourceWave\)/u,
+    "the exact picker atomically owns progression before the obsolete stream wait is released",
+  );
 });
 
 test("a won-wave faint reopens replacement only through one exact phase-owned CONTROL_COMMIT", () => {

@@ -398,6 +398,33 @@ export class CoopReplayTurnPhase extends Phase {
     return this.awaitingAuthority && !this.aborted && !this.ended;
   }
 
+  /**
+   * Yield an idle authority wait to the exact replacement picker that can produce the awaited checkpoint.
+   *
+   * An ordinary replacement-open can arrive after TurnInit has already parked this phase waiting for the
+   * corresponding REPLACEMENT_COMMIT. Queueing the picker behind that wait is a closed cycle: the authority
+   * cannot publish the commit until the owner picks, while this replay cannot end until it receives the commit.
+   * Only an exact-address wait with no presentation in flight is safe to replace. Chained replacement commits
+   * call the central projector synchronously while this flag is false and retain their existing queue+end path.
+   */
+  public replaceAwaitingAuthorityWithCoopV2Replacement(successor: Phase): boolean {
+    if (this.entryPresentationOnly || !this.isAwaitingAuthority()) {
+      return false;
+    }
+    const phaseManager = this.ownerPhaseManager ?? globalScene.phaseManager;
+    if (phaseManager.getCurrentPhase() !== this) {
+      return false;
+    }
+    const streamer = getCoopBattleStreamer();
+    if (streamer == null || !phaseManager.replaceWithCoopAuthoritativePhase(this, successor)) {
+      return false;
+    }
+    // retire() fenced this phase before the promise resolves. Wake the obsolete addressed wait now so its
+    // detached continuation observes `aborted` and cannot survive until the normal authority timeout.
+    streamer.supersedeTurnWait(this.turn, this.sourceWave);
+    return true;
+  }
+
   public override start(): void {
     super.start();
     activeCoopReplayTurnPhase = this;

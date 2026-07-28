@@ -7410,6 +7410,14 @@ function prepareCoopV2OrdinaryReplacementControlSurface(
   }
   const projectsBehindTurnFinalizer = current.is("CoopFinalizeTurnPhase");
   const projectsBehindReplacementReplay = current.is("CoopReplayTurnPhase");
+  const parkedReplacementReplay =
+    projectsBehindReplacementReplay
+    && typeof (current as { replaceAwaitingAuthorityWithCoopV2Replacement?: unknown })
+      .replaceAwaitingAuthorityWithCoopV2Replacement === "function"
+      ? (current as unknown as {
+          replaceAwaitingAuthorityWithCoopV2Replacement: (successor: Phase) => boolean;
+        })
+      : null;
   const replacementOpenMaterial = decodeControlOpenEntry(sourceEntry);
   const projectsFromReplacementOpen =
     replacementOpenMaterial?.kind === "replacement-open"
@@ -7434,15 +7442,27 @@ function prepareCoopV2OrdinaryReplacementControlSurface(
   ) {
     return false;
   }
-  const projectReplacement = (): void => {
-    phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", control.fieldIndex, {
+  const createReplacement = (): Phase =>
+    phaseManager.create("CoopGuestFaintSwitchPhase", control.fieldIndex, {
       wave: control.wave,
       turn: control.turn,
       occurrence: control.occurrence,
     });
+  const projectReplacement = (): void => {
+    phaseManager.unshiftPhase(createReplacement());
   };
   if (parkedCommand == null) {
-    projectReplacement();
+    // Public depth run 30357074506: TurnInit had already constructed an ordinary replay because the
+    // replacement carrier was pending. The immutable replacement-open then queued its picker BEHIND that
+    // replay, while the replay waited for the checkpoint only that picker could cause. Atomically replace an
+    // idle authority wait with the exact picker. A replay synchronously applying a prior replacement commit
+    // is not awaiting authority, so it keeps the established queue+end chained-replacement transaction.
+    if (
+      parkedReplacementReplay == null
+      || !parkedReplacementReplay.replaceAwaitingAuthorityWithCoopV2Replacement(createReplacement())
+    ) {
+      projectReplacement();
+    }
   } else if (
     // A chained replacement can be materially applied a few milliseconds after the replay that carried
     // its predecessor ends. The local phase manager may fill that gap with the next CommandPhase. Only
@@ -7455,9 +7475,10 @@ function prepareCoopV2OrdinaryReplacementControlSurface(
   }
   runtime.v2ProjectedReplacementControlId = controlId;
   // TURN_COMMIT successors park in CoopFinalizeTurnPhase and must be released through its exact claim.
-  // A chained REPLACEMENT_COMMIT is applied by the already-idle CoopReplayTurnPhase that consumed the
-  // out-of-band checkpoint. That replay has no generic finalizer release seam: it ends only after the
-  // checkpoint transaction ACKs continuationReady, at which point the queued picker becomes current.
+  // A chained REPLACEMENT_COMMIT is applied synchronously by the CoopReplayTurnPhase that consumed the
+  // out-of-band checkpoint. That replay is not parked on authority, so it ends only after the checkpoint
+  // transaction ACKs continuationReady, at which point its queued picker becomes current. An independently
+  // arriving replacement-open instead atomically replaced an idle replay above and needs no finalizer release.
   if (projectsBehindTurnFinalizer) {
     releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry);
   }
