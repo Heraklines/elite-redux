@@ -36,6 +36,8 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
+import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
@@ -64,6 +66,7 @@ import {
   clearCoopSchedulerActiveTimeClock,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostPartyRewardOwner,
@@ -114,6 +117,7 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
   afterEach(() => {
     resetCoopRewardOperationFlag();
     resetCoopRewardOperationState();
+    setCoopWaveBarrierMs(60_000);
     // Never let the active-time clock override bleed into the next test / file (no-op if never installed).
     clearCoopSchedulerActiveTimeClock();
     logs.dispose();
@@ -208,6 +212,121 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the counter once").toBe(counterBefore + 1);
     logs.flush();
   }, 300_000);
+
+  it.runIf(process.env.COOP_AUTHORITY_V2_INTERACTION === "on")(
+    "AUTHORITY V2: a projected reward successor ignores every legacy interaction-counter carrier",
+    async () => {
+      expect(isCoopRewardOperationEnabled(), "the migrated reward-operation path is active for this test").toBe(true);
+      // Failure-first cadence only: before the production fix, dropped counter broadcasts strand each side
+      // in CoopPartnerSyncPhase. Keep that legacy failure bounded instead of spending the file timeout there.
+      setCoopWaveBarrierMs(20);
+
+      let rewardPresentationCommitSeen = false;
+      let rewardPresentationControlInstalledSeen = false;
+      let legacyCounterCarrierAttempts = 0;
+      const pair = wrapCoopFaultPair(
+        createLoopbackPair(),
+        {
+          drop: 1,
+          reorder: 0,
+          delay: 0,
+          faultable: (message: CoopMessage): boolean => {
+            if (
+              message.t === "authorityEntry"
+              && message.body.kind === "INTERACTION_COMMIT"
+              && message.body.operationId.includes(":REWARD_PRESENT:")
+            ) {
+              rewardPresentationCommitSeen = true;
+              return false;
+            }
+            if (
+              rewardPresentationCommitSeen
+              && message.t === "authorityReceipt"
+              && message.body.stage === "controlInstalled"
+              && message.body.operationId.includes(":REWARD_PRESENT:")
+            ) {
+              rewardPresentationControlInstalledSeen = true;
+              return false;
+            }
+            const legacyCounterCarrier =
+              message.t === "requestInteractionCounter"
+              || (message.t === "interaction" && message.screen === "__turn__");
+            if (rewardPresentationControlInstalledSeen && legacyCounterCarrier) {
+              legacyCounterCarrierAttempts += 1;
+              return true;
+            }
+            return false;
+          },
+        },
+        { seed: 0x52e7_a2 },
+      );
+
+      const SLOT = 0;
+      forceItemRewards(game.override, [{ name: "LEFTOVERS" }]);
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+      const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+      expect(
+        isCoopV2InteractionCutoverActive(rig.hostRuntime.durability),
+        "the host negotiated the Authority V2 interaction cutover",
+      ).toBe(true);
+      wireGuestCommand(rig);
+
+      const turn = rig.hostScene.currentBattle.turn;
+      await hostPlayWave(rig);
+      await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      await withClient(rig.hostCtx, async () => {
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+      });
+      const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
+      await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+
+      await withClient(rig.hostCtx, () =>
+        driveHostPartyRewardOwner(hostShop, {
+          slot: SLOT,
+          // Arm the counter-drop membrane only after the complete V2 reward presentation has installed its
+          // address-exact control on the replica. The following public PARTY input therefore cannot inherit
+          // permission from a raw counter frame.
+          partnerReady: async () => {
+            for (let attempt = 0; attempt < 32 && !rewardPresentationControlInstalledSeen; attempt++) {
+              await withClient(rig.guestCtx, () => drainLoopback());
+              await withClient(rig.hostCtx, () => drainLoopback());
+            }
+            expect(rewardPresentationCommitSeen, "the immutable REWARD_PRESENT entry crossed the wire").toBe(true);
+            expect(
+              rewardPresentationControlInstalledSeen,
+              "the replica proved the exact reward control installed before human input",
+            ).toBe(true);
+          },
+        }),
+      );
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+
+      // The cursor still advances locally as persisted material, but V2 emits no legacy counter carrier and
+      // queues no peer-counter release phase. Pre-fix, those carriers are dropped above and wave 2 never opens.
+      expect(rig.hostRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
+      expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
+      expect(
+        legacyCounterCarrierAttempts,
+        "no interaction counter broadcast/request remains after V2 installed control",
+      ).toBe(0);
+
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
+      await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "wave 2 CommandPhase after the signed reward successor", {
+          matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === 2,
+        }),
+      );
+      expect(rig.hostScene.currentBattle.waveIndex, "the authority crossed the typed reward successor").toBe(2);
+      expect(rig.guestScene.currentBattle.waveIndex, "the replica crossed the same typed reward successor").toBe(2);
+      expect(rig.hostScene.phaseManager.getCurrentPhase()?.phaseName).not.toBe("CoopPartnerSyncPhase");
+      expect(rig.guestScene.phaseManager.getCurrentPhase()?.phaseName).not.toBe("CoopPartnerSyncPhase");
+      logs.flush();
+    },
+    300_000,
+  );
 
   it("DURABILITY: dropping the REAL V2 reward INTERACTION_COMMIT forces host redelivery + exactly-once apply", async () => {
     expect(isCoopRewardOperationEnabled(), "the migrated reward-operation path is active for this test").toBe(true);

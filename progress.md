@@ -5016,3 +5016,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The full and focused gates now explicitly run all `test/scripts/coop-*.test.mjs`, all node-pure
   `authority-v2-*.test.ts`, and all node-pure `coop-*.test.ts`. The focused aggregate requires this parallel contract
   job, closing the gap where presentation and migration-completeness contracts were never executed by CI.
+
+## 2026-07-28 - Reward successors no longer depend on the legacy interaction counter
+
+- Ordinary reward completion still queued `CoopPartnerSyncPhase` after a valid V2 result, leaving a raw
+  `interaction/__turn__` counter as a second progression authority. A lost/stale counter could therefore strand or
+  terminate a mechanically converged session.
+- Under active Authority V2, both replicas now derive the persisted alternation cursor locally from the immutable
+  commit and return before broadcasting or waiting on the legacy counter. The typed successor/projector alone releases
+  progression. Legacy sessions keep the existing broadcast and PartnerSync behavior.
+- The failure-first remote regression drops every counter broadcast/request after real reward `controlInstalled` and
+  requires both engines to reach the next command through the signed successor.
