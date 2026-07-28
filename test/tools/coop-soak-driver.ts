@@ -2535,19 +2535,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let committedBiomeOperationId: string | null = null;
       let hostBiomeProjected = false;
       let guestBiomeBoundary: BiomeBoundarySeam | null = null;
-      const hostArrangement = rig.hostScene.currentBattle.arrangement;
-      const guestArrangement = rig.guestScene.currentBattle.arrangement;
-      // The host owns battle identity. A replica reconstructed from an authoritative state image can
-      // legitimately reach this boundary before its cosmetic `isClassicFinalBoss` flag has been copied,
-      // even though both engines already expose the exact 1v1 stage-one geometry. Production's host-side
-      // CommandPhase makes the same decision from the host battle and publishes ARRIVE-ONLY; requiring the
-      // guest's non-authoritative flag made the soak demand a guest CommandPhase that cannot exist.
-      const finalBossStageOne =
-        rig.hostScene.currentBattle.isClassicFinalBoss
-        && hostArrangement.playerCapacity === 1
-        && hostArrangement.enemyCapacity === 1
-        && guestArrangement.playerCapacity === 1
-        && guestArrangement.enemyCapacity === 1;
       await withClient(rig.hostCtx, () => beforeHostCross?.());
       for (;;) {
         const boundary = restartAlreadyOpenHost
@@ -2786,6 +2773,19 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
         break;
       }
+      // Sample the finale boundary only AFTER the loop above has driven the real NewBattle/encounter tail.
+      // At a wave-199 -> wave-200 crossing, sampling before that loop observes the old doubles arrangement
+      // and makes the soak demand a guest CommandPhase even though production's live wave-200 host correctly
+      // publishes ARRIVE-ONLY. Battle identity comes from the authority; exact 1v1 geometry on both engines
+      // proves that the replica has no guest-owned command slot to materialize.
+      const hostArrangement = rig.hostScene.currentBattle.arrangement;
+      const guestArrangement = rig.guestScene.currentBattle.arrangement;
+      const finalBossStageOne =
+        rig.hostScene.currentBattle.isClassicFinalBoss
+        && hostArrangement.playerCapacity === 1
+        && hostArrangement.enemyCapacity === 1
+        && guestArrangement.playerCapacity === 1
+        && guestArrangement.enemyCapacity === 1;
       // Both production browsers start their first queued CommandPhase independently. The authority's
       // host-owned phase must therefore start before the replica can pass its read-only field-0 phase:
       // that exact start commits CONTROL_COMMIT, which is the sole ordered permission for the guest to

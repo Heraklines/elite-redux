@@ -218,10 +218,19 @@ test("a directly assigned co-op integration test does not manufacture cross-lane
 
 test("representative soak never manufactures a command rendezvous and scopes the spectator to final-boss stage one", () => {
   assert.doesNotMatch(soakDriver, /rendezvous\.reannounce\(point\)/u);
-  const spectatorDecision = soakDriver.slice(
-    soakDriver.indexOf("const finalBossStageOne ="),
-    soakDriver.indexOf("await withClient(rig.hostCtx, () => beforeHostCross?.());"),
+  const commandCrossing = soakDriver.slice(
+    soakDriver.indexOf("const crossCommandBoundaryWithReplayGuest = async"),
+    soakDriver.indexOf("/** Play ONE host wave"),
   );
+  const spectatorDecisionIndex = commandCrossing.indexOf("const finalBossStageOne =");
+  const lastTransitionProjectionIndex = commandCrossing.lastIndexOf("if (guestCrossroadsProjected");
+  const hostCommandIndex = commandCrossing.indexOf("let hostCommand:");
+  assert.ok(lastTransitionProjectionIndex >= 0, "the source contract found the real transition loop tail");
+  assert.ok(
+    spectatorDecisionIndex > lastTransitionProjectionIndex && spectatorDecisionIndex < hostCommandIndex,
+    "final-boss actionability is sampled after the live transition and before either command is driven",
+  );
+  const spectatorDecision = commandCrossing.slice(spectatorDecisionIndex, hostCommandIndex);
   assert.match(
     spectatorDecision,
     /rig\.hostScene\.currentBattle\.isClassicFinalBoss[\s\S]*hostArrangement\.playerCapacity === 1[\s\S]*hostArrangement\.enemyCapacity === 1[\s\S]*guestArrangement\.playerCapacity === 1[\s\S]*guestArrangement\.enemyCapacity === 1/u,
