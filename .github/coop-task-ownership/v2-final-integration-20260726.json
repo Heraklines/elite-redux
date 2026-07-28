@@ -222,5 +222,5 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": ["src/data/elite-redux/coop/coop-operation-envelope.ts"]
 }
