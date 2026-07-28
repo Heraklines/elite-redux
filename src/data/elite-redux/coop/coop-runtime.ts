@@ -11198,10 +11198,13 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
       return false;
     },
     executeDestination: () => {
+      const trainerVictoryMaterial =
+        payload.destination.kind === "reward" ? payload.destination.trainerVictoryMaterial : null;
       if (
         payload.destination.kind === "reward"
         && payload.destination.trainerVictory
-        && installCoopTrainerVictoryMaterial(globalScene, payload.destination.trainerVictoryMaterial) == null
+        && (trainerVictoryMaterial == null
+          || installCoopTrainerVictoryMaterial(globalScene, trainerVictoryMaterial) == null)
       ) {
         return false;
       }

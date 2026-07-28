@@ -226,18 +226,26 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
         && destination.continuation !== "encounter"
         && destination.continuation !== "none")
       || typeof destination.trainerVictory !== "boolean"
-      || !(destination.trainerVictory
-        ? isCompleteCoopTrainerVictoryMaterial(destination.trainerVictoryMaterial)
-        : destination.trainerVictoryMaterial === null)
       || !isCompleteCoopMeRewardSurfacePlan(rewardSurfaces)
       || typeof destination.eggLapse !== "boolean"
     ) {
       return false;
     }
+    let trainerVictoryMaterial: CoopTrainerVictoryMaterial | null;
+    if (destination.trainerVictory) {
+      if (!isCompleteCoopTrainerVictoryMaterial(destination.trainerVictoryMaterial)) {
+        return false;
+      }
+      trainerVictoryMaterial = destination.trainerVictoryMaterial;
+    } else {
+      if (destination.trainerVictoryMaterial !== null) {
+        return false;
+      }
+      trainerVictoryMaterial = null;
+    }
     const commonValid =
       (!destination.trainerVictory || destination.result === "victory")
-      && (!destination.trainerVictory
-        || destination.trainerVictoryMaterial.sourceWave === outcome.authoritativeState.wave)
+      && (trainerVictoryMaterial == null || trainerVictoryMaterial.sourceWave === outcome.authoritativeState.wave)
       && ((rewardSurfaces.length === 0 && !destination.eggLapse) || destination.continuation === "rewards");
     return value.terminal === "reward-settled"
       ? commonValid && destination.continuation === "rewards" && destination.trainerVictory === false
