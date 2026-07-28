@@ -351,15 +351,14 @@ if (
 if (
   !browserEntry.includes("hp: pokemon.hp")
   || !browserEntry.includes("maxHp: pokemon.getMaxHp()")
+  || !browserEntry.includes('uiMode === "PARTY" || uiMode === "COMMAND"')
   || !campaign.includes("export function chooseRewardPartyTargetSlot(")
   || !campaign.includes('observation?.surfaceId === "reward-shop"')
   || !campaign.includes("slot.fainted === true")
   || !campaign.includes("slot.hp < slot.maxHp")
   || !campaign.includes("chooseRewardPartyTargetSlot(boundary, driver.partySlot ?? 0)")
 ) {
-  failures.push(
-    "reward targeting must derive a legal revive/healing slot from the read-only visible party and reward projections",
-  );
+  failures.push("command/reward targeting must derive legal owned slots from the read-only visible party projection");
 }
 if (
   evidence?.includes("/operation delivery retries exhausted/iu")

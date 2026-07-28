@@ -293,11 +293,82 @@ export function chooseBestCampaignMove(observation, cycleIndex = 0) {
   return candidates[normalizedCycle % candidates.length] ?? null;
 }
 
+function partyHealthRatio(slot) {
+  return typeof slot?.hp === "number" && typeof slot?.maxHp === "number" && slot.maxHp > 0
+    ? slot.hp / slot.maxHp
+    : null;
+}
+
 /**
- * Submit the strongest visible usable move through the ordinary command and fight
- * menus. All decisions come from the public semantic mirror; all state changes are
- * Space/arrow key presses. Target selection remains owned by the harness's addressed
- * command-target driver.
+ * Choose a voluntary switch only when this seat's active is critically injured and one of its own
+ * visible reserves is meaningfully healthier. The command screen already renders the party team bar;
+ * this helper reads its semantic mirror but performs no mutation. Requiring a 25-point health gain
+ * prevents the driver from oscillating between two equally damaged mons merely to manufacture coverage.
+ */
+export function chooseVoluntarySwitchTarget(observation, criticalRatio = 0.4, minimumGain = 0.25) {
+  if (
+    observation?.surfaceId !== "command:command"
+    || !/^(?:host|guest)$/u.test(observation.localRole)
+    || !Array.isArray(observation.partySlots)
+  ) {
+    return null;
+  }
+  const owned = observation.partySlots.filter(slot => slot?.coopOwner === observation.localRole);
+  const active = owned.find(slot => slot?.active === true && slot?.fainted !== true);
+  const activeRatio = partyHealthRatio(active);
+  if (activeRatio == null || activeRatio > criticalRatio) {
+    return null;
+  }
+  const reserve = owned
+    .filter(slot => slot?.active !== true && slot?.fainted !== true && slot?.allowedInBattle === true)
+    .map(slot => ({ slot, ratio: partyHealthRatio(slot) }))
+    .filter(candidate => candidate.ratio != null && candidate.ratio >= activeRatio + minimumGain)
+    .sort((left, right) => right.ratio - left.ratio || left.slot.slot - right.slot.slot)[0]?.slot;
+  return Number.isSafeInteger(reserve?.slot) ? `party-slot:${reserve.slot}` : null;
+}
+
+async function driveCampaignVoluntarySwitch(client, command, targetId, purpose, timeoutMs) {
+  const partyCursor = client.evidence.cursor();
+  await selectOptionById(client, {
+    surfaceId: "command:command",
+    targetId: "command:pokemon",
+    navKeys: ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"],
+    submitKey: "Space",
+    fromCursor: command.index,
+    timeoutMs,
+  });
+  await selectOptionById(client, {
+    surfaceId: "party",
+    targetId,
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submit: false,
+    fromCursor: partyCursor,
+    timeoutMs,
+  });
+  const actionMenuCursor = client.evidence.cursor();
+  await client.press("Space", `${purpose}-open-${targetId}`);
+  const actionMenu = await client.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(actionMenuCursor, "party");
+      return event?.observation.optionIds?.includes("party-option:send-out") ? event : null;
+    },
+    { timeoutMs, description: `${purpose} actionable party SEND OUT submenu` },
+  );
+  await selectOptionById(client, {
+    surfaceId: "party",
+    targetId: "party-option:send-out",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    fromCursor: actionMenu.index,
+    timeoutMs,
+  });
+  client.evidence.record("campaign-voluntary-switch", { purpose, targetId });
+}
+
+/**
+ * Submit a survivability-aware command through the ordinary command UI: make a proven healthier
+ * voluntary switch when the acting mon is critical, otherwise choose the strongest visible usable
+ * move. All decisions come from the public semantic mirror; all state changes are Space/arrow key
+ * presses. Move target selection remains owned by the harness's addressed command-target driver.
  */
 export async function driveBestCampaignMove(
   client,
@@ -310,6 +381,11 @@ export async function driveBestCampaignMove(
       : client.evidence.findLastSemanticSurface(0, "command:command");
   if (command == null) {
     throw new Error(`${client.label}: ${purpose} exposed no command:command semantic surface`);
+  }
+  const switchTarget = chooseVoluntarySwitchTarget(command.observation);
+  if (switchTarget != null) {
+    await driveCampaignVoluntarySwitch(client, command, switchTarget, purpose, timeoutMs);
+    return;
   }
   const fightCursor = client.evidence.cursor();
   // CommandUiHandler remembers its cursor. A cancelled/superseded target flow can therefore reopen

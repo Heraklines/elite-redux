@@ -1491,7 +1491,7 @@ function observeSemanticSurface(): void {
     const moveSlots = readFightMoveSlots(uiMode);
     const starterGridCandidates = uiMode === "STARTER_SELECT" ? readStarterGridCandidates(handler) : null;
     const partySlots =
-      uiMode === "PARTY"
+      uiMode === "PARTY" || uiMode === "COMMAND"
         ? globalScene.getPlayerParty().map((pokemon, slot) => {
             const active = pokemon.isActive(true);
             const fainted = pokemon.isFainted();

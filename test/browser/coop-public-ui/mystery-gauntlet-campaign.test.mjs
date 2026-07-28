@@ -20,6 +20,7 @@ import {
   chooseAffordableStarterPair,
   chooseBestCampaignMove,
   chooseNavigationKey,
+  chooseVoluntarySwitchTarget,
   selectOptionById,
 } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
@@ -233,6 +234,36 @@ test("campaign fight policy prefers a usable damaging move and follows the visib
   });
 });
 
+test("campaign switch policy chooses only the acting seat's meaningfully healthier reserve", () => {
+  const observation = {
+    surfaceId: "command:command",
+    localRole: "guest",
+    partySlots: [
+      { slot: 0, coopOwner: "host", active: true, fainted: false, hp: 4, maxHp: 20, allowedInBattle: true },
+      { slot: 1, coopOwner: "guest", active: true, fainted: false, hp: 6, maxHp: 20, allowedInBattle: true },
+      { slot: 2, coopOwner: "host", active: false, fainted: false, hp: 20, maxHp: 20, allowedInBattle: true },
+      { slot: 3, coopOwner: "guest", active: false, fainted: false, hp: 18, maxHp: 20, allowedInBattle: true },
+    ],
+  };
+  assert.equal(chooseVoluntarySwitchTarget(observation), "party-slot:3");
+  assert.equal(
+    chooseVoluntarySwitchTarget({
+      ...observation,
+      partySlots: observation.partySlots.map(slot => (slot.slot === 1 ? { ...slot, hp: 14 } : slot)),
+    }),
+    null,
+    "a healthy active must not be swapped merely to generate switch coverage",
+  );
+  assert.equal(
+    chooseVoluntarySwitchTarget({
+      ...observation,
+      partySlots: observation.partySlots.map(slot => (slot.slot === 3 ? { ...slot, hp: 8 } : slot)),
+    }),
+    null,
+    "a marginal reserve must not cause low-HP switch thrashing",
+  );
+});
+
 test("campaign move driving semantically selects Fight instead of assuming the remembered command cursor", async () => {
   const navigation = await readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8");
   const start = navigation.indexOf("export async function driveBestCampaignMove");
@@ -240,8 +271,13 @@ test("campaign move driving semantically selects Fight instead of assuming the r
   const drive = navigation.slice(start, end);
 
   assert.ok(start >= 0 && end > start, "the campaign move driver is present");
+  assert.match(drive, /chooseVoluntarySwitchTarget\(command\.observation\)/u);
+  assert.match(drive, /driveCampaignVoluntarySwitch\(client, command, switchTarget, purpose, timeoutMs\)/u);
   assert.match(drive, /surfaceId: "command:command"[\s\S]+targetId: "command:fight"/u);
   assert.doesNotMatch(drive, /client\.press\("Space", `\$\{purpose\}-open-fight`\)/u);
+
+  assert.match(navigation, /surfaceId: "party"[\s\S]+targetId: "party-option:send-out"/u);
+  assert.match(navigation, /client\.evidence\.record\("campaign-voluntary-switch"/u);
 });
 
 test("title navigation never shortcuts upward into the notification inbox", () => {
