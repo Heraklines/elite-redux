@@ -56,6 +56,7 @@ import Overrides from "#app/overrides";
 import { CommonBattleAnim, MoveChargeAnim } from "#data/battle-anims";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { healEntranceFromConfusion } from "#data/elite-redux/ability-upgrades/requested-field-effects";
+import { recordDirectCoopCommonAnimPresentation } from "#data/elite-redux/coop/coop-common-anim-presentation";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { hasOtherErMajorStatus } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
@@ -2161,6 +2162,7 @@ export class ProtectedTag extends BattlerTag {
 
   lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
     if (lapseType === BattlerTagLapseType.CUSTOM) {
+      recordDirectCoopCommonAnimPresentation(CommonAnim.PROTECT, pokemon);
       new CommonBattleAnim(CommonAnim.PROTECT, pokemon).play();
       globalScene.phaseManager.queueMessage(
         i18next.t("battlerTags:protectedLapse", {

@@ -30,7 +30,9 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { getArenaTag } from "#data/arena-tag";
 import { CommonBattleAnim } from "#data/battle-anims";
+import { ProtectedTag } from "#data/battler-tags";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import {
   coopPresentationOutcome,
@@ -54,7 +56,10 @@ import {
 } from "#data/elite-redux/coop/coop-turn-recorder";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { TerrainType } from "#data/terrain";
+import { ArenaTagSide } from "#enums/arena-tag-side";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerIndex } from "#enums/battler-index";
+import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { GameModes } from "#enums/game-modes";
 import { HitResult } from "#enums/hit-result";
@@ -89,6 +94,7 @@ import { PokemonAnimPhase } from "#phases/pokemon-anim-phase";
 import { PokemonTransformPhase } from "#phases/pokemon-transform-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { installLocalV2TurnReplicaFixture, negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
+import { BooleanHolder } from "#utils/common";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -953,6 +959,46 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     environment.recordCoopPresentationAtEnqueue();
     expect(endCoopRecording().events).toEqual([]);
+  });
+
+  it("records direct Protect and team-guard VFX in exact authority order", async () => {
+    const field = await startCoopHost();
+    endCoopRecording();
+    const player = field[0];
+    const enemy = globalScene.getEnemyField()[0];
+    const playSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation(() => {});
+
+    beginCoopRecording(10, "direct-common-vfx");
+    new ProtectedTag(MoveId.PROTECT).lapse(player, BattlerTagLapseType.CUSTOM);
+    const quickGuard = getArenaTag(ArenaTagType.QUICK_GUARD, 1, MoveId.QUICK_GUARD, player.id, ArenaTagSide.PLAYER);
+    if (quickGuard == null) {
+      throw new Error("Quick Guard arena tag fixture was not constructed");
+    }
+    expect(
+      quickGuard.apply(false, new BooleanHolder(false), enemy, player, MoveId.QUICK_ATTACK, new BooleanHolder(false)),
+    ).toBe(true);
+    const recording = endCoopRecording();
+
+    expect(recording.events.filter(event => event.k === "commonAnim")).toEqual([
+      {
+        k: "commonAnim",
+        anim: CommonAnim.PROTECT,
+        bi: player.getBattlerIndex(),
+        actor: { side: "player", pokemonId: player.id },
+        targetBi: player.getBattlerIndex(),
+        targetActor: { side: "player", pokemonId: player.id },
+      },
+      {
+        k: "commonAnim",
+        anim: CommonAnim.PROTECT,
+        bi: player.getBattlerIndex(),
+        actor: { side: "player", pokemonId: player.id },
+        targetBi: player.getBattlerIndex(),
+        targetActor: { side: "player", pokemonId: player.id },
+      },
+    ]);
+    expect(playSpy, "the authority still plays each ordinary local VFX once").toHaveBeenCalledTimes(2);
+    playSpy.mockRestore();
   });
 
   it("records one exact Pokemon sprite transition and bounds its renderer outcome", async () => {

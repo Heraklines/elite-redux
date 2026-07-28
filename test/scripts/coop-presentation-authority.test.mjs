@@ -218,6 +218,46 @@ test("plain common battle animations are authority-authored at enqueue and repla
   assert.match(replayPump, /case "commonAnim":[\s\S]+"CoopCommonAnimReplayPhase"/u);
 });
 
+test("direct common battle animations enter the same immutable presentation stream exactly once", () => {
+  const helper = read("src/data/elite-redux/coop/coop-common-anim-presentation.ts");
+  const battlerTags = read("src/data/battler-tags.ts");
+  const arenaTags = read("src/data/arena-tag.ts");
+  const postTurnStatus = read("src/phases/post-turn-status-effect-phase.ts");
+  const obtainStatus = read("src/phases/obtain-status-effect-phase.ts");
+  const tera = read("src/phases/tera-phase.ts");
+
+  assert.match(
+    helper,
+    /recordCoopEvent\(\{\s*k: "commonAnim"[\s\S]+actor:[\s\S]+targetActor:/u,
+    "the direct-call adapter must retain exact source and target identities",
+  );
+  assert.match(
+    battlerTags,
+    /recordDirectCoopCommonAnimPresentation\(CommonAnim\.PROTECT, pokemon\);\s*new CommonBattleAnim\(CommonAnim\.PROTECT, pokemon\)\.play\(\)/u,
+    "single-target Protect must record immediately before its floating VFX",
+  );
+  assert.match(
+    arenaTags,
+    /recordDirectCoopCommonAnimPresentation\(CommonAnim\.PROTECT, defender\);\s*new CommonBattleAnim\(CommonAnim\.PROTECT, defender\)\.play\(\)/u,
+    "team guards must record immediately before their floating VFX",
+  );
+  assert.match(
+    postTurnStatus,
+    /recordDirectCoopCommonAnimPresentation\(statusAnim, pokemon\);\s*new CommonBattleAnim\(statusAnim, pokemon\)\.play/u,
+    "recurring poison, toxic, and burn ticks need a cue even though status identity did not change",
+  );
+  assert.doesNotMatch(
+    obtainStatus,
+    /recordDirectCoopCommonAnimPresentation/u,
+    "status acquisition already owns one richer status event and must not double-author its animation",
+  );
+  assert.doesNotMatch(
+    tera,
+    /recordDirectCoopCommonAnimPresentation/u,
+    "Terastallization already owns one richer tera event and must not double-author its animation",
+  );
+});
+
 test("Substitute and Commander sprite transitions are authority-authored and outcome-gated", () => {
   const manager = read("src/phase-manager.ts");
   const producer = read("src/phases/pokemon-anim-phase.ts");

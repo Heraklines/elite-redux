@@ -5133,3 +5133,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local policy-safe verification: the source contract is green (22/22), changed production files have no
   TypeScript diagnostics beyond the repository baseline, scoped formatting is clean apart from existing
   informational debt, and `git diff --check` is green. The added co-op engine regression remains remote-only.
+
+## 2026-07-29 - Floating common VFX enter the authoritative presentation ledger
+
+- A focused combat-presentation audit found that forced switch variants already converge through one immutable
+  `switch` event, active and innate ability flyouts carry their exact ability/source identities, and their concrete
+  replay outcomes are fenced before the renderer receipt. The uncovered breadth gap was three direct
+  `CommonBattleAnim` seams that never construct `CommonAnimPhase`: single-target Protect, team protection such as
+  Quick/Wide Guard, and recurring poison/toxic/burn ticks.
+- One presentation-only adapter now records those immediate/floating cues as the existing exact-actor `commonAnim`
+  event immediately before the authority's unchanged local animation. The ordinary renderer phase, watchdog,
+  outcome token, ordered receipt, duplicate watermark, and recovery behavior are reused without a wire or protocol
+  change. Status acquisition and Terastallization deliberately remain excluded because their richer typed events
+  already own the same visual; recording a generic cue there would display it twice.
+- Failure-first source coverage inventories all three bypasses and the richer-event exclusions. Remote engine
+  coverage exercises both real Protect call chains and requires exactly two immutable events while the authority
+  still plays exactly two local VFX. Local permitted evidence is 23/23 source contracts, scoped Biome, ownership
+  guard, and `git diff --check`; full TypeScript retains unrelated baseline diagnostics and reports none in the
+  changed files. No local co-op engine/browser execution and no deployment occurred.
+- Remaining independent presentation debt from this audit: enemy trainer switches are mechanically and sprite
+  synchronized, but `CoopSwitchReplayPhase` does not yet reproduce or explicitly settle the authority's trainer/tray
+  reveal-hide grammar. That is the next bounded visual cleanup; Showdown and tournament were not touched.
