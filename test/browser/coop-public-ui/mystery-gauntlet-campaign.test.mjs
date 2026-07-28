@@ -283,6 +283,30 @@ test("reward targeting chooses a legal visible party slot instead of blindly sel
   });
 });
 
+test("reward targeting prefers the acting seat's legal mon when utility is otherwise equal", () => {
+  const boundary = rewardId => ({
+    authority: {
+      localRole: "guest",
+      partySlots: [
+        { slot: 0, coopOwner: "host", fainted: false, hp: 20, maxHp: 20, allowedInBattle: true },
+        { slot: 1, coopOwner: "guest", fainted: false, hp: 20, maxHp: 20, allowedInBattle: true },
+        { slot: 2, coopOwner: "host", fainted: true, hp: 0, maxHp: 20, allowedInBattle: false },
+        { slot: 3, coopOwner: "guest", fainted: true, hp: 0, maxHp: 20, allowedInBattle: false },
+      ],
+    },
+    peerEvents: [{ observation: { surfaceId: "reward-shop", selectedOptionId: rewardId } }],
+  });
+
+  assert.deepEqual(chooseRewardPartyTargetSlot(boundary("RARE_CANDY"), 0), {
+    slot: 1,
+    rewardId: "RARE_CANDY",
+  });
+  assert.deepEqual(chooseRewardPartyTargetSlot(boundary("REVIVE"), 0), {
+    slot: 3,
+    rewardId: "REVIVE",
+  });
+});
+
 test("a Mystery reward keeps its paired owner boundary for semantic leave confirmation", () => {
   const watcher = {
     index: 10,

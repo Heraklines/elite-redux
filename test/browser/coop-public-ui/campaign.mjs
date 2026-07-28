@@ -2349,11 +2349,19 @@ async function checkpointRewardPartyTarget(rig, cursors, owner) {
 /** Pick a party slot on which the visible reward can actually operate. */
 export function chooseRewardPartyTargetSlot(boundary, fallbackSlot = 0) {
   const slots = Array.isArray(boundary?.authority?.partySlots) ? boundary.authority.partySlots : [];
+  const localRole = /^(?:host|guest)$/u.test(boundary?.authority?.localRole) ? boundary.authority.localRole : null;
+  const orderedSlots =
+    localRole == null
+      ? slots
+      : [
+          ...slots.filter(slot => slot?.coopOwner === localRole),
+          ...slots.filter(slot => slot?.coopOwner !== localRole),
+        ];
   const rewardId =
     boundary?.peerEvents?.map(event => event?.observation).find(observation => observation?.surfaceId === "reward-shop")
       ?.selectedOptionId ?? null;
   const exactFallback = slots.find(slot => slot?.slot === fallbackSlot);
-  const first = predicate => slots.find(slot => Number.isSafeInteger(slot?.slot) && predicate(slot));
+  const first = predicate => orderedSlots.find(slot => Number.isSafeInteger(slot?.slot) && predicate(slot));
   let target = null;
   if (typeof rewardId === "string" && /REVIVE/u.test(rewardId)) {
     target = first(slot => slot.fainted === true);
@@ -2367,7 +2375,9 @@ export function chooseRewardPartyTargetSlot(boundary, fallbackSlot = 0) {
     );
   }
   target ??=
-    exactFallback != null && exactFallback.fainted !== true
+    exactFallback != null
+    && exactFallback.fainted !== true
+    && (localRole == null || exactFallback.coopOwner === localRole)
       ? exactFallback
       : (first(slot => slot.fainted !== true && slot.allowedInBattle === true) ?? first(slot => slot.fainted !== true));
   return {
