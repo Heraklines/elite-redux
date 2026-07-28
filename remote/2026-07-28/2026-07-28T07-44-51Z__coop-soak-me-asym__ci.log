@@ -1,0 +1,61 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: fixed
+run_mode: calibrated-release
+calibration_id: me-host-guest-asym-double-faint
+target_sha: 07b823176f6ceba80a2f8446f10d68eda9113899
+checked_out_sha: 07b823176f6ceba80a2f8446f10d68eda9113899
+base_seed: 20260728
+campaign_seed: fixed-in-test (matrix candidate 20260728 not consumed)
+run: 30339318987 (workflow source 07b823176f6ceba80a2f8446f10d68eda9113899)
+timestamp: 2026-07-28T07-44-51Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[coop:checksum] capture digest=825bb9a865706f80 field=4 biome=0 seed=test weather=0 terrain=0 money=0 party=[890,384,493,150,382,888] partyLevels=[500,500,500,500,500,500] arenaTags=0 modifiers=2 heldItemsDigest=1 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp890/hp2061-2065/st0/ab5258/form0/tera0:3/boss0:0 bi1:sp384/hp1715-1715/st0/ab5144/form0/tera0:15/boss0:0 bi2:sp661/hp0-14/st7/ab79/form0/tera0:0/boss0:0 bi3:sp21/hp0-14/st7/ab177/form0/tera0:0/boss0:0]
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:224:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[coop:interaction] interactionCounter() read -> 1 (role=guest)
+[coop:reward] owner/watcher decision: pinnedStart=1 liveCounter=1 parity=1 role=guest pick=OWNER option=ADOPT spoof=false
+[coop:rendezvous] ARRIVE point=shop:2:1 (send) role=guest
+[coop:transport] send guest t=rendezvous point=shop:2:1
+[coop:reward] OWNER drives reward screen (start=1 role=guest spoof=false adoptsOptions=true wave=2)
+[coop:rendezvous] shop-pick-commit barrier AWAIT shop:2:1
+[coop:rendezvous] AWAIT point=shop:2:1 -> partner already arrived (buffer-hit) role=guest
+[coop:transport] recv host t=rendezvous point=shop:2:1 handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:224:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[coop:reward] WATCHER awaiting owner reward options (start=1 reroll=0 localCount=0)
+[coop:relay] AWAIT rewardOptions key=1:0 timeoutMs=1200000 -> BUFFER-HIT resolve count=3
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:224:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[coop:shop] reconstructRewardOptions OK count=3 ids=[GREAT_BALL,NUGGET,BASE_STAT_BOOSTER]
+[coop:reward] WATCHER ADOPTED owner reward options (was=0 now=3 ids=[GREAT_BALL,NUGGET,BASE_STAT_BOOSTER])
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:224:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[coop:transport] send guest t=turnCommitAck e=1828070076810762 wave=2 turn=1 rev=37 stage=continuationReady checksum=825bb9a865706f80
+[coop:stream] guest ACK turn stage=continuationReady e=1828070076810762 wave=2 turn=1 rev=37
+[coop:stream] guest continuation surface=sharedInput e=1828070076810762 wave=2 turn=2 waiting=1 released=1
+[coop:interaction] mirror begin role=owner mirrorSeq=64 interactionStart=1 reroll=0
+[coop:interaction] uiMirror beginSession role=owner mode=6 seq=64 early=0
+[coop:transport] recv host t=turnCommitAck e=1828070076810762 wave=2 turn=1 rev=37 stage=continuationReady checksum=825bb9a865706f80 handlers=1
+[coop:v2-replica] admit rev=9 kind=INTERACTION_COMMIT result=duplicate-pending-control frontier=9/9/8
+[coop:transport] send guest t=authorityReceipt t=authorityReceipt
+[coop:transport] send guest t=authorityReceipt t=authorityReceipt
+[coop:v2-replica] apply rev=9 kind=INTERACTION_COMMIT resume=materialApplied outcome=applied control=SHARED_INTERACTION/op%3Areward/REWARD_PRESENT/1828070076810762%3A1%3AREWARD_PRESENT%3A100000/s1/e1828070076810762/w2/t2/results:REWARD/resultIds:* frontier=9/9/9
+[coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+[coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:224:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m
+
+
