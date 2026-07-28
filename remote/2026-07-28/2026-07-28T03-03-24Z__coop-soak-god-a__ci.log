@@ -1,0 +1,58 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 55
+run_mode: diagnostic
+calibration_id: god-200
+target_sha: 948fe40fcda8e17c5030638653381b6bc914e19c
+checked_out_sha: 948fe40fcda8e17c5030638653381b6bc914e19c
+base_seed: 20260727
+campaign_seed: 20260727
+run: 30323283720 (workflow source 948fe40fcda8e17c5030638653381b6bc914e19c)
+timestamp: 2026-07-28T03-03-24Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260727 WAVES=55 - replay this run with:  SOAK_SEED=20260727 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 42 (seed 20260727): wave driving threw (strand/stall): Maximum call stack size exceeded. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-28T03-02-51-680Z__seed-20260727__wave-42. Replay: SOAK_SEED=20260727[39m
+
+----- vitest result tail -----
+[90m [2m❯[22m PlayerPokemon.getActiveAbilitySources src/field/pokemon.ts:[2m2902:17[22m[39m
+[90m [2m❯[22m PlayerPokemon.hasAbilityWithAttr src/field/pokemon.ts:[2m3483:37[22m[39m
+[90m [2m❯[22m src/field/pokemon.ts:[2m3404:18[22m[39m
+[90m [2m❯[22m PlayerPokemon.canApplyAbility src/field/pokemon.ts:[2m3400:10[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+
+[31m⎯⎯⎯⎯⎯[39m[1m[41m Uncaught Exception [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mRangeError[22m: Maximum call stack size exceeded[39m
+[36m [2m❯[22m PlayerPokemon.hasAbilityWithAttr src/field/pokemon.ts:[2m3482:10[22m[39m
+    [90m3480|[39m    * @returns Whether this Pokemon has an ability with the given {@lin…
+    [90m3481|[39m    */
+    [90m3482|[39m   public hasAbilityWithAttr(attrType: AbAttrString, canApply = true, i…
+    [90m   |[39m          [31m^[39m
+    [90m3483|[39m     const sources = canApply ? this.getActiveAbilitySources(ignoreOver…
+    [90m3484|[39m     return sources.some(source => source.ability.hasAttr(attrType));
+[90m [2m❯[22m src/field/pokemon.ts:[2m3404:18[22m[39m
+[90m [2m❯[22m PlayerPokemon.canApplyAbility src/field/pokemon.ts:[2m3400:10[22m[39m
+[90m [2m❯[22m PlayerPokemon.collectAbilitySources src/field/pokemon.ts:[2m2858:29[22m[39m
+[90m [2m❯[22m PlayerPokemon.getActiveAbilitySources src/field/pokemon.ts:[2m2902:17[22m[39m
+[90m [2m❯[22m PlayerPokemon.hasAbilityWithAttr src/field/pokemon.ts:[2m3483:37[22m[39m
+[90m [2m❯[22m src/field/pokemon.ts:[2m3404:18[22m[39m
+[90m [2m❯[22m PlayerPokemon.canApplyAbility src/field/pokemon.ts:[2m3400:10[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m2904 errors[39m[22m
+[2m   Start at [22m 02:59:00
+[2m   Duration [22m 255.21s[2m (transform 21.11s, setup 25.44s, import 323ms, tests 228.60s, environment 691ms)[22m
+
