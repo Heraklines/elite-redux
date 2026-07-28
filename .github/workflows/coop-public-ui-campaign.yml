@@ -9,10 +9,10 @@ on:
         type: string
         default: "30"
       surface_waves:
-        description: Animation-rendering surface breadth (kept short; runs beside depth)
+        description: Complete real-animation waves (two covers both reward-owner directions)
         required: false
         type: string
-        default: "3"
+        default: "2"
       cadence:
         description: Human input cadence (fast keeps 30 waves inside the CI budget)
         required: true
@@ -288,18 +288,24 @@ jobs:
     name: ${{ matrix.waves }}-wave co-op / ${{ matrix.profile }} / ${{ inputs.cadence || 'fast' }}
     needs: browser-build
     runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 55
+    timeout-minutes: ${{ matrix.job_timeout_minutes }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - profile: animations-on-surface
             artifact: surface
-            waves: ${{ inputs.surface_waves || '3' }}
+            # Two complete real-animation waves cover both reward-owner directions plus entry,
+            # move, damage, faint, replacement, and reward presentation. A third wave made no new
+            # presentation claim and only crossed the old 45m outer deadline on ~3fps hosted GPUs.
+            waves: ${{ inputs.surface_waves || '2' }}
             difficulty: ace
             difficulty_option: ace
             require_mystery: "0"
             reward_mode: leave
+            campaign_timeout_ms: "3120000"
+            process_timeout: 55m
+            job_timeout_minutes: 62
           - profile: animations-skipped-depth
             artifact: depth
             waves: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
@@ -307,6 +313,9 @@ jobs:
             difficulty_option: ace
             require_mystery: "0"
             reward_mode: ${{ inputs.reward_mode || 'pick-first' }}
+            campaign_timeout_ms: "2700000"
+            process_timeout: 48m
+            job_timeout_minutes: 55
           - profile: mystery-gauntlet
             artifact: mystery
             waves: "10"
@@ -316,6 +325,9 @@ jobs:
             difficulty_option: mystery
             require_mystery: "1"
             reward_mode: leave
+            campaign_timeout_ms: "2700000"
+            process_timeout: 48m
+            job_timeout_minutes: 55
           # Account-state fidelity lane (harness post-mortem 2026-07-17): every other profile
           # registers PRISTINE accounts, which made the whole dirty-account bug class (full slots,
           # divergent co-op remnants, reclaim ranking, guest checkpoint no-safe-slot) invisible to
@@ -330,6 +342,9 @@ jobs:
             require_mystery: "0"
             dirty_accounts: "1"
             reward_mode: leave
+            campaign_timeout_ms: "2700000"
+            process_timeout: 48m
+            job_timeout_minutes: 55
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -401,7 +416,7 @@ jobs:
           COOP_UI_MYSTERY_MIN_SURFACES: "6"
           # This is the whole lifecycle budget (preview boot + pairing + all waves), not a
           # refreshable or per-wave wait. It expires early enough to preserve failure evidence.
-          COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: "2700000"
+          COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: ${{ matrix.campaign_timeout_ms }}
           # Setup through the first shared command must fit the fast-lane contract. A renderer that
           # takes longer is runner starvation, not useful wave coverage, and fails with a causal marker.
           # Two fresh registrations + onboarding + Settings + consent lobby + starter setup use
@@ -458,7 +473,7 @@ jobs:
             [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
           done
           COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99 \
-            timeout --signal=INT --kill-after=3m 48m node \
+            timeout --signal=INT --kill-after=3m ${{ matrix.process_timeout }} node \
             test/browser/coop-public-ui/run-campaign.mjs
 
       # The environment seal is small, decisive audit evidence - upload it as its own artifact

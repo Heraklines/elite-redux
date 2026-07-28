@@ -70,15 +70,20 @@ test("failed graceful cleanup force-kills every remaining browser process", () =
   ]);
 });
 
-test("workflow reserves artifact-upload headroom after both lifecycle backstops", async () => {
+test("workflow reserves artifact-upload headroom and budgets the real-animation surface independently", async () => {
   const workflow = await readFile(
     new URL("../../../.github/workflows/coop-public-ui-campaign.yml", import.meta.url),
     "utf8",
   );
-  assert.match(workflow, /timeout-minutes: 55/u);
-  assert.match(workflow, /COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: "2700000"/u);
+  assert.match(workflow, /timeout-minutes: \$\{\{ matrix\.job_timeout_minutes \}\}/u);
+  assert.match(
+    workflow,
+    /profile: animations-on-surface[\s\S]*waves: \$\{\{ inputs\.surface_waves \|\| '2' \}\}[\s\S]*campaign_timeout_ms: "3120000"[\s\S]*process_timeout: 55m[\s\S]*job_timeout_minutes: 62/u,
+  );
+  assert.match(workflow, /profile: animations-skipped-depth[\s\S]*campaign_timeout_ms: "2700000"/u);
+  assert.match(workflow, /COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: \$\{\{ matrix\.campaign_timeout_ms \}\}/u);
   assert.match(workflow, /COOP_UI_SETUP_HARD_TIMEOUT_MS: "1200000"/u);
-  assert.match(workflow, /timeout --signal=INT --kill-after=3m 48m/u);
+  assert.match(workflow, /timeout --signal=INT --kill-after=3m \$\{\{ matrix\.process_timeout \}\}/u);
   assert.match(workflow, /if: always\(\)[\s\S]*Upload compact campaign diagnosis first/u);
 });
 
