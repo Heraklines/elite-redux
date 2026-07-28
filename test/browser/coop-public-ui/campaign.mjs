@@ -53,11 +53,14 @@ const INTERACTIVE_MYSTERY_NARRATION_PHASES = new Set([
   "CoopReplayMePhase",
 ]);
 const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;
-// Run 30232043330 measured one software-WebGL MoveEffectPhase -> DamageAnimPhase gap at 100.2s while
-// both engines and the exact presentation ledger continued converging. Give only the animations-on
-// profile 50% headroom over that observed intra-phase cost; skipped-animation profiles retain the
-// stricter 90s stall detector and every profile remains capped by its immutable hard ceiling.
-const ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS = 150_000;
+// Run 30366519918 measured one complete Lovely Bite animation at 252.3s on the GPU-less
+// two-browser SwiftShader runner: authority moveAnim seq=17 at 14:22:25.734, then the mechanically
+// resulting hp seq=18 at 14:26:38.030. Both screenshots showed the same live animation and the exact
+// presentation/state stream remained ordered. Give only the animations-on profile 25% headroom over
+// that measured single-event cost. Skipped-animation profiles retain the strict 90s stall detector,
+// and the immutable per-turn hard ceiling below still makes a genuinely parked animation fail.
+const ANIMATIONS_ON_SLOW_EVENT_MEASURED_MS = 253_000;
+const ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS = Math.ceil(ANIMATIONS_ON_SLOW_EVENT_MEASURED_MS * 1.25);
 const OUTCOME_HARD_CEILING_MS = 360_000;
 // Track R cycle 13 - animations-on-surface profile calibration (integration-owner authorized).
 // INVESTIGATION FIRST: this is NOT generic timeout inflation. The launch config already sets every

@@ -268,6 +268,15 @@ test("the animations-on turn budget is a per-event-derived ceiling scoped to the
   );
   // The default OUTCOME_HARD_CEILING_MS is UNCHANGED - every non-animations profile keeps it.
   assert.match(campaign, /const OUTCOME_HARD_CEILING_MS = 360_000;/u);
+  // A later GPU-less run exposed one 252.3s custom move animation while both ordered streams kept
+  // progressing. The sliding allowance is derived from that observation and remains animations-on-only;
+  // it must not weaken the 90s detector used by the skipped-animation depth and Mystery profiles.
+  assert.match(campaign, /const ANIMATIONS_ON_SLOW_EVENT_MEASURED_MS = 253_000;/u);
+  assert.match(
+    campaign,
+    /const ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS = Math\.ceil\(ANIMATIONS_ON_SLOW_EVENT_MEASURED_MS \* 1\.25\);/u,
+  );
+  assert.match(campaign, /const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;/u);
   // The calibrated ceiling is passed ONLY when the profile expects animations (policy.moveAnimationsExpected);
   // otherwise null flows through to the default. Asserted at BOTH turn-outcome waits.
   const gated =
