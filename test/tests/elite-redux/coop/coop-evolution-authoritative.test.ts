@@ -4,27 +4,21 @@
  */
 
 // Co-op authoritative EVOLUTION (#633 B6). In authoritative co-op the GUEST is a pure renderer; the
-// HOST owns evolution. A guest-side evolve would construct a per-client mon (its own RNG id / form
-// path / per-client-bound cloned held items - the Shedinja bonus-add) and DIVERGE. So the guest's
-// LevelUpPhase evolution trigger (B6.1) and the Shedinja party-add (B6.2) are gated off on the
-// authoritative guest. The guest adopts the host's evolved species via the resync `benchParty` (B4):
-// the evolving slot's species differs -> the speciesId-only `party` hash mismatches -> a resync fires
-// -> benchParty converges species + exp + level + moveset together (evolution convergence is
-// resync-gated, not instant - documented). This verifies (1) the cycle-free authoritative-guest gate
-// reads false off-session and true on an authoritative-guest session, and (2) over a GameManager, the
-// benchParty reconcile converges a slot whose host species EVOLVED past the guest's.
+// HOST owns evolution. A guest-side evolve would construct a per-client mon (its own RNG id / form path /
+// per-client-bound held items) and diverge. Evolution is now retained on WAVE_ADVANCE / ME_TERMINAL as a
+// complete immutable post-Pokemon image and replayed before DATA applies; full two-browser identity parity
+// is mandatory in the 30-wave public campaign. This focused file keeps only the leaf guest-mechanics gate
+// and the exact PokemonData wire-image round trip. It deliberately makes no obsolete resync claim.
 
-import { getGameMode } from "#app/game-mode";
+import { isValidWaveProgressionPresentation } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
   isCoopAuthoritativeGuestGated,
   setCoopAuthoritativeGuestPredicate,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
-import { applyCoopCaptureParty } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
-import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
-import { GameManager } from "#test/framework/game-manager";
 import { PokemonData } from "#system/pokemon-data";
+import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -57,7 +51,7 @@ describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", 
 
 const RUN = process.env.ER_SCENARIO === "1";
 
-describe.skipIf(!RUN)("co-op authoritative evolution (#633 B6) - resync-gated species convergence", () => {
+describe.skipIf(!RUN)("co-op authoritative evolution (#633 B6) - immutable V2 presentation image", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
 
@@ -83,30 +77,40 @@ describe.skipIf(!RUN)("co-op authoritative evolution (#633 B6) - resync-gated sp
     expect(isCoopAuthoritativeGuestGated()).toBe(false);
   });
 
-  it("B6: the guest's EVOLVED-on-host slot converges species via the benchParty reconcile", async () => {
+  it("B6: one exact evolved PokemonData image reconstructs without local evolution mechanics", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
-    startLocalCoopSession({ username: "Host" });
-    game.scene.gameMode = getGameMode(GameModes.COOP);
     const scene = game.scene;
 
-    // Guest has a PRE-evolution bench mon (Charmander) the host has EVOLVED (to Charmeleon). Because
-    // the guest skips evolution (B6), its slot still holds the pre-evolution species until the resync.
-    const lead = scene.getPlayerParty()[0];
-    lead.coopOwner = "host";
-    const benchPre = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.CHARMANDER), 16);
-    benchPre.coopOwner = "guest";
-    scene.getPlayerParty().push(benchPre);
-    expect(scene.getPlayerParty().map(p => p.species.speciesId)).toContain(SpeciesId.CHARMANDER);
+    const before = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.CHARMANDER), 16);
+    before.coopOwner = "guest";
+    const after = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.CHARMELEON), 17);
+    after.id = before.id;
+    after.coopOwner = "guest";
+    const postPokemon = JSON.parse(JSON.stringify(new PokemonData(after))) as Record<string, unknown>;
+    const event = {
+      k: "evolution" as const,
+      partySlot: 1,
+      pokemonId: before.id,
+      fromSpeciesId: before.species.speciesId,
+      fromFormIndex: before.formIndex,
+      fromSpriteKey: before.getSpriteKey(true),
+      toSpeciesId: after.species.speciesId,
+      toFormIndex: after.formIndex,
+      toSpriteKey: after.getSpriteKey(true),
+      postPokemon,
+    };
+    expect(isValidWaveProgressionPresentation(event), "the complete event passes the V2 wire validator").toBe(true);
 
-    // The HOST's authoritative party: the same slot now holds the EVOLVED species at a higher level.
-    const hostEvolved = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.CHARMELEON), 17);
-    hostEvolved.coopOwner = "guest";
-    const target = [lead, hostEvolved].map(p => JSON.stringify(new PokemonData(p)));
+    const rndState = Phaser.Math.RND.state();
+    const reconstructed = new PokemonData(event.postPokemon).toPokemon(undefined, event.partySlot);
+    Phaser.Math.RND.state(rndState);
+    expect(reconstructed.id).toBe(before.id);
+    expect(reconstructed.species.speciesId).toBe(SpeciesId.CHARMELEON);
+    expect(reconstructed.formIndex).toBe(after.formIndex);
+    expect(reconstructed.getSpriteKey(true)).toBe(event.toSpriteKey);
 
-    applyCoopCaptureParty(JSON.parse(JSON.stringify(target)));
-
-    const species = scene.getPlayerParty().map(p => p.species.speciesId);
-    expect(species).toContain(SpeciesId.CHARMELEON); // species converged to the host's evolved form
-    expect(species).not.toContain(SpeciesId.CHARMANDER); // the pre-evolution slot was reconciled away
+    reconstructed.destroy();
+    before.destroy();
+    after.destroy();
   });
 });

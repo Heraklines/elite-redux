@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "9848fd8a599a8c931e8808295d28bad61de34286",
+  "baseSha": "3925184367c476b737989b70db923bd03e1543a2",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -186,6 +186,7 @@
     "test/tests/elite-redux/coop/coop-duo-biome-operation.test.ts",
     "test/tests/elite-redux/coop/coop-duo-exploration.test.ts",
     "test/tests/elite-redux/coop/coop-duo-mystery.test.ts",
+    "test/tests/elite-redux/coop/coop-evolution-authoritative.test.ts",
     "test/tests/elite-redux/coop/coop-faint-switch-operation.test.ts",
     "test/tests/elite-redux/coop/coop-form-change-ordering.test.ts",
     "test/tests/elite-redux/coop/coop-guest-battletype-adopt.test.ts",
@@ -243,5 +244,5 @@
     "workers/er-editor-api/src/index.ts",
     "workers/er-editor-api/src/trainer-class-validation.ts"
   ],
-  "lockedSchemaFiles": ["src/data/elite-redux/coop/coop-transport.ts"]
+  "lockedSchemaFiles": []
 }
