@@ -66,4 +66,16 @@ test("the shared interaction lease is address-exact, control-proven, and recover
   assert.match(ownerWindow, /waitForAuthorityPeerStage\([\s\S]*"controlInstalled"/u);
   assert.match(ownerWindow, /!isCoopV2AuthorityWaitCreationFrozen\(runtime\)/u);
   assert.match(ownerWindow, /expired: \(\) => expired/u);
+
+  const surfaceReady = runtime.slice(
+    runtime.indexOf("export function notifyCoopV2InteractionSurfaceReady("),
+    runtime.indexOf("export function getCoopV2ActiveSharedInteractionOperationId("),
+  );
+  assert.match(surfaceReady, /const boundScene = runtimeSceneBindings\.get\(runtime\)/u);
+  assert.match(surfaceReady, /active !== runtime \|\| \(boundScene != null && boundScene !== globalScene\)/u);
+  assert.match(
+    surfaceReady,
+    /runWhenCoopRuntimeActive\(runtime, \(\) => notifyCoopV2InteractionSurfaceReady\(runtime\)\)/u,
+    "an async public-surface continuation must rebind the exact runtime and scene before attesting control",
+  );
 });

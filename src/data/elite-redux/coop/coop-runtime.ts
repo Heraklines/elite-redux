@@ -6558,6 +6558,15 @@ export function notifyCoopV2InteractionSurfaceReady(runtime: CoopRuntime | null 
   if (runtime == null || !coopV2ShadowHarnesses.has(runtime)) {
     return false;
   }
+  // A real browser owns one runtime/scene. The in-process duo harness owns two, so the promise returned by
+  // setMode() can settle after the caller restored the peer's global scene. Never attest that peer's handler
+  // against this runtime's immutable control claim. Queue the retry until setCoopRuntime has rebound the
+  // destination runtime and its scene together; callers use this as a fire-and-forget proof edge.
+  const boundScene = runtimeSceneBindings.get(runtime);
+  if (active !== runtime || (boundScene != null && boundScene !== globalScene)) {
+    runWhenCoopRuntimeActive(runtime, () => notifyCoopV2InteractionSurfaceReady(runtime));
+    return true;
+  }
   const control = runtime.v2ControlLedger.latestControl;
   if (control?.kind !== "SHARED_INTERACTION" && control?.kind !== "REPLACEMENT") {
     return false;

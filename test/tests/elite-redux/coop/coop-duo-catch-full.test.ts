@@ -222,13 +222,14 @@ describe.skipIf(!RUN)(
         "the host's catchFullPrompt queued a CoopGuestCatchFullPhase on the guest (the recipient drives) (#856)",
       ).toBeDefined();
 
-      // ===== (C) GUEST (SYNC): run the real picker. Stub the guest UI's showText (fire its cb) + the PARTY
-      // open to auto-pick slot 4 (the CATCHER'S choice); the phase relays the pick under the catchFull band.
-      // The MESSAGE setMode never resolves so the phase's own end() (shiftPhase) can't fire cross-ctx. The
-      // relayed pick is queued on the loopback, NOT flushed here. =====
-      withClientSync(rig.guestCtx, () => {
+      // ===== (C) GUEST: run the real picker. A browser cannot click PARTY until setMode has resolved and
+      // published the exact actionable surface. Preserve that order here: capture the public callback, let
+      // the phase's setMode continuation attest controlInstalled under the guest context, then click slot 4.
+      // The MESSAGE setMode never resolves so the phase's own end() (shiftPhase) can't fire cross-ctx. =====
+      await withClient(rig.guestCtx, async () => {
         const ui = rig.guestScene.ui as unknown as StubbableUi;
         const realSetMode = ui.setMode.bind(ui);
+        let choosePartySlot: ((slotIndex: number) => void) | null = null;
         ui.showText = (...args: unknown[]): unknown => {
           const cb = args.find(a => typeof a === "function") as (() => void) | undefined;
           cb?.();
@@ -237,8 +238,7 @@ describe.skipIf(!RUN)(
         ui.setMode = (...args: unknown[]): unknown => {
           const mode = args[0];
           if (mode === UiMode.PARTY) {
-            ui.setMode = realSetMode; // one-shot: restore before invoking the picker callback
-            (args[3] as (slotIndex: number) => void)(OWNER_PICK_SLOT);
+            choosePartySlot = args[3] as (slotIndex: number) => void;
             return Promise.resolve();
           }
           if (mode === UiMode.MESSAGE) {
@@ -247,6 +247,10 @@ describe.skipIf(!RUN)(
           return realSetMode(...args);
         };
         (guestPicker as Phase).start();
+        await Promise.resolve();
+        ui.setMode = realSetMode;
+        expect(choosePartySlot, "the actionable PARTY surface exposed its public picker callback").not.toBeNull();
+        choosePartySlot?.(OWNER_PICK_SLOT);
       });
 
       // ===== (D) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the helper's

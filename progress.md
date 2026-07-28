@@ -5078,3 +5078,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   address.
 - Source contracts are 105/105 green. This changes only the observer/driver verdict; production progression and the
   strict authoritative collection-close proof are unchanged.
+
+## 2026-07-28 - Gate 30400079428 closure: Bargain and catch-full order their real control edges
+
+- Lane B1 proved a production ordering bug: a guest-owned Bargain advanced the legacy interaction counter before the
+  authority retained its immutable result, so the V2 successor reservation was correctly refused. V2 Bargain owners
+  and watchers now rotate only after the complete result commit/applied callback; legacy sessions keep their prior
+  local/broadcast rotation.
+- Lane B9 was a harness-impossible click: its synthetic PARTY callback fired synchronously from `setMode`, before the
+  returned promise could install the exact `controlInstalled` proof. The fixture now waits for that public surface
+  continuation before clicking. The common proof publisher also rebinds an async continuation to its exact runtime
+  and scene, preventing a two-engine microtask from attesting the peer handler.
+- Local-safe TypeScript, scoped Biome, and node-pure source contracts are green. The engine regressions remain
+  remote-only; no deployment occurred.

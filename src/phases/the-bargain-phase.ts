@@ -181,7 +181,28 @@ export class TheBargainPhase extends Phase {
     } catch {
       coopWarn("reward", "bargain OWNER terminal capture threw");
     }
-    advanceCoopInteractionForContinuation(this.coopBargainStart);
+    // Under V2 the immutable BARGAIN result owns the rotation. Advancing here lets a guest proposal change
+    // ownership before the authority has retained that result and can make the predecessor reservation
+    // unprovable. Legacy keeps its historical local/broadcast advance.
+    const runtime = this.coopOwningRuntime ?? getCoopRuntime();
+    if (!isCoopV2InteractionCutoverActive(runtime?.durability)) {
+      advanceCoopInteractionForContinuation(this.coopBargainStart);
+    }
+  }
+
+  /** Advance ownership only after this runtime has retained/applied the exact immutable Bargain result. */
+  private advanceCoopBargainFromCommittedResult(): void {
+    const controller = getCoopController();
+    if (controller == null || this.coopBargainStart < 0) {
+      return;
+    }
+    const before = controller.interactionCounter();
+    controller.advanceInteractionFromAuthoritativeCommit(this.coopBargainStart);
+    coopLog(
+      "reward",
+      `advance Bargain from immutable result (role=${controller.role} from=${this.coopBargainStart} `
+        + `counter ${before} -> ${controller.interactionCounter()})`,
+    );
   }
 
   /**
@@ -217,6 +238,9 @@ export class TheBargainPhase extends Phase {
     ) {
       failCoopSharedSession(`Bargain terminal ${this.coopBargainStart} could not enter durable authority`);
       return;
+    }
+    if (!awaitsAuthoritativeResult && isCoopV2InteractionCutoverActive(runtime?.durability)) {
+      this.advanceCoopBargainFromCommittedResult();
     }
     const relay = getCoopInteractionRelay();
     const sendProposal = (): void => relay?.sendInteractionOutcomeProposal(seq, "bargain", outcome, operationId);
@@ -294,6 +318,7 @@ export class TheBargainPhase extends Phase {
     }
     this.coopAwaitingAuthorityOperationId = null;
     coopLog("v2-proposal", `committed Bargain result ${operationId} applied; releasing ordered wait`);
+    this.advanceCoopBargainFromCommittedResult();
     super.end();
     return settleCoopV2InteractionOperation(operationId, runtime);
   }
@@ -366,7 +391,13 @@ export class TheBargainPhase extends Phase {
       }
       coopWarn("reward", `bargain WATCHER: ${outcome == null ? "TIMEOUT" : "unexpected outcome kind"} -> move on`);
     }
-    advanceCoopInteractionForContinuation(this.coopBargainStart);
+    const v2 = isCoopV2InteractionCutoverActive(this.coopOwningRuntime?.durability);
+    if (!v2) {
+      advanceCoopInteractionForContinuation(this.coopBargainStart);
+    } else if (adoption.accepted && !adoption.requiresAuthorityCommit) {
+      // Host-owned result: the replica reached this watcher only after the immutable result applied.
+      this.advanceCoopBargainFromCommittedResult();
+    }
     try {
       globalScene.ui.clearText();
     } catch {
@@ -392,6 +423,9 @@ export class TheBargainPhase extends Phase {
         )
       ) {
         failCoopSharedSession(`Bargain result ${adoption.operationId} could not enter durable authority`);
+      } else if (v2 && adoption.requiresAuthorityCommit) {
+        // Guest-owned proposal: authority rotates only after retaining its complete immutable result.
+        this.advanceCoopBargainFromCommittedResult();
       }
     });
   }
