@@ -1748,6 +1748,7 @@ export class CoopReplayTurnPhase extends Phase {
               event.critical,
               event.actor,
               outcomeToken,
+              event.presentation,
             );
             break;
           }

@@ -469,14 +469,17 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
-test("protocol 59 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
+test("protocol 60 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-59"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-60"/u);
+  assert.match(transport, /presentation\?: "off-field"/u);
+  assert.match(validator, /event\.presentation === undefined \|\| event\.presentation === "off-field"/u);
+  assert.match(read("src/field/pokemon.ts"), /this\.isOnField\(\) \? \{\} : \{ presentation: "off-field" as const \}/u);
   assert.match(
     transport,
     /interface CoopFullMonSnapshot[\s\S]+tags: string\[\]/u,

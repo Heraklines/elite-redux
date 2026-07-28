@@ -564,6 +564,60 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
   });
 
+  it("an authority-declared off-field HP mutation skips only after proving that exact actor is absent", async () => {
+    const field = await startCoopGuest();
+    const token = createCoopPresentationOutcomeToken();
+    const pokemon = field[0];
+    globalScene.moveAnimations = true;
+    const phase = new CoopHpDrainReplayPhase(
+      pokemon.getBattlerIndex(),
+      pokemon.hp - 1,
+      pokemon.hp,
+      pokemon.getMaxHp(),
+      pokemon.species.speciesId,
+      undefined,
+      false,
+      { side: "player", pokemonId: Number.MAX_SAFE_INTEGER },
+      token,
+      "off-field",
+    );
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(coopPresentationOutcome(token)).toMatchObject({
+      kind: "intentionally-skipped",
+      reason: "off-field-hp",
+    });
+    expect(endSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("an off-field HP declaration fails closed if the exact actor is still displayed", async () => {
+    const field = await startCoopGuest();
+    const token = createCoopPresentationOutcomeToken();
+    const pokemon = field[0];
+    const phase = new CoopHpDrainReplayPhase(
+      pokemon.getBattlerIndex(),
+      pokemon.hp - 1,
+      pokemon.hp,
+      pokemon.getMaxHp(),
+      pokemon.species.speciesId,
+      undefined,
+      false,
+      { side: "player", pokemonId: pokemon.id },
+      token,
+      "off-field",
+    );
+    vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    expect(coopPresentationOutcome(token)).toMatchObject({
+      kind: "failed",
+      reason: "off-field-hp-actor-displayed",
+    });
+  });
+
   it("an animations-disabled engine lane does not require a display actor or claim rendered pixels", async () => {
     const field = await startCoopGuest();
     const token = createCoopPresentationOutcomeToken();

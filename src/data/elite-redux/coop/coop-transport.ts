@@ -158,7 +158,10 @@ export type CoopRole = "host" | "guest";
 // its guest replay to finish before the terminal state/reward successor installs.
 // er-coop-59 adds the authority's exact evolution transition and replays the full guest cutscene from the
 // immutable pre/post Pokemon images before either WAVE_ADVANCE or an ME_TERMINAL may apply its DATA.
-export const COOP_PROTOCOL_VERSION = "er-coop-59";
+// er-coop-60 distinguishes an HP mutation that happened after its actor left the displayed field. The
+// renderer proves that exact actor is absent and records a typed nonvisual receipt instead of pretending
+// to animate bench pixels or treating a legitimate Regenerator heal as field-order corruption.
+export const COOP_PROTOCOL_VERSION = "er-coop-60";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1167,6 +1170,8 @@ export type CoopBattleEvent =
       result?: number;
       critical?: boolean;
       actor: CoopPresentationActorRef;
+      /** Present only when the authority mutated HP after this exact actor had left the displayed field. */
+      presentation?: "off-field";
     }
   /**
    * A mon fainted. `narrate` (#691, additive optional) is true IFF the host shows an "X fainted!" message

@@ -4973,3 +4973,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Node contracts cover closed-by-default config, manifest-SHA validation, unchanged proxy-off 302s, two-seat
   deduplication, MIME/cache headers, byte/entry eviction, oversized streaming bodies, URL admission, and fail-closed
   errors. Browser/co-op Vitest execution remains remote-only per `AGENTS.md`; no deployment occurred.
+
+## 2026-07-28 - Off-field HP mutations have an exact nonvisual presentation contract
+
+- The animation-on surface oracle reached wave 2 with mechanics and Authority V2 revisions converged, then failed the
+  presentation ledger when Regenerator healed an outgoing Pokemon after its switch animation removed that actor from
+  the field. The old generic HP replay correctly rejected a missing displayed actor, but the event had no way to say
+  that this particular mutation was causally off-field.
+- Protocol 60 adds one closed `presentation: "off-field"` HP discriminator. The authority emits it only when the
+  universal heal seam observes that the exact actor is no longer fielded. The renderer consumes it at the event's
+  ordered position, after the preceding switch drains: an absent exact actor receives a typed nonvisual receipt, while
+  a still-displayed actor remains a hard ordering/material failure. Generic missing-actor HP events are unchanged.
+- Exact-browser receipt policy accepts that skip only when the immutable HP event carries the matching discriminator;
+  animation-disabled policy remains separate. Node/source contracts, full TypeScript, scoped formatting, and diff
+  checks are green. Engine and two-browser qualification remain remote-only; no deployment occurred.

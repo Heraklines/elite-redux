@@ -6140,6 +6140,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         hp: this.hp,
         maxHp: this.getMaxHp(),
         sp: this.species?.speciesId ?? 0,
+        // Regenerator and similar switch-out effects heal after the actor's sprite has left the
+        // field. Retain the mechanical mutation in the ordered stream, but explicitly authorize a
+        // nonvisual proof so the renderer never guesses that an absent actor is harmless.
+        ...(this.isOnField() ? {} : { presentation: "off-field" as const }),
       });
     }
     // ER Soulmate (ability 5918): 50% of the direct healing a Soulmate holder

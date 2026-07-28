@@ -137,6 +137,7 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
         && (event.result === undefined || [1, 2, 3, 4, 10, 12, 13].includes(event.result as number))
         && (event.critical === undefined || typeof event.critical === "boolean")
         && (event.result === undefined) === (event.critical === undefined)
+        && (event.presentation === undefined || event.presentation === "off-field")
         && isPresentationActorRef(event.actor)
       );
     case "faint":

@@ -972,6 +972,7 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
     private readonly critical = false,
     private readonly actor?: CoopPresentationActorRef,
     private readonly outcomeToken: CoopPresentationOutcomeToken = createCoopPresentationOutcomeToken(),
+    private readonly presentation?: "off-field",
   ) {
     super(battlerIndex);
   }
@@ -989,6 +990,21 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
         ? `bi${this.battlerIndex}`
         : `${this.actor.side}:bi${this.battlerIndex}:p${this.actor.pokemonId}`;
     try {
+      if (this.presentation === "off-field") {
+        // This typed arm is authored only when the mutation happened after the exact actor left
+        // the authority field (Regenerator is the canonical case). Validate the same condition on
+        // the renderer at the event's causal position, after the preceding switch phase drained.
+        // A still-displayed actor is real ordering/material drift and remains a hard failure.
+        const displayed = fieldMonByIdentity(this.battlerIndex, this.sp, this.actor);
+        settleCoopPresentationOutcome(
+          this.outcomeToken,
+          displayed == null
+            ? { kind: "intentionally-skipped", reason: "off-field-hp", actorFingerprint }
+            : { kind: "failed", reason: "off-field-hp-actor-displayed", actorFingerprint },
+        );
+        this.end();
+        return;
+      }
       // #796 ("pokemon not doing damage at all"): resolve by IDENTITY - never drain the wrong
       // mon's bar around a mid-turn switch-in; an unmaterialized actor defers to the checkpoint.
       const mon = fieldMonByIdentity(this.battlerIndex, this.sp, this.actor);

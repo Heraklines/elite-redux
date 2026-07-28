@@ -26,6 +26,14 @@ export function isAcceptedRendererPresentationReceipt(entry, allowAnimationsDisa
   if (entry.stage === "renderer-completed") {
     return true;
   }
+  if (
+    entry.stage === "renderer-skipped"
+    && entry.reason === "off-field-hp"
+    && entry.event?.k === "hp"
+    && entry.event.presentation === "off-field"
+  ) {
+    return true;
+  }
   return (
     allowAnimationsDisabledSkip === true && entry.stage === "renderer-skipped" && entry.reason === "animations-disabled"
   );

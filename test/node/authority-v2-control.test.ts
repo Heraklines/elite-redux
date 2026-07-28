@@ -82,6 +82,22 @@ describe("ordered shiny presentation contract", () => {
   });
 });
 
+describe("ordered HP presentation contract", () => {
+  const hp = {
+    k: "hp",
+    bi: 0,
+    hp: 7,
+    maxHp: 21,
+    actor: { side: "player", pokemonId: 25 },
+  } as const;
+
+  it("accepts only the closed off-field nonvisual discriminator", () => {
+    expect(isStrictCoopBattleEvent(hp)).toBe(true);
+    expect(isStrictCoopBattleEvent({ ...hp, presentation: "off-field" })).toBe(true);
+    expect(isStrictCoopBattleEvent({ ...hp, presentation: "missing-actor" })).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
