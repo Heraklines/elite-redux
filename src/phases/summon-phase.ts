@@ -4,7 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { erApplyPendingRevives } from "#data/elite-redux/archetypes/post-faint-deferred-revive";
 import { getCoopController, isAuthoritativeBattleSession } from "#data/elite-redux/coop/coop-runtime";
-import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import { beginCoopRecording, isCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erApplyPendingSwitchInBoost } from "#data/elite-redux/empower-switch-in";
 import { erApplyPendingSafePassage } from "#data/elite-redux/safe-passage";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
@@ -323,7 +323,11 @@ export class SummonPhase extends PartyMemberPokemonPhase {
       || [BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)
       || globalScene.currentBattle.waveIndex % 10 === 1
     ) {
-      globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeActiveTrigger, true);
+      // SummonPhase opens the co-op turn recorder before its entry chain. Keep any resulting material
+      // form change inside this causal subtree so it settles before the immutable turn commit. Other
+      // modes preserve the original root-queue delay.
+      const coopTurnRecording = globalScene.gameMode.isCoop && isCoopRecording();
+      globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeActiveTrigger, !coopTurnRecording);
       this.queuePostSummon();
     }
   }

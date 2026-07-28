@@ -7441,7 +7441,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public fieldSetup(resetSummonData?: boolean): void {
     this.switchOutStatus = false;
     if (globalScene) {
-      globalScene.triggerPokemonFormChange(this, SpeciesFormChangePostMoveTrigger, true);
+      // A summon can open the authoritative turn recorder before this setup runs. A delayed form
+      // mutation is placed on the root queue, behind the complete command/turn subtree, where the
+      // immutable turn commit must reject it as unsettled. Keep the mutation in this summon subtree
+      // for co-op only; solo and Showdown/lockstep retain their original delayed ordering.
+      const coopTurnRecording = globalScene.gameMode.isCoop && isCoopRecording();
+      globalScene.triggerPokemonFormChange(this, SpeciesFormChangePostMoveTrigger, !coopTurnRecording);
     }
     // If this Pokemon has a Substitute when loading in, play an animation to add its sprite
     if (this.getTag(SubstituteTag)) {
@@ -8053,7 +8058,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // HP back proportionally, restore its own max HP, and clear the blended look.
     erShatteredPsycheOnLeaveField(this);
     this.switchOutStatus = true;
-    globalScene.triggerPokemonFormChange(this, SpeciesFormChangeActiveTrigger, true);
+    // FaintPhase already omits an off-field enemy revert while an authoritative co-op turn is
+    // recording. leaveField() runs later from the faint tween and used to recreate that same inert
+    // QuietFormChangePhase on the root queue (god-a wave 115), after the turn-commit barrier. Do not
+    // recreate it. A player's off-field revert is material, so keep it in the current causal subtree.
+    // Solo and Showdown/lockstep preserve the original delayed behavior.
+    const coopTurnRecording = globalScene.gameMode.isCoop && isCoopRecording();
+    if (!coopTurnRecording || this.isPlayer()) {
+      globalScene.triggerPokemonFormChange(this, SpeciesFormChangeActiveTrigger, !coopTurnRecording);
+    }
     globalScene.field.remove(this, destroy);
   }
 
