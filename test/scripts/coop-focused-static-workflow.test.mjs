@@ -120,6 +120,20 @@ test("focused engine shards qualify the complete Authority V2 graph", () => {
   }
 });
 
+test("production mechanics regressions exposed by co-op soaks remain in the engine gate", () => {
+  const lanes = categorize();
+  assert.equal(
+    lanes.B.includes("test/tests/elite-redux/er-mental-pollution-suppress.test.ts"),
+    true,
+    "the exact two-holder recursion regression must execute with ER_SCENARIO=1",
+  );
+  assert.equal(
+    lanes.B.includes("test/tests/test-framework/phase-interceptor/unit.test.ts"),
+    true,
+    "the co-op soak interceptor contract remains engine-gating",
+  );
+});
+
 test("focused planner runs every six-lane representative and fails closed beyond six shards", () => {
   const impacted = [...impactLanes(["scripts/run-coop-gate.mjs"])].sort();
   assert.deepEqual(impacted, ["A", "B", "C", "P", "S", "T"]);

@@ -61,7 +61,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
 const COOP_DIR = join(REPO_ROOT, "test", "tests", "elite-redux", "coop");
 const COOP_DIR_REL = "test/tests/elite-redux/coop";
-const CRITICAL_HARNESS_TESTS = ["test/tests/test-framework/phase-interceptor/unit.test.ts"];
+const CRITICAL_ENGINE_TESTS = [
+  "test/tests/elite-redux/er-mental-pollution-suppress.test.ts",
+  "test/tests/test-framework/phase-interceptor/unit.test.ts",
+];
 
 /**
  * LANE P (#897/T2): GATING production-fidelity journeys. The nightly soak (lane C) heals the guest through
@@ -187,11 +190,10 @@ export function categorize() {
     const basename = file.slice(file.lastIndexOf("/") + 1);
     (QUARANTINE.has(basename) ? lanes.Q : lanes.S).push(file);
   }
-  // PhaseInterceptor drives every real-engine co-op soak. Its regression file lives outside the co-op
-  // directory, so directory-only discovery silently omitted the harness contract from the full gate.
-  // Keep it isolated with the other engine-backed files: a green campaign is not evidence that the
-  // driver's stop-before primitive itself was exercised failure-first.
-  lanes.B.push(...trackedTests(...CRITICAL_HARNESS_TESTS));
+  // Production regressions first exposed by a real-engine co-op soak may live outside the co-op directory.
+  // Directory-only discovery would silently skip both the harness primitive and the mechanics composition
+  // that the soak relies on. Keep the exact failure-first tests isolated with the other engine-backed files.
+  lanes.B.push(...trackedTests(...CRITICAL_ENGINE_TESTS));
   lanes.T.push(
     ...trackedTests(
       "test/data/battle-format.test.ts",

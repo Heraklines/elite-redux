@@ -4954,3 +4954,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   negative fixture relied on a now-invalid direct union assertion, and registry completeness still demanded direct
   concrete shop-phase calls. The negative now crosses `unknown` explicitly, while completeness requires all three
   encounters to call `setEncounterMarketReward` with one of the closed retained subtypes.
+- Follow-up gate tracing found the new Mental Pollution regression was `ER_SCENARIO`-gated but outside every co-op gate
+  discovery path, so ordinary CI would skip it and the co-op engine lane would never run it. The explicit engine
+  inventory now includes both this exact soak-exposed mechanics regression and the existing PhaseInterceptor contract;
+  a source-level gate test prevents either from silently falling out of Lane B.
