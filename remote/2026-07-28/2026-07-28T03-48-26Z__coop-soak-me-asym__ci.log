@@ -1,0 +1,17 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: fixed
+run_mode: calibrated-release
+calibration_id: me-host-guest-asym-double-faint
+target_sha: 4fd7dda616b9e3a8a07ab50ae266940a0e8f0155
+checked_out_sha: missing
+base_seed: 20260728
+campaign_seed: fixed-in-test (matrix candidate  not consumed)
+run: 30326522519 (workflow source 4fd7dda616b9e3a8a07ab50ae266940a0e8f0155)
+timestamp: 2026-07-28T03-48-26Z
+
+----- driver lines -----
+(no [coop-soak] lines captured)
+
+----- vitest result tail -----
