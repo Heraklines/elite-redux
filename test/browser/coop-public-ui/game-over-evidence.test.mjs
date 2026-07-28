@@ -71,7 +71,7 @@ test("GameOver journey uses visible starters, real command input, and exact reta
   assert.match(duoRegression, /coopRetainedGameOverSupersedesReplay\(7, 0\)[\s\S]*toBe\(false\)/u);
   assert.match(
     journeys,
-    /async function gameOver\(rig\)[\s\S]*loginBoth\(\)[\s\S]*pair\(rig\.config\.requesterSeat\)[\s\S]*startFreshRun\(\{ gameOverFixture: true \}\)[\s\S]*driveWaveToGameOver\(\)/u,
+    /async function prepareCoopJourneySettings\(rig\)[\s\S]*loginBoth\(\)[\s\S]*async function gameOver\(rig\)[\s\S]*pair\(rig\.config\.requesterSeat\)[\s\S]*startFreshRun\(\{ gameOverFixture: true \}\)[\s\S]*driveWaveToGameOver\(\)[\s\S]*export async function runJourney\(rig, name\)[\s\S]*prepareCoopJourneySettings\(rig\)[\s\S]*await journey\(rig\)/u,
   );
   assert.match(
     harness,
