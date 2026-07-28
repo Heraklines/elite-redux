@@ -358,6 +358,8 @@ function readArenaTagViews(): CoopSerializedArenaTag[] {
  */
 let coopStateTickCounter = 0;
 let coopLastAppliedStateTick = -1;
+/** Complete immutable image paired with the current full-state high-water, when that tick had one. */
+let coopLastAcceptedAuthoritativeState: CoopAuthoritativeBattleStateV1 | null = null;
 
 /** HOST: next monotonic tick for a state capture. */
 export function coopNextStateTick(): number {
@@ -377,6 +379,11 @@ export function coopAcceptStateTick(tick: number | undefined, label: string): bo
     return false;
   }
   coopLastAppliedStateTick = tick;
+  if (coopLastAcceptedAuthoritativeState?.tick !== tick) {
+    // Numeric checkpoints share the monotonic domain but are not complete state images. Never let a
+    // presentation fence mistake an older full image for the newly accepted checkpoint tick.
+    coopLastAcceptedAuthoritativeState = null;
+  }
   return true;
 }
 
@@ -392,10 +399,23 @@ export function coopAppliedStateTick(): number {
   return coopLastAppliedStateTick;
 }
 
+/**
+ * Read the exact complete image paired with the receiver's current accepted high-water. The clone prevents
+ * presentation code from mutating the retained authority material. A checkpoint-only high-water has no
+ * complete image and deliberately returns null instead of exposing an older state as current.
+ */
+export function readLatestAcceptedCoopAuthoritativeBattleState(): CoopAuthoritativeBattleStateV1 | null {
+  if (coopLastAcceptedAuthoritativeState?.tick !== coopLastAppliedStateTick) {
+    return null;
+  }
+  return structuredClone(coopLastAcceptedAuthoritativeState);
+}
+
 /** Session reset (new run / new rig): both sides start from a clean tick line. */
 export function resetCoopStateTicks(): void {
   coopStateTickCounter = 0;
   coopLastAppliedStateTick = -1;
+  coopLastAcceptedAuthoritativeState = null;
 }
 
 /** Clamp impossible HP created by a late max-HP recalculation before publishing authoritative state. */
@@ -3805,6 +3825,7 @@ function applyCoopAuthoritativeBattleStateTransaction(
         // Admission is the COMMIT marker. A failed apply can therefore never expose or consume this tick.
         coopLastAppliedStateTick = plan.state.tick;
       }
+      coopLastAcceptedAuthoritativeState = structuredClone(plan.state);
       return true;
     }
 

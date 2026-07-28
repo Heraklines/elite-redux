@@ -4890,3 +4890,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   authoritative-state-to-real-CommandPhase mutation window rather than teaching the soak to ignore it.
 - Showdown and tournament remain untouched. Engine, calibrated soak, and two-browser qualification remain remote-only;
   no deployment occurred.
+
+## 2026-07-28 - Entry presentation cannot leak intermediate mechanics into command control
+
+- Exact god-c soak `30327843809` reached wave 114 with both replicas on the same signed tick 2338, then found one
+  real stat-stage divergence: Eternatus was authoritative attack stage 0 on the host, while the guest retained +2.
+  The guest log proved the tick-2338 state applied and reasserted before presentation; one of the 31 retained entrance
+  cues then set the live stage to the streamed intermediate +2. A later host-only mechanical reset had no visual cue,
+  so presentation left that intermediate value behind when command control opened.
+- The single retained-prefix proof fence now receives the complete immutable command-open image and reinstalls it
+  after every ability/stat/HP/field cue has drained, but before advancing the rendered watermark or consuming the V2
+  command carrier. Equal ticks are transactionally reasserted, a missing V2 image fails closed, and a strictly newer
+  accepted tick still supersedes the older cosmetic prefix. Visuals remain complete while mechanics are exact.
+- A real-engine regression mutates a live stat stage after accepting the signed image and requires the finalizer to
+  restore it before control retirement. Local policy-safe evidence is 306/306 browser/source contracts, clean full
+  TypeScript, scoped formatting, and `git diff --check`. The exact god-c seed and full remote qualification remain the
+  required proof; wave 140's later recursion/no-park red stays independently owned unless the clean rerun removes it.
+  Showdown and tournament remain untouched; no deployment occurred.

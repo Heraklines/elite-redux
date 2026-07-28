@@ -249,6 +249,96 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(endSpy, "successful proof releases the queued command continuation").toHaveBeenCalledTimes(1);
   });
 
+  it("entry presentation restores signed mechanics after an intermediate visual stat value", async () => {
+    await startCoopGuest();
+    const runtime = getCoopRuntime();
+    expect(runtime).not.toBeNull();
+    const state = coopEngine.captureCoopAuthoritativeBattleState(1);
+    expect(state).not.toBeNull();
+    expect(coopEngine.applyCoopAuthoritativeBattleState(state!, true)).toBe(true);
+    const pokemon = globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX];
+    const signedStage = pokemon.getStatStage(Stat.ATK);
+    pokemon.setStatStage(Stat.ATK, Math.min(6, signedStage + 2));
+    expect(pokemon.getStatStage(Stat.ATK), "the visual cue temporarily changed live mechanics").not.toBe(signedStage);
+
+    const token = createCoopPresentationOutcomeToken();
+    expect(settleCoopPresentationOutcome(token, { kind: "rendered", actorFingerprint: `player:p${pokemon.id}` })).toBe(
+      true,
+    );
+    const renderedSpy = vi.spyOn(runtime!.battleStream, "noteRenderedThrough");
+    const consumedSpy = vi.spyOn(runtime!.battleStream, "noteConsumedCommandPresentation");
+    const phase = new CoopFinalizeEntryPresentationPhase(
+      1,
+      state!.wave,
+      1,
+      [token],
+      runtime!.battleStream,
+      "v2:command-open:test",
+      structuredClone(state!),
+    );
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    const restoredPokemon = globalScene.getPlayerParty().find(candidate => candidate.id === pokemon.id);
+    expect(restoredPokemon, "the signed player identity remains installed").toBeDefined();
+    expect(restoredPokemon!.getStatStage(Stat.ATK), "the proof fence restores the immutable final host value").toBe(
+      signedStage,
+    );
+    expect(renderedSpy, "the watermark advances only after the restore succeeds").toHaveBeenCalledWith(
+      1,
+      1,
+      state!.wave,
+    );
+    expect(consumedSpy, "the exact command carrier retires only after the restore succeeds").toHaveBeenCalledWith(
+      "v2:command-open:test",
+    );
+    expect(endSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a delayed cosmetic prefix restores a newer accepted image instead of rolling it back", async () => {
+    await startCoopGuest();
+    const runtime = getCoopRuntime();
+    expect(runtime).not.toBeNull();
+    const olderState = coopEngine.captureCoopAuthoritativeBattleState(1);
+    expect(olderState).not.toBeNull();
+    expect(coopEngine.applyCoopAuthoritativeBattleState(olderState!, true)).toBe(true);
+
+    const pokemonId = globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX].id;
+    globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX].setStatStage(Stat.ATK, -1);
+    const newerState = coopEngine.captureCoopAuthoritativeBattleState(1);
+    expect(newerState).not.toBeNull();
+    expect(coopEngine.applyCoopAuthoritativeBattleState(newerState!, true)).toBe(true);
+    globalScene
+      .getPlayerParty()
+      .find(candidate => candidate.id === pokemonId)!
+      .setStatStage(Stat.ATK, 2);
+
+    const token = createCoopPresentationOutcomeToken();
+    expect(settleCoopPresentationOutcome(token, { kind: "rendered", actorFingerprint: `player:p${pokemonId}` })).toBe(
+      true,
+    );
+    const phase = new CoopFinalizeEntryPresentationPhase(
+      1,
+      newerState!.wave,
+      1,
+      [token],
+      runtime!.battleStream,
+      "v2:command-open:delayed",
+      structuredClone(olderState!),
+    );
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+
+    const restoredPokemon = globalScene.getPlayerParty().find(candidate => candidate.id === pokemonId);
+    expect(restoredPokemon?.getStatStage(Stat.ATK), "the newest accepted stage wins after stale presentation").toBe(-1);
+    expect(coopEngine.coopAppliedStateTick(), "presentation cannot roll back the accepted high-water").toBe(
+      newerState!.tick,
+    );
+    expect(endSpy).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ["pending", undefined],
     ["failed", { kind: "failed" as const, reason: "ability-watchdog-expired" }],

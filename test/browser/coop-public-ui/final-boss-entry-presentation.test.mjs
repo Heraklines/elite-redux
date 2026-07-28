@@ -4,6 +4,7 @@ import test from "node:test";
 
 const runtime = await readFile(new URL("../../../src/data/elite-redux/coop/coop-runtime.ts", import.meta.url), "utf8");
 const replay = await readFile(new URL("../../../src/phases/coop-replay-turn-phase.ts", import.meta.url), "utf8");
+const replayPhases = await readFile(new URL("../../../src/phases/coop-replay-phases.ts", import.meta.url), "utf8");
 
 test("a late turn-one renderer reads and reasserts its exact retired command prefix", () => {
   assert.match(runtime, /export function readRetainedCoopV2CommandEntryPresentation\(/u);
@@ -26,4 +27,33 @@ test("a late turn-one renderer reads and reasserts its exact retired command pre
   assert.match(replay, /acceptedPrefixTick > prefix\.stateTick/u);
   assert.match(replay, /acceptedPrefixTick === prefix\.stateTick/u);
   assert.match(replay, /reapplyAcceptedCoopAuthoritativeBattleState\(prefixState, true\)/u);
+});
+
+test("entry presentation restores the signed state after every visual cue and before command release", () => {
+  const queueIndex = replay.indexOf('"CoopFinalizeEntryPresentationPhase"');
+  const endIndex = replay.indexOf("this.end();", queueIndex);
+  assert.ok(queueIndex >= 0 && endIndex > queueIndex, "the retained prefix must queue its proof fence");
+  assert.match(
+    replay.slice(queueIndex, endIndex),
+    /prefix\.authoritativeState == null \? undefined : structuredClone\(prefix\.authoritativeState\)/u,
+  );
+
+  const finalizerStart = replayPhases.indexOf("export class CoopFinalizeEntryPresentationPhase");
+  const nextPhase = replayPhases.indexOf("export class CoopFinalizeTurnPhase", finalizerStart);
+  assert.ok(finalizerStart >= 0 && nextPhase > finalizerStart, "the entry finalizer must remain an explicit phase");
+  const finalizer = replayPhases.slice(finalizerStart, nextPhase);
+  const restoreIndex = finalizer.indexOf("if (!this.restoreAuthoritativeState())");
+  const watermarkIndex = finalizer.indexOf("this.streamer.noteRenderedThrough", restoreIndex);
+  const controlIndex = finalizer.indexOf("this.streamer.noteConsumedCommandPresentation", restoreIndex);
+  assert.ok(restoreIndex >= 0, "the finalizer must restore mechanics after presentation drains");
+  assert.ok(watermarkIndex > restoreIndex, "render proof cannot precede the exact-state restore");
+  assert.ok(controlIndex > restoreIndex, "command control cannot precede the exact-state restore");
+  assert.match(
+    finalizer,
+    /coopAppliedStateTick\(\) === state\.tick[\s\S]*reapplyAcceptedCoopAuthoritativeBattleState\(state, true\)/u,
+  );
+  assert.match(finalizer, /appliedTick > state\.tick[\s\S]*readLatestAcceptedCoopAuthoritativeBattleState\(\)/u);
+  assert.doesNotMatch(finalizer, /appliedTick > state\.tick\) \{\s*return true/u);
+  assert.match(finalizer, /applyCoopAuthoritativeBattleState\(state, true\)/u);
+  assert.match(finalizer, /return this\.controlOperationId == null/u);
 });

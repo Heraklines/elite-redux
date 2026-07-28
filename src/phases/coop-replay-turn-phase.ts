@@ -1126,6 +1126,7 @@ export class CoopReplayTurnPhase extends Phase {
         this.presentationOutcomeTokens,
         streamer,
         prefix.controlOperationId,
+        prefix.authoritativeState == null ? undefined : structuredClone(prefix.authoritativeState),
       );
       this.end();
     } catch {

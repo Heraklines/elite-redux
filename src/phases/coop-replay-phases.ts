@@ -23,8 +23,10 @@
 // reaches `this.end()` (a thrown anim / missing sprite ends the phase instead of stranding
 // the queue, which would freeze the whole game). A garbled event was already skipped at
 // record/replay time; this is the second line of defense. None of these touch state the
-// checkpoint does not reconcile (hp / status / stat stages / field presence), so they can
-// never re-introduce a checksum divergence.
+// checkpoint does not reconcile (hp / status / stat stages / field presence). Retained
+// pre-command presentation has one additional hard fence: after every cue drains, its
+// finalizer reasserts the exact signed state image before command control may open. This
+// covers intermediate visual values whose final host value is not itself another cue.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -51,6 +53,7 @@ import {
   captureCoopFullSnapshot,
   coopAppliedStateTick,
   drainCoopApplyFailures,
+  readLatestAcceptedCoopAuthoritativeBattleState,
   reapplyAcceptedCoopAuthoritativeBattleState,
   summonCoopEnemyField,
   summonCoopPlayerField,
@@ -2100,7 +2103,9 @@ export interface CoopV2ControlSuccessorClaim {
  * The entry replay queues ability, weather, terrain, stat, switch, and other presentation phases before the
  * first CommandPhase. Merely queueing those phases is not evidence that they rendered: each concrete phase
  * must settle its outcome token, and this phase runs last on the same phase-tree level. Only a completely
- * successful prefix may advance the shared render watermark and release command control.
+ * successful prefix may advance the shared render watermark and release command control. The prefix's
+ * immutable state is reasserted at this fence after all presentation mutations, so intermediate stat/HP/
+ * field values used to animate can never become the mechanics seen by the opened CommandPhase.
  */
 export class CoopFinalizeEntryPresentationPhase extends Phase {
   public readonly phaseName = "CoopFinalizeEntryPresentationPhase";
@@ -2115,6 +2120,7 @@ export class CoopFinalizeEntryPresentationPhase extends Phase {
     private readonly presentationOutcomeTokens: readonly CoopPresentationOutcomeToken[],
     private readonly streamer: CoopBattleStreamer,
     private readonly controlOperationId?: string,
+    private readonly authoritativeState?: CoopAuthoritativeBattleStateV1,
   ) {
     super();
   }
@@ -2143,24 +2149,15 @@ export class CoopFinalizeEntryPresentationPhase extends Phase {
         `Wave ${this.sourceWave} entry presentation did not complete exactly `
         + `(pending=${presentation.pending} failed=${presentation.failed.length}`
         + `${firstFailure?.kind === "failed" ? ` reason=${firstFailure.reason}` : ""}).`;
-      const generation = this.generation;
-      void this.streamer
-        .broadcastAuthorityFailure({
-          epoch: this.controller.sessionEpoch,
-          wave: this.sourceWave,
-          turn: this.turn,
-          boundary: "turnResolution",
-          reason,
-        })
-        .then(() => {
-          if (
-            generation === coopSessionGeneration()
-            && getCoopBattleStreamer() === this.streamer
-            && getCoopController() === this.controller
-          ) {
-            terminateCoopAuthoritySession(reason);
-          }
-        });
+      this.failAuthority(reason);
+      return;
+    }
+    if (!this.restoreAuthoritativeState()) {
+      this.failAuthority(
+        `Wave ${this.sourceWave} entry presentation could not restore its exact signed state `
+          + `before command control (tick=${this.authoritativeState?.tick ?? "missing"} `
+          + `applied=${coopAppliedStateTick()}).`,
+      );
       return;
     }
     this.streamer.noteRenderedThrough(this.turn, this.throughCount, this.sourceWave);
@@ -2172,6 +2169,55 @@ export class CoopFinalizeEntryPresentationPhase extends Phase {
       `guest pre-command presentation PROVED wave=${this.sourceWave} turn=${this.turn} events=${this.throughCount}`,
     );
     this.end();
+  }
+
+  /**
+   * Presentation phases use live Pokemon values to render intermediate cues. Reinstall the immutable
+   * command-open image after they drain. A strictly newer accepted state supersedes this prefix; an equal
+   * tick must be reasserted, while a not-yet-admitted tick is installed transactionally.
+   */
+  private restoreAuthoritativeState(): boolean {
+    let state = this.authoritativeState;
+    if (state == null) {
+      // Legacy entry carriers do not contain a complete image. They cannot carry a V2 control operation;
+      // retaining this compatibility path is presentation-only and must never masquerade as V2 proof.
+      return this.controlOperationId == null;
+    }
+    const appliedTick = coopAppliedStateTick();
+    if (appliedTick > state.tick) {
+      // A newer full image can land while this older cosmetic prefix is draining. Restore that exact
+      // accepted image, never the older prefix and never an inferred local snapshot. If the newer high-water
+      // was checkpoint-only, there is no complete image with which presentation can safely release control.
+      state = readLatestAcceptedCoopAuthoritativeBattleState() ?? undefined;
+      if (state == null || state.tick !== appliedTick) {
+        return false;
+      }
+    }
+    if (coopAppliedStateTick() === state.tick) {
+      return reapplyAcceptedCoopAuthoritativeBattleState(state, true);
+    }
+    return applyCoopAuthoritativeBattleState(state, true) || reapplyAcceptedCoopAuthoritativeBattleState(state, true);
+  }
+
+  private failAuthority(reason: string): void {
+    const generation = this.generation;
+    void this.streamer
+      .broadcastAuthorityFailure({
+        epoch: this.controller?.sessionEpoch ?? 0,
+        wave: this.sourceWave,
+        turn: this.turn,
+        boundary: "turnResolution",
+        reason,
+      })
+      .then(() => {
+        if (
+          generation === coopSessionGeneration()
+          && getCoopBattleStreamer() === this.streamer
+          && getCoopController() === this.controller
+        ) {
+          terminateCoopAuthoritySession(reason);
+        }
+      });
   }
 }
 
