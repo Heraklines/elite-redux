@@ -1,0 +1,60 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: 948fe40fcda8e17c5030638653381b6bc914e19c
+checked_out_sha: 948fe40fcda8e17c5030638653381b6bc914e19c
+base_seed: 20260728
+campaign_seed: 20365457
+run: 30323074721 (workflow source 948fe40fcda8e17c5030638653381b6bc914e19c)
+timestamp: 2026-07-28T02-51-49Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365457 WAVES=200 - replay this run with:  SOAK_SEED=20365457 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=76 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1865,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":1503,"maxHp":1725,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":227,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":10072,"hp":194,"maxHp":194,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":192,"formIndex":0,"isTerastallized":false,"teraType":4,"bossSegments":0,"bossSegmentIndex":0,"moves":[[838,0],[444,0],[163,0],[446,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":68,"hp":184,"maxHp":184,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5011,"formIndex":0,"isTerastallized":false,"teraType":1,"bossSegments":0,"bossSegmentIndex":0,"moves":[[223,0],[70,0],[469,0],[90,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1865,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":1503,"maxHp":1725,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":227,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":10072,"hp":184,"maxHp":184,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":192,"formIndex":0,"isTerastallized":false,"teraType":4,"bossSegments":0,"bossSegmentIndex":0,"moves":[[838,0],[444,0],[163,0],[446,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":68,"hp":184,"maxHp":184,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5011,"formIndex":0,"isTerastallized":false,"teraType":1,"bossSegments":0,"bossSegmentIndex":0,"moves":[[223,0],[70,0],[469,0],[90,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=141 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":2065,"maxHp":2065,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":212,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1715,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":526,"hp":347,"maxHp":347,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5141,"formIndex":0,"isTerastallized":false,"teraType":5,"bossSegments":0,"bossSegmentIndex":0,"moves":[[439,0],[800,0],[5004,0],[234,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":218,"hp":250,"maxHp":250,"status":0,"statStages":[-2,0,-2,0,0,0,0],"fainted":false,"abilityId":86,"formIndex":0,"isTerastallized":false,"teraType":9,"bossSegments":0,"bossSegmentIndex":0,"moves":[[682,0],[255,0],[256,0],[220,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":2065,"maxHp":2065,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":212,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1715,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":526,"hp":347,"maxHp":347,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5141,"formIndex":0,"isTerastallized":false,"teraType":5,"bossSegments":0,"bossSegmentIndex":0,"moves":[[439,0],[800,0],[5004,0],[234,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":218,"hp":242,"maxHp":242,"status":0,"statStages":[-2,0,-2,0,0,0,0],"fainted":false,"abilityId":86,"formIndex":0,"isTerastallized":false,"teraType":9,"bossSegments":0,"bossSegmentIndex":0,"moves":[[682,0],[255,0],[256,0],[220,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 200 (seed 20365457): wave crossing threw (strand/stall): client phase drive to guest command 200:1 HANG on CoopReplayTurnPhase; queued=[CommandPhase,TurnStartPhase], ui=MESSAGE. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-28T02-51-19-556Z__seed-20365457__wave-200. Replay: SOAK_SEED=20365457[39m
+
+----- vitest result tail -----
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:launch] clearCoopRuntime role=host netcode=authoritative gen->6
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state host disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > retained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m29273[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:297:3[39m
+
+[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 200 (seed 20365457): wave crossing threw (strand/stall): client phase drive to guest command 200:1 HANG on CoopReplayTurnPhase; queued=[CommandPhase,TurnStartPhase], ui=MESSAGE. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-28T02-51-19-556Z__seed-20365457__wave-200. Replay: SOAK_SEED=20365457[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1725:11[22m[39m
+    [90m1723|[39m       phaseState: phaseStateDump(rig),
+    [90m1724|[39m     });
+    [90m1725|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1726|[39m   };
+    [90m1727|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m5095:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m184:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 02:28:38
+[2m   Duration [22m 1390.80s[2m (transform 20.71s, setup 24.95s, import 339ms, tests 1364.58s, environment 748ms)[22m
+
