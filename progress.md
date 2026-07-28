@@ -4987,3 +4987,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Exact-browser receipt policy accepts that skip only when the immutable HP event carries the matching discriminator;
   animation-disabled policy remains separate. Node/source contracts, full TypeScript, scoped formatting, and diff
   checks are green. Engine and two-browser qualification remain remote-only; no deployment occurred.
+
+## 2026-07-28 - Browser feedback and guest replacement ownership use causal progress
+
+- A healthy animation-on run took about 100 seconds for the guest to drain an exact retained `WAVE_ADVANCE` after the
+  host reward surface opened. The public driver now recognizes only that typed replay phase/entry as causal wave
+  progress and grants a 150-second sliding window under the unchanged 360-second hard ceiling. Generic keepalives
+  still cannot extend the wait.
+- The first shared-asset proxy CI attempt exposed a harness-only test race: it released the first upstream request
+  before proving the second request had joined the in-flight promise. The contract now waits for the claimed
+  `inFlightHits=1` condition; focused run `30394408935` is green at `3762ab6b`.
+- The live guest-owned `SwitchPhase` fallback no longer starts its 60-second decision window during replay/setup. Under
+  Authority V2 it waits for the exact peer `controlInstalled` proof, then arms the runtime-owned human-input lease.
+  Only that lease's own deadline may auto-pick; cancellation, disposal, supersession, or a missing proof fail the
+  shared boundary closed. Legacy behavior remains isolated outside V2.
+- Integration tip `7bdd300fb` is TypeScript-clean, 104/104 source contracts green, and ownership-exact. Depth and
+  Mystery campaigns continue at `3762ab6b`; surface, focused shards, fresh-wave2, and guest-owned faint replacement
+  are qualifying remotely at `7bdd300fb`. No local co-op engine/browser execution and no deployment occurred.

@@ -524,9 +524,10 @@ describe("co-op alternating-interaction relay (#633)", () => {
 
   it("lets an external owner lease abort a wait without a raw timer or sticky same-seq cancellation", async () => {
     const { host, guest } = createLoopbackPair();
-    const owner = new CoopInteractionRelay(host);
+    // Slot 1 belongs to the guest: exercise the live direction, guest owner -> host authority watcher.
+    const owner = new CoopInteractionRelay(guest);
     const schedule = vi.fn(() => () => {});
-    const watcher = new CoopInteractionRelay(guest, { schedule });
+    const watcher = new CoopInteractionRelay(host, { schedule });
     const seq = COOP_FAINT_SWITCH_SEQ_BASE + 1;
     const firstLease = new AbortController();
 
