@@ -101,12 +101,34 @@ test("focused aggregate requires static and isolated shard evidence", () => {
   const requiredStart = workflow.indexOf("\n  focused-required:\n");
   assert.notEqual(requiredStart, -1, "focused-required job must exist");
   const requiredJob = workflow.slice(requiredStart);
-  assert.match(requiredJob, /needs: \[plan, static, browser-build, browser, gate\]/u);
+  assert.match(requiredJob, /needs: \[plan, static, contracts, browser-build, browser, gate\]/u);
   assert.match(requiredJob, /STATIC_RESULT: \$\{\{ needs\.static\.result \}\}/u);
   assert.match(requiredJob, /test "\$STATIC_RESULT" = success/u);
+  assert.match(requiredJob, /CONTRACT_RESULT: \$\{\{ needs\.contracts\.result \}\}/u);
+  assert.match(requiredJob, /test "\$CONTRACT_RESULT" = success/u);
   assert.match(requiredJob, /BROWSER_SCOPE: \$\{\{ needs\.plan\.outputs\.browser_transport \}\}/u);
   assert.match(requiredJob, /test "\$BROWSER_BUILD_RESULT" = success/u);
   assert.match(requiredJob, /test "\$BROWSER_RESULT" = success/u);
+});
+
+test("full and focused gates run every co-op source and node-pure contract", () => {
+  const fullStart = fullWorkflow.indexOf("\n  public-ui-contracts:\n");
+  const fullEnd = fullWorkflow.indexOf("\n  gate:\n", fullStart + 1);
+  assert.notEqual(fullStart, -1, "full public-ui-contracts job must exist");
+  assert.notEqual(fullEnd, -1, "full gate job must follow public-ui-contracts");
+  const fullContractsJob = fullWorkflow.slice(fullStart, fullEnd);
+
+  const focusedContractsJob = job("contracts", "browser-build");
+  for (const contractJob of [fullContractsJob, focusedContractsJob]) {
+    assert.match(contractJob, /node --test test\/scripts\/coop-\*\.test\.mjs/u);
+    assert.match(contractJob, /pnpm exec vitest run --config test\/node\/vitest\.config\.ts/u);
+    assert.match(contractJob, /test\/node\/authority-v2-\*\.test\.ts/u);
+    assert.match(contractJob, /test\/node\/coop-\*\.test\.ts/u);
+    assert.match(contractJob, /--pool=forks --isolate --no-file-parallelism/u);
+  }
+
+  assert.match(focusedContractsJob, /needs: plan/u);
+  assert.match(focusedContractsJob, /timeout-minutes: 10/u);
 });
 
 test("focused engine shards qualify the complete Authority V2 graph", () => {

@@ -408,17 +408,21 @@ jobs:
           node test/browser/coop-public-ui/check-public-boundary.mjs
           node test/browser/coop-public-ui/check-campaign-boundary.mjs
 
+      - name: Run every co-op workflow and source contract
+        run: node --test test/scripts/coop-*.test.mjs
+
       - name: Run every public-UI source and evidence contract
         run: node --test test/browser/coop-public-ui/*.test.mjs
 
-      # The Authority V2 protocol suite lives in the node-pure Vitest project.
+      # The Authority V2 protocol and migrated co-op regression suites live in the node-pure Vitest project.
       # It is intentionally kept out of process-global Lane A: these tests define
       # admission/material/control/receipt/recovery semantics and must run with
       # fresh module state while sharing this already-warm fast-contract runner.
-      - name: Run every Authority V2 node-pure contract
+      - name: Run every co-op node-pure contract
         run: >-
           pnpm exec vitest run --config test/node/vitest.config.ts
           test/node/authority-v2-*.test.ts
+          test/node/coop-*.test.ts
           --pool=forks --isolate --no-file-parallelism
 
   gate:

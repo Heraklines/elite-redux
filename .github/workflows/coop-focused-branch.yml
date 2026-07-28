@@ -313,6 +313,30 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  contracts:
+    if: github.repository == 'Heraklines/elite-redux'
+    needs: plan
+    name: Focused co-op source and node-pure contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Run every co-op workflow and source contract
+        run: node --test test/scripts/coop-*.test.mjs
+
+      - name: Run every co-op node-pure contract
+        run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/authority-v2-*.test.ts
+          test/node/coop-*.test.ts
+          --pool=forks --isolate --no-file-parallelism
+
   browser-build:
     if: github.repository == 'Heraklines/elite-redux' && needs.plan.outputs.browser_transport == 'true'
     needs: plan
@@ -522,13 +546,14 @@ jobs:
   focused-required:
     name: Focused co-op required aggregate
     if: always()
-    needs: [plan, static, browser-build, browser, gate]
+    needs: [plan, static, contracts, browser-build, browser, gate]
     runs-on: ubuntu-latest
     steps:
-      - name: Require planner, branch static checks, and every selected shard
+      - name: Require planner, branch static and contract checks, and every selected shard
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
           STATIC_RESULT: ${{ needs.static.result }}
+          CONTRACT_RESULT: ${{ needs.contracts.result }}
           BROWSER_SCOPE: ${{ needs.plan.outputs.browser_transport }}
           BROWSER_BUILD_RESULT: ${{ needs.browser-build.result }}
           BROWSER_RESULT: ${{ needs.browser.result }}
@@ -536,6 +561,7 @@ jobs:
         run: |
           test "$PLAN_RESULT" = success
           test "$STATIC_RESULT" = success
+          test "$CONTRACT_RESULT" = success
           test "$GATE_RESULT" = success
           if [ "$BROWSER_SCOPE" = true ]; then
             test "$BROWSER_BUILD_RESULT" = success
