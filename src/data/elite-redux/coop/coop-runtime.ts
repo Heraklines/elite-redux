@@ -31,6 +31,7 @@ import {
 import {
   decodeReplacementCommitMaterial,
   type ReplacementAuthorityCarrier,
+  type ReplacementSourceAddress,
   replacementOperationId,
 } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
@@ -8013,6 +8014,78 @@ export function waitForCoopV2PeerMaterialApplied(
   return (
     coopV2ShadowHarnesses.get(runtime)?.waitForAuthorityPeerStage(operationId, "materialApplied")
     ?? Promise.resolve(false)
+  );
+}
+
+/**
+ * Upper bound for obtaining the remote owner's exact executable-control proof.
+ * This is a synchronization/recovery ceiling, not the human decision deadline:
+ * failure terminates the unsafe boundary instead of authorizing an auto-pick.
+ */
+const COOP_V2_REPLACEMENT_CONTROL_PROOF_WAIT_MS = 300_000;
+
+/**
+ * Wait until the remote owner has installed the exact actionable replacement
+ * picker, then arm the adapter's 60s `humanInput` owner window.
+ *
+ * The authority may not start that deadline from its own SwitchPhase: replay,
+ * projection, and browser setup can make the remote picker actionable much later.
+ * The authenticated `controlInstalled` receipt is the sole cross-browser proof.
+ */
+export async function armCoopV2ReplacementOwnerWindowAfterControlProof(
+  input: ReplacementSourceAddress & {
+    readonly ownerSeatId: number;
+    readonly operationId: string;
+  },
+  onFallback: () => void,
+  runtime: CoopRuntime | null = active,
+): Promise<(() => void) | null> {
+  if (
+    runtime == null
+    || runtime.controller.authorityRole !== "authority"
+    || runtime.controller.localSeatId !== runtime.controller.authoritySeatId
+    || runtime.controller.localSeatId === input.ownerSeatId
+    || !coopV2ReplacementCutovers.has(runtime)
+    || replacementOperationId(input, input.ownerSeatId) !== input.operationId
+  ) {
+    return null;
+  }
+  const harness = coopV2ShadowHarnesses.get(runtime);
+  if (harness == null) {
+    return null;
+  }
+  const exactSourceOperationId = (): string | null => {
+    const control = runtime.v2ControlLedger.latestControl;
+    if (
+      control?.kind !== "REPLACEMENT"
+      || control.operationId !== input.operationId
+      || control.ownerSeatId !== input.ownerSeatId
+      || control.epoch !== input.epoch
+      || control.wave !== input.wave
+      || control.turn !== input.turn
+      || control.occurrence !== input.occurrence
+      || control.fieldIndex !== input.fieldIndex
+      || !runtime.v2ControlLedger.isMaterialApplied(control)
+    ) {
+      return null;
+    }
+    return runtime.v2ControlLedger.sourceEntryOf(control)?.operationId ?? null;
+  };
+  const sourceOperationId = exactSourceOperationId();
+  if (sourceOperationId == null) {
+    return null;
+  }
+  return harness.armReplacementOwnerWindowAfterControlProof(
+    input,
+    input.ownerSeatId,
+    () =>
+      harness.waitForAuthorityPeerStage(
+        sourceOperationId,
+        "controlInstalled",
+        COOP_V2_REPLACEMENT_CONTROL_PROOF_WAIT_MS,
+      ),
+    () => exactSourceOperationId() === sourceOperationId,
+    onFallback,
   );
 }
 

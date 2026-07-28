@@ -11,6 +11,7 @@
 
 import {
   COOP_DEX_SYNC_SEQ,
+  COOP_FAINT_SWITCH_SEQ_BASE,
   COOP_INTERACTION_LEAVE,
   CoopInteractionRelay,
 } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -519,6 +520,47 @@ describe("co-op alternating-interaction relay (#633)", () => {
     expect(timer.fire).toBeDefined();
     timer.fire?.();
     expect(await awaited).toBeNull();
+  });
+
+  it("lets an external owner lease abort a wait without a raw timer or sticky same-seq cancellation", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopInteractionRelay(host);
+    const schedule = vi.fn(() => () => {});
+    const watcher = new CoopInteractionRelay(guest, { schedule });
+    const seq = COOP_FAINT_SWITCH_SEQ_BASE + 1;
+    const firstLease = new AbortController();
+
+    const first = watcher.awaitInteractionChoice(seq, null, ["switch"], undefined, undefined, firstLease.signal);
+    expect(schedule, "the Authority V2 owner lease is the only deadline").not.toHaveBeenCalled();
+    expect(watcher.describeAwaitedInteractions()).toMatchObject([{ seq, expectedKinds: ["switch"] }]);
+    firstLease.abort();
+    await expect(first).resolves.toBeNull();
+    expect(watcher.describeAwaitedInteractions()).toEqual([]);
+
+    const secondLease = new AbortController();
+    const second = watcher.awaitInteractionChoice(seq, null, ["switch"], undefined, undefined, secondLease.signal);
+    owner.sendInteractionChoice(seq, "switch", 3, [0]);
+    await expect(second).resolves.toMatchObject({ kind: "switch", choice: 3, data: [0] });
+    expect(schedule).not.toHaveBeenCalled();
+    secondLease.abort();
+    owner.dispose();
+    watcher.dispose();
+  });
+
+  it("keeps a non-deadline relay cancellation distinct from the external owner lease expiry", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopInteractionRelay(host);
+    const watcher = new CoopInteractionRelay(guest);
+    const seq = COOP_FAINT_SWITCH_SEQ_BASE + 1;
+    const ownerLease = new AbortController();
+
+    const awaited = watcher.awaitInteractionChoice(seq, null, ["switch"], undefined, undefined, ownerLease.signal);
+    watcher.cancelWaiters(candidate => candidate === seq);
+
+    await expect(awaited).resolves.toBeNull();
+    expect(ownerLease.signal.aborted, "a resync/refusal null must not impersonate the 60s owner deadline").toBe(false);
+    owner.dispose();
+    watcher.dispose();
   });
 
   it("a choice for a DIFFERENT interaction seq does not satisfy the wait", async () => {

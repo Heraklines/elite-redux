@@ -25,6 +25,7 @@
 
 import {
   armReplacementOwnerWindow,
+  armReplacementOwnerWindowAfterControlProof,
   buildReplacementCommitEntry,
   COOP_REPLACEMENT_OWNER_WINDOW_MS,
   decodeReplacementCommitMaterial,
@@ -728,6 +729,62 @@ describe("owner window (fallback-auto)", () => {
     cancel(); // owner picked within the window.
     clock.advance(COOP_REPLACEMENT_OWNER_WINDOW_MS * 2);
     expect(fallbacks).toBe(0);
+    expect(scheduler.pendingTimerCount).toBe(0);
+  });
+
+  it("does not arm or consume humanInput time before the exact remote control proof", async () => {
+    const cancellation = new AbortController();
+    let prove!: (ready: boolean) => void;
+    const proof = new Promise<boolean>(resolve => {
+      prove = resolve;
+    });
+    let fallbacks = 0;
+    const pending = armReplacementOwnerWindowAfterControlProof(
+      { scheduler, cancellation: cancellation.signal } as unknown as CoopRuntimeContext,
+      address(),
+      1,
+      () => proof,
+      () => true,
+      () => {
+        fallbacks++;
+      },
+    );
+
+    clock.advance(COOP_REPLACEMENT_OWNER_WINDOW_MS * 2);
+    expect(scheduler.pendingTimerCount, "no humanInput timer exists before controlInstalled").toBe(0);
+    expect(fallbacks).toBe(0);
+
+    prove(true);
+    const cancel = await pending;
+    expect(cancel).toBeTypeOf("function");
+    expect(scheduler.pendingTimerCount, "the exact proof arms one owner window").toBe(1);
+    clock.advance(COOP_REPLACEMENT_OWNER_WINDOW_MS - 1);
+    expect(fallbacks).toBe(0);
+    clock.advance(1);
+    expect(fallbacks).toBe(1);
+    cancel?.();
+    expect(scheduler.pendingTimerCount).toBe(0);
+  });
+
+  it("runtime cancellation before proof prevents a late proof from resurrecting the owner window", async () => {
+    const cancellation = new AbortController();
+    let prove!: (ready: boolean) => void;
+    const proof = new Promise<boolean>(resolve => {
+      prove = resolve;
+    });
+    const pending = armReplacementOwnerWindowAfterControlProof(
+      { scheduler, cancellation: cancellation.signal } as unknown as CoopRuntimeContext,
+      address(),
+      1,
+      () => proof,
+      () => true,
+      vi.fn(),
+    );
+
+    cancellation.abort();
+    expect(await pending).toBeNull();
+    prove(true);
+    await Promise.resolve();
     expect(scheduler.pendingTimerCount).toBe(0);
   });
 });
