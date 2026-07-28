@@ -65,7 +65,7 @@ jobs:
   ghost-gauntlet:
     if: github.repository == 'Heraklines/elite-redux'
     name: Ghost winner pair ${{ matrix.pairId }} (both sides)
-    needs: contract
+    needs: train
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
