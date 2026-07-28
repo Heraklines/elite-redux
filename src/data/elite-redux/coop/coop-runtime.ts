@@ -183,6 +183,7 @@ import {
 import { isStrictCoopEntryPresentation } from "#data/elite-redux/coop/coop-battle-event-validator";
 import {
   CoopBattleStreamer,
+  type CoopEntryPresentationPrefix,
   type CoopStateSyncFailure,
   type CoopStateSyncOutcome,
   type CoopStateSyncResult,
@@ -8970,6 +8971,55 @@ export function inspectCoopV2CommandPresentationRequirement(
   return source.kind === "CONTROL_COMMIT" && decodeControlOpenEntry(source)?.kind === "command-open"
     ? { kind: "presentation", operationId: source.operationId }
     : { kind: "covered-by-source", operationId: source.operationId };
+}
+
+/**
+ * Read the immutable pre-command presentation from the exact retained V2 source entry.
+ *
+ * A destination {@linkcode NewBattlePhase} can be the command-open entry's only material consumer. It
+ * installs the signed battle image and retires the entry before the destination {@linkcode TurnInitPhase}
+ * creates its presentation-only replay phase. The control ledger remains the ordering authority, so that
+ * later concrete renderer must recover the prefix from the same already-validated entry instead of waiting
+ * for a second transport delivery that can never exist.
+ *
+ * This is deliberately a read, not a presentation receipt: the replay finalizer records the exact operation
+ * watermark only after every ability, message, terrain and stat cue has actually completed.
+ */
+export function readRetainedCoopV2CommandEntryPresentation(
+  wave: number,
+  turn: number,
+  runtime: CoopRuntime | null = active,
+): CoopEntryPresentationPrefix | null {
+  if (
+    runtime == null
+    || runtime.controller.authorityRole !== "replica"
+    || !Number.isSafeInteger(wave)
+    || wave < 0
+    || !Number.isSafeInteger(turn)
+    || turn < 1
+  ) {
+    return null;
+  }
+  const control = runtime.v2ControlLedger.latestControl;
+  if (control?.kind !== "COMMAND_FRONTIER" || control.wave !== wave || control.turn !== turn) {
+    return null;
+  }
+  const source = runtime.v2ControlLedger.sourceEntryOf(control);
+  const material = source == null ? null : decodeControlOpenEntry(source);
+  if (
+    source?.kind !== "CONTROL_COMMIT"
+    || material?.kind !== "command-open"
+    || material.wave !== wave
+    || material.turn !== turn
+    || !controlsEqual(source.nextControl, control)
+  ) {
+    return null;
+  }
+  return {
+    events: structuredClone(material.entryPresentation),
+    stateTick: material.authoritativeState.tick,
+    controlOperationId: source.operationId,
+  };
 }
 
 /** Release only CommandPhase starts addressed by the applied immutable command frontier. */

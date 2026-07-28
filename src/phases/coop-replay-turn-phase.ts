@@ -44,6 +44,7 @@ import {
   getCoopController,
   isCoopAuthoritativeGuest,
   isCoopV2CommandEntryPresentationActive,
+  readRetainedCoopV2CommandEntryPresentation,
   registerCoopActiveReplayTurnAborter,
   retryCoopV2PendingAuthorityAtSafeBoundary,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -1110,6 +1111,14 @@ export class CoopReplayTurnPhase extends Phase {
     if (buffered != null) {
       this.v2EntryPresentationBuffered = null;
       return Promise.resolve(buffered);
+    }
+    // A signed next-wave NewBattlePhase can consume and retire CONTROL_COMMIT before TurnInit constructs
+    // this exact renderer. The immutable source remains retained by the global V2 control ledger; recover
+    // its prefix here so final-boss stage one (one host-owned field slot) still presents every entrance
+    // ability/message and reaches its spectator command watcher without requiring an impossible resend.
+    const retained = readRetainedCoopV2CommandEntryPresentation(this.sourceWave, this.turn);
+    if (retained != null) {
+      return Promise.resolve(retained);
     }
     return new Promise(resolve => {
       this.v2EntryPresentationResolver = resolve;
