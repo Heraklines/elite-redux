@@ -1072,8 +1072,8 @@ test("representative starter selection is deterministic and stays within the co-
     ],
   });
   assert.deepEqual(pair, [
-    { index: 3, speciesId: 152, cost: 2 },
     { index: 7, speciesId: 155, cost: 3 },
+    { index: 3, speciesId: 152, cost: 2 },
   ]);
 });
 
@@ -1087,12 +1087,12 @@ test("paired starter selection diversifies the two visible seat rosters", () => 
     ],
   };
   assert.deepEqual(chooseAffordableStarterPair(observation, 5, 0), [
-    { index: 3, speciesId: 152, cost: 2 },
     { index: 7, speciesId: 155, cost: 3 },
+    { index: 3, speciesId: 152, cost: 2 },
   ]);
   assert.deepEqual(chooseAffordableStarterPair(observation, 5, 1), [
-    { index: 3, speciesId: 152, cost: 2 },
     { index: 8, speciesId: 158, cost: 3 },
+    { index: 3, speciesId: 152, cost: 2 },
   ]);
 });
 

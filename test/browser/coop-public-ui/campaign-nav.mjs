@@ -593,7 +593,18 @@ export function chooseAffordableStarterPair(observation, budget = COOP_STARTER_B
       }
     }
   }
-  return best?.pair ?? null;
+  if (best == null) {
+    return null;
+  }
+  // Selection order determines the lead. Put each seat's deliberately different support family
+  // first so the two active Pokemon do not both open as the same weak Grass starter while the Fire
+  // and Water coverage sits in reserve. This is ordinary public starter-grid behavior and keeps the
+  // fresh depth profile representative without seeding stats, granting items, or accepting a wipe.
+  return best.pair.toSorted((left, right) => {
+    const leftPreferred = STARTER_FAMILY_BY_SPECIES.get(left.speciesId) === preferredSupportFamily;
+    const rightPreferred = STARTER_FAMILY_BY_SPECIES.get(right.speciesId) === preferredSupportFamily;
+    return Number(rightPreferred) - Number(leftPreferred);
+  });
 }
 
 async function waitForStarterGridMove(client, fromIndex, selectedOptionId, timeoutMs) {

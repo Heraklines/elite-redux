@@ -21,6 +21,7 @@ import {
   hasPassiveBattleProgressSurface,
   hasProvisionalCommandWatcherSurface,
   hasProvisionalMysteryNarrationSurface,
+  isExplicitEmptyRewardShop,
   resolveSurfaceOwner,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
@@ -725,6 +726,12 @@ test("reward selection preserves stable visible order inside one utility tier", 
     ),
     "SITRUS_BERRY",
   );
+});
+
+test("an explicit empty reward pool is a real Continue surface, not an exhausted or missing projection", () => {
+  assert.equal(isExplicitEmptyRewardShop({ selectedOptionId: "cursor:0", optionIds: [], optionCount: 0 }), true);
+  assert.equal(isExplicitEmptyRewardShop({ selectedOptionId: "cursor:0", optionIds: null, optionCount: null }), false);
+  assert.equal(isExplicitEmptyRewardShop({ selectedOptionId: "REVIVE", optionIds: ["REVIVE"], optionCount: 1 }), false);
 });
 
 test("a legacy phase marker stops registering a semantic surface after a later phase supersedes it", () => {

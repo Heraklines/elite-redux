@@ -2507,6 +2507,17 @@ export function chooseUntriedRewardOption(authority, rejectedRewardIds) {
   );
 }
 
+/**
+ * The production modifier handler deliberately renders an actionable Continue row when a reward
+ * pool is empty. This is distinct from a missing observer projection (`optionIds: null`) and from
+ * exhausting a non-empty list after declining nested learn-move prompts. A human simply presses
+ * ACTION on that row; the campaign must do the same instead of misclassifying a healthy exact-
+ * address surface as a reward-policy failure.
+ */
+export function isExplicitEmptyRewardShop(authority) {
+  return Array.isArray(authority?.optionIds) && authority.optionIds.length === 0 && authority.optionCount === 0;
+}
+
 async function driveRewardPartyTarget(rig, driver, owner, boundary) {
   const target = chooseRewardPartyTargetSlot(boundary, driver.partySlot ?? 0);
   const targetSlot = target.slot;
@@ -2845,12 +2856,20 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       const rejected = rewardRetryState.rejectedByAddress.get(addressKey) ?? new Set();
       const targetId = chooseUntriedRewardOption(mechanicalBoundary.authority, rejected);
       if (targetId == null) {
-        throw new Error(
-          `[campaign-reward-policy] every visible reward at ${addressKey} was already declined: `
-            + `${JSON.stringify(mechanicalBoundary.authority.optionIds ?? null)}`,
-        );
-      }
-      if (targetId === mechanicalBoundary.authority.selectedOptionId) {
+        if (isExplicitEmptyRewardShop(mechanicalBoundary.authority)) {
+          client.evidence.record("campaign-empty-reward-continue", {
+            address: mechanicalBoundary.authority.address,
+            selectedOptionId: mechanicalBoundary.authority.selectedOptionId,
+            optionCount: mechanicalBoundary.authority.optionCount,
+          });
+          await client.sequence(driver.keys, `campaign-${driver.name}-empty-continue`);
+        } else {
+          throw new Error(
+            `[campaign-reward-policy] every visible reward at ${addressKey} was already declined: `
+              + `${JSON.stringify(mechanicalBoundary.authority.optionIds ?? null)}`,
+          );
+        }
+      } else if (targetId === mechanicalBoundary.authority.selectedOptionId) {
         await client.sequence(driver.keys, `campaign-${driver.name}`);
       } else {
         await selectOptionById(client, {
