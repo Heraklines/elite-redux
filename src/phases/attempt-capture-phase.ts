@@ -15,6 +15,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopAttributeNewMon, setCoopCatchThrowerHint } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementCatch, erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
@@ -191,12 +192,12 @@ export class AttemptCapturePhase extends PokemonPhase {
                       globalScene.playSound("se/pb_move");
                     } else {
                       shakeCounter.stop();
-                      this.failCatch(shakeCount);
+                      this.failCatch(shakeCount, isCritical);
                     }
                   } else if (isCritical && pokemon.randBattleSeedInt(65536) >= shakeProbability) {
                     // Above, perform the one shake check for critical captures after the ball shakes once
                     shakeCounter.stop();
-                    this.failCatch(shakeCount);
+                    this.failCatch(shakeCount, isCritical);
                   } else {
                     globalScene.playSound("se/pb_lock");
                     globalScene.animations.addPokeballCaptureStars(this.pokeball);
@@ -224,7 +225,7 @@ export class AttemptCapturePhase extends PokemonPhase {
                   }
                 },
                 onComplete: () => {
-                  this.catch();
+                  this.catch(isCritical);
                 },
               });
             };
@@ -239,8 +240,19 @@ export class AttemptCapturePhase extends PokemonPhase {
     });
   }
 
-  failCatch(_shakeCount: number) {
+  failCatch(shakeCount: number, isCritical: boolean) {
     const pokemon = this.getPokemon();
+
+    recordCoopEvent({
+      k: "captureAttempt",
+      bi: this.battlerIndex,
+      actor: { side: "enemy", pokemonId: pokemon.id },
+      pokeballType: this.pokeballType,
+      critical: isCritical,
+      shakeCount: Math.max(1, Math.min(3, shakeCount)),
+      outcome: "escaped",
+      speciesId: pokemon.species.getRootSpeciesId(true),
+    });
 
     globalScene.playSound("se/pb_rel");
     pokemon.setY(this.originalY);
@@ -272,7 +284,7 @@ export class AttemptCapturePhase extends PokemonPhase {
     this.end();
   }
 
-  catch() {
+  catch(isCritical: boolean) {
     const pokemon = this.getPokemon() as EnemyPokemon;
 
     // ER relic (#439): Collector's Album - record this catch against the run's
@@ -323,6 +335,18 @@ export class AttemptCapturePhase extends PokemonPhase {
       addStatus.value = false;
     }
 
+    const captureEventRecorded =
+      recordCoopEvent({
+        k: "captureAttempt",
+        bi: this.battlerIndex,
+        actor: { side: "enemy", pokemonId: pokemon.id },
+        pokeballType: this.pokeballType,
+        critical: isCritical,
+        shakeCount: isCritical ? 1 : 3,
+        outcome: addStatus.value ? "caught" : "caughtButChallenge",
+        speciesId: pokemon.species.getRootSpeciesId(true),
+      }) != null;
+
     globalScene.ui.showText(
       i18next.t(addStatus.value ? "battle:pokemonCaught" : "battle:pokemonCaughtButChallenge", {
         pokemonName: pokemon.name,
@@ -335,19 +359,18 @@ export class AttemptCapturePhase extends PokemonPhase {
           // (it removes the captured enemy without a FaintPhase, so it never queues that tail
           // itself). Hard no-op for solo / non-host / lockstep; guarded against a double-advance.
           //
-          // Co-op (#689 capture animation): ALSO carry a tiny cosmetic presentation so the guest
-          // plays the ball-throw animation + a locally-localized "X was caught!" line (it never
-          // runs this host-only phase, which owns that presentation). Gate it on the SAME
-          // `addStatus.value` (mon actually KEPT / added to party) that distinguishes a real catch
-          // from a challenge-blocked one - a challenge-blocked catch shows the host
-          // `pokemonCaughtButChallenge` and must NOT show the guest a "caught!" line.
-          const capturePresentation = addStatus.value
-            ? {
-                pokeballType: this.pokeballType,
-                targetBattlerIndex: this.battlerIndex,
-                speciesId: pokemon.species.getRootSpeciesId(true),
-              }
-            : undefined;
+          // Modern sessions already retained the complete success/failure attempt inside the turn stream,
+          // where the renderer can animate the exact still-live target before checkpoint adoption. Preserve
+          // the old post-checkpoint successful-catch carrier only when no recording existed, so a defensive
+          // out-of-turn capture remains visible without double-playing an ordinary recorded success.
+          const capturePresentation =
+            addStatus.value && !captureEventRecorded
+              ? {
+                  pokeballType: this.pokeballType,
+                  targetBattlerIndex: this.battlerIndex,
+                  speciesId: pokemon.species.getRootSpeciesId(true),
+                }
+              : undefined;
           broadcastCoopWaveResolved("capture", capturePresentation);
           globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);
           globalScene.pokemonInfoContainer.hide();

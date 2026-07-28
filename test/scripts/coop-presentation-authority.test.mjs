@@ -469,14 +469,19 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
-test("protocol 54 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
+test("protocol 55 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-54"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-55"/u);
+  assert.match(
+    transport,
+    /interface CoopFullMonSnapshot[\s\S]+tags: string\[\]/u,
+    "full snapshots expose the runtime BattlerTagType string identities without an unsafe numeric adapter",
+  );
   const rewardUtilities = read("src/data/mystery-encounters/utils/encounter-phase-utils.ts");
   assert.match(rewardUtilities, /export function setEncounterMarketReward/u);
   for (const [path, marketKind] of [
@@ -503,9 +508,25 @@ test("protocol 54 binds every structured presentation cue and retained Mystery m
   assert.match(move, /animate: false/u);
   assert.match(read("src/phases/move-effect-phase.ts"), /k: "moveAnim"[\s\S]+hitsSubstitute/u);
   assert.match(read("src/phases/move-charge-phase.ts"), /k: "moveAnim"[\s\S]+chargeAnim: move\.chargeAnim/u);
+  const capture = read("src/phases/attempt-capture-phase.ts");
+  assert.match(
+    capture,
+    /failCatch\(shakeCount: number, isCritical: boolean\)[\s\S]+recordCoopEvent\(\{[\s\S]+k: "captureAttempt"[\s\S]+outcome: "escaped"/u,
+    "a failed throw is an ordered authority event instead of a host-only animation",
+  );
+  assert.match(
+    capture,
+    /const captureEventRecorded =[\s\S]+k: "captureAttempt"[\s\S]+outcome: addStatus\.value \? "caught" : "caughtButChallenge"[\s\S]+addStatus\.value && !captureEventRecorded/u,
+    "every successful result is retained before the old post-checkpoint carrier can act as fallback",
+  );
   assert.match(
     read("src/phases/coop-replay-turn-phase.ts"),
     /case "moveUsed"[\s\S]+event\.animate !== false[\s\S]+case "moveAnim"/u,
+  );
+  assert.match(
+    read("src/phases/coop-replay-turn-phase.ts"),
+    /case "captureAttempt":[\s\S]+createCoopPresentationOutcomeToken\(\)[\s\S]+unshiftNew\("CoopCaptureReplayPhase", event, outcomeToken\)/u,
+    "the exact attempt owns an outcome-gated pre-checkpoint renderer phase",
   );
 });
 

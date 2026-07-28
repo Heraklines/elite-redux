@@ -1831,6 +1831,11 @@ export class CoopReplayTurnPhase extends Phase {
             pm.unshiftNew("PokemonAnimPhase", anim, actor, fieldAssets, outcomeToken, event.actor, companion);
             break;
           }
+          case "captureAttempt":
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew("CoopCaptureReplayPhase", event, outcomeToken);
+            break;
           case "formChange":
             outcomeToken = createCoopPresentationOutcomeToken();
             this.presentationOutcomeTokens.push(outcomeToken);

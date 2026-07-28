@@ -199,6 +199,19 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
         && ((event.companionBi === null && event.companionActor === null)
           || (isActorAddressableBattlerIndex(event.companionBi) && isPresentationActorRef(event.companionActor)))
       );
+    case "captureAttempt":
+      return (
+        isValidBattlerIndex(event.bi)
+        && isPresentationActorRef(event.actor)
+        && event.actor.side === "enemy"
+        && isSafeAddressPart(event.pokeballType)
+        && event.pokeballType <= 5
+        && typeof event.critical === "boolean"
+        && isSafeAddressPart(event.shakeCount, false)
+        && event.shakeCount <= 3
+        && (event.outcome === "escaped" || event.outcome === "caught" || event.outcome === "caughtButChallenge")
+        && isPositiveSafeAddressPart(event.speciesId)
+      );
     case "formChange":
       return (
         isActorAddressableBattlerIndex(event.bi)

@@ -293,8 +293,7 @@ function isStrictFullField(value: unknown): value is CoopFullMonSnapshot[] {
     }
     const bi = (raw as { bi?: unknown }).bi;
     const mon = raw as Record<string, unknown>;
-    // BattlerTagType is a string enum at runtime. The frozen historical type says `number[]`, but no
-    // numeric-to-enum mapping ever existed; admitting numbers would produce a carrier that cannot converge.
+    // BattlerTagType is a string enum at runtime. Numeric values have no stable mapping and cannot converge.
     if (
       !isValidBattlerIndex(bi)
       || seen.has(bi)

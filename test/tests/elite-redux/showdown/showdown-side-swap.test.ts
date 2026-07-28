@@ -217,6 +217,16 @@ describe("showdown-side-swap: battle events", () => {
       doReturn: true,
       actor: { side: "player", pokemonId: 91 },
     },
+    {
+      k: "captureAttempt",
+      bi: BattlerIndex.ENEMY,
+      actor: { side: "enemy", pokemonId: 21 },
+      pokeballType: 0,
+      critical: false,
+      shakeCount: 2,
+      outcome: "escaped",
+      speciesId: 25,
+    },
     { k: "weather", weather: 2, turnsLeft: 5 },
     { k: "terrain", terrain: 1, turnsLeft: 3 },
   ];
@@ -246,12 +256,15 @@ describe("showdown-side-swap: battle events", () => {
       BattlerIndex.ENEMY_2,
     );
     expect((swapBattleEvent(events[8]) as Extract<CoopBattleEvent, { k: "switch" }>).bi).toBe(BattlerIndex.ENEMY);
+    const capture = swapBattleEvent(events[9]) as Extract<CoopBattleEvent, { k: "captureAttempt" }>;
+    expect(capture.bi).toBe(BattlerIndex.PLAYER);
+    expect(capture.actor).toEqual({ side: "player", pokemonId: 21 });
   });
 
   it("leaves side-free members (message / weather / terrain) untouched", () => {
     expect(swapBattleEvent(events[0])).toEqual(events[0]);
-    expect(swapBattleEvent(events[9])).toEqual(events[9]);
     expect(swapBattleEvent(events[10])).toEqual(events[10]);
+    expect(swapBattleEvent(events[11])).toEqual(events[11]);
   });
 
   it("swap∘swap = identity for every event kind", () => {

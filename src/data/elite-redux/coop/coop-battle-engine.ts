@@ -1779,9 +1779,9 @@ function readChecksumTagTypes(mon: Pokemon): string[] {
   }
 }
 
-/** Frozen full-snapshot schema adapter; runtime enum identities are strings despite the legacy numeric type. */
-function readTagTypes(mon: Pokemon): number[] {
-  return readChecksumTagTypes(mon) as unknown as number[];
+/** Full-snapshot tag identities use the runtime string-enum wire representation. */
+function readTagTypes(mon: Pokemon): string[] {
+  return readChecksumTagTypes(mon);
 }
 
 /** Read the arena's tag identities as `[tagType, side]`, sorted (turn counts excluded). */
@@ -4030,11 +4030,11 @@ function applyCoopAuthoritativeBattleStateInternal(
 }
 
 /** Reconcile a live mon's battler tags to exactly the snapshot's tag-type set. */
-function reconcileTags(mon: Pokemon, wantTagTypes: number[]): void {
+function reconcileTags(mon: Pokemon, wantTagTypes: string[]): void {
   try {
     // Strict carrier admission guarantees runtime string identities. Numeric legacy values have no stable
     // mapping to BattlerTagType and are rejected before apply rather than being silently mis-reconciled.
-    const want = new Set((wantTagTypes as unknown[]).filter((tag): tag is string => typeof tag === "string"));
+    const want = new Set(wantTagTypes.filter(tag => typeof tag === "string"));
     const have = new Set(mon.summonData.tags.map(t => t.tagType as unknown as string));
     // This is a REPLICA projector, not a battle-mechanics entry point. Pokemon.removeTag/addTag invoke
     // onRemove/onAdd plus immunity/held-item/ability checks; several tags then queue stat changes,

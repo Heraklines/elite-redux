@@ -34,6 +34,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim, MoveChargeAnim } from "#data/battle-anims";
 import { SideKind } from "#data/battle-format";
+import { SubstituteTag } from "#data/battler-tags";
 import { allAbilities } from "#data/data-lists";
 import { isTurnCommitSuccessorForSource } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import type { CoopAuthorityEntryKind, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
@@ -119,6 +120,7 @@ import type {
   CoopAuthoritativeBattleStateV1,
   CoopBattleCheckpoint,
   CoopBattleEvent,
+  CoopCaptureAttemptPresentation,
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
@@ -1942,12 +1944,19 @@ export class CoopFaintReplayPhase extends PokemonPhase {
 export class CoopCaptureReplayPhase extends Phase {
   public readonly phaseName = "CoopCaptureReplayPhase";
 
-  constructor(private readonly presentation: CoopCapturePresentation) {
+  constructor(
+    private readonly presentation: CoopCapturePresentation | CoopCaptureAttemptPresentation,
+    private readonly outcomeToken?: CoopPresentationOutcomeToken,
+  ) {
     super();
   }
 
   public override start(): void {
     super.start();
+    if ("k" in this.presentation) {
+      this.startExactAttempt(this.presentation);
+      return;
+    }
     if (isCoopDebug()) {
       coopLog(
         "replay",
@@ -2059,6 +2068,290 @@ export class CoopCaptureReplayPhase extends Phase {
       // A bad payload (unknown ball / species, missing sprite) must never strand the queue.
       coopWarn("replay", "present capture threw -> finish (handled)");
       finish();
+    }
+  }
+
+  /** Replay a turn-stream capture while the exact target still exists, before checkpoint adoption. */
+  private startExactAttempt(event: CoopCaptureAttemptPresentation): void {
+    const actorFingerprint = `${event.actor.side}:bi${event.bi}:p${event.actor.pokemonId}:capture:${event.outcome}:shakes${event.shakeCount}:crit${Number(event.critical)}`;
+    let ended = false;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
+    let pokeball: Phaser.GameObjects.Sprite | undefined;
+    let pokemon: Pokemon | null = null;
+    let originalY = 0;
+    let originalScaleX = 1;
+    let originalScaleY = 1;
+
+    const restoreEscapedActor = () => {
+      if (event.outcome !== "escaped" || pokemon == null) {
+        return;
+      }
+      try {
+        pokemon.setY(originalY);
+        pokemon.setScale(originalScaleX, originalScaleY);
+        pokemon.setVisible(true);
+        pokemon.untint(250, "Sine.easeOut");
+        pokemon.getTag(SubstituteTag)?.sprite?.setVisible(true);
+      } catch {
+        /* the final checkpoint remains the mechanical and presentation recovery fence */
+      }
+    };
+    const finish = (outcome: CoopPresentationOutcome) => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      restoreEscapedActor();
+      try {
+        pokeball?.destroy();
+      } catch {
+        /* sprite teardown best-effort */
+      }
+      try {
+        globalScene.ui.clearText();
+      } catch {
+        /* a torn message node cannot retain the authority queue */
+      }
+      if (this.outcomeToken != null) {
+        settleCoopPresentationOutcome(this.outcomeToken, outcome);
+      }
+      this.end();
+    };
+    const failed = (reason: string) => finish({ kind: "failed", reason, actorFingerprint });
+    const skipped = (): CoopPresentationOutcome => ({
+      kind: "intentionally-skipped",
+      reason: "animations-disabled",
+      actorFingerprint,
+    });
+    const rendered = (): CoopPresentationOutcome => ({ kind: "rendered", actorFingerprint });
+    const showCaughtMessage = (outcome: CoopPresentationOutcome) => {
+      try {
+        const pokemonName = pokemon?.name ?? getPokemonSpecies(event.speciesId).name;
+        globalScene.ui.showText(
+          i18next.t(event.outcome === "caught" ? "battle:pokemonCaught" : "battle:pokemonCaughtButChallenge", {
+            pokemonName,
+          }),
+          null,
+          () => finish(outcome),
+          null,
+          true,
+        );
+      } catch {
+        failed("capture-result-message-threw");
+      }
+    };
+
+    pokemon = exactDisplayedActor(event.actor);
+    if (pokemon == null || pokemon.getBattlerIndex() !== event.bi) {
+      failed("capture-target-not-displayed");
+      return;
+    }
+    originalY = pokemon.y;
+    originalScaleX = pokemon.scaleX;
+    originalScaleY = pokemon.scaleY;
+
+    if (!globalScene.moveAnimations) {
+      if (event.outcome === "escaped") {
+        finish(skipped());
+      } else {
+        showCaughtMessage(skipped());
+      }
+      return;
+    }
+
+    try {
+      const fpOffset = pokemon.getFieldPositionOffset();
+      const pokeballType = event.pokeballType as PokeballType;
+      const pokeballAtlasKey = getPokeballAtlasKey(pokeballType);
+      pokeball = globalScene.addFieldSprite(16, 80, "pb", pokeballAtlasKey);
+      pokeball.setOrigin(0.5, 0.625);
+      globalScene.field.add(pokeball);
+      pokemon.getTag(SubstituteTag)?.sprite?.setVisible(false);
+
+      watchdog = armCoopPresentationProgressWatchdog(() => failed("capture-presentation-watchdog-expired"));
+      globalScene.playSound(event.critical ? "se/crit_throw" : "se/pb_throw");
+      globalScene.time.delayedCall(300, () => {
+        if (!ended && pokeball != null && pokemon != null) {
+          globalScene.field.moveBelow(pokeball as Phaser.GameObjects.GameObject, pokemon);
+        }
+      });
+
+      globalScene.tweens.add({
+        targets: pokeball,
+        x: { value: 236 + fpOffset[0], ease: "Linear" },
+        y: { value: 16 + fpOffset[1], ease: "Cubic.easeOut" },
+        duration: 500,
+        onComplete: () => {
+          if (ended || pokeball == null || pokemon == null) {
+            return;
+          }
+          try {
+            pokeball.setTexture("pb", `${pokeballAtlasKey}_opening`);
+            globalScene.time.delayedCall(17, () => {
+              if (!ended) {
+                pokeball?.setTexture("pb", `${pokeballAtlasKey}_open`);
+              }
+            });
+            globalScene.playSound("se/pb_rel");
+            pokemon.tint(getPokeballTintColor(pokeballType));
+            globalScene.animations.addPokeballOpenParticles(pokeball.x, pokeball.y, pokeballType);
+            globalScene.tweens.add({
+              targets: pokemon,
+              duration: 500,
+              ease: "Sine.easeIn",
+              scale: 0.25,
+              y: 20,
+              onComplete: () => {
+                if (ended || pokeball == null || pokemon == null) {
+                  return;
+                }
+                try {
+                  pokeball.setTexture("pb", `${pokeballAtlasKey}_opening`);
+                  pokemon.setVisible(false);
+                  globalScene.playSound("se/pb_catch");
+                  globalScene.time.delayedCall(17, () => {
+                    if (!ended) {
+                      pokeball?.setTexture("pb", pokeballAtlasKey);
+                    }
+                  });
+
+                  const breakFree = () => {
+                    if (ended || pokeball == null || pokemon == null) {
+                      return;
+                    }
+                    try {
+                      globalScene.playSound("se/pb_rel");
+                      pokemon.setY(originalY);
+                      if (pokemon.status?.effect !== StatusEffect.SLEEP) {
+                        pokemon.cry(pokemon.getHpRatio() > 0.25 ? undefined : { rate: 0.85 });
+                      }
+                      pokemon.tint(getPokeballTintColor(pokeballType));
+                      pokemon.setVisible(true);
+                      pokemon.untint(250, "Sine.easeOut");
+                      pokemon.getTag(SubstituteTag)?.sprite?.setVisible(true);
+                      pokeball.setTexture("pb", `${pokeballAtlasKey}_opening`);
+                      globalScene.time.delayedCall(17, () => {
+                        if (!ended) {
+                          pokeball?.setTexture("pb", `${pokeballAtlasKey}_open`);
+                        }
+                      });
+                      globalScene.tweens.add({
+                        targets: pokemon,
+                        duration: 250,
+                        ease: "Sine.easeOut",
+                        scaleX: originalScaleX,
+                        scaleY: originalScaleY,
+                      });
+                      globalScene.tweens.add({
+                        targets: pokeball,
+                        duration: 250,
+                        delay: 250,
+                        ease: "Sine.easeIn",
+                        alpha: 0,
+                        onComplete: () => finish(rendered()),
+                      });
+                    } catch {
+                      failed("capture-break-free-presentation-threw");
+                    }
+                  };
+                  const lockCapture = () => {
+                    if (ended || pokeball == null) {
+                      return;
+                    }
+                    globalScene.playSound("se/pb_lock");
+                    globalScene.animations.addPokeballCaptureStars(pokeball);
+                    const pbTint = globalScene.add.sprite(pokeball.x, pokeball.y, "pb", "pb");
+                    pbTint.setOrigin(pokeball.originX, pokeball.originY);
+                    pbTint.setTintFill(0);
+                    pbTint.setAlpha(0);
+                    globalScene.field.add(pbTint);
+                    globalScene.tweens.add({
+                      targets: pbTint,
+                      alpha: 0.375,
+                      duration: 200,
+                      easing: "Sine.easeOut",
+                      onComplete: () => {
+                        globalScene.tweens.add({
+                          targets: pbTint,
+                          alpha: 0,
+                          duration: 200,
+                          easing: "Sine.easeIn",
+                          onComplete: () => pbTint.destroy(),
+                        });
+                      },
+                    });
+                  };
+                  const doShake = () => {
+                    if (ended || pokeball == null) {
+                      return;
+                    }
+                    let shakeCount = 0;
+                    const pbX = pokeball.x;
+                    const shakeCounter = globalScene.tweens.addCounter({
+                      from: 0,
+                      to: 1,
+                      repeat: event.critical ? 2 : 4,
+                      yoyo: true,
+                      ease: "Cubic.easeOut",
+                      duration: 250,
+                      repeatDelay: 500,
+                      onUpdate: tween => {
+                        if (ended || pokeball == null) {
+                          return;
+                        }
+                        if (shakeCount && shakeCount < (event.critical ? 2 : 4)) {
+                          const value = tween.getValue() ?? 0;
+                          const directionMultiplier = shakeCount % 2 === 1 ? 1 : -1;
+                          pokeball.setX(pbX + value * 4 * directionMultiplier);
+                          pokeball.setAngle(value * 27.5 * directionMultiplier);
+                        }
+                      },
+                      onRepeat: () => {
+                        if (ended) {
+                          shakeCounter.stop();
+                          return;
+                        }
+                        if (shakeCount++ < (event.critical ? 1 : 3)) {
+                          if (event.outcome === "escaped" && shakeCount >= event.shakeCount) {
+                            shakeCounter.stop();
+                            breakFree();
+                            return;
+                          }
+                          globalScene.playSound("se/pb_move");
+                        } else if (event.critical && event.outcome === "escaped") {
+                          shakeCounter.stop();
+                          breakFree();
+                        } else {
+                          lockCapture();
+                        }
+                      },
+                      onComplete: () => {
+                        if (event.outcome === "escaped") {
+                          breakFree();
+                        } else {
+                          showCaughtMessage(rendered());
+                        }
+                      },
+                    });
+                  };
+                  globalScene.time.delayedCall(250, () => {
+                    if (!ended && pokeball != null) {
+                      doPokeballBounceAnim(pokeball, 16, 72, 350, doShake, event.critical);
+                    }
+                  });
+                } catch {
+                  failed("capture-close-presentation-threw");
+                }
+              },
+            });
+          } catch {
+            failed("capture-open-presentation-threw");
+          }
+        },
+      });
+    } catch {
+      failed("capture-presentation-threw");
     }
   }
 }

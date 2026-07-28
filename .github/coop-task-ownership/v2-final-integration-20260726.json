@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "c9316996689e5861cf9be52877574c1a2864c5d0",
+  "baseSha": "37b5a64e62ad90bd32f548cf2ca2dbf32eabc652",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -80,6 +80,7 @@
     "src/modifier/modifier.ts",
     "src/phase-manager.ts",
     "src/phase.ts",
+    "src/phases/attempt-capture-phase.ts",
     "src/phases/biome-shop-phase.ts",
     "src/phases/command-phase.ts",
     "src/phases/coop-guest-faint-switch-phase.ts",

@@ -299,10 +299,19 @@ test("the browser receipt parser accepts every canonical CoopBattleEvent kind", 
     unionStart,
   );
   assert.ok(unionStart >= 0 && unionEnd > unionStart, "the canonical battle-event union is bounded");
+  const union = transport.slice(unionStart, unionEnd);
+  const namedArms = [...union.matchAll(/^\s*\|\s+([A-Z][A-Za-z0-9]+)\s*$/gmu)].map(match => match[1]);
+  const namedKinds = namedArms.flatMap(name => {
+    const start = transport.indexOf(`export interface ${name}`);
+    const end = start < 0 ? -1 : transport.indexOf("\n}", start);
+    return start < 0 || end < 0
+      ? []
+      : [...transport.slice(start, end).matchAll(/\bk:\s*"([A-Za-z]+)"/gu)].map(match => match[1]);
+  });
   const canonicalKinds = [
-    ...new Set([...transport.slice(unionStart, unionEnd).matchAll(/\bk:\s*"([A-Za-z]+)"/gu)].map(match => match[1])),
-  ];
-  assert.deepEqual(canonicalKinds, [
+    ...new Set([...union.matchAll(/\bk:\s*"([A-Za-z]+)"/gu)].map(match => match[1]).concat(namedKinds)),
+  ].sort();
+  const expectedKinds = [
     "message",
     "moveUsed",
     "moveAnim",
@@ -313,12 +322,15 @@ test("the browser receipt parser accepts every canonical CoopBattleEvent kind", 
     "showAbility",
     "tera",
     "commonAnim",
+    "pokemonAnim",
+    "captureAttempt",
     "formChange",
     "transform",
     "weather",
     "terrain",
     "switch",
-  ]);
+  ].sort();
+  assert.deepEqual(canonicalKinds, expectedKinds);
 
   const prefix = "[coop-browser:presentation-event] ";
   for (const kind of canonicalKinds) {

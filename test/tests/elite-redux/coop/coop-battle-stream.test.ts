@@ -1395,7 +1395,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       const { host } = createLoopbackPair();
       const hostStream = new CoopBattleStreamer(host, { authorityContext: context });
       const fullField = emptyFullField();
-      fullField[0].tags = [1];
+      fullField[0].tags = [1 as unknown as string];
 
       expect(() =>
         hostStream.emitTurn(

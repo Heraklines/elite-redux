@@ -188,6 +188,8 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
         companionBi: event.companionBi == null ? null : swapBi(event.companionBi, enemyBase),
         companionActor: event.companionActor == null ? null : swapActor(event.companionActor),
       };
+    case "captureAttempt":
+      return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };
     case "commonAnim":
       return {
         ...event,

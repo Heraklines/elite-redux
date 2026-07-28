@@ -41,7 +41,32 @@ import {
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
 import { applyEntry, expectedControlId, type ReplicaReceiptSink } from "#data/elite-redux/coop/authority-v2/replica";
+import { isStrictCoopBattleEvent } from "#data/elite-redux/coop/coop-battle-event-validator";
 import { describe, expect, it, vi } from "vitest";
+
+describe("ordered capture presentation contract", () => {
+  const escaped = {
+    k: "captureAttempt",
+    bi: 2,
+    actor: { side: "enemy", pokemonId: 25 },
+    pokeballType: 0,
+    critical: false,
+    shakeCount: 2,
+    outcome: "escaped",
+    speciesId: 25,
+  } as const;
+
+  it("accepts a complete exact attempt and rejects malformed result material", () => {
+    expect(isStrictCoopBattleEvent(escaped)).toBe(true);
+    expect(isStrictCoopBattleEvent({ ...escaped, shakeCount: 0 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...escaped, shakeCount: 4 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...escaped, pokeballType: 6 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...escaped, outcome: "maybe" })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...escaped, bi: -1 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...escaped, actor: { side: "player", pokemonId: 25 } })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...escaped, actor: { side: "enemy", pokemonId: 0 } })).toBe(false);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Fixtures

@@ -146,7 +146,10 @@ export type CoopRole = "host" | "guest";
 // er-coop-54 makes Substitute/Commander sprite transitions ordered authority presentation. Older strict
 // renderers reject the new event kind, so mixed builds must refuse pairing instead of silently showing a
 // missing doll or leaving Tatsugiri visible after Commander resolved.
-export const COOP_PROTOCOL_VERSION = "er-coop-54";
+// er-coop-55 moves every capture attempt into the ordered presentation stream. Older renderers know only
+// the post-checkpoint successful-catch approximation and silently omit failed throws, the exact target,
+// critical capture, and shake outcome, so mixed builds must refuse pairing.
+export const COOP_PROTOCOL_VERSION = "er-coop-55";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -742,8 +745,8 @@ export interface CoopFullMonSnapshot {
   bossSegmentIndex?: number;
   /** Each move slot as `[moveId, ppUsed]`, in moveset slot order. */
   moves: [number, number][];
-  /** Battler-tag TYPE ids present on the mon (identity only). */
-  tags: number[];
+  /** Battler-tag TYPE ids present on the mon (string-enum identities only). */
+  tags: string[];
   /**
    * This mon's held-item modifiers as plain ModifierData blobs (#633 RISKY #1/#2/#3). Carried in the
    * resync ONLY (never the per-turn checkpoint - too heavy; the checksum's compact held-item digest
@@ -1102,6 +1105,20 @@ export interface CoopPresentationActorRef {
   readonly pokemonId: number;
 }
 
+/** Complete authority-resolved presentation of one Pokeball throw; mechanics remain in the turn state. */
+export interface CoopCaptureAttemptPresentation {
+  readonly k: "captureAttempt";
+  readonly bi: number;
+  readonly actor: CoopPresentationActorRef;
+  readonly pokeballType: number;
+  readonly critical: boolean;
+  /** Number of passed shakes before escape, or the successful capture's ordinary visible shake count. */
+  readonly shakeCount: number;
+  readonly outcome: "escaped" | "caught" | "caughtButChallenge";
+  /** Root species identity used to localize the two successful-catch result messages on the renderer. */
+  readonly speciesId: number;
+}
+
 export type CoopBattleEvent =
   /** A battle-log line, ALREADY localized by the host (the guest shows it verbatim). */
   | { k: "message"; text: string }
@@ -1195,6 +1212,8 @@ export type CoopBattleEvent =
       companionBi: number | null;
       companionActor: CoopPresentationActorRef | null;
     }
+  /** Replay the authority's exact throw/shake/result against the still-live target before checkpoint apply. */
+  | CoopCaptureAttemptPresentation
   /** Apply and display one authority-resolved ordinary form change without re-running its mechanics. */
   | {
       k: "formChange";
@@ -1372,14 +1391,10 @@ export type CoopInteractionOutcome =
 export type CoopWaveOutcome = "win" | "capture" | "flee" | "gameOver";
 
 /**
- * Co-op authoritative CAPTURE PRESENTATION (#689): the tiny cosmetic payload the HOST streams
- * alongside a `waveResolved("capture")` so the GUEST - a pure renderer that never runs the
- * host-only `AttemptCapturePhase` - can play the ball-throw animation and show a LOCALLY-localized
- * "X was caught!" line. PRESENTATION ONLY: the authoritative party / dex state still rides
- * `captureParty` + the checkpoint; this only drives the cosmetic ball animation + message. A
- * SUCCESSFUL catch is the only thing that ever broadcasts `waveResolved("capture")`, so there is
- * no "broke free" arm on the wire (a challenge-blocked catch is host-gated to NOT carry this).
- * All plain JSON (enum VALUES / ids), so the transport stays the lowest layer.
+ * Legacy successful-catch presentation fallback (#689). Protocol 55 records ordinary successful and
+ * failed throws as {@linkcode CoopCaptureAttemptPresentation} before checkpoint adoption; this post-checkpoint
+ * approximation is retained only for a defensive capture that happened outside an active turn recording.
+ * PRESENTATION ONLY: authoritative party / dex state still rides `captureParty` + the checkpoint.
  */
 export interface CoopCapturePresentation {
   /** `PokeballType` enum value the ball animation renders. */
@@ -2027,11 +2042,9 @@ export type CoopMessage =
    * B2) and crediting the catch to its OWN gameData (B3) - because a pure renderer never runs the
    * `AttemptCapturePhase` that grows the party. Absent for non-capture outcomes (a hard no-op).
    *
-   * Co-op (#689 capture animation): on a SUCCESSFUL `"capture"` the host ALSO carries a tiny
-   * cosmetic {@linkcode CoopCapturePresentation} so the guest plays the ball-throw animation +
-   * a locally-localized "X was caught!" line (the guest never runs `AttemptCapturePhase`, which
-   * owns that presentation). Host-gated to a KEPT catch only (a challenge-blocked catch omits it,
-   * so the guest never shows a "caught!" line for a mon that was not added). Absent otherwise.
+   * Co-op (#689 capture fallback): on an out-of-turn successful `"capture"` that could not enter the
+   * protocol-55 turn stream, carry the legacy post-checkpoint approximation. Ordinary captures leave this
+   * absent because their exact success/failure attempt is already an ordered `CoopBattleEvent`.
    */
   | {
       t: "waveResolved";
