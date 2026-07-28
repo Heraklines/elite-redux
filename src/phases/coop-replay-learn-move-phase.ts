@@ -24,6 +24,7 @@ import {
   getCoopRuntime,
   getCoopUiMirror,
   notifyCoopV2InteractionSurfaceReady,
+  runWhenCoopRuntimeActive,
   setCoopLearnMovePickerOpener,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -308,35 +309,41 @@ export class CoopReplayLearnMovePhase extends Phase {
     this.committedV2ResultSettled = true;
     this.settled = true;
     coopLog("v2-proposal", `committed learn-move result ${operationId} applied; closing exact projected picker`);
-    void globalScene.ui
+    const scene = globalScene;
+    void scene.ui
       .setModeBoundedWhen(
         UiMode.MESSAGE,
         2_000,
         () =>
           getCoopRuntime() === runtime
-          && globalScene.phaseManager.getCurrentPhase() === this
+          && globalScene === scene
+          && scene.phaseManager.getCurrentPhase() === this
           && isCoopLearnMoveAuthorityV2Active(this.operationBinding)
           && this.coopV2ControlOperationId != null
           && coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId) === operationId,
       )
       .then(result => {
-        if (result === "superseded" || globalScene.phaseManager.getCurrentPhase() !== this) {
-          failCoopSharedSession(`Committed learn-move result ${operationId} lost its exact projected phase`);
-          return;
-        }
-        getCoopUiMirror()?.endSession();
-        clearCoopLearnMoveForwardInFlight(this.partySlot);
-        super.end();
-        if (globalScene.phaseManager.getCurrentPhase() === this) {
-          failCoopSharedSession(`Committed learn-move result ${operationId} did not close its projected phase`);
-          return;
-        }
-        if (!settleCoopV2InteractionOperation(operationId, runtime)) {
-          failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its projected terminal`);
-        }
+        runWhenCoopRuntimeActive(runtime, () => {
+          if (result === "superseded" || globalScene !== scene || scene.phaseManager.getCurrentPhase() !== this) {
+            failCoopSharedSession(`Committed learn-move result ${operationId} lost its exact projected phase`);
+            return;
+          }
+          getCoopUiMirror()?.endSession();
+          clearCoopLearnMoveForwardInFlight(this.partySlot);
+          super.end();
+          if (scene.phaseManager.getCurrentPhase() === this) {
+            failCoopSharedSession(`Committed learn-move result ${operationId} did not close its projected phase`);
+            return;
+          }
+          if (!settleCoopV2InteractionOperation(operationId, runtime)) {
+            failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its projected terminal`);
+          }
+        });
       })
       .catch(() => {
-        failCoopSharedSession(`Committed learn-move result ${operationId} could not close its projected picker`);
+        runWhenCoopRuntimeActive(runtime, () => {
+          failCoopSharedSession(`Committed learn-move result ${operationId} could not close its projected picker`);
+        });
       });
     return true;
   }

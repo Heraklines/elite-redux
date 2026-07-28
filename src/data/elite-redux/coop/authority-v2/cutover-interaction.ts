@@ -386,7 +386,9 @@ export const COOP_V2_INTERACTION_REGISTRY = {
           && payload.assignments.every(
             assignment => Array.isArray(assignment) && assignment.length === 2 && assignment.every(integer),
           )
-          && typeof payload.fallback === "boolean",
+          && typeof payload.fallback === "boolean"
+          && (payload.nextInteraction === undefined || isCoopInteractionSuccessorRef(payload.nextInteraction))
+          && (!payload.fallback || isCoopInteractionSuccessorRef(payload.nextInteraction)),
       ),
   },
   ME_BUTTON: {

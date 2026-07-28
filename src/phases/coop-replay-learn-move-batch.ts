@@ -249,6 +249,12 @@ export class CoopReplayLearnMoveBatchPhase extends Phase {
           getCoopUiMirror()?.endSession();
           clearCoopLearnMoveBatchInFlight(this.partySlot);
           super.end();
+          if (scene.phaseManager.getCurrentPhase() === this) {
+            failCoopSharedSession(
+              `Committed learn-move batch result ${operationId} did not retire its projected phase`,
+            );
+            return;
+          }
           if (!settleCoopV2InteractionOperation(operationId, runtime)) {
             failCoopSharedSession(`Committed learn-move batch result ${operationId} could not prove its terminal`);
           }
@@ -305,6 +311,11 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
   const operationBinding = captureCoopLearnMoveOperationBinding("guest");
   if (!phase.bindCoopOperation(operationBinding)) {
     failCoopSharedSession(`Learn-move batch phase for slot ${partySlot} changed its operation binding`);
+    return;
+  }
+  const owningRuntime = phase.owningRuntime();
+  if (owningRuntime == null) {
+    failCoopSharedSession(`Learn-move batch phase for slot ${partySlot} lost its owning runtime`);
     return;
   }
   const mirror = getCoopUiMirror();
@@ -372,7 +383,7 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
           type: "decision" as const,
           partySlot,
           assignments: learned.map(([moveId, slotIndex]) => [moveId, slotIndex] as [number, number]),
-          fallback: false,
+          fallback: false as const,
         };
         const v2 = isCoopLearnMoveAuthorityV2Active(operationBinding);
         if (v2 && decisionOperationId == null) {
@@ -390,14 +401,14 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
               fingerprint: JSON.stringify(payload),
               resend: sendProposal,
               onExhausted: exhaustedOperationId => {
-                if (getCoopRuntime() === phase.owningRuntime()) {
+                if (getCoopRuntime() === owningRuntime) {
                   failCoopSharedSession(
                     `Learn-move batch proposal ${exhaustedOperationId} exhausted before Authority V2 commit`,
                   );
                 }
               },
             },
-            phase.owningRuntime(),
+            owningRuntime,
           );
           if (lease === "conflict" || lease === "invalid" || lease === "disposed") {
             failCoopSharedSession(`Learn-move batch proposal ${decisionOperationId} could not obtain a V2 lease`);
@@ -441,7 +452,15 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
             undefined,
             decisionOperationId ?? undefined,
           );
-        const payload = { type: "decision" as const, partySlot, assignments: [], fallback: true };
+        const wave = globalScene.currentBattle?.waveIndex ?? 0;
+        const turn = globalScene.currentBattle?.turn ?? 0;
+        const payload = {
+          type: "decision" as const,
+          partySlot,
+          assignments: [],
+          fallback: true as const,
+          nextInteraction: { kind: "learn-move" as const, wave, turn },
+        };
         const v2 = isCoopLearnMoveAuthorityV2Active(operationBinding);
         if (v2 && decisionOperationId == null) {
           failCoopSharedSession(`Guest batch fallback for slot ${partySlot} lost its exact V2 address`);
@@ -458,14 +477,14 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
               fingerprint: JSON.stringify(payload),
               resend: sendProposal,
               onExhausted: exhaustedOperationId => {
-                if (getCoopRuntime() === phase.owningRuntime()) {
+                if (getCoopRuntime() === owningRuntime) {
                   failCoopSharedSession(
                     `Learn-move batch fallback ${exhaustedOperationId} exhausted before Authority V2 commit`,
                   );
                 }
               },
             },
-            phase.owningRuntime(),
+            owningRuntime,
           );
           if (lease === "conflict" || lease === "invalid" || lease === "disposed") {
             failCoopSharedSession(`Learn-move batch fallback ${decisionOperationId} could not obtain a V2 lease`);
@@ -480,8 +499,8 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
         armCoopLearnMoveBatchIntentResend(
           {
             payload,
-            wave: globalScene.currentBattle?.waveIndex ?? 0,
-            turn: globalScene.currentBattle?.turn ?? 0,
+            wave,
+            turn,
             resend: sendProposal,
           },
           operationBinding,
@@ -490,7 +509,7 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
       },
     };
     void globalScene.ui.setModeWithoutClear(UiMode.LEARN_MOVE_BATCH, deps).then(() => {
-      runWhenCoopRuntimeActive(phase.owningRuntime(), () => {
+      runWhenCoopRuntimeActive(owningRuntime, () => {
         if (!phase.markCoopV2PanelReady()) {
           if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
             failCoopSharedSession(`Learn-move batch owner for slot ${partySlot} could not prove its real panel`);
@@ -498,7 +517,7 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
           return;
         }
         getCoopUiMirror()?.beginSession("owner", UiMode.LEARN_MOVE_BATCH, seq);
-        notifyCoopV2InteractionSurfaceReady(phase.owningRuntime());
+        notifyCoopV2InteractionSurfaceReady(owningRuntime);
       });
     });
     return;
@@ -545,7 +564,7 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
     },
   };
   void globalScene.ui.setModeWithoutClear(UiMode.LEARN_MOVE_BATCH, watchDeps).then(() => {
-    runWhenCoopRuntimeActive(phase.owningRuntime(), () => {
+    runWhenCoopRuntimeActive(owningRuntime, () => {
       if (!phase.markCoopV2PanelReady()) {
         if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
           failCoopSharedSession(`Learn-move batch watcher for slot ${partySlot} could not prove its real panel`);
@@ -553,7 +572,7 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
         return;
       }
       getCoopUiMirror()?.beginSession("watcher", UiMode.LEARN_MOVE_BATCH, seq);
-      notifyCoopV2InteractionSurfaceReady(phase.owningRuntime());
+      notifyCoopV2InteractionSurfaceReady(owningRuntime);
     });
   });
   if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
@@ -572,7 +591,7 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
         if (
           expectedOperationId == null
           || res?.operationId !== expectedOperationId
-          || !settleCoopV2InteractionOperation(expectedOperationId, phase.owningRuntime())
+          || !settleCoopV2InteractionOperation(expectedOperationId, owningRuntime)
         ) {
           failCoopSharedSession(`Guest batch watcher for slot ${partySlot} could not settle its exact V2 result`);
           return;

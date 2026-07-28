@@ -460,7 +460,9 @@ function valid(value: unknown, kind: CoopOperationKind): value is LearnPayload {
     ? Array.isArray(b.learnableIds) && b.learnableIds.every(Number.isSafeInteger) && typeof b.ownerIsGuest === "boolean"
     : Array.isArray(b.assignments)
         && b.assignments.every(pair => pair.length === 2 && pair.every(Number.isSafeInteger))
-        && typeof b.fallback === "boolean";
+        && typeof b.fallback === "boolean"
+        && (b.nextInteraction === undefined || isCoopInteractionSuccessorRef(b.nextInteraction))
+        && (!b.fallback || isCoopInteractionSuccessorRef(b.nextInteraction));
 }
 function applyEnvelope(
   envelope: CoopAuthoritativeEnvelopeV1,

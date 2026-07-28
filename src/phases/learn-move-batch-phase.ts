@@ -351,19 +351,30 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       !v2 || this.coopV2ControlOperationId == null
         ? null
         : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const turn = globalScene.currentBattle?.turn ?? 0;
+    const payload = fallback
+      ? {
+          type: "decision" as const,
+          partySlot: this.partyMemberIndex,
+          assignments: assignments.map(([moveId, slotIndex]) => [moveId, slotIndex] as [number, number]),
+          fallback: true as const,
+          nextInteraction: { kind: "learn-move" as const, wave, turn },
+        }
+      : {
+          type: "decision" as const,
+          partySlot: this.partyMemberIndex,
+          assignments: assignments.map(([moveId, slotIndex]) => [moveId, slotIndex] as [number, number]),
+          fallback: false as const,
+        };
     if (
       !commitCoopLearnMoveBatchDecision(
         {
-          payload: {
-            type: "decision",
-            partySlot: this.partyMemberIndex,
-            assignments: assignments.map(([moveId, slotIndex]) => [moveId, slotIndex]),
-            fallback,
-          },
+          payload,
           ownerRole,
           localRole: "host",
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave,
+          turn,
           ...(operationId == null ? {} : { operationId }),
         },
         operationBinding,

@@ -324,7 +324,7 @@ describe("co-op learn-move operation migration", () => {
       type: "decision" as const,
       partySlot: SLOT,
       assignments: [[57, 1]] as [number, number][],
-      fallback: false,
+      fallback: false as const,
     };
     hostRuntime.interactionRelay.sendInteractionChoice(seq, "learnMoveBatch", 1, [57, 1]);
     expect(
@@ -362,7 +362,7 @@ describe("co-op learn-move operation migration", () => {
       type: "decision" as const,
       partySlot: SLOT,
       assignments: [[57, 1]] as [number, number][],
-      fallback: false,
+      fallback: false as const,
     };
     const send = () => guestRuntime.interactionRelay.sendInteractionChoice(seq, "learnMoveBatch", 1, [57, 1]);
     let delivered = 0;

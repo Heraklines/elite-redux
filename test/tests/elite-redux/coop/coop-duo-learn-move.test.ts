@@ -34,7 +34,7 @@ import {
   isCoopV2InteractionHumanInputFrozen,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
@@ -52,7 +52,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -506,6 +506,18 @@ describe.skipIf(!RUN)(
           : coopLearnMoveDecisionOperationId(projectedGuestPhase.coopV2ControlOperationId);
       expect(decisionOperationId, "the fallback has one exact result address").not.toBeNull();
       const droppedCommittedEchoes = dropBatchCommittedChoiceEcho(rig);
+      let fallbackNextControl: unknown;
+      const realHostSend = pair.host.send.bind(pair.host);
+      (pair.host as { send: (message: CoopMessage) => void }).send = (message: CoopMessage) => {
+        if (
+          message.t === "authorityEntry"
+          && message.body.kind === "INTERACTION_COMMIT"
+          && message.body.operationId === decisionOperationId
+        ) {
+          fallbackNextControl = structuredClone(message.body.nextControl);
+        }
+        realHostSend(message);
+      };
 
       withClientSync(rig.hostCtx, () => {
         const handler = rig.hostScene.ui.getHandler() as unknown as { deps: { fallback: () => void } | null };
@@ -515,6 +527,20 @@ describe.skipIf(!RUN)(
       await awaitBatchResultClosure(rig);
 
       expect(droppedCommittedEchoes(), "fallback release does not consult the retired result FIFO").toBe(0);
+      expect(
+        fallbackNextControl,
+        "the fallback commit names its exact single-move successor in allowedInteractionAddresses",
+      ).toMatchObject({
+        kind: "AWAIT_SUCCESSOR",
+        allowedInteractionAddresses: [
+          {
+            surfaceClass: "op:learnMove",
+            operationKind: "LEARN_MOVE",
+            wave: rig.hostScene.currentBattle?.waveIndex ?? 0,
+            turn: rig.hostScene.currentBattle?.turn ?? 0,
+          },
+        ],
+      });
       expect(
         rig.hostScene.getPlayerParty()[hostOwnedSlot].moveset.map(move => move.moveId),
         "fallback itself applies the complete unchanged moveset before opening the typed per-move path",
@@ -539,6 +565,48 @@ describe.skipIf(!RUN)(
         "a duplicate fallback result cannot re-open or re-advance the batch boundary",
       ).toBe(false);
 
+      logs.flush();
+    }, 120_000);
+
+    it("a projected batch phase that refuses to retire cannot publish terminal proof", async () => {
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+      const pair = createLoopbackPair();
+      const rig: DuoRig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+      const hostOwnedSlot = 0;
+      giveFullMoveset(rig, hostOwnedSlot);
+      await retireDuoInitialCommandForBoundaryTest(rig);
+
+      withClientSync(rig.hostCtx, () => {
+        const phase = rig.hostScene.phaseManager.create("LearnMoveBatchPhase", hostOwnedSlot, [NEW_MOVE]);
+        expect(rig.hostScene.phaseManager.overridePhase(phase)).toBe(true);
+        startedBatchPhases.add(phase);
+        phase.start();
+      });
+      await awaitBatchPanels(rig, "host");
+      const projectedGuestPhase = withClientSync(
+        rig.guestCtx,
+        () => rig.guestScene.phaseManager.getCurrentPhase() as unknown as ProjectedBatchPhaseProbe,
+      );
+      const decisionOperationId =
+        projectedGuestPhase.coopV2ControlOperationId == null
+          ? null
+          : coopLearnMoveDecisionOperationId(projectedGuestPhase.coopV2ControlOperationId);
+      expect(decisionOperationId).not.toBeNull();
+      const refusedRetirement = vi.spyOn(rig.guestScene.phaseManager, "shiftPhase").mockImplementationOnce(() => {});
+
+      withClientSync(rig.hostCtx, () => {
+        const handler = rig.hostScene.ui.getHandler() as unknown as { deps: { fallback: () => void } | null };
+        handler.deps!.fallback();
+      });
+      for (let attempt = 0; attempt < 40 && refusedRetirement.mock.calls.length === 0; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+      }
+      expect(refusedRetirement).toHaveBeenCalled();
+      refusedRetirement.mockRestore();
+      expect(
+        rig.guestRuntime.v2SettledInteractionOperations.has(decisionOperationId!),
+        "a failed phase retirement withholds the projected terminal proof",
+      ).toBe(false);
       logs.flush();
     }, 120_000);
   },

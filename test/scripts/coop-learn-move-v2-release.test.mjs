@@ -14,6 +14,7 @@ const replay = read("src/phases/coop-replay-learn-move-phase.ts");
 const operation = read("src/data/elite-redux/coop/coop-learn-move-operation.ts");
 const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
 const manager = read("src/phase-manager.ts");
+const duo = read("test/tests/elite-redux/coop/coop-duo-exploration.test.ts");
 
 const section = (source, start, end) => {
   const from = source.indexOf(start);
@@ -112,8 +113,11 @@ test("exact host/guest owner material is the sole replica release and duplicate 
   assert.match(queueOwned, /ownerSeatId !== coopSeatOfRole\(monOwner\)/u);
   assert.match(queueOwned, /this\.coopSubmittedV2ForgetSlot !== forgetSlot/u);
   assert.match(queueOwned, /!this\.coopAwaitingHostOwnedPresentation/u);
+  assert.match(queueOwned, /const scene = globalScene/u);
+  assert.match(queueOwned, /runWhenCoopRuntimeActive\(runtime/u);
+  assert.match(queueOwned, /globalScene !== scene/u);
   const queueEnd = queueOwned.indexOf("super.end()");
-  const queueClosed = queueOwned.indexOf("getCurrentPhase() === this", queueEnd);
+  const queueClosed = queueOwned.indexOf("scene.phaseManager.getCurrentPhase() === this", queueEnd);
   const queueProof = queueOwned.indexOf("settleCoopV2InteractionOperation(", queueClosed);
   const queueRotate = queueOwned.indexOf("advanceInteractionFromAuthoritativeCommit(", queueProof);
   assert.ok(
@@ -126,11 +130,15 @@ test("exact host/guest owner material is the sole replica release and duplicate 
   assert.match(projected, /ownerSeatId !== coopSeatOfRole\(this\.ownerIsGuest \? "guest" : "host"\)/u);
   assert.match(projected, /this\.ownerIsGuest && this\.submittedV2MoveIndex !== forgetSlot/u);
   assert.match(projected, /!this\.ownerIsGuest && this\.submittedV2MoveIndex != null/u);
+  assert.match(projected, /const scene = globalScene/u);
+  assert.match(projected, /runWhenCoopRuntimeActive\(runtime/u);
+  assert.match(projected, /globalScene !== scene/u);
   const projectedEnd = projected.indexOf("super.end()");
-  const projectedClosed = projected.indexOf("getCurrentPhase() === this", projectedEnd);
+  const projectedClosed = projected.indexOf("scene.phaseManager.getCurrentPhase() === this", projectedEnd);
   const projectedProof = projected.indexOf("settleCoopV2InteractionOperation(", projectedClosed);
   assert.ok(
     projectedEnd >= 0 && projectedClosed > projectedEnd && projectedProof > projectedClosed,
     "the projected picker proves terminal only after its real phase ends",
   );
+  assert.match(duo, /the single-move terminal resumes under the peer ambient before its captured runtime reactivates/u);
 });

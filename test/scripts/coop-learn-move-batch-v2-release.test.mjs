@@ -12,6 +12,8 @@ const read = path => readFileSync(new URL(path, root), "utf8").replace(/\r\n/gu,
 const authority = read("src/phases/learn-move-batch-phase.ts");
 const replica = read("src/phases/coop-replay-learn-move-batch.ts");
 const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
+const envelope = read("src/data/elite-redux/coop/coop-operation-envelope.ts");
+const cutover = read("src/data/elite-redux/coop/authority-v2/cutover-interaction.ts");
 const duo = read("test/tests/elite-redux/coop/coop-duo-learn-move.test.ts");
 
 const method = (source, start, end) => source.slice(source.indexOf(start), source.indexOf(end));
@@ -52,9 +54,12 @@ test("guest owner and watcher release only through the exact committed batch res
   assert.match(committed, /submitted\.assignments\.every/u);
   assert.match(committed, /\.setModeBoundedWhen\(/u);
   assert.match(committed, /runWhenCoopRuntimeActive\(runtime/u);
+  const phaseEnd = committed.indexOf("super.end();");
+  const retired = committed.indexOf("scene.phaseManager.getCurrentPhase() === this", phaseEnd);
+  const terminalProof = committed.indexOf("settleCoopV2InteractionOperation(operationId, runtime)", retired);
   assert.ok(
-    committed.indexOf("super.end();") < committed.indexOf("settleCoopV2InteractionOperation(operationId, runtime)"),
-    "replica terminal proof is published only after the exact projected phase retires",
+    phaseEnd >= 0 && retired > phaseEnd && terminalProof > retired,
+    "replica terminal proof is published only after the exact projected phase proves it retired",
   );
 
   const owner = method(replica, "if (ownerIsGuest) {", "// GUEST WATCHES");
@@ -107,4 +112,25 @@ test("runtime and focused two-engine coverage reject raw, wrong, duplicate, and 
   assert.match(duo, /a duplicate immutable result cannot close or advance twice/u);
   assert.match(duo, /dropBatchCommittedChoiceEcho/u);
   assert.match(duo, /HOST-owned fallback: immutable fallback closes both panels/u);
+  assert.match(duo, /a projected batch phase that refuses to retire cannot publish terminal proof/u);
+});
+
+test("batch fallback carries one mandatory immutable single-move successor into the V2 wait allowlist", () => {
+  const payloadStart = envelope.indexOf("export type CoopLearnMoveBatchPayload =");
+  const payload = envelope.slice(
+    payloadStart,
+    envelope.indexOf("// -----------------------------------------------------------------------------", payloadStart),
+  );
+  assert.match(payload, /readonly fallback: true;[\s\S]*readonly nextInteraction: CoopInteractionSuccessorRef/u);
+
+  const validator = method(cutover, "LEARN_MOVE_BATCH: {", "ME_BUTTON: {");
+  assert.match(validator, /!payload\.fallback \|\| isCoopInteractionSuccessorRef\(payload\.nextInteraction\)/u);
+
+  const successor = method(cutover, 'case "LEARN_MOVE":', 'case "ME_PRESENT":');
+  assert.match(successor, /isCoopInteractionSuccessorRef\(payload\?\.nextInteraction\)/u);
+  assert.match(successor, /interactionAddressOf\(payload\.nextInteraction\)/u);
+
+  const commit = method(authority, "private commitCoopBatchResult(", "private closeAndCommitCoopV2BatchResult(");
+  assert.match(commit, /nextInteraction: \{ kind: "learn-move" as const, wave, turn \}/u);
+  assert.match(duo, /the fallback commit names its exact single-move successor in allowedInteractionAddresses/u);
 });

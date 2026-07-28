@@ -415,12 +415,21 @@ export type CoopLearnMoveBatchPayload =
       readonly learnableIds: number[];
       readonly ownerIsGuest: boolean;
     }
-  | {
+  | ({
       readonly type: "decision";
       readonly partySlot: number;
       readonly assignments: [number, number][];
-      readonly fallback: boolean;
-    };
+    } & (
+      | {
+          readonly fallback: false;
+          readonly nextInteraction?: undefined;
+        }
+      | {
+          readonly fallback: true;
+          /** The exact first single-move surface authorized after batch fallback. */
+          readonly nextInteraction: CoopInteractionSuccessorRef;
+        }
+    ));
 
 // -----------------------------------------------------------------------------
 // Wave-2c: mystery-encounter payloads (§2.1 #8/#9/#10, MYSTERY_ENCOUNTER phase). The ME surface is
