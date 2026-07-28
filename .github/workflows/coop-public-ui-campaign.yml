@@ -309,8 +309,12 @@ jobs:
           - profile: animations-skipped-depth
             artifact: depth
             waves: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
-            difficulty: ace
-            difficulty_option: ace
+            # The long lane qualifies sustained synchronization, not challenge balance. Ace wiped both
+            # correctly synchronized clients on wave 4 even with semantic best-move selection and rewards,
+            # making the 30-wave claim unreachable for reasons unrelated to co-op. Keep the short surface
+            # and dirty-account lanes on Ace; use the real easiest difficulty for long-run depth.
+            difficulty: youngster
+            difficulty_option: youngster
             require_mystery: "0"
             reward_mode: ${{ inputs.reward_mode || 'pick-first' }}
             campaign_timeout_ms: "2700000"
