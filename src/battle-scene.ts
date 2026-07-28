@@ -39,6 +39,7 @@ import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lis
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { ER_SILKEN_DECREE_ABILITY_ID } from "#data/elite-redux/abilities/silken-decree";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
+import { getCoopBiomeTransitionTailPermit } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   getCoopBattleStreamer,
   getCoopController,
@@ -2395,7 +2396,27 @@ export class BattleScene extends SceneBase {
     if (!authoritativeGuest) {
       clearErFightTokens();
     }
-    const isNewBiome = this.isNewBiome(lastBattle);
+    // The committed V2 permit is the mechanical truth for a co-op map transition. The mutable ER structure
+    // probe can be overwritten by retained state ordering before this post-battle pass (god-a wave 110),
+    // incorrectly classifying the destination as an ordinary encounter. Besides skipping the biome intro,
+    // that also skips recalls and battle/wave reset mechanics and leaves the one-shot permit alive forever.
+    // Admit only the host's exact adjacent, fully prepared transition; every other mode keeps the local rule.
+    const controller = getCoopController();
+    const biomePermit = getCoopBiomeTransitionTailPermit();
+    const committedCoopBiomeTransition =
+      controller?.role === "host"
+      && controller.netcodeMode === "authoritative"
+      && biomePermit != null
+      && biomePermit.sessionEpoch === controller.sessionEpoch
+      && biomePermit.switchAdopted
+      && biomePermit.historyRecorded
+      && biomePermit.switchPrepared
+      && !biomePermit.encounterAdopted
+      && biomePermit.wave === lastBattle.waveIndex
+      && biomePermit.nextWave === this.currentBattle.waveIndex
+      && biomePermit.nextWave === biomePermit.wave + 1
+      && biomePermit.destinationBiomeId === this.arena.biomeId;
+    const isNewBiome = committedCoopBiomeTransition || this.isNewBiome(lastBattle);
     if (authoritativeGuest) {
       // The retained wave/enemy carriers own every shared post-battle mutation on an authoritative
       // renderer. Never even construct ReturnPhase or LevelCapPhase here: their factory calls are

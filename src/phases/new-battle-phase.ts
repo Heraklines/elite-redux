@@ -36,6 +36,68 @@ export interface ErGauntletBargainQueue {
   pushNew(name: "TheBargainPhase" | "NewBattlePhase"): unknown;
 }
 
+export interface CoopCommittedBiomeEncounterQueue {
+  getQueuedPhaseNames(): string[];
+  removeAllPhasesOfType(name: "NextEncounterPhase"): void;
+  pushNew(name: "NewBiomeEncounterPhase"): unknown;
+}
+
+interface CoopCommittedBiomeEncounterPermit {
+  readonly sessionEpoch: number;
+  readonly wave: number;
+  readonly destinationBiomeId: number;
+  readonly nextWave: number;
+  readonly switchAdopted: boolean;
+  readonly historyRecorded: boolean;
+  readonly switchPrepared: boolean;
+  readonly encounterAdopted: boolean;
+}
+
+/**
+ * Normalize the host's ordinary NewBattle tail from the exact committed biome permit.
+ *
+ * The renderer's signed-carrier path already makes this choice explicitly. The authority instead reaches
+ * ordinary `newBattle()`, whose mutable `isNewBiome()` probe can occasionally queue NextEncounter even
+ * after the committed Switch tail prepared the destination. In that schedule no NewBiome phase consumes
+ * the permit and a later World Map pick is rejected forever. The permit is the ordered V2 fact: it may
+ * replace exactly one ordinary encounter tail only at its adjacent source/destination battle address.
+ */
+export function routeCoopCommittedBiomeEncounterTail(params: {
+  readonly queue: CoopCommittedBiomeEncounterQueue;
+  readonly permit: CoopCommittedBiomeEncounterPermit;
+  readonly sessionEpoch: number;
+  readonly sourceWave: number;
+  readonly destinationWave: number;
+  readonly destinationBiomeId: number;
+}): boolean {
+  const { permit } = params;
+  if (
+    permit.sessionEpoch !== params.sessionEpoch
+    || !permit.switchAdopted
+    || !permit.historyRecorded
+    || !permit.switchPrepared
+    || permit.encounterAdopted
+    || permit.wave !== params.sourceWave
+    || permit.nextWave !== params.destinationWave
+    || permit.nextWave !== permit.wave + 1
+    || permit.destinationBiomeId !== params.destinationBiomeId
+  ) {
+    return false;
+  }
+  const queued = params.queue.getQueuedPhaseNames();
+  const newBiomeCount = queued.filter(name => name === "NewBiomeEncounterPhase").length;
+  const nextEncounterCount = queued.filter(name => name === "NextEncounterPhase").length;
+  if (newBiomeCount === 1 && nextEncounterCount === 0) {
+    return true;
+  }
+  if (newBiomeCount !== 0 || nextEncounterCount !== 1) {
+    return false;
+  }
+  params.queue.removeAllPhasesOfType("NextEncounterPhase");
+  params.queue.pushNew("NewBiomeEncounterPhase");
+  return true;
+}
+
 /**
  * Exact ordered wait installed by a terminal Authority V2 interaction.
  *
@@ -101,6 +163,44 @@ export class NewBattlePhase extends BattlePhase {
   private readonly coopV2Await: CoopV2NextWaveAwaitPermit | null;
   private coopV2Generation = -1;
   private coopV2DestinationBattleCreated = false;
+
+  /** The host's ordinary N -> N+1 construction must obey the same signed biome tail as the renderer. */
+  private routeCommittedHostBiomeEncounter(sourceWave: number): boolean {
+    const controller = getCoopController();
+    if (controller?.role !== "host" || controller.netcodeMode !== "authoritative") {
+      return true;
+    }
+    const permit = getCoopBiomeTransitionTailPermit();
+    if (permit == null || permit.wave !== sourceWave) {
+      return true;
+    }
+    const destinationWave = globalScene.currentBattle?.waveIndex ?? -1;
+    const destinationBiomeId = globalScene.arena?.biomeId ?? -1;
+    const routed = routeCoopCommittedBiomeEncounterTail({
+      queue: globalScene.phaseManager,
+      permit,
+      sessionEpoch: controller.sessionEpoch,
+      sourceWave,
+      destinationWave,
+      destinationBiomeId,
+    });
+    if (!routed) {
+      coopWarn(
+        "v2-control",
+        `NewBattlePhase could not install committed biome encounter tail wave=${sourceWave}->${destinationWave} `
+          + `biome=${destinationBiomeId} permit=${permit.operationId}`,
+      );
+      failCoopSharedSession(
+        `The shared biome transition could not install its exact encounter at wave ${destinationWave}.`,
+      );
+      return false;
+    }
+    coopLog(
+      "v2-control",
+      `NewBattlePhase installed committed host biome encounter wave=${sourceWave}->${destinationWave}`,
+    );
+    return true;
+  }
 
   constructor(coopV2Await: CoopV2NextWaveAwaitPermit | null = null) {
     super();
@@ -419,7 +519,12 @@ export class NewBattlePhase extends BattlePhase {
 
     globalScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
 
+    const sourceWave = globalScene.currentBattle?.waveIndex ?? -1;
     globalScene.newBattle();
+
+    if (!this.routeCommittedHostBiomeEncounter(sourceWave)) {
+      return;
+    }
 
     if (this.routeMysteryGauntletBargain()) {
       this.end();

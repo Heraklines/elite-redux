@@ -75,6 +75,7 @@ import { MoneyInterestModifier } from "#modifiers/modifier";
 import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
 import { EncounterPhase } from "#phases/encounter-phase";
 import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
+import { routeCoopCommittedBiomeEncounterTail } from "#phases/new-battle-phase";
 import { NewBiomeEncounterPhase } from "#phases/new-biome-encounter-phase";
 import { SelectBiomePhase } from "#phases/select-biome-phase";
 import { SwitchBiomePhase } from "#phases/switch-biome-phase";
@@ -305,6 +306,60 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       boundary.live;
     return phase;
   }
+
+  it("routes the host's ordinary NewBattle tail from the exact committed biome permit", () => {
+    const queued = ["ReturnPhase", "NextEncounterPhase"];
+    const queue = {
+      getQueuedPhaseNames: () => [...queued],
+      removeAllPhasesOfType: (name: "NextEncounterPhase") => {
+        for (let index = queued.length - 1; index >= 0; index--) {
+          if (queued[index] === name) {
+            queued.splice(index, 1);
+          }
+        }
+      },
+      pushNew: (name: "NewBiomeEncounterPhase") => queued.push(name),
+    };
+    const permit = {
+      sessionEpoch: 77,
+      wave: 110,
+      destinationBiomeId: BiomeId.SEA,
+      nextWave: 111,
+      switchAdopted: true,
+      historyRecorded: true,
+      switchPrepared: true,
+      encounterAdopted: false,
+    };
+
+    expect(
+      routeCoopCommittedBiomeEncounterTail({
+        queue,
+        permit,
+        sessionEpoch: 77,
+        sourceWave: 110,
+        destinationWave: 111,
+        destinationBiomeId: BiomeId.SEA,
+      }),
+      "the retained V2 permit replaces the mutable NextEncounter classification",
+    ).toBe(true);
+    expect(queued).toEqual(["ReturnPhase", "NewBiomeEncounterPhase"]);
+
+    const wrongAddressQueue = {
+      ...queue,
+      getQueuedPhaseNames: () => ["NextEncounterPhase"],
+    };
+    expect(
+      routeCoopCommittedBiomeEncounterTail({
+        queue: wrongAddressQueue,
+        permit,
+        sessionEpoch: 77,
+        sourceWave: 111,
+        destinationWave: 112,
+        destinationBiomeId: BiomeId.SEA,
+      }),
+      "a later ambient battle cannot spend the old transition permit",
+    ).toBe(false);
+  });
 
   async function driveGuestCommandUi(rig: DuoRig): Promise<void> {
     await driveDuoGuestTackleThroughPublicUi(game, rig, {
