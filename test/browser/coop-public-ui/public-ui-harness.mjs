@@ -1067,11 +1067,23 @@ export class PublicUiClient {
     if (browser == null) {
       throw new Error(`${this.label}: browser disappeared before cold-context replacement`);
     }
+    const previousContext = this.context;
+    const previousIsDefault = previousContext === browser.defaultBrowserContext();
     this.evidence.record("cold-context-replace", {
       reason: "brand-new cookie jar and local storage; visible login required",
+      previousContext: previousIsDefault ? "persistent-default" : "isolated",
     });
     this.page?.removeAllListeners("pageerror");
-    await this.context.close();
+    // A persistent userDataDir keeps the immutable bundle's HTTP cache in Chromium's DEFAULT
+    // context. Puppeteer deliberately forbids closing that context. Close its sole renderer page
+    // (the real cold-device boundary), leave the cache owner alive and unused, then move the client
+    // to a brand-new incognito context with empty cookies/local storage. Non-persistent launches
+    // retain their ordinary closable-context path.
+    await this.page?.close().catch(() => {});
+    this.page = null;
+    if (!previousIsDefault) {
+      await previousContext.close();
+    }
     this.context = await browser.createBrowserContext();
     this.authenticatedOnce = true;
     this.forceVisibleLogin = true;

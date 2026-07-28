@@ -12,6 +12,7 @@ import {
   loadCampaignLifecyclePolicy,
   withinDeadline,
 } from "./campaign-lifecycle.mjs";
+import { PublicUiClient } from "./public-ui-harness.mjs";
 
 test("campaign lifecycle has a finite outer deadline independent of per-wave waits", () => {
   const saved = {
@@ -140,4 +141,42 @@ test("cold journeys preserve simultaneous disconnect while staggering renderer b
     /Promise\.all\(Object\.values\(rig\.clients\)\.map\(client => client\.reopen\(\)\)\)/u,
     "no journey bypasses the contention-safe rig boundary",
   );
+});
+
+test("cold context replacement preserves a persistent profile's default cache context", async () => {
+  let defaultCloseAttempts = 0;
+  let pageCloses = 0;
+  const freshContext = { name: "fresh-incognito" };
+  const defaultContext = {
+    browser: () => browser,
+    async close() {
+      defaultCloseAttempts += 1;
+      throw new Error("Default BrowserContext cannot be closed!");
+    },
+  };
+  const browser = {
+    defaultBrowserContext: () => defaultContext,
+    createBrowserContext: async () => freshContext,
+  };
+  const client = Object.assign(Object.create(PublicUiClient.prototype), {
+    label: "host-seat",
+    context: defaultContext,
+    page: {
+      removeAllListeners() {},
+      async close() {
+        pageCloses += 1;
+      },
+    },
+    evidence: { record() {} },
+    authenticatedOnce: false,
+    forceVisibleLogin: false,
+  });
+
+  await client.prepareEmptyContext();
+
+  assert.equal(defaultCloseAttempts, 0, "the disk-cache owning default context is not closable");
+  assert.equal(pageCloses, 1, "the old renderer still disappears at the cold-device boundary");
+  assert.equal(client.page, null);
+  assert.equal(client.context, freshContext, "the next login receives a genuinely empty storage context");
+  assert.equal(client.forceVisibleLogin, true);
 });
