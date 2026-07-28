@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: god-c
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: 07b823176f6ceba80a2f8446f10d68eda9113899
+checked_out_sha: 07b823176f6ceba80a2f8446f10d68eda9113899
+base_seed: 20260728
+campaign_seed: 20470487
+run: 30339318987 (workflow source 07b823176f6ceba80a2f8446f10d68eda9113899)
+timestamp: 2026-07-28T07-44-51Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20470487 WAVES=200 - replay this run with:  SOAK_SEED=20470487 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[coop:relay] peer recv commandRequest fieldIndex=1 owner=guest turn=2 moveSlots=[0,1,2,3] -> reply command=0 cursor=0 moveId=34
+[coop:transport] send guest t=command fi=1 owner=guest turn=2 cmd=0 cursor=0 move=34
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:transport] recv host t=command fi=1 owner=guest turn=2 cmd=0 cursor=0 move=34 handlers=1
+[coop:relay] recv command fieldIndex=1 turn=2 command=0 -> resolved awaiting request
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:ai] applyWiredPartnerCommand partner=384 wiredMoveId=34 cursor=0 -> moveId=34 moveIndex=0 tera=false targets=[3] targetsFrom=wire-verbatim useMode=1
+Move: BODY_SLAM Move targets: { multiple: false, targets: [ 3 ] } 
+Player Pokemon: Rayquaza
+[38;2;0;60;189mUI mode changed from MESSAGE (=0) to MESSAGE (=0)![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: EnemyCommandPhase[39m
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Applied X Speed 
+Move Pool: [ 'Scorching Sands', 'Imprison', 'Wonder Room', 'Recover' ]
+Move Scores: [ -20, 0, 0, -7 ]
+Sorted Move Pool: [ 'Imprison', 'Wonder Room', 'Recover', 'Scorching Sands' ]
+Chosen Move: Scorching Sands
+
