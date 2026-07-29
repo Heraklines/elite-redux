@@ -67,7 +67,6 @@ export class FormChangePhase extends EvolutionPhase {
   private ownerPhaseManager: PhaseManager;
   private coopPresentationRecorded = false;
   private coopReplayTerminal = false;
-  private coopReplayClosing = false;
   private phaseEnded = false;
   private coopReplayWatchdog: CoopPresentationProgressWatchdog | undefined;
   private readonly scheduledCallbacks = new Set<() => void>();
@@ -116,8 +115,9 @@ export class FormChangePhase extends EvolutionPhase {
     );
   }
 
-  private dispatchBound(callback: () => void): void {
+  private dispatchBound(callback: () => void, onUnavailable: () => void = () => {}): void {
     if (this.phaseEnded || this.isRetired() || (this.coopReplay != null && this.coopReplayTerminal)) {
+      onUnavailable();
       return;
     }
     if (!this.hasRuntimeBoundary() || this.exactRuntimeInstalled()) {
@@ -127,16 +127,19 @@ export class FormChangePhase extends EvolutionPhase {
     const streamer = this.runtimeBinding.streamer;
     if (streamer == null || globalScene === this.runtimeBinding.scene) {
       this.retire();
+      onUnavailable();
       return;
     }
     let cancel = () => {};
     cancel = streamer.scheduleAuthorityRetry(() => {
       this.scheduledCallbacks.delete(cancel);
       if (this.phaseEnded || this.isRetired() || (this.coopReplay != null && this.coopReplayTerminal)) {
+        onUnavailable();
         return;
       }
       if (!this.exactRuntimeInstalled()) {
         this.retire();
+        onUnavailable();
         return;
       }
       callback();
@@ -197,6 +200,17 @@ export class FormChangePhase extends EvolutionPhase {
     }
   }
 
+  /**
+   * Cancel a pending open and synchronously remove only this phase's still-active evolution surface.
+   * The phase/current-runtime proof prevents an obsolete recovery callback from clearing a successor UI.
+   */
+  private retireCoopReplayUi(): void {
+    if (this.coopReplay == null || !this.exactRuntimeInstalled() || this.ownerPhaseManager.getCurrentPhase() !== this) {
+      return;
+    }
+    this.scene.ui.retirePresentationMode(UiMode.EVOLUTION_SCENE, UiMode.MESSAGE);
+  }
+
   validate(): boolean {
     return !!this.formChange;
   }
@@ -241,42 +255,63 @@ export class FormChangePhase extends EvolutionPhase {
       return;
     }
     this.coopReplayTerminal = true;
-    this.coopReplayClosing = false;
     this.clearOwnedResources();
+    // Invalidate a hung setMode/revert transition before retiring the phase. This close is synchronous and
+    // owner-checked, so no detached callback can later pop a recovery- or successor-owned UI.
+    this.retireCoopReplayUi();
     settleCoopPresentationOutcome(this.coopReplay.outcomeToken, outcome);
     this.destroyPresentationPokemon();
-    this.advanceOwner();
+    const ownsCurrentPhase = this.ownerPhaseManager.getCurrentPhase() === this;
+    this.phaseEnded = true;
+    // A terminal presentation is inert before the scheduler advances. EvolutionPhase.start() checks this
+    // exact retirement bit after its initial setMode await, fencing a late resolution of a watchdog-expired UI.
+    super.retire();
+    if (ownsCurrentPhase) {
+      this.ownerPhaseManager.shiftPhase();
+    }
   }
 
   /** Install only the signed appearance result; never re-run `Pokemon.changeForm()` mechanics. */
-  private async installCoopReplayResult(): Promise<boolean> {
+  private installCoopReplayResult(): Promise<boolean> {
     const replay = this.coopReplay;
     if (replay == null) {
-      await this.pokemon.changeForm(this.formChange);
-      return true;
+      return this.pokemon.changeForm(this.formChange).then(() => true);
     }
     if (this.coopReplayTerminal || this.isRetired()) {
-      return false;
+      return Promise.resolve(false);
     }
     const authorityPokemon = replay.authorityPokemon;
     authorityPokemon.formIndex = replay.targetFormIndex;
     authorityPokemon.generateName();
     authorityPokemon.setScale(authorityPokemon.getSpriteScale());
-    await authorityPokemon.loadAssets(false);
-    if (this.coopReplayTerminal || this.isRetired()) {
-      return false;
-    }
-    authorityPokemon.playAnim();
-    await Promise.all([authorityPokemon.updateInfo(), this.scene.updateFieldScale()]);
-    if (this.coopReplayTerminal || this.isRetired()) {
-      return false;
-    }
-
-    // The detached actor exists only to supply the cutscene's localized post-form name and cry.
-    this.pokemon.formIndex = replay.targetFormIndex;
-    this.pokemon.generateName();
-    this.pokemon.setScale(this.pokemon.getSpriteScale());
-    return true;
+    return new Promise<boolean>((resolve, reject) => {
+      const unavailable = () => resolve(false);
+      const rejectBound = (error: unknown) => this.dispatchBound(() => reject(error), unavailable);
+      authorityPokemon.loadAssets(false).then(
+        () =>
+          this.dispatchBound(() => {
+            try {
+              // The load promise can resolve with the peer browser ambient in the duo engine. Re-enter the
+              // immutable binding before every scene-sensitive appearance call.
+              authorityPokemon.playAnim();
+              Promise.all([authorityPokemon.updateInfo(), this.scene.updateFieldScale()]).then(
+                () =>
+                  this.dispatchBound(() => {
+                    // The detached actor exists only to supply the cutscene's localized post-form name and cry.
+                    this.pokemon.formIndex = replay.targetFormIndex;
+                    this.pokemon.generateName();
+                    this.pokemon.setScale(this.pokemon.getSpriteScale());
+                    resolve(true);
+                  }, unavailable),
+                rejectBound,
+              );
+            } catch (error) {
+              reject(error);
+            }
+          }, unavailable),
+        rejectBound,
+      );
+    });
   }
 
   private recordAuthoritativePresentation(): void {
@@ -539,9 +574,11 @@ export class FormChangePhase extends EvolutionPhase {
     if (this.isRetired()) {
       return;
     }
+    // Recovery calls retire while the discarded phase still owns the current tree. Cancel/clear its exact UI
+    // synchronously; if a successor has already won, the current-phase proof makes this a no-op.
+    this.retireCoopReplayUi();
     super.retire();
     this.phaseEnded = true;
-    this.coopReplayClosing = false;
     this.clearOwnedResources();
     if (this.coopReplay != null && !this.coopReplayTerminal) {
       this.coopReplayTerminal = true;
@@ -559,42 +596,14 @@ export class FormChangePhase extends EvolutionPhase {
 
   public override end(): void {
     if (this.coopReplay != null) {
-      if (this.coopReplayTerminal || this.coopReplayClosing || this.isRetired()) {
+      if (this.coopReplayTerminal || this.isRetired()) {
         return;
       }
-      this.coopReplayClosing = true;
       const replay = this.coopReplay;
-      let close: Promise<unknown>;
-      try {
-        close = this.scene.ui.revertMode();
-      } catch {
-        this.finishCoopReplay({
-          kind: "failed",
-          reason: "form-change-cutscene-close-threw",
-          actorFingerprint: replay.actorFingerprint,
-        });
-        return;
-      }
-      // Keep the presentation watchdog armed until the real UI close resolves. If this promise hangs, the
-      // exact-runtime wall fails the token and advances to the finalizer/shared terminal; it never strands it.
-      close
-        .then(() => {
-          this.dispatchBound(() =>
-            this.finishCoopReplay({
-              kind: "rendered",
-              actorFingerprint: replay.actorFingerprint,
-            }),
-          );
-        })
-        .catch(() => {
-          this.dispatchBound(() =>
-            this.finishCoopReplay({
-              kind: "failed",
-              reason: "form-change-cutscene-close-threw",
-              actorFingerprint: replay.actorFingerprint,
-            }),
-          );
-        });
+      this.finishCoopReplay({
+        kind: "rendered",
+        actorFingerprint: replay.actorFingerprint,
+      });
       return;
     }
     this.pokemon.findAndRemoveTags(t => t.tagType === BattlerTagType.AUTOTOMIZED);

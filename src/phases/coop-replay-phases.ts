@@ -453,12 +453,47 @@ export class CoopShinySparkleReplayPhase extends Phase {
   }
 }
 
-async function refreshAuthorityAppearance(pokemon: Pokemon): Promise<void> {
-  pokemon.generateName();
-  pokemon.setScale(pokemon.getSpriteScale());
-  await pokemon.loadAssets(false);
-  pokemon.playAnim();
-  await pokemon.updateInfo();
+type BoundPresentationDispatch = (callback: () => void, onUnavailable?: () => void) => void;
+
+/** Refresh one live actor without allowing either post-load continuation to borrow the peer's ambient scene. */
+function refreshAuthorityAppearance(
+  pokemon: Pokemon,
+  dispatchBound: BoundPresentationDispatch,
+  onComplete: () => void,
+  onError: (error: unknown) => void,
+): void {
+  try {
+    pokemon.generateName();
+    pokemon.setScale(pokemon.getSpriteScale());
+    pokemon.loadAssets(false).then(
+      () =>
+        dispatchBound(
+          () => {
+            try {
+              pokemon.playAnim();
+              pokemon.updateInfo().then(
+                () => dispatchBound(onComplete, () => {}),
+                error =>
+                  dispatchBound(
+                    () => onError(error),
+                    () => {},
+                  ),
+              );
+            } catch (error) {
+              onError(error);
+            }
+          },
+          () => {},
+        ),
+      error =>
+        dispatchBound(
+          () => onError(error),
+          () => {},
+        ),
+    );
+  } catch (error) {
+    onError(error);
+  }
 }
 
 function installAuthorityTransformMaterial(pokemon: Pokemon, result: CoopMonTransform): boolean {
@@ -530,8 +565,9 @@ export class CoopFormChangeReplayPhase extends Phase {
    * the captured stream scheduler; the harness binds that callback to its real browser context, while a real
    * browser simply executes it on the same runtime. A replaced generation is never retried or guessed.
    */
-  private dispatchBound(callback: () => void): void {
+  private dispatchBound(callback: () => void, onUnavailable: () => void = () => {}): void {
     if (this.ended || this.isRetired()) {
+      onUnavailable();
       return;
     }
     if (this.exactRuntimeInstalled()) {
@@ -540,16 +576,19 @@ export class CoopFormChangeReplayPhase extends Phase {
     }
     if (this.ownerStreamer == null || globalScene === this.ownerScene) {
       this.retire();
+      onUnavailable();
       return;
     }
     let cancel = () => {};
     cancel = this.ownerStreamer.scheduleAuthorityRetry(() => {
       this.scheduledCallbacks.delete(cancel);
       if (this.ended || this.isRetired()) {
+        onUnavailable();
         return;
       }
       if (!this.exactRuntimeInstalled()) {
         this.retire();
+        onUnavailable();
         return;
       }
       callback();
@@ -735,21 +774,17 @@ export class CoopFormChangeReplayPhase extends Phase {
       this.ownerScene.playSound("battle_anims/PRSFX- Transform");
     }
     pokemon.formIndex = formIndex;
-    refreshAuthorityAppearance(pokemon)
-      .then(() =>
-        this.dispatchBound(() =>
-          finish(
-            this.ownerScene.moveAnimations
-              ? { kind: "rendered", actorFingerprint }
-              : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
-          ),
+    refreshAuthorityAppearance(
+      pokemon,
+      (callback, onUnavailable) => this.dispatchBound(callback, onUnavailable),
+      () =>
+        finish(
+          this.ownerScene.moveAnimations
+            ? { kind: "rendered", actorFingerprint }
+            : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
         ),
-      )
-      .catch(() =>
-        this.dispatchBound(() =>
-          finish({ kind: "failed", reason: "form-change-presentation-threw", actorFingerprint }),
-        ),
-      );
+      () => finish({ kind: "failed", reason: "form-change-presentation-threw", actorFingerprint }),
+    );
   }
 }
 

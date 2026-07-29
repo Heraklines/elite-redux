@@ -377,6 +377,7 @@ test("form changes and Transform carry complete authority material into dedicate
   const replayPump = read("src/phases/coop-replay-turn-phase.ts");
   const rendererGate = read("src/data/elite-redux/coop/coop-renderer-gate.ts");
   const phaseManager = read("src/phase-manager.ts");
+  const ui = read("src/ui/ui.ts");
 
   assert.match(form, /recordCoopEvent\(\{\s*k: "formChange"[\s\S]+formIndex: pokemon\.formIndex/u);
   assert.match(form, /recordCoopMessage\(message\)/u, "direct form narration must enter the ordered stream");
@@ -427,8 +428,23 @@ test("form changes and Transform carry complete authority material into dedicate
   );
   assert.match(
     richForm,
-    /form-change-cutscene-watchdog-expired[\s\S]+coopReplayClosing = true[\s\S]+this\.scene\.ui\.revertMode\(\)/u,
-    "the cutscene keeps its watchdog alive until the actual UI close proves rendering complete",
+    /form-change-cutscene-watchdog-expired[\s\S]+retireCoopReplayUi\(\)[\s\S]+super\.retire\(\)[\s\S]+shiftPhase\(\)/u,
+    "a terminal cutscene retires its async phase before advancing the scheduler",
+  );
+  assert.match(
+    ui,
+    /retirePresentationMode\(expectedMode: UiMode, fallbackMode: UiMode\)[\s\S]+\+\+this\.modeTransitionGeneration[\s\S]+this\.getHandler\(\)\.clear\(\)[\s\S]+this\.mode = this\.modeChain\.pop\(\) \?\? fallbackMode/u,
+    "presentation retirement invalidates pending transitions and clears the exact stale overlay synchronously",
+  );
+  assert.match(
+    richForm,
+    /authorityPokemon\.loadAssets\(false\)\.then\([\s\S]+this\.dispatchBound\(\(\) => \{[\s\S]+authorityPokemon\.playAnim\(\)[\s\S]+authorityPokemon\.updateInfo\(\)[\s\S]+this\.scene\.updateFieldScale\(\)[\s\S]+this\.dispatchBound/u,
+    "the rich replay re-enters its immutable runtime after both appearance awaits",
+  );
+  assert.match(
+    replay,
+    /pokemon\.loadAssets\(false\)\.then\([\s\S]+dispatchBound\([\s\S]+pokemon\.playAnim\(\)[\s\S]+pokemon\.updateInfo\(\)\.then\([\s\S]+dispatchBound\(onComplete/u,
+    "the field refresh re-enters its immutable runtime after load and info refresh",
   );
   assert.match(
     richForm,

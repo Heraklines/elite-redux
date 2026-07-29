@@ -36,7 +36,7 @@ interface UiSeam {
   getHandler(): { active: boolean; clear(): void; show(args: unknown[]): void };
 }
 
-type UiHarness = UiSeam & Pick<UI, "getMode" | "setModeBounded" | "setModeBoundedWhen">;
+type UiHarness = UiSeam & Pick<UI, "getMode" | "retirePresentationMode" | "setModeBounded" | "setModeBoundedWhen">;
 
 describe("co-op bounded UI transition seam", () => {
   let previousScene: BattleScene;
@@ -128,6 +128,40 @@ describe("co-op bounded UI transition seam", () => {
     expect(ui.getMode()).toBe(UiMode.SUMMARY);
     expect(show).toHaveBeenCalledTimes(1);
     expect(show).toHaveBeenLastCalledWith([{ marker: "new" }]);
+  });
+
+  it("presentation retirement synchronously restores the prior mode without publishing a detached close", () => {
+    const fade = deferred();
+    const { ui, clear, show } = makeUi(fade);
+    ui.mode = UiMode.EVOLUTION_SCENE;
+    ui.modeChain = [UiMode.MESSAGE];
+
+    expect(ui.retirePresentationMode(UiMode.EVOLUTION_SCENE, UiMode.MESSAGE)).toBe(true);
+
+    expect(ui.getMode()).toBe(UiMode.MESSAGE);
+    expect(clear).toHaveBeenCalledOnce();
+    expect(show, "the still-active underlying overlay handler is not reopened or re-announced").not.toHaveBeenCalled();
+    expect(ui.overlay.setVisible).toHaveBeenLastCalledWith(false);
+  });
+
+  it("presentation retirement cancels a hung open before a successor and its late fade cannot clear the winner", async () => {
+    const fade = deferred();
+    const { ui, clear, show } = makeUi(fade);
+    let fadeCount = 0;
+    ui.fadeOut = () => (++fadeCount === 1 ? fade.promise : Promise.resolve());
+
+    const staleOpen = ui.setModeBounded(UiMode.EVOLUTION_SCENE, 100, { marker: "stale-evolution" });
+    expect(ui.retirePresentationMode(UiMode.EVOLUTION_SCENE, UiMode.MESSAGE)).toBe(false);
+    const successor = ui.setModeBounded(UiMode.SUMMARY, 100, { marker: "successor" });
+    await expect(successor).resolves.toBe("completed");
+    expect(ui.getMode()).toBe(UiMode.SUMMARY);
+
+    fade.resolve();
+    await expect(staleOpen).resolves.toBe("superseded");
+    expect(ui.getMode()).toBe(UiMode.SUMMARY);
+    expect(clear).toHaveBeenCalledOnce();
+    expect(show).toHaveBeenCalledOnce();
+    expect(show).toHaveBeenCalledWith([{ marker: "successor" }]);
   });
 
   it.each([
