@@ -83,8 +83,8 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
   );
   assert.match(
     structuralProjector,
-    /scene\.updateFieldScale\(\)\.catch\(\(\) => undefined\)/u,
-    "a torn cosmetic scale tween cannot reject after the immutable switch structure has already installed",
+    /incoming\.setFieldPosition\(desiredPosition, 0\)\.catch\(\(\) => undefined\)[\s\S]+scene\.updateFieldScale\(\)\.catch\(\(\) => undefined\)/u,
+    "torn cosmetic seating/scale promises cannot reject after immutable switch structure is installed",
   );
   assert.match(switchReplay, /projectCoopSwitchPresentationStructure\(scene,[\s\S]+pokemonId:[\s\S]+speciesId:/u);
   assert.doesNotMatch(switchReplay, /summonCoop(?:Player|Enemy)Field/u);

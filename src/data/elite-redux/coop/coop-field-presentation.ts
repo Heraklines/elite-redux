@@ -302,7 +302,10 @@ export function projectCoopSwitchPresentationStructure(
   incoming.switchOutStatus = false;
   incoming.fieldPosition = FieldPosition.CENTER;
   incoming.setPosition(baseX, baseY);
-  void incoming.setFieldPosition(desiredPosition, 0);
+  // The structural permutation is already authoritative. A torn/headless battle-info child can reject the
+  // cosmetic seating promise; handle that detached failure here so it cannot escape after this projector
+  // returns. Production's intact actor applies its position synchronously inside the promise executor.
+  incoming.setFieldPosition(desiredPosition, 0).catch(() => undefined);
   if (scene.field.getIndex(incoming) < 0) {
     scene.add.existing(incoming);
     scene.field.add(incoming);
