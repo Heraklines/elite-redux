@@ -415,7 +415,7 @@ export function isShowdownQueueActive(): boolean {
 
 export function getShowdownQueueStatus(): { presetName: string; active: boolean } | null {
   stored ??= readStoredQueue();
-  if (stored?.username !== loggedInUser?.username) {
+  if (stored == null || stored.username !== loggedInUser?.username) {
     return null;
   }
   return { presetName: stored.presetName, active: stored.active };

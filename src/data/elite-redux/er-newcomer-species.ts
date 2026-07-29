@@ -1116,10 +1116,7 @@ export function applyErNewcomerSpeciesLearnsets(): number {
  * run after `initEliteReduxEggMoves()`, which replaces Spinarak's vanilla list.
  */
 export function applyErNewcomerSpeciesEggMoves(): number {
-  const source = speciesEggMoves[SpeciesId.SPINARAK] ?? [];
-  if (source.length === 0) {
-    return 0;
-  }
+  const source = speciesEggMoves[SpeciesId.SPINARAK];
   (speciesEggMoves as Record<number, MoveId[]>)[ER_WEBBED_BRUISER_SPECIES_ID] = [...source];
   return 1;
 }

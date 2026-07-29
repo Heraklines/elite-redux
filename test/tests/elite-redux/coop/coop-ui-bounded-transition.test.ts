@@ -33,6 +33,7 @@ interface UiSeam {
   };
   fadeOut(): Promise<void>;
   fadeIn(): Promise<void>;
+  emit(event: string, ...args: unknown[]): boolean;
   getHandler(): { active: boolean; clear(): void; show(args: unknown[]): void };
 }
 
@@ -72,6 +73,7 @@ describe("co-op bounded UI transition seam", () => {
     ui.overlay = { setAlpha: vi.fn(), setVisible: vi.fn() };
     ui.fadeOut = () => fade.promise;
     ui.fadeIn = () => Promise.resolve();
+    ui.emit = vi.fn(() => false);
     ui.getHandler = () => handler;
     return { ui, clear, show };
   }
