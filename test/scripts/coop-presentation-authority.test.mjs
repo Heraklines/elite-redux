@@ -41,6 +41,7 @@ test("switch presentation is host-authored and the renderer never predicts its o
 test("enemy switch replay owns the ordinary trainer/tray grammar and retires it absolutely", () => {
   const battlePhase = read("src/phases/battle-phase.ts");
   const producer = read("src/phases/switch-summon-phase.ts");
+  const summon = read("src/phases/summon-phase.ts");
   const replay = read("src/phases/coop-replay-phases.ts");
   const tray = read("src/ui/containers/pokeball-tray.ts");
   const presentation = read("src/data/elite-redux/coop/coop-field-presentation.ts");
@@ -49,6 +50,9 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
   const replayStart = replay.indexOf("export class CoopSwitchReplayPhase");
   const replayEnd = replay.indexOf("\n}\n\n/**\n * GUEST: render a status change", replayStart);
   const switchReplay = replay.slice(replayStart, replayEnd);
+  const projectorStart = presentation.indexOf("export function projectCoopSwitchPresentationStructure");
+  const projectorEnd = presentation.indexOf("\n}\n\n/**\n * Retire or settle", projectorStart) + 2;
+  const structuralProjector = presentation.slice(projectorStart, projectorEnd);
 
   assert.match(
     battlePhase,
@@ -60,6 +64,25 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
     "ordinary reveal, recall narration, and send-out narration share the same format-aware resolver",
   );
   assert.doesNotMatch(producer, /fieldIndex\s*%\s*2\s*\?\s*TrainerSlot\.TRAINER_PARTNER/u);
+  assert.match(
+    summon,
+    /trainerName[\s\S]+enemyTrainerSlotForSwitch\([\s\S]+currentBattle\.double[\s\S]+trainer\?\.isDouble\(\)/u,
+    "initial trainer send-out shares the same double/triple-aware trainer attribution",
+  );
+  assert.doesNotMatch(summon, /fieldIndex\s*%\s*2\s*\?\s*TrainerSlot\.TRAINER_PARTNER/u);
+  assert.ok(projectorStart >= 0 && projectorEnd > projectorStart, "the structural switch projector is present");
+  assert.match(
+    structuralProjector,
+    /\[party\[request\.fieldSlot\], party\[request\.partySlot\]\][\s\S]+switchOutStatus = true[\s\S]+field\.remove[\s\S]+switchOutStatus = false[\s\S]+field\.add/u,
+    "the renderer installs only the authority's exact party permutation and field membership",
+  );
+  assert.doesNotMatch(
+    structuralProjector,
+    /\.(?:leaveField|resetSummonData|fieldSetup|loadAssets)\s*\(|applyAbAttrs\s*\(|triggerPokemonFormChange\s*\(/u,
+    "the renderer's structural switch projector must never re-enter battle mechanics or derive a local summon",
+  );
+  assert.match(switchReplay, /projectCoopSwitchPresentationStructure\(scene,[\s\S]+pokemonId:[\s\S]+speciesId:/u);
+  assert.doesNotMatch(switchReplay, /summonCoop(?:Player|Enemy)Field/u);
   assert.match(
     switchReplay,
     /const scene = globalScene;[\s\S]+const runtime = getCoopRuntime\(\);[\s\S]+const generation = coopSessionGeneration\(\);/u,
@@ -97,6 +120,16 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
     "retirement cannot leave a ball sprite or a half-scaled incoming actor behind",
   );
   assert.match(switchReplay, /retire\(\)[\s\S]+this\.retireActiveRun\?\.\(\)/u);
+  assert.match(
+    switchReplay,
+    /canRevealIncoming =[\s\S]+outcome\.kind !== "failed"[\s\S]+ownerIsCurrent\(\)[\s\S]+!this\.isRetired\(\)[\s\S]+settleCoopSwitchActorPresentation\(scene, incoming, canRevealIncoming \? "visible" : "hidden"\)/u,
+    "failed, retired, or ownership-mismatched replay cannot positively reveal an actor",
+  );
+  assert.match(
+    presentation,
+    /settleCoopSwitchActorPresentation\([\s\S]+completeTweensOf\(infoTargets, scene\)[\s\S]+killTweensOf\(compactTargets\(pokemon, sprite, tintSprite\), scene\)[\s\S]+globalScene !== scene[\s\S]+pokemon\.showInfo\(\)/u,
+    "actor cleanup owns main, tint, and info children and allows global-dependent reveal only on the exact scene",
+  );
   assert.match(
     switchReplay,
     /pbTrayEnemy\.settleHidden\(scene\)[\s\S]+settleCoopTrainerPresentation\("enemy", scene\)/u,

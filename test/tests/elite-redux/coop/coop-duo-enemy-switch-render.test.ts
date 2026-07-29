@@ -32,6 +32,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { projectCoopSwitchPresentationStructure } from "#data/elite-redux/coop/coop-field-presentation";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -128,6 +129,62 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
       };
     });
   }
+
+  it("projects an exact guest switch without invoking leave/summon mechanics", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.DRAGONITE, SpeciesId.TYRANITAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const party = rig.guestScene.getEnemyParty();
+    const outgoing = party[0];
+    const incoming = party[2];
+    expect(outgoing, "the guest fixture has an active enemy actor").toBeDefined();
+    expect(incoming, "the guest fixture has a reserve enemy actor").toBeDefined();
+    const leaveField = vi.spyOn(outgoing, "leaveField");
+    const resetSummonData = vi.spyOn(incoming, "resetSummonData");
+    const fieldSetup = vi.spyOn(incoming, "fieldSetup");
+
+    const rejected = await withClient(rig.guestCtx, () =>
+      projectCoopSwitchPresentationStructure(rig.guestScene, {
+        side: "enemy",
+        fieldSlot: 0,
+        partySlot: 2,
+        pokemonId: incoming.id,
+        speciesId: Number.NaN,
+      }),
+    );
+    expect(rejected).toEqual({ ok: false, reason: "switch-structural-identity-mismatch" });
+    expect(party[0], "a rejected identity cannot mutate the active party slot").toBe(outgoing);
+    expect(party[2], "a rejected identity cannot mutate the reserve party slot").toBe(incoming);
+    expect(leaveField).not.toHaveBeenCalled();
+    expect(resetSummonData).not.toHaveBeenCalled();
+    expect(fieldSetup).not.toHaveBeenCalled();
+
+    const projection = await withClient(rig.guestCtx, () =>
+      projectCoopSwitchPresentationStructure(rig.guestScene, {
+        side: "enemy",
+        fieldSlot: 0,
+        partySlot: 2,
+        pokemonId: incoming.id,
+        speciesId: incoming.species.speciesId,
+      }),
+    );
+
+    expect(projection).toMatchObject({ ok: true, incoming, outgoing, alreadyProjected: false });
+    expect(party[0], "the authority-selected reserve occupies the exact field party slot").toBe(incoming);
+    expect(party[2], "the outgoing actor moves to the exact vacated reserve slot").toBe(outgoing);
+    expect(rig.guestScene.field.getIndex(outgoing), "the outgoing actor is structurally absent from the field").toBe(
+      -1,
+    );
+    expect(
+      rig.guestScene.field.getIndex(incoming),
+      "the incoming actor is structurally present on the field",
+    ).toBeGreaterThanOrEqual(0);
+    expect(incoming.switchOutStatus, "the incoming actor is structurally active").toBe(false);
+    expect(outgoing.switchOutStatus, "the outgoing actor is structurally benched").toBe(true);
+    expect(leaveField, "guest projection never runs leave mechanics").not.toHaveBeenCalled();
+    expect(resetSummonData, "guest projection never derives fresh summon state").not.toHaveBeenCalled();
+    expect(fieldSetup, "guest projection never runs local form/substitute/Commander setup").not.toHaveBeenCalled();
+  });
 
   /** Play ONE host turn: HOST slot uses `hostMove` (auto ENEMY), GUEST slot rides the relay (auto ENEMY_2). */
   async function playTurn(rig: DuoRig, hostMove: MoveId, guestMove: MoveId): Promise<void> {

@@ -56,8 +56,6 @@ import {
   drainCoopApplyFailures,
   readLatestAcceptedCoopAuthoritativeBattleState,
   reapplyAcceptedCoopAuthoritativeBattleState,
-  summonCoopEnemyField,
-  summonCoopPlayerField,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import type {
   CoopAuthorityFailure,
@@ -77,6 +75,8 @@ import {
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   getActuallyFieldedCoopPokemon,
+  projectCoopSwitchPresentationStructure,
+  settleCoopSwitchActorPresentation,
   settleCoopTrainerPresentation,
 } from "#data/elite-redux/coop/coop-field-presentation";
 import { isCoopFaintSwitchSeq, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -1630,23 +1630,25 @@ export class CoopSwitchReplayPhase extends Phase {
       ownedActivations.clear();
       cleanupEnemyTrainerPresentation();
       try {
-        scene.tweens.killTweensOf([incoming, outgoing, pokeball].filter(value => value != null));
-        pokeball?.destroy();
-        pokeball = undefined;
-        if (outgoing != null && outgoing.id !== this.presentation.pokemonId) {
-          outgoing.setVisible(false);
-          outgoing.getSprite()?.setVisible(false);
+        if (pokeball != null) {
+          scene.tweens.killTweensOf(pokeball);
+          pokeball.destroy();
+          pokeball = undefined;
         }
+        if (outgoing != null && outgoing.id !== this.presentation.pokemonId) {
+          settleCoopSwitchActorPresentation(scene, outgoing, "hidden");
+        }
+        const exactIncoming =
+          incoming != null
+          && incoming.id === this.presentation.pokemonId
+          && incoming.species?.speciesId === this.presentation.speciesId;
+        const canRevealIncoming = outcome.kind !== "failed" && exactIncoming && ownerIsCurrent() && !this.isRetired();
         if (incoming != null) {
-          incoming.setVisible(true);
-          incoming.getSprite()?.setVisible(true);
-          incoming.getSprite()?.clearTint();
-          incoming.setScale(incoming.getSpriteScale());
-          incoming.showInfo();
-          void incoming.updateInfo();
+          settleCoopSwitchActorPresentation(scene, incoming, canRevealIncoming ? "visible" : "hidden");
         }
       } catch {
-        // The following authoritative projection retries the exact atlas/info-bar proof.
+        // The following authoritative projection retries the exact atlas/info-bar proof. Failure cleanup
+        // must still settle the outcome so recovery can replace this complete presentation owner.
       }
       settleCoopPresentationOutcome(this.outcomeToken, outcome);
       if (
@@ -1749,14 +1751,20 @@ export class CoopSwitchReplayPhase extends Phase {
       }
       const projectIncoming = (): void => {
         try {
-          if (!alreadyProjected) {
-            if (player) {
-              summonCoopPlayerField(located.position, partySlot);
-            } else {
-              summonCoopEnemyField(located.position, partySlot);
-            }
+          const projection = projectCoopSwitchPresentationStructure(scene, {
+            side: player ? "player" : "enemy",
+            fieldSlot: located.position,
+            partySlot,
+            pokemonId: this.presentation.pokemonId,
+            speciesId: this.presentation.speciesId,
+          });
+          if (!projection.ok) {
+            coopWarn("replay", `switch presentation structural projection failed reason=${projection.reason}`);
+            finish({ kind: "failed", reason: projection.reason, actorFingerprint });
+            return;
           }
-          incoming = party[located.position];
+          incoming = projection.incoming;
+          outgoing ??= projection.outgoing;
           if (
             incoming == null
             || incoming.id !== this.presentation.pokemonId

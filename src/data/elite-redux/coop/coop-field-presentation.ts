@@ -211,6 +211,150 @@ export function ensureCoopPokemonPresentationNodes(pokemon: Pokemon): boolean {
   return true;
 }
 
+export interface CoopSwitchStructuralProjectionRequest {
+  readonly side: "player" | "enemy";
+  readonly fieldSlot: number;
+  readonly partySlot: number;
+  readonly pokemonId: number;
+  readonly speciesId: number;
+}
+
+export type CoopSwitchStructuralProjectionResult =
+  | {
+      readonly ok: true;
+      readonly incoming: Pokemon;
+      readonly outgoing?: Pokemon;
+      readonly alreadyProjected: boolean;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: string;
+    };
+
+/**
+ * Install the immutable switch event's party/field structure without entering any battle mechanic.
+ *
+ * This is deliberately narrower than the historical `summonCoop*Field` helpers. In particular it must
+ * never call `leaveField`, `resetSummonData`, `fieldSetup`, ability hooks, form triggers, or a summon phase:
+ * all of those derive or execute gameplay that already happened on the authority. The later checkpoint
+ * owns every material value; this projector only gives the retained presentation its exact actor and seat.
+ */
+export function projectCoopSwitchPresentationStructure(
+  scene: BattleScene,
+  request: CoopSwitchStructuralProjectionRequest,
+): CoopSwitchStructuralProjectionResult {
+  if (globalScene !== scene || scene.currentBattle == null) {
+    return { ok: false, reason: "switch-structural-owner-mismatch" };
+  }
+  const party = request.side === "player" ? scene.getPlayerParty() : scene.getEnemyParty();
+  const capacity =
+    request.side === "player"
+      ? scene.currentBattle.arrangement.playerCapacity
+      : scene.currentBattle.arrangement.enemyCapacity;
+  if (
+    !Number.isSafeInteger(request.fieldSlot)
+    || request.fieldSlot < 0
+    || request.fieldSlot >= capacity
+    || !Number.isSafeInteger(request.partySlot)
+    || request.partySlot < 0
+    || request.partySlot >= party.length
+  ) {
+    return { ok: false, reason: "switch-structural-slot-invalid" };
+  }
+  const incoming = party[request.partySlot];
+  if (incoming?.id !== request.pokemonId || incoming.species?.speciesId !== request.speciesId) {
+    return { ok: false, reason: "switch-structural-identity-mismatch" };
+  }
+
+  const alreadyProjected = request.partySlot === request.fieldSlot;
+  const outgoing = alreadyProjected ? undefined : party[request.fieldSlot];
+  if (!alreadyProjected && outgoing == null) {
+    return { ok: false, reason: "switch-structural-outgoing-missing" };
+  }
+
+  // Capture the vacated platform base before the authoritative permutation is installed. A surviving
+  // ally is preferred because a faint/drop animation can leave the outgoing actor below its real base.
+  const desiredPosition = fieldPositionForSlot(request.fieldSlot, capacity);
+  const liveAlly = scene.field
+    .getAll()
+    .find(
+      (candidate): candidate is Pokemon =>
+        candidate instanceof Pokemon
+        && candidate !== incoming
+        && candidate !== outgoing
+        && (request.side === "player" ? candidate.isPlayer() : candidate.isEnemy())
+        && !candidate.switchOutStatus,
+    );
+  const anchor = liveAlly ?? outgoing ?? incoming;
+  const anchorOffset = anchor.getFieldPositionOffset();
+  const baseX = anchor.x - anchorOffset[0];
+  const baseY = anchor.y - anchorOffset[1];
+
+  if (!alreadyProjected) {
+    [party[request.fieldSlot], party[request.partySlot]] = [incoming, outgoing!];
+    outgoing!.switchOutStatus = true;
+    if (scene.field.getIndex(outgoing!) >= 0) {
+      scene.field.remove(outgoing!, false);
+    }
+  }
+
+  ensureCoopPokemonPresentationNodes(incoming);
+  incoming.switchOutStatus = false;
+  incoming.fieldPosition = FieldPosition.CENTER;
+  incoming.setPosition(baseX, baseY);
+  void incoming.setFieldPosition(desiredPosition, 0);
+  if (scene.field.getIndex(incoming) < 0) {
+    scene.add.existing(incoming);
+    scene.field.add(incoming);
+  }
+  if (request.side === "enemy") {
+    const player = scene.field
+      .getAll()
+      .find((candidate): candidate is Pokemon => candidate instanceof Pokemon && candidate.isPlayer());
+    if (player != null) {
+      scene.field.moveBelow(incoming, player);
+    }
+  }
+  scene.updateFieldScale();
+  return { ok: true, incoming, outgoing, alreadyProjected };
+}
+
+/**
+ * Retire or settle every visual child owned by one switch actor using the scene that created it.
+ * Positive reveal is refused when that scene is no longer the process-global owner.
+ */
+export function settleCoopSwitchActorPresentation(
+  scene: BattleScene,
+  pokemon: Pokemon,
+  desired: "visible" | "hidden",
+): boolean {
+  const sprite = pokemon.getSprite();
+  const tintSprite = pokemon.getTintSprite();
+  const info = pokemon.getBattleInfo();
+  const infoTargets = compactTargets(info, info?.expMaskRect);
+  // Info tween completion is presentation-only and restores its stable on-screen base. Body/tint tween
+  // callbacks may own later switch work, so those are killed without completion.
+  completeTweensOf(infoTargets, scene);
+  killTweensOf(compactTargets(pokemon, sprite, tintSprite), scene);
+
+  if (desired === "hidden" || globalScene !== scene) {
+    info?.setVisible(false);
+    sprite?.setVisible(false);
+    tintSprite?.setVisible(false).setAlpha(1).clearTint();
+    pokemon.setVisible(false).setAlpha(1).setScale(pokemon.getSpriteScale());
+    return desired === "hidden";
+  }
+
+  pokemon.setVisible(true).setAlpha(1).setScale(pokemon.getSpriteScale());
+  sprite?.setVisible(true).setAlpha(1).clearTint();
+  tintSprite?.setVisible(false).setAlpha(1).clearTint();
+  pokemon.showInfo();
+  completeTweensOf(infoTargets, scene);
+  info?.setVisible(true);
+  void pokemon.updateInfo(true);
+  return true;
+}
+
 interface CoopPokemonPresentationReadiness {
   ready: boolean;
   pokemonId: number;

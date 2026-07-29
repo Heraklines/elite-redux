@@ -13,8 +13,8 @@ import { BattleType } from "#enums/battle-type";
 import { FieldPosition } from "#enums/field-position";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { PlayerGender } from "#enums/player-gender";
-import { TrainerSlot } from "#enums/trainer-slot";
 import type { Pokemon } from "#field/pokemon";
+import { enemyTrainerSlotForSwitch } from "#phases/battle-phase";
 import { PartyMemberPokemonPhase } from "#phases/party-member-pokemon-phase";
 import i18next from "i18next";
 
@@ -118,7 +118,10 @@ export class SummonPhase extends PartyMemberPokemonPhase {
       || globalScene.currentBattle.mysteryEncounter?.encounterMode === MysteryEncounterMode.TRAINER_BATTLE
     ) {
       const trainerName = globalScene.currentBattle.trainer?.getName(
-        this.fieldIndex % 2 ? TrainerSlot.TRAINER_PARTNER : TrainerSlot.TRAINER,
+        enemyTrainerSlotForSwitch(
+          this.fieldIndex,
+          globalScene.currentBattle.double && !!globalScene.currentBattle.trainer?.isDouble(),
+        ),
       );
       const pokemonName = this.getPokemon().getNameToRender();
       const message = i18next.t("battle:trainerSendOut", {
