@@ -1,0 +1,18 @@
+{
+  "taskId": "v2-form-lifecycle-p1-20260729",
+  "version": 2,
+  "branch": "ci/coop/v2-form-lifecycle-p1-20260729",
+  "trainRef": "ci/coop/v2-final-integration-20260726",
+  "baseSha": "1ab896b5860bc18910afaf82c473af4dda07ac01",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-form-lifecycle-p1-20260729.json",
+    "src/phases/coop-replay-phases.ts",
+    "src/phases/form-change-phase.ts",
+    "src/ui/ui.ts",
+    "test/scripts/coop-presentation-authority.test.mjs",
+    "test/tests/elite-redux/coop/coop-battle-events.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-engine.test.ts",
+    "test/tests/elite-redux/coop/coop-ui-bounded-transition.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
