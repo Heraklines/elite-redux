@@ -2281,6 +2281,17 @@ export class BattleScene extends SceneBase {
       }
     }
 
+    // Two-player co-op owns exactly the legacy binary topology. Resolve this before
+    // Triples Only, the developer override, and the natural ER roll so a challenge
+    // imported from another mode (or a diagnostic override left enabled) cannot create
+    // a third control seat that the current two-seat authority graph cannot own. Keep
+    // the already-resolved binary width: ordinary co-op battles remain doubles while
+    // intentional single-only boundaries remain singles. Showdown is handled above and
+    // retains its independently negotiated singles/doubles/triples format.
+    if (this.gameMode.isCoop) {
+      return legacyFormat(double);
+    }
+
     // Triples Only is a direct format invariant for regular battles. Do not make it
     // depend on the intermediate legacy `double` flag: later encounter adapters can
     // legitimately recompute that boolean, and coupling the challenge to it caused a

@@ -24,8 +24,15 @@
 // =============================================================================
 
 import type { BattleScene } from "#app/battle-scene";
+import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
-import { TRIPLE_BATTLE_GHOST_RARITY, TRIPLE_BATTLE_RARITY, TRIPLE_FORMAT } from "#data/battle-format";
+import {
+  DOUBLE_FORMAT,
+  SINGLE_FORMAT,
+  TRIPLE_BATTLE_GHOST_RARITY,
+  TRIPLE_BATTLE_RARITY,
+  TRIPLE_FORMAT,
+} from "#data/battle-format";
 import {
   type GhostMember,
   type GhostTeamSnapshot,
@@ -39,6 +46,7 @@ import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { Challenges } from "#enums/challenges";
+import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import type { Trainer } from "#field/trainer";
@@ -56,6 +64,14 @@ const N = 2000;
 type RollFn = (props: NewBattleConstructedProps) => boolean;
 const rollTriple = (scene: BattleScene, props: NewBattleConstructedProps): boolean =>
   (scene as unknown as { rollTripleBattle: RollFn }).rollTripleBattle(props);
+
+type ResolveFormatFn = (props: NewBattleConstructedProps, double: boolean) => typeof SINGLE_FORMAT;
+const resolveBattleFormat = (
+  scene: BattleScene,
+  props: NewBattleConstructedProps,
+  double: boolean,
+): typeof SINGLE_FORMAT =>
+  (scene as unknown as { resolveBattleFormat: ResolveFormatFn }).resolveBattleFormat(props, double);
 
 /**
  * Observed win-rate of the triple roll over N distinct per-wave seeds. `resetSeed(w)`
@@ -247,6 +263,26 @@ describe.skipIf(!RUN)("ER triples roll - observed rates + rolled-path constructi
 
     const rate = measureRate(globalScene, wave => ({ battleType: BattleType.WILD, waveIndex: wave }));
     expect(rate).toBe(0);
+  });
+
+  it("keeps two-player co-op binary even when the developer override requests triples", () => {
+    game.scene.gameMode = getGameMode(GameModes.COOP);
+    game.override.battleStyle("triple");
+
+    expect(resolveBattleFormat(game.scene, { battleType: BattleType.WILD, waveIndex: 11 }, true)).toBe(DOUBLE_FORMAT);
+    expect(resolveBattleFormat(game.scene, { battleType: BattleType.MYSTERY_ENCOUNTER, waveIndex: 12 }, false)).toBe(
+      SINGLE_FORMAT,
+    );
+  });
+
+  it("keeps two-player co-op binary when a Triples Only challenge leaks into the mode", () => {
+    game.scene.gameMode = getGameMode(GameModes.COOP);
+    game.scene.gameMode.setChallengeValue(Challenges.TRIPLES_ONLY, 1);
+
+    expect(game.scene.gameMode.hasChallenge(Challenges.TRIPLES_ONLY)).toBe(true);
+    expect(resolveBattleFormat(game.scene, { battleType: BattleType.TRAINER, waveIndex: 11 }, true)).toBe(
+      DOUBLE_FORMAT,
+    );
   });
 
   it("the ROLLED path constructs an identical 3v3 to the forced path and plays a turn", async () => {

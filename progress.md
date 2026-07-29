@@ -5467,3 +5467,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   advance after a bounded lifecycle-owned dwell. Animations-disabled profiles collapse only that dwell.
 - AbortSignal fences every added text callback and runtime-wall delay. Recovery/retirement therefore cannot leave a
   late replica prompt or timer behind the succeeding authoritative state.
+
+## 2026-07-29 - Two-player co-op cannot construct a triple battle
+
+- The two-seat Authority V2 graph now has a matching battle-topology invariant: after Showdown's independent
+  negotiation, co-op resolves only the already-selected legacy single/double format before the Triples Only
+  challenge, developer override, or natural ER triple roll can run.
+- Ordinary two-player co-op battles remain doubles, and intentional single-only boundaries remain singles. This
+  removes the unsupported third command/replacement seat without changing Showdown, tournament, or solo triples.
+- Failure-first engine coverage pins both previously open entry paths: a forced triple override and a leaked
+  Triples Only challenge must resolve to a binary co-op format. This scope reduction does not require a new full
+  browser campaign; it will ride the next ordinary exact-SHA qualification.
