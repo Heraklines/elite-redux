@@ -221,12 +221,14 @@ test("journey starter fixtures require both the exact build and exact per-page U
 });
 
 test("registered-interaction journey reaches Revival mid-turn and Stormglass at the next wave through public UI", async () => {
-  const [workflow, config, harness, commandPhase, campaign] = await Promise.all([
+  const [workflow, config, harness, commandPhase, campaign, registry, starterCosts] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
     readFile(resolve(root, "src/phases/command-phase.ts"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/data/balance/starters.ts"), "utf8"),
   ]);
   assert.match(workflow, /- registered-interactions/u);
   assert.match(config, /"registered-interactions"/u);
@@ -241,6 +243,29 @@ test("registered-interaction journey reaches Revival mid-turn and Stormglass at 
   );
   assert.match(workflow, /== "market-wide-lens" \|\| .* == "registered-interactions"[\s\S]*run-campaign\.mjs/u);
   assert.match(harness, /journey === "registered-interactions"[\s\S]*"registered-owner"[\s\S]*"registered-partner"/u);
+  const fixtureStart = registry.indexOf("export function getCoopBrowserRegisteredInteractionFixtureStarters");
+  const fixtureEnd = registry.indexOf("\n}\n\n/**", fixtureStart);
+  const fixture = registry.slice(fixtureStart, fixtureEnd);
+  const ownerStart = fixture.indexOf('fixture === "registered-owner"');
+  const partnerStart = fixture.indexOf(": [{ speciesId: SpeciesId.BULBASAUR", ownerStart);
+  const ownerFixture = fixture.slice(ownerStart, partnerStart);
+  assert.match(ownerFixture, /SpeciesId\.MAGIKARP/u);
+  assert.match(ownerFixture, /SpeciesId\.SEEL/u);
+  assert.doesNotMatch(ownerFixture, /SpeciesId\.RATTATA/u, "the real five-point UI must not reject an illegal reserve");
+  const starterCost = speciesName => {
+    const match = starterCosts.match(new RegExp(`\\[SpeciesId\\.${speciesName}\\]: (\\d+),`, "u"));
+    assert.ok(match, `starter cost is declared for ${speciesName}`);
+    return Number(match[1]);
+  };
+  assert.ok(
+    starterCost("MAGIKARP") + starterCost("SEEL") <= 5,
+    "the registered owner fixture must remain legal under the real co-op starter budget",
+  );
+  assert.match(
+    harness,
+    /registeredInteractionsFixture[\s\S]*\[MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID\][\s\S]*\[BULBASAUR_SPECIES_ID\]/u,
+    "the public driver waits only for the exact roster that the production starter UI can accept",
+  );
   assert.match(
     commandPhase,
     /installCoopBrowserRegisteredInteractionFixture\(this\.fieldIndex\)[\s\S]*tryCoopCheckpointSync\(\)/u,

@@ -237,7 +237,8 @@ export function getCoopBrowserCampaignFixtureStarters(): Starter[] | null {
  * The owner first submits Healing Wish, publicly replaces into Seel, then selects Revival Blessing
  * while Magikarp is fainted. Water Spout remains available after the one-PP revival so the same
  * ordinary battle can finish. The partner's Splash keeps the wave alive until that interaction has
- * occurred. Every species is one starter point, so the visible co-op budget remains legal.
+ * occurred. Magikarp (4) plus Seel (1) exactly fills the visible five-point co-op budget; no
+ * third reserve may be injected because the ordinary starter UI must remain the authority on cost.
  */
 export function getCoopBrowserRegisteredInteractionFixtureStarters(): Starter[] | null {
   if (!isCoopBrowserRegisteredInteractionFixtureActive() || typeof location === "undefined") {
@@ -249,7 +250,6 @@ export function getCoopBrowserRegisteredInteractionFixtureStarters(): Starter[] 
       ? [
           { speciesId: SpeciesId.MAGIKARP, moveset: [MoveId.HEALING_WISH] },
           { speciesId: SpeciesId.SEEL, moveset: [MoveId.REVIVAL_BLESSING, MoveId.WATER_SPOUT] },
-          { speciesId: SpeciesId.RATTATA, moveset: [MoveId.TACKLE] },
         ]
       : [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.SPLASH] }];
   return specs.map(({ speciesId, moveset }) => ({

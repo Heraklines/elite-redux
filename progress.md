@@ -5606,3 +5606,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Dedicated run `30495741492` stopped before build/Chromium because the new conditional wave-count YAML replaced the
   Wide Lens lane's intentionally literal 20-wave source contract. The workflow again retains `20` in its environment
   and overrides to one only inside the registered-interactions process; this preserves both independent oracles.
+
+## 2026-07-30 - Registered interaction fixture obeys the real five-point starter cap
+
+- Exact two-Chromium run `30496100685` paired successfully and reached both ordinary starter screens, then the host
+  correctly refused the fixture's third mon: Magikarp costs four points and Seel costs one, so the requested Rattata
+  would exceed the real per-seat five-point budget. The screenshot and semantic trace agreed on the accepted pair;
+  the harness alone waited for the impossible third species.
+- The owner fixture now fields the exact Magikarp/Seel pair required for Healing Wish -> replacement -> Revival
+  Blessing. A source contract reads the production starter-cost table and fails if that pair ever exceeds the real
+  budget, and the public driver waits for exactly the legal roster. No game rule, authority path, or player-facing
+  behavior was weakened.

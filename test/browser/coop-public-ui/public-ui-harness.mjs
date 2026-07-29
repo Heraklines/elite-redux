@@ -64,7 +64,6 @@ const RENDEZVOUS_RECOVERY_RETRY_POINT =
 const TATSUGIRI_SPECIES_ID = 978;
 const DONDOZO_SPECIES_ID = 977;
 const MAGIKARP_SPECIES_ID = 129;
-const RATTATA_SPECIES_ID = 19;
 const CROBAT_SPECIES_ID = 169;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
@@ -3541,7 +3540,7 @@ export class DuoPublicUiRig {
                   ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
                   : registeredInteractionsFixture
                     ? client.label === "host-seat"
-                      ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID, RATTATA_SPECIES_ID]
+                      ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                       : [BULBASAUR_SPECIES_ID]
                     : null;
           const result =
