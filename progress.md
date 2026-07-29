@@ -5542,3 +5542,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   evidence is 40/40 green, the public-browser boundary is green, scoped Biome is error-clean apart from the existing
   informational complexity diagnostics, and `git diff --check` is clean. No local engine or Chromium execution was
   used; the corrected exact Mystery campaign remains remote-only.
+
+## 2026-07-29 - Revival and Stormglass are registered public-browser authority surfaces
+
+- The registry audit found that the read-only browser observer still classified Revival Blessing's PARTY picker as a
+  generic local party screen and Stormglass as generic message/option UI. That hid their stable authoritative owner
+  and prevented the real two-browser campaign from proving or driving either registered interaction.
+- The observer now emits exact `revival:party`, `stormglass:message`, and `stormglass:option` surfaces. Revival derives
+  its stable owner from the registered phase/user state, Stormglass remains host-owned, and both retain their exact
+  interaction address instead of falling back to local UI parity.
+- The campaign proves one exclusively actionable owner and one input-inert watcher at the same V2 address and
+  mechanical digest. Revival chooses a real fainted party slot and then the visible revive submenu action;
+  Stormglass chooses the visible stable option ordinal. Revival PARTY also blocks stale narration advancement.
+- Stormglass's initial MESSAGE is intentionally a known transition rather than a fabricated human control surface:
+  production passes a callback without `prompt`, so the typewriter completes it automatically. An earlier production
+  retry idea was disproved by the real `MessageUiHandler` contract and fully reverted before this checkpoint.
+- Local policy-safe evidence is green: 42/42 focused node contracts, the public-browser boundary, scoped Biome, and
+  `git diff --check`. Full TypeScript still reports the repository's unrelated baseline and no diagnostic in the six
+  changed files. No local engine or Chromium execution was used. Exact remote browser qualification is next; dedicated
+  deterministic browser fixtures are still required before Revival and Stormglass occurrence coverage can be claimed.

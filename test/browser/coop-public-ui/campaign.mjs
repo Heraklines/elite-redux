@@ -2482,6 +2482,121 @@ async function checkpointAsymmetricAbilitySurface(rig, driver, cursors, owner) {
   return { authority: ownerEvent.observation, ownerEvent, peerEvents: [watcherEvent] };
 }
 
+function assertAsymmetricRegisteredInteraction(ownerObservation, watcherObservation, contract) {
+  if (
+    !contract.ownerSurfaceIds.includes(ownerObservation?.surfaceId)
+    || ownerObservation.operationClass !== contract.operationClass
+    || !contract.ownerPhases.includes(ownerObservation.phase)
+    || ownerObservation.ownerSeat !== ownerObservation.localSeat
+    || ownerObservation.seatsWithInput?.length !== 1
+    || ownerObservation.seatsWithInput[0] !== ownerObservation.localSeat
+    || !isActionableSemanticObservation(ownerObservation, { requireExplicitUnblocked: true })
+  ) {
+    throw new Error(
+      `[campaign-${contract.label}] owner surface was not exclusively actionable: ${JSON.stringify(ownerObservation)}`,
+    );
+  }
+  if (
+    watcherObservation?.surfaceId !== contract.watcherSurfaceId
+    || watcherObservation.operationClass !== contract.operationClass
+    || !contract.watcherPhases.includes(watcherObservation.phase)
+    || watcherObservation.ready?.handlerActive !== true
+    || watcherObservation.localSeat === ownerObservation.localSeat
+    || watcherObservation.ownerSeat !== ownerObservation.ownerSeat
+    || watcherObservation.seatsWithInput?.length !== 1
+    || watcherObservation.seatsWithInput[0] !== ownerObservation.ownerSeat
+    || watcherObservation.seatsWithInput.includes(watcherObservation.localSeat)
+    || isActionableSemanticObservation(watcherObservation, { requireExplicitUnblocked: true })
+  ) {
+    throw new Error(
+      `[campaign-${contract.label}] partner did not expose an input-inert watcher: ${JSON.stringify(watcherObservation)}`,
+    );
+  }
+  if (
+    JSON.stringify(watcherObservation.address) !== JSON.stringify(ownerObservation.address)
+    || ownerObservation.stateDigest == null
+    || watcherObservation.stateDigest !== ownerObservation.stateDigest
+  ) {
+    throw new Error(
+      `[campaign-${contract.label}] owner/watcher crossed different authoritative states: ${JSON.stringify({
+        ownerObservation,
+        watcherObservation,
+      })}`,
+    );
+  }
+  return {
+    surfaceId: ownerObservation.surfaceId,
+    watcherSurfaceId: watcherObservation.surfaceId,
+    address: ownerObservation.address,
+    stateDigest: ownerObservation.stateDigest,
+    ownerSeat: ownerObservation.ownerSeat,
+    watcherSeat: watcherObservation.localSeat,
+  };
+}
+
+/** Revival Blessing is a symmetric PARTY shell with one stable Pokemon-owner input lease. */
+export function assertAsymmetricRevivalProjection(ownerObservation, watcherObservation) {
+  return assertAsymmetricRegisteredInteraction(ownerObservation, watcherObservation, {
+    label: "revival",
+    operationClass: "revival",
+    ownerSurfaceIds: ["revival:party"],
+    watcherSurfaceId: "revival:party",
+    ownerPhases: ["RevivalBlessingPhase", "CoopGuestRevivalPhase"],
+    watcherPhases: ["RevivalBlessingPhase", "CoopGuestRevivalPhase"],
+  });
+}
+
+/** Stormglass is fixed-host input: the guest remains on one passive MESSAGE shell. */
+export function assertAsymmetricStormglassProjection(ownerObservation, watcherObservation) {
+  return assertAsymmetricRegisteredInteraction(ownerObservation, watcherObservation, {
+    label: "stormglass",
+    operationClass: "stormglass",
+    ownerSurfaceIds: ["stormglass:message", "stormglass:option"],
+    watcherSurfaceId: "stormglass:message",
+    ownerPhases: ["ErStormglassPickerPhase"],
+    watcherPhases: ["ErStormglassPickerPhase"],
+  });
+}
+
+async function checkpointAsymmetricRegisteredSurface(rig, driver, cursors, owner) {
+  const ownerEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[owner.label] ?? 0, driver.v2SurfaceId);
+      return candidate != null
+        && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: `actionable ${driver.asymmetricSurface} owner` },
+  );
+  const watcher = Object.values(rig.clients).find(client => client !== owner);
+  if (watcher == null) {
+    throw new Error(`[campaign-${driver.asymmetricSurface}] surface has no watcher browser`);
+  }
+  const assertProjection =
+    driver.asymmetricSurface === "revival" ? assertAsymmetricRevivalProjection : assertAsymmetricStormglassProjection;
+  const watcherEvent = await watcher.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[watcher.label] ?? 0, driver.watcherSurfaceId);
+      if (candidate == null) {
+        return null;
+      }
+      try {
+        assertProjection(ownerEvent.observation, candidate.observation);
+        return candidate;
+      } catch {
+        return null;
+      }
+    },
+    { timeoutMs: rig.config.timeoutMs, description: `input-inert ${driver.asymmetricSurface} watcher` },
+  );
+  const proof = assertProjection(ownerEvent.observation, watcherEvent.observation);
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-semantic-convergence", proof);
+  }
+  return { authority: ownerEvent.observation, ownerEvent, peerEvents: [watcherEvent] };
+}
+
 /** Choose the stable party or ability option that advances the current registered ability workflow. */
 export function chooseAbilityInteractionOption(observation) {
   const options = observation?.optionIds;
@@ -2554,6 +2669,82 @@ async function driveAbilityInteraction(rig, driver, owner, boundary) {
     surfaceId: driver.v2SurfaceId,
     targetId,
     address: boundary.authority.address,
+  });
+}
+
+/** Choose a currently fainted party member from the real Revival Blessing slot list. */
+export function chooseRevivalPartySlot(observation) {
+  const optionIds = Array.isArray(observation?.optionIds) ? observation.optionIds : [];
+  const target = observation?.partySlots?.find(
+    slot => slot?.fainted === true && Number.isSafeInteger(slot.slot) && optionIds.includes(`party-slot:${slot.slot}`),
+  );
+  return target == null ? null : `party-slot:${target.slot}`;
+}
+
+async function driveRevivalInteraction(rig, owner, boundary) {
+  const targetId = chooseRevivalPartySlot(boundary.authority);
+  if (targetId == null) {
+    throw new Error(`[campaign-revival] picker exposed no fainted target: ${JSON.stringify(boundary.authority)}`);
+  }
+  const submenuCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "revival:party",
+    targetId,
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: boundary.ownerEvent.index,
+  });
+  const submenu = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(submenuCursor, "revival:party");
+      const observation = candidate?.observation;
+      return candidate != null
+        && observation.optionIds?.includes("party-option:revive")
+        && JSON.stringify(observation.address) === JSON.stringify(boundary.authority.address)
+        && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: `Revival Blessing REVIVE submenu for ${targetId}` },
+  );
+  await selectOptionById(owner, {
+    surfaceId: "revival:party",
+    targetId: "party-option:revive",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: submenu.index,
+  });
+  owner.evidence.record("campaign-revival-choice", {
+    address: boundary.authority.address,
+    ownerSeat: owner.publicSeat,
+    targetId,
+  });
+}
+
+/** Choose one visible Stormglass weather without depending on translated labels. */
+export function chooseStormglassOption(observation) {
+  return observation?.optionIds?.find(optionId => /^slot:\d+$/u.test(optionId)) ?? null;
+}
+
+async function driveStormglassOption(rig, owner, boundary) {
+  const targetId = chooseStormglassOption(boundary.authority);
+  if (targetId == null) {
+    throw new Error(`[campaign-stormglass] picker exposed no weather option: ${JSON.stringify(boundary.authority)}`);
+  }
+  await selectOptionById(owner, {
+    surfaceId: "stormglass:option",
+    targetId,
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: boundary.ownerEvent.index,
+  });
+  owner.evidence.record("campaign-stormglass-choice", {
+    address: boundary.authority.address,
+    ownerSeat: owner.publicSeat,
+    targetId,
   });
 }
 
@@ -3096,6 +3287,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       mechanicalBoundary = await checkpointAsymmetricLearnMoveSurface(rig, cursors, client);
     } else if (driver.abilitySurface) {
       mechanicalBoundary = await checkpointAsymmetricAbilitySurface(rig, driver, cursors, client);
+    } else if (driver.asymmetricSurface) {
+      mechanicalBoundary = await checkpointAsymmetricRegisteredSurface(rig, driver, cursors, client);
     } else if (driver.v2SurfaceId) {
       mechanicalBoundary = await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
     }
@@ -3159,6 +3352,10 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       await driveMysteryPartyPicker(rig, client, cursors, stats);
     } else if (driver.abilitySurface && mechanicalBoundary != null) {
       await driveAbilityInteraction(rig, driver, client, mechanicalBoundary);
+    } else if (driver.asymmetricSurface === "revival" && mechanicalBoundary != null) {
+      await driveRevivalInteraction(rig, client, mechanicalBoundary);
+    } else if (driver.stormglassSurfaceKind === "option" && mechanicalBoundary != null) {
+      await driveStormglassOption(rig, client, mechanicalBoundary);
     } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
       await driveConfirmedLeave(rig, driver, client, mechanicalBoundary.authority, cursors);
     } else {

@@ -10,9 +10,13 @@ import test from "node:test";
 import {
   assertAsymmetricAbilityProjection,
   assertAsymmetricMysteryPromptProjection,
+  assertAsymmetricRevivalProjection,
+  assertAsymmetricStormglassProjection,
   chooseAbilityInteractionOption,
   chooseMysteryEncounterOption,
+  chooseRevivalPartySlot,
   chooseRewardPartyTargetSlot,
+  chooseStormglassOption,
   createMysteryNarrationAdvancer,
   createRegisteredSurfaceProgressBudget,
   driveMysteryEncounterChoice,
@@ -24,6 +28,7 @@ import {
   chooseBestCampaignMove,
   chooseNavigationKey,
   chooseVoluntarySwitchTarget,
+  isPartyPickerSurfaceOpen,
   selectOptionById,
 } from "./campaign-nav.mjs";
 import { ABILITY_INTERACTION_SURFACES, buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
@@ -227,6 +232,100 @@ test("ability party driver targets the phase-owned mon and a stable ability slot
     }),
     "party-option:ability-slot-0",
     "the randomizer accepts any slot and deterministically uses the active slot first",
+  );
+});
+
+test("Revival and Stormglass have stable-owner public drivers instead of generic local surfaces", async () => {
+  const [observer, registry, revivalPhase, guestRevivalPhase, stormglassPhase] = await Promise.all([
+    readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/coop/coop-operation-surface-registry.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/revival-blessing-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/coop-guest-revival-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/er-stormglass-picker-phase.ts"), "utf8"),
+  ]);
+  const dispatch = buildDispatchTable(loadCampaignPolicy());
+  assert.deepEqual(
+    dispatch
+      .filter(driver => driver.asymmetricSurface === "revival" || driver.asymmetricSurface === "stormglass")
+      .map(driver => [driver.name, driver.v2SurfaceId, driver.watcherSurfaceId]),
+    [
+      ["revival", "revival:party", "revival:party"],
+      ["stormglass-message", "stormglass:message", "stormglass:message"],
+      ["stormglass-option", "stormglass:option", "stormglass:message"],
+    ],
+  );
+  assert.match(registry, /REVIVAL:[\s\S]*UiMode\.PARTY[\s\S]*"RevivalBlessingPhase"[\s\S]*"CoopGuestRevivalPhase"/u);
+  assert.match(registry, /STORMGLASS_PRESENT:[\s\S]*UiMode\.OPTION_SELECT[\s\S]*UiMode\.MESSAGE/u);
+  assert.match(observer, /surfaceId: "revival:party", operationClass: "revival", ownerModel: "interaction"/u);
+  assert.match(observer, /surfaceId: `stormglass:\$\{uiMode === "MESSAGE" \? "message" : "option"\}`/u);
+  assert.match(observer, /semantic\.operationClass === "stormglass"[\s\S]*return "host"/u);
+  assert.match(observer, /phase\.ownerIsGuest === true[\s\S]*return "guest"/u);
+  assert.match(observer, /phase\.user\?\.coopOwner === "guest" \? "guest" : "host"/u);
+  assert.match(revivalPhase, /this\.user\.coopOwner[\s\S]*startCoopPartnerPick\(\)/u);
+  assert.match(guestRevivalPhase, /this\.ownerIsGuest[\s\S]*PartyUiMode\.REVIVAL_BLESSING/u);
+  assert.match(stormglassPhase, /this\.coopOwner = spoofed \|\| controller\.role === "host"/u);
+});
+
+test("Revival and Stormglass projection proofs reject actionable watchers and choose visible targets", () => {
+  const base = {
+    localSeat: 1,
+    ownerSeat: 1,
+    seatsWithInput: [1],
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
+    address: { epoch: 9, wave: 4, turn: 2 },
+    stateDigest: "same-state",
+  };
+  const revivalOwner = {
+    ...base,
+    surfaceId: "revival:party",
+    operationClass: "revival",
+    phase: "CoopGuestRevivalPhase",
+    uiMode: "PARTY",
+    optionIds: ["party-slot:0", "party-slot:1", "party-slot:2"],
+    partySlots: [
+      { slot: 0, fainted: false },
+      { slot: 1, fainted: true },
+      { slot: 2, fainted: false },
+    ],
+  };
+  const revivalWatcher = {
+    ...revivalOwner,
+    phase: "RevivalBlessingPhase",
+    localSeat: 0,
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: true },
+  };
+  assert.equal(chooseRevivalPartySlot(revivalOwner), "party-slot:1");
+  assert.equal(isPartyPickerSurfaceOpen(revivalOwner), true);
+  assert.equal(assertAsymmetricRevivalProjection(revivalOwner, revivalWatcher).ownerSeat, 1);
+  assert.throws(
+    () =>
+      assertAsymmetricRevivalProjection(revivalOwner, {
+        ...revivalWatcher,
+        ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
+      }),
+    /input-inert watcher/u,
+  );
+
+  const stormglassOwner = {
+    ...base,
+    surfaceId: "stormglass:option",
+    operationClass: "stormglass",
+    phase: "ErStormglassPickerPhase",
+    uiMode: "OPTION_SELECT",
+    optionIds: ["slot:0", "slot:1", "slot:2", "slot:3", "slot:4"],
+  };
+  const stormglassWatcher = {
+    ...stormglassOwner,
+    surfaceId: "stormglass:message",
+    localSeat: 0,
+    uiMode: "MESSAGE",
+    ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true },
+  };
+  assert.equal(chooseStormglassOption(stormglassOwner), "slot:0");
+  assert.equal(assertAsymmetricStormglassProjection(stormglassOwner, stormglassWatcher).watcherSeat, 0);
+  assert.throws(
+    () => assertAsymmetricStormglassProjection(stormglassOwner, { ...stormglassWatcher, stateDigest: "different" }),
+    /different authoritative states/u,
   );
 });
 

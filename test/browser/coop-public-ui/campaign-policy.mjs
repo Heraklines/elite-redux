@@ -42,6 +42,8 @@ const LEARN_MOVE_CONFIRM_PHASE = /Start Phase LearnMovePhase/u;
 const LEARN_MOVE_BATCH_PHASE = /Start Phase LearnMoveBatchPhase/u;
 const EGG_LAPSE_PHASE = /Start Phase EggLapsePhase/u;
 const ATTEMPT_CAPTURE_PHASE = /Start Phase AttemptCapturePhase/u;
+const REVIVAL_PHASE = /Start Phase (?:RevivalBlessingPhase|CoopGuestRevivalPhase)/u;
+const STORMGLASS_PHASE = /Start Phase ErStormglassPickerPhase/u;
 
 /**
  * Every registered Authority V2 ability workflow and each human-input shape it can expose.
@@ -276,6 +278,11 @@ export function loadCampaignPolicy() {
       // Authority V2 ability pickers are state-aware below. This is only the normal public submit key;
       // party/option navigation is derived from the semantic observer rather than a blind macro.
       ability: envKeys("COOP_UI_ABILITY_KEYS", ["Space"]),
+      // Revival is a two-level PARTY picker (fainted slot, then REVIVE). The state-aware
+      // campaign driver uses this only as the final public submit key.
+      revival: envKeys("COOP_UI_REVIVAL_KEYS", ["Space"]),
+      // Stormglass first advances its owner-only prompt, then submits one visible weather.
+      stormglass: envKeys("COOP_UI_STORMGLASS_KEYS", ["Space"]),
       // Catch prompt (party full): skip / decline.
       catchSkip: envKeys("COOP_UI_CATCH_SKIP_KEYS", ["Backspace"]),
     },
@@ -436,6 +443,41 @@ export function buildDispatchTable(policy) {
       v2SurfaceId: "catch-full:confirm",
       owner: { role: "host" },
       keys: policy.keys.catchSkip,
+    },
+    {
+      name: "revival",
+      phase: REVIVAL_PHASE,
+      present: REVIVAL_PHASE,
+      v2SurfaceId: "revival:party",
+      semanticOnly: true,
+      asymmetricSurface: "revival",
+      watcherSurfaceId: "revival:party",
+      owner: { role: "host" },
+      keys: policy.keys.revival,
+    },
+    {
+      name: "stormglass-message",
+      phase: STORMGLASS_PHASE,
+      present: STORMGLASS_PHASE,
+      v2SurfaceId: "stormglass:message",
+      semanticOnly: true,
+      asymmetricSurface: "stormglass",
+      watcherSurfaceId: "stormglass:message",
+      stormglassSurfaceKind: "message",
+      owner: { role: "host" },
+      keys: policy.keys.stormglass,
+    },
+    {
+      name: "stormglass-option",
+      phase: STORMGLASS_PHASE,
+      present: STORMGLASS_PHASE,
+      v2SurfaceId: "stormglass:option",
+      semanticOnly: true,
+      asymmetricSurface: "stormglass",
+      watcherSurfaceId: "stormglass:message",
+      stormglassSurfaceKind: "option",
+      owner: { role: "host" },
+      keys: policy.keys.stormglass,
     },
     ...abilityDrivers,
     {

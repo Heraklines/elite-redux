@@ -553,6 +553,34 @@ const COOP_ABILITY_SURFACE_KIND = {
   MESSAGE: "message",
 } as const;
 
+const COOP_REVIVAL_PHASES = new Set(["RevivalBlessingPhase", "CoopGuestRevivalPhase"]);
+
+/**
+ * Resolve surfaces whose owner is part of the immutable operation, rather than the alternating
+ * interaction cursor. Revival follows the Pokemon that used the move; Stormglass is explicitly
+ * host-owned. Returning a role here prevents a passive PARTY/MESSAGE watcher from ever looking like
+ * the client that may submit the operation.
+ */
+function semanticStableOwnerRole(semantic: SemanticSurface, currentPhase: unknown): "host" | "guest" | null {
+  const phase = currentPhase as {
+    ownerIsGuest?: unknown;
+    user?: { coopOwner?: unknown };
+  };
+  if (semantic.operationClass === "stormglass") {
+    return "host";
+  }
+  if (semantic.operationClass !== "revival") {
+    return null;
+  }
+  if (phase.ownerIsGuest === true) {
+    return "guest";
+  }
+  if (phase.ownerIsGuest === false) {
+    return "host";
+  }
+  return phase.user?.coopOwner === "guest" ? "guest" : "host";
+}
+
 /**
  * Resolve the immutable interaction coordinate owned by the phase currently rendering a
  * shared surface. The live controller counter is only the next global cursor: a terminal
@@ -614,6 +642,16 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
     return {
       surfaceId: `ability:${phase}:${abilitySurfaceKind}`,
       operationClass: "ability",
+      ownerModel: "interaction",
+    };
+  }
+  if (COOP_REVIVAL_PHASES.has(phase) && uiMode === "PARTY") {
+    return { surfaceId: "revival:party", operationClass: "revival", ownerModel: "interaction" };
+  }
+  if (phase === "ErStormglassPickerPhase" && (uiMode === "MESSAGE" || uiMode === "OPTION_SELECT")) {
+    return {
+      surfaceId: `stormglass:${uiMode === "MESSAGE" ? "message" : "option"}`,
+      operationClass: "stormglass",
       ownerModel: "interaction",
     };
   }
@@ -1577,15 +1615,18 @@ function observeSemanticSurface(): void {
           : null;
       const learnMoveOwnerSeat =
         learnMoveOwnerRole == null ? null : runtime.controller.role === learnMoveOwnerRole ? localSeat : partnerSeat;
+      const stableOwnerRole = semanticStableOwnerRole(semantic, currentPhase);
+      const stableOwnerSeat =
+        stableOwnerRole == null ? null : runtime.controller.role === stableOwnerRole ? localSeat : partnerSeat;
       ownerSeat = localReplacementOwner
         ? localSeat
-        : learnMoveOwnerSeat == null
-          ? semantic.ownerModel === "interaction" && isLocalOwner != null
+        : (stableOwnerSeat
+          ?? learnMoveOwnerSeat
+          ?? (semantic.ownerModel === "interaction" && isLocalOwner != null
             ? isLocalOwner
               ? localSeat
               : partnerSeat
-            : null
-          : learnMoveOwnerSeat;
+            : null));
       // A reward continuation can queue the real LearnMovePhase on both clients. Its owner opens an
       // actionable SUMMARY picker while the partner opens the byte-identical read-only mirror. The
       // generic SUMMARY classifier cannot distinguish those roles, so classify only after resolving
