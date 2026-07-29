@@ -4192,7 +4192,8 @@
           "VOLT_TACKLE",
           "DRAGON_DANCE"
         ],
-        "species": 6059,
+        "sanityOff": true,
+        "species": 10610,
         "vitamins": {
           "atk": 2,
           "spd": 1
