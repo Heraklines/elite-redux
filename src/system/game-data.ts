@@ -5492,7 +5492,16 @@ export class GameData {
     // TODO: Add `null`/`undefined` to the corresponding type signatures for this
     // (or prevent them from being null)
     // If the value is able to *not exist*, it should say so in the code
-    const sessionData = JSON.parse(dataStr, (k: string, v: any) => {
+    const sessionData = JSON.parse(dataStr, function (this: Record<string, unknown>, k: string, v: any) {
+      // JSON.parse invokes a reviver for EVERY matching nested property name. These constructors belong only
+      // to the SessionSaveData root. In particular, TrainerData.ghost.party is a GhostMember[] whose entries
+      // use `speciesId`; treating it as the root PokemonData[] drops the complete ghost team and emits one
+      // fatal-looking session-load error per member during every co-op checkpoint validation.
+      const isSessionRoot =
+        Object.hasOwn(this, "seed") && Object.hasOwn(this, "gameMode") && Object.hasOwn(this, "waveIndex");
+      if (!isSessionRoot) {
+        return v;
+      }
       // TODO: Move this to occur _after_ migrate scripts (and refactor all non-assignment duties into migrate scripts)
       // This should ideally be just a giant assign block
       switch (k) {

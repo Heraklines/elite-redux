@@ -5428,3 +5428,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   contracts pass, scoped Biome is error-clean apart from pre-existing warnings/notices, `git diff --check` passes,
   and full TypeScript retains its 571-line baseline with zero diagnostics in changed production files. Engine and
   real-Chromium qualification remain remote-only; no staging, production, Showdown, or tournament code changed.
+
+## 2026-07-29 - Co-op checkpoints preserve nested ghost teams without false session corruption
+
+- Mystery campaign `30423057616` cleared six waves and reached the exact shared V2 GameOver terminal after a real
+  party wipe. It had no transport loss, recovery, desync, or stalled control frontier, but correctly failed browser
+  cleanliness when the wave-7 resume checkpoint logged three unloadable party members.
+- The checkpoint itself was valid. `parseSessionData()` applied its key-only JSON reviver to every nested `party`
+  property, so the scripted ghost trainer's three `GhostMember` rows (`speciesId`) were misread as top-level
+  `PokemonData` rows (`species`) and dropped. The parser now constructs save classes only for properties whose
+  parent is the actual SessionSaveData root; nested ghost/material payloads remain immutable plain data.
+- A failure-first real-engine regression reproduces the three-member Mystery ghost carrier, requires its exact
+  round trip with no unloadable-member error, and remains in co-op gate lane B as a critical engine dependency.
+  The lane-discovery source contract is 14/14 green, scoped Biome and `git diff --check` are clean, and full
+  TypeScript reports zero diagnostics in the changed parser/test. Engine and browser requalification are remote;
+  no deployment or non-co-op mode behavior changed.

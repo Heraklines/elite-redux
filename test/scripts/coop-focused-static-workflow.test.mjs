@@ -150,6 +150,11 @@ test("production mechanics regressions exposed by co-op soaks remain in the engi
     "the exact two-holder recursion regression must execute with ER_SCENARIO=1",
   );
   assert.equal(
+    lanes.B.includes("test/tests/elite-redux/er-session-load-regression.test.ts"),
+    true,
+    "the checkpoint parser must preserve nested ghost parties under the real engine",
+  );
+  assert.equal(
     lanes.B.includes("test/tests/test-framework/phase-interceptor/unit.test.ts"),
     true,
     "the co-op soak interceptor contract remains engine-gating",

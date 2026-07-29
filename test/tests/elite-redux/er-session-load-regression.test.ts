@@ -37,7 +37,7 @@ import { ModifierData } from "#system/modifier-data";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -117,6 +117,55 @@ describe.skipIf(!RUN)("ER P0 session-load regression", () => {
       parsed = game.scene.gameData.parseSessionData(JSON.stringify(json));
     }).not.toThrow();
     expect(parsed.party[0].species).toBe(ER_PARTNER_FAMILY[0].partnerId);
+  });
+
+  it("D: a retained ghost trainer party is not reinterpreted as the session PokemonData party", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const save = game.scene.gameData.getSessionSaveData();
+    const json = JSON.parse(JSON.stringify(save)) as any;
+    const ghostParty = [SpeciesId.RATTATA, SpeciesId.PIDGEY, SpeciesId.CATERPIE].map(speciesId => ({
+      speciesId,
+      formIndex: 0,
+      abilityIndex: 0,
+      ivs: [20, 20, 20, 20, 20, 20],
+      nature: 0,
+      level: 7,
+      gender: -1,
+      shiny: false,
+      variant: 0,
+      passive: false,
+      moves: [],
+    }));
+    json.trainer = {
+      trainerType: 1,
+      variant: 0,
+      partyTemplateIndex: 0,
+      nameKey: "Mystery Challenger",
+      ghost: {
+        id: "mystery-gauntlet-scripted-v1",
+        trainerName: "Mystery Challenger",
+        difficulty: "mystery",
+        mode: "classic",
+        waveReached: 7,
+        isVictory: false,
+        timestamp: 0,
+        party: ghostParty,
+      },
+    };
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let parsed: any;
+    let errors: string[] = [];
+    try {
+      parsed = game.scene.gameData.parseSessionData(JSON.stringify(json));
+      errors = errorSpy.mock.calls.flat().map(String);
+    } finally {
+      errorSpy.mockRestore();
+    }
+
+    expect(parsed.trainer.ghost.party).toEqual(ghostParty);
+    expect(errors.some(message => message.includes("dropped an unloadable party member"))).toBe(false);
+    expect(parsed.party.length).toBe(json.party.length);
   });
 
   it("B: an ER custom held-item class reconstructs via the save-slot preview resolver", async () => {

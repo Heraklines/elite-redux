@@ -63,6 +63,7 @@ const COOP_DIR = join(REPO_ROOT, "test", "tests", "elite-redux", "coop");
 const COOP_DIR_REL = "test/tests/elite-redux/coop";
 const CRITICAL_ENGINE_TESTS = [
   "test/tests/elite-redux/er-mental-pollution-suppress.test.ts",
+  "test/tests/elite-redux/er-session-load-regression.test.ts",
   "test/tests/test-framework/phase-interceptor/unit.test.ts",
 ];
 
