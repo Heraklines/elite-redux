@@ -308,10 +308,10 @@ describe("ordered-wait local presentation lease", () => {
     };
 
     expect(successorWaitAllowsLocalPresentationInput(turnWait, exactBattleEndMessage)).toBe(true);
-    for (const phaseName of ["TrainerVictoryPhase", "MoneyRewardPhase", "ModifierRewardPhase"]) {
+    for (const phaseName of ["ExpPhase", "TrainerVictoryPhase", "MoneyRewardPhase", "ModifierRewardPhase"]) {
       expect(
         successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, phaseName }),
-        `${phaseName} must remain actionable so trainer settlement can reach WAVE_ADVANCE`,
+        `${phaseName} must remain actionable so battle settlement can reach WAVE_ADVANCE`,
       ).toBe(true);
     }
     expect(

@@ -260,6 +260,7 @@ export interface CoopV2SharedInteractionPresentationInputProof extends CoopV2Loc
  */
 const WAVE_SETTLEMENT_PRESENTATION_PHASES: ReadonlySet<string> = new Set([
   "MessagePhase",
+  "ExpPhase",
   "TrainerVictoryPhase",
   "MoneyRewardPhase",
   "ModifierRewardPhase",
@@ -305,14 +306,14 @@ export function sharedInteractionAllowsLocalPresentationInput(
  * `messageHandlerActionable`.
  *
  * A settled turn can also have an action-only presentation chain before the authority can author
- * WAVE_ADVANCE. That includes BattleEnd's scattered-money MessagePhase and a trainer victory's
- * TrainerVictoryPhase -> MoneyRewardPhase -> ModifierRewardPhase chain. Freezing any of those prompts makes
- * the allowed successor unreachable. Current turn commits normalize the wait itself to that settlement
- * address (N+1), while replacement-origin waits can still name the resolving address (N). Mirror mechanical
- * successor admission by accepting the exact wait turn or its one permitted settlement successor, never
- * anything later. The lease remains limited to the closed action-only settlement phase set in the same wave
- * and a wait that explicitly names WAVE_ADVANCE; it grants no choice handler and cannot admit any mechanical
- * entry by itself.
+ * WAVE_ADVANCE. That includes a wild victory's ExpPhase, BattleEnd's scattered-money MessagePhase, and a
+ * trainer victory's TrainerVictoryPhase -> MoneyRewardPhase -> ModifierRewardPhase chain. Freezing any of
+ * those prompts makes the allowed successor unreachable. Current turn commits normalize the wait itself to
+ * that settlement address (N+1), while replacement-origin waits can still name the resolving address (N).
+ * Mirror mechanical successor admission by accepting the exact wait turn or its one permitted settlement
+ * successor, never anything later. The lease remains limited to the closed action-only settlement phase set
+ * in the same wave and a wait that explicitly names WAVE_ADVANCE; it grants no choice handler and cannot
+ * admit any mechanical entry by itself.
  *
  * A Mystery terminal whose immutable destination is a battle similarly names one exact same-address
  * command-open, but the host must drain the battle's complete presentation prefix before that control can be

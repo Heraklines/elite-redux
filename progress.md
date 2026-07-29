@@ -5632,3 +5632,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   alternatives. The preceding exact checkpoint remains independently green in focused gate `30497823364` and the
   ordinary two-browser fresh-wave journey `30497823286`; only the registered deterministic path exposed this
   interaction-specific successor seam.
+
+## 2026-07-30 - Interaction-origin victories retain the EXP settlement action
+
+- Exact registered-interactions run `30500034006` proved the Stormglass successor repair no longer triggered its
+  prior fail-closed command fault. It instead reached the earlier deterministic Revival boundary: both clients
+  installed the same prompt/result through revision 5, replayed the revive HP/message, completed the rest of turn 2,
+  and entered the legitimate wild-victory settlement. The authority then parked at an actionable `ExpPhase` while
+  the replica remained in its ordered replay watcher; there was no transport loss, checksum mismatch, or state drift.
+- Revival's terminal result superseded the turn entry and therefore owned the ordered wait to `WAVE_ADVANCE`. The
+  wait's closed presentation lease covered trainer rewards and generic messages but omitted the wild victory's
+  `ExpPhase`, so the default-deny UI gate blocked the exact ACTION callback required to make the promised successor
+  authorable. `ExpPhase` is now part of that closed action-only settlement class. It grants no party/choice input,
+  applies only at the wait's exact wave and N/N+1 settlement turn, and still requires an explicit `WAVE_ADVANCE` edge.
+- The node-pure control contract now exercises EXP alongside the existing trainer settlement phases while retaining
+  its wrong-address, non-actionable-handler, no-wave-successor, and choice-phase rejection cases. Ordinary exact
+  two-browser run `30500006056` and focused gate `30500006039` are independently green at the parent checkpoint.
