@@ -315,7 +315,10 @@ export function projectCoopSwitchPresentationStructure(
       scene.field.moveBelow(incoming, player);
     }
   }
-  scene.updateFieldScale();
+  // This scale tween is cosmetic and BattleScene returns a promise whose executor can reject in a torn
+  // renderer (or a deliberately minimal engine fixture). Never turn that detached presentation failure
+  // into an unhandled rejection after the exact structural switch has already succeeded.
+  scene.updateFieldScale().catch(() => undefined);
   return { ok: true, incoming, outgoing, alreadyProjected };
 }
 

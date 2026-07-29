@@ -81,6 +81,11 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
     /\.(?:leaveField|resetSummonData|fieldSetup|loadAssets)\s*\(|applyAbAttrs\s*\(|triggerPokemonFormChange\s*\(/u,
     "the renderer's structural switch projector must never re-enter battle mechanics or derive a local summon",
   );
+  assert.match(
+    structuralProjector,
+    /scene\.updateFieldScale\(\)\.catch\(\(\) => undefined\)/u,
+    "a torn cosmetic scale tween cannot reject after the immutable switch structure has already installed",
+  );
   assert.match(switchReplay, /projectCoopSwitchPresentationStructure\(scene,[\s\S]+pokemonId:[\s\S]+speciesId:/u);
   assert.doesNotMatch(switchReplay, /summonCoop(?:Player|Enemy)Field/u);
   assert.match(
@@ -473,6 +478,11 @@ test("form changes and Transform carry complete authority material into dedicate
     richForm,
     /authorityPokemon\.loadAssets\(false\)\.then\([\s\S]+this\.dispatchBound\(\(\) => \{[\s\S]+authorityPokemon\.playAnim\(\)[\s\S]+authorityPokemon\.updateInfo\(\)[\s\S]+this\.scene\.updateFieldScale\(\)[\s\S]+this\.dispatchBound/u,
     "the rich replay re-enters its immutable runtime after both appearance awaits",
+  );
+  assert.match(
+    richForm,
+    /private dispatchBound\([\s\S]+streamer!\.scheduleAuthorityRetry\(resume, 0\)[\s\S]+runWhenCoopRuntimeActive\(runtime, resume\)/u,
+    "V2 form promise tails use the captured runtime ledger; only the legacy streamer-only binding keeps its timer fallback",
   );
   assert.match(
     replay,

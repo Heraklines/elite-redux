@@ -13,6 +13,7 @@ import {
   coopSessionGeneration,
   getCoopBattleStreamer,
   getCoopRuntime,
+  runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementFormChange } from "#data/elite-redux/er-achievement-tracker";
@@ -124,14 +125,17 @@ export class FormChangePhase extends EvolutionPhase {
       callback();
       return;
     }
+    const runtime = this.runtimeBinding.runtime;
     const streamer = this.runtimeBinding.streamer;
-    if (streamer == null || globalScene === this.runtimeBinding.scene) {
+    if (runtime == null && (streamer == null || globalScene === this.runtimeBinding.scene)) {
       this.retire();
       onUnavailable();
       return;
     }
+    let completed = false;
     let cancel = () => {};
-    cancel = streamer.scheduleAuthorityRetry(() => {
+    const resume = () => {
+      completed = true;
       this.scheduledCallbacks.delete(cancel);
       if (this.phaseEnded || this.isRetired() || (this.coopReplay != null && this.coopReplayTerminal)) {
         onUnavailable();
@@ -143,8 +147,14 @@ export class FormChangePhase extends EvolutionPhase {
         return;
       }
       callback();
-    }, 0);
-    this.scheduledCallbacks.add(cancel);
+    };
+    // Authority V2 migration note: form presentation promises can settle while another browser engine owns
+    // the shared module globals. Runtime activation is the ordinary control-proof boundary for both live and
+    // recovery replay; the streamer timer remains only for the pre-V2 streamer-only compatibility binding.
+    cancel = runtime == null ? streamer!.scheduleAuthorityRetry(resume, 0) : runWhenCoopRuntimeActive(runtime, resume);
+    if (!completed) {
+      this.scheduledCallbacks.add(cancel);
+    }
   }
 
   private schedule(delay: number, callback: () => void): Phaser.Time.TimerEvent {
