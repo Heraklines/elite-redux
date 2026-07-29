@@ -539,6 +539,20 @@ interface SemanticSurface {
   readonly ownerModel: SemanticOwnerModel;
 }
 
+const COOP_ABILITY_INTERACTION_PHASES = new Set([
+  "ErAbilityCapsulePhase",
+  "ErGreaterAbilityCapsulePhase",
+  "ErGreaterAbilityRandomizerPhase",
+  "ErDexNavPhase",
+]);
+
+const COOP_ABILITY_SURFACE_KIND = {
+  OPTION_SELECT: "option",
+  PARTY: "party",
+  ER_BARGAIN: "choice",
+  MESSAGE: "message",
+} as const;
+
 /**
  * Resolve the immutable interaction coordinate owned by the phase currently rendering a
  * shared surface. The live controller counter is only the next global cursor: a terminal
@@ -552,10 +566,14 @@ function semanticPinnedInteractionCounter(semantic: SemanticSurface, currentPhas
     coopBargainStart?: unknown;
     coopBiomeStart?: unknown;
     coopInteractionStart?: unknown;
+    coopSeq?: unknown;
     coopStartCounter?: unknown;
     coopV2BiomeInteractionPin?: () => number;
   };
   let candidate: unknown = null;
+  if (semantic.operationClass === "ability") {
+    candidate = phase.coopSeq;
+  }
   switch (semantic.surfaceId) {
     case "reward-shop":
     case "party:reward-target":
@@ -591,6 +609,14 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
     || phase === "PostMysteryEncounterPhase"
     || phase === "CoopReplayMePhase"
     || phase === "TheBargainPhase";
+  const abilitySurfaceKind = COOP_ABILITY_SURFACE_KIND[uiMode as keyof typeof COOP_ABILITY_SURFACE_KIND];
+  if (COOP_ABILITY_INTERACTION_PHASES.has(phase) && abilitySurfaceKind != null) {
+    return {
+      surfaceId: `ability:${phase}:${abilitySurfaceKind}`,
+      operationClass: "ability",
+      ownerModel: "interaction",
+    };
+  }
   switch (uiMode) {
     case "LOGIN_OR_REGISTER":
       return { surfaceId: "auth:login-or-register", operationClass: "authentication", ownerModel: "local" };
@@ -1700,13 +1726,28 @@ function observeSemanticSurface(): void {
       phase === "CoopReplayMePhase" && Number.isSafeInteger(authorityAddress) && authorityAddress >= 0
         ? (authorityAddress % 1_000) + 1
         : null;
+    const readAbilitySurfaceGeneration = (currentPhase as unknown as { coopV2SurfaceGeneration?: () => number })
+      .coopV2SurfaceGeneration;
+    const abilitySurfaceGeneration =
+      semantic.operationClass === "ability" && typeof readAbilitySurfaceGeneration === "function"
+        ? readAbilitySurfaceGeneration.call(currentPhase)
+        : null;
+    const handlerSurfaceGeneration =
+      typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : null;
     const surfaceGeneration =
-      typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : authoritySurfaceGeneration;
+      Number.isSafeInteger(handlerSurfaceGeneration) && (handlerSurfaceGeneration as number) > 0
+        ? (handlerSurfaceGeneration as number)
+        : (abilitySurfaceGeneration ?? authoritySurfaceGeneration);
     const semanticSurfaceInstance =
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
         ? (promptGeneration as number)
         : semanticPhaseInstance;
     const displayedWave = globalScene.getDisplayedBiomeWaveIndex();
+    const phasePartyIndex = (currentPhase as unknown as { partyIndex?: unknown }).partyIndex;
+    const interactionTargetPartySlot =
+      semantic.operationClass === "ability" && Number.isSafeInteger(phasePartyIndex) && (phasePartyIndex as number) >= 0
+        ? (phasePartyIndex as number)
+        : null;
     const semanticDigestKey = [
       semantic.surfaceId,
       uiMode,
@@ -1721,6 +1762,7 @@ function observeSemanticSurface(): void {
       inputBlocked,
       surfaceGeneration,
       mysteryEncounterType,
+      interactionTargetPartySlot,
     ].join("|");
     const stateDigest = coop && battle != null ? semanticMechanicalDigest(semanticDigestKey).digest : null;
 
@@ -1759,6 +1801,7 @@ function observeSemanticSurface(): void {
       moveSlots,
       starterGridCandidates,
       partySlots,
+      interactionTargetPartySlot,
       ready: { handlerActive: true, awaitingActionInput, inputBlocked },
       phase,
       phaseInstance: semanticSurfaceInstance,

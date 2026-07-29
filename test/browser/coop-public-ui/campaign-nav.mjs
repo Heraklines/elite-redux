@@ -108,6 +108,9 @@ export function isPartyPickerSurfaceOpen(observation) {
   if (observation.surfaceId === "party:replacement") {
     return true;
   }
+  if (observation.operationClass === "ability" && /^ability:[A-Za-z0-9]+Phase:party$/u.test(observation.surfaceId)) {
+    return true;
+  }
   return (
     observation.surfaceId === "party"
     && observation.operationClass === "party"

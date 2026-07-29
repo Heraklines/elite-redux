@@ -8,7 +8,9 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
+  assertAsymmetricAbilityProjection,
   assertAsymmetricMysteryPromptProjection,
+  chooseAbilityInteractionOption,
   chooseMysteryEncounterOption,
   chooseRewardPartyTargetSlot,
   createMysteryNarrationAdvancer,
@@ -24,7 +26,7 @@ import {
   chooseVoluntarySwitchTarget,
   selectOptionById,
 } from "./campaign-nav.mjs";
-import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
+import { ABILITY_INTERACTION_SURFACES, buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
 import {
   captureCheckpointPngWithFallback,
   checkpointPixelIntegrityFailure,
@@ -120,6 +122,114 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
   );
 });
 
+test("every registered ability phase has an exact semantic driver and input-inert watcher contract", async () => {
+  const [observer, registry, regularCapsule, greaterCapsule, greaterRandomizer, dexNav] = await Promise.all([
+    readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/coop/coop-operation-surface-registry.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/er-ability-capsule-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/er-greater-ability-capsule-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/er-greater-ability-randomizer-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/er-dex-nav-phase.ts"), "utf8"),
+  ]);
+  const policy = loadCampaignPolicy();
+  const dispatch = buildDispatchTable(policy);
+  const expected = ABILITY_INTERACTION_SURFACES.flatMap(({ phase, kinds }) =>
+    kinds.map(kind => `ability:${phase}:${kind}`),
+  );
+  assert.deepEqual(
+    dispatch.filter(driver => driver.abilitySurface).map(driver => driver.v2SurfaceId),
+    expected,
+    "one dispatch entry must exist for every human-visible ability surface shape",
+  );
+  for (const { phase } of ABILITY_INTERACTION_SURFACES) {
+    assert.match(registry, new RegExp(`"${phase}"`, "u"), `${phase} must remain in the production registry`);
+    assert.match(observer, new RegExp(`"${phase}"`, "u"), `${phase} must remain in the browser observer`);
+  }
+  assert.match(observer, /semantic\.operationClass === "ability"[\s\S]*candidate = phase\.coopSeq/u);
+  assert.match(observer, /interactionTargetPartySlot/u);
+  assert.match(observer, /coopV2SurfaceGeneration/u);
+  for (const [phase, source] of [
+    ["ErAbilityCapsulePhase", regularCapsule],
+    ["ErGreaterAbilityCapsulePhase", greaterCapsule],
+    ["ErGreaterAbilityRandomizerPhase", greaterRandomizer],
+    ["ErDexNavPhase", dexNav],
+  ]) {
+    assert.match(
+      source,
+      /if \(this\.coopIsWatcher\) \{[\s\S]*?setMode\(UiMode\.MESSAGE\)[\s\S]*?notifyCoopV2InteractionSurfaceReady/u,
+      `${phase} watcher must install its passive MESSAGE handler before publishing V2 control readiness`,
+    );
+  }
+});
+
+test("ability owner/watcher proof rejects a second input seat or divergent mechanical state", () => {
+  const owner = {
+    surfaceId: "ability:ErAbilityCapsulePhase:option",
+    operationClass: "ability",
+    phase: "ErAbilityCapsulePhase",
+    uiMode: "OPTION_SELECT",
+    localSeat: 1,
+    ownerSeat: 1,
+    seatsWithInput: [1],
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
+    address: { epoch: 7, wave: 3, turn: 1 },
+    stateDigest: "same-state",
+    interactionTargetPartySlot: 2,
+  };
+  const watcher = {
+    ...owner,
+    surfaceId: "ability:ErAbilityCapsulePhase:message",
+    uiMode: "MESSAGE",
+    localSeat: 0,
+    ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true },
+  };
+  assert.deepEqual(assertAsymmetricAbilityProjection(owner, watcher), {
+    surfaceId: owner.surfaceId,
+    watcherSurfaceId: watcher.surfaceId,
+    phase: owner.phase,
+    address: owner.address,
+    stateDigest: owner.stateDigest,
+    ownerSeat: 1,
+    watcherSeat: 0,
+    interactionTargetPartySlot: 2,
+  });
+  assert.throws(
+    () => assertAsymmetricAbilityProjection(owner, { ...watcher, seatsWithInput: [0, 1] }),
+    /input-inert ability watcher/u,
+  );
+  assert.throws(
+    () => assertAsymmetricAbilityProjection(owner, { ...watcher, stateDigest: "different" }),
+    /different authoritative states/u,
+  );
+});
+
+test("ability party driver targets the phase-owned mon and a stable ability slot", () => {
+  assert.equal(
+    chooseAbilityInteractionOption({
+      phase: "ErGreaterAbilityCapsulePhase",
+      interactionTargetPartySlot: 2,
+      optionIds: ["party-slot:0", "party-slot:1", "party-slot:2"],
+    }),
+    "party-slot:2",
+  );
+  assert.equal(
+    chooseAbilityInteractionOption({
+      phase: "ErGreaterAbilityCapsulePhase",
+      optionIds: ["party-option:ability-slot-0", "party-option:ability-slot-1", "party-option:ability-slot-2"],
+    }),
+    "party-option:ability-slot-1",
+    "capsules prefer a locked innate over the active slot",
+  );
+  assert.equal(
+    chooseAbilityInteractionOption({
+      phase: "ErGreaterAbilityRandomizerPhase",
+      optionIds: ["party-option:ability-slot-0", "party-option:ability-slot-1"],
+    }),
+    "party-option:ability-slot-0",
+    "the randomizer accepts any slot and deterministically uses the active slot first",
+  );
+});
+
 test("a chained Mystery gauntlet refreshes only from proven surface progress and remains hard-bounded", () => {
   let now = 1_000;
   const budget = createRegisteredSurfaceProgressBudget(9_000, 3_000, 2, { now: () => now });
@@ -193,6 +303,11 @@ test("Mystery qualification keeps one visual proof without screenshotting every 
     readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
   ]);
   assert.match(config, /renderProfile === "animations-on-surface"/u);
+  assert.match(
+    config,
+    /difficultyOptionId,[\s\S]*renderProfile,[\s\S]*locales:/u,
+    "the parsed render profile must reach PublicUiClient.open before its first immutable URL is built",
+  );
   assert.match(
     campaign,
     /const firstMysteryVisualProof = stage === "presentation" && stats\.mysteryEvents\.length === 0/u,

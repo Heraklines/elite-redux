@@ -43,6 +43,18 @@ const LEARN_MOVE_BATCH_PHASE = /Start Phase LearnMoveBatchPhase/u;
 const EGG_LAPSE_PHASE = /Start Phase EggLapsePhase/u;
 const ATTEMPT_CAPTURE_PHASE = /Start Phase AttemptCapturePhase/u;
 
+/**
+ * Every registered Authority V2 ability workflow and each human-input shape it can expose.
+ * The watcher intentionally renders a MESSAGE shell while the owner moves through these surfaces;
+ * campaign.mjs proves that asymmetric projection before sending any public key.
+ */
+export const ABILITY_INTERACTION_SURFACES = Object.freeze([
+  { phase: "ErAbilityCapsulePhase", kinds: ["option", "party", "message"] },
+  { phase: "ErGreaterAbilityCapsulePhase", kinds: ["option", "party", "message"] },
+  { phase: "ErGreaterAbilityRandomizerPhase", kinds: ["party", "choice", "message"] },
+  { phase: "ErDexNavPhase", kinds: ["option", "message"] },
+]);
+
 // Per-client coop role markers (?coopdebug=1). The OWNER drives the real menu; the
 // WATCHER renders a read-only mirror and must NOT be sent input.
 const REWARD_OWNER = /OWNER drives reward screen/u;
@@ -261,6 +273,9 @@ export function loadCampaignPolicy() {
       learnMove: envKeys("COOP_UI_LEARN_MOVE_KEYS", ["Backspace"]),
       // Egg hatch: let it run / dismiss the summary.
       egg: envKeys("COOP_UI_EGG_KEYS", ["Space"]),
+      // Authority V2 ability pickers are state-aware below. This is only the normal public submit key;
+      // party/option navigation is derived from the semantic observer rather than a blind macro.
+      ability: envKeys("COOP_UI_ABILITY_KEYS", ["Space"]),
       // Catch prompt (party full): skip / decline.
       catchSkip: envKeys("COOP_UI_CATCH_SKIP_KEYS", ["Backspace"]),
     },
@@ -282,6 +297,23 @@ export function loadCampaignPolicy() {
  *   - `{ guestMarker, role }` guest if the guest-owns marker is present, else `role`.
  */
 export function buildDispatchTable(policy) {
+  const abilityDrivers = ABILITY_INTERACTION_SURFACES.flatMap(({ phase, kinds }) =>
+    kinds.map(kind => ({
+      name: `ability-${phase
+        .replace(/^Er|Phase$/gu, "")
+        .replaceAll(/([a-z])([A-Z])/gu, "$1-$2")
+        .toLowerCase()}-${kind}`,
+      phase: new RegExp(`Start Phase ${phase}`, "u"),
+      present: new RegExp(`Start Phase ${phase}`, "u"),
+      v2SurfaceId: `ability:${phase}:${kind}`,
+      semanticOnly: true,
+      abilitySurface: true,
+      abilitySurfaceKind: kind,
+      abilityPhase: phase,
+      owner: { role: "host" },
+      keys: policy.keys.ability,
+    })),
+  );
   return [
     {
       name: "reward",
@@ -405,6 +437,7 @@ export function buildDispatchTable(policy) {
       owner: { role: "host" },
       keys: policy.keys.catchSkip,
     },
+    ...abilityDrivers,
     {
       name: "learn-move-confirm",
       phase: LEARN_MOVE_CONFIRM_PHASE,

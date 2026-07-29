@@ -2380,6 +2380,177 @@ async function driveLearnMoveDecline(rig, owner, boundary) {
 }
 
 /**
+ * Validate an Authority V2 ability workflow while its owner and watcher intentionally render
+ * different UI modes. The owner alone may act; the watcher must remain on the phase-specific MESSAGE
+ * shell, name the same owner, and carry the same immutable battle address/mechanical state.
+ */
+export function assertAsymmetricAbilityProjection(ownerObservation, watcherObservation) {
+  const phase = ownerObservation?.phase;
+  const ownerPrefix = typeof phase === "string" ? `ability:${phase}:` : null;
+  if (
+    ownerPrefix == null
+    || !ownerObservation.surfaceId?.startsWith(ownerPrefix)
+    || ownerObservation.operationClass !== "ability"
+    || ownerObservation.ownerSeat !== ownerObservation.localSeat
+    || ownerObservation.seatsWithInput?.length !== 1
+    || ownerObservation.seatsWithInput[0] !== ownerObservation.localSeat
+    || !isActionableSemanticObservation(ownerObservation)
+  ) {
+    throw new Error(
+      `[campaign-ability] owner surface was not exclusively actionable: ${JSON.stringify(ownerObservation)}`,
+    );
+  }
+  if (
+    watcherObservation?.surfaceId !== `${ownerPrefix}message`
+    || watcherObservation.operationClass !== "ability"
+    || watcherObservation.phase !== phase
+    || watcherObservation.ready?.handlerActive !== true
+    || watcherObservation.localSeat === ownerObservation.localSeat
+    || watcherObservation.ownerSeat !== ownerObservation.ownerSeat
+    || watcherObservation.seatsWithInput?.length !== 1
+    || watcherObservation.seatsWithInput[0] !== ownerObservation.ownerSeat
+    || watcherObservation.seatsWithInput.includes(watcherObservation.localSeat)
+  ) {
+    throw new Error(
+      `[campaign-ability] partner did not expose the input-inert ability watcher: ${JSON.stringify(watcherObservation)}`,
+    );
+  }
+  if (
+    JSON.stringify(watcherObservation.address) !== JSON.stringify(ownerObservation.address)
+    || ownerObservation.stateDigest == null
+    || watcherObservation.stateDigest !== ownerObservation.stateDigest
+    || watcherObservation.interactionTargetPartySlot !== ownerObservation.interactionTargetPartySlot
+  ) {
+    throw new Error(
+      `[campaign-ability] owner/watcher crossed different authoritative states: ${JSON.stringify({
+        ownerObservation,
+        watcherObservation,
+      })}`,
+    );
+  }
+  return {
+    surfaceId: ownerObservation.surfaceId,
+    watcherSurfaceId: watcherObservation.surfaceId,
+    phase,
+    address: ownerObservation.address,
+    stateDigest: ownerObservation.stateDigest,
+    ownerSeat: ownerObservation.ownerSeat,
+    watcherSeat: watcherObservation.localSeat,
+    interactionTargetPartySlot: ownerObservation.interactionTargetPartySlot ?? null,
+  };
+}
+
+async function checkpointAsymmetricAbilitySurface(rig, driver, cursors, owner) {
+  const ownerEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[owner.label] ?? 0, driver.v2SurfaceId);
+      return candidate != null && isActionableSemanticObservation(candidate.observation) ? candidate : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: `actionable ability owner ${driver.v2SurfaceId}` },
+  );
+  const watcher = Object.values(rig.clients).find(client => client !== owner);
+  if (watcher == null) {
+    throw new Error(`[campaign-ability] ${driver.abilityPhase} has no watcher browser`);
+  }
+  const watcherSurfaceId = `ability:${driver.abilityPhase}:message`;
+  const watcherEvent = await watcher.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[watcher.label] ?? 0, watcherSurfaceId);
+      if (candidate == null) {
+        return null;
+      }
+      try {
+        assertAsymmetricAbilityProjection(ownerEvent.observation, candidate.observation);
+        return candidate;
+      } catch {
+        return null;
+      }
+    },
+    { timeoutMs: rig.config.timeoutMs, description: `input-inert ability watcher ${watcherSurfaceId}` },
+  );
+  const proof = assertAsymmetricAbilityProjection(ownerEvent.observation, watcherEvent.observation);
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-semantic-convergence", proof);
+  }
+  return { authority: ownerEvent.observation, ownerEvent, peerEvents: [watcherEvent] };
+}
+
+/** Choose the stable party or ability option that advances the current registered ability workflow. */
+export function chooseAbilityInteractionOption(observation) {
+  const options = observation?.optionIds;
+  if (!Array.isArray(options) || options.length === 0) {
+    return null;
+  }
+  if (options.every(optionId => /^party-slot:\d+$/u.test(optionId))) {
+    return Number.isSafeInteger(observation.interactionTargetPartySlot)
+      ? `party-slot:${observation.interactionTargetPartySlot}`
+      : null;
+  }
+  const abilitySlots = observation.phase === "ErGreaterAbilityRandomizerPhase" ? [0, 1, 2, 3] : [1, 2, 3, 0];
+  return (
+    abilitySlots.map(slot => `party-option:ability-slot-${slot}`).find(optionId => options.includes(optionId)) ?? null
+  );
+}
+
+async function driveAbilityInteraction(rig, driver, owner, boundary) {
+  if (driver.abilitySurfaceKind !== "party") {
+    await owner.sequence(driver.keys, `campaign-${driver.name}`);
+    return;
+  }
+  let surface = boundary.ownerEvent;
+  let targetId = chooseAbilityInteractionOption(surface.observation);
+  if (targetId == null) {
+    throw new Error(
+      `[campaign-ability] ${driver.abilityPhase} exposed no driveable party choice: `
+        + `${JSON.stringify(surface.observation)}`,
+    );
+  }
+  if (targetId.startsWith("party-slot:")) {
+    const submenuCursor = owner.evidence.cursor();
+    await selectOptionById(owner, {
+      surfaceId: driver.v2SurfaceId,
+      targetId,
+      navKeys: ["ArrowDown", "ArrowUp"],
+      submitKey: "Space",
+      timeoutMs: rig.config.timeoutMs,
+      fromCursor: surface.index,
+    });
+    surface = await owner.evidence.waitForCondition(
+      sink => {
+        const candidate = sink.findLastSemanticSurface(submenuCursor, driver.v2SurfaceId);
+        return candidate != null
+          && candidate.observation.optionIds?.some(optionId => optionId.startsWith("party-option:ability-slot-"))
+          && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+          ? candidate
+          : null;
+      },
+      { timeoutMs: rig.config.timeoutMs, description: `${driver.abilityPhase} ability-slot submenu` },
+    );
+    targetId = chooseAbilityInteractionOption(surface.observation);
+    if (targetId == null || !targetId.startsWith("party-option:ability-slot-")) {
+      throw new Error(
+        `[campaign-ability] ${driver.abilityPhase} opened no stable ability-slot option: `
+          + `${JSON.stringify(surface.observation)}`,
+      );
+    }
+  }
+  await selectOptionById(owner, {
+    surfaceId: driver.v2SurfaceId,
+    targetId,
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: surface.index,
+  });
+  owner.evidence.record("campaign-ability-choice", {
+    phase: driver.abilityPhase,
+    surfaceId: driver.v2SurfaceId,
+    targetId,
+    address: boundary.authority.address,
+  });
+}
+
+/**
  * Every symmetric registered interface is also a mechanical convergence boundary. This turns the
  * semantic observer into a generic future-screen contract: adding a driver without matching the
  * authority address and state digest on both real browsers cannot silently green the campaign.
@@ -2916,6 +3087,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       mechanicalBoundary = await checkpointRewardPartyTarget(rig, cursors, client);
     } else if (driver.name === "learn-move-confirm") {
       mechanicalBoundary = await checkpointAsymmetricLearnMoveSurface(rig, cursors, client);
+    } else if (driver.abilitySurface) {
+      mechanicalBoundary = await checkpointAsymmetricAbilitySurface(rig, driver, cursors, client);
     } else if (driver.v2SurfaceId) {
       mechanicalBoundary = await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
     }
@@ -2977,6 +3150,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       rewardRetryState.pendingTarget = null;
     } else if (driver.mysteryParty) {
       await driveMysteryPartyPicker(rig, client, cursors, stats);
+    } else if (driver.abilitySurface && mechanicalBoundary != null) {
+      await driveAbilityInteraction(rig, driver, client, mechanicalBoundary);
     } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
       await driveConfirmedLeave(rig, driver, client, mechanicalBoundary.authority, cursors);
     } else {

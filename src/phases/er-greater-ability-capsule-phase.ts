@@ -137,7 +137,12 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
         "ability",
         `greaterCapsule WATCHER-APPLIES-RELAYED seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name} (no local picker)`,
       );
-      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+      // The inherited reward handler is not this ABILITY_PRESENT control. Install the registered passive
+      // watcher surface before asking the projector for controlInstalled; otherwise the remote owner window
+      // waits forever for a proof this replica can never legally produce.
+      Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() =>
+        notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime),
+      );
       void this.coopApplyRelayedOutcome(mon);
       return;
     }

@@ -79,6 +79,15 @@ export class ErDexNavPhase extends Phase {
     this.coopOperationBinding = coopSeq >= 0 ? captureCoopAbilityOperationBinding() : null;
   }
 
+  /**
+   * Read-only ordered UI generation for the public two-browser oracle. Dex Nav intentionally reuses
+   * one phase object for two distinct species picks; without this counter the second real picker is
+   * byte-similar enough to be mistaken for the already-consumed first appearance.
+   */
+  public coopV2SurfaceGeneration(): number {
+    return ErDexNavPhase.PICK_COUNT - this.picksLeft + 1;
+  }
+
   start(): void {
     super.start();
     this.started = true;

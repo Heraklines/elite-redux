@@ -245,6 +245,11 @@ export function loadConfig() {
     accountMode,
     difficultyId,
     difficultyOptionId,
+    // PublicUiClient.open() needs the concrete render profile before the first navigation so
+    // exact-build/profile fixtures can be expressed in the immutable page URL. Keeping this only
+    // as a local parser variable made the Mystery campaign request its seeded starter contract in
+    // startFreshRun() while both real browsers had launched without the matching URL capability.
+    renderProfile,
     locales: {
       "host-seat": hostLocale,
       "guest-seat": guestLocale,

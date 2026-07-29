@@ -5492,3 +5492,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   point-legal three-mon team per seat. Both browsers still submit it through public keys, while surface, depth, and
   dirty profiles keep natural fresh-account selection. The ten-wave lane can now judge five MEs, ghost, boss,
   Bargain, battle/replacement, and reward synchronization rather than early-party RNG.
+
+## 2026-07-29 - Mystery profile propagation and Authority V2 ability UI coverage
+
+- Exact Mystery run `30430258572` failed before gameplay because both browser URLs omitted
+  `coopfixture=campaign-survival`; its paired final screenshots showed the ordinary empty Bulbasaur starter grid.
+  `loadConfig()` parsed `COOP_UI_RENDER_PROFILE` but did not return `renderProfile`, so `PublicUiClient.open()` could
+  never satisfy the exact Mystery build+profile URL gate. The shared config now carries the parsed value, with a
+  failure-first source contract that pins the wiring.
+- The parent depth artifact independently exposed `ErAbilityCapsulePhase` as an actionable owner surface with an
+  inert watcher, but the campaign had no registered ability driver. The read-only browser observer now projects
+  phase-specific ability `option`, `party`, `choice`, and `message` surfaces for all four production registry phases,
+  pins ownership to the phase's exact `coopSeq`, and exposes the immutable target party slot.
+- The same registry audit found that Greater Capsule and Greater Randomizer watchers announced readiness while still
+  inheriting the reward handler instead of installing their registered passive `MESSAGE` control surface. Both now
+  install that surface before retrying the projector, matching regular Capsule and Dex Nav; a source contract covers
+  all four workflows so a future reward-handler inheritance regression cannot silently strand control proof.
+- The public-key campaign now proves one exclusively actionable owner, one exact-address/mechanical-digest MESSAGE
+  watcher, then drives the real visible option. Nested PARTY flows navigate to the phase-owned mon and a stable
+  ability slot; Dex Nav publishes an ordered surface generation so its second real picker cannot be suppressed as
+  the first appearance. Ability party screens also block stale narration advancers from pressing through them.
+- Local policy-safe evidence: 50/50 focused node-pure browser contracts green, public browser boundary green,
+  scoped Biome clean, zero TypeScript diagnostics in the changed files (repository baseline currently reports 215),
+  and `git diff --check` clean. No local co-op engine/browser execution was used. Next: commit/push, then dispatch exact
+  Mystery and depth browser campaigns remotely and inspect both screenshots plus semantic traces before changing
+  further production behavior.
