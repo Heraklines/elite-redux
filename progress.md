@@ -5263,8 +5263,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   that unaddressed picker after the authoritative modal ended.
 - With the interaction cutover active, the raw prompt is now observational only and cannot create UI. The ordinary
   V2 projector is the sole phase constructor and successor owner. Legacy sessions retain the old callback behavior.
-  The duo test installs its UI seam before delivery, waits for the manager-owned projected phase plus exact
-  `controlInstalled`, proves no duplicate remains queued, and only then drives the public PARTY callback.
+  Exact gate `30418003889` then proved the duplicate was gone and the retained projector installed the correct
+  current phase. Its one-process fixture deliberately suppresses `startCurrentPhase`, so the test now restores that
+  single known harness edge only after proving manager ownership and no queued duplicate, then waits for exact
+  `controlInstalled` before driving the public PARTY callback. This matches the established Revival fixture model.
 - Local policy-safe evidence: the catch/revival source contract is 3/3, scoped formatting is clean, raw TypeScript
   has zero diagnostics in the changed runtime/test files, and `git diff --check` passes. Engine/browser execution
   remains remote-only; no deployment, Showdown, or tournament code changed.
+
+## 2026-07-29 - Raw Revival prompt obeys the same V2-only UI invariant
+
+- Auditing the only other runtime prompt callback found the analogous Revival compatibility seam. Reliable FIFO
+  usually delivered its V2 commit first, allowing the raw callback to rebind the already-projected phase, but the
+  fallback branch could still construct and override UI from a raw message during reconnect/redelivery timing.
+- With V2 active, `revivalPrompt` is now observational only. The retained `INTERACTION_COMMIT` projector is the
+  sole phase constructor and recovery owner; legacy sessions preserve their existing create/override behavior.
+  The Revival two-engine scenario already drives the V2-projected current phase, so its comments now state the
+  actual authority model and the source contract forbids both raw-prompt UI constructors.
+- Local policy-safe evidence: catch/revival contracts are 3/3, scoped Biome is error-clean, raw TypeScript reports
+  zero changed-file diagnostics, and `git diff --check` passes. Remote engine and Chromium qualification remain
+  required; no deployment or non-co-op mode changed.

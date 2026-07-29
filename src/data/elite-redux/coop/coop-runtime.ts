@@ -13675,6 +13675,16 @@ export function assembleCoopRuntime(
     if (getCoopRuntime() !== runtime || runtime.controller.role === "host") {
       return;
     }
+    // Revival uses the same compatibility carrier + retained V2 commit ordering as catch-full. The raw
+    // prompt may never create or rebind a mechanical input phase after cutover: only the ordered commit's
+    // projector owns that surface, including after reconnect/redelivery.
+    if (isCoopV2InteractionCutoverActive(runtime.durability)) {
+      coopLog(
+        "v2-interaction",
+        `revivalPrompt field=${fieldIndex} observed; ordered INTERACTION_COMMIT owns the picker`,
+      );
+      return;
+    }
     try {
       const parsedOperation = operationId == null ? null : parseCoopOperationId(operationId);
       const ownerIsGuest = parsedOperation == null || parsedOperation.owner === runtime.controller.localSeatId;
@@ -13695,9 +13705,8 @@ export function assembleCoopRuntime(
       failCoopSharedSession(`Revival Blessing surface for slot ${fieldIndex} could not be installed`);
     }
   };
-  // #856: the host asked THIS client - the CATCHER - to drive the full-party keep/release picker for a
-  // wild catch it threw. Queue the guest picker (the host awaits its relayed slot); the guest never runs
-  // AttemptCapturePhase, so this is the only place the recipient's picker opens.
+  // #856: compatibility prompt for the catcher's full-party picker. Legacy sessions queue the guest phase;
+  // V2 sessions project it exclusively from the retained interaction commit below.
   interactionRelay.onCatchFullPrompt = (pokemonName, speciesId, operationId) => {
     if (getCoopRuntime() !== runtime || runtime.controller.role === "host") {
       return;

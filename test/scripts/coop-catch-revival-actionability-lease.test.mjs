@@ -82,6 +82,16 @@ test("the shared interaction lease is address-exact, control-proven, and recover
 });
 
 test("the catch-full duo drives only a manager-owned, control-installed public picker", () => {
+  const revivalPromptHandler = runtime.slice(
+    runtime.indexOf("interactionRelay.onRevivalPrompt ="),
+    runtime.indexOf("interactionRelay.onCatchFullPrompt ="),
+  );
+  assert.match(
+    revivalPromptHandler,
+    /isCoopV2InteractionCutoverActive\(runtime\.durability\)[\s\S]+return;[\s\S]+(?:create|overridePhase)\(/u,
+    "the raw Revival compatibility prompt cannot construct or rebind UI after V2 owns the surface",
+  );
+
   const promptHandler = runtime.slice(
     runtime.indexOf("interactionRelay.onCatchFullPrompt ="),
     runtime.indexOf("// #807: a fresh SESSION", runtime.indexOf("interactionRelay.onCatchFullPrompt =")),
@@ -95,24 +105,34 @@ test("the catch-full duo drives only a manager-owned, control-installed public p
   const guestDrive = catchFullDuo.slice(catchFullDuo.indexOf("// ===== (B/C) GUEST:"));
   const drain = guestDrive.indexOf("await drainLoopback()");
   const currentProof = guestDrive.indexOf("getCurrentPhase()", drain);
-  const installedProof = guestDrive.indexOf("v2ControlLedger.activeControl", currentProof);
-  const exactAddress = guestDrive.indexOf("installed.operationId === current.coopV2ControlOperationId", installedProof);
-  const noDuplicate = guestDrive.indexOf('phaseQueue.find("CoopGuestCatchFullPhase")', exactAddress);
+  const noDuplicate = guestDrive.indexOf('phaseQueue.find("CoopGuestCatchFullPhase")', currentProof);
+  const harnessStart = guestDrive.indexOf("guestPicker.start()", noDuplicate);
+  const installedProof = guestDrive.indexOf("v2ControlLedger.activeControl", harnessStart);
+  const exactAddress = guestDrive.indexOf(
+    "installed.operationId === guestPicker.coopV2ControlOperationId",
+    installedProof,
+  );
   const click = guestDrive.indexOf("partyPicker.current?.(OWNER_PICK_SLOT)", exactAddress);
 
   assert.ok(
     drain >= 0
       && currentProof > drain
-      && installedProof > currentProof
+      && noDuplicate > currentProof
+      && harnessStart > noDuplicate
+      && installedProof > harnessStart
       && exactAddress > installedProof
-      && noDuplicate > exactAddress
       && click > exactAddress,
-    "the harness must reproduce V2 projection, manager ownership, exact controlInstalled, and no legacy duplicate before the public click",
+    "the harness must reproduce V2 projection, manager ownership, its one suppressed start edge, exact controlInstalled, and no legacy duplicate before the public click",
   );
   assert.doesNotMatch(
     guestDrive.slice(0, click),
     /\(guestPicker as Phase\)\.start\(\)[\s\S]*await Promise\.resolve\(\)/u,
     "a detached phase plus one microtask is not evidence that a browser-owned V2 surface is actionable",
   );
-  assert.doesNotMatch(guestDrive.slice(0, click), /replaceWithCoopAuthoritativePhase|guestPicker!?\.start\(\)/u);
+  assert.doesNotMatch(guestDrive.slice(0, click), /replaceWithCoopAuthoritativePhase/u);
+  assert.equal(
+    [...guestDrive.slice(0, click).matchAll(/guestPicker\.start\(\)/gu)].length,
+    1,
+    "the headless harness restores only its one intentionally suppressed manager start",
+  );
 });

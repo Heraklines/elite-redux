@@ -6,11 +6,11 @@
 // =============================================================================
 // PROBE #809 (matrix probe 1): REVIVAL BLESSING owner-pick across two engines. When a GUEST-OWNED mon
 // uses Revival Blessing IN BATTLE, the fainted-target PICK belongs to the mon's OWNER (the guest), NOT the
-// authoritative host. The host's RevivalBlessingPhase (startCoopPartnerPick) sends a `revivalPrompt`, the
-// guest's runtime queues a CoopGuestRevivalPhase which opens the real REVIVAL_BLESSING party picker and
-// relays the pick under the REVIVAL seq band (COOP_REVIVAL_SEQ_BASE + fieldIndex, #799 carries species
-// identity), and the host applies the revive at the relayed slot (identity-resolved). The revive then
-// materializes on the guest via the normal per-turn checkpoint (relay-only on the renderer).
+// authoritative host. The host's RevivalBlessingPhase (startCoopPartnerPick) retains a V2 prompt, which
+// projects a CoopGuestRevivalPhase opening the real REVIVAL_BLESSING party picker. It relays the pick under
+// the REVIVAL seq band (COOP_REVIVAL_SEQ_BASE + fieldIndex, #799 carries species identity), and the host
+// applies the revive at the relayed slot (identity-resolved). The raw `revivalPrompt` is compatibility-only
+// under V2 and cannot construct UI; the revive materializes via the normal per-turn checkpoint.
 //
 // This probe proves the OWNER'S pick DROVE the revive (not the host's AI fallback) by fainting TWO
 // guest-owned bench mons and having the guest pick the SECOND one: the host's fallback would revive the

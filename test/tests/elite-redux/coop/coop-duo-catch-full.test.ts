@@ -241,21 +241,11 @@ describe.skipIf(!RUN)(
         await vi.waitUntil(
           () => {
             const current = rig.guestScene.phaseManager.getCurrentPhase() as CatchFullPickerPhase;
-            const installed = rig.guestRuntime.v2ControlLedger.activeControl;
-            if (current.phaseName !== "CoopGuestCatchFullPhase") {
-              return false;
-            }
-            return (
-              installed?.kind === "SHARED_INTERACTION" && installed.operationId === current.coopV2ControlOperationId
-            );
+            return current.phaseName === "CoopGuestCatchFullPhase";
           },
           { timeout: 1_000, interval: 1 },
         );
         const guestPicker = rig.guestScene.phaseManager.getCurrentPhase() as CatchFullPickerPhase;
-        const installedControl = rig.guestRuntime.v2ControlLedger.activeControl;
-        if (installedControl?.kind !== "SHARED_INTERACTION") {
-          throw new Error("catch-full public surface did not install its shared interaction control");
-        }
         expect(
           rig.guestScene.phaseManager.getCurrentPhase(),
           "the retained V2 commit made its picker the manager-owned current phase",
@@ -264,6 +254,23 @@ describe.skipIf(!RUN)(
           (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.phaseQueue.find("CoopGuestCatchFullPhase"),
           "the compatibility prompt did not leave a second uncontrolled picker behind the V2 modal",
         ).toBeUndefined();
+        // Both headless phase schedulers deliberately suppress startCurrentPhase(). Production already
+        // starts this manager-owned modal synchronously; reproduce that one missing harness edge exactly
+        // once, after proving the V2 projector installed the current phase (never a detached queue copy).
+        guestPicker.start();
+        await vi.waitUntil(
+          () => {
+            const installed = rig.guestRuntime.v2ControlLedger.activeControl;
+            return (
+              installed?.kind === "SHARED_INTERACTION" && installed.operationId === guestPicker.coopV2ControlOperationId
+            );
+          },
+          { timeout: 1_000, interval: 1 },
+        );
+        const installedControl = rig.guestRuntime.v2ControlLedger.activeControl;
+        if (installedControl?.kind !== "SHARED_INTERACTION") {
+          throw new Error("catch-full public surface did not install its shared interaction control");
+        }
         expect(
           installedControl.operationId,
           "the public PARTY surface installed the exact retained interaction address",

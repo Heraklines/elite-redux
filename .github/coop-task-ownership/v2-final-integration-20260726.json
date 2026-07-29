@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "c61b5a5a48cfeca48a70c83a632a8df3a1ae3a9d",
+  "baseSha": "16a818cde95316c0abb77b8baf11022724a535e9",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -230,6 +230,7 @@
     "test/tests/elite-redux/coop/coop-duo-faint-switch.test.ts",
     "test/tests/elite-redux/coop/coop-duo-learn-move.test.ts",
     "test/tests/elite-redux/coop/coop-duo-mystery.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-revival-blessing-ownerpick.test.ts",
     "test/tests/elite-redux/coop/coop-duo-reward-operation.test.ts",
     "test/tests/elite-redux/coop/coop-evolution-authoritative.test.ts",
     "test/tests/elite-redux/coop/coop-faint-switch-operation.test.ts",
