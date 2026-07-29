@@ -3434,6 +3434,7 @@ function buildCommunityEntry(
   const allowed = Array.isArray(config.allowedSpecies) ? (config.allowedSpecies as number[]) : null;
   return {
     config,
+    status: row.status === "draft" ? "draft" : "active",
     stats: {
       attempts: stats.attempts,
       cleared: stats.cleared,
@@ -3669,7 +3670,7 @@ async function handleCommunityCreate(
       now,
     )
     .run();
-  return json({ id }, 200, cors);
+  return json({ id, config: stored, status: "draft" }, 200, cors);
 }
 
 /**

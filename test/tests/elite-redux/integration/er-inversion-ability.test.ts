@@ -53,7 +53,7 @@ describe.skipIf(!RUN)("ER Inversion ability (#103)", () => {
       .startingLevel(50)
       .enemyLevel(50)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     expect(game.scene.arena.getTag(ArenaTagType.INVERSE_ROOM)).toBeDefined();
   });
 
@@ -75,7 +75,7 @@ describe.skipIf(!RUN)("ER Inversion ability (#103)", () => {
       .criticalHits(false);
 
     const messageSpy = vi.spyOn(game.scene.phaseManager, "queueMessage");
-    await game.classicMode.startBattle([SpeciesId.WEAVILE]);
+    await game.classicMode.startBattle(SpeciesId.WEAVILE);
 
     expect(game.scene.arena.getTag(ArenaTagType.INVERSE_ROOM)).toBeDefined();
     expect(getTypeDamageMultiplier(PokemonType.DARK, PokemonType.PSYCHIC)).toBe(0.5);

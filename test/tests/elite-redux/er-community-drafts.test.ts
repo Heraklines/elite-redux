@@ -90,11 +90,19 @@ describe("ER Community Challenge - local drafts (MY CHALLENGES)", () => {
     expect(feed.featured).toHaveLength(1);
     const entry = feed.featured[0];
     expect(entry.config.id).toBe("draft-feed");
+    expect(entry.status).toBe("draft");
     expect(entry.stats.failed).toBe(1);
     expect(entry.allowedCount).toBe(3);
     expect(entry.allowedPreview).toEqual([1, 4, 7]);
     // rules are derived (difficulty + species cap + restriction + tag), never empty.
     expect(entry.rules.length).toBeGreaterThan(0);
+  });
+
+  it("marks a locally-published challenge active in the MY tab feed", () => {
+    saveLocalDraft(makeConfig("published-feed"));
+    recordLocalDraftAttempt("published-feed", "cleared", 200);
+
+    expect(buildMyChallengesFeed().featured[0].status).toBe("active");
   });
 
   it("an empty store yields an empty feed (no crash, MY tab shows its empty state)", () => {

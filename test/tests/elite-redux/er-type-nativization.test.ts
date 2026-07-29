@@ -91,7 +91,7 @@ function evolutionTypeFailures(speciesConst: string, sourceId: number, grantedTy
     }
     const targets: PokemonSpeciesForm[] = [
       evolved as unknown as PokemonSpeciesForm,
-      ...(evolved.forms as PokemonSpeciesForm[]).filter(form => form.formKey !== "redux"),
+      ...evolved.forms.filter(form => form.formKey !== "redux"),
     ];
     for (const target of targets) {
       const types = [target.type1, target.type2, ...target.getExtraTypes()];
@@ -177,7 +177,7 @@ describe.skipIf(!RUN)("ER type-nativization sweep (Pass A)", () => {
     for (const [speciesId, leakedType] of cases) {
       const redux = speciesById(speciesId)?.forms.find(form => form.formKey === "redux");
       expect(redux, `missing Redux form for species ${speciesId}`).toBeDefined();
-      expect(redux!.isOfType(leakedType), `${redux!.name} incorrectly inherited ${PokemonType[leakedType]}`).toBe(
+      expect(redux!.isOfType(leakedType), `${redux!.formName} incorrectly inherited ${PokemonType[leakedType]}`).toBe(
         false,
       );
     }

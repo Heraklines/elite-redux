@@ -47,10 +47,10 @@ import { randSeedInt } from "#utils/common";
 
 /** BST -> default tier bands (inclusive upper bound). Edit to re-band in bulk. */
 export const MEGA_BST_THRESHOLDS: ReadonlyArray<readonly [maxBst: number, tier: ModifierTier]> = [
-  [470, ModifierTier.COMMON],
-  [530, ModifierTier.GREAT],
-  [590, ModifierTier.ULTRA],
-  [660, ModifierTier.ROGUE],
+  [500, ModifierTier.COMMON],
+  [570, ModifierTier.GREAT],
+  [630, ModifierTier.ULTRA],
+  [700, ModifierTier.ROGUE],
   [Number.POSITIVE_INFINITY, ModifierTier.MASTER],
 ];
 
@@ -121,14 +121,14 @@ export const ER_MEGA_TIER_OVERRIDES: Readonly<Record<string, ModifierTier>> = {
   AGGRONITE: ModifierTier.ROGUE, // Filter + 230 Def
 };
 
-/** Roll weight per tier for the WEIGHTED stone pick. Rarer tier = far lower. */
+/** Roll weight per tier for the weighted stone pick. Stronger tiers remain rarer without being vanishingly rare. */
 export const TIER_GEN_WEIGHT: Readonly<Record<ModifierTier, number>> = {
-  [ModifierTier.COMMON]: 64,
-  [ModifierTier.GREAT]: 32,
-  [ModifierTier.ULTRA]: 12,
-  [ModifierTier.ROGUE]: 4,
-  [ModifierTier.MASTER]: 1,
-  [ModifierTier.LUXURY]: 12,
+  [ModifierTier.COMMON]: 12,
+  [ModifierTier.GREAT]: 10,
+  [ModifierTier.ULTRA]: 8,
+  [ModifierTier.ROGUE]: 6,
+  [ModifierTier.MASTER]: 4,
+  [ModifierTier.LUXURY]: 8,
 };
 
 /**
@@ -137,7 +137,7 @@ export const TIER_GEN_WEIGHT: Readonly<Record<ModifierTier, number>> = {
  *
  * This is a DIFFERENT knob from TIER_GEN_WEIGHT. TIER_GEN_WEIGHT is the
  * COMPETITIVE weighting - it decides WHICH stone wins when several are eligible
- * (a MASTER stone almost never beats a COMMON one in the same pool). But when a
+ * (a MASTER stone is less likely than a COMMON one in the same pool). But when a
  * MASTER-tier mega is a party's ONLY mega-capable mon, its stone is the sole
  * candidate (weight-1-of-1) and the competitive pick returns it every time -
  * which made a genuinely-elite stone effectively GUARANTEED in any form-change
@@ -145,22 +145,21 @@ export const TIER_GEN_WEIGHT: Readonly<Record<ModifierTier, number>> = {
  *
  * This table is the fix: after the competitive pick chooses a stone, its tier is
  * rolled against an ABSOLUTE probability to decide whether the stone MATERIALIZES
- * AT ALL. A MASTER stone clears the gate ~2% of the time even as the sole
- * candidate, so it stays genuinely rare; a COMMON stone is near-certain. On a
- * gate MISS the form-change slot yields NOTHING (the reward roll re-rolls a
- * non-form-change item in-tier; the biome-shop slot is skipped; a mining dig
- * turns up nothing) - it never crashes an empty slot.
+ * AT ALL. A MASTER stone clears the gate 40% of the time even as the sole
+ * candidate, so it stays special without making a mega build impractical. On a
+ * gate MISS the random reward roll re-rolls a non-form-change item in-tier and a
+ * mining dig turns up nothing. Biome shops intentionally do not use this gate.
  *
  * Reachability is preserved: every rate is > 0, so a mono-elite party can still
- * obtain its stone - it is just genuinely rare, not gated out entirely.
+ * obtain its stone - it is rarer, not gated out entirely.
  */
 export const TIER_APPEARANCE_RATE: Readonly<Record<ModifierTier, number>> = {
   [ModifierTier.COMMON]: 1.0, // abundant filler: always materializes
-  [ModifierTier.GREAT]: 0.72,
-  [ModifierTier.ULTRA]: 0.4,
-  [ModifierTier.ROGUE]: 0.12,
-  [ModifierTier.MASTER]: 0.02, // box legendaries / primal orbs / "-Z" ultra megas: ~2%, genuinely rare
-  [ModifierTier.LUXURY]: 0.4,
+  [ModifierTier.GREAT]: 0.95,
+  [ModifierTier.ULTRA]: 0.85,
+  [ModifierTier.ROGUE]: 0.65,
+  [ModifierTier.MASTER]: 0.4,
+  [ModifierTier.LUXURY]: 0.85,
 };
 
 /** Fallback tier for a stone whose triggered form can't be resolved. */
@@ -231,8 +230,8 @@ export function erMegaStoneGenWeight(item: FormChangeItem): number {
 }
 
 /**
- * Weighted pick of ONE stone from an eligible pool, biased HARD toward the
- * common tiers so a strong stone rarely wins when it competes. Runs off the
+ * Weighted pick of ONE stone from an eligible pool, moderately biased toward the
+ * common tiers so strength still matters without overwhelming party composition. Runs off the
  * seeded RNG (`randSeedInt`), so callers already inside `executeWithSeedOffset`
  * stay deterministic. Every stone has weight >= 1, so reachability holds.
  */

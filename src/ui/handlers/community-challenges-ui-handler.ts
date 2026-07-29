@@ -344,7 +344,16 @@ export class CommunityChallengesUiHandler extends UiHandler {
         fontSize: "32px",
       });
       name.setOrigin(0, 0).setColor(GOLD);
+      fitText(name, e.status === "draft" ? g.w - 42 : g.w - 8);
       this.dynamic.add(name);
+      if (e.status === "draft") {
+        const draft = addTextObject(g.x + g.w - 4, FEAT_Y + 3, "DRAFT", TextStyle.WINDOW, {
+          fontSize: "22px",
+          align: "right",
+        });
+        draft.setOrigin(1, 0).setColor("#e6a34a");
+        this.dynamic.add(draft);
+      }
       const sub = addTextObject(g.x + 4, FEAT_Y + 10, e.config.subtitle.toUpperCase(), TextStyle.WINDOW, {
         fontSize: "22px",
       });
@@ -751,7 +760,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
       // qualifying run from scratch (a win publishes it); a published one just replays.
       // No /community/attempt - founder runs are recorded via the founder flow on game-over.
       const draft = getLocalDraft(e.config.id);
-      if (draft?.status === "draft") {
+      if (draft?.status === "draft" || e.status === "draft") {
         setFounderRunState({ draftId: e.config.id, config: e.config });
       }
       this.onLaunch(e.config);
@@ -857,11 +866,17 @@ export class CommunityChallengesUiHandler extends UiHandler {
     }
   }
 
-  /** Open the challenge designer over the browser (PATTERN 1: browser stays underneath).
-   *  Hands the launch callback down so CREATE can drop the founder straight into their
-   *  qualifying run after publishing (args[0]=null = no seed; args[1]=the launch cb). */
+  /** Open the challenge designer over the browser (PATTERN 1: browser stays underneath). */
   private openCreate(): void {
-    globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGE_CREATE, null, this.onLaunch);
+    globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGE_CREATE, null, () => {
+      this.section = "mine";
+      this.navCursor = NAV_ITEMS.findIndex(item => item.key === "mine");
+      this.cardCursor = 0;
+      this.focus = "cards";
+      this.updateSectionHeader();
+      this.positionNavHighlight();
+      this.loadSection("mine");
+    });
   }
 
   private emptyFeed(): CommunityChallengeFeed {

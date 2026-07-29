@@ -21,7 +21,7 @@
 //     "roster pick" mode (all its filters/search) to toggle the allowed set; the
 //     chosen root ids return via onRosterConfirm (null = all species).
 //   - PUBLISH                        -> CONFIRM -> validateChallengeConfig ->
-//     createCommunityChallenge (a server DRAFT) -> success/failure text.
+//     createCommunityChallenge (a server DRAFT) -> MY CHALLENGES card.
 //
 // Opened over the browser via PATTERN 1 (setOverlayMode keeps the browser alive
 // underneath); CANCEL reverts straight back to it. Drive it headlessly via the
@@ -37,7 +37,6 @@ import {
   saveLocalDraft,
   validateChallengeConfig,
 } from "#data/elite-redux/er-community-challenges";
-import { setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { Button } from "#enums/buttons";
 import type { Challenges } from "#enums/challenges";
@@ -125,9 +124,8 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
   private rowCursor = 0;
   private scrollTop = 0;
   private errorMsg: string | null = null;
-  // The opener's config-based launch callback (browser -> TitlePhase). After publishing
-  // a draft, the founder is dropped straight into their qualifying run via this.
-  private onLaunch: ((config: CommunityChallengeConfig) => void) | null = null;
+  /** Tells the browser to reveal the newly-created card in MY CHALLENGES. */
+  private onCreated: ((config: CommunityChallengeConfig) => void) | null = null;
 
   constructor() {
     super(UiMode.COMMUNITY_CHALLENGE_CREATE);
@@ -176,7 +174,7 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
     this.rowCursor = 0;
     this.scrollTop = 0;
     this.errorMsg = null;
-    this.onLaunch = typeof args[1] === "function" ? (args[1] as (config: CommunityChallengeConfig) => void) : null;
+    this.onCreated = typeof args[1] === "function" ? (args[1] as (config: CommunityChallengeConfig) => void) : null;
     if (args.length > 0 && this.isConfig(args[0])) {
       this.seedFromConfig(args[0] as CommunityChallengeConfig);
     }
@@ -583,46 +581,11 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
       return;
     }
     this.errorMsg = null;
-    const serverId = await createCommunityChallenge(config);
-    if (this.onLaunch) {
-      // Local-first persistence: ALWAYS remember the draft locally (so a loss can't lose
-      // it + it lists in MY CHALLENGES), with the server id when we got one, else a local
-      // id - the draft stays playable + finalizable from MY even before the worker route
-      // ships. Saved as a draft (invisible to others until cleared). The FOUNDER must now
-      // win it: tag this as the qualifying run (persisted on the session save so a mid-run
-      // save/reload still auto-publishes), then drop straight into starter-select. A
-      // genuine victory flips the draft live (game-over-phase tryPublishFounderClear).
-      const draftId = serverId ?? `local-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-      const draftConfig = { ...config, id: draftId };
+    const draftConfig = await createCommunityChallenge(config);
+    if (draftConfig) {
       saveLocalDraft(draftConfig);
-      setFounderRunState({ draftId, config: draftConfig });
-      const launch = this.onLaunch;
-      // TEAR DOWN BOTH community overlays BEFORE the confirmation, not after. CREATE was
-      // opened OVER the browser, so both containers are visible and the browser is high-z.
-      // If we show the "Draft saved!" text with the browser still up, it renders BEHIND
-      // the featured page - invisible - so the player never sees a prompt to dismiss, the
-      // dismiss callback (which launches the run) never fires, and they sit on the featured
-      // page reading it as a softlock. (Both prior fixes failed for exactly this reason: the
-      // launch lived inside an unreachable callback.) setMode(MESSAGE) clears CREATE; the
-      // direct clear() hides the browser; resetModeChain drops the stack. Now the message
-      // shows on a clean screen and the launch is a plain card-play-style handoff.
-      globalScene.ui.setMode(UiMode.MESSAGE);
-      globalScene.ui.handlers[UiMode.COMMUNITY_CHALLENGES]?.clear();
-      globalScene.ui.resetModeChain();
-      console.log("[community-launch] publish teardown done; awaiting confirm", {
-        mode: UiMode[globalScene.ui.getMode()],
-        chain: globalScene.ui.getModeChain().map(m => UiMode[m]),
-      });
-      globalScene.ui.showText(
-        "Draft saved! Now clear it yourself to publish it.",
-        null,
-        () => {
-          console.log("[community-launch] confirm dismissed; launching run");
-          launch(draftConfig);
-        },
-        null,
-        true,
-      );
+      await globalScene.ui.revertMode();
+      this.onCreated?.(draftConfig);
       return;
     }
     // Failure (offline / guest / server reject): show it INLINE on the Create screen the
