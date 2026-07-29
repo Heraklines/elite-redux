@@ -5456,3 +5456,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   receipt. A visible nonzero-alpha trainer is a fatal browser error, and campaigns correlate each authoritative
   switch with that exact post-frame proof. This closes the next-frame behavior the synchronous headless assertion
   could not observe. No Showdown, tournament, staging, or production deployment behavior changed.
+
+## 2026-07-29 - Retained EXP presentation no longer asks the replica for authority
+
+- Fresh journey `30424848828` mechanically completed wave 1, but every retained EXP cue failed its renderer
+  watchdog. The replay opened a normal human-confirm prompt while the pending V2 WAVE_ADVANCE correctly froze
+  replica input, so the prompt had no legal owner.
+- Retained EXP and level-up narration now render without creating a second human control lease. Field gauges still
+  update; level-up stat increments and totals still appear, then their already-authorized presentation callbacks
+  advance after a bounded lifecycle-owned dwell. Animations-disabled profiles collapse only that dwell.
+- AbortSignal fences every added text callback and runtime-wall delay. Recovery/retirement therefore cannot leave a
+  late replica prompt or timer behind the succeeding authoritative state.

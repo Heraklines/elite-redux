@@ -65,6 +65,16 @@ test("authority and replica publish one lifecycle-owned progression ledger", asy
   assert.match(replay, /stage: "renderer-completed"[\s\S]*stage: "renderer-failed"/u);
   assert.match(replay, /override retire\(\): void[\s\S]*super\.retire\(\)[\s\S]*controller\.abort\(\)/u);
   assert.match(replay, /Promise\.race\(\[render\(controller\.signal\), aborted\]\)/u);
+  assert.match(
+    replay,
+    /showAutoText\([\s\S]*globalScene\.ui\.showText\(text, delay, finish, null, false\)/u,
+    "retained narration is visual output and cannot open a second human control lease on the replica",
+  );
+  assert.match(
+    replay,
+    /promptLevelUpStats\([\s\S]+for \(let panel = 0; panel < 2; panel\+\+\)[\s\S]+presentationDelay\([\s\S]+handler\.processInput\(Button\.ACTION\)/u,
+    "both retained level-up panels remain visible but their callbacks are lifecycle-owned",
+  );
   assert.match(entry, /setCoopWaveProgressionPresentationObserver[\s\S]*PROGRESSION_EVENT_PREFIX/u);
   assert.match(evidence, /sink\.record\("browser-progression-event"/u);
   assert.match(

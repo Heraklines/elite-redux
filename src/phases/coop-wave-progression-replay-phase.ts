@@ -13,12 +13,14 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { observeCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-wave-progression-observer";
 import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { getTypeRgb } from "#data/type";
+import { Button } from "#enums/buttons";
 import { ExpGainsSpeed } from "#enums/exp-gains-speed";
 import { ExpNotification } from "#enums/exp-notification";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import { PokemonData } from "#system/pokemon-data";
 import type { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
+import type { BattleMessageUiHandler } from "#ui/handlers/battle-message-ui-handler";
 import i18next from "i18next";
 import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 
@@ -499,26 +501,22 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     }
 
     const fastForward = globalScene.gameMode.isCoop && !globalScene.moveAnimations;
-    return new Promise<void>(resolve => {
-      globalScene.ui.showText(
-        i18next.t("battle:expGain", {
-          pokemonName: getPokemonNameWithAffix(pokemon),
-          exp: event.expGain,
-        }),
-        fastForward ? 0 : null,
-        () => {
-          if (signal.aborted) {
-            resolve();
-            return;
-          }
-          pokemon
-            .updateInfo(fastForward)
-            .catch(error => coopWarn("progression", "retained field EXP gauge update failed", error))
-            .finally(resolve);
-        },
-        null,
-        true,
-      );
+    return this.showAutoText(
+      i18next.t("battle:expGain", {
+        pokemonName: getPokemonNameWithAffix(pokemon),
+        exp: event.expGain,
+      }),
+      fastForward ? 0 : null,
+      signal,
+      "exp-presentation-retired",
+    ).then(async () => {
+      if (signal.aborted) {
+        throw new CoopWaveProgressionPresentationCancelled("exp-presentation-retired");
+      }
+      await pokemon.updateInfo(fastForward);
+      if (signal.aborted) {
+        throw new CoopWaveProgressionPresentationCancelled("exp-presentation-retired");
+      }
     });
   }
 
@@ -567,35 +565,109 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     if (globalScene.expParty === ExpNotification.SKIP) {
       return Promise.resolve();
     }
-    const promptStats = () =>
-      signal.aborted
-        ? Promise.reject(new CoopWaveProgressionPresentationCancelled("level-up-presentation-retired"))
-        : globalScene.ui
-            .getMessageHandler()
-            .promptLevelUpStats(event.partySlot, [...event.preStats], false, [...event.postStats]);
+    const promptStats = async (): Promise<void> => {
+      if (signal.aborted) {
+        throw new CoopWaveProgressionPresentationCancelled("level-up-presentation-retired");
+      }
+      const handler = globalScene.ui.getMessageHandler() as BattleMessageUiHandler;
+      const completed = handler.promptLevelUpStats(event.partySlot, [...event.preStats], false, [...event.postStats]);
+      if (globalScene.showLevelUpStats) {
+        const fastForward = globalScene.gameMode.isCoop && !globalScene.moveAnimations;
+        // The authority already received the human confirmations before it committed this immutable event.
+        // Requiring the replica to confirm the same two stat panels creates an illegal second control owner:
+        // V2 correctly freezes its public input while DATA is pending. Keep both visual panels, but advance
+        // their presentation-only callbacks after a bounded dwell owned by this replay lifecycle.
+        for (let panel = 0; panel < 2; panel++) {
+          await this.presentationDelay(fastForward ? 0 : 750, signal, "level-up-presentation-retired");
+          if (!handler.processInput(Button.ACTION)) {
+            throw new Error(`retained level-up stat panel ${panel + 1} was not actionable`);
+          }
+        }
+      }
+      await completed;
+    };
     if (globalScene.expParty !== ExpNotification.DEFAULT) {
       return promptStats();
     }
     globalScene.playSound("level_up_fanfare");
-    return new Promise<void>(resolve => {
-      globalScene.ui.showText(
-        i18next.t("battle:levelUp", {
-          pokemonName: getPokemonNameWithAffix(pokemon),
-          level: event.toLevel,
-        }),
-        null,
-        () => {
-          if (signal.aborted) {
-            resolve();
-            return;
-          }
-          promptStats()
-            .catch(error => coopWarn("progression", "retained level-up stats prompt failed", error))
-            .finally(resolve);
-        },
-        null,
-        true,
-      );
+    return this.showAutoText(
+      i18next.t("battle:levelUp", {
+        pokemonName: getPokemonNameWithAffix(pokemon),
+        level: event.toLevel,
+      }),
+      globalScene.gameMode.isCoop && !globalScene.moveAnimations ? 0 : null,
+      signal,
+      "level-up-presentation-retired",
+    ).then(promptStats);
+  }
+
+  /** Show one replica-only narration line without opening a second human control lease. */
+  private showAutoText(
+    text: string,
+    delay: number | null,
+    signal: AbortSignal,
+    cancellationReason: string,
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => signal.removeEventListener("abort", abort);
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve();
+      };
+      const abort = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        reject(new CoopWaveProgressionPresentationCancelled(cancellationReason));
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) {
+        abort();
+        return;
+      }
+      try {
+        // `prompt=false` is load-bearing: this is a committed visual result, not fresh replica input.
+        globalScene.ui.showText(text, delay, finish, null, false);
+      } catch (error) {
+        settled = true;
+        cleanup();
+        reject(error);
+      }
+    });
+  }
+
+  /** Runtime-wall delay fenced by the same AbortSignal that owns this presentation event. */
+  private presentationDelay(duration: number, signal: AbortSignal, cancellationReason: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        signal.removeEventListener("abort", abort);
+        resolve();
+      }, duration);
+      const abort = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        signal.removeEventListener("abort", abort);
+        reject(new CoopWaveProgressionPresentationCancelled(cancellationReason));
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) {
+        abort();
+      }
     });
   }
 
