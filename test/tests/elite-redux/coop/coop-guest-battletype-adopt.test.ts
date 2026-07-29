@@ -221,7 +221,6 @@ describe.skipIf(!RUN)("co-op GUEST newBattle adopts the host's battleType verdic
       }
       const battle = rig.guestScene.newBattle();
       expect(battle.battleType).toBe(BattleType.MYSTERY_ENCOUNTER);
-      expect(battle.mysteryEncounterType).toBe(MysteryEncounterType.DANCING_LESSONS);
 
       const phase = new EncounterPhase();
       const adopter = phase as unknown as {
@@ -229,6 +228,7 @@ describe.skipIf(!RUN)("co-op GUEST newBattle adopts the host's battleType verdic
       };
       await adopter.adoptCoopHostEnemyParty(() => rig.guestScene.currentBattle === battle);
 
+      expect(battle.mysteryEncounterType).toBe(MysteryEncounterType.DANCING_LESSONS);
       expect(battle.enemyParty).toHaveLength(1);
       expect(battle.enemyParty[0]?.id).toBe(authoritativeId);
       expect(battle.enemyParty[0]?.species.speciesId).toBe(SpeciesId.ORICORIO);
