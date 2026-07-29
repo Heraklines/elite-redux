@@ -74,6 +74,7 @@ const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
 const MARKET_PREFIX = "[coop-browser:market] ";
 const COMMANDER_PREFIX = "[coop-browser:commander] ";
 const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
+const TRAINER_POSTCONDITION_PREFIX = "[coop-browser:trainer-postcondition] ";
 const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const PRESENTATION_EVENT_KINDS = new Set([
@@ -871,6 +872,42 @@ export function presentationEventView(text) {
   return Object.freeze({ ...value, event: Object.freeze({ ...value.event }) });
 }
 
+/** Parse the two-render-frame trainer cleanup proof emitted after a guest switch receipt. */
+export function trainerPostconditionView(text) {
+  if (!text.startsWith(TRAINER_POSTCONDITION_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(TRAINER_POSTCONDITION_PREFIX.length));
+  } catch (error) {
+    throw new Error("built browser emitted malformed trainer-postcondition JSON", { cause: error });
+  }
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 1
+    || value.role !== "guest"
+    || !Number.isSafeInteger(value.epoch)
+    || value.epoch <= 0
+    || !Number.isSafeInteger(value.wave)
+    || value.wave <= 0
+    || !Number.isSafeInteger(value.turn)
+    || value.turn <= 0
+    || !Number.isSafeInteger(value.seq)
+    || value.seq < 0
+    || value.event?.k !== "switch"
+    || typeof value.trainerVisible !== "boolean"
+    || typeof value.trainerAlpha !== "number"
+    || !Number.isFinite(value.trainerAlpha)
+    || typeof value.trainerPresented !== "boolean"
+    || value.trainerPresented !== (value.trainerVisible && value.trainerAlpha > 0.001)
+  ) {
+    throw new Error("built browser emitted an invalid trainer-postcondition observation");
+  }
+  return Object.freeze({ ...value, event: Object.freeze({ ...value.event }) });
+}
+
 /** Parse one exact retained wave-progression authority/renderer receipt. */
 export function progressionEventView(text) {
   if (!text.startsWith(PROGRESSION_EVENT_PREFIX)) {
@@ -908,6 +945,10 @@ function recordBrowserObservations(sink, text) {
   const presentationEvent = presentationEventView(text);
   if (presentationEvent != null) {
     sink.record("browser-presentation-event", { observation: presentationEvent });
+  }
+  const trainerPostcondition = trainerPostconditionView(text);
+  if (trainerPostcondition != null) {
+    sink.record("browser-trainer-postcondition", { observation: trainerPostcondition });
   }
   const progressionEvent = progressionEventView(text);
   if (progressionEvent != null) {
@@ -1382,6 +1423,19 @@ export class EvidenceSink {
   /** Find the first canonical presentation event matching the same exact-address filters. */
   findPresentationEvent(filters = {}) {
     return this.findPresentationEvents(filters)[0];
+  }
+
+  /** Find the post-render-frame trainer settle paired to one exact authoritative switch event. */
+  findTrainerPostcondition({ epoch = null, wave = null, turn = null, seq = null, canonicalEvent = null } = {}) {
+    return this.events.find(
+      event =>
+        event.kind === "browser-trainer-postcondition"
+        && (epoch == null || event.observation.epoch === epoch)
+        && (wave == null || event.observation.wave === wave)
+        && (turn == null || event.observation.turn === turn)
+        && (seq == null || event.observation.seq === seq)
+        && (canonicalEvent == null || JSON.stringify(event.observation.event) === JSON.stringify(canonicalEvent)),
+    );
   }
 
   /** Latest render-profile observation regardless of value (proves the Settings menu is open). */

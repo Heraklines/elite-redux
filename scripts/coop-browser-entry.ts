@@ -95,6 +95,7 @@ const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const PRESENTATION_PREFIX = "[coop-browser:presentation] ";
 const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
+const TRAINER_POSTCONDITION_PREFIX = "[coop-browser:trainer-postcondition] ";
 const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 
 // Exact ordered presentation ledger. The authority callback runs synchronously after assigning the
@@ -119,6 +120,43 @@ setCoopPresentationObserver(observation => {
       ...(observation.actorFingerprint == null ? {} : { actorFingerprint: observation.actorFingerprint }),
     })}`,
   );
+  if (
+    runtime.controller.role === "guest"
+    && observation.event.k === "switch"
+    && (observation.stage === "renderer-completed" || observation.stage === "renderer-skipped")
+  ) {
+    const battle = globalScene.currentBattle;
+    const trainer = battle?.trainer;
+    const identity = {
+      version: 1,
+      role: runtime.controller.role,
+      epoch: runtime.controller.sessionEpoch,
+      wave: battle?.waveIndex ?? -1,
+      turn: observation.turn,
+      seq: observation.seq,
+      event: observation.event,
+    } as const;
+    // A synchronous receipt cannot catch a Phaser tween that is still registered and writes stale values
+    // on the next update.  Two real animation frames make this a pixel-adjacent lifecycle oracle while
+    // remaining strictly read-only and CI-bundle-only.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (getCoopRuntime() !== runtime || globalScene.currentBattle !== battle) {
+          return;
+        }
+        const trainerVisible = trainer?.visible === true;
+        const trainerAlpha = trainer?.alpha ?? 0;
+        const trainerPresented = trainerVisible && trainerAlpha > 0.001;
+        const payload = { ...identity, trainerVisible, trainerAlpha, trainerPresented };
+        const line = `${TRAINER_POSTCONDITION_PREFIX}${JSON.stringify(payload)}`;
+        if (trainerPresented) {
+          console.error(line);
+        } else {
+          console.info(line);
+        }
+      }),
+    );
+  }
 });
 
 // Post-battle EXP, level, and evolution cues live in the retained WAVE_ADVANCE transaction rather than

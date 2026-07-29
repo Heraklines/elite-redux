@@ -146,6 +146,11 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
     "actor cleanup owns main, tint, and info children and allows global-dependent reveal only on the exact scene",
   );
   assert.match(
+    presentation,
+    /completeTweensOf\(\[trainer, \.\.\.trainer\.getSprites\(\), \.\.\.trainer\.getTintSprites\(\)\], scene\);[\s\S]+killTweensOf\(\[trainer, \.\.\.trainer\.getSprites\(\), \.\.\.trainer\.getTintSprites\(\)\], scene\);[\s\S]+trainer\.setVisible\(true\)\.setAlpha\(0\)/u,
+    "trainer cleanup removes the completed tween before a later Phaser update can restore alpha",
+  );
+  assert.match(
     switchReplay,
     /pbTrayEnemy\.settleHidden\(scene\)[\s\S]+settleCoopTrainerPresentation\("enemy", scene\)/u,
   );
@@ -660,6 +665,8 @@ test("every authority event receives an ordered renderer-completion receipt in t
   const replay = read("src/phases/coop-replay-turn-phase.ts");
   const browser = read("scripts/coop-browser-entry.ts");
   const harness = read("test/browser/coop-public-ui/public-ui-harness.mjs");
+  const campaign = read("test/browser/coop-public-ui/campaign.mjs");
+  const evidence = read("test/browser/coop-public-ui/evidence.mjs");
 
   assert.match(recorder, /stage:\s*"authority-recorded"/u);
   assert.match(recorder, /stage:\s*"renderer-completed"/u);
@@ -670,6 +677,17 @@ test("every authority event receives an ordered renderer-completion receipt in t
   assert.match(harness, /assertPresentationLedger\(battleCursors, commandMatch/u);
   assert.match(harness, /assertPresentationLedger\(presentationCursors, commandMatch/u);
   assert.match(harness, /ordered presentation ledger diverged/u);
+  assert.match(
+    browser,
+    /observation\.event\.k === "switch"[\s\S]+requestAnimationFrame\(\(\) =>[\s\S]+requestAnimationFrame\(\(\) =>[\s\S]+trainerPresented[\s\S]+console\.error\(line\)/u,
+    "switch cleanup is inspected after real renderer updates and a leaked trainer is fatal",
+  );
+  assert.match(evidence, /trainerPostconditionView[\s\S]+browser-trainer-postcondition/u);
+  assert.match(
+    campaign,
+    /findTrainerPostcondition\(\{[\s\S]+canonicalEvent: switchAddress\.event[\s\S]+trainerPresented/u,
+    "campaign proof correlates the delayed trainer verdict to the exact authority switch",
+  );
 });
 
 test("presentation liveness uses an exact runtime wall scheduler rather than the ambient Phaser scene clock", () => {

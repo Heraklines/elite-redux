@@ -554,7 +554,26 @@ async function assertRenderProfileExecution(rig, policy, progress) {
           + "did not produce its exact guest renderer receipt",
       );
     }
-    return rendererSwitch;
+    const trainerPostcondition = rig.guest.evidence.findTrainerPostcondition({
+      epoch: switchAddress.epoch,
+      wave: switchAddress.wave,
+      turn: switchAddress.turn,
+      seq: switchAddress.seq,
+      canonicalEvent: switchAddress.event,
+    });
+    if (trainerPostcondition == null) {
+      throw new Error(
+        `${policy.renderProfile}: authoritative switch ${switchAddress.wave}:${switchAddress.turn}:${switchAddress.seq} `
+          + "did not produce a two-frame trainer cleanup proof",
+      );
+    }
+    if (trainerPostcondition.observation.trainerPresented) {
+      throw new Error(
+        `${policy.renderProfile}: trainer remained presented after switch `
+          + `${switchAddress.wave}:${switchAddress.turn}:${switchAddress.seq}`,
+      );
+    }
+    return { rendererSwitch, trainerPostcondition };
   });
   const proof = {
     renderProfile: policy.renderProfile,
@@ -562,9 +581,10 @@ async function assertRenderProfileExecution(rig, policy, progress) {
     authorityMoveEventIndex: authorityMove.index,
     rendererMoveEventIndex: rendererEvidence.index,
     authoritySwitchEventIndex: authoritySwitches[0]?.index ?? null,
-    rendererSwitchEventIndex: rendererSwitches[0]?.index ?? null,
+    rendererSwitchEventIndex: rendererSwitches[0]?.rendererSwitch.index ?? null,
     authoritySwitchEventIndices: authoritySwitches.map(event => event.index),
-    rendererSwitchEventIndices: rendererSwitches.map(event => event.index),
+    rendererSwitchEventIndices: rendererSwitches.map(({ rendererSwitch }) => rendererSwitch.index),
+    trainerPostconditionEventIndices: rendererSwitches.map(({ trainerPostcondition }) => trainerPostcondition.index),
   };
   rig.host.evidence.record("campaign-render-profile-proof", proof);
   rig.guest.evidence.record("campaign-render-profile-proof", proof);

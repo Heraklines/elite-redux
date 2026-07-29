@@ -5443,3 +5443,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   The lane-discovery source contract is 14/14 green, scoped Biome and `git diff --check` are clean, and full
   TypeScript reports zero diagnostics in the changed parser/test. Engine and browser requalification are remote;
   no deployment or non-co-op mode behavior changed.
+
+## 2026-07-29 - Enemy trainer cleanup is proven after real renderer frames
+
+- The Mystery campaign's final guest screenshot exposed a real presentation-only regression: after an enemy
+  replacement with animations disabled, the Mystery Challenger portrait reappeared behind the enemy field even
+  though the matching host was clean. Transport, V2 state, and the shared terminal remained converged.
+- The switch replay completed the trainer entrance tween synchronously and wrote alpha zero, but left that tween
+  registered; Phaser's next renderer update wrote alpha one again. Trainer settlement now removes the completed
+  tween before establishing the absolute hidden state.
+- The CI browser bundle now inspects the exact trainer container two real animation frames after every guest switch
+  receipt. A visible nonzero-alpha trainer is a fatal browser error, and campaigns correlate each authoritative
+  switch with that exact post-frame proof. This closes the next-frame behavior the synchronous headless assertion
+  could not observe. No Showdown, tournament, staging, or production deployment behavior changed.

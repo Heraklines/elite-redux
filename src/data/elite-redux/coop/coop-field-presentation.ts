@@ -134,6 +134,13 @@ export function settleCoopTrainerPresentation(which: "player" | "enemy", scene: 
     return;
   }
   completeTweensOf([trainer, ...trainer.getSprites(), ...trainer.getTintSprites()], scene);
+  // `Tween.forward(totalDuration)` writes the authored final values, but Phaser does not guarantee that
+  // the completed tween has left TweenManager before the next render update.  The animations-disabled
+  // switch replay reaches this settle while the trainer entrance tween is still registered; without the
+  // explicit kill below that tween gets one more update and restores alpha=1 after we establish alpha=0.
+  // This was visible only in real Chromium (the Mystery Challenger remained behind the enemy field), while
+  // the synchronous headless assertion sampled the correct transient alpha and therefore missed it.
+  killTweensOf([trainer, ...trainer.getSprites(), ...trainer.getTintSprites()], scene);
   // A trainer caught fully shown with no active hide tween still needs the normal hidden (+16,-16)
   // staging position so the next BattlePhase.showEnemyTrainer relative tween returns to the same base.
   if (trainer.alpha > 0) {

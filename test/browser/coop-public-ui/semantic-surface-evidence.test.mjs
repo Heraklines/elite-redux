@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { semanticSurfaceView } from "./evidence.mjs";
+import { semanticSurfaceView, trainerPostconditionView } from "./evidence.mjs";
 
 const PREFIX = "[coop-browser:surface2] ";
 
@@ -47,6 +47,31 @@ test("semantic evidence ignores unrelated console lines and freezes a valid proo
   assert.ok(Object.isFrozen(parsed.address));
   assert.ok(Object.isFrozen(parsed.ready));
   assert.ok(Object.isFrozen(parsed.seatsWithInput));
+});
+
+test("trainer postcondition evidence is exact, frozen, and rejects a dishonest derived verdict", () => {
+  const event = { k: "switch", bi: 2, partySlot: 2, pokemonId: 44, speciesId: 10, switchType: 1, doReturn: true };
+  const valid = {
+    version: 1,
+    role: "guest",
+    epoch: 7,
+    wave: 11,
+    turn: 3,
+    seq: 0,
+    event,
+    trainerVisible: true,
+    trainerAlpha: 0,
+    trainerPresented: false,
+  };
+  const prefix = "[coop-browser:trainer-postcondition] ";
+  const parsed = trainerPostconditionView(`${prefix}${JSON.stringify(valid)}`);
+  assert.equal(parsed.trainerPresented, false);
+  assert.ok(Object.isFrozen(parsed));
+  assert.ok(Object.isFrozen(parsed.event));
+  assert.throws(
+    () => trainerPostconditionView(`${prefix}${JSON.stringify({ ...valid, trainerAlpha: 1 })}`),
+    /invalid trainer-postcondition/u,
+  );
 });
 
 test("semantic evidence accepts an exact non-actionable replay watcher", () => {
