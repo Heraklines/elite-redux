@@ -32,6 +32,7 @@ import { FieldHelper } from "#test/helpers/field-helper";
 import { ModifierHelper } from "#test/helpers/modifiers-helper";
 import { MoveHelper } from "#test/helpers/move-helper";
 import { OverridesHelper } from "#test/helpers/overrides-helper";
+import type { UIPromptOptions } from "#test/helpers/prompt-handler";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import { ReloadHelper } from "#test/helpers/reload-helper";
 import { RngHelper } from "#test/helpers/rng-helper";
@@ -189,8 +190,9 @@ export class GameManager {
     callback: () => void,
     expireFn?: () => boolean,
     awaitingActionInput = false,
+    options: UIPromptOptions = {},
   ) {
-    this.promptHandler.addToNextPrompt(phaseTarget, mode, callback, expireFn, awaitingActionInput);
+    this.promptHandler.addToNextPrompt(phaseTarget, mode, callback, expireFn, awaitingActionInput, options);
   }
 
   /**
@@ -280,10 +282,11 @@ export class GameManager {
    * Emulate a player's target selection after a move is chosen, usually called automatically by {@linkcode MoveHelper.select}.
    * Will trigger during the next {@linkcode SelectTargetPhase}
    * @param targetIndex - The {@linkcode BattlerIndex} of the attack target, or `undefined` for multi-target attacks
+   * @param expectedBattlerIndex - Player field slot whose target phase may consume this prompt
    * @param movePosition - The 0-indexed position of the move in the pokemon's moveset array
    * @throws Immediately fails tests
    */
-  selectTarget(movePosition: number, targetIndex?: BattlerIndex) {
+  selectTarget(movePosition: number, targetIndex?: BattlerIndex, expectedBattlerIndex?: number) {
     this.onNextPrompt(
       "SelectTargetPhase",
       UiMode.TARGET_SELECT,
@@ -307,11 +310,33 @@ export class GameManager {
         // headless harness claim TARGET_SELECT coverage while skipping the production adapter entirely.
         this.scene.ui.processInput(Button.ACTION);
       },
-      () =>
-        this.isCurrentPhase("CommandPhase")
-        || this.isCurrentPhase("MovePhase")
-        || this.isCurrentPhase("TurnStartPhase")
-        || this.isCurrentPhase("TurnEndPhase"),
+      () => {
+        if (this.isCurrentPhase("SelectTargetPhase") && expectedBattlerIndex != null) {
+          const phase = this.scene.phaseManager.getCurrentPhase() as SelectTargetPhase;
+          if (phase.getPokemon().getBattlerIndex() !== expectedBattlerIndex) {
+            return true;
+          }
+        }
+        return (
+          this.isCurrentPhase("CommandPhase")
+          || this.isCurrentPhase("MovePhase")
+          || this.isCurrentPhase("TurnStartPhase")
+          || this.isCurrentPhase("TurnEndPhase")
+        );
+      },
+      false,
+      expectedBattlerIndex == null
+        ? {}
+        : {
+            allowOutOfOrder: true,
+            matchFn: () => {
+              if (!this.isCurrentPhase("SelectTargetPhase")) {
+                return false;
+              }
+              const phase = this.scene.phaseManager.getCurrentPhase() as SelectTargetPhase;
+              return phase.getPokemon().getBattlerIndex() === expectedBattlerIndex;
+            },
+          },
     );
   }
 

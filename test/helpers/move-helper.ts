@@ -93,7 +93,7 @@ export class MoveHelper extends GameManagerHelper {
     });
 
     if (targetIndex !== null) {
-      this.game.selectTarget(movePosition, targetIndex);
+      this.game.selectTarget(movePosition, targetIndex, pkmIndex);
     }
   }
 
@@ -144,7 +144,7 @@ export class MoveHelper extends GameManagerHelper {
     });
 
     if (targetIndex !== null) {
-      this.game.selectTarget(movePosition, targetIndex);
+      this.game.selectTarget(movePosition, targetIndex, pkmIndex);
     }
   }
 

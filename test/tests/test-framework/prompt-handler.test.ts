@@ -2,6 +2,7 @@ import type { Phase } from "#app/phase";
 import { UiMode } from "#enums/ui-mode";
 import type { GameManager } from "#test/framework/game-manager";
 import type { PhaseInterceptor } from "#test/framework/phase-interceptor";
+import type { UIPromptOptions } from "#test/helpers/prompt-handler";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import type { PhaseManager, PhaseString } from "#types/phase-types";
 import type { AwaitableUiHandler } from "#ui/handlers/awaitable-ui-handler";
@@ -61,8 +62,16 @@ describe("Test Utils - PromptHandler", () => {
     callback: () => void,
     expireFn?: () => boolean,
     awaitingActionInput = false,
+    options: UIPromptOptions = {},
   ) {
-    promptHandler.addToNextPrompt(target as unknown as PhaseString, mode, callback, expireFn, awaitingActionInput);
+    promptHandler.addToNextPrompt(
+      target as unknown as PhaseString,
+      mode,
+      callback,
+      expireFn,
+      awaitingActionInput,
+      options,
+    );
   }
 
   describe("setMode", () => {
@@ -139,6 +148,34 @@ describe("Test Utils - PromptHandler", () => {
       promptHandler["doPromptCheck"]();
       expect(callback2).toHaveBeenCalledOnce();
       expect(promptHandler["prompts"]).toHaveLength(0);
+    });
+
+    it("should route only an explicitly keyed prompt past an unrelated FIFO entry", () => {
+      onNextPrompt("wrong phase", UiMode.ACHIEVEMENTS, callback1);
+      onNextPrompt("testDialoguePhase", UiMode.TEST_DIALOGUE, callback2, undefined, false, {
+        allowOutOfOrder: true,
+        matchFn: () => true,
+      });
+
+      promptHandler["doPromptCheck"]();
+
+      expect(callback1).not.toHaveBeenCalled();
+      expect(callback2).toHaveBeenCalledOnce();
+      expect(promptHandler["prompts"]).toHaveLength(1);
+    });
+
+    it("should not route a keyed prompt whose instance predicate does not match", () => {
+      onNextPrompt("wrong phase", UiMode.ACHIEVEMENTS, callback1);
+      onNextPrompt("testDialoguePhase", UiMode.TEST_DIALOGUE, callback2, undefined, false, {
+        allowOutOfOrder: true,
+        matchFn: () => false,
+      });
+
+      promptHandler["doPromptCheck"]();
+
+      expect(callback1).not.toHaveBeenCalled();
+      expect(callback2).not.toHaveBeenCalled();
+      expect(promptHandler["prompts"]).toHaveLength(2);
     });
   });
 });

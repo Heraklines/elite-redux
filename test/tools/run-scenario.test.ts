@@ -2454,7 +2454,10 @@ function setCandidateAction(
   actorSlot: number,
   candidate: ErCombatCandidate,
 ): void {
-  const targetRef = candidate.kind === "move" && candidate.targets.length === 1 ? candidate.targets[0] : undefined;
+  const targetRef =
+    candidate.kind === "move" && !allMoves[candidate.moveId].isMultiTarget() && candidate.targets.length === 1
+      ? candidate.targets[0]
+      : undefined;
   const targetMon = targetRef
     ? (targetRef.side === "self" ? game.scene.getPlayerField() : game.scene.getEnemyField())[targetRef.activeSlot]
     : undefined;
