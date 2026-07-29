@@ -87,6 +87,12 @@ test("every host-owned prompt and decline continuation re-enters its captured V2
   assert.match(runtimeFence, /getCoopRuntime\(\) !== runtime/u);
   assert.match(runtimeFence, /globalScene\.phaseManager\.getCurrentPhase\(\) !== this/u);
   assert.match(runtimeFence, /failCoopSharedSession\(reason\)/u);
+  assert.match(runtimeFence, /this\.coopRuntimeActivations\.add\(cancel\)/u);
+  assert.match(
+    learnMove,
+    /public override retire\(\): void[\s\S]+for \(const cancel of this\.coopRuntimeActivations\)[\s\S]+cancel\(\)[\s\S]+this\.coopRuntimeActivations\.clear\(\)/u,
+    "destructive recovery cancels every promise tail still queued under the retired phase",
+  );
 
   const replace = section(learnMove, "async replaceMoveCheck(", "async forgetMoveProcess(");
   assert.equal(

@@ -116,6 +116,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private coopAwaitingAuthorityDecisionOperationId: string | null = null;
   private coopSubmittedV2ForgetSlot: number | null = null;
   private coopCommittedV2ResultSettled = false;
+  /** Runtime activations queued by async UI tails and canceled if recovery discards this exact phase. */
+  private readonly coopRuntimeActivations = new Set<() => void>();
 
   /**
    * Re-enter the runtime which created this phase before continuing an asynchronous V2 UI chain.
@@ -136,7 +138,11 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       }
     }
     return new Promise<T>((resolve, reject) => {
-      runWhenCoopRuntimeActive(runtime, () => {
+      let completed = false;
+      let cancel = () => {};
+      cancel = runWhenCoopRuntimeActive(runtime, () => {
+        completed = true;
+        this.coopRuntimeActivations.delete(cancel);
         if (getCoopRuntime() !== runtime || globalScene.phaseManager.getCurrentPhase() !== this) {
           const reason = "Learn-move V2 continuation lost its exact runtime/phase owner";
           failCoopSharedSession(reason);
@@ -149,7 +155,21 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
           reject(error);
         }
       });
+      if (!completed) {
+        this.coopRuntimeActivations.add(cancel);
+      }
     });
+  }
+
+  public override retire(): void {
+    if (this.isRetired()) {
+      return;
+    }
+    super.retire();
+    for (const cancel of this.coopRuntimeActivations) {
+      cancel();
+    }
+    this.coopRuntimeActivations.clear();
   }
 
   constructor(

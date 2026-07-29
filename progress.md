@@ -5206,3 +5206,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   A node source contract forbids returning to detached-phase plus one-microtask actionability evidence.
 - Local policy-safe evidence: the focused node contract is 3/3 green, scoped Biome and `git diff --check` are clean,
   and full TypeScript reports no diagnostics in the changed files. The engine regression remains remote-only.
+
+## 2026-07-29 - Async presentation and single-move UI tails re-enter their exact browser
+
+- The final gate exposed two callbacks that still crossed an asynchronous boundary through an ambient streamer or
+  bare promise continuation. A form cutscene asset load could therefore consume its continuation while the peer
+  engine owned the process globals, and a host-owned single-move decline could open its next confirmation there.
+- Rich form replay now dispatches every V2 promise tail through its captured runtime activation ledger, retaining the
+  streamer timer only for the legacy streamer-only compatibility binding. Single-move prompt, decline, forget, and
+  terminal narration steps use the same exact runtime/current-phase fence; losing that address fails the shared
+  session instead of mutating the peer UI.
+- Both phase types cancellation-own queued activations. Destructive recovery removes them before the obsolete phase
+  can touch a replacement surface. A torn cosmetic field-scale promise is also handled after switch structure is
+  installed, so presentation failure cannot become a detached unhandled rejection.
+- Local policy-safe evidence: presentation authority is 25/25 and single-move release is 4/4. Engine/browser
+  verification remains remote-only; Showdown, tournament, deployment, and production were not touched.
