@@ -5170,3 +5170,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   two-engine enemy-switch reconstruction scenario now requires positive guest trainer/tray replay and absolute final
   cleanup, while real two-browser campaigns correlate every switch they encounter to the exact guest receipt.
   Co-op engine/browser execution remains remote-only; no Showdown, tournament, wire schema, or mechanics changed.
+
+## 2026-07-29 - Switch and form replay are now presentation-only and lifecycle-owned
+
+- The switch audit found that the renderer still called the ordinary summon helpers, which re-entered
+  `leaveField`, `resetSummonData`, and `fieldSetup` on the guest. The replay now uses one exact structural projector
+  that validates scene/side/slot/id/species, installs only the signed party permutation and Phaser field membership,
+  and never runs abilities, form triggers, hazards, substitute setup, summon phases, or other battle mechanics.
+- Switch failure/retirement now settles the ball, actor body/main/tint/info/EXP-mask, trainer, and Pokeball tray on
+  the creating scene. A failed, retired, wrong-side, wrong-identity, or wrong-runtime replay cannot positively reveal
+  an actor. Initial trainer send-out also shares the partnered-double resolver, keeping triple slots on the primary
+  trainer.
+- The first full form-lifecycle gate exposed three compile failures and two two-engine context regressions that its
+  isolated report missed. Form and Transform appearance continuations now queue through the destination runtime's
+  activation ledger and both phases shift only their bound phase manager. The in-process duo tests explicitly install
+  the destination browser to flush that ledger, matching two concurrently installed real browser realms.
+- The rich form cutscene owns every shared animation counter, recursive cycle tween, infinite particle timer, and
+  spawned particle through an opt-in `AnimationResourceScope`. Success, failure, recovery, and retirement cancel that
+  scope; late callbacks cannot recurse or mutate a recovered scene. Ordinary non-co-op animation callers retain the
+  previous unowned behavior.
+- Local policy-safe evidence: all 55 co-op source/orchestration contracts and all 347 node-pure public-browser
+  contracts pass, scoped Biome and `git diff --check` are clean, and full TypeScript has zero diagnostics in changed
+  files. Co-op engine, gate, and real Chromium qualification remain remote-only; no deployment occurred.
