@@ -15,11 +15,13 @@ on:
       - "scripts/ai/**"
       - "scripts/run-combat-batch.mjs"
       - "scripts/run-scenario.mjs"
+      - "src/data/elite-redux/ability-upgrades/requested-field-effects.ts"
       - "src/data/elite-redux/ai/**"
       - "src/dev-tools/registry.ts"
       - "src/dev-tools/test-suite/scenario-spec.ts"
       - "src/phases/encounter-phase.ts"
       - "test/node/combat-contract.test.ts"
+      - "test/data/elite-redux/er-requested-field-effects.test.ts"
       - "test/tests/elite-redux/er-scenario-spec.test.ts"
       - "test/tools/run-scenario.test.ts"
 
@@ -46,6 +48,8 @@ jobs:
         run: pnpm exec vitest run --config test/node/vitest.config.ts test/node/combat-contract.test.ts --no-color
       - name: Verify ghost fields reach the dev-scenario engine adapter
         run: ER_SCENARIO=1 pnpm exec vitest run test/tests/elite-redux/er-scenario-spec.test.ts --no-color
+      - name: Guard requested field ability resolution
+        run: pnpm exec vitest run test/data/elite-redux/er-requested-field-effects.test.ts --no-color
       - name: Validate mirrored ghost-team fixtures
         run: node scripts/ai/test-ghost-gauntlet.mjs
       - name: Check changed AI files
@@ -60,6 +64,7 @@ jobs:
           scripts/ai/summarize-ghost-gauntlet.mjs
           scripts/ai/test-ghost-gauntlet.mjs
           scripts/run-combat-batch.mjs
+          src/data/elite-redux/ability-upgrades/requested-field-effects.ts
           src/data/elite-redux/ai/combat-contract.ts
           src/data/elite-redux/ai/combat-engine-adapter.ts
           src/data/elite-redux/ai/combat-features.ts
@@ -68,6 +73,7 @@ jobs:
           src/dev-tools/test-suite/scenario-spec.ts
           src/phases/encounter-phase.ts
           test/node/combat-contract.test.ts
+          test/data/elite-redux/er-requested-field-effects.test.ts
           test/tests/elite-redux/er-scenario-spec.test.ts
           test/tools/run-scenario.test.ts
 

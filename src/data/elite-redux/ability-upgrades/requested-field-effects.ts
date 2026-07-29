@@ -21,11 +21,20 @@ function erAbilityId(draftId: number): AbilityId | undefined {
   return ER_ID_MAP.abilities[draftId] as AbilityId | undefined;
 }
 
+/** Check one ability source without evaluating every unrelated source on the holder. */
+function hasActiveAbilitySource(holder: Pokemon, abilityId: AbilityId): boolean {
+  return holder
+    .getAbilitySources()
+    .some(source => source.ability.id === abilityId && holder.canApplyAbility(source.passive, source.passiveSlot ?? 0));
+}
+
 function activeFieldHasDraftAbility(draftId: number, predicate?: (holder: Pokemon) => boolean): boolean {
   const abilityId = erAbilityId(draftId);
   return (
     abilityId !== undefined
-    && globalScene.getField(true).some(holder => (!predicate || predicate(holder)) && holder.hasAbility(abilityId))
+    && globalScene
+      .getField(true)
+      .some(holder => (!predicate || predicate(holder)) && hasActiveAbilitySource(holder, abilityId))
   );
 }
 
@@ -85,7 +94,9 @@ export function isSuppressedByRequestedFieldAbility(pokemon: Pokemon, abilityId:
   const auraArmor = erAbilityId(1021);
   if (
     (abilityId === battleAura || abilityId === auraArmor)
-    && globalScene.getField(true).some(holder => holder.isOpponent(pokemon) && holder.hasAbility(AbilityId.AURA_BREAK))
+    && globalScene
+      .getField(true)
+      .some(holder => holder.isOpponent(pokemon) && hasActiveAbilitySource(holder, AbilityId.AURA_BREAK))
   ) {
     return true;
   }
