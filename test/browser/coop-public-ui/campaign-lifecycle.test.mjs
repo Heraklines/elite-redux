@@ -12,7 +12,7 @@ import {
   loadCampaignLifecyclePolicy,
   withinDeadline,
 } from "./campaign-lifecycle.mjs";
-import { PublicUiClient } from "./public-ui-harness.mjs";
+import { initializeDuoClients, PublicUiClient } from "./public-ui-harness.mjs";
 
 test("campaign lifecycle has a finite outer deadline independent of per-wave waits", () => {
   const saved = {
@@ -69,6 +69,60 @@ test("failed graceful cleanup force-kills every remaining browser process", () =
     ["host", "SIGKILL"],
     ["guest", "SIGKILL"],
   ]);
+});
+
+test("one canvas-less Chromium retries once after its isolated peer boots", async () => {
+  const calls = [];
+  const bootTimeout = new Error("Waiting for selector `#app canvas` failed");
+  const stuck = {
+    label: "host-seat",
+    evidence: { record: (kind, data) => calls.push([kind, data]) },
+    init: async () => {
+      calls.push("host-init");
+      throw bootTimeout;
+    },
+    reopen: async () => {
+      calls.push("host-reopen");
+    },
+  };
+  const healthy = {
+    label: "guest-seat",
+    init: async () => {
+      calls.push("guest-init");
+    },
+  };
+
+  await initializeDuoClients([stuck, healthy]);
+
+  assert.equal(calls.filter(call => call === "host-init").length, 1);
+  assert.equal(calls.filter(call => call === "guest-init").length, 1);
+  assert.equal(calls.filter(call => call === "host-reopen").length, 1);
+  assert.equal(calls.find(call => Array.isArray(call) && call[0] === "canvas-boot-retry")?.[1]?.maxAttempts, 1);
+});
+
+test("browser initialization never retries product errors or two dead renderers", async () => {
+  let reopenCount = 0;
+  const client = reason => ({
+    evidence: { record() {} },
+    init: async () => {
+      throw reason;
+    },
+    reopen: async () => {
+      reopenCount += 1;
+    },
+  });
+  const healthy = { init: async () => {} };
+  const pageError = new Error("Uncaught TypeError: production boot failed");
+
+  await assert.rejects(initializeDuoClients([client(pageError), healthy]), error => error === pageError);
+  await assert.rejects(
+    initializeDuoClients([
+      client(new Error("Waiting for selector `#app canvas` failed")),
+      client(new Error("Waiting for selector `#app canvas` failed")),
+    ]),
+    AggregateError,
+  );
+  assert.equal(reopenCount, 0, "only a single canvas-only failure beside a healthy peer is retryable");
 });
 
 test("workflow reserves artifact-upload headroom and budgets the real-animation surface independently", async () => {

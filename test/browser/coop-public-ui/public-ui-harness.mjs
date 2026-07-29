@@ -108,6 +108,45 @@ const SIMULTANEOUS_FAINT_PARTNER_SETTLE_MS = 5_000;
 // keeps the acceptance window open until the accept lands (see driveSelfHealingPairing).
 const LOBBY_REQUEST_REISSUE_MS = 10_000;
 const OPTIONAL_LOBBY_RELAY_WAIT_MS = 1_500;
+const CANVAS_BOOT_FAILURE = /Waiting for selector [`'"]#app canvas[`'"] failed/u;
+
+/**
+ * Start both real browser clients concurrently, but recover one narrowly classified renderer-start failure in-job.
+ * A resolved peer proves the sealed bundle, preview server, and one independent Chromium reached its real canvas.
+ * We retry only the other seat's canvas-less page, once, through the ordinary cold-page path; every page error,
+ * navigation error, double failure, or repeated canvas failure remains fatal.
+ */
+export async function initializeDuoClients(clients) {
+  if (!Array.isArray(clients) || clients.length !== 2) {
+    throw new Error("two-browser initialization requires exactly two isolated clients");
+  }
+  const results = await Promise.allSettled(clients.map(client => client.init()));
+  const failures = results.flatMap((result, index) =>
+    result.status === "rejected" ? [{ index, reason: result.reason }] : [],
+  );
+  if (failures.length === 0) {
+    return;
+  }
+  const [failure] = failures;
+  const failureMessage = String(failure?.reason?.message ?? failure?.reason ?? "");
+  if (failures.length !== 1 || !CANVAS_BOOT_FAILURE.test(failureMessage)) {
+    if (failures.length === 1) {
+      throw failure.reason;
+    }
+    throw new AggregateError(
+      failures.map(candidate => candidate.reason),
+      "both isolated browser clients failed during initialization",
+    );
+  }
+  const failedClient = clients[failure.index];
+  failedClient.evidence.record("canvas-boot-retry", {
+    reason: "one isolated peer reached its real canvas while this renderer never initialized Phaser",
+    initialError: failureMessage,
+    attempt: 1,
+    maxAttempts: 1,
+  });
+  await failedClient.reopen();
+}
 
 function primaryLanguage(locale) {
   return locale.trim().toLowerCase().split("-")[0];
@@ -2171,7 +2210,7 @@ export class DuoPublicUiRig {
       }
       rig.clients["host-seat"] = new PublicUiClient(hostContext, config.credentials.hostSeat, config);
       rig.clients["guest-seat"] = new PublicUiClient(guestContext, config.credentials.guestSeat, config);
-      await Promise.all(Object.values(rig.clients).map(client => client.init()));
+      await initializeDuoClients(Object.values(rig.clients));
       return rig;
     } catch (error) {
       await Promise.allSettled(browsers.map(browser => browser.close()));

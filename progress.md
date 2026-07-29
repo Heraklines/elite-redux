@@ -5361,3 +5361,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Local policy-safe evidence is green: Authority V2 source contracts 107/107, scoped Biome has no errors,
   `git diff --check` passes, and TypeScript reports zero changed-file diagnostics. Engine and exact two-browser
   Mystery requalification remain remote-only; no deployment or non-co-op mode changed.
+
+## 2026-07-29 - One canvas-dead browser gets one evidence-visible startup retry
+
+- Mystery requalification `30422749774` never reached gameplay: the guest Chromium initialized Phaser and Login,
+  while the host emitted only navigation/PWA-banner evidence and timed out without ever creating `#app canvas`.
+  No co-op runtime, transport, V2, or game surface existed, so this was a strict harness/infrastructure false red.
+- Duo initialization now retries exactly that narrow shape in the same isolated context: one client has resolved its
+  real canvas, exactly one peer failed with Puppeteer's canvas-selector timeout, and the failed seat receives one
+  ordinary cold-page reopen. The retry is recorded in JSONL evidence. Navigation errors, page errors retained by the
+  evidence sink, two failed clients, and a repeated canvas failure remain fatal.
+- Node-pure lifecycle coverage is 10/10 and explicitly proves the only retryable shape plus the non-retry cases;
+  scoped Biome has no errors and `git diff --check` passes. The exact Mystery rerun is `30423057616`. This is harness
+  code only; no production, staging, Showdown, or tournament behavior changed.
