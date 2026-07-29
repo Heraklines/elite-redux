@@ -207,3 +207,21 @@ test("journey starter fixtures require both the exact build and exact per-page U
     "only the normal visible co-op starter UI consumes the exact-gated fixture",
   );
 });
+
+test("Commander journey proves deterministic co-op entry presentation before public command", async () => {
+  const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
+  const proofStart = harness.indexOf("  assertCommanderEntryPresentation(boundary, purpose)");
+  const proofEnd = harness.indexOf("\n  /** Prove the hidden", proofStart);
+  assert.notEqual(proofStart, -1, "Commander owns a bounded entry-presentation proof");
+  assert.ok(proofEnd > proofStart, "Commander entry-presentation proof has a bounded source block");
+  const proof = harness.slice(proofStart, proofEnd);
+  assert.match(proof, /assertPresentationLedger\(\s*boundary\.cursors/u);
+  for (const kind of ["showAbility", "pokemonAnim", "statStage"]) {
+    assert.match(proof, new RegExp(`"${kind}"`, "u"));
+  }
+  assert.match(proof, /commander-entry-presentation-proof/u);
+  assert.match(
+    harness,
+    /waitForCommanderCommandBoundaryDrivingBattlePrompts\([\s\S]*?assertCommanderEntryPresentation\(boundary, "fresh-wave-1-commander-presentation"\)[\s\S]*?pendingCommanderBoundary = boundary/u,
+  );
+});

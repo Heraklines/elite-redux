@@ -2087,7 +2087,43 @@ export class DuoPublicUiRig {
         actionableEvidenceIndex: actionable.index,
       });
     }
-    return { actor, owner, observation, cursors };
+    return { actor, owner, observation, cursors, commandMatch: match };
+  }
+
+  /**
+   * Prove the deterministic co-op Commander entry through the same canonical authority/renderer
+   * ledger used by ordinary campaign turns. This is intentionally a co-op fixture (not Showdown):
+   * Tatsugiri's real PostSummon ability must produce its flyout, Commander sprite transition, and
+   * Dondozo stat material before either browser publishes the first addressed command frontier.
+   */
+  assertCommanderEntryPresentation(boundary, purpose) {
+    const ledger = this.assertPresentationLedger(
+      boundary.cursors,
+      {
+        hostProjection: { event: boundary.commandMatch.hostEvent },
+        guestProjection: { event: boundary.commandMatch.guestEvent },
+        comparable: { epoch: boundary.observation.epoch },
+      },
+      purpose,
+      { currentEpochPrefix: true },
+    );
+    const kinds = ledger.reduce((counts, entry) => {
+      counts[entry.event.k] = (counts[entry.event.k] ?? 0) + 1;
+      return counts;
+    }, {});
+    for (const kind of ["showAbility", "pokemonAnim", "statStage"]) {
+      if ((kinds[kind] ?? 0) < 1) {
+        throw new Error(`${purpose}: deterministic Commander entry omitted ${kind}; ledger=${JSON.stringify(ledger)}`);
+      }
+    }
+    for (const client of Object.values(this.clients)) {
+      client.evidence.record("commander-entry-presentation-proof", {
+        purpose,
+        address: boundary.observation.point,
+        kinds,
+      });
+    }
+    return ledger;
   }
 
   /** Prove the hidden, locally owned generated skip used the real reciprocal cmd rendezvous. */
@@ -3505,6 +3541,7 @@ export class DuoPublicUiRig {
         "fresh-wave-1-commander",
         { expectedWave: 1 },
       );
+      this.assertCommanderEntryPresentation(boundary, "fresh-wave-1-commander-presentation");
       this.activeBattleWave = boundary.observation.wave;
       this.pendingCommanderBoundary = boundary;
     } else {

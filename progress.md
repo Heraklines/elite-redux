@@ -5395,3 +5395,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The evidence contains authority/renderer move events and the formerly crashing voluntary-switch presentation on
   both clients (`authoritySwitchEventIndex: 5043`, `rendererSwitchEventIndex: 5368`). It finished at wave 3 with no
   error after 33m23s, proving the outgoing actor is hidden before detach under the real WebGL renderer.
+
+## 2026-07-29 - Commander journey becomes the deterministic co-op entry-presentation oracle
+
+- The ordinary campaign already compares every authority-recorded event with the replica's concrete renderer
+  outcome, but random starter and encounter rolls did not guarantee an ability event occurred. A green campaign
+  therefore proved exact delivery of the events it encountered without proving the previously reported missing
+  co-op ability flyout in a real Chromium pair.
+- The existing Commander journey already supplies the production PostSummon path needed to close that gap. At its
+  first addressed co-op command frontier it now compares the complete canonical authority/renderer ledger and
+  requires a real `showAbility`, `pokemonAnim`, and `statStage` event. Those are Commander’s ability bar, Tatsugiri
+  sprite transition, and Dondozo boosts; all must complete on the replica before public command input opens.
+- This reuses an existing two-browser journey and both ownership parities instead of adding another build/job, so
+  the stronger combat-presentation proof adds negligible wall-clock cost. All 350 public-browser node contracts
+  pass; scoped formatting is clean apart from pre-existing complexity notices. No production, Showdown, tournament,
+  staging, or deployment behavior changed.
