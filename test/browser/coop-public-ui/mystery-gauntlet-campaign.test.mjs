@@ -22,6 +22,7 @@ import {
   driveMysteryEncounterChoice,
   mechanicalBoundaryFromPairedSurfaces,
   pairedMysteryProjectionMatches,
+  selectLatestMysteryAuthorityEvent,
 } from "./campaign.mjs";
 import {
   chooseAffordableStarterPair,
@@ -459,6 +460,23 @@ test("campaign fight policy prefers a usable damaging move and follows the visib
     chooseBestCampaignMove(observation, 2)?.optionId,
     "move:22:slot:3",
     "the damaging-move policy cycles deterministically",
+  );
+  assert.equal(
+    chooseBestCampaignMove(observation, 0, 74)?.optionId,
+    "move:74:slot:2",
+    "an exact interaction fixture may request one observer-proven usable status move",
+  );
+  assert.equal(
+    chooseBestCampaignMove(
+      {
+        ...observation,
+        moveSlots: observation.moveSlots.map(slot => (slot.moveId === 74 ? { ...slot, usable: false } : slot)),
+      },
+      0,
+      74,
+    )?.optionId,
+    "move:22:slot:3",
+    "an exhausted preferred move falls back to the ordinary strongest usable move",
   );
   assert.equal(
     chooseNavigationKey(observation, best.optionId, ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"], 0),
@@ -926,6 +944,42 @@ test("paired structured Mystery surfaces inherit nullable encounter metadata wit
     pairedMysteryProjectionMatches({ ...authority, displayedWave: 2 }, renderer, "subprompt"),
     false,
     "the authority surface itself cannot attest with a stale rendered HUD wave",
+  );
+});
+
+test("paired Mystery convergence follows the newest ordered address when the interaction owner outruns the host", () => {
+  const runtimeHost = {
+    index: 101,
+    observation: {
+      localRole: "host",
+      address: { epoch: 1828208874108895, wave: 3, turn: 1 },
+      stateDigest: "retired-wave-three",
+    },
+  };
+  const interactionOwner = {
+    index: 202,
+    observation: {
+      localRole: "guest",
+      address: { epoch: 1828208874108895, wave: 4, turn: 1 },
+      stateDigest: "authorized-wave-four",
+    },
+  };
+
+  assert.equal(
+    selectLatestMysteryAuthorityEvent([interactionOwner, runtimeHost]),
+    interactionOwner,
+    "the runtime role must not make an already-retired Mystery address canonical",
+  );
+  assert.equal(
+    selectLatestMysteryAuthorityEvent([
+      interactionOwner,
+      {
+        ...runtimeHost,
+        observation: { ...runtimeHost.observation, address: interactionOwner.observation.address },
+      },
+    ]).observation.localRole,
+    "host",
+    "the host remains the deterministic canonical renderer once both browsers report the same address",
   );
 });
 

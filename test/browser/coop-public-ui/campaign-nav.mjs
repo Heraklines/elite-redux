@@ -278,7 +278,7 @@ export function chooseNavigationKey(observation, targetId, navKeys, step) {
  * Fixed-damage attacks can report non-positive power, so category is also considered
  * instead of assuming `power > 0` is the complete damage model.
  */
-export function chooseBestCampaignMove(observation, cycleIndex = 0) {
+export function chooseBestCampaignMove(observation, cycleIndex = 0, preferredMoveId = null) {
   if (
     observation?.surfaceId !== "command:fight"
     || !Array.isArray(observation.optionIds)
@@ -294,6 +294,12 @@ export function chooseBestCampaignMove(observation, cycleIndex = 0) {
       && observation.optionIds.includes(slot.optionId)
       && slot.usable === true,
   );
+  const preferred = Number.isSafeInteger(preferredMoveId)
+    ? selectable.find(slot => slot.moveId === preferredMoveId)
+    : null;
+  if (preferred != null) {
+    return preferred;
+  }
   selectable.sort((left, right) => {
     const leftDamaging = left.category !== "STATUS";
     const rightDamaging = right.category !== "STATUS";
@@ -389,7 +395,7 @@ async function driveCampaignVoluntarySwitch(client, command, targetId, purpose, 
 export async function driveBestCampaignMove(
   client,
   purpose,
-  { timeoutMs = 15_000, cycleIndex = 0, commandEvent = null } = {},
+  { timeoutMs = 15_000, cycleIndex = 0, commandEvent = null, preferredMoveId = null } = {},
 ) {
   const command =
     commandEvent?.observation?.surfaceId === "command:command"
@@ -420,7 +426,7 @@ export async function driveBestCampaignMove(
     fromCursor: fightCursor,
     timeoutMs,
   });
-  const move = chooseBestCampaignMove(fight.observation, cycleIndex);
+  const move = chooseBestCampaignMove(fight.observation, cycleIndex, preferredMoveId);
   if (move == null) {
     throw new Error(
       `${client.label}: ${purpose} exposed no observer-proven usable move: `

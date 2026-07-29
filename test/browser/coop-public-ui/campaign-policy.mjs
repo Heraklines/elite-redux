@@ -156,6 +156,7 @@ export function loadCampaignPolicy() {
   }
   const targetWaves = envInteger("COOP_UI_CAMPAIGN_WAVES", 30);
   const mysteryRequired = envBoolean("COOP_UI_REQUIRE_MYSTERY_GAUNTLET", false);
+  const registeredInteractionsRequired = envBoolean("COOP_UI_REQUIRE_REGISTERED_INTERACTIONS", false);
   const gameSpeed = envInteger("COOP_UI_GAME_SPEED", 10);
   if (!allowedGameSpeeds.has(gameSpeed)) {
     throw new Error(`COOP_UI_GAME_SPEED must be one of ${[...allowedGameSpeeds].join(", ")}`);
@@ -172,6 +173,12 @@ export function loadCampaignPolicy() {
     mysteryGauntlet: {
       required: mysteryRequired,
       minSurfaces: envInteger("COOP_UI_MYSTERY_MIN_SURFACES", 6),
+    },
+    registeredInteractions: {
+      required: registeredInteractionsRequired,
+      // The exact registered-interaction fixture uses this to choose Revival Blessing as soon as
+      // its user replaces the deterministic self-faint. Zero keeps ordinary campaign move policy.
+      preferredMoveId: envInteger("COOP_UI_PREFERRED_MOVE_ID", 0) || null,
     },
     // Press-through of an UNKNOWN interactive surface, mirroring the headless `--auto-first`.
     // Gated to shakedown mode above; a gating/nightly run always loud-fails on the unknown.

@@ -118,6 +118,25 @@ export function isCoopBrowserCampaignFixtureBuild(): boolean {
   return env?.VITE_COOP_BROWSER_FIXTURE === "campaign-survival";
 }
 
+/** Whether this exact bundle was built for the Revival + Stormglass public-browser journey. */
+export function isCoopBrowserRegisteredInteractionFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "registered-interactions";
+}
+
+/**
+ * The registered-interaction fixture needs one later wave-start hook in addition to its visible
+ * starter roster. Require both the immutable build identity and one exact per-seat URL token so a
+ * copied query parameter can never alter an ordinary staging/production run.
+ */
+export function isCoopBrowserRegisteredInteractionFixtureActive(): boolean {
+  if (!isCoopBrowserRegisteredInteractionFixtureBuild() || typeof location === "undefined") {
+    return false;
+  }
+  const fixture = new URLSearchParams(location.search).get("coopfixture");
+  return fixture === "registered-owner" || fixture === "registered-partner";
+}
+
 /** Whether this exact bundle was built for the public two-browser Showdown battle journey. */
 export function isCoopBrowserShowdownFixtureBuild(): boolean {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
@@ -207,6 +226,41 @@ export function getCoopBrowserCampaignFixtureStarters(): Starter[] | null {
     passive: false,
     nature: Nature.MODEST,
     moveset: [MoveId.WATER_SPOUT] as StarterMoveset,
+    pokerus: false,
+    ivs: new Array(6).fill(31),
+  }));
+}
+
+/**
+ * Materialize the two real player rosters for the exact Revival + Stormglass journey.
+ *
+ * The owner first submits Healing Wish, publicly replaces into Seel, then selects Revival Blessing
+ * while Magikarp is fainted. Water Spout remains available after the one-PP revival so the same
+ * ordinary battle can finish. The partner's Splash keeps the wave alive until that interaction has
+ * occurred. Every species is one starter point, so the visible co-op budget remains legal.
+ */
+export function getCoopBrowserRegisteredInteractionFixtureStarters(): Starter[] | null {
+  if (!isCoopBrowserRegisteredInteractionFixtureActive() || typeof location === "undefined") {
+    return null;
+  }
+  const fixture = new URLSearchParams(location.search).get("coopfixture");
+  const specs =
+    fixture === "registered-owner"
+      ? [
+          { speciesId: SpeciesId.MAGIKARP, moveset: [MoveId.HEALING_WISH] },
+          { speciesId: SpeciesId.SEEL, moveset: [MoveId.REVIVAL_BLESSING, MoveId.WATER_SPOUT] },
+          { speciesId: SpeciesId.RATTATA, moveset: [MoveId.TACKLE] },
+        ]
+      : [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.SPLASH] }];
+  return specs.map(({ speciesId, moveset }) => ({
+    speciesId,
+    shiny: false,
+    variant: 0,
+    formIndex: 0,
+    abilityIndex: 0,
+    passive: false,
+    nature: Nature.HARDY,
+    moveset: moveset as StarterMoveset,
     pokerus: false,
     ivs: new Array(6).fill(31),
   }));

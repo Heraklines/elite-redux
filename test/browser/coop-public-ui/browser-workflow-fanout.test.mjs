@@ -176,7 +176,7 @@ test("journey starter fixtures require both the exact build and exact per-page U
 
   assert.match(
     jobBlock(workflow, "browser-build"),
-    /VITE_COOP_BROWSER_FIXTURE:.*commander-skip.*faint-replacement.*game-over.*showdown-battle.*off/u,
+    /VITE_COOP_BROWSER_FIXTURE:.*commander-skip.*faint-replacement.*game-over.*registered-interactions.*showdown-battle.*off/u,
     "the sealed bundle receives one exact fixture identity and defaults closed",
   );
   assert.match(
@@ -185,6 +185,10 @@ test("journey starter fixtures require both the exact build and exact per-page U
   );
   assert.match(registry, /isCoopBrowserFaintFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "faint-replacement"/u);
   assert.match(registry, /isCoopBrowserGameOverFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "game-over"/u);
+  assert.match(
+    registry,
+    /isCoopBrowserRegisteredInteractionFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "registered-interactions"/u,
+  );
   assert.match(
     registry,
     /isCoopBrowserShowdownFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "showdown-battle"/u,
@@ -202,9 +206,49 @@ test("journey starter fixtures require both the exact build and exact per-page U
     /getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*!isCoopBrowserGameOverFixtureBuild\(\)[\s\S]*get\("coopfixture"\)[\s\S]*"game-over"[\s\S]*MoveId\.MEMENTO/u,
   );
   assert.match(
+    registry,
+    /isCoopBrowserRegisteredInteractionFixtureActive\(\)[\s\S]*"registered-owner" \|\| fixture === "registered-partner"/u,
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserRegisteredInteractionFixtureStarters\(\)[\s\S]*isCoopBrowserRegisteredInteractionFixtureActive\(\)[\s\S]*fixture === "registered-owner"[\s\S]*MoveId\.HEALING_WISH[\s\S]*MoveId\.REVIVAL_BLESSING[\s\S]*MoveId\.WATER_SPOUT[\s\S]*MoveId\.SPLASH/u,
+  );
+  assert.match(
     starterHandler,
-    /getCoopBrowserCommanderFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserFaintFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*globalScene\.gameMode\.isCoop[\s\S]*seedTeamFromStarters\(coopBrowserStarters, \{ allowUncaught: true \}\)/u,
+    /getCoopBrowserCommanderFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserFaintFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserRegisteredInteractionFixtureStarters\(\)[\s\S]*globalScene\.gameMode\.isCoop[\s\S]*seedTeamFromStarters\(coopBrowserStarters, \{ allowUncaught: true \}\)/u,
     "only the normal visible co-op starter UI consumes the exact-gated fixture",
+  );
+});
+
+test("registered-interaction journey reaches Revival mid-turn and Stormglass at the next wave through public UI", async () => {
+  const [workflow, config, harness, commandPhase, campaign] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "src/phases/command-phase.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+  ]);
+  assert.match(workflow, /- registered-interactions/u);
+  assert.match(config, /"registered-interactions"/u);
+  assert.match(
+    workflow,
+    /COOP_UI_REQUIRE_REGISTERED_INTERACTIONS:.*registered-interactions.*'1'[\s\S]*COOP_UI_PREFERRED_MOVE_ID:.*'863'/u,
+  );
+  assert.match(workflow, /== "market-wide-lens" \|\| .* == "registered-interactions"[\s\S]*run-campaign\.mjs/u);
+  assert.match(harness, /journey === "registered-interactions"[\s\S]*"registered-owner"[\s\S]*"registered-partner"/u);
+  assert.match(
+    commandPhase,
+    /installCoopBrowserRegisteredInteractionFixture\(this\.fieldIndex\)[\s\S]*tryCoopCheckpointSync\(\)/u,
+    "the host grants Stormglass before sealing the first authoritative command checkpoint",
+  );
+  assert.match(
+    campaign,
+    /driveRegisteredInteraction = createBattleRegisteredInteractionDriver[\s\S]*waitForOutcomeBounded[\s\S]*driveRegisteredInteraction/u,
+    "the real mid-turn Revival surface remains driven while waiting for the next battle frontier",
+  );
+  assert.match(
+    campaign,
+    /registeredInteractionCoverage\.revival\.length !== 1[\s\S]*registeredInteractionCoverage\.stormglass\.length !== 1[\s\S]*campaign-registered-interactions/u,
   );
 });
 

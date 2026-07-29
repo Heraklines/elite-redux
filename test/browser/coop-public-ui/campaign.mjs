@@ -1215,6 +1215,7 @@ export async function waitForOutcomeBounded(
     animationProgressAllowanceMs = null,
     singleSidedConfirmMs = 0,
     driveTargetSelection = null,
+    driveRegisteredInteraction = null,
   } = {},
 ) {
   const clients = Object.values(rig.clients);
@@ -1323,6 +1324,14 @@ export async function waitForOutcomeBounded(
     if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
       return { kind: "turn-progress" };
     }
+    // Some registered interactions are real mid-turn human boundaries. Revival Blessing is the
+    // first deterministic example: both commands have already entered the authoritative turn, then
+    // one owner must choose a fainted party member while the peer remains an inert watcher. Keep
+    // this exact public UI-to-relay chain armed in every causal outcome wait instead of limiting the
+    // generic registered-surface driver to rewards/between-wave phases.
+    if (driveRegisteredInteraction && (await driveRegisteredInteraction())) {
+      continue;
+    }
     // A move submission can open SelectTargetPhase only after the final sequential command owner
     // has been removed from the command driver's pending set. The target is ordinary required human
     // input, not evidence that the move failed. Consume only the caller's exact-address, readiness-
@@ -1427,6 +1436,7 @@ async function driveBattleWave(rig, policy, stats) {
                 timeoutMs: rig.config.timeoutMs,
                 cycleIndex: turn - 1,
                 commandEvent,
+                preferredMoveId: policy.registeredInteractions.preferredMoveId,
               }),
       },
     );
@@ -1482,11 +1492,13 @@ async function driveBattleWave(rig, policy, stats) {
     });
     const driveTargetSelection = () =>
       rig.driveAddressedTargetSelection(from, expectedCommandAddress, `${purpose}-post-command-target`);
+    const driveRegisteredInteraction = createBattleRegisteredInteractionDriver(rig, policy, from, stats);
     let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, {
       stopOnTurnProgress: true,
       stopOnOwnedCommandFrontier: true,
       singleSidedConfirmMs: SINGLE_SIDED_COMMAND_CONFIRM_MS,
       driveTargetSelection,
+      driveRegisteredInteraction,
     });
     const fallbackClients = [];
     let turnProgressed = false;
@@ -1504,6 +1516,7 @@ async function driveBattleWave(rig, policy, stats) {
         // entered its turn path on a CPU-dilated runner. Keep the same exact-address semantic driver
         // armed throughout the causal wait; the consumed-instance ledger prevents duplicate input.
         driveTargetSelection,
+        driveRegisteredInteraction,
         extendForAnimationProgress: true,
         animationHardCeilingMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : null,
         animationProgressAllowanceMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS : null,
@@ -1539,6 +1552,7 @@ async function driveBattleWave(rig, policy, stats) {
         // Blind fallback can open the real target picker rather than submit the move. Continue the
         // address-bound UI-to-relay chain during this second wait instead of parking a real human UI.
         driveTargetSelection,
+        driveRegisteredInteraction,
         extendForAnimationProgress: true,
         animationHardCeilingMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : null,
         animationProgressAllowanceMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS : null,
@@ -1955,6 +1969,36 @@ export function pairedMysteryProjectionMatches(authority, observation, stage) {
   );
 }
 
+/**
+ * Select the newest globally ordered Mystery surface without treating the runtime host as a progress clock.
+ *
+ * Interaction ownership alternates independently of the transport role. At a wave edge the interaction owner can
+ * install N+1 before the runtime host has replaced its retained N surface. Canonizing the host in that window makes
+ * the campaign wait for an already-retired address forever. Prefer the greatest address within the same session;
+ * retain the runtime host only as the deterministic tie-breaker for two observations of that exact address.
+ */
+export function selectLatestMysteryAuthorityEvent(events) {
+  const hostEvent = events.find(event => event?.observation?.localRole === "host") ?? events[0];
+  if (hostEvent == null) {
+    throw new Error("[campaign-convergence] paired Mystery surface omitted every browser observation");
+  }
+  return events.reduce((selected, candidate) => {
+    const selectedAddress = selected?.observation?.address;
+    const candidateAddress = candidate?.observation?.address;
+    if (selectedAddress == null || candidateAddress == null || selectedAddress.epoch !== candidateAddress.epoch) {
+      return selected;
+    }
+    const selectedOrder = [selectedAddress.wave, selectedAddress.turn];
+    const candidateOrder = [candidateAddress.wave, candidateAddress.turn];
+    for (let index = 0; index < selectedOrder.length; index += 1) {
+      if (candidateOrder[index] !== selectedOrder[index]) {
+        return candidateOrder[index] > selectedOrder[index] ? candidate : selected;
+      }
+    }
+    return candidate.observation.localRole === "host" ? candidate : selected;
+  }, hostEvent);
+}
+
 async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, stage) {
   const clients = Object.values(rig.clients);
   let events = await Promise.all(
@@ -1977,11 +2021,11 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
   );
   let observations = events.map(surfaceEvent => surfaceEvent.observation);
   // A fast authority can open N+1 while the renderer is still installing the globally ordered terminal for
-  // N. That is a provisional frame, not proof of divergence. Use the authority browser's complete surface
+  // N. That is a provisional frame, not proof of divergence. Use the newest complete ordered surface
   // as the convergence target and require every browser to publish that exact immutable view within the
   // ordinary bounded surface deadline. A genuinely different digest/options/owner never matches and still
   // fails closed; this merely observes the same asynchronous projection edge humans experience.
-  const authorityEvent = events.find(surfaceEvent => surfaceEvent.observation.localRole === "host") ?? events[0];
+  const authorityEvent = selectLatestMysteryAuthorityEvent(events);
   const authority = authorityEvent.observation;
   // The two engines legitimately host the SAME mystery surface from different phase classes: the
   // authoritative host sits in MysteryEncounterPhase while the replaying guest presents it from
@@ -3384,6 +3428,30 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
   return null;
 }
 
+/**
+ * Drive registered interaction controls that can open after command submission but before the
+ * next command/reward frontier. Keep a per-turn appearance ledger so a still-rendered PARTY shell
+ * can never receive the same public action twice.
+ */
+function createBattleRegisteredInteractionDriver(rig, policy, cursors, stats) {
+  const revivalDriver = buildDispatchTable(policy).find(driver => driver.name === "revival");
+  if (revivalDriver == null) {
+    throw new Error("[campaign-revival] registered battle driver is missing from the dispatch table");
+  }
+  const handledIndex = new Map();
+  const rewardRetryState = { rejectedByAddress: new Map(), pendingTarget: null };
+  return async () =>
+    (await driveOnePendingSurface(
+      rig,
+      [revivalDriver],
+      cursors,
+      handledIndex,
+      stats,
+      policy.mode !== "shakedown",
+      rewardRetryState,
+    )) === "revival";
+}
+
 /** The most recent `Start Phase <Name>` across both clients, by monotonic time (comparable in-process). */
 function latestStartPhase(clients) {
   let best = null;
@@ -3764,6 +3832,7 @@ export async function runCampaign(rig) {
     market: policy.market,
     renderProfile: policy.renderProfile,
     mysteryGauntlet: policy.mysteryGauntlet,
+    registeredInteractions: policy.registeredInteractions,
     setupTimeoutMs: lifecycle.setupTimeoutMs,
   });
 
@@ -3776,7 +3845,10 @@ export async function runCampaign(rig) {
     await configureRenderProfile(rig, policy, progress);
     await rig.pair(rig.config.requesterSeat);
     await progress.note("public lobby pairing complete");
-    await rig.startFreshRun({ campaignSurvivalFixture: policy.mysteryGauntlet.required });
+    await rig.startFreshRun({
+      campaignSurvivalFixture: policy.mysteryGauntlet.required,
+      registeredInteractionsFixture: policy.registeredInteractions.required,
+    });
     await progress.note("fresh co-op run reached its first shared command surface");
     if (rig.config.expectReclaim) {
       // Dirty-account fidelity: the pre-seeded full accounts force the reclaim path, and the
@@ -3823,6 +3895,7 @@ export async function runCampaign(rig) {
   let status = "continue";
   const marketCoverage = { visits: [], purchases: [] };
   const mysteryCoverage = { events: [], battleKinds: [] };
+  const registeredInteractionCoverage = { revival: [], stormglass: [] };
   try {
     for (let ordinal = 1; ordinal <= policy.maxBattleLoops && wavesCleared < policy.targetWaves; ordinal++) {
       battleLoops = ordinal;
@@ -3975,6 +4048,32 @@ export async function runCampaign(rig) {
         );
       }
     }
+    if (policy.registeredInteractions.required) {
+      for (const client of clients) {
+        registeredInteractionCoverage.revival.push(
+          ...client.evidence.events.filter(event => event.kind === "campaign-revival-choice"),
+        );
+        registeredInteractionCoverage.stormglass.push(
+          ...client.evidence.events.filter(event => event.kind === "campaign-stormglass-choice"),
+        );
+      }
+      if (registeredInteractionCoverage.revival.length !== 1 || registeredInteractionCoverage.stormglass.length !== 1) {
+        throw new Error(
+          "[campaign-registered-interactions] exact fixture did not drive one Revival and one Stormglass choice: "
+            + JSON.stringify({
+              revival: registeredInteractionCoverage.revival,
+              stormglass: registeredInteractionCoverage.stormglass,
+            }),
+        );
+      }
+      const proof = {
+        revival: registeredInteractionCoverage.revival[0],
+        stormglass: registeredInteractionCoverage.stormglass[0],
+      };
+      for (const client of clients) {
+        client.evidence.record("campaign-registered-interaction-coverage", proof);
+      }
+    }
     if (status === "continue" && wavesCleared >= policy.targetWaves) {
       await rig.assertCurrentPresentationLedger(`campaign-final-wave-${wavesCleared}-presentation-ledger`);
       assertRetainedEvolutionPresentationParity(rig, policy);
@@ -3993,6 +4092,7 @@ export async function runCampaign(rig) {
       maxBattleLoops: policy.maxBattleLoops,
       marketCoverage,
       mysteryCoverage,
+      registeredInteractionCoverage,
     });
     await progress.writeStageRollup().catch(() => {});
     await progress.flush();

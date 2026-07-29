@@ -3029,7 +3029,7 @@ test("the Mystery campaign waits for exact authority-surface convergence across 
   const checkpointEnd = campaignDriver.indexOf("\nasync function", checkpointStart + 1);
   assert.ok(checkpointStart >= 0 && checkpointEnd > checkpointStart);
   const checkpoint = campaignDriver.slice(checkpointStart, checkpointEnd);
-  assert.match(checkpoint, /localRole === "host"/u);
+  assert.match(checkpoint, /selectLatestMysteryAuthorityEvent\(events\)/u);
   assert.match(checkpoint, /if \(!observations\.every\(matchesAuthority\)\)/u);
   assert.match(checkpoint, /paired Mystery \$\{stage\} convergence at/u);
 });

@@ -5561,3 +5561,32 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `git diff --check`. Full TypeScript still reports the repository's unrelated baseline and no diagnostic in the six
   changed files. No local engine or Chromium execution was used. Exact remote browser qualification is next; dedicated
   deterministic browser fixtures are still required before Revival and Stormglass occurrence coverage can be claimed.
+
+## 2026-07-29 - Registered interactions now have a deterministic real-browser occurrence oracle
+
+- Revival Blessing exposed a representativeness hole: the registered-surface driver ran only between waves, while the
+  production PARTY choice opens inside a live turn after both commands. Every causal post-command wait now keeps an
+  exact, appearance-ledger-protected Revival driver armed, including fallback and animation-extended waits.
+- The exact `registered-interactions` bundle seeds a point-legal public starter roster that self-faints, replaces into
+  a one-PP Revival user, and retains a damaging move. A build+URL+runtime-host+wave-1 gate grants one ordinary
+  Stormglass before the first authoritative command checkpoint, so its real picker opens at wave 2 on both browsers.
+- The workflow reaches both surfaces through normal keyboard/DOM input, prefers Revival only while observer-proven
+  usable, and fails unless exactly one Revival and one Stormglass choice event are recorded. Ordinary builds and every
+  other journey remain closed to both fixture paths.
+- The preceding checkpoint `5a4cc2c3b` is fully remote-green: focused aggregate `30493006862` and exact two-Chromium
+  fresh-wave2 journey `30493011238`. Local policy-safe evidence for this next checkpoint is 43/43 Mystery/browser
+  contracts, 11/11 workflow contracts, 107/107 Authority V2 source contracts, and no local engine/browser execution.
+
+## 2026-07-29 - Mystery convergence follows the ordered interaction frontier, not the transport role
+
+- Artifact `30491678972` was not a gameplay desync: both clients had mechanically reached wave 4 and ultimately
+  published the same wave-4 Mystery address, digest, owner, options, and encounter type. The failure occurred because
+  the interaction owner installed wave 4 while the runtime host still retained wave 3; the harness canonized the
+  runtime host's retired address and waited forever for the faster browser to travel backwards.
+- Paired Mystery convergence now selects the greatest wave/turn address within the same epoch, using runtime host only
+  as the deterministic tie-breaker once both observations describe that exact address. A failure-first contract uses
+  the artifact's real wave-3/wave-4 ordering.
+- The same artifact also contains a separate real presentation defect under a 12-second asset timeout: three guarded
+  `pkmn__741` animation failures followed by a fatal stale BBCodeText `drawImage` callback. This is not being excused as
+  harness noise; it remains the next production presentation-lifecycle investigation after the registered journey is
+  sealed and remotely qualified.

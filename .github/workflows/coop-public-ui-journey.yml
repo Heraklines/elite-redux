@@ -41,6 +41,7 @@ on:
           - faint-replacement
           - commander-skip
           - game-over
+          - registered-interactions
           - showdown-battle
           - resume-scan-isolation
           - save-mutations
@@ -283,7 +284,7 @@ jobs:
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
@@ -396,7 +397,7 @@ jobs:
           # Both visits must buy Wide Lens, return to the same grid, leave normally and prove
           # the following public command surface. This is one real run, so no save/runtime
           # fixture or cross-job aggregation can counterfeit the owner alternation.
-          COOP_UI_CAMPAIGN_WAVES: "20"
+          COOP_UI_CAMPAIGN_WAVES: ${{ inputs.journey == 'registered-interactions' && '1' || '20' }}
           COOP_UI_CAMPAIGN_MODE: gating
           COOP_UI_RENDER_PROFILE: animations-skipped-depth
           COOP_UI_REWARD_MODE: leave
@@ -406,6 +407,10 @@ jobs:
           COOP_UI_MARKET_SECOND_PURCHASE: "1"
           COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ inputs.journey == 'market-wide-lens' && '2' || '0' }}
           COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: ${{ inputs.journey == 'market-wide-lens' && '1' || '0' }}
+          # One exact, point-legal journey deterministically self-faints, revives through the real
+          # PARTY submenu, clears wave 1, then chooses the host's newly-held Stormglass at wave 2.
+          COOP_UI_REQUIRE_REGISTERED_INTERACTIONS: ${{ inputs.journey == 'registered-interactions' && '1' || '0' }}
+          COOP_UI_PREFERRED_MOVE_ID: ${{ inputs.journey == 'registered-interactions' && '863' || '0' }}
           # A measured 537 MB screenshot-enabled CDP performance trace starved two real 10x clients.
           # Normal two-player fidelity keeps PNGs, semantic/network JSONL, key latency, render and
           # WebRTC evidence while omitting only that optional timeline. Manual diagnostics may opt in.
@@ -429,7 +434,7 @@ jobs:
             [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
           done
           export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99
-          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" ]]; then
             node test/browser/coop-public-ui/run-campaign.mjs
           else
             node test/browser/coop-public-ui/run.mjs

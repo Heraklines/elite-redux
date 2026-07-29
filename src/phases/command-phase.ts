@@ -1,10 +1,12 @@
 import type { TurnCommand } from "#app/battle";
 import { MAX_TERAS_PER_ARENA } from "#app/constants";
+import { isCoopBrowserRegisteredInteractionFixtureActive } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { modifierTypes } from "#data/data-lists";
 import { isReleasedCommander } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
@@ -96,6 +98,37 @@ import i18next from "i18next";
 // browser runner before it is able to reach the same command point. Keep this command-only wait bounded,
 // but beyond the measured seven-minute browser ceiling; shop/route waits retain the tighter default.
 const COMMAND_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS = 7;
+
+/**
+ * Exact-build browser fixture: grant the host one ordinary, unconfigured Stormglass only after the
+ * first battle has reached CommandPhase. The host's immediately following authoritative checkpoint
+ * carries it to the replica, and wave 2 then opens the real one-time picker. This timing deliberately
+ * keeps initial co-op setup unchanged so the campaign itself must drive the registered surface.
+ */
+function installCoopBrowserRegisteredInteractionFixture(fieldIndex: number): void {
+  if (
+    fieldIndex !== 0
+    || getCoopController()?.role !== "host"
+    || globalScene.currentBattle?.waveIndex !== 1
+    || !isCoopBrowserRegisteredInteractionFixtureActive()
+  ) {
+    return;
+  }
+  const stormglassType = modifierTypes.ER_RELIC_STORMGLASS();
+  if (globalScene.findModifier(modifier => modifier.type.id === stormglassType.id) != null) {
+    return;
+  }
+  const stormglass = stormglassType.newModifier();
+  if (stormglass == null) {
+    failCoopSharedSession("Registered-interaction browser fixture could not construct Stormglass");
+    return;
+  }
+  if (!globalScene.addModifier(stormglass, true)) {
+    failCoopSharedSession("Registered-interaction browser fixture could not install Stormglass");
+    return;
+  }
+  coopLog("browser-fixture", "host granted exact registered-interaction Stormglass at wave 1 command");
+}
 
 export class CommandPhase extends FieldPhase {
   public readonly phaseName = "CommandPhase";
@@ -843,6 +876,7 @@ export class CommandPhase extends FieldPhase {
   }
 
   public override start(): void {
+    installCoopBrowserRegisteredInteractionFixture(this.fieldIndex);
     // The host's final turn-one entry image must exist BEFORE Authority V2 authors command-open.
     // PostSummon can mutate weather, terrain, HP, forms, stages, and presentation after the encounter's
     // original wave-start carrier. Previously the V2 gate captured that older image first, then

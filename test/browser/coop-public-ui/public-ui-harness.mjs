@@ -64,6 +64,7 @@ const RENDEZVOUS_RECOVERY_RETRY_POINT =
 const TATSUGIRI_SPECIES_ID = 978;
 const DONDOZO_SPECIES_ID = 977;
 const MAGIKARP_SPECIES_ID = 129;
+const RATTATA_SPECIES_ID = 19;
 const CROBAT_SPECIES_ID = 169;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
@@ -1070,6 +1071,8 @@ export class PublicUiClient {
       );
     } else if (this.config.journey === "game-over") {
       entryUrl.searchParams.set("coopfixture", "game-over");
+    } else if (this.config.journey === "registered-interactions") {
+      entryUrl.searchParams.set("coopfixture", this.label === "host-seat" ? "registered-owner" : "registered-partner");
     } else if (this.config.journey === "showdown-battle") {
       entryUrl.searchParams.set("coopfixture", "showdown-battle");
       // Showdown remains deliberately disabled for ordinary players while the mode is under
@@ -3451,6 +3454,7 @@ export class DuoPublicUiRig {
     faintFixture = false,
     gameOverFixture = false,
     campaignSurvivalFixture = false,
+    registeredInteractionsFixture = false,
   } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
@@ -3535,7 +3539,11 @@ export class DuoPublicUiRig {
                 ? [CROBAT_SPECIES_ID]
                 : campaignSurvivalFixture
                   ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
-                  : null;
+                  : registeredInteractionsFixture
+                    ? client.label === "host-seat"
+                      ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID, RATTATA_SPECIES_ID]
+                      : [BULBASAUR_SPECIES_ID]
+                    : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {
