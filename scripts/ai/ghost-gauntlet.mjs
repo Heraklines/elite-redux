@@ -42,9 +42,6 @@ export function validateGhostFixture(fixture) {
   if (fixture?.schemaVersion !== 2 || !Array.isArray(fixture.teams) || fixture.teams.length < 2) {
     throw new Error("ghost fixture must contain at least two schema-v2 teams");
   }
-  if (fixture.teams.length % 2 !== 0) {
-    throw new Error("ghost fixture team count must be even so every matchup has an inverse leg");
-  }
   const ids = new Set();
   for (const team of fixture.teams) {
     validateGhostTeam(team, ids);
@@ -70,6 +67,9 @@ function scenarioMember(member, enemy) {
 
 export function buildGhostPair(fixture, pairIndex) {
   validateGhostFixture(fixture);
+  if (fixture.teams.length % 2 !== 0) {
+    throw new Error("evaluation fixture team count must be even so every matchup has an inverse leg");
+  }
   const pairCount = fixture.teams.length / 2;
   if (!Number.isInteger(pairIndex) || pairIndex < 0 || pairIndex >= pairCount) {
     throw new Error(`pair index must be from 0 through ${pairCount - 1}`);
@@ -102,6 +102,67 @@ export function buildGhostPair(fixture, pairIndex) {
     },
     legA: buildLeg("a", teamA, teamB),
     legB: buildLeg("b", teamB, teamA),
+  };
+}
+
+const roundRobinCache = new Map();
+
+function roundRobinPairs(teamCount) {
+  const cached = roundRobinCache.get(teamCount);
+  if (cached) {
+    return cached;
+  }
+  const participants = Array.from({ length: teamCount }, (_, index) => index);
+  if (participants.length % 2 !== 0) {
+    participants.push(null);
+  }
+  const pairs = [];
+  for (let round = 0; round < participants.length - 1; round++) {
+    for (let slot = 0; slot < participants.length / 2; slot++) {
+      const first = participants[slot];
+      const second = participants.at(-slot - 1);
+      if (first != null && second != null) {
+        pairs.push([first, second]);
+      }
+    }
+    participants.splice(1, 0, participants.pop());
+  }
+  roundRobinCache.set(teamCount, pairs);
+  return pairs;
+}
+
+export function buildGhostSelfPlayScenario(fixture, episodeIndex) {
+  validateGhostFixture(fixture);
+  if (!Number.isInteger(episodeIndex) || episodeIndex < 0) {
+    throw new Error(`episode index must be a non-negative integer: ${episodeIndex}`);
+  }
+  const pairCount = (fixture.teams.length * (fixture.teams.length - 1)) / 2;
+  const inversePairIndex = Math.floor(episodeIndex / 2);
+  const pairIndex = inversePairIndex % pairCount;
+  const cycle = Math.floor(inversePairIndex / pairCount);
+  const [firstIndex, secondIndex] = roundRobinPairs(fixture.teams.length)[pairIndex];
+  const reverse = episodeIndex % 2 === 1;
+  const player = fixture.teams[reverse ? secondIndex : firstIndex];
+  const enemy = fixture.teams[reverse ? firstIndex : secondIndex];
+  const format = ["single", "double", "triple"][(pairIndex + cycle) % 3];
+  const seed = `er-ai-selfplay-v1-${pairIndex}-${cycle}`;
+  return {
+    v: 1,
+    name: `Ghost self-play ${player.id} vs ${enemy.id}`,
+    notes:
+      "Combat-only training episode from source-disjoint sanitized winning Hell ghosts. Saved movesets and reconstructable per-Pokemon held items are preserved.",
+    run: {
+      wave: 199,
+      level: 200,
+      seed,
+      difficulty: "hell",
+      enemyAi: "hardest",
+      ...(format === "single" ? { double: false } : {}),
+      ...(format === "double" ? { double: true } : {}),
+      ...(format === "triple" ? { triple: true } : {}),
+    },
+    party: player.members.map(member => scenarioMember(member, false)),
+    enemy: { kind: "party", party: enemy.members.map(member => scenarioMember(member, true)) },
   };
 }
 

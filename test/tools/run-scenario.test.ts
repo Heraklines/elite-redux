@@ -161,6 +161,7 @@ import { Move } from "#moves/move";
 import type { CommandPhase } from "#phases/command-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
+import { PromptHandler } from "#test/helpers/prompt-handler";
 import type { AbstractOptionSelectUiHandler } from "#ui/handlers/abstract-option-select-ui-handler";
 import type { BiomeShopUiHandler } from "#ui/handlers/biome-shop-ui-handler";
 import type { ErMapUiHandler } from "#ui/handlers/er-map-ui-handler";
@@ -315,6 +316,16 @@ type RunnerInput = ScenarioSpec & {
   learnMove?: { slot: number };
 };
 
+interface CombatBatchEpisode {
+  id: string;
+  scenario: RunnerInput;
+}
+
+interface CombatBatchInput {
+  version: 1;
+  episodes: CombatBatchEpisode[];
+}
+
 /** Per-launch determinism / RNG knobs. */
 interface LaunchOpts {
   noMiss?: boolean;
@@ -349,9 +360,13 @@ const DEMO_SPEC: ScenarioSpec = {
 };
 
 const RAW = (process.env.ER_RUN_SCENARIO ?? "").trim();
-const INPUT = resolveSpec(RAW);
+const COMBAT_BATCH = resolveCombatBatch((process.env.ER_RUN_COMBAT_BATCH ?? "").trim());
+const INPUT = COMBAT_BATCH?.episodes[0]?.scenario ?? resolveSpec(RAW);
 mergePolicyOverride(INPUT); // shallow-merge a `--policy @file.json` blob over the spec
 normalizeSpec(INPUT); // resolve any enum NAMES (species/ability/move/…) to ids
+for (const episode of COMBAT_BATCH?.episodes ?? []) {
+  normalizeSpec(episode.scenario);
+}
 const SPEC: ScenarioSpec | null = INPUT;
 const SCRIPT = INPUT?.script;
 const EXPECT = INPUT?.expect;
@@ -368,7 +383,7 @@ const AI_DATA_OUT = (process.env.ER_RUN_AI_DATA_OUT ?? "").trim();
 const AI_BUILD_SHA = (process.env.ER_AI_BUILD_SHA ?? process.env.GITHUB_SHA ?? "local").trim();
 const AI_DEX_HASH = (process.env.ER_AI_DEX_HASH ?? "unknown").trim();
 const AI_DICTIONARY_HASH = (process.env.ER_AI_DICTIONARY_HASH ?? "unknown").trim();
-const AI_EPISODE_ID = (process.env.ER_AI_EPISODE_ID ?? INPUT?.run?.seed ?? "local-episode").trim();
+let activeAiEpisodeId = (process.env.ER_AI_EPISODE_ID ?? INPUT?.run?.seed ?? "local-episode").trim();
 const AI_DATASET_RECORDS: ErCombatDatasetRecord[] = [];
 const AI_MODEL_PATH = (process.env.ER_AI_POLICY_MODEL ?? "").trim();
 const AI_POLICY_MODE = (process.env.ER_AI_POLICY_MODE ?? "first-usable").trim();
@@ -487,6 +502,29 @@ function resolveSpec(raw: string): RunnerInput | null {
   }
   const json = raw.startsWith("@") ? readFileSync(raw.slice(1), "utf8") : raw;
   return JSON.parse(json) as RunnerInput;
+}
+
+function resolveCombatBatch(raw: string): CombatBatchInput | null {
+  if (!raw) {
+    return null;
+  }
+  const json = raw.startsWith("@") ? readFileSync(raw.slice(1), "utf8") : raw;
+  const batch = JSON.parse(json) as CombatBatchInput;
+  if (batch.version !== 1 || !Array.isArray(batch.episodes) || batch.episodes.length === 0) {
+    throw new Error("combat batch must be version 1 with at least one episode");
+  }
+  const ids = new Set<string>();
+  for (const [index, episode] of batch.episodes.entries()) {
+    if (!episode || typeof episode.id !== "string" || episode.id.trim() === "" || !episode.scenario) {
+      throw new Error(`combat batch episode ${index} needs a non-empty id and scenario`);
+    }
+    episode.id = episode.id.trim();
+    if (ids.has(episode.id)) {
+      throw new Error(`duplicate combat batch episode id: ${episode.id}`);
+    }
+    ids.add(episode.id);
+  }
+  return batch;
 }
 
 /** A move id or enum-name -> MoveId (null if unresolvable). */
@@ -688,7 +726,15 @@ function applyAction(
     const usable = mon.getMoveset().find(m => m.ppUsed < m.getMovePp());
     moveId = usable ? usable.moveId : MoveId.STRUGGLE;
   }
-  const target = action.target == null ? undefined : (action.target as BattlerIndex);
+  // Singles never open SelectTargetPhase, so do not leave a target prompt queued
+  // behind moves such as Revival Blessing. Multi-format actions still carry the
+  // explicit target selected by the policy/candidate extractor.
+  const target =
+    action.target == null && game.scene.currentBattle.getBattlerCount() === 1
+      ? null
+      : action.target == null
+        ? undefined
+        : (action.target as BattlerIndex);
   const tera = !!action.tera;
   const inMoveset = moveInUsableMoveset(mon, moveId);
 
@@ -701,7 +747,7 @@ function applyAction(
     log.push(`slot${idx}: ${MoveId[moveId]}${tera ? " (tera)" : ""} [select]`);
   } else {
     // Fallback only: the scripted move isn't in the real moveset, so splice it in.
-    game.move.use(moveId, idx, target, tera);
+    game.move.use(moveId, idx, target ?? undefined, tera);
     log.push(`slot${idx}: ${MoveId[moveId]}${tera ? " (tera)" : ""} [use — not in moveset, moveset replaced]`);
   }
 }
@@ -811,7 +857,7 @@ function recordAiTurn(
   const scene = game.scene;
   const wave = scene.currentBattle.waveIndex;
   const turn = scene.currentBattle.turn;
-  const jointActionId = `${AI_EPISODE_ID}:${wave}:${turn}`;
+  const jointActionId = `${activeAiEpisodeId}:${wave}:${turn}`;
   const earlier: ErCombatEarlierChoice[] = [];
   const field = scene.getPlayerField();
   for (let actorSlot = 0; actorSlot < field.length; actorSlot++) {
@@ -884,7 +930,7 @@ function buildAiDecisionForSlot({
         : candidate,
     );
     throw new Error(
-      `AI dataset label did not map to one legal candidate: episode=${AI_EPISODE_ID} `
+      `AI dataset label did not map to one legal candidate: episode=${activeAiEpisodeId} `
         + `decision=${jointActionId}:${actorSlot} action=${JSON.stringify(perSlotAction)} `
         + `actor=${mon.id} target=${JSON.stringify(chosenTargetRef(game, perSlotAction.target))} `
         + `candidates=${JSON.stringify(diagnostics)}`,
@@ -897,7 +943,7 @@ function buildAiDecisionForSlot({
     buildSha: AI_BUILD_SHA,
     dexHash: AI_DEX_HASH,
     dictionaryHash: AI_DICTIONARY_HASH,
-    episodeId: AI_EPISODE_ID,
+    episodeId: activeAiEpisodeId,
     jointActionId,
     decisionId: `${jointActionId}:${actorSlot}`,
     sourcePolicy,
@@ -1550,6 +1596,9 @@ function effectiveBattleStyle(spec: ScenarioSpec): "single" | "double" | "triple
   if (spec.run?.double) {
     return "double";
   }
+  if (spec.run?.double === false) {
+    return "single";
+  }
   if (spec.enemy?.kind === "party" && (spec.enemy.party?.length ?? 0) >= 2) {
     return "double";
   }
@@ -1617,7 +1666,16 @@ async function playBattle(
         await forceEnemyActions(game, action, actionLog);
       }
 
-      await game.toEndOfTurn();
+      try {
+        await game.toEndOfTurn();
+      } catch (error) {
+        const phaseName = game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "";
+        if (phaseName === "TitlePhase" || phaseName === "GameOverPhase" || phaseName === "EndCardPhase") {
+          wiped = game.scene.getPlayerParty().every(pokemon => pokemon.isFainted());
+          break;
+        }
+        throw error;
+      }
       fullLog.push(...game.textInterceptor.logs); // this turn's messages
       game.textInterceptor.clearLogs();
       for (const m of [...game.scene.getPlayerField(), ...game.scene.getEnemyField()]) {
@@ -1854,7 +1912,12 @@ function isAutopilotMode(phaseName: string, mode: UiMode): boolean {
         || phaseName === "CheckSwitchPhase"
       );
     case UiMode.PARTY:
-      return phaseName === "SelectModifierPhase" || phaseName === "SwitchPhase" || phaseName === "AttemptCapturePhase";
+      return (
+        phaseName === "SelectModifierPhase"
+        || phaseName === "SwitchPhase"
+        || phaseName === "AttemptCapturePhase"
+        || phaseName === "RevivalBlessingPhase"
+      );
     case UiMode.SUMMARY:
       return phaseName === "LearnMovePhase" || phaseName === "AttemptCapturePhase";
     case UiMode.MESSAGE:
@@ -2045,6 +2108,17 @@ function driveLearnMoveSummary(game: GameManager, st: RunState): void {
 
 function driveParty(game: GameManager, st: RunState, phaseName: string): void {
   const handler = game.scene.ui.getHandler() as PartyUiHandler;
+  if (phaseName === "RevivalBlessingPhase") {
+    const slot = game.scene.getPlayerParty().findIndex(pokemon => pokemon.isFainted());
+    if (slot < 0) {
+      throw new Error("Revival Blessing opened its party target menu without a fainted Pokemon");
+    }
+    handler.setCursor(slot);
+    handler.processInput(Button.ACTION);
+    handler.processInput(Button.ACTION);
+    st.log.push(`revival-blessing -> party[${slot}]`);
+    return;
+  }
   if (phaseName === "SwitchPhase") {
     const party = game.scene.getPlayerParty();
     const battlerCount = game.scene.currentBattle.getBattlerCount();
@@ -2497,7 +2571,7 @@ function treeModelAction(game: GameManager, model: ErTreeModelArtifact): TurnAct
         score: scoreErTreeModel(model, extractErCombatCandidateFeatures(observation, candidate)),
       }))
       .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id));
-    const policyKey = `${AI_EPISODE_ID}:${observation.wave}:${observation.turn}:${actorSlot}`;
+    const policyKey = `${activeAiEpisodeId}:${observation.wave}:${observation.turn}:${actorSlot}`;
     const explore = AI_POLICY_EPSILON > 0 && deterministicPolicyFraction(`${policyKey}:explore`) < AI_POLICY_EPSILON;
     const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * candidates.length);
     const chosen = (explore ? candidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate;
@@ -2547,6 +2621,12 @@ async function playWaveTurns(
     if (st.driveError) {
       break;
     }
+    if (COMBAT_BATCH) {
+      // A move whose own phase owns targeting can bypass SelectTargetPhase. Any
+      // helper prompt left from that completed turn must not head-block the next
+      // real CommandPhase in a long unattended batch.
+      game.promptHandler.clearPrompts();
+    }
     // Scripted action for this turn; else force the requested move; else pick the best
     // damaging move per slot (so type immunities don't wall an otherwise-winnable wave).
     const scriptedAction = opts.script?.[turn - 1];
@@ -2576,7 +2656,19 @@ async function playWaveTurns(
           runEnded: true,
         };
       }
-      throw e;
+      const pendingPrompts = (
+        game.promptHandler as unknown as {
+          prompts?: Array<{ phaseTarget?: string; mode?: UiMode }>;
+        }
+      ).prompts;
+      const promptSummary = pendingPrompts
+        ?.map(prompt => `${prompt.phaseTarget ?? "?"}/${getUiModeName(prompt.mode ?? UiMode.MESSAGE)}`)
+        .join(", ");
+      throw new Error(
+        `${e instanceof Error ? e.message : String(e)}`
+          + `\nRecent combat actions: ${st.log.slice(-12).join(" | ") || "(none)"}`
+          + `\nPending prompts: ${promptSummary || "(none)"}`,
+      );
     }
     fullLog.push(...game.textInterceptor.logs);
     game.textInterceptor.clearLogs();
@@ -2752,7 +2844,112 @@ async function playRun(
   };
 }
 
-const RUN = !!SPEC && process.env.ER_SCENARIO === "1";
+interface CombatBatchEpisodeResult {
+  id: string;
+  outcome: string;
+  turns: number;
+  startWave: number;
+  finalWave: number;
+  bootMs: number;
+  combatMs: number;
+  decisions: number;
+  progressionPhaseEntries: number;
+}
+
+function assertCombatOnlyEpisode(episode: CombatBatchEpisode): void {
+  const spec = episode.scenario;
+  if (spec.run?.difficulty !== "hell" || spec.run?.enemyAi !== "hardest") {
+    throw new Error(`${episode.id}: combat batches require Hell difficulty and enemyAi=hardest`);
+  }
+  if (spec.enemy?.kind !== "party" && spec.enemy?.kind !== "trainer") {
+    throw new Error(`${episode.id}: combat batches require a trainer or custom trainer party`);
+  }
+  if (
+    (spec.run?.waves ?? 1) !== 1
+    || (spec.rewards?.length ?? 0) > 0
+    || (spec.items?.shop?.length ?? 0) > 0
+    || usesFullRunPolicy(spec)
+  ) {
+    throw new Error(`${episode.id}: rewards and run-progression policy are forbidden in combat batches`);
+  }
+}
+
+async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput): Promise<void> {
+  const results: CombatBatchEpisodeResult[] = [];
+  const batchStart = performance.now();
+  for (const episode of batch.episodes) {
+    assertCombatOnlyEpisode(episode);
+    activeAiEpisodeId = episode.id;
+    const recordStart = AI_DATASET_RECORDS.length;
+    const bootStart = performance.now();
+    const game = await launchScenario(phaserGame, episode.scenario, { realRng: REAL_RNG });
+    const bootMs = Math.round(performance.now() - bootStart);
+    const combatStart = performance.now();
+    const state = newRunState(buildPolicy(episode.scenario, true));
+    const stopAutopilot = installMenuAutopilot(game, state);
+    const fullLog: string[] = [];
+    const result = await playWaveTurns(
+      game,
+      state,
+      { forcedMove: FORCED_MOVE, maxTurns: MAX_TURNS, quiet: true },
+      fullLog,
+    ).finally(stopAutopilot);
+    const combatMs = Math.round(performance.now() - combatStart);
+    const currentPhase = game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "";
+    const forbiddenProgressionPhases = new Set(["SelectModifierPhase", "BiomeShopPhase", "NewBattlePhase"]);
+    const progressionPhaseEntries = game.phaseInterceptor.log.filter(phase =>
+      forbiddenProgressionPhases.has(phase),
+    ).length;
+    if (currentPhase === "SelectModifierPhase" || progressionPhaseEntries > 0) {
+      throw new Error(`${episode.id}: combat-only worker entered a reward or progression phase`);
+    }
+    appendAiEpisodeTerminal({
+      outcome: result.won ? "victory" : result.wiped || result.runEnded ? "player-wiped" : "max-turns-reached",
+      startWave: episode.scenario.run?.wave ?? 1,
+      finalWave: episode.scenario.run?.wave ?? 1,
+      wavesCleared: result.won ? 1 : 0,
+    });
+    const decisions = AI_DATASET_RECORDS.slice(recordStart).filter(record => record.kind === "combat_decision").length;
+    results.push({
+      id: episode.id,
+      outcome: result.won ? "victory" : result.wiped || result.runEnded ? "player-wiped" : "max-turns-reached",
+      turns: result.turns,
+      startWave: episode.scenario.run?.wave ?? 1,
+      finalWave: episode.scenario.run?.wave ?? 1,
+      bootMs,
+      combatMs,
+      decisions,
+      progressionPhaseEntries,
+    });
+    console.log(
+      `COMBAT EPISODE ${episode.id}: ${results.at(-1)?.outcome}, ${result.turns} turns, `
+        + `${combatMs}ms combat, ${bootMs}ms reset, ${decisions} decisions`,
+    );
+    game.promptHandler.clearPrompts();
+    clearInterval(PromptHandler.runInterval);
+    PromptHandler.runInterval = undefined;
+    vi.restoreAllMocks();
+  }
+  flushAiDataset();
+  const totalMs = Math.round(performance.now() - batchStart);
+  const summary = {
+    version: 1,
+    combatOnly: true,
+    hardestTrainerAi: true,
+    progressionPhaseEntries: results.reduce((total, result) => total + result.progressionPhaseEntries, 0),
+    episodeCount: results.length,
+    totalMs,
+    averageMsPerEpisode: Math.round(totalMs / results.length),
+    results,
+  };
+  if (JSON_OUT) {
+    mkdirSync(dirname(JSON_OUT), { recursive: true });
+    writeFileSync(JSON_OUT, JSON.stringify(summary, null, 2));
+  }
+  console.log(`BATCH RESULT ${JSON.stringify(summary)}`);
+}
+
+const RUN = (!!SPEC || !!COMBAT_BATCH) && process.env.ER_SCENARIO === "1";
 
 describe.skipIf(!RUN)("headless scenario runner", () => {
   let phaserGame: Phaser.Game;
@@ -2762,6 +2959,10 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
   });
 
   it(`plays scenario: ${SPEC?.name || RAW}`, async () => {
+    if (COMBAT_BATCH) {
+      await playCombatBatch(phaserGame, COMBAT_BATCH);
+      return;
+    }
     const spec = SPEC as RunnerInput;
     console.log(`\n===== SCENARIO: ${spec.name || "(unnamed)"} =====`);
     console.log(describeScenarioSpec(spec));
@@ -2944,23 +3145,42 @@ function writeAiDataOut(result: { outcome: string; startWave: number; finalWave:
   if (!AI_DATA_OUT) {
     return;
   }
+  appendAiEpisodeTerminal(result);
+  flushAiDataset();
+}
+
+function appendAiEpisodeTerminal(result: {
+  outcome: string;
+  startWave: number;
+  finalWave: number;
+  wavesCleared: number;
+}): void {
   AI_DATASET_RECORDS.push({
     kind: "episode_terminal",
     schemaVersion: ER_COMBAT_CONTRACT_VERSION,
     buildSha: AI_BUILD_SHA,
     dexHash: AI_DEX_HASH,
     dictionaryHash: AI_DICTIONARY_HASH,
-    episodeId: AI_EPISODE_ID,
+    episodeId: activeAiEpisodeId,
     outcome: result.outcome,
     startWave: result.startWave,
     finalWave: result.finalWave,
     wavesCleared: result.wavesCleared,
     truncated: !["victory", "player-wiped"].includes(result.outcome),
   });
+}
+
+function flushAiDataset(): void {
+  if (!AI_DATA_OUT) {
+    return;
+  }
   try {
     mkdirSync(dirname(AI_DATA_OUT), { recursive: true });
     writeFileSync(AI_DATA_OUT, `${AI_DATASET_RECORDS.map(record => JSON.stringify(record)).join("\n")}\n`);
-    console.log(`AI dataset written to ${AI_DATA_OUT} (${AI_DATASET_RECORDS.length - 1} decisions + terminal)`);
+    const terminals = AI_DATASET_RECORDS.filter(record => record.kind === "episode_terminal").length;
+    console.log(
+      `AI dataset written to ${AI_DATA_OUT} (${AI_DATASET_RECORDS.length - terminals} decisions + ${terminals} terminals)`,
+    );
   } catch (err) {
     throw new Error(`could not write AI dataset: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -2978,6 +3198,7 @@ const NEWCOMER_SIGNATURE_CHECK = process.env.ER_NEWCOMER_SIGNATURE_CHECK === "1"
 const SELF_CHECK =
   process.env.ER_SCENARIO === "1"
   && !process.env.ER_RUN_SCENARIO
+  && !process.env.ER_RUN_COMBAT_BATCH
   && !EASY_ABILITY_ADDITION_CHECK
   && !NEWCOMER_SIGNATURE_CHECK;
 

@@ -1,53 +1,42 @@
 #!/usr/bin/env node
-/*
- * Build one deterministic, format-varied scenario for the non-production AI pilot.
- */
+/* Build one deterministic combat-only episode from the held-out ghost training pool. */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { buildGhostSelfPlayScenario, readGhostFixture } from "./ghost-gauntlet.mjs";
 
-const shard = Number.parseInt(process.argv[2] ?? "0", 10);
-const output = process.argv[3];
-if (!Number.isInteger(shard) || shard < 0 || !output) {
-  console.error("usage: node scripts/ai/make-pilot-scenario.mjs SHARD OUTPUT.json");
-  process.exit(2);
+export const DEFAULT_SELF_PLAY_FIXTURE = "ml/training/ghost-self-play-teams.v1.json";
+
+export function buildPilotScenario(episodeIndex, fixture) {
+  const source = fixture ?? readGhostFixture(DEFAULT_SELF_PLAY_FIXTURE);
+  return buildGhostSelfPlayScenario(source, episodeIndex);
 }
 
-const party = [
-  { species: "SNORLAX", moves: ["BODY_SLAM", "EARTHQUAKE", "CRUNCH", "REST"] },
-  { species: "CHARIZARD", moves: ["FLAMETHROWER", "AIR_SLASH", "DRAGON_PULSE", "ROOST"] },
-  { species: "BLASTOISE", moves: ["SURF", "ICE_BEAM", "AURA_SPHERE", "PROTECT"] },
-  { species: "VENUSAUR", moves: ["GIGA_DRAIN", "SLUDGE_BOMB", "EARTH_POWER", "SYNTHESIS"] },
-  { species: "GARCHOMP", moves: ["EARTHQUAKE", "DRAGON_CLAW", "STONE_EDGE", "SWORDS_DANCE"] },
-  { species: "GARDEVOIR", moves: ["PSYCHIC", "MOONBLAST", "SHADOW_BALL", "CALM_MIND"] },
-];
-const waveBands = [1, 41, 81, 121, 151, 181];
-const formats = ["single", "double", "triple"];
-const format = formats[shard % formats.length];
-const wave = waveBands[shard % waveBands.length];
-const level = Math.min(200, wave + 20);
-const activeCount = format === "triple" ? 3 : format === "double" ? 2 : 1;
-const enemy = [...party]
-  .reverse()
-  .slice(0, activeCount)
-  .map(mon => ({ ...mon, level }));
-const spec = {
-  v: 1,
-  name: `AI baseline pilot shard ${shard}`,
-  notes: "Synthetic GitHub-runner episode. Never deployed or uploaded as player telemetry.",
-  run: {
-    wave,
-    level,
-    seed: `er-ai-pilot-v1-${shard}`,
-    difficulty: "hell",
-    enemyAi: "hardest",
-    ...(format === "double" ? { double: true } : {}),
-    ...(format === "triple" ? { triple: true } : {}),
-  },
-  party,
-  enemy: { kind: "party", party: enemy },
-  rewards: Array.from({ length: 50 }, () => "FIRST"),
-};
+function main() {
+  const episodeIndex = Number.parseInt(process.argv[2] ?? "0", 10);
+  const output = process.argv[3];
+  const fixturePath = process.argv[4] ?? DEFAULT_SELF_PLAY_FIXTURE;
+  if (!Number.isInteger(episodeIndex) || episodeIndex < 0 || !output) {
+    console.error("usage: node scripts/ai/make-pilot-scenario.mjs EPISODE OUTPUT.json [GHOST_FIXTURE.json]");
+    process.exit(2);
+  }
+  const spec = buildPilotScenario(episodeIndex, readGhostFixture(fixturePath));
+  mkdirSync(dirname(output), { recursive: true });
+  writeFileSync(output, JSON.stringify(spec, null, 2));
+  console.log(
+    JSON.stringify({
+      episodeIndex,
+      output,
+      fixturePath,
+      wave: spec.run.wave,
+      level: spec.run.level,
+      format: spec.run.triple ? "triple" : spec.run.double ? "double" : "single",
+      player: spec.name.match(/Ghost self-play (.+) vs /)?.[1],
+      enemy: spec.name.match(/ vs (.+)$/)?.[1],
+    }),
+  );
+}
 
-mkdirSync(dirname(output), { recursive: true });
-writeFileSync(output, JSON.stringify(spec, null, 2));
-console.log(JSON.stringify({ shard, output, wave, level, format }));
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+  main();
+}

@@ -9,6 +9,15 @@ if (!withoutCapturePath || !withCapturePath || !datasetPath) {
 
 function normalizedResult(path) {
   const result = JSON.parse(readFileSync(path, "utf8"));
+  if (result.combatOnly === true) {
+    const { totalMs: _totalMs, averageMsPerEpisode: _averageMsPerEpisode, ...stable } = result;
+    return {
+      ...stable,
+      results: stable.results.map(
+        ({ bootMs: _episodeBootMs, combatMs: _episodeCombatMs, decisions: _decisions, ...episode }) => episode,
+      ),
+    };
+  }
   const { totalMs: _totalMs, bootMs: _bootMs, msPerWave: _msPerWave, waves = [], ...stable } = result;
   const { biomeOptions: _biomeOptions, ...stableState } = stable.state ?? {};
   return {

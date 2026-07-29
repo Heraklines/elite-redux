@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
-const [inputPath, outputPath, teamCountRaw = "100", capturedDate = new Date().toISOString().slice(0, 10)] =
-  process.argv.slice(2);
+const [
+  inputPath,
+  outputPath,
+  teamCountRaw = "100",
+  capturedDate = new Date().toISOString().slice(0, 10),
+  trainingOutputPath,
+] = process.argv.slice(2);
 if (!inputPath || !outputPath) {
-  console.error("usage: node scripts/ai/build-ghost-anchor.mjs RAW_D1.json OUTPUT.json [TEAM_COUNT] [YYYY-MM-DD]");
+  console.error(
+    "usage: node scripts/ai/build-ghost-anchor.mjs RAW_D1.json EVAL.json [TEAM_COUNT] [YYYY-MM-DD] [TRAINING.json]",
+  );
   process.exit(2);
 }
 
@@ -137,39 +145,75 @@ const sourceGroups = [...groups.values()]
     hash(a.map(row => row.fingerprint).join("|")).localeCompare(hash(b.map(row => row.fingerprint).join("|"))),
   );
 
-// Maximize source diversity: take every source's first roster before any source's second.
-const selected = [];
-for (let pass = 0; selected.length < requestedTeamCount; pass++) {
-  let added = 0;
-  for (const group of sourceGroups) {
-    if (group[pass] && selected.length < requestedTeamCount) {
-      selected.push(group[pass]);
-      added++;
+function chooseEvaluationGroups(allGroups, teamCount) {
+  const total = allGroups.reduce((sum, group) => sum + group.length, 0);
+  const targetSourceCount = Math.round((allGroups.length * teamCount) / total);
+  const choices = Array.from({ length: total + 1 }, () => new Map());
+  choices[0].set(0, []);
+  for (let groupIndex = 0; groupIndex < allGroups.length; groupIndex++) {
+    const size = allGroups[groupIndex].length;
+    for (let sum = total - size; sum >= 0; sum--) {
+      for (const [sourceCount, existing] of [...choices[sum]]) {
+        const nextSum = sum + size;
+        const nextSourceCount = sourceCount + 1;
+        if (!choices[nextSum].has(nextSourceCount)) {
+          choices[nextSum].set(nextSourceCount, [...existing, groupIndex]);
+        }
+      }
     }
   }
-  if (added === 0) {
-    break;
+  for (let sum = teamCount; sum < choices.length; sum++) {
+    const sourceChoices = [...choices[sum]];
+    if (sourceChoices.length > 0) {
+      sourceChoices.sort(
+        ([countA], [countB]) =>
+          Math.abs(countA - targetSourceCount) - Math.abs(countB - targetSourceCount) || countB - countA,
+      );
+      return new Set(sourceChoices[0][1]);
+    }
   }
-}
-if (selected.length < requestedTeamCount) {
-  throw new Error(
-    `only ${selected.length} distinct valid winning rosters are available; requested ${requestedTeamCount}`,
-  );
+  throw new Error(`only ${total} distinct valid winning rosters are available; requested ${teamCount}`);
 }
 
-// Keep the two legs independent at the source level too. With at most two selected
-// rosters per source this deterministic greedy pairing cannot strand a duplicate.
-const remaining = [...selected].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
-const paired = [];
-while (remaining.length > 0) {
-  const first = remaining.shift();
-  const partnerIndex = remaining.findIndex(candidate => candidate.sourceKey !== first.sourceKey);
-  if (partnerIndex < 0) {
-    throw new Error("could not create source-distinct inverse pairs");
+function selectSourceDiverse(allGroups, teamCount) {
+  const selected = [];
+  for (let pass = 0; selected.length < teamCount; pass++) {
+    let added = 0;
+    for (const group of allGroups) {
+      if (group[pass] && selected.length < teamCount) {
+        selected.push(group[pass]);
+        added++;
+      }
+    }
+    if (added === 0) {
+      break;
+    }
   }
-  paired.push(first, remaining.splice(partnerIndex, 1)[0]);
+  if (selected.length < teamCount) {
+    throw new Error(`only ${selected.length} eligible rosters are available; requested ${teamCount}`);
+  }
+  return selected;
 }
 
+function pairSourceDistinct(selectedCandidates) {
+  const remaining = [...selectedCandidates].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
+  const paired = [];
+  while (remaining.length > 0) {
+    const first = remaining.shift();
+    const partnerIndex = remaining.findIndex(candidate => candidate.sourceKey !== first.sourceKey);
+    if (partnerIndex < 0) {
+      throw new Error("could not create source-distinct inverse pairs");
+    }
+    paired.push(first, remaining.splice(partnerIndex, 1)[0]);
+  }
+  return paired;
+}
+
+const evaluationGroupIndexes = chooseEvaluationGroups(sourceGroups, requestedTeamCount);
+const evaluationGroups = sourceGroups.filter((_, index) => evaluationGroupIndexes.has(index));
+const trainingGroups = sourceGroups.filter((_, index) => !evaluationGroupIndexes.has(index));
+const selected = selectSourceDiverse(evaluationGroups, requestedTeamCount);
+const paired = pairSourceDistinct(selected);
 const sourceAccountCount = new Set(paired.map(candidate => candidate.sourceKey)).size;
 const fixture = {
   schemaVersion: 2,
@@ -179,7 +223,7 @@ const fixture = {
   source:
     "Sanitized read-only snapshot of distinct winning Hell ghost runs; no run, account, player, seed, or timestamp identifiers retained.",
   selection:
-    "Deterministic source-diverse sample: one roster per source before a second roster; inverse pairs never share a source account.",
+    "Deterministic player-level holdout: every source account represented here is excluded from the self-play fixture. One roster per held-out source is selected before a second; inverse pairs never share a source account.",
   normalization:
     "Original 1-6 member party size, species, form, ability slot, IVs, nature, gender, shiny tier, passive flag, first four moves, and exactly reconstructable per-Pokemon held-item stacks are preserved. Historical generic item-generator ids whose subtype was not saved are excluded instead of rerolled. Both sides run at level 200. Run-global relics, challenges, and trainer modifiers are excluded.",
   teams: paired.map((candidate, index) => ({
@@ -188,7 +232,38 @@ const fixture = {
   })),
 };
 
+mkdirSync(dirname(outputPath), { recursive: true });
 writeFileSync(outputPath, `${JSON.stringify(fixture, null, 2)}\n`);
-console.log(
-  `${fixture.teamCount} distinct Hell-winning teams from ${fixture.sourceAccountCount} anonymous sources form ${fixture.teamCount / 2} inverse pairs`,
-);
+const result = {
+  evaluationTeams: fixture.teamCount,
+  evaluationSources: fixture.sourceAccountCount,
+  inversePairs: fixture.teamCount / 2,
+};
+
+if (trainingOutputPath) {
+  const trainingCandidates = trainingGroups.flat().sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
+  if (trainingCandidates.length < 2) {
+    throw new Error("the player-level holdout left fewer than two self-play rosters");
+  }
+  const trainingFixture = {
+    schemaVersion: 2,
+    capturedDate,
+    teamCount: trainingCandidates.length,
+    sourceAccountCount: trainingGroups.length,
+    source:
+      "Sanitized read-only snapshot of distinct winning Hell ghost runs; no run, account, player, seed, or timestamp identifiers retained.",
+    selection:
+      "Every roster comes from a source account excluded from the evaluation fixture. No evaluation player or roster is used for self-play or model fitting.",
+    normalization: fixture.normalization,
+    teams: trainingCandidates.map((candidate, index) => ({
+      id: `hell-selfplay-${String(index + 1).padStart(3, "0")}`,
+      members: candidate.members,
+    })),
+  };
+  mkdirSync(dirname(trainingOutputPath), { recursive: true });
+  writeFileSync(trainingOutputPath, `${JSON.stringify(trainingFixture, null, 2)}\n`);
+  result.trainingTeams = trainingFixture.teamCount;
+  result.trainingSources = trainingFixture.sourceAccountCount;
+}
+
+console.log(JSON.stringify(result));

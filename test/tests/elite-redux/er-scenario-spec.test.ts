@@ -110,6 +110,23 @@ describe("ER scenario builder spec", () => {
     expect(consumeSkipNextDevEnemyModifierGeneration()).toBe(false);
   });
 
+  it("an explicit single battle keeps a full custom trainer roster in singles", () => {
+    const spec: ScenarioSpec = {
+      ...SPEC,
+      run: { ...SPEC.run, double: false },
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.SNORLAX, level: 55 },
+          { species: SpeciesId.GENGAR, level: 55 },
+        ],
+      },
+    };
+    buildDevScenario(spec).scenario.setup();
+    expect(Overrides.BATTLE_STYLE_OVERRIDE).toBe("single");
+    expect(consumePendingDevEnemyParty()).toHaveLength(2);
+  });
+
   it("preserves saved ghost fields and level 200 for mirrored evaluations", () => {
     const ivs = [31, 30, 29, 28, 27, 26];
     const spec: ScenarioSpec = {

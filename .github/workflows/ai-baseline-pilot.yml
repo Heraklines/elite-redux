@@ -11,7 +11,9 @@ on:
       - ".github/workflows/ai-baseline-pilot.yml"
       - "ml/baselines/**"
       - "ml/evaluation/**"
+      - "ml/training/**"
       - "scripts/ai/**"
+      - "scripts/run-combat-batch.mjs"
       - "scripts/run-scenario.mjs"
       - "src/data/elite-redux/ai/**"
       - "src/dev-tools/registry.ts"
@@ -52,9 +54,12 @@ jobs:
           scripts/ai/compare-run-results.mjs
           scripts/ai/build-ghost-anchor.mjs
           scripts/ai/ghost-gauntlet.mjs
+          scripts/ai/make-pilot-batch.mjs
+          scripts/ai/make-pilot-scenario.mjs
           scripts/ai/make-ghost-gauntlet.mjs
           scripts/ai/summarize-ghost-gauntlet.mjs
           scripts/ai/test-ghost-gauntlet.mjs
+          scripts/run-combat-batch.mjs
           src/data/elite-redux/ai/combat-contract.ts
           src/data/elite-redux/ai/combat-engine-adapter.ts
           src/data/elite-redux/ai/combat-features.ts
@@ -165,10 +170,10 @@ jobs:
 
   generate:
     if: github.repository == 'Heraklines/elite-redux'
-    name: Real-engine shard ${{ matrix.shard }}
+    name: Ghost self-play shard ${{ matrix.shard }}
     needs: [contract, capture-neutrality]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -180,8 +185,12 @@ jobs:
           fetch-depth: 1
           submodules: false
       - uses: ./.github/actions/setup-deps
-      - name: Build deterministic scenario
-        run: node scripts/ai/make-pilot-scenario.mjs "${{ matrix.shard }}" "ai-work/scenario-${{ matrix.shard }}.json"
+      - name: Build source-disjoint ghost combat batch
+        shell: bash
+        run: >-
+          node scripts/ai/make-pilot-batch.mjs
+          "$(( ${{ matrix.shard }} * 24 ))" 24
+          "ai-work/batch-${{ matrix.shard }}.json"
       - name: Compute immutable data identity
         id: identity
         shell: bash
@@ -197,9 +206,8 @@ jobs:
           ER_AI_DEX_HASH: ${{ steps.identity.outputs.dex_hash }}
           ER_AI_DICTIONARY_HASH: ${{ steps.identity.outputs.dictionary_hash }}
         run: >-
-          node scripts/run-scenario.mjs "@ai-work/scenario-${{ matrix.shard }}.json"
-          --waves 32 --turns 20 --quiet --auto-first --real-rng
-          --episode-id "pilot-${{ github.run_id }}-${{ matrix.shard }}"
+          node scripts/run-combat-batch.mjs "@ai-work/batch-${{ matrix.shard }}.json"
+          --turns 80 --real-rng
           --json-out "ai-work/result-${{ matrix.shard }}.json"
           --ai-data-out "ai-work/decisions-${{ matrix.shard }}.jsonl"
       - name: Upload immutable shard
@@ -209,7 +217,7 @@ jobs:
           path: |
             ai-work/decisions-${{ matrix.shard }}.jsonl
             ai-work/result-${{ matrix.shard }}.json
-            ai-work/scenario-${{ matrix.shard }}.json
+            ai-work/batch-${{ matrix.shard }}.json
           retention-days: 14
           if-no-files-found: error
 
@@ -225,12 +233,12 @@ jobs:
           fetch-depth: 1
           submodules: false
       - uses: ./.github/actions/setup-deps
-      - name: Build deterministic smoke scenario
-        run: node scripts/ai/make-pilot-scenario.mjs 0 ai-neutral/scenario.json
+      - name: Build deterministic smoke batch
+        run: node scripts/ai/make-pilot-batch.mjs 0 1 ai-neutral/batch.json
       - name: Run without capture
         run: >-
-          node scripts/run-scenario.mjs @ai-neutral/scenario.json
-          --waves 3 --turns 20 --quiet --auto-first --real-rng
+          node scripts/run-combat-batch.mjs @ai-neutral/batch.json
+          --turns 20 --real-rng
           --json-out ai-neutral/without-capture.json
       - name: Run with capture
         env:
@@ -238,9 +246,8 @@ jobs:
           ER_AI_DEX_HASH: capture-neutrality-smoke
           ER_AI_DICTIONARY_HASH: capture-neutrality-smoke
         run: >-
-          node scripts/run-scenario.mjs @ai-neutral/scenario.json
-          --waves 3 --turns 20 --quiet --auto-first --real-rng
-          --episode-id capture-neutrality-smoke
+          node scripts/run-combat-batch.mjs @ai-neutral/batch.json
+          --turns 20 --real-rng
           --json-out ai-neutral/with-capture.json
           --ai-data-out ai-neutral/decisions.jsonl
       - name: Assert capture neutrality and visibility boundary
@@ -294,7 +301,7 @@ jobs:
     name: Exploratory tree rollout ${{ matrix.shard }}
     needs: train
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -310,12 +317,12 @@ jobs:
         with:
           name: ai-baseline-leaderboard
           path: ai-bootstrap
-      - name: Build held-out-seed rollout scenario
+      - name: Build unseen source-disjoint ghost combat batch
         shell: bash
         run: >-
-          node scripts/ai/make-pilot-scenario.mjs
-          "$((100 + ${{ matrix.shard }}))"
-          "ai-work/scenario-${{ matrix.shard }}.json"
+          node scripts/ai/make-pilot-batch.mjs
+          "$((100000 + ${{ matrix.shard }} * 24))" 24
+          "ai-work/batch-${{ matrix.shard }}.json"
       - name: Compute immutable data identity
         id: identity
         shell: bash
@@ -331,10 +338,9 @@ jobs:
           ER_AI_DEX_HASH: ${{ steps.identity.outputs.dex_hash }}
           ER_AI_DICTIONARY_HASH: ${{ steps.identity.outputs.dictionary_hash }}
         run: >-
-          node scripts/run-scenario.mjs "@ai-work/scenario-${{ matrix.shard }}.json"
-          --waves 16 --turns 20 --quiet --auto-first --real-rng
+          node scripts/run-combat-batch.mjs "@ai-work/batch-${{ matrix.shard }}.json"
+          --turns 80 --real-rng
           --ai-model ai-bootstrap/models/selected-model.json --ai-epsilon 0.15
-          --episode-id "rollout-${{ github.run_id }}-${{ matrix.shard }}"
           --json-out "ai-work/result-rollout-${{ matrix.shard }}.json"
           --ai-data-out "ai-work/decisions-rollout-${{ matrix.shard }}.jsonl"
       - name: Upload rollout shard
@@ -344,7 +350,7 @@ jobs:
           path: |
             ai-work/decisions-rollout-${{ matrix.shard }}.jsonl
             ai-work/result-rollout-${{ matrix.shard }}.json
-            ai-work/scenario-${{ matrix.shard }}.json
+            ai-work/batch-${{ matrix.shard }}.json
           retention-days: 14
           if-no-files-found: error
 

@@ -522,6 +522,8 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       O.BATTLE_STYLE_OVERRIDE = "triple";
     } else if (run.double) {
       O.BATTLE_STYLE_OVERRIDE = "double";
+    } else if (run.double === false) {
+      O.BATTLE_STYLE_OVERRIDE = "single";
     }
     setErDifficulty(run.difficulty ?? "ace");
     const hardestEnemyAi = run.enemyAi === "hardest";
@@ -620,7 +622,7 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       setPendingDevEnemyParty(devParty);
       setSkipNextDevEnemyModifierGeneration();
       // Don't downgrade a triple to a double: a triple keeps its 3-wide style set above.
-      if (devParty.length >= 2 && !run.triple) {
+      if (devParty.length >= 2 && !run.triple && run.double !== false) {
         O.BATTLE_STYLE_OVERRIDE = "double";
       }
       // Ability / passive are SIDE-WIDE overrides (they hit every enemy), so they
