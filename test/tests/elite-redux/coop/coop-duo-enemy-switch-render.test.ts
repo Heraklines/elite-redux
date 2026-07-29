@@ -169,7 +169,16 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
       }),
     );
 
-    expect(projection).toMatchObject({ ok: true, incoming, outgoing, alreadyProjected: false });
+    expect(projection.ok).toBe(true);
+    if (!projection.ok) {
+      throw new Error(`exact structural switch projection failed: ${projection.reason}`);
+    }
+    // Phaser GameObjects expose iterable-like internals that Vitest's deep matcher cannot safely
+    // traverse. Prove the exact actor identities directly; this is stronger than recursively comparing
+    // two live render trees and cannot fail inside iterableEquality before reporting the real contract.
+    expect(projection.incoming).toBe(incoming);
+    expect(projection.outgoing).toBe(outgoing);
+    expect(projection.alreadyProjected).toBe(false);
     expect(party[0], "the authority-selected reserve occupies the exact field party slot").toBe(incoming);
     expect(party[2], "the outgoing actor moves to the exact vacated reserve slot").toBe(outgoing);
     expect(rig.guestScene.field.getIndex(outgoing), "the outgoing actor is structurally absent from the field").toBe(

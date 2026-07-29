@@ -1228,23 +1228,26 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       phase.start();
     });
 
-    let firstConfirm: object | null = null;
-    for (let attempt = 0; attempt < 100 && firstConfirm == null; attempt++) {
+    let firstConfirmGeneration = -1;
+    for (let attempt = 0; attempt < 100 && firstConfirmGeneration < 0; attempt++) {
       await pumpDuoDestinations(rig, 1);
-      firstConfirm = withClientSync(rig.hostCtx, () => {
+      firstConfirmGeneration = withClientSync(rig.hostCtx, () => {
         const handler = rig.hostScene.ui.getHandler() as unknown as {
           active?: boolean;
           isCoopV2InputActionable?: () => boolean;
+          getSurfaceGeneration?: () => number;
         };
         return rig.hostScene.ui.getMode() === UiMode.CONFIRM
           && handler.active === true
           && handler.isCoopV2InputActionable?.() === true
-          ? handler
-          : null;
+          ? (handler.getSurfaceGeneration?.() ?? -1)
+          : -1;
       });
     }
     expect(promptCommitted, "the host-owned presentation entered Authority V2 before input").toBe(true);
-    expect(firstConfirm, "the host reached its exact actionable replace confirmation").not.toBeNull();
+    expect(firstConfirmGeneration, "the host reached its exact actionable replace confirmation").toBeGreaterThanOrEqual(
+      0,
+    );
 
     let projectedGuestPhase: object | null = null;
     await withClient(rig.guestCtx, async () => {
@@ -1272,10 +1275,11 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         const handler = rig.hostScene.ui.getHandler() as unknown as {
           active?: boolean;
           isCoopV2InputActionable?: () => boolean;
+          getSurfaceGeneration?: () => number;
         };
         return (
           rig.hostScene.ui.getMode() === UiMode.CONFIRM
-          && handler !== firstConfirm
+          && (handler.getSurfaceGeneration?.() ?? -1) > firstConfirmGeneration
           && handler.active === true
           && handler.isCoopV2InputActionable?.() === true
         );

@@ -5232,3 +5232,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   replica UI/result continuations re-enter that captured browser and cancellation-own every queued activation.
 - The existing two-engine owner, watcher, fallback, refusal-to-retire, and soak cases remain the remote failure-first
   proof. The focused source contract is 5/5 green locally; no local engine/browser test or deployment occurred.
+
+## 2026-07-29 - Final B1/B9/B11 gate reds reduced to harness proof defects
+
+- Exact run `30416229019` left only B1, B9, and B11 red while static, build, source contracts, C2 batch
+  learn-move, B10 form presentation, and every other shard passed. Its two-real-browser public journey
+  `30416219940` also completed successfully from fresh start through wave 2.
+- B1 reached and completed the first single-move confirmation. The test then waited for a different
+  `ConfirmUiHandler` object, but Phaser intentionally reuses that singleton across prompts. The proof now requires
+  a strictly newer public surface generation on the same actionable handler, so it distinguishes real prompt
+  reincarnations without relying on object allocation.
+- B9 atomically installed the exact catch-full picker through `replaceWithCoopAuthoritativePhase`, which starts the
+  successor synchronously, and then started the same phase a second time. The duplicate manual start is removed and
+  the source contract now forbids it between manager installation and control-ledger proof.
+- B11's sole remaining error was Vitest `iterableEquality` recursively traversing live Phaser GameObjects in
+  `toMatchObject`; the switch projector itself returned the correct exact actors. The engine assertion now proves
+  incoming/outgoing identity and projection state directly, with a source guard against the unsafe deep matcher.
+- Local policy-safe evidence for these corrections is 32/32 source contracts, scoped Biome error-clean, and
+  `git diff --check`. The three engine regressions remain remote-only; no deployment, Showdown, or tournament work
+  occurred.

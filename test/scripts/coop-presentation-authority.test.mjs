@@ -45,6 +45,7 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
   const replay = read("src/phases/coop-replay-phases.ts");
   const tray = read("src/ui/containers/pokeball-tray.ts");
   const presentation = read("src/data/elite-redux/coop/coop-field-presentation.ts");
+  const enemySwitchDuo = read("test/tests/elite-redux/coop/coop-duo-enemy-switch-render.test.ts");
   const campaign = read("test/browser/coop-public-ui/campaign.mjs");
   const evidence = read("test/browser/coop-public-ui/evidence.mjs");
   const replayStart = replay.indexOf("export class CoopSwitchReplayPhase");
@@ -85,6 +86,15 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
     structuralProjector,
     /incoming\.setFieldPosition\(desiredPosition, 0\)\.catch\(\(\) => undefined\)[\s\S]+scene\.updateFieldScale\(\)\.catch\(\(\) => undefined\)/u,
     "torn cosmetic seating/scale promises cannot reject after immutable switch structure is installed",
+  );
+  assert.doesNotMatch(
+    enemySwitchDuo,
+    /expect\(projection\)\.toMatchObject/u,
+    "engine tests compare Phaser actor identity directly instead of recursively traversing live render trees",
+  );
+  assert.match(
+    enemySwitchDuo,
+    /expect\(projection\.incoming\)\.toBe\(incoming\)[\s\S]+expect\(projection\.outgoing\)\.toBe\(outgoing\)/u,
   );
   assert.match(switchReplay, /projectCoopSwitchPresentationStructure\(scene,[\s\S]+pokemonId:[\s\S]+speciesId:/u);
   assert.doesNotMatch(switchReplay, /summonCoop(?:Player|Enemy)Field/u);

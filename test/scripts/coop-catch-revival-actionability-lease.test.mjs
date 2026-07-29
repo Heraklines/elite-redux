@@ -105,4 +105,9 @@ test("the catch-full duo drives only a manager-owned, control-installed public p
     /\(guestPicker as Phase\)\.start\(\)[\s\S]*await Promise\.resolve\(\)/u,
     "a detached phase plus one microtask is not evidence that a browser-owned V2 surface is actionable",
   );
+  assert.doesNotMatch(
+    guestDrive.slice(replace, installedProof),
+    /guestPicker!\.start\(\)/u,
+    "replaceWithCoopAuthoritativePhase starts its installed successor exactly once",
+  );
 });

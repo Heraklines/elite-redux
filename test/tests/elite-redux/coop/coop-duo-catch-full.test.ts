@@ -264,7 +264,6 @@ describe.skipIf(!RUN)(
           rig.guestScene.phaseManager.getCurrentPhase(),
           "the catch-full picker is the manager-owned current phase before its UI becomes actionable",
         ).toBe(guestPicker);
-        guestPicker!.start();
         await vi.waitUntil(
           () => {
             const installed = rig.guestRuntime.v2ControlLedger.activeControl;

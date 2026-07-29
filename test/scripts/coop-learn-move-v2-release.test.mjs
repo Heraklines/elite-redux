@@ -168,4 +168,10 @@ test("exact host/guest owner material is the sole replica release and duplicate 
     "the projected picker proves terminal only after its real phase ends",
   );
   assert.match(duo, /the single-move terminal resumes under the peer ambient before its captured runtime reactivates/u);
+  assert.match(
+    duo,
+    /firstConfirmGeneration[\s\S]+getSurfaceGeneration\?\.\(\)[\s\S]+> firstConfirmGeneration/u,
+    "reused CONFIRM handlers distinguish successive public prompts by surface generation, not object identity",
+  );
+  assert.doesNotMatch(duo, /handler !== firstConfirm/u);
 });
