@@ -72,6 +72,7 @@ import { PokemonAnimType } from "#enums/pokemon-anim-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -807,7 +808,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     ]);
   });
 
-  it("replays an ordinary form cutscene from a detached preimage and releases only after UI closure", async () => {
+  it("replays an ordinary form cutscene from a detached preimage and retires its exact UI before release", async () => {
     const field = await startCoopGuest();
     const pokemon = field[0];
     const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
@@ -867,10 +868,16 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(pokemon.formIndex).toBe(targetFormIndex);
     expect(coopPresentationOutcome(token), "material alone is not a presentation receipt").toBeUndefined();
 
-    const revertMode = vi.spyOn(globalScene.ui, "revertMode").mockResolvedValue(true);
+    const retireMode = vi.spyOn(globalScene.ui, "retirePresentationMode").mockReturnValue(true);
+    vi.spyOn(globalScene.phaseManager, "getCurrentPhase").mockReturnValue(queuedCutscene);
+    const shift = vi.spyOn(globalScene.phaseManager, "shiftPhase").mockImplementation(() => {});
     queuedCutscene!.end();
     await vi.waitFor(() => expect(coopPresentationOutcome(token)).toMatchObject({ kind: "rendered" }));
-    expect(revertMode, "the cutscene's real UI closes before the outcome releases control").toHaveBeenCalledOnce();
+    expect(retireMode, "the exact cutscene UI is synchronously inert before control releases").toHaveBeenCalledWith(
+      UiMode.EVOLUTION_SCENE,
+      UiMode.MESSAGE,
+    );
+    expect(shift).toHaveBeenCalledOnce();
     expect(addPokemon).toHaveBeenCalledOnce();
   });
 
@@ -995,7 +1002,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
   });
 
-  it("keeps the exact-runtime wall through UI close and ignores a late close after timeout", async () => {
+  it("retires a watchdog-expired child before a hung initial mode open can resolve late", async () => {
     const field = await startCoopGuest();
     const pokemon = field[0];
     const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
@@ -1029,25 +1036,27 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
         generation: coopSessionGeneration(),
       },
     });
-    vi.spyOn(phase, "setMode").mockResolvedValue();
-    vi.spyOn(phase, "doEvolution").mockImplementation(() => {});
-    vi.spyOn(phase as unknown as { setupEvolutionAssets(): void }, "setupEvolutionAssets").mockImplementation(() => {});
-    vi.spyOn(phase as unknown as { setupPokemonSprites(): void }, "setupPokemonSprites").mockImplementation(() => {});
+    const open = deferred<void>();
+    vi.spyOn(phase, "setMode").mockReturnValue(open.promise);
+    const doEvolution = vi.spyOn(phase, "doEvolution").mockImplementation(() => {});
+    const setupAssets = vi
+      .spyOn(phase as unknown as { setupEvolutionAssets(): void }, "setupEvolutionAssets")
+      .mockImplementation(() => {});
+    const setupSprites = vi
+      .spyOn(phase as unknown as { setupPokemonSprites(): void }, "setupPokemonSprites")
+      .mockImplementation(() => {});
     let watchdogCallback: (() => void) | undefined;
     const cancelTimer = vi.fn();
     vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
       watchdogCallback = callback;
       return cancelTimer;
     });
-    const close = deferred<boolean>();
-    vi.spyOn(globalScene.ui, "revertMode").mockReturnValue(close.promise);
+    const retireMode = vi.spyOn(globalScene.ui, "retirePresentationMode").mockReturnValue(false);
     vi.spyOn(globalScene.phaseManager, "getCurrentPhase").mockReturnValue(phase);
     const shift = vi.spyOn(globalScene.phaseManager, "shiftPhase").mockImplementation(() => {});
 
-    await phase.start();
-    phase.end();
-    expect(coopPresentationOutcome(token), "a requested close is not yet a rendered receipt").toBeUndefined();
-    expect(cancelTimer, "the presentation wall remains armed while close is pending").not.toHaveBeenCalled();
+    const start = phase.start();
+    expect(coopPresentationOutcome(token), "the hung mode open has no receipt").toBeUndefined();
     watchdogCallback?.();
 
     expect(coopPresentationOutcome(token)).toMatchObject({
@@ -1055,12 +1064,17 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       reason: "form-change-cutscene-watchdog-expired",
     });
     expect(cancelTimer).toHaveBeenCalledOnce();
+    expect(retireMode).toHaveBeenCalledWith(UiMode.EVOLUTION_SCENE, UiMode.MESSAGE);
     expect(shift).toHaveBeenCalledOnce();
 
-    close.resolve(true);
+    open.resolve();
+    await start;
     await Promise.resolve();
     await Promise.resolve();
-    expect(shift, "the obsolete close continuation cannot advance the successor twice").toHaveBeenCalledOnce();
+    expect(setupAssets, "the retired late open cannot rebuild the evolution overlay").not.toHaveBeenCalled();
+    expect(setupSprites, "the retired late open cannot rebuild cutscene sprites").not.toHaveBeenCalled();
+    expect(doEvolution, "the retired late open cannot restart presentation").not.toHaveBeenCalled();
+    expect(shift, "the obsolete start continuation cannot advance the successor twice").toHaveBeenCalledOnce();
     expect(coopPresentationOutcome(token)).toMatchObject({ kind: "failed" });
   });
 

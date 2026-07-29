@@ -232,6 +232,150 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     await withClient(rig.guestCtx, () => queuedChild?.retire());
   }, 120_000);
 
+  it("guest form appearance continuations re-enter their captured engine after inner asset waits", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, scene => {
+      scene.gameMode = getGameMode(GameModes.COOP);
+    });
+    const fieldLoad = deferred();
+    const fieldInfo = deferred();
+    const childLoad = deferred();
+    const childInfo = deferred();
+    const fieldToken = createCoopPresentationOutcomeToken();
+    let fieldPlayCount = 0;
+    let fieldInfoCount = 0;
+    let childPlayCount = 0;
+    let childInfoCount = 0;
+    let childInstall!: Promise<boolean>;
+    let childPhase: { retire(): void } | null = null;
+
+    await withClient(rig.guestCtx, () => {
+      const pokemon = rig.guestScene.getPlayerField()[0];
+      const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
+      expect(formChange).toBeDefined();
+      const preFormIndex = pokemon.formIndex;
+      const targetFormIndex = pokemon.species.forms.findIndex(form => form.formKey === formChange!.formKey);
+      vi.spyOn(pokemon, "loadAssets").mockReturnValueOnce(fieldLoad.promise).mockReturnValueOnce(childLoad.promise);
+      vi.spyOn(pokemon, "playAnim").mockImplementation(() => {
+        expect(globalScene).toBe(rig.guestScene);
+        expect(getCoopRuntime()).toBe(rig.guestRuntime);
+        if (fieldPlayCount === 0) {
+          fieldPlayCount++;
+        } else {
+          childPlayCount++;
+        }
+      });
+      vi.spyOn(pokemon, "updateInfo").mockImplementation(() => {
+        expect(globalScene).toBe(rig.guestScene);
+        expect(getCoopRuntime()).toBe(rig.guestRuntime);
+        if (fieldInfoCount === 0) {
+          fieldInfoCount++;
+          return fieldInfo.promise;
+        }
+        childInfoCount++;
+        return childInfo.promise;
+      });
+      rig.guestScene.moveAnimations = false;
+      rig.guestScene.phaseManager
+        .create(
+          "CoopFormChangeReplayPhase",
+          {
+            k: "formChange",
+            bi: pokemon.getBattlerIndex(),
+            actor: { side: "player", pokemonId: pokemon.id },
+            speciesId: pokemon.species.speciesId,
+            preFormIndex,
+            formIndex: targetFormIndex,
+            presentation: "field",
+            animate: false,
+          },
+          fieldToken,
+        )
+        .start();
+    });
+
+    await withClient(rig.hostCtx, async () => {
+      fieldLoad.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(globalScene).toBe(rig.hostScene);
+    });
+    await vi.waitFor(() => expect(fieldPlayCount).toBe(1), { timeout: 2_000 });
+    expect(fieldInfoCount).toBe(1);
+    await withClient(rig.hostCtx, async () => {
+      fieldInfo.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await vi.waitFor(
+      () => expect(coopPresentationOutcome(fieldToken)).toMatchObject({ kind: "intentionally-skipped" }),
+      { timeout: 2_000 },
+    );
+
+    await withClient(rig.guestCtx, () => {
+      const pokemon = rig.guestScene.getPlayerField()[0];
+      const formChange = pokemonFormChanges[pokemon.species.speciesId]?.find(candidate => !candidate.quiet);
+      if (formChange == null) {
+        throw new Error("the Snorlax fixture needs an ordinary form-change edge");
+      }
+      const targetFormIndex = pokemon.species.forms.findIndex(form => form.formKey === formChange.formKey);
+      const detached = rig.guestScene.addPlayerPokemon(
+        pokemon.species,
+        pokemon.level,
+        pokemon.abilityIndex,
+        pokemon.formIndex,
+        pokemon.gender,
+        pokemon.shiny,
+        pokemon.variant,
+        pokemon.ivs,
+        pokemon.nature,
+        pokemon,
+      );
+      vi.spyOn(rig.guestScene, "updateFieldScale").mockImplementation(() => {
+        expect(globalScene).toBe(rig.guestScene);
+        expect(getCoopRuntime()).toBe(rig.guestRuntime);
+        return Promise.resolve();
+      });
+      const phase = rig.guestScene.phaseManager.create("CoopFormChangeCutsceneReplayPhase", detached, formChange, {
+        authorityPokemon: pokemon,
+        preFormIndex: pokemon.formIndex,
+        targetFormIndex,
+        outcomeToken: createCoopPresentationOutcomeToken(),
+        actorFingerprint: `player:p${pokemon.id}:inner-load-context`,
+        runtime: {
+          scene: rig.guestScene,
+          phaseManager: rig.guestScene.phaseManager,
+          runtime: rig.guestRuntime,
+          streamer: rig.guestRuntime.battleStream,
+          generation: coopSessionGeneration(),
+        },
+      });
+      childPhase = phase;
+      childInstall = (
+        phase as unknown as {
+          installCoopReplayResult(): Promise<boolean>;
+        }
+      ).installCoopReplayResult();
+    });
+
+    await withClient(rig.hostCtx, async () => {
+      childLoad.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(globalScene).toBe(rig.hostScene);
+    });
+    await vi.waitFor(() => expect(childPlayCount).toBe(1), { timeout: 2_000 });
+    expect(childInfoCount).toBe(1);
+    await withClient(rig.hostCtx, async () => {
+      childInfo.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await expect(childInstall).resolves.toBe(true);
+    await withClient(rig.guestCtx, () => childPhase?.retire());
+  }, 120_000);
+
   it("DUO: host plays a turn, the REAL guest engine RECVs+RESOLVEs+applies the checkpoint over loopback", async () => {
     // Build the same paired two-engine boundary as the maintained journeys. The original feasibility
     // spike assembled runtimes by hand and injected both commands into the host engine, so it never

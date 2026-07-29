@@ -1134,6 +1134,37 @@ export class UI extends Phaser.GameObjects.Container {
     return this.setModeInternal(mode, true, true, false, args);
   }
 
+  /**
+   * Synchronously retire one presentation-owned mode without publishing a new authoritative control surface.
+   *
+   * A destructively replaced co-op presentation cannot wait for the ordinary fade/revert promise: that
+   * promise may never settle, and its detached callback could later pop a successor UI. The owning phase
+   * calls this only while its exact scene/runtime and phase identity are still installed. Invalidating the
+   * transition generation first also makes a pending `setModeInternal` attempt inert before the phase shifts.
+   *
+   * @returns `true` when the expected mode was active and was synchronously removed. A pending transition is
+   * still cancelled when this returns `false`.
+   */
+  retirePresentationMode(expectedMode: UiMode, fallbackMode: UiMode): boolean {
+    ++this.modeTransitionGeneration;
+    this.normalizeTransitionOverlay();
+    if (this.mode !== expectedMode) {
+      return false;
+    }
+
+    this.getHandler().clear();
+    this.mode = this.modeChain.pop() ?? fallbackMode;
+    const touchControls = typeof document === "undefined" ? null : document.getElementById("touchControls");
+    if (touchControls) {
+      touchControls.dataset.uiMode = UiMode[this.mode];
+    }
+    const restoredHandler = this.getHandler();
+    if (!restoredHandler.active) {
+      restoredHandler.show([]);
+    }
+    return true;
+  }
+
   setModeWithoutClear(mode: UiMode, ...args: any[]): Promise<void> {
     return this.setModeInternal(mode, false, false, false, args);
   }
