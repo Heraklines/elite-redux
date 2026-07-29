@@ -5590,3 +5590,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `pkmn__741` animation failures followed by a fatal stale BBCodeText `drawImage` callback. This is not being excused as
   harness noise; it remains the next production presentation-lifecycle investigation after the registered journey is
   sealed and remotely qualified.
+
+## 2026-07-30 - Retired encounter actors reject late asset presentation callbacks
+
+- The wave-4 Oricorio artifact's three animation errors and fatal BBCodeText `drawImage` shared one lifecycle: the
+  bounded 12-second encounter join allowed mechanics to continue, the Mystery transition destroyed that temporary
+  Pokemon and its info panel, then the late atlas promise still called `playAnim()` and `updateInfo()` on those dead
+  Phaser objects.
+- Asset cache/animation construction still finishes globally, but per-instance rendering now stops when the Pokemon is
+  inactive. `playAnim()` rejects absent/inactive sprites without manufacturing a missing-asset error, and
+  `updateInfo()` resolves inertly once either the Pokemon or retained battle-info panel has been destroyed.
+- A remote-only real-engine regression destroys an Oricorio after battle construction, then requires both late callback
+  paths to be silent and non-throwing. This closes the browser-observed exception without extending any authority wait
+  or weakening fatal-console evidence.
+- Dedicated run `30495741492` stopped before build/Chromium because the new conditional wave-count YAML replaced the
+  Wide Lens lane's intentionally literal 20-wave source contract. The workflow again retains `20` in its environment
+  and overrides to one only inside the registered-interactions process; this preserves both independent oracles.

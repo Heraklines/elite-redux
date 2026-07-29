@@ -26,7 +26,7 @@ import { SpeciesId } from "#enums/species-id";
 import type { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe.runIf(process.env.ER_SCENARIO === "1")("co-op launch presentation with shiny-lab FX overlay", () => {
   let phaserGame: Phaser.Game;
@@ -105,5 +105,19 @@ describe.runIf(process.env.ER_SCENARIO === "1")("co-op launch presentation with 
     ).resolves.toBeGreaterThanOrEqual(0);
 
     expect(pokemon.getSprite()?.visible, "the base sprite stays hidden behind the covering overlay").toBe(false);
+  });
+
+  it("drops late sprite and info callbacks after a bounded encounter retires their Pokemon", async () => {
+    await game.classicMode.startBattle(SpeciesId.ORICORIO);
+    const pokemon = game.scene.getEnemyField()[0];
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    pokemon.destroy();
+
+    expect(() => pokemon.playAnim()).not.toThrow();
+    await expect(pokemon.updateInfo(true)).resolves.toBeUndefined();
+    expect(consoleError, "a retired presentation is not a missing-asset error").not.toHaveBeenCalled();
+
+    consoleError.mockRestore();
   });
 });

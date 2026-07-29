@@ -234,6 +234,11 @@ test("registered-interaction journey reaches Revival mid-turn and Stormglass at 
     workflow,
     /COOP_UI_REQUIRE_REGISTERED_INTERACTIONS:.*registered-interactions.*'1'[\s\S]*COOP_UI_PREFERRED_MOVE_ID:.*'863'/u,
   );
+  assert.match(
+    workflow,
+    /== "registered-interactions"[\s\S]*export COOP_UI_CAMPAIGN_WAVES=1/u,
+    "the focused occurrence journey overrides the retained 20-wave market contract only in its process",
+  );
   assert.match(workflow, /== "market-wide-lens" \|\| .* == "registered-interactions"[\s\S]*run-campaign\.mjs/u);
   assert.match(harness, /journey === "registered-interactions"[\s\S]*"registered-owner"[\s\S]*"registered-partner"/u);
   assert.match(

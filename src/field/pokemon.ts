@@ -1105,6 +1105,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       // ER: honour a multi-frame custom atlas's authored cadence (no-op otherwise).
       applyErAtlasFrameRate(globalScene.anims, battleSpriteKey, globalScene.textures.get(battleSpriteKey)?.customData);
     }
+    // A bounded co-op encounter may legitimately retire this Pokemon while its atlas is still
+    // completing. Cache construction above remains useful, but instance presentation must stop at
+    // that lifecycle boundary: destroyed sprites/info text no longer own a Phaser canvas.
+    if (!this.active) {
+      return;
+    }
+
     // With everything loaded, now begin playing the animation.
     this.playAnim();
 
@@ -1637,7 +1644,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param animConfig - String to pass to the sprite's {@linkcode Phaser.GameObjects.Sprite.play | play} method
    * @returns true if the sprite was able to be animated
    */
-  tryPlaySprite(sprite: Phaser.GameObjects.Sprite, tintSprite: Phaser.GameObjects.Sprite, key: string): boolean {
+  tryPlaySprite(
+    sprite: Phaser.GameObjects.Sprite | null | undefined,
+    tintSprite: Phaser.GameObjects.Sprite | null | undefined,
+    key: string,
+  ): boolean {
+    if (!this.active || sprite?.active !== true || tintSprite?.active !== true) {
+      return false;
+    }
     // Catch errors when trying to play an animation that doesn't exist
     try {
       sprite.play(key);
@@ -1652,8 +1666,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   playAnim(): void {
-    this.tryPlaySprite(this.getSprite(), this.getTintSprite()!, this.getBattleSpriteKey()); // TODO: is the bang correct?
-    this.refreshErShinyLabBattleFx();
+    if (this.tryPlaySprite(this.getSprite(), this.getTintSprite(), this.getBattleSpriteKey())) {
+      this.refreshErShinyLabBattleFx();
+    }
   }
 
   private startErShinyLabBattleFxTimer(): void {
@@ -4762,6 +4777,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   updateInfo(instant?: boolean): Promise<void> {
+    // Atlas and authoritative-state work can outlive a bounded encounter presentation. A retired
+    // Pokemon retains its battleInfo reference after destroy(), but that panel's BBCodeText canvas
+    // has already been released; a late setColor/updateText would otherwise throw from drawImage.
+    if (!this.active || this.battleInfo?.active !== true) {
+      return Promise.resolve();
+    }
     return this.battleInfo.updateInfo(this, instant);
   }
 
