@@ -10,15 +10,16 @@
 // otherwise open its OWN release picker over the MERGED party - releasing the host's own mons + mis-
 // attributing the guest's catch (the #800 class), and headless it deadlocks on an undrivable CONFIRM/PARTY.
 //
-// The fix (the recipient-drives twin of the #855 ME catch-full sub-prompt): the host streams a
-// `catchFullPrompt`, the guest's runtime queues a real CoopGuestCatchFullPhase which opens a NON-mutating
+// The fix (the recipient-drives twin of the #855 ME catch-full sub-prompt): the host retains an exact V2
+// interaction commit, which projects a real CoopGuestCatchFullPhase on the guest. It opens a NON-mutating
 // PARTY/SELECT picker + relays ONLY the chosen slot on COOP_CATCH_FULL_SEQ (kind "catchFull"), and the host
 // applies the authoritative release+add at the RELAYED slot. The caught mon materializes on the guest via
-// the normal capture handshake (applyCoopCaptureParty).
+// the normal capture handshake (applyCoopCaptureParty). The raw prompt is compatibility-only under V2 and
+// must not queue a second, uncontrolled picker.
 //
 // This probe proves over TWO REAL ENGINES that:
 //   (a) the CATCHER (guest) DROVE the picker - the host released the exact slot the guest relayed (a
-//       GUEST-owned mon), NOT a host default; the guest's real CoopGuestCatchFullPhase is what was queued;
+//       GUEST-owned mon), NOT a host default; the guest's real V2-projected CoopGuestCatchFullPhase owns UI;
 //   (b) the resulting party is byte-identical on both engines (species + owner ordering across all 6, and
 //       byte-equal PokemonData for every reconciled bench mon incl. the freshly caught one);
 //   (c) the interaction counter stays LOCKSTEP (the catchFull singleton band never ticks the counter).
@@ -27,7 +28,7 @@
 //
 // FAILS-BEFORE: pre-fix there is no recipient-drives path for a wild catch - the host cannot let the guest
 // drive its local release picker, so a guest-thrown full-party catch either releases the WRONG (host-chosen)
-// mon or deadlocks on the host's undrivable CONFIRM. Assertion (a) (a real CoopGuestCatchFullPhase queued +
+// mon or deadlocks on the host's undrivable CONFIRM. Assertion (a) (a real CoopGuestCatchFullPhase projected +
 // the host releasing the guest-relayed slot) is unsatisfiable without the fix.
 //
 // HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
@@ -66,7 +67,7 @@ function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
 
-/** The private PhaseTree seam we read to retrieve the runtime-queued guest picker (find, no mutation). */
+/** The private PhaseTree seam used only to prove that V2 left no legacy duplicate queued behind its modal. */
 interface PhaseQueueSeam {
   phaseManager: { phaseQueue: { find(name: string): Phase | undefined } };
 }
@@ -213,27 +214,9 @@ describe.skipIf(!RUN)(
         coopHostPrepareWildCatchFullDecision("Venusaur", releasedSpecies),
       );
 
-      // ===== (B) GUEST: drain so the queued `catchFullPrompt` is delivered while the GUEST runtime is live ->
-      // onCatchFullPrompt unshifts a real CoopGuestCatchFullPhase onto the guest queue (the wiring under test). =====
-      await withClient(rig.guestCtx, async () => {
-        await drainLoopback();
-      });
-      const guestPicker = withClientSync(
-        rig.guestCtx,
-        () =>
-          (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.phaseQueue.find("CoopGuestCatchFullPhase") as
-            | CatchFullPickerPhase
-            | undefined,
-      );
-      expect(
-        guestPicker,
-        "the host's catchFullPrompt queued a CoopGuestCatchFullPhase on the guest (the recipient drives) (#856)",
-      ).toBeDefined();
-
-      // ===== (C) GUEST: run the real picker. A browser cannot display a detached phase: the manager first
-      // owns the picker as its exact current boundary, then PARTY opens and the V2 projector attests that
-      // address as controlInstalled. Preserve that production order before clicking slot 4. The MESSAGE
-      // setMode never resolves so the phase's own end() (shiftPhase) can't fire cross-ctx. =====
+      // ===== (B/C) GUEST: install the UI seam before draining. The raw prompt must NOT queue legacy UI;
+      // its retained INTERACTION_COMMIT projects and starts the exact manager-owned modal. Prove the public
+      // PARTY surface and address-matching controlInstalled before clicking slot 4. =====
       await withClient(rig.guestCtx, async () => {
         const ui = rig.guestScene.ui as unknown as StubbableUi;
         const realSetMode = ui.setMode.bind(ui);
@@ -254,29 +237,40 @@ describe.skipIf(!RUN)(
           }
           return realSetMode(...args);
         };
-        const predecessor = rig.guestScene.phaseManager.getCurrentPhase();
-        expect(predecessor, "the guest has a manager-owned predecessor for the catch-full modal").toBeDefined();
-        expect(
-          rig.guestScene.phaseManager.replaceWithCoopAuthoritativePhase(predecessor, guestPicker!),
-          "the catch-full picker replaces its exact manager-owned predecessor",
-        ).toBe(true);
-        expect(
-          rig.guestScene.phaseManager.getCurrentPhase(),
-          "the catch-full picker is the manager-owned current phase before its UI becomes actionable",
-        ).toBe(guestPicker);
+        await drainLoopback();
         await vi.waitUntil(
           () => {
+            const current = rig.guestScene.phaseManager.getCurrentPhase() as CatchFullPickerPhase;
             const installed = rig.guestRuntime.v2ControlLedger.activeControl;
+            if (current.phaseName !== "CoopGuestCatchFullPhase") {
+              return false;
+            }
             return (
-              installed?.kind === "SHARED_INTERACTION"
-              && installed.operationId === guestPicker!.coopV2ControlOperationId
+              installed?.kind === "SHARED_INTERACTION" && installed.operationId === current.coopV2ControlOperationId
             );
           },
           { timeout: 1_000, interval: 1 },
         );
-        ui.setMode = realSetMode;
+        const guestPicker = rig.guestScene.phaseManager.getCurrentPhase() as CatchFullPickerPhase;
+        const installedControl = rig.guestRuntime.v2ControlLedger.activeControl;
+        if (installedControl?.kind !== "SHARED_INTERACTION") {
+          throw new Error("catch-full public surface did not install its shared interaction control");
+        }
+        expect(
+          rig.guestScene.phaseManager.getCurrentPhase(),
+          "the retained V2 commit made its picker the manager-owned current phase",
+        ).toBe(guestPicker);
+        expect(
+          (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.phaseQueue.find("CoopGuestCatchFullPhase"),
+          "the compatibility prompt did not leave a second uncontrolled picker behind the V2 modal",
+        ).toBeUndefined();
+        expect(
+          installedControl.operationId,
+          "the public PARTY surface installed the exact retained interaction address",
+        ).toBe(guestPicker.coopV2ControlOperationId);
         expect(partyPicker.current, "the actionable PARTY surface exposed its public picker callback").not.toBeNull();
         partyPicker.current?.(OWNER_PICK_SLOT);
+        ui.setMode = realSetMode;
       });
 
       // ===== (D) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the helper's

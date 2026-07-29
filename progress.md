@@ -5251,3 +5251,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local policy-safe evidence for these corrections is 32/32 source contracts, scoped Biome error-clean, and
   `git diff --check`. The three engine regressions remain remote-only; no deployment, Showdown, or tournament work
   occurred.
+
+## 2026-07-29 - Catch-full raw prompt can no longer compete with its V2 commit
+
+- Exact gate `30417425993` proved the reusable CONFIRM generation correction in B1 and the direct Phaser actor
+  identity proof in B11; both shards are green. B9 then exposed the next real boundary rather than repeating its
+  prior detached/double-start harness failures.
+- A guest catch-full decision emitted both its compatibility `catchFullPrompt` and its retained
+  `INTERACTION_COMMIT`. The raw callback queued a legacy picker while the V2 projector installed a second exact
+  modal from the command frontier. The engine test selected the stale queued copy; production could likewise reopen
+  that unaddressed picker after the authoritative modal ended.
+- With the interaction cutover active, the raw prompt is now observational only and cannot create UI. The ordinary
+  V2 projector is the sole phase constructor and successor owner. Legacy sessions retain the old callback behavior.
+  The duo test installs its UI seam before delivery, waits for the manager-owned projected phase plus exact
+  `controlInstalled`, proves no duplicate remains queued, and only then drives the public PARTY callback.
+- Local policy-safe evidence: the catch/revival source contract is 3/3, scoped formatting is clean, raw TypeScript
+  has zero diagnostics in the changed runtime/test files, and `git diff --check` passes. Engine/browser execution
+  remains remote-only; no deployment, Showdown, or tournament code changed.

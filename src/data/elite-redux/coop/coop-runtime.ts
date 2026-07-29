@@ -13702,6 +13702,14 @@ export function assembleCoopRuntime(
     if (getCoopRuntime() !== runtime || runtime.controller.role === "host") {
       return;
     }
+    // Under Authority V2 this raw prompt is only a proposal/presentation carrier. Its matching retained
+    // INTERACTION_COMMIT projects the exact addressed modal through the control ledger. Queuing another
+    // phase here leaves a stale legacy picker behind the V2 modal; after the real picker ends that duplicate
+    // can reopen with no live control and strand both peers. Legacy sessions still use this callback.
+    if (isCoopV2InteractionCutoverActive(runtime.durability)) {
+      coopLog("v2-interaction", `catchFullPrompt sp=${speciesId} observed; ordered INTERACTION_COMMIT owns the picker`);
+      return;
+    }
     try {
       globalScene.phaseManager.unshiftNew("CoopGuestCatchFullPhase", pokemonName, speciesId, operationId);
     } catch (e) {
