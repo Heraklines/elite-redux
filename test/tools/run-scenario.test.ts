@@ -129,7 +129,6 @@ import {
 } from "#data/elite-redux/ai/combat-tree-model";
 import { getErPendingNodes, resetErRouting, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { TerrainType } from "#data/terrain";
-import { getTypeDamageMultiplier } from "#data/type";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -2419,93 +2418,34 @@ interface RunResult {
   state: RunnerStateSnapshot;
 }
 
-/** The type-effectiveness multiplier of a move type against `enemy` (product over its types). */
-function moveTypeEffectiveness(moveType: number, enemy: Pokemon): number {
-  return enemy.getTypes().reduce((mult, t) => mult * getTypeDamageMultiplier(moveType, t), 1);
-}
-
 /**
- * Pick the most type-effective DAMAGING move in the mon's usable moveset against the
- * first live enemy — so a 200-wave run isn't walled by a type immunity (e.g. Psychic
- * into a Dark-type). Falls back to the first usable move. Used as the default action
- * for waves the script/forcedMove don't cover.
- */
-function pickBestMove(mon: Pokemon, enemies: (Pokemon | undefined)[]): MoveId | null {
-  // Use the engine's legality check so the unattended policy respects temporary
-  // restrictions such as Torment, Disable, Encore, Taunt, and Imprison.
-  const usable = mon.getMoveset().filter(m => m.isUsable(mon, false, true)[0]);
-  if (usable.length === 0) {
-    return null;
-  }
-  const target = enemies.find(e => e != null && !e.isFainted());
-  if (!target) {
-    return usable[0].moveId;
-  }
-  let best: MoveId | null = null;
-  let bestScore = -1;
-  for (const m of usable) {
-    const move = m.getMove();
-    if (move.category === MoveCategory.STATUS) {
-      continue; // a status move never wins a wave
-    }
-    const eff = moveTypeEffectiveness(move.type, target);
-    if (eff > bestScore) {
-      bestScore = eff;
-      best = m.moveId;
-    }
-  }
-  return best ?? usable[0].moveId;
-}
-
-/** Whether `moveId` is a single-target move for `mon` (so it needs an explicit target). */
-function isSingleTargetMove(mon: Pokemon, moveId: MoveId): boolean {
-  const move = mon
-    .getMoveset()
-    .find(m => m.moveId === moveId)
-    ?.getMove();
-  return move != null && !move.isMultiTarget();
-}
-
-/**
- * Build a per-slot default action that picks each active mon's best damaging move AND
- * (for single-target moves) targets the first LIVE enemy — so a double battle doesn't
- * stall firing into an already-fainted slot (the fixed BattlerIndex.ENEMY default).
+ * Build a per-slot default action entirely from the engine adapter's legal candidate
+ * set. In triples, the first live foe can be outside a wing Pokemon's reach; assigning
+ * that flat battler index directly creates an action that combat has to retarget and
+ * that cannot serve as a supervised-learning label.
  */
 function smartDefaultAction(game: GameManager): TurnAction {
-  const enemies = game.scene.getEnemyField();
+  const action: TurnAction = {};
+  const earlier: ErCombatEarlierChoice[] = [];
   const field = game.scene.getPlayerField();
-  const liveEnemyIdx = enemies.findIndex(e => e != null && !e.isFainted());
-  const targetBattler =
-    liveEnemyIdx >= 0 ? ((game.scene.currentBattle.arrangement.enemyOffset + liveEnemyIdx) as BattlerIndex) : undefined;
-  const a: TurnAction = {};
-  if (field[0]) {
-    const m = pickBestMove(field[0], enemies);
-    if (m != null) {
-      a.move = m;
-      if (targetBattler != null && isSingleTargetMove(field[0], m)) {
-        a.target = targetBattler;
-      }
+  for (let actorSlot = 0; actorSlot < field.length; actorSlot++) {
+    const actor = field[actorSlot];
+    if (!actor?.isActive(true) || actor.isFainted()) {
+      continue;
     }
-  }
-  if (field[1]) {
-    const m = pickBestMove(field[1], enemies);
-    if (m != null) {
-      a.move2 = m;
-      if (targetBattler != null && isSingleTargetMove(field[1], m)) {
-        a.target2 = targetBattler;
-      }
+    const moveCandidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier).filter(
+      (candidate): candidate is ErCombatMoveCandidate => candidate.kind === "move" && !candidate.tera,
+    );
+    const damaging = moveCandidates.filter(candidate => allMoves[candidate.moveId].category !== MoveCategory.STATUS);
+    const pool = damaging.length > 0 ? damaging : moveCandidates;
+    const chosen = pool.sort((a, b) => b.baseTypeMultiplier - a.baseTypeMultiplier || a.id.localeCompare(b.id))[0];
+    if (!chosen) {
+      continue;
     }
+    setCandidateAction(game, action, actorSlot, chosen);
+    earlier.push({ kind: chosen.kind, id: chosen.id, tera: chosen.tera });
   }
-  if (field[2]) {
-    const m = pickBestMove(field[2], enemies);
-    if (m != null) {
-      a.move3 = m;
-      if (targetBattler != null && isSingleTargetMove(field[2], m)) {
-        a.target3 = targetBattler;
-      }
-    }
-  }
-  return a;
+  return action;
 }
 
 function setCandidateAction(
