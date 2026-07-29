@@ -5617,3 +5617,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Blessing. A source contract reads the production starter-cost table and fails if that pair ever exceeds the real
   budget, and the public driver waits for exactly the legal roster. No game rule, authority path, or player-facing
   behavior was weakened.
+
+## 2026-07-30 - Stormglass states its exact post-result command frontier
+
+- Exact registered-interactions run `30497847906` proved both clients installed and settled the same Stormglass
+  result at Authority V2 revision 12, replayed the same weather/ability presentation, and then failed closed when
+  the host attempted the wave-2/turn-1 command control. Revival had already completed mechanically in the same
+  real two-browser run; pairing, launch, replacement, and the Stormglass owner/watcher picker all converged.
+- The Stormglass result used the ordinary broad interaction wait. That rule correctly permits a surviving battle's
+  command control at turn N+1, but Stormglass is a pre-command battle interaction whose result and command frontier
+  are both at N. Its successor now names only the exact same-wave/same-turn `command-open` control address. Generic
+  successor admission remains unchanged and wrong-turn or wrong-material controls stay fail-closed.
+- A node-pure failure-first contract asserts both the permitted exact command edge and the rejected turn/material
+  alternatives. The preceding exact checkpoint remains independently green in focused gate `30497823364` and the
+  ordinary two-browser fresh-wave journey `30497823286`; only the registered deterministic path exposed this
+  interaction-specific successor seam.

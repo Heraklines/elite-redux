@@ -242,6 +242,40 @@ describe("Authority V2 interaction cutover", () => {
     expect(built?.nextControl).not.toBeNull();
   });
 
+  it("authorizes only the exact same-turn command frontier after Stormglass settles", () => {
+    const value = envelope("STORMGLASS", { weatherIndex: 0, weather: 1 }, "INTERACTION", 0, 9_800_000);
+    const operationId = value.pendingOperation?.id;
+    const successor = successorOfCoopV2InteractionEnvelope("op:stormglass", value);
+    if (operationId == null || successor?.kind !== "AWAIT_SUCCESSOR") {
+      throw new Error("Stormglass did not build its ordered successor wait");
+    }
+
+    expect(successor.allowedControlAddresses).toEqual([
+      { materialKind: "command-open", wave: 1, turn: 1, operationId: null },
+    ]);
+    expect(
+      successorWaitAllows(successor, operationId, "CONTROL_COMMIT", "command-1", 1, {
+        kind: "command-open",
+        wave: 1,
+        turn: 1,
+      }),
+    ).toBe(true);
+    expect(
+      successorWaitAllows(successor, operationId, "CONTROL_COMMIT", "command-2", 1, {
+        kind: "command-open",
+        wave: 1,
+        turn: 2,
+      }),
+    ).toBe(false);
+    expect(
+      successorWaitAllows(successor, operationId, "CONTROL_COMMIT", "interaction-1", 1, {
+        kind: "interaction-open",
+        wave: 1,
+        turn: 1,
+      }),
+    ).toBe(false);
+  });
+
   it("admits a taken free reward as a terminal result through its exact JSON wire image", () => {
     const value = envelope(
       "REWARD",

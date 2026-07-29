@@ -1035,8 +1035,20 @@ export function successorOfCoopV2InteractionEnvelope(
           : undefined,
       );
     case "BARGAIN":
-    case "STORMGLASS":
       return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
+    case "STORMGLASS":
+      // Stormglass settles before the first command picker for this battle is authored. Its immutable
+      // result and the command frontier therefore share one wave/turn address; the ordinary broad
+      // interaction wait intentionally expects a later turn and would reject this edge. Name the exact
+      // command-open coordinate instead of weakening admission for every other interaction result.
+      return successorWait(
+        envelope,
+        ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+        false,
+        envelope,
+        undefined,
+        [{ materialKind: "command-open", wave: envelope.wave, turn: envelope.turn, operationId: null }],
+      );
     case "FAINT_SWITCH":
     case "WAVE_ADVANCE":
       return null;
