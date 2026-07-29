@@ -1245,26 +1245,26 @@ export class TitlePhase extends Phase {
             incoming
               ? `${incoming.name} wants to ${expectedOpponent == null ? "join your run" : "start the match"}!`
               : controller?.isRequestPending()
-              ? "Waiting for their answer..."
-              : visiblePlayers.length > 0
-                ? expectedOpponent == null
-                  ? "Pick a player below to send a request."
-                  : `${expectedOpponent} is ready. Send the match request.`
-                : expectedOpponent == null
-                  ? "Looking for other players..."
-                  : `Waiting for ${expectedOpponent} to join this match lobby...`,
-        );
-        const sig = visiblePlayers.map(p => p.id).join(",") + (incoming ? `|req:${incoming.id}` : "");
-        if (sig !== listSig) {
-          listSig = sig;
-          if (!incoming) {
-            renderPanel();
+                ? "Waiting for their answer..."
+                : visiblePlayers.length > 0
+                  ? expectedOpponent == null
+                    ? "Pick a player below to send a request."
+                    : `${expectedOpponent} is ready. Send the match request.`
+                  : expectedOpponent == null
+                    ? "Looking for other players..."
+                    : `Waiting for ${expectedOpponent} to join this match lobby...`,
+          );
+          const sig = visiblePlayers.map(p => p.id).join(",") + (incoming ? `|req:${incoming.id}` : "");
+          if (sig !== listSig) {
+            listSig = sig;
+            if (!incoming) {
+              renderPanel();
+            }
           }
-        }
-      },
-      // Lobby v2: someone asked to join US - take over the panel with Accept/Decline.
-      onRequest: from => {
-        if (expectedOpponent != null && from.name !== expectedOpponent) {
+        },
+        // Lobby v2: someone asked to join US - take over the panel with Accept/Decline.
+        onRequest: from => {
+          if (expectedOpponent != null && from.name !== expectedOpponent) {
             void controller?.respond(false);
             return;
           }
@@ -1290,7 +1290,7 @@ export class TitlePhase extends Phase {
             expectedOpponent == null
               ? "They withdrew. Looking for other players..."
               : `They withdrew. Waiting for ${expectedOpponent}...`,
-        );
+          );
           renderPanel();
         },
         onRequestPending: targetName => {
@@ -1319,32 +1319,32 @@ export class TitlePhase extends Phase {
           globalScene.ui.setMode(UiMode.MESSAGE);
           globalScene.ui.resetModeChain();
           globalScene.ui.showText(`Connecting to your ${expectedOpponent == null ? "partner" : "opponent"}...`, null);
-      },
-      onConnected: runtime => {
-        if (lobbyTerminated || getCoopRuntime() !== runtime) {
-          return;
-        }
-        const controller = runtime.controller;
-        const sessionGeneration = coopSessionGeneration();
-        flowRuntime = runtime;
-        flowController = controller;
-        flowGeneration = sessionGeneration;
-        const isCurrentSession = (): boolean =>
-          !lobbyTerminated && !lobbyCompleted && this.isExactCoopSession(runtime, controller, sessionGeneration);
-        // Versus launches no longer broadcast a runConfig, so BOTH clients must pin the mode selected
-        // by their title route before entering the battle flow. All Showdown matches, including
-        // scheduled tournament matches, run the same dual-engine lockstep path. Co-op's host remains
-        // the config authority for co-op sessions.
-        if (sessionKind === "versus" || runtime.controller.role === "host") {
-          runtime.controller.setNetcodeMode(netcodeMode);
-        }
-        // Showdown 1v1 (staging fix 2026-07-07): pin the session kind on BOTH roles. Both clients
-        // entered this lobby through the same menu entry, so the kind is local knowledge. The old
-        // host-only pin relied on broadcastRunConfig to carry it to the guest - that broadcast was
-        // removed with the deferred run launch (B7 item 11), which silently left the GUEST on
-        // "coop" and disabled every versus gate (perspective flip, showdown command menu, pure-
-        // renderer divert): the guest then ran a full live engine on the host's snapshot.
-        runtime.controller.setSessionKind(sessionKind);
+        },
+        onConnected: runtime => {
+          if (lobbyTerminated || getCoopRuntime() !== runtime) {
+            return;
+          }
+          const controller = runtime.controller;
+          const sessionGeneration = coopSessionGeneration();
+          flowRuntime = runtime;
+          flowController = controller;
+          flowGeneration = sessionGeneration;
+          const isCurrentSession = (): boolean =>
+            !lobbyTerminated && !lobbyCompleted && this.isExactCoopSession(runtime, controller, sessionGeneration);
+          // Versus launches no longer broadcast a runConfig, so BOTH clients must pin the mode selected
+          // by their title route before entering the battle flow. All Showdown matches, including
+          // scheduled tournament matches, run the same dual-engine lockstep path. Co-op's host remains
+          // the config authority for co-op sessions.
+          if (sessionKind === "versus" || runtime.controller.role === "host") {
+            runtime.controller.setNetcodeMode(netcodeMode);
+          }
+          // Showdown 1v1 (staging fix 2026-07-07): pin the session kind on BOTH roles. Both clients
+          // entered this lobby through the same menu entry, so the kind is local knowledge. The old
+          // host-only pin relied on broadcastRunConfig to carry it to the guest - that broadcast was
+          // removed with the deferred run launch (B7 item 11), which silently left the GUEST on
+          // "coop" and disabled every versus gate (perspective flip, showdown command menu, pure-
+          // renderer divert): the guest then ran a full live engine on the host's snapshot.
+          runtime.controller.setSessionKind(sessionKind);
           // The data channel is open, but peer identity and the functional-build fingerprint may
           // still be in flight. Resume discovery is pair-keyed and then deserializes a full save,
           // so hold both clients until the complete compatibility contract has settled.
@@ -1353,16 +1353,16 @@ export class TitlePhase extends Phase {
             expectedOpponent == null ? "Connected! Verifying your partner..." : "Connected! Verifying your opponent...",
           );
           globalScene.ui.setMode(UiMode.MESSAGE);
-        globalScene.ui.resetModeChain();
-        globalScene.ui.showText(
-          expectedOpponent == null
-            ? "Connected! Verifying your partner and co-op saves..."
-            : "Connected! Verifying your tournament opponent...",
-          null,
-        );
-        const startNewRun = () => {
-          if (!isCurrentSession()) {
-            return;
+          globalScene.ui.resetModeChain();
+          globalScene.ui.showText(
+            expectedOpponent == null
+              ? "Connected! Verifying your partner and co-op saves..."
+              : "Connected! Verifying your tournament opponent...",
+            null,
+          );
+          const startNewRun = () => {
+            if (!isCurrentSession()) {
+              return;
             }
             lobbyCompleted = true;
             stopConstraintPolling();
@@ -1370,23 +1370,23 @@ export class TitlePhase extends Phase {
             setModeAndEnd(launchMode);
           };
 
-        // A versus match is ephemeral and never enters the co-op resume path. Plain Showdown can
-        // launch immediately; tournament Showdown first resolves the transport's authenticated peer
-        // identity and requires the freshly validated bracket opponent on both clients.
-        if (sessionKind === "versus") {
-          if (expectedOpponent == null) {
-            startNewRun();
-            return;
-          }
-          void controller
-            .awaitPartnerCompatibility()
-            .then(identity => {
-              if (!isCurrentSession()) {
-                return;
-              }
-              if (identity?.partnerName !== expectedOpponent) {
-                terminalFailure(
-                  `This tournament pairing changed. Only ${expectedOpponent} can join this match. Returning to the bracket.`,
+          // A versus match is ephemeral and never enters the co-op resume path. Plain Showdown can
+          // launch immediately; tournament Showdown first resolves the transport's authenticated peer
+          // identity and requires the freshly validated bracket opponent on both clients.
+          if (sessionKind === "versus") {
+            if (expectedOpponent == null) {
+              startNewRun();
+              return;
+            }
+            void controller
+              .awaitPartnerCompatibility()
+              .then(identity => {
+                if (!isCurrentSession()) {
+                  return;
+                }
+                if (identity?.partnerName !== expectedOpponent) {
+                  terminalFailure(
+                    `This tournament pairing changed. Only ${expectedOpponent} can join this match. Returning to the bracket.`,
                   );
                   return;
                 }
@@ -1395,22 +1395,22 @@ export class TitlePhase extends Phase {
                 startNewRun();
               })
               .catch(error => {
+                if (!isCurrentSession()) {
+                  return;
+                }
+                console.error("[tournament-lobby] opponent verification failed", error);
+                terminalFailure("Could not verify your tournament opponent. Returning to the bracket.");
+              });
+            return;
+          }
+
+          void controller
+            .awaitPartnerCompatibility()
+            .then(async identity => {
               if (!isCurrentSession()) {
                 return;
               }
-              console.error("[tournament-lobby] opponent verification failed", error);
-              terminalFailure("Could not verify your tournament opponent. Returning to the bracket.");
-            });
-          return;
-        }
-
-        void controller
-          .awaitPartnerCompatibility()
-          .then(async identity => {
-            if (!isCurrentSession()) {
-              return;
-            }
-            if (identity == null || identity.partnerName == null) {
+              if (identity == null || identity.partnerName == null) {
                 console.warn(
                   "[coop-resume] peer compatibility barrier failed; keeping lobby closed (no unilateral start)",
                 );
@@ -1428,15 +1428,15 @@ export class TitlePhase extends Phase {
                 globalScene.gameData.armCoopResumeCheckpointPersistence();
               }
 
-            // #810 RESUME FLOW (maintainer directive): after the ACCEPT handshake, decide RESUME
-            // vs NEW GAME BEFORE anyone advances into starter-select. The HOST owns the decision
-            // (it holds the authoritative save + its own resume marker, which BOTH clients now
-            // record); the GUEST mirrors a waiting state. BARRIER: neither side calls startNewRun
-            // until the choice resolves. Identity is gated by the marker's exact (self, partner)
-            // account pair, so a save is never offered/loaded with a different partner.
-            if (identity.localRole === "guest") {
-              // GUEST: block on the host's decision. Show a mirrored "waiting" state - NO "press to
-              // start" (that was the barrier hole: the guest could start a new run while the host
+              // #810 RESUME FLOW (maintainer directive): after the ACCEPT handshake, decide RESUME
+              // vs NEW GAME BEFORE anyone advances into starter-select. The HOST owns the decision
+              // (it holds the authoritative save + its own resume marker, which BOTH clients now
+              // record); the GUEST mirrors a waiting state. BARRIER: neither side calls startNewRun
+              // until the choice resolves. Identity is gated by the marker's exact (self, partner)
+              // account pair, so a save is never offered/loaded with a different partner.
+              if (identity.localRole === "guest") {
+                // GUEST: block on the host's decision. Show a mirrored "waiting" state - NO "press to
+                // start" (that was the barrier hole: the guest could start a new run while the host
                 // was still deciding to resume). Release on EITHER the resume OFFER or the START-NEW
                 // signal. If the host goes silent, fail closed to reconnect instead of authorizing a
                 // unilateral new run that would split the clients across different states.
@@ -1445,17 +1445,17 @@ export class TitlePhase extends Phase {
                 globalScene.ui.resetModeChain();
                 globalScene.ui.showText(`Connected! Waiting for ${partner} to choose Resume or New Game...`, null);
 
-              let settled = false;
-              /** Claim the single decision; returns true only for the first caller. */
-              const claim = (): boolean => {
-                if (settled) {
-                  return false;
-                }
-                settled = true;
-                return true;
-              };
-              const guestWaitTimer = setTimeout(() => {
-                if (isCurrentSession() && claim()) {
+                let settled = false;
+                /** Claim the single decision; returns true only for the first caller. */
+                const claim = (): boolean => {
+                  if (settled) {
+                    return false;
+                  }
+                  settled = true;
+                  return true;
+                };
+                const guestWaitTimer = setTimeout(() => {
+                  if (isCurrentSession() && claim()) {
                     console.warn(
                       `[coop-resume] guest: no Resume/New Game from ${partner} in ${COOP_RESUME_GUEST_WAIT_MS}ms -> reconnect (fail-closed)`,
                     );
@@ -1463,43 +1463,43 @@ export class TitlePhase extends Phase {
                     terminalFailure(
                       "Your partner did not finish the co-op save decision. Please reconnect and try again.",
                     );
-                }
-              }, COOP_RESUME_GUEST_WAIT_MS);
+                  }
+                }, COOP_RESUME_GUEST_WAIT_MS);
 
-              // Host chose New Game (or had no save / we declined / the offer timed out): release.
-              controller.armResumeStartNewHandler(() => {
-                clearTimeout(guestWaitTimer);
-                if (isCurrentSession() && claim()) {
-                  startNewRun();
-                }
-              });
-              controller.armResumeBlockedHandler((reason, wave) => {
-                clearTimeout(guestWaitTimer);
-                if (!isCurrentSession() || !claim()) {
-                  return;
-                }
-                const message =
-                  reason === "unsafe-role-reversal"
-                    ? `A co-op save was found at wave ${wave}, but the host/guest seats are reversed. Reconnect with the same player accepting the invite as in the saved run, then choose Continue.`
-                    : reason === "legacy-unmappable"
-                      ? `A legacy co-op save was found at wave ${wave}, but it has no safe player-seat mapping. This save cannot be resumed without risking swapped Pokemon ownership.`
-                      : `A co-op save exists at wave ${wave}, but this account had no verified free save slot for its resume copy (slots were occupied or cloud status was unavailable). Free a slot if needed, then reconnect with this partner; a new game was not started.`;
-                terminalFailure(message);
-              });
-              // Host offers to resume: surface accept/decline. Keep the start-new handler live (the
-              // host can still time out and release us). Accept claims Resume; Decline remains behind
-              // the barrier until the host durably commits New Game.
-              controller.armResumeOfferHandler(commitment => {
-                clearTimeout(guestWaitTimer);
-                if (settled || !isCurrentSession()) {
-                  return;
-                }
-                if (
-                  commitment.gameMode !== GameModes.COOP
-                  || !coopSeatMapMatches(
-                    { version: 1, players: commitment.participants, seats: commitment.seats },
-                    controller.localName(),
-                    partner,
+                // Host chose New Game (or had no save / we declined / the offer timed out): release.
+                controller.armResumeStartNewHandler(() => {
+                  clearTimeout(guestWaitTimer);
+                  if (isCurrentSession() && claim()) {
+                    startNewRun();
+                  }
+                });
+                controller.armResumeBlockedHandler((reason, wave) => {
+                  clearTimeout(guestWaitTimer);
+                  if (!isCurrentSession() || !claim()) {
+                    return;
+                  }
+                  const message =
+                    reason === "unsafe-role-reversal"
+                      ? `A co-op save was found at wave ${wave}, but the host/guest seats are reversed. Reconnect with the same player accepting the invite as in the saved run, then choose Continue.`
+                      : reason === "legacy-unmappable"
+                        ? `A legacy co-op save was found at wave ${wave}, but it has no safe player-seat mapping. This save cannot be resumed without risking swapped Pokemon ownership.`
+                        : `A co-op save exists at wave ${wave}, but this account had no verified free save slot for its resume copy (slots were occupied or cloud status was unavailable). Free a slot if needed, then reconnect with this partner; a new game was not started.`;
+                  terminalFailure(message);
+                });
+                // Host offers to resume: surface accept/decline. Keep the start-new handler live (the
+                // host can still time out and release us). Accept claims Resume; Decline remains behind
+                // the barrier until the host durably commits New Game.
+                controller.armResumeOfferHandler(commitment => {
+                  clearTimeout(guestWaitTimer);
+                  if (settled || !isCurrentSession()) {
+                    return;
+                  }
+                  if (
+                    commitment.gameMode !== GameModes.COOP
+                    || !coopSeatMapMatches(
+                      { version: 1, players: commitment.participants, seats: commitment.seats },
+                      controller.localName(),
+                      partner,
                       controller.role,
                     )
                   ) {
@@ -1509,22 +1509,22 @@ export class TitlePhase extends Phase {
                     return;
                   }
                   globalScene.ui.showText(
-                  `${partner} wants to resume your saved co-op run (wave ${commitment.wave}). Accept?`,
-                  null,
-                  () => {
-                    if (!isCurrentSession()) {
-                      return;
-                    }
-                    globalScene.ui.setMode(
-                      UiMode.CONFIRM,
-                      () => {
-                        if (isCurrentSession() && claim()) {
-                          globalScene.ui.setMode(UiMode.MESSAGE);
-                          globalScene.ui.showText(`Waiting for ${partner} to commit the resume...`, null);
-                          void controller
-                            .replyResume(true)
-                            .then(committed => {
-                              if (!isCurrentSession()) {
+                    `${partner} wants to resume your saved co-op run (wave ${commitment.wave}). Accept?`,
+                    null,
+                    () => {
+                      if (!isCurrentSession()) {
+                        return;
+                      }
+                      globalScene.ui.setMode(
+                        UiMode.CONFIRM,
+                        () => {
+                          if (isCurrentSession() && claim()) {
+                            globalScene.ui.setMode(UiMode.MESSAGE);
+                            globalScene.ui.showText(`Waiting for ${partner} to commit the resume...`, null);
+                            void controller
+                              .replyResume(true)
+                              .then(committed => {
+                                if (!isCurrentSession()) {
                                   return;
                                 }
                                 if (!committed) {
@@ -1538,92 +1538,92 @@ export class TitlePhase extends Phase {
                                 void this.coopGuestResumeBoot(
                                   commitment,
                                   runtime,
-                                controller,
-                                sessionGeneration,
-                                terminalFailure,
-                              );
-                            })
-                            .catch(error => {
-                              if (!isCurrentSession()) {
-                                return;
-                              }
-                              console.error("[coop-resume] guest resume commit failed", error);
-                              terminalFailure("The resume decision could not be committed. Reconnect and try again.");
-                            });
-                        }
-                      },
-                      () => {
-                        if (!settled && isCurrentSession()) {
-                          controller
-                            .replyResume(false)
-                            .catch(error => console.warn("[coop-resume] failed to relay decline", error));
-                          // Stay behind the barrier until the host commits and durably broadcasts
-                          // resumeStartNew. Advancing here put the guest in team select while the
-                          // host was still showing a message/confirmation screen.
-                          globalScene.ui.setMode(UiMode.MESSAGE);
-                          globalScene.ui.showText(`Waiting for ${partner} to start a new run...`, null);
-                        }
-                      },
-                    );
-                  },
-                  null,
-                  true,
-                );
-              });
-              return;
-            }
+                                  controller,
+                                  sessionGeneration,
+                                  terminalFailure,
+                                );
+                              })
+                              .catch(error => {
+                                if (!isCurrentSession()) {
+                                  return;
+                                }
+                                console.error("[coop-resume] guest resume commit failed", error);
+                                terminalFailure("The resume decision could not be committed. Reconnect and try again.");
+                              });
+                          }
+                        },
+                        () => {
+                          if (!settled && isCurrentSession()) {
+                            controller
+                              .replyResume(false)
+                              .catch(error => console.warn("[coop-resume] failed to relay decline", error));
+                            // Stay behind the barrier until the host commits and durably broadcasts
+                            // resumeStartNew. Advancing here put the guest in team select while the
+                            // host was still showing a message/confirmation screen.
+                            globalScene.ui.setMode(UiMode.MESSAGE);
+                            globalScene.ui.showText(`Waiting for ${partner} to start a new run...`, null);
+                          }
+                        },
+                      );
+                    },
+                    null,
+                    true,
+                  );
+                });
+                return;
+              }
 
-            // Every host non-resume path relays the release so the waiting guest never hangs.
-            const hostStartNew = () => {
+              // Every host non-resume path relays the release so the waiting guest never hangs.
+              const hostStartNew = () => {
+                if (!isCurrentSession()) {
+                  return;
+                }
+                globalScene.ui.setMode(UiMode.MESSAGE);
+                globalScene.ui.showText(`Waiting for ${partner} to enter team selection...`, null);
+                void controller
+                  .sendResumeStartNew()
+                  .then(acknowledged => {
+                    if (!isCurrentSession()) {
+                      return;
+                    }
+                    if (acknowledged) {
+                      startNewRun();
+                    } else {
+                      terminalFailure("Could not commit the new co-op run. Reconnect and try again.");
+                    }
+                  })
+                  .catch(error => {
+                    if (!isCurrentSession()) {
+                      return;
+                    }
+                    console.error("[coop-resume] start-new commit failed", error);
+                    terminalFailure("Could not commit the new co-op run. Reconnect and try again.");
+                  });
+              };
+
+              // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
+              // Keep failures attached to their slots. A corrupt/ambiguous slot must not hide a valid
+              // candidate elsewhere or tear down an otherwise healthy paired transport.
+              const resumeSnapshot = await globalScene.gameData.getCoopResumeLobbySnapshot();
+              const discovery = await findCoopResumeCandidate(
+                controller.localName(),
+                partner,
+                controller.role,
+                async slot => {
+                  const failure = resumeSnapshot.failures.get(slot);
+                  if (failure != null) {
+                    throw failure;
+                  }
+                  return resumeSnapshot.sessions.get(slot);
+                },
+              );
               if (!isCurrentSession()) {
                 return;
               }
-              globalScene.ui.setMode(UiMode.MESSAGE);
-              globalScene.ui.showText(`Waiting for ${partner} to enter team selection...`, null);
-              void controller
-                .sendResumeStartNew()
-                .then(acknowledged => {
-                  if (!isCurrentSession()) {
-                    return;
-                  }
-                  if (acknowledged) {
-                    startNewRun();
-                  } else {
-                    terminalFailure("Could not commit the new co-op run. Reconnect and try again.");
-                  }
-                })
-                .catch(error => {
-                  if (!isCurrentSession()) {
-                    return;
-                  }
-                  console.error("[coop-resume] start-new commit failed", error);
-                  terminalFailure("Could not commit the new co-op run. Reconnect and try again.");
-                });
-            };
-
-            // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
-            // Keep failures attached to their slots. A corrupt/ambiguous slot must not hide a valid
-            // candidate elsewhere or tear down an otherwise healthy paired transport.
-            const resumeSnapshot = await globalScene.gameData.getCoopResumeLobbySnapshot();
-            const discovery = await findCoopResumeCandidate(
-              controller.localName(),
-              partner,
-              controller.role,
-              async slot => {
-                const failure = resumeSnapshot.failures.get(slot);
-                if (failure != null) {
-                  throw failure;
-                }
-                return resumeSnapshot.sessions.get(slot);
-              },
-            );
-            if (!isCurrentSession()) {
-              return;
-            }
-            const blockedMessage = coopResumeBlockMessage(discovery);
-            if (blockedMessage != null && discovery.kind !== "candidate" && discovery.kind !== "no-save") {
-              if (discovery.kind !== "replica-unavailable") {
-                // A fresh run is safe even when an old slot is quarantined: SelectStarterPhase
+              const blockedMessage = coopResumeBlockMessage(discovery);
+              if (blockedMessage != null && discovery.kind !== "candidate" && discovery.kind !== "no-save") {
+                if (discovery.kind !== "replica-unavailable") {
+                  // A fresh run is safe even when an old slot is quarantined: SelectStarterPhase
                   // independently proves a different slot empty in both local and cloud storage,
                   // fences it across the launch, and wins the backend empty-slot CAS before release.
                   // Require an explicit press so an ambiguous/legacy save is never silently ignored.
@@ -1631,6 +1631,29 @@ export class TitlePhase extends Phase {
                   globalScene.ui.setMode(UiMode.MESSAGE);
                   globalScene.ui.showText(
                     `${blockedMessage}\n\nPress to start a separate co-op run. Existing saves will not be overwritten.`,
+                    null,
+                    hostStartNew,
+                    null,
+                    true,
+                  );
+                  return;
+                }
+                const acknowledged = await controller.sendResumeBlocked(discovery.kind, discovery.wave);
+                if (!isCurrentSession()) {
+                  return;
+                }
+                if (!acknowledged) {
+                  console.warn(`[coop-resume] guest did not ACK blocked-save reason=${discovery.kind}`);
+                }
+                terminalFailure(blockedMessage);
+                return;
+              }
+              const marker = discovery.kind === "candidate" ? discovery.candidate : null;
+              if (marker == null) {
+                // Release the guest only when the host actually presses Start. Sending this before
+                // the prompt caused the live split: guest in team select, host still in the lobby.
+                globalScene.ui.showText(
+                  "Connected to your partner!\nPress to start co-op.",
                   null,
                   hostStartNew,
                   null,
@@ -1638,53 +1661,30 @@ export class TitlePhase extends Phase {
                 );
                 return;
               }
-              const acknowledged = await controller.sendResumeBlocked(discovery.kind, discovery.wave);
-              if (!isCurrentSession()) {
-                return;
-              }
-              if (!acknowledged) {
-                console.warn(`[coop-resume] guest did not ACK blocked-save reason=${discovery.kind}`);
-              }
-              terminalFailure(blockedMessage);
-              return;
-            }
-            const marker = discovery.kind === "candidate" ? discovery.candidate : null;
-            if (marker == null) {
-              // Release the guest only when the host actually presses Start. Sending this before
-              // the prompt caused the live split: guest in team select, host still in the lobby.
+              // Offer the HOST a real RESUME / NEW GAME choice.
               globalScene.ui.showText(
-                "Connected to your partner!\nPress to start co-op.",
+                `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
                 null,
-                hostStartNew,
-                null,
-                true,
-              );
-              return;
-            }
-            // Offer the HOST a real RESUME / NEW GAME choice.
-            globalScene.ui.showText(
-              `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
-              null,
-              () => {
-                if (!isCurrentSession()) {
-                  return;
-                }
-                globalScene.ui.setMode(
-                  UiMode.CONFIRM,
-                  () => {
-                    if (!isCurrentSession()) {
-                      return;
-                    }
-                    // RESUME: relay the offer; both proceed identically on accept. offerResume has
-                    // its own 60s no-reply timeout -> resolves false -> we fall to NEW GAME (and
-                    // release the guest), so the barrier can never hang on an unresponsive guest.
-                    globalScene.ui.setMode(UiMode.MESSAGE);
-                    globalScene.ui.showText(`Waiting for ${partner} to accept...`, null);
-                    void controller
-                      .offerResume(marker.commitment)
-                      .then(accepted => {
-                        if (!isCurrentSession()) {
-                          return;
+                () => {
+                  if (!isCurrentSession()) {
+                    return;
+                  }
+                  globalScene.ui.setMode(
+                    UiMode.CONFIRM,
+                    () => {
+                      if (!isCurrentSession()) {
+                        return;
+                      }
+                      // RESUME: relay the offer; both proceed identically on accept. offerResume has
+                      // its own 60s no-reply timeout -> resolves false -> we fall to NEW GAME (and
+                      // release the guest), so the barrier can never hang on an unresponsive guest.
+                      globalScene.ui.setMode(UiMode.MESSAGE);
+                      globalScene.ui.showText(`Waiting for ${partner} to accept...`, null);
+                      void controller
+                        .offerResume(marker.commitment)
+                        .then(accepted => {
+                          if (!isCurrentSession()) {
+                            return;
                           }
                           if (accepted) {
                             lobbyCompleted = true;
@@ -1699,35 +1699,35 @@ export class TitlePhase extends Phase {
                           } else {
                             // The guest remains behind the barrier after declining; this single durable
                             // release moves both clients into team select together.
-                          hostStartNew();
-                        }
-                      })
-                      .catch(error => {
-                        if (!isCurrentSession()) {
-                          return;
-                        }
-                        console.error("[coop-resume] resume offer failed", error);
-                        terminalFailure("Could not commit the co-op resume. Reconnect and try again.");
-                      });
-                  },
-                  // NEW GAME: release the guest and start fresh.
-                  hostStartNew,
-                );
-              },
-              null,
-              true,
-            );
-          })
-          .catch(error => {
-            if (!isCurrentSession()) {
-              return;
-            }
-            console.error("[coop-resume] identity/resume decision failed", error);
-            terminalFailure("Could not check co-op saves. Please reconnect and try again.");
-          });
-      },
-      onError: e => {
-        if (flowRuntime == null || isCurrentFlow()) {
+                            hostStartNew();
+                          }
+                        })
+                        .catch(error => {
+                          if (!isCurrentSession()) {
+                            return;
+                          }
+                          console.error("[coop-resume] resume offer failed", error);
+                          terminalFailure("Could not commit the co-op resume. Reconnect and try again.");
+                        });
+                    },
+                    // NEW GAME: release the guest and start fresh.
+                    hostStartNew,
+                  );
+                },
+                null,
+                true,
+              );
+            })
+            .catch(error => {
+              if (!isCurrentSession()) {
+                return;
+              }
+              console.error("[coop-resume] identity/resume decision failed", error);
+              terminalFailure("Could not check co-op saves. Please reconnect and try again.");
+            });
+        },
+        onError: e => {
+          if (flowRuntime == null || isCurrentFlow()) {
             terminalFailure(`${tournamentConstraint == null ? "Co-op" : "Tournament lobby"} error:\n${e}`);
           }
         },
