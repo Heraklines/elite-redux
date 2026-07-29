@@ -1,4 +1,4 @@
-import type { Animation } from "#app/animations";
+import { type Animation, type AnimationResourceOwner, AnimationResourceScope } from "#app/animations";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { PhaseManager } from "#app/phase-manager";
@@ -71,7 +71,7 @@ export class FormChangePhase extends EvolutionPhase {
   private coopReplayWatchdog: CoopPresentationProgressWatchdog | undefined;
   private readonly scheduledCallbacks = new Set<() => void>();
   private readonly timerEvents = new Set<Phaser.Time.TimerEvent>();
-  private readonly tweens = new Set<Phaser.Tweens.BaseTween>();
+  private readonly animationResources = new AnimationResourceScope();
   private transformedPokemon: Pokemon | null = null;
 
   constructor(
@@ -159,9 +159,14 @@ export class FormChangePhase extends EvolutionPhase {
 
   private trackTween<T extends Phaser.Tweens.BaseTween>(tween: T): T {
     if (this.coopReplay != null || this.hasRuntimeBoundary()) {
-      this.tweens.add(tween);
+      return this.animationResources.ownTween(tween);
     }
     return tween;
+  }
+
+  /** Shared helpers remain unowned for ordinary play and join this exact phase only in co-op. */
+  private formAnimationOwner(): AnimationResourceOwner | undefined {
+    return this.coopReplay != null || this.hasRuntimeBoundary() ? this.animationResources : undefined;
   }
 
   private clearOwnedResources(): void {
@@ -175,10 +180,7 @@ export class FormChangePhase extends EvolutionPhase {
       timer.remove(false);
     }
     this.timerEvents.clear();
-    for (const tween of this.tweens) {
-      tween.stop();
-    }
-    this.tweens.clear();
+    this.animationResources.cancel();
   }
 
   private destroyPresentationPokemon(): void {
@@ -428,7 +430,13 @@ export class FormChangePhase extends EvolutionPhase {
   private afterCycle(preName: string, transformedPokemon: Pokemon): void {
     this.scene.playSound("se/sparkle");
     this.pokemonEvoSprite.setVisible(true);
-    this.scene.animations.doCircleInward(this.evolutionBaseBg, this.evolutionContainer);
+    this.scene.animations.doCircleInward(
+      this.evolutionBaseBg,
+      this.evolutionContainer,
+      0,
+      0,
+      this.formAnimationOwner(),
+    );
     this.schedule(900, () => {
       if (this.coopReplayTerminal) {
         transformedPokemon.destroy();
@@ -453,7 +461,7 @@ export class FormChangePhase extends EvolutionPhase {
           this.ownerPhaseManager.unshiftNew("EndEvolutionPhase");
         }
         this.scene.playSound("se/shine");
-        this.scene.animations.doSpray(this.evolutionBaseBg, this.evolutionContainer);
+        this.scene.animations.doSpray(this.evolutionBaseBg, this.evolutionContainer, this.formAnimationOwner());
         this.postFormChangeTweens(transformedPokemon, preName);
       };
       const apply = this.installCoopReplayResult();
@@ -521,7 +529,13 @@ export class FormChangePhase extends EvolutionPhase {
             onStart: () =>
               this.dispatchBound(() => {
                 this.scene.playSound("se/charge");
-                this.scene.animations.doSpiralUpward(this.evolutionBaseBg, this.evolutionContainer);
+                this.scene.animations.doSpiralUpward(
+                  this.evolutionBaseBg,
+                  this.evolutionContainer,
+                  0,
+                  0,
+                  this.formAnimationOwner(),
+                );
               }),
             onComplete: () => this.dispatchBound(() => this.pokemonSprite.setVisible(false)),
           },
@@ -532,11 +546,17 @@ export class FormChangePhase extends EvolutionPhase {
         onComplete: () =>
           this.dispatchBound(() => {
             this.scene.playSound("se/beam");
-            this.scene.animations.doArcDownward(this.evolutionBaseBg, this.evolutionContainer);
+            this.scene.animations.doArcDownward(
+              this.evolutionBaseBg,
+              this.evolutionContainer,
+              0,
+              0,
+              this.formAnimationOwner(),
+            );
             this.schedule(1000, () => {
               this.pokemonEvoTintSprite.setScale(0.25).setVisible(true);
               this.scene.animations
-                .doCycle(1, 1, this.pokemonTintSprite, this.pokemonEvoSprite)
+                .doCycle(1, 1, this.pokemonTintSprite, this.pokemonEvoSprite, undefined, this.formAnimationOwner())
                 .then(() => this.dispatchBound(() => this.afterCycle(preName, transformedPokemon)));
             });
           }),
