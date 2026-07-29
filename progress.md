@@ -5221,3 +5221,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   installed, so presentation failure cannot become a detached unhandled rejection.
 - Local policy-safe evidence: presentation authority is 25/25 and single-move release is 4/4. Engine/browser
   verification remains remote-only; Showdown, tournament, deployment, and production were not touched.
+
+## 2026-07-29 - Batch move results decode and retire through the V2 envelope
+
+- The B11/C2 gate artifacts showed a valid batch decision at revision 15 remaining `materialDeferred` on every
+  delivery. The projected batch phase was passing the wrapped `INTERACTION_COMMIT` to the retired raw-material
+  decoder, which necessarily returned null; neither real panel could close and no terminal proof could publish.
+- Batch result settlement now validates the complete V2 interaction envelope, exact applied `LEARN_MOVE_BATCH`
+  operation, immutable assignment/fallback payload, global successor, phase, scene, and runtime. Authority and
+  replica UI/result continuations re-enter that captured browser and cancellation-own every queued activation.
+- The existing two-engine owner, watcher, fallback, refusal-to-retire, and soak cases remain the remote failure-first
+  proof. The focused source contract is 5/5 green locally; no local engine/browser test or deployment occurred.
