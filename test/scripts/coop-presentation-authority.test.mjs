@@ -491,6 +491,58 @@ test("form changes and Transform carry complete authority material into dedicate
   assert.match(replayPump, /case "transform":[\s\S]+"CoopTransformReplayPhase"/u);
 });
 
+test("co-op form cutscenes own and retire every nested shared animation resource", () => {
+  const animations = read("src/animations.ts");
+  const richForm = read("src/phases/form-change-phase.ts");
+
+  assert.match(
+    animations,
+    /export class AnimationResourceScope implements AnimationResourceOwner[\s\S]+private readonly tweens = new Set<Phaser\.Tweens\.BaseTween>\(\)[\s\S]+private readonly particles = new Set<Phaser\.GameObjects\.GameObject>\(\)/u,
+    "compound animation resources need one explicit lifecycle domain",
+  );
+  assert.match(
+    animations,
+    /public cancel\(\): void \{[\s\S]+this\.active = false[\s\S]+tween\.stop\(\)[\s\S]+this\.tweens\.clear\(\)[\s\S]+particle\.destroy\(\)[\s\S]+this\.particles\.clear\(\)/u,
+    "retirement must synchronously stop every nested tween and destroy every particle",
+  );
+  assert.match(
+    animations,
+    /private doOwnedCycle\([\s\S]+if \(!animationOwnerActive\(owner\)\)[\s\S]+ownAnimationTween\([\s\S]+onComplete: \(\) => \{[\s\S]+!animationOwnerActive\(owner\)[\s\S]+this\.doOwnedCycle\([\s\S]+scene,[\s\S]+owner/u,
+    "cycle recursion must retain the captured scene and owner and reject late completion callbacks",
+  );
+  assert.equal(
+    animations.match(/ownAnimationParticle\(owner, scene\.add\.image/g)?.length,
+    4,
+    "all four particle families must register every spawned image",
+  );
+  assert.equal(
+    animations.match(/const particleTimer = ownAnimationTween\(/g)?.length,
+    4,
+    "all four particle families must register their infinite counters",
+  );
+  assert.equal(
+    animations.match(/if \(!animationOwnerActive\(owner\)\) \{\s*particle\.destroy\(\);\s*particleTimer\.remove\(\);/g)
+      ?.length,
+    4,
+    "a late particle tick must be mechanically inert after its owner retires",
+  );
+  assert.match(
+    richForm,
+    /private readonly animationResources = new AnimationResourceScope\(\)[\s\S]+private formAnimationOwner\(\): AnimationResourceOwner \| undefined \{[\s\S]+this\.coopReplay != null \|\| this\.hasRuntimeBoundary\(\)[\s\S]+this\.animationResources/u,
+    "only co-op/runtime-bound form phases opt into the new owner; ordinary play stays unchanged",
+  );
+  assert.match(richForm, /private clearOwnedResources\(\): void \{[\s\S]+this\.animationResources\.cancel\(\)/u);
+  assert.match(richForm, /private finishCoopReplay\([\s\S]+this\.clearOwnedResources\(\)/u);
+  assert.match(richForm, /private advanceOwner\([\s\S]+this\.clearOwnedResources\(\)/u);
+  assert.match(richForm, /public override retire\(\): void \{[\s\S]+this\.clearOwnedResources\(\)/u);
+  assert.equal(
+    richForm.match(/this\.formAnimationOwner\(\)/g)?.length,
+    5,
+    "all five compound helper calls must share one phase lifecycle",
+  );
+  assert.doesNotMatch(richForm, /private readonly tweens =|this\.tweens\./u);
+});
+
 test("ordinary co-op and Showdown replay every retained pre-command presentation before input", () => {
   const summon = read("src/phases/summon-phase.ts");
   const initEncounter = read("src/phases/init-encounter-phase.ts");

@@ -5,6 +5,81 @@ import type { Variant } from "#sprites/variant";
 import { type BooleanHolder, getFrameMs, randGauss, randInt } from "#utils/common";
 import Phaser from "phaser";
 
+/** Optional lifecycle owner for compound animation helpers that create nested resources. */
+export interface AnimationResourceOwner {
+  isActive(): boolean;
+  ownTween<T extends Phaser.Tweens.BaseTween>(tween: T): T;
+  ownParticle<T extends Phaser.GameObjects.GameObject>(particle: T): T;
+}
+
+/**
+ * One cancellation domain for every tween/counter and particle created by a compound animation.
+ * Existing callers remain unowned; co-op presentation phases opt in and cancel the scope at their
+ * exact success/failure/recovery/retirement boundary.
+ */
+export class AnimationResourceScope implements AnimationResourceOwner {
+  private active = true;
+  private readonly tweens = new Set<Phaser.Tweens.BaseTween>();
+  private readonly particles = new Set<Phaser.GameObjects.GameObject>();
+
+  public isActive(): boolean {
+    return this.active;
+  }
+
+  public ownTween<T extends Phaser.Tweens.BaseTween>(tween: T): T {
+    if (!this.active) {
+      tween.stop();
+      return tween;
+    }
+    this.tweens.add(tween);
+    return tween;
+  }
+
+  public ownParticle<T extends Phaser.GameObjects.GameObject>(particle: T): T {
+    if (!this.active) {
+      particle.destroy();
+      return particle;
+    }
+    this.particles.add(particle);
+    return particle;
+  }
+
+  public cancel(): void {
+    if (!this.active && this.tweens.size === 0 && this.particles.size === 0) {
+      return;
+    }
+    this.active = false;
+    for (const tween of this.tweens) {
+      tween.stop();
+    }
+    this.tweens.clear();
+    for (const particle of this.particles) {
+      particle.destroy();
+    }
+    this.particles.clear();
+  }
+
+  /** Read-only lifecycle proof used by remote engine coverage. */
+  public ownedHandleCount(): number {
+    return this.tweens.size + this.particles.size;
+  }
+}
+
+function animationOwnerActive(owner?: AnimationResourceOwner): boolean {
+  return owner?.isActive() ?? true;
+}
+
+function ownAnimationTween<T extends Phaser.Tweens.BaseTween>(owner: AnimationResourceOwner | undefined, tween: T): T {
+  return owner?.ownTween(tween) ?? tween;
+}
+
+function ownAnimationParticle<T extends Phaser.GameObjects.GameObject>(
+  owner: AnimationResourceOwner | undefined,
+  particle: T,
+): T {
+  return owner?.ownParticle(particle) ?? particle;
+}
+
 /**
  * Class for handling general animations such as particle effects.
  * For battle animations, see {@linkcode BattleAnim}.
@@ -27,25 +102,38 @@ export class Animation {
     transformationContainer: Phaser.GameObjects.Container,
     xOffset = 0,
     yOffset = 0,
+    owner?: AnimationResourceOwner,
   ): void {
+    if (!animationOwnerActive(owner)) {
+      return;
+    }
+    const scene = globalScene;
     let cycle = 0;
 
-    globalScene.tweens.addCounter({
-      repeat: 8,
-      duration: getFrameMs(8),
-      onRepeat: () => {
-        for (let i = 0; i < 4; i++) {
-          this.doSpiralUpwardParticle(
-            16 * cycle + i * 64,
-            transformationBaseBg,
-            transformationContainer,
-            xOffset,
-            yOffset,
-          );
-        }
-        cycle++;
-      },
-    });
+    ownAnimationTween(
+      owner,
+      scene.tweens.addCounter({
+        repeat: 8,
+        duration: getFrameMs(8),
+        onRepeat: () => {
+          if (!animationOwnerActive(owner)) {
+            return;
+          }
+          for (let i = 0; i < 4; i++) {
+            this.doSpiralUpwardParticle(
+              scene,
+              16 * cycle + i * 64,
+              transformationBaseBg,
+              transformationContainer,
+              xOffset,
+              yOffset,
+              owner,
+            );
+          }
+          cycle++;
+        },
+      }),
+    );
   }
 
   /**
@@ -61,16 +149,35 @@ export class Animation {
     transformationContainer: Phaser.GameObjects.Container,
     xOffset = 0,
     yOffset = 0,
+    owner?: AnimationResourceOwner,
   ): void {
-    globalScene.tweens.addCounter({
-      repeat: 6,
-      duration: getFrameMs(1),
-      onRepeat: () => {
-        for (let i = 0; i < 9; i++) {
-          this.doArcDownParticle(i * 16, transformationBaseBg, transformationContainer, xOffset, yOffset);
-        }
-      },
-    });
+    if (!animationOwnerActive(owner)) {
+      return;
+    }
+    const scene = globalScene;
+    ownAnimationTween(
+      owner,
+      scene.tweens.addCounter({
+        repeat: 6,
+        duration: getFrameMs(1),
+        onRepeat: () => {
+          if (!animationOwnerActive(owner)) {
+            return;
+          }
+          for (let i = 0; i < 9; i++) {
+            this.doArcDownParticle(
+              scene,
+              i * 16,
+              transformationBaseBg,
+              transformationContainer,
+              xOffset,
+              yOffset,
+              owner,
+            );
+          }
+        },
+      }),
+    );
   }
 
   /**
@@ -87,38 +194,74 @@ export class Animation {
     pokemonTintSprite: Phaser.GameObjects.Sprite,
     pokemonNewFormTintSprite: Phaser.GameObjects.Sprite,
     cancelled?: BooleanHolder,
+    owner?: AnimationResourceOwner,
   ): Promise<void> {
+    return this.doOwnedCycle(
+      globalScene,
+      currentCycle,
+      finalCycle,
+      pokemonTintSprite,
+      pokemonNewFormTintSprite,
+      cancelled,
+      owner,
+    );
+  }
+
+  private doOwnedCycle(
+    scene: typeof globalScene,
+    currentCycle: number,
+    finalCycle: number,
+    pokemonTintSprite: Phaser.GameObjects.Sprite,
+    pokemonNewFormTintSprite: Phaser.GameObjects.Sprite,
+    cancelled?: BooleanHolder,
+    owner?: AnimationResourceOwner,
+  ): Promise<void> {
+    if (!animationOwnerActive(owner)) {
+      return Promise.resolve();
+    }
     const isFinalCycle = currentCycle === finalCycle;
     const duration = 500 / currentCycle;
 
     return new Promise(resolve => {
-      globalScene.tweens.add({
-        targets: pokemonTintSprite,
-        scale: 0.25,
-        ease: "Cubic.easeInOut",
-        duration,
-        yoyo: !isFinalCycle,
-      });
-      globalScene.tweens.add({
-        targets: pokemonNewFormTintSprite,
-        scale: 1,
-        ease: "Cubic.easeInOut",
-        duration,
-        yoyo: !isFinalCycle,
-        onComplete: () => {
-          if (cancelled?.value) {
-            return resolve();
-          }
-          if (isFinalCycle) {
-            pokemonTintSprite.setVisible(false);
-            return resolve();
-          }
-          // TODO: Explain or refactor away the recursion
-          this.doCycle(currentCycle + 0.5, finalCycle, pokemonTintSprite, pokemonNewFormTintSprite, cancelled).then(
-            resolve,
-          );
-        },
-      });
+      ownAnimationTween(
+        owner,
+        scene.tweens.add({
+          targets: pokemonTintSprite,
+          scale: 0.25,
+          ease: "Cubic.easeInOut",
+          duration,
+          yoyo: !isFinalCycle,
+        }),
+      );
+      ownAnimationTween(
+        owner,
+        scene.tweens.add({
+          targets: pokemonNewFormTintSprite,
+          scale: 1,
+          ease: "Cubic.easeInOut",
+          duration,
+          yoyo: !isFinalCycle,
+          onComplete: () => {
+            if (!animationOwnerActive(owner) || cancelled?.value) {
+              return resolve();
+            }
+            if (isFinalCycle) {
+              pokemonTintSprite.setVisible(false);
+              return resolve();
+            }
+            // TODO: Explain or refactor away the recursion
+            this.doOwnedCycle(
+              scene,
+              currentCycle + 0.5,
+              finalCycle,
+              pokemonTintSprite,
+              pokemonNewFormTintSprite,
+              cancelled,
+              owner,
+            ).then(resolve);
+          },
+        }),
+      );
     });
   }
 
@@ -134,43 +277,69 @@ export class Animation {
     transformationContainer: Phaser.GameObjects.Container,
     xOffset = 0,
     yOffset = 0,
+    owner?: AnimationResourceOwner,
   ): void {
+    if (!animationOwnerActive(owner)) {
+      return;
+    }
+    const scene = globalScene;
+    const offset = { x: xOffset, y: yOffset };
     // Add 2 batches of particles - 1 set immediately, another after 32 frames have passed
-    globalScene.tweens.addCounter({
-      duration: getFrameMs(32),
-      onStart: () => {
-        for (let i = 0; i < 16; i++) {
-          this.doCircleInwardParticle(i * 16, 4, transformationBaseBg, transformationContainer, xOffset, yOffset);
-        }
-      },
-      onComplete: () => {
-        for (let i = 0; i < 16; i++) {
-          this.doCircleInwardParticle(i * 16, 8, transformationBaseBg, transformationContainer, xOffset, yOffset);
-        }
-      },
-    });
+    ownAnimationTween(
+      owner,
+      scene.tweens.addCounter({
+        duration: getFrameMs(32),
+        onStart: () => {
+          if (!animationOwnerActive(owner)) {
+            return;
+          }
+          for (let i = 0; i < 16; i++) {
+            this.doCircleInwardParticle(scene, i * 16, 4, transformationBaseBg, transformationContainer, offset, owner);
+          }
+        },
+        onComplete: () => {
+          if (!animationOwnerActive(owner)) {
+            return;
+          }
+          for (let i = 0; i < 16; i++) {
+            this.doCircleInwardParticle(scene, i * 16, 8, transformationBaseBg, transformationContainer, offset, owner);
+          }
+        },
+      }),
+    );
   }
 
   public doSpray(
     transformationBaseBg: Phaser.GameObjects.Image,
     transformationContainer: Phaser.GameObjects.Container,
+    owner?: AnimationResourceOwner,
   ): void {
+    if (!animationOwnerActive(owner)) {
+      return;
+    }
+    const scene = globalScene;
     let f = 0;
 
-    globalScene.tweens.addCounter({
-      repeat: 48,
-      duration: getFrameMs(1),
-      onRepeat: () => {
-        if (!f) {
-          for (let i = 0; i < 8; i++) {
-            this.doSprayParticle(i, transformationBaseBg, transformationContainer);
+    ownAnimationTween(
+      owner,
+      scene.tweens.addCounter({
+        repeat: 48,
+        duration: getFrameMs(1),
+        onRepeat: () => {
+          if (!animationOwnerActive(owner)) {
+            return;
           }
-        } else if (f < 50) {
-          this.doSprayParticle(randInt(8), transformationBaseBg, transformationContainer);
-        }
-        f++;
-      },
-    });
+          if (!f) {
+            for (let i = 0; i < 8; i++) {
+              this.doSprayParticle(scene, i, transformationBaseBg, transformationContainer, owner);
+            }
+          } else if (f < 50) {
+            this.doSprayParticle(scene, randInt(8), transformationBaseBg, transformationContainer, owner);
+          }
+          f++;
+        },
+      }),
+    );
   }
 
   public addPokeballOpenParticles(x: number, y: number, pokeballType: PokeballType): void {
@@ -423,13 +592,15 @@ export class Animation {
   }
 
   private doSprayParticle(
+    scene: typeof globalScene,
     trigIndex: number,
     transformationBaseBg: Phaser.GameObjects.Image,
     transformationContainer: Phaser.GameObjects.Container,
+    owner?: AnimationResourceOwner,
   ): void {
     const initialX = transformationBaseBg.displayWidth / 2;
     const initialY = transformationBaseBg.displayHeight / 2;
-    const particle = globalScene.add.image(initialX, initialY, "evo_sparkle");
+    const particle = ownAnimationParticle(owner, scene.add.image(initialX, initialY, "evo_sparkle"));
     transformationContainer.add(particle);
 
     let f = 0;
@@ -437,15 +608,23 @@ export class Animation {
     const speed = 3 - randInt(8);
     const amp = 48 + randInt(64);
 
-    const particleTimer = globalScene.tweens.addCounter({
-      repeat: -1,
-      duration: getFrameMs(1),
-      onRepeat: () => {
-        updateParticle();
-      },
-    });
+    const particleTimer = ownAnimationTween(
+      owner,
+      scene.tweens.addCounter({
+        repeat: -1,
+        duration: getFrameMs(1),
+        onRepeat: () => {
+          updateParticle();
+        },
+      }),
+    );
 
     const updateParticle = () => {
+      if (!animationOwnerActive(owner)) {
+        particle.destroy();
+        particleTimer.remove();
+        return;
+      }
       if (!(f & 3)) {
         yOffset++;
       }
@@ -475,28 +654,38 @@ export class Animation {
    * @param yOffset - The y offset
    */
   private doSpiralUpwardParticle(
+    scene: typeof globalScene,
     trigIndex: number,
     transformationBaseBg: Phaser.GameObjects.Image,
     transformationContainer: Phaser.GameObjects.Container,
     xOffset: number,
     yOffset: number,
+    owner?: AnimationResourceOwner,
   ): void {
     const initialX = transformationBaseBg.displayWidth / 2 + xOffset;
-    const particle = globalScene.add.image(initialX, 0, "evo_sparkle");
+    const particle = ownAnimationParticle(owner, scene.add.image(initialX, 0, "evo_sparkle"));
     transformationContainer.add(particle);
 
     let f = 0;
     let amp = 48;
 
-    const particleTimer = globalScene.tweens.addCounter({
-      repeat: -1,
-      duration: getFrameMs(1),
-      onRepeat: () => {
-        updateParticle();
-      },
-    });
+    const particleTimer = ownAnimationTween(
+      owner,
+      scene.tweens.addCounter({
+        repeat: -1,
+        duration: getFrameMs(1),
+        onRepeat: () => {
+          updateParticle();
+        },
+      }),
+    );
 
     const updateParticle = () => {
+      if (!animationOwnerActive(owner)) {
+        particle.destroy();
+        particleTimer.remove();
+        return;
+      }
       if (!f || particle.y > 8) {
         particle.setPosition(initialX, 88 - (f * f) / 80 + yOffset);
         particle.y += this.sin(trigIndex, amp) / 4;
@@ -525,14 +714,16 @@ export class Animation {
    * @param yOffset - The y offset
    */
   private doArcDownParticle(
+    scene: typeof globalScene,
     trigIndex: number,
     transformationBaseBg: Phaser.GameObjects.Image,
     transformationContainer: Phaser.GameObjects.Container,
     xOffset: number,
     yOffset: number,
+    owner?: AnimationResourceOwner,
   ): void {
     const initialX = transformationBaseBg.displayWidth / 2 + xOffset;
-    const particle = globalScene.add.image(initialX, 0, "evo_sparkle");
+    const particle = ownAnimationParticle(owner, scene.add.image(initialX, 0, "evo_sparkle"));
     particle.setScale(0.5);
     transformationContainer.add(particle);
 
@@ -540,15 +731,23 @@ export class Animation {
     let amp = 8;
 
     // NB: While this would recurse infinitely, `addParticle` manually ends `particleTimer` once the particles descend enough.
-    const particleTimer = globalScene.tweens.addCounter({
-      repeat: -1,
-      duration: getFrameMs(1),
-      onRepeat: () => {
-        updateParticle();
-      },
-    });
+    const particleTimer = ownAnimationTween(
+      owner,
+      scene.tweens.addCounter({
+        repeat: -1,
+        duration: getFrameMs(1),
+        onRepeat: () => {
+          updateParticle();
+        },
+      }),
+    );
 
     const updateParticle = () => {
+      if (!animationOwnerActive(owner)) {
+        particle.destroy();
+        particleTimer.remove();
+        return;
+      }
       if (!f || particle.y < 88) {
         particle.setPosition(initialX, 8 + (f * f) / 5 + yOffset);
         particle.y += this.sin(trigIndex, amp) / 4;
@@ -574,29 +773,38 @@ export class Animation {
    * @param yOffset - The y offset
    */
   private doCircleInwardParticle(
+    scene: typeof globalScene,
     trigIndex: number,
     speed: number,
     transformationBaseBg: Phaser.GameObjects.Image,
     transformationContainer: Phaser.GameObjects.Container,
-    xOffset: number,
-    yOffset: number,
+    offset: Readonly<{ x: number; y: number }>,
+    owner?: AnimationResourceOwner,
   ): void {
-    const initialX = transformationBaseBg.displayWidth / 2 + xOffset;
-    const initialY = transformationBaseBg.displayHeight / 2 + yOffset;
-    const particle = globalScene.add.image(initialX, initialY, "evo_sparkle");
+    const initialX = transformationBaseBg.displayWidth / 2 + offset.x;
+    const initialY = transformationBaseBg.displayHeight / 2 + offset.y;
+    const particle = ownAnimationParticle(owner, scene.add.image(initialX, initialY, "evo_sparkle"));
     transformationContainer.add(particle);
 
     let amp = 120;
 
-    const particleTimer = globalScene.tweens.addCounter({
-      repeat: -1,
-      duration: getFrameMs(1),
-      onRepeat: () => {
-        updateParticle();
-      },
-    });
+    const particleTimer = ownAnimationTween(
+      owner,
+      scene.tweens.addCounter({
+        repeat: -1,
+        duration: getFrameMs(1),
+        onRepeat: () => {
+          updateParticle();
+        },
+      }),
+    );
 
     const updateParticle = () => {
+      if (!animationOwnerActive(owner)) {
+        particle.destroy();
+        particleTimer.remove();
+        return;
+      }
       if (amp > 8) {
         particle.setPosition(initialX, initialY);
         particle.y += this.sin(trigIndex, amp);

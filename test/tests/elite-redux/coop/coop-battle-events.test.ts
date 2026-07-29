@@ -28,6 +28,7 @@
 // turnResolution injected over the loopback peer. Gated ER_SCENARIO=1.
 // =============================================================================
 
+import type { AnimationResourceOwner } from "#app/animations";
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { getArenaTag } from "#data/arena-tag";
@@ -868,6 +869,28 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(pokemon.formIndex).toBe(targetFormIndex);
     expect(coopPresentationOutcome(token), "material alone is not a presentation receipt").toBeUndefined();
 
+    const resources = (
+      queuedCutscene as unknown as {
+        animationResources: AnimationResourceOwner & { ownedHandleCount(): number };
+      }
+    ).animationResources;
+    const oldSprite = { setVisible: vi.fn() } as unknown as Phaser.GameObjects.Sprite;
+    const newSprite = {} as Phaser.GameObjects.Sprite;
+    const tweenConfigs: Phaser.Types.Tweens.TweenBuilderConfig[] = [];
+    const tweenStops: ReturnType<typeof vi.fn>[] = [];
+    vi.spyOn(globalScene.tweens, "add").mockImplementation(config => {
+      const stop = vi.fn();
+      tweenConfigs.push(config as Phaser.Types.Tweens.TweenBuilderConfig);
+      tweenStops.push(stop);
+      return { stop } as unknown as Phaser.Tweens.Tween;
+    });
+    const particleDestroy = vi.fn();
+    resources.ownParticle({ destroy: particleDestroy } as unknown as Phaser.GameObjects.GameObject);
+    const cycle = globalScene.animations.doCycle(1, 2, oldSprite, newSprite, undefined, resources);
+    expect(resources.ownedHandleCount(), "the real cutscene phase owns the particle and both cycle tweens").toBe(3);
+    expect(tweenConfigs).toHaveLength(2);
+    const lateCycleCompletion = tweenConfigs[1].onComplete as (() => void) | undefined;
+
     const retireMode = vi.spyOn(globalScene.ui, "retirePresentationMode").mockReturnValue(true);
     vi.spyOn(globalScene.phaseManager, "getCurrentPhase").mockReturnValue(queuedCutscene!);
     const shift = vi.spyOn(globalScene.phaseManager, "shiftPhase").mockImplementation(() => {});
@@ -879,6 +902,16 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     );
     expect(shift).toHaveBeenCalledOnce();
     expect(addPokemon).toHaveBeenCalledOnce();
+    expect(resources.ownedHandleCount(), "no shared animation handle may survive phase retirement").toBe(0);
+    expect(tweenStops).toHaveLength(2);
+    expect(tweenStops.every(stop => stop.mock.calls.length === 1)).toBe(true);
+    expect(particleDestroy).toHaveBeenCalledOnce();
+
+    expect(lateCycleCompletion).toBeTypeOf("function");
+    lateCycleCompletion?.();
+    await cycle;
+    expect(globalScene.tweens.add, "a late cycle completion cannot recurse after retirement").toHaveBeenCalledTimes(2);
+    expect(oldSprite.setVisible, "a late cycle completion cannot mutate presentation sprites").not.toHaveBeenCalled();
   });
 
   it("bounds a detached form preimage load that never resolves before the cutscene exists", async () => {
