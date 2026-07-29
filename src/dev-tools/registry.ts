@@ -112,6 +112,12 @@ export function isCoopBrowserGameOverFixtureBuild(): boolean {
   return env?.VITE_COOP_BROWSER_FIXTURE === "game-over";
 }
 
+/** Whether this exact bundle was built for the full public-UI campaign matrix. */
+export function isCoopBrowserCampaignFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "campaign-survival";
+}
+
 /** Whether this exact bundle was built for the public two-browser Showdown battle journey. */
 export function isCoopBrowserShowdownFixtureBuild(): boolean {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
@@ -172,6 +178,36 @@ export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null
     baseCost: speciesStarterCosts[SpeciesId.ARCANINE],
   };
   return makeShowdownTeamPreset("Browser Showdown", [drizzleLead, intimidateSwitch]);
+}
+
+/**
+ * Materialize a durable but point-legal party for the ten-wave Mystery campaign only.
+ *
+ * The Mystery profile is an interaction-coverage lane, not a fresh-account balance oracle: it must cross five
+ * consecutive encounters, the scripted ghost, the boss, and the Bargain without a random early wipe converting
+ * a synchronization result into a survivability result. Dondozo (4), Lapras (4), and Seel (1) remain below the
+ * ordinary ten-point starter limit. Both browsers still see, submit, and confirm the ordinary starter surface;
+ * every battle command, replacement, interaction, reward, and transition remains a production public-UI path.
+ */
+export function getCoopBrowserCampaignFixtureStarters(): Starter[] | null {
+  if (!isCoopBrowserCampaignFixtureBuild() || typeof location === "undefined") {
+    return null;
+  }
+  if (new URLSearchParams(location.search).get("coopfixture") !== "campaign-survival") {
+    return null;
+  }
+  return [SpeciesId.DONDOZO, SpeciesId.LAPRAS, SpeciesId.SEEL].map(speciesId => ({
+    speciesId,
+    shiny: false,
+    variant: 0,
+    formIndex: 0,
+    abilityIndex: 0,
+    passive: false,
+    nature: Nature.MODEST,
+    moveset: [MoveId.WATER_SPOUT] as StarterMoveset,
+    pokerus: false,
+    ivs: new Array(6).fill(31),
+  }));
 }
 
 /**

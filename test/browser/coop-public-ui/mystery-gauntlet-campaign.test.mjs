@@ -146,8 +146,30 @@ test("a chained Mystery gauntlet refreshes only from proven surface progress and
 });
 
 test("workflow builds the staging-only fifth difficulty and fans a configurable ten-wave-default profile", async () => {
-  const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
+  const [workflow, registry, starterHandler, harness, battleScene] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8"),
+    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "src/battle-scene.ts"), "utf8"),
+  ]);
   assert.match(workflow, /VITE_DEV_TOOLS: 1/u);
+  assert.match(workflow, /VITE_COOP_BROWSER_FIXTURE: campaign-survival/u);
+  assert.match(
+    registry,
+    /isCoopBrowserCampaignFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "campaign-survival"[\s\S]*getCoopBrowserCampaignFixtureStarters\(\)[\s\S]*get\("coopfixture"\) !== "campaign-survival"[\s\S]*SpeciesId\.DONDOZO[\s\S]*SpeciesId\.LAPRAS[\s\S]*SpeciesId\.SEEL/u,
+  );
+  assert.match(starterHandler, /getCoopBrowserCampaignFixtureStarters\(\)/u);
+  assert.match(
+    harness,
+    /renderProfile === "mystery-gauntlet"[\s\S]*difficultyId === "mystery"[\s\S]*set\("coopfixture", "campaign-survival"\)/u,
+  );
+  assert.match(harness, /campaignSurvivalFixture[\s\S]*DONDOZO_SPECIES_ID, LAPRAS_SPECIES_ID, SEEL_SPECIES_ID/u);
+  assert.match(
+    battleScene,
+    /isFixedBattle\(waveIndex\) && !erGauntletActive\(\)[\s\S]*handleFixedBattle\(resolved\)[\s\S]*handleNonFixedBattle\(resolved\)/u,
+    "the scripted Mystery schedule must own fixed Classic wave slots such as wave 5",
+  );
   assert.match(
     workflow,
     /mystery_waves:\s+description: [^\n]+\s+required: false\s+type: string\s+default: "10"/u,

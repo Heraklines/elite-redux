@@ -67,6 +67,7 @@ const MAGIKARP_SPECIES_ID = 129;
 const CROBAT_SPECIES_ID = 169;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
+const LAPRAS_SPECIES_ID = 131;
 // Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
 // correctly parked command watcher and the host emitting Explosion's next authoritative HP/faint
 // events. The former 90s watchdog aborted four seconds before that real causal progress and the
@@ -1074,6 +1075,8 @@ export class PublicUiClient {
       // qualification. The dedicated exact-SHA journey must opt into the same public title path instead
       // of timing out on the intentional "Temporarily disabled" message.
       entryUrl.searchParams.set("enableShowdown", "1");
+    } else if (this.config.renderProfile === "mystery-gauntlet" && this.config.difficultyId === "mystery") {
+      entryUrl.searchParams.set("coopfixture", "campaign-survival");
     }
     this.evidence.record("navigate", { url: entryUrl.origin });
     await this.page.goto(entryUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
@@ -3442,7 +3445,12 @@ export class DuoPublicUiRig {
     return proof;
   }
 
-  async startFreshRun({ commanderFixture = false, faintFixture = false, gameOverFixture = false } = {}) {
+  async startFreshRun({
+    commanderFixture = false,
+    faintFixture = false,
+    gameOverFixture = false,
+    campaignSurvivalFixture = false,
+  } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
     }
@@ -3524,7 +3532,9 @@ export class DuoPublicUiRig {
                 : [BULBASAUR_SPECIES_ID]
               : gameOverFixture
                 ? [CROBAT_SPECIES_ID]
-                : null;
+                : campaignSurvivalFixture
+                  ? [DONDOZO_SPECIES_ID, LAPRAS_SPECIES_ID, SEEL_SPECIES_ID]
+                  : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {

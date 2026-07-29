@@ -3397,7 +3397,7 @@ export async function runCampaign(rig) {
     await configureRenderProfile(rig, policy, progress);
     await rig.pair(rig.config.requesterSeat);
     await progress.note("public lobby pairing complete");
-    await rig.startFreshRun();
+    await rig.startFreshRun({ campaignSurvivalFixture: policy.mysteryGauntlet.required });
     await progress.note("fresh co-op run reached its first shared command surface");
     if (rig.config.expectReclaim) {
       // Dirty-account fidelity: the pre-seeded full accounts force the reclaim path, and the

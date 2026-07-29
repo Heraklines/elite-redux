@@ -5478,3 +5478,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Failure-first engine coverage pins both previously open entry paths: a forced triple override and a leaked
   Triples Only challenge must resolve to a binary co-op format. This scope reduction does not require a new full
   browser campaign; it will ride the next ordinary exact-SHA qualification.
+
+## 2026-07-29 - Mystery qualification measures synchronization instead of random survival
+
+- Exact campaign `30428007443` completed three consecutive alternating-owner Mystery encounters, their retained
+  rewards, and real faint replacements without a desync or softlock, then failed through one synchronized party
+  wipe at wave 5. This was a noisy harness result, not a co-op failure.
+- The unexpected trainer at wave 5 exposed a separate schedule precedence defect: Classic's fixed wave-5 battle
+  was selected before the Mystery Gauntlet override could run. An active gauntlet now owns every fresh generated
+  wave; saved battles remain exact, while fixed Classic encounters remain unchanged outside the dev-only Mystery
+  difficulty.
+- Only the exact campaign bundle plus the exact Mystery-profile URL can visibly seed a durable, ordinary
+  point-legal three-mon team per seat. Both browsers still submit it through public keys, while surface, depth, and
+  dirty profiles keep natural fresh-account selection. The ten-wave lane can now judge five MEs, ghost, boss,
+  Bargain, battle/replacement, and reward synchronization rather than early-party RNG.

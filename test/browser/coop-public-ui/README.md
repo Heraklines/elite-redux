@@ -39,6 +39,12 @@ dex/save unlocks, is inert in ordinary local/staging/production bundles, and per
 mutation. This journey proves co-op authority from the configured-party boundary onward; it does not claim
 to test natural collection/unlock acquisition.
 
+The ten-wave `mystery-gauntlet` campaign has the same narrowly gated setup boundary. Its exact campaign bundle
+accepts only `coopfixture=campaign-survival`, which visibly seeds a point-legal Dondozo/Lapras/Seel team that both
+browsers submit with public keys. Other campaign profiles receive no fixture URL and retain natural fresh-account
+starter selection. This keeps the Mystery lane focused on its five encounters, ghost, boss, Bargain, rewards, and
+replacement/control boundaries instead of failing nondeterministically on early-run party balance.
+
 The CI public-UI matrix disables only Puppeteer's optional screenshot-enabled CDP performance timeline by
 default. A measured trace artifact reached 537 MB and starved two real 10x clients even though both kept
 advancing at the same co-op address over a healthy RTC connection. Per-checkpoint PNGs, per-seat

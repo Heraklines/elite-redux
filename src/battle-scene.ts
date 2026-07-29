@@ -1714,10 +1714,12 @@ export class BattleScene extends SceneBase {
     // TODO: This _should_ be safe to move elsewhere but idk
     this.resetSeed(waveIndex);
 
-    // Set attributes of the `resolved` object based on the type of battle being created.
+    // Set attributes of the `resolved` object based on the type of battle being created. Mystery is an explicit
+    // dev difficulty whose complete fresh-wave schedule owns ordinary Classic fixed slots too; saved battles stay
+    // exact. Without this precedence, Classic's fixed wave-5 trainer replaces the promised fifth Mystery encounter.
     if (fromSession) {
       this.handleSavedBattle(resolved, props);
-    } else if (this.gameMode.isFixedBattle(waveIndex)) {
+    } else if (this.gameMode.isFixedBattle(waveIndex) && !erGauntletActive()) {
       this.handleFixedBattle(resolved);
     } else {
       this.handleNonFixedBattle(resolved);

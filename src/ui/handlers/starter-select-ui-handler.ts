@@ -1,6 +1,7 @@
 import type { Ability } from "#abilities/ability";
 import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
 import {
+  getCoopBrowserCampaignFixtureStarters,
   getCoopBrowserCommanderFixtureStarters,
   getCoopBrowserFaintFixtureStarters,
   getCoopBrowserGameOverFixtureStarters,
@@ -1771,7 +1772,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const coopBrowserStarters =
         getCoopBrowserCommanderFixtureStarters()
         ?? getCoopBrowserFaintFixtureStarters()
-        ?? getCoopBrowserGameOverFixtureStarters();
+        ?? getCoopBrowserGameOverFixtureStarters()
+        ?? getCoopBrowserCampaignFixtureStarters();
       if (globalScene.gameMode.isCoop && coopBrowserStarters != null) {
         // CI checkpoint only: materialize the otherwise account-locked species in the NORMAL visible
         // starter UI. The browser still submits and confirms this team through public keys, and the
