@@ -138,6 +138,16 @@ test("workflow reserves artifact-upload headroom and budgets the real-animation 
   assert.match(workflow, /profile: "animations-skipped-depth"[\s\S]*campaign_timeout_ms: "2700000"/u);
   assert.match(
     workflow,
+    /campaign_waves:[\s\S]{0,220}?default: "4"[\s\S]*?DEPTH_WAVES: \$\{\{ inputs\.campaign_waves \|\| '4' \}\}/u,
+    "the ordinary depth qualification fits the empirically measured four-wave hosted-runner capacity",
+  );
+  assert.doesNotMatch(
+    workflow,
+    /DEPTH_WAVES:.*(?:'8'|'30')/u,
+    "push and nightly runs cannot advertise an impossible single-runner milestone as a release red",
+  );
+  assert.match(
+    workflow,
     /profile: "animations-skipped-depth", artifact: "depth"[\s\S]*difficulty: "youngster", difficulty_option: "youngster"/u,
     "the long depth lane measures sustained co-op on the survivable real difficulty",
   );

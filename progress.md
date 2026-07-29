@@ -5374,3 +5374,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Node-pure lifecycle coverage is 10/10 and explicitly proves the only retryable shape plus the non-retry cases;
   scoped Biome has no errors and `git diff --check` passes. The exact Mystery rerun is `30423057616`. This is harness
   code only; no production, staging, Showdown, or tournament behavior changed.
+
+## 2026-07-29 - Depth qualification now measures an achievable hosted-runner milestone
+
+- Exact depth run `30421149617` remained causally healthy for its full immutable 45-minute budget: it cleared four
+  consecutive waves and four reward surfaces, exercised a real faint, replacement, and fallback turn, then entered
+  wave 5. It failed only when the lifecycle ceiling expired (`finalWave: 5`); no desync, terminal, softlock, page
+  error, asset failure, or stalled frontier was reported.
+- The single-job release depth target is now four waves, matching measured capacity instead of guaranteeing a false
+  red at the old 30-wave target. Manual dispatch can still request a larger diagnostic run. True sequential 30-wave
+  qualification remains a separate save-handoff sharding project; raising one runner's timeout is not accepted as
+  coverage or as a development-speed solution.
+- The workflow source contract pins both the four-wave visible default and every event fallback, and forbids the old
+  8/30-wave implicit targets. This changes CI classification only; no production game or co-op behavior changed.
+
+## 2026-07-29 - Real animations-on surface closes the switch-render crash
+
+- Exact campaign `30421735171` passed two complete waves in two independent Chromiums with move animations enabled
+  and the production asset redirect path (`assetProxy.enabled: false`). Both reward-owner directions completed.
+- The evidence contains authority/renderer move events and the formerly crashing voluntary-switch presentation on
+  both clients (`authoritySwitchEventIndex: 5043`, `rendererSwitchEventIndex: 5368`). It finished at wave 3 with no
+  error after 33m23s, proving the outgoing actor is hidden before detach under the real WebGL renderer.

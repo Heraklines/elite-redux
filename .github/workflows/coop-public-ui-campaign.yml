@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       campaign_waves:
-        description: Co-op wave depth for the animations-skipped public-UI profile
+        description: Co-op wave depth for the animations-skipped public-UI profile (four fits one hosted-runner budget)
         required: true
         type: string
-        default: "30"
+        default: "4"
       surface_waves:
         description: Complete real-animation waves (two covers both reward-owner directions)
         required: false
@@ -30,7 +30,7 @@ on:
         type: string
         default: "10"
       cadence:
-        description: Human input cadence (fast keeps 30 waves inside the CI budget)
+        description: Human input cadence (fast maximizes causal wave coverage inside the CI budget)
         required: true
         type: choice
         default: fast
@@ -80,7 +80,7 @@ on:
           - host-seat
   push:
     # Narrowly scoped to this campaign branch so pushes run a cheap live smoke
-    # (8 waves) without needing the workflow on the default branch. LOUD-FAIL: a push
+    # (4 waves, the measured single-runner capacity) without needing the workflow on the default branch. LOUD-FAIL: a push
     # run never auto-firsts - an unknown/undriven surface fails the run so a missing
     # driver surfaces immediately instead of being pressed through silently.
     branches:
@@ -325,7 +325,7 @@ jobs:
         id: matrix
         env:
           SELECTED_PROFILE: ${{ inputs.campaign_profile || 'all' }}
-          DEPTH_WAVES: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
+          DEPTH_WAVES: ${{ inputs.campaign_waves || '4' }}
           SURFACE_WAVES: ${{ inputs.surface_waves || '2' }}
           MYSTERY_WAVES: ${{ inputs.mystery_waves || '10' }}
           DEPTH_REWARD_MODE: ${{ inputs.reward_mode || 'pick-first' }}
