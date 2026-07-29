@@ -117,6 +117,41 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private coopSubmittedV2ForgetSlot: number | null = null;
   private coopCommittedV2ResultSettled = false;
 
+  /**
+   * Re-enter the runtime which created this phase before continuing an asynchronous V2 UI chain.
+   *
+   * In production each browser owns one scene, but recovery can temporarily uninstall a runtime while a
+   * message promise is settling. The two-engine harness makes the same race deterministic by alternating
+   * two browser realms in one process: a bare `await` can otherwise resume while the peer scene is ambient
+   * and open the next CONFIRM on the wrong client. Every host-owned learn-move prompt/decline step therefore
+   * crosses this address-exact runtime fence before touching UI or phase state.
+   */
+  private runInCoopV2Runtime<T>(callback: () => T | PromiseLike<T>): Promise<T> {
+    const runtime = this.coopOwningRuntime;
+    if (!this.coopRuntimeBound || runtime == null || !isCoopLearnMoveAuthorityV2Active(this.coopOperationBinding)) {
+      try {
+        return Promise.resolve(callback());
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    }
+    return new Promise<T>((resolve, reject) => {
+      runWhenCoopRuntimeActive(runtime, () => {
+        if (getCoopRuntime() !== runtime || globalScene.phaseManager.getCurrentPhase() !== this) {
+          const reason = "Learn-move V2 continuation lost its exact runtime/phase owner";
+          failCoopSharedSession(reason);
+          reject(new Error(reason));
+          return;
+        }
+        try {
+          Promise.resolve(callback()).then(resolve, reject);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+  }
+
   constructor(
     partyMemberIndex: number,
     moveId: MoveId,
@@ -562,16 +597,18 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       );
       this.learnMove(moveIndex, move, pokemon, fullText);
     } else {
-      await globalScene.ui.setMode(this.messageMode);
-      await globalScene.ui.showTextPromise(
-        i18next.t("battle:learnMoveNotLearned", {
-          pokemonName: getPokemonNameWithAffix(pokemon),
-          moveName: move.name,
-        }),
-        undefined,
-        true,
+      await this.runInCoopV2Runtime(() => globalScene.ui.setMode(this.messageMode));
+      await this.runInCoopV2Runtime(() =>
+        globalScene.ui.showTextPromise(
+          i18next.t("battle:learnMoveNotLearned", {
+            pokemonName: getPokemonNameWithAffix(pokemon),
+            moveName: move.name,
+          }),
+          undefined,
+          true,
+        ),
       );
-      this.endAfterCoopLearnMoveDecision();
+      await this.runInCoopV2Runtime(() => this.endAfterCoopLearnMoveDecision());
     }
   }
 
@@ -1181,18 +1218,20 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       moveName: move.name,
     });
     const preQText = [learnMovePrompt, moveLimitReached].join("$");
-    await globalScene.ui.showTextPromise(preQText);
-    await globalScene.ui.showTextPromise(shouldReplaceQ, undefined, false);
-    await globalScene.ui.setModeWithoutClear(
-      UiMode.CONFIRM,
-      () => this.forgetMoveProcess(move, pokemon), // Yes
-      () => {
-        // No
-        globalScene.ui.setMode(this.messageMode);
-        this.rejectMoveAndEnd(move, pokemon);
-      },
+    await this.runInCoopV2Runtime(() => globalScene.ui.showTextPromise(preQText));
+    await this.runInCoopV2Runtime(() => globalScene.ui.showTextPromise(shouldReplaceQ, undefined, false));
+    await this.runInCoopV2Runtime(() =>
+      globalScene.ui.setModeWithoutClear(
+        UiMode.CONFIRM,
+        () => this.forgetMoveProcess(move, pokemon), // Yes
+        () => {
+          // No
+          globalScene.ui.setMode(this.messageMode);
+          this.rejectMoveAndEnd(move, pokemon);
+        },
+      ),
     );
-    notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    await this.runInCoopV2Runtime(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
   }
 
   /**
@@ -1207,44 +1246,54 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    * @param Pokemon The Pokemon learning the move
    */
   async forgetMoveProcess(move: Move, pokemon: Pokemon) {
-    globalScene.ui.setMode(this.messageMode);
-    await globalScene.ui.showTextPromise(i18next.t("battle:learnMoveForgetQuestion"), undefined, true);
+    await this.runInCoopV2Runtime(() => globalScene.ui.setMode(this.messageMode));
+    await this.runInCoopV2Runtime(() =>
+      globalScene.ui.showTextPromise(i18next.t("battle:learnMoveForgetQuestion"), undefined, true),
+    );
     // Co-op (#633): if WE own this mon, drive the shared move-forget menu and relay each
     // cursor button so the partner's mirror moves live. Hard no-op in solo (mirror is null).
     if (this.coopLearnMoveRole(pokemon) === "owner") {
       getCoopUiMirror()?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
     }
-    await globalScene.ui.setModeWithoutClear(
-      UiMode.SUMMARY,
-      pokemon,
-      SummaryUiMode.LEARN_MOVE,
-      move,
-      (moveIndex: number) => {
-        // Co-op (#633): selection made - stop mirroring our cursor (no-op in solo).
-        getCoopUiMirror()?.endSession();
-        // The summary returns the "new move" row index to signal rejection. That
-        // row sits below the existing moves, so it equals the move cap (4, or 5
-        // with ER's extra slot).
-        if (moveIndex === pokemon.getMaxMoveCount()) {
-          globalScene.ui.setMode(this.messageMode).then(() => this.rejectMoveAndEnd(move, pokemon));
-          return;
-        }
-        const forgetSuccessText = i18next.t("battle:learnMoveForgetSuccess", {
-          pokemonName: getPokemonNameWithAffix(pokemon),
-          moveName: pokemon.moveset[moveIndex]!.getName(),
-        });
-        const fullText = [i18next.t("battle:countdownPoof"), forgetSuccessText, i18next.t("battle:learnMoveAnd")].join(
-          "$",
-        );
-        // Co-op (#633): relay the owner's chosen forget-slot so the partner mirrors it.
-        this.coopRelayLearnResult(moveIndex);
-        // #record-replay (single-player): capture the learn-move RESULT (the forgotten moveset slot).
-        // No-op unless recording / in co-op (the co-op relay above owns that path).
-        recordSinglePlayerInteraction("learnMove", moveIndex);
-        globalScene.ui.setMode(this.messageMode).then(() => this.learnMove(moveIndex, move, pokemon, fullText));
-      },
+    await this.runInCoopV2Runtime(() =>
+      globalScene.ui.setModeWithoutClear(
+        UiMode.SUMMARY,
+        pokemon,
+        SummaryUiMode.LEARN_MOVE,
+        move,
+        (moveIndex: number) => {
+          // Co-op (#633): selection made - stop mirroring our cursor (no-op in solo).
+          getCoopUiMirror()?.endSession();
+          // The summary returns the "new move" row index to signal rejection. That
+          // row sits below the existing moves, so it equals the move cap (4, or 5
+          // with ER's extra slot).
+          if (moveIndex === pokemon.getMaxMoveCount()) {
+            this.runInCoopV2Runtime(() => globalScene.ui.setMode(this.messageMode)).then(() =>
+              this.runInCoopV2Runtime(() => this.rejectMoveAndEnd(move, pokemon)),
+            );
+            return;
+          }
+          const forgetSuccessText = i18next.t("battle:learnMoveForgetSuccess", {
+            pokemonName: getPokemonNameWithAffix(pokemon),
+            moveName: pokemon.moveset[moveIndex]!.getName(),
+          });
+          const fullText = [
+            i18next.t("battle:countdownPoof"),
+            forgetSuccessText,
+            i18next.t("battle:learnMoveAnd"),
+          ].join("$");
+          // Co-op (#633): relay the owner's chosen forget-slot so the partner mirrors it.
+          this.coopRelayLearnResult(moveIndex);
+          // #record-replay (single-player): capture the learn-move RESULT (the forgotten moveset slot).
+          // No-op unless recording / in co-op (the co-op relay above owns that path).
+          recordSinglePlayerInteraction("learnMove", moveIndex);
+          this.runInCoopV2Runtime(() => globalScene.ui.setMode(this.messageMode)).then(() =>
+            this.runInCoopV2Runtime(() => this.learnMove(moveIndex, move, pokemon, fullText)),
+          );
+        },
+      ),
     );
-    notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    await this.runInCoopV2Runtime(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
   }
 
   /**
@@ -1258,38 +1307,42 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    * @param Pokemon The Pokemon learning the move
    */
   async rejectMoveAndEnd(move: Move, pokemon: Pokemon) {
-    await globalScene.ui.showTextPromise(
-      i18next.t("battle:learnMoveStopTeaching", { moveName: move.name }),
-      undefined,
-      false,
+    await this.runInCoopV2Runtime(() =>
+      globalScene.ui.showTextPromise(
+        i18next.t("battle:learnMoveStopTeaching", { moveName: move.name }),
+        undefined,
+        false,
+      ),
     );
-    globalScene.ui.setModeWithoutClear(
-      UiMode.CONFIRM,
-      () => {
-        globalScene.ui.setMode(this.messageMode);
-        // Co-op (#633): relay "did not learn" (sentinel = the move cap) so the partner
-        // mirrors the no-op and both leave the screen together.
-        this.coopRelayLearnResult(pokemon.getMaxMoveCount());
-        // #record-replay (single-player): capture the learn-move DECLINE (sentinel = the move cap).
-        // No-op unless recording / in co-op (the co-op relay above owns that path).
-        recordSinglePlayerInteraction("learnMove", pokemon.getMaxMoveCount());
-        globalScene.ui
-          .showTextPromise(
-            i18next.t("battle:learnMoveNotLearned", {
-              pokemonName: getPokemonNameWithAffix(pokemon),
-              moveName: move.name,
-            }),
-            undefined,
-            true,
-          )
-          .then(() => this.endAfterCoopLearnMoveDecision());
-      },
-      () => {
-        globalScene.ui.setMode(this.messageMode);
-        this.replaceMoveCheck(move, pokemon);
-      },
+    await this.runInCoopV2Runtime(() =>
+      globalScene.ui.setModeWithoutClear(
+        UiMode.CONFIRM,
+        () => {
+          globalScene.ui.setMode(this.messageMode);
+          // Co-op (#633): relay "did not learn" (sentinel = the move cap) so the partner
+          // mirrors the no-op and both leave the screen together.
+          this.coopRelayLearnResult(pokemon.getMaxMoveCount());
+          // #record-replay (single-player): capture the learn-move DECLINE (sentinel = the move cap).
+          // No-op unless recording / in co-op (the co-op relay above owns that path).
+          recordSinglePlayerInteraction("learnMove", pokemon.getMaxMoveCount());
+          this.runInCoopV2Runtime(() =>
+            globalScene.ui.showTextPromise(
+              i18next.t("battle:learnMoveNotLearned", {
+                pokemonName: getPokemonNameWithAffix(pokemon),
+                moveName: move.name,
+              }),
+              undefined,
+              true,
+            ),
+          ).then(() => this.runInCoopV2Runtime(() => this.endAfterCoopLearnMoveDecision()));
+        },
+        () => {
+          globalScene.ui.setMode(this.messageMode);
+          this.replaceMoveCheck(move, pokemon);
+        },
+      ),
     );
-    notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    await this.runInCoopV2Runtime(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
   }
 
   /**

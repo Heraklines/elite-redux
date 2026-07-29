@@ -80,6 +80,27 @@ test("the authority closes the real phase, proves it, retains exact state, and o
   assert.ok(callback >= 0 && start > callback, "the queued successor cannot start before result retention succeeds");
 });
 
+test("every host-owned prompt and decline continuation re-enters its captured V2 runtime", () => {
+  const runtimeFence = section(learnMove, "private runInCoopV2Runtime<T>(", "constructor(\n");
+  assert.match(runtimeFence, /const runtime = this\.coopOwningRuntime/u);
+  assert.match(runtimeFence, /runWhenCoopRuntimeActive\(runtime/u);
+  assert.match(runtimeFence, /getCoopRuntime\(\) !== runtime/u);
+  assert.match(runtimeFence, /globalScene\.phaseManager\.getCurrentPhase\(\) !== this/u);
+  assert.match(runtimeFence, /failCoopSharedSession\(reason\)/u);
+
+  const replace = section(learnMove, "async replaceMoveCheck(", "async forgetMoveProcess(");
+  assert.equal(
+    [...replace.matchAll(/this\.runInCoopV2Runtime\(/gu)].length,
+    4,
+    "both introductory messages, the exact CONFIRM open, and readiness proof are runtime-bound",
+  );
+  const decline = section(learnMove, "async rejectMoveAndEnd(", "async learnMove(");
+  assert.ok(
+    [...decline.matchAll(/this\.runInCoopV2Runtime\(/gu)].length >= 5,
+    "stop confirmation, terminal narration, close, reconsideration, and readiness cannot resume under the peer",
+  );
+});
+
 test("exact host/guest owner material is the sole replica release and duplicate delivery is idempotent", () => {
   const settle = section(
     runtime,
