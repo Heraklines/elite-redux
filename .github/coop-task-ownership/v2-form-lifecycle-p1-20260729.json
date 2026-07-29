@@ -2,7 +2,7 @@
   "taskId": "v2-form-lifecycle-p1-20260729",
   "version": 2,
   "branch": "ci/coop/v2-form-lifecycle-p1-20260729",
-  "trainRef": "ci/coop/v2-final-integration-20260726",
+  "trainRef": "codex/coop-v2-integration-base-1ab896b58",
   "baseSha": "1ab896b5860bc18910afaf82c473af4dda07ac01",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-form-lifecycle-p1-20260729.json",
