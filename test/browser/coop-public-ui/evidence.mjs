@@ -1312,28 +1312,37 @@ export class EvidenceSink {
       .find(event => event.kind === "browser-render-profile" && event.observation.gameSpeed === gameSpeed);
   }
 
-  /** Find canonical host/renderer presentation evidence without depending on debug-log wording. */
-  findPresentationEvent({
+  /** Find all canonical host/renderer presentation evidence without depending on debug-log wording. */
+  findPresentationEvents({
     stage = null,
     eventKind = null,
     reason = null,
+    epoch = null,
     wave = null,
     turn = null,
     seq = null,
+    canonicalEvent = null,
     from = 0,
   } = {}) {
     return this.events
       .slice(from)
-      .find(
+      .filter(
         event =>
           event.kind === "browser-presentation-event"
           && (stage == null || event.observation.stage === stage)
           && (eventKind == null || event.observation.event.k === eventKind)
           && (reason == null || event.observation.reason === reason)
+          && (epoch == null || event.observation.epoch === epoch)
           && (wave == null || event.observation.wave === wave)
           && (turn == null || event.observation.turn === turn)
-          && (seq == null || event.observation.seq === seq),
+          && (seq == null || event.observation.seq === seq)
+          && (canonicalEvent == null || JSON.stringify(event.observation.event) === JSON.stringify(canonicalEvent)),
       );
+  }
+
+  /** Find the first canonical presentation event matching the same exact-address filters. */
+  findPresentationEvent(filters = {}) {
+    return this.findPresentationEvents(filters)[0];
   }
 
   /** Latest render-profile observation regardless of value (proves the Settings menu is open). */

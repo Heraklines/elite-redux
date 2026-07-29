@@ -550,8 +550,11 @@ export class FormChangePhase extends EvolutionPhase {
         reason: "form-change-cutscene-retired",
         actorFingerprint: this.coopReplay.actorFingerprint,
       });
-      this.destroyPresentationPokemon();
     }
+    // Recovery can also retire the authority's ordinary form phase while its detached transformed actor is
+    // still owned by an interrupted tween/load. Always destroy that cosmetic actor; the live Pokemon is
+    // destroyed only for the replay path by destroyPresentationPokemon().
+    this.destroyPresentationPokemon();
   }
 
   public override end(): void {

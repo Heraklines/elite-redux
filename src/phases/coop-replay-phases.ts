@@ -1560,9 +1560,11 @@ export class CoopSwitchReplayPhase extends Phase {
     let ended = false;
     let watchdog: CoopPresentationProgressWatchdog | undefined;
     let incoming: Pokemon | undefined;
+    let outgoing: Pokemon | undefined;
+    let pokeball: Phaser.GameObjects.Sprite | undefined;
     const ownedTimers = new Set<Phaser.Time.TimerEvent>();
     const ownedActivations = new Set<() => void>();
-    const ownsEnemyTrainerPresentation = this.presentation.actor.side === "enemy";
+    let ownsEnemyTrainerPresentation = false;
     const actorFingerprint = `bi${this.presentation.bi}:slot${this.presentation.partySlot}:p${this.presentation.pokemonId}:sp${this.presentation.speciesId}`;
     const ownerIsCurrent = (): boolean =>
       globalScene === scene && getCoopRuntime() === runtime && coopSessionGeneration() === generation;
@@ -1593,10 +1595,18 @@ export class CoopSwitchReplayPhase extends Phase {
       ownedActivations.clear();
       cleanupEnemyTrainerPresentation();
       try {
+        scene.tweens.killTweensOf([incoming, outgoing, pokeball].filter(value => value != null));
+        pokeball?.destroy();
+        pokeball = undefined;
+        if (outgoing != null && outgoing.id !== this.presentation.pokemonId) {
+          outgoing.setVisible(false);
+          outgoing.getSprite()?.setVisible(false);
+        }
         if (incoming != null) {
           incoming.setVisible(true);
           incoming.getSprite()?.setVisible(true);
           incoming.getSprite()?.clearTint();
+          incoming.setScale(incoming.getSpriteScale());
           incoming.showInfo();
           void incoming.updateInfo();
         }
@@ -1663,6 +1673,12 @@ export class CoopSwitchReplayPhase extends Phase {
         finish({ kind: "failed", reason: "switch-battler-address-unmapped", actorFingerprint });
         return;
       }
+      const expectedActorSide = player ? "player" : "enemy";
+      if (this.presentation.actor.side !== expectedActorSide) {
+        finish({ kind: "failed", reason: "switch-actor-side-mismatch", actorFingerprint });
+        return;
+      }
+      ownsEnemyTrainerPresentation = !player;
       const party = player ? scene.getPlayerParty() : scene.getEnemyParty();
       const exactSlot = party.findIndex(mon => mon?.id === this.presentation.pokemonId);
       if (exactSlot < 0) {
@@ -1683,7 +1699,7 @@ export class CoopSwitchReplayPhase extends Phase {
       const alreadyProjected = exactSlot === located.position;
       const partySlot = exactSlot;
       const recordedPartySlot = Math.trunc(this.presentation.partySlot);
-      const outgoing = alreadyProjected
+      outgoing = alreadyProjected
         ? recordedPartySlot >= 0 && recordedPartySlot !== located.position
           ? party[recordedPartySlot]
           : undefined
@@ -1736,21 +1752,22 @@ export class CoopSwitchReplayPhase extends Phase {
           incoming.setVisible(false);
           incoming.getSprite()?.setVisible(false);
           const fpOffset = incoming.getFieldPositionOffset();
-          const pokeball = scene.addFieldSprite(
+          const ball = scene.addFieldSprite(
             player ? 36 : 248,
             player ? 80 : 44,
             "pb",
             getPokeballAtlasKey(incoming.getPokeball(true)),
           );
-          pokeball.setOrigin(0.5, 0.625).setVisible(true);
-          scene.field.add(pokeball);
+          pokeball = ball;
+          ball.setOrigin(0.5, 0.625).setVisible(true);
+          scene.field.add(ball);
           scene.tweens.add({
-            targets: pokeball,
+            targets: ball,
             duration: 650,
             x: (player ? 100 : 236) + fpOffset[0],
           });
           scene.tweens.add({
-            targets: pokeball,
+            targets: ball,
             duration: 150,
             ease: "Cubic.easeOut",
             y: (player ? 70 : 34) + fpOffset[1],
@@ -1758,7 +1775,7 @@ export class CoopSwitchReplayPhase extends Phase {
               runOwned("switch-ball-launch-owner-retired", () => {
                 try {
                   scene.tweens.add({
-                    targets: pokeball,
+                    targets: ball,
                     duration: 500,
                     ease: "Cubic.easeIn",
                     angle: 1440,
@@ -1767,7 +1784,10 @@ export class CoopSwitchReplayPhase extends Phase {
                       runOwned("switch-ball-open-owner-retired", () => {
                         try {
                           scene.playSound("se/pb_rel");
-                          pokeball.destroy();
+                          ball.destroy();
+                          if (pokeball === ball) {
+                            pokeball = undefined;
+                          }
                           // HEADLESS has no pixels to present, while this particle helper owns an independent
                           // repeating timer that can outlive the phase/test scene. Do not create an orphaned
                           // callback there; real Canvas/WebGL clients retain the complete ball-open effect.

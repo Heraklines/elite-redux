@@ -313,6 +313,20 @@ test("render-profile execution proof uses canonical presentation outcomes, not d
     "guest",
   );
   assert.equal(sink.findPresentationEvent({ stage: "renderer-completed", eventKind: "moveAnim" }), undefined);
+  assert.deepEqual(
+    sink
+      .findPresentationEvents({
+        stage: "renderer-skipped",
+        eventKind: "moveAnim",
+        epoch: 1,
+        wave: 1,
+        turn: 1,
+        seq: 0,
+        canonicalEvent: event,
+      })
+      .map(entry => entry.observation.role),
+    ["guest"],
+  );
 });
 
 test("the animations-on turn budget is a per-event-derived ceiling scoped to the animations-on profile only", async () => {

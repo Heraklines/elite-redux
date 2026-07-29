@@ -66,6 +66,11 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
   );
   assert.match(
     switchReplay,
+    /presentation\.actor\.side !== expectedActorSide[\s\S]+switch-actor-side-mismatch[\s\S]+ownsEnemyTrainerPresentation = !player/u,
+    "trainer/tray ownership is admitted only after the signed actor side matches the mapped battler",
+  );
+  assert.match(
+    switchReplay,
     /runWhenCoopRuntimeActive\(runtime,[\s\S]+ownedActivations\.add\(cancel\)/u,
     "detached timers/tweens queue only under their exact runtime and retirement cancels queued activations",
   );
@@ -86,6 +91,11 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
     /finish = \(outcome[\s\S]+timer\.remove\(false\)[\s\S]+cleanupEnemyTrainerPresentation\(\)[\s\S]+settleCoopPresentationOutcome/u,
     "cleanup and owned timer cancellation precede the presentation proof",
   );
+  assert.match(
+    switchReplay,
+    /killTweensOf\(\[incoming, outgoing, pokeball\][\s\S]+pokeball\?\.destroy\(\)[\s\S]+incoming\.setScale\(incoming\.getSpriteScale\(\)\)/u,
+    "retirement cannot leave a ball sprite or a half-scaled incoming actor behind",
+  );
   assert.match(switchReplay, /retire\(\)[\s\S]+this\.retireActiveRun\?\.\(\)/u);
   assert.match(
     switchReplay,
@@ -96,12 +106,12 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
   assert.match(presentation, /settleCoopTrainerPresentation\([\s\S]+scene: BattleScene = globalScene/u);
   assert.match(
     campaign,
-    /eventKind: "switch"[\s\S]+wave: switchAddress\.wave[\s\S]+turn: switchAddress\.turn[\s\S]+seq: switchAddress\.seq/u,
+    /authoritySwitches\.map\([\s\S]+eventKind: "switch"[\s\S]+epoch: switchAddress\.epoch[\s\S]+wave: switchAddress\.wave[\s\S]+turn: switchAddress\.turn[\s\S]+seq: switchAddress\.seq[\s\S]+canonicalEvent: switchAddress\.event/u,
     "real two-browser campaigns correlate every encountered switch with its exact renderer receipt",
   );
   assert.match(
     evidence,
-    /findPresentationEvent\([\s\S]+wave = null[\s\S]+turn = null[\s\S]+seq = null[\s\S]+event\.observation\.seq === seq/u,
+    /findPresentationEvents\([\s\S]+epoch = null[\s\S]+wave = null[\s\S]+turn = null[\s\S]+seq = null[\s\S]+canonicalEvent = null[\s\S]+event\.observation\.epoch === epoch[\s\S]+event\.observation\.seq === seq[\s\S]+JSON\.stringify\(event\.observation\.event\) === JSON\.stringify\(canonicalEvent\)/u,
   );
 });
 
