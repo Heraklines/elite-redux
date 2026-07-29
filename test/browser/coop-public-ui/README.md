@@ -40,8 +40,8 @@ mutation. This journey proves co-op authority from the configured-party boundary
 to test natural collection/unlock acquisition.
 
 The ten-wave `mystery-gauntlet` campaign has the same narrowly gated setup boundary. Its exact campaign bundle
-accepts only `coopfixture=campaign-survival`, which visibly seeds a point-legal Dondozo/Lapras/Seel team that both
-browsers submit with public keys. Other campaign profiles receive no fixture URL and retain natural fresh-account
+accepts only `coopfixture=campaign-survival`, which visibly seeds a per-seat-point-legal Seel/Castform/Spinda team.
+Both browsers submit it with public keys. Other campaign profiles receive no fixture URL and retain natural fresh-account
 starter selection. This keeps the Mystery lane focused on its five encounters, ghost, boss, Bargain, rewards, and
 replacement/control boundaries instead of failing nondeterministically on early-run party balance.
 

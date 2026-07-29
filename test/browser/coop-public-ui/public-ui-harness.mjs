@@ -67,7 +67,8 @@ const MAGIKARP_SPECIES_ID = 129;
 const CROBAT_SPECIES_ID = 169;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
-const LAPRAS_SPECIES_ID = 131;
+const CASTFORM_SPECIES_ID = 351;
+const SPINDA_SPECIES_ID = 327;
 // Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
 // correctly parked command watcher and the host emitting Explosion's next authoritative HP/faint
 // events. The former 90s watchdog aborted four seconds before that real causal progress and the
@@ -3533,7 +3534,7 @@ export class DuoPublicUiRig {
               : gameOverFixture
                 ? [CROBAT_SPECIES_ID]
                 : campaignSurvivalFixture
-                  ? [DONDOZO_SPECIES_ID, LAPRAS_SPECIES_ID, SEEL_SPECIES_ID]
+                  ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
                   : null;
           const result =
             expectedSeededSpecies == null

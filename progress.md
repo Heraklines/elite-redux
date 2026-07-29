@@ -5528,3 +5528,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   could open a target picker and the harness would leave it untouched for the rest of the run. Both waits now retain
   the same exact-address, consumed-instance-protected driver. A failure-first source contract requires all three
   post-command waits to keep that public UI-to-relay chain armed.
+
+## 2026-07-29 - Mystery survival fixture obeys the real per-seat co-op budget
+
+- Exact Mystery run `30489511688` reached both ordinary starter screens with the correct exact-build fixture URL,
+  then timed out before launch. Its semantic trace proved that the production UI accepted only Dondozo: the fixture
+  requested a `4 + 4 + 1` team while two-player co-op correctly limits each seat to five starter points.
+- The exact-only fixture now fields Seel, Castform, and Spinda. All three are real one-point starters and retain the
+  fixture's deterministic Water Spout/31-IV setup, giving each browser three replacement-capable party members while
+  staying two points below the same five-point limit a human co-op player sees.
+- The node-pure campaign contract now checks both the exact fixture/harness roster and each member's real starter-cost
+  declaration, so a future balance or roster edit cannot quietly turn setup into a misleading gameplay red. Focused
+  evidence is 40/40 green, the public-browser boundary is green, scoped Biome is error-clean apart from the existing
+  informational complexity diagnostics, and `git diff --check` is clean. No local engine or Chromium execution was
+  used; the corrected exact Mystery campaign remains remote-only.

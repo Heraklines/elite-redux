@@ -185,8 +185,10 @@ export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null
  *
  * The Mystery profile is an interaction-coverage lane, not a fresh-account balance oracle: it must cross five
  * consecutive encounters, the scripted ghost, the boss, and the Bargain without a random early wipe converting
- * a synchronization result into a survivability result. Dondozo (4), Lapras (4), and Seel (1) remain below the
- * ordinary ten-point starter limit. Both browsers still see, submit, and confirm the ordinary starter surface;
+ * a synchronization result into a survivability result. Each co-op seat receives five starter points, so Seel,
+ * Castform, and Spinda (one point each) leave the fixture safely inside the real per-seat limit while still
+ * fielding three replacement-capable party members. Both browsers still see, submit, and confirm the ordinary
+ * starter surface;
  * every battle command, replacement, interaction, reward, and transition remains a production public-UI path.
  */
 export function getCoopBrowserCampaignFixtureStarters(): Starter[] | null {
@@ -196,7 +198,7 @@ export function getCoopBrowserCampaignFixtureStarters(): Starter[] | null {
   if (new URLSearchParams(location.search).get("coopfixture") !== "campaign-survival") {
     return null;
   }
-  return [SpeciesId.DONDOZO, SpeciesId.LAPRAS, SpeciesId.SEEL].map(speciesId => ({
+  return [SpeciesId.SEEL, SpeciesId.CASTFORM, SpeciesId.SPINDA].map(speciesId => ({
     speciesId,
     shiny: false,
     variant: 0,

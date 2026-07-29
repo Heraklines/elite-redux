@@ -256,9 +256,10 @@ test("a chained Mystery gauntlet refreshes only from proven surface progress and
 });
 
 test("workflow builds the staging-only fifth difficulty and fans a configurable ten-wave-default profile", async () => {
-  const [workflow, registry, starterHandler, harness, battleScene] = await Promise.all([
+  const [workflow, registry, starterCosts, starterHandler, harness, battleScene] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8"),
     readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/data/balance/starters.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
     readFile(resolve(root, "src/battle-scene.ts"), "utf8"),
@@ -267,14 +268,21 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
   assert.match(workflow, /VITE_COOP_BROWSER_FIXTURE: campaign-survival/u);
   assert.match(
     registry,
-    /isCoopBrowserCampaignFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "campaign-survival"[\s\S]*getCoopBrowserCampaignFixtureStarters\(\)[\s\S]*get\("coopfixture"\) !== "campaign-survival"[\s\S]*SpeciesId\.DONDOZO[\s\S]*SpeciesId\.LAPRAS[\s\S]*SpeciesId\.SEEL/u,
+    /isCoopBrowserCampaignFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "campaign-survival"[\s\S]*getCoopBrowserCampaignFixtureStarters\(\)[\s\S]*get\("coopfixture"\) !== "campaign-survival"[\s\S]*SpeciesId\.SEEL[\s\S]*SpeciesId\.CASTFORM[\s\S]*SpeciesId\.SPINDA/u,
   );
+  for (const species of ["SEEL", "CASTFORM", "SPINDA"]) {
+    assert.match(
+      starterCosts,
+      new RegExp(`\\[SpeciesId\\.${species}\\]: 1,`, "u"),
+      `${species} must remain a one-point starter so the three-mon fixture fits one co-op seat's five-point limit`,
+    );
+  }
   assert.match(starterHandler, /getCoopBrowserCampaignFixtureStarters\(\)/u);
   assert.match(
     harness,
     /renderProfile === "mystery-gauntlet"[\s\S]*difficultyId === "mystery"[\s\S]*set\("coopfixture", "campaign-survival"\)/u,
   );
-  assert.match(harness, /campaignSurvivalFixture[\s\S]*DONDOZO_SPECIES_ID, LAPRAS_SPECIES_ID, SEEL_SPECIES_ID/u);
+  assert.match(harness, /campaignSurvivalFixture[\s\S]*SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID/u);
   assert.match(
     battleScene,
     /isFixedBattle\(waveIndex\) && !erGauntletActive\(\)[\s\S]*handleFixedBattle\(resolved\)[\s\S]*handleNonFixedBattle\(resolved\)/u,
