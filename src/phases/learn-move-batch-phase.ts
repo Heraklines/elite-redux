@@ -182,11 +182,49 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
   /** Exact immutable presentation address required by the V2 control proof. */
   public coopV2ControlOperationId: string | null = null;
   private readonly candidateMoveIds: MoveId[];
+  /** The scene that constructed this queue-owned phase; async co-op continuations may never consult a peer scene. */
+  private readonly coopOwningScene = globalScene;
   private readonly coopOwningRuntime = getCoopRuntime();
+  /** Runtime activations owned by this exact phase generation and cancelled on destructive replacement. */
+  private readonly coopRuntimeContinuations = new Set<() => void>();
 
   constructor(partyMemberIndex: number, candidateMoveIds: MoveId[]) {
     super(partyMemberIndex);
     this.candidateMoveIds = candidateMoveIds;
+  }
+
+  /** Dispatch one continuation only under this phase's exact runtime/scene generation. */
+  private dispatchCoopRuntime(runtime: NonNullable<ReturnType<typeof getCoopRuntime>>, callback: () => void): void {
+    if (this.isRetired()) {
+      return;
+    }
+    let invoked = false;
+    let cancel = (): void => undefined;
+    cancel = runWhenCoopRuntimeActive(runtime, () => {
+      invoked = true;
+      this.coopRuntimeContinuations.delete(cancel);
+      if (!this.isRetired()) {
+        callback();
+      }
+    });
+    if (!invoked) {
+      if (this.isRetired()) {
+        cancel();
+      } else {
+        this.coopRuntimeContinuations.add(cancel);
+      }
+    }
+  }
+
+  public override retire(): void {
+    if (this.isRetired()) {
+      return;
+    }
+    for (const cancel of this.coopRuntimeContinuations) {
+      cancel();
+    }
+    this.coopRuntimeContinuations.clear();
+    super.retire();
   }
 
   start(): void {
@@ -323,7 +361,9 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
 
   /** The mode to return to when the panel closes (evolution scene vs the normal message box). */
   private coopReturnMode(): UiMode {
-    return globalScene.ui.getHandler() instanceof EvolutionSceneUiHandler ? UiMode.EVOLUTION_SCENE : UiMode.MESSAGE;
+    return this.coopOwningScene.ui.getHandler() instanceof EvolutionSceneUiHandler
+      ? UiMode.EVOLUTION_SCENE
+      : UiMode.MESSAGE;
   }
 
   /**
@@ -333,10 +373,13 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
    * softlock - the player still learns the moves.
    */
   private coopPerMoveFallback(learnable: MoveId[]): void {
+    const scene = this.coopOwningScene;
     for (const id of learnable) {
-      globalScene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
+      scene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
     }
-    this.end();
+    if (scene.phaseManager.getCurrentPhase() === this) {
+      scene.phaseManager.shiftPhase();
+    }
   }
 
   /** Commit one complete post-application batch result and its exact ordered terminal proof. */
@@ -351,8 +394,8 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       !v2 || this.coopV2ControlOperationId == null
         ? null
         : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
-    const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    const turn = globalScene.currentBattle?.turn ?? 0;
+    const wave = this.coopOwningScene.currentBattle?.waveIndex ?? 0;
+    const turn = this.coopOwningScene.currentBattle?.turn ?? 0;
     const payload = fallback
       ? {
           type: "decision" as const,
@@ -405,47 +448,57 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       failCoopSharedSession(`Learn-move batch result for slot ${this.partyMemberIndex} lost its exact V2 address`);
       return;
     }
-    const scene = globalScene;
+    const scene = this.coopOwningScene;
     const returnMode = this.coopReturnMode();
-    void scene.ui
-      .setModeBoundedWhen(
-        returnMode,
-        2_000,
-        () =>
-          scene.phaseManager.getCurrentPhase() === this
-          && this.coopV2ControlOperationId != null
-          && coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId) === operationId
-          && isCoopLearnMoveAuthorityV2Active(operationBinding),
-      )
-      .then(result => {
-        runWhenCoopRuntimeActive(owningRuntime, () => {
-          if (result === "superseded" || globalScene !== scene || scene.phaseManager.getCurrentPhase() !== this) {
-            failCoopSharedSession(`Learn-move batch result ${operationId} lost its exact authority phase`);
-            return;
-          }
-          getCoopUiMirror()?.endSession();
-          // Retire without shifting: terminal proof now belongs to a dead real handler, while no locally
-          // inferred successor can start before the immutable result installs its global control claim.
-          this.retire();
-          if (!settleCoopV2InteractionOperation(operationId, owningRuntime)) {
-            failCoopSharedSession(`Learn-move batch result ${operationId} could not prove its authority terminal`);
-            return;
-          }
-          if (!this.commitCoopBatchResult(assignments, fallback, ownerRole, operationBinding)) {
-            return;
-          }
-          coopLog("v2-proposal", `committed learn-move batch result id=${operationId} fallback=${fallback}`);
-          afterCommit();
-          // Shift only after the global result installed its AWAIT_SUCCESSOR. This prevents the local queue
-          // (especially a fallback LearnMovePhase) from opening under the retired prompt control.
-          scene.phaseManager.shiftPhase();
+    this.dispatchCoopRuntime(owningRuntime, () => {
+      if (
+        globalScene !== scene
+        || scene.phaseManager.getCurrentPhase() !== this
+        || !isCoopLearnMoveAuthorityV2Active(operationBinding)
+      ) {
+        failCoopSharedSession(`Learn-move batch result ${operationId} lost its exact authority phase`);
+        return;
+      }
+      void scene.ui
+        .setModeBoundedWhen(
+          returnMode,
+          2_000,
+          () =>
+            scene.phaseManager.getCurrentPhase() === this
+            && this.coopV2ControlOperationId != null
+            && coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId) === operationId
+            && isCoopLearnMoveAuthorityV2Active(operationBinding),
+        )
+        .then(result => {
+          this.dispatchCoopRuntime(owningRuntime, () => {
+            if (result === "superseded" || globalScene !== scene || scene.phaseManager.getCurrentPhase() !== this) {
+              failCoopSharedSession(`Learn-move batch result ${operationId} lost its exact authority phase`);
+              return;
+            }
+            getCoopUiMirror()?.endSession();
+            // Retire without shifting: terminal proof now belongs to a dead real handler, while no locally
+            // inferred successor can start before the immutable result installs its global control claim.
+            this.retire();
+            if (!settleCoopV2InteractionOperation(operationId, owningRuntime)) {
+              failCoopSharedSession(`Learn-move batch result ${operationId} could not prove its authority terminal`);
+              return;
+            }
+            if (!this.commitCoopBatchResult(assignments, fallback, ownerRole, operationBinding)) {
+              return;
+            }
+            coopLog("v2-proposal", `committed learn-move batch result id=${operationId} fallback=${fallback}`);
+            afterCommit();
+            // Shift only after the global result installed its AWAIT_SUCCESSOR. This prevents the local queue
+            // (especially a fallback LearnMovePhase) from opening under the retired prompt control.
+            scene.phaseManager.shiftPhase();
+          });
+        })
+        .catch(() => {
+          this.dispatchCoopRuntime(owningRuntime, () => {
+            failCoopSharedSession(`Learn-move batch result ${operationId} could not close its authority panel`);
+          });
         });
-      })
-      .catch(() => {
-        runWhenCoopRuntimeActive(owningRuntime, () => {
-          failCoopSharedSession(`Learn-move batch result ${operationId} could not close its authority panel`);
-        });
-      });
+    });
   }
 
   /**
@@ -477,8 +530,8 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       ownerIsGuest,
     });
     // Tell the partner to open the SAME panel (owner if it owns the mon, else a read-only watcher).
-    const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    const turn = globalScene.currentBattle?.turn ?? 0;
+    const wave = this.coopOwningScene.currentBattle?.waveIndex ?? 0;
+    const turn = this.coopOwningScene.currentBattle?.turn ?? 0;
     const operationBinding = captureCoopLearnMoveOperationBinding("host");
     const presentationOperationId = sendCoopLearnMoveBatchPromptWithOperationId(
       relay,
@@ -515,6 +568,7 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     seq: number,
     operationBinding: CoopLearnMoveOperationBinding,
   ): void {
+    const scene = this.coopOwningScene;
     const returnMode = this.coopReturnMode();
     const mirror = getCoopUiMirror();
     const relay = getCoopInteractionRelay();
@@ -526,12 +580,18 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       pokemon,
       learnableIds: [...learnable],
       assign: (moveId, slotIndex) => {
+        if (this.isRetired()) {
+          return;
+        }
         pokemon.setMove(slotIndex, moveId);
         erRecordAchievementLearnMove(pokemon, moveId);
         learned.push([moveId, slotIndex]);
         initMoveAnim(moveId).then(() => loadMoveAnimAssets([moveId], true));
       },
       revert: () => {
+        if (this.isRetired()) {
+          return;
+        }
         pokemon.moveset.splice(0, pokemon.moveset.length, ...snapshotMoveset);
         if (snapshotSummon && pokemon.summonData?.moveset) {
           pokemon.summonData.moveset.splice(0, pokemon.summonData.moveset.length, ...snapshotSummon);
@@ -539,12 +599,12 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         learned.length = 0;
       },
       done: () => {
-        if (finished) {
+        if (finished || this.isRetired()) {
           return;
         }
         finished = true;
         if (learned.length > 0) {
-          globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
+          scene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
         }
         if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
           this.closeAndCommitCoopV2BatchResult(learned, false, "host", operationBinding);
@@ -557,17 +617,21 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         const { choice, data } = encodeCoopLearnMoveBatchTerminal(learned);
         relay?.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, choice, data);
         coopLog("learnmove", "host drove batch panel, relays terminal to watcher (#848)", { seq, count: choice });
-        globalScene.ui.setMode(returnMode).then(() => this.end());
+        scene.ui.setMode(returnMode).then(() => {
+          if (scene.phaseManager.getCurrentPhase() === this) {
+            scene.phaseManager.shiftPhase();
+          }
+        });
       },
       fallback: () => {
-        if (finished) {
+        if (finished || this.isRetired()) {
           return;
         }
         finished = true;
         if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
           this.closeAndCommitCoopV2BatchResult([], true, "host", operationBinding, () => {
             for (const id of learnable) {
-              globalScene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
+              scene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
             }
           });
           return;
@@ -580,13 +644,17 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         relay?.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, COOP_LEARN_MOVE_BATCH_FALLBACK);
         coopWarn("learnmove", "host batch panel fallback -> per-move flow (#848)", { seq });
         for (const id of learnable) {
-          globalScene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
+          scene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
         }
-        globalScene.ui.setMode(returnMode).then(() => this.end());
+        scene.ui.setMode(returnMode).then(() => {
+          if (scene.phaseManager.getCurrentPhase() === this) {
+            scene.phaseManager.shiftPhase();
+          }
+        });
       },
     };
     try {
-      const mode = globalScene.ui.setMode(UiMode.LEARN_MOVE_BATCH, deps);
+      const mode = scene.ui.setMode(UiMode.LEARN_MOVE_BATCH, deps);
       mirror?.beginSession("owner", UiMode.LEARN_MOVE_BATCH, seq);
       Promise.resolve(mode).then(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
     } catch (e) {
@@ -609,6 +677,7 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     seq: number,
     operationBinding: CoopLearnMoveOperationBinding,
   ): Promise<void> {
+    const scene = this.coopOwningScene;
     const returnMode = this.coopReturnMode();
     const relay = getCoopInteractionRelay();
     const mirror = getCoopUiMirror();
@@ -636,7 +705,7 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       },
     };
     try {
-      await globalScene.ui.setModeWithoutClear(UiMode.LEARN_MOVE_BATCH, watchDeps);
+      await scene.ui.setModeWithoutClear(UiMode.LEARN_MOVE_BATCH, watchDeps);
       mirror?.beginSession("watcher", UiMode.LEARN_MOVE_BATCH, seq);
       notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
     } catch (e) {
@@ -665,45 +734,82 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       failCoopSharedSession(`Learn-move batch decision for slot ${this.partyMemberIndex} was not exact`);
       return;
     }
+    if (v2) {
+      const owningRuntime = this.coopOwningRuntime;
+      if (res == null || owningRuntime == null) {
+        failCoopSharedSession(`Learn-move batch decision for slot ${this.partyMemberIndex} lost its owner runtime`);
+        return;
+      }
+      // A relay promise can resume while the one-process duo harness exposes the peer browser. Run every
+      // authoritative write, form trigger, panel close, and log commit only after the captured host
+      // runtime/scene is installed again. Real browsers execute this immediately in their one owned realm.
+      this.dispatchCoopRuntime(owningRuntime, () => {
+        if (globalScene !== scene || scene.phaseManager.getCurrentPhase() !== this) {
+          failCoopSharedSession(`Learn-move batch decision for slot ${this.partyMemberIndex} lost its host phase`);
+          return;
+        }
+        if (res.choice === COOP_LEARN_MOVE_BATCH_FALLBACK) {
+          if (res.data != null && res.data.length > 0) {
+            failCoopSharedSession(`Learn-move batch fallback for slot ${this.partyMemberIndex} carried assignments`);
+            return;
+          }
+          coopWarn("learnmove", "guest batch panel fell back; host runs relayed per-move flow (#848)", { seq });
+          this.closeAndCommitCoopV2BatchResult([], true, "guest", operationBinding, () => {
+            for (const id of learnable) {
+              scene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
+            }
+          });
+          return;
+        }
+        const assignments = decodeExactCoopLearnMoveBatchTerminal(
+          res.choice,
+          res.data,
+          learnable,
+          pokemon.getMaxMoveCount(),
+        );
+        if (assignments == null) {
+          failCoopSharedSession(`Learn-move batch decision for slot ${this.partyMemberIndex} was malformed`);
+          return;
+        }
+        pokemon.moveset.splice(0, pokemon.moveset.length, ...snapshotMoveset);
+        if (snapshotSummon && pokemon.summonData?.moveset) {
+          pokemon.summonData.moveset.splice(0, pokemon.summonData.moveset.length, ...snapshotSummon);
+        }
+        for (const [moveId, slotIndex] of assignments) {
+          pokemon.setMove(slotIndex, moveId);
+          erRecordAchievementLearnMove(pokemon, moveId);
+          initMoveAnim(moveId).then(() => loadMoveAnimAssets([moveId], true));
+        }
+        if (assignments.length > 0) {
+          scene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
+        }
+        this.closeAndCommitCoopV2BatchResult(assignments, false, "guest", operationBinding);
+      });
+      return;
+    }
     if (res == null) {
       mirror?.endSession();
       coopWarn("learnmove", "guest batch terminal null (timeout/disconnect); keeping current moves (#848)", { seq });
       if (!this.commitCoopBatchResult([], true, "guest", operationBinding)) {
         return;
       }
-      await globalScene.ui.setMode(returnMode);
-      this.end();
+      await scene.ui.setMode(returnMode);
+      if (scene.phaseManager.getCurrentPhase() === this) {
+        scene.phaseManager.shiftPhase();
+      }
       return;
     }
     if (res.choice === COOP_LEARN_MOVE_BATCH_FALLBACK) {
       coopWarn("learnmove", "guest batch panel fell back; host runs relayed per-move flow (#848)", { seq });
-      if (v2) {
-        if (res.data != null && res.data.length > 0) {
-          failCoopSharedSession(`Learn-move batch fallback for slot ${this.partyMemberIndex} carried assignments`);
-          return;
-        }
-        this.closeAndCommitCoopV2BatchResult([], true, "guest", operationBinding, () => {
-          for (const id of learnable) {
-            globalScene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
-          }
-        });
-        return;
-      }
       mirror?.endSession();
       if (!this.commitCoopBatchResult([], true, "guest", operationBinding)) {
         return;
       }
-      await globalScene.ui.setMode(returnMode);
+      await scene.ui.setMode(returnMode);
       this.coopPerMoveFallback(learnable);
       return;
     }
-    const assignments = v2
-      ? decodeExactCoopLearnMoveBatchTerminal(res.choice, res.data, learnable, pokemon.getMaxMoveCount())
-      : decodeCoopLearnMoveBatchTerminal(res.choice, res.data);
-    if (assignments == null) {
-      failCoopSharedSession(`Learn-move batch decision for slot ${this.partyMemberIndex} was malformed`);
-      return;
-    }
+    const assignments = decodeCoopLearnMoveBatchTerminal(res.choice, res.data);
     // Apply the guest owner's picks AUTHORITATIVELY from the pre-panel snapshot (unaffected by cursor drift).
     pokemon.moveset.splice(0, pokemon.moveset.length, ...snapshotMoveset);
     if (snapshotSummon && pokemon.summonData?.moveset) {
@@ -715,11 +821,7 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       initMoveAnim(moveId).then(() => loadMoveAnimAssets([moveId], true));
     }
     if (assignments.length > 0) {
-      globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
-    }
-    if (v2) {
-      this.closeAndCommitCoopV2BatchResult(assignments, false, "guest", operationBinding);
-      return;
+      scene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
     }
     mirror?.endSession();
     if (!this.commitCoopBatchResult(assignments, false, "guest", operationBinding)) {
@@ -729,7 +831,9 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       seq,
       count: assignments.length,
     });
-    await globalScene.ui.setMode(returnMode);
-    this.end();
+    await scene.ui.setMode(returnMode);
+    if (scene.phaseManager.getCurrentPhase() === this) {
+      scene.phaseManager.shiftPhase();
+    }
   }
 }

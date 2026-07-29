@@ -30,7 +30,12 @@ test("batch decisions close the authority UI, retain one immutable result, then 
     close >= 0 && retire > close && proof > retire && commit > proof && successor > commit && shift > successor,
     "the real panel must close/retire before proof; the immutable successor must install before scheduler release",
   );
-  assert.match(terminal, /runWhenCoopRuntimeActive\(owningRuntime/u);
+  assert.match(terminal, /this\.dispatchCoopRuntime\(owningRuntime/u);
+  assert.match(terminal, /const scene = this\.coopOwningScene/u);
+  assert.ok(
+    terminal.indexOf("this.dispatchCoopRuntime(owningRuntime") < close,
+    "the panel transition itself must re-enter the exact authority runtime, not only its completion callback",
+  );
 
   const watcher = method(authority, "private async coopHostWatchBatch(", "\n  }\n}");
   assert.match(watcher, /v2 \? null : COOP_LEARN_MOVE_BATCH_WAIT_MS/u);
@@ -48,12 +53,15 @@ test("guest owner and watcher release only through the exact committed batch res
   const committed = method(replica, "public settleCoopV2CommittedLearnMoveBatchResult(", "\n  }\n}\n\n/**");
   assert.match(committed, /control\?\.kind !== "AWAIT_SUCCESSOR"/u);
   assert.match(committed, /sourceEntry\?\.kind !== "INTERACTION_COMMIT"/u);
-  assert.match(committed, /decodeInteractionMaterial\(sourceEntry\)/u);
+  assert.match(committed, /decodeCoopV2InteractionEnvelope\(sourceEntry\)/u);
+  assert.doesNotMatch(committed, /decodeInteractionMaterial/u);
+  assert.match(committed, /sourceOperation\?\.kind === "LEARN_MOVE_BATCH"/u);
   assert.match(committed, /!committedMatches/u);
   assert.match(committed, /!this\.coopPanelReady/u);
   assert.match(committed, /submitted\.assignments\.every/u);
   assert.match(committed, /\.setModeBoundedWhen\(/u);
-  assert.match(committed, /runWhenCoopRuntimeActive\(runtime/u);
+  assert.match(committed, /this\.dispatchCoopRuntime\(runtime/u);
+  assert.match(committed, /const scene = this\.coopOwningScene/u);
   const phaseEnd = committed.indexOf("super.end();");
   const retired = committed.indexOf("scene.phaseManager.getCurrentPhase() === this", phaseEnd);
   const terminalProof = committed.indexOf("settleCoopV2InteractionOperation(operationId, runtime)", retired);
@@ -63,6 +71,7 @@ test("guest owner and watcher release only through the exact committed batch res
   );
 
   const owner = method(replica, "if (ownerIsGuest) {", "// GUEST WATCHES");
+  assert.match(owner, /scene\.ui\.setModeWithoutClear\(UiMode\.LEARN_MOVE_BATCH/u);
   assert.ok(
     owner.indexOf("phase.parkCoopV2Decision(") < owner.indexOf("sendProposal();"),
     "the exact proposal is parked before a synchronous result can race back",
@@ -76,6 +85,7 @@ test("guest owner and watcher release only through the exact committed batch res
   );
 
   const watcher = replica.slice(replica.indexOf("// GUEST WATCHES"));
+  assert.match(watcher, /scene\.ui\.setModeWithoutClear\(UiMode\.LEARN_MOVE_BATCH/u);
   assert.ok(
     watcher.indexOf("if (isCoopLearnMoveAuthorityV2Active(operationBinding))")
       < watcher.indexOf(".awaitInteractionChoice("),
@@ -113,6 +123,24 @@ test("runtime and focused two-engine coverage reject raw, wrong, duplicate, and 
   assert.match(duo, /dropBatchCommittedChoiceEcho/u);
   assert.match(duo, /HOST-owned fallback: immutable fallback closes both panels/u);
   assert.match(duo, /a projected batch phase that refuses to retire cannot publish terminal proof/u);
+});
+
+test("batch phase runtime activations are owned and cancelled by their exact phase generation", () => {
+  for (const [name, source] of [
+    ["authority", authority],
+    ["replica", replica],
+  ]) {
+    assert.match(source, /coopRuntimeContinuations = new Set<\(\) => void>\(\)/u, `${name} owns activation cancels`);
+    assert.match(source, /cancel = runWhenCoopRuntimeActive\(runtime/u, `${name} wraps runtime re-entry`);
+    const retireStart = source.indexOf("public override retire(): void");
+    const retireEnd = source.indexOf(
+      name === "authority" ? "\n\n  start(): void" : "\n\n  public install",
+      retireStart,
+    );
+    const retire = source.slice(retireStart, retireEnd);
+    assert.match(retire, /for \(const cancel of this\.coopRuntimeContinuations\)/u, `${name} drains cancels`);
+    assert.match(retire, /this\.coopRuntimeContinuations\.clear\(\)/u, `${name} clears cancellation ownership`);
+  }
 });
 
 test("batch fallback carries one mandatory immutable single-move successor into the V2 wait allowlist", () => {
