@@ -837,6 +837,11 @@ test("Authority V2 routes guest replay narration through its exact acknowledgeme
     /phase === "CoopReplayLearnMovePhase"[\s\S]*replayLearnMoveOwner \? "learn-move:confirm" : "learn-move:summary"/u,
     "a guest replay must distinguish its actionable owner picker from the read-only host-owned watcher",
   );
+  assert.match(
+    observer,
+    /phase === "LearnMovePhase"[\s\S]*semantic\.operationClass === "learn-move"[\s\S]*ownerSeat != null[\s\S]*surfaceId: localSeat === ownerSeat \? "learn-move:confirm" : "learn-move:summary"/u,
+    "a queue-owned LearnMovePhase must expose the Pokemon owner as actionable after stable ownership resolves",
+  );
 });
 
 test("the continuity profile visibly declines Bargain and co-op cannot persist a half-open phase", async () => {

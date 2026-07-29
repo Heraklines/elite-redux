@@ -1382,7 +1382,7 @@ function observeSemanticSurface(): void {
     // the immutable constructor owner flag is the stable distinction. Without this override the
     // guest owner is mislabeled as a generic info screen and the campaign can never drive its pick.
     const replayLearnMoveOwner = (currentPhase as unknown as { ownerIsGuest?: unknown }).ownerIsGuest;
-    const semantic =
+    let semantic =
       phase === "CoopReplayLearnMovePhase" && uiMode === "SUMMARY" && typeof replayLearnMoveOwner === "boolean"
         ? {
             surfaceId: replayLearnMoveOwner ? "learn-move:confirm" : "learn-move:summary",
@@ -1497,6 +1497,22 @@ function observeSemanticSurface(): void {
               : partnerSeat
             : null
           : learnMoveOwnerSeat;
+      // A reward continuation can queue the real LearnMovePhase on both clients. Its owner opens an
+      // actionable SUMMARY picker while the partner opens the byte-identical read-only mirror. The
+      // generic SUMMARY classifier cannot distinguish those roles, so classify only after resolving
+      // the Pokemon's stable owner above. Without this late refinement the public campaign sees two
+      // `learn-move:summary` surfaces and never sends the owner's public Back/Action sequence.
+      if (
+        phase === "LearnMovePhase"
+        && uiMode === "SUMMARY"
+        && semantic.operationClass === "learn-move"
+        && ownerSeat != null
+      ) {
+        semantic = {
+          ...semantic,
+          surfaceId: localSeat === ownerSeat ? "learn-move:confirm" : "learn-move:summary",
+        };
+      }
       // This client's view of who may input: a local surface = this seat drives its own; an
       // interaction surface = only the owner. A driver unions both clients' markers.
       seatsWithInput = semantic.ownerModel === "local" ? [localSeat] : ownerSeat == null ? [] : [ownerSeat];

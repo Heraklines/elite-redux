@@ -3810,6 +3810,11 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
   );
   assert.match(
     encounterPhase,
+    /doEncounterCommon\([\s\S]*remainsCurrent: \(\) => boolean = \(\) => globalScene\.phaseManager\.getCurrentPhase\(\) === this/u,
+    "an obsolete encounter dialogue chain cannot queue a second Mystery classifier after V2 enters its battle",
+  );
+  assert.match(
+    encounterPhase,
     /globalScene\.ui\.setMode\(UiMode\.MESSAGE\)\.then\(\s*wrapCoopEncounterContinuation\(\(\) => \{/u,
     "the nested encounter UI-mode continuation cannot escape into the peer browser realm",
   );

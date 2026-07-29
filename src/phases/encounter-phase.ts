@@ -1666,7 +1666,7 @@ export class EncounterPhase extends BattlePhase {
 
   doEncounterCommon(
     showEncounterMessage = true,
-    remainsCurrent: () => boolean = () => true,
+    remainsCurrent: () => boolean = () => globalScene.phaseManager.getCurrentPhase() === this,
     setInteractiveWaiting: (waiting: boolean) => void = () => {},
   ) {
     const isCurrent = (): boolean => {

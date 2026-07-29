@@ -5298,3 +5298,33 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   contracts, all 347 public-browser node contracts, scoped Biome, and `git diff --check`; raw TypeScript retains its
   571-line baseline with zero diagnostics in the changed test. Remote engine qualification remains required;
   Showdown, tournament, staging, and production remain untouched.
+
+## 2026-07-29 - Deep campaign now drives queue-owned learn-move pickers
+
+- Exact campaign `30419517140` reached wave 2 with matching Authority V2 revision 14 fully installed on both
+  browsers, then waited in `LearnMovePhase` for the guest-owned move-forget picker. Transport, state digest, and
+  receipt frontiers remained healthy; the campaign stopped issuing input because its read-only observer labeled
+  both byte-identical SUMMARY screens `learn-move:summary`.
+- Stable Pokemon ownership was already resolved correctly as guest seat 1. The observer now performs the missing
+  late refinement: a queue-owned `LearnMovePhase` SUMMARY is `learn-move:confirm` only on that exact owner and
+  `learn-move:summary` on its watcher. The existing public driver can therefore exercise the intended Back/confirm
+  sequence without privileged callbacks or guessing from the alternating interaction counter.
+- The focused public-browser contract is 37/37 green, scoped Biome and `git diff --check` are clean, and raw
+  TypeScript retains its 571-line baseline with zero diagnostics in the changed observer. Remote campaign
+  requalification remains required; production, staging, Showdown, and tournament were not touched.
+
+## 2026-07-29 - Obsolete Mystery callbacks cannot reopen a completed encounter
+
+- The exact Mystery campaign completed two encounters and entered the wave-4 embedded battle with matching
+  Authority V2 state. Revision 23 installed command control on the host, but the guest remained deferred because a
+  late dialogue callback from the completed encounter queued a second `MysteryEncounterPhase` after the ordered
+  `ME_PRESENT` sequence had already ended. That unauthorized phase waited forever for a successor that could not
+  exist, even though transport, state, receipts, and battle replay were healthy.
+- `EncounterPhase.doEncounterCommon()` now defaults its nested continuations to the exact live phase instance. All
+  existing callback guards therefore discard obsolete work after progression changes the current phase. Explicit
+  callers such as biome transitions retain their stricter supplied predicate, while ordinary solo behavior is
+  unchanged for a still-current encounter.
+- The source-level Authority V2 regression contract is 107/107 green, all 347 public-browser node contracts are
+  green, scoped Biome and `git diff --check` are clean, and raw TypeScript retains its 571-line baseline with zero
+  diagnostics in the changed production file. Remote engine and campaign qualification remain required; staging,
+  production, Showdown, and tournament were not touched.
