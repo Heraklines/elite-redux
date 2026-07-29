@@ -44,6 +44,7 @@ import { coopHostPrepareWildCatchFullDecision } from "#data/elite-redux/coop/coo
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { setCoopCatchThrowerHint } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
@@ -59,7 +60,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -74,12 +75,6 @@ interface PhaseQueueSeam {
 
 interface CatchFullPickerPhase extends Phase {
   readonly coopV2ControlOperationId: string | null;
-}
-
-/** The minimal guest UI seam whose setMode/showText we stub to drive the SELECT picker headlessly. */
-interface StubbableUi {
-  setMode: (...args: unknown[]) => unknown;
-  showText: (...args: unknown[]) => unknown;
 }
 
 /** Tag all 6 party slots on a scene: 0..2 host, 3..5 guest (a clean 3/3 merged half split). */
@@ -214,70 +209,82 @@ describe.skipIf(!RUN)(
         coopHostPrepareWildCatchFullDecision("Venusaur", releasedSpecies),
       );
 
-      // ===== (B/C) GUEST: install the UI seam before draining. The raw prompt must NOT queue legacy UI;
-      // its retained INTERACTION_COMMIT projects and starts the exact manager-owned modal. Prove the public
-      // PARTY surface and address-matching controlInstalled before clicking slot 4. =====
-      await withClient(rig.guestCtx, async () => {
-        const ui = rig.guestScene.ui as unknown as StubbableUi;
-        const realSetMode = ui.setMode.bind(ui);
-        const partyPicker: { current: ((slotIndex: number) => void) | null } = { current: null };
-        ui.showText = (...args: unknown[]): unknown => {
-          const cb = args.find(a => typeof a === "function") as (() => void) | undefined;
-          cb?.();
-          return;
-        };
-        ui.setMode = (...args: unknown[]): unknown => {
-          const mode = args[0];
-          if (mode === UiMode.PARTY) {
-            partyPicker.current = args[3] as (slotIndex: number) => void;
-            return Promise.resolve();
+      // ===== (B/C) GUEST: the raw prompt must NOT queue legacy UI; its retained INTERACTION_COMMIT projects
+      // the exact manager-owned modal. Drive that modal exactly as a player does: dismiss its real MESSAGE,
+      // wait for the real PARTY handler + address-matching controlInstalled, then navigate and choose slot 4
+      // exclusively through public keyboard input. No callback-only UI stub may stand in for actionability. =====
+      let guestPicker: CatchFullPickerPhase | undefined;
+      let guestPickerReady = false;
+      const startedGuestPickers = new WeakSet<object>();
+      for (let attempt = 0; attempt < 100 && !guestPickerReady; attempt++) {
+        await withClient(rig.guestCtx, async () => {
+          await drainLoopback();
+        });
+        guestPickerReady = withClientSync(rig.guestCtx, () => {
+          const current = rig.guestScene.phaseManager.getCurrentPhase() as CatchFullPickerPhase;
+          if (current.phaseName !== "CoopGuestCatchFullPhase") {
+            return false;
           }
-          if (mode === UiMode.MESSAGE) {
-            return new Promise(() => {}); // never resolves -> phase.end() (shiftPhase) never fires cross-ctx
+          guestPicker = current;
+          if (!startedGuestPickers.has(current)) {
+            // Both headless phase schedulers intentionally suppress startCurrentPhase(). Production starts
+            // the override immediately, so start only this already-projected current V2 phase once.
+            startedGuestPickers.add(current);
+            current.start();
           }
-          return realSetMode(...args);
-        };
-        await drainLoopback();
-        await vi.waitUntil(
-          () => {
-            const current = rig.guestScene.phaseManager.getCurrentPhase() as CatchFullPickerPhase;
-            return current.phaseName === "CoopGuestCatchFullPhase";
-          },
-          { timeout: 1_000, interval: 1 },
-        );
-        const guestPicker = rig.guestScene.phaseManager.getCurrentPhase() as CatchFullPickerPhase;
-        expect(
-          rig.guestScene.phaseManager.getCurrentPhase(),
-          "the retained V2 commit made its picker the manager-owned current phase",
-        ).toBe(guestPicker);
-        expect(
-          (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.phaseQueue.find("CoopGuestCatchFullPhase"),
-          "the compatibility prompt did not leave a second uncontrolled picker behind the V2 modal",
-        ).toBeUndefined();
-        // Both headless phase schedulers deliberately suppress startCurrentPhase(). Production already
-        // starts this manager-owned modal synchronously; reproduce that one missing harness edge exactly
-        // once, after proving the V2 projector installed the current phase (never a detached queue copy).
-        guestPicker.start();
-        await vi.waitUntil(
-          () => {
-            const installed = rig.guestRuntime.v2ControlLedger.activeControl;
-            return (
-              installed?.kind === "SHARED_INTERACTION" && installed.operationId === guestPicker.coopV2ControlOperationId
-            );
-          },
-          { timeout: 1_000, interval: 1 },
-        );
-        const installedControl = rig.guestRuntime.v2ControlLedger.activeControl;
-        if (installedControl?.kind !== "SHARED_INTERACTION") {
-          throw new Error("catch-full public surface did not install its shared interaction control");
+          const handler = rig.guestScene.ui.getHandler() as unknown as {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          };
+          if (
+            rig.guestScene.ui.getMode() === UiMode.MESSAGE
+            && handler.active === true
+            && handler.isCoopV2InputActionable?.() === true
+          ) {
+            // The first ACTION may finish typewriter text and the next invokes its continuation. Repeating
+            // this ordinary player input across drive iterations is the production browser behavior.
+            rig.guestScene.ui.processInput(Button.ACTION);
+          }
+          const installed = rig.guestRuntime.v2ControlLedger.activeControl;
+          return (
+            rig.guestScene.ui.getMode() === UiMode.PARTY
+            && handler.active === true
+            && handler.isCoopV2InputActionable?.() === true
+            && installed?.kind === "SHARED_INTERACTION"
+            && installed.operationId === current.coopV2ControlOperationId
+          );
+        });
+        if (!guestPickerReady) {
+          await withClient(rig.guestCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
         }
-        expect(
-          installedControl.operationId,
-          "the public PARTY surface installed the exact retained interaction address",
-        ).toBe(guestPicker.coopV2ControlOperationId);
-        expect(partyPicker.current, "the actionable PARTY surface exposed its public picker callback").not.toBeNull();
-        partyPicker.current?.(OWNER_PICK_SLOT);
-        ui.setMode = realSetMode;
+      }
+      expect(guestPickerReady, "the V2 prompt installed the actionable guest catch-full picker").toBe(true);
+      expect(
+        rig.guestScene.phaseManager.getCurrentPhase(),
+        "the retained V2 commit made its picker the manager-owned current phase",
+      ).toBe(guestPicker);
+      expect(
+        (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.phaseQueue.find("CoopGuestCatchFullPhase"),
+        "the compatibility prompt did not leave a second uncontrolled picker behind the V2 modal",
+      ).toBeUndefined();
+      const installedControl = rig.guestRuntime.v2ControlLedger.activeControl;
+      if (installedControl?.kind !== "SHARED_INTERACTION") {
+        throw new Error("catch-full public surface did not install its shared interaction control");
+      }
+      expect(
+        installedControl.operationId,
+        "the public PARTY surface installed the exact retained interaction address",
+      ).toBe(guestPicker?.coopV2ControlOperationId);
+      withClientSync(rig.guestCtx, () => {
+        for (let slot = 0; slot < OWNER_PICK_SLOT; slot++) {
+          expect(rig.guestScene.ui.processInput(Button.DOWN), `guest navigates PARTY to slot ${slot + 1}`).toBe(true);
+        }
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest opens the selected mon's PARTY options").toBe(
+          true,
+        );
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest chooses Select through the public PARTY UI").toBe(
+          true,
+        );
       });
 
       // ===== (D) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the helper's

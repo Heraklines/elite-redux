@@ -5283,3 +5283,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local policy-safe evidence: catch/revival contracts are 3/3, scoped Biome is error-clean, raw TypeScript reports
   zero changed-file diagnostics, and `git diff --check` passes. Remote engine and Chromium qualification remain
   required; no deployment or non-co-op mode changed.
+
+## 2026-07-29 - Catch-full fixture now proves the real public input chain
+
+- Exact gate `30418430318` advanced B9 past manager projection and opened the projected catch-full phase, but the
+  fixture's replacement `setMode` returned a callback without installing a PARTY handler. Authority V2 correctly
+  refused to certify that nonexistent surface, so the remaining timeout was a harness false red rather than a
+  production progression defect.
+- The two-engine scenario now mirrors the already-green Revival pattern: it starts only the manager-owned projected
+  phase suppressed by the headless scheduler, dismisses the real MESSAGE through public ACTION input, waits for the
+  real actionable PARTY handler plus address-exact `controlInstalled`, and drives slot navigation/selection entirely
+  through public keyboard input. Callback-only UI stubs are forbidden by the source contract.
+- No production source changed in this correction. Local policy-safe evidence is green: all 58 co-op source
+  contracts, all 347 public-browser node contracts, scoped Biome, and `git diff --check`; raw TypeScript retains its
+  571-line baseline with zero diagnostics in the changed test. Remote engine qualification remains required;
+  Showdown, tournament, staging, and production remain untouched.

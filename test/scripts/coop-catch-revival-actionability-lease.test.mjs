@@ -105,33 +105,41 @@ test("the catch-full duo drives only a manager-owned, control-installed public p
   const guestDrive = catchFullDuo.slice(catchFullDuo.indexOf("// ===== (B/C) GUEST:"));
   const drain = guestDrive.indexOf("await drainLoopback()");
   const currentProof = guestDrive.indexOf("getCurrentPhase()", drain);
-  const noDuplicate = guestDrive.indexOf('phaseQueue.find("CoopGuestCatchFullPhase")', currentProof);
-  const harnessStart = guestDrive.indexOf("guestPicker.start()", noDuplicate);
+  const harnessStart = guestDrive.indexOf("current.start()", currentProof);
+  const messageInput = guestDrive.indexOf("processInput(Button.ACTION)", harnessStart);
+  const partyMode = guestDrive.indexOf("UiMode.PARTY", messageInput);
   const installedProof = guestDrive.indexOf("v2ControlLedger.activeControl", harnessStart);
-  const exactAddress = guestDrive.indexOf(
-    "installed.operationId === guestPicker.coopV2ControlOperationId",
-    installedProof,
-  );
-  const click = guestDrive.indexOf("partyPicker.current?.(OWNER_PICK_SLOT)", exactAddress);
+  const exactAddress = guestDrive.indexOf("installed.operationId === current.coopV2ControlOperationId", installedProof);
+  const noDuplicate = guestDrive.indexOf('phaseQueue.find("CoopGuestCatchFullPhase")', exactAddress);
+  const publicNavigation = guestDrive.indexOf("processInput(Button.DOWN)", noDuplicate);
+  const publicSelection = guestDrive.lastIndexOf("processInput(Button.ACTION)");
 
   assert.ok(
     drain >= 0
       && currentProof > drain
-      && noDuplicate > currentProof
-      && harnessStart > noDuplicate
+      && harnessStart > currentProof
+      && messageInput > harnessStart
+      && partyMode > messageInput
       && installedProof > harnessStart
       && exactAddress > installedProof
-      && click > exactAddress,
-    "the harness must reproduce V2 projection, manager ownership, its one suppressed start edge, exact controlInstalled, and no legacy duplicate before the public click",
+      && noDuplicate > exactAddress
+      && publicNavigation > noDuplicate
+      && publicSelection > publicNavigation,
+    "the harness must reproduce V2 projection, manager ownership, its one suppressed start edge, real MESSAGE/PARTY actionability, exact controlInstalled, no legacy duplicate, and public keyboard selection",
   );
   assert.doesNotMatch(
-    guestDrive.slice(0, click),
+    guestDrive.slice(0, publicSelection),
     /\(guestPicker as Phase\)\.start\(\)[\s\S]*await Promise\.resolve\(\)/u,
     "a detached phase plus one microtask is not evidence that a browser-owned V2 surface is actionable",
   );
-  assert.doesNotMatch(guestDrive.slice(0, click), /replaceWithCoopAuthoritativePhase/u);
+  assert.doesNotMatch(guestDrive.slice(0, publicSelection), /replaceWithCoopAuthoritativePhase/u);
+  assert.doesNotMatch(
+    guestDrive.slice(0, publicSelection),
+    /ui\.(?:showText|setMode)\s*=/u,
+    "the engine scenario may not replace the public UI with callback-only stubs",
+  );
   assert.equal(
-    [...guestDrive.slice(0, click).matchAll(/guestPicker\.start\(\)/gu)].length,
+    [...guestDrive.slice(0, publicSelection).matchAll(/current\.start\(\)/gu)].length,
     1,
     "the headless harness restores only its one intentionally suppressed manager start",
   );
