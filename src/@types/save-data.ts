@@ -191,6 +191,8 @@ export interface SessionSaveData {
    * backwards compatibility (older / non-founder saves restore none).
    */
   founderChallenge?: { draftId: string; config: CommunityChallengeConfig };
+  /** Published community challenge whose clear/fail result must survive reload. */
+  communityChallenge?: { challengeId: string; config: CommunityChallengeConfig };
   /**
    * ER Community Challenge: the run's allowed-species whitelist (root species ids), so the
    * catch gate survives a mid-run save/reload. Optional + absent for non-community runs.

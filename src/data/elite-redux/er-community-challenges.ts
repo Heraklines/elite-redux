@@ -129,6 +129,8 @@ export interface CommunityChallengeEntry {
   readonly config: CommunityChallengeConfig;
   /** Server/local publication state. Drafts are visible only to their author. */
   readonly status?: "draft" | "active";
+  /** This player's own result, independent of the aggregate community stats. */
+  readonly playerStatus?: CommunityPlayerStatus;
   readonly stats: CommunityChallengeStats;
   /** The human RULES list shown in the detail panel (derived from baseChallenges). */
   readonly rules: CommunityChallengeRule[];
@@ -137,6 +139,8 @@ export interface CommunityChallengeEntry {
   readonly allowedCount: number;
   readonly bookmarked?: boolean;
 }
+
+export type CommunityPlayerStatus = "in_progress" | "cleared" | "failed";
 
 /** The full feed the browser screen renders. */
 export interface CommunityChallengeFeed {
@@ -730,6 +734,118 @@ export async function recordCommunityClear(
   }
 }
 
+/**
+ * Report the result of a published community challenge played by a non-founder.
+ * The worker keeps clears sticky, so a later loss can never erase a completed card.
+ */
+export async function recordCommunityResult(
+  challengeId: string,
+  config: CommunityChallengeConfig,
+  outcome: "cleared" | "failed",
+  run: CommunityClearRun,
+): Promise<boolean | null> {
+  const base = serverBase();
+  const token = authToken();
+  if (!base || !token || typeof fetch !== "function" || !challengeId) {
+    return null;
+  }
+  try {
+    const res = await fetch(`${base}/community/clear`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token },
+      body: JSON.stringify({
+        challengeId,
+        outcome: outcome === "cleared" ? "victory" : "defeat",
+        wave: run.wave,
+        clearTimeMs: run.clearTimeMs,
+        party: run.party,
+        partyRoots: run.partyRoots,
+        gameModeId: config.gameModeId,
+        difficulty: config.difficulty,
+        baseChallenges: config.baseChallenges,
+        allowedSpecies: config.allowedSpecies,
+        seed: config.seed,
+      }),
+    });
+    if (res.status >= 500 || res.status === 401) {
+      console.warn(`[community] result for ${challengeId} could not be recorded yet (${res.status}); will retry`);
+      return null;
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[community] result for ${challengeId} rejected (${res.status}): ${body.slice(0, 200)}`);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn(`[community] result for ${challengeId} hit a network failure; will retry`, error);
+    return null;
+  }
+}
+
+// A victory/loss can happen while the player is offline or while their auth
+// token is expiring. Persist normal-player results too, so server HISTORY and
+// completed styling catch up on the next Community Challenges open.
+const PENDING_COMMUNITY_RESULTS_KEY = "er_pending_community_results";
+
+interface PendingCommunityResult {
+  challengeId: string;
+  config: CommunityChallengeConfig;
+  outcome: "cleared" | "failed";
+  run: CommunityClearRun;
+}
+
+function readPendingCommunityResults(): PendingCommunityResult[] {
+  if (typeof localStorage === "undefined") {
+    return [];
+  }
+  try {
+    const raw = localStorage.getItem(PENDING_COMMUNITY_RESULTS_KEY);
+    const value = raw ? JSON.parse(raw) : [];
+    return Array.isArray(value) ? (value as PendingCommunityResult[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingCommunityResults(results: PendingCommunityResult[]): void {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    if (results.length === 0) {
+      localStorage.removeItem(PENDING_COMMUNITY_RESULTS_KEY);
+    } else {
+      localStorage.setItem(PENDING_COMMUNITY_RESULTS_KEY, JSON.stringify(results));
+    }
+  } catch (error) {
+    console.warn("[community] could not persist a pending player result", error);
+  }
+}
+
+/** Persist a player result and immediately attempt to send it. Clears are sticky. */
+export function enqueueCommunityResult(result: PendingCommunityResult): void {
+  const previous = readPendingCommunityResults().find(entry => entry.challengeId === result.challengeId);
+  const effective = previous?.outcome === "cleared" ? previous : result;
+  const pending = readPendingCommunityResults().filter(entry => entry.challengeId !== result.challengeId);
+  pending.push(effective);
+  writePendingCommunityResults(pending);
+  void flushPendingCommunityResults();
+}
+
+/** Retry queued results; retain only transient/auth/network failures. */
+export async function flushPendingCommunityResults(): Promise<void> {
+  const pending = readPendingCommunityResults();
+  const keep: PendingCommunityResult[] = [];
+  for (const result of pending) {
+    const sent = await recordCommunityResult(result.challengeId, result.config, result.outcome, result.run);
+    if (sent === null) {
+      keep.push(result);
+    }
+  }
+  writePendingCommunityResults(keep);
+}
+
 // ---------------------------------------------------------------------------
 // Founder publish queue: a genuine victory must publish the draft, but the POST
 // can fail (offline at the exact moment of the win). So the clear is persisted in
@@ -835,6 +951,60 @@ export async function fetchCommunityBookmarks(): Promise<CommunityChallengeEntry
     return Array.isArray(data?.items) ? data.items : [];
   } catch {
     return [];
+  }
+}
+
+/** Fetch this player's challenge attempts for the HISTORY section. */
+export async function fetchCommunityHistory(): Promise<CommunityChallengeEntry[]> {
+  const base = serverBase();
+  const token = authToken();
+  if (!base || !token || typeof fetch !== "function") {
+    return [];
+  }
+  try {
+    const res = await fetch(`${base}/community/history`, { headers: { Authorization: token } });
+    if (!res.ok) {
+      return [];
+    }
+    const data = (await res.json()) as { items?: CommunityChallengeEntry[] };
+    return Array.isArray(data?.items) ? data.items : [];
+  } catch {
+    return [];
+  }
+}
+
+// Player-result cache: makes completed styling immediate and keeps it available
+// when the history request is offline. Server history remains authoritative once
+// reachable; sticky clears win over every other state here too.
+const PLAYER_STATUS_KEY = "er_community_player_status";
+
+export function getLocalCommunityStatuses(): Record<string, CommunityPlayerStatus> {
+  if (typeof localStorage === "undefined") {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PLAYER_STATUS_KEY) ?? "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, CommunityPlayerStatus>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+export function recordLocalCommunityStatus(challengeId: string, status: CommunityPlayerStatus): void {
+  if (!challengeId || typeof localStorage === "undefined") {
+    return;
+  }
+  const statuses = getLocalCommunityStatuses();
+  if (statuses[challengeId] === "cleared") {
+    return;
+  }
+  statuses[challengeId] = status;
+  try {
+    localStorage.setItem(PLAYER_STATUS_KEY, JSON.stringify(statuses));
+  } catch {
+    // Best-effort visual cache; the server remains the source of truth.
   }
 }
 
@@ -1018,6 +1188,7 @@ export function buildMyChallengesFeed(): CommunityChallengeFeed {
   const featured: CommunityChallengeEntry[] = listLocalDrafts().map(d => ({
     config: d.config,
     status: d.status === "draft" ? "draft" : "active",
+    ...(d.cleared > 0 ? { playerStatus: "cleared" as const } : d.failed > 0 ? { playerStatus: "failed" as const } : {}),
     stats: {
       attempts: d.attempts,
       cleared: d.cleared,

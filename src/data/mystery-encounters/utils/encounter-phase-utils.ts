@@ -1213,7 +1213,7 @@ export function selectOptionThenPokemon(
         UiMode.PARTY,
         PartyUiMode.SELECT,
         -1,
-        (slotIndex: number, _option: PartyOption) => {
+        async (slotIndex: number, _option: PartyOption) => {
           if (coopFence != null && !coopFence()) {
             return;
           }
@@ -1231,7 +1231,11 @@ export function selectOptionThenPokemon(
             });
           } else {
             // Back to first option select screen
-            displayOptions(config);
+            // Wait for PARTY -> MESSAGE -> OPTION_SELECT to finish before the
+            // party handler completes its cancel callback. Fire-and-forget here
+            // races the old PARTY surface's cleanup and can leave the restored
+            // option menu visible but unable to accept another selection.
+            await displayOptions(config);
           }
         },
         selectablePokemonFilter,

@@ -4107,6 +4107,44 @@ async function handleCommunityMine(auth: TokenPayload, env: Env, cors: Record<st
 }
 
 /**
+ * GET /community/history - this player's attempts, newest first. Each entry carries
+ * playerStatus so the client can style completed cards in every browser section.
+ */
+async function handleCommunityHistory(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureCommunityTables(env);
+  const cols = CC_ENTRY_COLS.split(", ")
+    .map(col => `c.${col}`)
+    .join(", ");
+  const { results } = await env.DB.prepare(
+    `SELECT ${cols}, a.status AS player_status
+       FROM community_challenge_attempts a
+       JOIN community_challenges c ON c.id = a.challenge_id
+      WHERE a.user_id = ?
+      ORDER BY a.updated_at DESC
+      LIMIT 100`,
+  )
+    .bind(auth.uid)
+    .all<CommunityChallengeRow & { player_status: "in_progress" | "cleared" | "failed" }>();
+  const items = (results ?? [])
+    .filter(row => row.status !== "hidden" && row.status !== "rejected")
+    .map(row => ({
+      ...(buildCommunityEntry(
+        row,
+        {
+          attempts: row.attempts_total,
+          cleared: row.cleared_count,
+          inProgress: row.inprogress_count,
+          failed: row.failed_count,
+          recent: [],
+        },
+        false,
+      ) as Record<string, unknown>),
+      playerStatus: row.player_status,
+    }));
+  return json({ items }, 200, cors);
+}
+
+/**
  * POST /community/achv - the player REPORTS their tracked achievement unlocks (the
  * client sends these because system saves are encrypted and the worker can't read
  * achvUnlocks itself). Body: `{ unlocked: Array<{ id: string; at?: number }> }`.
@@ -5176,6 +5214,9 @@ export default {
       }
       if (pathname === "/community/mine" && method === "GET") {
         return await handleCommunityMine(auth, env, cors);
+      }
+      if (pathname === "/community/history" && method === "GET") {
+        return await handleCommunityHistory(auth, env, cors);
       }
       // Player reports their tracked achievement unlocks (system saves are encrypted,
       // so the worker can't read achvUnlocks itself). Only TRACKED_ACHV_IDS are stored.

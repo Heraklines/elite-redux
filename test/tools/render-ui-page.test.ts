@@ -834,6 +834,19 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildInfernoFeed()],
     diffTolerance: 90_000,
   },
+  // A player-completed card keeps the normal trial art but gains the green
+  // CLEARED badge/frame and the detail-panel "YOU CLEARED THIS" treatment.
+  "community-challenges-completed": {
+    mode: UiMode.COMMUNITY_CHALLENGES,
+    prepare: () => {
+      const feed = buildDemoChallengesConfig({ populated: true });
+      const featured = feed.featured.map((entry, index) =>
+        index === 0 ? { ...entry, playerStatus: "cleared" as const } : entry,
+      );
+      return [{ featured, selected: featured[0], totalCount: featured.length }];
+    },
+    diffTolerance: 0,
+  },
   // Stage B nav sections: DOWN to BROWSE (nav index 2) + ACTION switches the section;
   // BROWSE has no live backend offline so it settles on the genuine "BE THE FIRST"
   // empty state (fetchCommunityFeed -> emptyFeed). Static -> exact diff.

@@ -206,6 +206,11 @@ export class SummonPhase extends PartyMemberPokemonPhase {
               scale: pokemon.getSpriteScale(),
               onComplete: () => {
                 pokemon.cry(pokemon.getHpRatio() > 0.25 ? undefined : { rate: 0.85 });
+                // Evolution can replace the tint child while this mon is on
+                // the bench. Normalize the actual overlay as well as the base
+                // sprite so the Poké Ball's red summon tint cannot survive on
+                // the newly evolved sprite into the next battle.
+                pokemon.untint(0);
                 pokemon.getSprite().clearTint();
                 pokemon.fieldSetup();
                 // necessary to stay transformed during wild waves
@@ -271,6 +276,7 @@ export class SummonPhase extends PartyMemberPokemonPhase {
       scale: pokemon.getSpriteScale(),
       onComplete: () => {
         pokemon.cry(pokemon.getHpRatio() > 0.25 ? undefined : { rate: 0.85 });
+        pokemon.untint(0);
         pokemon.getSprite().clearTint();
         pokemon.fieldSetup();
         globalScene.updateFieldScale();

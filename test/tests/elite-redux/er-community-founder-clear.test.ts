@@ -17,9 +17,12 @@
 
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import {
+  type CommunityRunState,
   type FounderRunState,
+  getCommunityRunState,
   getFounderRunState,
   resetCommunityRunState,
+  setCommunityRunState,
   setFounderRunState,
 } from "#data/elite-redux/er-community-run-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -77,5 +80,17 @@ describe("ER Community Challenge - founder run-state", () => {
     expect(getFounderRunState()).not.toBeNull();
     resetCommunityRunState();
     expect(getFounderRunState()).toBeNull();
+  });
+
+  it("persists an ordinary published challenge until game-over can report its result", () => {
+    const state: CommunityRunState = { challengeId: "cc-live", config: makeConfig("cc-live") };
+    setCommunityRunState(state);
+    const serialized = JSON.parse(JSON.stringify(getCommunityRunState())) as CommunityRunState;
+    setCommunityRunState(null);
+    setCommunityRunState(serialized);
+
+    expect(getCommunityRunState()?.challengeId).toBe("cc-live");
+    resetCommunityRunState();
+    expect(getCommunityRunState()).toBeNull();
   });
 });

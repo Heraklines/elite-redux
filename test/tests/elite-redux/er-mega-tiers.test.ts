@@ -23,6 +23,7 @@ import {
   erMegaStoneAppearsAtGate,
   erMegaStoneGenWeight,
   erMegaStoneTier,
+  megaTierForBst,
   pickErMegaStoneWeighted,
   resetErMegaTierCache,
   TIER_APPEARANCE_RATE,
@@ -35,6 +36,22 @@ import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+describe("ER mega stone BST tier contract", () => {
+  it("uses exactly Ultra below 650, Rogue from 650 through 700, and Master above 700", () => {
+    expect(megaTierForBst(1)).toBe(ModifierTier.ULTRA);
+    expect(megaTierForBst(649)).toBe(ModifierTier.ULTRA);
+    expect(megaTierForBst(650)).toBe(ModifierTier.ROGUE);
+    expect(megaTierForBst(700)).toBe(ModifierTier.ROGUE);
+    expect(megaTierForBst(701)).toBe(ModifierTier.MASTER);
+  });
+
+  it("keeps story-shop prices aligned to the three rarity tiers", () => {
+    expect(ER_SHOP_ITEM_TIER_FACTOR[ModifierTier.ULTRA]).toBe(2.6);
+    expect(ER_SHOP_ITEM_TIER_FACTOR[ModifierTier.ROGUE]).toBe(6);
+    expect(ER_SHOP_ITEM_TIER_FACTOR[ModifierTier.MASTER]).toBe(12);
+  });
+});
 
 describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
   let phaserGame: Phaser.Game;
@@ -49,24 +66,19 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
     resetErMegaTierCache();
   });
 
-  it("box legendaries / primal orbs / ultra megas are MASTER-tier", () => {
-    for (const stone of [
-      FormChangeItem.XERNEASITE,
-      FormChangeItem.YVELTALITE,
-      FormChangeItem.RED_ORB,
-      FormChangeItem.LUSTROUS_ORB,
-      FormChangeItem.CHARIZARDITE_Z,
-    ]) {
-      expect(erMegaStoneTier(stone)).toBe(ModifierTier.MASTER);
+  it("forms above 700 BST are MASTER-tier", () => {
+    for (const stone of [FormChangeItem.XERNEASITE, FormChangeItem.YVELTALITE, FormChangeItem.RED_ORB]) {
+      expect(erMegaStoneTier(stone), FormChangeItem[stone]).toBe(ModifierTier.MASTER);
     }
   });
 
-  it("kit-monster megas are ROGUE, a plain mega is well below MASTER", () => {
-    expect(erMegaStoneTier(FormChangeItem.KANGASKHANITE)).toBe(ModifierTier.ROGUE);
-    expect(erMegaStoneTier(FormChangeItem.GENGARITE)).toBe(ModifierTier.ROGUE);
-    // Snorlax's plain mega is a mid-BST bruiser, nowhere near the elite class.
-    expect(erMegaStoneTier(FormChangeItem.SNORLAXITE)).toBeLessThan(ModifierTier.MASTER);
-    expect(erMegaStoneTier(FormChangeItem.VENUSAURITE)).toBeLessThan(ModifierTier.MASTER);
+  it("does not promote sub-650 kit monsters above ULTRA", () => {
+    expect(erMegaStoneTier(FormChangeItem.KANGASKHANITE)).toBe(ModifierTier.ULTRA);
+    expect(erMegaStoneTier(FormChangeItem.GENGARITE)).toBe(ModifierTier.ULTRA);
+    expect(erMegaStoneTier(FormChangeItem.VENUSAURITE)).toBe(ModifierTier.ULTRA);
+    // ER Mega Charizard Z is 635 BST; the old name-based override incorrectly
+    // promoted it to Master despite falling below the 650 boundary.
+    expect(erMegaStoneTier(FormChangeItem.CHARIZARDITE_Z)).toBe(ModifierTier.ULTRA);
   });
 
   it("gen weights are strictly ordered without an extreme gap", () => {
@@ -105,7 +117,7 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
     expect(masterFactor / commonFactor).toBeLessThan(20);
   });
 
-  it("a MASTER stone prices above the flat EVO bucket without the old 12x spike", () => {
+  it("a MASTER stone prices at the Master Ball story-shop band", () => {
     // Directive 2 proof: the biome shop prices a resolved stone by ITS strength
     // tier (getPlayerShopModifierTypeOptionsForWave: FormChangeItemModifierType ->
     // erMegaStoneTier -> erBiomeTierPrice), so a MASTER stone gets the masterball
@@ -116,7 +128,7 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
     expect(ER_SHOP_ITEM_TIER_FACTOR[erMegaStoneTier(FormChangeItem.XERNEASITE)]).toBe(masterFactor);
     // The masterball band is strictly above the flat EVO "great" bucket.
     expect(masterFactor).toBeGreaterThan(evoGreatFactor);
-    expect(masterFactor).toBeLessThanOrEqual(5.5);
+    expect(masterFactor).toBe(12);
   });
 
   // ---------------------------------------------------------------------------
