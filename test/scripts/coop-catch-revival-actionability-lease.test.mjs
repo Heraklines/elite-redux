@@ -14,6 +14,7 @@ const revivalOwner = read("src/phases/revival-blessing-phase.ts");
 const revivalWatcher = read("src/phases/coop-guest-revival-phase.ts");
 const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
 const lease = read("src/data/elite-redux/coop/authority-v2/human-input-lease.ts");
+const catchFullDuo = read("test/tests/elite-redux/coop/coop-duo-catch-full.test.ts");
 
 function assertProofGatedExternalWait(source, label) {
   const proof = source.indexOf("armCoopV2InteractionOwnerWindowAfterControlProof(");
@@ -77,5 +78,31 @@ test("the shared interaction lease is address-exact, control-proven, and recover
     surfaceReady,
     /runWhenCoopRuntimeActive\(runtime, \(\) => notifyCoopV2InteractionSurfaceReady\(runtime\)\)/u,
     "an async public-surface continuation must rebind the exact runtime and scene before attesting control",
+  );
+});
+
+test("the catch-full duo drives only a manager-owned, control-installed public picker", () => {
+  const guestDrive = catchFullDuo.slice(catchFullDuo.indexOf("// ===== (C) GUEST:"));
+  const replace = guestDrive.indexOf("replaceWithCoopAuthoritativePhase(predecessor, guestPicker!)");
+  const currentProof = guestDrive.indexOf("getCurrentPhase()", replace);
+  const installedProof = guestDrive.indexOf("v2ControlLedger.activeControl", currentProof);
+  const exactAddress = guestDrive.indexOf(
+    "installed.operationId === guestPicker!.coopV2ControlOperationId",
+    installedProof,
+  );
+  const click = guestDrive.indexOf("partyPicker.current?.(OWNER_PICK_SLOT)", exactAddress);
+
+  assert.ok(
+    replace >= 0
+      && currentProof > replace
+      && installedProof > currentProof
+      && exactAddress > installedProof
+      && click > exactAddress,
+    "the harness must reproduce manager ownership and exact controlInstalled before the public click",
+  );
+  assert.doesNotMatch(
+    guestDrive.slice(0, click),
+    /\(guestPicker as Phase\)\.start\(\)[\s\S]*await Promise\.resolve\(\)/u,
+    "a detached phase plus one microtask is not evidence that a browser-owned V2 surface is actionable",
   );
 });

@@ -58,7 +58,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -69,6 +69,10 @@ function toCoop(scene: BattleScene): void {
 /** The private PhaseTree seam we read to retrieve the runtime-queued guest picker (find, no mutation). */
 interface PhaseQueueSeam {
   phaseManager: { phaseQueue: { find(name: string): Phase | undefined } };
+}
+
+interface CatchFullPickerPhase extends Phase {
+  readonly coopV2ControlOperationId: string | null;
 }
 
 /** The minimal guest UI seam whose setMode/showText we stub to drive the SELECT picker headlessly. */
@@ -214,18 +218,22 @@ describe.skipIf(!RUN)(
       await withClient(rig.guestCtx, async () => {
         await drainLoopback();
       });
-      const guestPicker = withClientSync(rig.guestCtx, () =>
-        (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.phaseQueue.find("CoopGuestCatchFullPhase"),
+      const guestPicker = withClientSync(
+        rig.guestCtx,
+        () =>
+          (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.phaseQueue.find("CoopGuestCatchFullPhase") as
+            | CatchFullPickerPhase
+            | undefined,
       );
       expect(
         guestPicker,
         "the host's catchFullPrompt queued a CoopGuestCatchFullPhase on the guest (the recipient drives) (#856)",
       ).toBeDefined();
 
-      // ===== (C) GUEST: run the real picker. A browser cannot click PARTY until setMode has resolved and
-      // published the exact actionable surface. Preserve that order here: capture the public callback, let
-      // the phase's setMode continuation attest controlInstalled under the guest context, then click slot 4.
-      // The MESSAGE setMode never resolves so the phase's own end() (shiftPhase) can't fire cross-ctx. =====
+      // ===== (C) GUEST: run the real picker. A browser cannot display a detached phase: the manager first
+      // owns the picker as its exact current boundary, then PARTY opens and the V2 projector attests that
+      // address as controlInstalled. Preserve that production order before clicking slot 4. The MESSAGE
+      // setMode never resolves so the phase's own end() (shiftPhase) can't fire cross-ctx. =====
       await withClient(rig.guestCtx, async () => {
         const ui = rig.guestScene.ui as unknown as StubbableUi;
         const realSetMode = ui.setMode.bind(ui);
@@ -246,8 +254,27 @@ describe.skipIf(!RUN)(
           }
           return realSetMode(...args);
         };
-        (guestPicker as Phase).start();
-        await Promise.resolve();
+        const predecessor = rig.guestScene.phaseManager.getCurrentPhase();
+        expect(predecessor, "the guest has a manager-owned predecessor for the catch-full modal").toBeDefined();
+        expect(
+          rig.guestScene.phaseManager.replaceWithCoopAuthoritativePhase(predecessor, guestPicker!),
+          "the catch-full picker replaces its exact manager-owned predecessor",
+        ).toBe(true);
+        expect(
+          rig.guestScene.phaseManager.getCurrentPhase(),
+          "the catch-full picker is the manager-owned current phase before its UI becomes actionable",
+        ).toBe(guestPicker);
+        guestPicker!.start();
+        await vi.waitUntil(
+          () => {
+            const installed = rig.guestRuntime.v2ControlLedger.activeControl;
+            return (
+              installed?.kind === "SHARED_INTERACTION"
+              && installed.operationId === guestPicker!.coopV2ControlOperationId
+            );
+          },
+          { timeout: 1_000, interval: 1 },
+        );
         ui.setMode = realSetMode;
         expect(partyPicker.current, "the actionable PARTY surface exposed its public picker callback").not.toBeNull();
         partyPicker.current?.(OWNER_PICK_SLOT);

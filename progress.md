@@ -5192,3 +5192,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local policy-safe evidence: all 55 co-op source/orchestration contracts and all 347 node-pure public-browser
   contracts pass, scoped Biome and `git diff --check` are clean, and full TypeScript has zero diagnostics in changed
   files. Co-op engine, gate, and real Chromium qualification remain remote-only; no deployment occurred.
+
+## 2026-07-29 - B9 catch-full gate reproduces the production phase-ownership edge
+
+- Gate `30412975989` did not lose the guest's first `CATCH_FULL:2` proposal. Its first host-endpoint delivery was
+  captured in the guest-side log because that realm was ambient in the one-process rig, and the authority buffered
+  it once. The later host-log lines are legitimate retry deduplication.
+- The fixture directly started a picker that remained detached in `phaseQueue` while `CommandPhase` was still the
+  manager-owned current phase. Authority V2 correctly refused `controlInstalled`, so the host never armed the exact
+  proposal waiter that would consume the buffered decision.
+- The duo scenario now installs the queued picker by atomically replacing its exact current predecessor, proves the
+  manager owns it, waits for the address-matching active V2 control, and only then invokes the public PARTY callback.
+  A node source contract forbids returning to detached-phase plus one-microtask actionability evidence.
+- Local policy-safe evidence: the focused node contract is 3/3 green, scoped Biome and `git diff --check` are clean,
+  and full TypeScript reports no diagnostics in the changed files. The engine regression remains remote-only.
