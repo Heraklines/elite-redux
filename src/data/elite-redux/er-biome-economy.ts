@@ -240,10 +240,10 @@ export interface ErBiomeShopStockEntry {
 export const ER_SHOP_ITEM_TIER_FACTOR: Record<ModifierTier, number> = {
   [ModifierTier.COMMON]: 0.35,
   [ModifierTier.GREAT]: 1.0,
-  [ModifierTier.ULTRA]: 2.6,
-  [ModifierTier.ROGUE]: 6,
-  [ModifierTier.MASTER]: 12,
-  [ModifierTier.LUXURY]: 9,
+  [ModifierTier.ULTRA]: 2.2,
+  [ModifierTier.ROGUE]: 3.5,
+  [ModifierTier.MASTER]: 5.5,
+  [ModifierTier.LUXURY]: 5,
 };
 
 /** How many of an item the market stocks, by rarity (rarer = scarcer). */

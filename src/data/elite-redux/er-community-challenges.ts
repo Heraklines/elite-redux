@@ -127,6 +127,8 @@ export interface CommunityChallengeStats {
 /** A challenge plus its derived display fields, as the browser binds it. */
 export interface CommunityChallengeEntry {
   readonly config: CommunityChallengeConfig;
+  /** Server/local publication state. Drafts are visible only to their author. */
+  readonly status?: "draft" | "active";
   readonly stats: CommunityChallengeStats;
   /** The human RULES list shown in the detail panel (derived from baseChallenges). */
   readonly rules: CommunityChallengeRule[];
@@ -598,10 +600,10 @@ export async function fetchCommunityChallenge(id: string): Promise<CommunityChal
 }
 
 /**
- * Create a DRAFT challenge from a config. Returns its server id, or null when
+ * Create a DRAFT challenge from a config. Returns the server-canonical config, or null when
  * offline / guest / invalid. Validates client-side first (the worker re-validates).
  */
-export async function createCommunityChallenge(config: CommunityChallengeConfig): Promise<string | null> {
+export async function createCommunityChallenge(config: CommunityChallengeConfig): Promise<CommunityChallengeConfig | null> {
   const base = serverBase();
   const token = authToken();
   if (!base || !token || typeof fetch !== "function") {
@@ -617,21 +619,20 @@ export async function createCommunityChallenge(config: CommunityChallengeConfig)
       body: JSON.stringify(config),
     });
     if (!res.ok) {
-      // A null here makes the create handler mint a LOCAL draft id; the eventual founder
-      // clear then 404s server-side (unknown id) and can never publish. Log loudly so the
-      // bug-report console buffer shows exactly why a draft went local-only.
       const body = await res.text().catch(() => "");
-      console.error(`[community] challenge create REJECTED (${res.status}): ${body.slice(0, 200)} - draft saved LOCALLY only`);
+      console.error(`[community] challenge create rejected (${res.status}): ${body.slice(0, 200)}`);
       return null;
     }
-    const data = (await res.json()) as { id?: string };
+    const data = (await res.json()) as { id?: string; config?: CommunityChallengeConfig };
     if (typeof data?.id !== "string") {
-      console.error("[community] challenge create returned no id - draft saved LOCALLY only");
+      console.error("[community] challenge create returned no id");
       return null;
     }
-    return data.id;
+    // New workers return the server-owned author/id/timestamp. Keep compatibility
+    // with an older staging worker during rolling deploys.
+    return data.config && data.config.id === data.id ? data.config : { ...config, id: data.id };
   } catch (e) {
-    console.error("[community] challenge create failed (network) - draft saved LOCALLY only", e);
+    console.error("[community] challenge create failed (network)", e);
     return null;
   }
 }
@@ -1016,6 +1017,7 @@ function deriveGenericRules(config: CommunityChallengeConfig): CommunityChalleng
 export function buildMyChallengesFeed(): CommunityChallengeFeed {
   const featured: CommunityChallengeEntry[] = listLocalDrafts().map(d => ({
     config: d.config,
+    status: d.status === "draft" ? "draft" : "active",
     stats: {
       attempts: d.attempts,
       cleared: d.cleared,

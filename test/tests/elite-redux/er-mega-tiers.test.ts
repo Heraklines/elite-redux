@@ -9,10 +9,9 @@
 //   - box legendaries / primal orbs / "-Z" ultra megas resolve MASTER;
 //   - a plain low-BST mega resolves well below MASTER;
 //   - the per-tier gen weights are strictly ordered (rarer = lower);
-//   - the weighted pick biases HARD toward the common tier (a MASTER stone
-//     almost never wins against a lower-tier one), yet keeps weight >= 1 so it
-//     stays reachable;
-//   - the biome-shop price factor for a MASTER stone dwarfs a COMMON one.
+//   - the weighted pick moderately favors the common tier, yet keeps strong
+//     stones realistically reachable;
+//   - the biome-shop price ladder remains ordered without extreme multipliers.
 //
 // Gated ER_SCENARIO=1 (needs the ER form-change registry + injected form stats).
 // Run: ER_SCENARIO=1 npx vitest run test/tests/elite-redux/er-mega-tiers.test.ts
@@ -70,17 +69,18 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
     expect(erMegaStoneTier(FormChangeItem.VENUSAURITE)).toBeLessThan(ModifierTier.MASTER);
   });
 
-  it("gen weights are strictly ordered (rarer tier weighs far less)", () => {
+  it("gen weights are strictly ordered without an extreme gap", () => {
     expect(TIER_GEN_WEIGHT[ModifierTier.COMMON]).toBeGreaterThan(TIER_GEN_WEIGHT[ModifierTier.GREAT]);
     expect(TIER_GEN_WEIGHT[ModifierTier.GREAT]).toBeGreaterThan(TIER_GEN_WEIGHT[ModifierTier.ULTRA]);
     expect(TIER_GEN_WEIGHT[ModifierTier.ULTRA]).toBeGreaterThan(TIER_GEN_WEIGHT[ModifierTier.ROGUE]);
     expect(TIER_GEN_WEIGHT[ModifierTier.ROGUE]).toBeGreaterThan(TIER_GEN_WEIGHT[ModifierTier.MASTER]);
     // Never zero: every stone stays reachable.
     expect(erMegaStoneGenWeight(FormChangeItem.XERNEASITE)).toBeGreaterThanOrEqual(1);
+    expect(TIER_GEN_WEIGHT[ModifierTier.COMMON] / TIER_GEN_WEIGHT[ModifierTier.MASTER]).toBeLessThanOrEqual(3);
   });
 
-  it("the weighted pick biases hard toward the lower tier", () => {
-    // MASTER (weight 1) vs ROGUE (weight 4): the ROGUE stone should win ~4x more.
+  it("the weighted pick moderately favors the lower tier", () => {
+    // MASTER (weight 4) vs ROGUE (weight 6): lower tier is favored, not dominant.
     const pool = [FormChangeItem.XERNEASITE, FormChangeItem.GENGARITE];
     let xerneas = 0;
     let gengar = 0;
@@ -91,7 +91,7 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
         gengar++;
       }
     }
-    expect(gengar).toBeGreaterThan(xerneas * 2); // decisively favored, well clear of 1:1
+    expect(gengar).toBeGreaterThan(xerneas * 1.2);
   });
 
   it("a single eligible stone is always returned (mono-mega party stays reachable)", () => {
@@ -102,9 +102,10 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
     const masterFactor = ER_SHOP_ITEM_TIER_FACTOR[erMegaStoneTier(FormChangeItem.XERNEASITE)];
     const commonFactor = ER_SHOP_ITEM_TIER_FACTOR[erMegaStoneTier(FormChangeItem.SNORLAXITE)];
     expect(masterFactor).toBeGreaterThan(commonFactor);
+    expect(masterFactor / commonFactor).toBeLessThan(20);
   });
 
-  it("a MASTER stone prices at the masterball-band factor, dwarfing the flat EVO bucket", () => {
+  it("a MASTER stone prices above the flat EVO bucket without the old 12x spike", () => {
     // Directive 2 proof: the biome shop prices a resolved stone by ITS strength
     // tier (getPlayerShopModifierTypeOptionsForWave: FormChangeItemModifierType ->
     // erMegaStoneTier -> erBiomeTierPrice), so a MASTER stone gets the masterball
@@ -115,6 +116,7 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
     expect(ER_SHOP_ITEM_TIER_FACTOR[erMegaStoneTier(FormChangeItem.XERNEASITE)]).toBe(masterFactor);
     // The masterball band is strictly above the flat EVO "great" bucket.
     expect(masterFactor).toBeGreaterThan(evoGreatFactor);
+    expect(masterFactor).toBeLessThanOrEqual(5.5);
   });
 
   // ---------------------------------------------------------------------------
@@ -124,20 +126,19 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
   // orthogonal knob that suppresses it absolutely.
   // ---------------------------------------------------------------------------
 
-  it("appearance-rate ladder is strictly ordered; MASTER ~2%, COMMON near-certain", () => {
+  it("appearance-rate ladder is strictly ordered; MASTER remains realistically obtainable", () => {
     expect(TIER_APPEARANCE_RATE[ModifierTier.COMMON]).toBeGreaterThan(TIER_APPEARANCE_RATE[ModifierTier.GREAT]);
     expect(TIER_APPEARANCE_RATE[ModifierTier.GREAT]).toBeGreaterThan(TIER_APPEARANCE_RATE[ModifierTier.ULTRA]);
     expect(TIER_APPEARANCE_RATE[ModifierTier.ULTRA]).toBeGreaterThan(TIER_APPEARANCE_RATE[ModifierTier.ROGUE]);
     expect(TIER_APPEARANCE_RATE[ModifierTier.ROGUE]).toBeGreaterThan(TIER_APPEARANCE_RATE[ModifierTier.MASTER]);
-    // MASTER in the 1-3% band the maintainer specified; every rate is > 0 (reachable).
-    expect(TIER_APPEARANCE_RATE[ModifierTier.MASTER]).toBeGreaterThan(0);
-    expect(TIER_APPEARANCE_RATE[ModifierTier.MASTER]).toBeLessThanOrEqual(0.03);
+    expect(TIER_APPEARANCE_RATE[ModifierTier.MASTER]).toBeGreaterThanOrEqual(0.35);
+    expect(TIER_APPEARANCE_RATE[ModifierTier.MASTER]).toBeLessThanOrEqual(0.5);
     expect(TIER_APPEARANCE_RATE[ModifierTier.COMMON]).toBeGreaterThanOrEqual(0.95);
     // A MASTER stone reports the MASTER rate through the resolver.
     expect(erMegaStoneAppearanceRate(FormChangeItem.XERNEASITE)).toBe(TIER_APPEARANCE_RATE[ModifierTier.MASTER]);
   });
 
-  it("a sole MASTER stone materializes at ~its low rate (<=3%), NOT ~100%; red-proof vs the pre-gate pick", () => {
+  it("a sole MASTER stone materializes at its moderate rate instead of the old ~2%", () => {
     // A party whose ONLY mega mon is a MASTER-tier one: the competitive pick is a
     // pool of ONE, so it ALWAYS returns the master stone (the pre-gate defect).
     const soleMasterPool = [FormChangeItem.XERNEASITE];
@@ -154,10 +155,8 @@ describe.skipIf(!RUN)("ER mega stone strength tiers (#mega-rarity)", () => {
     }
     // Red-proof: the competitive pick alone yields the master stone 100% of the time.
     expect(preGatePicks).toBe(N);
-    // Green: the absolute gate makes it materialize only ~2% (well under 3%)...
-    expect(materialized / N).toBeLessThanOrEqual(0.03);
-    // ...but non-zero, so a mono-master party can still eventually obtain it.
-    expect(materialized).toBeGreaterThan(0);
+    expect(materialized / N).toBeGreaterThanOrEqual(0.35);
+    expect(materialized / N).toBeLessThanOrEqual(0.45);
   });
 
   it("a COMMON-tier stone materializes on nearly every eligible slot", () => {

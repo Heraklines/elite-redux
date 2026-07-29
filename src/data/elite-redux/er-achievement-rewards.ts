@@ -985,12 +985,18 @@ function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
     }
     case "shiny": {
       const tier = resolveShinyTier(spec.tier);
-      const species = resolveSpecies(spec.species, spec.minCost);
+      const species = resolveSpecies(spec.species, spec.minCost, id => !ownsShinyTier(id, tier));
+      if (species == null) {
+        return null;
+      }
       grantShiny(species, tier);
       return { text: describeRewardSpec(spec, { species }) ?? "", iconSpecies: species, shiny: true, variant: tier - 1 };
     }
     case "blackShiny": {
-      const species = resolveSpecies(spec.species);
+      const species = resolveSpecies(spec.species, undefined, id => !ownsBlackShiny(id));
+      if (species == null) {
+        return null;
+      }
       grantBlackShiny(species);
       // variant 2 = the epic/black sprite frame (off-by-one vs the VARIANT_3 bit).
       return { text: describeRewardSpec(spec, { species }) ?? "", iconSpecies: species, shiny: true, variant: 2 };
@@ -1075,7 +1081,7 @@ function grantVouchers(voucherType: VoucherType, count: number): void {
 }
 
 function grantShiny(species: SpeciesId, tier: 1 | 2 | 3): void {
-  const variantBit = tier === 3 ? DexAttr.VARIANT_3 : tier === 2 ? DexAttr.VARIANT_2 : DexAttr.DEFAULT_VARIANT;
+  const variantBit = shinyVariantBit(tier);
   orCaughtAttr(species, DexAttr.SHINY | variantBit | DexAttr.MALE | DexAttr.DEFAULT_FORM);
 }
 
@@ -1122,6 +1128,22 @@ function rootSpeciesId(species: SpeciesId): SpeciesId {
   return getPokemonSpecies(species).getRootSpeciesId();
 }
 
+function shinyVariantBit(tier: 1 | 2 | 3): bigint {
+  return tier === 3 ? DexAttr.VARIANT_3 : tier === 2 ? DexAttr.VARIANT_2 : DexAttr.DEFAULT_VARIANT;
+}
+
+/** True only when this exact normal shiny tier is already unlocked for the species line. */
+function ownsShinyTier(species: SpeciesId, tier: 1 | 2 | 3): boolean {
+  const caught = globalScene.gameData.dexData[rootSpeciesId(species)]?.caughtAttr ?? 0n;
+  const required = DexAttr.SHINY | shinyVariantBit(tier);
+  return (caught & required) === required;
+}
+
+/** Black shiny ownership is separate from the normal tier-3 dex bits. */
+function ownsBlackShiny(species: SpeciesId): boolean {
+  return globalScene.gameData.starterData[rootSpeciesId(species)]?.erBlackShiny === true;
+}
+
 function speciesName(species: SpeciesId): string {
   return getPokemonSpecies(species).name;
 }
@@ -1137,12 +1159,17 @@ function resolveShinyTier(tier: 1 | 2 | 3 | "random"): 1 | 2 | 3 {
 }
 
 /**
- * Resolve a reward species: a fixed id passes through; "random" rolls a starter. When
+ * Resolve a reward species: a fixed id passes through when eligible; otherwise it
+ * rerolls from the starter pool. When
  * `minCost` is given, a "random" roll is restricted to starters whose base cost is at
- * least that value (falls back to the full pool if the filter is somehow empty).
+ * least that value. Returns null only when every eligible starter is already owned.
  */
-function resolveSpecies(species: SpeciesId | "random", minCost?: number): SpeciesId {
-  if (species !== "random") {
+function resolveSpecies(
+  species: SpeciesId | "random",
+  minCost?: number,
+  isEligible: (id: SpeciesId) => boolean = () => true,
+): SpeciesId | null {
+  if (species !== "random" && isEligible(species)) {
     return species;
   }
   let pool = Object.keys(speciesStarterCosts).map(Number) as SpeciesId[];
@@ -1151,6 +1178,10 @@ function resolveSpecies(species: SpeciesId | "random", minCost?: number): Specie
     if (filtered.length > 0) {
       pool = filtered;
     }
+  }
+  pool = pool.filter(isEligible);
+  if (pool.length === 0) {
+    return null;
   }
   // Use an UNSEEDED pick, NOT randSeedItem: an achievement unlocks with the battle RNG at a
   // fixed / reset state that is identical across players, so the seeded pick handed EVERY player
