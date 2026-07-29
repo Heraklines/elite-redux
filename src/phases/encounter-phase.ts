@@ -882,9 +882,6 @@ export class EncounterPhase extends BattlePhase {
     if (battle.battleType !== BattleType.MYSTERY_ENCOUNTER && enemies.length === 0) {
       throw new Error(`Authoritative enemy party was empty at wave ${battle.waveIndex}`);
     }
-    if (battle.battleType === BattleType.MYSTERY_ENCOUNTER && enemies.length > 0) {
-      throw new Error(`Mystery encounter carried an unexpected ordinary enemy party at wave ${battle.waveIndex}`);
-    }
     const levels = battle.enemyLevels ?? [];
     // Trainer enemies belong in TrainerSlot.TRAINER; wild enemies in NONE.
     const trainerSlot = battle.battleType === BattleType.TRAINER ? TrainerSlot.TRAINER : TrainerSlot.NONE;
@@ -938,11 +935,16 @@ export class EncounterPhase extends BattlePhase {
       }
       rebuilt[entry.fieldIndex] = built;
     }
-    if (battle.battleType === BattleType.MYSTERY_ENCOUNTER) {
-      if (rebuilt.length > 0) {
-        throw new Error(`Mystery encounter rebuilt an unexpected enemy party at wave ${battle.waveIndex}`);
-      }
-    } else if (rebuilt.length !== enemies.length || rebuilt[0] == null || rebuilt.some(enemy => enemy == null)) {
+    // Mystery selectors are allowed to carry encounter-owned Pokemon (for example Dancing Lessons).
+    // They are authoritative presentation/data actors even though the selector never places them on the
+    // ordinary battle field. Empty Mystery parties remain valid; every non-empty carrier must satisfy the
+    // same dense identity reconstruction as a battle party. Ordinary WILD/TRAINER battles additionally
+    // require slot zero above/below so an empty battle can never be accepted.
+    if (
+      rebuilt.length !== enemies.length
+      || rebuilt.some(enemy => enemy == null)
+      || (battle.battleType !== BattleType.MYSTERY_ENCOUNTER && rebuilt[0] == null)
+    ) {
       throw new Error(`Authoritative enemy party was incomplete at wave ${battle.waveIndex}`);
     }
     battle.enemyParty = rebuilt;

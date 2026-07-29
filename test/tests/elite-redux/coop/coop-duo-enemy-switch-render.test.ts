@@ -184,6 +184,13 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     expect(rig.guestScene.field.getIndex(outgoing), "the outgoing actor is structurally absent from the field").toBe(
       -1,
     );
+    expect(outgoing.visible, "a detached outgoing Pokemon cannot remain renderable as a top-level container").toBe(
+      false,
+    );
+    expect(outgoing.getSprite()?.visible, "the detached actor's shadow sprite is hidden before field removal").toBe(
+      false,
+    );
+    expect(outgoing.getBattleInfo()?.visible, "the detached actor's info surface is hidden with its body").toBe(false);
     expect(
       rig.guestScene.field.getIndex(incoming),
       "the incoming actor is structurally present on the field",

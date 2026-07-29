@@ -5344,3 +5344,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Biome and `git diff --check` are clean, and raw TypeScript reports zero changed-file diagnostics. Remote engine
   and animations-on requalification remain required; staging, production, Showdown, and tournament were not
   touched.
+
+## 2026-07-29 - Mystery selectors may carry authoritative encounter-owned Pokemon
+
+- Exact Mystery campaign `30421151514` completed `ER_GENTLE_GIANT`, reached wave 3
+  `DANCING_LESSONS`, and received the host's exact one-Pokemon `enemyPartySync`. The guest then rejected that
+  valid carrier solely because an obsolete encounter-adoption invariant required every Mystery party to be empty;
+  after two retries it terminalized an otherwise healthy session.
+- Mystery selectors such as Dancing Lessons legitimately create a Pokemon for their presentation and later option
+  material. Authoritative adoption now accepts both an empty selector carrier and a dense non-empty one. Ordinary
+  WILD/TRAINER carriers still require slot zero and can never be accepted empty; every carrier still rejects holes,
+  duplicate/invalid indexes, missing species, or incomplete reconstruction.
+- The production-path engine regression sends a real Dancing Lessons carrier through the loopback transport,
+  builds the guest's next Mystery battle, invokes the same encounter adoption boundary, and proves the exact host
+  id/species/level survives. A source contract also forbids reinstating either obsolete empty-only rejection.
+  Local policy-safe evidence is green: Authority V2 source contracts 107/107, scoped Biome has no errors,
+  `git diff --check` passes, and TypeScript reports zero changed-file diagnostics. Engine and exact two-browser
+  Mystery requalification remain remote-only; no deployment or non-co-op mode changed.

@@ -25,12 +25,13 @@ import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-ru
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
 import type { Trainer } from "#field/trainer";
-import { applyCoopEncounterAuthority } from "#phases/encounter-phase";
+import { applyCoopEncounterAuthority, EncounterPhase } from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -182,4 +183,57 @@ describe.skipIf(!RUN)("co-op GUEST newBattle adopts the host's battleType verdic
     expect(Object.values(battle.turnCommands).every(command => command == null)).toBe(true);
     expect(Object.values(battle.preTurnCommands).every(command => command == null)).toBe(true);
   });
+
+  it("adopts a dense encounter-owned Pokemon carrier for Dancing Lessons", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.DRAGONITE, SpeciesId.TYRANITAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const nextWave = rig.guestScene.currentBattle.waveIndex + 1;
+    const authoritativeId = 0x34ab12cd;
+
+    rig.hostRuntime.battleStream.sendEnemyParty(
+      nextWave,
+      [
+        {
+          fieldIndex: 0,
+          data: {
+            id: authoritativeId,
+            speciesId: SpeciesId.ORICORIO,
+            level: 5,
+          },
+        },
+      ],
+      MysteryEncounterType.DANCING_LESSONS,
+      BattleType.MYSTERY_ENCOUNTER,
+      undefined,
+      {
+        battleType: BattleType.MYSTERY_ENCOUNTER,
+        mysteryEncounterType: MysteryEncounterType.DANCING_LESSONS,
+        formatId: "single",
+        enemyLevels: [5],
+      },
+    );
+
+    await withClient(rig.guestCtx, async () => {
+      for (let i = 0; i < 4; i++) {
+        await rig.guestCtx.pumpInbound?.();
+        await Promise.resolve();
+      }
+      const battle = rig.guestScene.newBattle();
+      expect(battle.battleType).toBe(BattleType.MYSTERY_ENCOUNTER);
+      expect(battle.mysteryEncounterType).toBe(MysteryEncounterType.DANCING_LESSONS);
+
+      const phase = new EncounterPhase();
+      const adopter = phase as unknown as {
+        adoptCoopHostEnemyParty(isCurrent?: () => boolean): Promise<void>;
+      };
+      await adopter.adoptCoopHostEnemyParty(() => rig.guestScene.currentBattle === battle);
+
+      expect(battle.enemyParty).toHaveLength(1);
+      expect(battle.enemyParty[0]?.id).toBe(authoritativeId);
+      expect(battle.enemyParty[0]?.species.speciesId).toBe(SpeciesId.ORICORIO);
+      expect(battle.enemyParty[0]?.level).toBe(5);
+    });
+    logs.flush();
+  }, 240_000);
 });

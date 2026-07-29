@@ -808,6 +808,16 @@ test("a legacy enemy manifest cannot overwrite a newer V2 wave image", () => {
     /enemyPokemon\.fieldSetup\(!this\.coopV2PreservedEnemyFields\.has\(e\)\)/u,
     "encounter presentation cannot reset summonData on an exact enemy object preserved from newer V2 state",
   );
+  assert.doesNotMatch(
+    adoption,
+    /Mystery encounter carried an unexpected ordinary enemy party|Mystery encounter rebuilt an unexpected enemy party/u,
+    "Mystery selectors may legitimately carry encounter-owned Pokemon such as Dancing Lessons",
+  );
+  assert.match(
+    adoption,
+    /rebuilt\.length !== enemies\.length[\s\S]*?rebuilt\.some\(enemy => enemy == null\)[\s\S]*?battle\.battleType !== BattleType\.MYSTERY_ENCOUNTER && rebuilt\[0\] == null/u,
+    "all non-empty carriers remain dense while only ordinary battles require a non-empty slot zero",
+  );
 });
 
 test("post-battle continuation identity follows the active V2 wave into completed evidence", () => {
