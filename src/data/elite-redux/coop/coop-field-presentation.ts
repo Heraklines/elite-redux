@@ -293,6 +293,13 @@ export function projectCoopSwitchPresentationStructure(
   if (!alreadyProjected) {
     [party[request.fieldSlot], party[request.partySlot]] = [incoming, outgoing!];
     outgoing!.switchOutStatus = true;
+    // Phaser's exclusive Container.remove(child, false) promotes the removed child back to the
+    // scene display list. A still-visible Pokemon then renders as a top-level container while its
+    // shadow sprite's pipeline expects Pokemon.parentContainer to be the field. That leaves `field`
+    // null in SpritePipeline.batchQuad and crashes WebGL on the first rendered voluntary switch.
+    // Settle the actor before detaching it; the immutable party permutation still owns mechanics,
+    // and a future authoritative switch will explicitly project/reveal this Pokemon again.
+    settleCoopSwitchActorPresentation(scene, outgoing!, "hidden");
     if (scene.field.getIndex(outgoing!) >= 0) {
       scene.field.remove(outgoing!, false);
     }

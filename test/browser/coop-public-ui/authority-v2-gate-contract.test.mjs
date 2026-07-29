@@ -58,6 +58,7 @@ const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
 const learnMovePhase = readFileSync(new URL("src/phases/learn-move-phase.ts", root), "utf8");
 const encounterPhase = readFileSync(new URL("src/phases/encounter-phase.ts", root), "utf8");
+const fieldPresentation = readFileSync(new URL("src/data/elite-redux/coop/coop-field-presentation.ts", root), "utf8");
 const battleScene = readFileSync(new URL("src/battle-scene.ts", root), "utf8");
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
 const trainerVictoryPhase = readFileSync(new URL("src/phases/trainer-victory-phase.ts", root), "utf8");
@@ -3812,6 +3813,11 @@ test("the one-process duo pins Phaser tween callbacks to the browser that schedu
     encounterPhase,
     /doEncounterCommon\([\s\S]*remainsCurrent: \(\) => boolean = \(\) => globalScene\.phaseManager\.getCurrentPhase\(\) === this/u,
     "an obsolete encounter dialogue chain cannot queue a second Mystery classifier after V2 enters its battle",
+  );
+  assert.match(
+    fieldPresentation,
+    /settleCoopSwitchActorPresentation\(scene, outgoing!, "hidden"\);\s*if \(scene\.field\.getIndex\(outgoing!\) >= 0\) \{\s*scene\.field\.remove\(outgoing!, false\)/u,
+    "a switched-out actor must become non-renderable before Phaser promotes it out of the field container",
   );
   assert.match(
     encounterPhase,

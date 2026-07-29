@@ -5328,3 +5328,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   green, scoped Biome and `git diff --check` are clean, and raw TypeScript retains its 571-line baseline with zero
   diagnostics in the changed production file. Remote engine and campaign qualification remain required; staging,
   production, Showdown, and tournament were not touched.
+
+## 2026-07-29 - Voluntary switch replay no longer detaches a visible shadow actor
+
+- The animations-on surface lane reached wave 2 turn 2 and exercised a real guest voluntary switch. Its WebGL
+  renderer then threw `Cannot read properties of null (reading 'scale')` inside `SpritePipeline.batchQuad`, froze
+  on `CoopSwitchReplayPhase`, and left the incoming Pokeball visible. The trace and screenshot show this was a
+  production presentation crash, not a campaign timeout or Authority V2 state mismatch.
+- The structural switch projector removed the outgoing Pokemon from Phaser's exclusive field container while it
+  was still visible. Phaser promoted that actor to the scene display list, but its shadow sprite requires the
+  Pokemon's parent container to be the field; the promoted actor therefore rendered with a null field. The
+  projector now settles the outgoing actor hidden before removal. Future authoritative projection remains solely
+  responsible for revealing it again.
+- A source-level contract pins hide-before-detach ordering. The Authority V2 contract is 107/107 green, scoped
+  Biome and `git diff --check` are clean, and raw TypeScript reports zero changed-file diagnostics. Remote engine
+  and animations-on requalification remain required; staging, production, Showdown, and tournament were not
+  touched.
