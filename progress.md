@@ -5517,3 +5517,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   and `git diff --check` clean. No local co-op engine/browser execution was used. Next: commit/push, then dispatch exact
   Mystery and depth browser campaigns remotely and inspect both screenshots plus semantic traces before changing
   further production behavior.
+
+## 2026-07-29 - Late two-seat target picker remains driveable after fallback
+
+- Re-triaged the exact surface artifact from campaign `30428007443`. At wave 2 turn 2 the guest opened and publicly
+  submitted its `command:target` surface, then entered `CoopReplayTurnPhase`. The host's target picker opened 30s
+  later only after the bounded command fallback reached it; its observer proved `SelectTargetPhase`, active
+  `TARGET_SELECT`, address `1828154092343565:2:2`, and the same mechanical digest as the guest. No desync occurred.
+- The campaign's primary outcome wait drove targets, but both longer causal waits dropped that callback. Thus fallback
+  could open a target picker and the harness would leave it untouched for the rest of the run. Both waits now retain
+  the same exact-address, consumed-instance-protected driver. A failure-first source contract requires all three
+  post-command waits to keep that public UI-to-relay chain armed.

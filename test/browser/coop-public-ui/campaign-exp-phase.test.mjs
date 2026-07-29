@@ -4,6 +4,8 @@
  */
 
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import test from "node:test";
 import {
   allClientsAtCurrentCommandFrontier,
@@ -27,6 +29,8 @@ import {
 } from "./campaign.mjs";
 import { isActionableSemanticObservation, planNavigationStep } from "./campaign-nav.mjs";
 import { DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
+
+const root = resolve(import.meta.dirname, "../../..");
 
 class FakeEvidence {
   constructor(texts = []) {
@@ -1624,6 +1628,19 @@ test("the bounded outcome wait drives a late addressed target before arming blin
 
   assert.deepEqual(outcome, { kind: "turn-progress" });
   assert.equal(targetDrives, 1, "the semantic target is consumed during the primary wait, not by fallback");
+});
+
+test("every causal post-command wait keeps the exact-address target driver armed", async () => {
+  const source = await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8");
+  const start = source.indexOf("async function driveBattleWave(");
+  const end = source.indexOf("\n/**\n * The client that reports ITSELF", start);
+  assert.ok(start >= 0 && end > start, "driveBattleWave source boundary must remain inspectable");
+  const battleDriver = source.slice(start, end);
+  assert.equal(
+    battleDriver.match(/\n\s*driveTargetSelection,/gu)?.length ?? 0,
+    3,
+    "primary, progressed-turn, and post-fallback waits must all drive a late public target picker",
+  );
 });
 
 test("fallback stops retrying when an earlier key visibly enters the turn", async () => {

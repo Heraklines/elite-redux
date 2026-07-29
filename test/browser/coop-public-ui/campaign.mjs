@@ -1500,6 +1500,10 @@ async function driveBattleWave(rig, policy, stats) {
       });
       outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
         advanceBattlePrompt,
+        // A partner target picker can become actionable only after the other browser has already
+        // entered its turn path on a CPU-dilated runner. Keep the same exact-address semantic driver
+        // armed throughout the causal wait; the consumed-instance ledger prevents duplicate input.
+        driveTargetSelection,
         extendForAnimationProgress: true,
         animationHardCeilingMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : null,
         animationProgressAllowanceMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS : null,
@@ -1532,6 +1536,9 @@ async function driveBattleWave(rig, policy, stats) {
       }
       outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
         advanceBattlePrompt,
+        // Blind fallback can open the real target picker rather than submit the move. Continue the
+        // address-bound UI-to-relay chain during this second wait instead of parking a real human UI.
+        driveTargetSelection,
         extendForAnimationProgress: true,
         animationHardCeilingMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : null,
         animationProgressAllowanceMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_PROGRESS_ALLOWANCE_MS : null,
