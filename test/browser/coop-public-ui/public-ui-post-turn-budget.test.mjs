@@ -1409,6 +1409,9 @@ test("faint tail drives the won-wave reward-to-wave-2 chain when the faint co-wi
     async assertSharedSurface(surface, _floor, proofName, options) {
       calls.push(["assertSharedSurface", surface, proofName, options.expectedWave]);
     },
+    assertWaveProgressionLedger(wave, proofName, options) {
+      calls.push(["assertWaveProgressionLedger", wave, proofName, options.requireExp]);
+    },
     async leaveRewardsAndReachWave2() {
       calls.push(["leaveRewardsAndReachWave2"]);
     },
@@ -1423,6 +1426,7 @@ test("faint tail drives the won-wave reward-to-wave-2 chain when the faint co-wi
   assert.equal(result.route, "won");
   assert.deepEqual(calls, [
     ["assertSharedSurface", "reward", "wave-1-won-faint-reward", 1],
+    ["assertWaveProgressionLedger", 1, "wave-1-won-faint-progression", true],
     ["leaveRewardsAndReachWave2"],
   ]);
 });

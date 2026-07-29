@@ -10,6 +10,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { observeCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-wave-progression-observer";
 import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { getTypeRgb } from "#data/type";
 import { ExpGainsSpeed } from "#enums/exp-gains-speed";
@@ -29,6 +30,13 @@ class CoopEvolutionPresentationCancelled extends Error {
   constructor() {
     super("retained evolution presentation cancelled");
     this.name = "CoopEvolutionPresentationCancelled";
+  }
+}
+
+class CoopWaveProgressionPresentationCancelled extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = "CoopWaveProgressionPresentationCancelled";
   }
 }
 
@@ -328,6 +336,7 @@ export class CoopWaveProgressionReplayPhase extends Phase {
   private readonly wave: number;
   private readonly events: readonly CoopWaveProgressionPresentationV2[];
   private readonly onComplete: () => void;
+  private readonly renderControllers = new Set<AbortController>();
   private completed = false;
 
   constructor(wave: number, events: readonly CoopWaveProgressionPresentationV2[], onComplete: () => void) {
@@ -347,10 +356,36 @@ export class CoopWaveProgressionReplayPhase extends Phase {
 
   private async renderAll(): Promise<void> {
     coopLog("progression", `GUEST retained presentation start wave=${this.wave} events=${this.events.length}`);
-    for (const event of this.events) {
+    for (let seq = 0; seq < this.events.length; seq++) {
+      if (this.completed) {
+        return;
+      }
+      const event = this.events[seq];
       try {
-        await this.withWatchdog(event, () => this.render(event));
+        await this.withWatchdog(event, signal => this.render(event, signal));
+        if (this.completed) {
+          return;
+        }
+        observeCoopWaveProgressionPresentation({
+          stage: "renderer-completed",
+          wave: this.wave,
+          seq,
+          event,
+        });
       } catch (error) {
+        // Authoritative replacement retired this exact phase. Its cancellation is not a damaged cue, and
+        // no later event from the discarded transaction may start against the newly installed control.
+        if (this.isRetired()) {
+          return;
+        }
+        const reason = error instanceof Error ? error.message : String(error);
+        observeCoopWaveProgressionPresentation({
+          stage: "renderer-failed",
+          wave: this.wave,
+          seq,
+          event,
+          reason,
+        });
         coopWarn("progression", `GUEST retained ${event.k} presentation failed; skipping cue`, error);
       }
     }
@@ -359,69 +394,79 @@ export class CoopWaveProgressionReplayPhase extends Phase {
 
   private async withWatchdog(
     event: CoopWaveProgressionPresentationV2,
-    render: (signal?: AbortSignal) => Promise<void>,
+    render: (signal: AbortSignal) => Promise<void>,
   ): Promise<void> {
+    const controller = new AbortController();
+    this.renderControllers.add(controller);
     let timeout: ReturnType<typeof setTimeout> | null = null;
+    let watchdogFired = false;
     try {
+      const watchdogMs = event.k === "evolution" ? EVOLUTION_STEP_WATCHDOG_MS : PROGRESSION_STEP_WATCHDOG_MS;
+      timeout = setTimeout(() => {
+        watchdogFired = true;
+        coopWarn(
+          "progression",
+          `GUEST retained ${event.k} presentation watchdog wave=${this.wave} slot=${event.partySlot}`,
+        );
+        controller.abort();
+        if (event.k !== "evolution") {
+          globalScene.ui.setMode(UiMode.MESSAGE).catch(() => undefined);
+          globalScene.partyExpBar.hide().catch(() => undefined);
+        }
+      }, watchdogMs);
       if (event.k === "evolution") {
-        const controller = new AbortController();
-        let watchdogFired = false;
-        timeout = setTimeout(() => {
-          watchdogFired = true;
-          coopWarn(
-            "progression",
-            `GUEST retained evolution presentation watchdog wave=${this.wave} slot=${event.partySlot}`,
-          );
-          controller.abort();
-        }, EVOLUTION_STEP_WATCHDOG_MS);
-        try {
-          // Unlike the old Promise.race guard, abort tears down every owned callback and waits for the
-          // presentation's finally block before DATA may apply. No stale evolution code can outlive release.
-          await render(controller.signal);
-        } catch (error) {
-          if (!watchdogFired || !(error instanceof CoopEvolutionPresentationCancelled)) {
-            throw error;
-          }
+        // Evolution owns cancellable timers, tweens, the recursive sprite cycle, mode restoration, and its
+        // temporary Pokemon. Abort and JOIN that cleanup before WAVE_ADVANCE DATA may apply; unlike the
+        // message/EXP APIs below, this renderer has a complete lifecycle contract and must not be detached.
+        await render(controller.signal);
+        if (watchdogFired || controller.signal.aborted) {
+          throw new CoopWaveProgressionPresentationCancelled("evolution-presentation-watchdog-expired");
         }
         return;
       }
-      await Promise.race([
-        render(),
-        new Promise<void>(resolve => {
-          timeout = setTimeout(() => {
-            coopWarn(
-              "progression",
-              `GUEST retained ${event.k} presentation watchdog wave=${this.wave} slot=${event.partySlot}`,
-            );
-            globalScene.ui.setMode(UiMode.MESSAGE).catch(() => undefined);
-            resolve();
-          }, PROGRESSION_STEP_WATCHDOG_MS);
-        }),
-      ]);
+      const aborted = new Promise<never>((_resolve, reject) => {
+        controller.signal.addEventListener(
+          "abort",
+          () => reject(new CoopWaveProgressionPresentationCancelled(`${event.k}-presentation-retired`)),
+          { once: true },
+        );
+      });
+      await Promise.race([render(controller.signal), aborted]);
+      if (watchdogFired || controller.signal.aborted) {
+        throw new CoopWaveProgressionPresentationCancelled(`${event.k}-presentation-watchdog-expired`);
+      }
+    } catch (error) {
+      if (watchdogFired) {
+        throw new CoopWaveProgressionPresentationCancelled(`${event.k}-presentation-watchdog-expired`);
+      }
+      if (controller.signal.aborted && !(error instanceof CoopWaveProgressionPresentationCancelled)) {
+        throw new CoopWaveProgressionPresentationCancelled(
+          watchdogFired ? `${event.k}-presentation-watchdog-expired` : `${event.k}-presentation-retired`,
+        );
+      }
+      throw error;
     } finally {
       if (timeout != null) {
         clearTimeout(timeout);
       }
+      this.renderControllers.delete(controller);
     }
   }
 
-  private render(event: CoopWaveProgressionPresentationV2, signal?: AbortSignal): Promise<void> {
+  private render(event: CoopWaveProgressionPresentationV2, signal: AbortSignal): Promise<void> {
     const pokemon = this.resolvePokemon(event.partySlot, event.pokemonId);
     if (pokemon == null) {
-      coopWarn(
-        "progression",
-        `GUEST retained ${event.k} actor missing wave=${this.wave} slot=${event.partySlot} pokemon=${event.pokemonId}`,
+      return Promise.reject(
+        new Error(
+          `retained-${event.k}-actor-missing-wave-${this.wave}-slot-${event.partySlot}-pokemon-${event.pokemonId}`,
+        ),
       );
-      return Promise.resolve();
     }
     if (event.k === "exp") {
-      return this.renderExp(pokemon, event);
+      return this.renderExp(pokemon, event, signal);
     }
     if (event.k === "levelUp") {
-      return this.renderLevelUp(pokemon, event);
-    }
-    if (signal == null) {
-      return Promise.reject(new Error("retained evolution presentation requires its watchdog signal"));
+      return this.renderLevelUp(pokemon, event, signal);
     }
     return this.renderEvolution(pokemon, event, signal);
   }
@@ -439,14 +484,18 @@ export class CoopWaveProgressionReplayPhase extends Phase {
   private renderExp(
     pokemon: PlayerPokemon,
     event: Extract<CoopWaveProgressionPresentationV2, { k: "exp" }>,
+    signal: AbortSignal,
   ): Promise<void> {
+    if (signal.aborted) {
+      return Promise.reject(new CoopWaveProgressionPresentationCancelled("exp-presentation-retired"));
+    }
     // These are host-stated result values, not a local EXP calculation. The complete wave image that follows
     // repeats and validates them as part of its atomic state application.
     pokemon.level = event.toLevel;
     pokemon.exp = event.toExp;
 
     if (event.display === "party") {
-      return this.renderPartyExp(pokemon, event);
+      return this.renderPartyExp(pokemon, event, signal);
     }
 
     const fastForward = globalScene.gameMode.isCoop && !globalScene.moveAnimations;
@@ -458,6 +507,10 @@ export class CoopWaveProgressionReplayPhase extends Phase {
         }),
         fastForward ? 0 : null,
         () => {
+          if (signal.aborted) {
+            resolve();
+            return;
+          }
           pokemon
             .updateInfo(fastForward)
             .catch(error => coopWarn("progression", "retained field EXP gauge update failed", error))
@@ -472,8 +525,15 @@ export class CoopWaveProgressionReplayPhase extends Phase {
   private async renderPartyExp(
     pokemon: PlayerPokemon,
     event: Extract<CoopWaveProgressionPresentationV2, { k: "exp" }>,
+    signal: AbortSignal,
   ): Promise<void> {
+    if (signal.aborted) {
+      throw new CoopWaveProgressionPresentationCancelled("exp-presentation-retired");
+    }
     await pokemon.updateInfo(globalScene.expGainsSpeed >= ExpGainsSpeed.SKIP);
+    if (signal.aborted) {
+      throw new CoopWaveProgressionPresentationCancelled("exp-presentation-retired");
+    }
     if (globalScene.expParty === ExpNotification.SKIP) {
       return;
     }
@@ -486,24 +546,33 @@ export class CoopWaveProgressionReplayPhase extends Phase {
       globalScene.expParty === ExpNotification.ONLY_LEVEL_UP,
       event.toLevel,
     );
+    if (signal.aborted) {
+      throw new CoopWaveProgressionPresentationCancelled("exp-presentation-retired");
+    }
     await globalScene.partyExpBar.hide();
   }
 
   private async renderLevelUp(
     pokemon: PlayerPokemon,
     event: Extract<CoopWaveProgressionPresentationV2, { k: "levelUp" }>,
+    signal: AbortSignal,
   ): Promise<void> {
     pokemon.level = event.toLevel;
     pokemon.stats = [...event.postStats];
     await pokemon.updateInfo();
+    if (signal.aborted) {
+      throw new CoopWaveProgressionPresentationCancelled("level-up-presentation-retired");
+    }
 
     if (globalScene.expParty === ExpNotification.SKIP) {
       return Promise.resolve();
     }
     const promptStats = () =>
-      globalScene.ui
-        .getMessageHandler()
-        .promptLevelUpStats(event.partySlot, [...event.preStats], false, [...event.postStats]);
+      signal.aborted
+        ? Promise.reject(new CoopWaveProgressionPresentationCancelled("level-up-presentation-retired"))
+        : globalScene.ui
+            .getMessageHandler()
+            .promptLevelUpStats(event.partySlot, [...event.preStats], false, [...event.postStats]);
     if (globalScene.expParty !== ExpNotification.DEFAULT) {
       return promptStats();
     }
@@ -516,6 +585,10 @@ export class CoopWaveProgressionReplayPhase extends Phase {
         }),
         null,
         () => {
+          if (signal.aborted) {
+            resolve();
+            return;
+          }
           promptStats()
             .catch(error => coopWarn("progression", "retained level-up stats prompt failed", error))
             .finally(resolve);
@@ -578,5 +651,21 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     // boundary, so DATA can never apply while this cosmetic override is still current.
     this.end();
     this.onComplete();
+  }
+
+  /** Cancel detached UI work when recovery or a newer authority entry destructively replaces this phase. */
+  public override retire(): void {
+    if (this.isRetired()) {
+      return;
+    }
+    // Fence end() before abort rejects the outstanding Promise.race and schedules its continuation.
+    super.retire();
+    this.completed = true;
+    for (const controller of this.renderControllers) {
+      controller.abort();
+    }
+    this.renderControllers.clear();
+    globalScene.ui.setMode(UiMode.MESSAGE).catch(() => undefined);
+    globalScene.partyExpBar.hide().catch(() => undefined);
   }
 }

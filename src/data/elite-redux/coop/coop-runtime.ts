@@ -501,6 +501,7 @@ import {
   setCoopWaveAdvanceOperationRevisionFloor,
   tryApplyCoopWaveAdvanceDataAtBoundary,
 } from "#data/elite-redux/coop/coop-wave-operation";
+import { observeCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-wave-progression-observer";
 import { installCoopWaveResolutionBroadcaster } from "#data/elite-redux/coop/coop-wave-resolution-bridge";
 import { BARGAIN_SIN_ORDER } from "#data/elite-redux/er-bargain-sins";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
@@ -4506,6 +4507,12 @@ export function recordCoopWaveProgressionPresentation(
     return false;
   }
   capture.events.push(structuredClone(event));
+  observeCoopWaveProgressionPresentation({
+    stage: "authority-recorded",
+    wave: capture.wave,
+    seq: capture.events.length - 1,
+    event,
+  });
   const exactEvolution = event.k === "evolution" ? ` species=${event.fromSpeciesId}->${event.toSpeciesId}` : "";
   coopLog(
     "progression",

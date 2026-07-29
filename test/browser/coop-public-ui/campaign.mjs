@@ -3478,6 +3478,9 @@ export async function runCampaign(rig) {
       if (advanced.boundary != null) {
         wavesCleared = Math.max(wavesCleared, advanced.boundary.wave - 1);
       }
+      rig.assertWaveProgressionLedger(waveNo, `campaign-wave-${waveNo}-progression-ledger`, {
+        requireExp: battleKind.battleType === "WILD" || battleKind.battleType === "TRAINER",
+      });
       await Promise.all(clients.map(client => client.checkpoint(`wave-${waveNo}-cleared`)));
       await progress.wave({
         ...stats,

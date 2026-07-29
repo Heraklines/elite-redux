@@ -26,6 +26,7 @@ const [
   },
   { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress, coopMeInteractionStartValue },
   { setCoopPresentationObserver },
+  { setCoopWaveProgressionPresentationObserver },
   { setCoopPresentationHardWallMsForTest },
   { BattlerTagType },
   { BattleType },
@@ -44,6 +45,7 @@ const [
   import("../src/data/elite-redux/coop/coop-runtime"),
   import("../src/data/elite-redux/coop/coop-me-pin-state"),
   import("../src/data/elite-redux/coop/coop-turn-recorder"),
+  import("../src/data/elite-redux/coop/coop-wave-progression-observer"),
   import("../src/phases/coop-presentation-watchdog"),
   import("../src/enums/battler-tag-type"),
   import("../src/enums/battle-type"),
@@ -93,6 +95,7 @@ const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const PRESENTATION_PREFIX = "[coop-browser:presentation] ";
 const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
+const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 
 // Exact ordered presentation ledger. The authority callback runs synchronously after assigning the
 // event's immutable per-turn sequence; the renderer callback runs only when the matching presentation
@@ -114,6 +117,28 @@ setCoopPresentationObserver(observation => {
       event: observation.event,
       ...(observation.reason == null ? {} : { reason: observation.reason }),
       ...(observation.actorFingerprint == null ? {} : { actorFingerprint: observation.actorFingerprint }),
+    })}`,
+  );
+});
+
+// Post-battle EXP, level, and evolution cues live in the retained WAVE_ADVANCE transaction rather than
+// the turn event stream. Give them the same exact authority/renderer receipt evidence so a mechanically
+// converged browser cannot silently omit progression presentation and still pass the campaign.
+setCoopWaveProgressionPresentationObserver(observation => {
+  const runtime = getCoopRuntime();
+  if (runtime == null) {
+    return;
+  }
+  console.info(
+    `${PROGRESSION_EVENT_PREFIX}${JSON.stringify({
+      version: 1,
+      stage: observation.stage,
+      role: runtime.controller.role,
+      epoch: runtime.controller.sessionEpoch,
+      wave: observation.wave,
+      seq: observation.seq,
+      event: observation.event,
+      ...(observation.reason == null ? {} : { reason: observation.reason }),
     })}`,
   );
 });

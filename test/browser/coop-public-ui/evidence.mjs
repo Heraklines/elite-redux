@@ -74,6 +74,7 @@ const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
 const MARKET_PREFIX = "[coop-browser:market] ";
 const COMMANDER_PREFIX = "[coop-browser:commander] ";
 const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
+const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const PRESENTATION_EVENT_KINDS = new Set([
   "message",
@@ -95,6 +96,7 @@ const PRESENTATION_EVENT_KINDS = new Set([
   "terrain",
   "switch",
 ]);
+const PROGRESSION_EVENT_KINDS = new Set(["exp", "levelUp", "evolution"]);
 const CHECKSUM_SENTINEL = "0000000000000000";
 /** The client's own fail-closed handling of a post-terminal signaling beat (see assertClean). */
 const HEARTBEAT_OWNERSHIP_LOSS = /P33 heartbeat lost authenticated ownership status=(?:401|403)/u;
@@ -869,10 +871,47 @@ export function presentationEventView(text) {
   return Object.freeze({ ...value, event: Object.freeze({ ...value.event }) });
 }
 
+/** Parse one exact retained wave-progression authority/renderer receipt. */
+export function progressionEventView(text) {
+  if (!text.startsWith(PROGRESSION_EVENT_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(PROGRESSION_EVENT_PREFIX.length));
+  } catch (error) {
+    throw new Error("built browser emitted malformed progression-event JSON", { cause: error });
+  }
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 1
+    || !["authority-recorded", "renderer-completed", "renderer-failed"].includes(value.stage)
+    || (value.role !== "host" && value.role !== "guest")
+    || !Number.isSafeInteger(value.epoch)
+    || value.epoch <= 0
+    || !Number.isSafeInteger(value.wave)
+    || value.wave <= 0
+    || !Number.isSafeInteger(value.seq)
+    || value.seq < 0
+    || !value.event
+    || typeof value.event !== "object"
+    || !PROGRESSION_EVENT_KINDS.has(value.event.k)
+    || (value.stage === "renderer-failed" && (typeof value.reason !== "string" || value.reason.length === 0))
+  ) {
+    throw new Error("built browser emitted an invalid progression-event observation");
+  }
+  return Object.freeze({ ...value, event: Object.freeze({ ...value.event }) });
+}
+
 function recordBrowserObservations(sink, text) {
   const presentationEvent = presentationEventView(text);
   if (presentationEvent != null) {
     sink.record("browser-presentation-event", { observation: presentationEvent });
+  }
+  const progressionEvent = progressionEventView(text);
+  if (progressionEvent != null) {
+    sink.record("browser-progression-event", { observation: progressionEvent });
   }
   // Exact read-only receipt from InputsController's production input_down event.
   if (text.startsWith(INPUT_DISPATCH_PREFIX)) {

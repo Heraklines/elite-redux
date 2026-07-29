@@ -2699,6 +2699,64 @@ export class DuoPublicUiRig {
   }
 
   /**
+   * Prove every retained post-battle EXP/level/evolution cue was rendered once, in order, from the
+   * authority's immutable WAVE_ADVANCE material. State convergence alone is not enough here: a failed
+   * renderer receipt is a presentation regression even though production safely continues mechanically.
+   */
+  assertWaveProgressionLedger(wave, proofName, { requireExp = false } = {}) {
+    const host = this.host;
+    const guest = this.guest;
+    if (!host || !guest) {
+      throw new Error(`${proofName}: paired host/guest progression observations were unavailable`);
+    }
+    const hostEvents = host.evidence.events
+      .filter(
+        event =>
+          event.kind === "browser-progression-event"
+          && event.observation?.wave === wave
+          && event.observation.stage === "authority-recorded",
+      )
+      .map(event => event.observation);
+    const guestEvents = guest.evidence.events
+      .filter(event => event.kind === "browser-progression-event" && event.observation?.wave === wave)
+      .map(event => event.observation);
+    const failed = guestEvents.find(event => event.stage === "renderer-failed");
+    if (failed != null) {
+      throw new Error(
+        `${proofName}: renderer failed retained ${failed.event.k} seq=${failed.seq}: ${failed.reason ?? "unknown"}`,
+      );
+    }
+    const rendered = guestEvents.filter(event => event.stage === "renderer-completed");
+    const comparable = events =>
+      events.map(event => ({
+        epoch: event.epoch,
+        wave: event.wave,
+        seq: event.seq,
+        event: event.event,
+      }));
+    const authority = comparable(hostEvents);
+    const renderer = comparable(rendered);
+    if (JSON.stringify(authority) !== JSON.stringify(renderer)) {
+      throw new Error(
+        `${proofName}: retained progression ledger diverged; authority=${JSON.stringify(authority)} `
+          + `renderer=${JSON.stringify(renderer)}`,
+      );
+    }
+    if (requireExp && !authority.some(entry => entry.event.k === "exp")) {
+      throw new Error(`${proofName}: completed battle produced no retained EXP presentation`);
+    }
+    for (const client of [host, guest]) {
+      client.evidence.record("wave-progression-ledger-proof", {
+        proofName,
+        wave,
+        eventCount: authority.length,
+        kinds: authority.map(entry => entry.event.k),
+      });
+    }
+    return authority;
+  }
+
+  /**
    * Cross the real Showdown pre-battle pipeline after public lobby pairing. Unlike ordinary co-op,
    * Showdown has no save prompt or host launch button: the title flow commits a fresh shared identity
    * automatically, both players independently lock the Friendly wager, and the ordinary battle opens.
@@ -3661,6 +3719,9 @@ export class DuoPublicUiRig {
           expectedWave: this.activeBattleWave,
         });
         await this.assertRetainedContinuation(outcomeCursors, `turn-${turn}-reward`);
+        this.assertWaveProgressionLedger(this.activeBattleWave, `wave-${this.activeBattleWave}-progression`, {
+          requireExp: true,
+        });
         return turn;
       }
       if (outcome.kind === "faint") {
@@ -3720,6 +3781,9 @@ export class DuoPublicUiRig {
     if (route === "won") {
       await this.assertSharedSurface("reward", floor, `wave-${this.activeBattleWave}-won-faint-reward`, {
         expectedWave: this.activeBattleWave,
+      });
+      this.assertWaveProgressionLedger(this.activeBattleWave, `wave-${this.activeBattleWave}-won-faint-progression`, {
+        requireExp: true,
       });
       await this.leaveRewardsAndReachWave2();
       return { route, floor };
@@ -4005,6 +4069,9 @@ export class DuoPublicUiRig {
           expectedWave: this.activeBattleWave,
         });
         await this.assertRetainedContinuation(outcomeCursors, `commander-turn-${round}-reward`);
+        this.assertWaveProgressionLedger(this.activeBattleWave, `wave-${this.activeBattleWave}-commander-progression`, {
+          requireExp: true,
+        });
         this.assertNoFatalRecoverySince(this.lastWaveCursors, "Commander wave through retained reward");
         return round;
       }

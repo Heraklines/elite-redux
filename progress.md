@@ -5410,3 +5410,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the stronger combat-presentation proof adds negligible wall-clock cost. All 350 public-browser node contracts
   pass; scoped formatting is clean apart from pre-existing complexity notices. No production, Showdown, tournament,
   staging, or deployment behavior changed.
+
+## 2026-07-29 - Retained wave progression has an exact authority-to-renderer ledger
+
+- Turn presentation already had exact ordered receipts, but post-battle EXP, level-up, and evolution cues live in
+  the separate retained `WAVE_ADVANCE` transaction. A mechanically converged browser could therefore omit one of
+  those visuals and still pass every campaign presentation check.
+- The authority now emits a read-only receipt for each immutable progression event, while the replica emits either
+  `renderer-completed` or a typed `renderer-failed` receipt at the same wave/sequence coordinate. Fresh journeys
+  and every campaign battle compare those ledgers exactly and require real EXP presentation before accepting the
+  reward frontier; state equality alone can no longer certify this boundary.
+- Non-evolution UI waits are watchdog-bounded and fence every late callback. Evolution retains its stronger abort-
+  and-join contract, so its temporary Pokemon, tweens, recursive cycle, timers, and mode restoration settle before
+  DATA may apply. Destructive authoritative replacement now retires the replay phase through its real `retire()`
+  lifecycle, aborts its current renderer, and prevents any later event from starting against the replacement UI.
+- Local policy-safe evidence is green: all 352 public-browser node contracts and all 25 presentation-authority
+  contracts pass, scoped Biome is error-clean apart from pre-existing warnings/notices, `git diff --check` passes,
+  and full TypeScript retains its 571-line baseline with zero diagnostics in changed production files. Engine and
+  real-Chromium qualification remain remote-only; no staging, production, Showdown, or tournament code changed.

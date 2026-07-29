@@ -186,7 +186,8 @@ jobs:
             test/browser/coop-public-ui/preview-server.test.mjs \
             test/browser/coop-public-ui/public-ui-harness.mjs \
             test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs \
-            test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
+            test/browser/coop-public-ui/semantic-surface-evidence.test.mjs \
+            test/browser/coop-public-ui/wave-progression-presentation-evidence.test.mjs
 
       - name: Enforce public-driver boundary (original harness files)
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
@@ -208,6 +209,7 @@ jobs:
           test/browser/coop-public-ui/preview-server.test.mjs
           test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
           test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
+          test/browser/coop-public-ui/wave-progression-presentation-evidence.test.mjs
 
       # Cache the built bundle keyed on the GAME-SOURCE inputs only (src/public/lockfile/
       # entry/sealer/vite-config/workflow-env) - NOT the harness driver. A harness-only push
