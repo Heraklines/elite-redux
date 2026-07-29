@@ -574,13 +574,15 @@ export class CoopFormChangeReplayPhase extends Phase {
       callback();
       return;
     }
-    if (this.ownerStreamer == null || globalScene === this.ownerScene) {
+    if (this.ownerRuntime == null || globalScene === this.ownerScene) {
       this.retire();
       onUnavailable();
       return;
     }
+    let completed = false;
     let cancel = () => {};
-    cancel = this.ownerStreamer.scheduleAuthorityRetry(() => {
+    cancel = runWhenCoopRuntimeActive(this.ownerRuntime, () => {
+      completed = true;
       this.scheduledCallbacks.delete(cancel);
       if (this.ended || this.isRetired()) {
         onUnavailable();
@@ -592,8 +594,10 @@ export class CoopFormChangeReplayPhase extends Phase {
         return;
       }
       callback();
-    }, 0);
-    this.scheduledCallbacks.add(cancel);
+    });
+    if (!completed) {
+      this.scheduledCallbacks.add(cancel);
+    }
   }
 
   private clearOwnedResources(): void {
@@ -791,6 +795,14 @@ export class CoopFormChangeReplayPhase extends Phase {
 /** GUEST: install the complete authority-selected Transform image and refresh the exact actor. */
 export class CoopTransformReplayPhase extends Phase {
   public readonly phaseName = "CoopTransformReplayPhase";
+  private readonly ownerScene = globalScene;
+  private ownerPhaseManager = globalScene.phaseManager;
+  private readonly ownerRuntime = getCoopRuntime();
+  private readonly ownerStreamer = getCoopBattleStreamer();
+  private readonly ownerGeneration = coopSessionGeneration();
+  private readonly scheduledCallbacks = new Set<() => void>();
+  private watchdog: CoopPresentationProgressWatchdog | undefined;
+  private ended = false;
 
   constructor(
     private readonly bi: number,
@@ -802,46 +814,136 @@ export class CoopTransformReplayPhase extends Phase {
     super();
   }
 
+  public bindOwnerPhaseManager(phaseManager: typeof globalScene.phaseManager): this {
+    this.ownerPhaseManager = phaseManager;
+    return this;
+  }
+
+  private actorFingerprint(): string {
+    return `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}:transform-sp${this.result.speciesId}:form${this.result.formIndex}`;
+  }
+
+  private exactRuntimeInstalled(): boolean {
+    return (
+      globalScene === this.ownerScene
+      && getCoopRuntime() === this.ownerRuntime
+      && getCoopBattleStreamer() === this.ownerStreamer
+      && coopSessionGeneration() === this.ownerGeneration
+    );
+  }
+
+  private dispatchBound(callback: () => void, onUnavailable: () => void = () => {}): void {
+    if (this.ended || this.isRetired()) {
+      onUnavailable();
+      return;
+    }
+    if (this.exactRuntimeInstalled()) {
+      callback();
+      return;
+    }
+    if (this.ownerRuntime == null || globalScene === this.ownerScene) {
+      this.retire();
+      onUnavailable();
+      return;
+    }
+    let completed = false;
+    let cancel = () => {};
+    cancel = runWhenCoopRuntimeActive(this.ownerRuntime, () => {
+      completed = true;
+      this.scheduledCallbacks.delete(cancel);
+      if (this.ended || this.isRetired()) {
+        onUnavailable();
+        return;
+      }
+      if (!this.exactRuntimeInstalled()) {
+        this.retire();
+        onUnavailable();
+        return;
+      }
+      callback();
+    });
+    if (!completed) {
+      this.scheduledCallbacks.add(cancel);
+    }
+  }
+
+  private clearOwnedResources(): void {
+    this.watchdog?.remove();
+    this.watchdog = undefined;
+    for (const cancel of this.scheduledCallbacks) {
+      cancel();
+    }
+    this.scheduledCallbacks.clear();
+  }
+
+  private finish(outcome: CoopPresentationOutcome): void {
+    if (this.ended || this.isRetired()) {
+      return;
+    }
+    this.ended = true;
+    this.clearOwnedResources();
+    settleCoopPresentationOutcome(this.outcomeToken, outcome);
+    if (this.ownerPhaseManager.getCurrentPhase() === this) {
+      this.ownerPhaseManager.shiftPhase();
+    }
+  }
+
+  public override retire(): void {
+    if (this.isRetired()) {
+      return;
+    }
+    super.retire();
+    this.ended = true;
+    this.clearOwnedResources();
+    settleCoopPresentationOutcome(this.outcomeToken, {
+      kind: "failed",
+      reason: "transform-presentation-retired",
+      actorFingerprint: this.actorFingerprint(),
+    });
+  }
+
+  public override end(): void {
+    this.finish({ kind: "rendered", actorFingerprint: this.actorFingerprint() });
+  }
+
   public override start(): void {
     super.start();
-    const actorFingerprint = `${this.actor.side}:bi${this.bi}:p${this.actor.pokemonId}:transform-sp${this.result.speciesId}:form${this.result.formIndex}`;
+    if (!this.exactRuntimeInstalled()) {
+      this.dispatchBound(() => this.startBound());
+      return;
+    }
+    this.startBound();
+  }
+
+  private startBound(): void {
+    const actorFingerprint = this.actorFingerprint();
     const pokemon = exactDisplayedActor(this.actor);
     if (pokemon == null || !installAuthorityTransformMaterial(pokemon, this.result)) {
-      settleCoopPresentationOutcome(this.outcomeToken, {
+      this.finish({
         kind: "failed",
         reason: pokemon == null ? "transform-actor-not-displayed" : "transform-material-invalid",
         actorFingerprint,
       });
-      this.end();
       return;
     }
 
-    let ended = false;
-    let watchdog: CoopPresentationProgressWatchdog | undefined;
-    const finish = (outcome: CoopPresentationOutcome) => {
-      if (ended) {
-        return;
-      }
-      ended = true;
-      watchdog?.remove();
-      settleCoopPresentationOutcome(this.outcomeToken, outcome);
-      this.end();
-    };
-    watchdog = armCoopPresentationProgressWatchdog(() =>
-      finish({ kind: "failed", reason: "transform-watchdog-expired", actorFingerprint }),
+    this.watchdog = armCoopPresentationProgressWatchdog(() =>
+      this.finish({ kind: "failed", reason: "transform-watchdog-expired", actorFingerprint }),
     );
-    if (this.playSound && globalScene.moveAnimations) {
-      globalScene.playSound("battle_anims/PRSFX- Transform");
+    if (this.playSound && this.ownerScene.moveAnimations) {
+      this.ownerScene.playSound("battle_anims/PRSFX- Transform");
     }
-    void refreshAuthorityAppearance(pokemon)
-      .then(() =>
-        finish(
-          globalScene.moveAnimations
+    refreshAuthorityAppearance(
+      pokemon,
+      (callback, onUnavailable) => this.dispatchBound(callback, onUnavailable),
+      () =>
+        this.finish(
+          this.ownerScene.moveAnimations
             ? { kind: "rendered", actorFingerprint }
             : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
         ),
-      )
-      .catch(() => finish({ kind: "failed", reason: "transform-presentation-threw", actorFingerprint }));
+      () => this.finish({ kind: "failed", reason: "transform-presentation-threw", actorFingerprint }),
+    );
   }
 }
 

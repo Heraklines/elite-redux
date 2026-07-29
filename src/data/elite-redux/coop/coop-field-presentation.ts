@@ -223,7 +223,7 @@ export type CoopSwitchStructuralProjectionResult =
   | {
       readonly ok: true;
       readonly incoming: Pokemon;
-      readonly outgoing?: Pokemon;
+      readonly outgoing: Pokemon | undefined;
       readonly alreadyProjected: boolean;
     }
   | {

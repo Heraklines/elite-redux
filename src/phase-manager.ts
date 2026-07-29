@@ -901,7 +901,11 @@ export class PhaseManager {
     if (created instanceof CoopReplayTurnPhase) {
       created.bindOwnerPhaseManager(this);
     }
-    if (created instanceof CoopFormChangeReplayPhase || created instanceof CoopFormChangeCutsceneReplayPhase) {
+    if (
+      created instanceof CoopFormChangeReplayPhase
+      || created instanceof CoopFormChangeCutsceneReplayPhase
+      || created instanceof CoopTransformReplayPhase
+    ) {
       created.bindOwnerPhaseManager(this);
     }
     return created;

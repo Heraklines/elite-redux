@@ -224,6 +224,9 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       expect(globalScene).toBe(rig.hostScene);
       expect(getCoopRuntime()).toBe(rig.hostRuntime);
     });
+    // Two real browsers keep both realms installed concurrently. The in-process harness instead flushes
+    // runtime-owned continuations when it next installs that browser, so explicitly yield one guest window.
+    await withClient(rig.guestCtx, () => {});
     await vi.waitFor(() => expect(guestQueue).toHaveBeenCalledOnce(), { timeout: 2_000 });
 
     expect(hostQueue, "ambient host ownership is never consulted by the guest promise tail").not.toHaveBeenCalled();
@@ -301,6 +304,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       await Promise.resolve();
       expect(globalScene).toBe(rig.hostScene);
     });
+    await withClient(rig.guestCtx, () => {});
     await vi.waitFor(() => expect(fieldPlayCount).toBe(1), { timeout: 2_000 });
     expect(fieldInfoCount).toBe(1);
     await withClient(rig.hostCtx, async () => {
@@ -308,6 +312,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       await Promise.resolve();
       await Promise.resolve();
     });
+    await withClient(rig.guestCtx, () => {});
     await vi.waitFor(
       () => expect(coopPresentationOutcome(fieldToken)).toMatchObject({ kind: "intentionally-skipped" }),
       { timeout: 2_000 },
@@ -365,6 +370,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       await Promise.resolve();
       expect(globalScene).toBe(rig.hostScene);
     });
+    await withClient(rig.guestCtx, () => {});
     await vi.waitFor(() => expect(childPlayCount).toBe(1), { timeout: 2_000 });
     expect(childInfoCount).toBe(1);
     await withClient(rig.hostCtx, async () => {
@@ -372,6 +378,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       await Promise.resolve();
       await Promise.resolve();
     });
+    await withClient(rig.guestCtx, () => {});
     await expect(childInstall).resolves.toBe(true);
     await withClient(rig.guestCtx, () => childPhase?.retire());
   }, 120_000);

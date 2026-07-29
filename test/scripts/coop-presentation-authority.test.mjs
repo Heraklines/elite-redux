@@ -116,7 +116,7 @@ test("enemy switch replay owns the ordinary trainer/tray grammar and retires it 
   );
   assert.match(
     switchReplay,
-    /killTweensOf\(\[incoming, outgoing, pokeball\][\s\S]+pokeball\?\.destroy\(\)[\s\S]+incoming\.setScale\(incoming\.getSpriteScale\(\)\)/u,
+    /pokeball != null[\s\S]+scene\.tweens\.killTweensOf\(pokeball\)[\s\S]+pokeball\.destroy\(\)[\s\S]+settleCoopSwitchActorPresentation\(scene, outgoing, "hidden"\)[\s\S]+settleCoopSwitchActorPresentation\(scene, incoming,/u,
     "retirement cannot leave a ball sprite or a half-scaled incoming actor behind",
   );
   assert.match(switchReplay, /retire\(\)[\s\S]+this\.retireActiveRun\?\.\(\)/u);

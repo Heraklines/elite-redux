@@ -869,7 +869,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(coopPresentationOutcome(token), "material alone is not a presentation receipt").toBeUndefined();
 
     const retireMode = vi.spyOn(globalScene.ui, "retirePresentationMode").mockReturnValue(true);
-    vi.spyOn(globalScene.phaseManager, "getCurrentPhase").mockReturnValue(queuedCutscene);
+    vi.spyOn(globalScene.phaseManager, "getCurrentPhase").mockReturnValue(queuedCutscene!);
     const shift = vi.spyOn(globalScene.phaseManager, "shiftPhase").mockImplementation(() => {});
     queuedCutscene!.end();
     await vi.waitFor(() => expect(coopPresentationOutcome(token)).toMatchObject({ kind: "rendered" }));
