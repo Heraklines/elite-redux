@@ -3576,6 +3576,9 @@ export const REPLAY_DRAIN_PHASES = new Set([
   // Exact host-authored ability flyout. It owns a bounded presentation promise and must be driven before
   // the harness can call a replayed turn complete (the real renderer gate permits the same phase).
   "CoopShowAbilityReplayPhase",
+  // Exact host-authored flyout teardown. Leaving it queued makes a headless turn look mechanically done
+  // while a real renderer still has stale ability chrome (and its ordered presentation receipt) pending.
+  "CoopHideAbilityReplayPhase",
   // Terastallization is an asynchronous CommonBattleAnim presentation child. Omitting it made the
   // production-shaped soak return at the child while CoopFinalizeTurnPhase was still queued, which
   // falsely classified a healthy authority stream as a stranded renderer at the first Tera turn.

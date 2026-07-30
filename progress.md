@@ -5944,3 +5944,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Node-pure contracts cover both lifecycle boundaries. Remote focused/static, aggregate, fresh, surface-animation,
   and Mystery qualification remain required on the resulting exact SHA; no staging or production deploy is part of
   this checkpoint.
+- Aggregate run `30520664562` correctly failed its early static/contract sentinels before the engine matrix settled:
+  the new watchdog test's Phaser spy returned `void`, and the headless replay pump's closed phase inventory omitted
+  `CoopHideAbilityReplayPhase`. The spy now preserves `TweenManager`'s return type and the actual two-engine replay
+  drain starts/ends the teardown phase before declaring the authoritative turn complete. The failure-first source
+  contract is green locally; the rest of that exact run remains intact for independent merge/product evidence.

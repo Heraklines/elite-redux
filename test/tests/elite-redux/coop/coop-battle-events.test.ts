@@ -492,7 +492,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(true);
     vi.spyOn(globalScene.abilityBar, "hide").mockReturnValue(new Promise(() => {}));
-    const killSpy = vi.spyOn(globalScene.tweens, "killTweensOf").mockImplementation(() => {});
+    const killSpy = vi.spyOn(globalScene.tweens, "killTweensOf").mockImplementation(() => globalScene.tweens);
     const visibleSpy = vi.spyOn(globalScene.abilityBar, "setVisible").mockReturnValue(globalScene.abilityBar);
     const phase = new CoopHideAbilityReplayPhase(token);
     const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
