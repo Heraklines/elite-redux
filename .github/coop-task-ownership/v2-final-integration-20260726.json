@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "d5146ab27f12720d0a0d1b12c81663355032931f",
+  "baseSha": "0fd078942aaf4e887085949d309dcaa31a6b877f",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -43,6 +43,7 @@
     "src/data/elite-redux/coop/coop-ability-operation.ts",
     "src/data/elite-redux/coop/coop-ability-picker-relay.ts",
     "src/data/elite-redux/coop/coop-authority-state-hooks.ts",
+    "src/data/elite-redux/coop/coop-bargain-operation.ts",
     "src/data/elite-redux/coop/coop-battle-engine.ts",
     "src/data/elite-redux/coop/coop-battle-event-validator.ts",
     "src/data/elite-redux/coop/coop-battle-stream.ts",
