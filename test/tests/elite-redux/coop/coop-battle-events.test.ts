@@ -1495,7 +1495,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
   /**
    * The presentation phases {@linkcode CoopReplayTurnPhase} unshifts (the anim pump + the deferred
-   * finalize), PLUS the MessagePhase a `message` event queues - all of which must drain to reach
+   * finalize), PLUS every exact presentation phase (including ability show/hide) and the MessagePhase a
+   * `message` event queues - all of which must drain to reach
    * the deferred {@linkcode CoopFinalizeTurnPhase} that now applies the checkpoint.
    */
   const REPLAY_DRAIN_PHASES = [
