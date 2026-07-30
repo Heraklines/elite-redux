@@ -375,15 +375,23 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
   it("an earlier enemy trainer summon cannot consume a guest-owned player replacement checkpoint", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.DRAGONITE, SpeciesId.CHARIZARD);
     // Random trainer generation is allowed to produce only three party members for this double battle
-    // (focused B11 run 30503943750). Two simultaneous enemy faints need two actual reserves, so pin the
-    // missing bench member before buildDuo mirrors the live battle into the second engine. This changes
-    // only the fixture's party cardinality; the production switch/replacement scheduling stays real.
+    // (focused B11 run 30503943750). Total cardinality is not sufficient: the partnered-double switch rule
+    // requires each lead's own trainer slot to have a reserve. Pin only the missing per-slot reserve before
+    // buildDuo mirrors the live battle into the second engine. Production switch scheduling stays real.
     const hostBattle = game.scene.currentBattle;
-    const enemyLead = game.scene.getEnemyField()[0];
-    while (hostBattle.enemyParty.length < 4) {
-      hostBattle.enemyParty.push(
-        game.scene.addEnemyPokemon(getPokemonSpecies(SpeciesId.SHUCKLE), enemyLead.level, enemyLead.trainerSlot),
-      );
+    const enemyLeads = game.scene.getEnemyField();
+    const enemyLeadIds = new Set(enemyLeads.map(mon => mon.id));
+    for (const trainerSlot of new Set(enemyLeads.map(mon => mon.trainerSlot))) {
+      const leadCount = enemyLeads.filter(mon => mon.trainerSlot === trainerSlot).length;
+      const enemyLead = enemyLeads.find(mon => mon.trainerSlot === trainerSlot)!;
+      while (
+        hostBattle.enemyParty.filter(mon => mon.trainerSlot === trainerSlot && !enemyLeadIds.has(mon.id)).length
+        < leadCount
+      ) {
+        hostBattle.enemyParty.push(
+          game.scene.addEnemyPokemon(getPokemonSpecies(SpeciesId.SHUCKLE), enemyLead.level, trainerSlot),
+        );
+      }
     }
     const pair = createLoopbackPair();
     const authorityEntries: Array<{ kind: string; nextControl?: { kind?: string } | null }> = [];

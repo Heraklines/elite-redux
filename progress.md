@@ -5766,3 +5766,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local policy-safe evidence is scoped Biome plus `git diff --check`; the engine regression remains remote-only per
   `AGENTS.md`. The ownership manifest advances to exact parent `b379e805e` so the next focused B11 run cannot be
   mistaken for evidence from the earlier fixture.
+
+## 2026-07-30 - Double-trainer replacement fixtures reserve each trainer slot
+
+- Focused run `30505309974` proved the corrected enemy-first reproduction: the enemy summon preceded the bound
+  player summon, the player transaction committed exactly once, the selected Charizard occupied the guest-owned
+  field, and no forced resync occurred. Its final assertion exposed a separate fixture defect: a four-mon partnered
+  trainer party did not guarantee a legal reserve for both trainer slots, so only one enemy slot could refill.
+- The fixture now requires one off-field reserve per simultaneously-fainting lead within each exact `trainerSlot`,
+  adding a Shuckle only behind a deficient slot. This matches `FaintPhase`'s production legality rule for partnered
+  doubles; checking total party length alone could silently put the extra reserve behind the already-covered trainer.
+- No product path changed. The next focused B11 run must prove the full enemy-first + exact player binding + both
+  legal enemy replacements + zero-resync chain on parent `7f5e6c985`.
