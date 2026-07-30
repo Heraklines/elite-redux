@@ -6183,3 +6183,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   then the ordinary journey's preflight caught its own stale source assertion: it still required the one-target helper
   call that the retry loop deliberately replaced. The boundary now seals the stronger candidate-exhaustion, prompt
   observation, and alternate-reward recovery contract. No browser gameplay ran under that stale preflight result.
+
+## 2026-07-30 - A projected World Map cannot mistake a refused pre-start UI open for success
+
+- Exact Mystery run `30563290512` cleared the prior inoperable-reward frontier, six consecutive Mystery surfaces,
+  the wave-7 trainer, the wave-8 boss, the wave-9 Bargain, and both wave-10 Mystery terminals. It then exposed a real
+  replica control failure at global revision 51: the authority opened the actionable World Map, while the replica's
+  projected `SelectBiomePhase` retained the preceding callback-backed MESSAGE handler. The replica remained at
+  material frontier 51 / control frontier 50 until its bounded recovery correctly failed the shared session closed.
+- The exact trace showed why the map never appeared. Authority projection starts a replacement phase inside the
+  phase-manager's atomic install; its UI fence is briefly false until that phase becomes current. `setModeInternal`
+  correctly made no mutation, but `setModeBoundedWhen` translated the resolved no-op into `"completed"`. The biome
+  watcher therefore believed ER_MAP was installed and waited for a public surface that could never exist.
+- `setModeBoundedWhen` now reports an initially false caller fence as `"superseded"` before creating a transition or
+  timeout. The existing address-exact biome recovery then retries after the projected phase is current and can install
+  the real read-only World Map. A failure-first UI seam test proves the refused pre-start attempt mutates no handler,
+  increments no transition generation, leaves no timer, and cannot report completion. This is a generic bounded-UI
+  contract repair; no Showdown, tournament, triples, deployment, or legacy authority behavior is changed.

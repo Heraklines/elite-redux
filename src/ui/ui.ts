@@ -1095,6 +1095,14 @@ export class UI extends Phaser.GameObjects.Container {
     isCurrent: (() => boolean) | undefined,
     ...args: any[]
   ): Promise<"completed" | "forced" | "superseded"> {
+    // A projector may construct and start an exact successor before PhaseManager publishes it as the
+    // current phase. setModeInternal deliberately performs no mutation when that caller fence is false,
+    // but its resolved void promise cannot distinguish that refusal from a completed transition. Preserve
+    // the stronger bounded contract here: a transition that never started is superseded, so the owning
+    // phase can retry after its atomic installation instead of falsely publishing a missing UI surface.
+    if (isCurrent?.() === false) {
+      return Promise.resolve("superseded");
+    }
     const transition = this.setModeInternal(mode, true, false, false, args, isCurrent);
     const generation = this.modeTransitionGeneration;
     return new Promise(resolve => {

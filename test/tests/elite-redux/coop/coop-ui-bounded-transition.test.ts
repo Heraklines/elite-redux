@@ -202,6 +202,21 @@ describe("co-op bounded UI transition seam", () => {
     expect(ui.overlay.setVisible).toHaveBeenLastCalledWith(false);
   });
 
+  it("reports an initially unpublished phase as superseded instead of a completed no-op", async () => {
+    const fade = deferred();
+    const { ui, clear, show } = makeUi(fade);
+
+    await expect(ui.setModeBoundedWhen(UiMode.ER_MAP, 25, () => false, { marker: "not-current-yet" })).resolves.toBe(
+      "superseded",
+    );
+
+    expect(ui.getMode()).toBe(UiMode.STARTER_SELECT);
+    expect(ui.modeTransitionGeneration).toBe(0);
+    expect(clear).not.toHaveBeenCalled();
+    expect(show).not.toHaveBeenCalled();
+    expect(vi.getTimerCount(), "a refused pre-start transition leaves no force timer behind").toBe(0);
+  });
+
   it("a rapid transition during fadeIn kills the old owner and its late callback cannot hide the new fade", async () => {
     const unused = deferred();
     const { ui } = makeUi(unused);
