@@ -5886,3 +5886,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Failure-first Authority V2 control coverage now includes the positive deterministic learn narration and its
   no-wave-successor denial. The browser source contract also requires the phase to remain in the closed settlement
   set. No Showdown, tournament, triples, deployment, or legacy correctness path changed.
+
+## 2026-07-30 - Exhaustive Mystery registry proof avoids per-case matcher noise
+
+- Full aggregate run `30514422658` timed out after 20 seconds in the single exhaustive seeded-gauntlet registry test.
+  All other Lane A files passed, and the same exact product SHA passed the same A1 assignment minutes earlier in
+  focused run `30513387665`. This is a wall-clock test implementation failure, not a product or registry mismatch.
+- The proof still evaluates every Mystery-designated wave for all 512 deterministic seeds. It now performs the hot
+  loop with plain comparisons, counts every checked pair, and reports the first 16 invalid selections plus the total
+  if any exist. Only the final coverage assertion uses a Vitest matcher, removing tens of thousands of matcher calls
+  without reducing one seed, wave, or production invariant.
+- Existing exact-SHA two-browser campaigns and aggregate evidence remain untouched. This change is test-only; no
+  runtime, Showdown, tournament, triples, or deployment behavior changes.

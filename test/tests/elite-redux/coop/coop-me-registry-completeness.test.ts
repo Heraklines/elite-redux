@@ -83,6 +83,44 @@ function assertProof(testFile: string, needles: readonly string[]): void {
   }
 }
 
+function invalidGauntletPickReason(selected: MysteryEncounterType): "synthetic" | "unregistered" | null {
+  if (selected === MysteryEncounterType.LLM_DIRECTED || selected === MysteryEncounterType.ER_THE_BARGAIN) {
+    return "synthetic";
+  }
+  return allMysteryEncounters[selected] === undefined ? "unregistered" : null;
+}
+
+function auditSeededGauntletPicks(): {
+  checked: number;
+  failureCount: number;
+  failureSamples: string[];
+  mysteryWaveCount: number;
+} {
+  const mysteryWaves = Array.from({ length: 256 }, (_, index) => index + 2).filter(
+    wave => erGauntletWaveKind(wave) === "me",
+  );
+  const failureSamples: string[] = [];
+  let failureCount = 0;
+  let checked = 0;
+
+  for (let seedIndex = 0; seedIndex < 512; seedIndex++) {
+    const seed = `gauntlet-registry-${seedIndex}`;
+    for (const wave of mysteryWaves) {
+      const selected = erGauntletPickMeType(wave, [], seed);
+      checked++;
+      const reason = invalidGauntletPickReason(selected);
+      if (reason === null) {
+        continue;
+      }
+      failureCount++;
+      if (failureSamples.length < 16) {
+        failureSamples.push(`seed ${seed} wave ${wave} selected ${reason} ${MysteryEncounterType[selected]}`);
+      }
+    }
+  }
+  return { checked, failureCount, failureSamples, mysteryWaveCount: mysteryWaves.length };
+}
+
 describe("co-op Mystery Encounter registry and exceptional-surface completeness", () => {
   it("registers every concrete enum event exactly once (91 registry events + one gauntlet-only Bargain)", () => {
     const expectedRegistry = enumMembers().filter(name => name !== "LLM_DIRECTED" && name !== "ER_THE_BARGAIN");
@@ -95,25 +133,16 @@ describe("co-op Mystery Encounter registry and exceptional-surface completeness"
 
   it("keeps every seeded gauntlet ME pick concrete and registered", () => {
     initMysteryEncounters();
-    const syntheticTypes = new Set([MysteryEncounterType.LLM_DIRECTED, MysteryEncounterType.ER_THE_BARGAIN]);
+    const { checked, failureCount, failureSamples, mysteryWaveCount } = auditSeededGauntletPicks();
 
-    for (let seedIndex = 0; seedIndex < 512; seedIndex++) {
-      const seed = `gauntlet-registry-${seedIndex}`;
-      for (let wave = 2; wave <= 257; wave++) {
-        if (erGauntletWaveKind(wave) !== "me") {
-          continue;
-        }
-        const selected = erGauntletPickMeType(wave, [], seed);
-        expect(
-          syntheticTypes.has(selected),
-          `seed ${seed} wave ${wave} selected synthetic ${MysteryEncounterType[selected]}`,
-        ).toBe(false);
-        expect(
-          allMysteryEncounters[selected],
-          `seed ${seed} wave ${wave} selected unregistered ${MysteryEncounterType[selected]}`,
-        ).toBeDefined();
-      }
+    if (failureCount > 0) {
+      throw new Error(
+        `found ${failureCount} invalid seeded gauntlet Mystery picks${
+          failureCount > failureSamples.length ? ` (first ${failureSamples.length} shown)` : ""
+        }:\n${failureSamples.join("\n")}`,
+      );
     }
+    expect(checked, "every seed is checked against every Mystery-designated wave").toBe(512 * mysteryWaveCount);
   });
 
   it("keeps every direct encounter UI escape inside the audited files", () => {
