@@ -16,6 +16,7 @@
 // to Pastel Veil / Magic Guard / Mystic Power.
 // =============================================================================
 
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { SpeciesId } from "#enums/species-id";
@@ -24,6 +25,11 @@ import { describe, expect, it } from "vitest";
 
 describe("ER — Eternal Floette kit (er-species-abilities override)", () => {
   const floette = () => getPokemonSpecies(SpeciesId.ETERNAL_FLOETTE);
+
+  it("maps the ER record onto the existing Gen 6 species instead of a duplicate custom entry", () => {
+    expect(ER_ID_MAP.species[1716]).toBe(SpeciesId.ETERNAL_FLOETTE);
+    expect(floette().forms.some(form => form.formKey === "mega")).toBe(true);
+  });
 
   it("active abilities are Energy Tap / Grassy Surge / Fairy Aura", () => {
     const sp = floette();

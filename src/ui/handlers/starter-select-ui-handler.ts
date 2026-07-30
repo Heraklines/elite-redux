@@ -4228,7 +4228,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // Revert the overlay back to the (still-alive) grid - never setMode(STARTER_SELECT), which re-shows
       // it empty (init gated on the callback arg).
       onCancel: () => void this.getUi().revertMode(),
-      onCycleTeam: dir => this.cycleShowdownEditorTeam(editIndex, dir),
+      onCycleTeam: (dir, result) => this.cycleShowdownEditorTeam(species, root, editIndex, result, dir),
       // Set Menu Export: copy the PS-format set text to the clipboard (guarded util; headless = no-op).
       copyToClipboard: text => copyTextToClipboard(text),
     };
@@ -4389,10 +4389,32 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * From a CREATE slot it enters the picked list at either end. Uncommitted create edits are discarded
    * (cycling is navigation between committed slots).
    */
-  private cycleShowdownEditorTeam(currentEditIndex: number, dir: number): void {
+  private cycleShowdownEditorTeam(
+    species: PokemonSpecies,
+    root: number,
+    currentEditIndex: number,
+    result: { stage: ShowdownEditorStage; set: ShowdownEditorSet },
+    dir: number,
+  ): void {
     const count = this.starterSpecies.length;
     if (count === 0) {
       return;
+    }
+    // Team navigation is not a cancel action. Persist the set being edited
+    // before loading its sibling, otherwise returning to it reconstructs the
+    // old moveset and makes players build the whole roster before editing.
+    if (currentEditIndex >= 0) {
+      const { stage, set } = result;
+      const starter = this.starters[currentEditIndex];
+      starter.showdownSpeciesId = stage.speciesId;
+      starter.showdownFormIndex = stage.formIndex;
+      starter.showdownItem = set.item;
+      starter.abilityIndex = set.abilityIndex;
+      starter.nature = set.nature as Nature;
+      starter.moveset = set.moves.filter((move): move is MoveId => move != null) as StarterMoveset;
+      this.showdownSelections.set(root, { speciesId: stage.speciesId, formIndex: stage.formIndex, item: set.item });
+      this.rememberShowdownSet(species, root, result);
+      this.updatePartyIcon(this.starterSpecies[currentEditIndex], currentEditIndex);
     }
     const base = currentEditIndex >= 0 ? currentEditIndex : dir > 0 ? -1 : count;
     const next = (((base + dir) % count) + count) % count;

@@ -40,6 +40,8 @@ describe("ER shiny favour", () => {
     expect(getChallengeFavour(challengeStub(Challenges.SINGLE_TYPE, 3))).toBe(5);
     expect(getChallengeFavour(challengeStub(Challenges.INVERSE_BATTLE, 1))).toBe(3);
     expect(getChallengeFavour(challengeStub(Challenges.FLIP_STAT, 1))).toBe(3);
+    expect(getChallengeFavour(challengeStub(Challenges.DOUBLES_ONLY, 1))).toBe(3);
+    expect(getChallengeFavour(challengeStub(Challenges.TRIPLES_ONLY, 1))).toBe(5);
     // Inactive (value 0) contributes nothing.
     expect(getChallengeFavour(challengeStub(Challenges.PASSIVES, 0))).toBe(0);
   });

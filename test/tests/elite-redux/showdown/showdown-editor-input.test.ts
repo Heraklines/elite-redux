@@ -20,6 +20,7 @@
 import { allMoves } from "#data/data-lists";
 import { Button } from "#enums/buttons";
 import type { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -28,6 +29,7 @@ import {
   type ShowdownEditorTextInput,
   type ShowdownSetEditorUiHandler,
 } from "#ui/showdown-set-editor-ui-handler";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -39,11 +41,16 @@ type EditorInternals = {
   filter: string;
   field: EditorField;
   paneCursor: number;
-  config: { set: { abilityIndex: number }; unlocks: { unlockedAbilityIndices: number[] } };
+  config: {
+    stage: { speciesId: number; formIndex: number };
+    set: { abilityIndex: number };
+    unlocks: { unlockedAbilityIndices: number[] };
+  };
   setFilter(value: string): void;
   moveEntries(): { moveId: MoveId; name: string; locked: boolean }[];
   selectPaneRow(): boolean;
   selectableAbilityIndices(): number[];
+  activeAbilityIds(): number[];
   processInput(button: Button): boolean;
 };
 
@@ -146,6 +153,23 @@ describe.skipIf(!RUN)("Showdown Set Editor type-to-search input model", () => {
       expect(unlocked, "cycling never lands on a locked ability slot").toContain(internals.config.set.abilityIndex);
       expect(selectable, "cycling stays within the selectable actives").toContain(internals.config.set.abilityIndex);
     }
+  });
+
+  it.each([
+    SpeciesId.KLEAVOR,
+    SpeciesId.DRAGAPULT,
+  ])("reads the selected mega form's active abilities for species %s", speciesId => {
+    const game = new GameManager(phaserGame);
+    const { internals } = buildEditor(game, EditorField.ABILITY);
+    const species = getPokemonSpecies(speciesId);
+    const megaIndex = species.forms.findIndex(form => form.formKey === "mega");
+    expect(megaIndex, `${species.name} Mega form is injected`).toBeGreaterThanOrEqual(0);
+    const mega = species.forms[megaIndex];
+
+    internals.config.stage = { speciesId, formIndex: megaIndex };
+
+    expect(internals.activeAbilityIds()).toEqual([mega.ability1, mega.ability2, mega.abilityHidden]);
+    expect(internals.activeAbilityIds()).not.toEqual([species.ability1, species.ability2, species.abilityHidden]);
   });
 
   // SOFTLOCK FIX (round 4): Escape (Button.MENU) must LEAVE the editor via onCancel. Before, MENU was
@@ -283,6 +307,9 @@ describe.skipIf(!RUN)("Showdown Set Editor type-to-search input model", () => {
     // With the capture released, the printable team-cycle hotkeys reach the handler and fire onCycleTeam.
     internals.processInput(Button.CYCLE_TERA); // V -> next
     internals.processInput(Button.CYCLE_GENDER); // G -> prev
-    expect(cycles.mock.calls, "V cycles next (+1), G cycles prev (-1)").toEqual([[1], [-1]]);
+    expect(
+      cycles.mock.calls.map(call => call[0]),
+      "V cycles next (+1), G cycles prev (-1)",
+    ).toEqual([1, -1]);
   });
 });

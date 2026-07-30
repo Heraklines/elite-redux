@@ -392,6 +392,7 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     expect(mode(), "the Set Editor opened on slot 0").toBe(UiMode.SHOWDOWN_SET_EDITOR);
     const editor: any = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR];
     const slot0Root = editor.config.rootSpeciesId;
+    editor.config.set.moves = [MoveId.TACKLE, MoveId.BODY_SLAM, null, null];
 
     // V (CYCLE_TERA) = NEXT team mon. With the dead-cycle bug, openShowdownEditor's setOverlayMode
     // no-ops (this.mode === SHOWDOWN_SET_EDITOR) and the editor keeps rendering slot 0; the fix
@@ -407,5 +408,9 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     game.scene.ui.getHandler().processInput(Button.CYCLE_GENDER);
     await wait(200);
     expect(editor.config.rootSpeciesId, "G cycled back to the first mon").toBe(slot0Root);
+    expect(editor.config.set.moves.slice(0, 2), "team cycling preserves the edited moveset").toEqual([
+      MoveId.TACKLE,
+      MoveId.BODY_SLAM,
+    ]);
   });
 });

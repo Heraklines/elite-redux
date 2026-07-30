@@ -123,6 +123,20 @@ describe.skipIf(!RUN)("ER Elite BST curve enforcement (#419)", () => {
     expect(enemy.getSpeciesForm().getBaseStatTotal()).toBe(candidate.baseBst);
   });
 
+  it("regenerates a usable moveset when an over-cap Pikachu form falls back to base Pikachu", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    setErDifficulty("elite");
+    const enemy = retarget(SpeciesId.PIKACHU, 19);
+    enemy.formIndex = 6;
+    expect(enemy.getSpeciesForm().getBaseStatTotal()).toBeGreaterThan(420);
+
+    enforceErEliteBstCurve(enemy);
+
+    expect(enemy.species.speciesId).toBe(SpeciesId.PIKACHU);
+    expect(enemy.formIndex).toBe(0);
+    expect(enemy.getMoveset()).not.toHaveLength(0);
+  });
+
   it("rechecks a legal base after a held-item mutation makes it an over-cap mega", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     setErDifficulty("hell");

@@ -91,10 +91,21 @@ interface AbilityUpgradeResult {
 const CUSTOM_DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
   [369, "All other Pokemon on the field deal 33% less damage."],
   [
+    292,
+    "Moves deal 50% more damage for one turn after an ally faints. Attack and Sp. Atk also rise by 5% per fainted ally.",
+  ],
+  [329, "Lowers opposing Pokemon's Sp. Atk on entry; each successful drop has a 10% chance to inflict Fear."],
+  [
+    534,
+    "Deals double damage to confused or enraged targets and when they hurt themselves. Enemy confusion and enrage can be prevented, but cannot be cured early.",
+  ],
+  [632, "Sharply lowers opposing Pokemon's Sp. Atk on entry; each successful drop has a 10% chance to inflict Fear."],
+  [
     250,
     "Terrain-based moves use the higher offense. Terrain Pulse gains STAB and chooses the strongest of Psychic, Fairy, Poison, Electric, or Grass.",
   ],
   [411, "On entry, every active Pokemon becomes weak to Poison-type moves until it switches out."],
+  [508, "May infatuate on contact and drains HP from infatuated targets. Fairy-type Pokemon appear more often."],
   [461, "Uses Tickle on entry. After lowering a target's stats, follows up with a 20 BP Covet."],
   [
     511,
@@ -115,6 +126,7 @@ const CUSTOM_DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
   [545, "Copies sound moves used by others and is immune to sound-based moves."],
   [546, "Traps opposing Pokemon. If one escapes by any switching method, its replacement is Salt Cured."],
   [557, "Doubles direct move damage on the first turn after entering battle."],
+  [589, "Sun boosts Water and rain boosts Fire. Hail boosts Rock and sandstorm boosts Ice."],
   [591, "Recovers 1/8 of its maximum HP each turn under Misty Terrain."],
   [596, "Sound moves have a 30% disable chance, increased to 100% if the target used a sound move earlier that turn."],
   [603, "Boosts Grass moves by 50% and recovers 1/8 of its maximum HP each turn in Grassy Terrain."],
@@ -128,7 +140,12 @@ const CUSTOM_DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
   [700, "Same-type attacks get a 1.2x boost, all moves gain STAB, and the user changes type each turn."],
   [711, "Copies moves with Star, Moon, or Lunar in their name and suppresses opposing abilities from those families."],
   [839, "Uses Defog on entry and negates enemy weather-based moves."],
+  [831, "Sound moves may inflict Fear, and Grass-type moves also count as sound moves."],
   [848, "Steadfast, blocks phasing moves, and gains Heavy Metal, including halved sound damage."],
+  [
+    850,
+    "Doubles secondary-effect chances, boosts wing, wind, and air moves by 30%, and increases experience gained by 20%.",
+  ],
   [429, "Retains its retreat trigger and guarantees escape from wild battles."],
   [335, "Curses a direct-damage attacker on fainting. Its attacks also have a 10% chance to Curse."],
   [687, "Punching moves restore 1/4 of the damage dealt."],
@@ -183,8 +200,166 @@ const CUSTOM_DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
   [1006, "Uses Ion Deluge when entering battle."],
   [1009, "Using an Ice-type move triggers a 40 BP Breaking Swipe follow-up."],
   [
+    303,
+    "Halves incoming Rock damage. Rock moves gain STAB for Rock-type holders; otherwise they deal 20% more damage.",
+  ],
+  [
+    337,
+    "Halves incoming Grass damage. Grass moves gain STAB for Grass-type holders; otherwise they deal 20% more damage.",
+  ],
+  [373, "Contact may trap the target. Every damaging move also binds for four turns, dealing 1/4 maximum HP per turn."],
+  [
     1028,
     "Deals 50% more damage to Grass-type Pokemon, gains Infiltrator, and takes half damage from Grass-type Pokemon.",
+  ],
+]);
+
+const REQUESTED_VANILLA_DESCRIPTIONS: ReadonlyMap<AbilityId, string> = new Map([
+  [AbilityId.INSOMNIA, "Prevents sleep and casts Torment on opposing Pokemon on entry."],
+  [
+    AbilityId.LIQUID_OOZE,
+    "Reverses drain and Predator-style post-attack healing into damage. Shell Bell is unaffected.",
+  ],
+  [AbilityId.HEALER, "Always cures the user's and its ally's status conditions at the end of each turn."],
+  [
+    AbilityId.SYNCHRONIZE,
+    "Copies non-sleep status conditions back to their source and forces opposing Pokemon to use the holder's Nature.",
+  ],
+  [AbilityId.TRACE, "Copies an opposing Ability on entry and disables that Ability on its source for two turns."],
+  [AbilityId.SUCTION_CUPS, "Prevents forced switching and steals the attacker's held item when hit by contact."],
+  [
+    AbilityId.IMPOSTER,
+    "Transforms into the opponent on entry; while transformed, copied attacks deal 30% more damage.",
+  ],
+  [
+    AbilityId.INTIMIDATE,
+    "Lowers opposing Pokemon's Attack on entry; each successful drop has a 10% chance to inflict Fear.",
+  ],
+  [AbilityId.GLUTTONY, "Uses berries early. Contact attacks have a 30% chance to steal a berry."],
+  [AbilityId.SHED_SKIN, "May cure status at the end of each turn. Shed Tail costs 1/3 of maximum HP."],
+  [
+    AbilityId.MUMMY,
+    "Contact replaces the attacker's Ability with Mummy and disables its first innate until it switches. Mummy-family holders are immune.",
+  ],
+  [
+    AbilityId.LINGERING_AROMA,
+    "Contact replaces the attacker's Ability with Lingering Aroma and disables its first innate until it switches. Mummy-family holders are immune.",
+  ],
+  [
+    AbilityId.WANDERING_SPIRIT,
+    "Contact swaps Abilities and disables the attacker's first innate until it switches. Mummy-family holders are immune. Reveals one additional biome.",
+  ],
+  [
+    AbilityId.DEFEATIST,
+    "Halves Attack and Sp. Atk below one-third HP. Once per battle at 10% HP, raises Attack, Sp. Atk, and Speed by two stages.",
+  ],
+  [
+    AbilityId.OBLIVIOUS,
+    "Prevents infatuation, Taunt, and adjacent attack reductions. Offensive contact has a 20% chance to confuse.",
+  ],
+  [
+    AbilityId.KLUTZ,
+    "Disables the holder's items and prevents opposing Pokemon from consuming Berries or other held items.",
+  ],
+  [
+    AbilityId.ICE_BODY,
+    "Prevents hail damage and restores HP in hail or snow. Defensive contact has a 10% chance to inflict Frostbite.",
+  ],
+  [
+    AbilityId.TELEPATHY,
+    "Prevents friendly-fire damage, senses super-effective moves, dodges the first such hit, and reveals one additional biome.",
+  ],
+  [
+    AbilityId.AROMA_VEIL,
+    "Protects the holder and its ally from mental effects and from non-guaranteed secondary effects.",
+  ],
+  [
+    AbilityId.SWEET_VEIL,
+    "Prevents sleep for the holder and allies. On its first entry, restores 10% HP to the whole party.",
+  ],
+  [
+    AbilityId.AURA_BREAK,
+    "Reverses Dark Aura and Fairy Aura, weakens Aura moves by 25%, and suppresses opposing Battle Aura and Aura Armor.",
+  ],
+  [AbilityId.TANGLING_HAIR, "Contact lowers the attacker's Speed and has a 50% chance to trap it."],
+  [
+    AbilityId.GULP_MISSILE,
+    "Surf or Dive catches prey that is spat at the next attacker. The holder also takes 20% less direct damage.",
+  ],
+  [
+    AbilityId.MIMICRY,
+    "Changes type with terrain. Terrain-based moves use the higher offense; Terrain Pulse gains STAB and chooses its strongest legal type.",
+  ],
+  [AbilityId.PASTEL_VEIL, "Uses Safeguard on entry. On its first entry, restores 10% HP to the whole party."],
+  [
+    AbilityId.STENCH,
+    "Attacks gain a 10% flinch chance. Toxic Surge cannot expire or be removed by terrain or moves while the holder is active.",
+  ],
+  [
+    AbilityId.ANTICIPATION,
+    "Senses dangerous moves, dodges the first super-effective hit, and reveals one additional biome.",
+  ],
+  [
+    AbilityId.BERSERK,
+    "Raises the higher attacking stat after dropping to half HP, becoming confused, or becoming enraged.",
+  ],
+  [AbilityId.DELTA_STREAM, "Summons strong winds on entry and creates Tailwind for 3 turns."],
+  [AbilityId.HEAVY_METAL, "Doubles weight and halves damage from Ghost, Dark, and sound-based moves."],
+  [
+    AbilityId.FLOWER_GIFT,
+    "In harsh sunlight, raises the holder's and its allies' higher attacking and defensive stats by 50%.",
+  ],
+  [AbilityId.MARVEL_SCALE, "Raises Defense by 1.5x while statused and prevents damage from status conditions."],
+  [
+    AbilityId.RAIN_DISH,
+    "Restores HP in rain. Water-type moves are blocked and raise the holder's higher defensive stat without redirection.",
+  ],
+  [AbilityId.WIMP_OUT, "Switches out below half HP and guarantees escape from wild battles."],
+  [AbilityId.RATTLED, "Raises Speed when threatened by certain moves and guarantees escape from wild battles."],
+  [AbilityId.EMERGENCY_EXIT, "Switches out below half HP and guarantees escape from wild battles."],
+  [
+    AbilityId.FOREWARN,
+    "Reveals an opposing move and treats attacks as not very effective for the first two turns, once per battle.",
+  ],
+  [AbilityId.DAZZLING, "Protects the holder's side from priority moves and multiplies accuracy by 1.2x."],
+  [AbilityId.PERISH_BODY, "Contact starts a perish count for both battlers. Also applies Aftermath when knocked out."],
+  [
+    AbilityId.SCREEN_CLEANER,
+    "On entry, removes Reflect, Light Screen, Aurora Veil, and Smokescreen from the opposing side only.",
+  ],
+  [
+    AbilityId.QUICK_DRAW,
+    "Damaging moves may act first. A Quick Draw-procced attack deals double damage to another Quick Draw holder.",
+  ],
+  [
+    AbilityId.GOOD_AS_GOLD,
+    "Blocks directly targeted status moves and increases money gained by 20% when active at battle end.",
+  ],
+  [AbilityId.SUPER_LUCK, "Raises critical-hit ratio by one stage and increases experience gained by 20%."],
+  [
+    AbilityId.GUARD_DOG,
+    "Prevents forced switching, reverses adjacent attack reductions, and counters every direct hit with a 30 BP Bite.",
+  ],
+  [
+    AbilityId.COMMANDER,
+    "Enters an allied Dondozo and sharply raises its stats. Below half HP, Dondozo releases it to act at half damage until freed.",
+  ],
+  [AbilityId.WHITE_SMOKE, "Prevents stat reductions and sets Mist on the holder's side for three turns on entry."],
+  [
+    AbilityId.STEADFAST,
+    "Raises Speed when flinched and grants Limber: paralysis immunity, protection from self-inflicted stat drops, and halved recoil.",
+  ],
+  [
+    AbilityId.SNOW_CLOAK,
+    "During hail or snow, creates and maintains Aurora Veil until the weather ends or the holder leaves the field.",
+  ],
+  [
+    AbilityId.BALL_FETCH,
+    "Steals throwing and Ball-named moves for immediate use and returns used Poke Balls and Great Balls after battle.",
+  ],
+  [
+    AbilityId.UNBURDEN,
+    "Boosts Speed by 1.2x while active and prevents every Speed-lowering effect, including paralysis and held items.",
   ],
 ]);
 
@@ -1030,6 +1205,29 @@ export function initEliteReduxAbilityUpgrades(): AbilityUpgradeResult {
     setAbilityName(ability, "Ninja's Blade");
     return 1;
   });
+
+  // Some requested description-only riders are implemented in shared field,
+  // encounter, or stat-drop hooks rather than by an attr appended in this
+  // function. Apply the complete authored description table independently of
+  // the mechanic patch list so those entries cannot retain their pre-overhaul
+  // draft text merely because they had no local `patch(...)` call.
+  for (const draftId of CUSTOM_DESCRIPTIONS.keys()) {
+    const ability = getErAbility(draftId);
+    if (ability !== undefined) {
+      setCustomDescription(ability, draftId);
+    }
+  }
+  for (const [abilityId, description] of REQUESTED_VANILLA_DESCRIPTIONS) {
+    const ability = allAbilities[abilityId];
+    if (ability !== undefined) {
+      Object.defineProperty(ability, "description", {
+        configurable: true,
+        enumerable: true,
+        value: description,
+        writable: false,
+      });
+    }
+  }
 
   return result;
 }

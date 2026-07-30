@@ -178,9 +178,10 @@ export interface ShowdownSetEditorConfig {
   onCancel?: () => void;
   /**
    * L/R team cycling (shoulders): switch the editor to the sibling already-picked team mon
-   * (`dir` = -1 previous / +1 next). Absent when there is no sibling to cycle to.
+   * (`dir` = -1 previous / +1 next). The current edit is supplied so navigation
+   * can preserve it before loading the sibling. Absent when there is no sibling.
    */
-  onCycleTeam?: (dir: number) => void;
+  onCycleTeam?: (dir: number, result: { stage: ShowdownEditorStage; set: ShowdownEditorSet }) => void;
   /** EXPORT set: copy the given PS-format set text to the clipboard (production wires navigator.clipboard). */
   copyToClipboard?: (text: string) => void;
   /** Deterministic initial Set Menu view (for the render recipes): the menu / import / load / save sub-state. */
@@ -464,10 +465,15 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     return isMegaStage(this.config!.stage.speciesId, this.config!.stage.formIndex);
   }
 
-  /** The fielded species' three active-ability ids (may repeat / include NONE). */
+  /** The fielded form's three active-ability ids (may repeat / include NONE). */
   private activeAbilityIds(): number[] {
     const sp = this.fieldedSpecies;
-    return [sp.ability1, sp.ability2, sp.abilityHidden];
+    // Injected ER megas/forms share their root species id and differ only by
+    // formIndex. Reading the species-level slots made every mega show the base
+    // form's choices (Kleavor) and could duplicate an innate (Dragapult's
+    // Parental Bond). Everything in the editor must follow the selected stage.
+    const form = sp.forms[this.config!.stage.formIndex];
+    return [form?.ability1 ?? sp.ability1, form?.ability2 ?? sp.ability2, form?.abilityHidden ?? sp.abilityHidden];
   }
 
   /** The fielded species' three innate (passive) ability ids. */
@@ -579,7 +585,9 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     if (this.config?.onCycleTeam == null) {
       return false;
     }
-    this.config.onCycleTeam(dir);
+    // Cycling is navigation, not submission. Preserve partial builds too: a
+    // player must be able to move between teammates while filling moveslots.
+    this.config.onCycleTeam(dir, { stage: this.config.stage, set: this.config.set });
     return true;
   }
 
@@ -1152,8 +1160,13 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     } else if (this.config!.set.item === MEGA_STONE_ITEM) {
       this.config!.set.item = SHOWDOWN_ITEM_POOL[0];
     }
-    // A new stage can shift which active-ability slots are legal; keep the index in range.
-    this.config!.set.abilityIndex = Math.max(0, Math.min(this.config!.set.abilityIndex, 2));
+    // A new stage can shift which active-ability slots are legal. Keep the
+    // current slot only if the new form actually exposes it; otherwise select
+    // the first unlocked, distinct ability for that form.
+    const selectableAbilities = this.selectableAbilityIndices();
+    if (!selectableAbilities.includes(this.config!.set.abilityIndex)) {
+      this.config!.set.abilityIndex = selectableAbilities[0] ?? 0;
+    }
     this.render();
     return true;
   }

@@ -39,6 +39,40 @@ import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { paginateAndJoin } from "#system/llm-director/text-pagination";
 import { randSeedInt } from "#utils/common";
 
+/**
+ * Drop the remainder of the just-finished turn once the final enemy is gone.
+ * In multi-active battles, ally MovePhases can already be queued behind the
+ * first VictoryPhase. Letting them run with no targets eventually schedules a
+ * fresh CommandPhase and strands the cleared wave forever.
+ */
+export function removeQueuedPostVictoryCombatPhases(): void {
+  // Authoritative co-op owns a separately sanctioned victory tail. This cleanup
+  // is for the solo multi-active queue corruption reported in production.
+  if (globalScene.gameMode.isCoop) {
+    return;
+  }
+  const staleCombatPhases = [
+    "CommandPhase",
+    "EnemyCommandPhase",
+    "TurnStartPhase",
+    "MovePhase",
+    "MoveEndPhase",
+    "CheckInterludePhase",
+    "WeatherEffectPhase",
+    "PositionalTagPhase",
+    "BerryPhase",
+    "CheckStatusEffectPhase",
+    "PostTurnStatusEffectPhase",
+    "TurnEndPhase",
+    "TurnInitPhase",
+  ] as const;
+  for (const phaseName of staleCombatPhases) {
+    while (globalScene.phaseManager.tryRemovePhase(phaseName)) {
+      // Remove static phases, dynamic phases, and their markers.
+    }
+  }
+}
+
 export class VictoryPhase extends PokemonPhase {
   public readonly phaseName = "VictoryPhase";
   /** If true, indicates that the phase is intended for EXP purposes only, and not to continue a battle to next phase */
@@ -140,6 +174,7 @@ export class VictoryPhase extends PokemonPhase {
         .getEnemyParty()
         .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)))
     ) {
+      removeQueuedPostVictoryCombatPhases();
       // Co-op (#633, authoritative wave-advance handshake): this is the real WIN / wave-clear
       // branch (not the exp-only / mystery-encounter paths, which returned above). The host is
       // the sole engine; signal the guest renderer that this wave RESOLVED so it runs the same

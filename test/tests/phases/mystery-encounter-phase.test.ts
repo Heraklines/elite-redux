@@ -3,6 +3,7 @@ import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import type { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import type { MessageUiHandler } from "#ui/message-ui-handler";
 import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
@@ -102,6 +103,26 @@ describe("Mystery Encounter Phases", () => {
         300,
         true,
       );
+    });
+
+    it("re-arms option input when a pre-option selector is cancelled", async () => {
+      await game.runToMysteryEncounter(MysteryEncounterType.TRAINING_SESSION, [
+        SpeciesId.CHARIZARD,
+        SpeciesId.VOLCARONA,
+      ]);
+      await game.phaseInterceptor.to("MysteryEncounterPhase", false);
+
+      const phase = game.scene.phaseManager.getCurrentPhase() as MysteryEncounterPhase;
+      const option = game.scene.currentBattle.mysteryEncounter!.options[0];
+      const originalPreOption = option.onPreOptionPhase;
+      option.onPreOptionPhase = vi.fn().mockResolvedValue(false);
+
+      expect(phase.handleOptionSelect(option, 0)).toBe(true);
+      await vi.waitFor(() => expect(option.onPreOptionPhase).toHaveBeenCalledTimes(1));
+      expect(phase.handleOptionSelect(option, 0), "the top-level selector accepts input again").toBe(true);
+      await vi.waitFor(() => expect(option.onPreOptionPhase).toHaveBeenCalledTimes(2));
+
+      option.onPreOptionPhase = originalPreOption;
     });
   });
 

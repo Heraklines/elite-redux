@@ -172,6 +172,12 @@ export class BattleEndPhase extends BattlePhase {
   start() {
     super.start();
 
+    // The party-count trays are encounter-intro / switch presentation only.
+    // Ensure a delayed or interrupted summon animation cannot leave either tray
+    // covering the reward shop after the battle has definitively ended.
+    globalScene.pbTray.hide();
+    globalScene.pbTrayEnemy.hide();
+
     // cull any extra `BattleEnd` phases from the queue.
     this.isVictory ||= globalScene.phaseManager.hasPhaseOfType(
       "BattleEndPhase",

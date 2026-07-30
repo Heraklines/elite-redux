@@ -29,14 +29,17 @@ import {
   ER_OMINOUS_SHROUD_ABILITY_ID,
   ER_WATERBORNE_ABILITY_ID,
 } from "#data/elite-redux/abilities/type-nativization-abilities";
+import { isSuppressedByRequestedFieldAbility } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { getErAbilityRomDescription } from "#data/elite-redux/er-ability-descriptions";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { resolveErSpeciesConstId } from "#data/elite-redux/er-type-nativization";
 import type { PokemonSpecies, PokemonSpeciesForm } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { ErAbilityId } from "#enums/er-ability-id";
+import type { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -90,13 +93,14 @@ const DRAFT_OMINOUS_SHROUD = 5523;
 
 describe.skipIf(!RUN)("ER type-nativization maintainer corrections (2026-07-17)", () => {
   let phaserGame: Phaser.Game;
+  let game: GameManager;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
   });
 
   beforeEach(() => {
-    void new GameManager(phaserGame);
+    game = new GameManager(phaserGame);
   });
 
   it("1. Free Climb composite = Unburden + Mountaineer (not Hyper Aggressive)", () => {
@@ -126,6 +130,27 @@ describe.skipIf(!RUN)("ER type-nativization maintainer corrections (2026-07-17)"
     expect(names).toContain("Lunar Affinity");
     expect(names).not.toContain("Serene Grace");
     expect(names).toContain("Sheer Force");
+  });
+
+  it("3. Lunar Affinity suppression resolves raw field sources without re-entering hasAbility", () => {
+    const lunarAffinity = ER_ID_MAP.abilities[711] as AbilityId;
+    const lunarNamedAbility = allAbilities.find(
+      ability => ability?.id !== lunarAffinity && /(?:lunar|moon|star)/i.test(ability?.name ?? ""),
+    );
+    expect(lunarNamedAbility, "a suppressible lunar/moon/star ability exists").toBeDefined();
+
+    const subject = {} as Pokemon;
+    const holder = {
+      hp: 1,
+      isOpponent: (pokemon: Pokemon) => pokemon === subject,
+      getAbilitySources: () => [{ ability: { id: lunarAffinity } }],
+      hasAbility: () => {
+        throw new Error("Lunar Affinity must not recurse through hasAbility");
+      },
+    } as unknown as Pokemon;
+    vi.spyOn(game.scene, "getField").mockReturnValue([holder]);
+
+    expect(isSuppressedByRequestedFieldAbility(subject, lunarNamedAbility!.id)).toBe(true);
   });
 
   it("4-7. Composite abilities invoke the nativized constituents (not the removed type-grants)", () => {
