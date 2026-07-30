@@ -134,7 +134,8 @@ if (
   || !harness.includes("expectedCommandAddress:")
   || !harness.includes("boundary.observation.epoch")
   || !campaign.includes("expectedCommandAddress ??")
-  || !campaign.includes("currentSharedCommandAddress(clients, purpose)")
+  || !campaign.includes("expectedAddress = currentSharedCommandAddress(clients)")
+  || !campaign.includes("if (expectedAddress == null)")
 ) {
   failures.push(
     "public-ui-harness.mjs: Commander must drive exact-address public prompts, prove hidden-owner rendezvous, and admit only exact-point converged retries",

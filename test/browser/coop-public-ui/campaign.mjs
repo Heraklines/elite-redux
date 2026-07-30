@@ -743,13 +743,26 @@ export async function driveBattleFallback(rig, keys, from, purpose, expectedComm
   return pending;
 }
 
-function currentSharedCommandAddress(clients, purpose) {
+function currentSharedCommandAddress(clients) {
   const addresses = clients.map(client => {
-    const observation = client.evidence.findLastSurface("command")?.observation;
-    return observation == null ? null : `${observation.epoch}:${observation.wave}:${observation.turn}`;
+    // The append-only legacy command mirror records only command-menu appearances. During the
+    // ordinary sequential frontier one browser can already be waiting on a battle MESSAGE at turn
+    // N while its partner is still exposing the preceding command marker. Treating both historical
+    // command markers as current produced a harness-only desync at wave 3 turn 4 (depth run
+    // 30500538258). The semantic mirror describes what each browser displays NOW, including that
+    // partner-wait message, so prefer its address and use the legacy command only before any semantic
+    // surface exists. No convergence means "not actionable yet", never permission to guess.
+    const semantic = client.evidence.findLastSemanticSurface()?.observation;
+    const address =
+      semantic?.address ?? (semantic == null ? client.evidence.findLastSurface("command")?.observation : null);
+    return Number.isSafeInteger(address?.epoch)
+      && Number.isSafeInteger(address?.wave)
+      && Number.isSafeInteger(address?.turn)
+      ? `${address.epoch}:${address.wave}:${address.turn}`
+      : null;
   });
   if (addresses.some(address => address == null) || new Set(addresses).size !== 1) {
-    throw new Error(`${purpose}: battle prompt advancement requires one shared public command address`);
+    return null;
   }
   return addresses[0];
 }
@@ -825,12 +838,12 @@ export function createBattlePromptAdvancer(
     throw new Error(`${purpose}: battle prompt advancement requires the authenticated public host`);
   }
   const clients = Object.values(rig.clients);
-  // Ordinary battles derive the address from both clients' last public command surface. Commander is
-  // intentionally asymmetric: the hidden Tatsugiri owner must never expose that surface. Its strict
-  // read-only Commander observation already proves one shared epoch/wave/turn, so that caller supplies
-  // the exact address instead of weakening prompt admission to any live battle address.
-  const expectedAddress =
-    expectedCommandAddress ?? (requireSharedCommandAddress ? currentSharedCommandAddress(clients, purpose) : null);
+  // Ordinary battles freeze the first address on which both browsers' CURRENT public semantic
+  // surfaces converge. Sequential command ownership legitimately opens one browser before the other;
+  // until both observations name the same address the helper is inert and its caller keeps polling.
+  // Commander is intentionally asymmetric: the hidden Tatsugiri owner must never expose a command
+  // surface, so that caller supplies the exact address from its stricter Commander proof.
+  let expectedAddress = expectedCommandAddress ?? null;
   const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
   // Consumption belongs to the browser session, not one helper invocation. Several public journeys
   // create a fresh advancer at the same battle boundary (post-turn -> faint picker -> next command).
@@ -851,6 +864,12 @@ export function createBattlePromptAdvancer(
       observation.surfaceGeneration ?? null,
     ]);
   return async () => {
+    if (expectedAddress == null && requireSharedCommandAddress) {
+      expectedAddress = currentSharedCommandAddress(clients);
+      if (expectedAddress == null) {
+        return false;
+      }
+    }
     for (const client of clients) {
       const readyEvent = client.evidence.events.slice(cursors.get(client.label) ?? 0).find(event => {
         if (event.kind !== "browser-surface2") {

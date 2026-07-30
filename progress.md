@@ -5728,3 +5728,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `baseSha` before shard selection. The next checkpoint advances that manifest to exact previous tip `356283262`,
   and deliberately retains the simultaneous-switch engine test in the pushed delta so the replacement shard is not
   skipped merely because the first planner stopped before qualification.
+
+## 2026-07-30 - Sequential command frontiers use current semantic addresses
+
+- Parent campaign `30500538258` depth did not expose a product desync at wave 3 turn 4. The host browser visibly
+  showed the current partner-wait message at turn 4 while the guest browser opened the real turn-4 command menu;
+  both engines were healthy. The browser driver nevertheless compared their last historical legacy command markers
+  (host turn 1, guest turn 3) and threw `battle prompt advancement requires one shared public command address`.
+- Battle prompt advancement now derives address authority from each browser's current semantic surface, with the
+  legacy command mirror used only before a semantic surface exists. A sequential one-browser-ahead frontier is an
+  ordinary provisional state: the driver sends no key and keeps polling until both current semantic addresses
+  converge, then freezes that exact address for the helper's lifetime. Null never means "any live address".
+- A node-pure failure-first contract recreates the exact stale-legacy/current-semantic split. It proves construction
+  and the first poll neither throw nor spend input, then advances the second semantic mirror to turn 4 and permits
+  exactly one Space on the live turn-4 narration. The campaign and faint-replacement pure suites are 61/61 green;
+  both public boundary checks, the 25-test presentation source suite, scoped Biome error diagnostics, and diff checks
+  are green locally.
+- Focused parent run `30503943750` selected B11 and kept branch static green. Its source lane failed only because an
+  old regex required the replacement checkpoint constructor to have exactly one argument after the exact summon
+  binding added a second; the contract now asserts the typed default without freezing constructor arity. B11 ran
+  95/96 green and stopped the new simultaneous-switch regression before mechanics because random trainer generation
+  produced a three-mon party. The fixture now pins the missing fourth enemy before `buildDuo` mirrors both engines,
+  guaranteeing two real reserves for the two simultaneous enemy faints without mocking switch scheduling.

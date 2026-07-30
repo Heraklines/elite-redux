@@ -795,7 +795,10 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.ok(apply > presentationGate, "checkpoint apply occurs only after the presentation gate");
   assert.match(replay, /CoopSwitchReplayPhase[\s\S]+CoopReplayTurnPhase[\s\S]+this\.end\(\)/u);
   assert.match(checkpoint, /private readonly noSummonExpected: boolean/u);
-  assert.match(checkpoint, /constructor\(noSummonExpected = false\)[\s\S]+this\.noSummonExpected = noSummonExpected/u);
+  assert.match(
+    checkpoint,
+    /constructor\(\s*noSummonExpected = false,[\s\S]+this\.noSummonExpected = noSummonExpected/u,
+  );
   assert.match(
     checkpoint,
     /recordedPresentation == null && !this\.noSummonExpected[\s\S]+recordedPresentation \?\? \[\]/u,

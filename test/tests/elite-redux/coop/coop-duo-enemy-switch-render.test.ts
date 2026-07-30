@@ -62,6 +62,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
@@ -371,6 +372,17 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
 
   it("an earlier enemy trainer summon cannot consume a guest-owned player replacement checkpoint", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.DRAGONITE, SpeciesId.CHARIZARD);
+    // Random trainer generation is allowed to produce only three party members for this double battle
+    // (focused B11 run 30503943750). Two simultaneous enemy faints need two actual reserves, so pin the
+    // missing bench member before buildDuo mirrors the live battle into the second engine. This changes
+    // only the fixture's party cardinality; the production switch/replacement scheduling stays real.
+    const hostBattle = game.scene.currentBattle;
+    const enemyLead = game.scene.getEnemyField()[0];
+    while (hostBattle.enemyParty.length < 4) {
+      hostBattle.enemyParty.push(
+        game.scene.addEnemyPokemon(getPokemonSpecies(SpeciesId.SHUCKLE), enemyLead.level, enemyLead.trainerSlot),
+      );
+    }
     const pair = createLoopbackPair();
     const authorityEntries: Array<{ kind: string; nextControl?: { kind?: string } | null }> = [];
     const originalHostSend = pair.host.send.bind(pair.host);

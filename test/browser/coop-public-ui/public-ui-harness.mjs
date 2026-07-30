@@ -4635,12 +4635,11 @@ export class DuoPublicUiRig {
     // A faint window is INHERENTLY a divergent-address state: the fainted owner is in its own-slot
     // SwitchPhase / replacement picker while the partner still holds (or has already left) the last
     // battle command surface, so the two clients have NO single shared public command address. The
-    // default advancer eagerly computes currentSharedCommandAddress and THREW here on a staggered /
-    // double faint (Track R animations-on-surface lane: "battle prompt advancement requires one shared
-    // public command address"). This advancer only drives the local CoopFaintReplayPhase MessagePhase
-    // narration, which is scoped by the picker-open cursor and each ready prompt's own live battle
-    // address - it never needs a shared command address. Same relaxation the between-wave advancer
-    // already uses (advanceToNextWaveCommand) for the same divergent-address reason.
+    // A required shared-address advancer would correctly remain inert here forever: a staggered/double
+    // faint has no converged command address by construction. This advancer only drives the local
+    // CoopFaintReplayPhase MessagePhase narration, scoped by the picker-open cursor and each ready
+    // prompt's own live battle address, so it explicitly does not require shared command convergence.
+    // This is the same relaxation advanceToNextWaveCommand uses during between-wave presentation.
     const advanceBattlePrompt = createBattlePromptAdvancer(this, advancerCursors, {}, "faint-replacement-picker", {
       requireSharedCommandAddress: false,
     });

@@ -60,7 +60,8 @@ for (const file of files) {
 
 const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
 if (
-  !campaign.includes("currentSharedCommandAddress(clients, purpose)")
+  !campaign.includes("expectedAddress = currentSharedCommandAddress(clients)")
+  || !campaign.includes("if (expectedAddress == null)")
   || !campaign.includes("observedAddress === expectedAddress")
   || !campaign.includes("observation.ready?.handlerActive === true")
 ) {

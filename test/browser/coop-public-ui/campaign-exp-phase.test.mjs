@@ -920,6 +920,36 @@ test("only ready active local battle narration and EXP instances advance once on
   );
 });
 
+test("a staggered sequential command frontier waits for current semantic address convergence", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const stats = { battleMessagePrompts: 0, postBattleExpPrompts: 0 };
+
+  // Reproduce depth run 30500538258: the authority's last legacy command marker is from turn 1,
+  // while its current partner-wait message is already at turn 4. The renderer is still at turn 3.
+  authority.evidence.pushCommandSurface({ epoch: 7, wave: 3, turn: 1 });
+  renderer.evidence.pushCommandSurface({ epoch: 7, wave: 3, turn: 3 });
+  authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 71, true, {
+    epoch: 7,
+    wave: 3,
+    turn: 4,
+  });
+  renderer.evidence.pushOwnedCommandSurface(1, { epoch: 7, wave: 3, turn: 3 });
+
+  const advance = createBattlePromptAdvancer(rig, { authority: 0, renderer: 0 }, stats, "staggered-frontier");
+  assert.equal(await advance(), false, "a normal one-browser-ahead frontier must wait instead of throwing or guessing");
+  assert.equal(authority.presses.length, 0, "no public input is spent before the two current addresses converge");
+
+  renderer.evidence.pushOwnedCommandSurface(1, { epoch: 7, wave: 3, turn: 4 });
+  assert.equal(await advance(), true, "the exact current turn becomes actionable once both semantic mirrors agree");
+  assert.deepEqual(
+    authority.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.equal(renderer.presses.length, 0, "the command-menu owner is left to the sequential command driver");
+});
+
 test("successor-address faint narration advances only after the browser observes its structural FaintPhase", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
