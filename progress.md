@@ -5949,3 +5949,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `CoopHideAbilityReplayPhase`. The spy now preserves `TweenManager`'s return type and the actual two-engine replay
   drain starts/ends the teardown phase before declaring the authoritative turn complete. The failure-first source
   contract is green locally; the rest of that exact run remains intact for independent merge/product evidence.
+- Artifact triage of representative B1, C1, and P1 failures from that aggregate proved the broad engine red set had
+  the same single cause: each test reached a queued `CoopHideAbilityReplayPhase` and the shared headless driver failed
+  closed before finalize. The current-tip focused gate then passed source/static/A/P but exposed one second test-local
+  phase inventory in `coop-battle-events.test.ts`; its bespoke replay driver stopped before the checkpoint, leaving HP
+  at 32 instead of the streamed 9. That fixture now also drains the exact hide phase. This is test-driver wiring only,
+  while the old aggregate and all browser runs remain undisturbed as required.
