@@ -1341,6 +1341,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     let ownerDone = false;
     let watchDone = false;
     let ownerPhase: InstanceType<typeof TheBargainPhase> | null = null;
+    let watcherPhase: InstanceType<typeof TheBargainPhase> | null = null;
     await withClient(rig.hostCtx, async () => {
       const phase = new TheBargainPhase();
       ownerPhase = phase;
@@ -1357,12 +1358,10 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
       });
       watcherProjected = projected.phaseName === "TheBargainPhase";
-      const seam = projected as unknown as { end: () => void };
-      const realEnd = seam.end.bind(projected);
-      seam.end = () => {
-        watchDone = true;
-        realEnd();
-      };
+      // Authority V2 closes this boundary through shiftPhaseThroughCoopAuthorityCommit, which deliberately
+      // retires the exact current phase without consulting the legacy Phase.end() lifecycle hook. Prove the
+      // scheduler edge itself instead of wrapping an API that no longer owns correctness.
+      watcherPhase = projected as InstanceType<typeof TheBargainPhase>;
       projected.start();
       await drainLoopback();
     });
@@ -1400,6 +1399,10 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     for (let i = 0; i < 80 && (!ownerDone || !watchDone); i++) {
       await pumpDuoDestinations(rig, 1);
       ownerDone = await withClient(rig.hostCtx, () => rig.hostScene.phaseManager.getCurrentPhase() !== ownerPhase);
+      watchDone = await withClient(
+        rig.guestCtx,
+        () => watcherPhase != null && rig.guestScene.phaseManager.getCurrentPhase() !== watcherPhase,
+      );
     }
     await pumpDuoDestinations(rig);
     expect(ownerDone, "owner bargain chain fully completed after public input").toBe(true);
@@ -1432,14 +1435,11 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
 
     const { TheBargainPhase } = await import("#phases/the-bargain-phase");
     let watcherDone = false;
+    let watcherPhase: InstanceType<typeof TheBargainPhase> | null = null;
     await withClient(rig.hostCtx, async () => {
       const watcher = new TheBargainPhase();
-      const seam = watcher as unknown as { end: () => void };
-      const realEnd = seam.end.bind(watcher);
-      seam.end = () => {
-        watcherDone = true;
-        realEnd();
-      };
+      // The committed-control scheduler retires this exact phase atomically; Phase.end() is not the V2 proof.
+      watcherPhase = watcher;
       expect(rig.hostScene.phaseManager.overridePhase(watcher), "the host watcher owns the real Bargain boundary").toBe(
         true,
       );
@@ -1514,6 +1514,10 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         ownerDone = await withClient(
           rig.guestCtx,
           () => ownerPhase != null && rig.guestScene.phaseManager.getCurrentPhase() !== ownerPhase,
+        );
+        watcherDone = await withClient(
+          rig.hostCtx,
+          () => watcherPhase != null && rig.hostScene.phaseManager.getCurrentPhase() !== watcherPhase,
         );
       }
 
