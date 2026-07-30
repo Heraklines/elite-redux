@@ -532,6 +532,19 @@ test("reward navigation treats the visible reward carousel as one horizontal axi
   );
 });
 
+test("ordinary campaign turns keep the strongest visible move instead of weakening by turn number", async () => {
+  const campaign = await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8");
+  assert.doesNotMatch(
+    campaign,
+    /cycleIndex:\s*turn\s*-\s*1/u,
+    "a later battle turn is not evidence that the strongest move failed or hit an immunity",
+  );
+  assert.match(
+    campaign,
+    /driveBestCampaignMove\(client, commandPurpose, \{[\s\S]*?commandEvent,[\s\S]*?preferredMoveId:/u,
+  );
+});
+
 test("campaign switch policy chooses only the acting seat's meaningfully healthier reserve", () => {
   const observation = {
     surfaceId: "command:command",

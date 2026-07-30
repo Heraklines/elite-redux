@@ -6041,3 +6041,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Failure-first source contracts cover the N+1 successor, exact runtime/scene binding, signed bridge installation,
   and atomic phase close. The combined Authority V2, campaign, and Bargain source suite passes 166/166; Biome and
   changed-file TypeScript diagnostics are clean. Exact two-browser Mystery requalification remains required.
+
+## 2026-07-30 - Depth campaign stops weakening successful attacks by turn ordinal
+
+- Exact depth run `30537161760` was mechanically synchronized through wave 2 and reached a normal shared GameOver,
+  but wiped after only one clear. Its public evidence showed the driver selecting progressively weaker moves solely
+  because the turn number increased: the decisive second wave-2 round used visible power 60 + 25 even though each
+  actor had a healthy visible 80 + 40 option and no immunity or failed-command evidence existed.
+- Ordinary campaign rounds now omit the alternate-move index and therefore keep choosing the strongest visible,
+  usable damaging move. The explicit cycling primitive remains available for a caller that has actual evidence a
+  move must change; a successful prior turn is no longer treated as such evidence.
+- A node-pure source contract forbids restoring `cycleIndex: turn - 1`. This changes only human-equivalent browser
+  policy, not production battle state, Authority V2, Showdown, tournament, triples, or deployment behavior.

@@ -1454,7 +1454,9 @@ async function driveBattleWave(rig, policy, stats) {
           : (client, commandPurpose, commandEvent) =>
               driveBestCampaignMove(client, commandPurpose, {
                 timeoutMs: rig.config.timeoutMs,
-                cycleIndex: turn - 1,
+                // A later turn proves the previous command resolved; it does not prove the
+                // strongest move was ineffective. Alternate only when a caller has explicit
+                // failure/immunity evidence instead of weakening every ordinary round.
                 commandEvent,
                 preferredMoveId: policy.registeredInteractions.preferredMoveId,
               }),
