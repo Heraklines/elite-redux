@@ -322,11 +322,12 @@ export type CoopNextControl =
        * No mechanically authoritative choice UI is authorized by this entry. The replica is parked at this
        * exact source address until the immediately-following ordered entry has one of the stated kinds.
        * A wait that explicitly permits WAVE_ADVANCE may grant the exact same-wave/N+1 BattleEnd MESSAGE
-       * prefix needed to reach that successor. `allowNextWaveStart` may also grant the exact same-address
-       * LevelUp MESSAGE produced by an already-applied terminal result and the N+1/t1 NextEncounter MESSAGE
-       * their local action-only leases. Those prompts cannot choose or mutate authoritative material and are
-       * required to reach the next ordered boundary. This remains an explicit sequencing contract, never a
-       * nullable/locally-derived tail or a lease for a choice surface.
+       * prefix needed to reach that successor, including EXP, level-up, and deterministic evolution prompts.
+       * `allowNextWaveStart` may also grant the exact same-address LevelUp MESSAGE produced by an
+       * already-applied terminal result and the N+1/t1 NextEncounter MESSAGE their local action-only leases.
+       * Those prompts cannot choose or mutate authoritative material and are required to reach the next
+       * ordered boundary. This remains an explicit sequencing contract, never a nullable/locally-derived tail
+       * or a lease for a choice surface.
        */
       readonly kind: "AWAIT_SUCCESSOR";
       readonly afterOperationId: string;

@@ -112,6 +112,21 @@ export interface ReplacementProposal {
 }
 
 /**
+ * Immutable identity carried by the exact player SwitchSummonPhase that materializes a staged replacement.
+ * The phase scheduler may also contain enemy/trainer summons at the same faint boundary, so ambient
+ * "a summon just finished" state is not sufficient authority for a REPLACEMENT_COMMIT.
+ */
+export interface ReplacementSummonBinding {
+  readonly operationId: string;
+  readonly ownerSeatId: number;
+  readonly fieldIndex: number;
+  readonly partySlot: number;
+  /** Runtime identity survives form changes that can legitimately alter species during PostSummon. */
+  readonly pokemonId: number;
+  readonly speciesId: number;
+}
+
+/**
  * How the authority RESOLVED the proposal:
  *   - "owner-pick"    - the owning seat chose within its window.
  *   - "fallback-auto" - the owner window ({@link COOP_REPLACEMENT_OWNER_WINDOW_MS}

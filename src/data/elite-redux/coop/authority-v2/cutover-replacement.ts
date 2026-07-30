@@ -102,6 +102,8 @@ export interface CoopV2ReplacementCommitBatch {
   } | null;
   /** Exact currently-executable replacement head authored by the preceding mechanical entry. */
   readonly activeControl: Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
+  /** Exact selection carried by the SwitchSummonPhase that produced this carrier, when available. */
+  readonly expectedSelection?: { readonly partySlot: number; readonly speciesId: number } | null;
   /** Exact mechanical successor command frontier after the final same-boundary faint is materialized. */
   readonly commands: readonly CoopCommandControlTarget[];
   /** Exact non-command successor when the final replacement closes a known differently-addressed boundary. */
@@ -255,6 +257,14 @@ export class CoopV2ReplacementCutover {
       return { kind: "failed-clean" };
     }
     const selected = current.proposal.selected;
+    if (
+      batch.expectedSelection != null
+      && (selected == null
+        || selected.partySlot !== batch.expectedSelection.partySlot
+        || selected.speciesId !== batch.expectedSelection.speciesId)
+    ) {
+      return { kind: "failed-clean" };
+    }
     if (
       selected != null
       && (batch.presentationSeat == null

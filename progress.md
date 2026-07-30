@@ -5648,3 +5648,63 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The node-pure control contract now exercises EXP alongside the existing trainer settlement phases while retaining
   its wrong-address, non-actionable-handler, no-wave-successor, and choice-phase rejection cases. Ordinary exact
   two-browser run `30500006056` and focused gate `30500006039` are independently green at the parent checkpoint.
+
+## 2026-07-30 - EXP settlement retains its reachable level-up action chain
+
+- Source tracing found the immediate successor hidden behind the newly admitted `ExpPhase`: a level gain unshifts
+  `LevelUpPhase`, whose public flow can arm the level-up line plus two stat-panel ACTION callbacks before it can open
+  a registered learn-move/evolution surface or let `BattleEndPhase` author `WAVE_ADVANCE`.
+- The same exact-address settlement lease now names `LevelUpPhase`. It remains restricted to a material-applied
+  `AWAIT_SUCCESSOR` that explicitly permits `WAVE_ADVANCE`, the same epoch/wave, turn N or N+1, and a live actionable
+  MESSAGE handler. `ShowPartyExpBarPhase` is intentionally excluded because its progress is promise/timer-driven and
+  exposes no human input. Party, learn-move, evolution, and other choice handlers remain outside this lease and must
+  obtain their own registered Authority V2 control.
+- The node-pure contract includes LevelUp in the closed settlement set while retaining the existing rejection proofs.
+  Local policy-safe checks: scoped Biome is error-free (four pre-existing complexity infos), `git diff --check` is
+  clean, and TypeScript remains at the 215-diagnostic repository baseline with zero diagnostics in the changed files.
+  The parent checkpoint `47db3304e` focused gate `30501227491` is fully green; its exact ordinary and registered
+  two-browser journeys remain in progress and are deliberately not cancelled or replaced.
+
+## 2026-07-30 - Post-level evolution presentation cannot be frozen behind WAVE_ADVANCE
+
+- Continuing the reachable queue audit exposed a separate handler domain after `LevelUpPhase`: a deterministic co-op
+  `EvolutionPhase` finishes through an armed ACTION callback under `UiMode.EVOLUTION_SCENE`, and an evolution-taught
+  `LearnMovePhase` can introduce its registered picker through that same message-derived handler. The existing gate
+  recognized only `UiMode.MESSAGE`, so the first evolving party member could strand the authority before the next
+  interaction or wave commit even though mechanics remained single-owner.
+- Runtime proof now distinguishes active MESSAGE and EVOLUTION_SCENE handlers. The ordered settlement lease admits
+  only an exact `EvolutionPhase` under the latter; the shared learn-move pre-picker bridge admits only its already
+  addressed `LEARN_MOVE` control and exact `LearnMovePhase`. Co-op already disables evolution cancellation and chooses
+  the first valid branch deterministically, so neither lease exposes a mechanical choice. All other evolution-mode
+  phases remain denied.
+- Static source contracts now require both runtime proof wiring and the closed evolution edge. The full 107-test
+  Authority V2 source contract is green locally, scoped Biome at error severity and `git diff --check` are clean.
+  Node-pure behavioral contracts remain reserved for the external focused runner per AGENTS.md.
+
+## 2026-07-30 - Each V2 replacement checkpoint belongs to its exact player summon
+
+- The completed parent campaign `30500538258` is materially stronger than its aggregate red: the dirty three-wave
+  lane and the full animations-on two-wave lane both passed. The Mystery lane reached wave 7 turn 2 before exposing
+  the tester-reported simultaneous-switch failure: the guest-owned player faint and both enemy faints produced one
+  player `REPLACEMENT` control, the real guest PARTY picker selected slot 3, and the authority received that proposal.
+- Production then ran `SwitchSummonPhase`/`PostSummonPhase` for an enemy Caterpie before the player replacement
+  checkpoint. The checkpoint captured a field where player field 1 was still fainted and enemy field 2 already held
+  Caterpie, so the staged player transaction correctly failed closed for lacking its player presentation seat. This
+  was not transport loss or checksum drift; the old sibling checkpoint used ambient summon order and an enemy
+  trainer switch consumed a player-owned authoritative boundary.
+- A V2 player summon now carries an immutable operation/owner/field/party-slot/Pokemon/species binding and queues its
+  own checkpoint only after its `PostSummonPhase` subtree drains. Enemy and legacy summons cannot own that checkpoint,
+  and enemy switches no longer suppress their ordinary presentation merely because an unrelated player replacement
+  is pending. The checkpoint proves the exact runtime Pokemon is on the bound player field before it may commit.
+- Host-owned replacement proposals now stage the selected species instead of the former baton-only payload. The
+  cutover also compares the staged party-slot/species selection with the summon binding, preserving fail-closed
+  behavior if any wrong phase or party member reaches the carrier.
+- The deterministic two-engine trainer regression reproduces the same ordering with both enemy leads fainted and
+  the guest-owned player lead at one HP. It requires an enemy summon to start before the bound player summon, exactly
+  one `REPLACEMENT_COMMIT`, the chosen player mon plus both trainer reserves on field, and zero forced resyncs. Per
+  workstation policy it is authored for the external focused shard and was not executed locally.
+- Parent focused gate `30501227491` and exact ordinary two-browser run `30501227488` are green. Exact registered run
+  `30501237914` independently reached its deterministic Revival path and failed waiting for the guest's input-inert
+  revival watcher; that separate surface failure remains next after this replacement closure. Local policy-safe
+  evidence is 107/107 static contracts, scoped Biome clean, zero TypeScript diagnostics (including repository-wide),
+  and `git diff --check` clean. No local engine or Chromium execution was used.

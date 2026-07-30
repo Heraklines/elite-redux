@@ -86,6 +86,7 @@ const biomeShopPhase = readFileSync(new URL("src/phases/biome-shop-phase.ts", ro
 const soakDriver = readFileSync(new URL("test/tools/coop-soak-driver.ts", root), "utf8");
 const hostFaintSoak = readFileSync(new URL("test/tests/elite-redux/coop/coop-soak-host-faint.test.ts", root), "utf8");
 const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "utf8");
+const switchSummonPhase = readFileSync(new URL("src/phases/switch-summon-phase.ts", root), "utf8");
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
 const gameData = readFileSync(new URL("src/system/game-data.ts", root), "utf8");
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
@@ -304,6 +305,31 @@ test("replacement command control cannot overtake retained post-summon presentat
   assert.ok(
     queuePrefix >= 0 && applyFrame > queuePrefix,
     "the complete renderer proof fence runs before replacement state and command control can install",
+  );
+  assert.match(
+    replacementAdapter,
+    /interface ReplacementSummonBinding[\s\S]*operationId: string[\s\S]*ownerSeatId: number[\s\S]*fieldIndex: number[\s\S]*partySlot: number[\s\S]*pokemonId: number[\s\S]*speciesId: number/u,
+    "the exact player summon carries the complete immutable replacement identity",
+  );
+  assert.match(
+    switchSummonPhase,
+    /this\.player[\s\S]*this\.coopReplacementBinding != null[\s\S]*replacementOwnsPresentation[\s\S]*queuePostSummon\(\)[\s\S]*CoopPushReplacementCheckpointPhase[\s\S]*this\.coopReplacementBinding/u,
+    "only the bound player summon suppresses duplicate presentation and emits its own checkpoint",
+  );
+  assert.match(
+    pushReplacementCheckpointPhase,
+    /this\.summonBinding != null[\s\S]*presented\.id !== this\.summonBinding\.pokemonId[\s\S]*presented\.isOnField\(\) !== true[\s\S]*commitCoopV2ReplacementAuthority\([\s\S]*this\.summonBinding/u,
+    "the checkpoint proves the exact replacement is visibly materialized before committing",
+  );
+  assert.match(
+    switchPhase,
+    /receipt\.v2Staged === true[\s\S]*operationId: this\.coopV2ControlOperationId[\s\S]*pokemonId: authoritativePick\.id[\s\S]*speciesId: authoritativePick\.species\.speciesId[\s\S]*summonBinding == null[\s\S]*CoopPushReplacementCheckpointPhase/u,
+    "guest-owned V2 replacements delegate checkpoint ownership to their exact summon",
+  );
+  assert.match(
+    switchPhase,
+    /const pickedReplacement = scene\.getPlayerParty\(\)\[slotIndex\][\s\S]*speciesId: pickedReplacement\?\.species\?\.speciesId \?\? 0[\s\S]*speciesId: pickedReplacement\.species\.speciesId/u,
+    "host-owned V2 replacements stage and bind the chosen species rather than a null placeholder",
   );
 });
 
@@ -2219,6 +2245,7 @@ test("a host-owned learn-move prompt has one exact pre-picker presentation lease
   assert.match(inputGate, /localSeatId: runtime\.controller\.localSeatId/u);
   assert.match(inputGate, /coopV2ControlOperationId/u);
   assert.match(inputGate, /messageHandlerActionable,/u);
+  assert.match(inputGate, /evolutionHandlerActionable,/u);
   assert.doesNotMatch(
     inputGate.slice(
       inputGate.indexOf('if (pending.kind === "SHARED_INTERACTION")'),
@@ -2242,7 +2269,7 @@ test("an ME battle handoff leases its whole exact-address action-only pre-comman
   );
   assert.match(
     lease,
-    /if \(exactBattleCommandTarget === true\) \{\s*return wait\.allowedKinds\.includes\("CONTROL_COMMIT"\);\s*\}/u,
+    /if \(exactBattleCommandTarget === true\) \{\s*return proof\.messageHandlerActionable && wait\.allowedKinds\.includes\("CONTROL_COMMIT"\);\s*\}/u,
     "every ACTION-only presentation prefix at that exact address can drain before CONTROL_COMMIT",
   );
   assert.doesNotMatch(
@@ -2263,9 +2290,21 @@ test("a turn wait leases only its exact action-only settlement chain on the path
     /wait\.allowedKinds\.includes\("WAVE_ADVANCE"\)[\s\S]*proof\.wave === wait\.wave[\s\S]*proof\.turn === wait\.turn \+ 1[\s\S]*WAVE_SETTLEMENT_PRESENTATION_PHASES\.has\(proof\.phaseName\)/u,
     "the settlement lease is pinned to the exact turn, a closed action-only phase set, and an explicit wave edge",
   );
-  for (const phaseName of ["MessagePhase", "TrainerVictoryPhase", "MoneyRewardPhase", "ModifierRewardPhase"]) {
+  for (const phaseName of [
+    "MessagePhase",
+    "ExpPhase",
+    "LevelUpPhase",
+    "TrainerVictoryPhase",
+    "MoneyRewardPhase",
+    "ModifierRewardPhase",
+  ]) {
     assert.match(nextControl, new RegExp(`"${phaseName}"`, "u"), `${phaseName} belongs to the closed settlement set`);
   }
+  assert.match(
+    lease,
+    /proof\.evolutionHandlerActionable === true && proof\.phaseName === "EvolutionPhase"/u,
+    "the deterministic evolution completion uses its own exact-phase actionable-handler proof",
+  );
   assert.doesNotMatch(
     nextControl.slice(nextControl.indexOf("const WAVE_SETTLEMENT_PRESENTATION_PHASES"), start),
     /PartyUiPhase|SelectModifierPhase|SelectBiomePhase/u,

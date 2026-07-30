@@ -308,12 +308,27 @@ describe("ordered-wait local presentation lease", () => {
     };
 
     expect(successorWaitAllowsLocalPresentationInput(turnWait, exactBattleEndMessage)).toBe(true);
-    for (const phaseName of ["ExpPhase", "TrainerVictoryPhase", "MoneyRewardPhase", "ModifierRewardPhase"]) {
+    for (const phaseName of [
+      "ExpPhase",
+      "LevelUpPhase",
+      "TrainerVictoryPhase",
+      "MoneyRewardPhase",
+      "ModifierRewardPhase",
+    ]) {
       expect(
         successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, phaseName }),
         `${phaseName} must remain actionable so battle settlement can reach WAVE_ADVANCE`,
       ).toBe(true);
     }
+    expect(
+      successorWaitAllowsLocalPresentationInput(turnWait, {
+        ...exactBattleEndMessage,
+        phaseName: "EvolutionPhase",
+        messageHandlerActionable: false,
+        evolutionHandlerActionable: true,
+      }),
+      "the deterministic evolution completion must drain before WAVE_ADVANCE",
+    ).toBe(true);
     expect(
       successorWaitAllowsLocalPresentationInput({ ...turnWait, turn: 7 }, exactBattleEndMessage),
       "a replacement-origin wait may still name the resolving turn and settle exactly once at N+1",
@@ -332,6 +347,14 @@ describe("ordered-wait local presentation lease", () => {
     ).toBe(false);
     expect(
       successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, phaseName: "PartyUiPhase" }),
+    ).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(turnWait, {
+        ...exactBattleEndMessage,
+        phaseName: "EvolutionPhase",
+        messageHandlerActionable: false,
+        evolutionHandlerActionable: false,
+      }),
     ).toBe(false);
     expect(successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, turn: 10 })).toBe(false);
     expect(successorWaitAllowsLocalPresentationInput(turnWait, { ...exactBattleEndMessage, wave: 4 })).toBe(false);
@@ -441,6 +464,14 @@ describe("shared-control local presentation lease", () => {
         messageHandlerActionable: false,
       }),
     ).toBe(false);
+    expect(
+      sharedInteractionAllowsLocalPresentationInput(learnMoveControl, {
+        ...exactLearnMoveMessage,
+        messageHandlerActionable: false,
+        evolutionHandlerActionable: true,
+      }),
+      "an evolution-taught move uses the same exact LearnMove control under EVOLUTION_SCENE",
+    ).toBe(true);
     expect(
       sharedInteractionAllowsLocalPresentationInput(
         { ...learnMoveControl, operationKind: "LEARN_MOVE_BATCH" },

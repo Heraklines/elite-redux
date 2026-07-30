@@ -32,6 +32,7 @@ import {
   decodeReplacementCommitMaterial,
   type ReplacementAuthorityCarrier,
   type ReplacementSourceAddress,
+  type ReplacementSummonBinding,
   replacementOperationId,
 } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
@@ -6162,11 +6163,12 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
           isCoopV2InputActionable?: () => boolean;
         }
       | undefined;
-    const messageHandlerActionable =
-      globalScene.ui?.getMode() === UiMode.MESSAGE
-      && handler?.active === true
+    const handlerActionable =
+      handler?.active === true
       && typeof handler.isCoopV2InputActionable === "function"
       && handler.isCoopV2InputActionable();
+    const messageHandlerActionable = globalScene.ui?.getMode() === UiMode.MESSAGE && handlerActionable;
+    const evolutionHandlerActionable = globalScene.ui?.getMode() === UiMode.EVOLUTION_SCENE && handlerActionable;
     if (
       // This is deliberately a PRE-install bridge: the exact registered picker cannot become the active
       // executable control until its own introductory ACTION message has been dismissed. The authenticated
@@ -6185,6 +6187,7 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
         turn: battle.turn,
         phaseName: phase.phaseName,
         messageHandlerActionable,
+        evolutionHandlerActionable,
       })
     ) {
       return false;
@@ -6200,11 +6203,12 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
           isCoopV2InputActionable?: () => boolean;
         }
       | undefined;
-    const messageHandlerActionable =
-      globalScene.ui?.getMode() === UiMode.MESSAGE
-      && handler?.active === true
+    const handlerActionable =
+      handler?.active === true
       && typeof handler.isCoopV2InputActionable === "function"
       && handler.isCoopV2InputActionable();
+    const messageHandlerActionable = globalScene.ui?.getMode() === UiMode.MESSAGE && handlerActionable;
+    const evolutionHandlerActionable = globalScene.ui?.getMode() === UiMode.EVOLUTION_SCENE && handlerActionable;
     if (
       activeControl?.kind === "AWAIT_SUCCESSOR"
       && controlsEqual(activeControl, pending)
@@ -6217,6 +6221,7 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
         turn: battle.turn,
         phaseName: phase.phaseName,
         messageHandlerActionable,
+        evolutionHandlerActionable,
       })
     ) {
       return false;
@@ -8492,6 +8497,7 @@ export function retainCoopV2InteractionProposal(
 export function commitCoopV2ReplacementAuthority(
   authorityCarrier: ReplacementAuthorityCarrier,
   boundary: { readonly mysteryBattle: boolean } = { mysteryBattle: false },
+  summonBinding: ReplacementSummonBinding | null = null,
 ): CoopV2ReplacementBatchResult | null {
   const runtime = active;
   if (runtime == null || runtime.controller.authorityRole !== "authority") {
@@ -8513,6 +8519,18 @@ export function commitCoopV2ReplacementAuthority(
     || (activeControl.turn !== authorityCarrier.turn && activeControl.turn + 1 !== authorityCarrier.turn)
   ) {
     coopWarn("v2-replacement", "host refused post-summon carrier without the exact active replacement head");
+    return { kind: "failed-clean" };
+  }
+  if (
+    summonBinding != null
+    && (activeControl.operationId !== summonBinding.operationId
+      || activeControl.ownerSeatId !== summonBinding.ownerSeatId
+      || activeControl.fieldIndex !== summonBinding.fieldIndex)
+  ) {
+    coopWarn(
+      "v2-replacement",
+      `host refused summon binding ${summonBinding.operationId} for active ${activeControl.operationId}`,
+    );
     return { kind: "failed-clean" };
   }
   const hasImmediateCommand = activeControl.remaining.length === 0 && hasCoopV2ImmediateCommandSuccessor(state);
@@ -8638,6 +8656,8 @@ export function commitCoopV2ReplacementAuthority(
         ? null
         : { side: replacementSeat.side, bi: replacementSeat.bi, pokemonId: replacementSeat.pokemonId },
     activeControl,
+    expectedSelection:
+      summonBinding == null ? null : { partySlot: summonBinding.partySlot, speciesId: summonBinding.speciesId },
     commands: commandFrontier.commands,
     nextSuccessorWait,
   });

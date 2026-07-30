@@ -468,6 +468,24 @@ describe("authority-v2 replacement staged transaction", () => {
     duo.dispose();
   });
 
+  it("refuses a checkpoint emitted by a different summon than the staged replacement", () => {
+    const duo = buildDuo();
+    const cutover = new CoopV2ReplacementCutover(duo.host);
+    const pick = proposal();
+    expect(stage(cutover, pick)).toBe(true);
+    const result = cutover.commitStagedHostReplacements({
+      authorityCarrier: carrier(),
+      presentationSeat: { side: "player", bi: 0, pokemonId: 101 },
+      activeControl: replacementControl(pick),
+      expectedSelection: { partySlot: 3, speciesId: 133 },
+      commands: [{ ownerSeatId: 0, pokemonId: 101, fieldIndex: 0 }],
+    });
+    expect(result.kind).toBe("failed-clean");
+    expect(cutover.pendingCount).toBe(1);
+    cutover.dispose();
+    duo.dispose();
+  });
+
   it("commits only the active same-boundary faint and installs the next exact picker", () => {
     const duo = buildDuo();
     const cutover = new CoopV2ReplacementCutover(duo.host);

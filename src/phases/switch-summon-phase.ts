@@ -10,7 +10,9 @@ import {
   markGenuineVoluntaryEntry,
 } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { getSaltCircleEscapeSource } from "#data/elite-redux/ability-upgrades/requested-field-effects";
+import type { ReplacementSummonBinding } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import { getActiveCoopV2ReplacementCutover } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
+import { failCoopSharedSession } from "#data/elite-redux/coop/coop-runtime";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
@@ -33,6 +35,8 @@ export class SwitchSummonPhase extends SummonPhase {
   private readonly switchType: SwitchType;
   private readonly slotIndex: number;
   private readonly doReturn: boolean;
+  private readonly coopReplacementBinding: ReplacementSummonBinding | null;
+  private coopReplacementMaterialized = false;
 
   private lastPokemon: Pokemon;
 
@@ -43,13 +47,22 @@ export class SwitchSummonPhase extends SummonPhase {
    * @param slotIndex - The index of pokemon (in party of 6) to switch into
    * @param doReturn - Whether to render "comeback" dialogue
    * @param player - Whether the switch came from the player or enemy; default `true`
+   * @param coopReplacementBinding - Exact Authority V2 replacement this player summon materializes
    */
-  constructor(switchType: SwitchType, fieldIndex: number, slotIndex: number, doReturn: boolean, player = true) {
+  constructor(
+    switchType: SwitchType,
+    fieldIndex: number,
+    slotIndex: number,
+    doReturn: boolean,
+    player = true,
+    coopReplacementBinding: ReplacementSummonBinding | null = null,
+  ) {
     super(fieldIndex, player);
 
     this.switchType = switchType;
     this.slotIndex = slotIndex;
     this.doReturn = doReturn;
+    this.coopReplacementBinding = coopReplacementBinding;
   }
 
   start(): void {
@@ -83,7 +96,10 @@ export class SwitchSummonPhase extends SummonPhase {
     // A staged post-faint V2 replacement carries its summon in REPLACEMENT_COMMIT instead, so it cannot be
     // rendered twice when that out-of-band entry races the eventual turn batch.
     const replacementOwnsPresentation =
-      outgoing?.isFainted() === true && (getActiveCoopV2ReplacementCutover()?.pendingCount ?? 0) > 0;
+      this.player
+      && this.coopReplacementBinding != null
+      && outgoing?.isFainted() === true
+      && (getActiveCoopV2ReplacementCutover()?.pendingCount ?? 0) > 0;
     const incomingSpeciesId = incoming?.species?.speciesId;
     if (
       incoming != null
@@ -174,6 +190,22 @@ export class SwitchSummonPhase extends SummonPhase {
     const party = this.player ? this.getParty() : globalScene.getEnemyParty();
     const switchedInPokemon: Pokemon | undefined = party[this.slotIndex];
     this.lastPokemon = this.getPokemon();
+
+    if (
+      this.coopReplacementBinding != null
+      && (!this.player
+        || this.fieldIndex !== this.coopReplacementBinding.fieldIndex
+        || this.slotIndex !== this.coopReplacementBinding.partySlot
+        || switchedInPokemon?.id !== this.coopReplacementBinding.pokemonId
+        || switchedInPokemon?.species?.speciesId !== this.coopReplacementBinding.speciesId)
+    ) {
+      failCoopSharedSession(
+        `Authority V2 replacement ${this.coopReplacementBinding.operationId} reached the wrong summon `
+          + `(player=${String(this.player)} field=${this.fieldIndex} partySlot=${this.slotIndex} `
+          + `pokemon=${switchedInPokemon?.id ?? 0} species=${switchedInPokemon?.species?.speciesId ?? 0}).`,
+      );
+      return;
+    }
 
     // ER (#400): this guard used to sit AFTER the resetSummonData call below,
     // so an unresolvable slot (slotIndex -1: the second replacement of a
@@ -291,6 +323,7 @@ export class SwitchSummonPhase extends SummonPhase {
 
     party[this.slotIndex] = this.lastPokemon;
     party[this.fieldIndex] = switchedInPokemon;
+    this.coopReplacementMaterialized = this.coopReplacementBinding != null;
     const showTextAndSummon = () => {
       globalScene.ui.showText(this.getSendOutText(switchedInPokemon));
       /**
@@ -392,6 +425,12 @@ export class SwitchSummonPhase extends SummonPhase {
 
   queuePostSummon(): void {
     globalScene.phaseManager.unshiftNew("PostSummonPhase", this.getPokemon().getBattlerIndex());
+    if (this.coopReplacementBinding != null && this.coopReplacementMaterialized) {
+      // The checkpoint is a child of THIS exact player summon. Enemy/trainer summons already queued at
+      // the same faint boundary cannot consume it, and PostSummon's complete ability/hazard subtree drains
+      // first because unshifted phases are FIFO at this level and descendants run before siblings.
+      globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase", false, this.coopReplacementBinding);
+    }
   }
 
   /**

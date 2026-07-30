@@ -408,17 +408,32 @@ export class SwitchPhase extends BattlePhase {
                       return;
                     }
                     if (slotIndex >= battlerCount && slotIndex < 6) {
+                      const summonBinding =
+                        receipt.v2Staged === true && this.coopV2ControlOperationId != null && authoritativePick != null
+                          ? {
+                              operationId: this.coopV2ControlOperationId,
+                              ownerSeatId,
+                              fieldIndex,
+                              partySlot: slotIndex,
+                              pokemonId: authoritativePick.id,
+                              speciesId: authoritativePick.species.speciesId,
+                            }
+                          : null;
                       scene.phaseManager.unshiftNew(
                         "SwitchSummonPhase",
                         this.switchType,
                         fieldIndex,
                         slotIndex,
                         this.doReturn,
+                        true,
+                        summonBinding,
                       );
-                      // Queue the checkpoint only after the retained old-address terminal and this host
-                      // message surface have both materially closed. It may carry turn N+1, but can no
-                      // longer race an N modal or leak into a superseding phase.
-                      scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+                      if (summonBinding == null) {
+                        // Legacy/non-cutover keeps its compatibility checkpoint as a sibling. V2 instead
+                        // lets the exact bound SwitchSummonPhase queue its own checkpoint after PostSummon,
+                        // so an enemy trainer summon at the same faint boundary cannot consume it.
+                        scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+                      }
                     } else if (receipt.v2Staged === true) {
                       // Explicit no-replacement is still an authoritative transaction: no summon phase will
                       // create a later capture point, so publish the complete sealed-slot state now.
@@ -578,7 +593,8 @@ export class SwitchPhase extends BattlePhase {
             return;
           }
           const isBaton = option === PartyOption.PASS_BATON;
-          let data = isBaton ? [1] : [0];
+          const pickedReplacement = scene.getPlayerParty()[slotIndex];
+          let data = [isBaton ? 1 : 0, pickedReplacement?.species?.speciesId ?? 0];
           if (authoritative) {
             data = addressCoopFaintSwitchChoiceData(
               data,
@@ -595,6 +611,7 @@ export class SwitchPhase extends BattlePhase {
                 payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
                 ownerRole: coopController.role,
                 localRole: coopController.role,
+                speciesId: pickedReplacement?.species?.speciesId ?? 0,
                 ...operationSourceAddress,
               },
               operationBinding,
@@ -608,7 +625,29 @@ export class SwitchPhase extends BattlePhase {
           const finishOwnerReplacement = (): void => {
             if (slotIndex >= scene.currentBattle.getBattlerCount() && slotIndex < 6) {
               const switchType = isBaton ? SwitchType.BATON_PASS : this.switchType;
-              scene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
+              const summonBinding =
+                authoritative
+                && isCoopV2ReplacementCutoverActive()
+                && this.coopV2ControlOperationId != null
+                && pickedReplacement != null
+                  ? {
+                      operationId: this.coopV2ControlOperationId,
+                      ownerSeatId,
+                      fieldIndex,
+                      partySlot: slotIndex,
+                      pokemonId: pickedReplacement.id,
+                      speciesId: pickedReplacement.species.speciesId,
+                    }
+                  : null;
+              scene.phaseManager.unshiftNew(
+                "SwitchSummonPhase",
+                switchType,
+                fieldIndex,
+                slotIndex,
+                this.doReturn,
+                true,
+                summonBinding,
+              );
               // #836 (live wave-5 party-order transposition): the host's SwitchSummonPhase SWAPS the party
               // array (`party[slotIndex] = fainted; party[fieldIndex] = replacement`), but the WATCHER (the
               // guest) mirrors a HOST-OWNED faint only at the NEXT turn resolution - so between the faint and
@@ -621,7 +660,7 @@ export class SwitchPhase extends BattlePhase {
               // a HOST-owned faint so both engines' party order stays byte-identical from the moment of the
               // swap. Authoritative-only (the pure-renderer guest never reaches this branch; lockstep both run
               // their own SwitchSummonPhase); the phase itself is a host-role-gated no-op besides.
-              if (authoritative) {
+              if (authoritative && summonBinding == null) {
                 scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
               }
             }

@@ -34,7 +34,7 @@ import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
 import { projectCoopSwitchPresentationStructure } from "#data/elite-redux/coop/coop-field-presentation";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopController, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
@@ -45,17 +45,22 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
+import { UiMode } from "#enums/ui-mode";
 import { Move } from "#moves/move";
+import { SwitchSummonPhase } from "#phases/switch-summon-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  settleDuoPromise,
   withClient,
+  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
@@ -95,7 +100,7 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
       .battleType(BattleType.TRAINER)
       .randomTrainer({ trainerType: TrainerType.ACE_TRAINER, trainerVariant: TrainerVariant.DOUBLE })
       .startingLevel(100)
-      .moveset([KO_MOVE, HOLD_MOVE, MoveId.THUNDERBOLT, MoveId.BODY_SLAM]);
+      .moveset([KO_MOVE, HOLD_MOVE, MoveId.THUNDERBOLT, MoveId.EARTHQUAKE]);
   });
 
   afterEach(() => {
@@ -361,6 +366,130 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     // Zero forced resyncs: the render happened through the normal apply, not a heal that would mask it.
     expect(resyncProbe?.count(), "the enemy-switch turn converged with ZERO forced resyncs").toBe(0);
 
+    logs.flush();
+  }, 300_000);
+
+  it("an earlier enemy trainer summon cannot consume a guest-owned player replacement checkpoint", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.DRAGONITE, SpeciesId.CHARIZARD);
+    const pair = createLoopbackPair();
+    const authorityEntries: Array<{ kind: string; nextControl?: { kind?: string } | null }> = [];
+    const originalHostSend = pair.host.send.bind(pair.host);
+    vi.spyOn(pair.host, "send").mockImplementation(message => {
+      if (message.t === "authorityEntry") {
+        authorityEntries.push(message.body);
+      }
+      originalHostSend(message);
+    });
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    resyncProbe = installCoopResyncProbe(rig.guestRuntime);
+    currentGuestMove = HOLD_MOVE;
+
+    const initialEnemyIds = rig.hostScene.getEnemyField().map(mon => mon.id);
+    expect(
+      rig.hostScene.getEnemyParty().length,
+      "the trainer has reserves for both fainted enemy slots",
+    ).toBeGreaterThan(3);
+
+    // Recreate the live wave-7 frontier without relying on damage rolls: the guest-owned player actor and
+    // both enemy leads all faint during the same authoritative turn. SNORLAX's Earthquake is the last
+    // mechanical action and therefore leaves trainer replacements plus the player picker in one phase tree.
+    rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+    for (const enemy of rig.hostScene.getEnemyField()) {
+      enemy.hp = 1;
+    }
+    withClientSync(rig.guestCtx, () => {
+      rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+      for (const enemy of rig.guestScene.getEnemyField()) {
+        enemy.hp = 1;
+      }
+    });
+
+    const turn = rig.hostScene.currentBattle.turn;
+    const commandPoint = `cmd:${rig.hostScene.currentBattle.waveIndex}:${turn + 1}`;
+    withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive(commandPoint));
+    await drainLoopback();
+
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
+    });
+    expect(
+      rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX]?.isFainted(),
+      "the guest-owned player actor fainted in the trainer replacement turn",
+    ).toBe(true);
+    expect(
+      rig.hostScene.getEnemyField().every(mon => mon.isFainted()),
+      "both trainer leads fainted before their replacement summons",
+    ).toBe(true);
+
+    const guestUi = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+    const realGuestSetMode = guestUi.setMode.bind(guestUi);
+    guestUi.setMode = (...args: unknown[]): unknown => {
+      if (args[0] === UiMode.PARTY) {
+        guestUi.setMode = realGuestSetMode;
+        const opened = realGuestSetMode(...args);
+        Promise.resolve(opened).then(
+          () => queueMicrotask(() => (args[3] as (slotIndex: number, option: number) => void)(3, 0)),
+          () => undefined,
+        );
+        return opened;
+      }
+      return realGuestSetMode(...args);
+    };
+
+    const authoritySummonStarts: Array<{ player: boolean; bound: boolean }> = [];
+    const realSwitchSummonStart = SwitchSummonPhase.prototype.start;
+    const summonStartSpy = vi.spyOn(SwitchSummonPhase.prototype, "start").mockImplementation(function (
+      this: SwitchSummonPhase,
+    ): void {
+      const phase = this as unknown as {
+        player: boolean;
+        coopReplacementBinding: { operationId: string; pokemonId: number } | null;
+      };
+      if (getCoopController()?.role === "host") {
+        authoritySummonStarts.push({ player: phase.player, bound: phase.coopReplacementBinding != null });
+      }
+      realSwitchSummonStart.call(this);
+    });
+    try {
+      await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+      let hostAdvance: Promise<void> | undefined;
+      await withClient(rig.hostCtx, async () => {
+        hostAdvance = game.phaseInterceptor.to("CommandPhase") as Promise<void>;
+        await drainLoopback();
+      });
+      expect(hostAdvance, "the post-replacement host crossing started").toBeDefined();
+      await settleDuoPromise(rig, hostAdvance!, "simultaneous player/enemy replacement crossing");
+    } finally {
+      guestUi.setMode = realGuestSetMode;
+      summonStartSpy.mockRestore();
+    }
+
+    const firstEnemySummon = authoritySummonStarts.findIndex(summon => !summon.player);
+    const boundPlayerSummon = authoritySummonStarts.findIndex(summon => summon.player && summon.bound);
+    expect(firstEnemySummon, "the fixture executed an enemy trainer replacement summon").toBeGreaterThanOrEqual(0);
+    expect(boundPlayerSummon, "the player replacement summon carried its exact V2 binding").toBeGreaterThanOrEqual(0);
+    expect(
+      firstEnemySummon,
+      "an enemy summon ran before the bound player summon, matching the live failure",
+    ).toBeLessThan(boundPlayerSummon);
+    expect(
+      authorityEntries.filter(entry => entry.kind === "REPLACEMENT_COMMIT"),
+      "the exact player summon authored one replacement transaction",
+    ).toHaveLength(1);
+    expect(
+      rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX]?.species.speciesId,
+      "the guest's chosen CHARIZARD occupies the player field after enemy replacements",
+    ).toBe(SpeciesId.CHARIZARD);
+    const enemyReplacementFacts = withClientSync(rig.hostCtx, () =>
+      rig.hostScene.getEnemyField().map(mon => ({ id: mon.id, onField: mon.isOnField() })),
+    );
+    expect(
+      enemyReplacementFacts.every(mon => !initialEnemyIds.includes(mon.id) && mon.onField),
+      "both enemy trainer replacements remain materialized and presentation-bearing",
+    ).toBe(true);
+    expect(resyncProbe?.count(), "the mixed replacement frontier converged without a forced resync").toBe(0);
     logs.flush();
   }, 300_000);
 });

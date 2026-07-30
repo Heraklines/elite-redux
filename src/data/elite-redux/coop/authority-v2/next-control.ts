@@ -244,6 +244,8 @@ export interface CoopV2LocalPresentationInputProof {
   readonly phaseName: string;
   /** True only for the active MESSAGE handler with an armed ACTION/CANCEL continuation. */
   readonly messageHandlerActionable: boolean;
+  /** True only for the active EVOLUTION_SCENE handler with an armed ACTION/CANCEL continuation. */
+  readonly evolutionHandlerActionable?: boolean;
 }
 
 export interface CoopV2SharedInteractionPresentationInputProof extends CoopV2LocalPresentationInputProof {
@@ -261,6 +263,7 @@ export interface CoopV2SharedInteractionPresentationInputProof extends CoopV2Loc
 const WAVE_SETTLEMENT_PRESENTATION_PHASES: ReadonlySet<string> = new Set([
   "MessagePhase",
   "ExpPhase",
+  "LevelUpPhase",
   "TrainerVictoryPhase",
   "MoneyRewardPhase",
   "ModifierRewardPhase",
@@ -281,7 +284,7 @@ export function sharedInteractionAllowsLocalPresentationInput(
     || control.wave !== proof.wave
     || control.turn !== proof.turn
     || control.operationId !== proof.operationId
-    || !proof.messageHandlerActionable
+    || (!proof.messageHandlerActionable && proof.evolutionHandlerActionable !== true)
   ) {
     return false;
   }
@@ -306,10 +309,13 @@ export function sharedInteractionAllowsLocalPresentationInput(
  * `messageHandlerActionable`.
  *
  * A settled turn can also have an action-only presentation chain before the authority can author
- * WAVE_ADVANCE. That includes a wild victory's ExpPhase, BattleEnd's scattered-money MessagePhase, and a
- * trainer victory's TrainerVictoryPhase -> MoneyRewardPhase -> ModifierRewardPhase chain. Freezing any of
- * those prompts makes the allowed successor unreachable. Current turn commits normalize the wait itself to
- * that settlement address (N+1), while replacement-origin waits can still name the resolving address (N).
+ * WAVE_ADVANCE. That includes a wild victory's ExpPhase -> LevelUpPhase -> EvolutionPhase chain,
+ * BattleEnd's scattered-money MessagePhase, and a trainer victory's TrainerVictoryPhase -> MoneyRewardPhase
+ * -> ModifierRewardPhase chain. Evolution completion uses the MESSAGE-derived handler under
+ * EVOLUTION_SCENE, so it receives a separate exact-phase readiness proof rather than being added to the
+ * MESSAGE allowlist. Freezing any of those prompts makes the allowed successor unreachable. Current turn
+ * commits normalize the wait itself to that settlement address (N+1), while replacement-origin waits can
+ * still name the resolving address (N).
  * Mirror mechanical successor admission by accepting the exact wait turn or its one permitted settlement
  * successor, never anything later. The lease remains limited to the closed action-only settlement phase set
  * in the same wave and a wait that explicitly names WAVE_ADVANCE; it grants no choice handler and cannot
@@ -326,7 +332,7 @@ export function successorWaitAllowsLocalPresentationInput(
   wait: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>,
   proof: CoopV2LocalPresentationInputProof,
 ): boolean {
-  if (proof.sessionEpoch !== wait.epoch || !proof.messageHandlerActionable) {
+  if (proof.sessionEpoch !== wait.epoch) {
     return false;
   }
   const exactBattleCommandTarget = wait.allowedControlAddresses?.some(
@@ -337,17 +343,18 @@ export function successorWaitAllowsLocalPresentationInput(
       && target.operationId == null,
   );
   if (exactBattleCommandTarget === true) {
-    return wait.allowedKinds.includes("CONTROL_COMMIT");
+    return proof.messageHandlerActionable && wait.allowedKinds.includes("CONTROL_COMMIT");
   }
   const exactWaveSettlementPresentation =
     wait.allowedKinds.includes("WAVE_ADVANCE")
     && proof.wave === wait.wave
     && (proof.turn === wait.turn || proof.turn === wait.turn + 1)
-    && WAVE_SETTLEMENT_PRESENTATION_PHASES.has(proof.phaseName);
+    && ((proof.messageHandlerActionable && WAVE_SETTLEMENT_PRESENTATION_PHASES.has(proof.phaseName))
+      || (proof.evolutionHandlerActionable === true && proof.phaseName === "EvolutionPhase"));
   if (exactWaveSettlementPresentation) {
     return true;
   }
-  if (!wait.allowNextWaveStart) {
+  if (!proof.messageHandlerActionable || !wait.allowNextWaveStart) {
     return false;
   }
   const sameAddressLevelUp = proof.wave === wait.wave && proof.turn === wait.turn && proof.phaseName === "LevelUpPhase";

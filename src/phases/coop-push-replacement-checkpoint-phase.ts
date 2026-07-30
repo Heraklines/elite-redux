@@ -6,6 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import type { ReplacementSummonBinding } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
@@ -30,6 +31,7 @@ import { snapshotCoopRecordedPresentation } from "#data/elite-redux/coop/coop-tu
 export class CoopPushReplacementCheckpointPhase extends Phase {
   public readonly phaseName = "CoopPushReplacementCheckpointPhase";
   private readonly noSummonExpected: boolean;
+  private readonly summonBinding: ReplacementSummonBinding | null;
 
   /**
    * A half-wiped seat still resolves a real REPLACEMENT transaction, but no SwitchSummonPhase exists and
@@ -37,9 +39,10 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
    * of treating every empty recorder as either valid or fatal: completed summons remain fail-closed, while
    * the typed no-replacement result publishes an intentionally empty immutable presentation prefix.
    */
-  constructor(noSummonExpected = false) {
+  constructor(noSummonExpected = false, summonBinding: ReplacementSummonBinding | null = null) {
     super();
     this.noSummonExpected = noSummonExpected;
+    this.summonBinding = summonBinding;
   }
 
   public override start(): void {
@@ -70,6 +73,17 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
     };
     try {
       if (streamer != null && controller?.role === "host") {
+        if (this.summonBinding != null) {
+          const presented = globalScene.getPlayerParty()[this.summonBinding.fieldIndex];
+          if (presented == null || presented.id !== this.summonBinding.pokemonId || presented.isOnField() !== true) {
+            fatal(
+              `Authority V2 replacement ${this.summonBinding.operationId} did not materialize its exact `
+                + `player summon field=${this.summonBinding.fieldIndex} partySlot=${this.summonBinding.partySlot} `
+                + `pokemon=${this.summonBinding.pokemonId} species=${this.summonBinding.speciesId}.`,
+            );
+            return;
+          }
+        }
         // Every completed summon is now its own immutable V2 transaction. Capturing the intermediate field
         // is intentional: its entry installs the next addressed replacement picker, so no later seat must
         // choose before the log authorizes it. The final summon then carries the fully-refilled field and
@@ -122,6 +136,7 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
             entryPresentation,
           },
           { mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true },
+          this.summonBinding,
         );
         if (v2?.kind === "committed") {
           coopLog(
