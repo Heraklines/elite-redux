@@ -1004,6 +1004,11 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // addEnemyPokemon - the test's enemySpecies(MAGIKARP) override would force it to MAGIKARP too,
     // colliding with the lead's species and defeating the species-based switch detection).
     const bench = new EnemyPokemon(getPokemonSpecies(SpeciesId.PIKACHU), 5, TrainerSlot.TRAINER, false, false);
+    // Match the production encounter lifecycle. A directly-constructed Pokemon has no battle-info
+    // panel until init(); the real trainer-party builder always initializes it before a checkpoint
+    // can seat it. Skipping this made setFieldPosition reject asynchronously after every mechanical
+    // assertion had passed, so Vitest reported a noisy unhandled error instead of a product failure.
+    bench.init();
     globalScene.getEnemyParty().push(bench);
     const benchSpecies = bench.species.speciesId;
 

@@ -5792,3 +5792,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The next remote B11 pass on parent `ed0b58239` must therefore prove the intended live topology: two current leads
   faint first, two genuine bench actors summon, the guest-owned burned actor faints at turn end, and its exact bound
   replacement commits without being consumed by either earlier enemy summon.
+
+## 2026-07-30 - Exact replacement and registered-interaction closure
+
+- Focused run `30506254760` is fully green at exact SHA `a08b1f0ac85c1756815dec2d7fcf05416f242a48`.
+  The deterministic two-engine regression now proves the intended enemy-first ordering, two legal trainer-slot
+  replacements, one exact bound player replacement commit, Charizard in the guest-owned field slot, and zero forced
+  resyncs. The source/node contracts, planner, ownership gate, and static/type lane are green in the same run.
+- Exact two-browser registered-interactions run `30506589457` is green at the same SHA. Its compact artifact records
+  one real faint replacement, a host-owned Revival choice at wave 1 turn 2, a host-owned Stormglass choice at the
+  wave-2 turn-1 command frontier, wave 1 cleared, both browsers advanced to wave 2, graceful cleanup, and no terminal
+  error. This closes the historical Revival-owner reuse false failure with current-surface evidence.
+- Exact fresh-wave2 two-browser run `30504605880` is also green on the same product code; the later commits through
+  `a08b1f0a` changed only engine fixtures, the ownership manifest, and this progress record.
+
+## 2026-07-30 - B7 switch-mirror fixture follows the real Pokemon lifecycle
+
+- Full aggregate run `30507407743` reached 38 green jobs before Lane B 7/13 reported red. All 11 files and all 77
+  assertions in B7 passed; the only failure was a Vitest unhandled rejection after the switch-mirror test completed.
+  Its directly constructed Pikachu bench member had skipped `Pokemon.init()`, so the later real
+  `setFieldPosition()` call found no `battleInfo` panel. Production trainer parties are initialized before they can
+  be seated, and the exact browser journeys do not reproduce this error.
+- The fixture now calls `bench.init()` before adding the member to the enemy party, preserving the distinct-species
+  switch setup while matching the production object lifecycle. No production behavior is weakened or changed. The
+  aggregate red is classified as a harness-fixture failure, but the noisy signal is still repaired rather than
+  waived.

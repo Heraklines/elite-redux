@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "ed0b582398ba4f6c51cf06efdc2f1377484e0068",
+  "baseSha": "a08b1f0ac85c1756815dec2d7fcf05416f242a48",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -241,6 +241,7 @@
     "test/tests/elite-redux/coop/coop-form-change-ordering.test.ts",
     "test/tests/elite-redux/coop/coop-guest-battletype-adopt.test.ts",
     "test/tests/elite-redux/coop/coop-guest-faint-no-local-victory.test.ts",
+    "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
     "test/tests/elite-redux/coop/coop-interaction-relay.test.ts",
     "test/tests/elite-redux/coop/coop-launch-presentation-fx.test.ts",
     "test/tests/elite-redux/coop/coop-learn-move-operation.test.ts",
