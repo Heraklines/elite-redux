@@ -4491,7 +4491,12 @@ export async function runCampaign(rig) {
         wavesCleared = Math.max(wavesCleared, advanced.boundary.wave - 1);
       }
       rig.assertWaveProgressionLedger(waveNo, `campaign-wave-${waveNo}-progression-ledger`, {
-        requireExp: battleKind.battleType === "WILD" || battleKind.battleType === "TRAINER",
+        // The dedicated navigation fixture starts both parties at level 100, so a completed
+        // battle correctly has no EXP presentation. Keep the complete authority-vs-renderer
+        // ledger equality proof above, but reserve the mandatory EXP cue for normal-level
+        // journeys that can actually gain EXP.
+        requireExp:
+          !policy.navigation.required && (battleKind.battleType === "WILD" || battleKind.battleType === "TRAINER"),
       });
       await Promise.all(clients.map(client => client.checkpoint(`wave-${waveNo}-cleared`)));
       await progress.wave({

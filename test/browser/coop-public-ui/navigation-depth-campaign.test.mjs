@@ -168,6 +168,11 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(workflow, /COOP_UI_REQUIRE_NAVIGATION_DEPTH:[^\n]*navigation-depth-30/u);
   assert.match(campaign, /\[coop-soak:\$\{kind\}\]/u);
   assert.match(campaign, /startHeartbeat\(\(\) => campaignLiveSnapshot/u);
+  assert.match(
+    campaign,
+    /requireExp:\s*!policy\.navigation\.required\s*&&\s*\(battleKind\.battleType === "WILD"/u,
+    "the level-100 navigation fixture must retain ledger equality without inventing an EXP cue",
+  );
   assert.match(headlessSoak, /\[coop-soak:wave-start\]/u);
   assert.match(headlessSoak, /\[coop-soak:wave-complete\]/u);
 });
