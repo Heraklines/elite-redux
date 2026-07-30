@@ -1780,6 +1780,17 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
   if (driver.v2SurfaceId) {
     const semanticOwner = findSemanticOwner(rig, driver.v2SurfaceId, cursors);
     if (semanticOwner) {
+      if (driver.semanticOnly) {
+        const cursor = cursors[semanticOwner.client.label] ?? 0;
+        const current = semanticOwner.client.evidence.findLastSemanticSurface(cursor);
+        if (semanticOwner.markerEvent.index !== current?.index) {
+          // Semantic-only controls have no phase/owner fallback. A completed in-battle Revival can remain
+          // in the wave-wide evidence window when the between-wave dispatcher is recreated; once reward,
+          // command, or any other public surface supersedes it, that historical owner must never be driven
+          // again. findRegisteredSurface already held this invariant; direct dispatch must hold it too.
+          return null;
+        }
+      }
       // Phase/owner evidence can precede the real handler by several seconds while narration or
       // transitions finish. Keyboard input in that interval is legitimately discarded. Wait for
       // the observer's addressed actionable projection; this is the same state a human sees before

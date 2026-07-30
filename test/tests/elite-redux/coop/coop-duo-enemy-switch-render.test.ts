@@ -471,6 +471,14 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     expect(firstEnemySummon, "the fixture executed an enemy trainer replacement summon").toBeGreaterThanOrEqual(0);
     expect(boundPlayerSummon, "the player replacement summon carried its exact V2 binding").toBeGreaterThanOrEqual(0);
     expect(
+      authoritySummonStarts.filter(summon => summon.player && summon.bound),
+      "the authority materialized exactly one bound player replacement summon",
+    ).toHaveLength(1);
+    expect(
+      authoritySummonStarts.filter(summon => summon.player && !summon.bound),
+      "no ambient unbound player summon can author this V2 replacement boundary",
+    ).toHaveLength(0);
+    expect(
       firstEnemySummon,
       "an enemy summon ran before the bound player summon, matching the live failure",
     ).toBeLessThan(boundPlayerSummon);

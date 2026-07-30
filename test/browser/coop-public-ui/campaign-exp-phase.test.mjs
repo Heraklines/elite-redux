@@ -672,6 +672,48 @@ test("a semantic-only reward target stops registering after a newer public surfa
   );
 });
 
+test("direct dispatch cannot re-drive a superseded semantic-only Revival owner", () => {
+  const authority = fakeClient("authority");
+  authority.publicSeat = 1;
+  const renderer = fakeClient("renderer");
+  renderer.publicSeat = 0;
+  const rig = { host: authority, clients: { authority, renderer } };
+  const driver = {
+    name: "revival",
+    v2SurfaceId: "revival:party",
+    semanticOnly: true,
+    owner: { role: "host" },
+  };
+  const cursors = { authority: 0, renderer: 0 };
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "revival:party",
+      localSeat: 1,
+      ownerSeat: 1,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true)?.client, authority);
+
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      localSeat: 1,
+      ownerSeat: 1,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  assert.equal(
+    resolveSurfaceOwner(rig, driver, cursors, new Map(), true),
+    null,
+    "a wave-wide cursor cannot resurrect the completed Revival while the reward shop is current",
+  );
+});
+
 test("a blocked current Mystery narration handoff is known provisional work only until actionable", () => {
   const owner = fakeClient("owner");
   const cursors = { owner: 0 };

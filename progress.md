@@ -5708,3 +5708,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   revival watcher; that separate surface failure remains next after this replacement closure. Local policy-safe
   evidence is 107/107 static contracts, scoped Biome clean, zero TypeScript diagnostics (including repository-wide),
   and `git diff --check` clean. No local engine or Chromium execution was used.
+
+## 2026-07-30 - Historical Revival UI cannot be re-driven after its successor opens
+
+- Exact registered-interactions artifact `30501237914` disproves its headline as a production failure. Both browsers
+  published `revival:party` at epoch `1828218966946640`, wave 1 turn 2, digest `b5fd989ce342087b`; exactly seat 1 was
+  actionable, seat 0 was input-inert, and the campaign recorded its paired semantic convergence before selecting the
+  fainted Magikarp. The result committed, both clients reached turn 3, won the wave, and opened the same reward shop.
+- The later timeout came from a second harness dispatcher with a wave-wide cursor. Its readiness scanner already
+  required semantic-only UI to remain the browser's current public surface, but direct owner resolution omitted that
+  guard. It immediately reused the historical Revival owner event, then waited for an impossible old-digest watcher
+  after the real watcher had applied the revive. Final screenshots showed the healthy Ability Capsule reward flow.
+- Direct dispatch now applies the same current-surface invariant: a semantic-only Revival, Stormglass, reward target,
+  or Mystery sub-surface is driveable only while that exact event remains current in its owner browser. A node-pure
+  failure-first contract reproduces completed Revival followed by reward-shop and requires owner resolution to return
+  null. Focused local evidence is 52/52 campaign contracts, scoped Biome clean, and `git diff --check` clean; no local
+  engine or Chromium execution was used.
+- Focused run `30503496683` executed no tests: its planner correctly rejected the integration manifest's stale
+  `baseSha` before shard selection. The next checkpoint advances that manifest to exact previous tip `356283262`,
+  and deliberately retains the simultaneous-switch engine test in the pushed delta so the replacement shard is not
+  skipped merely because the first planner stopped before qualification.
