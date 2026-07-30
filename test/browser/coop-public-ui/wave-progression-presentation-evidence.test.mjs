@@ -93,8 +93,8 @@ test("authority and replica publish one lifecycle-owned progression ledger", asy
   );
   assert.match(
     playerBattleInfo,
-    /if \(instant\) \{[\s\S]+continueAfterLevel\(\)[\s\S]+updatePokemonExp\(pokemon, instant, durationMultiplier\)/u,
-    "PlayerBattleInfo must honor the instant contract through the recursive level-boundary EXP update",
+    /if \(instant\) \{[\s\S]+this\.expMaskRect\.x = ratio \* 510;[\s\S]+complete\(\);[\s\S]+return;[\s\S]+globalScene\.tweens\.add\([\s\S]+updatePokemonExp\(pokemon, instant, durationMultiplier\)/u,
+    "PlayerBattleInfo must bypass the render-tick tween and honor instant through recursive level-boundary EXP updates",
   );
   assert.match(entry, /setCoopWaveProgressionPresentationObserver[\s\S]*PROGRESSION_EVENT_PREFIX/u);
   assert.match(evidence, /sink\.record\("browser-progression-event"/u);

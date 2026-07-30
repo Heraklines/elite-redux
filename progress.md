@@ -6156,3 +6156,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   hard-coded its EXP sub-update back to animated and retained the half-second level-boundary delay. The instant flag now
   reaches the complete recursive EXP update, including a synchronous level-boundary continuation and no duplicate
   level-up sound. This makes the replay fix real instead of merely changing its call-site spelling.
+- A Phaser tween with duration zero still waits for a render tick, so the instant branch now writes the exact EXP-mask
+  endpoint directly and bypasses TweenManager altogether. Multi-level immutable updates therefore complete in
+  microtasks rather than one low-FPS frame per crossed level.

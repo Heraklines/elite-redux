@@ -167,36 +167,44 @@ export class PlayerBattleInfo extends BattleInfo {
       globalScene.playSound("se/exp");
     }
     return new Promise(resolve => {
+      const complete = () => {
+        if (!globalScene) {
+          return resolve();
+        }
+        if (duration) {
+          globalScene.sound.stopByKey("se/exp");
+        }
+        if (ratio === 1) {
+          if (!instant) {
+            globalScene.playSound("se/level_up");
+          }
+          this.setLevel(this.lastLevel);
+          const continueAfterLevel = () => {
+            this.expMaskRect.x = 0;
+            this.updateInfo(pokemon, instant).then(() => resolve());
+          };
+          if (instant) {
+            continueAfterLevel();
+          } else {
+            globalScene.time.delayedCall(500 * levelDurationMultiplier, continueAfterLevel);
+          }
+          return;
+        }
+        resolve();
+      };
+      // A zero-duration Phaser tween still completes on a later render tick. `instant` is used by authoritative
+      // material installation and must be independent of renderer FPS, including multi-level recursion.
+      if (instant) {
+        this.expMaskRect.x = ratio * 510;
+        complete();
+        return;
+      }
       globalScene.tweens.add({
         targets: this.expMaskRect,
         ease: "Sine.easeIn",
         x: ratio * 510,
         duration,
-        onComplete: () => {
-          if (!globalScene) {
-            return resolve();
-          }
-          if (duration) {
-            globalScene.sound.stopByKey("se/exp");
-          }
-          if (ratio === 1) {
-            if (!instant) {
-              globalScene.playSound("se/level_up");
-            }
-            this.setLevel(this.lastLevel);
-            const continueAfterLevel = () => {
-              this.expMaskRect.x = 0;
-              this.updateInfo(pokemon, instant).then(() => resolve());
-            };
-            if (instant) {
-              continueAfterLevel();
-            } else {
-              globalScene.time.delayedCall(500 * levelDurationMultiplier, continueAfterLevel);
-            }
-            return;
-          }
-          resolve();
-        },
+        onComplete: complete,
       });
     });
   }
