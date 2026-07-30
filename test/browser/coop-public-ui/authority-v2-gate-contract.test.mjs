@@ -4113,3 +4113,15 @@ test("a passive command watcher carries the same visible-wave proof as an action
     "the watcher cannot emit a mechanically valid proof while omitting its visible HUD wave",
   );
 });
+
+test("the browser oracle identifies an authoritative CommandPhase waiting on the peer's stable slot", () => {
+  assert.match(
+    browserEntry,
+    /const commandPartnerWait =[^;]+getCoopNetcodeMode\(\) === "authoritative"[^;]+commandSlotOwner !== runtime\.controller\.role/u,
+  );
+  assert.match(
+    browserEntry,
+    /commandPartnerWait[\s\S]*?surfaceId: "command:watcher"[\s\S]*?ownerSeat = partnerSeat;[\s\S]*?seatsWithInput = \[partnerSeat\]/u,
+    "a waiting engine must expose the peer's input partition, never claim local command input",
+  );
+});

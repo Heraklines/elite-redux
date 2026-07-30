@@ -97,6 +97,32 @@ test("semantic evidence accepts an exact non-actionable replay watcher", () => {
   assert.deepEqual(parsed.seatsWithInput, []);
 });
 
+test("semantic evidence accepts an authoritative partner-command watcher", () => {
+  const parsed = semanticSurfaceView(
+    `${PREFIX}${JSON.stringify(
+      valid({
+        surfaceId: "command:watcher",
+        operationClass: "command",
+        ownerModel: "local",
+        localSeat: 0,
+        localRole: "host",
+        ownerSeat: 1,
+        seatsWithInput: [1],
+        selectedOptionId: "cursor:0",
+        optionIds: null,
+        optionCount: null,
+        ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: null },
+        phase: "CommandPhase",
+        surfaceGeneration: null,
+        uiMode: "MESSAGE",
+      }),
+    )}`,
+  );
+  assert.equal(parsed.surfaceId, "command:watcher");
+  assert.equal(parsed.ownerSeat, 1);
+  assert.deepEqual(parsed.seatsWithInput, [1]);
+});
+
 test("semantic evidence accepts an exact locally owned battle target surface", () => {
   const parsed = semanticSurfaceView(
     `${PREFIX}${JSON.stringify(

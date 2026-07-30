@@ -325,6 +325,42 @@ test("between-wave completion accepts both semantic command frontiers without le
   assert.equal(allClientsAtCurrentCommandFrontier(clients, { "seat-0": 0, "seat-1": 0 }), true);
 });
 
+test("between-wave completion accepts an exact partner-command wait after one half is wiped", () => {
+  const waiting = fakeClient("waiting");
+  waiting.publicSeat = 0;
+  waiting.evidence.events.push({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:watcher",
+      operationClass: "command",
+      phase: "CommandPhase",
+      uiMode: "MESSAGE",
+      localSeat: 0,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: null },
+    },
+  });
+  const owner = fakeClient("owner");
+  owner.publicSeat = 1;
+  owner.evidence.events.push({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:command",
+      operationClass: "command",
+      phase: "CommandPhase",
+      uiMode: "COMMAND",
+      localSeat: 1,
+      seatsWithInput: [1],
+      ready: { handlerActive: true },
+    },
+  });
+
+  assert.equal(allClientsAtCurrentCommandFrontier([waiting, owner], { waiting: 0, owner: 0 }), true);
+});
+
 test("a one-sided next-wave command does not preempt its partner's current learn-move continuation", () => {
   const host = fakeClient("host");
   host.publicSeat = 0;

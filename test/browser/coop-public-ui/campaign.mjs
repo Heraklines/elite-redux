@@ -759,6 +759,16 @@ export function allClientsAtCurrentCommandFrontier(clients, from) {
       && observation.ready?.handlerActive === false
       && observation.ready?.awaitingActionInput === false
       && observation.ready?.inputBlocked === true;
+    const partnerCommandWatcher =
+      observation.surfaceId === "command:watcher"
+      && observation.operationClass === "command"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "MESSAGE"
+      && observation.seatsWithInput?.length === 1
+      && !observation.seatsWithInput.includes(client.publicSeat)
+      && observation.ready?.handlerActive === true
+      && observation.ready?.awaitingActionInput === false
+      && observation.ready?.inputBlocked !== true;
     const partnerWaiting =
       observation.surfaceId === "battle:message"
       && observation.operationClass === "battle-progress"
@@ -766,7 +776,7 @@ export function allClientsAtCurrentCommandFrontier(clients, from) {
       && observation.uiMode === "MESSAGE"
       && observation.ready?.handlerActive === true
       && observation.ready?.awaitingActionInput === true;
-    return owner || rendererWatcher || partnerWaiting;
+    return owner || rendererWatcher || partnerCommandWatcher || partnerWaiting;
   });
 }
 
@@ -3849,13 +3859,20 @@ export function hasProvisionalCommandWatcherSurface(clients, cursors) {
     const event = client.evidence.findLastSemanticSurface(cursor, "command:watcher");
     const latest = client.evidence.findLastSemanticSurface(cursor);
     const observation = event?.observation;
-    return (
-      event?.index === latest?.index
-      && observation?.phase === "CoopReplayTurnPhase"
+    const replayWait =
+      observation?.phase === "CoopReplayTurnPhase"
       && observation.ready?.handlerActive === false
       && observation.ready?.awaitingActionInput === false
-      && observation.ready?.inputBlocked === true
-    );
+      && observation.ready?.inputBlocked === true;
+    const partnerCommandWait =
+      observation?.phase === "CommandPhase"
+      && observation.uiMode === "MESSAGE"
+      && observation.seatsWithInput?.length === 1
+      && !observation.seatsWithInput.includes(client.publicSeat)
+      && observation.ready?.handlerActive === true
+      && observation.ready?.awaitingActionInput === false
+      && observation.ready?.inputBlocked !== true;
+    return event?.index === latest?.index && (replayWait || partnerCommandWait);
   });
 }
 

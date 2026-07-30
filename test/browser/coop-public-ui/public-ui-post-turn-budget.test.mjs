@@ -157,6 +157,29 @@ test("command frontier accepts an exact replay waiter as a non-actionable watche
   assert.equal(match?.address, "73:2:4");
 });
 
+test("command frontier accepts the authoritative engine waiting on a surviving partner", () => {
+  const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
+  const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };
+  const address = { epoch: 73, wave: 2, turn: 1 };
+  host.evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      ...commandFrontierObservation(0, "watcher", "same-state", address).observation,
+      surfaceId: "command:watcher",
+      operationClass: "command",
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: null },
+    },
+  });
+  guest.evidence.push(commandFrontierObservation(1, "owner", "same-state", address));
+
+  const match = findSharedCommandFrontierMatch(host, guest, { host: 0, guest: 0 }, null);
+  assert.equal(match?.hostProjection.kind, "watcher");
+  assert.equal(match?.guestProjection.kind, "owner");
+  assert.equal(match?.address, "73:2:1");
+});
+
 test("command frontier rejects owner/watcher digest or generation disagreement", () => {
   const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
   const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };

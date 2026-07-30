@@ -766,6 +766,16 @@ function commandFrontierProjection(client, event) {
     && observation.ready?.handlerActive === false
     && observation.ready.awaitingActionInput === false
     && observation.ready.inputBlocked === true;
+  const partnerCommandWatcher =
+    observation?.surfaceId === "command:watcher"
+    && observation.operationClass === "command"
+    && observation.phase === "CommandPhase"
+    && observation.uiMode === "MESSAGE"
+    && observation.seatsWithInput?.length === 1
+    && !observation.seatsWithInput.includes(client.publicSeat)
+    && observation.ready?.handlerActive === true
+    && observation.ready.awaitingActionInput === false
+    && observation.ready.inputBlocked !== true;
   if (
     observation?.coop !== true
     || observation.localSeat !== client.publicSeat
@@ -788,6 +798,7 @@ function commandFrontierProjection(client, event) {
     && observation.seatsWithInput?.includes(client.publicSeat);
   const watcher =
     rendererWatcher
+    || partnerCommandWatcher
     || (observation.surfaceId === "battle:message"
       && observation.operationClass === "battle-progress"
       && observation.phase === "CommandPhase"

@@ -1530,13 +1530,35 @@ function observeSemanticSurface(): void {
       return;
     }
     const classifiedSemantic = classifySemanticSurface(phase, uiMode);
+    // The authoritative engine keeps a real CommandPhase open while it waits for a command
+    // owned by the peer. Its local UI is intentionally a non-actionable MESSAGE ("partner is
+    // choosing"), not a command menu. Classify that exact slot-owner relationship as a command
+    // watcher so a half-wiped seat cannot look like an orphaned battle message to the browser
+    // oracle. This observer is CI-only and reads the phase/field; it does not advance either.
+    const commandPhaseFieldIndex = (currentPhase as unknown as { fieldIndex?: unknown }).fieldIndex;
+    const commandSlotOwner =
+      phase === "CommandPhase" && Number.isSafeInteger(commandPhaseFieldIndex)
+        ? globalScene.getPlayerField()[commandPhaseFieldIndex as number]?.coopOwner
+        : null;
+    const commandPartnerWait =
+      phase === "CommandPhase"
+      && uiMode === "MESSAGE"
+      && runtime != null
+      && getCoopNetcodeMode() === "authoritative"
+      && (commandSlotOwner === "host" || commandSlotOwner === "guest")
+      && commandSlotOwner !== runtime.controller.role;
     // A guest-owned full-moveset prompt is rendered by a queue-owned replay phase. Both its
     // actionable owner picker and the host-owned read-only fallback use SUMMARY, so phase name plus
     // the immutable constructor owner flag is the stable distinction. Without this override the
     // guest owner is mislabeled as a generic info screen and the campaign can never drive its pick.
     const replayLearnMoveOwner = (currentPhase as unknown as { ownerIsGuest?: unknown }).ownerIsGuest;
-    let semantic =
-      phase === "CoopReplayLearnMovePhase" && uiMode === "SUMMARY" && typeof replayLearnMoveOwner === "boolean"
+    let semantic = commandPartnerWait
+      ? {
+          surfaceId: "command:watcher",
+          operationClass: "command",
+          ownerModel: "local" as const,
+        }
+      : phase === "CoopReplayLearnMovePhase" && uiMode === "SUMMARY" && typeof replayLearnMoveOwner === "boolean"
         ? {
             surfaceId: replayLearnMoveOwner ? "learn-move:confirm" : "learn-move:summary",
             operationClass: "learn-move",
@@ -1672,6 +1694,13 @@ function observeSemanticSurface(): void {
       // This client's view of who may input: a local surface = this seat drives its own; an
       // interaction surface = only the owner. A driver unions both clients' markers.
       seatsWithInput = semantic.ownerModel === "local" ? [localSeat] : ownerSeat == null ? [] : [ownerSeat];
+      if (commandPartnerWait) {
+        // This browser owns no key at this phase; the peer's stable seat owns the command.
+        // Keep the real active MESSAGE handler/readiness below, but make the input partition
+        // explicit instead of claiming the waiting browser can act.
+        ownerSeat = partnerSeat;
+        seatsWithInput = [partnerSeat];
+      }
     }
 
     const selection = readSelection(handler, uiMode);
