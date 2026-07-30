@@ -40,6 +40,8 @@ interface CoopMachineWait {
   since: number;
   /** False for reciprocal barriers that may legitimately wait while the peer renders/reads local UI. */
   asymmetricEligible: boolean;
+  /** Optional bounded lead/lag grace before this wait becomes asymmetric-deadlock evidence. */
+  asymmetricGraceMs: number;
 }
 
 export interface CoopMachineWaitOptions {
@@ -49,6 +51,12 @@ export interface CoopMachineWaitOptions {
    * for phase holds whose peer is already beyond the held continuation.
    */
   asymmetricEligible?: boolean;
+  /**
+   * Keep an otherwise eligible one-sided wait out of asymmetric recovery for this many milliseconds.
+   * Use this for ordered authority barriers whose peer may legitimately still be rendering, but which
+   * must eventually become recoverable rather than turning into an indefinite softlock.
+   */
+  asymmetricGraceMs?: number;
 }
 
 let nextWaitId = 0;
@@ -69,10 +77,12 @@ export function setCoopStallProbeClock(now: (() => number) | null): void {
  */
 export function beginCoopMachineWait(label: string, options: CoopMachineWaitOptions = {}): () => void {
   const id = nextWaitId++;
+  const requestedGraceMs = options.asymmetricGraceMs ?? 0;
   machineWaits.set(id, {
     label,
     since: clock(),
     asymmetricEligible: options.asymmetricEligible ?? true,
+    asymmetricGraceMs: Number.isFinite(requestedGraceMs) ? Math.max(0, requestedGraceMs) : 0,
   });
   let ended = false;
   return () => {
@@ -112,6 +122,9 @@ export function oldestCoopAsymmetricMachineWaitMs(): number {
       continue;
     }
     const age = now - wait.since;
+    if (age < wait.asymmetricGraceMs) {
+      continue;
+    }
     if (age > oldest) {
       oldest = age;
     }

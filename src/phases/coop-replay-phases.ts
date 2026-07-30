@@ -4316,6 +4316,14 @@ export class CoopFinalizeTurnPhase extends Phase {
         }
         this.authoritySuccessorMachineWaitEnd ??= beginCoopMachineWait(
           `authority-v2-successor:w${wave}:t${this.turn}:r${this.revision ?? "?"}`,
+          {
+            // AWAIT_SUCCESSOR is a one-sided lead/lag barrier: the replica can reach it while the
+            // authority is still draining narration, rewards, or another committed presentation tail.
+            // Keep it as mutual-stall evidence immediately. Defer one-sided recovery long enough for
+            // slow presentation, but make it eligible after a bounded grace so an actually missing
+            // successor still recovers instead of becoming a permanent softlock.
+            asymmetricGraceMs: 120_000,
+          },
         );
         coopLog(
           "v2-turn",

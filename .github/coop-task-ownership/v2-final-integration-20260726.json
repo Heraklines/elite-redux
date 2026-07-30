@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "113ed7443cb243d0ec6fb3435eb6b8e53fcd26fb",
+  "baseSha": "69ef05ddd12517e6de6ed80e319f41ae0e6b9d29",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -68,6 +68,7 @@
     "src/data/elite-redux/coop/coop-reward-operation.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
     "src/data/elite-redux/coop/coop-session-controller.ts",
+    "src/data/elite-redux/coop/coop-stall-probe.ts",
     "src/data/elite-redux/coop/coop-trainer-authority.ts",
     "src/data/elite-redux/coop/coop-trainer-victory-boundary.ts",
     "src/data/elite-redux/coop/coop-transport.ts",

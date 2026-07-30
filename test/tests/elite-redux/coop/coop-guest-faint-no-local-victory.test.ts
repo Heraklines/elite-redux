@@ -33,7 +33,13 @@ import { globalScene, initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { PhaseManager } from "#app/phase-manager";
 import { clearCoopRuntime, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
-import { clearCoopMachineWaits, coopMachineWaitLabels } from "#data/elite-redux/coop/coop-stall-probe";
+import {
+  clearCoopMachineWaits,
+  coopMachineWaitLabels,
+  oldestCoopAsymmetricMachineWaitMs,
+  oldestCoopMachineWaitMs,
+  setCoopStallProbeClock,
+} from "#data/elite-redux/coop/coop-stall-probe";
 import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { CoopInertPhase } from "#phases/coop-inert-phase";
 import { CoopFinalizeTurnPhase, type CoopV2ControlSuccessorClaim } from "#phases/coop-replay-phases";
@@ -131,6 +137,7 @@ function markSupersededByNextTurnReplacement(phase: CoopFinalizeTurnPhase, turn:
 
 describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory deadlock)", () => {
   let prevGlobalScene: BattleScene;
+  let stallProbeNow = 0;
 
   beforeEach(() => {
     prevGlobalScene = globalScene;
@@ -140,11 +147,14 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     rec.shiftPhaseCalls = 0;
     rec.pushedPhases = [];
     rec.turn = 1;
+    stallProbeNow = 0;
+    setCoopStallProbeClock(() => stallProbeNow);
     initGlobalScene(makeStubScene());
   });
 
   afterEach(() => {
     clearCoopMachineWaits();
+    setCoopStallProbeClock(null);
     // Tear down any session so the next test (and the rest of the suite) starts solo / off-session.
     clearCoopRuntime();
     // Citizenship (#710): this engine-free file replaces globalScene with a reset-less stub. Restore
@@ -235,6 +245,18 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     );
     callPrivate(phase, "finishTurn");
     expect(coopMachineWaitLabels()).toEqual([expect.stringContaining("authority-v2-successor:w5:t1:r16")]);
+    expect(oldestCoopMachineWaitMs(), "the successor barrier still proves a mutual stall").toBeGreaterThanOrEqual(0);
+    expect(
+      oldestCoopAsymmetricMachineWaitMs(),
+      "an authority still rendering the route to its successor starts inside a bounded grace",
+    ).toBe(-1);
+    stallProbeNow = 119_999;
+    expect(oldestCoopAsymmetricMachineWaitMs(), "slow presentation remains safe through the grace").toBe(-1);
+    stallProbeNow = 120_000;
+    expect(
+      oldestCoopAsymmetricMachineWaitMs(),
+      "a genuinely missing successor eventually becomes one-sided recovery evidence",
+    ).toBe(120_000);
 
     // Reward/market/Mystery opens replace the finalizer without calling end(): end() would let the old turn
     // derive another local phase. The scheduler must nevertheless retire its wait before starting the exact
