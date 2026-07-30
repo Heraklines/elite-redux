@@ -137,6 +137,7 @@ import {
   coopWaveAdvanceSanctionedTails,
   isCoopWaveAdvanceOperationEnabled,
 } from "#data/elite-redux/coop/coop-wave-operation";
+import { applyErBlackShinyInterimTint } from "#data/elite-redux/er-black-shinies";
 import type { Gender } from "#data/gender";
 import { doPokeballBounceAnim, getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -788,6 +789,167 @@ export class CoopFormChangeReplayPhase extends Phase {
             : { kind: "intentionally-skipped", reason: "animations-disabled", actorFingerprint },
         ),
       () => finish({ kind: "failed", reason: "form-change-presentation-threw", actorFingerprint }),
+    );
+  }
+}
+
+/** GUEST: install and refresh one authority-selected same-form visual identity. */
+export class CoopAppearanceReplayPhase extends Phase {
+  public readonly phaseName = "CoopAppearanceReplayPhase";
+  private readonly ownerScene = globalScene;
+  private ownerPhaseManager = globalScene.phaseManager;
+  private readonly ownerRuntime = getCoopRuntime();
+  private readonly ownerStreamer = getCoopBattleStreamer();
+  private readonly ownerGeneration = coopSessionGeneration();
+  private readonly scheduledCallbacks = new Set<() => void>();
+  private watchdog: CoopPresentationProgressWatchdog | undefined;
+  private ended = false;
+
+  constructor(
+    private readonly event: Extract<CoopBattleEvent, { k: "appearance" }>,
+    private readonly outcomeToken: CoopPresentationOutcomeToken = createCoopPresentationOutcomeToken(),
+  ) {
+    super();
+  }
+
+  public bindOwnerPhaseManager(phaseManager: typeof globalScene.phaseManager): this {
+    this.ownerPhaseManager = phaseManager;
+    return this;
+  }
+
+  private actorFingerprint(): string {
+    const { actor, bi, erBlackShiny, formIndex, speciesId, variant } = this.event;
+    return `${actor.side}:bi${bi}:p${actor.pokemonId}:appearance-sp${speciesId}:form${formIndex}:v${variant}:black${Number(erBlackShiny)}`;
+  }
+
+  private exactRuntimeInstalled(): boolean {
+    return (
+      globalScene === this.ownerScene
+      && getCoopRuntime() === this.ownerRuntime
+      && getCoopBattleStreamer() === this.ownerStreamer
+      && coopSessionGeneration() === this.ownerGeneration
+    );
+  }
+
+  private dispatchBound(callback: () => void, onUnavailable: () => void = () => {}): void {
+    if (this.ended || this.isRetired()) {
+      onUnavailable();
+      return;
+    }
+    if (this.exactRuntimeInstalled()) {
+      callback();
+      return;
+    }
+    if (this.ownerRuntime == null || globalScene === this.ownerScene) {
+      this.retire();
+      onUnavailable();
+      return;
+    }
+    let completed = false;
+    let cancel = () => {};
+    cancel = runWhenCoopRuntimeActive(this.ownerRuntime, () => {
+      completed = true;
+      this.scheduledCallbacks.delete(cancel);
+      if (this.ended || this.isRetired()) {
+        onUnavailable();
+        return;
+      }
+      if (!this.exactRuntimeInstalled()) {
+        this.retire();
+        onUnavailable();
+        return;
+      }
+      callback();
+    });
+    if (!completed) {
+      this.scheduledCallbacks.add(cancel);
+    }
+  }
+
+  private clearOwnedResources(): void {
+    this.watchdog?.remove();
+    this.watchdog = undefined;
+    for (const cancel of this.scheduledCallbacks) {
+      cancel();
+    }
+    this.scheduledCallbacks.clear();
+  }
+
+  private finish(outcome: CoopPresentationOutcome): void {
+    if (this.ended || this.isRetired()) {
+      return;
+    }
+    this.ended = true;
+    this.clearOwnedResources();
+    settleCoopPresentationOutcome(this.outcomeToken, outcome);
+    if (this.ownerPhaseManager.getCurrentPhase() === this) {
+      this.ownerPhaseManager.shiftPhase();
+    }
+  }
+
+  public override retire(): void {
+    if (this.isRetired()) {
+      return;
+    }
+    super.retire();
+    this.ended = true;
+    this.clearOwnedResources();
+    settleCoopPresentationOutcome(this.outcomeToken, {
+      kind: "failed",
+      reason: "appearance-presentation-retired",
+      actorFingerprint: this.actorFingerprint(),
+    });
+  }
+
+  public override end(): void {
+    this.finish({ kind: "rendered", actorFingerprint: this.actorFingerprint() });
+  }
+
+  public override start(): void {
+    super.start();
+    if (!this.exactRuntimeInstalled()) {
+      this.dispatchBound(() => this.startBound());
+      return;
+    }
+    this.startBound();
+  }
+
+  private startBound(): void {
+    const { actor, bi, erBlackShiny, formIndex, shiny, speciesId, variant } = this.event;
+    const actorFingerprint = this.actorFingerprint();
+    const pokemon = exactDisplayedActor(actor);
+    if (
+      pokemon == null
+      || pokemon.getBattlerIndex() !== bi
+      || pokemon.species.speciesId !== speciesId
+      || formIndex >= pokemon.species.forms.length
+    ) {
+      this.finish({ kind: "failed", reason: "appearance-material-invalid", actorFingerprint });
+      return;
+    }
+
+    // This is immutable presentation material installed before the complete checkpoint. No ability,
+    // item, RNG, or form-change mechanics run here; the checkpoint replaces the full custom state.
+    pokemon.formIndex = formIndex;
+    pokemon.shiny = shiny;
+    pokemon.variant = variant;
+    pokemon.customPokemonData.erBlackShiny = erBlackShiny;
+    this.watchdog = armCoopPresentationProgressWatchdog(() =>
+      this.finish({ kind: "failed", reason: "appearance-watchdog-expired", actorFingerprint }),
+    );
+    refreshAuthorityAppearance(
+      pokemon,
+      (callback, onUnavailable) => this.dispatchBound(callback, onUnavailable),
+      () => {
+        if (shiny && pokemon.isOnField()) {
+          pokemon.initShinySparkle();
+        }
+        if (erBlackShiny) {
+          applyErBlackShinyInterimTint(pokemon);
+        }
+        this.finish({ kind: "rendered", actorFingerprint });
+      },
+      () => this.finish({ kind: "failed", reason: "appearance-presentation-threw", actorFingerprint }),
     );
   }
 }

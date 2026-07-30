@@ -419,6 +419,46 @@ test("Substitute and Commander sprite transitions are authority-authored and out
   assert.match(sideSwap, /case "pokemonAnim":[\s\S]+swapBi\(event\.bi/u);
 });
 
+test("same-form Black Shiny promotion is an ordered exact-actor appearance refresh", () => {
+  const producer = read("src/data/elite-redux/er-black-shinies.ts");
+  const transport = read("src/data/elite-redux/coop/coop-transport.ts");
+  const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
+  const replay = read("src/phases/coop-replay-phases.ts");
+  const replayPump = read("src/phases/coop-replay-turn-phase.ts");
+  const rendererGate = read("src/data/elite-redux/coop/coop-renderer-gate.ts");
+  const phaseManager = read("src/phase-manager.ts");
+  const harness = read("test/tools/coop-duo-harness.ts");
+
+  assert.match(
+    producer,
+    /applyErBlackShinyKit\(pokemon\);[\s\S]+recordCoopEvent\(\{[\s\S]+k: "appearance"[\s\S]+erBlackShiny:[\s\S]+recordCoopEvent\(\{ k: "shinySparkle"/u,
+    "the authority orders the complete appearance refresh before its direct sparkle cue",
+  );
+  assert.match(transport, /k: "appearance";[\s\S]+erBlackShiny: boolean/u);
+  assert.match(
+    validator,
+    /case "appearance":[\s\S]+event\.variant <= 2[\s\S]+!event\.erBlackShiny \|\| \(event\.shiny && event\.variant === 2\)/u,
+  );
+  assert.match(
+    replay,
+    /export class CoopAppearanceReplayPhase[\s\S]+exactDisplayedActor\(actor\)[\s\S]+pokemon\.customPokemonData\.erBlackShiny = erBlackShiny[\s\S]+refreshAuthorityAppearance[\s\S]+pokemon\.initShinySparkle\(\)[\s\S]+applyErBlackShinyInterimTint/u,
+    "the replica installs visual identity only, refreshes assets, and prepares the streamed sparkle",
+  );
+  assert.doesNotMatch(
+    replay.slice(
+      replay.indexOf("export class CoopAppearanceReplayPhase"),
+      replay.indexOf("export class CoopTransformReplayPhase"),
+    ),
+    /applyErBlackShinyKit|drawDistinctFromPool|changeForm\(/u,
+    "appearance replay must not re-enter gift RNG or form mechanics",
+  );
+  assert.match(replay, /appearance-watchdog-expired/u);
+  assert.match(replayPump, /case "appearance":[\s\S]+"CoopAppearanceReplayPhase"/u);
+  assert.match(rendererGate, /"CoopAppearanceReplayPhase"/u);
+  assert.match(phaseManager, /CoopAppearanceReplayPhase,[\s\S]+created instanceof CoopAppearanceReplayPhase/u);
+  assert.match(harness, /"CoopAppearanceReplayPhase"/u);
+});
+
 test("form changes and Transform carry complete authority material into dedicated renderer phases", () => {
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");

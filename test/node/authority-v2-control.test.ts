@@ -82,6 +82,29 @@ describe("ordered shiny presentation contract", () => {
   });
 });
 
+describe("ordered same-form appearance contract", () => {
+  const appearance = {
+    k: "appearance",
+    bi: 2,
+    actor: { side: "enemy", pokemonId: 25 },
+    speciesId: 268,
+    formIndex: 1,
+    shiny: true,
+    variant: 2,
+    erBlackShiny: true,
+  } as const;
+
+  it("requires a complete visual identity and a coherent Black Shiny marker", () => {
+    expect(isStrictCoopBattleEvent(appearance)).toBe(true);
+    expect(isStrictCoopBattleEvent({ ...appearance, bi: -2 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...appearance, speciesId: 0 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...appearance, formIndex: -1 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...appearance, variant: 3 })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...appearance, shiny: false })).toBe(false);
+    expect(isStrictCoopBattleEvent({ ...appearance, variant: 1 })).toBe(false);
+  });
+});
+
 describe("ordered HP presentation contract", () => {
   const hp = {
     k: "hp",

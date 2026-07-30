@@ -36,6 +36,7 @@ import {
   erBlackSpritePathFromBase,
 } from "#data/elite-redux/er-black-sprite-manifest";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
+import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import type { Pokemon } from "#field/pokemon";
@@ -321,6 +322,22 @@ export function promoteToErBlackShinyInBattle(pokemon: Pokemon): void {
   pokemon.shiny = true;
   pokemon.variant = 2;
   applyErBlackShinyKit(pokemon);
+  const actor = { side: pokemon.isPlayer() ? ("player" as const) : ("enemy" as const), pokemonId: pokemon.id };
+  recordCoopEvent({
+    k: "appearance",
+    bi: pokemon.getBattlerIndex(),
+    actor,
+    speciesId: pokemon.species.speciesId,
+    formIndex: pokemon.formIndex,
+    shiny: pokemon.shiny,
+    variant: pokemon.variant,
+    erBlackShiny: pokemon.customPokemonData.erBlackShiny === true,
+  });
+  // The host calls sparkle directly after the refreshed atlas loads. Retain the same cue separately so
+  // the renderer cannot sparkle the stale pre-promotion sprite or silently omit the entrance effect.
+  if (pokemon.isOnField()) {
+    recordCoopEvent({ k: "shinySparkle", bi: pokemon.getBattlerIndex(), actor });
+  }
   try {
     void pokemon
       .loadAssets(false)

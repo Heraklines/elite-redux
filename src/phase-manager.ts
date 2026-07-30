@@ -42,6 +42,7 @@ import { CoopReplayLearnMoveBatchPhase } from "#phases/coop-replay-learn-move-ba
 import { CoopReplayLearnMovePhase } from "#phases/coop-replay-learn-move-phase";
 import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
 import {
+  CoopAppearanceReplayPhase,
   CoopApplyResyncPhase,
   CoopCaptureReplayPhase,
   CoopCommonAnimReplayPhase,
@@ -225,6 +226,7 @@ const PHASES = Object.freeze({
   CoopTurnCommitPhase,
   CoopWaveProgressionReplayPhase,
   CoopApplyResyncPhase,
+  CoopAppearanceReplayPhase,
   CoopCaptureReplayPhase,
   CoopCommonAnimReplayPhase,
   CoopFinalizeEntryPresentationPhase,
@@ -904,7 +906,8 @@ export class PhaseManager {
       created.bindOwnerPhaseManager(this);
     }
     if (
-      created instanceof CoopFormChangeReplayPhase
+      created instanceof CoopAppearanceReplayPhase
+      || created instanceof CoopFormChangeReplayPhase
       || created instanceof CoopFormChangeCutsceneReplayPhase
       || created instanceof CoopTransformReplayPhase
     ) {

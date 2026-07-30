@@ -204,6 +204,18 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
       );
     case "shinySparkle":
       return isValidBattlerIndex(event.bi) && isPresentationActorRef(event.actor);
+    case "appearance":
+      return (
+        isActorAddressableBattlerIndex(event.bi)
+        && isPresentationActorRef(event.actor)
+        && isPositiveSafeAddressPart(event.speciesId)
+        && isSafeAddressPart(event.formIndex)
+        && typeof event.shiny === "boolean"
+        && isSafeAddressPart(event.variant)
+        && event.variant <= 2
+        && typeof event.erBlackShiny === "boolean"
+        && (!event.erBlackShiny || (event.shiny && event.variant === 2))
+      );
     case "captureAttempt":
       return (
         isValidBattlerIndex(event.bi)

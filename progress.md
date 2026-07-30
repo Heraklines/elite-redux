@@ -6091,3 +6091,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Mystery battles remain covered rather than disappearing from the browser matrix.
 - Profile contracts prove the split explicitly. Production code, Authority V2, Showdown, tournament, triples, and
   deployment behavior are unchanged.
+
+## 2026-07-30 - Final-boss same-form promotion enters the presentation stream
+
+- The Hell finale changes its phase-two boss into a Black Shiny without changing form. That path directly reloaded
+  assets, refreshed the nameplate, tinted the sprite, and sparkled only on the authority; the mechanical checkpoint
+  carried the resulting state but supplied no ordered presentation instruction to the replica.
+- A closed `appearance` event now carries exact actor, species, form, shiny variant, and Black-Shiny identity. Its
+  renderer installs only that immutable visual preimage, re-enters the captured runtime after asset/info promises,
+  and is bounded by the same hard presentation watchdog as form/Transform replays. The existing exact-actor sparkle
+  event follows it, so the replica cannot sparkle a stale atlas or omit the cue.
+- The strict validator rejects incoherent Black-Shiny material, the renderer switch remains compile-time exhaustive,
+  and the production renderer gate plus headless drain inventory include the new phase. The source contract is green
+  at 26/26, full TypeScript is clean, and changed-file formatting is clean; remote engine qualification remains due.

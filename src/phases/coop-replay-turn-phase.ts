@@ -1874,6 +1874,11 @@ export class CoopReplayTurnPhase extends Phase {
             this.presentationOutcomeTokens.push(outcomeToken);
             pm.unshiftNew("CoopShinySparkleReplayPhase", event.bi, event.actor, outcomeToken);
             break;
+          case "appearance":
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew("CoopAppearanceReplayPhase", event, outcomeToken);
+            break;
           case "formChange":
             outcomeToken = createCoopPresentationOutcomeToken();
             this.presentationOutcomeTokens.push(outcomeToken);

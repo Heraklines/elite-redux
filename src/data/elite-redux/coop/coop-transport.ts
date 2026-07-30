@@ -1233,6 +1233,21 @@ export type CoopBattleEvent =
     }
   /** Play one authority-observed shiny entrance cue against the exact displayed actor. */
   | { k: "shinySparkle"; bi: number; actor: CoopPresentationActorRef }
+  /**
+   * Refresh an authority-selected visual identity that changed without a form edge (for example the
+   * Hell finale's mid-battle Black Shiny promotion). The following checkpoint still owns complete
+   * mechanics; this entry makes the asset/nameplate boundary ordered and observable before it.
+   */
+  | {
+      k: "appearance";
+      bi: number;
+      actor: CoopPresentationActorRef;
+      speciesId: number;
+      formIndex: number;
+      shiny: boolean;
+      variant: number;
+      erBlackShiny: boolean;
+    }
   /** Replay the authority's exact throw/shake/result against the still-live target before checkpoint apply. */
   | CoopCaptureAttemptPresentation
   /** Apply and display one authority-resolved ordinary form change without re-running its mechanics. */

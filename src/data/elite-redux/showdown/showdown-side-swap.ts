@@ -200,6 +200,7 @@ export function swapBattleEvent(event: CoopBattleEvent, enemyBase: number = live
         targetBi: swapBi(event.targetBi, enemyBase),
         targetActor: swapActor(event.targetActor),
       };
+    case "appearance":
     case "formChange":
     case "transform":
       return { ...event, bi: swapBi(event.bi, enemyBase), actor: swapActor(event.actor) };

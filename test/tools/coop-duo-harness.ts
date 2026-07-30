@@ -3566,6 +3566,7 @@ export const REPLAY_DRAIN_PHASES = new Set([
   // deliberately skips their Phaser tweens, but it must still start/end the exact production phase before
   // declaring the turn finalized. Keep this list in lockstep with the production replay switch.
   "CoopCommonAnimReplayPhase",
+  "CoopAppearanceReplayPhase",
   "CoopFormChangeCutsceneReplayPhase",
   "CoopFormChangeReplayPhase",
   "CoopTransformReplayPhase",
