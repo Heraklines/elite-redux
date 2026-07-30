@@ -5817,3 +5817,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   switch setup while matching the production object lifecycle. No production behavior is weakened or changed. The
   aggregate red is classified as a harness-fixture failure, but the noisy signal is still repaired rather than
   waived.
+- Focused run `30507854271` is fully green at test-only tip `729b21524`, including B7, all source/node contracts,
+  static/type, and its required aggregate. This independently closes the aggregate run's only substantive red job.
+
+## 2026-07-30 - Mystery grid navigation explores each observed cursor state
+
+- Exact mystery-gauntlet run `30506589586` kept both browsers synchronized through five consecutive Mystery surfaces,
+  one real replacement, and wave 6. At Fight Club both clients showed epoch `1828225473892116`, wave 6 turn 1,
+  Mystery type 85, digest `42080feb9dae5374`, and owner seat 1; the owner remained explicitly actionable. The red was
+  the browser driver timing out while trying to select the visible third choice, not a production softlock.
+- Trace evidence shows the former global `Right, Down, Left, Up` fallback repeatedly traversed
+  `option 1 -> option 0 -> View Party` and never tried `Down` while option 0 was selected. The public UI and keyboard
+  input remained healthy throughout. `selectOptionById` now advances its direction index per exact observed selection
+  plus option set, so a grid cycle cannot pin one cursor state to one ineffective direction forever.
+- A node-pure failure-first regression recreates a four-cell Mystery grid whose global modulo sequence cycles while
+  the target is reachable from a direction never attempted at that state. It requires the public-key driver to reach
+  and submit the target without any DOM or game-state mutation shortcut. Production co-op code is unchanged.

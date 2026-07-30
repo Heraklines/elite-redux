@@ -1704,3 +1704,65 @@ test("semantic navigation never submits a selected lobby row while its repaint b
   });
   assert.deepEqual(presses, ["Space"]);
 });
+
+test("semantic grid navigation explores directions per cursor state instead of cycling globally", async () => {
+  const optionIds = [
+    "mystery-option:0:enabled",
+    "mystery-option:1:enabled",
+    "mystery-option:2:enabled",
+    "mystery-action:view-party",
+  ];
+  const targetId = "mystery-option:2:enabled";
+  const transitions = new Map([
+    [`${optionIds[3]}:ArrowRight`, optionIds[1]],
+    [`${optionIds[1]}:ArrowRight`, optionIds[0]],
+    [`${optionIds[1]}:ArrowDown`, optionIds[0]],
+    [`${optionIds[0]}:ArrowRight`, targetId],
+    // The former global sequence followed these three edges forever:
+    // view-party --Right--> 1 --Down--> 0 --Left--> view-party.
+    [`${optionIds[0]}:ArrowLeft`, optionIds[3]],
+  ]);
+  const events = [
+    {
+      index: 1,
+      observation: {
+        surfaceId: "mystery-encounter",
+        selectedOptionId: optionIds[3],
+        optionIds,
+        ready: { handlerActive: true, inputBlocked: false },
+      },
+    },
+  ];
+  const presses = [];
+  const client = {
+    label: "host-seat",
+    evidence: {
+      findLastSemanticSurface(fromCursor, surfaceId) {
+        return events.findLast(event => event.index >= fromCursor && event.observation.surfaceId === surfaceId) ?? null;
+      },
+      record() {},
+    },
+    async press(key) {
+      presses.push(key);
+      if (key === "Space") {
+        return;
+      }
+      const current = events.at(-1).observation;
+      const selectedOptionId = transitions.get(`${current.selectedOptionId}:${key}`);
+      assert.ok(selectedOptionId, `fixture has no ${key} edge from ${current.selectedOptionId}`);
+      events.push({
+        index: events.at(-1).index + 1,
+        observation: { ...current, selectedOptionId },
+      });
+    },
+  };
+
+  await selectOptionById(client, {
+    surfaceId: "mystery-encounter",
+    targetId,
+    navKeys: ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"],
+    timeoutMs: 1_000,
+  });
+
+  assert.deepEqual(presses, ["ArrowRight", "ArrowRight", "ArrowRight", "Space"]);
+});

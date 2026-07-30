@@ -785,6 +785,12 @@ export async function selectOptionById(
   const label = `${surfaceId}->${targetId}`;
   let stalls = 0;
   let step = 0;
+  // A grid can contain a directional cycle where a global key sequence always revisits the
+  // same selected option on the same modulo step. Track exploration per observed cursor state
+  // so every supplied direction is tried from that state before repeating. The wave-6 Fight
+  // Club surface exposed this exactly: the old global Right/Down/Left/Up loop visited option 0
+  // only on Up and therefore never tried the Down edge to option 2.
+  const navigationAttemptsBySelection = new Map();
   const deadline = Date.now() + timeoutMs;
   while (step < maxSteps && Date.now() < deadline) {
     const remainingMs = Math.max(1, deadline - Date.now());
@@ -818,12 +824,22 @@ export async function selectOptionById(
     // navigate: press a direction, then verify the selected id actually changed.
     const before = observation.selectedOptionId;
     const beforeIndex = event.index;
-    const key = chooseNavigationKey(observation, targetId, navKeys, step);
+    const selectionKey = JSON.stringify([before, observation.optionIds ?? null]);
+    const selectionStep = navigationAttemptsBySelection.get(selectionKey) ?? 0;
+    const key = chooseNavigationKey(observation, targetId, navKeys, selectionStep);
+    navigationAttemptsBySelection.set(selectionKey, selectionStep + 1);
     await client.press(key, `nav-move-${label}-step${step}`);
     const afterEvent = await waitForNewerSelection(client, surfaceId, beforeIndex, before, remainingMs);
     if (afterEvent == null) {
       stalls += 1;
-      client.evidence.record("campaign-nav", { surfaceId, targetId, action: "stall", key, step });
+      client.evidence.record("campaign-nav", {
+        surfaceId,
+        targetId,
+        action: "stall",
+        key,
+        step,
+        selectionStep,
+      });
       // Cycle through the provided nav axes before giving up (e.g. a 2x2 grid needs Down + Right).
       if (stalls > navKeys.length) {
         throw new Error(`${client.label}: selectOptionById(${label}) cursor did not move after ${stalls} presses`);
