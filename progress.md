@@ -5750,3 +5750,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   95/96 green and stopped the new simultaneous-switch regression before mechanics because random trainer generation
   produced a three-mon party. The fixture now pins the missing fourth enemy before `buildDuo` mirrors both engines,
   guaranteeing two real reserves for the two simultaneous enemy faints without mocking switch scheduling.
+
+## 2026-07-30 - The replacement regression now recreates enemy-first summon order
+
+- Focused run `30504605855` kept the source/node contracts and branch static gate green, then ran B11 95/96 green.
+  The replacement regression reached all of its mechanical assertions: one exact bound player summon, no ambient
+  unbound player summon, one `REPLACEMENT_COMMIT`, both trainer reserves plus the selected Charizard on field, and
+  zero forced resyncs. Its sole failure was the test's reproduction precondition: the player summon ran at index 0
+  and the first enemy summon at index 1, so the fixture did not exercise the historical enemy-first phase order.
+- The earlier Earthquake setup fainted the player partner before its enemy targets, naturally scheduling the player
+  replacement first. The fixture now uses a real enemy-only Dazzling Gleam to faint both trainer leads and a real
+  end-of-turn burn to faint the guest-owned player afterward. Enemy moves are pinned to Splash. This produces the
+  production phase ordering without mocking or rearranging `PhaseManager`: the enemy summon must precede the later
+  player picker, while the same exact summon-binding and zero-resync assertions remain intact.
+- Local policy-safe evidence is scoped Biome plus `git diff --check`; the engine regression remains remote-only per
+  `AGENTS.md`. The ownership manifest advances to exact parent `b379e805e` so the next focused B11 run cannot be
+  mistaken for evidence from the earlier fixture.

@@ -43,6 +43,7 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
 import { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
@@ -101,7 +102,8 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
       .battleType(BattleType.TRAINER)
       .randomTrainer({ trainerType: TrainerType.ACE_TRAINER, trainerVariant: TrainerVariant.DOUBLE })
       .startingLevel(100)
-      .moveset([KO_MOVE, HOLD_MOVE, MoveId.THUNDERBOLT, MoveId.EARTHQUAKE]);
+      .moveset([KO_MOVE, HOLD_MOVE, MoveId.DAZZLING_GLEAM, MoveId.EARTHQUAKE])
+      .enemyMoveset(MoveId.SPLASH);
   });
 
   afterEach(() => {
@@ -403,15 +405,20 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
       "the trainer has reserves for both fainted enemy slots",
     ).toBeGreaterThan(3);
 
-    // Recreate the live wave-7 frontier without relying on damage rolls: the guest-owned player actor and
-    // both enemy leads all faint during the same authoritative turn. SNORLAX's Earthquake is the last
-    // mechanical action and therefore leaves trainer replacements plus the player picker in one phase tree.
-    rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+    // Recreate the live wave-7 frontier without relying on damage rolls: DAZZLING_GLEAM faints both trainer
+    // leads first, then end-of-turn burn faints the guest-owned player actor. That naturally queues and runs
+    // the enemy trainer summon before the later player replacement picker—the ordering that exposed the live
+    // checkpoint theft—without mocking or reordering the production phase manager.
+    const hostGuestActor = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+    hostGuestActor.hp = 1;
+    hostGuestActor.doSetStatus(StatusEffect.BURN);
     for (const enemy of rig.hostScene.getEnemyField()) {
       enemy.hp = 1;
     }
     withClientSync(rig.guestCtx, () => {
-      rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+      const guestGuestActor = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      guestGuestActor.hp = 1;
+      guestGuestActor.doSetStatus(StatusEffect.BURN);
       for (const enemy of rig.guestScene.getEnemyField()) {
         enemy.hp = 1;
       }
@@ -423,7 +430,7 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     await drainLoopback();
 
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
+      game.move.select(MoveId.DAZZLING_GLEAM, COOP_HOST_FIELD_INDEX);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(
