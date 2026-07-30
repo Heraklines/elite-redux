@@ -33,45 +33,12 @@ import type { CustomModifierSettings } from "#modifiers/modifier-type";
 import { type ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import { generateModifierType, handleMysteryEncounterVictory } from "#mystery-encounters/encounter-phase-utils";
 import { PokemonPhase } from "#phases/pokemon-phase";
+import { removeQueuedPostVictoryCombatPhases } from "#phases/post-victory-queue-cleanup";
 import { applyEffects } from "#system/llm-director/consequence-effects";
 import { logEffectApplied } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { paginateAndJoin } from "#system/llm-director/text-pagination";
 import { randSeedInt } from "#utils/common";
-
-/**
- * Drop the remainder of the just-finished turn once the final enemy is gone.
- * In multi-active battles, ally MovePhases can already be queued behind the
- * first VictoryPhase. Letting them run with no targets eventually schedules a
- * fresh CommandPhase and strands the cleared wave forever.
- */
-export function removeQueuedPostVictoryCombatPhases(): void {
-  // Authoritative co-op owns a separately sanctioned victory tail. This cleanup
-  // is for the solo multi-active queue corruption reported in production.
-  if (globalScene.gameMode.isCoop) {
-    return;
-  }
-  const staleCombatPhases = [
-    "CommandPhase",
-    "EnemyCommandPhase",
-    "TurnStartPhase",
-    "MovePhase",
-    "MoveEndPhase",
-    "CheckInterludePhase",
-    "WeatherEffectPhase",
-    "PositionalTagPhase",
-    "BerryPhase",
-    "CheckStatusEffectPhase",
-    "PostTurnStatusEffectPhase",
-    "TurnEndPhase",
-    "TurnInitPhase",
-  ] as const;
-  for (const phaseName of staleCombatPhases) {
-    while (globalScene.phaseManager.tryRemovePhase(phaseName)) {
-      // Remove static phases, dynamic phases, and their markers.
-    }
-  }
-}
 
 export class VictoryPhase extends PokemonPhase {
   public readonly phaseName = "VictoryPhase";
