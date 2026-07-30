@@ -311,6 +311,7 @@ describe("ordered-wait local presentation lease", () => {
     for (const phaseName of [
       "ExpPhase",
       "LevelUpPhase",
+      "LearnMovePhase",
       "TrainerVictoryPhase",
       "MoneyRewardPhase",
       "ModifierRewardPhase",
@@ -370,6 +371,13 @@ describe("ordered-wait local presentation lease", () => {
         ...exactBattleEndMessage,
         messageHandlerActionable: false,
       }),
+    ).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(
+        { ...turnWait, allowedKinds: ["CONTROL_COMMIT", "TERMINAL_COMMIT"] },
+        { ...exactBattleEndMessage, phaseName: "LearnMovePhase" },
+      ),
+      "deterministic learn narration cannot borrow a lease from a wait that has no wave successor",
     ).toBe(false);
   });
 

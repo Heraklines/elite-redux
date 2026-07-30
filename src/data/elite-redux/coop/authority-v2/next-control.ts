@@ -264,6 +264,11 @@ const WAVE_SETTLEMENT_PRESENTATION_PHASES: ReadonlySet<string> = new Set([
   "MessagePhase",
   "ExpPhase",
   "LevelUpPhase",
+  // A committed reward can deterministically queue a move into an empty slot. LearnMovePhase applies that
+  // immutable result without a picker, then parks on its local "learned Move!" ACTION narration before the
+  // authority can author WAVE_ADVANCE. The choice-bearing CONFIRM/SUMMARY handlers do not satisfy the MESSAGE
+  // readiness proof below and therefore still require their own SHARED_INTERACTION control.
+  "LearnMovePhase",
   "TrainerVictoryPhase",
   "MoneyRewardPhase",
   "ModifierRewardPhase",

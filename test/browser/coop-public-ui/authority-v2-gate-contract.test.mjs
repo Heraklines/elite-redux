@@ -2294,6 +2294,7 @@ test("a turn wait leases only its exact action-only settlement chain on the path
     "MessagePhase",
     "ExpPhase",
     "LevelUpPhase",
+    "LearnMovePhase",
     "TrainerVictoryPhase",
     "MoneyRewardPhase",
     "ModifierRewardPhase",

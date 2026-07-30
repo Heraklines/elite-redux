@@ -5871,3 +5871,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   move -> Backspace -> exact command -> Pokemon -> owned reserve -> Send Out -> relay proof. It forbids an attack
   record and uses no DOM/game-state mutation. The next exact proof remains Mystery-only because runtime product code
   and the already-green aggregate are unchanged.
+
+## 2026-07-30 - Deterministic reward move learning retains an action-only V2 lease
+
+- Exact Mystery run `30512187831` reached a synchronized wave-1 reward continuation and applied Horn Attack to both
+  Seel copies. Both final screenshots visibly showed `Seel learned Horn Attack!` with the ACTION arrow, at the same
+  epoch/wave/turn and state digest, but both semantic observers reported `inputBlocked:true`. This was a production
+  softlock: `Ui.processInputCoopAware` rejected the Space a real player had to press while the reward terminal's
+  ordered successor wait remained current.
+- This empty-slot auto-learn path is deterministic and exposes only an action-only MESSAGE before WAVE_ADVANCE can be
+  authored. `LearnMovePhase` now belongs to the closed wave-settlement presentation set, so that exact active MESSAGE
+  handler can drain. CONFIRM and SUMMARY remain excluded by construction and still require the typed LEARN_MOVE
+  shared control; wrong address and waits without WAVE_ADVANCE stay frozen.
+- Failure-first Authority V2 control coverage now includes the positive deterministic learn narration and its
+  no-wave-successor denial. The browser source contract also requires the phase to remain in the closed settlement
+  set. No Showdown, tournament, triples, deployment, or legacy correctness path changed.
