@@ -16,11 +16,16 @@
 // =============================================================================
 
 import { allAbilities } from "#data/data-lists";
+import {
+  REQUESTED_ABILITY_UPGRADES,
+  type RequestedAbilityUpgrade,
+} from "#data/elite-redux/ability-upgrades/requested-ability-manifest";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ROM_DESCRIPTIONS } from "#data/elite-redux/er-ability-rom-descriptions";
 import { MANUAL_COMPOSITE_PARTS } from "#data/elite-redux/abilities/composite-newcomers";
 import { ER_COMPOSITE_PARTS, type ErCompositePartRef } from "#data/elite-redux/er-composite-parts";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { AbilityId } from "#enums/ability-id";
 
 // IMPORTANT: build this map from ER_ABILITIES (the auto-generated draft list),
 // NOT from the raw vendor/elite-redux/v2.65beta.json dump. The on-disk json was
@@ -43,13 +48,59 @@ for (const ab of ER_ABILITIES) {
   map.set(pokerogueId, desc);
 }
 
+// The July 2026 overhaul applies its final player-facing descriptions to the
+// live Ability objects after the generated ER/ROM tables are loaded. Keep an
+// index of those abilities so the compact and Detail views do not mask the
+// final text with an older generated description.
+const upgradedAbilityIds = new Set<number>();
+const upgradedAbilityIdByName = new Map<string, number>();
+const requestedAbilityUpgrades: readonly RequestedAbilityUpgrade[] = REQUESTED_ABILITY_UPGRADES;
+for (const row of requestedAbilityUpgrades) {
+  const vanillaId = row.vanillaKey
+    ? (AbilityId as unknown as Record<string, number | string>)[row.vanillaKey]
+    : undefined;
+  const runtimeId = row.erDraftId === undefined
+    ? (typeof vanillaId === "number" ? vanillaId : undefined)
+    : ER_ID_MAP.abilities[row.erDraftId];
+  if (runtimeId === undefined) {
+    continue;
+  }
+  upgradedAbilityIds.add(runtimeId);
+  upgradedAbilityIdByName.set(canonicalAbilityName(row.name), runtimeId);
+  if (row.newName) {
+    upgradedAbilityIdByName.set(canonicalAbilityName(row.newName), runtimeId);
+  }
+}
+
+function liveUpgradedDescription(pokerogueAbilityId: number | undefined): string | null {
+  if (pokerogueAbilityId === undefined || !upgradedAbilityIds.has(pokerogueAbilityId)) {
+    return null;
+  }
+  return allAbilities[pokerogueAbilityId]?.description?.trim() || null;
+}
+
+function upgradedAbilityIdForDisplayName(canonicalName: string): number | undefined {
+  const englishId = upgradedAbilityIdByName.get(canonicalName);
+  if (englishId !== undefined) {
+    return englishId;
+  }
+  // Vanilla ability names are localized at runtime. Match the current display
+  // name as a fallback so the Detail view remains correct outside English too.
+  for (const runtimeId of upgradedAbilityIds) {
+    if (canonicalAbilityName(allAbilities[runtimeId]?.name ?? "") === canonicalName) {
+      return runtimeId;
+    }
+  }
+  return undefined;
+}
+
 /**
  * Look up the short ER description for a pokerogue ability id.
  * Returns null when none is registered (caller falls back to pokerogue's
  * own description).
  */
 export function getErAbilityDescription(pokerogueAbilityId: number): string | null {
-  return map.get(pokerogueAbilityId) ?? null;
+  return liveUpgradedDescription(pokerogueAbilityId) ?? map.get(pokerogueAbilityId) ?? null;
 }
 
 /** Canonical (lowercase alphanumerics-only) key — matches the ROM-desc generator. */
@@ -67,7 +118,12 @@ export function getErAbilityRomDescription(abilityName: string | undefined | nul
   if (!abilityName) {
     return null;
   }
-  return ER_ABILITY_ROM_DESCRIPTIONS[canonicalAbilityName(abilityName)] ?? null;
+  const canonicalName = canonicalAbilityName(abilityName);
+  return (
+    liveUpgradedDescription(upgradedAbilityIdForDisplayName(canonicalName))
+    ?? ER_ABILITY_ROM_DESCRIPTIONS[canonicalName]
+    ?? null
+  );
 }
 
 // Reverse pokerogue-ability-id → ER-ability-id map (first match wins), built

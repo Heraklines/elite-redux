@@ -29,6 +29,26 @@ function activeFieldHasDraftAbility(draftId: number, predicate?: (holder: Pokemo
   );
 }
 
+/**
+ * Resolve a field suppressor without asking the normal active-ability pipeline.
+ * Lunar Affinity is consulted by that pipeline itself; calling hasAbility here
+ * recurses when its holder also owns another lunar/moon/star-named ability.
+ */
+function activeFieldHasRawDraftAbility(draftId: number, predicate?: (holder: Pokemon) => boolean): boolean {
+  const abilityId = erAbilityId(draftId);
+  return (
+    abilityId !== undefined
+    && globalScene
+      .getField(true)
+      .some(
+        holder =>
+          holder.hp > 0
+          && (!predicate || predicate(holder))
+          && holder.getAbilitySources().some(source => source.ability.id === abilityId),
+      )
+  );
+}
+
 const FOOD_SPECIES_NAMES = new Set([
   "alcremie",
   "appletun",
@@ -96,7 +116,7 @@ export function isSuppressedByRequestedFieldAbility(pokemon: Pokemon, abilityId:
   }
   const abilityName = allAbilities[abilityId]?.name ?? "";
   return (
-    /(?:lunar|moon|star)/i.test(abilityName) && activeFieldHasDraftAbility(711, holder => holder.isOpponent(pokemon))
+    /(?:lunar|moon|star)/i.test(abilityName) && activeFieldHasRawDraftAbility(711, holder => holder.isOpponent(pokemon))
   );
 }
 

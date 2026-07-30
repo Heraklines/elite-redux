@@ -3,7 +3,7 @@ import { globalScene } from "#app/global-scene";
 import type { Pokemon } from "#field/pokemon";
 
 export class PokeballTray extends Phaser.GameObjects.Container {
-  private player: boolean;
+  private readonly player: boolean;
 
   private bg: Phaser.GameObjects.NineSlice;
   private balls: Phaser.GameObjects.Sprite[];
@@ -55,6 +55,22 @@ export class PokeballTray extends Phaser.GameObjects.Container {
 
   showPbTray(party: Pokemon[], scene: BattleScene = globalScene): Promise<void> {
     return new Promise(resolve => {
+      // A trainer replacement or an unusually fast battle transition can ask an
+      // already-visible tray to represent a different party. Always refresh the
+      // six frames before the animation guard so a stale 3-mon tray cannot be
+      // carried into a 6-mon trainer battle.
+      this.balls.forEach((ball, b) => {
+        let ballFrame = "ball";
+        if (b >= party.length) {
+          ballFrame = "empty";
+        } else if (!party[b].hp) {
+          ballFrame = "faint";
+        } else if (party[b].status) {
+          ballFrame = "status";
+        }
+        ball.setFrame(ballFrame);
+      });
+
       if (this.shown) {
         return resolve();
       }
@@ -67,17 +83,8 @@ export class PokeballTray extends Phaser.GameObjects.Container {
       this.bg.width = 104;
       this.bg.alpha = 1;
 
-      this.balls.forEach((ball, b) => {
+      this.balls.forEach(ball => {
         ball.x += (scene.scaledCanvas.width + 104) * (this.player ? 1 : -1);
-        let ballFrame = "ball";
-        if (b >= party.length) {
-          ballFrame = "empty";
-        } else if (!party[b].hp) {
-          ballFrame = "faint";
-        } else if (party[b].status) {
-          ballFrame = "status";
-        }
-        ball.setFrame(ballFrame);
       });
 
       scene.playSound("se/pb_tray_enter");

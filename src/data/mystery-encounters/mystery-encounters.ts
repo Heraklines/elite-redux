@@ -221,7 +221,7 @@ const civilizationBiomeEncounters: MysteryEncounterType[] = [
   MysteryEncounterType.DEPARTMENT_STORE_SALE,
   MysteryEncounterType.PART_TIMER,
   MysteryEncounterType.FUN_AND_GAMES,
-  MysteryEncounterType.GLOBAL_TRADE_SYSTEM,
+  // GLOBAL_TRADE_SYSTEM is intentionally disabled until its trade flow is repaired.
 ];
 
 /**

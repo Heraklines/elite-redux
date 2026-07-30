@@ -11,10 +11,14 @@ import { PokeballType } from "#enums/pokeball";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
+// biome-ignore lint/suspicious/noImportCycles: PokemonData and the long-standing battle model mutually serialize each other.
 import { EnemyPokemon, Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import type { Variant } from "#sprites/variant";
 import { getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
+
+/** Pre-dedup custom id formerly assigned to ER Floette Eternal Flower. */
+const LEGACY_ER_ETERNAL_FLOETTE_ID = 10308;
 
 export class PokemonData {
   public id: number;
@@ -94,7 +98,8 @@ export class PokemonData {
 
     this.id = source.id;
     this.player = sourcePokemon?.isPlayer() ?? source.player;
-    this.species = sourcePokemon?.species.speciesId ?? source.species;
+    const sourceSpecies = sourcePokemon?.species.speciesId ?? source.species;
+    this.species = (sourceSpecies === LEGACY_ER_ETERNAL_FLOETTE_ID ? 2670 : sourceSpecies) as SpeciesId;
     this.nickname = source.nickname;
     this.formIndex = Math.max(Math.min(source.formIndex, getPokemonSpecies(this.species).forms.length - 1), 0);
     this.abilityIndex = source.abilityIndex;
@@ -126,7 +131,7 @@ export class PokemonData {
     this.friendship = source.friendship ?? getPokemonSpecies(this.species).baseFriendship;
     this.metLevel = source.metLevel || 5;
     this.metBiome = source.metBiome ?? -1;
-    this.metSpecies = source.metSpecies;
+    this.metSpecies = (source.metSpecies === LEGACY_ER_ETERNAL_FLOETTE_ID ? 2670 : source.metSpecies) as SpeciesId;
     this.metWave = source.metWave ?? (this.metBiome === -1 ? -1 : 0);
     this.luck = source.luck ?? (source.shiny ? source.variant + 1 : 0);
     this.pauseEvolutions = !!source.pauseEvolutions;
@@ -145,7 +150,10 @@ export class PokemonData {
       ? new CustomPokemonData(source.fusionMysteryEncounterPokemonData)
       : null;
 
-    this.fusionSpecies = sourcePokemon?.fusionSpecies?.speciesId ?? source.fusionSpecies;
+    const sourceFusionSpecies = sourcePokemon?.fusionSpecies?.speciesId ?? source.fusionSpecies;
+    this.fusionSpecies = (
+      sourceFusionSpecies === LEGACY_ER_ETERNAL_FLOETTE_ID ? 2670 : sourceFusionSpecies
+    ) as SpeciesId;
     this.fusionFormIndex = source.fusionFormIndex;
     this.fusionAbilityIndex = source.fusionAbilityIndex;
     // Same declared-boolean-serialized-as-undefined class as `passive`/`shiny` above (a non-fused mon

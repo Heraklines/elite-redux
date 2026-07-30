@@ -34,6 +34,7 @@ import type { CustomModifierSettings } from "#modifiers/modifier-type";
 import { type ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import { generateModifierType, handleMysteryEncounterVictory } from "#mystery-encounters/encounter-phase-utils";
 import { PokemonPhase } from "#phases/pokemon-phase";
+import { removeQueuedPostVictoryCombatPhases } from "#phases/post-victory-queue-cleanup";
 import { applyEffects } from "#system/llm-director/consequence-effects";
 import { logEffectApplied } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
@@ -157,6 +158,7 @@ export class VictoryPhase extends PokemonPhase {
         .getEnemyParty()
         .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)))
     ) {
+      removeQueuedPostVictoryCombatPhases();
       // Co-op (#633, authoritative wave-advance handshake): this is the real WIN / wave-clear
       // branch (not the exp-only / mystery-encounter paths, which returned above). The host is
       // the sole engine; signal the guest renderer that this wave RESOLVED so it runs the same

@@ -38,6 +38,7 @@ import { erAdvanceTacticalRecharges } from "#data/elite-redux/er-tactical-items"
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
+import { removeQueuedPostVictoryCombatPhases } from "#phases/post-victory-queue-cleanup";
 
 export type RetainedWaveStateAdmission = "applied" | "superseded" | "reapply" | "rejected";
 
@@ -170,6 +171,18 @@ export class BattleEndPhase extends BattlePhase {
 
   start() {
     super.start();
+
+    // The party-count trays are encounter-intro / switch presentation only.
+    // Ensure a delayed or interrupted summon animation cannot leave either tray
+    // covering the reward shop after the battle has definitively ended.
+    globalScene.pbTray.hide();
+    globalScene.pbTrayEnemy.hide();
+
+    // Turn-settlement phases intentionally survive the first victory cleanup.
+    // Some of them can materialize a stale TurnInit/Command tail only after the
+    // final VictoryPhase has ended. Purge that tail at the BattleEnd boundary,
+    // before it can jump ahead of the next encounter's recall/summon phases.
+    removeQueuedPostVictoryCombatPhases();
 
     // cull any extra `BattleEnd` phases from the queue.
     this.isVictory ||= globalScene.phaseManager.hasPhaseOfType(

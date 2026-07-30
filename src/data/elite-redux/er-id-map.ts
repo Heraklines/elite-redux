@@ -1349,7 +1349,10 @@ export const ER_ID_MAP: ErIdMap = {
     "1713": 10305,
     "1714": 10306,
     "1715": 10307,
-    "1716": 10308,
+    // ER's Floette Eternal Flower is the same species as pokerogue's existing
+    // Gen 6 Eternal Floette. Reuse that canonical id so it has one dex entry,
+    // one egg-move record, and the ER mega attached to the same species.
+    "1716": 2670,
     "1717": 10309,
     "1718": 10310,
     "1719": 10311,

@@ -826,13 +826,14 @@ export class MysteryEncounterPhase extends Phase {
     if (!this.optionSelectSettings) {
       // Saves the selected option in the ME save data, only if this is not a followup option select phase
       // Can be used for analytics purposes to track what options are popular on certain encounters
-      const encounterSaveData = globalScene.mysteryEncounterSaveData.encounteredEvents.at(-1)!;
-      if (encounterSaveData.type === globalScene.currentBattle.mysteryEncounter?.encounterType) {
+      const encounterSaveData = globalScene.mysteryEncounterSaveData.encounteredEvents.at(-1);
+      if (encounterSaveData && encounterSaveData.type === globalScene.currentBattle.mysteryEncounter?.encounterType) {
         encounterSaveData.selectedOption = index;
       }
     }
 
     if (!option.onOptionPhase) {
+      this.selectionResolving = false;
       return false;
     }
 
@@ -841,11 +842,23 @@ export class MysteryEncounterPhase extends Phase {
 
     if (option.onPreOptionPhase) {
       globalScene.executeWithSeedOffset(async () => {
-        return await option.onPreOptionPhase!().then(result => {
+        try {
+          const result = await option.onPreOptionPhase!();
           if (result == null || result) {
             this.continueEncounter();
+          } else {
+            // Party/secondary selectors may return to the encounter without
+            // committing a choice. Re-arm the top-level selector in that case;
+            // otherwise every later ACTION is rejected as a duplicate forever.
+            this.selectionResolving = false;
           }
-        });
+          return result;
+        } catch (error) {
+          // A failed pre-option must not permanently poison the encounter input
+          // lock. Preserve the rejection for diagnostics after restoring input.
+          this.selectionResolving = false;
+          throw error;
+        }
       }, globalScene.currentBattle.mysteryEncounter?.getSeedOffset());
     } else {
       this.continueEncounter();
