@@ -144,7 +144,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
-import { MoveUseMode } from "#enums/move-use-mode";
+import { isIgnorePP, isVirtual, MoveUseMode } from "#enums/move-use-mode";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
 import { PokeballType } from "#enums/pokeball";
@@ -676,6 +676,31 @@ function slotAction(a: TurnAction | undefined, slot: 0 | 1 | 2): SlotAction {
   return { move: a.move3, target: a.target3, tera: a.tera3, switch: a.switch3, ball: a.ball3, run: a.run3 };
 }
 
+/**
+ * Whether this slot already has its command, or CommandPhase will consume a queued
+ * continuation without opening player input (charge, recharge, rampage, etc.).
+ * Keep this aligned with CommandPhase.clearUnusableMoves/tryExecuteQueuedMove so
+ * unattended policies neither queue stale prompts nor record decisions never made.
+ */
+function slotCommandIsAutomatic(game: GameManager, mon: Pokemon): boolean {
+  if (game.scene.currentBattle.turnCommands[mon.getBattlerIndex()] != null) {
+    return true;
+  }
+  const moveset = mon.getMoveset();
+  const queuedMove = mon.getMoveQueue().find(move => {
+    const movesetMove = moveset.find(candidate => candidate.moveId === move.move);
+    return (
+      move.move === MoveId.NONE
+      || isVirtual(move.useMode)
+      || (movesetMove?.isUsable(mon, isIgnorePP(move.useMode), true)[0] ?? false)
+    );
+  });
+  if (queuedMove == null) {
+    return false;
+  }
+  return !(mon.getTag(BattlerTagType.FRENZY) && mon.hasAbilityWithAttr("SwitchWhileRampagingAbAttr"));
+}
+
 /** Whether `moveId` is in this mon's REAL moveset with PP left (mirrors MoveHelper.getMovePosition). */
 function moveInUsableMoveset(mon: Pokemon, moveId: MoveId): boolean {
   return mon.getMoveset().some(m => m.moveId === moveId && m.ppUsed < m.getMovePp());
@@ -696,7 +721,7 @@ function applyAction(
   forcedMove: MoveId | null,
   log: string[],
 ): void {
-  if (mon.isFainted()) {
+  if (mon.isFainted() || slotCommandIsAutomatic(game, mon)) {
     return;
   }
   if (action.switch != null) {
@@ -861,7 +886,7 @@ function recordAiTurn(
   const field = scene.getPlayerField();
   for (let actorSlot = 0; actorSlot < field.length; actorSlot++) {
     const mon = field[actorSlot];
-    if (!mon?.isActive(true) || mon.isFainted()) {
+    if (!mon?.isActive(true) || mon.isFainted() || slotCommandIsAutomatic(game, mon)) {
       continue;
     }
     const built = buildAiDecisionForSlot({
@@ -1911,9 +1936,12 @@ function isAutopilotMode(phaseName: string, mode: UiMode): boolean {
         || phaseName === "CheckSwitchPhase"
       );
     case UiMode.PARTY:
+      // If every active player slot fainted, the phase queue can advance while
+      // the mandatory replacement menu remains open.
       return (
         phaseName === "SelectModifierPhase"
         || phaseName === "SwitchPhase"
+        || phaseName === "EnemyCommandPhase"
         || phaseName === "AttemptCapturePhase"
         || phaseName === "RevivalBlessingPhase"
       );
@@ -2118,7 +2146,7 @@ function driveParty(game: GameManager, st: RunState, phaseName: string): void {
     st.log.push(`revival-blessing -> party[${slot}]`);
     return;
   }
-  if (phaseName === "SwitchPhase") {
+  if (phaseName === "SwitchPhase" || phaseName === "EnemyCommandPhase") {
     const party = game.scene.getPlayerParty();
     const battlerCount = game.scene.currentBattle.getBattlerCount();
     const slot = party.findIndex((p, i) => i >= battlerCount && p.isAllowedInBattle());
@@ -2430,7 +2458,7 @@ function smartDefaultAction(game: GameManager): TurnAction {
   const field = game.scene.getPlayerField();
   for (let actorSlot = 0; actorSlot < field.length; actorSlot++) {
     const actor = field[actorSlot];
-    if (!actor?.isActive(true) || actor.isFainted()) {
+    if (!actor?.isActive(true) || actor.isFainted() || slotCommandIsAutomatic(game, actor)) {
       continue;
     }
     const moveCandidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier).filter(
@@ -2499,7 +2527,7 @@ function treeModelAction(game: GameManager, model: ErTreeModelArtifact): TurnAct
   const field = game.scene.getPlayerField();
   for (let actorSlot = 0; actorSlot < field.length; actorSlot++) {
     const actor = field[actorSlot];
-    if (!actor?.isActive(true) || actor.isFainted()) {
+    if (!actor?.isActive(true) || actor.isFainted() || slotCommandIsAutomatic(game, actor)) {
       continue;
     }
     // Shift commands are not yet represented by TurnAction; doubles (the baseline
@@ -3233,6 +3261,28 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     expect(curl?.ppUsed, "Defense Curl PP must have depleted across 3 turns").toBe(3);
   }, 180_000);
 
+  it("a queued two-turn continuation does not consume the next scripted command", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "automatic continuation command regression",
+      run: { level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.KARTANA, moves: [MoveId.SOLAR_BLADE, MoveId.SPLASH] }],
+      enemy: { kind: "wild", wild: { species: SpeciesId.SHUCKLE, level: 100, moves: [MoveId.TORMENT, MoveId.SPLASH] } },
+      script: [
+        { move: "SOLAR_BLADE", enemyMove: "TORMENT" },
+        // Solar Blade executes automatically here. Queueing this duplicate command
+        // used to leave a stale FIGHT prompt that Torment rejected on turn three.
+        { move: "SOLAR_BLADE", enemyMove: "SPLASH" },
+        { move: "SPLASH", enemyMove: "SPLASH" },
+      ],
+    };
+    const { game, summary } = await runInline(phaserGame, spec);
+    expect(summary.turnsPlayed).toBe(3);
+    const moveset = game.scene.getPlayerField()[0].getMoveset();
+    expect(moveset.find(move => move.moveId === MoveId.SOLAR_BLADE)?.ppUsed).toBe(1);
+    expect(moveset.find(move => move.moveId === MoveId.SPLASH)?.ppUsed).toBe(1);
+  }, 180_000);
+
   it("a fallback move NOT in the moveset uses the destructive `use` path", async () => {
     const spec: RunnerInput = {
       v: 1,
@@ -3636,6 +3686,39 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     expect(game.scene.getPlayerField()[0].species.speciesId, "the bench Snorlax should be active").toBe(
       SpeciesId.SNORLAX,
     );
+  }, 180_000);
+
+  it("the full-run autopilot replaces an all-fainted doubles field after enemy command starts", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "full-run doubles replacement phase regression",
+      run: { level: 100, difficulty: "ace", double: true },
+      party: [
+        { species: SpeciesId.MAGIKARP, moves: [MoveId.SPLASH] },
+        { species: SpeciesId.FEEBAS, moves: [MoveId.SPLASH] },
+        { species: SpeciesId.SNORLAX, moves: [MoveId.TACKLE] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.GARCHOMP, level: 100, moves: [MoveId.EARTHQUAKE] },
+          { species: SpeciesId.RAYQUAZA, level: 100, moves: [MoveId.PROTECT] },
+        ],
+      },
+      start: { playerHpPct: 1, player2HpPct: 1 },
+      script: [
+        {
+          move: "SPLASH",
+          move2: "SPLASH",
+          enemyMove: "EARTHQUAKE",
+          enemyMove2: "PROTECT",
+        },
+      ],
+    };
+    const { result } = await runInlineRun(phaserGame, spec, 1);
+    expect(result.outcome).not.toBe("error");
+    expect(result.log).toContain("faint-switch");
+    expect(result.autoFirstLog).toEqual([]);
   }, 180_000);
 
   it("per-slot expect surface (doubles): player2 / enemy2 HP + fainted", async () => {
