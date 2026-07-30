@@ -1,4 +1,8 @@
+import hashlib
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 import numpy as np
 
@@ -8,10 +12,41 @@ from train_candidate_baselines import (
     record_split_group,
     select_elite_rollouts,
     split_groups,
+    validate_data_dictionary,
 )
 
 
 class CandidateBaselineContractTest(unittest.TestCase):
+    def test_runtime_dictionary_must_cover_recorded_ids_and_match_hash(self) -> None:
+        payload = {
+            "schemaVersion": 2,
+            "moves": {"1": {}},
+            "abilities": {"2": {}, "3": {}},
+            "items": {"LEFTOVERS": {}},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "dictionary.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            decision = {
+                "dictionaryHash": digest,
+                "observation": {
+                    "selfParty": [{
+                        "ability": 2,
+                        "innates": [3],
+                        "moves": [{"moveId": 1}],
+                        "heldItems": ["LEFTOVERS"],
+                    }],
+                    "opponentActive": [],
+                },
+                "candidates": [{"kind": "move", "moveId": 1}],
+            }
+            coverage = validate_data_dictionary(path, [decision])
+            self.assertEqual(coverage["referencedMoves"], 1)
+            decision["observation"]["selfParty"][0]["ability"] = 4
+            with self.assertRaisesRegex(ValueError, "misses recorded runtime ids"):
+                validate_data_dictionary(path, [decision])
+
     def test_inverse_pilot_legs_share_a_legacy_split_group(self) -> None:
         self.assertEqual(record_split_group({"episodeId": "pilot-20"}), "pilot-pair-10")
         self.assertEqual(record_split_group({"episodeId": "pilot-21"}), "pilot-pair-10")

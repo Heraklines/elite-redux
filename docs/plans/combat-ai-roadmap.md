@@ -63,14 +63,16 @@ dataset the rest of this stands on.
 - Telemetry events carry numeric **IDs + the build id**, never baked balance values. The ML side joins
   each event against the **data dictionary OF THAT BUILD**, so a balance change (a move's power, an
   ability's effect) can never corrupt historical data - old data is read with the old build's dictionary.
-- **Generator:** `scripts/export-data-dictionary.mjs` (a build-time script, NOT runtime). It reads the ER
-  2.65 authoritative dex tables already in the repo (`er-moves.ts` / `er-abilities.ts` /
-  `er-move-tables.ts` - pure static data, no engine boot; Node strips the TS types on import) and writes a
-  JSON artifact keyed by build id: `moves` (type / power / accuracy / pp / priority / category / target /
-  effect / flags + the authoritative description text), `abilities` (name + description text). Held-item
-  attributes are an engine-boot extension point (telemetry stores held-item id strings today).
+- **Generator:** `scripts/export-data-dictionary.mjs` runs the initialized test runtime and writes the
+  canonical registries used by combat after ER draft ids are mapped and hand-authored content is installed.
+  The deterministic JSON artifact contains `moves` (final type / power / accuracy / pp / priority /
+  category / target / effect / flags / attribute classes + description), `abilities` (runtime flags /
+  attribute classes + description), and held items. Draft ids are retained only as provenance.
   - Run: `node scripts/export-data-dictionary.mjs [--out <path>]` ->
     `dev-logs/data-dictionary/er-data-dictionary-<build>.json`.
+- **Hard provenance gate:** generation stamps the SHA-256 of the actual dictionary artifact on every
+  decision. Both tree and neural trainers reject mixed hashes, artifact mismatches, and any referenced
+  runtime move, ability, or item id missing from the dictionary.
 - **Contract now, upload later:** the generator + JSON shape is the deliverable. Wire the per-deployed-build
   upload to R2 (alongside telemetry, e.g. `dictionaries/<build>.json`) as a follow-up so the offline
   pipeline has the exact table for every build it sees in the dataset.

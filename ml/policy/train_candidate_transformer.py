@@ -34,6 +34,7 @@ from train_candidate_baselines import (  # noqa: E402
     record_split_group,
     select_elite_rollouts,
     split_groups,
+    validate_data_dictionary,
 )
 
 from candidate_transformer import (  # noqa: E402
@@ -253,6 +254,7 @@ def dataset_hash(paths: list[Path]) -> str:
 def train(args: argparse.Namespace) -> dict[str, Any]:
     set_determinism(args.seed)
     decisions, terminals = load_records(args.data)
+    dictionary_coverage = validate_data_dictionary(args.dictionary, decisions)
     rollout_selection: dict[str, Any] | None = None
     if args.elite_rollouts:
         decisions, rollout_selection = select_elite_rollouts(decisions, terminals)
@@ -379,6 +381,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "terminalOutcomes": dict(Counter(terminal["outcome"] for terminal in terminals)),
             "rolloutSelection": rollout_selection,
             "identity": identity,
+            "dictionaryCoverage": dictionary_coverage,
             "jsonlSha256": dataset_hash(sorted(args.data.rglob("*.jsonl"))),
         },
         "validation": final_metrics,
@@ -401,6 +404,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=Path, required=True)
+    parser.add_argument("--dictionary", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=20260730)
     parser.add_argument("--device", default="auto")

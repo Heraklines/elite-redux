@@ -193,11 +193,11 @@ and never parses the schema at all.
 
 ## 10. Per-build data dictionary (ML join table)
 
-Telemetry events store numeric ids (moves/abilities) + held-item id strings + the build id - NOT the
-balance values. `scripts/export-data-dictionary.mjs` exports the id -> attributes tables the ML side joins
-against, keyed by build id, from the ER 2.65 authoritative dex (`er-moves.ts` / `er-abilities.ts` /
-`er-move-tables.ts`; pure static data, no engine boot). Output: moves (type/power/accuracy/pp/priority/
-category/target/effect/flags + the authoritative description text) and abilities (name + description);
-held-item attributes are an engine-boot extension point. Training against a historical dataset joins
-against the dictionary **of that build**, so a balance change never corrupts older data. Upload one
-dictionary to R2 per deployed build (upload wired later). See `docs/plans/combat-ai-roadmap.md`.
+Telemetry events store numeric runtime ids (moves/abilities) + held-item id strings + the build id - NOT
+the balance values. `scripts/export-data-dictionary.mjs` boots the test runtime, runs the canonical game
+initializers, and exports the exact registries combat uses after ER ids have been mapped and hand-authored
+content has been installed. Output includes moves, abilities, and held-item attributes. The artifact is
+deterministic and its SHA-256 is stamped on every generated record; training rejects a hash mismatch or
+any referenced id absent from that artifact. Training against a historical dataset joins against the
+dictionary **of that build**, so a balance change never corrupts older data. Upload one dictionary to R2
+per deployed build (upload wired later). See `docs/plans/combat-ai-roadmap.md`.

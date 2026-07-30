@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import pickle
@@ -114,6 +115,57 @@ def validate_dataset(decisions: list[dict[str, Any]], terminals: list[dict[str, 
     inconsistent = sorted(episode for episode, groups in groups_by_episode.items() if len(groups) != 1)
     if inconsistent:
         raise ValueError(f"episodes map to multiple split groups: {inconsistent}")
+
+
+def validate_data_dictionary(path: Path, decisions: list[dict[str, Any]]) -> dict[str, int | str]:
+    raw = path.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    dictionary = json.loads(raw)
+    if dictionary.get("schemaVersion") != 2:
+        raise ValueError(f"unsupported combat data dictionary schema {dictionary.get('schemaVersion')}")
+    recorded_hashes = {record.get("dictionaryHash") for record in decisions}
+    if recorded_hashes != {digest}:
+        raise ValueError(f"dictionary hash mismatch: records={sorted(map(str, recorded_hashes))}, file={digest}")
+
+    known_moves = {int(value) for value in dictionary.get("moves", {})}
+    known_abilities = {int(value) for value in dictionary.get("abilities", {})}
+    known_items = set(dictionary.get("items", {}))
+    referenced_moves: set[int] = set()
+    referenced_abilities: set[int] = set()
+    referenced_items: set[str] = set()
+    for decision in decisions:
+        observation = decision["observation"]
+        for pokemon in observation["selfParty"] + observation["opponentActive"]:
+            ability = pokemon.get("ability")
+            if ability is not None:
+                referenced_abilities.add(int(ability))
+            referenced_abilities.update(int(value) for value in pokemon.get("innates", []) if value is not None)
+            referenced_moves.update(int(move["moveId"]) for move in pokemon.get("moves", []))
+            held_items = pokemon.get("heldItems")
+            if isinstance(held_items, list):
+                referenced_items.update(str(value) for value in held_items)
+        referenced_moves.update(
+            int(candidate["moveId"])
+            for candidate in decision["candidates"]
+            if candidate.get("kind") == "move"
+        )
+
+    missing = {
+        "moves": sorted(referenced_moves - known_moves),
+        "abilities": sorted(referenced_abilities - known_abilities),
+        "items": sorted(referenced_items - known_items),
+    }
+    if any(missing.values()):
+        raise ValueError(f"combat data dictionary misses recorded runtime ids: {missing}")
+    return {
+        "sha256": digest,
+        "moves": len(known_moves),
+        "abilities": len(known_abilities),
+        "items": len(known_items),
+        "referencedMoves": len(referenced_moves),
+        "referencedAbilities": len(referenced_abilities),
+        "referencedItems": len(referenced_items),
+    }
 
 
 def select_elite_rollouts(
@@ -525,6 +577,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     if not 0.0 <= args.loss_episode_weight <= 1.0:
         raise ValueError("loss episode weight must be between 0 and 1")
     all_decisions, terminals = load_records(args.data)
+    dictionary_coverage = validate_data_dictionary(args.dictionary, all_decisions)
     decisions, rollout_selection = (
         select_elite_rollouts(all_decisions, terminals)
         if args.elite_rollouts
@@ -717,6 +770,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "formats": Counter(record["observation"]["format"] for record in decisions),
             "terminalOutcomes": Counter(record["outcome"] for record in terminals),
             "identity": hashes,
+            "dictionaryCoverage": dictionary_coverage,
         },
         "generation": load_generation_metrics(args.data),
         "rolloutSelection": rollout_selection,
@@ -775,6 +829,7 @@ def markdown(report: dict[str, Any]) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=Path, required=True)
+    parser.add_argument("--dictionary", type=Path, required=True)
     parser.add_argument("--report-json", type=Path, required=True)
     parser.add_argument("--report-md", type=Path, required=True)
     parser.add_argument("--models-dir", type=Path)

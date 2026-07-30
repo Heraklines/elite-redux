@@ -14,6 +14,8 @@ on:
       - "ml/evaluation/**"
       - "ml/training/**"
       - "scripts/ai/**"
+      - "scripts/export-data-dictionary.mjs"
+      - "scripts/export-data-dictionary.test.ts"
       - "scripts/run-combat-batch.mjs"
       - "scripts/run-scenario.mjs"
       - "src/data/elite-redux/ability-upgrades/requested-field-effects.ts"
@@ -21,6 +23,7 @@ on:
       - "src/dev-tools/registry.ts"
       - "src/dev-tools/test-suite/scenario-spec.ts"
       - "src/phases/encounter-phase.ts"
+      - "test/framework/game-manager.ts"
       - "test/node/combat-contract.test.ts"
       - "test/data/elite-redux/er-requested-field-effects.test.ts"
       - "test/tests/elite-redux/er-scenario-spec.test.ts"
@@ -66,20 +69,58 @@ jobs:
           scripts/ai/summarize-ghost-gauntlet.mjs
           scripts/ai/summarize-ghost-batch-eval.mjs
           scripts/ai/test-ghost-gauntlet.mjs
+          scripts/export-data-dictionary.mjs
+          scripts/export-data-dictionary.test.ts
           scripts/run-combat-batch.mjs
           src/data/elite-redux/ability-upgrades/requested-field-effects.ts
           src/data/elite-redux/ai/combat-contract.ts
+          src/data/elite-redux/ai/combat-data-dictionary.ts
           src/data/elite-redux/ai/combat-engine-adapter.ts
           src/data/elite-redux/ai/combat-features.ts
           src/data/elite-redux/ai/combat-tree-model.ts
           src/dev-tools/registry.ts
           src/dev-tools/test-suite/scenario-spec.ts
           src/phases/encounter-phase.ts
+          test/framework/game-manager.ts
           test/node/combat-contract.test.ts
           test/data/elite-redux/er-requested-field-effects.test.ts
           test/tests/elite-redux/er-scenario-spec.test.ts
           test/tools/run-scenario.test.ts
           test/tools/ai-neural-policy-client.ts
+
+  identity:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Canonical runtime data dictionary
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      dex_hash: ${{ steps.identity.outputs.dex_hash }}
+      dictionary_hash: ${{ steps.identity.outputs.dictionary_hash }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Export initialized runtime registries
+        run: node scripts/export-data-dictionary.mjs --out ai-identity/er-combat-data-dictionary.json
+      - name: Compute immutable data identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          dex_hash=$(find src/data/elite-redux -type f -name '*.ts' -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+          dictionary_hash=$(sha256sum ai-identity/er-combat-data-dictionary.json | cut -d' ' -f1)
+          echo "dex_hash=$dex_hash" >> "$GITHUB_OUTPUT"
+          echo "dictionary_hash=$dictionary_hash" >> "$GITHUB_OUTPUT"
+      - name: Upload canonical runtime dictionary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-data-dictionary
+          path: ai-identity/er-combat-data-dictionary.json
+          retention-days: 30
+          if-no-files-found: error
 
   ghost-gauntlet:
     if: github.repository == 'Heraklines/elite-redux'
@@ -197,7 +238,7 @@ jobs:
   generate:
     if: github.repository == 'Heraklines/elite-redux'
     name: Ghost self-play shard ${{ matrix.shard }}
-    needs: [contract, capture-neutrality]
+    needs: [identity, capture-neutrality]
     runs-on: ubuntu-latest
     timeout-minutes: 35
     strategy:
@@ -217,20 +258,11 @@ jobs:
           node scripts/ai/make-pilot-batch.mjs
           "$(( ${{ matrix.shard }} * 24 ))" 24
           "ai-work/batch-${{ matrix.shard }}.json"
-      - name: Compute immutable data identity
-        id: identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          dex_hash=$(find src/data/elite-redux -type f \( -name 'er-*.ts' -o -name '*mechanic*.ts' \) -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
-          dictionary_hash=$(sha256sum scripts/export-data-dictionary.mjs | cut -d' ' -f1)
-          echo "dex_hash=$dex_hash" >> "$GITHUB_OUTPUT"
-          echo "dictionary_hash=$dictionary_hash" >> "$GITHUB_OUTPUT"
       - name: Generate real-engine decisions
         env:
           ER_AI_BUILD_SHA: ${{ github.sha }}
-          ER_AI_DEX_HASH: ${{ steps.identity.outputs.dex_hash }}
-          ER_AI_DICTIONARY_HASH: ${{ steps.identity.outputs.dictionary_hash }}
+          ER_AI_DEX_HASH: ${{ needs.identity.outputs.dex_hash }}
+          ER_AI_DICTIONARY_HASH: ${{ needs.identity.outputs.dictionary_hash }}
         run: >-
           node scripts/run-combat-batch.mjs "@ai-work/batch-${{ matrix.shard }}.json"
           --turns 80 --real-rng
@@ -297,6 +329,10 @@ jobs:
           pattern: ai-baseline-shard-*
           path: ai-data
           merge-multiple: true
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-data-dictionary
+          path: ai-dictionary
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -310,6 +346,7 @@ jobs:
         run: >-
           python ml/baselines/train_candidate_baselines.py
           --data ai-data
+          --dictionary ai-dictionary/er-combat-data-dictionary.json
           --report-json ai-report/leaderboard.json
           --report-md ai-report/leaderboard.md
           --models-dir ai-report/models
@@ -327,7 +364,7 @@ jobs:
   rollout:
     if: github.repository == 'Heraklines/elite-redux'
     name: Exploratory tree rollout ${{ matrix.shard }}
-    needs: train
+    needs: [train, identity]
     runs-on: ubuntu-latest
     timeout-minutes: 35
     strategy:
@@ -351,20 +388,11 @@ jobs:
           node scripts/ai/make-pilot-batch.mjs
           "$((100000 + ${{ matrix.shard }} * 24))" 24
           "ai-work/batch-${{ matrix.shard }}.json"
-      - name: Compute immutable data identity
-        id: identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          dex_hash=$(find src/data/elite-redux -type f \( -name 'er-*.ts' -o -name '*mechanic*.ts' \) -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
-          dictionary_hash=$(sha256sum scripts/export-data-dictionary.mjs | cut -d' ' -f1)
-          echo "dex_hash=$dex_hash" >> "$GITHUB_OUTPUT"
-          echo "dictionary_hash=$dictionary_hash" >> "$GITHUB_OUTPUT"
       - name: Collect deterministic epsilon-tree trajectories
         env:
           ER_AI_BUILD_SHA: ${{ github.sha }}
-          ER_AI_DEX_HASH: ${{ steps.identity.outputs.dex_hash }}
-          ER_AI_DICTIONARY_HASH: ${{ steps.identity.outputs.dictionary_hash }}
+          ER_AI_DEX_HASH: ${{ needs.identity.outputs.dex_hash }}
+          ER_AI_DICTIONARY_HASH: ${{ needs.identity.outputs.dictionary_hash }}
         run: >-
           node scripts/run-combat-batch.mjs "@ai-work/batch-${{ matrix.shard }}.json"
           --turns 80 --real-rng
@@ -403,6 +431,10 @@ jobs:
           pattern: ai-rollout-shard-*
           path: ai-data/rollout
           merge-multiple: true
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-data-dictionary
+          path: ai-dictionary
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -416,6 +448,7 @@ jobs:
         run: >-
           python ml/baselines/train_candidate_baselines.py
           --data ai-data
+          --dictionary ai-dictionary/er-combat-data-dictionary.json
           --elite-rollouts
           --report-json ai-report/leaderboard.json
           --report-md ai-report/leaderboard.md
@@ -457,6 +490,10 @@ jobs:
           pattern: ai-rollout-shard-*
           path: ai-data/rollout
           merge-multiple: true
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-data-dictionary
+          path: ai-dictionary
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -472,6 +509,7 @@ jobs:
         run: >-
           python ml/policy/train_candidate_transformer.py
           --data ai-data
+          --dictionary ai-dictionary/er-combat-data-dictionary.json
           --output-dir "ai-neural/seed-${{ matrix.seed }}"
           --elite-rollouts
           --device cpu

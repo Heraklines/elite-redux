@@ -311,12 +311,10 @@ export class GameManager {
         this.scene.ui.processInput(Button.ACTION);
       },
       () => {
-        if (this.isCurrentPhase("SelectTargetPhase") && expectedBattlerIndex != null) {
-          const phase = this.scene.phaseManager.getCurrentPhase() as SelectTargetPhase;
-          if (phase.getPokemon().getBattlerIndex() !== expectedBattlerIndex) {
-            return true;
-          }
-        }
+        // A different battler's target phase does not make this prompt stale. In
+        // triples, later slots already have their prompts queued while earlier
+        // slots target; allowOutOfOrder routes the matching prompt when its actor
+        // appears. The command/move boundaries below still retire omitted phases.
         return (
           this.isCurrentPhase("CommandPhase")
           || this.isCurrentPhase("MovePhase")

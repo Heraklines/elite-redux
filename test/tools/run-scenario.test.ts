@@ -1847,8 +1847,9 @@ interface RunState {
   crossroadCursor: number;
   meCursor: number;
   rewardCursor: number;
-  /** Last driven (phase|mode) signature, so one menu appearance is driven exactly once. */
-  lastSig: string;
+  /** Last driven phase instance + mode, so consecutive same-name phases are distinct appearances. */
+  lastDrivenPhase: object | null;
+  lastDrivenMode: UiMode | null;
   /** When an unhandled interactive menu was first seen (ms), for the stall watchdog. */
   stallSince: number;
   stallMode: string | null;
@@ -1868,7 +1869,8 @@ function newRunState(policy: RunPolicy): RunState {
     crossroadCursor: 0,
     meCursor: 0,
     rewardCursor: 0,
-    lastSig: "",
+    lastDrivenPhase: null,
+    lastDrivenMode: null,
     stallSince: 0,
     stallMode: null,
     meDriven: false,
@@ -2298,18 +2300,19 @@ function autopilotTick(game: GameManager, st: RunState): void {
   // blockExit for ~1s), so press EACH tick until they clear — NOT sig-guarded.
   if (mode === UiMode.EGG_HATCH_SUMMARY) {
     game.scene.ui.processInput(Button.CANCEL); // egg summary dismisses on CANCEL once blockExit elapses
-    st.lastSig = "";
+    st.lastDrivenPhase = null;
+    st.lastDrivenMode = null;
     return;
   }
   if (mode === UiMode.EGG_HATCH_SCENE) {
     game.scene.ui.processInput(Button.ACTION); // skip the animated hatch scene
-    st.lastSig = "";
+    st.lastDrivenPhase = null;
+    st.lastDrivenMode = null;
     return;
   }
 
   if (isAutopilotMode(phaseName, mode)) {
-    const sig = `${phaseName}|${mode}`;
-    if (sig === st.lastSig) {
+    if (phase === st.lastDrivenPhase && mode === st.lastDrivenMode) {
       return; // already driven this appearance; wait for the transition it triggers
     }
     // The reward shop + ME/ intro MESSAGE handlers (AwaitableUiHandler) IGNORE input
@@ -2319,7 +2322,8 @@ function autopilotTick(game: GameManager, st: RunState): void {
       return;
     }
     if (dispatchMenu(game, st, phaseName, mode)) {
-      st.lastSig = sig;
+      st.lastDrivenPhase = phase ?? null;
+      st.lastDrivenMode = mode;
       st.stallSince = 0;
       st.stallMode = null;
     }
@@ -2327,7 +2331,8 @@ function autopilotTick(game: GameManager, st: RunState): void {
   }
 
   // Not a menu we own. Reset the per-appearance guard so a repeat drivable menu re-fires.
-  st.lastSig = "";
+  st.lastDrivenPhase = null;
+  st.lastDrivenMode = null;
 
   // CATCH-ALL FUTURE-PROOFING: an interactive menu with no registered driver.
   if (isInteractiveMenuMode(mode) && phaseName !== "CommandPhase") {
@@ -3807,6 +3812,66 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     expect(result.outcome).not.toBe("error");
     expect(result.log).toContain("faint-switch");
     expect(result.autoFirstLog).toEqual([]);
+  }, 180_000);
+
+  it("the combat autopilot drives consecutive triple faint replacements", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "triple consecutive faint replacements",
+      run: { wave: 146, level: 100, difficulty: "hell", enemyAi: "hardest", triple: true },
+      party: [
+        { species: SpeciesId.MAGIKARP, moves: [MoveId.SPLASH] },
+        { species: SpeciesId.FEEBAS, moves: [MoveId.SPLASH] },
+        { species: SpeciesId.CATERPIE, moves: [MoveId.STRING_SHOT] },
+        { species: SpeciesId.SNORLAX, moves: [MoveId.TACKLE] },
+        { species: SpeciesId.BLISSEY, moves: [MoveId.TACKLE] },
+        { species: SpeciesId.SHUCKLE, moves: [MoveId.TACKLE] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          {
+            species: SpeciesId.RAYQUAZA,
+            level: 500,
+            moves: [MoveId.HYPER_BEAM],
+            ability: AbilityId.HONEY_GATHER,
+            passiveAbility: AbilityId.HONEY_GATHER,
+          },
+          {
+            species: SpeciesId.RAYQUAZA,
+            level: 500,
+            moves: [MoveId.HYPER_BEAM],
+            ability: AbilityId.HONEY_GATHER,
+            passiveAbility: AbilityId.HONEY_GATHER,
+          },
+          {
+            species: SpeciesId.RAYQUAZA,
+            level: 500,
+            moves: [MoveId.HYPER_BEAM],
+            ability: AbilityId.HONEY_GATHER,
+            passiveAbility: AbilityId.HONEY_GATHER,
+          },
+        ],
+      },
+      start: { playerHpPct: 1, player2HpPct: 1, player3HpPct: 1 },
+      script: [
+        {
+          move: "SPLASH",
+          move2: "SPLASH",
+          move3: "STRING_SHOT",
+          enemyMove: "HYPER_BEAM",
+          enemyTarget: BattlerIndex.PLAYER,
+          enemyMove2: "HYPER_BEAM",
+          enemyTarget2: BattlerIndex.PLAYER_2,
+          enemyMove3: "HYPER_BEAM",
+          enemyTarget3: 2 as BattlerIndex,
+        },
+      ],
+    };
+    const { game, result } = await runInlineRun(phaserGame, spec, 1);
+    expect(result.outcome).not.toBe("error");
+    expect(result.log.match(/faint-switch/g)).toHaveLength(3);
+    expect(game.scene.getPlayerField()).toHaveLength(3);
   }, 180_000);
 
   it("per-slot expect surface (doubles): player2 / enemy2 HP + fainted", async () => {
