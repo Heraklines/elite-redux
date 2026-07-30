@@ -119,6 +119,7 @@ import {
   snapshotErCombatObservation,
 } from "#data/elite-redux/ai/combat-engine-adapter";
 import {
+  ER_COMBAT_FEATURE_NAMES,
   ER_COMBAT_FEATURE_SCHEMA_VERSION,
   extractErCombatCandidateFeatures,
 } from "#data/elite-redux/ai/combat-features";
@@ -161,6 +162,7 @@ import type { CommandPhase } from "#phases/command-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
+import { AiNeuralPolicyClient } from "#test/tools/ai-neural-policy-client";
 import type { AbstractOptionSelectUiHandler } from "#ui/handlers/abstract-option-select-ui-handler";
 import type { BiomeShopUiHandler } from "#ui/handlers/biome-shop-ui-handler";
 import type { ErMapUiHandler } from "#ui/handlers/er-map-ui-handler";
@@ -170,7 +172,7 @@ import type { PartyUiHandler } from "#ui/party-ui-handler";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import Phaser from "phaser";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // A turn action for the optional `script`: which move each active player mon uses
 // this turn (slot 0 = `move`, slot 1 = `move2`, slot 2 = `move3`), an optional
@@ -317,6 +319,7 @@ type RunnerInput = ScenarioSpec & {
 
 interface CombatBatchEpisode {
   id: string;
+  splitGroupId?: string;
   scenario: RunnerInput;
 }
 
@@ -383,10 +386,15 @@ const AI_BUILD_SHA = (process.env.ER_AI_BUILD_SHA ?? process.env.GITHUB_SHA ?? "
 const AI_DEX_HASH = (process.env.ER_AI_DEX_HASH ?? "unknown").trim();
 const AI_DICTIONARY_HASH = (process.env.ER_AI_DICTIONARY_HASH ?? "unknown").trim();
 let activeAiEpisodeId = (process.env.ER_AI_EPISODE_ID ?? INPUT?.run?.seed ?? "local-episode").trim();
+let activeAiSplitGroupId = activeAiEpisodeId;
 const AI_DATASET_RECORDS: ErCombatDatasetRecord[] = [];
 const AI_MODEL_PATH = (process.env.ER_AI_POLICY_MODEL ?? "").trim();
+const AI_NEURAL_MODEL_DIR = (process.env.ER_AI_NEURAL_POLICY_MODEL ?? "").trim();
 const AI_POLICY_MODE = (process.env.ER_AI_POLICY_MODE ?? "first-usable").trim();
 const AI_POLICY_EPSILON = Number(process.env.ER_AI_POLICY_EPSILON ?? "0");
+if (AI_MODEL_PATH && AI_NEURAL_MODEL_DIR) {
+  throw new Error("ER_AI_POLICY_MODEL and ER_AI_NEURAL_POLICY_MODEL are mutually exclusive");
+}
 if (!["first-usable", "smart-default"].includes(AI_POLICY_MODE)) {
   throw new Error(`unsupported ER_AI_POLICY_MODE: ${AI_POLICY_MODE}`);
 }
@@ -407,6 +415,9 @@ function loadAiTreeModel(path: string): ErTreeModelArtifact | null {
 }
 
 const AI_TREE_MODEL = loadAiTreeModel(AI_MODEL_PATH);
+const AI_NEURAL_CLIENT = AI_NEURAL_MODEL_DIR
+  ? new AiNeuralPolicyClient(AI_NEURAL_MODEL_DIR, ER_COMBAT_FEATURE_NAMES.length)
+  : null;
 
 function computeWaves(): number {
   const env = Number(process.env.ER_RUN_WAVES);
@@ -968,6 +979,7 @@ function buildAiDecisionForSlot({
     dexHash: AI_DEX_HASH,
     dictionaryHash: AI_DICTIONARY_HASH,
     episodeId: activeAiEpisodeId,
+    splitGroupId: activeAiSplitGroupId,
     jointActionId,
     decisionId: `${jointActionId}:${actorSlot}`,
     sourcePolicy,
@@ -1668,8 +1680,8 @@ async function playBattle(
       const scriptedAction = opts.script?.[turn - 1];
       const action =
         scriptedAction
-        ?? (opts.forcedMove == null && (AI_TREE_MODEL || AI_POLICY_MODE === "smart-default")
-          ? unattendedPolicyAction(game)
+        ?? (opts.forcedMove == null && (AI_TREE_MODEL || AI_NEURAL_CLIENT || AI_POLICY_MODE === "smart-default")
+          ? await unattendedPolicyAction(game)
           : undefined);
       recordAiTurn(
         game,
@@ -1677,7 +1689,7 @@ async function playBattle(
         opts.forcedMove ?? null,
         scriptedAction
           ? "scripted"
-          : AI_TREE_MODEL && opts.forcedMove == null
+          : (AI_TREE_MODEL || AI_NEURAL_CLIENT) && opts.forcedMove == null
             ? unattendedSourcePolicy()
             : AI_POLICY_MODE === "smart-default" && opts.forcedMove == null
               ? "smart-default-v1"
@@ -2560,15 +2572,72 @@ function treeModelAction(game: GameManager, model: ErTreeModelArtifact): TurnAct
   return action;
 }
 
-function unattendedPolicyAction(game: GameManager): TurnAction {
-  return AI_TREE_MODEL ? treeModelAction(game, AI_TREE_MODEL) : smartDefaultAction(game);
+async function neuralModelAction(game: GameManager, client: AiNeuralPolicyClient): Promise<TurnAction> {
+  const observation = snapshotErCombatObservation(game.scene);
+  const action: TurnAction = {};
+  const earlier: ErCombatEarlierChoice[] = [];
+  const field = game.scene.getPlayerField();
+  for (let actorSlot = 0; actorSlot < field.length; actorSlot++) {
+    const actor = field[actorSlot];
+    if (!isNeuralPolicyActor(game, actor)) {
+      continue;
+    }
+    const candidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier).filter(
+      candidate => candidate.kind !== "shift",
+    );
+    if (candidates.length === 0) {
+      continue;
+    }
+    const features = candidates.map(candidate => extractErCombatCandidateFeatures(observation, candidate));
+    const scores = await client.score(features);
+    if (scores.length !== candidates.length) {
+      throw new Error(`neural policy returned ${scores.length} scores for ${candidates.length} candidates`);
+    }
+    const ranked = candidates
+      .map((candidate, index) => ({ candidate, score: scores[index] }))
+      .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id));
+    const policyKey = `${activeAiEpisodeId}:${observation.wave}:${observation.turn}:${actorSlot}`;
+    const explore = AI_POLICY_EPSILON > 0 && deterministicPolicyFraction(`${policyKey}:explore`) < AI_POLICY_EPSILON;
+    const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * candidates.length);
+    const chosen = (explore ? candidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate;
+    setCandidateAction(game, action, actorSlot, chosen);
+    earlier.push({
+      kind: chosen.kind,
+      id: chosen.id,
+      ...(chosen.kind === "switch" ? { partyIndex: chosen.partyIndex } : {}),
+      ...(chosen.kind === "move" ? { tera: chosen.tera } : {}),
+    });
+  }
+  return action;
+}
+
+function isNeuralPolicyActor(game: GameManager, actor: Pokemon | undefined): actor is Pokemon {
+  return !!actor?.isActive(true) && !actor.isFainted() && !slotCommandIsAutomatic(game, actor);
+}
+
+async function unattendedPolicyAction(game: GameManager): Promise<TurnAction> {
+  if (AI_TREE_MODEL) {
+    return treeModelAction(game, AI_TREE_MODEL);
+  }
+  if (AI_NEURAL_CLIENT) {
+    return await neuralModelAction(game, AI_NEURAL_CLIENT);
+  }
+  return smartDefaultAction(game);
 }
 
 function unattendedSourcePolicy(): ErCombatDecisionRecord["sourcePolicy"] {
   if (AI_TREE_MODEL) {
     return AI_POLICY_EPSILON > 0 ? "epsilon-tree-v1" : "tree-model-v1";
   }
+  if (AI_NEURAL_CLIENT) {
+    return AI_POLICY_EPSILON > 0 ? "epsilon-neural-v1" : "neural-model-v1";
+  }
   return "smart-default-v1";
+}
+
+function isTerminalRunPhase(game: GameManager): boolean {
+  const phaseName = game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "";
+  return phaseName === "TitlePhase" || phaseName === "GameOverPhase" || phaseName === "EndCardPhase";
 }
 
 /** Play the CURRENT battle wave to completion (victory / wipe / maxTurns). */
@@ -2601,7 +2670,7 @@ async function playWaveTurns(
     // Scripted action for this turn; else force the requested move; else pick the best
     // damaging move per slot (so type immunities don't wall an otherwise-winnable wave).
     const scriptedAction = opts.script?.[turn - 1];
-    const action = scriptedAction ?? (opts.forcedMove == null ? unattendedPolicyAction(game) : undefined);
+    const action = scriptedAction ?? (opts.forcedMove == null ? await unattendedPolicyAction(game) : undefined);
     recordAiTurn(
       game,
       action,
@@ -2617,8 +2686,7 @@ async function playWaveTurns(
     } catch (e) {
       // A mid-turn RUN END (wipe -> GameOverPhase -> TitlePhase, or the post-victory
       // credits) never reaches TurnEndPhase - that is an OUTCOME, not a soft-lock.
-      const phaseName = game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "";
-      if (phaseName === "TitlePhase" || phaseName === "GameOverPhase" || phaseName === "EndCardPhase") {
+      if (isTerminalRunPhase(game)) {
         return {
           won: false,
           wiped: game.scene.getPlayerParty().every(p => p.isFainted()),
@@ -2658,7 +2726,20 @@ async function playWaveTurns(
       break;
     }
     if (turn < opts.maxTurns) {
-      await game.toNextTurn(); // autopilot drives any pending faint-switch PARTY
+      try {
+        await game.toNextTurn(); // autopilot drives any pending faint-switch PARTY
+      } catch (error) {
+        if (isTerminalRunPhase(game)) {
+          return {
+            won: false,
+            wiped: game.scene.getPlayerParty().every(p => p.isFainted()),
+            turns,
+            maxHits,
+            runEnded: true,
+          };
+        }
+        throw error;
+      }
     }
   }
   return { won, wiped, turns, maxHits };
@@ -2851,6 +2932,7 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
   for (const episode of batch.episodes) {
     assertCombatOnlyEpisode(episode);
     activeAiEpisodeId = episode.id;
+    activeAiSplitGroupId = episode.splitGroupId?.trim() || episode.id;
     const recordStart = AI_DATASET_RECORDS.length;
     const bootStart = performance.now();
     const game = await launchScenario(phaserGame, episode.scenario, { realRng: REAL_RNG });
@@ -2925,9 +3007,12 @@ const RUN = (!!SPEC || !!COMBAT_BATCH) && process.env.ER_SCENARIO === "1";
 describe.skipIf(!RUN)("headless scenario runner", () => {
   let phaserGame: Phaser.Game;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    await AI_NEURAL_CLIENT?.start();
   });
+
+  afterAll(() => AI_NEURAL_CLIENT?.stop());
 
   it(`plays scenario: ${SPEC?.name || RAW}`, async () => {
     if (COMBAT_BATCH) {
@@ -2944,9 +3029,11 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
           ? `player action: force ${MoveId[FORCED_MOVE]} every turn`
           : AI_TREE_MODEL
             ? `player action: tree model ${AI_TREE_MODEL.modelName}${AI_POLICY_EPSILON > 0 ? ` (epsilon ${AI_POLICY_EPSILON})` : ""}`
-            : AI_POLICY_MODE === "smart-default"
-              ? "player action: smart-default-v1"
-              : "player action: first usable move",
+            : AI_NEURAL_CLIENT
+              ? `player action: neural model${AI_POLICY_EPSILON > 0 ? ` (epsilon ${AI_POLICY_EPSILON})` : ""}`
+              : AI_POLICY_MODE === "smart-default"
+                ? "player action: smart-default-v1"
+                : "player action: first usable move",
     );
 
     const bootStart = performance.now();
@@ -3133,6 +3220,7 @@ function appendAiEpisodeTerminal(result: {
     dexHash: AI_DEX_HASH,
     dictionaryHash: AI_DICTIONARY_HASH,
     episodeId: activeAiEpisodeId,
+    splitGroupId: activeAiSplitGroupId,
     outcome: result.outcome,
     startWave: result.startWave,
     finalWave: result.finalWave,

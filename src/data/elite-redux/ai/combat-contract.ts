@@ -111,9 +111,19 @@ export interface ErCombatDecisionRecord {
   dexHash: string;
   dictionaryHash: string;
   episodeId: string;
+  /** Matchup-level split identity; inverse legs must share this value. */
+  splitGroupId?: string;
   jointActionId: string;
   decisionId: string;
-  sourcePolicy: "smart-default-v1" | "scripted" | "forced-move" | "first-usable" | "tree-model-v1" | "epsilon-tree-v1";
+  sourcePolicy:
+    | "smart-default-v1"
+    | "scripted"
+    | "forced-move"
+    | "first-usable"
+    | "tree-model-v1"
+    | "epsilon-tree-v1"
+    | "neural-model-v1"
+    | "epsilon-neural-v1";
   actorSlot: number;
   earlierCandidateIds: string[];
   observation: ErCombatObservation;
@@ -130,6 +140,7 @@ export interface ErCombatTerminalRecord {
   dexHash: string;
   dictionaryHash: string;
   episodeId: string;
+  splitGroupId?: string;
   outcome: string;
   startWave: number;
   finalWave: number;

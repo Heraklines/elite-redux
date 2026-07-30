@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { assertInversePair, buildGhostPair, buildGhostSelfPlayScenario, readGhostFixture } from "./ghost-gauntlet.mjs";
+import { buildGhostEvalBatch, EXPECTED_GHOST_EVAL_PAIRS, GHOST_EVAL_CONTROLLERS } from "./make-ghost-eval-batch.mjs";
+import { buildPilotBatch } from "./make-pilot-batch.mjs";
+import { buildGhostBatchReport } from "./summarize-ghost-batch-eval.mjs";
 
 const fixturePath = process.argv[2] ?? "ml/evaluation/ghost-winner-teams.v2.json";
 const fixture = readGhostFixture(fixturePath);
@@ -20,6 +23,45 @@ for (let pairIndex = 0; pairIndex < fixture.teams.length / 2; pairIndex++) {
 assert.equal(seen.size, fixture.teams.length);
 assert.equal(fixture.teams.length, 100);
 assert.equal(fixture.sourceAccountCount, 28);
+const evalBatch = buildGhostEvalBatch(fixture, 0, 3);
+assert.equal(evalBatch.manifests.length, 3);
+assert.equal(evalBatch.batch.episodes.length, 6);
+assert.deepEqual(evalBatch.manifests[0].playerControllers, GHOST_EVAL_CONTROLLERS);
+assert.ok(evalBatch.batch.episodes.every(episode => episode.scenario.eggs === undefined));
+assert.deepEqual(
+  evalBatch.batch.episodes.map(episode => episode.splitGroupId),
+  ["pair-01", "pair-01", "pair-02", "pair-02", "pair-03", "pair-03"],
+);
+const fullEval = buildGhostEvalBatch(fixture, 0, EXPECTED_GHOST_EVAL_PAIRS);
+const controllerBatches = GHOST_EVAL_CONTROLLERS.map(controller => ({
+  name: `shard-0-${controller}-results.json`,
+  controller,
+  batch: {
+    version: 1,
+    combatOnly: true,
+    hardestTrainerAi: true,
+    progressionPhaseEntries: 0,
+    episodeCount: fullEval.batch.episodes.length,
+    results: fullEval.batch.episodes.map(episode => ({
+      id: episode.id,
+      outcome: "victory",
+      turns: 1,
+      bootMs: 1,
+      combatMs: 1,
+      progressionPhaseEntries: 0,
+    })),
+  },
+}));
+const fullReport = buildGhostBatchReport(fullEval.manifests, controllerBatches);
+assert.equal(fullReport.pairs, EXPECTED_GHOST_EVAL_PAIRS);
+assert.equal(fullReport.legs, EXPECTED_GHOST_EVAL_PAIRS * 2 * GHOST_EVAL_CONTROLLERS.length);
+assert.throws(
+  () => buildGhostBatchReport(fullEval.manifests.slice(1), controllerBatches),
+  /expected 50 inverse-pair manifests/,
+);
+const weakened = structuredClone(controllerBatches);
+weakened[0].batch.hardestTrainerAi = false;
+assert.throws(() => buildGhostBatchReport(fullEval.manifests, weakened), /invalid hardest-AI combat batch result/);
 
 const trainingFixture = readGhostFixture("ml/training/ghost-self-play-teams.v1.json");
 assert.equal(trainingFixture.teams.length, 163);
@@ -30,6 +72,11 @@ for (const team of trainingFixture.teams) {
 }
 const forward = buildGhostSelfPlayScenario(trainingFixture, 0);
 const reverse = buildGhostSelfPlayScenario(trainingFixture, 1);
+const splitBatch = buildPilotBatch(0, 4, trainingFixture);
+assert.deepEqual(
+  splitBatch.episodes.map(episode => episode.splitGroupId),
+  ["pilot-pair-0", "pilot-pair-0", "pilot-pair-1", "pilot-pair-1"],
+);
 const withoutEnemyLevel = member => {
   const { level: _level, ...rest } = member;
   return rest;

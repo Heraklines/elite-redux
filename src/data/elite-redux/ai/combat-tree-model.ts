@@ -20,7 +20,7 @@ export interface ErTreeModelArtifact {
   featureCount: number;
   modelName: string;
   modelType: "sklearn_forest" | "sklearn_hist_gradient_boosting" | "lightgbm";
-  aggregation: "mean" | "sum_logit";
+  aggregation: "mean" | "sum_logit" | "sum_raw";
   baseScore: number;
   trees: ErTreeNode[][];
 }

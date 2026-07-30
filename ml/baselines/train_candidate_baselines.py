@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import pickle
+import re
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -18,9 +19,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 try:
-    from lightgbm import LGBMClassifier
+    from lightgbm import LGBMClassifier, LGBMRanker
 except ModuleNotFoundError:  # The core sklearn ladder remains locally runnable without the optional wheel.
     LGBMClassifier = None
+    LGBMRanker = None
 
 SCHEMA_VERSION = 2
 FEATURE_SCHEMA_VERSION = 1
@@ -106,6 +108,13 @@ def validate_dataset(decisions: list[dict[str, Any]], terminals: list[dict[str, 
         if len(values) != 1 or None in values or "unknown" in values:
             raise ValueError(f"dataset must have one known {identity}, found {sorted(map(str, values))}")
 
+    groups_by_episode: dict[str, set[str]] = defaultdict(set)
+    for record in decisions + terminals:
+        groups_by_episode[record["episodeId"]].add(record_split_group(record))
+    inconsistent = sorted(episode for episode, groups in groups_by_episode.items() if len(groups) != 1)
+    if inconsistent:
+        raise ValueError(f"episodes map to multiple split groups: {inconsistent}")
+
 
 def select_elite_rollouts(
     decisions: list[dict[str, Any]], terminals: list[dict[str, Any]]
@@ -147,11 +156,25 @@ def embedded_candidate_features(decision: dict[str, Any], candidate: dict[str, A
     return [float(value) for value in by_id[candidate["id"]]]
 
 
-def make_rows(decisions: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, list[str], list[str], list[int]]:
+def record_split_group(record: dict[str, Any]) -> str:
+    explicit = record.get("splitGroupId")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    episode_id = record["episodeId"]
+    legacy_pilot = re.fullmatch(r"pilot-(\d+)", episode_id)
+    if legacy_pilot:
+        return f"pilot-pair-{int(legacy_pilot.group(1)) // 2}"
+    return episode_id
+
+
+def make_rows(
+    decisions: list[dict[str, Any]],
+) -> tuple[np.ndarray, np.ndarray, list[str], list[str], list[str], list[int]]:
     x_rows: list[list[float]] = []
     labels: list[int] = []
     decision_ids: list[str] = []
     episodes: list[str] = []
+    split_groups: list[str] = []
     candidate_counts: list[int] = []
     for decision in decisions:
         candidates = decision["candidates"]
@@ -161,20 +184,43 @@ def make_rows(decisions: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, 
             labels.append(int(candidate["id"] == decision["chosenCandidateId"]))
             decision_ids.append(decision["decisionId"])
             episodes.append(decision["episodeId"])
+            split_groups.append(record_split_group(decision))
     feature_counts = {len(row) for row in x_rows}
     if len(feature_counts) != 1:
         raise ValueError(f"dataset contains inconsistent feature counts: {sorted(feature_counts)}")
-    return np.asarray(x_rows, dtype=np.float32), np.asarray(labels), decision_ids, episodes, candidate_counts
+    return (
+        np.asarray(x_rows, dtype=np.float32),
+        np.asarray(labels),
+        decision_ids,
+        episodes,
+        split_groups,
+        candidate_counts,
+    )
 
 
-def split_episodes(episodes: list[str], seed: int) -> tuple[set[str], set[str]]:
-    unique = sorted(set(episodes))
+def split_groups(groups: list[str], seed: int) -> tuple[set[str], set[str]]:
+    unique = sorted(set(groups))
     if len(unique) < 2:
-        raise ValueError("at least two episodes are required for a leakage-safe split")
+        raise ValueError("at least two matchup groups are required for a leakage-safe split")
     rng = np.random.default_rng(seed)
     rng.shuffle(unique)
     test_count = max(1, int(round(len(unique) * 0.34)))
     return set(unique[test_count:]), set(unique[:test_count])
+
+
+def ordered_group_sizes(decision_ids: list[str]) -> list[int]:
+    sizes: list[int] = []
+    seen: set[str] = set()
+    previous: str | None = None
+    for decision_id in decision_ids:
+        if decision_id != previous:
+            if decision_id in seen:
+                raise ValueError(f"candidate rows for decision {decision_id} are not contiguous")
+            seen.add(decision_id)
+            sizes.append(0)
+            previous = decision_id
+        sizes[-1] += 1
+    return sizes
 
 
 def row_weights(labels: np.ndarray, decision_ids: list[str]) -> np.ndarray:
@@ -282,40 +328,6 @@ def leaf_node(value: float) -> dict[str, Any]:
     return {"feature": -1, "threshold": 0.0, "left": -1, "right": -1, "value": float(value)}
 
 
-def sklearn_forest_artifact(name: str, model: Any, feature_count: int) -> dict[str, Any]:
-    positive_index = int(np.flatnonzero(model.classes_ == 1)[0])
-    trees: list[list[dict[str, Any]]] = []
-    for estimator in model.estimators_:
-        source = estimator.tree_
-        nodes: list[dict[str, Any]] = []
-        for index in range(source.node_count):
-            if source.children_left[index] < 0:
-                counts = source.value[index][0]
-                probability = float(counts[positive_index] / max(EPSILON, counts.sum()))
-                nodes.append(leaf_node(probability))
-            else:
-                nodes.append(
-                    {
-                        "feature": int(source.feature[index]),
-                        "threshold": float(source.threshold[index]),
-                        "left": int(source.children_left[index]),
-                        "right": int(source.children_right[index]),
-                        "defaultLeft": True,
-                    }
-                )
-        trees.append(nodes)
-    return {
-        "schemaVersion": 1,
-        "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
-        "featureCount": feature_count,
-        "modelName": name,
-        "modelType": "sklearn_forest",
-        "aggregation": "mean",
-        "baseScore": 0.0,
-        "trees": trees,
-    }
-
-
 def hist_gradient_artifact(name: str, model: HistGradientBoostingClassifier, feature_count: int) -> dict[str, Any]:
     trees: list[list[dict[str, Any]]] = []
     for iteration in model._predictors:  # sklearn has no public neutral tree export for HGB.
@@ -349,7 +361,12 @@ def hist_gradient_artifact(name: str, model: HistGradientBoostingClassifier, fea
     }
 
 
-def lightgbm_artifact(name: str, model: Any, feature_count: int) -> dict[str, Any]:
+def lightgbm_artifact(
+    name: str,
+    model: Any,
+    feature_count: int,
+    aggregation: str = "sum_logit",
+) -> dict[str, Any]:
     dumped = model.booster_.dump_model()
     trees: list[list[dict[str, Any]]] = []
 
@@ -382,7 +399,7 @@ def lightgbm_artifact(name: str, model: Any, feature_count: int) -> dict[str, An
         "featureCount": feature_count,
         "modelName": name,
         "modelType": "lightgbm",
-        "aggregation": "sum_logit",
+        "aggregation": aggregation,
         "baseScore": 0.0,
         "trees": trees,
     }
@@ -390,9 +407,13 @@ def lightgbm_artifact(name: str, model: Any, feature_count: int) -> dict[str, An
 
 def export_tree_artifact(name: str, model: Any, feature_count: int) -> dict[str, Any] | None:
     if isinstance(model, (RandomForestClassifier, ExtraTreesClassifier)):
-        return sklearn_forest_artifact(name, model, feature_count)
+        # Keep these as CPU baselines. Their literal JSON exports are hundreds of
+        # megabytes and made every runner download the same non-selected models.
+        return None
     if isinstance(model, HistGradientBoostingClassifier):
         return hist_gradient_artifact(name, model, feature_count)
+    if LGBMRanker is not None and isinstance(model, LGBMRanker):
+        return lightgbm_artifact(name, model, feature_count, "sum_raw")
     if LGBMClassifier is not None and isinstance(model, LGBMClassifier):
         return lightgbm_artifact(name, model, feature_count)
     return None
@@ -415,26 +436,30 @@ def artifact_scores(artifact: dict[str, Any], x: np.ndarray) -> np.ndarray:
         values = [tree_score(tree, row) for tree in artifact["trees"]]
         if artifact["aggregation"] == "mean":
             result.append(float(np.mean(values)))
-        else:
+        elif artifact["aggregation"] == "sum_logit":
             raw = artifact["baseScore"] + sum(values)
             result.append(1.0 / (1.0 + math.exp(-max(-50.0, min(50.0, raw)))))
+        else:
+            result.append(artifact["baseScore"] + sum(values))
     return np.asarray(result)
 
 
-def model_specs(seed: int) -> list[tuple[str, Any, bool]]:
+def model_specs(seed: int) -> list[tuple[str, Any, bool, bool]]:
     specs = [
-        ("logistic", LogisticRegression(max_iter=1000, class_weight=None, random_state=seed), True),
+        ("logistic", LogisticRegression(max_iter=1000, class_weight=None, random_state=seed), True, False),
         (
             "random_forest",
             RandomForestClassifier(n_estimators=250, min_samples_leaf=2, n_jobs=-1, random_state=seed),
+            False,
             False,
         ),
         (
             "extra_trees",
             ExtraTreesClassifier(n_estimators=250, min_samples_leaf=2, n_jobs=-1, random_state=seed),
             False,
+            False,
         ),
-        ("hist_gradient_boosting", HistGradientBoostingClassifier(max_iter=200, random_state=seed), False),
+        ("hist_gradient_boosting", HistGradientBoostingClassifier(max_iter=200, random_state=seed), False, False),
     ]
     if LGBMClassifier is not None:
         specs.append(
@@ -449,12 +474,56 @@ def model_specs(seed: int) -> list[tuple[str, Any, bool]]:
                     verbosity=-1,
                 ),
                 False,
+                False,
+            )
+        )
+        specs.append(
+            (
+                "lightgbm_lambdarank",
+                LGBMRanker(
+                    objective="lambdarank",
+                    n_estimators=300,
+                    learning_rate=0.04,
+                    num_leaves=31,
+                    min_child_samples=20,
+                    n_jobs=-1,
+                    random_state=seed,
+                    verbosity=-1,
+                ),
+                False,
+                True,
+            )
+        )
+    return specs
+
+
+def outcome_weighted_model_specs(seed: int) -> list[tuple[str, Any]]:
+    specs: list[tuple[str, Any]] = [
+        (
+            "outcome_weighted_hist_gradient_boosting",
+            HistGradientBoostingClassifier(max_iter=250, random_state=seed),
+        )
+    ]
+    if LGBMClassifier is not None:
+        specs.append(
+            (
+                "outcome_weighted_lightgbm",
+                LGBMClassifier(
+                    n_estimators=300,
+                    learning_rate=0.04,
+                    num_leaves=31,
+                    n_jobs=-1,
+                    random_state=seed,
+                    verbosity=-1,
+                ),
             )
         )
     return specs
 
 
 def train(args: argparse.Namespace) -> dict[str, Any]:
+    if not 0.0 <= args.loss_episode_weight <= 1.0:
+        raise ValueError("loss episode weight must be between 0 and 1")
     all_decisions, terminals = load_records(args.data)
     decisions, rollout_selection = (
         select_elite_rollouts(all_decisions, terminals)
@@ -470,11 +539,21 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             },
         )
     )
-    x, y, decision_ids, episodes, candidate_counts = make_rows(decisions)
-    train_episodes, test_episodes = split_episodes(episodes, args.seed)
-    train_mask = np.asarray([episode in train_episodes for episode in episodes])
-    test_mask = np.asarray([episode in test_episodes for episode in episodes])
+    x, y, decision_ids, episodes, split_group_ids, candidate_counts = make_rows(decisions)
+    train_groups, test_groups = split_groups(split_group_ids, args.seed)
+    train_mask = np.asarray([group in train_groups for group in split_group_ids])
+    test_mask = np.asarray([group in test_groups for group in split_group_ids])
+    train_episodes = {episode for episode, selected in zip(episodes, train_mask) if selected}
+    test_episodes = {episode for episode, selected in zip(episodes, test_mask) if selected}
     weights = row_weights(y, decision_ids)
+    terminal_by_episode = {terminal["episodeId"]: terminal for terminal in terminals}
+    successful_rows = np.asarray(
+        [terminal_by_episode[episode]["outcome"] in SUCCESSFUL_ROLLOUT_OUTCOMES for episode in episodes]
+    )
+    outcome_weights = np.asarray(
+        [1.0 if successful else args.loss_episode_weight for successful in successful_rows],
+        dtype=np.float64,
+    )
     scaler = StandardScaler().fit(x[train_mask])
 
     test_decisions = [decision for decision in decisions if decision["episodeId"] in test_episodes]
@@ -497,14 +576,25 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         },
     ]
     artifacts: dict[str, dict[str, Any]] = {}
-    for name, model, scale in model_specs(args.seed):
+    for name, model, scale, ranker in model_specs(args.seed):
         train_x = scaler.transform(x[train_mask]) if scale else x[train_mask]
         test_x = scaler.transform(x[test_mask]) if scale else x[test_mask]
         started = time.perf_counter()
-        model.fit(train_x, y[train_mask], sample_weight=weights[train_mask])
+        if ranker:
+            train_decision_ids = [
+                decision_id for decision_id, selected in zip(decision_ids, train_mask) if selected
+            ]
+            model.fit(
+                train_x,
+                y[train_mask],
+                group=ordered_group_sizes(train_decision_ids),
+                sample_weight=weights[train_mask],
+            )
+        else:
+            model.fit(train_x, y[train_mask], sample_weight=weights[train_mask])
         train_seconds = time.perf_counter() - started
         infer_started = time.perf_counter()
-        scores = model.predict_proba(test_x)[:, 1]
+        scores = model.predict(test_x) if ranker else model.predict_proba(test_x)[:, 1]
         infer_seconds = time.perf_counter() - infer_started
         metrics = ranking_metrics(
             scores,
@@ -530,14 +620,74 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
 
-    learned_rows = [row for row in leaderboard if row["model"] in artifacts]
+    successful_test_mask = test_mask & successful_rows
+    outcome_artifacts: dict[str, dict[str, Any]] = {}
+    for name, model in outcome_weighted_model_specs(args.seed):
+        started = time.perf_counter()
+        model.fit(x[train_mask], y[train_mask], sample_weight=weights[train_mask] * outcome_weights[train_mask])
+        train_seconds = time.perf_counter() - started
+        infer_started = time.perf_counter()
+        scores = model.predict_proba(x[test_mask])[:, 1]
+        infer_seconds = time.perf_counter() - infer_started
+        metrics = ranking_metrics(
+            scores,
+            y[test_mask],
+            [decision_id for decision_id, selected in zip(decision_ids, test_mask) if selected],
+        )
+        successful_metrics = (
+            ranking_metrics(
+                model.predict_proba(x[successful_test_mask])[:, 1],
+                y[successful_test_mask],
+                [decision_id for decision_id, selected in zip(decision_ids, successful_test_mask) if selected],
+            )
+            if successful_test_mask.any()
+            else None
+        )
+        artifact = export_tree_artifact(name, model, x.shape[1])
+        if artifact is None:
+            raise ValueError(f"{name} cannot be exported to the neutral runtime")
+        neutral_scores = artifact_scores(artifact, x[test_mask])
+        parity_error = float(np.max(np.abs(scores - neutral_scores)))
+        if parity_error > 1e-5:
+            raise ValueError(f"{name} neutral artifact parity error {parity_error}")
+        artifacts[name] = artifact
+        outcome_artifacts[name] = artifact
+        leaderboard.append(
+            {
+                "model": name,
+                **metrics,
+                "successfulEpisodeMetrics": successful_metrics,
+                "trainingObjective": f"loss episodes weighted {args.loss_episode_weight}",
+                "trainSeconds": train_seconds,
+                "inferenceMsPerDecision": 1000 * infer_seconds / max(1, metrics["decisions"]),
+                "modelBytes": len(pickle.dumps({"model": model, "scaler": None})),
+                "neutralArtifactMaxError": parity_error,
+            }
+        )
+
+    learned_rows = [
+        row for row in leaderboard if row["model"] in artifacts and row["model"] not in outcome_artifacts
+    ]
     selected = sorted(learned_rows, key=lambda row: (-row["top1"], row["candidateNll"], row["model"]))[0]["model"]
+    outcome_rows = [row for row in leaderboard if row["model"] in outcome_artifacts]
+    outcome_selected = sorted(
+        outcome_rows,
+        key=lambda row: (
+            -(row["successfulEpisodeMetrics"] or row)["top1"],
+            (row["successfulEpisodeMetrics"] or row)["candidateNll"],
+            row["model"],
+        ),
+    )[0]["model"]
     if args.models_dir is not None:
         args.models_dir.mkdir(parents=True, exist_ok=True)
         for name, artifact in artifacts.items():
             (args.models_dir / f"{name}.json").write_text(json.dumps(artifact, separators=(",", ":")) + "\n", encoding="utf-8")
         (args.models_dir / "selected-model.json").write_text(
             json.dumps(artifacts[selected], separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        (args.models_dir / "outcome-selected-model.json").write_text(
+            json.dumps(outcome_artifacts[outcome_selected], separators=(",", ":")) + "\n",
             encoding="utf-8",
         )
 
@@ -549,13 +699,18 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "schemaVersion": SCHEMA_VERSION,
         "metricScope": "offline imitation of the recorded source policy; not battle win rate",
         "selectedBattlePolicy": selected,
+        "selectedOutcomeWeightedPolicy": outcome_selected,
+        "lossEpisodeWeight": args.loss_episode_weight,
         "seed": args.seed,
         "data": {
             "decisions": len(decisions),
             "candidateRows": len(y),
             "episodes": len(set(episodes)),
+            "successfulEpisodes": len({episode for episode, successful in zip(episodes, successful_rows) if successful}),
             "trainEpisodes": sorted(train_episodes),
             "testEpisodes": sorted(test_episodes),
+            "trainSplitGroups": sorted(train_groups),
+            "testSplitGroups": sorted(test_groups),
             "meanCandidates": float(np.mean(candidate_counts)),
             "p95Candidates": float(np.percentile(candidate_counts, 95)),
             "sourcePolicies": Counter(record["sourcePolicy"] for record in decisions),
@@ -599,6 +754,21 @@ def markdown(report: dict[str, Any]) -> str:
             f"{row['candidateNll']:.3f} | {row['trainSeconds']:.2f} | "
             f"{row.get('inferenceMsPerDecision', 0):.3f} | {row['modelBytes'] / 1024:.1f} |"
         )
+    outcome_rows = [row for row in report["leaderboard"] if row.get("successfulEpisodeMetrics")]
+    if outcome_rows:
+        lines.extend(
+            [
+                "",
+                f"Outcome-weighted selector: `{report['selectedOutcomeWeightedPolicy']}`. "
+                f"Loss-episode decisions carry {report['lossEpisodeWeight']:.2f}x training weight.",
+                "",
+                "| Outcome-weighted model | Successful-episode Top-1 | Successful-episode NLL |",
+                "| --- | ---: | ---: |",
+            ]
+        )
+        for row in outcome_rows:
+            metrics = row["successfulEpisodeMetrics"]
+            lines.append(f"| {row['model']} | {metrics['top1']:.3f} | {metrics['candidateNll']:.3f} |")
     return "\n".join(lines) + "\n"
 
 
@@ -614,6 +784,7 @@ def parse_args() -> argparse.Namespace:
         help="retain epsilon-tree decisions only from episodes that reached their requested horizon",
     )
     parser.add_argument("--seed", type=int, default=20260728)
+    parser.add_argument("--loss-episode-weight", type=float, default=0.1)
     return parser.parse_args()
 
 

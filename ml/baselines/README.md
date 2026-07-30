@@ -10,12 +10,27 @@ battle strength. They answer whether a model learned the recorded policy. A
 model is not better than the game's AI until its exported inference policy wins
 more often on a fixed-seed, held-out real-engine gauntlet.
 
-The first tree is exported to a neutral JSON format and executed by the same
-TypeScript feature extractor used to record training rows. A second data pass
-runs that tree with deterministic 15% legal-action exploration. Retraining keeps
-the expert rows plus successful exploratory trajectories. This is a small
-cross-entropy-style policy iteration against the game's hardest Hell trainer AI.
-It is not symmetric model self-play yet.
+Runtime-suitable HGB and LightGBM trees are exported to a neutral JSON format
+and executed by the same TypeScript feature extractor used to record training
+rows. Random Forest and Extra Trees remain measured CPU baselines, but their
+literal neutral exports are deliberately omitted because they are hundreds of
+megabytes and are not selected runtime candidates. A second data pass runs the
+selected tree with deterministic 15% legal-action exploration. Retraining keeps
+the expert rows plus successful exploratory trajectories.
+
+The tree lane exports two finalists. `selected-model.json` optimizes held-out
+action imitation. `outcome-selected-model.json` reduces the weight of decisions
+from losing episodes and selects among those candidates using held-out
+successful episodes. Only the real-engine gauntlet determines which is stronger.
+This is a small cross-entropy-style policy iteration against the game's hardest
+Hell trainer AI. It is not symmetric model self-play yet.
+
+The neural lane trains three independently seeded 4.27M-parameter,
+permutation-equivariant candidate-set transformers with policy and terminal-value
+heads, then averages their logits at inference. It is an ER-native numerical
+policy baseline, not an LLM and not a claim of global SOTA. A persistent test-only
+Python sidecar loads the `safetensors` checkpoints once; the game and production
+bundles do not import Torch.
 
 The fixed gauntlet uses 100 sanitized rosters from actual winning Hell ghost
 runs, drawn from 28 anonymous accounts held out at the player level. The
@@ -23,8 +38,10 @@ self-play pool contains another 163 winning rosters from 45 different accounts;
 no evaluation player or roster enters fitting. Training matchups use a balanced
 round-robin order and consecutive episodes are strict inverse legs. The fixed
 gauntlet also plays every pair twice: A as the player against B, then B as the
-player against A. The selected tree and the `smart-default-v1` control each play
-all 100 legs.
+player against A. The imitation-selected tree, outcome-weighted tree, candidate
+transformer, and `smart-default-v1` control each play all 100 legs. Evaluation
+batches preserve both A-vs-B and B-vs-A while reusing one warm engine process per
+shard.
 
 Original 1-6 member party sizes, saved movesets, forms, ability slots, IVs,
 natures, shiny tiers, saved passive flags, and exactly reconstructable
@@ -43,6 +60,7 @@ Cloudflare credential, or repository write permission. Every run uploads its
 versioned JSONL shards, neutral model artifacts, and both leaderboards so results
 can be compared by commit and GitHub Actions run. The workflow caps every matrix
 at six concurrent runners and has no production or staging deployment step. A
-runner boots the Vitest/Phaser engine once and executes 24 isolated battles in
-that warm process; every episode records its own terminal outcome and the worker
-fails if it enters a reward or run-progression phase.
+generation runner boots the Vitest/Phaser engine once and executes 24 isolated
+battles in that warm process. Evaluation is split into six warm batches rather
+than one cold process per matchup. Every episode records its own terminal outcome
+and the worker fails if it enters a reward or run-progression phase.

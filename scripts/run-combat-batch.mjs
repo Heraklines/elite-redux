@@ -7,7 +7,7 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
   console.log(
     "Usage: node scripts/run-combat-batch.mjs @batch.json "
       + "[--turns N] [--json-out FILE] [--ai-data-out FILE] "
-      + "[--ai-model FILE] [--ai-policy MODE] [--ai-epsilon P] [--real-rng]",
+      + "[--ai-model FILE] [--ai-neural-model DIR] [--ai-policy MODE] [--ai-epsilon P] [--real-rng]",
   );
   process.exit(argv.length === 0 ? 1 : 0);
 }
@@ -24,6 +24,7 @@ let turns = "80";
 let jsonOut;
 let aiDataOut;
 let aiModel;
+let aiNeuralModel;
 let aiPolicy;
 let aiEpsilon;
 let realRng = false;
@@ -37,6 +38,8 @@ for (let index = 1; index < argv.length; index++) {
     aiDataOut = argv[++index];
   } else if (arg === "--ai-model") {
     aiModel = argv[++index];
+  } else if (arg === "--ai-neural-model") {
+    aiNeuralModel = argv[++index];
   } else if (arg === "--ai-policy") {
     aiPolicy = argv[++index];
     if (!["first-usable", "smart-default"].includes(aiPolicy)) {
@@ -78,6 +81,9 @@ if (aiDataOut) {
 }
 if (aiModel) {
   env.ER_AI_POLICY_MODEL = aiModel.startsWith("@") ? aiModel.slice(1) : aiModel;
+}
+if (aiNeuralModel) {
+  env.ER_AI_NEURAL_POLICY_MODEL = aiNeuralModel.startsWith("@") ? aiNeuralModel.slice(1) : aiNeuralModel;
 }
 if (aiPolicy) {
   env.ER_AI_POLICY_MODE = aiPolicy;

@@ -27,6 +27,7 @@ import { spawnSync } from "node:child_process";
  *   --ai-data-out FILE  write versioned combat-decision JSONL for offline training
  *   --episode-id ID  stable episode id stamped into AI dataset rows
  *   --ai-model FILE   run an exported ER tree policy through the real combat harness
+ *   --ai-neural-model DIR  run an ER candidate-transformer bundle through a persistent sidecar
  *   --ai-policy MODE  no-model policy: first-usable (default) or smart-default
  *   --ai-epsilon P    deterministic random-action rate for tree-policy data collection
  *   --no-miss        force every move to hit
@@ -48,7 +49,7 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
     "Usage: node scripts/run-scenario.mjs <ERS1-code | @file.json | demo> "
       + "[--turns N] [--move MOVE] [--waves N] [--to-end] [--quiet] [--auto-first] "
       + "[--policy @file.json] [--json-out FILE] [--ai-data-out FILE] [--episode-id ID] "
-      + "[--ai-model FILE] [--ai-policy MODE] [--ai-epsilon P] "
+      + "[--ai-model FILE] [--ai-neural-model DIR] [--ai-policy MODE] [--ai-epsilon P] "
       + "[--no-miss] [--no-crit] [--real-rng]",
   );
   process.exit(argv.length === 0 ? 1 : 0);
@@ -66,6 +67,7 @@ let jsonOut;
 let aiDataOut;
 let episodeId;
 let aiModel;
+let aiNeuralModel;
 let aiPolicy;
 let aiEpsilon;
 let noMiss = false;
@@ -94,6 +96,8 @@ for (let i = 1; i < argv.length; i++) {
     episodeId = argv[++i];
   } else if (argv[i] === "--ai-model") {
     aiModel = argv[++i];
+  } else if (argv[i] === "--ai-neural-model") {
+    aiNeuralModel = argv[++i];
   } else if (argv[i] === "--ai-policy") {
     aiPolicy = argv[++i];
     if (!["first-usable", "smart-default"].includes(aiPolicy)) {
@@ -153,6 +157,9 @@ if (episodeId) {
 }
 if (aiModel) {
   env.ER_AI_POLICY_MODEL = aiModel.startsWith("@") ? aiModel.slice(1) : aiModel;
+}
+if (aiNeuralModel) {
+  env.ER_AI_NEURAL_POLICY_MODEL = aiNeuralModel.startsWith("@") ? aiNeuralModel.slice(1) : aiNeuralModel;
 }
 if (aiPolicy) {
   env.ER_AI_POLICY_MODE = aiPolicy;
