@@ -56,6 +56,7 @@ const INTERACTIVE_MYSTERY_NARRATION_PHASES = new Set([
   "MysteryEncounterRewardsPhase",
   "PostMysteryEncounterPhase",
   "ErQuizPhase",
+  "TheBargainPhase",
   "CoopReplayMePhase",
 ]);
 const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;

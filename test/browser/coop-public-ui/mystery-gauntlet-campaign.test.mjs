@@ -1348,7 +1348,7 @@ test("paired Mystery convergence follows the newest ordered address when the int
   );
 });
 
-test("the mystery narration driver advances the authoritative selected-option phase once", async () => {
+test("the mystery narration driver advances selected-option and Bargain outcome prompts once", async () => {
   const hostEvents = [
     {
       index: 0,
@@ -1406,6 +1406,32 @@ test("the mystery narration driver advances the authoritative selected-option ph
   ]);
   assert.deepEqual(guest.presses, []);
   assert.equal(await advance(), false, "one prompt generation must never be submitted twice");
+
+  guestEvents.push({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "mystery-encounter:message",
+      operationClass: "encounter-prompt",
+      phase: "TheBargainPhase",
+      uiMode: "MESSAGE",
+      ownerModel: "interaction",
+      coop: true,
+      localSeat: 1,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      phaseInstance: 15,
+      ready: { handlerActive: true, awaitingActionInput: true },
+    },
+  });
+  assert.equal(await advance(), true);
+  assert.deepEqual(guest.presses, [
+    {
+      key: "Space",
+      purpose: "wave-1-mystery-narration-guest-seat-mystery-narration-2",
+    },
+  ]);
+  assert.equal(await advance(), false, "the Bargain outcome prompt must never be submitted twice");
 });
 
 test("the mystery narration driver waits through an exact guest-ack fence without consuming the prompt", async () => {

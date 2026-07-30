@@ -5911,3 +5911,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   input-frozen mirrored `bargain` watcher at the same address, digest, encounter metadata, and option image.
 - Failure-first node-pure coverage rejects a watcher whose input is unblocked or whose digest diverges. This is a
   harness-only correction; Authority V2 runtime, Showdown, tournament, triples, and deployment behavior are unchanged.
+
+## 2026-07-30 - Mystery campaign drains the Bargain owner's terminal narration
+
+- Exact follow-up run `30515740250` proved the mirrored Bargain checkpoint at wave 9, then failed later with the owner
+  visibly on Giratina's actionable `Leaving?` MESSAGE while the watcher correctly retained the input-frozen offer.
+  Both remained at Authority V2 address `1828237916126050/9/1` and digest `f1163e66233d2af0`; this was neither a
+  mechanical divergence nor a production softlock.
+- A human owner must press ACTION once to dismiss this final `TheBargainPhase` narration before the immutable Bargain
+  result can release the watcher. The campaign's closed Mystery-narration allowlist covered ordinary encounters,
+  quizzes, and replay phases but omitted Bargain, so the public-key driver left a genuinely actionable prompt idle.
+- `TheBargainPhase` is now admitted by that same readiness/owner/address-gated narration driver. Node-pure coverage
+  proves the exact owner prompt is pressed once and never consumed twice. Runtime, Showdown, tournament, triples, and
+  deployment behavior remain unchanged.
