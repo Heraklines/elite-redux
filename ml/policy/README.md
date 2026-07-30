@@ -7,8 +7,10 @@ auxiliary target.
 
 Each default network has 4,273,602 parameters. The workflow trains three seeds
 and averages their policy and value logits. Candidate order has no positional
-encoding, so permuting legal actions only permutes their policy scores. Inverse
-matchup legs share a split group and cannot cross the train/validation boundary.
+encoding, so permuting legal actions only permutes their policy scores. Source
+rosters are assigned to disjoint folds before matchups are generated, and the
+model splits on those folds; neither a roster nor its inverse leg can cross the
+train/validation boundary.
 Failed exploratory tree trajectories are removed with `--elite-rollouts`; loss
 episodes retained from the source policy receive reduced policy weight.
 

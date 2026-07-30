@@ -113,6 +113,8 @@ export interface ErCombatDecisionRecord {
   episodeId: string;
   /** Matchup-level split identity; inverse legs must share this value. */
   splitGroupId?: string;
+  /** Roster-disjoint partition identity used for honest offline train/test and OOF splits. */
+  sourcePartitionId?: string;
   jointActionId: string;
   decisionId: string;
   sourcePolicy:
@@ -141,6 +143,7 @@ export interface ErCombatTerminalRecord {
   dictionaryHash: string;
   episodeId: string;
   splitGroupId?: string;
+  sourcePartitionId?: string;
   outcome: string;
   startWave: number;
   finalWave: number;

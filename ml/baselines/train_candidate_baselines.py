@@ -15,8 +15,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from sklearn.base import clone
 from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 
 try:
@@ -110,11 +112,18 @@ def validate_dataset(decisions: list[dict[str, Any]], terminals: list[dict[str, 
             raise ValueError(f"dataset must have one known {identity}, found {sorted(map(str, values))}")
 
     groups_by_episode: dict[str, set[str]] = defaultdict(set)
+    partitions_by_episode: dict[str, set[str]] = defaultdict(set)
     for record in decisions + terminals:
         groups_by_episode[record["episodeId"]].add(record_split_group(record))
+        partitions_by_episode[record["episodeId"]].add(record_source_partition(record))
     inconsistent = sorted(episode for episode, groups in groups_by_episode.items() if len(groups) != 1)
     if inconsistent:
         raise ValueError(f"episodes map to multiple split groups: {inconsistent}")
+    inconsistent_partitions = sorted(
+        episode for episode, partitions in partitions_by_episode.items() if len(partitions) != 1
+    )
+    if inconsistent_partitions:
+        raise ValueError(f"episodes map to multiple source partitions: {inconsistent_partitions}")
 
 
 def validate_data_dictionary(path: Path, decisions: list[dict[str, Any]]) -> dict[str, int | str]:
@@ -219,14 +228,22 @@ def record_split_group(record: dict[str, Any]) -> str:
     return episode_id
 
 
+def record_source_partition(record: dict[str, Any]) -> str:
+    explicit = record.get("sourcePartitionId")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    return record_split_group(record)
+
+
 def make_rows(
     decisions: list[dict[str, Any]],
-) -> tuple[np.ndarray, np.ndarray, list[str], list[str], list[str], list[int]]:
+) -> tuple[np.ndarray, np.ndarray, list[str], list[str], list[str], list[str], list[int]]:
     x_rows: list[list[float]] = []
     labels: list[int] = []
     decision_ids: list[str] = []
     episodes: list[str] = []
     split_groups: list[str] = []
+    source_partitions: list[str] = []
     candidate_counts: list[int] = []
     for decision in decisions:
         candidates = decision["candidates"]
@@ -237,6 +254,7 @@ def make_rows(
             decision_ids.append(decision["decisionId"])
             episodes.append(decision["episodeId"])
             split_groups.append(record_split_group(decision))
+            source_partitions.append(record_source_partition(decision))
     feature_counts = {len(row) for row in x_rows}
     if len(feature_counts) != 1:
         raise ValueError(f"dataset contains inconsistent feature counts: {sorted(feature_counts)}")
@@ -246,6 +264,7 @@ def make_rows(
         decision_ids,
         episodes,
         split_groups,
+        source_partitions,
         candidate_counts,
     )
 
@@ -472,6 +491,14 @@ def export_tree_artifact(name: str, model: Any, feature_count: int) -> dict[str,
 
 
 def artifact_scores(artifact: dict[str, Any], x: np.ndarray) -> np.ndarray:
+    if artifact.get("schemaVersion") == 2:
+        members = artifact["members"]
+        member_scores = np.column_stack([artifact_scores(member, x) for member in members])
+        means = np.asarray(artifact["memberMeans"], dtype=np.float64)
+        scales = np.asarray(artifact["memberScales"], dtype=np.float64)
+        weights = np.asarray(artifact["weights"], dtype=np.float64)
+        return float(artifact["intercept"]) + ((member_scores - means) / scales) @ weights
+
     def tree_score(nodes: list[dict[str, Any]], row: np.ndarray) -> float:
         index = 0
         for _ in range(len(nodes) + 1):
@@ -494,6 +521,79 @@ def artifact_scores(artifact: dict[str, Any], x: np.ndarray) -> np.ndarray:
         else:
             result.append(artifact["baseScore"] + sum(values))
     return np.asarray(result)
+
+
+def fit_stacked_tree_ensemble(
+    fitted_models: dict[str, tuple[Any, bool]],
+    artifacts: dict[str, dict[str, Any]],
+    x: np.ndarray,
+    y: np.ndarray,
+    decision_ids: list[str],
+    source_partition_ids: list[str],
+    train_mask: np.ndarray,
+    test_mask: np.ndarray,
+    weights: np.ndarray,
+) -> tuple[dict[str, Any], np.ndarray, float, list[str]] | None:
+    member_names = sorted(name for name in fitted_models if name in artifacts)
+    if len(member_names) < 2:
+        return None
+
+    train_indices = np.flatnonzero(train_mask)
+    train_partitions = np.asarray(source_partition_ids, dtype=object)[train_mask]
+    fold_count = min(5, len(set(train_partitions)))
+    if fold_count < 2:
+        return None
+    out_of_fold = np.zeros((len(train_indices), len(member_names)), dtype=np.float64)
+    started = time.perf_counter()
+    for fold_train, fold_validation in GroupKFold(n_splits=fold_count).split(
+        train_indices,
+        y[train_indices],
+        groups=train_partitions,
+    ):
+        source_indices = train_indices[fold_train]
+        validation_indices = train_indices[fold_validation]
+        for member_index, name in enumerate(member_names):
+            template, ranker = fitted_models[name]
+            model = clone(template)
+            if ranker:
+                fold_decision_ids = [decision_ids[index] for index in source_indices]
+                model.fit(
+                    x[source_indices],
+                    y[source_indices],
+                    group=ordered_group_sizes(fold_decision_ids),
+                    sample_weight=weights[source_indices],
+                )
+                scores = model.predict(x[validation_indices])
+            else:
+                model.fit(x[source_indices], y[source_indices], sample_weight=weights[source_indices])
+                scores = model.predict_proba(x[validation_indices])[:, 1]
+            out_of_fold[fold_validation, member_index] = scores
+
+    scaler = StandardScaler().fit(out_of_fold)
+    meta_model = LogisticRegression(max_iter=1000, random_state=0).fit(
+        scaler.transform(out_of_fold),
+        y[train_indices],
+        sample_weight=weights[train_indices],
+    )
+    test_member_scores = np.column_stack([artifact_scores(artifacts[name], x[test_mask]) for name in member_names])
+    test_scores = meta_model.decision_function(scaler.transform(test_member_scores))
+    artifact = {
+        "schemaVersion": 2,
+        "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
+        "featureCount": int(x.shape[1]),
+        "modelName": "stacked_tree_ensemble",
+        "modelType": "stacked_tree_ensemble",
+        "members": [artifacts[name] for name in member_names],
+        "memberMeans": scaler.mean_.tolist(),
+        "memberScales": scaler.scale_.tolist(),
+        "weights": meta_model.coef_[0].tolist(),
+        "intercept": float(meta_model.intercept_[0]),
+    }
+    neutral_scores = artifact_scores(artifact, x[test_mask])
+    parity_error = float(np.max(np.abs(test_scores - neutral_scores)))
+    if parity_error > 1e-5:
+        raise ValueError(f"stacked tree neutral artifact parity error {parity_error}")
+    return artifact, test_scores, time.perf_counter() - started, member_names
 
 
 def model_specs(seed: int) -> list[tuple[str, Any, bool, bool]]:
@@ -592,10 +692,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             },
         )
     )
-    x, y, decision_ids, episodes, split_group_ids, candidate_counts = make_rows(decisions)
-    train_groups, test_groups = split_groups(split_group_ids, args.seed)
-    train_mask = np.asarray([group in train_groups for group in split_group_ids])
-    test_mask = np.asarray([group in test_groups for group in split_group_ids])
+    x, y, decision_ids, episodes, split_group_ids, source_partition_ids, candidate_counts = make_rows(decisions)
+    train_partitions, test_partitions = split_groups(source_partition_ids, args.seed)
+    train_mask = np.asarray([partition in train_partitions for partition in source_partition_ids])
+    test_mask = np.asarray([partition in test_partitions for partition in source_partition_ids])
     train_episodes = {episode for episode, selected in zip(episodes, train_mask) if selected}
     test_episodes = {episode for episode, selected in zip(episodes, test_mask) if selected}
     weights = row_weights(y, decision_ids)
@@ -629,6 +729,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         },
     ]
     artifacts: dict[str, dict[str, Any]] = {}
+    fitted_models: dict[str, tuple[Any, bool]] = {}
     for name, model, scale, ranker in model_specs(args.seed):
         train_x = scaler.transform(x[train_mask]) if scale else x[train_mask]
         test_x = scaler.transform(x[test_mask]) if scale else x[test_mask]
@@ -662,6 +763,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             if parity_error > 1e-5:
                 raise ValueError(f"{name} neutral artifact parity error {parity_error}")
             artifacts[name] = artifact
+            if scale:
+                raise ValueError(f"deployable ensemble member {name} unexpectedly requires feature scaling")
+            fitted_models[name] = (model, ranker)
         leaderboard.append(
             {
                 "model": name,
@@ -669,6 +773,42 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                 "trainSeconds": train_seconds,
                 "inferenceMsPerDecision": 1000 * infer_seconds / max(1, metrics["decisions"]),
                 "modelBytes": len(pickle.dumps({"model": model, "scaler": scaler if scale else None})),
+                "neutralArtifactMaxError": parity_error,
+            }
+        )
+
+    stack = fit_stacked_tree_ensemble(
+        fitted_models,
+        artifacts,
+        x,
+        y,
+        decision_ids,
+        source_partition_ids,
+        train_mask,
+        test_mask,
+        weights,
+    )
+    if stack is not None:
+        artifact, scores, train_seconds, members = stack
+        infer_started = time.perf_counter()
+        neutral_scores = artifact_scores(artifact, x[test_mask])
+        infer_seconds = time.perf_counter() - infer_started
+        metrics = ranking_metrics(
+            scores,
+            y[test_mask],
+            [decision_id for decision_id, selected in zip(decision_ids, test_mask) if selected],
+        )
+        parity_error = float(np.max(np.abs(scores - neutral_scores)))
+        artifacts["stacked_tree_ensemble"] = artifact
+        leaderboard.append(
+            {
+                "model": "stacked_tree_ensemble",
+                **metrics,
+                "members": members,
+                "trainingObjective": "group-fold out-of-fold logistic stacking",
+                "trainSeconds": train_seconds,
+                "inferenceMsPerDecision": 1000 * infer_seconds / max(1, metrics["decisions"]),
+                "modelBytes": len(json.dumps(artifact, separators=(",", ":")).encode("utf-8")),
                 "neutralArtifactMaxError": parity_error,
             }
         )
@@ -762,8 +902,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "successfulEpisodes": len({episode for episode, successful in zip(episodes, successful_rows) if successful}),
             "trainEpisodes": sorted(train_episodes),
             "testEpisodes": sorted(test_episodes),
-            "trainSplitGroups": sorted(train_groups),
-            "testSplitGroups": sorted(test_groups),
+            "trainSourcePartitions": sorted(train_partitions),
+            "testSourcePartitions": sorted(test_partitions),
+            "trainSplitGroups": sorted({group for group, selected in zip(split_group_ids, train_mask) if selected}),
+            "testSplitGroups": sorted({group for group, selected in zip(split_group_ids, test_mask) if selected}),
             "meanCandidates": float(np.mean(candidate_counts)),
             "p95Candidates": float(np.percentile(candidate_counts, 95)),
             "sourcePolicies": Counter(record["sourcePolicy"] for record in decisions),

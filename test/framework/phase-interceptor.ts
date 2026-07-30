@@ -21,6 +21,9 @@ import { vi } from "vitest";
  */
 type StateType = "running" | "interrupted" | "idling";
 
+/** Guard against a phase queue that advances forever without reaching its requested boundary. */
+const MAX_PHASE_TRANSITIONS_PER_WAIT = 10_000;
+
 /**
  * The PhaseInterceptor is a wrapper around the `BattleScene`'s {@linkcode PhaseManager}.
  * It allows tests to exert finer control over the phase system, providing logging, manual advancing, and other helpful utilities.
@@ -32,6 +35,8 @@ export class PhaseInterceptor {
    * Entries are appended each time {@linkcode run} is called, and can be cleared manually with {@linkcode clearLogs}.
    */
   public readonly log: PhaseString[] = [];
+  /** Wall time spent inside each real phase start/end lifecycle. */
+  public readonly timings: Array<{ phase: PhaseString; ms: number }> = [];
   /**
    * The interceptor's current state.
    * @see {@linkcode StateType}
@@ -80,33 +85,32 @@ export class PhaseInterceptor {
     let currentPhase = pm.getCurrentPhase();
     let didLog = false;
 
-    // NB: This has to use an interval to wait for UI prompts to activate
-    // since our UI code effectively stalls when waiting for input.
-    // This entire function can likely be made synchronous once UI code is moved to a separate scene.
     try {
-      await vi.waitUntil(
-        async () => {
-          // If we were interrupted by a UI prompt, we assume that the calling code will queue inputs to
-          // end the current phase manually, so we just wait for the phase to end from the caller.
-          if (this.state === "interrupted") {
-            if (!didLog) {
-              this.doLog("PhaseInterceptor.to: Waiting for phase to end after being interrupted!");
-              didLog = true;
-            }
-            return false;
-          }
+      let transitions = 0;
+      while (true) {
+        currentPhase = pm.getCurrentPhase();
+        if (currentPhase.is(this.target)) {
+          break;
+        }
 
-          currentPhase = pm.getCurrentPhase();
-          if (currentPhase.is(this.target)) {
-            return true;
+        // A prompt can interrupt a phase while the caller drives its public UI.
+        // Give that single parked phase the normal watchdog budget. Completed
+        // phases reset the budget instead of sharing one timeout across an
+        // entire (potentially expensive) hardest-AI triple turn.
+        if (this.state === "interrupted") {
+          if (!didLog) {
+            this.doLog("PhaseInterceptor.to: Waiting for phase to end after being interrupted!");
+            didLog = true;
           }
+          await vi.waitUntil(() => this.state !== "interrupted", { interval: 0, timeout: TEST_TIMEOUT });
+          continue;
+        }
 
-          // Current phase is different; run and wait for it to finish.
-          await this.run(currentPhase);
-          return false;
-        },
-        { interval: 0, timeout: TEST_TIMEOUT },
-      );
+        if (++transitions > MAX_PHASE_TRANSITIONS_PER_WAIT) {
+          throw new Error(`phase transition budget exceeded before reaching ${this.target}`);
+        }
+        await this.run(currentPhase);
+      }
     } catch (err) {
       // A timeout here is a soft-lock / freeze: the target phase was never reached
       // because something is waiting on input that never came. Surface the CURRENT
@@ -152,20 +156,21 @@ export class PhaseInterceptor {
     const pm = this.scene.phaseManager;
     let currentPhase = pm.getCurrentPhase();
     try {
-      await vi.waitUntil(
-        async () => {
-          if (this.state === "interrupted") {
-            return false;
-          }
-          currentPhase = pm.getCurrentPhase();
-          if (targetSet.has(currentPhase.phaseName)) {
-            return true;
-          }
-          await this.run(currentPhase);
-          return false;
-        },
-        { interval: 0, timeout: TEST_TIMEOUT },
-      );
+      let transitions = 0;
+      while (true) {
+        currentPhase = pm.getCurrentPhase();
+        if (targetSet.has(currentPhase.phaseName)) {
+          break;
+        }
+        if (this.state === "interrupted") {
+          await vi.waitUntil(() => this.state !== "interrupted", { interval: 0, timeout: TEST_TIMEOUT });
+          continue;
+        }
+        if (++transitions > MAX_PHASE_TRANSITIONS_PER_WAIT) {
+          throw new Error(`phase transition budget exceeded before reaching one of ${targets.join(", ")}`);
+        }
+        await this.run(currentPhase);
+      }
     } catch (err) {
       const stuckPhase = pm.getCurrentPhase()?.phaseName ?? "(none)";
       const uiMode = getEnumStr(UiMode, this.scene.ui.getMode());
@@ -184,6 +189,7 @@ export class PhaseInterceptor {
    * @returns A Promise that resolves when the phase has completed running.
    */
   private async run(currentPhase: Phase): Promise<void> {
+    const started = performance.now();
     try {
       this.state = "running";
       this.logPhase(currentPhase.phaseName);
@@ -193,6 +199,8 @@ export class PhaseInterceptor {
       throw error instanceof Error
         ? error
         : new Error(`Unknown error occurred while running phase ${currentPhase.phaseName}!\nError: ${inspect(error)}`);
+    } finally {
+      this.timings.push({ phase: currentPhase.phaseName, ms: performance.now() - started });
     }
   }
 
@@ -247,6 +255,7 @@ export class PhaseInterceptor {
    */
   public clearLogs(): void {
     this.log.splice(0, this.log.length);
+    this.timings.splice(0, this.timings.length);
   }
 
   /**

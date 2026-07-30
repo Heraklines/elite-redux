@@ -7,7 +7,12 @@ import {
   isVersusSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
-import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import {
+  ER_DOOMED_SWITCH_THRESHOLD_MULT,
+  type ErThreat,
+  erAssessThreat,
+  getErAiProfile,
+} from "#data/elite-redux/er-enemy-ai";
 import { isReplayRecording, recordReplayCommand } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -233,6 +238,7 @@ export class EnemyCommandPhase extends FieldPhase {
     const battle = globalScene.currentBattle;
 
     const trainer = battle.trainer;
+    let assessedThreat: ErThreat | undefined;
 
     // Any multi format + ANY ally (a triple has two; was `double` + first-ally-only, so
     // Commander never skipped the hidden mon's turn in triples): the acting mon is hiding
@@ -280,8 +286,8 @@ export class EnemyCommandPhase extends FieldPhase {
           // it can't outrun the hit), pivot more eagerly - drop the threshold so a
           // benched wall triggers the switch. The active dies for nothing otherwise.
           if (erAi.active) {
-            const threat = erAssessThreat(enemyPokemon);
-            if (threat.incomingKO && !threat.outspeeds) {
+            assessedThreat = erAssessThreat(enemyPokemon);
+            if (assessedThreat.incomingKO && !assessedThreat.outspeeds) {
               switchThreshold *= ER_DOOMED_SWITCH_THRESHOLD_MULT;
             }
           }
@@ -306,7 +312,7 @@ export class EnemyCommandPhase extends FieldPhase {
     }
 
     /** Select a move to use (and a target to use it against, if applicable) */
-    const nextMove = enemyPokemon.getNextMove();
+    const nextMove = enemyPokemon.getNextMove(assessedThreat);
 
     if (this.shouldTera(enemyPokemon)) {
       globalScene.currentBattle.preTurnCommands[globalScene.currentBattle.arrangement.enemyOffset + this.fieldIndex] = {

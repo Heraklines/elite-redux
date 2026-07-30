@@ -6,6 +6,7 @@ import { assertInversePair, buildGhostPair, readGhostFixture } from "./ghost-gau
 
 export const GHOST_EVAL_CONTROLLERS = [
   "selected-tree-v1",
+  "stacked-tree-v1",
   "outcome-tree-v1",
   "candidate-transformer-v1",
   "smart-default-v1",

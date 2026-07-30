@@ -18,10 +18,12 @@ megabytes and are not selected runtime candidates. A second data pass runs the
 selected tree with deterministic 15% legal-action exploration. Retraining keeps
 the expert rows plus successful exploratory trajectories.
 
-The tree lane exports two finalists. `selected-model.json` optimizes held-out
+The tree lane exports three challengers. `selected-model.json` optimizes held-out
 action imitation. `outcome-selected-model.json` reduces the weight of decisions
 from losing episodes and selects among those candidates using held-out
-successful episodes. Only the real-engine gauntlet determines which is stronger.
+successful episodes. `stacked_tree_ensemble.json` combines the compact tree
+artifacts using roster-partitioned out-of-fold logistic stacking. Only the
+real-engine gauntlet determines which is stronger.
 This is a small cross-entropy-style policy iteration against the game's hardest
 Hell trainer AI. It is not symmetric model self-play yet.
 
@@ -35,11 +37,13 @@ bundles do not import Torch.
 The fixed gauntlet uses 100 sanitized rosters from actual winning Hell ghost
 runs, drawn from 28 anonymous accounts held out at the player level. The
 self-play pool contains another 163 winning rosters from 45 different accounts;
-no evaluation player or roster enters fitting. Training matchups use a balanced
-round-robin order and consecutive episodes are strict inverse legs. The fixed
+no evaluation player or roster enters fitting. Training rosters are assigned to
+five disjoint source folds before matchups are generated; offline train/test and
+stacking folds therefore never share a roster. Matchups use balanced round-robin
+orders within each fold, and consecutive episodes are strict inverse legs. The fixed
 gauntlet also plays every pair twice: A as the player against B, then B as the
 player against A. The imitation-selected tree, outcome-weighted tree, candidate
-transformer, and `smart-default-v1` control each play all 100 legs. Evaluation
+transformer, stacked tree, and `smart-default-v1` control each play all 100 legs. Evaluation
 batches preserve both A-vs-B and B-vs-A while reusing one warm engine process per
 shard.
 

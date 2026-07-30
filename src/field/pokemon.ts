@@ -129,6 +129,7 @@ import {
   type ErDepth1Move,
   type ErHazardKind,
   type ErHazards,
+  type ErThreat,
   erAssessThreat,
   erDepth1MoveScore,
   getErAiProfile,
@@ -9108,7 +9109,7 @@ export class EnemyPokemon extends Pokemon {
    * @returns this Pokemon's next move in the format {move, moveTargets}
    */
   // TODO: split this up and move it elsewhere
-  getNextMove(): TurnMove {
+  getNextMove(knownThreat?: ErThreat): TurnMove {
     // If this Pokemon has a usable move already queued, return it,
     // removing all unusable moves before it in the queue.
     const moveQueue = this.getMoveQueue();
@@ -9125,6 +9126,39 @@ export class EnemyPokemon extends Pokemon {
 
     // We went through the entire queue without a match; clear the entire thing.
     this.summonData.moveQueue = [];
+
+    // ER scoring asks for the same simulated outgoing hit in both the KO pre-pass
+    // and the real-damage ranker. Nothing can change during one command decision,
+    // so retain those pure simulated results only for this invocation.
+    const outgoingDamageCache = new Map<Pokemon, Map<Move, Map<boolean, number>>>();
+    const getSimulatedOutgoingDamage = (target: Pokemon, move: Move, isCritical: boolean): number => {
+      let moveCache = outgoingDamageCache.get(target);
+      if (!moveCache) {
+        moveCache = new Map();
+        outgoingDamageCache.set(target, moveCache);
+      }
+      let criticalCache = moveCache.get(move);
+      if (!criticalCache) {
+        criticalCache = new Map();
+        moveCache.set(move, criticalCache);
+      }
+      const cachedDamage = criticalCache.get(isCritical);
+      if (cachedDamage !== undefined) {
+        return cachedDamage;
+      }
+      const { damage } = target.getAttackDamage({
+        source: this,
+        move,
+        ignoreAbility: !target.waveData.abilityRevealed,
+        ignoreSourceAbility: false,
+        ignoreAllyAbility: !target.getAlly()?.waveData.abilityRevealed,
+        ignoreSourceAllyAbility: false,
+        isCritical,
+        simulated: true,
+      });
+      criticalCache.set(isCritical, damage);
+      return damage;
+    };
 
     // Filter out any moves this Pokemon cannot use
     let movePool = this.getMoveset().filter(m => m.isUsable(this, false, true)[0]);
@@ -9188,19 +9222,7 @@ export class EnemyPokemon extends Pokemon {
                   !globalScene.arena.isMoveWeatherCancelled(this, move)
                   && (move.applyConditions(this, p, -1)
                     || [MoveId.SUCKER_PUNCH, MoveId.UPPER_HAND, MoveId.THUNDERCLAP].includes(move.id));
-                return (
-                  doesNotFail
-                  && p.getAttackDamage({
-                    source: this,
-                    move,
-                    ignoreAbility: !p.waveData.abilityRevealed,
-                    ignoreSourceAbility: false,
-                    ignoreAllyAbility: !p.getAlly()?.waveData.abilityRevealed,
-                    ignoreSourceAllyAbility: false,
-                    isCritical,
-                    simulated: true,
-                  }).damage >= p.hp
-                );
+                return doesNotFail && getSimulatedOutgoingDamage(p, move, isCritical) >= p.hp;
               })
             );
           }, this);
@@ -9326,7 +9348,7 @@ export class EnemyPokemon extends Pokemon {
             if (useDepth1) {
               const oppMon = activeOpponents[0];
               // Worst incoming hit + speed read (fog-aware) - the maximin reply.
-              const threat = erAssessThreat(this);
+              const threat = knownThreat ?? erAssessThreat(this);
               const readBoosts = (p: Pokemon): ErBoostStages => ({
                 atk: p.getStatStage(Stat.ATK),
                 def: p.getStatStage(Stat.DEF),
@@ -9413,16 +9435,7 @@ export class EnemyPokemon extends Pokemon {
                 let myDamage = 0;
                 if (move.is("AttackMove")) {
                   const isCritical = move.hasAttr("CritOnlyAttr") || !!this.getTag(BattlerTagType.ALWAYS_CRIT);
-                  const { damage } = oppMon.getAttackDamage({
-                    source: this,
-                    move,
-                    ignoreAbility: !oppMon.waveData.abilityRevealed,
-                    ignoreSourceAbility: false,
-                    ignoreAllyAbility: !oppMon.getAlly()?.waveData.abilityRevealed,
-                    ignoreSourceAllyAbility: false,
-                    isCritical,
-                    simulated: true,
-                  });
+                  const damage = getSimulatedOutgoingDamage(oppMon, move, isCritical);
                   const acc = move.accuracy <= 0 ? 100 : Math.min(move.accuracy, 100);
                   myDamage = damage * (acc / 100);
                 }
@@ -9464,7 +9477,7 @@ export class EnemyPokemon extends Pokemon {
               // steering the AI toward a priority snipe.
               const threat =
                 koMoves.length === 0
-                  ? erAssessThreat(this)
+                  ? (knownThreat ?? erAssessThreat(this))
                   : { incomingKO: false, outspeeds: true, worstIncomingDamage: 0 };
 
               movePool.forEach((pokemonMove, moveIndex) => {
@@ -9484,16 +9497,7 @@ export class EnemyPokemon extends Pokemon {
                       continue;
                     }
                     const isCritical = move.hasAttr("CritOnlyAttr") || !!this.getTag(BattlerTagType.ALWAYS_CRIT);
-                    const { damage } = target.getAttackDamage({
-                      source: this,
-                      move,
-                      ignoreAbility: !target.waveData.abilityRevealed,
-                      ignoreSourceAbility: false,
-                      ignoreAllyAbility: !target.getAlly()?.waveData.abilityRevealed,
-                      ignoreSourceAllyAbility: false,
-                      isCritical,
-                      simulated: true,
-                    });
+                    const damage = getSimulatedOutgoingDamage(target, move, isCritical);
                     best = Math.max(best, damageToScore(damage, target.getMaxHp(), target.hp, move.accuracy));
                   }
                   // Slice 4 (doubles/triples): a spread move that also hits our own ally is

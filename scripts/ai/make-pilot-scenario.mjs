@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Build one deterministic combat-only episode from the held-out ghost training pool. */
+/* Build one deterministic combat-only episode from the source-disjoint ghost training pool. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";

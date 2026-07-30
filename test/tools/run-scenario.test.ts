@@ -160,15 +160,17 @@ import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import { Move } from "#moves/move";
 import type { CommandPhase } from "#phases/command-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
+import type { SelectTargetPhase } from "#phases/select-target-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import { AiNeuralPolicyClient } from "#test/tools/ai-neural-policy-client";
+import type { TurnMove } from "#types/turn-move";
 import type { AbstractOptionSelectUiHandler } from "#ui/handlers/abstract-option-select-ui-handler";
 import type { BiomeShopUiHandler } from "#ui/handlers/biome-shop-ui-handler";
 import type { ErMapUiHandler } from "#ui/handlers/er-map-ui-handler";
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
-import type { PartyUiHandler } from "#ui/party-ui-handler";
+import { PartyOption, type PartyUiHandler } from "#ui/party-ui-handler";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import Phaser from "phaser";
@@ -320,6 +322,7 @@ type RunnerInput = ScenarioSpec & {
 interface CombatBatchEpisode {
   id: string;
   splitGroupId?: string;
+  sourcePartitionId?: string;
   scenario: RunnerInput;
 }
 
@@ -387,6 +390,7 @@ const AI_DEX_HASH = (process.env.ER_AI_DEX_HASH ?? "unknown").trim();
 const AI_DICTIONARY_HASH = (process.env.ER_AI_DICTIONARY_HASH ?? "unknown").trim();
 let activeAiEpisodeId = (process.env.ER_AI_EPISODE_ID ?? INPUT?.run?.seed ?? "local-episode").trim();
 let activeAiSplitGroupId = activeAiEpisodeId;
+let activeAiSourcePartitionId = activeAiSplitGroupId;
 const AI_DATASET_RECORDS: ErCombatDatasetRecord[] = [];
 const AI_MODEL_PATH = (process.env.ER_AI_POLICY_MODEL ?? "").trim();
 const AI_NEURAL_MODEL_DIR = (process.env.ER_AI_NEURAL_POLICY_MODEL ?? "").trim();
@@ -712,6 +716,43 @@ function slotCommandIsAutomatic(game: GameManager, mon: Pokemon): boolean {
   return !(mon.getTag(BattlerTagType.FRENZY) && mon.hasAbilityWithAttr("SwitchWhileRampagingAbAttr"));
 }
 
+/** The exact automatic move CommandPhase will consume, if it can still require target confirmation. */
+function automaticTurnMove(game: GameManager, mon: Pokemon): TurnMove | null {
+  const commandMove = game.scene.currentBattle.turnCommands[mon.getBattlerIndex()]?.move;
+  if (commandMove?.move && commandMove.move !== MoveId.NONE) {
+    return commandMove;
+  }
+  const moveset = mon.getMoveset();
+  return (
+    mon.getMoveQueue().find(move => {
+      const movesetMove = moveset.find(candidate => candidate.moveId === move.move);
+      return (
+        move.move !== MoveId.NONE
+        && (isVirtual(move.useMode) || (movesetMove?.isUsable(mon, isIgnorePP(move.useMode), true)[0] ?? false))
+      );
+    }) ?? null
+  );
+}
+
+/**
+ * Automatic charge/rampage commands do not open COMMAND input, but the engine may
+ * still open SelectTargetPhase (notably for queued spread moves). Mirror that
+ * human-visible confirmation without inventing a new model decision.
+ */
+function registerAutomaticTarget(game: GameManager, mon: Pokemon, log: string[]): void {
+  const queued = automaticTurnMove(game, mon);
+  if (!queued) {
+    return;
+  }
+  const movePosition = mon.getMoveset().findIndex(move => move.moveId === queued.move);
+  if (movePosition < 0) {
+    return;
+  }
+  const target = allMoves[queued.move].isMultiTarget() ? undefined : queued.targets[0];
+  game.selectTarget(movePosition, target, mon.getBattlerIndex());
+  log.push(`slot${mon.getBattlerIndex()}: ${MoveId[queued.move]} [automatic target]`);
+}
+
 /** Whether `moveId` is in this mon's REAL moveset with PP left (mirrors MoveHelper.getMovePosition). */
 function moveInUsableMoveset(mon: Pokemon, moveId: MoveId): boolean {
   return mon.getMoveset().some(m => m.moveId === moveId && m.ppUsed < m.getMovePp());
@@ -732,7 +773,11 @@ function applyAction(
   forcedMove: MoveId | null,
   log: string[],
 ): void {
-  if (mon.isFainted() || slotCommandIsAutomatic(game, mon)) {
+  if (slotCommandIsAutomatic(game, mon)) {
+    registerAutomaticTarget(game, mon, log);
+    return;
+  }
+  if (mon.isFainted()) {
     return;
   }
   if (action.switch != null) {
@@ -980,6 +1025,7 @@ function buildAiDecisionForSlot({
     dictionaryHash: AI_DICTIONARY_HASH,
     episodeId: activeAiEpisodeId,
     splitGroupId: activeAiSplitGroupId,
+    sourcePartitionId: activeAiSourcePartitionId,
     jointActionId,
     decisionId: `${jointActionId}:${actorSlot}`,
     sourcePolicy,
@@ -1045,19 +1091,22 @@ function registerFaintSwitch(game: GameManager, overrideSlot: number | undefined
     UiMode.PARTY,
     () => {
       const party = game.scene.getPlayerParty();
-      const battlerCount = game.scene.currentBattle.getBattlerCount();
+      const handler = game.scene.ui.getHandler() as PartyUiHandler;
+      const overridePokemon = overrideSlot == null ? undefined : party[overrideSlot];
       const slot =
-        overrideSlot != null && party[overrideSlot]?.isAllowedInBattle()
+        overrideSlot != null
+        && overridePokemon != null
+        && partySlotCanReplace(game, handler, overridePokemon, overrideSlot)
           ? overrideSlot
-          : party.findIndex((p, i) => i >= battlerCount && p.isAllowedInBattle());
+          : party.findIndex((pokemon, index) => partySlotCanReplace(game, handler, pokemon, index));
       if (slot < 0) {
         return;
       }
-      const handler = game.scene.ui.getHandler() as PartyUiHandler;
-      handler.setCursor(slot);
-      handler.processInput(Button.ACTION); // select the bench mon
-      handler.processInput(Button.ACTION); // send out
-      log.push(`faint-switch -> party[${slot}]`);
+      const handled = drivePartySelection(game, slot);
+      if (handled) {
+        log.push(`faint-switch -> party[${slot}]`);
+      }
+      return handled;
     },
     // Registered post-hoc (only when a send-out is pending), so it fires at the imminent SwitchPhase.
     // Safety net: expire once we've reached the next turn / a post-battle phase without it firing, so
@@ -1850,6 +1899,8 @@ interface RunState {
   /** Last driven phase instance + mode, so consecutive same-name phases are distinct appearances. */
   lastDrivenPhase: object | null;
   lastDrivenMode: UiMode | null;
+  /** Distinguishes consecutive forced replacements that reuse one SwitchPhase and PARTY mode. */
+  lastDrivenPartyCallback: unknown;
   /** When an unhandled interactive menu was first seen (ms), for the stall watchdog. */
   stallSince: number;
   stallMode: string | null;
@@ -1858,6 +1909,9 @@ interface RunState {
   eggDriven: boolean;
   biomeShopDriven: boolean;
   driveError: unknown;
+  autopilotTicks: number;
+  partyTicks: number;
+  lastPartyAttempt: string | null;
 }
 
 function newRunState(policy: RunPolicy): RunState {
@@ -1871,6 +1925,7 @@ function newRunState(policy: RunPolicy): RunState {
     rewardCursor: 0,
     lastDrivenPhase: null,
     lastDrivenMode: null,
+    lastDrivenPartyCallback: null,
     stallSince: 0,
     stallMode: null,
     meDriven: false,
@@ -1878,6 +1933,9 @@ function newRunState(policy: RunPolicy): RunState {
     eggDriven: false,
     biomeShopDriven: false,
     driveError: null,
+    autopilotTicks: 0,
+    partyTicks: 0,
+    lastPartyAttempt: null,
   };
 }
 
@@ -1959,8 +2017,16 @@ function isAutopilotMode(phaseName: string, mode: UiMode): boolean {
         || phaseName === "AttemptCapturePhase"
         || phaseName === "RevivalBlessingPhase"
       );
+    case UiMode.TARGET_SELECT:
+      // Combat batches can inherit an engine-created target confirmation from a
+      // committed/virtual command for a slot that no longer takes model input.
+      return !!COMBAT_BATCH && phaseName === "SelectTargetPhase";
     case UiMode.SUMMARY:
-      return phaseName === "LearnMovePhase" || phaseName === "AttemptCapturePhase";
+      return (
+        phaseName === "LearnMovePhase"
+        || phaseName === "AttemptCapturePhase"
+        || (!!COMBAT_BATCH && phaseName === "SwitchPhase")
+      );
     case UiMode.MESSAGE:
       return phaseName.startsWith("MysteryEncounter") || phaseName === "PostMysteryEncounterPhase";
     default:
@@ -2147,46 +2213,109 @@ function driveLearnMoveSummary(game: GameManager, st: RunState): void {
   st.log.push(st.policy.learnMove ? `learn-move: forget slot ${slot}` : "learn-move: declined");
 }
 
-function driveParty(game: GameManager, st: RunState, phaseName: string): void {
+/**
+ * Select a party slot through the same public UI boundary as a player. The PARTY
+ * screen can be active while its fade or internal block still rejects input, so
+ * `false` deliberately leaves the current prompt/autopilot appearance retryable.
+ */
+function drivePartySelection(game: GameManager, slot: number): boolean {
+  const handler = game.scene.ui.getHandler() as PartyUiHandler;
+  const state = handler as unknown as {
+    cursor?: number;
+    options?: PartyOption[];
+    optionsMode?: boolean;
+  };
+  if (state.optionsMode === true) {
+    const sendOut = state.options?.indexOf(PartyOption.SEND_OUT) ?? -1;
+    if (state.cursor === slot && sendOut >= 0) {
+      // `setCursor` addresses the options cursor while this submenu is open.
+      handler.setCursor(sendOut);
+      return game.scene.ui.processInput(Button.ACTION);
+    }
+    // Consecutive triple replacements can reopen with the prior active slot's
+    // option menu still visible. Close that stale submenu before moving the
+    // party cursor; otherwise option 0 can be Summary instead of Send Out.
+    if (!game.scene.ui.processInput(Button.CANCEL)) {
+      return false;
+    }
+  }
+  handler.setCursor(slot);
+  if (!game.scene.ui.processInput(Button.ACTION)) {
+    return false;
+  }
+  if (game.scene.ui.getMode() !== UiMode.PARTY || !handler.active) {
+    return true;
+  }
+  const sendOut = state.options?.indexOf(PartyOption.SEND_OUT) ?? -1;
+  if (state.optionsMode !== true || sendOut < 0) {
+    return false;
+  }
+  handler.setCursor(sendOut);
+  return game.scene.ui.processInput(Button.ACTION);
+}
+
+/** Use the production party filter to avoid repeatedly choosing a bench mon this exact prompt rejects. */
+function partySlotCanSendOut(handler: PartyUiHandler, pokemon: Pokemon): boolean {
+  const getFilterResult = (
+    handler as unknown as { getFilterResult?: (option: PartyOption, candidate: Pokemon) => string | null }
+  ).getFilterResult;
+  return !getFilterResult || getFilterResult.call(handler, PartyOption.SEND_OUT, pokemon) === null;
+}
+
+function partySlotCanReplace(game: GameManager, handler: PartyUiHandler, pokemon: Pokemon, index: number): boolean {
+  const battlerCount = game.scene.currentBattle.getBattlerCount();
+  const isNormalBench = index >= battlerCount;
+  const isOrphanedSoloPrefix = !game.scene.gameMode.isCoop && !game.scene.gameMode.isShowdown && !pokemon.isOnField();
+  return (
+    (isNormalBench || isOrphanedSoloPrefix) && pokemon.isAllowedInBattle() && partySlotCanSendOut(handler, pokemon)
+  );
+}
+
+function driveParty(game: GameManager, st: RunState, phaseName: string): boolean {
+  st.partyTicks++;
   const handler = game.scene.ui.getHandler() as PartyUiHandler;
   if (phaseName === "RevivalBlessingPhase") {
     const slot = game.scene.getPlayerParty().findIndex(pokemon => pokemon.isFainted());
     if (slot < 0) {
       throw new Error("Revival Blessing opened its party target menu without a fainted Pokemon");
     }
-    handler.setCursor(slot);
-    handler.processInput(Button.ACTION);
-    handler.processInput(Button.ACTION);
-    st.log.push(`revival-blessing -> party[${slot}]`);
-    return;
+    const handled = drivePartySelection(game, slot);
+    if (handled) {
+      st.log.push(`revival-blessing -> party[${slot}]`);
+    }
+    return handled;
   }
   if (phaseName === "SwitchPhase" || phaseName === "EnemyCommandPhase") {
     const party = game.scene.getPlayerParty();
-    const battlerCount = game.scene.currentBattle.getBattlerCount();
-    const slot = party.findIndex((p, i) => i >= battlerCount && p.isAllowedInBattle());
+    const slot = party.findIndex((pokemon, index) => partySlotCanReplace(game, handler, pokemon, index));
     if (slot < 0) {
-      return;
+      st.lastPartyAttempt = `${phaseName}: no legal bench slot`;
+      return true;
     }
-    handler.setCursor(slot);
-    handler.processInput(Button.ACTION);
-    handler.processInput(Button.ACTION);
-    st.log.push(`faint-switch → party[${slot}]`);
-    return;
+    const handled = drivePartySelection(game, slot);
+    st.lastPartyAttempt = `${phaseName}: slot=${slot} handled=${handled}`;
+    if (handled) {
+      st.log.push(`faint-switch → party[${slot}]`);
+    }
+    return handled;
   }
   if (phaseName === "AttemptCapturePhase") {
     // Party-full replace: RELEASE mode → pick the slot to release (keep = slot 0).
     const pol = st.policy.onCatchFull;
     const slot = typeof pol === "object" ? pol.replaceSlot : 0;
     handler.setCursor(slot);
-    handler.processInput(Button.ACTION);
-    st.log.push(`catch-full: replace slot ${slot}`);
-    return;
+    const handled = game.scene.ui.processInput(Button.ACTION);
+    if (handled) {
+      st.log.push(`catch-full: replace slot ${slot}`);
+    }
+    return handled;
   }
   // Reward party-target (SelectModifierPhase): apply the reward to the lead.
-  handler.setCursor(0);
-  handler.processInput(Button.ACTION);
-  handler.processInput(Button.ACTION);
-  st.log.push("reward-target → lead");
+  const handled = drivePartySelection(game, 0);
+  if (handled) {
+    st.log.push("reward-target → lead");
+  }
+  return handled;
 }
 
 function driveMysteryEncounter(game: GameManager, st: RunState): void {
@@ -2255,9 +2384,26 @@ function dispatchMenu(game: GameManager, st: RunState, phaseName: string, mode: 
       }
       return true;
     case UiMode.PARTY:
-      driveParty(game, st, phaseName);
-      return true;
+      return driveParty(game, st, phaseName);
+    case UiMode.TARGET_SELECT: {
+      // Explicit per-slot prompts carry the model's selected target and always
+      // win. Only confirm the handler default when this exact actor has no prompt
+      // (for example, a stale virtual command on a newly-fainted field slot).
+      if (game.promptHandler.hasMatchingPrompt()) {
+        return false;
+      }
+      const phase = game.scene.phaseManager.getCurrentPhase() as SelectTargetPhase;
+      const actor = phase.getPokemon().getBattlerIndex();
+      const handled = game.scene.ui.processInput(Button.ACTION);
+      if (handled) {
+        st.log.push(`slot${actor}: automatic target confirmation`);
+      }
+      return handled;
+    }
     case UiMode.SUMMARY:
+      if (COMBAT_BATCH && phaseName === "SwitchPhase") {
+        return game.scene.ui.processInput(Button.CANCEL);
+      }
       if (phaseName === "LearnMovePhase") {
         driveLearnMoveSummary(game, st);
       } else {
@@ -2287,6 +2433,7 @@ const STALL_MS = 4000; // how long an unhandled interactive menu may persist bef
 
 /** One autopilot tick: drive the current menu if it's one we own; watchdog otherwise. */
 function autopilotTick(game: GameManager, st: RunState): void {
+  st.autopilotTicks++;
   const ui = game.scene.ui;
   const mode = ui.getMode();
   const handler = ui.getHandler();
@@ -2302,17 +2449,49 @@ function autopilotTick(game: GameManager, st: RunState): void {
     game.scene.ui.processInput(Button.CANCEL); // egg summary dismisses on CANCEL once blockExit elapses
     st.lastDrivenPhase = null;
     st.lastDrivenMode = null;
+    st.lastDrivenPartyCallback = null;
     return;
   }
   if (mode === UiMode.EGG_HATCH_SCENE) {
     game.scene.ui.processInput(Button.ACTION); // skip the animated hatch scene
     st.lastDrivenPhase = null;
     st.lastDrivenMode = null;
+    st.lastDrivenPartyCallback = null;
+    return;
+  }
+
+  // Battle text can occasionally request an explicit player acknowledgement
+  // without inserting a MessagePhase (for example, an effect reached from
+  // MovePhase). A real player advances it through the public UI. Combat batches
+  // must do the same, but only after the handler proves it is ready; ordinary
+  // animated battle text keeps awaitingActionInput=false and is left alone.
+  if (COMBAT_BATCH && mode === UiMode.MESSAGE && handlerAwaitingInput(handler)) {
+    game.scene.ui.processInput(Button.ACTION);
+    st.lastDrivenPhase = null;
+    st.lastDrivenMode = null;
+    st.lastDrivenPartyCallback = null;
+    return;
+  }
+
+  // A rejected party option displays an acknowledgement prompt without changing
+  // the phase or mode. Clear it through the public UI before selecting another
+  // legal bench member.
+  if (mode === UiMode.PARTY && (handler as { awaitingActionInput?: unknown }).awaitingActionInput === true) {
+    game.scene.ui.processInput(Button.ACTION);
+    st.lastDrivenPhase = null;
+    st.lastDrivenMode = null;
+    st.lastDrivenPartyCallback = null;
     return;
   }
 
   if (isAutopilotMode(phaseName, mode)) {
-    if (phase === st.lastDrivenPhase && mode === st.lastDrivenMode) {
+    const partyCallback =
+      mode === UiMode.PARTY ? ((handler as unknown as { selectCallback?: unknown }).selectCallback ?? null) : null;
+    if (
+      phase === st.lastDrivenPhase
+      && mode === st.lastDrivenMode
+      && (mode !== UiMode.PARTY || partyCallback === st.lastDrivenPartyCallback)
+    ) {
       return; // already driven this appearance; wait for the transition it triggers
     }
     // The reward shop + ME/ intro MESSAGE handlers (AwaitableUiHandler) IGNORE input
@@ -2324,6 +2503,8 @@ function autopilotTick(game: GameManager, st: RunState): void {
     if (dispatchMenu(game, st, phaseName, mode)) {
       st.lastDrivenPhase = phase ?? null;
       st.lastDrivenMode = mode;
+      st.lastDrivenPartyCallback =
+        mode === UiMode.PARTY ? ((handler as unknown as { selectCallback?: unknown }).selectCallback ?? null) : null;
       st.stallSince = 0;
       st.stallMode = null;
     }
@@ -2333,6 +2514,7 @@ function autopilotTick(game: GameManager, st: RunState): void {
   // Not a menu we own. Reset the per-appearance guard so a repeat drivable menu re-fires.
   st.lastDrivenPhase = null;
   st.lastDrivenMode = null;
+  st.lastDrivenPartyCallback = null;
 
   // CATCH-ALL FUTURE-PROOFING: an interactive menu with no registered driver.
   if (isInteractiveMenuMode(mode) && phaseName !== "CommandPhase") {
@@ -2645,20 +2827,45 @@ function isTerminalRunPhase(game: GameManager): boolean {
   return phaseName === "TitlePhase" || phaseName === "GameOverPhase" || phaseName === "EndCardPhase";
 }
 
+/**
+ * Advance a combat-only batch through the current turn without waiting for an
+ * impossible TurnEndPhase after a wipe. Normal scenario tests retain the
+ * stricter GameManager.toEndOfTurn() contract.
+ */
+async function toCombatBatchTurnBoundary(game: GameManager): Promise<void> {
+  const boundary = await game.phaseInterceptor.toFirst([
+    "TurnEndPhase",
+    "GameOverPhase",
+    "TitlePhase",
+    "EndCardPhase",
+  ] as const);
+  if (boundary === "TurnEndPhase") {
+    await game.phaseInterceptor.to("TurnEndPhase");
+  }
+}
+
 /** Play the CURRENT battle wave to completion (victory / wipe / maxTurns). */
 async function playWaveTurns(
   game: GameManager,
   st: RunState,
   opts: { script?: TurnAction[] | undefined; forcedMove?: MoveId | null | undefined; maxTurns: number; quiet: boolean },
   fullLog: string[],
-): Promise<{ won: boolean; wiped: boolean; turns: number; maxHits: number; runEnded?: boolean }> {
+): Promise<{
+  won: boolean;
+  wiped: boolean;
+  turns: number;
+  maxHits: number;
+  enemyMovesUsed: string[];
+  runEnded?: boolean;
+}> {
   let won = false;
   let wiped = false;
   let turns = 0;
   let maxHits = 0;
+  const enemyMovesUsed: string[] = [];
 
   if (game.isVictory()) {
-    return { won: true, wiped: false, turns: 0, maxHits: 0 };
+    return { won: true, wiped: false, turns: 0, maxHits: 0, enemyMovesUsed };
   }
 
   for (let turn = 1; turn <= opts.maxTurns; turn++) {
@@ -2687,7 +2894,11 @@ async function playWaveTurns(
       await forceEnemyActions(game, action, st.log);
     }
     try {
-      await game.toEndOfTurn();
+      if (COMBAT_BATCH) {
+        await toCombatBatchTurnBoundary(game);
+      } else {
+        await game.toEndOfTurn();
+      }
     } catch (e) {
       // A mid-turn RUN END (wipe -> GameOverPhase -> TitlePhase, or the post-victory
       // credits) never reaches TurnEndPhase - that is an OUTCOME, not a soft-lock.
@@ -2697,19 +2908,49 @@ async function playWaveTurns(
           wiped: game.scene.getPlayerParty().every(p => p.isFainted()),
           turns,
           maxHits,
+          enemyMovesUsed,
           runEnded: true,
         };
       }
       const pendingPrompts = (
         game.promptHandler as unknown as {
-          prompts?: Array<{ phaseTarget?: string; mode?: UiMode }>;
+          prompts?: Array<{ phaseTarget?: string; mode?: UiMode; debugLabel?: string }>;
         }
       ).prompts;
       const promptSummary = pendingPrompts
-        ?.map(prompt => `${prompt.phaseTarget ?? "?"}/${getUiModeName(prompt.mode ?? UiMode.MESSAGE)}`)
+        ?.map(
+          prompt =>
+            `${prompt.phaseTarget ?? "?"}/${getUiModeName(prompt.mode ?? UiMode.MESSAGE)}`
+            + `${prompt.debugLabel ? ` (${prompt.debugLabel})` : ""}`,
+        )
         .join(", ");
+      const currentPhase = game.scene.phaseManager.getCurrentPhase();
+      const targetActor =
+        currentPhase?.phaseName === "SelectTargetPhase"
+          ? (currentPhase as SelectTargetPhase).getPokemon().getBattlerIndex()
+          : null;
+      const uiDebug = game.scene.ui as unknown as { overlayActive?: boolean };
+      const fieldDebug = game.scene.getPlayerField().map((mon, fieldSlot) => ({
+        fieldSlot,
+        id: mon.id,
+        species: mon.species.name,
+        battlerIndex: mon.getBattlerIndex(),
+        hp: mon.hp,
+        fainted: mon.isFainted(),
+        active: mon.isActive(true),
+        queue: mon.getMoveQueue().map(move => ({
+          move: MoveId[move.move],
+          targets: move.targets,
+          useMode: MoveUseMode[move.useMode],
+        })),
+        command: game.scene.currentBattle.turnCommands[mon.getBattlerIndex()] ?? null,
+      }));
       throw new Error(
         `${e instanceof Error ? e.message : String(e)}`
+          + `\nEpisode: ${activeAiEpisodeId || "(none)"}`
+          + `\nCurrent target actor: ${targetActor ?? "(none)"}; handlerActive=${game.scene.ui.getHandler()?.active === true}; overlayActive=${uiDebug.overlayActive === true}`
+          + `\nPlayer field: ${JSON.stringify(fieldDebug)}`
+          + `\nRecent phases: ${game.phaseInterceptor.log.slice(-30).join(" -> ")}`
           + `\nRecent combat actions: ${st.log.slice(-12).join(" | ") || "(none)"}`
           + `\nPending prompts: ${promptSummary || "(none)"}`,
       );
@@ -2718,6 +2959,12 @@ async function playWaveTurns(
     game.textInterceptor.clearLogs();
     for (const m of [...game.scene.getPlayerField(), ...game.scene.getEnemyField()]) {
       maxHits = Math.max(maxHits, m.turnData?.hitCount ?? 0);
+    }
+    for (const enemy of game.scene.getEnemyField()) {
+      const lastMove = enemy.getLastXMoves(1)[0];
+      if (lastMove?.move != null) {
+        enemyMovesUsed.push(MoveId[lastMove.move]);
+      }
     }
     if (!opts.quiet) {
       console.log("STATE", JSON.stringify(snapshot(game)));
@@ -2740,6 +2987,7 @@ async function playWaveTurns(
             wiped: game.scene.getPlayerParty().every(p => p.isFainted()),
             turns,
             maxHits,
+            enemyMovesUsed,
             runEnded: true,
           };
         }
@@ -2747,7 +2995,7 @@ async function playWaveTurns(
       }
     }
   }
-  return { won, wiped, turns, maxHits };
+  return { won, wiped, turns, maxHits, enemyMovesUsed };
 }
 
 /**
@@ -2910,7 +3158,63 @@ interface CombatBatchEpisodeResult {
   bootMs: number;
   combatMs: number;
   decisions: number;
+  enemyMovesUsed: string[];
+  phaseMs: Record<string, number>;
+  slowPhases: Array<{ phase: string; ms: number }>;
   progressionPhaseEntries: number;
+}
+
+function combatBatchFailureContext(game: GameManager, st: RunState): string {
+  const handler = game.scene.ui.getHandler() as unknown as Record<string, unknown>;
+  const prompts = (
+    game.promptHandler as unknown as {
+      prompts?: Array<{ phaseTarget?: string; mode?: UiMode; debugLabel?: string }>;
+    }
+  ).prompts;
+  const handlerState = {
+    type: (handler as unknown as { constructor?: { name?: string } }).constructor?.name ?? "unknown",
+    active: handler?.active,
+    awaitingActionInput: handler?.awaitingActionInput,
+    blockInput: handler?.blockInput,
+    pendingPrompt: !!handler?.pendingPrompt,
+    optionsMode: handler?.optionsMode,
+    partyUiMode: handler?.partyUiMode,
+    fieldIndex: handler?.fieldIndex,
+    cursor: handler?.cursor,
+    optionsCursor: handler?.optionsCursor,
+    options: Array.isArray(handler?.options)
+      ? (handler.options as number[]).map(option => PartyOption[option] ?? option)
+      : undefined,
+    hasSelectCallback: typeof handler?.selectCallback === "function",
+    sameDrivenPhase: game.scene.phaseManager.getCurrentPhase() === st.lastDrivenPhase,
+    sameDrivenMode: game.scene.ui.getMode() === st.lastDrivenMode,
+    sameDrivenCallback: handler?.selectCallback === st.lastDrivenPartyCallback,
+  };
+  const getFilterResult = handler?.getFilterResult as
+    | ((option: PartyOption, candidate: Pokemon) => string | null)
+    | undefined;
+  const party = game.scene.getPlayerParty().map((pokemon, index) => ({
+    index,
+    id: pokemon.id,
+    species: pokemon.species.name,
+    hp: pokemon.hp,
+    fainted: pokemon.isFainted(),
+    active: pokemon.isActive(true),
+    allowed: pokemon.isAllowedInBattle(),
+    sendOutFilter: getFilterResult?.call(handler, PartyOption.SEND_OUT, pokemon) ?? null,
+  }));
+  const pendingPrompts = prompts?.map(prompt => ({
+    phase: prompt.phaseTarget,
+    mode: prompt.mode == null ? undefined : getUiModeName(prompt.mode),
+    label: prompt.debugLabel,
+  }));
+  return (
+    `\nHandler: ${JSON.stringify(handlerState)}`
+    + `\nParty: ${JSON.stringify(party)}`
+    + `\nRecent actions: ${st.log.slice(-20).join(" | ") || "(none)"}`
+    + `\nAutopilot: ${JSON.stringify({ ticks: st.autopilotTicks, partyTicks: st.partyTicks, lastPartyAttempt: st.lastPartyAttempt, driveError: st.driveError instanceof Error ? st.driveError.message : st.driveError })}`
+    + `\nPending prompts: ${JSON.stringify(pendingPrompts ?? [])}`
+  );
 }
 
 function assertCombatOnlyEpisode(episode: CombatBatchEpisode): void {
@@ -2938,6 +3242,7 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
     assertCombatOnlyEpisode(episode);
     activeAiEpisodeId = episode.id;
     activeAiSplitGroupId = episode.splitGroupId?.trim() || episode.id;
+    activeAiSourcePartitionId = episode.sourcePartitionId?.trim() || activeAiSplitGroupId;
     const recordStart = AI_DATASET_RECORDS.length;
     const bootStart = performance.now();
     const game = await launchScenario(phaserGame, episode.scenario, { realRng: REAL_RNG });
@@ -2946,18 +3251,37 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
     const state = newRunState(buildPolicy(episode.scenario, true));
     const stopAutopilot = installMenuAutopilot(game, state);
     const fullLog: string[] = [];
-    const result = await playWaveTurns(
-      game,
-      state,
-      { forcedMove: FORCED_MOVE, maxTurns: MAX_TURNS, quiet: true },
-      fullLog,
-    ).finally(stopAutopilot);
+    let result: Awaited<ReturnType<typeof playWaveTurns>>;
+    try {
+      result = await playWaveTurns(game, state, { forcedMove: FORCED_MOVE, maxTurns: MAX_TURNS, quiet: true }, fullLog);
+    } catch (error) {
+      throw new Error(
+        `${episode.id}: ${error instanceof Error ? error.message : String(error)}`
+          + combatBatchFailureContext(game, state),
+      );
+    } finally {
+      stopAutopilot();
+    }
     const combatMs = Math.round(performance.now() - combatStart);
     const currentPhase = game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "";
     const forbiddenProgressionPhases = new Set(["SelectModifierPhase", "BiomeShopPhase", "NewBattlePhase"]);
     const progressionPhaseEntries = game.phaseInterceptor.log.filter(phase =>
       forbiddenProgressionPhases.has(phase),
     ).length;
+    const phaseMs = Object.fromEntries(
+      [
+        ...game.phaseInterceptor.timings.reduce(
+          (totals, timing) => totals.set(timing.phase, (totals.get(timing.phase) ?? 0) + timing.ms),
+          new Map<string, number>(),
+        ),
+      ]
+        .sort((a, b) => b[1] - a[1])
+        .map(([phase, ms]) => [phase, Math.round(ms)]),
+    );
+    const slowPhases = game.phaseInterceptor.timings
+      .map(timing => ({ phase: timing.phase, ms: Math.round(timing.ms) }))
+      .sort((a, b) => b.ms - a.ms)
+      .slice(0, 20);
     if (currentPhase === "SelectModifierPhase" || progressionPhaseEntries > 0) {
       throw new Error(`${episode.id}: combat-only worker entered a reward or progression phase`);
     }
@@ -2977,6 +3301,9 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
       bootMs,
       combatMs,
       decisions,
+      enemyMovesUsed: result.enemyMovesUsed,
+      phaseMs,
+      slowPhases,
       progressionPhaseEntries,
     });
     console.log(
@@ -3226,6 +3553,7 @@ function appendAiEpisodeTerminal(result: {
     dictionaryHash: AI_DICTIONARY_HASH,
     episodeId: activeAiEpisodeId,
     splitGroupId: activeAiSplitGroupId,
+    sourcePartitionId: activeAiSourcePartitionId,
     outcome: result.outcome,
     startWave: result.startWave,
     finalWave: result.finalWave,

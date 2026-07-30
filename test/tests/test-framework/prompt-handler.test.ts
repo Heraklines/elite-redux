@@ -59,7 +59,7 @@ describe("Test Utils - PromptHandler", () => {
   function onNextPrompt(
     target: string,
     mode: UiMode,
-    callback: () => void,
+    callback: () => void | boolean,
     expireFn?: () => boolean,
     awaitingActionInput = false,
     options: UIPromptOptions = {},
@@ -101,6 +101,19 @@ describe("Test Utils - PromptHandler", () => {
       expect(callback1).toHaveBeenCalled();
       expect(callback2).not.toHaveBeenCalled();
       expect(promptHandler["prompts"]).toHaveLength(1);
+    });
+
+    it("should retry a matching prompt when the public UI rejects its input", () => {
+      const retryingCallback = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+      onNextPrompt("testDialoguePhase", UiMode.TEST_DIALOGUE, retryingCallback);
+
+      promptHandler["doPromptCheck"]();
+      expect(retryingCallback).toHaveBeenCalledOnce();
+      expect(promptHandler["prompts"]).toHaveLength(1);
+
+      promptHandler["doPromptCheck"]();
+      expect(retryingCallback).toHaveBeenCalledTimes(2);
+      expect(promptHandler["prompts"]).toHaveLength(0);
     });
 
     it.each<{ reason: string; callback: () => void }>([
@@ -176,6 +189,31 @@ describe("Test Utils - PromptHandler", () => {
       expect(callback1).not.toHaveBeenCalled();
       expect(callback2).not.toHaveBeenCalled();
       expect(promptHandler["prompts"]).toHaveLength(2);
+    });
+
+    it("should keep an out-of-order prompt in place when the public UI rejects its input", () => {
+      const retryingCallback = vi.fn().mockReturnValue(false);
+      onNextPrompt("wrong phase", UiMode.ACHIEVEMENTS, callback1);
+      onNextPrompt("testDialoguePhase", UiMode.TEST_DIALOGUE, retryingCallback, undefined, false, {
+        allowOutOfOrder: true,
+        matchFn: () => true,
+      });
+
+      promptHandler["doPromptCheck"]();
+
+      expect(callback1).not.toHaveBeenCalled();
+      expect(retryingCallback).toHaveBeenCalledOnce();
+      expect(promptHandler["prompts"]).toHaveLength(2);
+    });
+
+    it("should report only prompts matching the exact current surface", () => {
+      onNextPrompt("wrong phase", UiMode.ACHIEVEMENTS, callback1);
+      expect(promptHandler.hasMatchingPrompt()).toBe(false);
+
+      onNextPrompt("testDialoguePhase", UiMode.TEST_DIALOGUE, callback2, undefined, false, {
+        matchFn: () => true,
+      });
+      expect(promptHandler.hasMatchingPrompt()).toBe(true);
     });
   });
 });

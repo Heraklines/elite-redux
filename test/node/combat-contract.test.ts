@@ -17,6 +17,7 @@ import {
   extractErCombatCandidateFeatures,
 } from "#data/elite-redux/ai/combat-features";
 import {
+  type ErSingleTreeModelArtifact,
   type ErTreeModelArtifact,
   scoreErTreeModel,
   validateErTreeModel,
@@ -212,5 +213,63 @@ describe("ER combat AI contract", () => {
     expect(validateErTreeModel(model)).toEqual([]);
     expect(scoreErTreeModel(model, [0, ...new Array(model.featureCount - 1).fill(0)])).toBe(0.2);
     expect(scoreErTreeModel(model, [1, ...new Array(model.featureCount - 1).fill(0)])).toBe(0.8);
+  });
+
+  it("scores and validates a stacked neutral tree ensemble", () => {
+    const member = (name: string, left: number, right: number): ErSingleTreeModelArtifact => ({
+      schemaVersion: 1,
+      featureSchemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
+      featureCount: ER_COMBAT_FEATURE_NAMES.length,
+      modelName: name,
+      modelType: "sklearn_forest",
+      aggregation: "mean",
+      baseScore: 0,
+      trees: [
+        [
+          { feature: 0, threshold: 0.5, left: 1, right: 2 },
+          { feature: -1, threshold: 0, left: -1, right: -1, value: left },
+          { feature: -1, threshold: 0, left: -1, right: -1, value: right },
+        ],
+      ],
+    });
+    const model: ErTreeModelArtifact = {
+      schemaVersion: 2,
+      featureSchemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
+      featureCount: ER_COMBAT_FEATURE_NAMES.length,
+      modelName: "unit-stack",
+      modelType: "stacked_tree_ensemble",
+      members: [member("first", 0, 1), member("second", 1, 3)],
+      memberMeans: [0.5, 2],
+      memberScales: [0.5, 1],
+      weights: [2, -0.5],
+      intercept: 0.25,
+    };
+    expect(validateErTreeModel(model)).toEqual([]);
+    expect(scoreErTreeModel(model, [0, ...new Array(model.featureCount - 1).fill(0)])).toBe(-1.25);
+    expect(scoreErTreeModel(model, [1, ...new Array(model.featureCount - 1).fill(0)])).toBe(1.75);
+  });
+
+  it("reports malformed stacked artifacts without throwing", () => {
+    const malformed = {
+      schemaVersion: 2,
+      featureSchemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
+      featureCount: ER_COMBAT_FEATURE_NAMES.length,
+      modelName: "malformed-stack",
+      modelType: "stacked_tree_ensemble",
+      members: null,
+      memberMeans: "missing",
+      memberScales: null,
+      weights: {},
+      intercept: 0,
+    } as unknown as ErTreeModelArtifact;
+
+    expect(validateErTreeModel(malformed)).toEqual(
+      expect.arrayContaining([
+        "stacked tree artifact members must be an array",
+        "stacked tree artifact member means must be an array",
+        "stacked tree artifact member scales must be an array",
+        "stacked tree artifact weights must be an array",
+      ]),
+    );
   });
 });

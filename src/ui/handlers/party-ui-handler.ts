@@ -1772,7 +1772,15 @@ export class PartyUiHandler extends MessageUiHandler {
       case PartyUiMode.SWITCH:
       case PartyUiMode.FAINT_SWITCH:
       case PartyUiMode.POST_BATTLE_SWITCH:
-        if (this.cursor >= globalScene.currentBattle.getBattlerCount()) {
+        if (
+          this.cursor >= globalScene.currentBattle.getBattlerCount()
+          || (this.partyUiMode === PartyUiMode.FAINT_SWITCH
+            && !globalScene.gameMode.isCoop
+            && !globalScene.gameMode.isShowdown
+            && this.cursor !== this.fieldIndex
+            && pokemon.isAllowedInBattle()
+            && !pokemon.isOnField())
+        ) {
           const allowBatonModifierSwitch = this.allowBatonModifierSwitch();
           const isBatonPassMove = this.isBatonPassMove();
 

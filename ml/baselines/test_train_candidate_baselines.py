@@ -5,11 +5,14 @@ import unittest
 from pathlib import Path
 
 import numpy as np
+from sklearn.ensemble import HistGradientBoostingClassifier
 
 from train_candidate_baselines import (
     artifact_scores,
+    fit_stacked_tree_ensemble,
     ordered_group_sizes,
     record_split_group,
+    record_source_partition,
     select_elite_rollouts,
     split_groups,
     validate_data_dictionary,
@@ -54,6 +57,13 @@ class CandidateBaselineContractTest(unittest.TestCase):
             record_split_group({"episodeId": "pilot-20", "splitGroupId": "explicit"}),
             "explicit",
         )
+        self.assertEqual(
+            record_source_partition(
+                {"episodeId": "pilot-20", "splitGroupId": "pair", "sourcePartitionId": "roster-fold"}
+            ),
+            "roster-fold",
+        )
+        self.assertEqual(record_source_partition({"episodeId": "pilot-20", "splitGroupId": "pair"}), "pair")
 
     def test_group_split_has_no_matchup_overlap(self) -> None:
         train, test = split_groups(["a", "a", "b", "b", "c", "c"], 7)
@@ -77,6 +87,78 @@ class CandidateBaselineContractTest(unittest.TestCase):
         }
         scores = artifact_scores(artifact, np.asarray([[0.0], [1.0]], dtype=np.float32))
         np.testing.assert_allclose(scores, [-0.25, 1.25])
+
+    def test_stacked_tree_artifact_combines_standardized_member_scores(self) -> None:
+        first = {
+            "schemaVersion": 1,
+            "aggregation": "sum_raw",
+            "baseScore": 0.0,
+            "trees": [[{"value": 1.0}]],
+        }
+        second = {
+            "schemaVersion": 1,
+            "aggregation": "sum_raw",
+            "baseScore": 0.0,
+            "trees": [[
+                {"feature": 0, "threshold": 0.5, "left": 1, "right": 2},
+                {"value": 0.0},
+                {"value": 4.0},
+            ]],
+        }
+        stack = {
+            "schemaVersion": 2,
+            "members": [first, second],
+            "memberMeans": [0.5, 2.0],
+            "memberScales": [0.5, 1.0],
+            "weights": [2.0, -0.5],
+            "intercept": 0.25,
+        }
+        scores = artifact_scores(stack, np.asarray([[0.0], [1.0]], dtype=np.float32))
+        np.testing.assert_allclose(scores, [3.25, 1.25])
+
+    def test_stacked_tree_training_uses_group_fold_predictions(self) -> None:
+        x = np.asarray([[candidate, group] for group in range(8) for candidate in (0.0, 1.0)], dtype=np.float32)
+        y = np.asarray([0, 1] * 8)
+        decision_ids = [f"decision-{group}" for group in range(8) for _ in range(2)]
+        split_groups = [f"pair-{group}" for group in range(8) for _ in range(2)]
+        train_mask = np.asarray([group < 6 for group in range(8) for _ in range(2)])
+        test_mask = ~train_mask
+        weights = np.full(len(y), 0.5)
+        templates = {
+            "first": (HistGradientBoostingClassifier(max_iter=3, max_leaf_nodes=2, min_samples_leaf=1), False),
+            "second": (HistGradientBoostingClassifier(max_iter=4, max_leaf_nodes=3, min_samples_leaf=1), False),
+        }
+        member = {
+            "schemaVersion": 1,
+            "featureSchemaVersion": 1,
+            "featureCount": 2,
+            "modelName": "member",
+            "modelType": "sklearn_hist_gradient_boosting",
+            "aggregation": "sum_raw",
+            "baseScore": 0.0,
+            "trees": [[
+                {"feature": 0, "threshold": 0.5, "left": 1, "right": 2},
+                {"value": -1.0},
+                {"value": 1.0},
+            ]],
+        }
+        result = fit_stacked_tree_ensemble(
+            templates,
+            {"first": member, "second": {**member, "modelName": "member-2"}},
+            x,
+            y,
+            decision_ids,
+            split_groups,
+            train_mask,
+            test_mask,
+            weights,
+        )
+        self.assertIsNotNone(result)
+        artifact, scores, _seconds, names = result
+        self.assertEqual(names, ["first", "second"])
+        self.assertEqual(artifact["schemaVersion"], 2)
+        self.assertEqual(scores.shape, (4,))
+        self.assertTrue(np.isfinite(scores).all())
 
     def test_elite_rollouts_retain_only_successful_exploration(self) -> None:
         decisions = [

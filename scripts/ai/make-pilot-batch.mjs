@@ -2,18 +2,36 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readGhostFixture } from "./ghost-gauntlet.mjs";
-import { buildPilotScenario, DEFAULT_SELF_PLAY_FIXTURE } from "./make-pilot-scenario.mjs";
+import { buildGhostSelfPlayScenario, readGhostFixture } from "./ghost-gauntlet.mjs";
+import { DEFAULT_SELF_PLAY_FIXTURE } from "./make-pilot-scenario.mjs";
+
+export const PILOT_SOURCE_PARTITION_COUNT = 5;
+
+function buildPartitionedPilotScenario(episodeIndex, fixture) {
+  const inversePairIndex = Math.floor(episodeIndex / 2);
+  const sourcePartitionIndex = inversePairIndex % PILOT_SOURCE_PARTITION_COUNT;
+  const partitionFixture = {
+    ...fixture,
+    teams: fixture.teams.filter((_, index) => index % PILOT_SOURCE_PARTITION_COUNT === sourcePartitionIndex),
+  };
+  const partitionEpisodeIndex = Math.floor(inversePairIndex / PILOT_SOURCE_PARTITION_COUNT) * 2 + (episodeIndex % 2);
+  return {
+    sourcePartitionId: `pilot-source-fold-${sourcePartitionIndex}`,
+    scenario: buildGhostSelfPlayScenario(partitionFixture, partitionEpisodeIndex),
+  };
+}
 
 export function buildPilotBatch(startEpisode, count, fixture) {
   return {
     version: 1,
     episodes: Array.from({ length: count }, (_, offset) => {
       const episodeIndex = startEpisode + offset;
+      const { sourcePartitionId, scenario } = buildPartitionedPilotScenario(episodeIndex, fixture);
       return {
         id: `pilot-${episodeIndex}`,
         splitGroupId: `pilot-pair-${Math.floor(episodeIndex / 2)}`,
-        scenario: buildPilotScenario(episodeIndex, fixture),
+        sourcePartitionId,
+        scenario,
       };
     }),
   };

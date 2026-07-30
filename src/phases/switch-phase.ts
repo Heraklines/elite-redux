@@ -337,7 +337,16 @@ export class SwitchPhase extends BattlePhase {
       this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
       fieldIndex,
       (slotIndex: number, option: PartyOption) => {
-        if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
+        const picked = globalScene.getPlayerParty()[slotIndex];
+        const isBenchSlot = slotIndex >= globalScene.currentBattle.getBattlerCount();
+        const isOrphanedSoloPrefix =
+          !globalScene.gameMode.isCoop
+          && !globalScene.gameMode.isShowdown
+          && slotIndex >= 0
+          && slotIndex !== fieldIndex
+          && picked?.isAllowedInBattle() === true
+          && !picked.isOnField();
+        if ((isBenchSlot || isOrphanedSoloPrefix) && slotIndex < 6) {
           const switchType = option === PartyOption.PASS_BATON ? SwitchType.BATON_PASS : this.switchType;
           globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
           this.maybePushVersusHostReplacementCheckpoint();

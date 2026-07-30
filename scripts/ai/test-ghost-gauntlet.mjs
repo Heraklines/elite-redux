@@ -77,6 +77,10 @@ assert.deepEqual(
   splitBatch.episodes.map(episode => episode.splitGroupId),
   ["pilot-pair-0", "pilot-pair-0", "pilot-pair-1", "pilot-pair-1"],
 );
+assert.deepEqual(
+  splitBatch.episodes.map(episode => episode.sourcePartitionId),
+  ["pilot-source-fold-0", "pilot-source-fold-0", "pilot-source-fold-1", "pilot-source-fold-1"],
+);
 const withoutEnemyLevel = member => {
   const { level: _level, ...rest } = member;
   return rest;
@@ -90,15 +94,23 @@ assert.ok(
 );
 
 const firstBatchAppearances = new Map(trainingFixture.teams.map(team => [team.id, 0]));
+const sourcePartitionsByTeam = new Map();
+const firstTrainingBatch = buildPilotBatch(0, 576, trainingFixture);
 for (let episode = 0; episode < 576; episode += 2) {
-  const firstLeg = buildGhostSelfPlayScenario(trainingFixture, episode);
-  const secondLeg = buildGhostSelfPlayScenario(trainingFixture, episode + 1);
+  const first = firstTrainingBatch.episodes[episode];
+  const second = firstTrainingBatch.episodes[episode + 1];
+  const firstLeg = first.scenario;
+  const secondLeg = second.scenario;
   assert.equal(firstLeg.run.seed, secondLeg.run.seed);
+  assert.equal(first.sourcePartitionId, second.sourcePartitionId);
   assert.deepEqual(firstLeg.party, secondLeg.enemy.party.map(withoutEnemyLevel));
   assert.deepEqual(secondLeg.party, firstLeg.enemy.party.map(withoutEnemyLevel));
   for (const name of [firstLeg.name, secondLeg.name]) {
     const playerId = name.match(/Ghost self-play (.+) vs /)?.[1];
     firstBatchAppearances.set(playerId, (firstBatchAppearances.get(playerId) ?? 0) + 1);
+    const previousPartition = sourcePartitionsByTeam.get(playerId);
+    assert.ok(previousPartition === undefined || previousPartition === first.sourcePartitionId);
+    sourcePartitionsByTeam.set(playerId, first.sourcePartitionId);
   }
 }
 const appearanceCounts = [...firstBatchAppearances.values()];

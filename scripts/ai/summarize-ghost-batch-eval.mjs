@@ -117,7 +117,8 @@ export function buildGhostBatchReport(manifests, controllerBatches) {
   const legs = collectLegs(manifests, byController);
   const controllerReports = summarizeControllers(legs);
   return {
-    evaluator: "Tree, ER candidate transformer, and smart-default versus hardest engine trainer AI",
+    evaluator:
+      "Single trees, stacked trees, ER candidate transformer, and smart-default versus hardest engine trainer AI",
     warning: "Offline imitation scores are not win rates; these rates come only from real-engine battles.",
     pairs: manifests.length,
     legs: legs.length,

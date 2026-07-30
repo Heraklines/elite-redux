@@ -32,6 +32,7 @@ from train_candidate_baselines import (  # noqa: E402
     embedded_candidate_features,
     load_records,
     record_split_group,
+    record_source_partition,
     select_elite_rollouts,
     split_groups,
     validate_data_dictionary,
@@ -52,6 +53,7 @@ class DecisionExample:
     decision_id: str
     episode_id: str
     split_group_id: str
+    source_partition_id: str
     features: np.ndarray
     chosen_index: int
     terminal_value: float | None
@@ -100,6 +102,7 @@ def make_examples(
                 decision_id=decision["decisionId"],
                 episode_id=decision["episodeId"],
                 split_group_id=record_split_group(decision),
+                source_partition_id=record_source_partition(decision),
                 features=features,
                 chosen_index=chosen_index,
                 terminal_value=value,
@@ -261,12 +264,14 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         selected_episodes = {decision["episodeId"] for decision in decisions}
         terminals = [terminal for terminal in terminals if terminal["episodeId"] in selected_episodes]
     examples = make_examples(decisions, terminals, args.loss_policy_weight)
-    train_group_ids, validation_group_ids = split_groups(
-        [example.split_group_id for example in examples],
+    train_partition_ids, validation_partition_ids = split_groups(
+        [example.source_partition_id for example in examples],
         args.seed,
     )
-    train_examples = [example for example in examples if example.split_group_id in train_group_ids]
-    validation_examples = [example for example in examples if example.split_group_id in validation_group_ids]
+    train_examples = [example for example in examples if example.source_partition_id in train_partition_ids]
+    validation_examples = [
+        example for example in examples if example.source_partition_id in validation_partition_ids
+    ]
     if not train_examples or not validation_examples:
         raise ValueError("both train and validation examples are required")
     feature_mean, feature_std = feature_normalization(train_examples)
@@ -375,8 +380,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "trainDecisions": len(train_examples),
             "validationDecisions": len(validation_examples),
             "episodes": len({example.episode_id for example in examples}),
-            "trainSplitGroups": len(train_group_ids),
-            "validationSplitGroups": len(validation_group_ids),
+            "trainSourcePartitions": sorted(train_partition_ids),
+            "validationSourcePartitions": sorted(validation_partition_ids),
+            "trainSplitGroups": len({example.split_group_id for example in train_examples}),
+            "validationSplitGroups": len({example.split_group_id for example in validation_examples}),
             "sourcePolicies": dict(Counter(decision["sourcePolicy"] for decision in decisions)),
             "terminalOutcomes": dict(Counter(terminal["outcome"] for terminal in terminals)),
             "rolloutSelection": rollout_selection,

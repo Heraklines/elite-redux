@@ -187,7 +187,7 @@ export class GameManager {
   onNextPrompt(
     phaseTarget: PhaseString,
     mode: UiMode,
-    callback: () => void,
+    callback: () => void | boolean,
     expireFn?: () => boolean,
     awaitingActionInput = false,
     options: UIPromptOptions = {},
@@ -308,7 +308,7 @@ export class GameManager {
         // Drive the same public UI boundary as a human. Calling the handler directly bypasses Ui.processInput's
         // co-op owner gates, ME pump, cursor mirror, and UI-to-relay contract trace, which previously let the
         // headless harness claim TARGET_SELECT coverage while skipping the production adapter entirely.
-        this.scene.ui.processInput(Button.ACTION);
+        return this.scene.ui.processInput(Button.ACTION);
       },
       () => {
         // A different battler's target phase does not make this prompt stale. In
@@ -327,6 +327,7 @@ export class GameManager {
         ? {}
         : {
             allowOutOfOrder: true,
+            debugLabel: `target actor=${expectedBattlerIndex} moveSlot=${movePosition}`,
             matchFn: () => {
               if (!this.isCurrentPhase("SelectTargetPhase")) {
                 return false;
