@@ -8,21 +8,15 @@
 // Elite Redux - STRENGTH-TIERED mega/primal stone rarity (mandate: "some megas
 // are much stronger than others and need to be properly rare").
 //
-// Every obtainable mega/primal stone is scored to one of the game's five reward
-// tiers (COMMON < GREAT < ULTRA < ROGUE < MASTER). The score is:
-//   1. the BST of the mega FORM the stone triggers (the authoritative injected
-//      form's own base stats, read live from the form-change registry), mapped
-//      through MEGA_BST_THRESHOLDS; then
-//   2. a hand-curated OVERRIDE (ER_MEGA_TIER_OVERRIDES) that WINS over BST, for
-//      the "kit >> BST" megas (Kangaskhan/Maw ile/Medicham...) and the genuinely
-//      elite class (box legendaries, primal orbs, the "-Z" ultra megas) that must
-//      be MASTER-rare regardless of raw stats.
+// Every obtainable mega/primal stone is scored from the BST of the FORM the
+// stone triggers (the authoritative injected form's own base stats, read live
+// from the form-change registry). Mega stones intentionally use only the three
+// high reward tiers: <650 ULTRA, 650-700 ROGUE, >700 MASTER.
 //
 // The two knobs the maintainer edits to re-tune the whole economy live HERE and
 // are the vetoable surface documented in docs/plans/2026-07-22-item-economy-
-// tuning.md: MEGA_BST_THRESHOLDS (the bulk bands) and ER_MEGA_TIER_OVERRIDES
-// (per-stone line items). TIER_GEN_WEIGHT sets how rare each tier is when it
-// competes for a single roll.
+// tuning.md: MEGA_BST_THRESHOLDS. TIER_GEN_WEIGHT sets how rare each tier is
+// when it competes for a single roll.
 //
 // The tier drives THREE circulation channels consistently:
 //   - reward-roll selection (FormChangeItemModifierTypeGenerator): a weighted
@@ -39,6 +33,11 @@
 // =============================================================================
 
 import { allSpecies } from "#data/data-lists";
+import { resolveErStoneFormChangeItem } from "#data/elite-redux/er-mega-stones";
+import {
+  ER_FORM_CHANGE_KIND,
+  ER_FORM_CHANGE_REGISTRY,
+} from "#data/elite-redux/init-elite-redux-form-changes";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { FormChangeItem } from "#enums/form-change-item";
@@ -47,79 +46,18 @@ import { randSeedInt } from "#utils/common";
 
 /** BST -> default tier bands (inclusive upper bound). Edit to re-band in bulk. */
 export const MEGA_BST_THRESHOLDS: ReadonlyArray<readonly [maxBst: number, tier: ModifierTier]> = [
-  [500, ModifierTier.COMMON],
-  [570, ModifierTier.GREAT],
-  [630, ModifierTier.ULTRA],
+  [649, ModifierTier.ULTRA],
   [700, ModifierTier.ROGUE],
   [Number.POSITIVE_INFINITY, ModifierTier.MASTER],
 ];
 
 /**
- * Per-stone tier OVERRIDES (stone enum NAME -> tier). WINS over the BST band.
- * This is the hand-curated "kit quality" + "must-be-elite" list. Unknown names
- * are harmless no-ops, so over-listing is safe.
- *
- * Two intents:
- *   MASTER  - box legendaries, primal/creation orbs, and the "-Z / -X ultra"
- *             class the mandate calls out (Mega Xerneas / Yveltal / the Z megas):
- *             genuinely rare, masterball-tier.
- *   ROGUE   - "kit far exceeds BST" megas whose ability makes them run-defining
- *             even at a modest stat total (Parental Bond, Huge/Pure Power,
- *             Speed Boost, the classic top-of-format megas).
+ * Exceptional per-stone overrides. The normal table is deliberately empty:
+ * rarity is BST-driven, so a sub-650 mega cannot silently become Rogue/Master
+ * because of a hand-curated kit judgement. Kept as an explicit extension seam
+ * for a genuinely non-BST form-change item whose triggered form cannot resolve.
  */
-export const ER_MEGA_TIER_OVERRIDES: Readonly<Record<string, ModifierTier>> = {
-  // --- MASTER: box legendaries + creation/primal orbs -----------------------
-  RED_ORB: ModifierTier.MASTER, // Primal Groudon
-  BLUE_ORB: ModifierTier.MASTER, // Primal Kyogre
-  GRISEOUS_ORB: ModifierTier.MASTER, // Giratina
-  ADAMANT_ORB: ModifierTier.MASTER, // Dialga
-  LUSTROUS_ORB: ModifierTier.MASTER, // Palkia
-  GALACTIC_ORB: ModifierTier.MASTER,
-  PLANETARY_ORB: ModifierTier.MASTER,
-  EMBRYONIC_ORB: ModifierTier.MASTER,
-  VICTINI_ORB: ModifierTier.MASTER,
-  MEWTWONITE_X: ModifierTier.MASTER,
-  MEWTWONITE_Y: ModifierTier.MASTER,
-  XERNEASITE: ModifierTier.MASTER,
-  YVELTALITE: ModifierTier.MASTER,
-  ZYGARDITE: ModifierTier.MASTER,
-  LATIASITE: ModifierTier.MASTER,
-  LATIOSITE: ModifierTier.MASTER,
-  DIANCITE: ModifierTier.MASTER,
-  HEATRANITE: ModifierTier.MASTER,
-  DARKRANITE: ModifierTier.MASTER,
-  ZERAORITE: ModifierTier.MASTER,
-  MAGEARNITE: ModifierTier.MASTER,
-  CHIEN_PAOITE: ModifierTier.MASTER,
-  ULTRANECROZIUM_P: ModifierTier.MASTER,
-  PHANTOM_METEOR: ModifierTier.MASTER,
-  // --- MASTER: the "-Z / ultra" super-mega class ----------------------------
-  LUCARIONITE_Z: ModifierTier.MASTER,
-  CHARIZARDITE_Z: ModifierTier.MASTER,
-  GARCHOMPITE_Z: ModifierTier.MASTER,
-  ABSOLITE_Z: ModifierTier.MASTER,
-  DRAGONINITE_Z: ModifierTier.MASTER,
-  SKARMORITE_Z: ModifierTier.MASTER,
-  GYARADEATHITE_X: ModifierTier.MASTER,
-  GYARADEATHITE_Y: ModifierTier.MASTER,
-  KILOZUNITE: ModifierTier.MASTER,
-  // --- ROGUE: kit >> BST (ability makes them elite regardless of stats) ------
-  KANGASKHANITE: ModifierTier.ROGUE, // Parental Bond
-  MAWILITE: ModifierTier.ROGUE, // Huge Power
-  MEDICHAMITE: ModifierTier.ROGUE, // Pure Power
-  BLAZIKENITE: ModifierTier.ROGUE, // Speed Boost
-  GENGARITE: ModifierTier.ROGUE,
-  LUCARIONITE: ModifierTier.ROGUE,
-  METAGROSSITE: ModifierTier.ROGUE,
-  GARCHOMPITE: ModifierTier.ROGUE,
-  SALAMENCITE: ModifierTier.ROGUE, // Aerilate
-  TYRANITARITE: ModifierTier.ROGUE,
-  SCIZORITE: ModifierTier.ROGUE, // Technician
-  GARDEVOIRITE: ModifierTier.ROGUE, // Pixilate
-  LOPUNNITE: ModifierTier.ROGUE, // Scrappy + High Jump Kick
-  GALLADITE: ModifierTier.ROGUE,
-  AGGRONITE: ModifierTier.ROGUE, // Filter + 230 Def
-};
+export const ER_MEGA_TIER_OVERRIDES: Readonly<Record<string, ModifierTier>> = {};
 
 /** Roll weight per tier for the weighted stone pick. Stronger tiers remain rarer without being vanishingly rare. */
 export const TIER_GEN_WEIGHT: Readonly<Record<ModifierTier, number>> = {
@@ -165,7 +103,7 @@ export const TIER_APPEARANCE_RATE: Readonly<Record<ModifierTier, number>> = {
 /** Fallback tier for a stone whose triggered form can't be resolved. */
 const DEFAULT_UNKNOWN_TIER = ModifierTier.ULTRA;
 
-function defaultTierForBst(bst: number): ModifierTier {
+export function megaTierForBst(bst: number): ModifierTier {
   for (const [maxBst, tier] of MEGA_BST_THRESHOLDS) {
     if (bst <= maxBst) {
       return tier;
@@ -183,6 +121,27 @@ let tierTable: Map<FormChangeItem, ModifierTier> | null = null;
 
 function buildTierTable(): Map<FormChangeItem, ModifierTier> {
   const table = new Map<FormChangeItem, ModifierTier>();
+  const speciesById = new Map(allSpecies.map(species => [species.speciesId as number, species]));
+
+  // ER-only megas are separate target species, so their authoritative BST lives
+  // on ER_FORM_CHANGE_REGISTRY.targetSpeciesId rather than a source-species form.
+  for (const change of ER_FORM_CHANGE_REGISTRY) {
+    if (change.kind !== ER_FORM_CHANGE_KIND.MEGA && change.kind !== ER_FORM_CHANGE_KIND.PRIMAL) {
+      continue;
+    }
+    const item = resolveErStoneFormChangeItem(change.requirement);
+    const target = speciesById.get(change.targetSpeciesId);
+    if (item == null || item === FormChangeItem.NONE || !target) {
+      continue;
+    }
+    const tier = megaTierForBst(target.getBaseStatTotal());
+    const existing = table.get(item);
+    if (existing === undefined || tier > existing) {
+      table.set(item, tier);
+    }
+  }
+
+  // Vanilla/form-backed megas keep their BST on the source species' form.
   for (const species of allSpecies) {
     const changes = pokemonFormChanges[species.speciesId];
     if (!changes) {
@@ -199,7 +158,7 @@ function buildTierTable(): Map<FormChangeItem, ModifierTier> {
         continue;
       }
       const override = ER_MEGA_TIER_OVERRIDES[FormChangeItem[item]];
-      const tier = override ?? defaultTierForBst(form.getBaseStatTotal());
+      const tier = override ?? megaTierForBst(form.getBaseStatTotal());
       const existing = table.get(item);
       // Keep the STRONGEST classification if a stone maps to several forms.
       if (existing === undefined || tier > existing) {

@@ -21,7 +21,8 @@
 //     "roster pick" mode (all its filters/search) to toggle the allowed set; the
 //     chosen root ids return via onRosterConfirm (null = all species).
 //   - PUBLISH                        -> CONFIRM -> validateChallengeConfig ->
-//     createCommunityChallenge (a server DRAFT) -> MY CHALLENGES card.
+//     createCommunityChallenge (a server DRAFT) -> saved in the existing MY
+//     CHALLENGES list, then return to the browser section the player came from.
 //
 // Opened over the browser via PATTERN 1 (setOverlayMode keeps the browser alive
 // underneath); CANCEL reverts straight back to it. Drive it headlessly via the

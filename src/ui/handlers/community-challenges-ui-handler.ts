@@ -27,15 +27,20 @@ import {
   type CommunityChallengeConfig,
   type CommunityChallengeEntry,
   type CommunityChallengeFeed,
+  type CommunityPlayerStatus,
   fetchCommunityBookmarks,
   fetchCommunityFeed,
+  fetchCommunityHistory,
   fetchMyChallenges,
+  flushPendingCommunityResults,
   flushPendingFounderPublishes,
+  getLocalCommunityStatuses,
   getLocalDraft,
   recordCommunityAttempt,
+  recordLocalCommunityStatus,
   reportTrackedAchievements,
 } from "#data/elite-redux/er-community-challenges";
-import { setFounderRunState } from "#data/elite-redux/er-community-run-state";
+import { setCommunityRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
@@ -95,6 +100,7 @@ const GOLD_DIM = "#b9924a";
 const INK = "#d8c9a8";
 const DIM = "#8a8470";
 const CYAN = "#7fd8f5";
+const CLEARED_GREEN = "#5fd38a";
 const ACTIVE_RED = 0xd8542a;
 
 // --- Region geometry ---
@@ -159,8 +165,9 @@ export class CommunityChallengesUiHandler extends UiHandler {
   // The merged featured/community feed handed in at open(); reused by the
   // FEATURED/COMMUNITY sections so switching back is instant + offline-safe.
   private baseFeed: CommunityChallengeFeed | null = null;
-  // Sections with no client feed yet (MY / HISTORY) render the "coming soon"
-  // empty copy instead of the genuine "be the first" empty state.
+  private historyFeed: CommunityChallengeFeed | null = null;
+  private playerStatuses = new Map<string, CommunityPlayerStatus>();
+  // Async section loads can temporarily render their own empty-state copy.
   private comingSoon = false;
   // Sidebar label Text refs, recolored gold/dim as the nav cursor moves.
   private navLabels: Phaser.GameObjects.Text[] = [];
@@ -330,6 +337,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
       win.setTint(PANEL_TINT);
       this.dynamic.add(win);
       const selected = i === this.cardCursor;
+      const cleared = e.playerStatus === "cleared";
       // Trial Plate: type-tinted black-silhouette card art fills the card.
       this.dynamic.add(
         buildChallengeCardArt(e, g.x + 1, FEAT_Y + 1, g.w - 2, FEAT_H - 2, selected ? 0x3890f8 : 0xa040c0),
@@ -339,12 +347,17 @@ export class CommunityChallengesUiHandler extends UiHandler {
       this.dynamic.add(
         globalScene.add.rectangle(g.x + 1, FEAT_Y + FEAT_H - 11, g.w - 2, 10, 0x0a0a12, 0.6).setOrigin(0),
       );
+      if (cleared) {
+        this.dynamic.add(
+          globalScene.add.rectangle(g.x + 1, FEAT_Y + 1, g.w - 2, FEAT_H - 2, 0x5fd38a, 0.12).setOrigin(0),
+        );
+      }
 
       const name = addTextObject(g.x + 4, FEAT_Y + 3, e.config.name.toUpperCase(), TextStyle.WINDOW, {
         fontSize: "32px",
       });
       name.setOrigin(0, 0).setColor(GOLD);
-      fitText(name, e.status === "draft" ? g.w - 42 : g.w - 8);
+      fitText(name, e.status === "draft" || cleared ? g.w - 48 : g.w - 8);
       this.dynamic.add(name);
       if (e.status === "draft") {
         const draft = addTextObject(g.x + g.w - 4, FEAT_Y + 3, "DRAFT", TextStyle.WINDOW, {
@@ -353,6 +366,13 @@ export class CommunityChallengesUiHandler extends UiHandler {
         });
         draft.setOrigin(1, 0).setColor("#e6a34a");
         this.dynamic.add(draft);
+      } else if (cleared) {
+        const badge = addTextObject(g.x + g.w - 4, FEAT_Y + 3, "CLEARED", TextStyle.WINDOW, {
+          fontSize: "22px",
+          align: "right",
+        });
+        badge.setOrigin(1, 0).setColor(CLEARED_GREEN);
+        this.dynamic.add(badge);
       }
       const sub = addTextObject(g.x + 4, FEAT_Y + 10, e.config.subtitle.toUpperCase(), TextStyle.WINDOW, {
         fontSize: "22px",
@@ -362,7 +382,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
       const rate = addTextObject(g.x + 4, FEAT_Y + FEAT_H - 10, `${this.clearRatePct(e)}%`, TextStyle.WINDOW, {
         fontSize: "30px",
       });
-      rate.setOrigin(0, 0).setColor(CYAN);
+      rate.setOrigin(0, 0).setColor(cleared ? CLEARED_GREEN : CYAN);
       this.dynamic.add(rate);
       const att = addTextObject(g.x + g.w - 4, FEAT_Y + FEAT_H - 10, this.kFmt(e.stats.attempts), TextStyle.WINDOW, {
         fontSize: "28px",
@@ -371,6 +391,11 @@ export class CommunityChallengesUiHandler extends UiHandler {
       att.setOrigin(1, 0).setColor(INK);
       this.dynamic.add(att);
 
+      if (cleared) {
+        const completeFrame = globalScene.add.rectangle(g.x, FEAT_Y, g.w, FEAT_H, 0, 0).setOrigin(0);
+        completeFrame.setStrokeStyle(2, 0x5fd38a, 0.95);
+        this.dynamic.add(completeFrame);
+      }
       // Selection frame on top.
       if (selected) {
         const selFrame = globalScene.add.rectangle(g.x, FEAT_Y, g.w, FEAT_H, 0, 0).setOrigin(0);
@@ -418,6 +443,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
     // Wax-seal crest (type-tinted disc + hero silhouette / charge).
     this.dynamic.add(buildChallengeEmblem(e, CONTENT_X + 15, DETAIL_Y + 15, 12));
 
+    const cleared = e.playerStatus === "cleared";
     const title = addTextObject(
       CONTENT_X + 30,
       DETAIL_Y + 3,
@@ -426,8 +452,16 @@ export class CommunityChallengesUiHandler extends UiHandler {
       { fontSize: "36px" },
     );
     title.setOrigin(0, 0).setColor(GOLD);
-    fitText(title, w - 32);
+    fitText(title, cleared ? w - 92 : w - 32);
     this.dynamic.add(title);
+    if (cleared) {
+      const complete = addTextObject(CONTENT_X + w - 4, DETAIL_Y + 3, "YOU CLEARED THIS", TextStyle.WINDOW, {
+        fontSize: "22px",
+        align: "right",
+      });
+      complete.setOrigin(1, 0).setColor(CLEARED_GREEN);
+      this.dynamic.add(complete);
+    }
 
     const by = addTextObject(CONTENT_X + 30, DETAIL_Y + 11, `Created by ${e.config.author}`, TextStyle.WINDOW, {
       fontSize: "22px",
@@ -663,14 +697,21 @@ export class CommunityChallengesUiHandler extends UiHandler {
 
   show(args: any[]): boolean {
     super.show(args);
-    this.feed =
+    const initialFeed =
       args.length > 0 && this.isFeed(args[0]) ? (args[0] as CommunityChallengeFeed) : buildDemoChallengesConfig();
     this.onLaunch = typeof args[1] === "function" ? (args[1] as (config: CommunityChallengeConfig) => void) : null;
     this.onBack = typeof args[2] === "function" ? (args[2] as () => void) : null;
     this.disposed = false;
+    this.playerStatuses = new Map(Object.entries(getLocalCommunityStatuses()));
+    if (globalScene.gameData.achvUnlocks.INFERNO !== undefined) {
+      this.playerStatuses.set("er-inferno", "cleared");
+    }
+    this.historyFeed = null;
+    this.feed = this.decorateFeed(initialFeed);
     // Retry any founder publish that the win-time POST couldn't land (offline), so
     // returning here after a victory still publishes the draft - it's never lost.
     void flushPendingFounderPublishes();
+    void flushPendingCommunityResults();
     // Report this player's tracked achievement unlocks (Inferno) so the live holder
     // tally stays current. Best-effort, decoupled from the save-upload path; swallows
     // errors and never blocks the UI.
@@ -686,7 +727,57 @@ export class CommunityChallengesUiHandler extends UiHandler {
     this.positionNavHighlight();
     this.rebuild();
     this.container.setVisible(true);
+    void this.refreshHistory(false);
     return true;
+  }
+
+  private decorateFeed(feed: CommunityChallengeFeed): CommunityChallengeFeed {
+    const featured = feed.featured.map(entry => {
+      const playerStatus = this.playerStatuses.get(entry.config.id) ?? entry.playerStatus;
+      return playerStatus ? { ...entry, playerStatus } : entry;
+    });
+    return {
+      featured,
+      selected: featured[this.cardCursor] ?? featured[0] ?? null,
+      totalCount: feed.totalCount,
+    };
+  }
+
+  private async refreshHistory(renderHistory: boolean): Promise<void> {
+    const items = await fetchCommunityHistory();
+    if (this.disposed) {
+      return;
+    }
+    for (const entry of items) {
+      if (entry.playerStatus) {
+        const previous = this.playerStatuses.get(entry.config.id);
+        if (previous !== "cleared") {
+          this.playerStatuses.set(entry.config.id, entry.playerStatus);
+        }
+      }
+    }
+    const serverIds = new Set(items.map(entry => entry.config.id));
+    const localOnly = (this.baseFeed?.featured ?? []).filter(
+      entry => !serverIds.has(entry.config.id) && this.playerStatuses.has(entry.config.id),
+    );
+    const history = [...items, ...localOnly];
+    const decorated = this.decorateFeed({
+      featured: history,
+      selected: history[0] ?? null,
+      totalCount: history.length,
+    });
+    this.historyFeed = decorated;
+    if (this.baseFeed) {
+      this.baseFeed = this.decorateFeed(this.baseFeed);
+    }
+    if (renderHistory && this.section === "history") {
+      this.feed = decorated;
+      this.cardCursor = 0;
+      this.rebuild();
+    } else if (this.feed) {
+      this.feed = this.decorateFeed(this.feed);
+      this.rebuild();
+    }
   }
 
   private isFeed(arg: unknown): arg is CommunityChallengeFeed {
@@ -762,13 +853,17 @@ export class CommunityChallengesUiHandler extends UiHandler {
       const draft = getLocalDraft(e.config.id);
       if (draft?.status === "draft" || e.status === "draft") {
         setFounderRunState({ draftId: e.config.id, config: e.config });
+        setCommunityRunState(null);
+        this.onLaunch(e.config);
+        return;
       }
-      this.onLaunch(e.config);
-      return;
     }
     // Record a normal attempt for published cards (built-in er-* / demo cards have
     // no worker row), then teardown-launch the run (setModeAndEnd clears this handler).
     if (!/^(er-|demo-)/.test(e.config.id)) {
+      setFounderRunState(null);
+      setCommunityRunState({ challengeId: e.config.id, config: e.config });
+      recordLocalCommunityStatus(e.config.id, "in_progress");
       void recordCommunityAttempt(e.config.id);
     }
     this.onLaunch(e.config);
@@ -791,7 +886,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
    * Load the feed for a section + rebuild. Sync sections (FEATURED/COMMUNITY) render
    * immediately; async sections render the empty state first, then fill on resolve
    * (guarded by `this.section === key` so a fast switch never clobbers a newer one).
-   * MY / HISTORY have no client feed yet -> the "coming soon" empty copy.
+   * MY / HISTORY use their own feeds and empty-state copy.
    */
   private loadSection(key: string): void {
     this.comingSoon = false;
@@ -803,12 +898,12 @@ export class CommunityChallengesUiHandler extends UiHandler {
         // player-authored cards). Guarded by `this.section === key` so a fast nav switch
         // away never clobbers a newer section; the merged result is cached as `baseFeed`
         // so switching back is instant.
-        this.feed = this.baseFeed ?? buildInfernoFeed();
+        this.feed = this.decorateFeed(this.baseFeed ?? buildInfernoFeed());
         this.rebuild();
         void buildMergedCommunityFeed({ sort: "trending" }).then(f => {
           if (!this.disposed && this.section === key) {
-            this.baseFeed = f;
-            this.feed = f;
+            this.baseFeed = this.decorateFeed(f);
+            this.feed = this.baseFeed;
             this.cardCursor = 0;
             this.rebuild();
           }
@@ -819,7 +914,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
         this.rebuild();
         void fetchCommunityFeed({ sort: "newest" }).then(f => {
           if (!this.disposed && this.section === key) {
-            this.feed = f;
+            this.feed = this.decorateFeed(f);
             this.cardCursor = 0;
             this.rebuild();
           }
@@ -830,7 +925,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
         this.rebuild();
         void fetchCommunityBookmarks().then(items => {
           if (!this.disposed && this.section === key) {
-            this.feed = { featured: items, selected: items[0] ?? null, totalCount: items.length };
+            this.feed = this.decorateFeed({ featured: items, selected: items[0] ?? null, totalCount: items.length });
             this.cardCursor = 0;
             this.rebuild();
           }
@@ -842,7 +937,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
         // attempt stats) once that route ships - keeping any local-only drafts the server
         // doesn't know yet. Empty list -> the generic "forge one" empty copy.
         const local = buildMyChallengesFeed();
-        this.feed = local;
+        this.feed = this.decorateFeed(local);
         this.cardCursor = 0;
         this.rebuild();
         void fetchMyChallenges().then(items => {
@@ -850,18 +945,17 @@ export class CommunityChallengesUiHandler extends UiHandler {
             const serverIds = new Set(items.map(i => i.config.id));
             const localOnly = local.featured.filter(e => !serverIds.has(e.config.id));
             const featured = [...items, ...localOnly];
-            this.feed = { featured, selected: featured[0] ?? null, totalCount: featured.length };
+            this.feed = this.decorateFeed({ featured, selected: featured[0] ?? null, totalCount: featured.length });
             this.cardCursor = 0;
             this.rebuild();
           }
         });
         break;
       }
-      default:
-        // "history" - no client feed yet.
-        this.feed = this.emptyFeed();
-        this.comingSoon = true;
+      case "history":
+        this.feed = this.historyFeed ?? this.emptyFeed();
         this.rebuild();
+        void this.refreshHistory(true);
         break;
     }
   }
@@ -869,13 +963,17 @@ export class CommunityChallengesUiHandler extends UiHandler {
   /** Open the challenge designer over the browser (PATTERN 1: browser stays underneath). */
   private openCreate(): void {
     globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGE_CREATE, null, () => {
-      this.section = "mine";
-      this.navCursor = NAV_ITEMS.findIndex(item => item.key === "mine");
+      // Return to the section the player came from. MY already exists as the
+      // authored-draft list; creating a challenge must not turn the browser into MY.
+      this.navCursor = Math.max(
+        0,
+        NAV_ITEMS.findIndex(item => item.key === this.section),
+      );
       this.cardCursor = 0;
       this.focus = "cards";
       this.updateSectionHeader();
       this.positionNavHighlight();
-      this.loadSection("mine");
+      this.loadSection(this.section);
     });
   }
 
