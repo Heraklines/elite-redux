@@ -8,7 +8,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { assertFocusedCandidateLimit, categorize, impactLanes } from "../../scripts/run-coop-gate.mjs";
+import {
+  assertFocusedCandidateLimit,
+  categorize,
+  createCiMatrix,
+  impactLanes,
+  parseCiLaneSelection,
+} from "../../scripts/run-coop-gate.mjs";
 
 const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const workflow = readFileSync(resolve(root, ".github/workflows/coop-focused-branch.yml"), "utf8").replaceAll(
@@ -129,6 +135,23 @@ test("full and focused gates run every co-op source and node-pure contract", () 
 
   assert.match(focusedContractsJob, /needs: plan/u);
   assert.match(focusedContractsJob, /timeout-minutes: 10/u);
+});
+
+test("manual qualification can reserve runners by selecting only two-player co-op lanes", () => {
+  assert.deepEqual(parseCiLaneSelection(undefined), ["A", "B", "C", "P", "S", "T"]);
+  assert.deepEqual(parseCiLaneSelection("a, B,c,p"), ["A", "B", "C", "P"]);
+  assert.throws(() => parseCiLaneSelection("A,A"), /duplicate lane/u);
+  assert.throws(() => parseCiLaneSelection("A,Q"), /unknown\/non-gating lane/u);
+
+  const lanes = categorize();
+  const matrix = createCiMatrix(lanes, ["A", "B", "C", "P"]);
+  assert.deepEqual([...new Set(matrix.include.map(entry => entry.lane))], ["A", "B", "C", "P"]);
+  assert.equal(matrix.include.length, 21, "co-op-only qualification uses 1+13+5+2 weighted shards");
+
+  assert.match(fullWorkflow, /coop_only:[\s\S]*default: true/u);
+  assert.match(fullWorkflow, /COOP_CI_LANES:[\s\S]*'A,B,C,P'[\s\S]*'A,B,C,P,S,T'/u);
+  assert.match(fullWorkflow, /--ci-matrix --ci-lanes "\$COOP_CI_LANES"/u);
+  assert.match(fullWorkflow, /max-parallel: 24/u);
 });
 
 test("focused engine shards qualify the complete Authority V2 graph", () => {

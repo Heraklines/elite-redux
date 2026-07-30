@@ -2,6 +2,12 @@ name: Co-op Gate (Sharded)
 
 on:
   workflow_dispatch:
+    inputs:
+      coop_only:
+        description: Qualify only two-player co-op lanes A/B/C/P (exclude unchanged Showdown and triples)
+        required: true
+        type: boolean
+        default: true
   push:
     branches:
       - feat/elite-redux-port
@@ -64,11 +70,12 @@ jobs:
         id: plan
         env:
           COOP_CI_PLAN_MANIFEST: coop-ci-full-plan.json
+          COOP_CI_LANES: ${{ github.event_name == 'workflow_dispatch' && inputs.coop_only && 'A,B,C,P' || 'A,B,C,P,S,T' }}
         shell: bash
         run: |
           set +e
           set -o pipefail
-          node scripts/run-coop-gate.mjs --ci-matrix 2>&1 | tee coop-ci-full-plan.log
+          node scripts/run-coop-gate.mjs --ci-matrix --ci-lanes "$COOP_CI_LANES" 2>&1 | tee coop-ci-full-plan.log
           status=${PIPESTATUS[0]}
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           exit "$status"
@@ -433,6 +440,10 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
+      # Four mutation shards plus browser/static/source sentinels also run beside this matrix. Capping the
+      # heavyweight jobs at 24 keeps the workflow inside the 32-runner co-op allocation and leaves the
+      # repository's reserved capacity available to independent workstreams.
+      max-parallel: 24
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v6

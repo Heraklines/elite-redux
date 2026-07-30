@@ -89,6 +89,7 @@ const PROD_FIDELITY_GATE_WAVES = 12;
 
 /** Everyday external-runner target. Counts are capped to discovered inventory, so no shard is vacuous. */
 export const COOP_CI_TARGET_SHARDS = Object.freeze({ A: 1, B: 13, C: 5, P: 2, S: 8, T: 4 });
+const COOP_CI_LANES = Object.freeze(Object.keys(COOP_CI_TARGET_SHARDS));
 const HEAVY_LANES = new Set(["B", "C", "P", "S", "T"]);
 const TIMING_MANIFEST_PATH = resolve(__dirname, "coop-gate-timings.json");
 const TIMING_MANIFEST = JSON.parse(readFileSync(TIMING_MANIFEST_PATH, "utf8"));
@@ -389,20 +390,42 @@ function actualShardTotal(lane, files) {
   return files.length === 0 ? 1 : Math.min(target, files.length);
 }
 
-export function createCiMatrix(lanes = categorize()) {
+/** Parse an explicit CI lane subset without permitting an unknown, duplicate, empty, or quarantined lane. */
+export function parseCiLaneSelection(raw) {
+  if (raw == null || raw.trim() === "") {
+    return [...COOP_CI_LANES];
+  }
+  const selected = raw
+    .split(",")
+    .map(value => value.trim().toUpperCase())
+    .filter(Boolean);
+  if (selected.length === 0) {
+    throw new Error("--ci-lanes requires at least one gating lane");
+  }
+  if (new Set(selected).size !== selected.length) {
+    throw new Error(`--ci-lanes contains a duplicate lane: ${raw}`);
+  }
+  const unknown = selected.filter(lane => !COOP_CI_LANES.includes(lane));
+  if (unknown.length > 0) {
+    throw new Error(`--ci-lanes contains unknown/non-gating lane(s): ${unknown.join(", ")}`);
+  }
+  return selected;
+}
+
+export function createCiMatrix(lanes = categorize(), selectedLanes = COOP_CI_LANES) {
   const include = [];
-  for (const lane of Object.keys(COOP_CI_TARGET_SHARDS)) {
+  for (const lane of selectedLanes) {
     const total = actualShardTotal(lane, lanes[lane]);
     for (let shard = 1; shard <= total; shard++) {
       include.push({ lane, shard, total });
     }
   }
-  verifyMatrixCoverage(lanes, include);
+  verifyMatrixCoverage(lanes, include, selectedLanes);
   return { include };
 }
 
-export function verifyMatrixCoverage(lanes, include) {
-  for (const lane of Object.keys(COOP_CI_TARGET_SHARDS)) {
+export function verifyMatrixCoverage(lanes, include, selectedLanes = COOP_CI_LANES) {
+  for (const lane of selectedLanes) {
     const expected = [...lanes[lane]].sort();
     const seen = include
       .filter(entry => entry.lane === lane)
@@ -653,10 +676,12 @@ function main() {
   const args = process.argv.slice(2);
   const lanes = categorize();
   if (args.includes("--ci-matrix")) {
-    const matrix = createCiMatrix(lanes);
+    const selectedLanes = parseCiLaneSelection(argValue(args, "--ci-lanes"));
+    const matrix = createCiMatrix(lanes, selectedLanes);
     emitPlannerResult(matrix, {
       kind: "full",
-      targetShards: COOP_CI_TARGET_SHARDS,
+      selectedLanes,
+      targetShards: Object.fromEntries(selectedLanes.map(lane => [lane, COOP_CI_TARGET_SHARDS[lane]])),
       inventory: Object.fromEntries(Object.entries(lanes).map(([lane, files]) => [lane, files.length])),
     });
     return;

@@ -6066,3 +6066,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   ordered progress, not a malformed two-sided control and never permission to spend a second Bargain key.
 - A node-pure regression recreates the exact owner-advanced/watcher-retained surface history and proves it returns no
   pending Bargain owner without throwing. Production Authority V2 behavior is unchanged.
+
+## 2026-07-30 - Manual co-op qualification stays inside its runner allocation
+
+- A full aggregate previously expanded to 37 matrix jobs before its mutation/browser/static sentinels, which could
+  consume the complete 40-runner account while an independent workstream still owned reserved capacity. The manual
+  workflow now defaults to the two-player co-op lanes A/B/C/P and keeps unchanged Showdown and triples out of this
+  qualification, matching the active product scope.
+- The matrix planner accepts an explicit, fail-closed lane subset and proves complete weighted coverage of every file
+  in each selected lane. Duplicate, unknown, empty, and quarantined lane selections are rejected; feat push
+  qualification retains the all-surface A/B/C/P/S/T inventory.
+- The heavyweight matrix is capped at 24 concurrent jobs so its four mutation shards and browser/static/source
+  sentinels remain inside the 32-runner co-op allocation. The co-op-only plan is exactly 21 shards
+  (A=1, B=13, C=5, P=2); its source contract passes 15/15 and changed-file formatting is clean.
