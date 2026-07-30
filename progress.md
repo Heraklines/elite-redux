@@ -6179,3 +6179,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local node-pure campaign/semantic contracts are green, changed-file Biome is clean, and `git diff --check` is clean.
   The next remote step is a focused source/static gate followed by the exact ten-wave Mystery profile; the full
   aggregate does not need repeating unless remote compile evidence exposes a production-impacting change.
+- The first exact-SHA push proved remote TypeScript, formatting, workflow/source contracts, and the selected A1 shard,
+  then the ordinary journey's preflight caught its own stale source assertion: it still required the one-target helper
+  call that the retry loop deliberately replaced. The boundary now seals the stronger candidate-exhaustion, prompt
+  observation, and alternate-reward recovery contract. No browser gameplay ran under that stale preflight result.

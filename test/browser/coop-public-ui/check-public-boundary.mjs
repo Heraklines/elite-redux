@@ -361,12 +361,18 @@ if (
   || !browserEntry.includes("maxHp: pokemon.getMaxHp()")
   || !browserEntry.includes('uiMode === "PARTY" || uiMode === "COMMAND"')
   || !campaign.includes("export function chooseRewardPartyTargetSlot(")
+  || !campaign.includes("export function rewardPartyTargetCandidates(")
   || !campaign.includes('observation?.surfaceId === "reward-shop"')
   || !campaign.includes("slot.fainted === true")
   || !campaign.includes("slot.hp < slot.maxHp")
-  || !campaign.includes("chooseRewardPartyTargetSlot(boundary, driver.partySlot ?? 0)")
+  || !campaign.includes("rewardPartyTargetCandidates(boundary, driver.partySlot ?? 0)")
+  || !campaign.includes("campaign-reward-target-dismiss-rejection")
+  || !campaign.includes("campaign-reward-target-exhausted")
+  || !browserEntry.includes("partyPromptReady.call(handler) === true")
 ) {
-  failures.push("command/reward targeting must derive legal owned slots from the read-only visible party projection");
+  failures.push(
+    "command/reward targeting must derive and exhaust legal visible slots, expose PARTY validation prompts, and recover to an untried reward",
+  );
 }
 if (
   evidence?.includes("/operation delivery retries exhausted/iu")
