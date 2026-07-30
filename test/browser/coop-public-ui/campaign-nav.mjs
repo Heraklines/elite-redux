@@ -321,6 +321,17 @@ function partyHealthRatio(slot) {
     : null;
 }
 
+function sameSemanticAddress(left, right) {
+  return (
+    Number.isSafeInteger(left?.epoch)
+    && Number.isSafeInteger(left?.wave)
+    && Number.isSafeInteger(left?.turn)
+    && left.epoch === right?.epoch
+    && left.wave === right?.wave
+    && left.turn === right?.turn
+  );
+}
+
 /**
  * Choose a voluntary switch only when this seat's active is critically injured and one of its own
  * visible reserves is meaningfully healthier. The command screen already renders the party team bar;
@@ -376,6 +387,7 @@ async function driveCampaignVoluntarySwitch(client, command, targetId, purpose, 
     },
     { timeoutMs, description: `${purpose} actionable party SEND OUT submenu` },
   );
+  const submitCursor = client.evidence.cursor();
   await selectOptionById(client, {
     surfaceId: "party",
     targetId: "party-option:send-out",
@@ -383,7 +395,68 @@ async function driveCampaignVoluntarySwitch(client, command, targetId, purpose, 
     fromCursor: actionMenu.index,
     timeoutMs,
   });
-  client.evidence.record("campaign-voluntary-switch", { purpose, targetId });
+  const consumedMessages = new Set();
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const relay = client.evidence.findLast(/\[coop:relay\] broadcastLocalCommand SEND/u, submitCursor);
+    if (relay != null) {
+      client.evidence.record("campaign-voluntary-switch", {
+        purpose,
+        targetId,
+        relayEventIndex: relay.index,
+      });
+      return { submitted: true, commandEvent: null };
+    }
+
+    // PartyUiHandler can reject an otherwise observer-visible reserve (the wave-2 Mystery trace
+    // did this after SEND OUT). That rejection is narrated by CommandPhase, then the same exact
+    // command frontier reopens. A human dismisses the narration and attacks; treating the key as
+    // a submitted relay command made the sequential driver retire this owner and wait forever for
+    // a peer command that correctly remained gated.
+    const latest = client.evidence.findLastSemanticSurface(submitCursor);
+    const reopened = client.evidence.findLastSemanticSurface(submitCursor, "command:command");
+    if (
+      reopened != null
+      && latest?.index === reopened.index
+      && reopened.index > command.index
+      && sameSemanticAddress(reopened.observation.address, command.observation.address)
+      && reopened.observation.localSeat === client.publicSeat
+      && reopened.observation.seatsWithInput?.includes(client.publicSeat)
+      && isActionableSemanticObservation(reopened.observation, { requireExplicitUnblocked: true })
+    ) {
+      client.evidence.record("campaign-voluntary-switch-rejected", {
+        purpose,
+        targetId,
+        commandEventIndex: reopened.index,
+      });
+      return { submitted: false, commandEvent: reopened };
+    }
+
+    const message = client.evidence.findLastSemanticSurface(submitCursor, "battle:message");
+    const messageKey = `${message?.observation.phase ?? "unknown"}:${message?.observation.phaseInstance ?? "unknown"}`;
+    if (
+      message != null
+      && latest?.index === message.index
+      && message.observation.phase === "CommandPhase"
+      && sameSemanticAddress(message.observation.address, command.observation.address)
+      && message.observation.localSeat === client.publicSeat
+      && message.observation.seatsWithInput?.includes(client.publicSeat)
+      && isActionableSemanticObservation(message.observation)
+      && !consumedMessages.has(messageKey)
+    ) {
+      consumedMessages.add(messageKey);
+      client.evidence.record("campaign-voluntary-switch-rejection-prompt", {
+        purpose,
+        targetId,
+        messageEventIndex: message.index,
+        phaseInstance: message.observation.phaseInstance ?? null,
+      });
+      await client.press("Space", `${purpose}-dismiss-switch-rejection`);
+      continue;
+    }
+    await delay(80);
+  }
+  throw new Error(`${client.label}: ${purpose} voluntary switch produced neither relay proof nor a reopened command`);
 }
 
 /**
@@ -397,7 +470,7 @@ export async function driveBestCampaignMove(
   purpose,
   { timeoutMs = 15_000, cycleIndex = 0, commandEvent = null, preferredMoveId = null } = {},
 ) {
-  const command =
+  let command =
     commandEvent?.observation?.surfaceId === "command:command"
       ? commandEvent
       : client.evidence.findLastSemanticSurface(0, "command:command");
@@ -406,8 +479,11 @@ export async function driveBestCampaignMove(
   }
   const switchTarget = chooseVoluntarySwitchTarget(command.observation);
   if (switchTarget != null) {
-    await driveCampaignVoluntarySwitch(client, command, switchTarget, purpose, timeoutMs);
-    return;
+    const switchResult = await driveCampaignVoluntarySwitch(client, command, switchTarget, purpose, timeoutMs);
+    if (switchResult.submitted) {
+      return;
+    }
+    command = switchResult.commandEvent;
   }
   const fightCursor = client.evidence.cursor();
   // CommandUiHandler remembers its cursor. A cancelled/superseded target flow can therefore reopen

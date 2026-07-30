@@ -29,6 +29,7 @@ import {
   chooseBestCampaignMove,
   chooseNavigationKey,
   chooseVoluntarySwitchTarget,
+  driveBestCampaignMove,
   isPartyPickerSurfaceOpen,
   selectOptionById,
 } from "./campaign-nav.mjs";
@@ -573,6 +574,173 @@ test("campaign move driving semantically selects Fight instead of assuming the r
 
   assert.match(navigation, /surfaceId: "party"[\s\S]+targetId: "party-option:send-out"/u);
   assert.match(navigation, /client\.evidence\.record\("campaign-voluntary-switch"/u);
+});
+
+test("a rejected voluntary switch stays on the same owner and falls back to a relayed attack", async () => {
+  const address = { epoch: 91, wave: 2, turn: 3 };
+  const partySlots = [
+    { slot: 0, coopOwner: "host", active: true, fainted: false, hp: 4, maxHp: 25, allowedInBattle: true },
+    { slot: 1, coopOwner: "guest", active: true, fainted: false, hp: 9, maxHp: 22, allowedInBattle: true },
+    { slot: 2, coopOwner: "host", active: false, fainted: false, hp: 22, maxHp: 22, allowedInBattle: true },
+  ];
+  const events = [];
+  const presses = [];
+  const records = [];
+  let nextIndex = 0;
+  const pushSurface = observation => {
+    const event = { index: nextIndex++, kind: "browser-surface2", observation };
+    events.push(event);
+    return event;
+  };
+  const pushRelay = () => {
+    events.push({
+      index: nextIndex++,
+      kind: "console",
+      text: "[coop:relay] broadcastLocalCommand SEND fieldIndex=0 owner=host turn=3 command=0",
+    });
+  };
+  const commandObservation = selectedOptionId => ({
+    surfaceId: "command:command",
+    operationClass: "command",
+    ownerModel: "local",
+    address,
+    localSeat: 0,
+    localRole: "host",
+    seatsWithInput: [0],
+    selectedOptionId,
+    optionIds: ["command:fight", "command:ball", "command:pokemon", "command:run"],
+    partySlots,
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+  });
+  const firstCommand = pushSurface(commandObservation("command:fight"));
+  const evidence = {
+    cursor: () => nextIndex,
+    findLast(pattern, from = 0) {
+      return events.filter(event => event.index >= from).findLast(event => pattern.test(event.text ?? ""));
+    },
+    findLastSemanticSurface(from = 0, surfaceId = null) {
+      return events
+        .filter(
+          event =>
+            event.index >= from
+            && event.kind === "browser-surface2"
+            && (surfaceId == null || event.observation.surfaceId === surfaceId),
+        )
+        .at(-1);
+    },
+    record(kind, data) {
+      records.push({ kind, ...data });
+      events.push({ index: nextIndex++, kind, ...data });
+    },
+    async waitForCondition(predicate, { timeoutMs, description }) {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const result = predicate(evidence);
+        if (result) {
+          return result;
+        }
+        await new Promise(resolvePromise => setTimeout(resolvePromise, 1));
+      }
+      throw new Error(`fixture timed out waiting for ${description}`);
+    },
+  };
+  const inputHandlers = [
+    {
+      matches: purpose => purpose.startsWith("nav-move-command:command->command:pokemon"),
+      run: () => pushSurface(commandObservation("command:pokemon")),
+    },
+    {
+      matches: purpose => purpose === "nav-submit-command:command->command:pokemon",
+      run: () =>
+        pushSurface({
+          surfaceId: "party",
+          address,
+          selectedOptionId: "party-slot:0",
+          optionIds: ["party-slot:0", "party-slot:1", "party-slot:2"],
+          partySlots,
+          ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+        }),
+    },
+    {
+      matches: purpose => purpose.startsWith("nav-move-party->party-slot:2"),
+      run: current => {
+        const slot = Number(current.observation.selectedOptionId.split(":").at(-1));
+        pushSurface({ ...current.observation, selectedOptionId: `party-slot:${Math.min(2, slot + 1)}` });
+      },
+    },
+    {
+      matches: purpose => purpose.endsWith("-open-party-slot:2"),
+      run: current =>
+        pushSurface({
+          ...current.observation,
+          selectedOptionId: "party-option:send-out",
+          optionIds: ["party-option:send-out", "party-option:summary", "party-option:cancel"],
+        }),
+    },
+    {
+      matches: purpose => purpose === "nav-submit-party->party-option:send-out",
+      run: () =>
+        // The production trace returned to CommandPhase narration without ever emitting SEND.
+        pushSurface({
+          surfaceId: "battle:message",
+          address,
+          phase: "CommandPhase",
+          phaseInstance: 25,
+          localSeat: 0,
+          seatsWithInput: [0],
+          ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: null },
+        }),
+    },
+    {
+      matches: purpose => purpose.endsWith("-dismiss-switch-rejection"),
+      run: () => pushSurface(commandObservation("command:fight")),
+    },
+    {
+      matches: purpose => purpose === "nav-submit-command:command->command:fight",
+      run: () =>
+        pushSurface({
+          surfaceId: "command:fight",
+          address,
+          selectedOptionId: "move-slot:0",
+          optionIds: ["move-slot:0"],
+          moveSlots: [
+            { index: 0, optionId: "move-slot:0", moveId: 55, category: "SPECIAL", power: 40, pp: 20, usable: true },
+          ],
+          ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+        }),
+    },
+    {
+      matches: purpose => purpose === "nav-submit-command:fight->move-slot:0",
+      run: pushRelay,
+    },
+  ];
+  const client = {
+    label: "host-seat",
+    publicSeat: 0,
+    evidence,
+    async press(key, purpose) {
+      presses.push({ key, purpose });
+      const current = evidence.findLastSemanticSurface();
+      const handler = inputHandlers.find(candidate => candidate.matches(purpose));
+      assert.ok(handler, `unexpected fixture input ${key} for ${purpose}`);
+      handler.run(current);
+    },
+  };
+
+  const move = await driveBestCampaignMove(client, "rejected-switch", {
+    timeoutMs: 1_000,
+    commandEvent: firstCommand,
+  });
+
+  assert.equal(move.moveId, 55);
+  assert.equal(records.filter(record => record.kind === "campaign-voluntary-switch").length, 0);
+  assert.equal(records.filter(record => record.kind === "campaign-voluntary-switch-rejected").length, 1);
+  assert.equal(records.filter(record => record.kind === "campaign-battle-move").length, 1);
+  assert.equal(presses.filter(press => press.purpose.endsWith("-dismiss-switch-rejection")).length, 1);
+  assert.ok(
+    presses.some(press => press.purpose === "nav-submit-command:fight->move-slot:0"),
+    "the same owner must submit an attack after the rejected switch",
+  );
 });
 
 test("title navigation never shortcuts upward into the notification inbox", () => {

@@ -5833,3 +5833,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A node-pure failure-first regression recreates a four-cell Mystery grid whose global modulo sequence cycles while
   the target is reachable from a direction never attempted at that state. It requires the public-key driver to reach
   and submit the target without any DOM or game-state mutation shortcut. Production co-op code is unchanged.
+
+## 2026-07-30 - Rejected voluntary switches remain owned until a relay command exists
+
+- Exact tip `1d5be4cfc177c81d604ee677ff3df17ea7831bfd` has a fully green 45-job aggregate gate in run
+  `30508656241`; focused source/node/static qualification is green in `30508485575`. The Mystery-only campaign
+  `30508566981` proved the preceding grid-navigation repair by selecting Fight Club option 2, then exposed a new
+  harness frontier at wave 2 turn 3 while both browsers retained the same address and digest.
+- The critically injured host selected a healthy host-owned reserve through Command -> Pokemon -> Send Out. The
+  production input handler accepted every key but emitted no `[coop:relay] broadcastLocalCommand SEND`; instead it
+  presented one actionable CommandPhase message and reopened the same exact host command frontier. The generic
+  sequential driver had already retired the host as if a command existed, so it incorrectly waited for a guest
+  frontier that remained gated behind the missing host proposal.
+- Voluntary campaign switches now count only after post-input relay evidence. If CommandPhase narrates a rejection,
+  the owner dismisses that exact-address prompt once, proves the same actionable command frontier reopened, and
+  continues through Fight without surrendering ownership. A node-pure public-key regression recreates the complete
+  UI -> rejected Send Out -> prompt -> same command -> relayed attack chain; no DOM or game-state mutation is used.
+- The change is harness-only. The already-qualified Authority V2 product runtime is unchanged; the next remote proof
+  is the Mystery profile alone at the new exact SHA, not a redundant rerun of the three already-green profiles.
