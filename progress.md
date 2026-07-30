@@ -6152,3 +6152,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Replica party EXP now installs the immutable level/EXP preimage through `updateInfo(true)` and still renders and hides
   the exact retained party flyout before emitting `renderer-completed`. A source contract fixes that lifecycle order;
   the next exact-SHA qualification must prove both campaigns have zero failed presentation receipts.
+- Follow-up inspection found that `PlayerBattleInfo.updateInfo(true)` honored the instant contract for HP/status but
+  hard-coded its EXP sub-update back to animated and retained the half-second level-boundary delay. The instant flag now
+  reaches the complete recursive EXP update, including a synchronous level-boundary continuation and no duplicate
+  level-up sound. This makes the replay fix real instead of merely changing its call-site spelling.

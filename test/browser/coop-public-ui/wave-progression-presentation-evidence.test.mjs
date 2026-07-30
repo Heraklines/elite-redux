@@ -47,18 +47,29 @@ test("retained wave-progression observations are strict, typed browser evidence"
 });
 
 test("authority and replica publish one lifecycle-owned progression ledger", async () => {
-  const [observer, runtime, replay, entry, evidence, harness, campaign, campaignWorkflow, journeyWorkflow] =
-    await Promise.all([
-      read("src/data/elite-redux/coop/coop-wave-progression-observer.ts"),
-      read("src/data/elite-redux/coop/coop-runtime.ts"),
-      read("src/phases/coop-wave-progression-replay-phase.ts"),
-      read("scripts/coop-browser-entry.ts"),
-      read("test/browser/coop-public-ui/evidence.mjs"),
-      read("test/browser/coop-public-ui/public-ui-harness.mjs"),
-      read("test/browser/coop-public-ui/campaign.mjs"),
-      read(".github/workflows/coop-public-ui-campaign.yml"),
-      read(".github/workflows/coop-public-ui-journey.yml"),
-    ]);
+  const [
+    observer,
+    runtime,
+    replay,
+    playerBattleInfo,
+    entry,
+    evidence,
+    harness,
+    campaign,
+    campaignWorkflow,
+    journeyWorkflow,
+  ] = await Promise.all([
+    read("src/data/elite-redux/coop/coop-wave-progression-observer.ts"),
+    read("src/data/elite-redux/coop/coop-runtime.ts"),
+    read("src/phases/coop-wave-progression-replay-phase.ts"),
+    read("src/ui/battle-info/player-battle-info.ts"),
+    read("scripts/coop-browser-entry.ts"),
+    read("test/browser/coop-public-ui/evidence.mjs"),
+    read("test/browser/coop-public-ui/public-ui-harness.mjs"),
+    read("test/browser/coop-public-ui/campaign.mjs"),
+    read(".github/workflows/coop-public-ui-campaign.yml"),
+    read(".github/workflows/coop-public-ui-journey.yml"),
+  ]);
 
   assert.match(observer, /"authority-recorded" \| "renderer-completed" \| "renderer-failed"/u);
   assert.match(runtime, /capture\.events\.push\(structuredClone\(event\)\)[\s\S]*stage: "authority-recorded"/u);
@@ -79,6 +90,11 @@ test("authority and replica publish one lifecycle-owned progression ledger", asy
     replay,
     /renderPartyExp\([\s\S]+await pokemon\.updateInfo\(true\)[\s\S]+partyExpBar\.showPokemonExp\([\s\S]+partyExpBar\.hide\(\)/u,
     "party EXP installs its immutable field preimage instantly and receipts the retained flyout, not a second EXP tween",
+  );
+  assert.match(
+    playerBattleInfo,
+    /if \(instant\) \{[\s\S]+continueAfterLevel\(\)[\s\S]+updatePokemonExp\(pokemon, instant, durationMultiplier\)/u,
+    "PlayerBattleInfo must honor the instant contract through the recursive level-boundary EXP update",
   );
   assert.match(entry, /setCoopWaveProgressionPresentationObserver[\s\S]*PROGRESSION_EVENT_PREFIX/u);
   assert.match(evidence, /sink\.record\("browser-progression-event"/u);

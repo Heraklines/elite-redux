@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "3dfdfe56e29991d51655d880dd5e6a1a5b1ec4ec",
+  "baseSha": "158a331018240ccf9cbbbbf2c06cc09e55db443e",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -172,6 +172,7 @@
     "src/phases/turn-init-phase.ts",
     "src/phases/victory-phase.ts",
     "src/system/game-data.ts",
+    "src/ui/battle-info/player-battle-info.ts",
     "src/ui/containers/pokeball-tray.ts",
     "src/ui/handlers/abstract-option-select-ui-handler.ts",
     "src/ui/handlers/community-challenge-create-ui-handler.ts",

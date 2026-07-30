@@ -180,12 +180,19 @@ export class PlayerBattleInfo extends BattleInfo {
             globalScene.sound.stopByKey("se/exp");
           }
           if (ratio === 1) {
-            globalScene.playSound("se/level_up");
+            if (!instant) {
+              globalScene.playSound("se/level_up");
+            }
             this.setLevel(this.lastLevel);
-            globalScene.time.delayedCall(500 * levelDurationMultiplier, () => {
+            const continueAfterLevel = () => {
               this.expMaskRect.x = 0;
               this.updateInfo(pokemon, instant).then(() => resolve());
-            });
+            };
+            if (instant) {
+              continueAfterLevel();
+            } else {
+              globalScene.time.delayedCall(500 * levelDurationMultiplier, continueAfterLevel);
+            }
             return;
           }
           resolve();
@@ -212,7 +219,7 @@ export class PlayerBattleInfo extends BattleInfo {
         Phaser.Tweens.Builders.GetEaseFunction("Cubic.easeIn")(1 - Math.min(pokemon.level - this.lastLevel, 10) / 10),
         0.1,
       );
-      await this.updatePokemonExp(pokemon, false, durationMultiplier);
+      await this.updatePokemonExp(pokemon, instant, durationMultiplier);
     } else if (isLevelCapped !== oldLevelCapped) {
       this.setLevel(pokemon.level);
     }
