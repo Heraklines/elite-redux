@@ -420,16 +420,10 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     const hostGuestActor = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     hostGuestActor.hp = 1;
     hostGuestActor.doSetStatus(StatusEffect.BURN);
-    for (const enemy of rig.hostScene.getEnemyField()) {
-      enemy.hp = 1;
-    }
     withClientSync(rig.guestCtx, () => {
       const guestGuestActor = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
       guestGuestActor.hp = 1;
       guestGuestActor.doSetStatus(StatusEffect.BURN);
-      for (const enemy of rig.guestScene.getEnemyField()) {
-        enemy.hp = 1;
-      }
     });
 
     const turn = rig.hostScene.currentBattle.turn;
@@ -439,6 +433,18 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
 
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.DAZZLING_GLEAM, COOP_HOST_FIELD_INDEX);
+      // Keep the foes healthy while the real trainer AI locks its commands; otherwise it can legitimately
+      // choose a voluntary low-HP switch and later recycle that original lead as a "replacement". Stop just
+      // before TurnStart, then create the deterministic simultaneous enemy KO on both renderer images.
+      await game.phaseInterceptor.to("TurnStartPhase", false);
+      for (const enemy of rig.hostScene.getEnemyField()) {
+        enemy.hp = 1;
+      }
+      withClientSync(rig.guestCtx, () => {
+        for (const enemy of rig.guestScene.getEnemyField()) {
+          enemy.hp = 1;
+        }
+      });
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(

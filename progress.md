@@ -5778,3 +5778,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   doubles; checking total party length alone could silently put the extra reserve behind the already-covered trainer.
 - No product path changed. The next focused B11 run must prove the full enemy-first + exact player binding + both
   legal enemy replacements + zero-resync chain on parent `7f5e6c985`.
+
+## 2026-07-30 - Enemy KO injection occurs after trainer commands are locked
+
+- Focused run `30505754322` again proved enemy-first summon order, the exact bound player replacement, one V2 commit,
+  selected Charizard placement, and zero forced resyncs. Both enemy `SwitchSummonPhase` instances also ran. The final
+  identity assertion failed because the fixture set foes to one HP before the real AI chose commands: it voluntarily
+  switched one low-HP original lead, then later selected that still-healthy original as a legal faint replacement.
+- The host trace made this visible as a `SwitchSummonPhase` during `TurnStartPhase`, before Dazzling Gleam, followed by
+  the two post-faint enemy summons. The fixture now lets both real enemy commands lock while the leads are healthy,
+  stops immediately before `TurnStartPhase`, and only then sets the two live foe images to one HP on host and guest.
+  No production phase, command, switch, or authority API is mocked.
+- The next remote B11 pass on parent `ed0b58239` must therefore prove the intended live topology: two current leads
+  faint first, two genuine bench actors summon, the guest-owned burned actor faints at turn end, and its exact bound
+  replacement commits without being consumed by either earlier enemy summon.
