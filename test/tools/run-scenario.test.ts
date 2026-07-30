@@ -170,7 +170,7 @@ import type { BiomeShopUiHandler } from "#ui/handlers/biome-shop-ui-handler";
 import type { ErMapUiHandler } from "#ui/handlers/er-map-ui-handler";
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
-import { PartyOption, type PartyUiHandler } from "#ui/party-ui-handler";
+import { PartyOption, type PartyUiHandler, PartyUiMode } from "#ui/party-ui-handler";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import Phaser from "phaser";
@@ -1983,7 +1983,7 @@ function biomeShopBuysForWave(policy: RunPolicy, wave: number): string[] {
  * MEs). Turn-level modes (COMMAND / FIGHT / BALL / TARGET_SELECT) are deliberately
  * NOT owned — the per-turn logic drives those.
  */
-function isAutopilotMode(phaseName: string, mode: UiMode): boolean {
+function isAutopilotMode(phaseName: string, mode: UiMode, handler?: object): boolean {
   switch (mode) {
     case UiMode.BIOME_SHOP:
     case UiMode.ER_MAP:
@@ -2007,16 +2007,21 @@ function isAutopilotMode(phaseName: string, mode: UiMode): boolean {
         || phaseName === "SelectModifierPhase"
         || phaseName === "CheckSwitchPhase"
       );
-    case UiMode.PARTY:
+    case UiMode.PARTY: {
       // If every active player slot fainted, the phase queue can advance while
       // the mandatory replacement menu remains open.
+      const partyUiMode = (handler as { partyUiMode?: PartyUiMode } | undefined)?.partyUiMode;
       return (
         phaseName === "SelectModifierPhase"
         || phaseName === "SwitchPhase"
         || phaseName === "EnemyCommandPhase"
         || phaseName === "AttemptCapturePhase"
         || phaseName === "RevivalBlessingPhase"
+        || partyUiMode === PartyUiMode.SWITCH
+        || partyUiMode === PartyUiMode.FAINT_SWITCH
+        || partyUiMode === PartyUiMode.POST_BATTLE_SWITCH
       );
+    }
     case UiMode.TARGET_SELECT:
       // Combat batches can inherit an engine-created target confirmation from a
       // committed/virtual command for a slot that no longer takes model input.
@@ -2265,7 +2270,9 @@ function partySlotCanSendOut(handler: PartyUiHandler, pokemon: Pokemon): boolean
 function partySlotCanReplace(game: GameManager, handler: PartyUiHandler, pokemon: Pokemon, index: number): boolean {
   const battlerCount = game.scene.currentBattle.getBattlerCount();
   const isNormalBench = index >= battlerCount;
-  const isOrphanedSoloPrefix = !game.scene.gameMode.isCoop && !game.scene.gameMode.isShowdown && !pokemon.isOnField();
+  const fieldIndex = (handler as unknown as { fieldIndex?: number }).fieldIndex;
+  const isOrphanedSoloPrefix =
+    !game.scene.gameMode.isCoop && !game.scene.gameMode.isShowdown && index !== fieldIndex && !pokemon.isOnField();
   return (
     (isNormalBench || isOrphanedSoloPrefix) && pokemon.isAllowedInBattle() && partySlotCanSendOut(handler, pokemon)
   );
@@ -2274,6 +2281,7 @@ function partySlotCanReplace(game: GameManager, handler: PartyUiHandler, pokemon
 function driveParty(game: GameManager, st: RunState, phaseName: string): boolean {
   st.partyTicks++;
   const handler = game.scene.ui.getHandler() as PartyUiHandler;
+  const partyUiMode = (handler as unknown as { partyUiMode?: PartyUiMode }).partyUiMode;
   if (phaseName === "RevivalBlessingPhase") {
     const slot = game.scene.getPlayerParty().findIndex(pokemon => pokemon.isFainted());
     if (slot < 0) {
@@ -2285,7 +2293,11 @@ function driveParty(game: GameManager, st: RunState, phaseName: string): boolean
     }
     return handled;
   }
-  if (phaseName === "SwitchPhase" || phaseName === "EnemyCommandPhase") {
+  if (
+    partyUiMode === PartyUiMode.SWITCH
+    || partyUiMode === PartyUiMode.FAINT_SWITCH
+    || partyUiMode === PartyUiMode.POST_BATTLE_SWITCH
+  ) {
     const party = game.scene.getPlayerParty();
     const slot = party.findIndex((pokemon, index) => partySlotCanReplace(game, handler, pokemon, index));
     if (slot < 0) {
@@ -2484,7 +2496,7 @@ function autopilotTick(game: GameManager, st: RunState): void {
     return;
   }
 
-  if (isAutopilotMode(phaseName, mode)) {
+  if (isAutopilotMode(phaseName, mode, handler)) {
     const partyCallback =
       mode === UiMode.PARTY ? ((handler as unknown as { selectCallback?: unknown }).selectCallback ?? null) : null;
     if (
@@ -2832,15 +2844,102 @@ function isTerminalRunPhase(game: GameManager): boolean {
  * impossible TurnEndPhase after a wipe. Normal scenario tests retain the
  * stricter GameManager.toEndOfTurn() contract.
  */
-async function toCombatBatchTurnBoundary(game: GameManager): Promise<void> {
-  const boundary = await game.phaseInterceptor.toFirst([
-    "TurnEndPhase",
-    "GameOverPhase",
-    "TitlePhase",
-    "EndCardPhase",
-  ] as const);
-  if (boundary === "TurnEndPhase") {
-    await game.phaseInterceptor.to("TurnEndPhase");
+async function toCombatBatchTurnBoundary(game: GameManager): Promise<"turn-ended" | "victory" | "run-ended"> {
+  while (true) {
+    const boundary = await game.phaseInterceptor.toFirst([
+      "TurnEndPhase",
+      "VictoryPhase",
+      "BattleEndPhase",
+      "TrainerVictoryPhase",
+      "SelectModifierPhase",
+      "BiomeShopPhase",
+      "NewBattlePhase",
+      "GameOverPhase",
+      "TitlePhase",
+      "EndCardPhase",
+    ] as const);
+    if (boundary === "VictoryPhase") {
+      if (isCombatBatchVictory(game)) {
+        return "victory";
+      }
+      await game.phaseInterceptor.to("VictoryPhase");
+      if (isCombatBatchVictory(game)) {
+        return "victory";
+      }
+      continue;
+    }
+    if (boundary === "TurnEndPhase") {
+      await game.phaseInterceptor.to("TurnEndPhase");
+      const nextPhase = game.scene.phaseManager.getCurrentPhase()?.phaseName;
+      if (
+        nextPhase === "VictoryPhase"
+        || nextPhase === "BattleEndPhase"
+        || nextPhase === "TrainerVictoryPhase"
+        || nextPhase === "SelectModifierPhase"
+        || nextPhase === "BiomeShopPhase"
+        || nextPhase === "NewBattlePhase"
+      ) {
+        continue;
+      }
+      return "turn-ended";
+    }
+    if (
+      boundary === "BattleEndPhase"
+      || boundary === "TrainerVictoryPhase"
+      || boundary === "SelectModifierPhase"
+      || boundary === "BiomeShopPhase"
+      || boundary === "NewBattlePhase"
+    ) {
+      return "victory";
+    }
+    return "run-ended";
+  }
+}
+
+/** Match VictoryPhase's trainer terminal predicate, including segmented/final-faint state. */
+function isCombatBatchVictory(game: GameManager): boolean {
+  return game.scene.getEnemyParty().every(pokemon => pokemon.isFainted(true));
+}
+
+/** Advance toward the next command without crossing an indirect-KO victory tail. */
+async function toCombatBatchNextCommand(game: GameManager): Promise<"command" | "victory" | "run-ended"> {
+  while (true) {
+    const boundary = await game.phaseInterceptor.toFirst([
+      "CommandPhase",
+      "VictoryPhase",
+      "BattleEndPhase",
+      "TrainerVictoryPhase",
+      "SelectModifierPhase",
+      "BiomeShopPhase",
+      "NewBattlePhase",
+      "GameOverPhase",
+      "TitlePhase",
+      "EndCardPhase",
+    ] as const);
+    if (boundary === "CommandPhase") {
+      await game.phaseInterceptor.to("CommandPhase");
+      return "command";
+    }
+    if (boundary === "VictoryPhase") {
+      if (isCombatBatchVictory(game)) {
+        return "victory";
+      }
+      await game.phaseInterceptor.to("VictoryPhase");
+      if (isCombatBatchVictory(game)) {
+        return "victory";
+      }
+      continue;
+    }
+    if (
+      boundary === "BattleEndPhase"
+      || boundary === "TrainerVictoryPhase"
+      || boundary === "SelectModifierPhase"
+      || boundary === "BiomeShopPhase"
+      || boundary === "NewBattlePhase"
+    ) {
+      return "victory";
+    }
+    return "run-ended";
   }
 }
 
@@ -2864,7 +2963,7 @@ async function playWaveTurns(
   let maxHits = 0;
   const enemyMovesUsed: string[] = [];
 
-  if (game.isVictory()) {
+  if (COMBAT_BATCH ? isCombatBatchVictory(game) : game.isVictory()) {
     return { won: true, wiped: false, turns: 0, maxHits: 0, enemyMovesUsed };
   }
 
@@ -2893,9 +2992,10 @@ async function playWaveTurns(
     if (action && hasEnemyForce(action)) {
       await forceEnemyActions(game, action, st.log);
     }
+    let combatBoundary: Awaited<ReturnType<typeof toCombatBatchTurnBoundary>> | null = null;
     try {
       if (COMBAT_BATCH) {
-        await toCombatBatchTurnBoundary(game);
+        combatBoundary = await toCombatBatchTurnBoundary(game);
       } else {
         await game.toEndOfTurn();
       }
@@ -2969,7 +3069,7 @@ async function playWaveTurns(
     if (!opts.quiet) {
       console.log("STATE", JSON.stringify(snapshot(game)));
     }
-    if (game.isVictory()) {
+    if (combatBoundary === "victory" || (COMBAT_BATCH ? isCombatBatchVictory(game) : game.isVictory())) {
       won = true;
       break;
     }
@@ -2979,7 +3079,25 @@ async function playWaveTurns(
     }
     if (turn < opts.maxTurns) {
       try {
-        await game.toNextTurn(); // autopilot drives any pending faint-switch PARTY
+        if (COMBAT_BATCH) {
+          const nextBoundary = await toCombatBatchNextCommand(game);
+          if (nextBoundary === "victory") {
+            won = true;
+            break;
+          }
+          if (nextBoundary === "run-ended") {
+            return {
+              won: false,
+              wiped: game.scene.getPlayerParty().every(p => p.isFainted()),
+              turns,
+              maxHits,
+              enemyMovesUsed,
+              runEnded: true,
+            };
+          }
+        } else {
+          await game.toNextTurn(); // autopilot drives any pending faint-switch PARTY
+        }
       } catch (error) {
         if (isTerminalRunPhase(game)) {
           return {
@@ -3263,8 +3381,13 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
       stopAutopilot();
     }
     const combatMs = Math.round(performance.now() - combatStart);
-    const currentPhase = game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "";
-    const forbiddenProgressionPhases = new Set(["SelectModifierPhase", "BiomeShopPhase", "NewBattlePhase"]);
+    const forbiddenProgressionPhases = new Set([
+      "BattleEndPhase",
+      "TrainerVictoryPhase",
+      "SelectModifierPhase",
+      "BiomeShopPhase",
+      "NewBattlePhase",
+    ]);
     const progressionPhaseEntries = game.phaseInterceptor.log.filter(phase =>
       forbiddenProgressionPhases.has(phase),
     ).length;
@@ -3282,8 +3405,11 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
       .map(timing => ({ phase: timing.phase, ms: Math.round(timing.ms) }))
       .sort((a, b) => b.ms - a.ms)
       .slice(0, 20);
-    if (currentPhase === "SelectModifierPhase" || progressionPhaseEntries > 0) {
-      throw new Error(`${episode.id}: combat-only worker entered a reward or progression phase`);
+    if (progressionPhaseEntries > 0) {
+      const executed = game.phaseInterceptor.log.filter(phase => forbiddenProgressionPhases.has(phase));
+      throw new Error(
+        `${episode.id}: combat-only worker executed a reward or progression phase: ${executed.join(", ")}`,
+      );
     }
     appendAiEpisodeTerminal({
       outcome: result.won ? "victory" : result.wiped || result.runEnded ? "player-wiped" : "max-turns-reached",
@@ -3734,6 +3860,24 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     const { game } = await runInline(phaserGame, spec);
     expect(game.scene.getPlayerField()[0].species.speciesId, "PIKACHU should be active after the switch").toBe(
       SpeciesId.PIKACHU,
+    );
+  }, 180_000);
+
+  it("a pivot move selects a bench replacement instead of the withdrawn source", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "pivot replacement",
+      run: { level: 100, difficulty: "ace" },
+      party: [
+        { species: SpeciesId.KILOWATTREL, moves: [MoveId.VOLT_SWITCH] },
+        { species: SpeciesId.SNORLAX, moves: [MoveId.SPLASH] },
+      ],
+      enemy: { kind: "wild", wild: { species: SpeciesId.CHANSEY, level: 100, moves: [MoveId.SPLASH] } },
+      script: [{ move: "VOLT_SWITCH", target: BattlerIndex.ENEMY, enemyMove: "SPLASH" }],
+    };
+    const { game } = await runInlineRun(phaserGame, spec, 1);
+    expect(game.scene.getPlayerField()[0].species.speciesId, "the bench Snorlax should replace Kilowattrel").toBe(
+      SpeciesId.SNORLAX,
     );
   }, 180_000);
 
