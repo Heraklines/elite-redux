@@ -6138,3 +6138,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   3.3 GB survivor and was terminated under the workstation-contention rule, so the next remote static shard is the
   authoritative compile proof. Exact Mystery/depth browser requalification also remains required; no deployment is
   authorized.
+
+## 2026-07-30 - Retained party EXP receipts the flyout instead of a second field tween
+
+- Exact Mystery run `30552115976` mechanically cleared six waves (including the wave-4 embedded battle) and exact
+  depth run `30552115449` cleared all four requested waves with two replacement controls. Both peers reached matching
+  later command surfaces, but each campaign correctly failed its strict presentation ledger when the replica's
+  level-crossing party EXP cue exceeded the 15-second renderer watchdog.
+- The authority's `ShowPartyExpBarPhase` starts the field-info refresh without awaiting it and owns progression through
+  the small party EXP flyout. The replica instead awaited a second non-instant `PlayerBattleInfo` EXP tween before it
+  showed that flyout. At the remote browser's deliberately constrained frame rate, the recursive level-boundary tween
+  exceeded the receipt deadline even though mechanics, state, and the later public screen remained synchronized.
+- Replica party EXP now installs the immutable level/EXP preimage through `updateInfo(true)` and still renders and hides
+  the exact retained party flyout before emitting `renderer-completed`. A source contract fixes that lifecycle order;
+  the next exact-SHA qualification must prove both campaigns have zero failed presentation receipts.

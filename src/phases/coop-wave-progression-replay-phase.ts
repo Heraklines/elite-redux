@@ -14,7 +14,6 @@ import { observeCoopWaveProgressionPresentation } from "#data/elite-redux/coop/c
 import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { getTypeRgb } from "#data/type";
 import { Button } from "#enums/buttons";
-import { ExpGainsSpeed } from "#enums/exp-gains-speed";
 import { ExpNotification } from "#enums/exp-notification";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
@@ -528,7 +527,12 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     if (signal.aborted) {
       throw new CoopWaveProgressionPresentationCancelled("exp-presentation-retired");
     }
-    await pokemon.updateInfo(globalScene.expGainsSpeed >= ExpGainsSpeed.SKIP);
+    // ShowPartyExpBarPhase never waits for the field EXP bar before advancing the party flyout. Waiting for a
+    // non-instant update here is observably different: a level boundary can recurse through PlayerBattleInfo's
+    // Phaser tween/delayedCall chain and, on a low-frame-rate replica, outlive this event's hard watchdog even
+    // though the small party flyout is healthy. Install the immutable preimage instantly; the retained flyout
+    // below remains the visible, lifecycle-owned presentation for this event.
+    await pokemon.updateInfo(true);
     if (signal.aborted) {
       throw new CoopWaveProgressionPresentationCancelled("exp-presentation-retired");
     }

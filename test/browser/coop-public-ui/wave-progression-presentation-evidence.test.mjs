@@ -75,6 +75,11 @@ test("authority and replica publish one lifecycle-owned progression ledger", asy
     /promptLevelUpStats\([\s\S]+for \(let panel = 0; panel < 2; panel\+\+\)[\s\S]+presentationDelay\([\s\S]+handler\.processInput\(Button\.ACTION\)/u,
     "both retained level-up panels remain visible but their callbacks are lifecycle-owned",
   );
+  assert.match(
+    replay,
+    /renderPartyExp\([\s\S]+await pokemon\.updateInfo\(true\)[\s\S]+partyExpBar\.showPokemonExp\([\s\S]+partyExpBar\.hide\(\)/u,
+    "party EXP installs its immutable field preimage instantly and receipts the retained flyout, not a second EXP tween",
+  );
   assert.match(entry, /setCoopWaveProgressionPresentationObserver[\s\S]*PROGRESSION_EVENT_PREFIX/u);
   assert.match(evidence, /sink\.record\("browser-progression-event"/u);
   assert.match(
