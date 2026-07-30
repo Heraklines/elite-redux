@@ -6005,3 +6005,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Trapped voluntary switches now retire PARTY through MESSAGE, narrate switch semantics, and restore the exact
   field's COMMAND handler after dismissal. The source contract and simulated public-driver fallback are green;
   the complete local node-pure contract set passes 157/157 before remote causal requalification.
+
+## 2026-07-30 - Bargain coordinates become intrinsic and Mystery targets ignore stale owners
+
+- Focused exact-SHA run `30537052257` passed every selected source/engine shard and its real two-browser public
+  journey, but its static lane caught four TypeScript diagnostics in the Bargain coordinate fix. The phase was
+  reading complete-state fields through broader transport unions even though the operation boundary is the component
+  that validates the immutable result.
+- Bargain result commits now accept no caller-supplied wave or turn. The operation boundary validates the complete
+  `meResync` image first and derives both coordinates from `authoritativeState` internally for host-owned and
+  guest-owned results. This closes the ambient-coordinate API seam as well as the compile failure.
+- Exact Mystery artifact `30526577924` showed a separate harness-only stall: during a chained wave-6 reward target,
+  the host's superseded wave-1 self-owner was found before the guest's current actionable owner. Semantic-only owner
+  resolution now discards superseded per-client candidates before selecting a seat, so a historical asymmetric
+  surface cannot hide the partner's live control.
+- Failure-first owner-resolution coverage reproduces the cross-seat history exactly. Bargain/source/campaign
+  contracts pass 165/165 locally; full `tsc` reports only the repository's existing non-co-op baseline and no
+  diagnostics in the changed co-op files. Remote exact-SHA static and causal Mystery requalification remain required.

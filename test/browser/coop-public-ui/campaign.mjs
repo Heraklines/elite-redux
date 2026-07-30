@@ -1626,9 +1626,13 @@ async function driveBattleWave(rig, policy, stats) {
  * The client that reports ITSELF as owner of `surfaceId` in the v2 semantic mirror
  * (ownerSeat === its own localSeat), or null. Evidence-derived ownership - never rig.host.
  */
-function findSemanticOwner(rig, surfaceId, cursors) {
+function findSemanticOwner(rig, surfaceId, cursors, { currentOnly = false } = {}) {
   for (const client of Object.values(rig.clients)) {
-    const event = client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, surfaceId);
+    const cursor = cursors[client.label] ?? 0;
+    const event = client.evidence.findLastSemanticSurface(cursor, surfaceId);
+    if (currentOnly && event?.index !== client.evidence.findLastSemanticSurface(cursor)?.index) {
+      continue;
+    }
     const observation = event?.observation;
     if (observation && observation.ownerSeat != null && observation.ownerSeat === observation.localSeat) {
       return { client, markerEvent: event };
@@ -1798,7 +1802,9 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
   // post-battle cursor is captured. Prefer the semantic appearance whenever a driver declares one;
   // otherwise a valid visible reward/market can be parked even though both browsers report its owner.
   if (driver.v2SurfaceId) {
-    const semanticOwner = findSemanticOwner(rig, driver.v2SurfaceId, cursors);
+    const semanticOwner = findSemanticOwner(rig, driver.v2SurfaceId, cursors, {
+      currentOnly: driver.semanticOnly === true,
+    });
     if (semanticOwner) {
       if (driver.semanticOnly) {
         const cursor = cursors[semanticOwner.client.label] ?? 0;

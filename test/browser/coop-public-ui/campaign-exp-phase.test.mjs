@@ -672,6 +672,59 @@ test("a semantic-only reward target stops registering after a newer public surfa
   );
 });
 
+test("a stale semantic-only owner on one seat cannot hide the partner's current owner surface", () => {
+  const host = fakeClient("host");
+  host.publicSeat = 0;
+  const guest = fakeClient("guest");
+  guest.publicSeat = 1;
+  const rig = { host, guest, clients: { host, guest } };
+  const driver = {
+    name: "reward-target",
+    v2SurfaceId: "party:reward-target",
+    semanticOnly: true,
+    owner: { role: "host" },
+  };
+  host.evidence.events.push({
+    index: host.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "party:reward-target",
+      address: { epoch: 9, wave: 1, turn: 2 },
+      localSeat: 0,
+      ownerSeat: 0,
+      ready: { handlerActive: true },
+    },
+  });
+  host.evidence.events.push({
+    index: host.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      address: { epoch: 9, wave: 6, turn: 1 },
+      localSeat: 0,
+      ownerSeat: 1,
+      ready: { handlerActive: true, inputBlocked: true },
+    },
+  });
+  guest.evidence.events.push({
+    index: guest.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "party:reward-target",
+      address: { epoch: 9, wave: 6, turn: 1 },
+      localSeat: 1,
+      ownerSeat: 1,
+      ready: { handlerActive: true },
+    },
+  });
+
+  assert.equal(
+    resolveSurfaceOwner(rig, driver, { host: 0, guest: 0 }, new Map(), true)?.client,
+    guest,
+    "the resolver must skip a superseded local owner and continue to the partner's live owner",
+  );
+});
+
 test("direct dispatch cannot re-drive a superseded semantic-only Revival owner", () => {
   const authority = fakeClient("authority");
   authority.publicSeat = 1;

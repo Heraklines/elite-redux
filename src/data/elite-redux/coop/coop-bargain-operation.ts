@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+// biome-ignore lint/suspicious/noImportCycles: This operation adapter captures the canonical battle image through the established runtime/engine composition cycle.
 import { applyCoopMeOutcome, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_BARGAIN, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -157,7 +158,11 @@ function intentFor(pinned: number, outcome: CoopInteractionOutcome): CoopPending
   };
 }
 
-function commit(pinned: number, outcome: CoopInteractionOutcome, wave: number, turn: number): boolean {
+function commit(pinned: number, outcome: CoopInteractionOutcome): boolean {
+  if (!isCompleteCoopMeResyncOutcome(outcome)) {
+    return false;
+  }
+  const { wave, turn } = outcome.authoritativeState;
   const intent = intentFor(pinned, outcome);
   const result = host().submit(intent, controlContext(wave, turn, outcome), proposed =>
     proposed.owner === coopInteractionOwnerSeat(pinned) ? { ok: true } : { ok: false, reason: "wrong-owner" },
@@ -227,13 +232,11 @@ export function commitBargainOwnerOutcome(params: {
   pinned: number;
   outcome: CoopInteractionOutcome;
   localRole: CoopRole;
-  wave: number;
-  turn?: number;
 }): boolean {
   if (!isCoopBargainOperationEnabled()) {
     return true;
   }
-  if (params.pinned < 0) {
+  if (params.pinned < 0 || !isCompleteCoopMeResyncOutcome(params.outcome)) {
     return false;
   }
   // A guest-owned bargain uses the raw typed outcome only as its proposal carrier; the host watcher is the
@@ -242,7 +245,7 @@ export function commitBargainOwnerOutcome(params: {
     return true;
   }
   try {
-    return commit(params.pinned, params.outcome, params.wave, params.turn ?? 0);
+    return commit(params.pinned, params.outcome);
   } catch (error) {
     coopWarn("reward", "bargain owner op commit threw; refusing the unretained terminal", error);
     return false;
@@ -355,13 +358,13 @@ export function adoptBargainWatcherOutcome(params: {
 /** Host watcher post-terminal seam for a guest-owned Bargain proposal. */
 export function commitBargainWatcherOutcome(
   operationId: string,
-  params: { readonly pinned: number; readonly wave: number; readonly turn: number },
+  params: { readonly pinned: number },
   outcome: CoopInteractionOutcome,
 ): boolean {
   return (
     operationId === coopBargainOperationId(params.pinned)
     && isCompleteCoopMeResyncOutcome(outcome)
-    && commit(params.pinned, outcome, params.wave, params.turn)
+    && commit(params.pinned, outcome)
   );
 }
 

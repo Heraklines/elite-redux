@@ -127,6 +127,7 @@ const authorityStateHooks = readFileSync(
 );
 const biomeOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-biome-operation.ts", root), "utf8");
 const selectModifierPhase = readFileSync(new URL("src/phases/select-modifier-phase.ts", root), "utf8");
+const bargainOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-bargain-operation.ts", root), "utf8");
 const theBargainPhase = readFileSync(new URL("src/phases/the-bargain-phase.ts", root), "utf8");
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
@@ -2649,8 +2650,8 @@ test("every relay-driven remote interaction derives one exact authority proposal
   const flush = theBargainPhase.slice(flushStart, flushEnd);
   assert.match(
     flush,
-    /commitBargainOwnerOutcome\(\{[\s\S]*?wave: outcome\.authoritativeState\.wave,[\s\S]*?turn: outcome\.authoritativeState\.turn/u,
-    "a host-owned Bargain commit keeps the immutable captured state's coordinates",
+    /commitBargainOwnerOutcome\(\{[\s\S]*?pinned: this\.coopBargainStart,[\s\S]*?outcome,[\s\S]*?localRole: controller\.role/u,
+    "a host-owned Bargain commit passes the immutable captured result to its authority boundary",
   );
   assert.doesNotMatch(
     flush,
@@ -2664,8 +2665,13 @@ test("every relay-driven remote interaction derives one exact authority proposal
   const watcher = theBargainPhase.slice(watcherStart, watcherEnd);
   assert.match(
     watcher,
-    /commitBargainWatcherOutcome\([\s\S]*?wave: adoption\.authoritativeOutcome\.authoritativeState\.wave,[\s\S]*?turn: adoption\.authoritativeOutcome\.authoritativeState\.turn/u,
-    "a guest-owned Bargain result keeps the immutable proposed state's coordinates",
+    /commitBargainWatcherOutcome\([\s\S]*?adoption\.operationId,[\s\S]*?pinned: this\.coopBargainStart,[\s\S]*?adoption\.authoritativeOutcome/u,
+    "a guest-owned Bargain commit passes the authority-recaptured immutable result to its boundary",
+  );
+  assert.match(
+    bargainOperation,
+    /function commit\(pinned: number, outcome: CoopInteractionOutcome\): boolean \{[\s\S]*?isCompleteCoopMeResyncOutcome\(outcome\)[\s\S]*?const \{ wave, turn \} = outcome\.authoritativeState;[\s\S]*?controlContext\(wave, turn, outcome\)/u,
+    "the Bargain boundary validates complete state and derives coordinates only from that immutable state",
   );
 
   const resultSettleStart = theBargainPhase.indexOf("  public settleCoopV2CommittedBargainResult(");
