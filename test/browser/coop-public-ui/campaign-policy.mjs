@@ -386,7 +386,11 @@ export function buildDispatchTable(policy) {
       v2SurfaceId: "mystery-encounter",
       owner: { marker: ME_HOST_OWNER },
       keys: policy.keys.mystery,
-      preferLastEnabledOption: policy.mysteryGauntlet.required,
+      // The long-running depth lane is proving progression/survivability, not press-your-luck
+      // Mystery combat. Prefer the final enabled option there (as the Mystery gauntlet already
+      // does), which is ordinarily the lower-risk leave/support branch. Keep the animation-surface
+      // lane on option zero so embedded Mystery battles remain covered by a distinct profile.
+      preferLastEnabledOption: policy.mysteryGauntlet.required || policy.renderProfile === "animations-skipped-depth",
     },
     {
       name: "mystery-subprompt",

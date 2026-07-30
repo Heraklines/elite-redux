@@ -6079,3 +6079,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The heavyweight matrix is capped at 24 concurrent jobs so its four mutation shards and browser/static/source
   sentinels remain inside the 32-runner co-op allocation. The co-op-only plan is exactly 21 shards
   (A=1, B=13, C=5, P=2); its source contract passes 15/15 and changed-file formatting is clean.
+
+## 2026-07-30 - Depth campaigns avoid optional press-your-luck Mystery battles
+
+- Exact depth run `30542111085` cleared three waves with matching state and presentation evidence, then both peers
+  entered the same Authority V2 terminal after the driver chose Dancing Lessons option zero and lost its optional
+  enraged two-bar boss fight. Revision 29 reached `controlInstalled` on both browsers; this was a synchronized
+  Game Over, not a desync, softlock, or terminal-authority defect.
+- The long-running depth profile now chooses the last enabled Mystery option, matching the already-qualified Mystery
+  gauntlet's lower-risk public-key policy. The animation-surface profile deliberately retains option zero so embedded
+  Mystery battles remain covered rather than disappearing from the browser matrix.
+- Profile contracts prove the split explicitly. Production code, Authority V2, Showdown, tournament, triples, and
+  deployment behavior are unchanged.

@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { loadCampaignPolicy } from "./campaign-policy.mjs";
+import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
 import { EvidenceSink, isCapturedApiUrl, waitForPublicInputDispatch } from "./evidence.mjs";
 
 function withRenderProfile(value, callback) {
@@ -48,11 +48,19 @@ test("render profiles are explicit and the depth profile retains public Settings
     const policy = loadCampaignPolicy();
     assert.equal(policy.renderProfile, "animations-on-surface");
     assert.equal(policy.moveAnimationsExpected, true);
+    assert.equal(
+      buildDispatchTable(policy).find(driver => driver.name === "mystery-encounter")?.preferLastEnabledOption,
+      false,
+    );
   });
 
   withRenderProfile("animations-skipped-depth", () => {
     const policy = loadCampaignPolicy();
     assert.equal(policy.moveAnimationsExpected, false);
+    assert.equal(
+      buildDispatchTable(policy).find(driver => driver.name === "mystery-encounter")?.preferLastEnabledOption,
+      true,
+    );
     assert.deepEqual(policy.keys.renderProfileToggle, ["ArrowRight"]);
     assert.deepEqual(policy.keys.renderProfileOpen.slice(-6), ["r", ...new Array(5).fill("ArrowDown")]);
     assert.equal(policy.keys.renderProfileCloseKeysFromEnv, false);
