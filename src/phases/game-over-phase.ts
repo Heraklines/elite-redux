@@ -12,8 +12,18 @@ import {
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
 import { erRecordDailySeedWon } from "#data/elite-redux/er-achievement-detection";
-import { enqueueFounderPublish, recordLocalDraftAttempt } from "#data/elite-redux/er-community-challenges";
-import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
+import {
+  enqueueCommunityResult,
+  enqueueFounderPublish,
+  recordLocalCommunityStatus,
+  recordLocalDraftAttempt,
+} from "#data/elite-redux/er-community-challenges";
+import {
+  getCommunityRunState,
+  getFounderRunState,
+  setCommunityRunState,
+  setFounderRunState,
+} from "#data/elite-redux/er-community-run-state";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -279,6 +289,7 @@ export class GameOverPhase extends BattlePhase {
               // auto-publishes the draft (flips draft->active); a LOSS still records the
               // attempt locally so the draft is NOT lost and stays in MY CHALLENGES to finalize.
               this.recordFounderRunOutcome();
+              this.recordCommunityRunOutcome();
               // Co-op (#829/#834): the run is over - tear the co-op runtime down on THIS client so the
               // run-over tail cleans up on BOTH clients (drop the detached ME listeners + stall watchdog,
               // close the transport, and zero the ME pins so nothing leaks into the next co-op run). Placed
@@ -401,6 +412,30 @@ export class GameOverPhase extends BattlePhase {
         clearTimeMs: Math.round((globalScene.sessionPlayTime ?? 0) * 1000),
         party,
         partyRoots,
+      },
+    });
+  }
+
+  /** Record an ordinary player's published community-challenge result. */
+  private recordCommunityRunOutcome(): void {
+    const active = getCommunityRunState();
+    if (!active) {
+      return;
+    }
+    setCommunityRunState(null);
+    const outcome = this.isVictory ? "cleared" : "failed";
+    recordLocalCommunityStatus(active.challengeId, outcome);
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const playerParty = globalScene.getPlayerParty();
+    enqueueCommunityResult({
+      challengeId: active.challengeId,
+      config: active.config,
+      outcome,
+      run: {
+        wave,
+        clearTimeMs: Math.round((globalScene.sessionPlayTime ?? 0) * 1000),
+        party: playerParty.map(p => new PokemonData(p)),
+        partyRoots: [...new Set(playerParty.map(p => p.species.getRootSpeciesId()))],
       },
     });
   }

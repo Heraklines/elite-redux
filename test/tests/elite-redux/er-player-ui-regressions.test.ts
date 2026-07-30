@@ -10,6 +10,7 @@ import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { speciesTmMoves } from "#balance/tms";
 import { FreshStartChallenge } from "#data/challenge";
 import { allSpecies } from "#data/data-lists";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { ER_BLACK_SHINY_LUCK, isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { ER_WEBBED_BRUISER_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
 import { resolveErSpeciesConstId } from "#data/elite-redux/er-type-nativization";
@@ -121,6 +122,21 @@ describe.skipIf(!RUN)("reported player UI regressions", () => {
 
     expect(internals.eggMoves).toHaveLength(4);
     expect(internals.blockInput).toBe(false);
+  });
+
+  it("opens starter select when the editor configures more than five Pokerus starters", async () => {
+    await game.runToTitle();
+    const handler = game.scene.ui.handlers[UiMode.STARTER_SELECT] as StarterSelectUiHandler;
+    const internals = handler as unknown as {
+      pokerusCursorObjs: Phaser.GameObjects.Image[];
+      pokerusSpecies: unknown[];
+    };
+    const configuredCount = erBalanceNum("vanilla.pokerusCount");
+
+    expect(configuredCount).toBeGreaterThan(5);
+    expect(() => handler.show([() => {}])).not.toThrow();
+    expect(internals.pokerusSpecies).toHaveLength(configuredCount);
+    expect(internals.pokerusCursorObjs).toHaveLength(configuredCount);
   });
 
   it("cycles Larvesta Redux through its native Ghost third type", async () => {

@@ -19,14 +19,17 @@
 import {
   buildMyChallengesFeed,
   type CommunityChallengeConfig,
+  enqueueCommunityResult,
+  getLocalCommunityStatuses,
   getLocalDraft,
   listLocalDrafts,
+  recordLocalCommunityStatus,
   recordLocalDraftAttempt,
   saveLocalDraft,
 } from "#data/elite-redux/er-community-challenges";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { GameModes } from "#enums/game-modes";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 function makeConfig(id: string, allowedSpecies: number[] | null = null): CommunityChallengeConfig {
   return {
@@ -90,6 +93,7 @@ describe("ER Community Challenge - local drafts (MY CHALLENGES)", () => {
     expect(feed.featured).toHaveLength(1);
     const entry = feed.featured[0];
     expect(entry.config.id).toBe("draft-feed");
+    expect(entry.status).toBe("draft");
     expect(entry.stats.failed).toBe(1);
     expect(entry.allowedCount).toBe(3);
     expect(entry.allowedPreview).toEqual([1, 4, 7]);
@@ -97,9 +101,40 @@ describe("ER Community Challenge - local drafts (MY CHALLENGES)", () => {
     expect(entry.rules.length).toBeGreaterThan(0);
   });
 
+  it("marks a locally-published challenge active in the MY tab feed", () => {
+    saveLocalDraft(makeConfig("published-feed"));
+    recordLocalDraftAttempt("published-feed", "cleared", 200);
+
+    expect(buildMyChallengesFeed().featured[0].status).toBe("active");
+    expect(buildMyChallengesFeed().featured[0].playerStatus).toBe("cleared");
+  });
+
   it("an empty store yields an empty feed (no crash, MY tab shows its empty state)", () => {
     const feed = buildMyChallengesFeed();
     expect(feed.featured).toHaveLength(0);
     expect(feed.selected).toBeNull();
+  });
+
+  it("keeps a player's completed-card status sticky", () => {
+    recordLocalCommunityStatus("cc-clear", "in_progress");
+    recordLocalCommunityStatus("cc-clear", "cleared");
+    recordLocalCommunityStatus("cc-clear", "failed");
+    expect(getLocalCommunityStatuses()["cc-clear"]).toBe("cleared");
+  });
+
+  it("durably queues server results and never replaces a queued clear with a loss", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    const config = makeConfig("cc-queued");
+    const run = { wave: 200, clearTimeMs: 1234, party: [], partyRoots: [] };
+    enqueueCommunityResult({ challengeId: config.id, config, outcome: "cleared", run });
+    enqueueCommunityResult({ challengeId: config.id, config, outcome: "failed", run });
+
+    const queued = JSON.parse(localStorage.getItem("er_pending_community_results") ?? "[]") as Array<{
+      challengeId: string;
+      outcome: string;
+    }>;
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({ challengeId: "cc-queued", outcome: "cleared" });
+    fetchSpy.mockRestore();
   });
 });

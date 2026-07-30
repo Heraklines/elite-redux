@@ -53,8 +53,10 @@ import type { CoopLaunchSnapshotAbortReason, CoopResumeCommitment } from "#data/
 import { getErAchievementRunState, restoreErAchievementRunState } from "#data/elite-redux/er-achievement-run-state";
 import {
   getCommunityAllowedSpecies,
+  getCommunityRunState,
   getFounderRunState,
   setCommunityAllowedSpecies,
+  setCommunityRunState,
   setFounderRunState,
 } from "#data/elite-redux/er-community-run-state";
 import {
@@ -1919,6 +1921,9 @@ export class GameData {
       // ER Community Challenge: if this run is a founder's qualifying play of a draft,
       // persist {draftId, config} so a mid-run reload still auto-publishes on the win.
       founderChallenge: getFounderRunState() ?? undefined,
+      // Persist ordinary community runs too, so a reload cannot lose the final
+      // clear/fail report and leave the card permanently "in progress".
+      communityChallenge: getCommunityRunState() ?? undefined,
       // ER Community Challenge: persist the allowed-species whitelist so the catch gate
       // survives a mid-run reload (it gates the whole run, not just starter-select).
       communityAllowedSpecies: getCommunityAllowedSpecies() ?? undefined,
@@ -5070,6 +5075,7 @@ export class GameData {
     // ER Community Challenge: restore the founder qualifying-run linkage so a reload
     // still auto-publishes the draft on the eventual win (null for non-founder saves).
     setFounderRunState(fromSession.founderChallenge ?? null);
+    setCommunityRunState(fromSession.communityChallenge ?? null);
     // ER Community Challenge: restore the allowed-species whitelist so the catch gate
     // keeps working after a mid-run reload (null/absent for non-community saves).
     setCommunityAllowedSpecies(fromSession.communityAllowedSpecies ?? null);

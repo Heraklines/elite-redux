@@ -2051,8 +2051,7 @@ export class FormChangeItemModifierTypeGenerator extends ModifierTypeGenerator {
                   let foundULTRA_Z = false;
                   let foundN_LUNA = false;
                   let foundN_SOLAR = false;
-                  formChangeItemTriggers.forEach((fc, _i) => {
-                    console.log("Checking ", fc.item);
+                  formChangeItemTriggers.forEach(fc => {
                     switch (fc.item) {
                       case FormChangeItem.ULTRANECROZIUM_Z:
                         foundULTRA_Z = true;
@@ -2070,8 +2069,6 @@ export class FormChangeItemModifierTypeGenerator extends ModifierTypeGenerator {
                     formChangeItemTriggers = formChangeItemTriggers.filter(
                       fc => fc.item !== FormChangeItem.ULTRANECROZIUM_Z,
                     );
-                  } else {
-                    console.log("DID NOT FIND ");
                   }
                 }
                 return formChangeItemTriggers;
@@ -2952,7 +2949,6 @@ export interface ModifierPool {
 }
 
 let modifierPoolThresholds = {};
-let ignoredPoolIndexes = {};
 
 let dailyStarterModifierPoolThresholds = {};
 // biome-ignore lint/correctness/noUnusedVariables: TODO explain why this is marked as OK
@@ -3054,7 +3050,6 @@ export function regenerateModifierPoolThresholds(
   switch (poolType) {
     case ModifierPoolType.PLAYER:
       modifierPoolThresholds = thresholds;
-      ignoredPoolIndexes = ignoredIndexes;
       break;
     case ModifierPoolType.WILD:
     case ModifierPoolType.TRAINER:
@@ -3290,26 +3285,9 @@ export function getPlayerShopModifierTypeOptionsForWave(
             "er-biome-shop-gen",
           );
         }
-        // ABSOLUTE APPEARANCE GATE (er-mega-tiers): a mega/primal stone rolled into
-        // a biome-shop form-change slot must clear its tier's absolute appearance
-        // rate, so a MASTER stone stays genuinely rare even as the party's ONLY
-        // eligible stone. On a gate MISS the slot is skipped (yields nothing) - it
-        // never leaves an empty slot uncomputed. Rolled under the SAME wave seed the
-        // stock roll uses, so the reward phase and the UI handler agree on the stock.
-        if (mt instanceof FormChangeItemModifierType) {
-          let appears = true;
-          const stone = mt.formChangeItem;
-          globalScene.executeWithSeedOffset(
-            () => {
-              appears = erMegaStoneAppearsAtGate(stone);
-            },
-            waveIndex,
-            "er-biome-shop-mega-gate",
-          );
-          if (!appears) {
-            mt = null;
-          }
-        }
+        // Shops are reliable: once a form-change slot rolls a compatible stone,
+        // display it. Tier weighting, price and stock already provide scarcity;
+        // applying the random-drop appearance gate here created empty shop slots.
         if (mt != null) {
           // CRITICAL: set the id first. getOrInferTier reverse-looks-up the
           // item in the reward pools BY id; without it every item returns a
@@ -3586,16 +3564,10 @@ function getNewModifierTypeOption(
     return null;
   }
 
-  if (player) {
-    console.log(index, ignoredPoolIndexes[tier].filter(i => i <= index).length, ignoredPoolIndexes[tier]);
-  }
   let modifierType: ModifierType | null = pool[tier][index].modifierType;
   if (modifierType instanceof ModifierTypeGenerator) {
     modifierType = (modifierType as ModifierTypeGenerator).generateType(party);
     if (modifierType === null) {
-      if (player) {
-        console.log(ModifierTier[tier], upgradeCount);
-      }
       return getNewModifierTypeOption(party, poolType, tier, upgradeCount, ++retryCount);
     }
   }
@@ -3610,8 +3582,6 @@ function getNewModifierTypeOption(
   if (modifierType instanceof FormChangeItemModifierType && !erMegaStoneAppearsAtGate(modifierType.formChangeItem)) {
     return getNewModifierTypeOption(party, poolType, tier, upgradeCount, ++retryCount);
   }
-
-  console.log(modifierType, player ? "" : "(enemy)");
 
   return new ModifierTypeOption(modifierType as ModifierType, upgradeCount!); // TODO: is this bang correct?
 }

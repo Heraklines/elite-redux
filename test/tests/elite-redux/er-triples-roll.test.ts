@@ -114,10 +114,8 @@ const GHOST_SNAPSHOT: GhostTeamSnapshot = {
   id: "ghost-triples-roll-1",
   trainerName: "Uploader",
   difficulty: "hell",
-  // Keep the injected team inside the production +20/+40 wave band for the
-  // wave-5 challenge encounter. A deep endgame team is intentionally ineligible
-  // here, even when it is injected through the test hook.
-  waveReached: 25,
+  // Must be eligible for the wave-5 Ghost Trainers challenge fixture (+40 fairness window).
+  waveReached: 40,
   isVictory: true,
   timestamp: 1,
   party: [member(SpeciesId.SNORLAX), member(SpeciesId.DRAGONITE), member(SpeciesId.SALAMENCE)],

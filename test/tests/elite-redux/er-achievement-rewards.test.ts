@@ -16,6 +16,7 @@
 // =============================================================================
 
 import { grantErAchievementReward } from "#data/elite-redux/er-achievement-rewards";
+import { DexAttr } from "#enums/dex-attr";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -120,5 +121,44 @@ describe.skipIf(!RUN)("ER achievement rewards — grant on unlock", () => {
     expect(first).toBeDefined();
     expect(second).toBeDefined();
     expect(second).not.toBe(first);
+  });
+
+  it("rerolls a fixed shiny reward when that exact species and tier is already owned", async () => {
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+    const gd = game.scene.gameData;
+    gd.dexData[SpeciesId.ABSOL].caughtAttr |= DexAttr.SHINY | DexAttr.DEFAULT_VARIANT;
+    const ownsTierOne = () =>
+      Object.values(gd.dexData).filter(
+        d => (d.caughtAttr & (DexAttr.SHINY | DexAttr.DEFAULT_VARIANT)) === (DexAttr.SHINY | DexAttr.DEFAULT_VARIANT),
+      ).length;
+    const before = ownsTierOne();
+
+    grantErAchievementReward("HEEDING_THE_WARNING");
+
+    expect(ownsTierOne()).toBe(before + 1);
+  });
+
+  it("does not treat another shiny tier on the same species as a duplicate", async () => {
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+    const gd = game.scene.gameData;
+    gd.dexData[SpeciesId.ABSOL].caughtAttr |= DexAttr.SHINY | DexAttr.VARIANT_2;
+
+    grantErAchievementReward("HEEDING_THE_WARNING");
+
+    expect(gd.dexData[SpeciesId.ABSOL].caughtAttr & DexAttr.DEFAULT_VARIANT).toBe(DexAttr.DEFAULT_VARIANT);
+  });
+
+  it("filters already-owned black shinies out of later random achievement rewards", async () => {
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+    const gd = game.scene.gameData;
+    const count = () => Object.values(gd.starterData).filter(s => s.erBlackShiny).length;
+    const spy = vi.spyOn(Math, "random").mockReturnValue(0);
+    const before = count();
+
+    grantErAchievementReward("INFERNO");
+    grantErAchievementReward("INFERNO");
+    spy.mockRestore();
+
+    expect(count()).toBe(before + 2);
   });
 });

@@ -5924,3 +5924,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - `TheBargainPhase` is now admitted by that same readiness/owner/address-gated narration driver. Node-pure coverage
   proves the exact owner prompt is pressed once and never consumed twice. Runtime, Showdown, tournament, triples, and
   deployment behavior remain unchanged.
+
+## 2026-07-30 - Integrate current feat and close two browser-observed presentation failures
+
+- The latest `feat/elite-redux-port` tip `11e79cca9` is merged into the Authority V2 integration line. The three
+  textual conflicts preserve the already-qualified atomic co-op/Showdown lobby boundary, retain the stronger room
+  constructor contract, and accept feat's current Ghost Trainer fixture while keeping co-op triples disabled.
+- Fresh two-browser run `30517753247` was mechanically green through the exact wave-2 command frontier, but visual
+  inspection found the guest still displaying the preceding ability flyout over command input. The host records
+  `showAbility` but previously treated `HideAbilityPhase` as renderer-local. `hideAbility` is now a closed wire event,
+  replayed in order through a receipt-owned `CoopHideAbilityReplayPhase`; a runtime watchdog forces the safe hidden
+  terminal state if the cosmetic tween stalls.
+- Mystery run `30517825943` cleared four consecutive Mystery encounters and remained transport/state synchronized at
+  wave 6. Its only fatal browser event was a host `displayHeight` dereference in Dancing Lessons: at the deliberately
+  throttled render rate, the intro `EncounterBattleAnim` was still draining after the encounter retired/rebuilt the
+  Oricorio field actor. `BattleAnim` now captures geometry from the exact starting sprites and terminates/cleans up
+  immediately when either render surface is retired or replaced, instead of crashing a tween callback and stranding
+  progression.
+- Node-pure contracts cover both lifecycle boundaries. Remote focused/static, aggregate, fresh, surface-animation,
+  and Mystery qualification remain required on the resulting exact SHA; no staging or production deploy is part of
+  this checkpoint.

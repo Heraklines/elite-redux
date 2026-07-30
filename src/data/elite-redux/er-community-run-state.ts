@@ -29,6 +29,12 @@ export interface FounderRunState {
   readonly config: CommunityChallengeConfig;
 }
 
+/** A published community challenge being played by any trainer. */
+export interface CommunityRunState {
+  readonly challengeId: string;
+  readonly config: CommunityChallengeConfig;
+}
+
 let forcedDifficulty: ErDifficulty | null = null;
 let allowedSpecies: Set<number> | null = null;
 // The run is the founder's qualifying play of a draft they just created: a legit
@@ -36,6 +42,7 @@ let allowedSpecies: Set<number> | null = null;
 // consumed at launch - it rides the whole run and is serialized with the SESSION save
 // (so a mid-run save + reload still auto-publishes on the eventual win).
 let founderChallenge: FounderRunState | null = null;
+let communityChallenge: CommunityRunState | null = null;
 
 /** Force the run difficulty so starter-select skips the chooser and launches directly. */
 export function setForcedCommunityDifficulty(d: ErDifficulty): void {
@@ -82,9 +89,20 @@ export function getFounderRunState(): FounderRunState | null {
   return founderChallenge;
 }
 
+/** Tag/clear the published community challenge whose result must be reported. */
+export function setCommunityRunState(state: CommunityRunState | null): void {
+  communityChallenge = state;
+}
+
+/** The active published community run, persisted across a session reload. */
+export function getCommunityRunState(): CommunityRunState | null {
+  return communityChallenge;
+}
+
 /** Reset all gates (returning to the title / starting fresh). */
 export function resetCommunityRunState(): void {
   forcedDifficulty = null;
   allowedSpecies = null;
   founderChallenge = null;
+  communityChallenge = null;
 }

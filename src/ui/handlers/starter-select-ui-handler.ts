@@ -20,7 +20,6 @@ import {
   getSameSpeciesEggCandyCounts,
   getStarterValueFriendshipCap,
   getValueReductionCandyCounts,
-  POKERUS_STARTER_COUNT,
   speciesStarterCosts,
 } from "#balance/starters";
 import { allAbilities, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
@@ -30,6 +29,7 @@ import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SLOTS_PER_PLAYER } from "#data/elite-redux/coop/coop-session";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import { resetErAchievementRunState } from "#data/elite-redux/er-achievement-run-state";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import {
   countErBlackShinyStarters,
   ER_BLACK_SHINY_LUCK,
@@ -1178,7 +1178,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     starterBoxContainer.add(this.starterSelectScrollBar);
 
     this.pokerusCursorObjs = [];
-    for (let i = 0; i < POKERUS_STARTER_COUNT; i++) {
+    // Keep the highlight pool aligned with the editor-tunable daily Pokerus count.
+    for (let i = 0; i < erBalanceNum("vanilla.pokerusCount"); i++) {
       const cursorObj = globalScene.add.image(0, 0, "select_cursor_pokerus");
       cursorObj.setVisible(false);
       cursorObj.setOrigin(0);

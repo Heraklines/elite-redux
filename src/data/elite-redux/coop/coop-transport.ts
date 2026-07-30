@@ -1202,6 +1202,8 @@ export type CoopBattleEvent =
       passiveSlot: number;
       actor: CoopPresentationActorRef;
     }
+  /** Retire the currently displayed ability flyout at the authority's exact ordered boundary. */
+  | { k: "hideAbility" }
   /** Show the exact authority-selected Terastallization without running its mechanics on the renderer. */
   | {
       k: "tera";

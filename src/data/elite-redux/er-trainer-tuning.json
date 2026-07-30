@@ -1,1 +1,8 @@
-{}
+{
+  "frequency": {
+    "elite": {
+      "trainerCadence": 5
+    },
+    "hell": {}
+  }
+}

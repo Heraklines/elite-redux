@@ -75,9 +75,17 @@ import {
   reconcileSeason,
   seasonIdFromTime,
 } from "./showdown-rank";
+import { handleTelemetryIngest, type TelemetryR2Bucket } from "./telemetry";
 
 interface Env {
   DB: D1Database;
+  /**
+   * OPTIONAL R2 bucket for the player-telemetry ML pipeline (#player-telemetry). Bound only on the
+   * staging worker (bucket `er-telemetry-staging`); absent elsewhere, so `POST /telemetry/ingest` fails
+   * soft (503) until the maintainer enables R2 + binds it. The client drops on any non-2xx, so an unbound
+   * binding never affects gameplay.
+   */
+  TELEMETRY?: TelemetryR2Bucket;
   /** Secret used to sign/verify session tokens. Set via `wrangler secret put`. */
   SESSION_SECRET: string;
   /** Shared only with the co-op signaling Worker; signs short-lived identity tickets. */
@@ -3426,6 +3434,7 @@ function buildCommunityEntry(
   const allowed = Array.isArray(config.allowedSpecies) ? (config.allowedSpecies as number[]) : null;
   return {
     config,
+    status: row.status === "draft" ? "draft" : "active",
     stats: {
       attempts: stats.attempts,
       cleared: stats.cleared,
@@ -3661,7 +3670,7 @@ async function handleCommunityCreate(
       now,
     )
     .run();
-  return json({ id }, 200, cors);
+  return json({ id, config: stored, status: "draft" }, 200, cors);
 }
 
 /**
@@ -4094,6 +4103,44 @@ async function handleCommunityMine(auth: TokenPayload, env: Env, cors: Record<st
         false,
       ),
     );
+  return json({ items }, 200, cors);
+}
+
+/**
+ * GET /community/history - this player's attempts, newest first. Each entry carries
+ * playerStatus so the client can style completed cards in every browser section.
+ */
+async function handleCommunityHistory(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureCommunityTables(env);
+  const cols = CC_ENTRY_COLS.split(", ")
+    .map(col => `c.${col}`)
+    .join(", ");
+  const { results } = await env.DB.prepare(
+    `SELECT ${cols}, a.status AS player_status
+       FROM community_challenge_attempts a
+       JOIN community_challenges c ON c.id = a.challenge_id
+      WHERE a.user_id = ?
+      ORDER BY a.updated_at DESC
+      LIMIT 100`,
+  )
+    .bind(auth.uid)
+    .all<CommunityChallengeRow & { player_status: "in_progress" | "cleared" | "failed" }>();
+  const items = (results ?? [])
+    .filter(row => row.status !== "hidden" && row.status !== "rejected")
+    .map(row => ({
+      ...(buildCommunityEntry(
+        row,
+        {
+          attempts: row.attempts_total,
+          cleared: row.cleared_count,
+          inProgress: row.inprogress_count,
+          failed: row.failed_count,
+          recent: [],
+        },
+        false,
+      ) as Record<string, unknown>),
+      playerStatus: row.player_status,
+    }));
   return json({ items }, 200, cors);
 }
 
@@ -5056,6 +5103,15 @@ export default {
       if (pathname === "/account/logout" && method === "GET") {
         return text("", 200, cors);
       }
+      // Player-telemetry ML ingest (#player-telemetry). Routed in the PUBLIC block because a
+      // `navigator.sendBeacon` flush (fired on pagehide/visibilitychange) cannot set an Authorization
+      // header, so the token also rides the `?t=` query param; the handler owns its own 401. Auth is the
+      // SAME stateless session token as the savedata endpoints.
+      if (pathname === "/telemetry/ingest" && method === "POST") {
+        const tAuth =
+          (await authUser(request, env)) ?? (await verifyToken(url.searchParams.get("t") ?? "", env.SESSION_SECRET));
+        return await handleTelemetryIngest(request, tAuth, env, cors);
+      }
 
       // Tournament reward delivery — server-to-server from er-telemetry, authenticated by the shared
       // SHOWDOWN_GRANT_SECRET (X-Grant-Auth), NOT a session token. Placed in the unauthenticated block.
@@ -5158,6 +5214,9 @@ export default {
       }
       if (pathname === "/community/mine" && method === "GET") {
         return await handleCommunityMine(auth, env, cors);
+      }
+      if (pathname === "/community/history" && method === "GET") {
+        return await handleCommunityHistory(auth, env, cors);
       }
       // Player reports their tracked achievement unlocks (system saves are encrypted,
       // so the worker can't read achvUnlocks itself). Only TRACKED_ACHV_IDS are stored.

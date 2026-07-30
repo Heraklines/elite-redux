@@ -1777,6 +1777,11 @@ export class CoopReplayTurnPhase extends Phase {
               event.actor,
             );
             break;
+          case "hideAbility":
+            outcomeToken = createCoopPresentationOutcomeToken();
+            this.presentationOutcomeTokens.push(outcomeToken);
+            pm.unshiftNew("CoopHideAbilityReplayPhase", outcomeToken);
+            break;
           case "tera":
             outcomeToken = createCoopPresentationOutcomeToken();
             this.presentationOutcomeTokens.push(outcomeToken);

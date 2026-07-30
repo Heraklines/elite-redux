@@ -368,6 +368,9 @@ export class UI extends Phaser.GameObjects.Container {
    * @returns true if the input attempt succeeds
    */
   processInput(button: Button): boolean {
+    // #player-telemetry: emit the raw input as a compact code + surface context. No listener unless a
+    // telemetry build subscribed, so this is behavior-preserving.
+    this.emit("er-telemetry-input", button, this.mode);
     const coopUiInputId = beginCoopUiRelayInput(this.mode);
     try {
       return this.processInputCoopAware(button);
@@ -945,6 +948,9 @@ export class UI extends Phaser.GameObjects.Container {
           if (touchControls) {
             touchControls.dataset.uiMode = UiMode[mode];
           }
+          // #player-telemetry: emit the surface-open at the single mode chokepoint (UI is a Phaser
+          // EventEmitter). No listener unless a telemetry build subscribed, so this is behavior-preserving.
+          this.emit("er-telemetry-surface", mode, args);
           this.getHandler().show(args);
           this.coopAuthoritySurfaceReady(mode);
         }

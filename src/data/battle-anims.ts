@@ -863,7 +863,8 @@ export abstract class BattleAnim {
 
   private getGraphicFrameData(
     frames: AnimFrame[],
-    onSubstitute?: boolean,
+    userHalfHeight: number,
+    targetHalfHeight: number,
   ): Map<number, Map<AnimFrameTarget, GraphicFrameData>> {
     const ret: Map<number, Map<AnimFrameTarget, GraphicFrameData>> = new Map([
       [AnimFrameTarget.GRAPHIC, new Map<AnimFrameTarget, GraphicFrameData>()],
@@ -871,19 +872,10 @@ export abstract class BattleAnim {
       [AnimFrameTarget.TARGET, new Map<AnimFrameTarget, GraphicFrameData>()],
     ]);
 
-    const isOppAnim = this.isOppAnim();
-    const user = isOppAnim ? this.target : this.user;
-    const target = isOppAnim ? this.user : this.target;
-
-    const targetSubstitute = onSubstitute && user !== target ? target!.getTag(BattlerTagType.SUBSTITUTE) : null;
-
-    const userInitialX = user!.x; // TODO: is this bang correct?
-    const userInitialY = user!.y; // TODO: is this bang correct?
-    const userHalfHeight = user!.getSprite().displayHeight! / 2; // TODO: is this bang correct?
-
-    const targetInitialX = targetSubstitute?.sprite?.x ?? target!.x; // TODO: is this bang correct?
-    const targetInitialY = targetSubstitute?.sprite?.y ?? target!.y; // TODO: is this bang correct?
-    const targetHalfHeight = (targetSubstitute?.sprite ?? target!.getSprite()).displayHeight! / 2; // TODO: is this bang correct?
+    // Frame geometry is anchored to the exact render surfaces captured by play(). Re-reading
+    // Pokemon.getSprite() here is unsafe: Mystery encounters and other boundary transitions may
+    // retire/rebuild those children while a low-frame-rate tween is still draining.
+    const [userInitialX, userInitialY, targetInitialX, targetInitialY] = this.dstLine;
 
     let g = 0;
     let u = 0;
@@ -953,6 +945,14 @@ export abstract class BattleAnim {
     const userSprite = user.getSprite();
     const targetSprite = targetSubstitute?.sprite ?? target.getSprite();
 
+    // Pokemon.getSprite() is transiently nullable at runtime while a field actor is being rebuilt.
+    // An animation is presentation-only, so failing closed by completing it is safer than crashing
+    // the phase/tween callback and stranding the authoritative control frontier.
+    if (!userSprite || !targetSprite) {
+      callback?.();
+      return;
+    }
+
     const spriteCache: SpriteCache = {
       [AnimFrameTarget.GRAPHIC]: [],
       [AnimFrameTarget.USER]: [],
@@ -960,31 +960,39 @@ export abstract class BattleAnim {
     };
     const spritePriorities: number[] = [];
 
+    let completed = false;
     const cleanUpAndComplete = () => {
-      userSprite.setPosition(0, 0);
-      userSprite.setScale(1);
-      userSprite.setAlpha(1);
-      userSprite.pipelineData["tone"] = [0.0, 0.0, 0.0, 0.0];
-      userSprite.setAngle(0);
-      if (targetSubstitute) {
-        targetSprite.setPosition(
-          target.x - target.getSubstituteOffset()[0],
-          target.y - target.getSubstituteOffset()[1],
-        );
-        targetSprite.setScale(target.getSpriteScale() * (target.isPlayer() ? 0.5 : 1));
-        targetSprite.setAlpha(1);
-      } else {
-        targetSprite.setPosition(0, 0);
-        targetSprite.setScale(1);
-        targetSprite.setAlpha(1);
+      if (completed) {
+        return;
       }
-      targetSprite.pipelineData["tone"] = [0.0, 0.0, 0.0, 0.0];
-      targetSprite.setAngle(0);
+      completed = true;
+      if (userSprite.active) {
+        userSprite.setPosition(0, 0);
+        userSprite.setScale(1);
+        userSprite.setAlpha(1);
+        userSprite.pipelineData["tone"] = [0.0, 0.0, 0.0, 0.0];
+        userSprite.setAngle(0);
+        userSprite.off("animationupdate");
+      }
+      if (targetSprite.active) {
+        if (targetSubstitute) {
+          targetSprite.setPosition(
+            target.x - target.getSubstituteOffset()[0],
+            target.y - target.getSubstituteOffset()[1],
+          );
+          targetSprite.setScale(target.getSpriteScale() * (target.isPlayer() ? 0.5 : 1));
+          targetSprite.setAlpha(1);
+        } else {
+          targetSprite.setPosition(0, 0);
+          targetSprite.setScale(1);
+          targetSprite.setAlpha(1);
+        }
+        targetSprite.pipelineData["tone"] = [0.0, 0.0, 0.0, 0.0];
+        targetSprite.setAngle(0);
+        targetSprite.off("animationupdate");
+      }
 
       // Remove animation event listeners to enable sprites to be freed.
-      userSprite.off("animationupdate");
-      targetSprite.off("animationupdate");
-
       /**
        * This and `targetSpriteToShow` are used to restore context lost
        * from the `isOppAnim` swap. Using these references instead of `this.user`
@@ -993,23 +1001,25 @@ export abstract class BattleAnim {
        */
       const userSpriteToShow = isOppAnim ? targetSprite : userSprite;
       const targetSpriteToShow = isOppAnim ? userSprite : targetSprite;
-      if (!this.isHideUser() && userSpriteToShow) {
+      if (!this.isHideUser() && userSpriteToShow.active) {
         userSpriteToShow.setVisible(true);
       }
-      if (!this.isHideTarget() && (targetSpriteToShow !== userSpriteToShow || !this.isHideUser())) {
+      if (
+        !this.isHideTarget()
+        && targetSpriteToShow.active
+        && (targetSpriteToShow !== userSpriteToShow || !this.isHideUser())
+      ) {
         targetSpriteToShow.setVisible(true);
       }
       for (const ms of Object.values(spriteCache).flat()) {
-        if (ms) {
+        if (ms?.active) {
           ms.destroy();
         }
       }
-      if (this.bgSprite) {
+      if (this.bgSprite?.active) {
         this.bgSprite.destroy();
       }
-      if (callback) {
-        callback();
-      }
+      callback?.();
     };
 
     if (!globalScene.moveAnimations && !this.playRegardlessOfIssues) {
@@ -1022,6 +1032,8 @@ export abstract class BattleAnim {
     const userInitialY = user.y;
     const targetInitialX = targetSubstitute?.sprite?.x ?? target.x;
     const targetInitialY = targetSubstitute?.sprite?.y ?? target.y;
+    const userHalfHeight = userSprite.displayHeight / 2;
+    const targetHalfHeight = targetSprite.displayHeight / 2;
 
     this.srcLine = [userFocusX, userFocusY, targetFocusX, targetFocusY];
     this.dstLine = [userInitialX, userInitialY, targetInitialX, targetInitialY];
@@ -1029,17 +1041,37 @@ export abstract class BattleAnim {
     let r = anim?.frames.length ?? 0;
     let f = 0;
 
-    globalScene.tweens.addCounter({
+    let playbackTween: Phaser.Tweens.Tween | undefined;
+    const presentationActorsIntact = (): boolean =>
+      user.active
+      && target.active
+      && userSprite.active
+      && targetSprite.active
+      && user.getSprite() === userSprite
+      && (targetSubstitute?.sprite ?? target.getSprite()) === targetSprite;
+    const abortRetiredPresentation = () => {
+      playbackTween?.stop();
+      cleanUpAndComplete();
+    };
+
+    playbackTween = globalScene.tweens.addCounter({
       duration: getFrameMs(3),
       repeat: anim?.frames.length ?? 0,
       onRepeat: () => {
+        if (completed) {
+          return;
+        }
+        if (!presentationActorsIntact()) {
+          abortRetiredPresentation();
+          return;
+        }
         if (!f) {
           userSprite.setVisible(false);
           targetSprite.setVisible(false);
         }
 
         const spriteFrames = anim!.frames[f]; // TODO: is the bang correcT?
-        const frameData = this.getGraphicFrameData(anim!.frames[f], onSubstitute); // TODO: is the bang correct?
+        const frameData = this.getGraphicFrameData(anim!.frames[f], userHalfHeight, targetHalfHeight);
         let u = 0;
         let t = 0;
         let g = 0;
@@ -1211,6 +1243,9 @@ export abstract class BattleAnim {
         r--;
       },
       onComplete: () => {
+        if (completed) {
+          return;
+        }
         for (const ms of Object.values(spriteCache).flat()) {
           if (ms && !ms.getData("locked")) {
             ms.destroy();

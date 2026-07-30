@@ -294,7 +294,7 @@ function addNativeTypeToEvolutionLine(sourceId: number, type: PokemonType): numb
       }
       const targets: PokemonSpeciesForm[] = [
         evolved as unknown as PokemonSpeciesForm,
-        ...(evolved.forms as PokemonSpeciesForm[]).filter(form => form.formKey !== "redux"),
+        ...evolved.forms.filter(form => form.formKey !== "redux"),
       ];
       for (const target of targets) {
         if (addNativeType(target, type)) {

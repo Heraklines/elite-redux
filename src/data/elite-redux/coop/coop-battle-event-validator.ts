@@ -172,6 +172,8 @@ export function isStrictCoopBattleEvent(value: unknown): value is CoopBattleEven
         && isPresentationActorRef(event.actor)
         && event.actor.pokemonId === event.pokemonId
       );
+    case "hideAbility":
+      return Object.keys(event).length === 1;
     case "tera":
       return (
         isActorAddressableBattlerIndex(event.bi)

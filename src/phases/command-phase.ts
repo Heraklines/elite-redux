@@ -66,6 +66,7 @@ import {
   buildShowdownSwitchCommand,
 } from "#data/elite-redux/showdown/showdown-guest-command";
 import { broadcastShowdownSyncPlayerCommand } from "#data/elite-redux/showdown/showdown-sync-command";
+import { recordTelemetryDecision } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -618,6 +619,8 @@ export class CommandPhase extends FieldPhase {
           this.applyRelayedActionCommand(cmd);
           // #record-replay: capture the partner slot's relayed action command (no-op unless recording).
           recordCoopPartnerSlotCommand(this.fieldIndex, cmd);
+          // #player-telemetry: observe the co-op partner's decision (actor=partner). No-op unless recording.
+          recordTelemetryDecision(this.fieldIndex, cmd.command, cmd.cursor ?? 0, "partner");
           return;
         }
         // FIGHT: the RELAYED partner command, else the AI fallback (a null guest reply still produces a
@@ -630,6 +633,8 @@ export class CommandPhase extends FieldPhase {
           cursor: resolved.moveIndex,
           targets: resolved.turnMove.targets,
         });
+        // #player-telemetry: observe the co-op partner's resolved FIGHT (actor=partner). No-op unless recording.
+        recordTelemetryDecision(this.fieldIndex, resolved.command, resolved.moveIndex, "partner");
       });
     return true;
   }
@@ -2010,6 +2015,9 @@ export class CommandPhase extends FieldPhase {
       // Fires AFTER the co-op broadcast above (behavior-preserving) and is a hard no-op in co-op (the
       // co-op relay taps own that path) + when not recording - so solo / co-op are both unaffected.
       recordSinglePlayerCommand(this.fieldIndex, command, cursor);
+      // #player-telemetry: capture this client's OWN committed decision as a (state, action) pair in
+      // player-run modes. Showdown/tournament versus sessions are explicitly excluded by the recorder.
+      recordTelemetryDecision(this.fieldIndex, command, cursor, "self");
       this.end();
     }
 

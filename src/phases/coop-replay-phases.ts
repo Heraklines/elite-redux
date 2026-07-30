@@ -1094,6 +1094,57 @@ export class CoopShowAbilityReplayPhase extends Phase {
 }
 
 /**
+ * GUEST: retire the current ability flyout at the exact point recorded by the authority. The final
+ * hidden state is safe to force if a throttled tween never resolves; a cosmetic teardown must not
+ * retain stale chrome over command input or hold the authoritative presentation receipt forever.
+ */
+export class CoopHideAbilityReplayPhase extends Phase {
+  public readonly phaseName = "CoopHideAbilityReplayPhase";
+  private readonly outcomeToken: CoopPresentationOutcomeToken;
+
+  constructor(outcomeToken?: CoopPresentationOutcomeToken) {
+    super();
+    this.outcomeToken = outcomeToken ?? createCoopPresentationOutcomeToken();
+  }
+
+  public override start(): void {
+    super.start();
+
+    const actorFingerprint = "ability-bar";
+    if (!globalScene.abilityBar.isVisible()) {
+      settleCoopPresentationOutcome(this.outcomeToken, { kind: "rendered", actorFingerprint });
+      this.end();
+      return;
+    }
+
+    let ended = false;
+    let watchdog: CoopPresentationProgressWatchdog | undefined;
+    const finishHidden = () => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      settleCoopPresentationOutcome(this.outcomeToken, { kind: "rendered", actorFingerprint });
+      this.end();
+    };
+    const forceHidden = (reason: string) => {
+      coopWarn("replay", `ability teardown ${reason}; forcing hidden terminal presentation`);
+      globalScene.tweens.killTweensOf(globalScene.abilityBar);
+      globalScene.abilityBar.setVisible(false);
+      finishHidden();
+    };
+
+    try {
+      watchdog = armCoopPresentationProgressWatchdog(() => forceHidden("watchdog-expired"));
+      globalScene.abilityBar.hide().then(finishHidden, () => forceHidden("rejected"));
+    } catch {
+      forceHidden("threw");
+    }
+  }
+}
+
+/**
  * GUEST: play one authority-selected Terastallization animation. The following authoritative state image
  * owns `isTerastallized`, typing, form, counters, and every mechanical consequence; this phase only renders
  * CommonAnim.TERASTALLIZE against the side/party identity carried by the event.

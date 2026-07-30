@@ -190,7 +190,7 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
   });
 
   it("reports a peer-routed result and keeps the match context until attestation completes", async () => {
-    let resolveReport: ((value: tournamentClient.ClientResult<{ resolution: string }>) => void) | null = null;
+    let resolveReport!: (value: tournamentClient.ClientResult<{ resolution: string }>) => void;
     const reportTournament = vi.spyOn(tournamentClient, "reportTournamentResult").mockReturnValue(
       new Promise(resolve => {
         resolveReport = resolve;
@@ -213,7 +213,7 @@ describe.skipIf(!RUN)("Showdown tournament match — result path (P1)", () => {
     expect(getTournamentMatchContext(), "context survives until the result request settles").not.toBeNull();
     expect(game.scene.phaseManager.getCurrentPhase()?.phaseName).toBe("ShowdownResultPhase");
 
-    resolveReport?.({ ok: true, data: { resolution: "settled" } });
+    resolveReport({ ok: true, data: { resolution: "settled" } });
     await returnToTitle;
     expect(getTournamentMatchContext()).toBeNull();
   });

@@ -20282,6 +20282,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Starter Select opens with editor-tuned Pokerus counts",
+    description:
+      "STARTER-SELECT fix (UI state, not a battle behavior) - the daily Pokerus highlight pool now\n"
+      + "uses the same editor-tunable vanilla.pokerusCount value as the generated daily species list.\n"
+      + "DO: choose Classic from the title screen while the configured Pokerus count is 8.\n"
+      + "EXPECT: starter select opens normally and all 8 daily Pokerus species have highlights; there is\n"
+      + "no setPosition crash. Headless regression: er-player-ui-regressions.test.ts plus the real\n"
+      + "starter-select render recipe in test/tools/render-ui-page.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });
+      return [
+        makeStarter(SpeciesId.BULBASAUR, {
+          moveset: [MoveId.TACKLE, MoveId.VINE_WHIP, MoveId.GROWL, MoveId.GROWTH],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Starter Select: Black Shiny preview, Luck 5, and one-per-team cap",
     description:
       "STARTER-SELECT fix (UI state, not a battle behavior) - cycling an unlocked epic shiny into\n"

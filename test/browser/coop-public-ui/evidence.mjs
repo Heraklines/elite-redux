@@ -86,6 +86,7 @@ const PRESENTATION_EVENT_KINDS = new Set([
   "statStage",
   "status",
   "showAbility",
+  "hideAbility",
   "tera",
   "commonAnim",
   "pokemonAnim",

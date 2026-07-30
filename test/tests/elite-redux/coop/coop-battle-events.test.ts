@@ -85,6 +85,7 @@ import {
   CoopFinalizeEntryPresentationPhase,
   CoopFinalizeTurnPhase,
   CoopFormChangeReplayPhase,
+  CoopHideAbilityReplayPhase,
   CoopHpDrainReplayPhase,
   CoopMoveAnimReplayPhase,
   CoopShowAbilityReplayPhase,
@@ -477,6 +478,33 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(cancelTimer, "the real ability completion retires its runtime watchdog").toHaveBeenCalledOnce();
     scheduleSpy.mockRestore();
     sceneTimerSpy.mockRestore();
+  });
+
+  it("an authority-authored ability teardown forces its hidden terminal state when the tween stalls", async () => {
+    await startCoopGuest();
+    const runtime = getCoopRuntime()!;
+    const token = createCoopPresentationOutcomeToken();
+    let expireWatchdog!: () => void;
+    const cancelTimer = vi.fn();
+    vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
+      expireWatchdog = callback;
+      return cancelTimer;
+    });
+    vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(true);
+    vi.spyOn(globalScene.abilityBar, "hide").mockReturnValue(new Promise(() => {}));
+    const killSpy = vi.spyOn(globalScene.tweens, "killTweensOf").mockImplementation(() => {});
+    const visibleSpy = vi.spyOn(globalScene.abilityBar, "setVisible").mockReturnValue(globalScene.abilityBar);
+    const phase = new CoopHideAbilityReplayPhase(token);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+    phase.start();
+    expireWatchdog();
+
+    expect(killSpy).toHaveBeenCalledWith(globalScene.abilityBar);
+    expect(visibleSpy).toHaveBeenCalledWith(false);
+    expect(coopPresentationOutcome(token)).toEqual({ kind: "rendered", actorFingerprint: "ability-bar" });
+    expect(cancelTimer).toHaveBeenCalledOnce();
+    expect(endSpy).toHaveBeenCalledOnce();
   });
 
   it("an exact ability identity survives a stale post-reorder battler index", async () => {
@@ -1643,10 +1671,14 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     const visibleSpy = vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(false);
     const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility").mockResolvedValue();
+    const hideSpy = vi.spyOn(globalScene.abilityBar, "hide").mockResolvedValue();
 
     beginCoopRecording(globalScene.currentBattle.turn);
     const phase = game.scene.phaseManager.create("ShowAbilityPhase", hostMon.getBattlerIndex(), false, 0);
     phase.start();
+    await new Promise(r => setTimeout(r, 0));
+    const hidePhase = game.scene.phaseManager.create("HideAbilityPhase");
+    hidePhase.start();
     await new Promise(r => setTimeout(r, 0));
     expect(globalScene.arena.trySetWeather(WeatherType.RAIN, hostMon)).toBe(true);
     expect(globalScene.arena.trySetTerrain(TerrainType.GRASSY, false, hostMon)).toBe(true);
@@ -1662,6 +1694,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       passive: false,
       passiveSlot: 0,
     });
+    expect(recording.events.filter(event => event.k === "hideAbility")).toEqual([{ k: "hideAbility" }]);
+    expect(recording.events.findIndex(event => event.k === "hideAbility")).toBe(
+      recording.events.findIndex(event => event.k === "showAbility") + 1,
+    );
     expect(recording.events.find(event => event.k === "weather")).toMatchObject({
       k: "weather",
       weather: WeatherType.RAIN,
@@ -1681,6 +1717,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     visibleSpy.mockRestore();
     showSpy.mockRestore();
+    hideSpy.mockRestore();
   });
 
   it("(A) the recorder seams are INERT outside a recording (no event leaks, solo unaffected)", async () => {
@@ -1705,8 +1742,14 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const turn = globalScene.currentBattle.turn;
     const enemy0 = globalScene.getEnemyField(false)[0];
     const hostMon = field[COOP_HOST_FIELD_INDEX];
-    const visibleSpy = vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(false);
+    const visibleSpy = vi
+      .spyOn(globalScene.abilityBar, "isVisible")
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+      .mockReturnValue(false);
     const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility").mockResolvedValue();
+    const hideSpy = vi.spyOn(globalScene.abilityBar, "hide").mockResolvedValue();
 
     // A rich event stream: a move animation, an HP drain on the host's mon, a stat change, a status anim,
     // and a faint on an enemy. Every kind the host can emit. The checkpoint snaps every mon to hp=9.
@@ -1765,6 +1808,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
           passiveSlot: 0,
           actor: { side: "player", pokemonId: hostMon.id },
         },
+        { k: "hideAbility" },
         { k: "faint", bi: enemy0.getBattlerIndex(), actor: { side: "enemy", pokemonId: enemy0.id } },
       ],
     });
@@ -1780,8 +1824,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       expect(mon.hp, "guest field snaps to the host's streamed checkpoint hp").toBe(9);
     }
     expect(showSpy, "the renderer displays the exact streamed ability material").toHaveBeenCalledTimes(1);
+    expect(hideSpy, "the renderer retires the flyout at the authority's exact boundary").toHaveBeenCalledTimes(1);
     visibleSpy.mockRestore();
     showSpy.mockRestore();
+    hideSpy.mockRestore();
   });
 
   it("(B) CONVERGENCE: after the guest pump + checkpoint, the post-render CHECKSUM matches the host's", async () => {
