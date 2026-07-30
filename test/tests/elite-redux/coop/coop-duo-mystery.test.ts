@@ -38,6 +38,7 @@ import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import {
   captureCoopMeControlTransactionState,
+  coopMeInteractionStartValue,
   resetCoopActiveMysteryControl,
   restoreCoopMeControlTransactionState,
   setCoopMeInteractionStart,
@@ -1517,10 +1518,14 @@ describe.skipIf(!RUN)(
       withClientSync(rig.hostCtx, () => {
         setCoopMeInteractionStart(-1);
         resetCoopActiveMysteryControl();
+        expect(coopMeInteractionStartValue(), "the authority fixture no longer supplies an ambient Mystery pin").toBe(
+          -1,
+        );
       });
       withClientSync(rig.guestCtx, () => {
         setCoopMeInteractionStart(-1);
         resetCoopActiveMysteryControl();
+        expect(coopMeInteractionStartValue(), "the recovering replica must rely on its retained V2 entry").toBe(-1);
       });
       withClientSync(rig.guestCtx, () => {
         rig.guestScene.money += 424_242; // diverge so captureCoopChecksum mismatches the host's
