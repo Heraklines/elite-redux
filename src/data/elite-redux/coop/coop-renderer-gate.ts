@@ -51,6 +51,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { COOP_LOCAL_PRESENTATION_INPUT_PHASES } from "#data/elite-redux/coop/coop-local-presentation-input";
 import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   COOP_BIOME_PICK_SEQ_BASE,
@@ -100,7 +101,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "ShowPartyExpBarPhase", // exp-bar chrome
   "HidePartyExpBarPhase", // exp-bar chrome
   "ShowTrainerPhase", // trainer-sprite intro
-  "ScanIvsPhase", // per-client IV scanner readout
+  ...COOP_LOCAL_PRESENTATION_INPUT_PHASES,
   "EndCardPhase", // run end card
   // Context-safe account reward: the phase itself permits only AddVoucherModifierType on the renderer
   // and skips shared run modifiers, which arrive from host authority.

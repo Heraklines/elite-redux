@@ -164,6 +164,7 @@ import {
   type CoopPresentationProgressWatchdog,
 } from "#phases/coop-presentation-watchdog";
 import { PokemonPhase } from "#phases/pokemon-phase";
+import type { Variant } from "#sprites/variant";
 import type { DamageResult } from "#types/damage-result";
 import { fixedInt } from "#utils/common";
 import { getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
@@ -932,7 +933,7 @@ export class CoopAppearanceReplayPhase extends Phase {
     // item, RNG, or form-change mechanics run here; the checkpoint replaces the full custom state.
     pokemon.formIndex = formIndex;
     pokemon.shiny = shiny;
-    pokemon.variant = variant;
+    pokemon.variant = variant as Variant;
     pokemon.customPokemonData.erBlackShiny = erBlackShiny;
     this.watchdog = armCoopPresentationProgressWatchdog(() =>
       this.finish({ kind: "failed", reason: "appearance-watchdog-expired", actorFingerprint }),

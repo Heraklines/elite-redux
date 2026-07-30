@@ -8,6 +8,7 @@ import { dirname, resolve } from "node:path";
 import { loadCampaignLifecyclePolicy, withinDeadline } from "./campaign-lifecycle.mjs";
 import {
   driveBestCampaignMove,
+  findLocalActionableIvScannerSurface,
   findOwnedActionableMysteryPartySurface,
   findOwnedActionableReplacementSurface,
   isActionableSemanticObservation,
@@ -1783,6 +1784,19 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
       : event != null && event.index > (handled ?? -1);
   };
 
+  // Renderer-only prompts are reciprocal local input: each browser owns and dismisses its own copy.
+  // They deliberately have ownerSeat=null, so the alternating shared-interaction owner resolver cannot
+  // and must not choose one peer on behalf of the other.
+  if (driver.localPerClientSurface) {
+    for (const client of clients) {
+      const event = findLocalActionableIvScannerSurface(client, cursors[client.label] ?? 0);
+      if (notYetHandled(client, event)) {
+        return { client, markerEvent: event };
+      }
+    }
+    return null;
+  }
+
   // Mystery-encounter PARTY sub-prompt (`selectPokemonForOption`): projected as the plain `party`
   // surface with `ownerModel: "local"` and `ownerSeat: null`, so the generic v2 semantic-owner path
   // (which requires `ownerSeat === localSeat`) can never resolve it. The owner is the seat that
@@ -3387,7 +3401,9 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
               ? "reward"
               : null;
     let mechanicalBoundary = null;
-    if (driver.mysteryParty) {
+    if (driver.localPerClientSurface) {
+      // No paired mechanical checkpoint: this is a presentation-only prompt local to this browser.
+    } else if (driver.mysteryParty) {
       // The ME PARTY sub-prompt is OWNER-ONLY: only the owning browser opens the party UI
       // (`selectPokemonForOption`); the watcher never renders it, so the paired-mystery checkpoint
       // (which awaits the surface on BOTH clients) would hang. Its owner-only convergence + drive
@@ -3420,7 +3436,21 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       mechanicalBoundary = await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
     }
     await client.checkpoint(`wave-${stats.wave}-${driver.name}-owner`);
-    if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
+    if (driver.localPerClientSurface) {
+      await selectOptionById(client, {
+        surfaceId: driver.v2SurfaceId,
+        targetId: "no",
+        navKeys: ["ArrowDown", "ArrowUp"],
+        submitKey: "Space",
+        timeoutMs: rig.config.timeoutMs,
+        fromCursor: cursors[client.label] ?? 0,
+      });
+      client.evidence.record("campaign-local-presentation", {
+        surface: driver.name,
+        localSeat: client.publicSeat,
+        targetId: "no",
+      });
+    } else if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
       stats.market = await driveTargetedMarket(rig, cursors, driver.market);
     } else if (driver.name === "reward" && mechanicalBoundary != null && driver.confirmSurfaceId == null) {
       const addressKey = authoritativeAddressKey(mechanicalBoundary.authority.address);
@@ -3494,7 +3524,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
     // event index (evidence indices are per-client and not cross-comparable). Both clients
     // log the phase marker for role-owned surfaces, so mark both to avoid a double drive.
     const suppress = driver.owner.marker ?? driver.present;
-    for (const c of Object.values(rig.clients)) {
+    const suppressionClients = driver.localPerClientSurface ? [client] : Object.values(rig.clients);
+    for (const c of suppressionClients) {
       const seen = c.evidence.findLast(suppress, cursors[c.label]);
       if (seen) {
         handledIndex.set(`${driver.name}:${c.label}`, seen.index);

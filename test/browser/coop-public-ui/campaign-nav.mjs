@@ -98,6 +98,35 @@ export function findOwnedActionableMysteryPartySurface(client, fromCursor = 0) {
     : null;
 }
 
+/**
+ * One renderer-only IV-scanner prompt that belongs to this browser, not an alternating interaction owner.
+ *
+ * Both clients render and dismiss their own prompt. Requiring `ownerSeat === localSeat` would strand it
+ * because local presentation surfaces intentionally have no shared owner seat.
+ */
+export function findLocalActionableIvScannerSurface(client, fromCursor = 0) {
+  const event = client.evidence.findLastSemanticSurface(fromCursor, "confirm:ScanIvsPhase");
+  const latest = client.evidence.findLastSemanticSurface(fromCursor);
+  const observation = event?.observation;
+  return event != null
+    && latest?.index === event.index
+    && observation?.operationClass === "confirm"
+    && observation.ownerModel === "local"
+    && observation.phase === "ScanIvsPhase"
+    && observation.uiMode === "CONFIRM"
+    && observation.localSeat === client.publicSeat
+    && observation.ownerSeat == null
+    && Array.isArray(observation.seatsWithInput)
+    && observation.seatsWithInput.length === 1
+    && observation.seatsWithInput.includes(client.publicSeat)
+    && Array.isArray(observation.optionIds)
+    && observation.optionIds.includes("yes")
+    && observation.optionIds.includes("no")
+    && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+    ? event
+    : null;
+}
+
 /** Whether ANY latest surface at/after the cursor is an OPEN party picker (faint replacement or an
  * ME party sub-prompt). The between-wave advancers must not press a stale prompt Space THROUGH an
  * open party UI into a default slot selection (mirrors the existing `party:replacement` guard). */

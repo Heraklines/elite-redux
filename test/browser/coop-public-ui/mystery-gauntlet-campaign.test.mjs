@@ -32,6 +32,7 @@ import {
   chooseNavigationKey,
   chooseVoluntarySwitchTarget,
   driveBestCampaignMove,
+  findLocalActionableIvScannerSurface,
   isPartyPickerSurfaceOpen,
   ownedReserveSwitchTargetIds,
   selectOptionById,
@@ -332,6 +333,71 @@ test("Revival and Stormglass projection proofs reject actionable watchers and ch
     () => assertAsymmetricStormglassProjection(stormglassOwner, { ...stormglassWatcher, stateDigest: "different" }),
     /different authoritative states/u,
   );
+});
+
+test("the IV scanner is actionable only as this browser's exact local presentation prompt", () => {
+  let event = {
+    index: 41,
+    observation: {
+      surfaceId: "confirm:ScanIvsPhase",
+      operationClass: "confirm",
+      ownerModel: "local",
+      phase: "ScanIvsPhase",
+      uiMode: "CONFIRM",
+      localSeat: 1,
+      ownerSeat: null,
+      seatsWithInput: [1],
+      optionIds: ["yes", "no"],
+      selectedOptionId: "yes",
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
+    },
+  };
+  let latest = event;
+  const client = {
+    publicSeat: 1,
+    evidence: {
+      findLastSemanticSurface: (_from, surfaceId) => (surfaceId === "confirm:ScanIvsPhase" ? event : latest),
+    },
+  };
+
+  assert.equal(findLocalActionableIvScannerSurface(client), event);
+  event = {
+    ...event,
+    observation: { ...event.observation, ready: { ...event.observation.ready, inputBlocked: true } },
+  };
+  latest = event;
+  assert.equal(findLocalActionableIvScannerSurface(client), null);
+  event = {
+    ...event,
+    observation: { ...event.observation, ready: { ...event.observation.ready, inputBlocked: false } },
+  };
+  latest = { index: 42, observation: { surfaceId: "battle:message" } };
+  assert.equal(findLocalActionableIvScannerSurface(client), null);
+});
+
+test("local presentation input has one registry shared by production and the two-browser oracle", async () => {
+  const [registry, gate, ui, observer, policy, campaign] = await Promise.all(
+    [
+      "src/data/elite-redux/coop/coop-local-presentation-input.ts",
+      "src/data/elite-redux/coop/coop-renderer-gate.ts",
+      "src/ui/ui.ts",
+      "scripts/coop-browser-entry.ts",
+      "test/browser/coop-public-ui/campaign-policy.mjs",
+      "test/browser/coop-public-ui/campaign.mjs",
+    ].map(path => readFile(resolve(root, path), "utf8")),
+  );
+  assert.match(registry, /COOP_LOCAL_PRESENTATION_INPUT_PHASES[\s\S]*"ScanIvsPhase"/u);
+  assert.match(gate, /\.\.\.COOP_LOCAL_PRESENTATION_INPUT_PHASES/u);
+  assert.match(
+    ui,
+    /localPresentationInput = isCoopLocalPresentationInputPhase[\s\S]*!hostEngineDialogueAdvance && !localPresentationInput/u,
+  );
+  assert.match(observer, /case "CONFIRM":[\s\S]*isCoopLocalPresentationInputPhase\(phase\)[\s\S]*ownerModel: "local"/u);
+  assert.match(observer, /v2InputFrozen[\s\S]*&& !localPresentationInput/u);
+  assert.match(policy, /name: "iv-scanner"[\s\S]*localPerClientSurface: true/u);
+  assert.match(campaign, /if \(driver\.localPerClientSurface\)[\s\S]*findLocalActionableIvScannerSurface/u);
+  assert.match(campaign, /targetId: "no"[\s\S]*campaign-local-presentation/u);
+  assert.match(campaign, /driver\.localPerClientSurface \? \[client\] : Object\.values\(rig\.clients\)/u);
 });
 
 test("a chained Mystery gauntlet refreshes only from proven surface progress and remains hard-bounded", () => {

@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 // #789: registers the co-op controller name tag with the ui-mirror session hook (side effect).
 import "#ui/coop-controller-tag";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { isCoopLocalPresentationInputPhase } from "#data/elite-redux/coop/coop-local-presentation-input";
 import {
   coopMeBespokeHostDrives,
   coopMeHandoffBattleStarted,
@@ -421,7 +422,13 @@ export class UI extends Phaser.GameObjects.Container {
         meHandoffBattleStarted: coopMeHandoffBattleStarted(),
         meBespokeHostDrives: coopMeBespokeHostDrives(),
       });
-      if (isCoopV2InteractionHumanInputFrozen() && !hostEngineDialogueAdvance) {
+      // Scan/inspect prompts are renderer-only and belong to each browser independently. They do not
+      // choose shared mechanics or emit an intent, so the ordered interaction freeze must not turn a
+      // visible local prompt into an unpressable session-wide softlock.
+      const localPresentationInput = isCoopLocalPresentationInputPhase(
+        globalScene.phaseManager.getCurrentPhase()?.phaseName,
+      );
+      if (isCoopV2InteractionHumanInputFrozen() && !hostEngineDialogueAdvance && !localPresentationInput) {
         return false;
       }
       // The exact narration lease owns every host MESSAGE surface until the remote owner dismisses

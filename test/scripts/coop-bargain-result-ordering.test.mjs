@@ -61,3 +61,16 @@ test("Authority V2 Bargain terminal owns the signed next-wave bridge", () => {
   assert.match(install, /removeAllPhasesOfType\("NewBattlePhase"\)/u);
   assert.match(install, /pushNew\("NewBattlePhase", \{/u);
 });
+
+test("a Bargain replica never re-derives an immutable offer from account-local state", () => {
+  const presentation = method("private async coopAwaitBargainPresentation", "private runWithSins");
+  assert.match(presentation, /const localMechanicalAuthority = getCoopController\(\)\?\.role === "host"/u);
+  assert.match(
+    presentation,
+    /localMechanicalAuthority[\s\S]*sins\.some\(sin => DISABLED_BARGAIN_SINS\.has\(sin\) \|\| !bargainSinAvailable\(sin\)\)/u,
+  );
+  assert.ok(
+    presentation.indexOf("const localMechanicalAuthority") < presentation.indexOf("bargainSinAvailable(sin)"),
+    "availability is checked only after the local mechanical-authority role is established",
+  );
+});

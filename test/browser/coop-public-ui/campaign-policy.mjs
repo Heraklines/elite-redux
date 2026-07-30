@@ -44,6 +44,7 @@ const EGG_LAPSE_PHASE = /Start Phase EggLapsePhase/u;
 const ATTEMPT_CAPTURE_PHASE = /Start Phase AttemptCapturePhase/u;
 const REVIVAL_PHASE = /Start Phase (?:RevivalBlessingPhase|CoopGuestRevivalPhase)/u;
 const STORMGLASS_PHASE = /Start Phase ErStormglassPickerPhase/u;
+const SCAN_IVS_PHASE = /Start Phase ScanIvsPhase/u;
 
 /**
  * Every registered Authority V2 ability workflow and each human-input shape it can expose.
@@ -445,6 +446,18 @@ export function buildDispatchTable(policy) {
       v2SurfaceId: "party",
       owner: { marker: ME_HOST_OWNER },
       keys: policy.keys.mystery,
+    },
+    {
+      // Renderer-only: each browser dismisses its own IV scanner prompt. This is deliberately not
+      // routed through the alternating interaction-owner model and never commits shared mechanics.
+      name: "iv-scanner",
+      phase: SCAN_IVS_PHASE,
+      present: SCAN_IVS_PHASE,
+      v2SurfaceId: "confirm:ScanIvsPhase",
+      semanticOnly: true,
+      localPerClientSurface: true,
+      owner: { role: "host" },
+      keys: [],
     },
     {
       name: "catch-full",

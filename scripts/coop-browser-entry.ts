@@ -24,6 +24,7 @@ const [
     getCoopRuntime,
     isCoopV2InteractionHumanInputFrozen,
   },
+  { isCoopLocalPresentationInputPhase },
   { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress, coopMeInteractionStartValue },
   { setCoopPresentationObserver },
   { setCoopWaveProgressionPresentationObserver },
@@ -43,6 +44,7 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-engine"),
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
+  import("../src/data/elite-redux/coop/coop-local-presentation-input"),
   import("../src/data/elite-redux/coop/coop-me-pin-state"),
   import("../src/data/elite-redux/coop/coop-turn-recorder"),
   import("../src/data/elite-redux/coop/coop-wave-progression-observer"),
@@ -740,6 +742,9 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
         ownerModel: uiMode === "MENU_OPTION_SELECT" ? "local" : "interaction",
       };
     case "CONFIRM":
+      if (isCoopLocalPresentationInputPhase(phase)) {
+        return { surfaceId: `confirm:${phase}`, operationClass: "confirm", ownerModel: "local" };
+      }
       if (phase === "EggLapsePhase") {
         return { surfaceId: "egg:lapse", operationClass: "egg", ownerModel: "interaction" };
       }
@@ -1750,7 +1755,9 @@ function observeSemanticSurface(): void {
       && hostEngineDialogueAdvance
       && interactiveMysteryPhase
       && coopHostMeNarrationAwaitingGuestAck(runtime);
-    const v2SurfaceInputBlocked = v2InputFrozen && (!hostEngineDialogueAdvance || hostEngineDialogueBlockedByAck);
+    const localPresentationInput = isCoopLocalPresentationInputPhase(phase);
+    const v2SurfaceInputBlocked =
+      v2InputFrozen && !localPresentationInput && (!hostEngineDialogueAdvance || hostEngineDialogueBlockedByAck);
     const inputBlocked = v2SurfaceInputBlocked || handlerInputBlocked === true ? true : handlerInputBlocked;
     const phaseAuthorityOperationId = (currentPhase as unknown as { coopV2ControlOperationId?: unknown })
       .coopV2ControlOperationId;

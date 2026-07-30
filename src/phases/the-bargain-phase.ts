@@ -587,7 +587,12 @@ export class TheBargainPhase extends Phase {
     }
     const sins = indices.map(index => BARGAIN_SIN_ORDER[index]);
     this.coopV2ControlOperationId = presented?.operationId ?? null;
-    if (sins.some(sin => DISABLED_BARGAIN_SINS.has(sin) || !bargainSinAvailable(sin))) {
+    // The authority validates and freezes this offer before either peer renders it. A replica must not
+    // re-derive availability from account-local data that is intentionally absent from the shared state
+    // (Lust's candy balance is the concrete case from the ten-wave browser campaign). Only the mechanical
+    // authority may reject an offer that stopped being executable on its own source state.
+    const localMechanicalAuthority = getCoopController()?.role === "host";
+    if (localMechanicalAuthority && sins.some(sin => DISABLED_BARGAIN_SINS.has(sin) || !bargainSinAvailable(sin))) {
       failCoopSharedSession(`Bargain presentation ${this.coopBargainStart} was not executable on the adopted state`);
       return;
     }

@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "290023f2b403c986d57a8bcfc9b488ef772cbb0c",
+  "baseSha": "38d9edc819a09e6fb6827941f8fc33cf93c8d855",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -55,6 +55,7 @@
     "src/data/elite-redux/coop/coop-interaction-relay.ts",
     "src/data/elite-redux/coop/coop-learn-move-operation.ts",
     "src/data/elite-redux/coop/coop-lobby.ts",
+    "src/data/elite-redux/coop/coop-local-presentation-input.ts",
     "src/data/elite-redux/coop/coop-me-operation.ts",
     "src/data/elite-redux/coop/coop-me-presentation.ts",
     "src/data/elite-redux/coop/coop-me-terminal-validator.ts",

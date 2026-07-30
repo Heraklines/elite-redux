@@ -6117,3 +6117,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The ownership manifest now advances to the exact preceding tip and clears the single-use locked-schema declaration.
   A focused source/static run must qualify this follow-up, and the capped full A/B/C/P aggregate must provide the
   complete engine proof for the final-boss appearance implementation.
+
+## 2026-07-30 - Browser campaigns close account-local Bargain and IV-scanner input seams
+
+- Exact Mystery run `30542668305` cleared six consecutive Mystery encounters plus the wave-7 trainer, then the
+  guest watcher terminated on `Bargain presentation 8 was not executable`. The immutable offer was
+  `[lust, greed, gluttony]`; Lust availability reads account-local candy, which is deliberately absent from the
+  adopted shared state. The authority had validated and retained the offer, but the replica incorrectly re-derived
+  it from its own account. Replica Bargain phases now trust the strict immutable offer; only the mechanical authority
+  may reject an offer against its source state.
+- Exact depth run `30545514114` reached matching `ScanIvsPhase` prompts on both browsers at the same V2 address and
+  digest. The phase is renderer-only, but the global interaction freeze reported both real CONFIRM handlers as
+  blocked, while the campaign had no driver. A cycle-free local-presentation-input registry now feeds renderer
+  admission, production UI dispatch, and the sealed browser observer. Each browser owns its own IV-scanner prompt;
+  the campaign visibly selects `no` through verified keys and suppresses only that client's exact appearance.
+- Local source evidence is green: Mystery/public driver contracts 51/51, Bargain ordering contracts 3/3,
+  presentation contracts 26/26, changed-file Biome clean, and `git diff --check` clean. The preceding remote static
+  run correctly caught the appearance event's validated numeric variant being assigned to the narrower `Variant`
+  field; replay now crosses that boundary with an explicit type-only cast. A repeated local full compile became a
+  3.3 GB survivor and was terminated under the workstation-contention rule, so the next remote static shard is the
+  authoritative compile proof. Exact Mystery/depth browser requalification also remains required; no deployment is
+  authorized.
