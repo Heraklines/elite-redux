@@ -6104,3 +6104,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The strict validator rejects incoherent Black-Shiny material, the renderer switch remains compile-time exhaustive,
   and the production renderer gate plus headless drain inventory include the new phase. The source contract is green
   at 26/26, full TypeScript is clean, and changed-file formatting is clean; remote engine qualification remains due.
+
+## 2026-07-30 - Appearance schema follow-up restores exact qualification boundaries
+
+- The first final-boss push failed before executing tests because its locked `coop-transport.ts` change lacked the
+  integration manifest's exact declaration. The declaration-only follow-up then also failed before tests because a
+  push train must declare the immediately preceding remote tip, not an older two-commit base. Neither result is
+  product evidence.
+- The earlier automatic browser bundle independently found one real test-migration omission: the canonical receipt
+  parser already accepted `appearance`, but its exhaustive expected-kind inventory did not list it. The inventory now
+  includes the event; this changes no Showdown or tournament runtime behavior.
+- The ownership manifest now advances to the exact preceding tip and clears the single-use locked-schema declaration.
+  A focused source/static run must qualify this follow-up, and the capped full A/B/C/P aggregate must provide the
+  complete engine proof for the final-boss appearance implementation.

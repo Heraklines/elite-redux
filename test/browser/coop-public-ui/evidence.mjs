@@ -78,6 +78,7 @@ const TRAINER_POSTCONDITION_PREFIX = "[coop-browser:trainer-postcondition] ";
 const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const PRESENTATION_EVENT_KINDS = new Set([
+  "appearance",
   "message",
   "moveUsed",
   "moveAnim",

@@ -312,6 +312,7 @@ test("the browser receipt parser accepts every canonical CoopBattleEvent kind", 
     ...new Set([...union.matchAll(/\bk:\s*"([A-Za-z]+)"/gu)].map(match => match[1]).concat(namedKinds)),
   ].sort();
   const expectedKinds = [
+    "appearance",
     "message",
     "moveUsed",
     "moveAnim",
