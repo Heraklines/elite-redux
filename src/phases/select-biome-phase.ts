@@ -59,6 +59,7 @@ import {
   getErPendingNodes,
   getErPrevBiome,
   rollErNextBiomeNodes,
+  setErPendingNodes,
 } from "#data/elite-redux/er-biome-routing";
 import {
   clearMapTravelTarget,
@@ -410,6 +411,14 @@ export class SelectBiomePhase extends BattlePhase {
         return;
       }
       const nodes = pending.length > 0 ? pending : rollErNextBiomeNodes(currentBiome, getErPrevBiome());
+      if (pending.length === 0) {
+        // The run-start fallback is still authoritative routing material. Retain it before a natural
+        // BIOME_PICK authors its CONTROL_COMMIT so the complete V2 state image carries the exact routes to
+        // the watcher. Keeping this only in the authority phase's local `nodes` array opens ER_MAP on the
+        // owner but leaves a replica reconstructed from the control entry with no route graph; it can then
+        // prove neither the read-only map surface nor the eventual immutable result.
+        setErPendingNodes(nodes.map(node => ({ ...node })));
+      }
       const revealed = nodes.filter(n => n.revealed);
       if (revealed.length === 0) {
         coopWarn("reward", "World Map authority exposed no revealed route; transition remains closed");

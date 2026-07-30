@@ -547,7 +547,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
   // speculative tail was removed by an earlier destructive projection. The legacy biomepick rendezvous is
   // deliberately absent under V2 because waiting for that missing replica phase before publishing control is
   // a causal cycle. Only then does the guest owner's ER_MAP open.
-  async function driveRealNaturalGuestOwnedMapPick(rig: DuoRig, destination: BiomeId): Promise<void> {
+  async function driveRealNaturalGuestOwnedMapPick(rig: DuoRig, destination?: BiomeId): Promise<BiomeId> {
     const pinned = rig.hostRuntime.controller.interactionCounter();
     expect(pinned % 2, "the guest owns the odd-parity natural biome pick").toBe(1);
     await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectBiomePhase", false));
@@ -557,6 +557,16 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       hostMap.start();
       await drainLoopback();
     });
+    const authorityRoutes = withClientSync(rig.hostCtx, () =>
+      getErPendingNodes()
+        .filter(node => node.revealed)
+        .map(node => ({ ...node })),
+    );
+    expect(authorityRoutes.length, "the authority retained at least two revealed natural routes").toBeGreaterThan(1);
+    const selectedDestination = destination ?? authorityRoutes[1].biome;
+    expect(authorityRoutes[1].biome, "the requested destination is the real World Map's second revealed route").toBe(
+      selectedDestination,
+    );
     const guestMap = await withClient(rig.guestCtx, () =>
       driveClientPhaseQueueTo(rig.guestScene, "SelectBiomePhase", {
         matches: phase => phase instanceof SelectBiomePhase,
@@ -570,6 +580,14 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     // Cross the reciprocal #858 boundary barrier on BOTH engines. The host authors the natural biome
     // interaction-open here; the guest (replica owner) parked on it and is released by the ordered entry.
     await pumpBoth(rig, 8);
+    expect(
+      withClientSync(rig.guestCtx, () =>
+        getErPendingNodes()
+          .filter(node => node.revealed)
+          .map(node => ({ ...node })),
+      ),
+      "the natural BIOME_PICK control state carried the authority's freshly rolled route graph",
+    ).toEqual(authorityRoutes);
     await waitForMode(rig.guestCtx, UiMode.ER_MAP, "guest-owned natural World Map");
     await pressUntilAccepted(rig, rig.guestCtx, Button.RIGHT, "World Map second route");
     await pressUntilAccepted(rig, rig.guestCtx, Button.ACTION, "World Map travel");
@@ -591,13 +609,14 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       "stale wrong travel target was consumed",
     ).toBeNull();
     expect(withClientSync(rig.hostCtx, () => getCoopBiomeTransitionTailPermit())).toMatchObject({
-      destinationBiomeId: destination,
+      destinationBiomeId: selectedDestination,
       switchAdopted: false,
     });
     expect(withClientSync(rig.guestCtx, () => getCoopBiomeTransitionTailPermit())).toMatchObject({
-      destinationBiomeId: destination,
+      destinationBiomeId: selectedDestination,
       switchAdopted: false,
     });
+    return selectedDestination;
   }
 
   it("permit mismatches park SwitchBiome/NewBiome in place without mutation or queue advance", async () => {
@@ -1895,14 +1914,13 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     pair.setAutomaticDelivery(false);
     const headlessAtlas = withClientSync(rig.guestCtx, () => installHeadlessPlayerAtlasCompletion(rig.guestScene));
 
-    const routes: ErRouteNode[] = [
-      { biome: BiomeId.FOREST, revealed: true },
-      { biome: BiomeId.VOLCANO, revealed: true, source: "upgrade" },
-    ];
     for (const ctx of [rig.hostCtx, rig.guestCtx]) {
       await withClient(ctx, () => {
         restoreErBiomeStructure(10, 1, null);
-        setErPendingNodes(routes.map(node => ({ ...node })));
+        // Reproduce the real-browser failure: neither engine was pre-seeded with a route graph. The
+        // authority must roll it at SelectBiome and retain it before authoring the interaction-open; the
+        // replica is forbidden from rolling a local substitute and must receive those exact routes in V2.
+        markErPendingNodesAwaitingAuthority();
       });
     }
 
@@ -1922,7 +1940,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       // guest owner (counter 1) can act. driveRealGuestOwnedMapPick presses RIGHT + ACTION through the REAL
       // ER_MAP and blocks on both counters crossing to 2 - which never happens while the owner is frozen.
       await driveRealBiomeMarketLeave(rig);
-      await driveRealNaturalGuestOwnedMapPick(rig, BiomeId.VOLCANO);
+      await driveRealNaturalGuestOwnedMapPick(rig);
 
       expect(rig.hostRuntime.controller.interactionCounter(), "host advanced past the natural biome pick").toBe(2);
       expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced past the natural biome pick").toBe(2);
