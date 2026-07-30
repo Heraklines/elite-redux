@@ -5851,3 +5851,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   UI -> rejected Send Out -> prompt -> same command -> relayed attack chain; no DOM or game-state mutation is used.
 - The change is harness-only. The already-qualified Authority V2 product runtime is unchanged; the next remote proof
   is the Mystery profile alone at the new exact SHA, not a redundant rerun of the three already-green profiles.
+
+## 2026-07-30 - Depleted move sets switch through the public command UI
+
+- Exact harness tip `b21f4d796e49fc4aaba3bc3cedcac849a969f0d4` is fully green in focused run
+  `30510424625`: planner/ownership, all source and node-pure contracts, static/type, P2, C5, and the required
+  aggregate passed. Automatic two-browser fresh-wave2 run `30510424441` is also green. The exact 10-wave Mystery
+  run `30510438462` proved the rejected-switch repair by progressing far beyond the old wave-2 owner timeout.
+- That run cleared six consecutive Mystery surfaces to the shared wave-7 command frontier, including alternating
+  interaction owners, a guest-owned Mystery party sub-prompt, one real faint replacement, rewards, and a four-turn
+  Mystery battle. It stopped cleanly with both browsers at epoch `1828230599614993`, wave 7 turn 1, digest
+  `842da5aa7c08bddd`: the guest's only visible move was correctly projected as `usable:false`, and the harness had no
+  human-equivalent all-PP-depleted policy. This was neither a desync nor a softlock.
+- The campaign driver now treats a complete observer-proven unusable move set as a command decision, not an error.
+  It presses Backspace to leave Fight, proves the same exact owned command reopened, orders healthy owned reserves
+  deterministically, and tries Send Out until a real post-input relay command exists. A rejected reserve remains on
+  the same owner and advances to the next reserve; the sequential round is never retired on keypress alone.
+- A node-pure failure-first regression recreates the exact public chain: actionable command -> Fight -> one unusable
+  move -> Backspace -> exact command -> Pokemon -> owned reserve -> Send Out -> relay proof. It forbids an attack
+  record and uses no DOM/game-state mutation. The next exact proof remains Mystery-only because runtime product code
+  and the already-green aggregate are unchanged.

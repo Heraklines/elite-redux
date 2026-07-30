@@ -360,6 +360,30 @@ export function chooseVoluntarySwitchTarget(observation, criticalRatio = 0.4, mi
   return Number.isSafeInteger(reserve?.slot) ? `party-slot:${reserve.slot}` : null;
 }
 
+/** Healthy owned reserves in deterministic human-choice order. Unlike the low-HP policy above,
+ * this is the escape hatch for an active whose complete visible move set is unusable. */
+export function ownedReserveSwitchTargetIds(observation) {
+  if (
+    observation?.surfaceId !== "command:command"
+    || !/^(?:host|guest)$/u.test(observation.localRole)
+    || !Array.isArray(observation.partySlots)
+  ) {
+    return [];
+  }
+  return observation.partySlots
+    .filter(
+      slot =>
+        slot?.coopOwner === observation.localRole
+        && slot.active !== true
+        && slot.fainted !== true
+        && slot.allowedInBattle === true
+        && Number.isSafeInteger(slot.slot),
+    )
+    .map(slot => ({ slot, ratio: partyHealthRatio(slot) ?? -1 }))
+    .sort((left, right) => right.ratio - left.ratio || left.slot.slot - right.slot.slot)
+    .map(({ slot }) => `party-slot:${slot.slot}`);
+}
+
 async function driveCampaignVoluntarySwitch(client, command, targetId, purpose, timeoutMs) {
   const partyCursor = client.evidence.cursor();
   await selectOptionById(client, {
@@ -459,6 +483,55 @@ async function driveCampaignVoluntarySwitch(client, command, targetId, purpose, 
   throw new Error(`${client.label}: ${purpose} voluntary switch produced neither relay proof nor a reopened command`);
 }
 
+async function driveNoUsableMoveSwitch(client, initialCommand, fight, purpose, timeoutMs) {
+  const observedMoves = Array.isArray(fight.observation.moveSlots) ? fight.observation.moveSlots : [];
+  if (observedMoves.length === 0 || observedMoves.some(slot => slot?.usable === true)) {
+    return false;
+  }
+  const reserveTargets = ownedReserveSwitchTargetIds(initialCommand.observation);
+  if (reserveTargets.length === 0) {
+    return false;
+  }
+
+  // A depleted one-move active cannot attack. Back out through the same public CANCEL input a
+  // player uses, prove the exact owned command reopened, and try healthy owned reserves until
+  // one produces a real relay command. Never retire this sequential owner merely because a
+  // party SEND OUT key was pressed.
+  const commandCursor = client.evidence.cursor();
+  client.evidence.record("campaign-no-usable-move", {
+    purpose,
+    moveSlots: observedMoves,
+    reserveTargets,
+  });
+  await client.press("Backspace", `${purpose}-no-usable-move-back`);
+  let command = await waitForActionableSemanticSurface(client, "command:command", {
+    fromCursor: commandCursor,
+    timeoutMs,
+  });
+  if (
+    !sameSemanticAddress(command.observation.address, fight.observation.address)
+    || command.observation.localSeat !== client.publicSeat
+    || !command.observation.seatsWithInput?.includes(client.publicSeat)
+  ) {
+    throw new Error(`${client.label}: ${purpose} no-PP backout did not reopen the exact owned command`);
+  }
+  for (const reserveTarget of reserveTargets) {
+    const switchResult = await driveCampaignVoluntarySwitch(
+      client,
+      command,
+      reserveTarget,
+      `${purpose}-no-usable-move`,
+      timeoutMs,
+    );
+    if (switchResult.submitted) {
+      client.evidence.record("campaign-no-usable-move-switch", { purpose, reserveTarget });
+      return true;
+    }
+    command = switchResult.commandEvent;
+  }
+  throw new Error(`${client.label}: ${purpose} exhausted every owned reserve without a relay command`);
+}
+
 /**
  * Submit a survivability-aware command through the ordinary command UI: make a proven healthier
  * voluntary switch when the acting mon is critical, otherwise choose the strongest visible usable
@@ -504,6 +577,9 @@ export async function driveBestCampaignMove(
   });
   const move = chooseBestCampaignMove(fight.observation, cycleIndex, preferredMoveId);
   if (move == null) {
+    if (await driveNoUsableMoveSwitch(client, command, fight, purpose, timeoutMs)) {
+      return;
+    }
     throw new Error(
       `${client.label}: ${purpose} exposed no observer-proven usable move: `
         + `${JSON.stringify(fight.observation.moveSlots ?? null)}`,
