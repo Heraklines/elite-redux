@@ -348,12 +348,12 @@ if (
   || !campaignNav.includes('surfaceId: "command:fight"')
   || !campaignNav.includes("candidates[normalizedCycle % candidates.length]")
   || !campaign.includes("driveBestCampaignMove(client, commandPurpose")
-  || !campaign.includes("cycleIndex: turn - 1")
+  || campaign.includes("cycleIndex: turn - 1")
   || !campaign.includes("policy.keys.battleKeysFromEnv")
   || !harness.includes("driveCommand(client, `${purpose}-${client.label}`, event)")
 ) {
   failures.push(
-    "campaign battle selection must use read-only visible FIGHT metadata and public keys, with exact key overrides retained",
+    "campaign battle selection must use the strongest read-only visible move and public keys, with explicit alternates and exact key overrides retained",
   );
 }
 if (

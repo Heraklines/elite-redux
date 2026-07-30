@@ -6051,5 +6051,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Ordinary campaign rounds now omit the alternate-move index and therefore keep choosing the strongest visible,
   usable damaging move. The explicit cycling primitive remains available for a caller that has actual evidence a
   move must change; a successful prior turn is no longer treated as such evidence.
-- A node-pure source contract forbids restoring `cycleIndex: turn - 1`. This changes only human-equivalent browser
-  policy, not production battle state, Authority V2, Showdown, tournament, triples, or deployment behavior.
+- Node-pure and browser-build boundary contracts forbid restoring `cycleIndex: turn - 1`. This changes only
+  human-equivalent browser policy, not production battle state, Authority V2, Showdown, tournament, triples, or
+  deployment behavior.
