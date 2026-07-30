@@ -158,6 +158,7 @@ import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import { Move } from "#moves/move";
+import { getMoveTargets } from "#moves/move-utils";
 import type { CommandPhase } from "#phases/command-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import type { SelectTargetPhase } from "#phases/select-target-phase";
@@ -758,6 +759,33 @@ function moveInUsableMoveset(mon: Pokemon, moveId: MoveId): boolean {
   return mon.getMoveset().some(m => m.moveId === moveId && m.ppUsed < m.getMovePp());
 }
 
+/** Commit the engine-synthesized Struggle command without replacing the real moveset. */
+function selectSyntheticStruggle(
+  game: GameManager,
+  mon: Pokemon,
+  target: BattlerIndex | null | undefined,
+  log: string[],
+  idx: BattlerIndex,
+): void {
+  const turnMove: TurnMove = {
+    move: MoveId.STRUGGLE,
+    targets: target == null ? getMoveTargets(mon, MoveId.STRUGGLE).targets : [target],
+    useMode: MoveUseMode.NORMAL,
+  };
+  game.onNextPrompt("CommandPhase", UiMode.COMMAND, () =>
+    game.scene.ui.setMode(UiMode.FIGHT, (game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex()),
+  );
+  game.onNextPrompt("CommandPhase", UiMode.FIGHT, () =>
+    (game.scene.phaseManager.getCurrentPhase() as CommandPhase).handleCommand(
+      Command.FIGHT,
+      -1,
+      MoveUseMode.NORMAL,
+      turnMove,
+    ),
+  );
+  log.push(`slot${idx}: STRUGGLE [synthetic command; moveset preserved]`);
+}
+
 /**
  * Command one player mon for the turn: switch / ball / run / move (+ optional
  * tera). A scripted MOVE already in the mon's real moveset routes through the
@@ -817,8 +845,11 @@ function applyAction(
         : (action.target as BattlerIndex);
   const tera = !!action.tera;
   const inMoveset = moveInUsableMoveset(mon, moveId);
+  const syntheticStruggle = moveId === MoveId.STRUGGLE && !mon.getMoveset().some(move => move.moveId === moveId);
 
-  if (inMoveset) {
+  if (syntheticStruggle) {
+    selectSyntheticStruggle(game, mon, target, log, idx);
+  } else if (inMoveset) {
     if (tera && (idx === BattlerIndex.PLAYER || idx === BattlerIndex.PLAYER_2)) {
       game.move.selectWithTera(moveId, idx, target);
     } else {
@@ -888,10 +919,7 @@ function findChosenCombatCandidate(
     ?? forcedMove
     ?? mon.getMoveset().find(move => move.ppUsed < move.getMovePp())?.moveId
     ?? MoveId.STRUGGLE;
-  const moveSlot =
-    moveId === MoveId.STRUGGLE
-      ? -1
-      : mon.getMoveset().findIndex(move => move.moveId === moveId && move.ppUsed < move.getMovePp());
+  const moveSlot = mon.getMoveset().findIndex(move => move.moveId === moveId && move.ppUsed < move.getMovePp());
   const chosenTarget = chosenTargetRef(game, action.target);
   const matches = candidates.filter(
     (candidate): candidate is ErCombatMoveCandidate =>
@@ -3806,6 +3834,32 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     expect(moveset.length, "moveset must NOT be spliced down to a single move").toBe(4);
     const curl = moveset.find(m => m.moveId === MoveId.DEFENSE_CURL);
     expect(curl?.ppUsed, "Defense Curl PP must have depleted across 3 turns").toBe(3);
+  }, 180_000);
+
+  it("engine-synthesized Struggle preserves an exhausted real moveset", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "synthetic Struggle preserves moveset",
+      run: { level: 100, difficulty: "ace" },
+      party: [{ species: SpeciesId.SNORLAX, moves: [MoveId.SPLASH, MoveId.PROTECT] }],
+      enemy: { kind: "wild", wild: { species: SpeciesId.CHANSEY, level: 100, moves: [MoveId.SPLASH] } },
+      script: [{}],
+    };
+    normalizeSpec(spec);
+    const game = await launchScenario(phaserGame, spec, {});
+    const lead = game.scene.getPlayerField()[0];
+    const originalMoveIds = lead.getMoveset().map(move => move.moveId);
+    lead.getMoveset().forEach(move => {
+      move.ppUsed = move.getMovePp();
+    });
+
+    await playBattle(game, { script: spec.script, forcedMove: null, maxTurns: 1, waves: 1 });
+
+    expect(
+      lead.getMoveset().map(move => move.moveId),
+      "synthetic Struggle must not splice the moveset",
+    ).toEqual(originalMoveIds);
+    expect(lead.getLastXMoves()[0]?.move, "the exhausted Pokemon should execute Struggle").toBe(MoveId.STRUGGLE);
   }, 180_000);
 
   it("a queued two-turn continuation does not consume the next scripted command", async () => {
