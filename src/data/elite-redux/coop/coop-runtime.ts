@@ -7302,8 +7302,18 @@ function materializeCoopV2InteractionProjection(
         plan.operationId,
       );
     case "mystery": {
+      const priorMysteryControl = source === "recovery" ? captureCoopMeControlTransactionState() : null;
       if (coopMeInteractionStartValue() !== plan.pinned) {
-        return null;
+        if (source !== "recovery") {
+          return null;
+        }
+        // A first-of-wave ME_PRESENT can overtake the replica's SwitchBiome/NewBiome shell. In that race
+        // the replica never ran MysteryEncounterPhase, so no legacy phase had an opportunity to create the
+        // ambient ME pin. Recovery nevertheless owns an immutable, address-exact presentation entry. Adopt
+        // its signed coordinate before reconstructing the screen; requiring the absent local phase to have
+        // guessed this pin made an otherwise successful full-state recovery terminate at prepareControl.
+        setCoopMeInteractionStart(plan.pinned);
+        coopLog("v2-recovery", `rehydrated Mystery pin=${plan.pinned} from retained ${plan.operationId}`);
       }
       // A retained first-of-wave Mystery can be projected after the signed destination Battle was
       // constructed without passing through ModifierSelectUiHandler, the ordinary HUD refresh seam.
@@ -7330,15 +7340,20 @@ function materializeCoopV2InteractionProjection(
           presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
         ): boolean;
       };
-      return phase.installCoopV2MePresentation(
+      const installed = phase.installCoopV2MePresentation(
         plan.operationId,
         plan.pinned,
         plan.mysteryEncounterType,
         plan.introVisuals,
         plan.presentation,
-      )
-        ? phase
-        : null;
+      );
+      if (!installed) {
+        if (priorMysteryControl != null) {
+          restoreCoopMeControlTransactionState(priorMysteryControl);
+        }
+        return null;
+      }
+      return phase;
     }
     case "revival":
       return phaseManager.create("CoopGuestRevivalPhase", plan.fieldIndex, plan.operationId, ownerIsLocal);

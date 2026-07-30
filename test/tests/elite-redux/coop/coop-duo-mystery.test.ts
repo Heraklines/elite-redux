@@ -36,6 +36,12 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  captureCoopMeControlTransactionState,
+  resetCoopActiveMysteryControl,
+  restoreCoopMeControlTransactionState,
+  setCoopMeInteractionStart,
+} from "#data/elite-redux/coop/coop-me-pin-state";
 import { type CoopMePresentPayload, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
@@ -1503,6 +1509,19 @@ describe.skipIf(!RUN)(
         rig.guestCtx,
         () => getCoopV2Shadow(rig.guestRuntime)?.diagnostics().recovery?.completedReplicaProofs ?? 0,
       );
+      // Reproduce the browser's cross-biome delivery order: ME_PRESENT already exists in the retained V2
+      // frontier, but neither the stale replica shell nor the recovery snapshot carries a legacy Mystery
+      // pin/control. Recovery must reconstruct that coordinate from the signed entry itself. The prior test
+      // accidentally kept both pins live, so it could not catch the real SwitchBiome -> ME_PRESENT failure.
+      const hostMysteryControl = withClientSync(rig.hostCtx, () => captureCoopMeControlTransactionState());
+      withClientSync(rig.hostCtx, () => {
+        setCoopMeInteractionStart(-1);
+        resetCoopActiveMysteryControl();
+      });
+      withClientSync(rig.guestCtx, () => {
+        setCoopMeInteractionStart(-1);
+        resetCoopActiveMysteryControl();
+      });
       withClientSync(rig.guestCtx, () => {
         rig.guestScene.money += 424_242; // diverge so captureCoopChecksum mismatches the host's
       });
@@ -1599,6 +1618,11 @@ describe.skipIf(!RUN)(
         withClientSync(rig.guestCtx, () => rig.guestScene.getPlayerField().length),
         "the complete recovery image preserved the authoritative field composition",
       ).toBe(guestFieldBefore);
+
+      // The authority itself did not recover, so restore its pre-injection control before completing the
+      // original guest-owned encounter. This is test-fixture cleanup; the replica above had to rebuild its
+      // control solely from the retained V2 entry and has already returned the correlated proof.
+      withClientSync(rig.hostCtx, () => restoreCoopMeControlTransactionState(hostMysteryControl));
 
       // ===== PROVE NO ORPHAN by completing the guest-owned ME through convergence (the IT #2 handshake).
       // The reconstructed selector is live, so the guest relays its pick, the host applies it, and both
