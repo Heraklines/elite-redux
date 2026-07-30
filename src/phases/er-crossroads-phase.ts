@@ -254,6 +254,7 @@ export class ErCrossroadsPhase extends Phase {
       {
         // Plain "Stay" (keep exploring this biome) - clearer than the biome verb.
         label: "Stay",
+        semanticId: "stay",
         handler: () => {
           this.resolve(false);
           return true;
@@ -261,6 +262,7 @@ export class ErCrossroadsPhase extends Phase {
       },
       {
         label: "Leave",
+        semanticId: "leave",
         handler: () => {
           this.resolve(true);
           return true;
@@ -488,6 +490,7 @@ export class ErCrossroadsPhase extends Phase {
     const options: OptionSelectItem[] = [
       {
         label: "Stay",
+        semanticId: "stay",
         handler: () => {
           if (!this.boundaryStillLive(generation, wave)) {
             return false;
@@ -498,6 +501,7 @@ export class ErCrossroadsPhase extends Phase {
       },
       {
         label: "Leave",
+        semanticId: "leave",
         handler: () => {
           if (!this.boundaryStillLive(generation, wave)) {
             return false;
@@ -668,8 +672,8 @@ export class ErCrossroadsPhase extends Phase {
     // no-ops: the awaited relay is the sole authority (a replayed owner ACTION must never
     // resolve the watcher against its own possibly-drifted cursor).
     const watchOptions: OptionSelectItem[] = [
-      { label: "Stay", handler: () => true },
-      { label: "Leave", handler: () => true },
+      { label: "Stay", semanticId: "stay", handler: () => true },
+      { label: "Leave", semanticId: "leave", handler: () => true },
     ];
     let mode: "completed" | "forced" | "superseded" | null = null;
     try {

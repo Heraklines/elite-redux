@@ -1464,6 +1464,18 @@ function observeSemanticSurface(): void {
       const { digest: stateDigest } = semanticMechanicalDigest(
         `watcher:${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}:${phase}:${semanticPhaseInstance}`,
       );
+      const partySlots = globalScene.getPlayerParty().map((pokemon, slot) => ({
+        slot,
+        speciesId: pokemon.species.speciesId,
+        coopOwner: pokemon.coopOwner ?? null,
+        active: pokemon.isActive(true),
+        fainted: pokemon.isFainted(),
+        hp: pokemon.hp,
+        maxHp: pokemon.getMaxHp(),
+        level: pokemon.level,
+        allowedInBattle: pokemon.isAllowedInBattle(),
+        replacementEligible: false,
+      }));
       const observation = {
         version: 2,
         surfaceId: "command:watcher",
@@ -1486,6 +1498,7 @@ function observeSemanticSurface(): void {
         optionCount: null,
         teamSpeciesIds: null,
         moveSlots: null,
+        partySlots,
         ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
         phase,
         phaseInstance: semanticPhaseInstance,
@@ -1495,6 +1508,14 @@ function observeSemanticSurface(): void {
         // command watcher fail closed in the public two-browser oracle.
         displayedWave: globalScene.getDisplayedBiomeWaveIndex(),
         mysteryEncounterType: battle.mysteryEncounter?.encounterType ?? null,
+        arena: {
+          biomeId: globalScene.arena?.biomeId ?? null,
+          weather: globalScene.arena?.weather?.weatherType ?? 0,
+          terrain: globalScene.arena?.terrain?.terrainType ?? 0,
+        },
+        presentation: {
+          trainerVisible: globalScene.trainer?.visible === true,
+        },
         stateDigest,
         uiMode,
       } as const;
@@ -1657,7 +1678,7 @@ function observeSemanticSurface(): void {
     const moveSlots = readFightMoveSlots(uiMode);
     const starterGridCandidates = uiMode === "STARTER_SELECT" ? readStarterGridCandidates(handler) : null;
     const partySlots =
-      uiMode === "PARTY" || uiMode === "COMMAND"
+      uiMode === "PARTY" || semantic.operationClass === "command"
         ? globalScene.getPlayerParty().map((pokemon, slot) => {
             const active = pokemon.isActive(true);
             const fainted = pokemon.isFainted();
@@ -1674,6 +1695,7 @@ function observeSemanticSurface(): void {
               fainted,
               hp: pokemon.hp,
               maxHp: pokemon.getMaxHp(),
+              level: pokemon.level,
               allowedInBattle,
               replacementEligible: reserve && !active && !fainted && allowedInBattle && ownedReplacement,
             };
@@ -1864,6 +1886,14 @@ function observeSemanticSurface(): void {
       // prove that an apparently matching Mystery surface is actually the same encounter and
       // lets the ten-wave gauntlet prove non-repeating event breadth.
       mysteryEncounterType,
+      arena: {
+        biomeId: globalScene.arena?.biomeId ?? null,
+        weather: globalScene.arena?.weather?.weatherType ?? 0,
+        terrain: globalScene.arena?.terrain?.terrainType ?? 0,
+      },
+      presentation: {
+        trainerVisible: globalScene.trainer?.visible === true,
+      },
       // Every co-op UI-to-relay surface carries the same broad mechanical fingerprint used at
       // battle continuation boundaries. A Mystery/shop/prompt desync can no longer heal before
       // the next command and disappear from the two-browser evidence.

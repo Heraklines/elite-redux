@@ -126,14 +126,17 @@ test("gold-standard coverage requires both owner parities and a later command af
 
 test("journey workflow enables the continuous two-parity contract and trace-off public lane", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
-  assert.match(workflow, /COOP_UI_CAMPAIGN_WAVES: "20"/u);
   assert.match(
     workflow,
-    /COOP_UI_MARKET_REQUIRED_PURCHASES: \$\{\{ inputs\.journey == 'market-wide-lens' && '2' \|\| '0' \}\}/u,
+    /COOP_UI_CAMPAIGN_WAVES: \$\{\{ inputs\.journey == 'navigation-depth-30' && '30' \|\| '20' \}\}/u,
   );
   assert.match(
     workflow,
-    /COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: \$\{\{ inputs\.journey == 'market-wide-lens' && '1' \|\| '0' \}\}/u,
+    /COOP_UI_MARKET_REQUIRED_PURCHASES: \$\{\{ \(inputs\.journey == 'market-wide-lens' \|\| inputs\.journey == 'navigation-depth-30'\) && '2' \|\| '0' \}\}/u,
+  );
+  assert.match(
+    workflow,
+    /COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: \$\{\{ \(inputs\.journey == 'market-wide-lens' \|\| inputs\.journey == 'navigation-depth-30'\) && '1' \|\| '0' \}\}/u,
   );
   assert.match(workflow, /COOP_UI_MARKET_SECOND_PURCHASE: "1"/u);
   assert.match(workflow, /COOP_UI_CHROME_TRACE: \$\{\{ inputs\.chrome_trace && '1' \|\| '0' \}\}/u);

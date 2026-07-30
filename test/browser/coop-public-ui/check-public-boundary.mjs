@@ -359,7 +359,7 @@ if (
 if (
   !browserEntry.includes("hp: pokemon.hp")
   || !browserEntry.includes("maxHp: pokemon.getMaxHp()")
-  || !browserEntry.includes('uiMode === "PARTY" || uiMode === "COMMAND"')
+  || !browserEntry.includes('uiMode === "PARTY" || semantic.operationClass === "command"')
   || !campaign.includes("export function chooseRewardPartyTargetSlot(")
   || !campaign.includes("export function rewardPartyTargetCandidates(")
   || !campaign.includes('observation?.surfaceId === "reward-shop"')

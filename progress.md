@@ -6200,3 +6200,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the real read-only World Map. A failure-first UI seam test proves the refused pre-start attempt mutates no handler,
   increments no transition generation, leaves no timer, and cannot report completion. This is a generic bounded-UI
   contract repair; no Showdown, tournament, triples, deployment, or legacy authority behavior is changed.
+
+## 2026-07-30 - Live soak progress and continuous navigation qualification
+
+- Long-running two-browser campaigns now print every structured progress boundary immediately as
+  `[coop-soak:progress]` and emit a read-only `[coop-soak:heartbeat]` once per minute with elapsed time, current/target
+  wave, and each Chromium client's latest phase, surface, address, readiness, and evidence count. The timer samples
+  only already-captured evidence, sends no browser input, and is cleared during campaign flush. The single-process
+  engine soaks likewise print machine-readable `wave-start` and `wave-complete` records, so a stalled run exposes its
+  exact last wave and both engine phase names before end-of-run artifacts exist.
+- A new exact-build-and-URL-gated `navigation-depth-30` journey drives one continuous two-Chromium session for 30
+  waves. Both seats visibly choose three point-legal starters that are assigned level 100 only while the initial shared
+  save is constructed; there is no runtime healing hook. Its closed acceptance contract requires the wave 10/20/30
+  markets, both interaction-owner seats, Crossroads Stay and Leave, World Map completion, a second biome, the ordered
+  reward -> market -> Crossroads -> map chain, the wave-20 trainer boss, paired arena/weather/terrain parity, and
+  trainer-presentation cleanup at wave 21. The job has a 240-minute ceiling and consumes one campaign runner.
+- The prior exact-SHA matrix isolated two additional frontiers. The Mystery lane exhausted every visible move with no
+  legal reserve, so the public driver now selects the visible depleted slot and lets production convert it to Struggle.
+  The registered-interaction lane proved Stormglass can legitimately hand off to same-address `ME_PRESENT` on Mystery
+  difficulty; its V2 successor now admits exactly that interaction or the existing same-address command, while wrong
+  kinds/turns remain denied.
+- Local public-source qualification is 193/193 green, campaign/public boundary checks are green, changed-file Biome is
+  clean, and `git diff --check` is clean. TypeScript, Authority V2 Vitest, and real Chromium execution remain remote-only;
+  the next exact-SHA roll must prove the focused gate, Mystery, registered interactions, and the new navigation journey.

@@ -609,6 +609,30 @@ export async function driveBestCampaignMove(
     if (await driveNoUsableMoveSwitch(client, command, fight, purpose, timeoutMs)) {
       return;
     }
+    const observedMoves = Array.isArray(fight.observation.moveSlots) ? fight.observation.moveSlots : [];
+    const struggleTrigger = observedMoves
+      .filter(slot => slot?.usable === false && typeof slot.optionId === "string" && Number.isSafeInteger(slot.index))
+      .sort((left, right) => left.index - right.index)[0];
+    if (struggleTrigger != null && observedMoves.every(slot => slot?.usable !== true)) {
+      // CommandPhase owns the ordinary all-PP-depleted rule: choosing any visible exhausted move
+      // becomes Struggle when no move can be used. A real player still selects that public slot;
+      // the browser driver must not invent a command or fail merely because no healthy reserve exists.
+      await selectOptionById(client, {
+        surfaceId: "command:fight",
+        targetId: struggleTrigger.optionId,
+        navKeys: ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"],
+        submitKey: "Space",
+        fromCursor: fightCursor,
+        timeoutMs,
+      });
+      client.evidence.record("campaign-battle-struggle", {
+        purpose,
+        selectedOptionId: struggleTrigger.optionId,
+        depletedMoveId: struggleTrigger.moveId ?? null,
+        slot: struggleTrigger.index,
+      });
+      return struggleTrigger;
+    }
     throw new Error(
       `${client.label}: ${purpose} exposed no observer-proven usable move: `
         + `${JSON.stringify(fight.observation.moveSlots ?? null)}`,

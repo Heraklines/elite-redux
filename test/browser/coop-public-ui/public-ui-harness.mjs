@@ -1072,6 +1072,8 @@ export class PublicUiClient {
       entryUrl.searchParams.set("coopfixture", "game-over");
     } else if (this.config.journey === "registered-interactions") {
       entryUrl.searchParams.set("coopfixture", this.label === "host-seat" ? "registered-owner" : "registered-partner");
+    } else if (this.config.journey === "navigation-depth-30") {
+      entryUrl.searchParams.set("coopfixture", "navigation-depth-30");
     } else if (this.config.journey === "showdown-battle") {
       entryUrl.searchParams.set("coopfixture", "showdown-battle");
       // Showdown remains deliberately disabled for ordinary players while the mode is under
@@ -3453,6 +3455,7 @@ export class DuoPublicUiRig {
     faintFixture = false,
     gameOverFixture = false,
     campaignSurvivalFixture = false,
+    navigationFixture = false,
     registeredInteractionsFixture = false,
   } = {}) {
     if (!this.host) {
@@ -3538,11 +3541,13 @@ export class DuoPublicUiRig {
                 ? [CROBAT_SPECIES_ID]
                 : campaignSurvivalFixture
                   ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
-                  : registeredInteractionsFixture
-                    ? client.label === "host-seat"
-                      ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
-                      : [BULBASAUR_SPECIES_ID]
-                    : null;
+                  : navigationFixture
+                    ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
+                    : registeredInteractionsFixture
+                      ? client.label === "host-seat"
+                        ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
+                        : [BULBASAUR_SPECIES_ID]
+                      : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {

@@ -1039,6 +1039,116 @@ test("an all-PP-depleted active backs out and relays an owned reserve switch", a
   assert.ok(presses.some(press => press.key === "Backspace" && press.purpose.endsWith("-no-usable-move-back")));
 });
 
+test("an all-PP-depleted last owner selects the public move slot to trigger Struggle", async () => {
+  const address = { epoch: 1828284717667802, wave: 7, turn: 6 };
+  const partySlots = [
+    { slot: 0, coopOwner: "host", active: true, fainted: false, hp: 16, maxHp: 25, allowedInBattle: true },
+    { slot: 1, coopOwner: "guest", active: true, fainted: false, hp: 20, maxHp: 25, allowedInBattle: true },
+  ];
+  const events = [];
+  const records = [];
+  const presses = [];
+  let nextIndex = 0;
+  const pushSurface = observation => {
+    const event = { index: nextIndex++, kind: "browser-surface2", observation };
+    events.push(event);
+    return event;
+  };
+  const firstCommand = pushSurface({
+    surfaceId: "command:command",
+    operationClass: "command",
+    ownerModel: "local",
+    address,
+    localSeat: 0,
+    localRole: "host",
+    seatsWithInput: [0],
+    selectedOptionId: "command:fight",
+    optionIds: ["command:fight", "command:ball", "command:pokemon", "command:run"],
+    partySlots,
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+  });
+  const evidence = {
+    cursor: () => nextIndex,
+    findLastSemanticSurface(from = 0, surfaceId = null) {
+      return events
+        .filter(
+          event =>
+            event.index >= from
+            && event.kind === "browser-surface2"
+            && (surfaceId == null || event.observation.surfaceId === surfaceId),
+        )
+        .at(-1);
+    },
+    record(kind, data) {
+      records.push({ kind, ...data });
+      events.push({ index: nextIndex++, kind, ...data });
+    },
+    async waitForCondition(predicate, { timeoutMs, description }) {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const result = predicate(evidence);
+        if (result) {
+          return result;
+        }
+        await new Promise(resolvePromise => setTimeout(resolvePromise, 1));
+      }
+      throw new Error(`fixture timed out waiting for ${description}`);
+    },
+  };
+  const inputHandlers = [
+    {
+      matches: purpose => purpose === "nav-submit-command:command->command:fight",
+      run: () =>
+        pushSurface({
+          surfaceId: "command:fight",
+          address,
+          localSeat: 0,
+          seatsWithInput: [0],
+          selectedOptionId: "move:323:slot:0",
+          optionIds: ["move:323:slot:0"],
+          moveSlots: [
+            {
+              index: 0,
+              optionId: "move:323:slot:0",
+              moveId: 323,
+              category: "SPECIAL",
+              power: 150,
+              usable: false,
+            },
+          ],
+          ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+        }),
+    },
+    {
+      matches: purpose => purpose === "nav-submit-command:fight->move:323:slot:0",
+      run: () => {},
+    },
+  ];
+  const client = {
+    label: "host-seat",
+    publicSeat: 0,
+    evidence,
+    async press(key, purpose) {
+      presses.push({ key, purpose });
+      const handler = inputHandlers.find(candidate => candidate.matches(purpose));
+      assert.ok(handler, `unexpected fixture input ${key} for ${purpose}`);
+      handler.run();
+    },
+  };
+
+  const move = await driveBestCampaignMove(client, "last-owner-no-pp", {
+    timeoutMs: 1_000,
+    commandEvent: firstCommand,
+  });
+
+  assert.equal(move.optionId, "move:323:slot:0");
+  assert.equal(records.filter(record => record.kind === "campaign-battle-struggle").length, 1);
+  assert.equal(records.filter(record => record.kind === "campaign-no-usable-move").length, 0);
+  assert.equal(records.filter(record => record.kind === "campaign-no-usable-move-switch").length, 0);
+  assert.ok(presses.some(press => press.purpose === "nav-submit-command:fight->move:323:slot:0"));
+  assert.ok(!presses.some(press => press.key === "Backspace"));
+});
+
 test("title navigation never shortcuts upward into the notification inbox", () => {
   const title = {
     surfaceId: "title-menu",

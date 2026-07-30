@@ -118,6 +118,23 @@ export function isCoopBrowserCampaignFixtureBuild(): boolean {
   return env?.VITE_COOP_BROWSER_FIXTURE === "campaign-survival";
 }
 
+/** Whether this exact bundle was built for the continuous 30-wave navigation journey. */
+export function isCoopBrowserNavigationFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "navigation-depth-30";
+}
+
+/**
+ * Require both the immutable bundle identity and the exact public-journey URL token.
+ * A copied query parameter in any normal local, staging, or production bundle is inert.
+ */
+export function isCoopBrowserNavigationFixtureActive(): boolean {
+  if (!isCoopBrowserNavigationFixtureBuild() || typeof location === "undefined") {
+    return false;
+  }
+  return new URLSearchParams(location.search).get("coopfixture") === "navigation-depth-30";
+}
+
 /** Whether this exact bundle was built for the Revival + Stormglass public-browser journey. */
 export function isCoopBrowserRegisteredInteractionFixtureBuild(): boolean {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
@@ -229,6 +246,42 @@ export function getCoopBrowserCampaignFixtureStarters(): Starter[] | null {
     pokerus: false,
     ivs: new Array(6).fill(31),
   }));
+}
+
+/**
+ * Point-legal, replacement-capable party for the navigation-only 30-wave browser journey.
+ *
+ * These are ordinary legal level-up moves with enough PP for longitudinal play. The level is
+ * deliberately not carried in the public Starter payload: the exact-build launch boundary below
+ * applies it once while constructing the initial shared save, after both humans visibly confirm
+ * this normal starter screen. No later battle healing or mutation hook exists.
+ */
+export function getCoopBrowserNavigationFixtureStarters(): Starter[] | null {
+  if (!isCoopBrowserNavigationFixtureActive()) {
+    return null;
+  }
+  const specs = [
+    { speciesId: SpeciesId.SEEL, moveId: MoveId.WATER_GUN },
+    { speciesId: SpeciesId.CASTFORM, moveId: MoveId.WATER_GUN },
+    { speciesId: SpeciesId.SPINDA, moveId: MoveId.TACKLE },
+  ];
+  return specs.map(({ speciesId, moveId }) => ({
+    speciesId,
+    shiny: false,
+    variant: 0,
+    formIndex: 0,
+    abilityIndex: 0,
+    passive: false,
+    nature: Nature.MODEST,
+    moveset: [moveId] as StarterMoveset,
+    pokerus: false,
+    ivs: new Array(6).fill(31),
+  }));
+}
+
+/** Initial-save-only construction level for the exact navigation fixture. */
+export function getCoopBrowserNavigationFixtureStartingLevel(): number | null {
+  return isCoopBrowserNavigationFixtureActive() ? 100 : null;
 }
 
 /**

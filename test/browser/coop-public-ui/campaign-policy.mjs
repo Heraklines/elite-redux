@@ -158,6 +158,11 @@ export function loadCampaignPolicy() {
   const targetWaves = envInteger("COOP_UI_CAMPAIGN_WAVES", 30);
   const mysteryRequired = envBoolean("COOP_UI_REQUIRE_MYSTERY_GAUNTLET", false);
   const registeredInteractionsRequired = envBoolean("COOP_UI_REQUIRE_REGISTERED_INTERACTIONS", false);
+  const navigationRequired = envBoolean("COOP_UI_REQUIRE_NAVIGATION_DEPTH", false);
+  const crossroadsRoute = envKeys("COOP_UI_CROSSROADS_ROUTE", ["stay", "leave", "stay", "leave"]);
+  if (crossroadsRoute.length === 0 || crossroadsRoute.some(choice => choice !== "stay" && choice !== "leave")) {
+    throw new Error("COOP_UI_CROSSROADS_ROUTE must be a non-empty JSON array containing only stay or leave");
+  }
   const gameSpeed = envInteger("COOP_UI_GAME_SPEED", 10);
   if (!allowedGameSpeeds.has(gameSpeed)) {
     throw new Error(`COOP_UI_GAME_SPEED must be one of ${[...allowedGameSpeeds].join(", ")}`);
@@ -180,6 +185,10 @@ export function loadCampaignPolicy() {
       // The exact registered-interaction fixture uses this to choose Revival Blessing as soon as
       // its user replaces the deterministic self-faint. Zero keeps ordinary campaign move policy.
       preferredMoveId: envInteger("COOP_UI_PREFERRED_MOVE_ID", 0) || null,
+    },
+    navigation: {
+      required: navigationRequired,
+      crossroadsRoute,
     },
     // Press-through of an UNKNOWN interactive surface, mirroring the headless `--auto-first`.
     // Gated to shakedown mode above; a gating/nightly run always loud-fails on the unknown.

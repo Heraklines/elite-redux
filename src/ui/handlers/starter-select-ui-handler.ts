@@ -5,6 +5,7 @@ import {
   getCoopBrowserCommanderFixtureStarters,
   getCoopBrowserFaintFixtureStarters,
   getCoopBrowserGameOverFixtureStarters,
+  getCoopBrowserNavigationFixtureStarters,
   getCoopBrowserRegisteredInteractionFixtureStarters,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
@@ -1776,6 +1777,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         ?? getCoopBrowserFaintFixtureStarters()
         ?? getCoopBrowserGameOverFixtureStarters()
         ?? getCoopBrowserRegisteredInteractionFixtureStarters()
+        ?? getCoopBrowserNavigationFixtureStarters()
         ?? getCoopBrowserCampaignFixtureStarters();
       if (globalScene.gameMode.isCoop && coopBrowserStarters != null) {
         // CI checkpoint only: materialize the otherwise account-locked species in the NORMAL visible

@@ -117,7 +117,7 @@ function retainedEvolutionKeys(client, pattern) {
 export function assertRetainedEvolutionPresentationParity(rig, policy) {
   const authority = retainedEvolutionKeys(rig.host, HOST_RETAINED_EVOLUTION).toSorted();
   const renderer = retainedEvolutionKeys(rig.guest, GUEST_RETAINED_EVOLUTION).toSorted();
-  const proof = { authority, renderer, required: policy.targetWaves >= 30 };
+  const proof = { authority, renderer, required: policy.targetWaves >= 30 && policy.navigation?.required !== true };
   for (const client of Object.values(rig.clients)) {
     client.evidence.record("campaign-retained-evolution-proof", proof);
   }
@@ -205,6 +205,11 @@ class CampaignProgress {
     this.startedMs = performance.now();
     this.lastRowMs = this.startedMs;
     this.rows = [];
+    this.heartbeatTimer = null;
+  }
+
+  emitLive(kind, detail) {
+    console.log(`[coop-soak:${kind}] ${JSON.stringify(detail)}`);
   }
 
   append(row) {
@@ -217,6 +222,7 @@ class CampaignProgress {
     };
     this.lastRowMs = nowMs;
     this.rows.push(timed);
+    this.emitLive("progress", timed);
     const line = `${JSON.stringify(timed)}\n`;
     this.tail = this.tail.then(() => appendFile(this.path, line));
     return this.tail;
@@ -259,9 +265,60 @@ class CampaignProgress {
     return this.append({ kind: "summary", ...row });
   }
 
+  /**
+   * Keep long Chromium stages observable in the Actions log while their compact artifacts are still open.
+   * The sampler only reads already-captured evidence and never touches either page or its input timing.
+   */
+  startHeartbeat(sample, intervalMs = 60_000) {
+    if (this.heartbeatTimer != null) {
+      return;
+    }
+    this.heartbeatTimer = setInterval(() => {
+      try {
+        this.emitLive("heartbeat", {
+          sinceStartMs: Math.round(performance.now() - this.startedMs),
+          lastProgress: this.rows.at(-1) ?? null,
+          ...sample(),
+        });
+      } catch (error) {
+        this.emitLive("heartbeat-error", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }, intervalMs);
+    this.heartbeatTimer.unref?.();
+  }
+
   async flush() {
+    if (this.heartbeatTimer != null) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
     await this.tail;
   }
+}
+
+function campaignLiveSnapshot(rig, clients, targetWaves) {
+  return {
+    activeWave: rig.activeBattleWave,
+    targetWaves,
+    clients: Object.fromEntries(
+      clients.map(client => {
+        const phase = client.evidence.findLast(START_PHASE);
+        const surface = client.evidence.findLastSemanticSurface();
+        return [
+          client.label,
+          {
+            evidenceEvents: client.evidence.events.length,
+            phase: phase == null ? null : (START_PHASE.exec(phase.text ?? "")?.[1] ?? null),
+            surface: surface?.observation?.surfaceId ?? null,
+            address: surface?.observation?.address ?? null,
+            ready: surface?.observation?.ready ?? null,
+          },
+        ];
+      }),
+    ),
+  };
 }
 
 /** Bounded per-step observation window for the state-aware Settings walk. */
@@ -3496,7 +3553,16 @@ export async function driveConfirmedLeave(rig, driver, owner, authority, waveSta
 }
 
 /** Drive at most one pending between-wave surface. Returns the surface name driven, or null. */
-async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stats, strict, rewardRetryState) {
+async function driveOnePendingSurface(
+  rig,
+  dispatch,
+  cursors,
+  handledIndex,
+  stats,
+  strict,
+  rewardRetryState,
+  navigationCoverage = null,
+) {
   for (const driver of dispatch) {
     const resolved = resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict);
     if (!resolved) {
@@ -3646,6 +3712,51 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       await driveRevivalInteraction(rig, client, mechanicalBoundary);
     } else if (driver.stormglassSurfaceKind === "option" && mechanicalBoundary != null) {
       await driveStormglassOption(rig, client, mechanicalBoundary);
+    } else if (driver.name === "crossroads" && mechanicalBoundary != null && navigationCoverage != null) {
+      const routeIndex = navigationCoverage.crossroads.length;
+      const targetId = navigationCoverage.route[routeIndex % navigationCoverage.route.length];
+      await selectOptionById(client, {
+        surfaceId: "crossroads",
+        targetId,
+        navKeys: ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"],
+        submitKey: "Space",
+        timeoutMs: rig.config.timeoutMs,
+        fromCursor: mechanicalBoundary.ownerEvent.index,
+      });
+      const proof = {
+        wave: stats.wave,
+        address: mechanicalBoundary.authority.address,
+        ownerSeat: mechanicalBoundary.authority.ownerSeat,
+        ownerLabel: client.label,
+        targetId,
+        routeIndex,
+      };
+      navigationCoverage.crossroads.push(proof);
+      client.evidence.record("campaign-navigation-crossroads", proof);
+    } else if (driver.name === "biome-pick" && mechanicalBoundary != null && navigationCoverage != null) {
+      const targetId =
+        mechanicalBoundary.authority.selectedOptionId ?? mechanicalBoundary.authority.optionIds?.[0] ?? null;
+      if (targetId == null) {
+        await client.sequence(driver.keys, `campaign-${driver.name}`);
+      } else {
+        await selectOptionById(client, {
+          surfaceId: "world-map",
+          targetId,
+          navKeys: ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"],
+          submitKey: "Space",
+          timeoutMs: rig.config.timeoutMs,
+          fromCursor: mechanicalBoundary.ownerEvent.index,
+        });
+      }
+      const proof = {
+        wave: stats.wave,
+        address: mechanicalBoundary.authority.address,
+        ownerSeat: mechanicalBoundary.authority.ownerSeat,
+        ownerLabel: client.label,
+        targetId,
+      };
+      navigationCoverage.worldMaps.push(proof);
+      client.evidence.record("campaign-navigation-world-map", proof);
     } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
       await driveConfirmedLeave(rig, driver, client, mechanicalBoundary.authority, cursors);
     } else {
@@ -3840,6 +3951,159 @@ export function currentPairedBattleKind(rig, wave) {
   return { wave, ...fields(first) };
 }
 
+function latestCommandObservation(client, wave) {
+  const event = client.evidence.findLastSemanticSurface();
+  const observation = event?.observation;
+  return observation?.operationClass === "command" && observation.address?.wave === wave ? observation : null;
+}
+
+/** Prove the exact initial-save fixture produced three level-100 mons for each real player's seat. */
+export function assertNavigationFixtureParty(rig, wave = 1) {
+  const observations = Object.values(rig.clients).map(client => ({
+    label: client.label,
+    observation: latestCommandObservation(client, wave),
+  }));
+  const expectedSpecies = [86, 327, 351];
+  const projections = observations.map(({ label, observation }) => {
+    const party = observation?.partySlots;
+    if (!Array.isArray(party) || party.length !== 6) {
+      throw new Error(`[campaign-navigation] ${label} did not observe the six-mon initial shared party`);
+    }
+    for (const owner of ["host", "guest"]) {
+      const owned = party.filter(slot => slot.coopOwner === owner);
+      const species = owned.map(slot => slot.speciesId).toSorted((left, right) => left - right);
+      if (
+        owned.length !== 3
+        || owned.some(slot => slot.level !== 100)
+        || JSON.stringify(species) !== JSON.stringify(expectedSpecies)
+      ) {
+        throw new Error(
+          `[campaign-navigation] ${label} ${owner} fixture mismatch: ${JSON.stringify(owned.map(slot => ({ speciesId: slot.speciesId, level: slot.level })))}`,
+        );
+      }
+    }
+    return party.map(slot => ({
+      slot: slot.slot,
+      speciesId: slot.speciesId,
+      coopOwner: slot.coopOwner,
+      level: slot.level,
+    }));
+  });
+  if (JSON.stringify(projections[0]) !== JSON.stringify(projections[1])) {
+    throw new Error(
+      `[campaign-navigation] initial level-100 party projection diverged: ${JSON.stringify(projections)}`,
+    );
+  }
+  const proof = { wave, party: projections[0] };
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-navigation-level100-party", proof);
+  }
+  return proof;
+}
+
+/** Capture the raw arena/presentation view at a paired command frontier; the mechanical digest remains primary. */
+export function recordNavigationCommandFrontier(rig, coverage, wave) {
+  if (coverage.commandFrontiers.some(frontier => frontier.wave === wave)) {
+    return coverage.commandFrontiers.find(frontier => frontier.wave === wave);
+  }
+  const projections = Object.values(rig.clients).map(client => {
+    const observation = latestCommandObservation(client, wave);
+    if (observation?.arena == null || observation.presentation == null) {
+      throw new Error(`[campaign-navigation] ${client.label} omitted arena/presentation at command wave ${wave}`);
+    }
+    return {
+      label: client.label,
+      arena: observation.arena,
+      presentation: observation.presentation,
+      displayedWave: observation.displayedWave,
+    };
+  });
+  const canonical = projections.map(({ label: _label, ...projection }) => JSON.stringify(projection));
+  if (canonical[0] !== canonical[1]) {
+    throw new Error(
+      `[campaign-navigation] command arena/presentation diverged at wave ${wave}: ${JSON.stringify(projections)}`,
+    );
+  }
+  const frontier = { wave, ...projections[0] };
+  coverage.commandFrontiers.push(frontier);
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-navigation-command-frontier", frontier);
+  }
+  return frontier;
+}
+
+/** Closed acceptance contract for the navigation-only 30-wave journey. */
+export function assertNavigationCoverage(coverage, marketCoverage, battleKinds, targetWaves) {
+  const requiredMarketWaves = [10, 20, 30].filter(wave => wave <= targetWaves);
+  const marketWaves = marketCoverage.visits.map(visit => visit.address?.wave).filter(Number.isSafeInteger);
+  const missingMarkets = requiredMarketWaves.filter(wave => !marketWaves.includes(wave));
+  if (missingMarkets.length > 0) {
+    throw new Error(`[campaign-navigation] missing biome markets at waves ${missingMarkets.join(",")}`);
+  }
+  const marketOwners = new Set(marketCoverage.visits.map(visit => visit.ownerSeat));
+  if (requiredMarketWaves.length >= 2 && (!marketOwners.has(0) || !marketOwners.has(1))) {
+    throw new Error(
+      `[campaign-navigation] markets did not exercise both interaction owners: ${JSON.stringify([...marketOwners])}`,
+    );
+  }
+  const crossroadsChoices = new Set(coverage.crossroads.map(event => event.targetId));
+  if (!crossroadsChoices.has("stay") || !crossroadsChoices.has("leave")) {
+    throw new Error(
+      `[campaign-navigation] Crossroads did not prove both Stay and Leave: ${JSON.stringify(coverage.crossroads)}`,
+    );
+  }
+  if (coverage.worldMaps.length === 0) {
+    throw new Error("[campaign-navigation] Crossroads Leave never opened and completed the World Map");
+  }
+  const biomeIds = new Set(coverage.commandFrontiers.map(frontier => frontier.arena.biomeId));
+  if (biomeIds.size < 2) {
+    throw new Error(`[campaign-navigation] no second biome reached: ${JSON.stringify([...biomeIds])}`);
+  }
+  const chained = coverage.waveSurfaces.some(({ surfaces }) => {
+    const names = surfaces.map(surface => surface.surface);
+    const reward = names.indexOf("reward");
+    const market = names.indexOf("biome-shop");
+    const crossroads = names.indexOf("crossroads");
+    const worldMap = names.indexOf("biome-pick");
+    return reward >= 0 && market > reward && crossroads > market && worldMap > crossroads;
+  });
+  if (!chained) {
+    throw new Error(
+      "[campaign-navigation] no ordered reward -> market -> Crossroads Leave -> World Map chain completed",
+    );
+  }
+  if (targetWaves >= 20) {
+    const wave20 = battleKinds.find(kind => kind.wave === 20);
+    if (wave20?.battleType !== "TRAINER" || wave20.trainerBoss !== true) {
+      throw new Error(`[campaign-navigation] wave 20 was not the required trainer boss: ${JSON.stringify(wave20)}`);
+    }
+    const afterGym = coverage.commandFrontiers.find(frontier => frontier.wave === 21);
+    if (afterGym == null || afterGym.presentation.trainerVisible !== false) {
+      throw new Error(
+        `[campaign-navigation] trainer presentation remained visible after wave 20: ${JSON.stringify(afterGym)}`,
+      );
+    }
+  }
+  const malformedArena = coverage.commandFrontiers.find(
+    frontier =>
+      !Number.isSafeInteger(frontier.arena.biomeId)
+      || !Number.isSafeInteger(frontier.arena.weather)
+      || !Number.isSafeInteger(frontier.arena.terrain),
+  );
+  if (malformedArena != null) {
+    throw new Error(`[campaign-navigation] malformed arena initialization proof: ${JSON.stringify(malformedArena)}`);
+  }
+  return {
+    requiredMarketWaves,
+    marketWaves,
+    marketOwners: [...marketOwners],
+    crossroads: coverage.crossroads,
+    worldMaps: coverage.worldMaps,
+    biomeIds: [...biomeIds],
+    chained,
+  };
+}
+
 /**
  * Leave the reward shop and drive every between-wave interactive surface (biome shop,
  * crossroads, biome pick, mystery encounters, learn-move, eggs) until both clients reach
@@ -3850,7 +4114,7 @@ export function currentPairedBattleKind(rig, wave) {
  * (COOP_UI_AUTO_FIRST=1) presses through logging `[auto-first] <phase>` - the exact
  * loud-fail / auto-first contract the headless autopilot enforces.
  */
-async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surfaceCursors) {
+async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surfaceCursors, navigationCoverage = null) {
   const clients = Object.values(rig.clients);
   const dispatch = buildDispatchTable(policy);
   const handledIndex = new Map();
@@ -3959,6 +4223,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
       stats,
       !policy.autoFirst,
       rewardRetryState,
+      navigationCoverage,
     );
     if (drove === "target-reached") {
       rig.activeBattleWave = stats.targetBoundary.wave;
@@ -4073,6 +4338,14 @@ export async function runCampaign(rig) {
   const lifecycle = loadCampaignLifecyclePolicy();
   const progress = new CampaignProgress(rig.config.artifactDir);
   const clients = Object.values(rig.clients);
+  const navigationCoverage = {
+    route: policy.navigation.crossroadsRoute,
+    crossroads: [],
+    worldMaps: [],
+    commandFrontiers: [],
+    waveSurfaces: [],
+  };
+  progress.startHeartbeat(() => campaignLiveSnapshot(rig, clients, policy.targetWaves));
   await progress.note("campaign start", {
     targetWaves: policy.targetWaves,
     rewardMode: policy.rewardMode,
@@ -4080,6 +4353,7 @@ export async function runCampaign(rig) {
     renderProfile: policy.renderProfile,
     mysteryGauntlet: policy.mysteryGauntlet,
     registeredInteractions: policy.registeredInteractions,
+    navigation: policy.navigation,
     setupTimeoutMs: lifecycle.setupTimeoutMs,
   });
 
@@ -4094,6 +4368,7 @@ export async function runCampaign(rig) {
     await progress.note("public lobby pairing complete");
     await rig.startFreshRun({
       campaignSurvivalFixture: policy.mysteryGauntlet.required,
+      navigationFixture: policy.navigation.required,
       registeredInteractionsFixture: policy.registeredInteractions.required,
     });
     await progress.note("fresh co-op run reached its first shared command surface");
@@ -4136,6 +4411,11 @@ export async function runCampaign(rig) {
   // Verify the layer-8 passive-digest fix did not disable ER innates (maintainer-directed invariant).
   assertInnatesLive(rig);
   await progress.note("innate-activation invariant checked at wave-1 command surface");
+  if (policy.navigation.required) {
+    assertNavigationFixtureParty(rig, 1);
+    recordNavigationCommandFrontier(rig, navigationCoverage, 1);
+    await progress.note("navigation fixture level-100 parties and initial arena proven");
+  }
 
   let wavesCleared = 0;
   let battleLoops = 0;
@@ -4188,7 +4468,20 @@ export async function runCampaign(rig) {
         });
         break;
       }
-      const advanced = await advanceToNextWaveCommand(rig, policy, ordinal, stats, surfaceCursors);
+      const advanced = await advanceToNextWaveCommand(
+        rig,
+        policy,
+        ordinal,
+        stats,
+        surfaceCursors,
+        policy.navigation.required ? navigationCoverage : null,
+      );
+      if (policy.navigation.required) {
+        navigationCoverage.waveSurfaces.push({ wave: waveNo, surfaces: [...stats.surfaces] });
+        if (advanced.boundary != null) {
+          recordNavigationCommandFrontier(rig, navigationCoverage, advanced.boundary.wave);
+        }
+      }
       if (stats.market != null) {
         marketCoverage.visits.push(stats.market);
         marketCoverage.purchases.push(...stats.market.purchases);
@@ -4215,6 +4508,17 @@ export async function runCampaign(rig) {
       await assertRenderProfileExecution(rig, policy, progress);
     }
     assertMarketCoverage(marketCoverage, policy.market);
+    if (policy.navigation.required) {
+      const navigationProof = assertNavigationCoverage(
+        navigationCoverage,
+        marketCoverage,
+        mysteryCoverage.battleKinds,
+        policy.targetWaves,
+      );
+      for (const client of clients) {
+        client.evidence.record("campaign-navigation-coverage", navigationProof);
+      }
+    }
     if (policy.mysteryGauntlet.required) {
       const expectedEvents = new Map(
         [
@@ -4340,6 +4644,7 @@ export async function runCampaign(rig) {
       marketCoverage,
       mysteryCoverage,
       registeredInteractionCoverage,
+      navigationCoverage,
     });
     await progress.writeStageRollup().catch(() => {});
     await progress.flush();

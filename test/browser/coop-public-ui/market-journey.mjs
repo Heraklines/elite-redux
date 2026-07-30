@@ -418,6 +418,7 @@ export async function driveTargetedMarket(
   await snapshot.owner.checkpoint("market-before-normal-leave");
   await leaveMarket(snapshot.owner, snapshot.pinnedInteraction);
   return {
+    address: snapshot.byLabel[snapshot.owner.label].address,
     ownerLabel: snapshot.owner.label,
     ownerSeat: snapshot.byLabel[snapshot.owner.label].ownerSeat,
     pinnedInteraction: snapshot.pinnedInteraction,

@@ -1464,6 +1464,7 @@ function recordTurnSituations(rig: DuoRig, enemyIdsBefore: number[], hits: SoakH
  */
 export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise<SoakResult> {
   const { seed, waves, logs } = opts;
+  const soakStartedAt = Date.now();
   const rewardPolicy = opts.rewardPolicy ?? "seeded";
   const profile = opts.profile ?? "god";
   // #879 review item 5: production-fidelity mode (default "harness" = byte-identical to today). Gates the
@@ -5094,6 +5095,21 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     );
   }
   for (let wave = 1; wave <= waves; wave++) {
+    const waveStartedAt = Date.now();
+    // Keep remote Vitest soaks observable before their end-of-run artifact exists. This is a
+    // read-only progress marker: it samples the two phase names and never pumps either engine.
+    // eslint-disable-next-line no-console
+    console.log(
+      `[coop-soak:wave-start] ${JSON.stringify({
+        seed,
+        wave,
+        wavesRequested: waves,
+        wavesCompleted,
+        elapsedMs: waveStartedAt - soakStartedAt,
+        hostPhase: rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? null,
+        guestPhase: rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? null,
+      })}`,
+    );
     // Sample cumulatively before the next wave can terminal and clear the runtime's session-local diagnostic
     // ledger. A wave-180 GameOver used to erase 179 waves of op:wave/op:reward evidence before the sole
     // end-of-run sample, making guaranteed operation coverage falsely report cold.
@@ -5233,6 +5249,20 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
     await capturePostWaveState(wave);
     wavesCompleted++;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[coop-soak:wave-complete] ${JSON.stringify({
+        seed,
+        wave,
+        wavesRequested: waves,
+        wavesCompleted,
+        waveElapsedMs: Date.now() - waveStartedAt,
+        elapsedMs: Date.now() - soakStartedAt,
+        findings: findings.length,
+        hostPhase: rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? null,
+        guestPhase: rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? null,
+      })}`,
+    );
     // #828 ASYMMETRIC CONTINUATION (BUILD 2): if the HOST half is exhausted after this wave (a host-owned
     // field slot fainted with no legal host-owned replacement) but the GUEST half is still alive, the run
     // just played this wave with the guest SOLO - the partner-plays-on path. Record the surface + count it,

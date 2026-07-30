@@ -78,6 +78,7 @@ const allowedJourneys = new Set([
   "commander-skip",
   "game-over",
   "registered-interactions",
+  "navigation-depth-30",
   "showdown-battle",
   "resume-scan-isolation",
   "save-mutations",

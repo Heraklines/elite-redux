@@ -4,6 +4,7 @@ import {
   consumePendingDevPartySetup,
   consumePendingDevStarterLevels,
   consumePendingDevStarters,
+  getCoopBrowserNavigationFixtureStartingLevel,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
@@ -319,6 +320,9 @@ export class SelectStarterPhase extends Phase {
     console.log(
       `[coop-launch] launchCoopMergedParty role=${role} merged=${merged.length} slot=${globalScene.sessionSlotId}`,
     );
+    const navigationStartingLevel = getCoopBrowserNavigationFixtureStartingLevel();
+    const navigationStartingLevels =
+      navigationStartingLevel == null ? undefined : merged.map(() => navigationStartingLevel);
     if (role === "guest") {
       globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
       // The guest skips the SAVE_SLOT screen - but on the solo path it is that
@@ -338,7 +342,7 @@ export class SelectStarterPhase extends Phase {
           }
           return;
         }
-        this.initBattle(merged, true, owners);
+        this.initBattle(merged, true, owners, undefined, navigationStartingLevels);
       });
       return;
     }
@@ -379,7 +383,7 @@ export class SelectStarterPhase extends Phase {
         failCoopSharedSession("fresh co-op save slot changed before starter materialization");
         return;
       }
-      this.initBattle(merged, true, owners);
+      this.initBattle(merged, true, owners, undefined, navigationStartingLevels);
     });
   }
 

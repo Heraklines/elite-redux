@@ -46,6 +46,7 @@ on:
           - resume-scan-isolation
           - save-mutations
           - market-wide-lens
+          - navigation-depth-30
       requester_seat:
         description: Seat that sends the first lobby invitation
         required: true
@@ -152,7 +153,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/er-crossroads-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -167,6 +168,7 @@ jobs:
             .github/workflows/coop-public-ui-journey.yml \
             scripts/coop-browser-entry.ts \
             scripts/prepare-coop-browser-artifact.mjs \
+            src/data/elite-redux/coop/authority-v2/cutover-interaction.ts \
             src/data/elite-redux/coop/coop-durability.ts \
             src/data/elite-redux/coop/coop-runtime.ts \
             src/data/elite-redux/coop/coop-transport.ts \
@@ -176,6 +178,8 @@ jobs:
             src/dev-tools/registry.ts \
             src/phases/command-phase.ts \
             src/phases/coop-replay-turn-phase.ts \
+            src/phases/er-crossroads-phase.ts \
+            src/phases/select-starter-phase.ts \
             src/phases/title-phase.ts \
             src/ui/handlers/save-slot-select-ui-handler.ts \
             src/ui/handlers/starter-select-ui-handler.ts \
@@ -195,6 +199,7 @@ jobs:
             test/browser/coop-public-ui/local-worker-vite.config.mjs \
             test/browser/coop-public-ui/market-gold-standard.test.mjs \
             test/browser/coop-public-ui/market-journey.mjs \
+            test/browser/coop-public-ui/navigation-depth-campaign.test.mjs \
             test/browser/coop-public-ui/preview-server.mjs \
             test/browser/coop-public-ui/preview-server.test.mjs \
             test/browser/coop-public-ui/provision-accounts.mjs \
@@ -212,7 +217,8 @@ jobs:
             test/tests/elite-redux/coop/coop-guest-renderer.test.ts \
             test/tests/elite-redux/coop/coop-p33-client.test.ts \
             test/tests/elite-redux/coop/coop-session-controller.test.ts \
-            test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts
+            test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts \
+            test/tools/coop-soak-driver.ts
 
       - name: Verify retained GameOver two-engine operation regression
         if: inputs.journey == 'game-over'
@@ -256,6 +262,9 @@ jobs:
       - name: Verify strict Wide Lens market contracts
         run: node --test test/browser/coop-public-ui/market-gold-standard.test.mjs
 
+      - name: Verify continuous navigation-depth contracts
+        run: node --test test/browser/coop-public-ui/navigation-depth-campaign.test.mjs
+
       - name: Verify strict semantic surface evidence contracts
         run: node --test test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
 
@@ -284,7 +293,7 @@ jobs:
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'navigation-depth-30' && 'navigation-depth-30') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
@@ -317,7 +326,7 @@ jobs:
     # The fresh+resume journey deliberately runs two complete launches. Its adaptive progress budget can
     # remain healthy for roughly 48 minutes on the constrained ~3-fps runner; a 35-minute outer job ceiling
     # previously cancelled it mid-ShowAbilityPhase while both peers were connected and assertion-clean.
-    timeout-minutes: ${{ (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'market-wide-lens' && 55 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'fresh-resume' && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'save-mutations' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
+    timeout-minutes: ${{ (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'navigation-depth-30' && 240 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'market-wide-lens' && 55 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'fresh-resume' && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'save-mutations' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
       matrix:
@@ -397,16 +406,19 @@ jobs:
           # Both visits must buy Wide Lens, return to the same grid, leave normally and prove
           # the following public command surface. This is one real run, so no save/runtime
           # fixture or cross-job aggregation can counterfeit the owner alternation.
-          COOP_UI_CAMPAIGN_WAVES: "20"
-          COOP_UI_CAMPAIGN_MODE: gating
+          COOP_UI_CAMPAIGN_WAVES: ${{ inputs.journey == 'navigation-depth-30' && '30' || '20' }}
+          COOP_UI_CAMPAIGN_MODE: ${{ inputs.journey == 'navigation-depth-30' && 'nightly' || 'gating' }}
+          COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: ${{ inputs.journey == 'navigation-depth-30' && '13800000' || '2700000' }}
           COOP_UI_RENDER_PROFILE: animations-skipped-depth
           COOP_UI_REWARD_MODE: leave
           COOP_UI_RAISE_SPEED: "1"
-          COOP_UI_MARKET_MODE: ${{ inputs.journey == 'market-wide-lens' && 'target-held' || 'leave' }}
+          COOP_UI_MARKET_MODE: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && 'target-held' || 'leave' }}
           COOP_UI_MARKET_TARGET_ID: WIDE_LENS
           COOP_UI_MARKET_SECOND_PURCHASE: "1"
-          COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ inputs.journey == 'market-wide-lens' && '2' || '0' }}
-          COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: ${{ inputs.journey == 'market-wide-lens' && '1' || '0' }}
+          COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && '2' || '0' }}
+          COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && '1' || '0' }}
+          COOP_UI_REQUIRE_NAVIGATION_DEPTH: ${{ inputs.journey == 'navigation-depth-30' && '1' || '0' }}
+          COOP_UI_CROSSROADS_ROUTE: '["stay","leave","stay","leave"]'
           # One exact, point-legal journey deterministically self-faints, revives through the real
           # PARTY submenu, clears wave 1, then chooses the host's newly-held Stormglass at wave 2.
           COOP_UI_REQUIRE_REGISTERED_INTERACTIONS: ${{ inputs.journey == 'registered-interactions' && '1' || '0' }}
@@ -437,7 +449,7 @@ jobs:
           if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" ]]; then
             export COOP_UI_CAMPAIGN_WAVES=1
           fi
-          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "navigation-depth-30" ]]; then
             node test/browser/coop-public-ui/run-campaign.mjs
           else
             node test/browser/coop-public-ui/run.mjs
