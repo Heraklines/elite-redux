@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "66cc28f4fcd52d66997e5c6e075aabe4a73e59c7",
+  "baseSha": "8543b543746d6154125f64298c229351d0ef2f19",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -34,6 +34,7 @@
     "src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts",
     "src/data/elite-redux/coop/authority-v2/command-frontier.ts",
     "src/data/elite-redux/coop/authority-v2/contract.ts",
+    "src/data/elite-redux/coop/authority-v2/control-ledger.ts",
     "src/data/elite-redux/coop/authority-v2/cutover-interaction.ts",
     "src/data/elite-redux/coop/authority-v2/human-input-lease.ts",
     "src/data/elite-redux/coop/authority-v2/interaction-projection.ts",

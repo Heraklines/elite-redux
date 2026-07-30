@@ -2925,7 +2925,12 @@ test("an ordered no-choice replacement parks until its immutable result without 
   assert.match(orderedOpen, /const hasLegalOwnerBench =/u);
   assert.match(
     orderedOpen,
-    /if \(hasLegalOwnerBench\) \{[\s\S]*return false;[\s\S]*isCoopFaintSwitchPickerSettled\([\s\S]*sendCoopFaintSwitchChoice\([\s\S]*this\.noChoiceCommitWait = \{ generation, sessionEpoch, operationId \};/u,
+    /isCoopV2ReplacementCutoverActive\(\)[\s\S]*installCoopV2AutomaticNoReplacementControl\(\{[\s\S]*operationId,[\s\S]*ownerSeatId: controller\.localSeatId,[\s\S]*phaseToken: this/u,
+    "a wiped remote owner installs the exact typed no-surface proof before waiting for its immutable result",
+  );
+  assert.match(
+    orderedOpen,
+    /if \(hasLegalOwnerBench\) \{[\s\S]*return false;[\s\S]*installCoopV2AutomaticNoReplacementControl\([\s\S]*isCoopFaintSwitchPickerSettled\([\s\S]*sendCoopFaintSwitchChoice\([\s\S]*this\.noChoiceCommitWait = \{ generation, sessionEpoch, operationId \};/u,
     "a wiped owner half publishes at most one exact NONE result and retains the addressed ordered wait",
   );
   assert.doesNotMatch(
@@ -2952,6 +2957,32 @@ test("an ordered no-choice replacement parks until its immutable result without 
     release,
     /this\.noChoiceCommitWait = null;[\s\S]*this\.end\(\);[\s\S]*return true;/u,
     "only that immutable result releases the passive wait to consume its retained carrier",
+  );
+});
+
+test("the runtime accepts the replica's exact no-surface replacement proof before demanding PARTY", () => {
+  const installStart = coopRuntime.indexOf("export function installCoopV2AutomaticNoReplacementControl(");
+  const installEnd = coopRuntime.indexOf("\n}\n", installStart) + 3;
+  assert.ok(installStart >= 0 && installEnd > installStart, "the automatic replacement installer is bounded");
+  const install = coopRuntime.slice(installStart, installEnd);
+  assert.match(install, /runtime\.controller\.localSeatId !== input\.ownerSeatId/u);
+  assert.match(
+    install,
+    /runtime\.controller\.authorityRole === "authority" \? "SwitchPhase" : "CoopGuestFaintSwitchPhase"/u,
+    "authority and replica prove the same no-surface result only from their exact engine phase",
+  );
+  assert.match(install, /!phase\?\.is\(expectedPhaseName\)[\s\S]*phaseOperationId !== control\.operationId/u);
+  assert.match(install, /const legalReplacement = globalScene[\s\S]*if \(legalReplacement\) \{[\s\S]*return false;/u);
+  assert.match(install, /projectAutomaticReplacement\(control/u);
+
+  const projectorStart = coopRuntime.indexOf("function projectCoopV2InteractionControl(");
+  const projectorEnd = coopRuntime.indexOf("\n}\n", projectorStart) + 3;
+  const projector = coopRuntime.slice(projectorStart, projectorEnd);
+  const automatic = projector.indexOf("isAutomaticReplacementInstalled(control)");
+  const publicHandler = projector.indexOf("const contract = coopV2InteractionProofContract(control)");
+  assert.ok(
+    automatic >= 0 && publicHandler > automatic,
+    "the typed no-surface proof is recognized before an ordinary PARTY handler can be required",
   );
 });
 

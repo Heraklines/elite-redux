@@ -521,6 +521,18 @@ export class CoopV2ControlLedger {
     return result;
   }
 
+  /** Whether this exact replacement is proven to expose no human picker. */
+  isAutomaticReplacementInstalled(control: Extract<CoopV2InteractionControl, { kind: "REPLACEMENT" }>): boolean {
+    const claim = this.claims.get(controlIdOf(control));
+    return (
+      claim != null
+      && !claim.superseded
+      && claim.materialApplied
+      && controlsEqual(claim.control, control)
+      && claim.installed?.observation.kind === "automatic-replacement"
+    );
+  }
+
   /** Whether a physical human input is authorized at this exact live phase/handler generation. */
   allowsHumanInput(localSeatId: number, observation: CoopV2InteractionSurfaceObservation | null): boolean {
     if (this.activeControlId == null || observation == null) {

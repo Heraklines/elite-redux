@@ -5871,6 +5871,15 @@ function projectCoopV2InteractionControl(
     prepareCoopV2OrdinaryReplacementControlSurface(runtime, control);
   }
 
+  // A wiped owner half has no PARTY handler by definition. Its exact phase can instead install the
+  // ledger's typed automatic-replacement proof after rechecking the immutable address and owner-local
+  // party. Recognize that stronger no-surface proof before the ordinary public-handler requirement;
+  // otherwise a correct null proposal can never emit controlInstalled and the authority cannot consume it.
+  if (control.kind === "REPLACEMENT" && runtime.v2ControlLedger.isAutomaticReplacementInstalled(control)) {
+    runtime.v2InstalledInteractionTargets.add(controlId);
+    return { kind: "already-installed", controlId };
+  }
+
   const contract = coopV2InteractionProofContract(control);
   const observation = observeCoopV2InteractionSurface(contract);
   const isShopControl =
@@ -8862,11 +8871,12 @@ export function enterCoopV2ReplacementControlBoundary(input: {
 }
 
 /**
- * Install the authority's exact replacement control when the owning seat has no legal bench selection.
+ * Install one exact replacement control when the local owning seat has no legal bench selection.
  *
  * A half-wiped seat still has a mechanically meaningful REPLACEMENT -> REPLACEMENT_COMMIT edge, but it
  * must not open an impossible PARTY picker. This proof is accepted only from the exact current SwitchPhase,
- * at the immutable faint address, after independently rechecking that the owner has no legal reserve.
+ * or the replica's exact CoopGuestFaintSwitchPhase, at the immutable faint address, after independently
+ * rechecking that the owner has no legal reserve. It grants no human input.
  */
 export function installCoopV2AutomaticNoReplacementControl(input: {
   readonly operationId: string;
@@ -8881,7 +8891,6 @@ export function installCoopV2AutomaticNoReplacementControl(input: {
   if (
     runtime == null
     || !coopV2ReplacementCutovers.has(runtime)
-    || runtime.controller.authorityRole !== "authority"
     || runtime.controller.localSeatId !== input.ownerSeatId
   ) {
     return false;
@@ -8909,7 +8918,9 @@ export function installCoopV2AutomaticNoReplacementControl(input: {
     typeof (phase as { coopV2ControlOperationId?: unknown } | null)?.coopV2ControlOperationId === "string"
       ? (phase as unknown as { coopV2ControlOperationId: string }).coopV2ControlOperationId
       : null;
-  if (phase !== input.phaseToken || !phase?.is("SwitchPhase") || phaseOperationId !== control.operationId) {
+  const expectedPhaseName =
+    runtime.controller.authorityRole === "authority" ? "SwitchPhase" : "CoopGuestFaintSwitchPhase";
+  if (phase !== input.phaseToken || !phase?.is(expectedPhaseName) || phaseOperationId !== control.operationId) {
     return false;
   }
   const battlerCount = globalScene.currentBattle.getBattlerCount();
@@ -8933,7 +8944,11 @@ export function installCoopV2AutomaticNoReplacementControl(input: {
     kind: "installed",
     controlId: controlIdOf(control),
   }));
-  return projected.kind === "installed" || projected.kind === "already-installed";
+  if (projected.kind === "installed" || projected.kind === "already-installed") {
+    runtime.v2InstalledInteractionTargets.add(projected.controlId);
+    return true;
+  }
+  return false;
 }
 
 /**

@@ -7,6 +7,7 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { replacementOperationId } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
+import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   addressCoopFaintSwitchChoiceData,
@@ -32,6 +33,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
+  installCoopV2AutomaticNoReplacementControl,
   notifyCoopV2InteractionSurfaceReady,
   retryCoopV2PendingAuthorityAtSafeBoundary,
   runWhenCoopRuntimeActive,
@@ -107,6 +109,26 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       );
     if (hasLegalOwnerBench) {
       return false;
+    }
+    // No PARTY handler exists for a wiped owner half. The exact ordered phase still has to prove that
+    // terminal fact through the same V2 ledger as an actionable picker; otherwise the authority waits
+    // forever for a controlInstalled receipt that this branch can never publish. This proof authorizes
+    // only the addressed null result and grants no human input or local progression.
+    if (
+      controller.sessionKind === "coop"
+      && isCoopV2ReplacementCutoverActive()
+      && !installCoopV2AutomaticNoReplacementControl({
+        operationId,
+        ownerSeatId: controller.localSeatId,
+        wave: sourceWave,
+        turn: sourceTurn,
+        occurrence,
+        fieldIndex: this.fieldIndex,
+        phaseToken: this,
+      })
+    ) {
+      failCoopSharedSession("The empty replacement could not prove its exact Authority V2 control.");
+      return true;
     }
     // The ordered replacement control can arrive after live faint presentation already proved that this
     // owner half has no legal reserve. It still authorizes an exact NONE result, but it must never create

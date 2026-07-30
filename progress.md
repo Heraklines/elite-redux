@@ -5955,3 +5955,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   phase inventory in `coop-battle-events.test.ts`; its bespoke replay driver stopped before the checkpoint, leaving HP
   at 32 instead of the streamed 9. That fixture now also drains the exact hide phase. This is test-driver wiring only,
   while the old aggregate and all browser runs remain undisturbed as required.
+
+## 2026-07-30 - A wiped remote owner proves its exact no-surface replacement control
+
+- Mystery run `30520664321` reproduced a real asymmetric replacement deadlock at wave 4 turn 7. The authority browser
+  waited on `Waiting for your partner to choose their next Pokemon...`, while the replica remained on `Seel fainted!`.
+  Both retained the same mechanical state; this was not a checksum divergence or a campaign-driver timeout.
+- Revision 30 correctly opened the guest-owned replacement before the remaining host replacement. The replica proved
+  that its owner half had no legal reserve and had already relayed the addressed `NONE` choice, but its exact
+  `CoopGuestFaintSwitchPhase` could not install `controlInstalled`: the typed automatic-replacement proof was wired
+  only to the authority's `SwitchPhase`. The authority therefore retained the `NONE` proposal without permission to
+  consume it, and both peers waited forever.
+- The no-choice branch now installs the same address-exact, non-actionable automatic-replacement ledger proof from
+  either owning engine phase. It rechecks local ownership, phase identity, operation id, faint address, and absence of
+  a legal same-owner reserve; it opens no PARTY handler and grants no human input. Ordinary projection recognizes that
+  stronger proof before requiring a public PARTY surface, allowing the existing `NONE` proposal to become the exact
+  immutable `REPLACEMENT_COMMIT` and advance to the next typed control.
+- Failure-first source coverage requires the replica proof before the no-choice result parks and forbids weakening the
+  public-handler contract. The complete source contract is locally green at 108/108; remote focused, aggregate, and
+  exact two-browser Mystery requalification remain pending on the resulting commit.
