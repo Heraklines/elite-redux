@@ -52,6 +52,7 @@ import {
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import {
   type ErRouteNode,
+  erPendingNodesReady,
   getErPendingNodes,
   markErPendingNodesAwaitingAuthority,
   setErPendingNodes,
@@ -562,6 +563,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         .filter(node => node.revealed)
         .map(node => ({ ...node })),
     );
+    expect(
+      withClientSync(rig.hostCtx, () => erPendingNodesReady()),
+      "the fallback route graph is retained",
+    ).toBe(true);
     expect(authorityRoutes.length, "the authority retained at least two revealed natural routes").toBeGreaterThan(1);
     const selectedDestination = destination ?? authorityRoutes[1].biome;
     expect(authorityRoutes[1].biome, "the requested destination is the real World Map's second revealed route").toBe(
@@ -588,6 +593,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       ),
       "the natural BIOME_PICK control state carried the authority's freshly rolled route graph",
     ).toEqual(authorityRoutes);
+    expect(
+      withClientSync(rig.guestCtx, () => erPendingNodesReady()),
+      "the replica treats the V2-carried graph as authoritative rather than rerolling it",
+    ).toBe(true);
     await waitForMode(rig.guestCtx, UiMode.ER_MAP, "guest-owned natural World Map");
     await pressUntilAccepted(rig, rig.guestCtx, Button.RIGHT, "World Map second route");
     await pressUntilAccepted(rig, rig.guestCtx, Button.ACTION, "World Map travel");
