@@ -2462,9 +2462,23 @@ export class CoopReplayMePhase extends Phase {
     }
     if (committedDestination == null) {
       this.end();
-    } else {
-      currentPhase.end();
+      return;
     }
+    // The retained Mystery selector belongs to the interaction which just committed. Starting the
+    // embedded battle while its MYSTERY_ENCOUNTER handler is still current leaves the replica's trainer
+    // intro painted over the old option grid. More importantly, that stale handler is not an exact battle
+    // presentation consumer, so the next command CONTROL_COMMIT remains deferred forever. Cross the real
+    // asynchronous UI boundary first; only then may the queued MysteryEncounterBattlePhase become current.
+    void this.openModeBounded(UiMode.MESSAGE).then(opened => {
+      if (
+        opened === "superseded"
+        || !this.boundaryStillLive()
+        || globalScene.phaseManager.getCurrentPhase() !== currentPhase
+      ) {
+        return;
+      }
+      currentPhase.end();
+    });
   }
 
   /**

@@ -5974,3 +5974,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Failure-first source coverage requires the replica proof before the no-choice result parks and forbids weakening the
   public-handler contract. The complete source contract is locally green at 108/108; remote focused, aggregate, and
   exact two-browser Mystery requalification remain pending on the resulting commit.
+
+## 2026-07-30 - Embedded Mystery battles retire the replica selector before presentation
+
+- Independent exact-tip Mystery run `30522043292` cleared four consecutive registered encounters, then exposed a
+  different product deadlock at the wave-5 Mysterious Challengers trainer battle. The authority reached CommandPhase
+  and authored CONTROL_COMMIT revision 23; the replica remained in `MysteryEncounterBattlePhase`, so the authority's
+  `cmd:5:1` rendezvous waited indefinitely for the absent replica command consumer.
+- The replica screenshot and semantic trace showed the exact cause: `CoopReplayMePhase` ended synchronously while its
+  retired `MYSTERY_ENCOUNTER` selector handler was still current. The renderer-only battle phase inherited that
+  handler, painted the trainer intro over the old option grid, and could neither complete the presentation prefix nor
+  install the ordered command control. This is a production presentation/progression defect, not harness noise.
+- The committed handoff now queues the immutable battle destination, crosses a bounded asynchronous MESSAGE-mode
+  transition, and ends the replay phase only if the exact runtime, Mystery pin, and phase generation are still live.
+  The replica therefore starts `MysteryEncounterBattlePhase` on the normal battle message surface; stale UI callbacks
+  cannot advance a replacement session. A source contract forbids restoring the synchronous selector-inheriting edge.

@@ -1495,6 +1495,31 @@ test("an embedded Mystery trainer battle retains and renders its trainer present
   );
 });
 
+test("an embedded Mystery battle retires its selector handler before the replica battle starts", () => {
+  const handoffStart = replayMePhase.indexOf("private finishWithoutLeaving(");
+  const handoffEnd = replayMePhase.indexOf("#821 SHOP HANDOFF", handoffStart);
+  assert.ok(handoffStart >= 0 && handoffEnd > handoffStart, "the embedded battle handoff is bounded");
+  const handoff = replayMePhase.slice(handoffStart, handoffEnd);
+  const queue = handoff.indexOf('pushNew("MysteryEncounterBattlePhase"');
+  const messageTransition = handoff.indexOf("this.openModeBounded(UiMode.MESSAGE)");
+  const phaseEnd = handoff.indexOf("currentPhase.end()", messageTransition);
+  assert.ok(queue >= 0, "the committed destination queues the renderer-only battle phase");
+  assert.ok(
+    messageTransition > queue && phaseEnd > messageTransition,
+    "the retired selector crosses the asynchronous MESSAGE boundary before the queued battle becomes current",
+  );
+  assert.match(
+    handoff.slice(messageTransition, phaseEnd),
+    /opened === "superseded"[\s\S]*!this\.boundaryStillLive\(\)[\s\S]*getCurrentPhase\(\) !== currentPhase/u,
+    "a late UI completion cannot start the battle in a replacement runtime or phase generation",
+  );
+  assert.doesNotMatch(
+    handoff,
+    /else \{\s*currentPhase\.end\(\);\s*\}/u,
+    "the V2 battle handoff cannot synchronously inherit the retired Mystery selector",
+  );
+});
+
 test("Mystery projection construction cannot recursively attest an unopened handler", () => {
   const installerStart = replayMePhase.indexOf("public installCoopV2MePresentation(");
   const installerEnd = replayMePhase.indexOf("/**", installerStart + 1);
