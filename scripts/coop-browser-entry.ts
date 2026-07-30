@@ -1700,6 +1700,7 @@ function observeSemanticSurface(): void {
       battle?.mysteryEncounter?.encounterType
       ?? (Number.isSafeInteger(replayMysteryEncounterType) ? (replayMysteryEncounterType as number) : null);
     const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
+    const partyPromptReady = (handler as unknown as { isAwaitingActionInput?: () => boolean }).isAwaitingActionInput;
     const readPromptGeneration = (handler as unknown as { getPromptGeneration?: () => number }).getPromptGeneration;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
     const inputBlockedRaw = (handler as unknown as { blockInput?: unknown }).blockInput;
@@ -1711,7 +1712,9 @@ function observeSemanticSurface(): void {
     // repeated ExpPhase prompts. Non-message handlers keep the established raw-field projection.
     const awaitingActionInput =
       uiMode === "PARTY"
-        ? null
+        ? typeof partyPromptReady === "function" && partyPromptReady.call(handler) === true
+          ? true
+          : null
         : typeof promptReady === "function"
           ? promptReady.call(handler)
           : typeof awaitingRaw === "boolean"

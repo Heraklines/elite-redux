@@ -2996,8 +2996,8 @@ async function checkpointRewardPartyTarget(rig, cursors, owner) {
   return { authority, ownerEvent, peerEvents: [watcherEvent] };
 }
 
-/** Pick a party slot on which the visible reward can actually operate. */
-export function chooseRewardPartyTargetSlot(boundary, fallbackSlot = 0) {
+/** Ordered public party targets for the visible reward, preferring the acting seat's usable mons. */
+export function rewardPartyTargetCandidates(boundary, fallbackSlot = 0) {
   const slots = Array.isArray(boundary?.authority?.partySlots) ? boundary.authority.partySlots : [];
   const localRole = /^(?:host|guest)$/u.test(boundary?.authority?.localRole) ? boundary.authority.localRole : null;
   const orderedSlots =
@@ -3010,30 +3010,80 @@ export function chooseRewardPartyTargetSlot(boundary, fallbackSlot = 0) {
   const rewardId =
     boundary?.peerEvents?.map(event => event?.observation).find(observation => observation?.surfaceId === "reward-shop")
       ?.selectedOptionId ?? null;
-  const exactFallback = slots.find(slot => slot?.slot === fallbackSlot);
-  const first = predicate => orderedSlots.find(slot => Number.isSafeInteger(slot?.slot) && predicate(slot));
-  let target = null;
+  const usableSlots = orderedSlots.filter(slot => Number.isSafeInteger(slot?.slot));
+  let candidates = [];
   if (typeof rewardId === "string" && /REVIVE/u.test(rewardId)) {
-    target = first(slot => slot.fainted === true);
+    candidates = usableSlots.filter(slot => slot.fainted === true);
   } else if (
     typeof rewardId === "string"
     && /POTION|RESTORE|HEAL|WATER|SODA|LEMONADE|MOOMOO_MILK|ENERGY_ROOT|BERRY/u.test(rewardId)
   ) {
-    target = first(
+    candidates = usableSlots.filter(
       slot =>
         slot.fainted !== true && typeof slot.hp === "number" && typeof slot.maxHp === "number" && slot.hp < slot.maxHp,
     );
+  } else {
+    candidates = usableSlots.filter(slot => slot.fainted !== true && slot.allowedInBattle === true);
   }
-  target ??=
-    exactFallback != null
-    && exactFallback.fainted !== true
-    && (localRole == null || exactFallback.coopOwner === localRole)
-      ? exactFallback
-      : (first(slot => slot.fainted !== true && slot.allowedInBattle === true) ?? first(slot => slot.fainted !== true));
+  if (candidates.length === 0) {
+    candidates = usableSlots.filter(slot => slot.fainted !== true);
+  }
+  const exactFallback = candidates.find(slot => slot.slot === fallbackSlot);
+  if (exactFallback != null && (localRole == null || exactFallback.coopOwner === localRole)) {
+    candidates = [exactFallback, ...candidates.filter(slot => slot !== exactFallback)];
+  }
   return {
-    slot: Number.isSafeInteger(target?.slot) ? target.slot : fallbackSlot,
+    slots: candidates.map(slot => slot.slot),
     rewardId,
   };
+}
+
+/** Pick the first party slot on which the visible reward can operate. */
+export function chooseRewardPartyTargetSlot(boundary, fallbackSlot = 0) {
+  const candidates = rewardPartyTargetCandidates(boundary, fallbackSlot);
+  return {
+    slot: candidates.slots[0] ?? fallbackSlot,
+    rewardId: candidates.rewardId,
+  };
+}
+
+/**
+ * Classify only public evidence emitted after applying a party-target reward.
+ *
+ * A valid application can briefly return to the PARTY slot list before its V2 result advances the
+ * phase, so that shell alone is not rejection evidence. A filter rejection instead installs a real
+ * Action/Cancel message prompt on the same exact-address PARTY surface. That callback-backed prompt
+ * is the human-visible distinction the driver uses; no modifier or engine state is inspected.
+ */
+export function classifyRewardTargetApplyOutcome(events, from, address) {
+  for (const event of events.slice(from)) {
+    if (event.kind === "console") {
+      const phaseMatch = START_PHASE.exec(event.text ?? "");
+      if (phaseMatch != null && phaseMatch[1] !== "SelectModifierPhase") {
+        return { status: "accepted", event };
+      }
+    }
+    if (event.kind !== "browser-surface2") {
+      continue;
+    }
+    const surfaceOutcome = classifyRewardTargetSurface(event.observation, address);
+    if (surfaceOutcome != null) {
+      return { status: surfaceOutcome, event };
+    }
+  }
+  return null;
+}
+
+function classifyRewardTargetSurface(observation, address) {
+  if (
+    JSON.stringify(observation?.address) !== JSON.stringify(address)
+    || observation.surfaceId !== "party:reward-target"
+  ) {
+    return "accepted";
+  }
+  return /^party-slot:\d+$/u.test(observation.selectedOptionId ?? "") && observation.ready?.awaitingActionInput === true
+    ? "rejected"
+    : null;
 }
 
 function authoritativeAddressKey(address) {
@@ -3099,12 +3149,8 @@ export function isExplicitEmptyRewardShop(authority) {
   return Array.isArray(authority?.optionIds) && authority.optionIds.length === 0 && authority.optionCount === 0;
 }
 
-async function driveRewardPartyTarget(rig, driver, owner, boundary) {
-  const target = chooseRewardPartyTargetSlot(boundary, driver.partySlot ?? 0);
-  const targetSlot = target.slot;
-  let event = boundary.ownerEvent;
-  const selectedCursor = () => /^party-slot:(\d+)$/u.exec(event.observation.selectedOptionId ?? "");
-  const match = selectedCursor();
+async function moveRewardPartyCursor(rig, owner, event, targetSlot) {
+  const match = /^party-slot:(\d+)$/u.exec(event.observation.selectedOptionId ?? "");
   if (match == null) {
     throw new Error(`[campaign-reward-target] ${owner.label} exposed no stable party cursor before target selection`);
   }
@@ -3126,10 +3172,13 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
   if (cursor !== targetSlot) {
     throw new Error(`[campaign-reward-target] could not reach party slot ${targetSlot} from ${cursor}`);
   }
+  return event;
+}
 
+async function openRewardPartyApply(rig, owner, boundary, targetSlot) {
   const optionCursor = owner.evidence.cursor();
   await owner.press("Space", "campaign-reward-target-open-action");
-  const optionEvent = await owner.evidence.waitForCondition(
+  return owner.evidence.waitForCondition(
     sink => {
       const candidate = sink.findLastSemanticSurface(optionCursor, "party:reward-target");
       const observation = candidate?.observation;
@@ -3151,19 +3200,83 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
       description: `semantic reward action for party slot ${targetSlot}`,
     },
   );
-  owner.evidence.record("campaign-reward-target-action", {
-    address: boundary.authority.address,
-    ownerSeat: owner.publicSeat,
-    partySlot: targetSlot,
-    rewardId: target.rewardId,
-    selectedOptionId: optionEvent.observation.selectedOptionId,
-    optionIds: optionEvent.observation.optionIds,
-  });
-  await owner.press("Space", `campaign-reward-target-apply-${optionEvent.observation.selectedOptionId}`);
+}
+
+async function dismissRewardTargetRejection(rig, owner, boundary, targetSlot) {
+  const dismissCursor = owner.evidence.cursor();
+  await owner.press("Space", `campaign-reward-target-dismiss-rejection-${targetSlot}`);
+  return owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(dismissCursor, "party:reward-target");
+      return candidate != null
+        && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
+        && /^party-slot:\d+$/u.test(candidate.observation.selectedOptionId ?? "")
+        && candidate.observation.ready?.awaitingActionInput !== true
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: `dismissed reward rejection for party slot ${targetSlot}` },
+  );
+}
+
+async function driveRewardPartyTarget(rig, driver, owner, boundary) {
+  const target = rewardPartyTargetCandidates(boundary, driver.partySlot ?? 0);
+  const candidateSlots = target.slots;
+  let event = boundary.ownerEvent;
+  for (const targetSlot of candidateSlots) {
+    event = await moveRewardPartyCursor(rig, owner, event, targetSlot);
+    const optionEvent = await openRewardPartyApply(rig, owner, boundary, targetSlot);
+    owner.evidence.record("campaign-reward-target-action", {
+      address: boundary.authority.address,
+      ownerSeat: owner.publicSeat,
+      partySlot: targetSlot,
+      rewardId: target.rewardId,
+      selectedOptionId: optionEvent.observation.selectedOptionId,
+      optionIds: optionEvent.observation.optionIds,
+    });
+    const applyCursor = owner.evidence.cursor();
+    await owner.press("Space", `campaign-reward-target-apply-${optionEvent.observation.selectedOptionId}`);
+    const outcome = await owner.evidence.waitForCondition(
+      sink => classifyRewardTargetApplyOutcome(sink.events, applyCursor, boundary.authority.address),
+      { timeoutMs: rig.config.timeoutMs, description: `reward target ${targetSlot} accepted or visibly rejected` },
+    );
+    if (outcome.status === "accepted") {
+      return {
+        addressKey: authoritativeAddressKey(boundary.authority.address),
+        address: boundary.authority.address,
+        rewardId: target.rewardId,
+        exhausted: false,
+      };
+    }
+
+    owner.evidence.record("campaign-reward-target-rejected", {
+      address: boundary.authority.address,
+      ownerSeat: owner.publicSeat,
+      partySlot: targetSlot,
+      rewardId: target.rewardId,
+    });
+    event = await dismissRewardTargetRejection(rig, owner, boundary, targetSlot);
+  }
+
+  const cancelCursor = owner.evidence.cursor();
+  await owner.press("Backspace", "campaign-reward-target-exhausted-cancel");
+  await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cancelCursor, "reward-shop");
+      return candidate != null
+        && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
+        && candidate.observation.ownerSeat === owner.publicSeat
+        && isActionableSemanticObservation(candidate.observation)
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "reward shop restored after all party targets rejected" },
+  );
   return {
     addressKey: authoritativeAddressKey(boundary.authority.address),
     address: boundary.authority.address,
     rewardId: target.rewardId,
+    exhausted: true,
   };
 }
 
@@ -3401,6 +3514,7 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
               ? "reward"
               : null;
     let mechanicalBoundary = null;
+    let drivenName = driver.name;
     if (driver.localPerClientSurface) {
       // No paired mechanical checkpoint: this is a presentation-only prompt local to this browser.
     } else if (driver.mysteryParty) {
@@ -3487,7 +3601,26 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
         });
       }
     } else if (driver.name === "reward-target" && mechanicalBoundary != null) {
-      rewardRetryState.pendingTarget = await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
+      const result = await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
+      if (result.exhausted) {
+        const rejected = rewardRetryState.rejectedByAddress.get(result.addressKey) ?? new Set();
+        if (result.rewardId != null) {
+          rejected.add(result.rewardId);
+        }
+        rewardRetryState.rejectedByAddress.set(result.addressKey, rejected);
+        rewardRetryState.pendingTarget = null;
+        for (const candidate of Object.values(rig.clients)) {
+          handledIndex.delete(`reward:${candidate.label}`);
+        }
+        client.evidence.record("campaign-reward-target-exhausted", {
+          address: result.address,
+          rewardId: result.rewardId,
+          rejectedRewardIds: [...rejected],
+        });
+        drivenName = "reward-target-retry";
+      } else {
+        rewardRetryState.pendingTarget = result;
+      }
     } else if (driver.name === "mystery-encounter") {
       await driveMysteryEncounterChoice(rig, client, cursors, driver.preferLastEnabledOption === true);
     } else if (driver.name === "learn-move-confirm" && mechanicalBoundary != null) {
@@ -3537,7 +3670,7 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
         }
       }
     }
-    return driver.name;
+    return drivenName;
   }
   return null;
 }
@@ -3836,7 +3969,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
       stallSince = 0;
       lastRegisteredSurface = drove;
       lastPhaseProgress = phaseProgressSignature(clients);
-      drivenSurfacePhaseSignature = lastPhaseProgress;
+      drivenSurfacePhaseSignature = drove === "reward-target-retry" ? null : lastPhaseProgress;
       continue;
     }
 

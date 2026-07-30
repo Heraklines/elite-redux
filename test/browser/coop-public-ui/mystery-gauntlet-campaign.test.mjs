@@ -18,12 +18,14 @@ import {
   chooseRevivalPartySlot,
   chooseRewardPartyTargetSlot,
   chooseStormglassOption,
+  classifyRewardTargetApplyOutcome,
   createMysteryNarrationAdvancer,
   createRegisteredSurfaceProgressBudget,
   driveMysteryEncounterChoice,
   mechanicalBoundaryFromPairedSurfaces,
   pairedMysteryProjectionMatches,
   resolveSurfaceOwner,
+  rewardPartyTargetCandidates,
   selectLatestMysteryAuthorityEvent,
 } from "./campaign.mjs";
 import {
@@ -1098,6 +1100,48 @@ test("reward targeting prefers the acting seat's legal mon when utility is other
     slot: 3,
     rewardId: "REVIVE",
   });
+  assert.deepEqual(rewardPartyTargetCandidates(boundary("RARE_CANDY"), 0), {
+    slots: [1, 0],
+    rewardId: "RARE_CANDY",
+  });
+});
+
+test("reward targeting distinguishes an accepted transient PARTY shell from an inoperable prompt", () => {
+  const address = { epoch: 7, wave: 7, turn: 3 };
+  const transientParty = {
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "party:reward-target",
+      address,
+      selectedOptionId: "party-slot:0",
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+    },
+  };
+  assert.equal(classifyRewardTargetApplyOutcome([transientParty], 0, address), null);
+  assert.equal(
+    classifyRewardTargetApplyOutcome(
+      [transientParty, { kind: "console", text: "Start Phase NewBattlePhase" }],
+      0,
+      address,
+    )?.status,
+    "accepted",
+  );
+  assert.equal(
+    classifyRewardTargetApplyOutcome(
+      [
+        {
+          ...transientParty,
+          observation: {
+            ...transientParty.observation,
+            ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: null },
+          },
+        },
+      ],
+      0,
+      address,
+    )?.status,
+    "rejected",
+  );
 });
 
 test("a Mystery reward keeps its paired owner boundary for semantic leave confirmation", () => {
@@ -1188,6 +1232,7 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
   const campaign = await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8");
   const observer = await readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8");
+  const awaitable = await readFile(resolve(root, "src/ui/handlers/awaitable-ui-handler.ts"), "utf8");
   assert.match(harness, /targetId: this\.config\.difficultyOptionId/u);
   assert.match(harness, /guest received difficulty=\$\{this\.config\.difficultyId\}/u);
   assert.match(harness, /difficulty-\$\{this\.config\.difficultyId\}-attested/u);
@@ -1205,11 +1250,15 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /async function driveRewardPartyTarget\(/u);
   assert.match(
     campaign,
-    /selectedCursor = \(\) => \/\^party-slot:\(\\d\+\)\$\/u[\s\S]*selectedOptionId === `party-slot:\$\{nextCursor\}`/u,
+    /const match = \/\^party-slot:\(\\d\+\)\$\/u[\s\S]*selectedOptionId === `party-slot:\$\{nextCursor\}`/u,
   );
   assert.doesNotMatch(campaign, /\^cursor:\(\\d\+\)\$/u);
   assert.match(campaign, /selected\.startsWith\("party-option:"\)/u);
   assert.match(campaign, /campaign-reward-target-action/u);
+  assert.match(campaign, /campaign-reward-target-dismiss-rejection/u);
+  assert.match(campaign, /campaign-reward-target-exhausted/u);
+  assert.match(awaitable, /public isAwaitingActionInput\(\): boolean/u);
+  assert.match(observer, /partyPromptReady\.call\(handler\) === true/u);
   assert.match(campaign, /await driveConfirmedLeave\(rig, driver, client, mechanicalBoundary\.authority, cursors\)/u);
   assert.match(campaign, /mechanicalBoundary = mysteryCheckpoint\.boundary/u);
   // Track R dirty lane wave-3: the watcher's non-actionable reward-shop replica is emitted ONCE and held on
@@ -1918,7 +1967,10 @@ test("semantic option identity is independent of every presentation language", a
   assert.match(observer, /partyOptionSemanticId\(/u);
   assert.match(observer, /party-option:\$\{enumName\.toLowerCase\(\)\.replaceAll\("_", "-"\)\}/u);
   assert.match(observer, /partyHandler\.optionsMode === true/u);
-  assert.match(observer, /uiMode === "PARTY"\s*\? null/u);
+  assert.match(
+    observer,
+    /uiMode === "PARTY"[\s\S]*partyPromptReady\.call\(handler\) === true[\s\S]*\? true\s*:\s*null/u,
+  );
 });
 
 test("representative starter selection is deterministic and stays within the co-op budget", () => {

@@ -17,6 +17,18 @@ export abstract class AwaitableUiHandler extends UiHandler {
     super(mode);
   }
 
+  /**
+   * Read-only prompt state for semantic/browser observers.
+   *
+   * PARTY normally accepts cursor input without waiting on the inherited message prompt. Incidental
+   * validation text (for example, "can't take this item") temporarily flips this exact state and
+   * accepts only Action/Cancel. Exposing the complete callback-backed condition lets a public-input
+   * driver distinguish those two visible states without reading or mutating private UI internals.
+   */
+  public isAwaitingActionInput(): boolean {
+    return this.awaitingActionInput === true && this.onActionInput != null;
+  }
+
   processTutorialInput(button: Button): boolean {
     if ((button === Button.ACTION || button === Button.CANCEL) && this.onActionInput) {
       this.getUi().playSelect();

@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "4fdd7b4cc60518d82c272b8e85dad5ad930ee298",
+  "baseSha": "73c0639ff35d26e7f56175ee2e1e5ca06b0486c7",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -175,6 +175,7 @@
     "src/ui/battle-info/player-battle-info.ts",
     "src/ui/containers/pokeball-tray.ts",
     "src/ui/handlers/abstract-option-select-ui-handler.ts",
+    "src/ui/handlers/awaitable-ui-handler.ts",
     "src/ui/handlers/community-challenge-create-ui-handler.ts",
     "src/ui/handlers/community-challenges-ui-handler.ts",
     "src/ui/handlers/pokedex-page-ui-handler.ts",

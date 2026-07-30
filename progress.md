@@ -6159,3 +6159,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A Phaser tween with duration zero still waits for a render tick, so the instant branch now writes the exact EXP-mask
   endpoint directly and bypasses TweenManager altogether. Multi-level immutable updates therefore complete in
   microtasks rather than one low-FPS frame per crossed level.
+
+## 2026-07-30 - Reward-target rejections become public, recoverable campaign states
+
+- Exact SHA `73c0639ff` is qualified by focused gate `30557525600`, the complete capped A/B/C/P aggregate
+  `30558170443`, normal two-browser wave-2 journey `30557525012`, and four-wave depth campaign `30557704292`.
+  The aggregate used 31 or fewer co-op runners, below the user-owned ceiling of 32. The depth campaign crossed the
+  formerly failing wave-4 party EXP frontier and reached wave 5 with no desync, softlock, or presentation failure.
+- Mystery campaign `30557701282` also crossed that EXP frontier and cleared six consecutive Mystery surfaces plus its
+  wave-7 trainer. It then selected `BASE_STAT_BOOSTER` on slot zero, received the visible and recoverable
+  `Seel can't take this item!` prompt, and stayed there until the harness deadline. Both screenshots and exact-address
+  semantic evidence remained synchronized; this was a public-driver coverage gap, not an Authority V2 failure.
+- PARTY inherited a callback-backed message prompt but the CI semantic observer deliberately flattened every PARTY
+  `awaitingActionInput` value to null. A read-only accessor now exposes only the real callback-backed prompt state;
+  normal cursor surfaces remain null/actionable, while an inoperable-item message reports true. The campaign dismisses
+  that prompt with Action, tries each legal visible target in acting-seat-first order, and, if all targets reject,
+  cancels back to the same reward shop and chooses an untried reward. It never reads localized text or private
+  modifier state and still drives exclusively through public keys.
+- Local node-pure campaign/semantic contracts are green, changed-file Biome is clean, and `git diff --check` is clean.
+  The next remote step is a focused source/static gate followed by the exact ten-wave Mystery profile; the full
+  aggregate does not need repeating unless remote compile evidence exposes a production-impacting change.
