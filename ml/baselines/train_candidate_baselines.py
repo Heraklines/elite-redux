@@ -247,14 +247,34 @@ def load_generation_metrics(path: Path) -> dict[str, float | int]:
     for file in sorted(path.rglob("result-*.json")) if path.is_dir() else []:
         results.append(json.loads(file.read_text(encoding="utf-8")))
     total_ms = sum(int(result.get("totalMs", 0)) for result in results)
-    total_waves = sum(len(result.get("waves", [])) for result in results)
+    episodes: list[dict[str, Any]] = []
+    for result in results:
+        batch_results = result.get("results")
+        if isinstance(batch_results, list):
+            episodes.extend(entry for entry in batch_results if isinstance(entry, dict))
+            continue
+        # Compatibility with the original full-run result shape, where each wave
+        # represented one independently recorded combat episode.
+        waves = result.get("waves")
+        if isinstance(waves, list):
+            episodes.extend(entry for entry in waves if isinstance(entry, dict))
+
+    total_episodes = len(episodes)
+    total_turns = sum(int(episode.get("turns", 0)) for episode in episodes)
+    total_combat_ms = sum(int(episode.get("combatMs", 0)) for episode in episodes)
+    boot_samples = [int(episode.get("bootMs", 0)) for episode in episodes if "bootMs" in episode]
+    if not boot_samples:
+        boot_samples = [int(result.get("bootMs", 0)) for result in results if "bootMs" in result]
     return {
         "shards": len(results),
-        "waves": total_waves,
+        "episodes": total_episodes,
+        "turns": total_turns,
         "runnerComputeSeconds": total_ms / 1000,
         "parallelEngineWallSeconds": max((int(result.get("totalMs", 0)) for result in results), default=0) / 1000,
-        "meanEngineMsPerWave": total_ms / max(1, total_waves),
-        "meanBootMs": float(np.mean([result.get("bootMs", 0) for result in results])) if results else 0.0,
+        "meanRunnerMsPerEpisode": total_ms / max(1, total_episodes),
+        "meanCombatMsPerEpisode": total_combat_ms / max(1, total_episodes),
+        "meanTurnsPerEpisode": total_turns / max(1, total_episodes),
+        "meanBootMs": float(np.mean(boot_samples)) if boot_samples else 0.0,
     }
 
 
@@ -559,8 +579,10 @@ def markdown(report: dict[str, Any]) -> str:
         "",
         f"Decisions: {report['data']['decisions']} across {report['data']['episodes']} episodes; "
         f"mean candidates: {report['data']['meanCandidates']:.2f}.",
-        f"Generation: {report['generation']['shards']} runner shards, {report['generation']['waves']} waves, "
-        f"{report['generation']['meanEngineMsPerWave']:.0f} engine ms/wave.",
+        f"Generation: {report['generation']['shards']} runner shards, "
+        f"{report['generation']['episodes']} battle episodes, "
+        f"{report['generation']['meanRunnerMsPerEpisode']:.0f} runner ms/episode, "
+        f"{report['generation']['meanCombatMsPerEpisode']:.0f} combat ms/episode.",
         (
             f"Exploratory rollouts: {report['rolloutSelection']['successfulEpisodes']}/"
             f"{report['rolloutSelection']['episodes']} reached their requested horizon; "
