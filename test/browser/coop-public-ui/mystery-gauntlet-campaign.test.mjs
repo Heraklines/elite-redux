@@ -23,6 +23,7 @@ import {
   driveMysteryEncounterChoice,
   mechanicalBoundaryFromPairedSurfaces,
   pairedMysteryProjectionMatches,
+  resolveSurfaceOwner,
   selectLatestMysteryAuthorityEvent,
 } from "./campaign.mjs";
 import {
@@ -542,6 +543,71 @@ test("ordinary campaign turns keep the strongest visible move instead of weakeni
   assert.match(
     campaign,
     /driveBestCampaignMove\(client, commandPurpose, \{[\s\S]*?commandEvent,[\s\S]*?preferredMoveId:/u,
+  );
+});
+
+test("a semantic-only Bargain owner may advance to narration while its watcher retains the frozen offer", () => {
+  const event = (index, observation) => ({ index, kind: "browser-surface2", observation });
+  const evidence = events => ({
+    events,
+    findLastSemanticSurface(from = 0, surfaceId = null) {
+      return this.events
+        .slice(from)
+        .toReversed()
+        .find(
+          candidate =>
+            candidate.kind === "browser-surface2"
+            && (surfaceId == null || candidate.observation.surfaceId === surfaceId),
+        );
+    },
+  });
+  const address = { epoch: 17, wave: 9, turn: 1 };
+  const owner = {
+    label: "owner",
+    publicSeat: 0,
+    evidence: evidence([
+      event(0, {
+        surfaceId: "bargain",
+        localSeat: 0,
+        ownerSeat: 0,
+        address,
+        ready: { handlerActive: true, inputBlocked: false },
+      }),
+      event(1, {
+        surfaceId: "mystery-encounter:message",
+        localSeat: 0,
+        ownerSeat: 0,
+        address,
+        ready: { handlerActive: true, awaitingActionInput: true },
+      }),
+    ]),
+  };
+  const watcher = {
+    label: "watcher",
+    publicSeat: 1,
+    evidence: evidence([
+      event(0, {
+        surfaceId: "bargain",
+        localSeat: 1,
+        ownerSeat: 0,
+        address,
+        ready: { handlerActive: true, inputBlocked: true },
+      }),
+    ]),
+  };
+  const driver = {
+    name: "mystery-bargain",
+    v2SurfaceId: "bargain",
+    semanticOnly: true,
+  };
+
+  assert.doesNotThrow(() =>
+    resolveSurfaceOwner({ clients: { owner, watcher } }, driver, { owner: 0, watcher: 0 }, new Map(), true),
+  );
+  assert.equal(
+    resolveSurfaceOwner({ clients: { owner, watcher } }, driver, { owner: 0, watcher: 0 }, new Map(), true),
+    null,
+    "the completed Bargain picker is no longer a pending owner control",
   );
 });
 

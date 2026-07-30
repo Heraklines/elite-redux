@@ -6054,3 +6054,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Node-pure and browser-build boundary contracts forbid restoring `cycleIndex: turn - 1`. This changes only
   human-equivalent browser policy, not production battle state, Authority V2, Showdown, tournament, triples, or
   deployment behavior.
+
+## 2026-07-30 - Semantic-only Bargain ownership retires with the owner's picker
+
+- Pre-scheduler-fix Mystery run `30539104150` reached wave 9 with an actionable host-owned Bargain and a converged,
+  input-frozen watcher replica. After the owner publicly declined, it correctly advanced to the terminal narration
+  while the watcher retained the offer; the campaign then combined that current watcher with the owner's historical
+  Bargain event and falsely threw `campaign-owner-evidence` before the narration driver could act.
+- The strict malformed-owner check now applies the same current-only rule already used by semantic-only owner
+  selection and registered-surface discovery. One current watcher plus a superseded owner picker is provisional
+  ordered progress, not a malformed two-sided control and never permission to spend a second Bargain key.
+- A node-pure regression recreates the exact owner-advanced/watcher-retained surface history and proves it returns no
+  pending Bargain owner without throwing. Production Authority V2 behavior is unchanged.

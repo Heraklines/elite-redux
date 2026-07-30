@@ -1831,9 +1831,18 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
       }
       return null;
     }
-    const semanticEvents = clients.map(client =>
-      client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, driver.v2SurfaceId),
-    );
+    const semanticEvents = clients.map(client => {
+      const cursor = cursors[client.label] ?? 0;
+      const event = client.evidence.findLastSemanticSurface(cursor, driver.v2SurfaceId);
+      // Semantic-only controls are mutually exclusive current UI states. Once the owner advances
+      // from Bargain/quiz/subprompt to its terminal narration while the watcher intentionally
+      // retains the frozen replica, the owner's historical surface must not help manufacture a
+      // malformed two-sided appearance. This is the same current-only rule used above to select
+      // the owner and by findRegisteredSurface to decide whether the driver is still pending.
+      return driver.semanticOnly === true && event?.index !== client.evidence.findLastSemanticSurface(cursor)?.index
+        ? null
+        : event;
+    });
     if (semanticEvents.every(event => event == null)) {
       return null;
     }
