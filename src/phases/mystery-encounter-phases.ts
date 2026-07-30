@@ -751,7 +751,7 @@ export class MysteryEncounterPhase extends Phase {
       // Saves the selected option in the ME save data, only if this is not a followup option select phase
       // Can be used for analytics purposes to track what options are popular on certain encounters
       const encounterSaveData = globalScene.mysteryEncounterSaveData.encounteredEvents.at(-1);
-      if (encounterSaveData?.type === globalScene.currentBattle.mysteryEncounter?.encounterType) {
+      if (encounterSaveData && encounterSaveData.type === globalScene.currentBattle.mysteryEncounter?.encounterType) {
         encounterSaveData.selectedOption = index;
       }
     }

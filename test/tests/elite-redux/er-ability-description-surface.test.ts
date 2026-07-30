@@ -5,14 +5,17 @@
  */
 
 import { allAbilities } from "#data/data-lists";
-import { REQUESTED_ABILITY_UPGRADES } from "#data/elite-redux/ability-upgrades/requested-ability-manifest";
+import {
+  REQUESTED_ABILITY_UPGRADES,
+  type RequestedAbilityUpgrade,
+} from "#data/elite-redux/ability-upgrades/requested-ability-manifest";
 import { getErAbilityDescription, getErAbilityRomDescription } from "#data/elite-redux/er-ability-descriptions";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 import "#test/framework/game-manager";
 import { describe, expect, it } from "vitest";
 
-function runtimeIdFor(row: (typeof REQUESTED_ABILITY_UPGRADES)[number]): number | undefined {
+function runtimeIdFor(row: RequestedAbilityUpgrade): number | undefined {
   if (row.erDraftId !== undefined) {
     return ER_ID_MAP.abilities[row.erDraftId];
   }

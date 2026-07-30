@@ -16,7 +16,10 @@
 // =============================================================================
 
 import { allAbilities } from "#data/data-lists";
-import { REQUESTED_ABILITY_UPGRADES } from "#data/elite-redux/ability-upgrades/requested-ability-manifest";
+import {
+  REQUESTED_ABILITY_UPGRADES,
+  type RequestedAbilityUpgrade,
+} from "#data/elite-redux/ability-upgrades/requested-ability-manifest";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ROM_DESCRIPTIONS } from "#data/elite-redux/er-ability-rom-descriptions";
 import { MANUAL_COMPOSITE_PARTS } from "#data/elite-redux/abilities/composite-newcomers";
@@ -51,7 +54,8 @@ for (const ab of ER_ABILITIES) {
 // final text with an older generated description.
 const upgradedAbilityIds = new Set<number>();
 const upgradedAbilityIdByName = new Map<string, number>();
-for (const row of REQUESTED_ABILITY_UPGRADES) {
+const requestedAbilityUpgrades: readonly RequestedAbilityUpgrade[] = REQUESTED_ABILITY_UPGRADES;
+for (const row of requestedAbilityUpgrades) {
   const vanillaId = row.vanillaKey
     ? (AbilityId as unknown as Record<string, number | string>)[row.vanillaKey]
     : undefined;
