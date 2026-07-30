@@ -2643,6 +2643,31 @@ test("every relay-driven remote interaction derives one exact authority proposal
     "a guest owner cannot advance its ambient phase queue at proposal-send time",
   );
 
+  const flushStart = theBargainPhase.indexOf("  private flushCoopBargainTerminal(): void {");
+  const flushEnd = theBargainPhase.indexOf("\n  /** Guest owner", flushStart);
+  assert.ok(flushStart >= 0 && flushEnd > flushStart, "Bargain exposes its bounded terminal publisher");
+  const flush = theBargainPhase.slice(flushStart, flushEnd);
+  assert.match(
+    flush,
+    /commitBargainOwnerOutcome\(\{[\s\S]*?wave: outcome\.authoritativeState\.wave,[\s\S]*?turn: outcome\.authoritativeState\.turn/u,
+    "a host-owned Bargain commit keeps the immutable captured state's coordinates",
+  );
+  assert.doesNotMatch(
+    flush,
+    /commitBargainOwnerOutcome\(\{[\s\S]*?wave: globalScene\.currentBattle/u,
+    "ambient next-wave state cannot relabel an already captured Bargain result",
+  );
+
+  const watcherStart = theBargainPhase.indexOf("  private finishCoopBargainWatch(");
+  const watcherEnd = theBargainPhase.indexOf("\n  private rollAvailableSins", watcherStart);
+  assert.ok(watcherStart >= 0 && watcherEnd > watcherStart, "Bargain exposes its bounded watcher terminal");
+  const watcher = theBargainPhase.slice(watcherStart, watcherEnd);
+  assert.match(
+    watcher,
+    /commitBargainWatcherOutcome\([\s\S]*?wave: adoption\.authoritativeOutcome\.authoritativeState\.wave,[\s\S]*?turn: adoption\.authoritativeOutcome\.authoritativeState\.turn/u,
+    "a guest-owned Bargain result keeps the immutable proposed state's coordinates",
+  );
+
   const resultSettleStart = theBargainPhase.indexOf("  public settleCoopV2CommittedBargainResult(");
   const resultSettleEnd = theBargainPhase.indexOf("\n  /** Close locally only", resultSettleStart);
   assert.ok(
@@ -2676,6 +2701,34 @@ test("every relay-driven remote interaction derives one exact authority proposal
     coopRuntime,
     /op\.owner === runtime\.controller\.localSeatId[\s\S]*?isCoopV2InteractionCutoverActive\(runtime\.durability\)[\s\S]*?return settleCoopV2CommittedBargainResult\(runtime, op\.id\);/u,
     "a guest-owned V2 Bargain bypasses the compatibility raw-result FIFO",
+  );
+});
+
+test("a trapped voluntary switch leaves PARTY and restores its exact command frontier", () => {
+  const trapStart = commandPhase.indexOf("  private handleTrap(): boolean {");
+  const trapEnd = commandPhase.indexOf("\n  /**\n   * Common helper method", trapStart);
+  assert.ok(trapStart >= 0 && trapEnd > trapStart, "the trapping boundary is structurally bounded");
+  const trap = commandPhase.slice(trapStart, trapEnd);
+  assert.match(trap, /const trappingTag = trapTag \?\? fairyLockTag/u);
+  assert.match(
+    trap,
+    /if \(isSwitch\) \{[\s\S]*?setMode\(UiMode\.MESSAGE\)\.then\(\(\) => this\.showNoEscapeText\(trappingTag, true\)\)/u,
+    "every trapped switch must retire the party handler and narrate switch semantics",
+  );
+
+  const textStart = commandPhase.indexOf("  private showNoEscapeText(");
+  const textEnd = commandPhase.indexOf("\n  // Overloads for handleCommand", textStart);
+  assert.ok(textStart >= 0 && textEnd > textStart, "the no-escape terminal is structurally bounded");
+  const noEscape = commandPhase.slice(textStart, textEnd);
+  assert.match(
+    noEscape,
+    /tag == null[\s\S]*?"battle:noEscapeSwitch"[\s\S]*?"battle:noEscapeFlee"/u,
+    "generic trapping effects without a move tag still expose a localized rejection terminal",
+  );
+  assert.match(
+    noEscape,
+    /globalScene\.ui\.showText\("", 0\);\s*globalScene\.ui\.setMode\(UiMode\.COMMAND, this\.fieldIndex\);/u,
+    "every completed no-escape narration restores the same command owner",
   );
 });
 

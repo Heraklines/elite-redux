@@ -234,8 +234,10 @@ export class TheBargainPhase extends Phase {
         pinned: this.coopBargainStart,
         outcome,
         localRole: controller.role,
-        wave: globalScene.currentBattle?.waveIndex ?? 0,
-        turn: globalScene.currentBattle?.turn ?? 0,
+        // The local phase may already have opened the next battle before this result is published.
+        // Keep the envelope in the same coordinate domain as its immutable captured state.
+        wave: outcome.authoritativeState.wave,
+        turn: outcome.authoritativeState.turn,
       })
     ) {
       failCoopSharedSession(`Bargain terminal ${this.coopBargainStart} could not enter durable authority`);
@@ -440,8 +442,9 @@ export class TheBargainPhase extends Phase {
           adoption.operationId,
           {
             pinned: this.coopBargainStart,
-            wave: globalScene.currentBattle?.waveIndex ?? 0,
-            turn: globalScene.currentBattle?.turn ?? 0,
+            // `this.end()` above may already have advanced the ambient battle.
+            wave: adoption.authoritativeOutcome.authoritativeState.wave,
+            turn: adoption.authoritativeOutcome.authoritativeState.turn,
           },
           adoption.authoritativeOutcome,
         )

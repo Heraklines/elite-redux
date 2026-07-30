@@ -5989,3 +5989,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   transition, and ends the replay phase only if the exact runtime, Mystery pin, and phase generation are still live.
   The replica therefore starts `MysteryEncounterBattlePhase` on the normal battle message surface; stale UI callbacks
   cannot advance a replacement session. A source contract forbids restoring the synchronous selector-inheriting edge.
+
+## 2026-07-30 - Bargain terminals and rejected switches retain their captured control boundary
+
+- Broad exact-tip campaign run `30526765498` reached the wave-9 Bargain, applied and receipted its presentation on
+  both browsers, then rejected the owner's complete terminal before it could enter the mechanical V2 log. The owner
+  had ended its phase first, so ambient `currentBattle` described wave 10 while the immutable result still described
+  wave 9; the envelope/state validator correctly failed closed rather than consuming a mixed-coordinate revision.
+- Both owner and guest-proposal Bargain commits now derive wave/turn from the captured authoritative outcome. Local
+  or watcher progression can no longer relabel an immutable result after `end()`; a source contract covers both
+  commit edges and rejects the ambient-coordinate regression.
+- The same run's depth lane submitted a visible guest-owned reserve switch, but a tag/Fairy-Lock rejection kept the
+  PARTY handler current, emitted no relay command, and never restored the command frontier. This was a production
+  control/UI defect, not a driver timeout.
+- Trapped voluntary switches now retire PARTY through MESSAGE, narrate switch semantics, and restore the exact
+  field's COMMAND handler after dismissal. The source contract and simulated public-driver fallback are green;
+  the complete local node-pure contract set passes 157/157 before remote causal requalification.

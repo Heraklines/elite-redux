@@ -1794,15 +1794,17 @@ export class CommandPhase extends FieldPhase {
     } else {
       const trapTag = playerPokemon.getTag(TrappedTag);
       const fairyLockTag = globalScene.arena.getTagOnSide(ArenaTagType.FAIRY_LOCK, ArenaTagSide.PLAYER);
+      const trappingTag = trapTag ?? fairyLockTag;
 
-      if (!isSwitch) {
+      if (isSwitch) {
+        // Every trapped voluntary switch starts in PARTY, including generic locks with no tag.
+        // Retire that handler before narrating, then restore the exact command owner.
+        // biome-ignore lint/complexity/noVoid: The callback restores the exact command frontier asynchronously.
+        void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.showNoEscapeText(trappingTag, true));
+      } else {
         globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
         globalScene.ui.setMode(UiMode.MESSAGE);
-      }
-      if (trapTag) {
-        this.showNoEscapeText(trapTag, false);
-      } else if (fairyLockTag) {
-        this.showNoEscapeText(fairyLockTag, false);
+        this.showNoEscapeText(trappingTag, false);
       }
     }
 
@@ -1914,22 +1916,24 @@ export class CommandPhase extends FieldPhase {
   /**
    * Show a message indicating that the pokemon cannot escape, and then return to the command phase.
    */
-  private showNoEscapeText(tag: any, isSwitch: boolean): void {
+  private showNoEscapeText(tag: any | null, isSwitch: boolean): void {
+    const message =
+      tag == null
+        ? i18next.t(isSwitch ? "battle:noEscapeSwitch" : "battle:noEscapeFlee")
+        : i18next.t("battle:noEscapePokemon", {
+            pokemonName:
+              tag.sourceId && globalScene.getPokemonById(tag.sourceId)
+                ? getPokemonNameWithAffix(globalScene.getPokemonById(tag.sourceId)!)
+                : "",
+            moveName: tag.getMoveName(),
+            escapeVerb: i18next.t(isSwitch ? "battle:escapeVerbSwitch" : "battle:escapeVerbFlee"),
+          });
     globalScene.ui.showText(
-      i18next.t("battle:noEscapePokemon", {
-        pokemonName:
-          tag.sourceId && globalScene.getPokemonById(tag.sourceId)
-            ? getPokemonNameWithAffix(globalScene.getPokemonById(tag.sourceId)!)
-            : "",
-        moveName: tag.getMoveName(),
-        escapeVerb: i18next.t(isSwitch ? "battle:escapeVerbSwitch" : "battle:escapeVerbFlee"),
-      }),
+      message,
       null,
       () => {
         globalScene.ui.showText("", 0);
-        if (!isSwitch) {
-          globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
-        }
+        globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
       },
       null,
       true,
