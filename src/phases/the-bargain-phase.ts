@@ -20,6 +20,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
@@ -104,6 +105,13 @@ export class TheBargainPhase extends Phase {
   private coopAwaitingAuthorityOperationId: string | null = null;
   /** Exact runtime that owns this phase across its post-terminal publication callback. */
   private readonly coopOwningRuntime = getCoopRuntime();
+  /** Exact scene/phase tree that owns this phase across asynchronous UI and relay callbacks. */
+  private readonly coopOwningScene = globalScene;
+  /** Signed terminal wait installed from the immutable Bargain result before this phase may leave. */
+  private coopV2NextWaveAwait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null = null;
+  private coopV2NextWaveAwaitQueued = false;
+  /** Runtime-ledger proof bound by the V2 result projector, never recovered through ambient runtime state. */
+  private coopV2TerminalSettlement: { readonly operationId: string; readonly settle: () => boolean } | null = null;
 
   /** Bind a recovered immutable offer before start() may consult the live interaction cursor. */
   public installCoopV2BargainPresentation(operationId: string, pinned: number): boolean {
@@ -118,6 +126,58 @@ export class TheBargainPhase extends Phase {
     }
     this.coopBargainStart = pinned;
     this.coopV2ControlOperationId = operationId;
+    return true;
+  }
+
+  /** Bind the result's signed N+1 bridge before its complete state can retire. */
+  public installCoopV2TerminalSuccessor(
+    operationId: string,
+    successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>,
+    settle: () => boolean,
+  ): boolean {
+    const battle = this.coopOwningScene.currentBattle;
+    if (
+      operationId.length === 0
+      || this.coopBargainStart < 0
+      || battle == null
+      || successor.afterOperationId !== operationId
+      || successor.epoch !== (this.coopOwningRuntime?.controller.sessionEpoch ?? getCoopController()?.sessionEpoch)
+      || successor.wave !== battle.waveIndex
+      || successor.turn !== battle.turn
+      || !successor.allowNextWaveStart
+    ) {
+      return false;
+    }
+    if (this.coopV2TerminalSettlement != null && this.coopV2TerminalSettlement.operationId !== operationId) {
+      return false;
+    }
+    if (this.coopV2NextWaveAwait != null && JSON.stringify(this.coopV2NextWaveAwait) !== JSON.stringify(successor)) {
+      return false;
+    }
+    this.coopV2ControlOperationId = operationId;
+    this.coopV2TerminalSettlement ??= { operationId, settle };
+    this.coopV2NextWaveAwait ??= structuredClone(successor);
+    return true;
+  }
+
+  /** Replace the projector-discarded local tail with the one signed NewBattle bridge. */
+  private queueCoopV2NextWaveAwait(operationId: string): boolean {
+    const wait = this.coopV2NextWaveAwait;
+    if (wait == null || wait.afterOperationId !== operationId || !wait.allowNextWaveStart) {
+      return false;
+    }
+    if (this.coopV2NextWaveAwaitQueued) {
+      return true;
+    }
+    this.coopOwningScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
+    this.coopOwningScene.phaseManager.pushNew("NewBattlePhase", {
+      afterOperationId: wait.afterOperationId,
+      epoch: wait.epoch,
+      wave: wait.wave,
+      turn: wait.turn,
+    });
+    this.coopV2NextWaveAwaitQueued = true;
+    coopLog("v2-interaction", `queued signed Bargain next-wave wait after ${operationId}`);
     return true;
   }
 
@@ -212,12 +272,12 @@ export class TheBargainPhase extends Phase {
    * current as an ordered wait until the host-authored result returns; ending it at proposal-send time lets
    * the ambient queue advance before Authority V2 owns the successor.
    */
-  private flushCoopBargainTerminal(): void {
+  private flushCoopBargainTerminal(): boolean {
     const outcome = this.coopTerminalOutcome;
     const runtime = this.coopOwningRuntime ?? getCoopRuntime();
     const controller = runtime?.controller ?? getCoopController();
     if (outcome == null || controller == null) {
-      return;
+      return false;
     }
     const operationId = coopBargainOperationId(this.coopBargainStart);
     const seq = COOP_BARGAIN_SEQ_BASE + this.coopBargainStart;
@@ -237,7 +297,7 @@ export class TheBargainPhase extends Phase {
       })
     ) {
       failCoopSharedSession(`Bargain terminal ${this.coopBargainStart} could not enter durable authority`);
-      return;
+      return false;
     }
     if (!awaitsAuthoritativeResult && isCoopV2InteractionCutoverActive(runtime?.durability)) {
       this.advanceCoopBargainFromCommittedResult();
@@ -247,11 +307,11 @@ export class TheBargainPhase extends Phase {
     if (awaitsAuthoritativeResult) {
       if (relay == null || runtime == null) {
         failCoopSharedSession(`Bargain proposal ${operationId} has no active V2 relay`);
-        return;
+        return false;
       }
       if (!this.parkCoopV2AuthoritativeBargainResult(operationId, runtime)) {
         failCoopSharedSession(`Bargain proposal ${operationId} could not park its exact V2 result phase`);
-        return;
+        return false;
       }
       const lease = retainCoopV2InteractionProposal(
         {
@@ -268,13 +328,14 @@ export class TheBargainPhase extends Phase {
       );
       if (lease === "conflict" || lease === "invalid" || lease === "disposed") {
         failCoopSharedSession(`Bargain proposal ${operationId} could not obtain a V2 resend lease (${lease})`);
-        return;
+        return false;
       }
       coopLog("v2-proposal", `retained Bargain outcome proposal id=${operationId} status=${lease}`);
-      return;
+      return true;
     }
     relay?.sendInteractionOutcome(seq, "bargain", outcome);
     coopLog("reward", `bargain OWNER terminal: outcome blob sent (pinnedStart=${this.coopBargainStart})`);
+    return true;
   }
 
   /** Guest owner: retain one exact phase identity while the authority commits its proposed result. */
@@ -316,11 +377,18 @@ export class TheBargainPhase extends Phase {
     ) {
       return false;
     }
-    this.coopAwaitingAuthorityOperationId = null;
-    coopLog("v2-proposal", `committed Bargain result ${operationId} applied; releasing ordered wait`);
-    this.advanceCoopBargainFromCommittedResult();
-    super.end();
-    return settleCoopV2InteractionOperation(operationId, runtime);
+    if (!this.queueCoopV2NextWaveAwait(operationId)) {
+      return false;
+    }
+    return this.coopOwningScene.phaseManager.shiftPhaseThroughCoopAuthorityCommit(this, () => {
+      this.coopAwaitingAuthorityOperationId = null;
+      coopLog("v2-proposal", `committed Bargain result ${operationId} applied; releasing ordered wait`);
+      this.advanceCoopBargainFromCommittedResult();
+      const terminalSettlement = this.coopV2TerminalSettlement;
+      return terminalSettlement?.operationId === operationId
+        ? terminalSettlement.settle()
+        : settleCoopV2InteractionOperation(operationId, runtime);
+    });
   }
 
   /** Close locally only when no host-authored V2 result still owns this phase's successor. */
@@ -332,9 +400,21 @@ export class TheBargainPhase extends Phase {
         this.coopTerminalOutcome != null
         && controller?.role === "guest"
         && isCoopV2InteractionCutoverActive(runtime?.durability);
-      if (!parkForAuthority) {
-        super.end();
+      if (parkForAuthority) {
+        this.flushCoopBargainTerminal();
+        return;
       }
+      if (isCoopV2InteractionCutoverActive(runtime?.durability)) {
+        if (
+          !this.coopOwningScene.phaseManager.shiftPhaseThroughCoopAuthorityCommit(this, () =>
+            this.flushCoopBargainTerminal(),
+          )
+        ) {
+          failCoopSharedSession(`Bargain terminal ${this.coopBargainStart} could not close through Authority V2`);
+        }
+        return;
+      }
+      super.end();
       this.flushCoopBargainTerminal();
     };
     if (runtime == null) {
@@ -426,26 +506,48 @@ export class TheBargainPhase extends Phase {
       /* cosmetic */
     }
     const finalize = (): void => {
-      this.end();
-      if (adoption.accepted && adoption.operationId != null) {
-        settleCoopV2InteractionOperation(adoption.operationId, runtime);
+      const operationId = adoption.operationId;
+      if (!v2 || !adoption.accepted || operationId == null) {
+        this.end();
+        if (operationId != null) {
+          settleCoopV2InteractionOperation(operationId, runtime);
+        }
+        return;
       }
-      if (
-        adoption.requiresAuthorityCommit
-        && adoption.operationId != null
-        && adoption.authoritativeOutcome != null
-        && !commitBargainWatcherOutcome(
-          adoption.operationId,
-          {
-            pinned: this.coopBargainStart,
-          },
-          adoption.authoritativeOutcome,
-        )
-      ) {
-        failCoopSharedSession(`Bargain result ${adoption.operationId} could not enter durable authority`);
-      } else if (v2 && adoption.requiresAuthorityCommit) {
+      if (!adoption.requiresAuthorityCommit && !this.queueCoopV2NextWaveAwait(operationId)) {
+        failCoopSharedSession(`Bargain result ${operationId} lacked its signed next-wave bridge`);
+        return;
+      }
+      const shifted = this.coopOwningScene.phaseManager.shiftPhaseThroughCoopAuthorityCommit(this, () => {
+        const terminalSettlement = this.coopV2TerminalSettlement;
+        const settled =
+          terminalSettlement?.operationId === operationId
+            ? terminalSettlement.settle()
+            : settleCoopV2InteractionOperation(operationId, runtime);
+        if (!settled) {
+          return false;
+        }
+        if (!adoption.requiresAuthorityCommit) {
+          return true;
+        }
+        if (
+          adoption.authoritativeOutcome == null
+          || !commitBargainWatcherOutcome(
+            operationId,
+            {
+              pinned: this.coopBargainStart,
+            },
+            adoption.authoritativeOutcome,
+          )
+        ) {
+          return false;
+        }
         // Guest-owned proposal: authority rotates only after retaining its complete immutable result.
         this.advanceCoopBargainFromCommittedResult();
+        return true;
+      });
+      if (!shifted) {
+        failCoopSharedSession(`Bargain result ${operationId} could not close through Authority V2`);
       }
     };
     void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {

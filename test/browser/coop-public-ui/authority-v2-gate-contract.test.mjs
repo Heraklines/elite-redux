@@ -2637,14 +2637,16 @@ test("every relay-driven remote interaction derives one exact authority proposal
   const park = close.indexOf("const parkForAuthority");
   const localEnd = close.indexOf("super.end()");
   const publish = close.indexOf("this.flushCoopBargainTerminal()");
-  assert.ok(park >= 0 && localEnd > park && publish > localEnd, "Bargain decides its V2 park before publishing");
+  const atomicClose = close.indexOf("shiftPhaseThroughCoopAuthorityCommit");
+  assert.ok(park >= 0 && publish > park && atomicClose > publish, "Bargain decides its V2 park before closing");
   assert.match(
-    close.slice(park, publish),
-    /if \(!parkForAuthority\) \{\s*super\.end\(\);\s*\}/u,
-    "a guest owner cannot advance its ambient phase queue at proposal-send time",
+    close,
+    /if \(parkForAuthority\) \{[\s\S]*?flushCoopBargainTerminal\(\);[\s\S]*?return;[\s\S]*?shiftPhaseThroughCoopAuthorityCommit\(this,[\s\S]*?flushCoopBargainTerminal/u,
+    "a V2 owner either parks for authority or commits atomically before the next phase starts",
   );
+  assert.ok(localEnd > atomicClose, "only the legacy path may use ordinary phase teardown");
 
-  const flushStart = theBargainPhase.indexOf("  private flushCoopBargainTerminal(): void {");
+  const flushStart = theBargainPhase.indexOf("  private flushCoopBargainTerminal(): boolean {");
   const flushEnd = theBargainPhase.indexOf("\n  /** Guest owner", flushStart);
   assert.ok(flushStart >= 0 && flushEnd > flushStart, "Bargain exposes its bounded terminal publisher");
   const flush = theBargainPhase.slice(flushStart, flushEnd);
@@ -2665,8 +2667,13 @@ test("every relay-driven remote interaction derives one exact authority proposal
   const watcher = theBargainPhase.slice(watcherStart, watcherEnd);
   assert.match(
     watcher,
-    /commitBargainWatcherOutcome\([\s\S]*?adoption\.operationId,[\s\S]*?pinned: this\.coopBargainStart,[\s\S]*?adoption\.authoritativeOutcome/u,
+    /commitBargainWatcherOutcome\([\s\S]*?operationId,[\s\S]*?pinned: this\.coopBargainStart,[\s\S]*?adoption\.authoritativeOutcome/u,
     "a guest-owned Bargain commit passes the authority-recaptured immutable result to its boundary",
+  );
+  assert.match(
+    watcher,
+    /queueCoopV2NextWaveAwait\(operationId\)[\s\S]*?shiftPhaseThroughCoopAuthorityCommit\(this,[\s\S]*?terminalSettlement/u,
+    "a host-owned Bargain watcher restores the projector-discarded tail before atomically proving terminal",
   );
   assert.match(
     bargainOperation,
@@ -2691,11 +2698,22 @@ test("every relay-driven remote interaction derives one exact authority proposal
     /awaitInteractionOutcome|consumeCommittedInteractionOutcomeOperationId|COOP_BIOME_WAIT_MS/u,
     "a raw Bargain outcome FIFO cannot release the parked V2 phase",
   );
-  const authorityEnd = resultSettle.indexOf("super.end()");
+  const signedBridge = resultSettle.indexOf("this.queueCoopV2NextWaveAwait(operationId)");
+  const authorityEnd = resultSettle.indexOf("shiftPhaseThroughCoopAuthorityCommit");
   const terminalProof = resultSettle.indexOf("settleCoopV2InteractionOperation");
   assert.ok(
-    authorityEnd >= 0 && terminalProof > authorityEnd,
-    "the real phase terminal precedes its address-exact settlement proof",
+    signedBridge >= 0 && authorityEnd > signedBridge && terminalProof > authorityEnd,
+    "the signed bridge is queued before atomic phase close publishes its address-exact settlement proof",
+  );
+  assert.doesNotMatch(resultSettle, /super\.end\(\)/u, "V2 Bargain cannot fall through an ambient empty queue");
+
+  const bargainSuccessorStart = interactionCutover.indexOf('    case "BARGAIN":');
+  const bargainSuccessorEnd = interactionCutover.indexOf('    case "STORMGLASS":', bargainSuccessorStart);
+  assert.ok(bargainSuccessorStart >= 0 && bargainSuccessorEnd > bargainSuccessorStart);
+  assert.match(
+    interactionCutover.slice(bargainSuccessorStart, bargainSuccessorEnd),
+    /wait\(\["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"\], true\)/u,
+    "the immutable Bargain result explicitly authorizes its next-wave bridge",
   );
 
   assert.match(

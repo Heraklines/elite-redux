@@ -1035,7 +1035,10 @@ export function successorOfCoopV2InteractionEnvelope(
           : undefined,
       );
     case "BARGAIN":
-      return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
+      // The Bargain is a synthetic encounter wave whose terminal always advances through NewBattlePhase.
+      // Its projector deliberately discarded the replica's locally-guessed queue when it installed the
+      // immutable offer, so a same-wave wait leaves the renderer with no lawful bridge to wave N+1.
+      return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], true);
     case "STORMGLASS":
       // Stormglass settles before the first command picker for this battle is authored. Its immutable
       // result and the command frontier therefore share one wave/turn address; the ordinary broad

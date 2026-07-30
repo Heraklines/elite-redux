@@ -6022,3 +6022,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Failure-first owner-resolution coverage reproduces the cross-seat history exactly. Bargain/source/campaign
   contracts pass 165/165 locally; full `tsc` reports only the repository's existing non-co-op baseline and no
   diagnostics in the changed co-op files. Remote exact-SHA static and causal Mystery requalification remain required.
+
+## 2026-07-30 - Bargain owns its signed next-wave scheduler bridge
+
+- Exact Mystery run `30537141109` proved the earlier coordinate fix, cleared the first six scripted Mystery
+  encounters plus the wave-7 trainer and wave-8 boss, then exposed a distinct Authority V2 scheduler deadlock after
+  the host-owned wave-9 Bargain. The host correctly committed global revision 47 and advanced to the wave-10 Lake
+  Spirit encounter; the replica applied and acknowledged the same immutable result but fell into wave-9
+  `CoopReplayTurnPhase`. The host then waited in `NextEncounterPhase` for the replica's wave-10 destination consumer.
+- The Bargain presentation projector intentionally destroys the replica's speculative phase tree. Its result had
+  stated `AWAIT_SUCCESSOR` with `allowNextWaveStart:false`, so no authority-owned `NewBattlePhase` survived to replace
+  that discarded tree. This was a production progression seam, not campaign noise or a checksum divergence.
+- A complete Bargain result now explicitly authorizes N+1. Every projected owner/watcher phase binds that immutable
+  wait, replaces any guessed NewBattle tail with the signed bridge, and closes through
+  `shiftPhaseThroughCoopAuthorityCommit`; neither peer can start an ambient `TurnInitPhase` nor advance to the next
+  wave before the result is retained and its exact phase terminal is proved. Host-owned and guest-owned outcomes use
+  the same atomic edge.
+- Failure-first source contracts cover the N+1 successor, exact runtime/scene binding, signed bridge installation,
+  and atomic phase close. The combined Authority V2, campaign, and Bargain source suite passes 166/166; Biome and
+  changed-file TypeScript diagnostics are clean. Exact two-browser Mystery requalification remains required.
