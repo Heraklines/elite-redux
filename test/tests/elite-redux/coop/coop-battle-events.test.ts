@@ -1507,6 +1507,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     "CoopStatStageReplayPhase",
     "CoopStatusReplayPhase",
     "CoopShowAbilityReplayPhase",
+    // Keep the teardown explicit: stopping here leaves the checkpoint queued and stale ability chrome visible.
     "CoopHideAbilityReplayPhase",
     "CoopFaintReplayPhase",
     "CoopSwitchReplayPhase",
