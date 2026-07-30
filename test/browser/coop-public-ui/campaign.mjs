@@ -2309,23 +2309,14 @@ async function checkpointAsymmetricBargainSurface(rig, cursors, stats, owner) {
   const ownerObservation = ownerEvent.observation;
   const watcherEvent = await watcher.evidence.waitForCondition(
     sink => {
-      const candidate = sink.findLastSemanticSurface(cursors[watcher.label] ?? 0, "mystery-encounter:message");
-      return candidate?.observation.address.wave === ownerObservation.address.wave ? candidate : null;
+      const candidate = sink.findLastSemanticSurface(cursors[watcher.label] ?? 0, "bargain");
+      return JSON.stringify(candidate?.observation.address) === JSON.stringify(ownerObservation.address)
+        ? candidate
+        : null;
     },
-    { timeoutMs: rig.config.timeoutMs, description: "watcher partner-bargaining projection" },
+    { timeoutMs: rig.config.timeoutMs, description: "watcher input-inert mirrored Bargain projection" },
   );
-  const watcherObservation = watcherEvent.observation;
-  if (
-    JSON.stringify(watcherObservation.address) !== JSON.stringify(ownerObservation.address)
-    || watcherObservation.ownerSeat !== ownerObservation.ownerSeat
-    || watcherObservation.mysteryEncounterType !== ownerObservation.mysteryEncounterType
-    || watcherObservation.stateDigest !== ownerObservation.stateDigest
-    || ownerObservation.ownerSeat !== owner.publicSeat
-  ) {
-    throw new Error(
-      `[campaign-mystery] asymmetric bargain ownership/address diverged: ${JSON.stringify({ ownerObservation, watcherObservation })}`,
-    );
-  }
+  const proof = assertAsymmetricBargainProjection(ownerObservation, watcherEvent.observation);
   await finalizePendingMysteryEvent(rig, stats, {
     kind: "bargain-surface",
     wave: ownerObservation.address.wave,
@@ -2340,21 +2331,65 @@ async function checkpointAsymmetricBargainSurface(rig, cursors, stats, owner) {
     terminalCursors: fromEach(Object.values(rig.clients), client => client.evidence.cursor()),
     terminal: null,
   };
-  const proof = {
-    stage: "presentation",
-    surfaceId: "bargain",
-    watcherSurfaceId: "mystery-encounter:message",
-    address: ownerObservation.address,
-    ownerSeat: ownerObservation.ownerSeat,
-    optionIds: ownerObservation.optionIds ?? null,
-    mysteryEncounterType: ownerObservation.mysteryEncounterType ?? null,
-    stateDigest: ownerObservation.stateDigest ?? null,
-  };
   stats.mysteryEvents.push(event);
   appendMysteryProof(rig, event, proof);
   await Promise.all(
     Object.values(rig.clients).map(client => client.checkpoint(`wave-${event.wave}-mystery-presentation-bargain`)),
   );
+}
+
+/** The Bargain offer is mirrored visually, but only its exact interaction owner may act. */
+export function assertAsymmetricBargainProjection(ownerObservation, watcherObservation) {
+  if (
+    ownerObservation?.surfaceId !== "bargain"
+    || ownerObservation.ownerSeat !== ownerObservation.localSeat
+    || ownerObservation.seatsWithInput?.length !== 1
+    || ownerObservation.seatsWithInput[0] !== ownerObservation.localSeat
+    || !isActionableSemanticObservation(ownerObservation)
+  ) {
+    throw new Error(
+      `[campaign-mystery] Bargain owner was not exclusively actionable: ${JSON.stringify(ownerObservation)}`,
+    );
+  }
+  if (
+    watcherObservation?.surfaceId !== "bargain"
+    || watcherObservation.localSeat === ownerObservation.localSeat
+    || watcherObservation.ownerSeat !== ownerObservation.ownerSeat
+    || watcherObservation.seatsWithInput?.length !== 1
+    || watcherObservation.seatsWithInput[0] !== ownerObservation.ownerSeat
+    || watcherObservation.ready?.handlerActive !== true
+    || watcherObservation.ready?.inputBlocked !== true
+  ) {
+    throw new Error(
+      `[campaign-mystery] mirrored Bargain watcher was not input-inert: ${JSON.stringify(watcherObservation)}`,
+    );
+  }
+  if (
+    JSON.stringify(watcherObservation.address) !== JSON.stringify(ownerObservation.address)
+    || ownerObservation.stateDigest == null
+    || watcherObservation.stateDigest !== ownerObservation.stateDigest
+    || watcherObservation.mysteryEncounterType !== ownerObservation.mysteryEncounterType
+    || JSON.stringify(watcherObservation.optionIds ?? null) !== JSON.stringify(ownerObservation.optionIds ?? null)
+  ) {
+    throw new Error(
+      "[campaign-mystery] mirrored Bargain owner/watcher state diverged: "
+        + `${JSON.stringify({ ownerObservation, watcherObservation })}`,
+    );
+  }
+  return {
+    stage: "presentation",
+    surfaceId: ownerObservation.surfaceId,
+    watcherSurfaceId: watcherObservation.surfaceId,
+    phase: ownerObservation.phase,
+    uiMode: ownerObservation.uiMode,
+    selectedOptionId: ownerObservation.selectedOptionId ?? null,
+    address: ownerObservation.address,
+    ownerSeat: ownerObservation.ownerSeat,
+    watcherSeat: watcherObservation.localSeat,
+    optionIds: ownerObservation.optionIds ?? null,
+    mysteryEncounterType: ownerObservation.mysteryEncounterType ?? null,
+    stateDigest: ownerObservation.stateDigest,
+  };
 }
 
 /**

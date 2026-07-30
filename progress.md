@@ -5898,3 +5898,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   without reducing one seed, wave, or production invariant.
 - Existing exact-SHA two-browser campaigns and aggregate evidence remain untouched. This change is test-only; no
   runtime, Showdown, tournament, triples, or deployment behavior changes.
+
+## 2026-07-30 - Mystery campaign recognizes the input-frozen mirrored Bargain screen
+
+- Exact Mystery run `30513537000` cleared seven waves and six consecutive ordinary Mystery surfaces, then reached
+  the wave-9 Bargain with both browsers on the same address and `b6cecff493129300` state digest. Both final screenshots
+  visibly show the same Giratina offer. The owner observation was actionable for seat 0; the watcher observation
+  retained `seatsWithInput:[0]` and `inputBlocked:true`.
+- Production intentionally replaced the old watcher-only text with the complete immutable Bargain offer while
+  freezing its controls. The browser campaign was stale: it still waited for `mystery-encounter:message`, so it timed
+  out on a stronger correct presentation. The oracle now requires an actionable exact owner and an explicitly
+  input-frozen mirrored `bargain` watcher at the same address, digest, encounter metadata, and option image.
+- Failure-first node-pure coverage rejects a watcher whose input is unblocked or whose digest diverges. This is a
+  harness-only correction; Authority V2 runtime, Showdown, tournament, triples, and deployment behavior are unchanged.

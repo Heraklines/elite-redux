@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 import {
   assertAsymmetricAbilityProjection,
+  assertAsymmetricBargainProjection,
   assertAsymmetricMysteryPromptProjection,
   assertAsymmetricRevivalProjection,
   assertAsymmetricStormglassProjection,
@@ -1046,7 +1047,10 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(harness, /guest received difficulty=\$\{this\.config\.difficultyId\}/u);
   assert.match(harness, /difficulty-\$\{this\.config\.difficultyId\}-attested/u);
   assert.match(campaign, /\[2, "mystery"\][\s\S]*\[6, "mystery"\][\s\S]*\[9, "bargain"\][\s\S]*\[10, "mystery"\]/u);
-  assert.match(campaign, /watcherSurfaceId: "mystery-encounter:message"/u);
+  assert.match(campaign, /async function checkpointAsymmetricBargainSurface\(/u);
+  assert.match(campaign, /watcher input-inert mirrored Bargain projection/u);
+  assert.match(campaign, /watcherSurfaceId: watcherObservation\.surfaceId/u);
+  assert.doesNotMatch(campaign, /watcherSurfaceId: "mystery-encounter:message"/u);
   assert.match(campaign, /async function driveConfirmedLeave\(/u);
   assert.match(campaign, /owner\.waitForOwnedRewardConfirm\(/u);
   assert.match(campaign, /watcher\.waitForAddressedRewardWatcher\(/u);
@@ -1216,6 +1220,51 @@ test("a generic Mystery secondary prompt has one actionable owner and one conver
   );
   assert.throws(
     () => assertAsymmetricMysteryPromptProjection(owner, { ...watcher, stateDigest: "diverged" }),
+    /owner\/watcher state diverged/u,
+  );
+});
+
+test("the mirrored Bargain offer gives input only to its exact interaction owner", () => {
+  const owner = {
+    surfaceId: "bargain",
+    phase: "TheBargainPhase",
+    uiMode: "ER_BARGAIN",
+    localSeat: 0,
+    ownerSeat: 0,
+    seatsWithInput: [0],
+    selectedOptionId: "cursor:0",
+    optionIds: null,
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+    address: { epoch: 19, wave: 9, turn: 1 },
+    stateDigest: "bargain-state",
+    mysteryEncounterType: null,
+  };
+  const watcher = {
+    ...owner,
+    localSeat: 1,
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: true },
+  };
+
+  assert.deepEqual(assertAsymmetricBargainProjection(owner, watcher), {
+    stage: "presentation",
+    surfaceId: "bargain",
+    watcherSurfaceId: "bargain",
+    phase: "TheBargainPhase",
+    uiMode: "ER_BARGAIN",
+    selectedOptionId: "cursor:0",
+    address: { epoch: 19, wave: 9, turn: 1 },
+    ownerSeat: 0,
+    watcherSeat: 1,
+    optionIds: null,
+    mysteryEncounterType: null,
+    stateDigest: "bargain-state",
+  });
+  assert.throws(
+    () => assertAsymmetricBargainProjection(owner, { ...watcher, ready: { handlerActive: true, inputBlocked: false } }),
+    /watcher was not input-inert/u,
+  );
+  assert.throws(
+    () => assertAsymmetricBargainProjection(owner, { ...watcher, stateDigest: "diverged" }),
     /owner\/watcher state diverged/u,
   );
 });
