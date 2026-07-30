@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { normalizeRunResult } from "./compare-run-results.mjs";
 import { assertInversePair, buildGhostPair, buildGhostSelfPlayScenario, readGhostFixture } from "./ghost-gauntlet.mjs";
 import { buildGhostEvalBatch, EXPECTED_GHOST_EVAL_PAIRS, GHOST_EVAL_CONTROLLERS } from "./make-ghost-eval-batch.mjs";
 import { buildPilotBatch } from "./make-pilot-batch.mjs";
@@ -59,6 +60,16 @@ assert.throws(
   () => buildGhostBatchReport(fullEval.manifests.slice(1), controllerBatches),
   /expected 50 inverse-pair manifests/,
 );
+
+const timingOnlyDifference = structuredClone(controllerBatches[0].batch);
+timingOnlyDifference.totalMs = 200;
+timingOnlyDifference.averageMsPerEpisode = 2;
+timingOnlyDifference.results[0].bootMs = 30;
+timingOnlyDifference.results[0].combatMs = 170;
+timingOnlyDifference.results[0].decisions = 4;
+timingOnlyDifference.results[0].phaseMs = { EnemyCommandPhase: 12 };
+timingOnlyDifference.results[0].slowPhases = [{ phase: "EnemyCommandPhase", ms: 12 }];
+assert.deepEqual(normalizeRunResult(timingOnlyDifference), normalizeRunResult(controllerBatches[0].batch));
 const weakened = structuredClone(controllerBatches);
 weakened[0].batch.hardestTrainerAi = false;
 assert.throws(() => buildGhostBatchReport(fullEval.manifests, weakened), /invalid hardest-AI combat batch result/);
