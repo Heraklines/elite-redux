@@ -4017,7 +4017,7 @@
     "id": 70022,
     "introDialogue": "If you want to keep this world from disappearing, then face me in battle!",
     "maxWave": 199,
-    "minWave": 181,
+    "minWave": 180,
     "name": "Volo",
     "team": [
       {
@@ -4109,6 +4109,12 @@
       },
       {
         "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
         "level": null,
         "moves": [
           "DRAGON_CLAW",
@@ -4117,7 +4123,7 @@
           "EXCALIBUR"
         ],
         "sanityOff": true,
-        "species": 10134
+        "species": 445
       },
       {
         "abilitySlot": 1,
@@ -4170,7 +4176,7 @@
     "id": 70023,
     "introDialogue": "If you want to keep this world from disappearing, then face me in battle!",
     "maxWave": 199,
-    "minWave": 181,
+    "minWave": 180,
     "name": "Volo",
     "team": [
       {
@@ -4200,7 +4206,7 @@
         }
       },
       {
-        "abilitySlot": 0,
+        "abilitySlot": 2,
         "heldItems": [
           {
             "count": 2,
@@ -4248,6 +4254,12 @@
       },
       {
         "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
         "level": null,
         "moves": [
           "FOCUS_BLAST",
