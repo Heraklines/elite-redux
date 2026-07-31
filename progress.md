@@ -6502,3 +6502,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   immutable result, fallback successor, and legacy resend all reuse that address. Focused source contracts enforce that
   construction is the only scene battle-coordinate read for both batch panels and that catch-full never rereads inside
   its public callback. The guest catch-full phase is now explicitly owned by this integration train.
+
+## 2026-07-31 - Half-wipe browser red was a stale close observer
+
+- Exact `470cb7ae3` half-wipe run `30645234686` executed Memento, replayed the faint on the replica, proved that its
+  entire owned half had no legal bench, and opened the survivor's turn-2 command surface. No replacement input was owed.
+- The harness still waited only for the older host `half wiped` and committed-authority `party[-1]` messages. The live
+  renderer used its equivalent pre-picker close, `own-faint picker gate ... no legal bench -> skip`, so the journey
+  timed out after the correct product continuation had already happened.
+- The close observer now accepts all three production no-pick proofs. This is harness-only; no Authority V2 or battle
+  behavior changed. Exact executable validation remains on GitHub-hosted runners.
+
+## 2026-07-31 - Registered-interactions red reached both target interactions
+
+- Exact `470cb7ae3` registered-interactions run `30645239422` drove one real Revival owner choice, cleared wave 1,
+  converged the wave-2 Stormglass owner/watcher surfaces, and committed the exact Stormglass choice.
+- Its fixture then genuinely lost at the start of wave 2, so campaign bookkeeping reported zero cleared waves even
+  though both target UI-to-relay-to-authority chains were complete. This is provisionally classified as harness-profile
+  survivability/bookkeeping, not a co-op desync; the exact `b6eb9a8f3` rerun will confirm it before its rule is changed.

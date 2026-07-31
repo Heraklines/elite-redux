@@ -37,12 +37,13 @@ const REPLACEMENT_PICK_COMMITTED = /faint picker PICK|Start Phase SwitchSummonPh
 const REPLACEMENT_PICKER_OPEN = /Start Phase (?:SwitchPhase|CoopGuestFaintSwitchPhase)|guest own-faint picker OPEN/u;
 // A forced faint-replacement CLOSES with the slot left EMPTY when the owner's whole half is wiped (no
 // legal same-owner bench): the host's own SwitchPhase logs the no-legal-same-owner close (switch-phase.ts
-// OWNER branch) and the guest's picker closes from committed authority with a NO-PICK sentinel (partySlot
-// -1). Either way NO human pick is owed - the slot stays empty and the run continues asymmetric (#828, the
+// OWNER branch), the guest's picker can close from committed authority with a NO-PICK sentinel (partySlot
+// -1), and the authoritative replay can prove the same condition before opening a picker at all. In every
+// case NO human pick is owed - the slot stays empty and the run continues asymmetric (#828, the
 // coop-duo-half-wiped product path). The drive must complete like a real seat at that picker instead of
 // spinning to its timeout waiting for an actionable picker that (by design) never becomes selectable.
 const REPLACEMENT_HALF_WIPED_CLOSE =
-  /no legal same-owner replacement \(half wiped\)|own-faint picker CLOSE from committed authority[^\n]*party\[-1\]/u;
+  /no legal same-owner replacement \(half wiped\)|own-faint picker CLOSE from committed authority[^\n]*party\[-1\]|own-faint picker gate bi=\d+: no legal bench -> skip/u;
 // Distinct resolution sentinel for the send-out-menu wait: the authority committed the pick under us.
 const REPLACEMENT_DRIVE_SUPERSEDED = Symbol("replacement-drive-superseded");
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;

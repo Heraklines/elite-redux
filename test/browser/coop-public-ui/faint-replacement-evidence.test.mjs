@@ -254,7 +254,7 @@ test("the replacement picker drive completes on a half-wiped close instead of sp
   // sibling awaitConcurrentOwnedReplacement, the drive must return on the close evidence.
   assert.match(
     harness,
-    /const REPLACEMENT_HALF_WIPED_CLOSE =\s*\/no legal same-owner replacement \\\(half wiped\\\)\|own-faint picker CLOSE from committed authority\[\^\\n\]\*party\\\[-1\\\]\/u;/u,
+    /const REPLACEMENT_HALF_WIPED_CLOSE =[\s\S]*?no legal same-owner replacement \\\(half wiped\\\)[\s\S]*?own-faint picker CLOSE from committed authority\[\^\\n\]\*party\\\[-1\\\][\s\S]*?own-faint picker gate bi=\\d\+: no legal bench -> skip\/u;/u,
   );
   const drive = harness.slice(
     harness.indexOf("async driveOwnedReplacementPicker("),
