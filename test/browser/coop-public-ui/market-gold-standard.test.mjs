@@ -7,11 +7,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import {
-  assertMarketCoverage,
-  assertMarketPurchaseConverged,
-  findPairedMarketOutcome,
-} from "./market-journey.mjs";
+import { assertMarketCoverage, assertMarketPurchaseConverged, findPairedMarketOutcome } from "./market-journey.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 

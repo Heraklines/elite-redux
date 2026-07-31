@@ -3578,22 +3578,22 @@ export class DuoPublicUiRig {
                 ? [CROBAT_SPECIES_ID]
                 : [DONDOZO_SPECIES_ID]
               : faintFixture
-              ? client.label === this.config.faintOwnerSeat
-                ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
-                : [BULBASAUR_SPECIES_ID]
-              : gameOverFixture
-                ? [CROBAT_SPECIES_ID]
-                : campaignSurvivalFixture
-                  ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
-                  : navigationFixture
+                ? client.label === this.config.faintOwnerSeat
+                  ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
+                  : [BULBASAUR_SPECIES_ID]
+                : gameOverFixture
+                  ? [CROBAT_SPECIES_ID]
+                  : campaignSurvivalFixture
                     ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
-                    : evolutionFixture
-                      ? [CATERPIE_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
-                      : registeredInteractionsFixture
-                        ? client.label === "host-seat"
-                          ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
-                          : [BULBASAUR_SPECIES_ID]
-                        : null;
+                    : navigationFixture
+                      ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
+                      : evolutionFixture
+                        ? [CATERPIE_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
+                        : registeredInteractionsFixture
+                          ? client.label === "host-seat"
+                            ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
+                            : [BULBASAUR_SPECIES_ID]
+                          : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {

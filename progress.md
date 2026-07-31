@@ -6426,3 +6426,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The journey and campaign build gates now request only unlimited error-level Biome diagnostics. Their previous default
   diagnostic cap printed hundreds of legacy lint infos while hiding the single blocking error, turning a fast static
   failure into an opaque red. This changes reporting only: the same files and the same `biome check` exit status remain.
+
+## 2026-07-31 - Broad browser builders now expose exact static blockers
+
+- Exact `4a7a1682c` source and node-pure contracts passed in focused run `30643254348`; its remaining selected shards
+  continue remotely. The push journey `30643254369` and Mystery campaign `30643308686` stopped before bundle creation,
+  so neither is gameplay evidence.
+- With error-only unlimited diagnostics enabled, the formerly opaque builders identified only two mechanical Biome
+  layouts: the new market test import and the pre-existing half-wipe fixture's nested roster expression. Both now match
+  the exact remote formatter output. No behavior changed.
+- Navigation-depth-30 run `30643301581` and half-wipe run `30643304926` remain immutable attempts on `4a7a1682c`; they
+  may independently reach Chromium if their build workers had not yet evaluated the old layout. All replacement
+  qualification remains on GitHub-hosted runners, with no local executable validation.
