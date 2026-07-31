@@ -690,6 +690,16 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
     /entry\.kind !== "CONTROL_COMMIT" && entry\.nextControl\.kind === "COMMAND_FRONTIER"[\s\S]+releaseCoopV2ParkedTurnBoundary\(runtime, entry\)[\s\S]+releaseCoopV2DeferredCommandStarts\(runtime, entry\.nextControl\)/u,
     "a non-CONTROL command successor releases either exact wait shape after its material applies",
   );
+  assert.match(
+    runtime,
+    /claim\.addressedByCurrent[\s\S]+isMaterialApplied\(current\)[\s\S]+inspectCoopV2CommandPresentationRequirement\(state\.wave, state\.turn, runtime\)[\s\S]+!runtime\.battleStream\.hasConsumedCommandPresentation\(presentation\.operationId\)[\s\S]+return "presentation-required"[\s\S]+return "ready"/u,
+    "a parked post-replacement command cannot become actionable before its CONTROL prefix is receipted",
+  );
+  assert.match(
+    command,
+    /boundary === "presentation-required"[\s\S]+phaseManager\.create\([\s\S]+"CoopReplayTurnPhase"[\s\S]+battle\.waveIndex,[\s\S]+true,[\s\S]+replaceWithCoopAuthoritativePhase\(this, replay\)[\s\S]+return;/u,
+    "the TurnInit-bypassing CommandPhase atomically projects the ordinary presentation-only replay",
+  );
 });
 
 test("renderer fixtures cannot manufacture legacy wave authority", () => {

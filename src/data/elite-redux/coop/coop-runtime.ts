@@ -8688,7 +8688,7 @@ export function commitCoopV2ReplacementAuthority(
   });
 }
 
-export type CoopV2CommandBoundaryVerdict = "ready" | "deferred" | "failed" | "dissolved";
+export type CoopV2CommandBoundaryVerdict = "ready" | "deferred" | "presentation-required" | "failed" | "dissolved";
 export type CoopV2InteractionBoundaryVerdict = "ready" | "deferred" | "failed";
 
 export type CoopV2ReplacementBoundaryResult =
@@ -9392,6 +9392,25 @@ export function enterCoopV2CommandControlBoundary(
     return "failed";
   }
   if (claim.addressedByCurrent && current != null && runtime.v2ControlLedger.isMaterialApplied(current)) {
+    const presentation = inspectCoopV2CommandPresentationRequirement(state.wave, state.turn, runtime);
+    if (
+      presentation.kind === "presentation"
+      && !runtime.battleStream.hasConsumedCommandPresentation(presentation.operationId)
+    ) {
+      // TurnInit ordinarily creates the presentation-only replay before either CommandPhase. A replacement
+      // transaction can instead create its refilled-slot CommandPhase directly and park it while the later
+      // CONTROL_COMMIT is in flight. Resuming that parked phase here used to bypass TurnInit completely and
+      // expose command input before the CONTROL_COMMIT's already-received switch/ability prefix rendered.
+      // Return a typed projection request to the exact current CommandPhase; it atomically replaces itself
+      // with the ordinary retained-prefix replay. The replay's exact receipt is the only edge that lets the
+      // reconstructed TurnInit/CommandPhase pass this branch on re-entry.
+      coopLog(
+        "v2-control",
+        `command-open holds input for retained presentation ${presentation.operationId} `
+          + `at wave=${state.wave} turn=${state.turn}`,
+      );
+      return "presentation-required";
+    }
     return "ready";
   }
   if (current?.kind === "TERMINAL") {

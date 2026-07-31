@@ -908,6 +908,29 @@ export class CommandPhase extends FieldPhase {
       }
       // Un-parked normally (command frontier admitted): drop any parked-replacement wake armed above.
       this.clearParkedReplacementWake();
+      if (boundary === "presentation-required") {
+        // A replacement can construct this CommandPhase directly, without the TurnInit route that normally
+        // inserts the CONTROL_COMMIT's retained presentation replay. The ordered command boundary detected
+        // that exact case. Replace this still-inert phase tree with the same presentation-only replay used by
+        // TurnInit; after its renderer receipt the empty authoritative queue reconstructs TurnInit and a new
+        // CommandPhase, which can open only after the operation watermark proves the prefix was consumed.
+        const battle = globalScene.currentBattle;
+        const replay = globalScene.phaseManager.create(
+          "CoopReplayTurnPhase",
+          battle.turn,
+          0,
+          undefined,
+          battle.waveIndex,
+          true,
+        );
+        if (!globalScene.phaseManager.replaceWithCoopAuthoritativePhase(this, replay)) {
+          failCoopSharedSession(
+            `Authority V2 could not install pre-command presentation for field ${this.fieldIndex} `
+              + `at wave ${battle.waveIndex} turn ${battle.turn}`,
+          );
+        }
+        return;
+      }
       if (boundary === "dissolved") {
         // Stale command for an already-advance-signaled wave (a queue-empty TurnInit->Command
         // manufacture for the OLD wave before the local battle re-based). Parking it would deadlock
