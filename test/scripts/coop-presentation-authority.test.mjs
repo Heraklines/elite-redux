@@ -947,6 +947,7 @@ test("protocol 61 binds every structured presentation cue and retained Mystery m
   const levelUp = read("src/phases/level-up-phase.ts");
   const evolution = read("src/phases/evolution-phase.ts");
   const progressionReplay = read("src/phases/coop-wave-progression-replay-phase.ts");
+  const animations = read("src/animations.ts");
   const battleEngine = read("src/data/elite-redux/coop/coop-battle-engine.ts");
   const meTerminalValidator = read("src/data/elite-redux/coop/coop-me-terminal-validator.ts");
   const meOperation = read("src/data/elite-redux/coop/coop-me-operation.ts");
@@ -1005,6 +1006,21 @@ test("protocol 61 binds every structured presentation cue and retained Mystery m
     progressionReplay,
     /await this\.awaitExternal\(Promise\.all\([\s\S]+heartbeat\("assets-loaded"\)[\s\S]+heartbeat\("mode-ready"\)[\s\S]+heartbeat\("cycle-complete"\)[\s\S]+heartbeat\("completion-text"\)/u,
     "slow real-browser evolution reports progress across assets, UI transition, animation cycle, and final text",
+  );
+  assert.match(
+    animations,
+    /public doCycle\([\s\S]+onCycleComplete\?: \(cycle: number\) => void[\s\S]+this\.doOwnedCycle\([\s\S]+onCycleComplete/u,
+    "the public morph animation carries an optional progress callback into its owned recursive implementation",
+  );
+  assert.match(
+    animations,
+    /onCycleComplete\?\.\(currentCycle\)[\s\S]+this\.doOwnedCycle\([\s\S]+onCycleComplete/u,
+    "every completed morph tween reports progress and carries the callback into the next recursive cycle",
+  );
+  assert.match(
+    progressionReplay,
+    /doCycle\(\s*1,\s*15,[\s\S]+this\.cycleCancelled,[\s\S]+undefined,[\s\S]+cycle => heartbeat\(`cycle-\$\{cycle\}`\)/u,
+    "the retained evolution renderer renews its watchdog after each real morph cycle",
   );
   assert.match(
     progressionReplay,

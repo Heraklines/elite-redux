@@ -6253,3 +6253,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The failure-first source contract went red before implementation and the focused presentation contract is green after
   it. Full local source/boundary/format qualification and the exact two-browser evolution rerun are the next proofs;
   TypeScript and co-op Vitest remain remote-only.
+
+## 2026-07-31 - Evolution morph recursion reports real progress
+
+- Exact-SHA exhaustive co-op gate `30625544724` at `e47f3a6e6` is fully green across type/static/contracts and every
+  selected A/B/C/P shard. The focused push gate skipped its shards only because the ownership manifest still named the
+  older train base; this change advances that base to `e47f3a6e6` so the next push validates its actual diff.
+- Exact evolution journey `30624937639` proved the rolling watchdog is healthy through `assets-loaded`, `mode-ready`,
+  scene setup, every pre-morph delay/tween, and `arc-delay`. The renderer then spent roughly 48 seconds actively
+  completing the 29 recursive `doCycle` tweens on the approximately three-FPS runner, so the 45-second lease expired
+  before the coarse `cycle-complete` heartbeat. The animation now reports each completed recursive cycle to the same
+  watchdog. A frozen tween still expires after 45 seconds; an advancing morph no longer looks dead merely because the
+  whole recursive sequence is slow.
+- Fresh-wave2 journey `30624924809` reached wave 2 with both browsers mechanically and visually synchronized on the
+  same guest-owned Guessing Booth Mystery Encounter. Its driver then falsely required a command frontier even though
+  the authoritative next-wave control was a valid interaction. That harness-only red is retained for a separate,
+  deterministic wave-2 battle-fixture cycle; the Mystery campaign remains responsible for real encounter coverage.
+- Failure-first source coverage now requires the public animation callback, propagation through every recursive call,
+  and the retained renderer heartbeat at every real morph completion. Local source/static qualification follows before
+  the exact evolution journey is dispatched again; co-op Vitest and Chromium execution remain remote-only.

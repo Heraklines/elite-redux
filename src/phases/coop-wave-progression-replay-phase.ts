@@ -129,7 +129,15 @@ class CoopEvolutionPresentation {
       this.afterTint!.setScale(0.25).setVisible(true);
       // doCycle owns recursive tweens. Its BooleanHolder stops the recursion at the current (<=500 ms)
       // tween boundary, after which assertActive exits without scheduling any later presentation work.
-      await globalScene.animations.doCycle(1, 15, this.beforeTint!, this.afterTint!, this.cycleCancelled);
+      await globalScene.animations.doCycle(
+        1,
+        15,
+        this.beforeTint!,
+        this.afterTint!,
+        this.cycleCancelled,
+        undefined,
+        cycle => heartbeat(`cycle-${cycle}`),
+      );
       this.assertActive();
       heartbeat("cycle-complete");
       globalScene.playSound("se/sparkle");

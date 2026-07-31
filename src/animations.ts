@@ -187,6 +187,8 @@ export class Animation {
    * @param pokemonTintSprite - The tinted sprite of the Pokemon
    * @param pokemonNewFormTintSprite - The tinted sprite of the Pokemon's new form
    * @param cancelled - If its value is set to `true` by external code during the animation, then cancel the animation.
+   * @param owner - Optional lifecycle owner for every tween created by this recursive animation.
+   * @param onCycleComplete - Reports each completed morph tween so callers can prove forward progress.
    */
   public doCycle(
     currentCycle: number,
@@ -195,6 +197,7 @@ export class Animation {
     pokemonNewFormTintSprite: Phaser.GameObjects.Sprite,
     cancelled?: BooleanHolder,
     owner?: AnimationResourceOwner,
+    onCycleComplete?: (cycle: number) => void,
   ): Promise<void> {
     return this.doOwnedCycle(
       globalScene,
@@ -204,6 +207,7 @@ export class Animation {
       pokemonNewFormTintSprite,
       cancelled,
       owner,
+      onCycleComplete,
     );
   }
 
@@ -215,6 +219,7 @@ export class Animation {
     pokemonNewFormTintSprite: Phaser.GameObjects.Sprite,
     cancelled?: BooleanHolder,
     owner?: AnimationResourceOwner,
+    onCycleComplete?: (cycle: number) => void,
   ): Promise<void> {
     if (!animationOwnerActive(owner)) {
       return Promise.resolve();
@@ -245,6 +250,7 @@ export class Animation {
             if (!animationOwnerActive(owner) || cancelled?.value) {
               return resolve();
             }
+            onCycleComplete?.(currentCycle);
             if (isFinalCycle) {
               pokemonTintSprite.setVisible(false);
               return resolve();
@@ -258,6 +264,7 @@ export class Animation {
               pokemonNewFormTintSprite,
               cancelled,
               owner,
+              onCycleComplete,
             ).then(resolve);
           },
         }),

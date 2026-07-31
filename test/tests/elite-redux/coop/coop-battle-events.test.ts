@@ -914,7 +914,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     const particleDestroy = vi.fn();
     resources.ownParticle({ destroy: particleDestroy } as unknown as Phaser.GameObjects.GameObject);
-    const cycle = globalScene.animations.doCycle(1, 2, oldSprite, newSprite, undefined, resources);
+    const cycleProgress = vi.fn();
+    const cycle = globalScene.animations.doCycle(1, 2, oldSprite, newSprite, undefined, resources, cycleProgress);
     expect(resources.ownedHandleCount(), "the real cutscene phase owns the particle and both cycle tweens").toBe(3);
     expect(tweenConfigs).toHaveLength(2);
     const lateCycleCompletion = tweenConfigs[1].onComplete as (() => void) | undefined;
@@ -940,6 +941,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     await cycle;
     expect(globalScene.tweens.add, "a late cycle completion cannot recurse after retirement").toHaveBeenCalledTimes(2);
     expect(oldSprite.setVisible, "a late cycle completion cannot mutate presentation sprites").not.toHaveBeenCalled();
+    expect(
+      cycleProgress,
+      "a late cycle completion cannot renew presentation liveness after retirement",
+    ).not.toHaveBeenCalled();
   });
 
   it("bounds a detached form preimage load that never resolves before the cutscene exists", async () => {
