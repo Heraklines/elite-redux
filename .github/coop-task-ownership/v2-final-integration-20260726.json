@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "f4d23d43a04cb3b14e198307823ee6e775e99041",
+  "baseSha": "a20428d60397add0d03f7507e43591f91c21dfe6",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -165,6 +165,7 @@
     "src/phases/move-phase.ts",
     "src/phases/mystery-encounter-phases.ts",
     "src/phases/new-battle-phase.ts",
+    "src/phases/new-biome-encounter-phase.ts",
     "src/phases/pokemon-anim-phase.ts",
     "src/phases/post-turn-status-effect-phase.ts",
     "src/phases/post-victory-queue-cleanup.ts",

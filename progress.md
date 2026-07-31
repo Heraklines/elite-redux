@@ -6588,3 +6588,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   refreshes the visible biome/wave label. After the signed destination carrier is applied and before presentation
   starts, the replica now refreshes that cosmetic label from the already-authoritative Battle and arena. No mechanical
   state, progression, or local successor is derived by the repair.
+- Focused run `30652743153` stopped in the ownership planner before any executable test because this integration
+  manifest did not yet declare the newly modified `new-biome-encounter-phase.ts`. This is classified as CI metadata,
+  not a product or test failure; the sorted exact path is now owned and the focused qualification is redispatched by
+  the metadata push.
