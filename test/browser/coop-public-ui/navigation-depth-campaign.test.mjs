@@ -190,7 +190,7 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   );
   assert.match(
     campaign,
-    /const registeredSurfaceProgressBudget = policy\.mysteryGauntlet\.required \|\| policy\.navigation\.required/u,
+    /const registeredSurfaceProgressBudget =\s*policy\.mysteryGauntlet\.required \|\| policy\.navigation\.required/u,
     "embedded Mystery chains must extend navigation only from observer-proven public progress",
   );
   assert.match(

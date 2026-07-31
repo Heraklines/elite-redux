@@ -3921,7 +3921,7 @@ test("the Mystery and navigation journeys use progress-proven rolling surface wi
   assert.match(campaignDriver, /export function createRegisteredSurfaceProgressBudget\(/u);
   assert.match(
     campaignDriver,
-    /const registeredSurfaceProgressBudget = policy\.mysteryGauntlet\.required \|\| policy\.navigation\.required/u,
+    /const registeredSurfaceProgressBudget =\s*policy\.mysteryGauntlet\.required \|\| policy\.navigation\.required/u,
   );
   assert.match(campaignDriver, /policy\.mysteryGauntlet\.minSurfaces/u);
   assert.match(campaignDriver, /recordRegisteredSurfaceProgress\(`surface:\$\{drove\}`\)/u);
