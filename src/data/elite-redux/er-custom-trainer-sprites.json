@@ -51,6 +51,20 @@
       "alien"
     ]
   },
+  "red_masters_ex": {
+    "author": "Kyle Dove",
+    "genders": false,
+    "kind": "other",
+    "label": "Champion_Red_Ex",
+    "license": "cc-by",
+    "sourceUrl": "https://pokengine.org/trainers/01zoe17k/Red",
+    "spriteKey": "red_masters_ex",
+    "tags": [
+      "champion",
+      "red",
+      "masters-ex"
+    ]
+  },
   "volo": {
     "author": "Kyle Dove",
     "genders": false,
