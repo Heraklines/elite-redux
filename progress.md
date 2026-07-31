@@ -6399,3 +6399,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   only red was the fixture roster's TypeScript inference after adding the conditional Jolly nature. The fixture now keeps
   the original homogeneous roster shape and chooses nature in the contextually typed `Starter` projection. Remote
   qualification and the real Mystery reproduction remain the sole executable validation.
+
+## 2026-07-31 - Ability-address checkpoint has a formatter-only focused red
+
+- Exact `0f81e27cd` focused run `30641543340` passed every completed co-op source/node contract and selected engine
+  shard. Remote TypeScript again reported no changed-file diagnostic; its only finished red is Biome's requested layout
+  for the new half-wipe source contract.
+- The contract now matches that exact remote formatter output. The already-running fresh-wave, half-wipe, Mystery, and
+  navigation journeys remain sealed to their immutable SHAs and are deliberately not cancelled. This checkpoint changes
+  no production behavior and all executable revalidation remains on GitHub-hosted runners.
