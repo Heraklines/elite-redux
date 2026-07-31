@@ -13,6 +13,7 @@ import {
   assertAsymmetricMysteryPromptProjection,
   assertAsymmetricRevivalProjection,
   assertAsymmetricStormglassProjection,
+  assertMysteryFixtureParty,
   chooseAbilityInteractionOption,
   chooseMysteryEncounterOption,
   chooseRevivalPartySlot,
@@ -48,6 +49,33 @@ import {
 import { reachFirstCommand } from "./solo-classic.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
+
+test("Mystery interaction qualification proves its six level-100 fixture mons on both browsers", () => {
+  const party = [
+    { slot: 0, speciesId: 86, coopOwner: "host", level: 100 },
+    { slot: 1, speciesId: 86, coopOwner: "guest", level: 100 },
+    { slot: 2, speciesId: 351, coopOwner: "host", level: 100 },
+    { slot: 3, speciesId: 351, coopOwner: "guest", level: 100 },
+    { slot: 4, speciesId: 327, coopOwner: "host", level: 100 },
+    { slot: 5, speciesId: 327, coopOwner: "guest", level: 100 },
+  ];
+  const records = [];
+  const makeClient = label => ({
+    label,
+    evidence: {
+      findLastSemanticSurface: () => ({
+        observation: { operationClass: "command", address: { wave: 1 }, partySlots: party },
+      }),
+      record: (kind, detail) => records.push({ label, kind, detail }),
+    },
+  });
+  const proof = assertMysteryFixtureParty(
+    { clients: { host: makeClient("host-seat"), guest: makeClient("guest-seat") } },
+    1,
+  );
+  assert.equal(proof.party.length, 6);
+  assert.equal(records.filter(record => record.kind === "campaign-mystery-level100-party").length, 2);
+});
 
 function withEnvironment(values, callback) {
   const previous = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
@@ -428,19 +456,27 @@ test("a chained Mystery gauntlet refreshes only from proven surface progress and
 });
 
 test("workflow builds the staging-only fifth difficulty and fans a configurable ten-wave-default profile", async () => {
-  const [workflow, registry, starterCosts, starterHandler, harness, battleScene] = await Promise.all([
-    readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8"),
-    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
-    readFile(resolve(root, "src/data/balance/starters.ts"), "utf8"),
-    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
-    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
-    readFile(resolve(root, "src/battle-scene.ts"), "utf8"),
-  ]);
+  const [workflow, registry, starterCosts, starterHandler, starterPhase, harness, campaign, battleScene] =
+    await Promise.all([
+      readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8"),
+      readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+      readFile(resolve(root, "src/data/balance/starters.ts"), "utf8"),
+      readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+      readFile(resolve(root, "src/phases/select-starter-phase.ts"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+      readFile(resolve(root, "src/battle-scene.ts"), "utf8"),
+    ]);
   assert.match(workflow, /VITE_DEV_TOOLS: 1/u);
   assert.match(workflow, /VITE_COOP_BROWSER_FIXTURE: campaign-survival/u);
   assert.match(
     registry,
-    /isCoopBrowserCampaignFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "campaign-survival"[\s\S]*getCoopBrowserCampaignFixtureStarters\(\)[\s\S]*get\("coopfixture"\) !== "campaign-survival"[\s\S]*SpeciesId\.SEEL[\s\S]*SpeciesId\.CASTFORM[\s\S]*SpeciesId\.SPINDA/u,
+    /isCoopBrowserCampaignFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "campaign-survival"[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*get\("coopfixture"\) === "campaign-survival"[\s\S]*getCoopBrowserCampaignFixtureStarters\(\)[\s\S]*SpeciesId\.SEEL[\s\S]*SpeciesId\.CASTFORM[\s\S]*SpeciesId\.SPINDA/u,
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*\? 100 : null/u,
+    "the interaction-only Mystery journey cannot randomly wipe before its wave-10 authority boundary",
   );
   for (const species of ["SEEL", "CASTFORM", "SPINDA"]) {
     assert.match(
@@ -450,11 +486,18 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
     );
   }
   assert.match(starterHandler, /getCoopBrowserCampaignFixtureStarters\(\)/u);
+  assert.match(starterPhase, /this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels\)/u);
   assert.match(
     harness,
     /renderProfile === "mystery-gauntlet"[\s\S]*difficultyId === "mystery"[\s\S]*set\("coopfixture", "campaign-survival"\)/u,
   );
   assert.match(harness, /campaignSurvivalFixture[\s\S]*SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID/u);
+  assert.match(campaign, /assertMysteryFixtureParty\(rig, 1\)[\s\S]*mystery fixture level-100 parties proven/u);
+  assert.match(
+    campaign,
+    /requireExp:\s*!\(policy\.navigation\.required \|\| policy\.mysteryGauntlet\.required\)/u,
+    "the level-100 Mystery fixture must retain ledger equality without inventing an EXP cue",
+  );
   assert.match(
     battleScene,
     /isFixedBattle\(waveIndex\) && !erGauntletActive\(\)[\s\S]*handleFixedBattle\(resolved\)[\s\S]*handleNonFixedBattle\(resolved\)/u,

@@ -156,9 +156,12 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
     ]);
   assert.match(registry, /VITE_COOP_BROWSER_FIXTURE === "navigation-depth-30"/u);
   assert.match(registry, /get\("coopfixture"\) === "navigation-depth-30"/u);
-  assert.match(registry, /getCoopBrowserNavigationFixtureStartingLevel[\s\S]*?\? 100 : null/u);
+  assert.match(
+    registry,
+    /getCoopBrowserLongitudinalFixtureStartingLevel[\s\S]*isCoopBrowserNavigationFixtureActive\(\)[\s\S]*\? 100 : null/u,
+  );
   assert.match(starterHandler, /getCoopBrowserNavigationFixtureStarters\(\)/u);
-  assert.match(starterPhase, /this\.initBattle\(merged, true, owners, undefined, navigationStartingLevels\)/u);
+  assert.match(starterPhase, /this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels\)/u);
   assert.match(crossroads, /label: "Stay",\s*semanticId: "stay"/u);
   assert.match(crossroads, /label: "Leave",\s*semanticId: "leave"/u);
   assert.match(observer, /level: pokemon\.level/u);
@@ -170,7 +173,7 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(campaign, /startHeartbeat\(\(\) => campaignLiveSnapshot/u);
   assert.match(
     campaign,
-    /requireExp:\s*!policy\.navigation\.required\s*&&\s*\(battleKind\.battleType === "WILD"/u,
+    /requireExp:\s*!\(policy\.navigation\.required \|\| policy\.mysteryGauntlet\.required\)\s*&&\s*\(battleKind\.battleType === "WILD"/u,
     "the level-100 navigation fixture must retain ledger equality without inventing an EXP cue",
   );
   assert.match(headlessSoak, /\[coop-soak:wave-start\]/u);

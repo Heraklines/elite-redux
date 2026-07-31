@@ -118,6 +118,14 @@ export function isCoopBrowserCampaignFixtureBuild(): boolean {
   return env?.VITE_COOP_BROWSER_FIXTURE === "campaign-survival";
 }
 
+/** Require both the dedicated campaign bundle and its exact Mystery-profile URL token. */
+export function isCoopBrowserCampaignFixtureActive(): boolean {
+  if (!isCoopBrowserCampaignFixtureBuild() || typeof location === "undefined") {
+    return false;
+  }
+  return new URLSearchParams(location.search).get("coopfixture") === "campaign-survival";
+}
+
 /** Whether this exact bundle was built for the continuous 30-wave navigation journey. */
 export function isCoopBrowserNavigationFixtureBuild(): boolean {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
@@ -228,10 +236,7 @@ export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null
  * every battle command, replacement, interaction, reward, and transition remains a production public-UI path.
  */
 export function getCoopBrowserCampaignFixtureStarters(): Starter[] | null {
-  if (!isCoopBrowserCampaignFixtureBuild() || typeof location === "undefined") {
-    return null;
-  }
-  if (new URLSearchParams(location.search).get("coopfixture") !== "campaign-survival") {
+  if (!isCoopBrowserCampaignFixtureActive()) {
     return null;
   }
   return [SpeciesId.SEEL, SpeciesId.CASTFORM, SpeciesId.SPINDA].map(speciesId => ({
@@ -279,9 +284,9 @@ export function getCoopBrowserNavigationFixtureStarters(): Starter[] | null {
   }));
 }
 
-/** Initial-save-only construction level for the exact navigation fixture. */
-export function getCoopBrowserNavigationFixtureStartingLevel(): number | null {
-  return isCoopBrowserNavigationFixtureActive() ? 100 : null;
+/** Initial-save-only construction level for longitudinal interaction/navigation browser fixtures. */
+export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null {
+  return isCoopBrowserCampaignFixtureActive() || isCoopBrowserNavigationFixtureActive() ? 100 : null;
 }
 
 /**

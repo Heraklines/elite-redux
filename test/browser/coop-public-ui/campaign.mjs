@@ -4002,8 +4002,8 @@ function latestCommandObservation(client, wave) {
   return observation?.operationClass === "command" && observation.address?.wave === wave ? observation : null;
 }
 
-/** Prove the exact initial-save fixture produced three level-100 mons for each real player's seat. */
-export function assertNavigationFixtureParty(rig, wave = 1) {
+/** Prove an exact initial-save fixture produced three level-100 mons for each real player's seat. */
+function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind) {
   const observations = Object.values(rig.clients).map(client => ({
     label: client.label,
     observation: latestCommandObservation(client, wave),
@@ -4012,7 +4012,7 @@ export function assertNavigationFixtureParty(rig, wave = 1) {
   const projections = observations.map(({ label, observation }) => {
     const party = observation?.partySlots;
     if (!Array.isArray(party) || party.length !== 6) {
-      throw new Error(`[campaign-navigation] ${label} did not observe the six-mon initial shared party`);
+      throw new Error(`[campaign-${context}] ${label} did not observe the six-mon initial shared party`);
     }
     for (const owner of ["host", "guest"]) {
       const owned = party.filter(slot => slot.coopOwner === owner);
@@ -4023,7 +4023,7 @@ export function assertNavigationFixtureParty(rig, wave = 1) {
         || JSON.stringify(species) !== JSON.stringify(expectedSpecies)
       ) {
         throw new Error(
-          `[campaign-navigation] ${label} ${owner} fixture mismatch: ${JSON.stringify(owned.map(slot => ({ speciesId: slot.speciesId, level: slot.level })))}`,
+          `[campaign-${context}] ${label} ${owner} fixture mismatch: ${JSON.stringify(owned.map(slot => ({ speciesId: slot.speciesId, level: slot.level })))}`,
         );
       }
     }
@@ -4036,14 +4036,22 @@ export function assertNavigationFixtureParty(rig, wave = 1) {
   });
   if (JSON.stringify(projections[0]) !== JSON.stringify(projections[1])) {
     throw new Error(
-      `[campaign-navigation] initial level-100 party projection diverged: ${JSON.stringify(projections)}`,
+      `[campaign-${context}] initial level-100 party projection diverged: ${JSON.stringify(projections)}`,
     );
   }
   const proof = { wave, party: projections[0] };
   for (const client of Object.values(rig.clients)) {
-    client.evidence.record("campaign-navigation-level100-party", proof);
+    client.evidence.record(evidenceKind, proof);
   }
   return proof;
+}
+
+export function assertNavigationFixtureParty(rig, wave = 1) {
+  return assertLongitudinalFixtureParty(rig, wave, "navigation", "campaign-navigation-level100-party");
+}
+
+export function assertMysteryFixtureParty(rig, wave = 1) {
+  return assertLongitudinalFixtureParty(rig, wave, "mystery", "campaign-mystery-level100-party");
 }
 
 /** Capture the raw arena/presentation view at a paired command frontier; the mechanical digest remains primary. */
@@ -4489,6 +4497,9 @@ export async function runCampaign(rig) {
     assertNavigationFixtureParty(rig, 1);
     recordNavigationCommandFrontier(rig, navigationCoverage, 1);
     await progress.note("navigation fixture level-100 parties and initial arena proven");
+  } else if (policy.mysteryGauntlet.required) {
+    assertMysteryFixtureParty(rig, 1);
+    await progress.note("mystery fixture level-100 parties proven");
   }
 
   let wavesCleared = 0;
@@ -4578,12 +4589,13 @@ export async function runCampaign(rig) {
         wavesCleared = Math.max(wavesCleared, advanced.boundary.wave - 1);
       }
       rig.assertWaveProgressionLedger(waveNo, `campaign-wave-${waveNo}-progression-ledger`, {
-        // The dedicated navigation fixture starts both parties at level 100, so a completed
+        // The dedicated longitudinal fixtures start both parties at level 100, so a completed
         // battle correctly has no EXP presentation. Keep the complete authority-vs-renderer
         // ledger equality proof above, but reserve the mandatory EXP cue for normal-level
         // journeys that can actually gain EXP.
         requireExp:
-          !policy.navigation.required && (battleKind.battleType === "WILD" || battleKind.battleType === "TRAINER"),
+          !(policy.navigation.required || policy.mysteryGauntlet.required)
+          && (battleKind.battleType === "WILD" || battleKind.battleType === "TRAINER"),
       });
       await Promise.all(clients.map(client => client.checkpoint(`wave-${waveNo}-cleared`)));
       await progress.wave({
