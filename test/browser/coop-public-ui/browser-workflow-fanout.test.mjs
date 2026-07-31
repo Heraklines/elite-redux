@@ -248,11 +248,11 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     registry,
-    /getCoopBrowserEvolutionFixtureStarters\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*SpeciesId\.SEEL[\s\S]*SpeciesId\.CASTFORM[\s\S]*SpeciesId\.SPINDA/u,
+    /getCoopBrowserEvolutionFixtureStarters\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*SpeciesId\.CATERPIE[\s\S]*SpeciesId\.CASTFORM[\s\S]*SpeciesId\.SPINDA/u,
   );
   assert.match(
     registry,
-    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*\? 99[\s\S]*\? 100[\s\S]*: null/u,
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*\? 6[\s\S]*\? 100[\s\S]*: null/u,
     "evolution starts below the level cap while longitudinal fixtures remain level 100",
   );
   assert.match(
@@ -268,7 +268,7 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   assert.match(
     selectStarter,
     /isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*i === 0[\s\S]*starterPokemon\.exp = getLevelTotalExp\(starterLevel \+ 1, starterPokemon\.species\.growthRate\) - 1/u,
-    "the exact initial-save fixture primes one Seel one EXP below its next level",
+    "the exact initial-save fixture primes one Caterpie one EXP below its next level",
   );
   assert.match(starterHandler, /getCoopBrowserEvolutionFixtureStarters\(\)[\s\S]*seedTeamFromStarters/u);
   assert.match(config, /"evolution-sync"/u);
@@ -278,12 +278,17 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     harness,
-    /startFreshRun\(\{[\s\S]*evolutionFixture = false[\s\S]*evolutionFixture[\s\S]*SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID/u,
+    /startFreshRun\(\{[\s\S]*evolutionFixture = false[\s\S]*evolutionFixture[\s\S]*CATERPIE_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID/u,
     "the public driver proves the exact visible seeded team instead of adding generic starters to it",
   );
   assert.match(
     journeys,
     /async function evolutionSync\(rig\)[\s\S]*freshThroughWave2\(rig, \{ evolutionFixture: true \}\)/u,
+  );
+  assert.match(
+    journeys,
+    /function assertEvolutionFixtureParty\(rig[\s\S]*speciesId: 10[\s\S]*level: 6[\s\S]*pauseEvolutions: false[\s\S]*freshRunOptions\?\.evolutionFixture[\s\S]*assertEvolutionFixtureParty\(rig/u,
+    "the journey proves the exact launch material before it spends a battle input",
   );
   assert.match(journeys, /event\.k === "evolution"/u, "the immutable wave ledger must contain a real evolution");
   assert.match(journeys, /surfaceId === "battle:evolution"/u);

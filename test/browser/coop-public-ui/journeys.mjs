@@ -342,9 +342,46 @@ function oppositeSeat(seat) {
   return seat === "host-seat" ? "guest-seat" : "host-seat";
 }
 
+function assertEvolutionFixtureParty(rig) {
+  const expected = [
+    { slot: 0, speciesId: 10, coopOwner: "host", level: 6, pauseEvolutions: false },
+    { slot: 1, speciesId: 10, coopOwner: "guest", level: 6, pauseEvolutions: false },
+    { slot: 2, speciesId: 351, coopOwner: "host", level: 6, pauseEvolutions: false },
+    { slot: 3, speciesId: 351, coopOwner: "guest", level: 6, pauseEvolutions: false },
+    { slot: 4, speciesId: 327, coopOwner: "host", level: 6, pauseEvolutions: false },
+    { slot: 5, speciesId: 327, coopOwner: "guest", level: 6, pauseEvolutions: false },
+  ];
+  for (const client of Object.values(rig.clients)) {
+    const surface = client.evidence.events.findLast(
+      event =>
+        event.kind === "browser-surface2"
+        && event.observation?.operationClass === "command"
+        && event.observation.address?.wave === 1
+        && event.observation.partySlots?.length === expected.length,
+    );
+    const actual = surface?.observation.partySlots.map(({ slot, speciesId, coopOwner, level, pauseEvolutions }) => ({
+      slot,
+      speciesId,
+      coopOwner,
+      level,
+      pauseEvolutions,
+    }));
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(`${client.label}: evolution fixture mismatch ${JSON.stringify(actual)}`);
+    }
+    client.evidence.record("evolution-fixture-party-proof", {
+      surfaceIndex: surface.index,
+      party: actual,
+    });
+  }
+}
+
 async function freshThroughWave2(rig, freshRunOptions) {
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun(freshRunOptions);
+  if (freshRunOptions?.evolutionFixture) {
+    assertEvolutionFixtureParty(rig);
+  }
   await rig.driveWaveToReward();
   await rig.leaveRewardsAndReachWave2();
 }

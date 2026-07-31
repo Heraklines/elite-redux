@@ -67,6 +67,7 @@ const MAGIKARP_SPECIES_ID = 129;
 const CROBAT_SPECIES_ID = 169;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
+const CATERPIE_SPECIES_ID = 10;
 const CASTFORM_SPECIES_ID = 351;
 const SPINDA_SPECIES_ID = 327;
 // Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
@@ -3558,7 +3559,7 @@ export class DuoPublicUiRig {
                   : navigationFixture
                     ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
                     : evolutionFixture
-                      ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
+                      ? [CATERPIE_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
                       : registeredInteractionsFixture
                         ? client.label === "host-seat"
                           ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
