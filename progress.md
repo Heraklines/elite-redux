@@ -6476,3 +6476,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Focused planner run `30644395283` stopped before validation because the integration manifest did not yet list
   `er-stormglass-picker-phase.ts`. The source-address hardening intentionally brings that registered interaction into
   scope, so the manifest now names it explicitly. This metadata checkpoint changes no runtime behavior.
+
+## 2026-07-31 - Half-wipe fixture targets the actual replica seat
+
+- Exact `5283e3abf` half-wipe run `30643717683` built and paired two real browsers, then reached a synchronized wave-1
+  command frontier. It stopped before battle input because the workflow rewrote the requested `guest-seat` faint owner
+  to `host-seat`, assuming the invitation requester changes Authority V2 roles. The public artifact proved the opposite:
+  `host-seat` remained role host and `guest-seat` remained role guest.
+- The workflow now honors the explicit `faint_owner_seat` input (default `guest-seat`) independently of invitation
+  direction. A source contract rejects reintroducing requester-based half-wipe inversion. This is harness-only; the
+  failed run contains no product desync or half-wipe execution evidence.

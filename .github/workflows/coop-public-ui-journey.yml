@@ -402,9 +402,9 @@ jobs:
           COOP_UI_ACCOUNT_MODE: register
           COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ github.run_attempt }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
-          # A public invitation requester becomes the Authority V2 host. The half-wipe fixture must
-          # wipe the opposite, replica-owned seat so it reaches the zero-local-command passive watcher.
-          COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.journey == 'half-wipe' && (inputs.requester_seat == 'guest-seat' && 'host-seat' || 'guest-seat') || inputs.faint_owner_seat || 'guest-seat' }}
+          # Browser roles remain tied to their public seats regardless of which seat sends the invitation.
+          # The half-wipe caller explicitly selects the replica-owned guest seat.
+          COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
           COOP_UI_COMMANDER_OWNER_SEAT: ${{ matrix.commander_owner_seat }}
           COOP_UI_HOST_LOCALE: en
           # The retained GameOver oracle isolates terminal ordering from the separately-gated

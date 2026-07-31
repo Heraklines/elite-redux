@@ -25,9 +25,10 @@ test("the two-browser half-wipe journey proves replica passive presentation befo
   );
   assert.match(
     workflow,
-    /inputs\.journey == 'half-wipe'[\s\S]*?inputs\.requester_seat == 'guest-seat'[\s\S]*?'host-seat'[\s\S]*?'guest-seat'/u,
-    "the workflow assigns the wipe to the non-requesting replica seat",
+    /COOP_UI_FAINT_OWNER_SEAT: \$\{\{ inputs\.faint_owner_seat \|\| 'guest-seat' \}\}/u,
+    "the workflow assigns the wipe to the explicitly configured replica seat",
   );
+  assert.doesNotMatch(workflow, /inputs\.journey == 'half-wipe'.*inputs\.requester_seat/u);
   assert.match(config, /"half-wipe"/u);
   assert.match(
     registry,
