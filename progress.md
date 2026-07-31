@@ -6449,3 +6449,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Market routing now treats a missing optional detailed-market reader as no market evidence. Production browser sinks
   still provide the method, and `readMarketPair` remains mandatory before any market input. This restores fixture
   compatibility without weakening the real owner/watcher/address proof.
+
+## 2026-07-31 - Async interactions retain their predecessor battle coordinate
+
+- The ability failure exposed a broader architectural invariant: a retained runtime binding does not preserve the
+  battle address. Stormglass, Bargain, and Learn Move still read `currentBattle` after UI callbacks or relay awaits;
+  recovery or a fast successor could therefore assign otherwise-valid material to the wrong wave/turn.
+- Stormglass and Bargain now retain their source wave/turn with the phase generation. Learn Move captures both when it
+  binds its authoritative runtime, before opening or awaiting any public picker. Presentation, result, proposal resend,
+  watcher adoption, and signed-successor validation use those immutable coordinates.
+- World Map already retained both coordinates, but its recovery lease still keyed itself to the ambient turn. It now
+  uses the retained source turn as well. A browser source contract rejects ambient address reads at these V2 material
+  sites. Type, format, contracts, and affected engine shards will run only on GitHub-hosted runners.

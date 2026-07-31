@@ -75,12 +75,17 @@ export class ErStormglassPickerPhase extends Phase {
   private coopOwner = true;
   /** Exact runtime that owns this picker across its async UI/watcher tails. */
   private readonly coopOwningRuntime;
+  /** Immutable battle coordinate retained before an async picker callback can observe a successor battle. */
+  private readonly coopSourceWave: number;
+  private readonly coopSourceTurn: number;
   /** Per-runtime operation state captured before any picker callback/await. */
   private readonly coopOperationBinding: CoopStormglassOperationBinding | null;
 
   constructor() {
     super();
     this.coopOwningRuntime = getCoopRuntime();
+    this.coopSourceWave = globalScene.currentBattle?.waveIndex ?? 0;
+    this.coopSourceTurn = globalScene.currentBattle?.turn ?? 0;
     this.coopOperationBinding = this.coopOwningRuntime == null ? null : captureCoopStormglassOperationBinding();
   }
 
@@ -121,8 +126,8 @@ export class ErStormglassPickerPhase extends Phase {
         })),
         {
           localRole: controller.role,
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopSourceWave,
+          turn: this.coopSourceTurn,
         },
         this.coopOperationBinding,
       );
@@ -203,8 +208,8 @@ export class ErStormglassPickerPhase extends Phase {
               weather,
               {
                 localRole: "host",
-                wave: globalScene.currentBattle?.waveIndex ?? 0,
-                turn: globalScene.currentBattle?.turn ?? 0,
+                wave: this.coopSourceWave,
+                turn: this.coopSourceTurn,
               },
               this.coopOperationBinding,
             )

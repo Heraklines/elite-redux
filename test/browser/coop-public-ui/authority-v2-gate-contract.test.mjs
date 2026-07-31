@@ -132,6 +132,7 @@ const theBargainPhase = readFileSync(new URL("src/phases/the-bargain-phase.ts", 
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
 const newBattlePhase = readFileSync(new URL("src/phases/new-battle-phase.ts", root), "utf8");
+const stormglassPhase = readFileSync(new URL("src/phases/er-stormglass-picker-phase.ts", root), "utf8");
 const abilityPickerPhases = {
   capsule: readFileSync(new URL("src/phases/er-ability-capsule-phase.ts", root), "utf8"),
   "greater-capsule": readFileSync(new URL("src/phases/er-greater-ability-capsule-phase.ts", root), "utf8"),
@@ -904,6 +905,35 @@ test("every ability picker retains its construction address after ending into a 
       `${workflow} never re-reads an ambient successor battle for Authority V2 material`,
     );
   }
+});
+
+test("asynchronous interaction phases retain one source address instead of consulting an ambient successor", () => {
+  assert.match(stormglassPhase, /private readonly coopSourceWave: number;/u);
+  assert.match(stormglassPhase, /private readonly coopSourceTurn: number;/u);
+  assert.match(stormglassPhase, /this\.coopSourceWave = globalScene\.currentBattle\?\.waveIndex \?\? 0;/u);
+  assert.match(stormglassPhase, /this\.coopSourceTurn = globalScene\.currentBattle\?\.turn \?\? 0;/u);
+
+  assert.match(theBargainPhase, /private readonly coopSourceWave = globalScene\.currentBattle\?\.waveIndex \?\? 0;/u);
+  assert.match(theBargainPhase, /private readonly coopSourceTurn = globalScene\.currentBattle\?\.turn \?\? 0;/u);
+  assert.match(theBargainPhase, /successor\.wave !== this\.coopSourceWave/u);
+  assert.match(theBargainPhase, /successor\.turn !== this\.coopSourceTurn/u);
+
+  assert.match(learnMovePhase, /this\.coopSourceWave = globalScene\.currentBattle\?\.waveIndex \?\? 0;/u);
+  assert.match(learnMovePhase, /this\.coopSourceTurn = globalScene\.currentBattle\?\.turn \?\? 0;/u);
+
+  for (const [surface, source] of [
+    ["stormglass", stormglassPhase],
+    ["bargain", theBargainPhase],
+    ["learn-move", learnMovePhase],
+  ]) {
+    assert.doesNotMatch(
+      source,
+      /wave: globalScene\.currentBattle\?\.waveIndex|turn: globalScene\.currentBattle\?\.turn/u,
+      `${surface} never addresses retained V2 material from the ambient battle`,
+    );
+  }
+
+  assert.match(selectBiomePhase, /const turn = this\.coopSourceTurn;\s*const boundaryRevision/u);
 });
 
 test("correlated recovery is wired through all four production progression fences", () => {

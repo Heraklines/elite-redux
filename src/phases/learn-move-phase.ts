@@ -92,6 +92,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private coopInteractionCounter: (() => number) | null = null;
   private coopRuntimeBound = false;
   private readonly coopOwningRuntime = getCoopRuntime();
+  /** Immutable source address captured with the authoritative runtime before any picker/relay await. */
+  private coopSourceWave = 0;
+  private coopSourceTurn = 0;
   /**
    * A host-owned full-moveset prompt must keep the guest's real LearnMovePhase at the same
    * wave/turn until the exact V2 result arrives. Ending this phase early lets NewBattlePhase
@@ -257,6 +260,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     }
     this.coopLocalRole = controller.role;
     this.coopInteractionCounter = () => controller.interactionCounter();
+    this.coopSourceWave = globalScene.currentBattle?.waveIndex ?? 0;
+    this.coopSourceTurn = globalScene.currentBattle?.turn ?? 0;
     this.coopOperationBinding = captureCoopLearnMoveOperationBinding(controller.role);
     this.coopRelay = getCoopInteractionRelay();
     this.coopRuntimeBound = true;
@@ -354,8 +359,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       {
         ownerRole: "host",
         localRole: "host",
-        wave: globalScene.currentBattle?.waveIndex ?? 0,
-        turn: globalScene.currentBattle?.turn ?? 0,
+        wave: this.coopSourceWave,
+        turn: this.coopSourceTurn,
       },
       binding,
     );
@@ -401,8 +406,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       ownerRole,
       forgetSlot,
       maxMoveCount,
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      turn: globalScene.currentBattle?.turn ?? 0,
+      wave: this.coopSourceWave,
+      turn: this.coopSourceTurn,
       interactionCounter: this.coopInteractionCounter?.() ?? -1,
       ...(nextInteraction == null ? {} : { nextInteraction: structuredClone(nextInteraction) }),
     };
@@ -554,8 +559,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
           },
           ownerRole: "host",
           localRole: "host",
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopSourceWave,
+          turn: this.coopSourceTurn,
         },
         this.coopOperationBinding,
       );
@@ -950,8 +955,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       moveId: this.moveId,
       maxMoveCount,
     });
-    const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    const turn = globalScene.currentBattle?.turn ?? 0;
+    const wave = this.coopSourceWave;
+    const turn = this.coopSourceTurn;
     const operationBinding = this.coopOperationBinding;
     this.coopNestedReturnPlan ??= captureCoopNestedInteractionReturnPlan(this.coopInteractionCounter?.());
     const presentationOperationId =
@@ -1079,8 +1084,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       armCoopLearnMoveIntentResend(
         {
           payload,
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopSourceWave,
+          turn: this.coopSourceTurn,
           resend: () =>
             relay?.sendInteractionChoice(
               seq,

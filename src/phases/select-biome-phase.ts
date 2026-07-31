@@ -1508,7 +1508,7 @@ export class SelectBiomePhase extends BattlePhase {
       return;
     }
 
-    const turn = globalScene.currentBattle?.turn ?? 0;
+    const turn = this.coopSourceTurn;
     const boundaryRevision =
       this.coopAdvancePinned >= 0
         ? this.coopAdvancePinned

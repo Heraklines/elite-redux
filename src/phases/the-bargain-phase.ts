@@ -107,6 +107,9 @@ export class TheBargainPhase extends Phase {
   private readonly coopOwningRuntime = getCoopRuntime();
   /** Exact scene/phase tree that owns this phase across asynchronous UI and relay callbacks. */
   private readonly coopOwningScene = globalScene;
+  /** Immutable battle coordinate retained before Bargain's UI, proposal, or watcher awaits can resume. */
+  private readonly coopSourceWave = globalScene.currentBattle?.waveIndex ?? 0;
+  private readonly coopSourceTurn = globalScene.currentBattle?.turn ?? 0;
   /** Signed terminal wait installed from the immutable Bargain result before this phase may leave. */
   private coopV2NextWaveAwait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null = null;
   private coopV2NextWaveAwaitQueued = false;
@@ -135,15 +138,13 @@ export class TheBargainPhase extends Phase {
     successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>,
     settle: () => boolean,
   ): boolean {
-    const battle = this.coopOwningScene.currentBattle;
     if (
       operationId.length === 0
       || this.coopBargainStart < 0
-      || battle == null
       || successor.afterOperationId !== operationId
       || successor.epoch !== (this.coopOwningRuntime?.controller.sessionEpoch ?? getCoopController()?.sessionEpoch)
-      || successor.wave !== battle.waveIndex
-      || successor.turn !== battle.turn
+      || successor.wave !== this.coopSourceWave
+      || successor.turn !== this.coopSourceTurn
       || !successor.allowNextWaveStart
     ) {
       return false;
@@ -209,8 +210,8 @@ export class TheBargainPhase extends Phase {
             pinned: this.coopBargainStart,
             sins,
             localRole: "host",
-            wave: globalScene.currentBattle?.waveIndex ?? 0,
-            turn: globalScene.currentBattle?.turn ?? 0,
+            wave: this.coopSourceWave,
+            turn: this.coopSourceTurn,
           })
         ) {
           failCoopSharedSession(`Bargain presentation ${this.coopBargainStart} could not enter durable authority`);
@@ -477,8 +478,8 @@ export class TheBargainPhase extends Phase {
             pinned: this.coopBargainStart,
             outcome,
             localRole,
-            wave: globalScene.currentBattle?.waveIndex ?? 0,
-            turn: globalScene.currentBattle?.turn ?? 0,
+            wave: this.coopSourceWave,
+            turn: this.coopSourceTurn,
           });
     if (adoption.accepted && outcome?.k === "meResync") {
       coopLog("reward", "bargain WATCHER: outcome blob received -> converging");
